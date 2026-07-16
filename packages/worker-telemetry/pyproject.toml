@@ -1,0 +1,24 @@
+[project]
+name = "worker-telemetry"
+version = "0.1.0"
+description = "Unified telemetry: Logging + Metrics + Tracing integration"
+requires-python = ">=3.14"
+dependencies = [
+    "opentelemetry-api>=1.25.0,<2.0.0",
+    "opentelemetry-sdk>=1.25.0,<2.0.0",
+    "prometheus-client>=0.19.0,<1.0.0",
+    "structlog>=24.1.0,<25.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_telemetry"
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-logging = { workspace = true }
+worker-metrics = { workspace = true }
+worker-tracing = { workspace = true }

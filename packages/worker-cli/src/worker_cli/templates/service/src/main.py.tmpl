@@ -1,0 +1,68 @@
+"""${ServiceClass} service entry point."""
+
+from __future__ import annotations
+
+import uvicorn
+from fastapi import FastAPI
+from worker_platform.builder import PlatformBuilder
+from worker_platform.configuration import PlatformSettings
+
+from ${module_name}.configuration import ${ServiceClass}Settings
+from ${module_name}.presentation.http import router as api_router
+
+
+def create_app(settings: ${ServiceClass}Settings | None = None) -> FastAPI:
+    """Create the FastAPI application with all platform features."""
+    settings = settings or ${ServiceClass}Settings()
+    
+    return (
+        PlatformBuilder(PlatformSettings(
+            service_name=settings.service_name,
+            service_version=settings.service_version,
+            environment=settings.environment,
+            host=settings.host,
+            port=settings.port,
+        ))
+        .add_configuration()
+        .add_logging(json_format=True)
+        .add_database(url=str(settings.database_url))
+        .add_cache(redis_url=str(settings.redis_url))
+        .add_authentication(
+            jwt_secret=settings.jwt_secret,
+            jwt_algorithm=settings.jwt_algorithm,
+        )
+        .add_authorization(model_path="auth_model.conf")
+        .add_multitenancy(resolver="claim")
+        .add_correlation()
+        .add_healthchecks([
+            # DatabaseCheck(),
+            # RedisCheck(),
+            # RabbitMQCheck(),
+        ])
+        .add_metrics()
+        .add_tracing()
+        .add_rate_limiting(requests=100, window=60)
+        .add_resilience()
+        .add_cqrs()
+        .add_events()
+        .add_messaging(broker="rabbitmq", url=settings.rabbitmq_url)
+        .add_router(api_router, prefix="/api/v1", tags=["api"])
+        .build()
+    )
+
+
+app = create_app()
+
+
+def run() -> None:
+    """Run the service with uvicorn."""
+    settings = ${ServiceClass}Settings()
+    uvicorn.run(
+        create_app(settings),
+        host=settings.host,
+        port=settings.port,
+    )
+
+
+if __name__ == "__main__":
+    run()

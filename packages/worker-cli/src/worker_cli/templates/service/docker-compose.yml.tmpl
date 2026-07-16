@@ -1,0 +1,78 @@
+version: "3.9"
+
+services:
+  ${service_name}:
+    build:
+      context: ..
+      dockerfile: ${service_name}/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - WORKER_SERVICE_NAME=${service_name}
+      - WORKER_DATABASE_URL=postgresql://workertransfer:workertransfer@postgres:5432/${module_name}
+      - WORKER_REDIS_URL=redis://redis:6379/0
+      - WORKER_RABBITMQ_URL=amqp://workertransfer:workertransfer@rabbitmq:5672/
+      - WORKER_JWT_SECRET=${JWT_SECRET}
+      - WORKER_JWT_ALGORITHM=RS256
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - workertransfer
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: workertransfer
+      POSTGRES_PASSWORD: workertransfer
+      POSTGRES_DB: ${module_name}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workertransfer"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: workertransfer
+      RABBITMQ_DEFAULT_PASS: workertransfer
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  workertransfer:
+    driver: bridge

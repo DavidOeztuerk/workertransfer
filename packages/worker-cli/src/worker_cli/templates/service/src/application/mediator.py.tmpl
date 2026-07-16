@@ -1,0 +1,62 @@
+"""Application mediator and CQRS."""
+
+from __future__ import annotations
+
+from collections.abc import Awaitable, Callable
+from typing import Any, Protocol, cast, Generic, TypeVar
+
+TResponse = TypeVar("TResponse")
+
+class Request(Generic[TResponse]):
+    """Base request type."""
+    pass
+
+class Command(Request[TResponse]):
+    """Command - state changing request."""
+    pass
+
+class Query(Request[TResponse]):
+    """Query - read-only request."""
+    pass
+
+NextHandler = Callable[[Request[Any]], Awaitable[Any]]
+
+class PipelineBehavior(Protocol):
+    async def handle(self, request: Request[Any], next_handler: NextHandler) -> Any: ...
+
+class HandlerNotRegisteredError(LookupError):
+    def __init__(self, request_type: type[Request[Any]]) -> None:
+        super().__init__(f"No handler registered for '{request_type.__name__}'")
+
+class Mediator:
+    def __init__(self) -> None:
+        self._handlers: dict[type[Request[Any]], Callable[[Any], Awaitable[Any]]] = {}
+        self._behaviors: list[PipelineBehavior] = []
+    
+    def register_handler[TResponse](
+        self, request_type: type[Request[TResponse]], handler: Callable[[Any], Awaitable[TResponse]]
+    ) -> None:
+        self._handlers[cast(type[Request[Any]], request_type)] = handler
+    
+    def add_behavior(self, behavior: PipelineBehavior) -> None:
+        self._behaviors.append(behavior)
+    
+    async def send[TResponse](self, request: Request[TResponse]) -> TResponse:
+        handler = self._handlers.get(type(request))
+        if handler is None:
+            raise HandlerNotRegisteredError(type(request))
+        
+        async def terminal(current_request: Request[Any]) -> Any:
+            return await handler(current_request)
+        
+        pipeline: NextHandler = terminal
+        for behavior in reversed(self._behaviors):
+            pipeline = self._wrap(behavior, pipeline)
+        
+        return cast(TResponse, await pipeline(request))
+    
+    @staticmethod
+    def _wrap(behavior: PipelineBehavior, next_handler: NextHandler) -> NextHandler:
+        async def wrapped(request: Request[Any]) -> Any:
+            return await behavior.handle(request, next_handler)
+        return wrapped

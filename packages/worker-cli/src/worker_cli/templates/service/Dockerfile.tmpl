@@ -1,0 +1,46 @@
+# Dockerfile for ${service_name}
+
+# Build stage
+FROM python:3.14-slim AS builder
+
+WORKDIR /app
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Enable bytecode compilation
+ENV UV_COMPILE_BYTECODE=1
+
+# Copy workspace files
+COPY pyproject.toml uv.lock ./
+COPY packages/ ./packages/
+COPY apps/ ./apps/
+
+# Install dependencies
+RUN uv sync --all-packages --all-groups --no-dev
+
+# Runtime stage
+FROM python:3.14-slim AS runtime
+
+WORKDIR /app
+
+# Create non-root user
+RUN groupadd -r workertransfer && useradd -r -g workertransfer workertransfer
+
+# Copy from builder
+COPY --from=builder /app /app
+
+# Set ownership
+RUN chown -R workertransfer:workertransfer /app
+
+USER workertransfer
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/health/live || exit 1
+
+# Run service
+CMD ["uv", "run", "${module_name}"]

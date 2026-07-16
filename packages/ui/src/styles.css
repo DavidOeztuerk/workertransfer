@@ -1,0 +1,82 @@
+:root {
+  --wt-ink: #18221d;
+  --wt-muted: #607067;
+  --wt-surface: #fbfcf8;
+  --wt-surface-raised: #ffffff;
+  --wt-line: #dbe4db;
+  --wt-mint: #b9f5cf;
+  --wt-green: #1b6a47;
+  --wt-green-deep: #105137;
+  --wt-radius-sm: 0.75rem;
+  --wt-radius-md: 1.25rem;
+  --wt-shadow: 0 18px 50px rgba(24, 34, 29, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 20rem;
+  color: var(--wt-ink);
+  background: var(--wt-surface);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.wt-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.65rem 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.wt-button:hover {
+  transform: translateY(-1px);
+}
+
+.wt-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--wt-mint), white 30%);
+  outline-offset: 3px;
+}
+
+.wt-button--primary {
+  color: white;
+  background: var(--wt-green);
+}
+
+.wt-button--primary:hover {
+  background: var(--wt-green-deep);
+}
+
+.wt-button--secondary {
+  color: var(--wt-green-deep);
+  border-color: var(--wt-green);
+  background: transparent;
+}
+
+.wt-button--quiet {
+  color: var(--wt-ink);
+  background: transparent;
+}
+
+.wt-card {
+  border: 1px solid var(--wt-line);
+  border-radius: var(--wt-radius-md);
+  background: var(--wt-surface-raised);
+  box-shadow: var(--wt-shadow);
+}

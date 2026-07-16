@@ -1,0 +1,11 @@
+"""HTTP presentation layer."""
+
+from fastapi import APIRouter
+
+router = APIRouter()
+
+
+@router.get("/example")
+async def example_endpoint() -> dict[str, str]:
+    """Example endpoint."""
+    return {"message": "Hello from ${service_name}!"}

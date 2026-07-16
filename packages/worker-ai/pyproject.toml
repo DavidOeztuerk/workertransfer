@@ -1,0 +1,28 @@
+[project]
+name = "worker-ai"
+version = "0.1.0"
+description = "AI Runtime: Provider abstraction, Tool calling, Memory, Prompt templates, Streaming"
+requires-python = ">=3.14"
+dependencies = [
+    "openai>=1.0.0,<2.0.0",
+    "anthropic>=0.30.0,<1.0.0",
+    "google-generativeai>=0.5.0,<1.0.0",
+    "ollama>=0.2.0,<1.0.0",
+    "pydantic>=2.8.0,<3.0.0",
+    "pydantic-ai>=0.1.0,<1.0.0",
+    "chromadb>=0.5.0,<1.0.0",
+    "sentence-transformers>=3.0.0,<4.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_ai"
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-config = { workspace = true }
+worker-cache = { workspace = true }
+worker-mcp = { workspace = true }
