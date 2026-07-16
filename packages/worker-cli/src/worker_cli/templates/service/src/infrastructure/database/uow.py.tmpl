@@ -1,0 +1,49 @@
+"""Unit of Work implementation."""
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+from ${module_name}.infrastructure.database.repositories import SqlAlchemyExampleRepository
+from ${module_name}.domain.repositories import ExampleRepository
+
+class UnitOfWork:
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
+        self._session_factory = session_factory
+        self._session: AsyncSession | None = None
+        self._examples: ExampleRepository | None = None
+    
+    @property
+    def session(self) -> AsyncSession:
+        if self._session is None:
+            raise RuntimeError("UnitOfWork not started. Use async with.")
+        return self._session
+    
+    @property
+    def examples(self) -> ExampleRepository:
+        if self._examples is None:
+            self._examples = SqlAlchemyExampleRepository(self.session)
+        return self._examples
+    
+    async def __aenter__(self) -> "UnitOfWork":
+        self._session = self._session_factory()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        if exc_type:
+            await self.rollback()
+        else:
+            await self.commit()
+        await self._session.close()
+        self._session = None
+        self._examples = None
+    
+    async def commit(self) -> None:
+        await self._session.commit()
+    
+    async def rollback(self) -> None:
+        await self._session.rollback()
+    
+    @asynccontextmanager
+    async def transaction(self) -> AsyncIterator[AsyncSession]:
+        async with self._session.begin():
+            yield self._session

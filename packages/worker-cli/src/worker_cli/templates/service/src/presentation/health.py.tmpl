@@ -1,0 +1,32 @@
+"""Health check endpoints."""
+
+from fastapi import APIRouter
+from worker_platform.presentation.health import create_health_router
+from ${module_name}.configuration import ${ServiceClass}Settings
+
+def create_health_routers(settings: ${ServiceClass}Settings) -> APIRouter:
+    """Create health check routers with custom checks."""
+    from worker_platform.presentation.health import ReadinessCheck
+    
+    class DatabaseCheck(ReadinessCheck):
+        name = "database"
+        async def check(self) -> bool:
+            # Implement actual DB check
+            return True
+    
+    class RedisCheck(ReadinessCheck):
+        name = "redis"
+        async def check(self) -> bool:
+            # Implement actual Redis check
+            return True
+    
+    class RabbitMQCheck(ReadinessCheck):
+        name = "rabbitmq"
+        async def check(self) -> bool:
+            # Implement actual RabbitMQ check
+            return True
+    
+    return create_health_router(
+        settings.service_name,
+        [DatabaseCheck(), RedisCheck(), RabbitMQCheck()],
+    )

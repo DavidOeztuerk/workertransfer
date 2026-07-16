@@ -1,0 +1,20 @@
+[project]
+name = "worker-mcp"
+version = "0.1.0"
+description = "MCP Integration: MCP servers/clients, Tool registry, Resource registry"
+requires-python = ">=3.14"
+dependencies = [
+    "mcp>=1.0.0,<2.0.0",
+    "pydantic>=2.8.0,<3.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_mcp"
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-ai = { workspace = true }

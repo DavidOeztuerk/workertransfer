@@ -1,0 +1,22 @@
+[project]
+name = "worker-logging"
+version = "0.1.0"
+description = "Structured JSON logging with correlation IDs, trace IDs, and context enrichment"
+requires-python = ">=3.14"
+dependencies = [
+    "structlog>=24.1.0,<25.0.0",
+    "python-json-logger>=2.0.0,<3.0.0",
+    "worker-core",
+    "worker-correlation",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.28,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_logging"
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-correlation = { workspace = true }

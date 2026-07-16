@@ -1,0 +1,38 @@
+"""Example entity."""
+
+from worker_core.domain import Entity
+from dataclasses import dataclass, field
+from uuid import UUID, uuid4
+from datetime import datetime, UTC
+
+@dataclass(eq=False)
+class ExampleEntity(Entity):
+    """Example domain entity."""
+    name: str
+    description: str | None = None
+    is_active: bool = True
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    
+    def __post_init__(self):
+        if not self.id:
+            self.id = uuid4()
+        if not self.created_at:
+            self.created_at = datetime.now(UTC)
+        if not self.updated_at:
+            self.updated_at = datetime.now(UTC)
+    
+    def update(self, name: str | None = None, description: str | None = None) -> None:
+        if name is not None:
+            self.name = name
+        if description is not None:
+            self.description = description
+        self.updated_at = datetime.now(UTC)
+    
+    def activate(self) -> None:
+        self.is_active = True
+        self.updated_at = datetime.now(UTC)
+    
+    def deactivate(self) -> None:
+        self.is_active = False
+        self.updated_at = datetime.now(UTC)

@@ -1,0 +1,104 @@
+[project]
+name = "workertransfer"
+version = "0.1.0"
+description = "Consent-first talent mobility platform"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "httpx2>=2.5.0,<3.0.0",
+  "mypy>=1.19.1,<2.0.0",
+  "pytest>=9.0.2,<10.0.0",
+  "pytest-asyncio>=1.3.0,<2.0.0",
+  "ruff>=0.15.0,<1.0.0",
+]
+
+[tool.uv.workspace]
+members = ["apps/identity-service", "packages/worker-*", "packages/worker-cli"]
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-platform = { workspace = true }
+worker-shared = { workspace = true }
+worker-config = { workspace = true }
+worker-logging = { workspace = true }
+worker-correlation = { workspace = true }
+worker-security = { workspace = true }
+worker-auth = { workspace = true }
+worker-authorization = { workspace = true }
+worker-database = { workspace = true }
+worker-cache = { workspace = true }
+worker-events = { workspace = true }
+worker-messaging = { workspace = true }
+worker-middleware = { workspace = true }
+worker-health = { workspace = true }
+worker-metrics = { workspace = true }
+worker-tracing = { workspace = true }
+worker-telemetry = { workspace = true }
+worker-validation = { workspace = true }
+worker-exceptions = { workspace = true }
+worker-ratelimit = { workspace = true }
+worker-tenancy = { workspace = true }
+worker-resilience = { workspace = true }
+worker-storage = { workspace = true }
+worker-search = { workspace = true }
+worker-contracts = { workspace = true }
+worker-scheduler = { workspace = true }
+worker-ai = { workspace = true }
+worker-mcp = { workspace = true }
+worker-agents = { workspace = true }
+worker-templates = { workspace = true }
+worker-notifications = { workspace = true }
+worker-email = { workspace = true }
+worker-files = { workspace = true }
+worker-github = { workspace = true }
+worker-cli = { workspace = true }
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["apps", "packages"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**/*.py" = ["S101"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+warn_unreachable = true
+exclude = ["tests"]
+
+# Untyped third-party libraries (no py.typed marker / no stubs available).
+# Strict mode stays on; we only silence import-untyped for these specific modules.
+[[tool.mypy.overrides]]
+module = [
+  "apscheduler.*",
+  "githubkit.*",
+  "redis.*",
+  "elasticsearch.*",
+  "meilisearch.*",
+  "qdrant_client.*",
+  "aiokafka.*",
+  "boto3.*",
+  "casbin.*",
+  "casbin_sqlalchemy_adapter.*",
+  "sendgrid.*",
+  "weasyprint.*",
+  "pdfplumber.*",
+  "docx.*",
+  "meilisearch_sdk.*",
+  "github.*",
+  "jose.*",
+  "passlib.*",
+  "magic.*",
+  "bs4.*",
+]
+ignore_missing_imports = true

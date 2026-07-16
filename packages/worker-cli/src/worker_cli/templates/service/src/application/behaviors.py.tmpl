@@ -1,0 +1,70 @@
+"""Pipeline behaviors."""
+
+from __future__ import annotations
+
+import logging
+from typing import Any, Awaitable, Callable
+from ${module_name}.application.mediator import PipelineBehavior, NextHandler, Request
+
+logger = logging.getLogger(__name__)
+
+class LoggingBehavior(PipelineBehavior):
+    async def handle(self, request: Request[Any], next_handler: NextHandler) -> Any:
+        request_type = type(request).__name__
+        logger.info("Handling %s", request_type)
+        try:
+            result = await next_handler(request)
+            logger.info("Completed %s", request_type)
+            return result
+        except Exception:
+            logger.exception("Failed to handle %s", request_type)
+            raise
+
+class ValidationBehavior(PipelineBehavior):
+    def __init__(self, validators: dict[type, Callable[[Any], Awaitable[Any]]]):
+        self._validators = validators
+    
+    async def handle(self, request: Request[Any], next_handler: NextHandler) -> Any:
+        validator = self._validators.get(type(request))
+        if validator:
+            await validator(request)
+        return await next_handler(request)
+
+class TransactionBehavior(PipelineBehavior):
+    def __init__(self, uow_factory: Callable[[], Any]):
+        self._uow_factory = uow_factory
+    
+    async def handle(self, request: Request[Any], next_handler: NextHandler) -> Any:
+        async with self._uow_factory() as uow:
+            result = await next_handler(request)
+            await uow.commit()
+            return result
+
+class AuthorizationBehavior(PipelineBehavior):
+    def __init__(self, authz_service: Any):
+        self._authz = authz_service
+    
+    async def handle(self, request: Request[Any], next_handler: NextHandler) -> Any:
+        # Check permissions based on request type
+        # This would be implemented based on your authz model
+        return await next_handler(request)
+
+class CachingBehavior(PipelineBehavior):
+    def __init__(self, cache: Any, ttl: int = 3600):
+        self._cache = cache
+        self._ttl = ttl
+    
+    async def handle(self, request: Request[Any], next_handler: NextHandler) -> Any:
+        # Only cache queries
+        from ${module_name}.application.mediator import Query
+        if not isinstance(request, Query):
+            return await next_handler(request)
+        
+        key = f"query:{type(request).__name__}:{hash(str(request))}"
+        cached = await self._cache.get(key)
+        if cached is not None:
+            return cached
+        
+        result = await next_handler(request)
+        await self._cache.set(key, result, self._ttl)
+        return result

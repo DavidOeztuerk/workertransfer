@@ -1,0 +1,57 @@
+[project]
+name = "${service_name}"
+version = "0.1.0"
+description = "${service_title} service"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.110.0,<1.0.0",
+    "uvicorn[standard]>=0.30.0,<1.0.0",
+    "worker-core",
+    "worker-platform",
+    "worker-database",
+    "worker-cache",
+    "worker-cqrs",
+    "worker-events",
+    "worker-messaging",
+    "worker-auth",
+    "worker-authorization",
+    "worker-health",
+    "worker-metrics",
+    "worker-tracing",
+    "worker-telemetry",
+    "worker-validation",
+    "worker-exceptions",
+    "worker-ratelimit",
+    "worker-tenancy",
+    "worker-resilience",
+]
+
+[project.scripts]
+${module_name} = "${module_name}.main:run"
+
+[build-system]
+requires = ["uv_build>=0.11.28,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "${module_name}"
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-platform = { workspace = true }
+worker-database = { workspace = true }
+worker-cache = { workspace = true }
+worker-cqrs = { workspace = true }
+worker-events = { workspace = true }
+worker-messaging = { workspace = true }
+worker-auth = { workspace = true }
+worker-authorization = { workspace = true }
+worker-health = { workspace = true }
+worker-metrics = { workspace = true }
+worker-tracing = { workspace = true }
+worker-telemetry = { workspace = true }
+worker-validation = { workspace = true }
+worker-exceptions = { workspace = true }
+worker-ratelimit = { workspace = true }
+worker-tenancy = { workspace = true }
+worker-resilience = { workspace = true }

@@ -1,0 +1,22 @@
+[project]
+name = "worker-templates"
+version = "0.1.0"
+description = "Document templates: Contract generation, Letters, CV, PDF rendering"
+requires-python = ">=3.14"
+dependencies = [
+    "jinja2>=3.1.0,<4.0.0",
+    "weasyprint>=60.0,<61.0",
+    "pydantic>=2.8.0,<3.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_templates"
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-config = { workspace = true }
+worker-storage = { workspace = true }
