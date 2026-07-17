@@ -4,10 +4,17 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from jose import jwt
-from passlib.context import CryptContext
 from pydantic import BaseModel
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from worker_auth.password import (
+    BcryptPasswordHasher,
+    PasswordHashError,
+    PasswordTooLong,
+    hash_password,
+    verify_password,
+)
+
+# legacy passlib.CryptContext removed (ADR-0006); no sentinel retained.
 
 
 class TokenPayload(BaseModel):
@@ -55,9 +62,12 @@ class TokenManager:
         return TokenPayload(**payload)
 
 
-def hash_password(password: str) -> str:
-    return str(pwd_context.hash(password))
-
-
-def verify_password(plain: str, hashed: str) -> bool:
-    return bool(pwd_context.verify(plain, hashed))
+__all__ = [
+    "BcryptPasswordHasher",
+    "PasswordHashError",
+    "PasswordTooLong",
+    "TokenManager",
+    "TokenPayload",
+    "hash_password",
+    "verify_password",
+]
