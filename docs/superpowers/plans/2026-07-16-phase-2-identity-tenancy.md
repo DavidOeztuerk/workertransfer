@@ -327,6 +327,8 @@ for back-compat smoke call sites."
 
 ### Task 2: TokenManager → PyJWT (HS256) + TokenPayload rewrite
 
+**Status:** ✅ DONE (2026-07-18). `worker_auth.jwt.TokenManager` (PyJWT HS256, access+refresh, `verify_token(*, expected_type)` → `InvalidToken`/`ExpiredToken`); `TokenPayload` moved to `jwt.py`. `python-jose`/`passlib[bcrypt]` dropped from `worker-auth` deps; `bcrypt>=4.0,<5.0` added (resolved 4.3.0). `__init__.py` re-exports from `jwt`+`password`. `jose.*`/`passlib.*` mypy overrides removed from root `pyproject.toml`. `uv sync` uninstalled jose/ecdsa/rsa. Tests: 10 (6 JWT + 4 password) all pass. `make check` green (72 passed, 2 skipped). `grep -RIn "import jose|from jose|passlib|pwd_context" packages apps` returns nothing.
+
 **Files:**
 - Create: `packages/worker-auth/src/worker_auth/jwt.py`
 - Modify: `packages/worker-auth/src/worker_auth/__init__.py` (remove `from jose import jwt`; remove inline `TokenManager`/`TokenPayload`; re-export from `jwt.py`)
