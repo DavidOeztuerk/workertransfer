@@ -137,6 +137,8 @@ apps/web/
 
 ### Task 1: BcryptPasswordHasher (password hashing, direct bcrypt)
 
+**Status:** ✅ DONE (2026-07-17). `worker_auth.password.BcryptPasswordHasher` (bcrypt>=4 direct, rounds=12) + `PasswordTooLong`/`PasswordHashError`; passlib machinery removed from `__init__.py`; module-level `hash_password`/`verify_password` re-export from the new module. Tests: 4 new (roundtrip / module funcs / >72 bytes / malformed hash) all pass. `make check` green (67 passed, 2 skipped). `python-jose` + old `TokenManager` left untouched (Task 2 rewrites them).
+
 **Files:**
 - Create: `packages/worker-auth/src/worker_auth/password.py`
 - Modify: `packages/worker-auth/src/worker_auth/__init__.py` (lines 1-10, 58-63)
