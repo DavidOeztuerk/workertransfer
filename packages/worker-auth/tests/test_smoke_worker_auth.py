@@ -1,48 +1,100 @@
-"""Smoke tests for worker-auth (Phase 1.5).
+"""worker-auth smoke + unit tests (Phase 2).
 
-Exercises the ``TokenManager`` constructor (pure field storage) and the
-``TokenPayload`` pydantic model. ``hash_password``/``verify_password`` are NOT
-called — they trigger passlib's bcrypt backend, which is broken in the current
-venv (passlib/bcrypt version skew), and run real crypto. ``create_access_token``
-needs a real RSA key and is also avoided.
+Exercises real bcrypt (BcryptPasswordHasher) and real HS256 JWT roundtrips
+(TokenManager on PyJWT). The Phase-1 passlib/jose blockers are resolved.
 """
 
 import time
 from uuid import uuid4
 
-from worker_auth import TokenManager, TokenPayload
+import pytest
+from worker_auth import (
+    BcryptPasswordHasher,
+    ExpiredToken,
+    InvalidToken,
+    PasswordTooLong,
+    TokenManager,
+    TokenPayload,
+    hash_password,
+    verify_password,
+)
 
 
-def test_smoke_token_manager_and_payload() -> None:
-    manager = TokenManager(
-        private_key="priv",
-        public_key="pub",
-        algorithm="HS256",
-        access_token_expire_minutes=5,
-    )
+def test_access_token_roundtrip() -> None:
+    secret = "a" * 40
+    manager = TokenManager(secret=secret)
+    user_id, tenant_id = uuid4(), uuid4()
+
+    token = manager.create_access_token(user_id, tenant_id, roles=["user"], permissions=["read"])
+    decoded = manager.verify_token(token, expected_type="access")
+
+    assert decoded.sub == user_id
+    assert decoded.tenant_id == tenant_id
+    assert decoded.roles == ["user"]
+    assert decoded.permissions == ["read"]
+    assert decoded.type == "access"
+    assert isinstance(decoded.jti, str) and len(decoded.jti) > 0
+
+
+def test_refresh_token_has_distinct_type_and_jti() -> None:
+    secret = "a" * 40
+    manager = TokenManager(secret=secret)
+    user_id, tenant_id = uuid4(), uuid4()
+
+    token = manager.create_refresh_token(user_id, tenant_id, session_jti="session-jti-123")
+    decoded = manager.verify_token(token, expected_type="refresh")
+
+    assert decoded.type == "refresh"
+    assert decoded.jti == "session-jti-123"
+
+
+def test_wrong_expected_type_rejects() -> None:
+    secret = "a" * 40
+    manager = TokenManager(secret=secret)
+    user_id, tenant_id = uuid4(), uuid4()
+
+    access = manager.create_access_token(user_id, tenant_id, roles=[], permissions=[])
+    with pytest.raises(InvalidToken):
+        manager.verify_token(access, expected_type="refresh")
+
+
+def test_expired_token_raises_expired() -> None:
+    secret = "a" * 40
+    user_id, tenant_id = uuid4(), uuid4()
+    zero_min = TokenManager(secret=secret, access_token_expire_minutes=0)
+    expired = zero_min.create_access_token(user_id, tenant_id, roles=[], permissions=[])
+    import time as _t
+
+    _t.sleep(1)  # ensure exp (now) is in the past by >=1s
+    manager = TokenManager(secret=secret)
+    with pytest.raises(ExpiredToken):
+        manager.verify_token(expired, expected_type="access")
+
+
+def test_tampered_signature_rejected() -> None:
+    secret = "a" * 40
+    manager = TokenManager(secret=secret)
+    user_id, tenant_id = uuid4(), uuid4()
+    token = manager.create_access_token(user_id, tenant_id, roles=[], permissions=[])
+    tampered = token[:-4] + "aaaa"
+    with pytest.raises(InvalidToken):
+        manager.verify_token(tampered, expected_type="access")
+
+
+def test_tokenpayload_model_fields() -> None:
     now = int(time.time())
     payload = TokenPayload(
         sub=uuid4(),
         tenant_id=uuid4(),
+        roles=["admin"],
+        permissions=["*"],
         exp=now + 60,
         iat=now,
         type="access",
         jti="j",
     )
-
-    assert manager.algorithm == "HS256"
-    assert manager.private_key == "priv"
     assert payload.type == "access"
-    assert payload.jti == "j"
-
-
-import pytest  # noqa: E402
-from worker_auth import (  # noqa: E402
-    BcryptPasswordHasher,
-    PasswordTooLong,
-    hash_password,
-    verify_password,
-)
+    assert payload.roles == ["admin"]
 
 
 def test_hash_and_verify_roundtrip() -> None:

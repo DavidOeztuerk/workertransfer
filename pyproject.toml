@@ -96,8 +96,6 @@ module = [
   "docx.*",
   "meilisearch_sdk.*",
   "github.*",
-  "jose.*",
-  "passlib.*",
   "magic.*",
   "bs4.*",
 ]
