@@ -17,3 +17,17 @@ def test_smoke_cli_help_lists_commands() -> None:
     assert result.exit_code == 0
     # ``new-service`` is one of the 12 registered commands.
     assert "new-service" in result.stdout
+
+
+def test_migrate_reports_missing_alembic_ini() -> None:
+    """A service without apps/<service>/alembic.ini must fail fast with an
+    actionable ADR-0010 message (Sub-step 2.2 Task 5), not a bare alembic failure."""
+    runner = CliRunner()
+    # "nonexistent-service" has no directory at all, so the pre-check fires before
+    # any subprocess runs. (apps/identity-service gains alembic.ini in Sub-step 2.4;
+    # using a bogus name keeps the test independent of migration scaffolding order.)
+    result = runner.invoke(app, ["migrate", "msg", "--service", "nonexistent-service"])
+
+    assert result.exit_code != 0
+    out = result.stdout
+    assert "alembic.ini" in out
