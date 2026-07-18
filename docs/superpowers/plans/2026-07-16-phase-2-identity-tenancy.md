@@ -673,6 +673,8 @@ git commit -m "docs(adr): 0006 bcrypt-direct hashing, 0007 HS256+PyJWT signing"
 
 ### Task 4: ADR-0010 (Alembic per-service, async) — written early because it governs 2.4
 
+**Status:** ✅ DONE (2026-07-18). `docs/adr/0010-alembic-per-service-async.md` written (Accepted): per-service `alembic.ini` + `apps/<service>/migrations/` with async `env.py` via `async_engine_from_config` + `connection.run_sync`; `worker_database.Base.metadata` as single autogenerate target; shared `alembic.ini`/multi-env rejected (ADR-0004); `worker-cli migrate/upgrade` pre-check referenced. Docs-only; `make check` green (72 passed, 2 skipped).
+
 > Spec §2 writes ADR-0010 in 2.4, but the decision governs the env.py we build in 2.4. Writing it now (early) avoids divergence.
 
 **Files:**
