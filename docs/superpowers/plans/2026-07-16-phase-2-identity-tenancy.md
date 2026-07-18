@@ -697,6 +697,8 @@ git commit -m "docs(adr): 0010 Alembic per-service async env.py"
 
 ### Task 5: Repair `worker-cli migrate/upgrade` to verify alembic.ini + give actionable feedback
 
+**Status:** ✅ DONE (2026-07-18). Hoisted `subprocess` import; added `_alembic_dir_for(service)`. `migrate`/`upgrade` now pre-check `apps/<service>/alembic.ini` and exit 1 with an ADR-0010-referencing message when missing (no bare alembic subprocess failure). `test_migrate_reports_missing_alembic_ini` (CliRunner, bogus `nonexistent-service` to stay independent of 2.4 scaffolding) passes. `make check` green (73 passed, 2 skipped). This is a pure-CLI test — no Docker/DB involved.
+
 **Files:**
 - Modify: `packages/worker-cli/src/worker_cli/__init__.py:291-325` (`migrate`, `upgrade`, the `_generate_infrastructure`-adjacent helpers are untouched)
 
