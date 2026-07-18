@@ -916,10 +916,12 @@ git commit -m "identity-service: settings skeleton (jwt_secret SecretStr, databa
 
 ### Task 7: Value objects (Email, PasswordHash, UserId, TenantId)
 
+**Status:** ✅ DONE (2026-07-18). `domain/value_objects.py` implements `Email` (lowercased + pragmatic-regex validation, rejects garbage/empty/>254-char segments incl. the 1000-char extreme case, raises `InvalidEmail` `DomainError`, equality by normalized value), `PasswordHash` (opaque, accepts an already-hashed string only), `UserId(UUID)`, and `TenantId(UUID)` (non-nil, `ValueError`). Built on the `worker_core.ValueObject` frozen+slots marker: validation runs through a manual `__init__` that writes fields via `object.__setattr__` because the dataclass is frozen — the plan-flagged pattern compiles cleanly under mypy-strict. 6 unit tests pass (`uv run pytest apps/identity-service/tests/unit/test_value_objects.py -v` → 6 passed). `make check` green (79 passed, 2 skipped, +6 over Task 6's 73). No `tests/unit/__init__.py` — intentionally omitted per the Phase-1 collection convention (unique test filenames, no `tests/__init__.py`) to avoid turning `tests/` into a package and disturbing pytest's rootdir import under `testpaths = ["apps", "packages"]`. Committed as `baed2b3`.
+
 **Files:**
 - Create: `apps/identity-service/src/identity_service/domain/__init__.py`
 - Create: `apps/identity-service/src/identity_service/domain/value_objects.py`
-- Test: `apps/identity-service/tests/unit/__init__.py`, `apps/identity-service/tests/unit/test_value_objects.py`
+- Test: `apps/identity-service/tests/unit/test_value_objects.py` (no `__init__.py` — see Status note)
 
 **Interfaces:**
 - Produces: `Email(raw: str)` (frozen `ValueObject`; lowercased; validates with a pragmatic regex; equality by lowercased value; raises `InvalidEmail`), `PasswordHash(value: str)` (frozen; opaque; `PasswordHash(value)` accepts an already-hashed string only), `UserId(value: UUID)`, `TenantId(value: UUID)` (frozen; non-nil).
