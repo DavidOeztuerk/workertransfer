@@ -819,6 +819,8 @@ git commit -m "worker-cli: verify per-service alembic.ini before migrate/upgrade
 
 ### Task 6: Add identity-service deps + settings skeleton
 
+**Status:** ✅ DONE (2026-07-18). `apps/identity-service/pyproject.toml` deps extended (fastapi, sqlalchemy[asyncio], asyncpg, alembic, psycopg[binary], pydantic, pydantic-settings, worker-auth/database/events/tenancy/config) — resolved via root `[tool.uv.sources]` workspace table, no service-local sources block needed. `configuration.IdentityServiceSettings` adds `jwt_secret` SecretStr, `database_url`, `jwt_access/refresh_token_expire_minutes`, `bcrypt_rounds`. `uv sync` installed psycopg + greenlet. Smoke import prints `identity-service 8001 dev-...`. `make check` green (73 passed, 2 skipped). bcrypt/pyjwt come transitively via worker-auth (single canonical home, ADR-0002).
+
 **Files:**
 - Modify: `apps/identity-service/pyproject.toml` (`dependencies` + `[tool.uv.sources]`)
 - Modify: `apps/identity-service/src/identity_service/configuration.py`
