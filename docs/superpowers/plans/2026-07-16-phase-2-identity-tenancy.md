@@ -630,6 +630,8 @@ RS256 + Vault/K8s key storage documented as Phase-6/10 upgrade in ADR-0007."
 
 ### Task 3: ADR-0006 (password hashing) + ADR-0007 (JWT signing)
 
+**Status:** ✅ DONE (2026-07-18). `docs/adr/0006-password-hashing-bcrypt-direct.md` and `docs/adr/0007-jwt-signing-hs256-pyjwt.md` written (Accepted, cross-linked to ADR-0002 + the spec, full Context/Decision/Consequences/Verification). Docs-only; `make check` still green (72 passed, 2 skipped).
+
 **Files:**
 - Create: `docs/adr/0006-password-hashing-bcrypt-direct.md`
 - Create: `docs/adr/0007-jwt-signing-hs256-pyjwt.md`
