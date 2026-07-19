@@ -1583,6 +1583,8 @@ git commit -m "docs(adr): 0008 password-flow now, OIDC-provider as upgrade path"
 
 ### Task 11: Add Testcontainers + httpx to root dev group
 
+**Status:** ✅ DONE (2026-07-19). Root `[dependency-groups].dev` extended with `httpx>=0.27,<1` (0.28.1) and `testcontainers[postgres]>=4,<5` (4.14.2, pulls `docker==7.2.0`). `httpx2` retained (out of scope to remove per plan note). `psycopg[binary]` is already an identity-service runtime dep (Task 6). `uv sync --all-packages --all-groups` resolved 318 packages, installed 2; `uv.lock` updated. Smoke import verified: `from testcontainers.postgres import PostgresContainer; import httpx`. `make check` green (87 passed, 2 skipped — no new test files yet). **Docker-daemon runtime requirement** for the Sub-step 2.4 integration tests is noted but not exercised here (no container started in this task). Committed as `ec86181`. ADR-0011 (Testcontainers) is recorded later in the sub-step.
+
 **Files:**
 - Modify: `pyproject.toml` (root) `[dependency-groups].dev`
 - Verify: `uv.lock` updates
@@ -1623,6 +1625,10 @@ git commit -m "dev: add testcontainers[postgres] + httpx for Phase 2 integration
 ```
 
 ### Task 12: SQLAlchemy models (users, sessions, audit_events)
+
+**Status:** ✅ DONE (2026-07-19). `infrastructure/database/models.py` defines `UserModel` (users; `TimestampMixin`+`VersionMixin`;`UniqueConstraint(tenant_id, email)` **declaratively** — not the plan's flagged `.__call__` hack), `SessionModel` (sessions; `user_id` FK→users.id `ON DELETE CASCADE`, unique `refresh_jti`, tz `expires_at`, nullable `revoked_at`), and `AuditEventModel` (audit_events; nullable `actor_id` idx, `audit_action` enum, nullable `target_id`, `correlation_id`, tz `occurred_at`, JSONB metadata). PG-native types: `UUID(as_uuid=True)`, `JSONB`, `CITEXT`, tz-aware `DateTime`, `Enum` with `values_callable` so PG enums store the `StrEnum` lowercase values. Unused `Interval`/`text` imports dropped (plan flags). Smoke import verified (`UserModel.__tablename__` / `SessionModel` / `AuditEventModel` register on `Base.metadata`; `AuditEventModel.__table__.c.metadata.name == 'metadata'` JSONB). `make check` green (87 passed, 2 skipped, no new tests). Committed as `cb1c80c`.
+
+**Deviation from the plan snippet (recorded):** the plan named the `AuditEventModel` column `metadata`, but `metadata` is **reserved on `DeclarativeBase`** — `Base.metadata` is SQLAlchemy's `MetaData` object, and declarative mapping raises `InvalidRequestError: Attribute name 'metadata' is reserved`. The Python attribute is `meta`; the DB column keeps the name `metadata` via `mapped_column("metadata", JSONB, ...)` for compatibility with the domain `AuditEvent.metadata` schema, JSONB queries, and migration 0001. The Task 13 repository mapper translates `meta ↔ metadata`.
 
 **Files:**
 - Create: `apps/identity-service/src/identity_service/infrastructure/__init__.py`
