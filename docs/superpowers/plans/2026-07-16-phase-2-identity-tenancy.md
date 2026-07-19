@@ -3437,6 +3437,8 @@ git commit -m "identity-service/http: /auth/{register,login,refresh,logout}, /me
 
 ### Task 19: Extend `worker-platform` `create_api_app` with a compose-hook
 
+**Status:** ✅ DONE (2026-07-19). `create_api_app` gains a compose-hook so services register their concerns at the kernel boundary instead of mutating the returned app: `create_api_app(settings, *, readiness_checks=(), tenant_resolver: TenantResolver | None = None, auth_middleware: Any = None, routers: Iterable[APIRouter] = ())`. `tenant_resolver` overrides the legacy default (None → `DevelopmentHeaderTenantResolver` when `allow_development_tenant_header`+low-env, else `NoTenantResolver`); `routers` are `include_router`'d after the health router. **Middleware order correction per plan note 3564 applied:** auth middleware runs *outside* `TenantContextMiddleware` so a claim-based resolver (2.6) can read `request.state.user` before the tenant contextvar is set. Starlette is last-added-is-outermost, so the innermost-first add order is now `SecurityHeaders` → `TenantContext` → `auth_middleware` → `CorrelationId` (outer→inner: CorrelationId, auth_middleware, TenantContext, SecurityHeaders). Backward compatible — `identity-service.compose_api.build_app` still calls `create_api_app(settings)` with the shell only and overlays its own routers+middleware (2.5 shape); 2.6 migrates it onto the hook. **TDD:** `test_app_compose_hook.py` (2 tests) written first, watched fail with `TypeError: unexpected keyword argument 'tenant_resolver'`, then implemented → pass. `make check` green (**105 passed, 2 skipped**, +2 over Task 18). Committed as `62ca3a0`.
+
 **Files:**
 - Modify: `packages/worker-platform/src/worker_platform/presentation/app.py:23-58`
 
