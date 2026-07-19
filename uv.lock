@@ -30,7 +30,6 @@ members = [
     "worker-mcp",
     "worker-messaging",
     "worker-metrics",
-    "worker-middleware",
     "worker-notifications",
     "worker-platform",
     "worker-ratelimit",
@@ -4878,21 +4877,6 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "prometheus-client", specifier = ">=0.19.0,<1.0.0" },
-    { name = "starlette", specifier = ">=0.37.0,<1.0.0" },
-]
-
-[[package]]
-name = "worker-middleware"
-version = "0.1.0"
-source = { editable = "packages/worker-middleware" }
-dependencies = [
-    { name = "fastapi" },
-    { name = "starlette" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = ">=0.110.0,<1.0.0" },
     { name = "starlette", specifier = ">=0.37.0,<1.0.0" },
 ]
 
