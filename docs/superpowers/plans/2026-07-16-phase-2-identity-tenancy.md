@@ -2360,6 +2360,10 @@ git commit -m "identity-service: alembic.ini + async env.py + 0001_init migratio
 
 ### Task 15: Composition-Root (`compose.py`)
 
+**Status:** ✅ DONE (2026-07-19). `infrastructure/compose.py` implements `compose_infrastructure(settings, engine) -> dict[str, Any]` returning the wiring bundle `{"engine", "session_factory", "request_scope", "hasher", "tokens", "clock", "eventbus"}` (ADR-0003 — explicit Composition-Root, no fluent `PlatformBuilder`). `request_scope` is an `asynccontextmanager` yielding `(UnitOfWork, repos)` for one request transaction, repos built with `uow.session` (the public property that raises if the UoW has not been entered). Hasher takes `settings.bcrypt_rounds`; `JwTokenService` takes the unsealed `jwt_secret` + access/refresh expire minutes; `SystemClock` and `EventBus` are bare singletons (domain-event publication wiring lands in 2.7). Smoke import verified; `make check` green (89 passed, 2 skipped, no new tests). Committed as `deab353`.
+
+**Deviation from the plan snippet:** repos use `uow.session` (not the private `uow._session` the plan snippet flagged — plan note 2434); the unused `Callable` import in the plan snippet was dropped.
+
 **Files:**
 - Create: `apps/identity-service/src/identity_service/infrastructure/compose.py`
 
