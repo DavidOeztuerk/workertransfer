@@ -1555,6 +1555,8 @@ git commit -m "identity-service/domain: User aggregate + AccountStatus lifecycle
 
 ### Task 10: ADR-0008 (password-flow, not OIDC)
 
+**Status:** ✅ DONE (2026-07-19). `docs/adr/0008-auth-flow-password-not-oidc.md` written in the established ADR format (Status / Date / Relates / Context / Decision / Consequences / Upgrade path / Verification). Relates to ADR-0002, 0006, 0007, the Phase-2 design spec, and `product-scope.md` (both link targets verified to exist). Decision: self-hosted password flow — identity-service owns the `User` aggregate (Task 9) and issues HS256 access+refresh JWTs (ADR-0007) via `POST /auth/register` + `POST /auth/login`; refresh rotates a server-side `sessions` jti; no external IdP, no OIDC-provider endpoints in Phase 2. Both upgrade seams (OIDC-provider via `authlib` on the `TokenService` port; external IdP as an alternative federated-login path) documented as Phase-6/10 and reversible without re-doing Phase 2. The ULTRAPLAN "OIDC/OAuth2-Einstieg" checkbox is intentionally deferred, not silently dropped. Doc-only task — no `make check` impact; link targets verified. Committed as `a4dd5cf`.
+
 **Files:**
 - Create: `docs/adr/0008-auth-flow-password-not-oidc.md`
 
