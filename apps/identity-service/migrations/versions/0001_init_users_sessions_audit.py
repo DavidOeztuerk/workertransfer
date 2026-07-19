@@ -23,6 +23,11 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    # citext is a PG contrib extension (present in the standard image; needs
+    # enabling per-database). Required by the users.email CITEXT column for
+    # case-insensitive per-tenant uniqueness. Idempotent.
+    op.execute("CREATE EXTENSION IF NOT EXISTS citext")
+
     account_status = sa.Enum(
         AccountStatus, name="account_status", values_callable=lambda e: [m.value for m in e]
     )
@@ -97,3 +102,6 @@ def downgrade() -> None:
     op.drop_table("users")
     sa.Enum(name="audit_action").drop(op.get_bind(), checkfirst=True)
     sa.Enum(name="account_status").drop(op.get_bind(), checkfirst=True)
+    # Leave ``citext`` installed: it is a shared contrib extension and other
+    # services/tables may depend on it; dropping it could break unrelated
+    # sessions in the same DB.
