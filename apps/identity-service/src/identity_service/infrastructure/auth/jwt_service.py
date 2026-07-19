@@ -47,7 +47,10 @@ class JwTokenService:
     def _verify(self, token: str, *, expected_type: str) -> AuthPrincipal:
         payload = self._manager.verify_token(token, expected_type=expected_type)
         return AuthPrincipal(
-            user_id=payload.sub, tenant_id=payload.tenant_id, roles=tuple(payload.roles)
+            user_id=payload.sub,
+            tenant_id=payload.tenant_id,
+            roles=tuple(payload.roles),
+            jti=payload.jti,
         )
 
     def verify_access_token(self, token: str) -> AuthPrincipal:
