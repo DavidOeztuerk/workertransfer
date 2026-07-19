@@ -34,7 +34,6 @@ worker-database = { workspace = true }
 worker-cache = { workspace = true }
 worker-events = { workspace = true }
 worker-messaging = { workspace = true }
-worker-middleware = { workspace = true }
 worker-health = { workspace = true }
 worker-metrics = { workspace = true }
 worker-tracing = { workspace = true }
