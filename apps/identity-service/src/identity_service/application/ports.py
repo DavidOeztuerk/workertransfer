@@ -25,6 +25,7 @@ class AuthPrincipal:
     user_id: UUID
     tenant_id: UUID
     roles: tuple[str, ...]
+    jti: str  # the session jti — used by handle_refresh to key the sessions table
 
 
 @dataclass(frozen=True, slots=True)
