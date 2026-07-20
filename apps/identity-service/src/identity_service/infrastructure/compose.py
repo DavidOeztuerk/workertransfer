@@ -11,6 +11,7 @@ from worker_database import UnitOfWork
 from worker_events import EventBus
 
 from identity_service.configuration import IdentityServiceSettings
+from identity_service.domain.user import UserLoggedIn, UserRegistered
 from identity_service.infrastructure.auth.hasher import BcryptPasswordAdapter
 from identity_service.infrastructure.auth.jwt_service import JwTokenService
 from identity_service.infrastructure.clock import SystemClock
@@ -41,12 +42,31 @@ async def request_scope(
         yield uow, repos
 
 
+async def _noop_domain_event_handler(_event: Any) -> None:
+    """Production seam for future domain-event side-effects (notifications, etc.).
+
+    Phase 2 has no cross-service consumer for ``UserLoggedIn``/``UserRegistered``
+    yet. Audit persistence is synchronous inside the command's UoW (ADR-0012) —
+    it is NOT routed through here. This handler exists so a future side-effect
+    handler has a place to hook in without touching the commands.
+    """
+    return None
+
+
 def compose_infrastructure(
-    settings: IdentityServiceSettings, engine: AsyncEngine
+    settings: IdentityServiceSettings,
+    engine: AsyncEngine,
+    *,
+    eventbus: EventBus | None = None,
 ) -> dict[str, Any]:
     session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False, autoflush=False
     )
+    bus = eventbus if eventbus is not None else EventBus()
+    # Subscription seam (Task 22, ADR-0012): no-op handlers for the domain
+    # events the Task-17 commands publish on this bus after a UoW commit.
+    bus.subscribe(UserLoggedIn, _noop_domain_event_handler)
+    bus.subscribe(UserRegistered, _noop_domain_event_handler)
     return {
         "engine": engine,
         "session_factory": session_factory,
@@ -58,5 +78,5 @@ def compose_infrastructure(
             refresh_expire_minutes=settings.jwt_refresh_token_expire_minutes,
         ),
         "clock": SystemClock(),
-        "eventbus": EventBus(),
+        "eventbus": bus,
     }
