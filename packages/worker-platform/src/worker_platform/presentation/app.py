@@ -27,6 +27,7 @@ def create_api_app(
     readiness_checks: Iterable[ReadinessCheck] = (),
     tenant_resolver: TenantResolver | None = None,
     auth_middleware: Any = None,
+    auth_middleware_kwargs: dict[str, Any] | None = None,
     routers: Iterable[APIRouter] = (),
 ) -> FastAPI:
     """Create a secure, observable HTTP entry point with no business endpoints.
@@ -76,6 +77,6 @@ def create_api_app(
     )
     app.add_middleware(TenantContextMiddleware, resolver=resolved_tenant)
     if auth_middleware is not None:
-        app.add_middleware(auth_middleware)
+        app.add_middleware(auth_middleware, **(auth_middleware_kwargs or {}))
     app.add_middleware(CorrelationIdMiddleware)
     return app

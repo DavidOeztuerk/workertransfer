@@ -51,3 +51,27 @@ def test_create_api_app_default_resolver_unchanged_when_none() -> None:
     # accepted and the app still builds with the legacy defaults.
     resp = client.get("/health/live")
     assert resp.status_code in (200, 404)
+
+
+def test_create_api_app_passes_auth_middleware_kwargs_to_ctor() -> None:
+    """The auth_middleware_kwargs dict flows through to the middleware ctor."""
+    captured: dict[str, object] = {}
+
+    class _CapturingMiddleware:
+        def __init__(self, app: object, *, injected: str) -> None:
+            self.app = app
+            captured["injected"] = injected
+
+        async def __call__(self, scope: object, receive: object, send: object) -> None:
+            await self.app(scope, receive, send)  # type: ignore[arg-type]
+
+    settings = PlatformSettings(environment=Environment.TEST)
+    app = create_api_app(
+        settings,
+        auth_middleware=_CapturingMiddleware,
+        auth_middleware_kwargs={"injected": "the-tokens-or-whatever"},
+    )
+    client = TestClient(app)
+    # Drive one request so Starlette constructs the middleware stack.
+    client.get("/health/live")
+    assert captured.get("injected") == "the-tokens-or-whatever"
