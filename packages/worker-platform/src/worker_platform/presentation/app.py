@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from fastapi import APIRouter, FastAPI
+from starlette.middleware.cors import CORSMiddleware
 
 from worker_platform.configuration import Environment, PlatformSettings
 from worker_platform.logging import configure_logging
@@ -65,12 +66,13 @@ def create_api_app(
         resolved_tenant = NoTenantResolver()
 
     # Starlette: the last middleware added is outermost in the call chain.
-    # Desired outer→inner order: CorrelationId → auth_middleware →
-    # TenantContext → SecurityHeaders. The auth middleware must run *outside*
-    # TenantContext so a claim-based tenant resolver can read request.state.user
-    # (set by the auth middleware) before TenantContext populates the contextvar.
-    # Therefore add innermost-first: SecurityHeaders, TenantContext,
-    # auth_middleware, CorrelationId.
+    # Desired outer→inner order: CORS → CorrelationId → auth_middleware →
+    # TenantContext → SecurityHeaders. CORS must be outermost so its preflight
+    # short-circuit answers OPTIONS before any other middleware runs. The auth
+    # middleware must run *outside* TenantContext so a claim-based tenant resolver
+    # can read request.state.user (set by the auth middleware) before
+    # TenantContext populates the contextvar. Therefore add innermost-first:
+    # SecurityHeaders, TenantContext, auth_middleware, CorrelationId, CORS.
     app.add_middleware(
         SecurityHeadersMiddleware,
         enforce_https=settings.environment is Environment.PRODUCTION,
@@ -79,4 +81,28 @@ def create_api_app(
     if auth_middleware is not None:
         app.add_middleware(auth_middleware, **(auth_middleware_kwargs or {}))
     app.add_middleware(CorrelationIdMiddleware)
+    _add_cors_middleware(app, settings)
     return app
+
+
+def _add_cors_middleware(app: FastAPI, settings: PlatformSettings) -> None:
+    """Register CORSMiddleware when a non-empty allowlist is set outside prod.
+
+    Default-off (empty allowlist => no CORS) and refused in PRODUCTION: the
+    gateway terminates cross-origin traffic in production (ULTRAPLAN Phase 10),
+    and exposing allow-credentials CORS from the origin service would widen the
+    HTTP-only cookie surface. Called last so CORS is the outermost middleware.
+    """
+
+    if not settings.cors_allow_origins:
+        return
+    if settings.environment is Environment.PRODUCTION:
+        return
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allow_origins,
+        allow_credentials=settings.cors_allow_credentials,
+        allow_methods=settings.cors_allow_methods,
+        allow_headers=settings.cors_allow_headers,
+        expose_headers=settings.cors_expose_headers,
+    )
