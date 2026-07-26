@@ -20,4 +20,7 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run ruff check .
       - run: uv run mypy packages apps
+      # Testcontainers (identity-service integration suite) needs a reachable
+      # Docker daemon. ubuntu-latest has Docker, so the integration tests run
+      # here; on Docker-less runners they self-skip (ADR-0011 offline-skip).
       - run: uv run pytest

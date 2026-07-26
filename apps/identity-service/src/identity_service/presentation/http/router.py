@@ -40,6 +40,9 @@ class LoginBody(BaseModel):
 
 
 def build_auth_router(deps: dict[str, Any]) -> APIRouter:
+    # TODO Phase-10: enforce per-IP rate-limiting (worker-ratelimit) on /auth/login
+    # and /auth/refresh before any external exposure; the auth flow currently has
+    # no brute-force throttle (rate-limiting was explicitly out of Phase-2 scope).
     router = APIRouter(prefix="/auth", tags=["auth"])
     settings = deps["settings"]
     session_factory = deps["session_factory"]
