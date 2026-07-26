@@ -22,7 +22,6 @@ members = [
     "worker-email",
     "worker-events",
     "worker-exceptions",
-    "worker-files",
     "worker-github",
     "worker-health",
     "worker-identity-service",
@@ -3448,15 +3447,6 @@ wheels = [
 ]
 
 [[package]]
-name = "python-magic"
-version = "0.4.27"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/da/db/0b3e28ac047452d079d375ec6798bf76a036a08182dbb39ed38116a49130/python-magic-0.4.27.tar.gz", hash = "sha256:c1ba14b08e4a5f5c31a302b7721239695b2f0f058d125bd5ce1ee36b9d9d3c3b", size = 14677, upload-time = "2022-06-07T20:16:59.508Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6c/73/9f872cb81fc5c3bb48f7227872c28975f998f3e7c2b1c16e95e6432bbb90/python_magic-0.4.27-py2.py3-none-any.whl", hash = "sha256:c212960ad306f700aa0d01e5d7a325d20548ff97eb9920dcd29513174f0294d3", size = 13840, upload-time = "2022-06-07T20:16:57.763Z" },
-]
-
-[[package]]
 name = "python-multipart"
 version = "0.0.32"
 source = { registry = "https://pypi.org/simple" }
@@ -4713,27 +4703,6 @@ requires-dist = [
 ]
 
 [[package]]
-name = "worker-files"
-version = "0.1.0"
-source = { editable = "packages/worker-files" }
-dependencies = [
-    { name = "azure-storage-blob" },
-    { name = "boto3" },
-    { name = "minio" },
-    { name = "pillow" },
-    { name = "python-magic" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "azure-storage-blob", specifier = ">=12.23.0,<13.0.0" },
-    { name = "boto3", specifier = ">=1.34.0,<2.0.0" },
-    { name = "minio", specifier = ">=7.2.0,<8.0.0" },
-    { name = "pillow", specifier = ">=10.0.0,<11.0.0" },
-    { name = "python-magic", specifier = ">=0.4.27,<1.0.0" },
-]
-
-[[package]]
 name = "worker-github"
 version = "0.1.0"
 source = { editable = "packages/worker-github" }
@@ -5051,6 +5020,10 @@ source = { editable = "packages/worker-templates" }
 dependencies = [
     { name = "jinja2" },
     { name = "pydantic" },
+]
+
+[package.optional-dependencies]
+pdf = [
     { name = "weasyprint" },
 ]
 
@@ -5058,8 +5031,9 @@ dependencies = [
 requires-dist = [
     { name = "jinja2", specifier = ">=3.1.0,<4.0.0" },
     { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
-    { name = "weasyprint", specifier = ">=60.0,<61.0" },
+    { name = "weasyprint", marker = "extra == 'pdf'", specifier = ">=60.0,<61.0" },
 ]
+provides-extras = ["pdf"]
 
 [[package]]
 name = "worker-tenancy"
