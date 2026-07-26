@@ -19,6 +19,15 @@ dev = [
 
 [tool.uv.workspace]
 members = ["apps/identity-service", "packages/worker-*", "packages/worker-cli"]
+# Phase-1 deficit: worker-files is a shell whose declared C-backend deps
+# (pillow, python-magic) and He adapt (boto3, minio, azure, ...) have no active
+# workspace consumer (no app/service depends on it; its Phase-1 smoke skips on
+# missing system libmagic). Excluded from the workspace so uv lock / uv sync
+# --all-packages no longer resolve it (CI was failing building Pillow from
+# source on Python 3.14/ubuntu-latest — no wheel + missing libjpeg headers).
+# Re-include in Phase 3 Sub-step 3.5 when an actual consumer is wired. The shell
+# code and smoke test remain on disk; pytest skips its import.
+exclude = ["packages/worker-files"]
 
 [tool.uv.sources]
 worker-core = { workspace = true }
@@ -53,7 +62,6 @@ worker-agents = { workspace = true }
 worker-templates = { workspace = true }
 worker-notifications = { workspace = true }
 worker-email = { workspace = true }
-worker-files = { workspace = true }
 worker-github = { workspace = true }
 worker-cli = { workspace = true }
 
