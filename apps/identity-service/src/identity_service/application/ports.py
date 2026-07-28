@@ -8,8 +8,8 @@ from typing import Protocol
 from uuid import UUID
 
 from identity_service.domain.audit import AuditEvent
+from identity_service.domain.session import SessionView
 from identity_service.domain.user import User
-from identity_service.infrastructure.database.models import SessionModel
 
 __all__ = [
     "AuditRepository",
@@ -44,7 +44,7 @@ class SessionRepository(Protocol):
     async def add(
         self, *, user_id: UUID, tenant_id: UUID, refresh_jti: str, expires_at: datetime
     ) -> None: ...
-    async def get_by_jti(self, refresh_jti: str) -> SessionModel | None: ...
+    async def get_by_jti(self, refresh_jti: str) -> SessionView | None: ...
     async def revoke(self, refresh_jti: str, revoked_at: datetime) -> None: ...
 
 

@@ -18,6 +18,7 @@ from identity_service.application.commands import (
 )
 from identity_service.application.ports import AuthPrincipal, TokenPair
 from identity_service.domain.audit import AuditAction
+from identity_service.domain.session import SessionView
 from identity_service.domain.user import AccountStatus, User
 from identity_service.domain.value_objects import Email, PasswordHash
 
@@ -41,38 +42,34 @@ class _FakeUsers:
         self.by_email[(user.tenant_id.value, user.email.value)] = user
 
 
-class _FakeSessionRow:
-    def __init__(
-        self, *, user_id: UUID, tenant_id: UUID, refresh_jti: str, expires_at: datetime
-    ) -> None:
-        self.user_id = user_id
-        self.tenant_id = tenant_id
-        self.refresh_jti = refresh_jti
-        self.expires_at = expires_at
-        self.revoked_at: datetime | None = None
-
-
 class _FakeSessions:
     def __init__(self) -> None:
-        self.rows: dict[str, _FakeSessionRow] = {}
+        self.rows: dict[str, SessionView] = {}
 
     async def add(
         self, *, user_id: UUID, tenant_id: UUID, refresh_jti: str, expires_at: datetime
     ) -> None:
-        self.rows[refresh_jti] = _FakeSessionRow(
+        self.rows[refresh_jti] = SessionView(
             user_id=user_id,
             tenant_id=tenant_id,
             refresh_jti=refresh_jti,
             expires_at=expires_at,
+            revoked_at=None,
         )
 
-    async def get_by_jti(self, refresh_jti: str) -> _FakeSessionRow | None:
+    async def get_by_jti(self, refresh_jti: str) -> SessionView | None:
         return self.rows.get(refresh_jti)
 
     async def revoke(self, refresh_jti: str, revoked_at: datetime) -> None:
         row = self.rows.get(refresh_jti)
         if row is not None and row.revoked_at is None:
-            row.revoked_at = revoked_at
+            self.rows[refresh_jti] = SessionView(
+                user_id=row.user_id,
+                tenant_id=row.tenant_id,
+                refresh_jti=row.refresh_jti,
+                expires_at=row.expires_at,
+                revoked_at=revoked_at,
+            )
 
 
 class _FakeAudit:
