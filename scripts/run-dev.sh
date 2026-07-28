@@ -27,10 +27,7 @@ echo "    Database: $DB_URL"
 WORKER_DATABASE_URL="$DB_URL" \
   IDENTITY_JWT_SECRET="${IDENTITY_JWT_SECRET:-dev-only-secret-change-me-in-production-32bytes}" \
   WORKER_CORS_ALLOW_ORIGINS="${IDENTITY_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}" \
-  uv run -p identity-identity-service python -c "
-from identity_service.main import run
-run()
-" &
+  uv run worker-identity &
 
 BACKEND_PID=$!
 trap 'kill $BACKEND_PID 2>/dev/null; exit' INT TERM
