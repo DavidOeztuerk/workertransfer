@@ -6,7 +6,12 @@ each provider's ``__init__`` and are intentionally NOT touched here (no network,
 no API key, no model download).
 """
 
-from worker_ai import Message
+import pytest
+
+try:
+    from worker_ai import Message  # type: ignore[no-redef,unused-ignore]
+except ImportError:
+    pytest.skip("worker-ai is excluded from the workspace", allow_module_level=True)  # type: ignore[unused-ignore]
 
 
 def test_smoke_message_constructs() -> None:

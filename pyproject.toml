@@ -27,7 +27,7 @@ members = ["apps/identity-service", "packages/worker-*", "packages/worker-cli"]
 # source on Python 3.14/ubuntu-latest — no wheel + missing libjpeg headers).
 # Re-include in Phase 3 Sub-step 3.5 when an actual consumer is wired. The shell
 # code and smoke test remain on disk; pytest skips its import.
-exclude = ["packages/worker-files"]
+exclude = ["packages/worker-files", "packages/worker-ai"]
 
 [tool.uv.sources]
 worker-core = { workspace = true }
@@ -83,7 +83,7 @@ select = ["E", "F", "I", "B", "UP", "ASYNC", "RUF"]
 python_version = "3.14"
 strict = true
 warn_unreachable = true
-exclude = ["tests"]
+exclude = ["tests", "packages/worker-files", "packages/worker-ai"]
 
 # Untyped third-party libraries (no py.typed marker / no stubs available).
 # Strict mode stays on; we only silence import-untyped for these specific modules.

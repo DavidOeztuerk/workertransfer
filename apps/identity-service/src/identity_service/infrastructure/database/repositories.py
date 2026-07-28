@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from identity_service.domain.audit import AuditEvent
+from identity_service.domain.session import SessionView
 from identity_service.domain.user import AccountStatus, User
 from identity_service.domain.value_objects import Email, PasswordHash, TenantId, UserId
 from identity_service.infrastructure.database.models import (
@@ -77,9 +78,18 @@ class SqlAlchemySessionRepository:
         )
         await self._session.flush()
 
-    async def get_by_jti(self, refresh_jti: str) -> SessionModel | None:
+    async def get_by_jti(self, refresh_jti: str) -> SessionView | None:
         stmt = select(SessionModel).where(SessionModel.refresh_jti == refresh_jti)
-        return (await self._session.execute(stmt)).scalar_one_or_none()
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            return None
+        return SessionView(
+            user_id=row.user_id,
+            tenant_id=row.tenant_id,
+            refresh_jti=row.refresh_jti,
+            expires_at=row.expires_at,
+            revoked_at=row.revoked_at,
+        )
 
     async def revoke(self, refresh_jti: str, revoked_at: datetime) -> None:
         stmt = select(SessionModel).where(SessionModel.refresh_jti == refresh_jti)
