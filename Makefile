@@ -7,7 +7,7 @@
 #
 # Python lifecycle goes through `uv` (never pip/poetry); frontend through `pnpm`.
 
-.PHONY: help check lint fix type test sync ci clean
+.PHONY: help check lint fix type test sync ci clean dev
 
 help:  # Show this help (default target).
 	@awk 'BEGIN {FS = ":.*#"} /^[a-zA-Z_-]+:.*# / {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -36,6 +36,9 @@ sync:  # Install every workspace package + dev group.
 	uv sync --all-packages --all-groups
 
 ci: check  # Mirror the CI job locally (same steps, same order).
+
+dev:  # Start backend + frontend together locally.
+	./scripts/run-dev.sh
 
 clean:  # Remove caches + bytecode artifacts.
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
