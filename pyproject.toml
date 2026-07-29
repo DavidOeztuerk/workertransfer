@@ -18,7 +18,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["apps/identity-service", "packages/worker-*", "packages/worker-cli"]
+members = ["apps/identity-service", "apps/consent-service", "packages/worker-*", "packages/worker-cli"]
 # Phase-1 deficit: worker-files is a shell whose declared C-backend deps
 # (pillow, python-magic) and He adapt (boto3, minio, azure, ...) have no active
 # workspace consumer (no app/service depends on it; its Phase-1 smoke skips on
@@ -64,6 +64,7 @@ worker-notifications = { workspace = true }
 worker-email = { workspace = true }
 worker-github = { workspace = true }
 worker-cli = { workspace = true }
+consent-service = { workspace = true }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -83,7 +84,7 @@ select = ["E", "F", "I", "B", "UP", "ASYNC", "RUF"]
 python_version = "3.14"
 strict = true
 warn_unreachable = true
-exclude = ["tests", "packages/worker-files", "packages/worker-ai"]
+exclude = ["tests", "packages/worker-files", "packages/worker-ai", "apps/identity-service/migrations", "apps/consent-service/migrations"]
 
 # Untyped third-party libraries (no py.typed marker / no stubs available).
 # Strict mode stays on; we only silence import-untyped for these specific modules.
