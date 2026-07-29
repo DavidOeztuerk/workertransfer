@@ -1,5 +1,6 @@
 """Worker CLI: Code generation for services, packages, and Clean Architecture components."""
 
+import subprocess
 from pathlib import Path
 from string import Template
 
@@ -10,6 +11,11 @@ app = typer.Typer(help="WorkerTransfer Platform CLI")
 console = Console()
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
+
+
+def _alembic_dir_for(service: str) -> Path:
+    """Return the per-service root that must contain an alembic.ini (ADR-0010)."""
+    return Path(f"apps/{service}")
 
 
 @app.command()
@@ -294,11 +300,16 @@ def migrate(
     service: str = typer.Option(..., help="Target service"),
 ) -> None:
     """Create Alembic migration"""
-    import subprocess
-
+    service_dir = _alembic_dir_for(service)
+    if not (service_dir / "alembic.ini").is_file():
+        console.print(
+            f"[red]No alembic.ini at {service_dir}/alembic.ini[/red] "
+            "(per-service Alembic, see ADR-0010): run `worker new-service`"
+        )
+        raise typer.Exit(1)
     result = subprocess.run(
         ["uv", "run", "alembic", "revision", "--autogenerate", "-m", message],
-        cwd=f"apps/{service}",
+        cwd=str(service_dir),
     )
     if result.returncode == 0:
         console.print("[green]Migration created successfully![/green]")
@@ -312,11 +323,16 @@ def upgrade(
     revision: str = typer.Option("head", help="Target revision"),
 ) -> None:
     """Run database migrations"""
-    import subprocess
-
+    service_dir = _alembic_dir_for(service)
+    if not (service_dir / "alembic.ini").is_file():
+        console.print(
+            f"[red]No alembic.ini at {service_dir}/alembic.ini[/red] "
+            "(per-service Alembic, see ADR-0010)."
+        )
+        raise typer.Exit(1)
     result = subprocess.run(
         ["uv", "run", "alembic", "upgrade", revision],
-        cwd=f"apps/{service}",
+        cwd=str(service_dir),
     )
     if result.returncode == 0:
         console.print("[green]Migrations applied successfully![/green]")

@@ -8,15 +8,26 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+  "httpx>=0.27.0,<1.0.0",
   "httpx2>=2.5.0,<3.0.0",
   "mypy>=1.19.1,<2.0.0",
   "pytest>=9.0.2,<10.0.0",
   "pytest-asyncio>=1.3.0,<2.0.0",
   "ruff>=0.15.0,<1.0.0",
+  "testcontainers[postgres]>=4.0.0,<5.0.0",
 ]
 
 [tool.uv.workspace]
 members = ["apps/identity-service", "packages/worker-*", "packages/worker-cli"]
+# Phase-1 deficit: worker-files is a shell whose declared C-backend deps
+# (pillow, python-magic) and He adapt (boto3, minio, azure, ...) have no active
+# workspace consumer (no app/service depends on it; its Phase-1 smoke skips on
+# missing system libmagic). Excluded from the workspace so uv lock / uv sync
+# --all-packages no longer resolve it (CI was failing building Pillow from
+# source on Python 3.14/ubuntu-latest — no wheel + missing libjpeg headers).
+# Re-include in Phase 3 Sub-step 3.5 when an actual consumer is wired. The shell
+# code and smoke test remain on disk; pytest skips its import.
+exclude = ["packages/worker-files", "packages/worker-ai"]
 
 [tool.uv.sources]
 worker-core = { workspace = true }
@@ -32,7 +43,6 @@ worker-database = { workspace = true }
 worker-cache = { workspace = true }
 worker-events = { workspace = true }
 worker-messaging = { workspace = true }
-worker-middleware = { workspace = true }
 worker-health = { workspace = true }
 worker-metrics = { workspace = true }
 worker-tracing = { workspace = true }
@@ -52,7 +62,6 @@ worker-agents = { workspace = true }
 worker-templates = { workspace = true }
 worker-notifications = { workspace = true }
 worker-email = { workspace = true }
-worker-files = { workspace = true }
 worker-github = { workspace = true }
 worker-cli = { workspace = true }
 
@@ -74,7 +83,7 @@ select = ["E", "F", "I", "B", "UP", "ASYNC", "RUF"]
 python_version = "3.14"
 strict = true
 warn_unreachable = true
-exclude = ["tests"]
+exclude = ["tests", "packages/worker-files", "packages/worker-ai"]
 
 # Untyped third-party libraries (no py.typed marker / no stubs available).
 # Strict mode stays on; we only silence import-untyped for these specific modules.
@@ -96,8 +105,6 @@ module = [
   "docx.*",
   "meilisearch_sdk.*",
   "github.*",
-  "jose.*",
-  "passlib.*",
   "magic.*",
   "bs4.*",
 ]

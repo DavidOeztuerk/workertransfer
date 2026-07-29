@@ -314,6 +314,13 @@ findet, Analytics aggregiert datenschutzkonform. Tests (Testcontainers).
   → Jaeger/Prometheus/Loki + Grafana + Alerting + SLO/SLI).
 - Production-Hardening: Verschlüsselung, DPIA-Werte, Retention/Deletion/Export,
   Access-Control, Threat-Modell, Dependency-Scanning.
+  - **Per-IP Rate-Limiting am Auth-Rand (Phase-2-Folge):** `worker-ratelimit`
+    (Token-Bucket, implementiert) an `POST /auth/login` und `/auth/refresh` im
+    identity-service anbinden *bevor* das Gateway externen Traffic zulässt.
+    Phase-2 hat bewusst nur den TODO-Marker in
+    `apps/identity-service/src/identity_service/presentation/http/router.py`
+    (`build_auth_router`) gesetzt; der Service lauscht bis dahin loopback und
+    ist nicht extern erreichbar — der Marker ist in Phase 10 einzulösen.
 **DoD:** Frontend baut&typecheckt, Gateway routet, Docker-Compose bringt den
 Stack hoch, OTel sichtbar, Hardening-Checkliste abgehakt. CI grün.
 

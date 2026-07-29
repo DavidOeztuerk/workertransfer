@@ -1,90 +1,59 @@
-"""Multi-tenancy: Tenant resolution, Context, Isolation strategies."""
+"""Multi-tenancy: thin re-export of the platform tenant-context canon (ADR-0009 prep).
+
+The canonical tenant contextvar lives in ``worker_platform.context`` (the
+str-form of the UUID, per ADR-0002/ADR-0005). This keeps a thin re-export for
+consumers and adds ``ClaimTenantResolver`` — the production tenant source that
+derives the tenant id from ``request.state.user`` (set by the identity-service
+auth middleware), returning the str-form for the platform str-typed contextvar.
+
+Removed (recorded in ADR-0009): the UUID-typed ``_tenant_id``/``_tenant_context``
+ContextVars, ``set_tenant_id``/``set_tenant_context``/``get_tenant_context``,
+``HeaderTenantResolver`` (superseded by the platform
+``DevelopmentHeaderTenantResolver`` for local/test), and the
+``SubdomainTenantResolver`` stub (a real scope-based subdomain resolver is a
+Phase-4 concern, re-added there). ``worker-middleware`` — the lone duplicate of
+the platform canon with zero importers — was deleted alongside this
+consolidation (the same treatment ADR-0005 gave ``worker-cqrs``).
+"""
 
 from __future__ import annotations
 
-from contextvars import ContextVar
-from typing import Any
-from uuid import UUID
-
-from starlette.requests import Request
+from starlette.types import Scope
+from worker_platform.context import get_tenant_id, tenant_context
+from worker_platform.presentation.middleware import (
+    DevelopmentHeaderTenantResolver,
+    NoTenantResolver,
+    TenantResolver,
+)
 
 __all__ = [
     "ClaimTenantResolver",
-    "HeaderTenantResolver",
-    "SubdomainTenantResolver",
+    "DevelopmentHeaderTenantResolver",
+    "NoTenantResolver",
     "TenantResolver",
-    "get_tenant_context",
     "get_tenant_id",
-    "set_tenant_context",
-    "set_tenant_id",
+    "tenant_context",
 ]
 
-_tenant_id: ContextVar[UUID | None] = ContextVar("tenant_id", default=None)
-_tenant_context: ContextVar[dict[str, Any] | None] = ContextVar("tenant_context", default=None)
 
+class ClaimTenantResolver:
+    """Production tenant source: read ``tenant_id`` from the authenticated
+    principal attached at ``request.state.user`` by the auth middleware.
 
-def set_tenant_id(tenant_id: UUID | None) -> None:
-    _tenant_id.set(tenant_id)
-
-
-def get_tenant_id() -> UUID | None:
-    return _tenant_id.get()
-
-
-def set_tenant_context(context: dict[str, Any] | None) -> None:
-    _tenant_context.set(context)
-
-
-def get_tenant_context() -> dict[str, Any] | None:
-    return _tenant_context.get()
-
-
-class TenantResolver:
-    def resolve(self, request: Request) -> UUID | None:
-        # Override in subclasses
-        return None
-
-
-class HeaderTenantResolver(TenantResolver):
-    def __init__(self, header_name: str = "X-Tenant-ID") -> None:
-        self.header_name = header_name
-
-    def resolve(self, request: Request) -> UUID | None:
-        value = request.headers.get(self.header_name)
-        if value:
-            try:
-                return UUID(value)
-            except ValueError:
-                pass
-        return None
-
-
-class ClaimTenantResolver(TenantResolver):
-    def __init__(self, claim: str = "tenant_id") -> None:
-        self.claim = claim
-
-    def resolve(self, request: Request) -> UUID | None:
-        if hasattr(request.state, "user"):
-            tenant_id: Any = getattr(request.state.user, self.claim, None)
-            if tenant_id:
-                return UUID(str(tenant_id))
-        return None
-
-
-class SubdomainTenantResolver(TenantResolver):
-    def resolve(self, request: Request) -> UUID | None:
-        host = request.headers.get("host", "")
-        # Phase 4 will implement tenant-by-subdomain lookup; the parse is kept here as a stub.
-        subdomain = host.split(".")[0]  # noqa: F841
-        # Look up tenant by subdomain
-        return None  # Implement lookup
-
-
-class NoTenantResolver(TenantResolver):
-    """Resolver that never resolves a tenant (open-context default).
-
-    Used in local/dev/test for routes that are intentionally tenant-agnostic.
+    Returns the str-form of the tenant id (UUID_str) for the platform
+    str-typed tenant contextvar; ``None`` when there is no user, no
+    tenant_id, or the attribute is absent.
     """
 
-    def resolve(self, request: Request) -> UUID | None:
-        return None
+    def __init__(self, claim_attr: str = "tenant_id") -> None:
+        self.claim_attr = claim_attr
+
+    def resolve(self, scope: Scope) -> str | None:
+        state = scope.get("state") or {}
+        user = state.get("user")
+        if user is None:
+            return None
+        value = getattr(user, self.claim_attr, None)
+        if value is None:
+            return None
+        return str(value)

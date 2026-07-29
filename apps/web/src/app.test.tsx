@@ -1,10 +1,11 @@
 import { render, screen } from "@testing-library/react";
 
-import { App } from "./app";
+import { HomeRoute } from "./routes/home";
+import { LoginRoute } from "./routes/login";
 
-describe("App", () => {
+describe("HomeRoute", () => {
   it("states the consent-first product promise", () => {
-    render(<App />);
+    render(<HomeRoute />);
 
     expect(
       screen.getByRole("heading", {
@@ -12,5 +13,12 @@ describe("App", () => {
       })
     ).toBeInTheDocument();
     expect(screen.getByText("Du entscheidest")).toBeInTheDocument();
+  });
+});
+
+describe("LoginRoute", () => {
+  it("renders the German login heading", () => {
+    render(<LoginRoute />);
+    expect(screen.getByRole("heading", { name: "Anmelden" })).toBeInTheDocument();
   });
 });

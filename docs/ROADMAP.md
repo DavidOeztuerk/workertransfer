@@ -11,7 +11,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 |---|-------|--------|----------|
 | 0 | Repo-Disziplin & Betriebsamskeit | ✅ | Roadmap, ADRs, Skills, Glossar |
 | 1 | Foundation festigen (CI grün) | ✅ | ruff 0 ✅, mypy 0 ✅, CLI läuft ✅, Duplikate ✅, Smoke-Tests ✅, Premerge-Wrapper ✅ |
-| 2 | Identity & Tenancy | ⬜ | OIDC/OAuth, JWT, Claims-Tenant, Audit, DB-Migration |
+| 2 | Identity & Tenancy | ✅ | OIDC/OAuth, JWT, Claims-Tenant, Audit, DB-Migration |
 | 3 | Candidate Core | ⬜ | Profile/Resume/Portfolio + Consent-Ledger |
 | 4 | Jobs & Applications | ⬜ | Jobs, Applications, Companies, Career-Sites |
 | 5 | Transfermarkt | ⬜ | Market-State-Machine, Konsensflows, Vertragsdraft |
@@ -120,11 +120,29 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
   `make lint`/`make type`/`make test` alle Exit 0, `make fix` idempotent — Phase 1
   DoD erfüllt.)
 
-Nächste Aktion: **Phase 2 starten — Identity & Tenancy.** Erster vertikaler
-Slice mit echter Domain: `apps/identity-service` ausbauen (User-Aggregat,
-Account-Lifecycle, Sessions, OIDC/OAuth2-Einstieg, JWT-Ausgabe/-Verify,
-Refresh-Tokens), `worker-auth` + `worker-authorization` einbinden,
-PostgreSQL-Substrat via `worker-database`, Tenant-Kontext von Header-Resolver
-auf claims-basiert umstellen (Header-Resolver nur local/test), Audit-Events.
-DoD: User kann sich anmelden, erhält JWT, Tenant kommt aus dem Claim, Audit-Event
-persistiert, Identity-Service hat DB-Migration, Tests (Testcontainers).
+### Phase 2 — Status: ✅ erledigt (2.1–2.9 ✅)
+- ✅ 2.1 worker-auth repariert (bcrypt direkt + HS256 via PyJWT, jose gefallen) — ADR-0006/0007
+- ✅ 2.2 pro-service async Alembic + worker-cli-Reparatur — ADR-0010
+- ✅ 2.3 identity-domain (User-Aggregat, Email/PasswordHash/UserId/TenantId Value Objects,
+  AccountStatus synchron-ACTIVE, AuditEvent, Ports)
+- ✅ 2.4 Persistenz + Migration `0001_init_users_sessions_audit` + Testcontainers — ADR-0011
+- ✅ 2.5 application commands (register/login/refresh) + HTTP `/auth/*` + `/me` + auth middleware
+- ✅ 2.6 tenant consolidation (worker-tenancy re-export + ClaimTenantResolver aus JWT-Claim;
+  `X-Tenant-ID` in prod ignoriert) — ADR-0009
+- ✅ 2.7 audit EventBus-Seam + atomicity-Tests (login_success/login_failure persistiert,
+  `actor_id` NULL bei unbekanntem User) — ADR-0012
+- ✅ 2.8 frontend `/login` (deutsch, TanStack Router code-router, cookie-auth);
+  worker-platform optional CORS hook (dev-allowlist, prod-refused) als cookie-auth-enabler
+- ✅ 2.9 CI bereit für Testcontainers (Docker auf `ubuntu-latest`, offline-skip ADR-0011) + ROADMAP ✅
+- ADRs geschrieben: 0006, 0007, 0008, 0009, 0010, 0011, 0012
+- DoD erfüllt: User kann sich anmelden → `POST /auth/login` 200 + `access`/`refresh` HTTP-only-Cookies
+  (`test_auth_endpoints.py`); erhält JWT (HS256, `worker-auth`); Tenant kommt aus dem Claim
+  (`/me`, `test_tenant_source.py`); Audit persistiert (`test_audit_atomicity.py`);
+  DB-Migration läuft (`test_migrations.py`); Testcontainers-Integration; frontend `/login`;
+  `make check` + `pnpm check`/`pnpm test` grün.
+- Folge-Defizit (nicht blockierend): per-IP-Rate-Limiting fehlt — TODO-Marker in
+  `build_auth_router` (Phase-10, `worker-ratelimit`).
+
+Nächste Aktion: **Phase 3 starten — Candidate Core.** Profile/Resume/Portfolio +
+Consent-Ledger als nächster vertikaler Slice; Identity-Service bleibt Voraussetzung
+für authentifizierte Candidate-Endpunkte.
