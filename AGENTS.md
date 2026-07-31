@@ -27,13 +27,21 @@ This is a **dual-ecosystem monorepo**: Python (uv workspace) + frontend (pnpm + 
 
 ```text
 apps/
-  identity-service/   Python service (uv workspace member)
+  identity-service/   auth vertical slice — the reference service shape
+  consent-service/    consent ledger (Phase 3, ~10% built)
   web/                React frontend (pnpm workspace member)
-packages/
-  worker-core/        Framework-free domain primitives (Python)
-  worker-platform/    HTTP/platform utilities (Python)
-  ui/                 Shared React components
+packages/             34 Python packages + 1 TypeScript package
+  worker-core/        framework-free domain primitives
+  worker-platform/    the kernel: settings, context, logging, CQRS, middleware, health, errors
+  worker-shared/      domain-neutral primitives (utc_now, Page, Cursor, Money)
+  worker-*/           composable infrastructure libraries (auth, database, events, …)
+  ui/                 shared React components (Button, Card)
+tests/                repo-level architectural guards
 ```
+
+Most `worker-*` packages have one smoke test and no production consumer. `worker-ai`
+and `worker-files` are **excluded from the uv workspace**; `worker-github` is
+unimportable (PyGithub vs. githubkit mismatch). Verify before depending on any of them.
 
 ## Python workspace
 
@@ -41,7 +49,9 @@ packages/
 
 ```bash
 uv sync --all-packages --all-groups
-make check   # = ruff format --check → ruff check → mypy packages apps → pytest
+make check      # all six steps, fail-fast
+make check-py   # Python only
+make check-web  # frontend only
 ```
 Equivalent explicit steps (the binding order):
 ```bash
@@ -55,7 +65,8 @@ uv run pytest
 - **Linter/formatter**: ruff (line-length=100, target py314)
 - **Type checker**: mypy strict mode (excludes tests)
 - **Test runner**: pytest with `asyncio_mode = "auto"`
-- **Service entrypoint**: `apps/identity-service/src/identity_service/main.py`
+- **Service entrypoints**: `apps/<service>/src/<module>/main.py`, exposed as `[project.scripts]`
+- **Python 3.14 must be a *final* release**, not an rc — pydantic breaks on 3.14.0rc2
 
 ### Service architecture
 
