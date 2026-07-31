@@ -35,8 +35,11 @@
 
 - Each service owns its data and emits audit events for security-sensitive actions.
 - Tenant identity will come from authenticated claims, never from a browser-controlled
-  request header. The development-only header support in the foundation is for local
-  test fixtures only.
+  request header — nor from a request body, which is equally client-controlled. The
+  development-only header support in the foundation is for local test fixtures only.
+- A tenant is a **company**; a natural person has none (ADR-0017). Tenant scopes
+  company data, never personal data — personal data is scoped by the person. The
+  consent-ledger is subject-scoped for exactly this reason.
 - Data retention, deletion, export, consent history, access controls, encryption,
   threat modelling, and a DPIA are first-class delivery requirements, not a final
   hardening phase.
