@@ -307,8 +307,10 @@ def migrate(
             "(per-service Alembic, see ADR-0010): run `worker new-service`"
         )
         raise typer.Exit(1)
-    result = subprocess.run(
-        ["uv", "run", "alembic", "revision", "--autogenerate", "-m", message],
+    # S603/S607: fixed argv, no shell=True; `uv` is resolved from PATH on
+    # purpose so the project's own venv provides alembic (ADR-0010).
+    result = subprocess.run(  # noqa: S603
+        ["uv", "run", "alembic", "revision", "--autogenerate", "-m", message],  # noqa: S607
         cwd=str(service_dir),
     )
     if result.returncode == 0:
@@ -330,8 +332,10 @@ def upgrade(
             "(per-service Alembic, see ADR-0010)."
         )
         raise typer.Exit(1)
-    result = subprocess.run(
-        ["uv", "run", "alembic", "upgrade", revision],
+    # S603/S607: fixed argv, no shell=True; `uv` is resolved from PATH on
+    # purpose so the project's own venv provides alembic (ADR-0010).
+    result = subprocess.run(  # noqa: S603
+        ["uv", "run", "alembic", "upgrade", revision],  # noqa: S607
         cwd=str(service_dir),
     )
     if result.returncode == 0:

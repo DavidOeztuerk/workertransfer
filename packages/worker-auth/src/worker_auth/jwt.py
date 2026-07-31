@@ -55,7 +55,7 @@ class TokenManager:
             tenant_id=tenant_id,
             roles=roles,
             permissions=permissions,
-            token_type="access",
+            token_type="access",  # noqa: S106 - JWT claim discriminator, not a secret
             expire_minutes=self.access_token_expire_minutes,
             jti=str(uuid4()),
         )
@@ -66,7 +66,7 @@ class TokenManager:
             tenant_id=tenant_id,
             roles=[],
             permissions=[],
-            token_type="refresh",
+            token_type="refresh",  # noqa: S106 - JWT claim discriminator, not a secret
             expire_minutes=self.refresh_token_expire_minutes,
             jti=session_jti,
         )

@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import tempfile
 from abc import ABC, abstractmethod
 from typing import Any, BinaryIO
 
@@ -107,9 +108,13 @@ class MinIOStorage(StorageBackend):
 
 
 class LocalStorage(StorageBackend):
-    def __init__(self, base_path: str = "/tmp/storage"):
-        self._base_path = base_path
-        os.makedirs(base_path, exist_ok=True)
+    def __init__(self, base_path: str | None = None):
+        # A hardcoded "/tmp/storage" default is a predictable, world-writable
+        # path that any local user can pre-create or read — unacceptable for a
+        # product that stores CVs and contracts. Callers should pass an explicit
+        # path; the fallback resolves the platform temp dir at runtime.
+        self._base_path = base_path or os.path.join(tempfile.gettempdir(), "workertransfer-storage")
+        os.makedirs(self._base_path, mode=0o700, exist_ok=True)
 
     def _full_path(self, key: str) -> str:
         return os.path.join(self._base_path, key)
