@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Unified telemetry: Logging + Metrics + Tracing integration"
 requires-python = ">=3.14"
 dependencies = [
+    "worker-logging",
+    "worker-metrics",
+    "worker-tracing",
     "opentelemetry-api>=1.25.0,<2.0.0",
     "opentelemetry-sdk>=1.25.0,<2.0.0",
     "prometheus-client>=0.19.0,<1.0.0",
