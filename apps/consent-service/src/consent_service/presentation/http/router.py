@@ -13,7 +13,13 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
-from worker_contracts import ConsentCheckV1, ConsentGrantV1, ConsentRevokeV1, ConsentStateV1
+from worker_contracts import (
+    ConsentCheckResultV1,
+    ConsentCheckV1,
+    ConsentGrantV1,
+    ConsentRevokeV1,
+    ConsentStateV1,
+)
 from worker_core import DomainError
 
 from consent_service.application.commands import (
@@ -54,12 +60,25 @@ def _to_http(error: DomainError | None) -> HTTPException:
 
 
 def _state_dto(subject_id: Any, capability: str, state: ConsentState) -> ConsentStateV1:
+    """Full state including the reason — only for a caller that IS the subject."""
     return ConsentStateV1(
         subject_id=subject_id,
         capability=capability,
         granted=state.granted,
         deleted=state.deleted,
         reason=state.reason,
+    )
+
+
+def _check_result_dto(
+    subject_id: Any, capability: str, state: ConsentState
+) -> ConsentCheckResultV1:
+    """State without the reason — for the cross-subject read (see `/check`)."""
+    return ConsentCheckResultV1(
+        subject_id=subject_id,
+        capability=capability,
+        granted=state.granted,
+        deleted=state.deleted,
     )
 
 
@@ -111,16 +130,18 @@ def build_consent_router(deps: dict[str, Any]) -> APIRouter:
         return _state_dto(body.subject_id, body.capability, result.value)
 
     @router.post("/check")
-    async def check(body: ConsentCheckV1, request: Request) -> ConsentStateV1:
+    async def check(body: ConsentCheckV1, request: Request) -> ConsentCheckResultV1:
         # Any authenticated caller may ask about any subject: that is what makes
         # the ledger usable as an enabler by consuming services. The answer only
-        # reveals whether a capability is granted, never the data behind it.
+        # reveals whether a capability is granted, never the data behind it —
+        # hence ConsentCheckResultV1, which has no `reason`. The withdrawal
+        # reason is free text the subject wrote and belongs to the subject alone.
         _actor_id(request)
         query = CheckConsentQuery(subject_id=body.subject_id, capability=body.capability)
         async with request_scope(session_factory) as (_uow, repos):
             result = await handle_check(query, deps=deps, repos=repos)
         if not result.is_success:
             raise _to_http(result.error)
-        return _state_dto(body.subject_id, body.capability, result.value)
+        return _check_result_dto(body.subject_id, body.capability, result.value)
 
     return router

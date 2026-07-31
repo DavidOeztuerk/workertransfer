@@ -15,6 +15,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 __all__ = [
+    "ConsentCheckResultV1",
     "ConsentCheckV1",
     "ConsentGrantV1",
     "ConsentRevokeV1",
@@ -53,6 +54,11 @@ class ConsentStateV1(BaseModel):
 
     `granted: false` with `reason: "no consent event"` is the answer for a pair
     nobody ever touched — absence is a state, not a 404.
+
+    Carries `reason`, so it is only safe to return to the subject itself. The
+    write endpoints qualify: they refuse an actor that is not the subject
+    (`ConsentSubjectMismatch`). For the cross-subject read use
+    `ConsentCheckResultV1`.
     """
 
     subject_id: UUID
@@ -60,3 +66,23 @@ class ConsentStateV1(BaseModel):
     granted: bool
     deleted: bool = False
     reason: str | None = None
+
+
+class ConsentCheckResultV1(BaseModel):
+    """The answer to "may I?" — deliberately without the reason.
+
+    `/consent/check` is open to any authenticated caller asking about any
+    subject, because that is what makes the ledger usable as an enabler by
+    consuming services. A withdrawal reason is up to 500 characters of free text
+    the subject wrote about themselves, so it must not ride along on a query
+    anyone may issue: the caller learns whether a capability is granted, never
+    why it was withdrawn.
+
+    Separate model rather than a nulled-out field on `ConsentStateV1`: a field
+    that must be blanked at the boundary gets un-blanked by the next refactor.
+    """
+
+    subject_id: UUID
+    capability: str
+    granted: bool
+    deleted: bool = False

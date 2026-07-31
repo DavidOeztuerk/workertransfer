@@ -11,7 +11,13 @@ from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
-from worker_contracts import ConsentCheckV1, ConsentGrantV1, ConsentRevokeV1, ConsentStateV1
+from worker_contracts import (
+    ConsentCheckResultV1,
+    ConsentCheckV1,
+    ConsentGrantV1,
+    ConsentRevokeV1,
+    ConsentStateV1,
+)
 
 SUBJECT = uuid4()
 CAPABILITY = "profile.visibility:public"
@@ -62,7 +68,32 @@ def test_absent_consent_is_a_state_not_an_error() -> None:
 
 def test_dtos_carry_no_domain_types() -> None:
     """A consumer must never need to import consent_service to talk to it."""
-    for model in (ConsentGrantV1, ConsentRevokeV1, ConsentCheckV1, ConsentStateV1):
+    for model in (
+        ConsentGrantV1,
+        ConsentRevokeV1,
+        ConsentCheckV1,
+        ConsentStateV1,
+        ConsentCheckResultV1,
+    ):
         for field in model.model_fields.values():
             annotation = str(field.annotation)
             assert "consent_service" not in annotation, annotation
+
+
+def test_check_result_has_no_reason_field() -> None:
+    """The cross-subject read answers "may I?", never "why not".
+
+    A withdrawal reason is up to 500 characters the subject wrote about itself.
+    `/consent/check` is open to every authenticated caller for every subject, so
+    the field must be absent from the model rather than blanked at the boundary —
+    a blanked field gets un-blanked by the next refactor.
+    """
+    assert "reason" not in ConsentCheckResultV1.model_fields
+    assert "reason" in ConsentStateV1.model_fields
+
+
+def test_check_result_still_answers_the_question() -> None:
+    result = ConsentCheckResultV1(subject_id=SUBJECT, capability=CAPABILITY, granted=False)
+
+    assert result.granted is False
+    assert result.deleted is False
