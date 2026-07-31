@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Notifications: Email, SMS, Push, WebSocket, Templates, Queue"
 requires-python = ">=3.14"
 dependencies = [
+    "worker-email",
     "pydantic>=2.8.0,<3.0.0",
     "redis>=5.0.0,<6.0.0",
 ]

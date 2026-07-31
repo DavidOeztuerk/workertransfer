@@ -762,15 +762,6 @@ wheels = [
 ]
 
 [[package]]
-name = "dnspython"
-version = "2.8.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/8c/8b/57666417c0f90f08bcafa776861060426765fdb422eb10212086fb811d26/dnspython-2.8.0.tar.gz", hash = "sha256:181d3c6996452cb1189c4046c61599b84a5a86e099562ffde77d26984ff26d0f", size = 368251, upload-time = "2025-09-07T18:58:00.022Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ba/5a/18ad964b0086c6e62e2e7500f7edc89e3faa45033c71c1893d34eed2b2de/dnspython-2.8.0-py3-none-any.whl", hash = "sha256:01d9bbc4a2d76bf0db7c1f729812ded6d912bd318d3b1cf81d30c0f845dbf3af", size = 331094, upload-time = "2025-09-07T18:57:58.071Z" },
-]
-
-[[package]]
 name = "docker"
 version = "7.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -809,19 +800,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/6b/79/365e306017a9fcfbbefab1a3b588d2404bea8806b36766ff0f886509a20e/elasticsearch-8.19.3.tar.gz", hash = "sha256:e84dd618a220cac25b962790085045dd27ac72e01c0a5d81bd29a2d47a71f03f", size = 800298, upload-time = "2025-12-23T12:56:00.72Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/56/0f/ac126833c385b06166d41c486e4911f58ad7791fd1a53dd6e0b8d16ff214/elasticsearch-8.19.3-py3-none-any.whl", hash = "sha256:fe1db2555811192e8a1be78b01234d0a49d32b185ea7eeeb6f059331dee32838", size = 952820, upload-time = "2025-12-23T12:55:56.796Z" },
-]
-
-[[package]]
-name = "email-validator"
-version = "2.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "dnspython" },
-    { name = "idna" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f5/22/900cb125c76b7aaa450ce02fd727f452243f2e91a61af068b40adba60ea9/email_validator-2.3.0.tar.gz", hash = "sha256:9fc05c37f2f6cf439ff414f8fc46d917929974a82244c20eb10231ba60c54426", size = 51238, upload-time = "2025-08-26T13:09:06.831Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/15/545e2b6cf2e3be84bc1ed85613edd75b8aea69807a71c26f4ca6a9258e82/email_validator-2.3.0-py3-none-any.whl", hash = "sha256:80f13f623413e6b197ae73bb10bf4eb0908faf509ad8362c5edeb0be7fd450b4", size = 35604, upload-time = "2025-08-26T13:09:05.858Z" },
 ]
 
 [[package]]
@@ -1978,15 +1956,6 @@ wheels = [
 ]
 
 [[package]]
-name = "phonenumbers"
-version = "8.13.55"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/6e/23/b4c886487ca212ca87768433a43e2b3099c1c2fa5d9e21d2fbce187cc3c2/phonenumbers-8.13.55.tar.gz", hash = "sha256:57c989dda3eabab1b5a9e3d24438a39ebd032fa0172bf68bfd90ab70b3d5e08b", size = 2296624, upload-time = "2025-02-15T08:06:03.465Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/50/dc/a7f0a9d5ad8b98bc5406deb00207b268d6d2edd215c21642e8f2ecc6f0ce/phonenumbers-8.13.55-py2.py3-none-any.whl", hash = "sha256:25feaf46135f0fb1e61b69513dc97c477285ba98a69204bf5a8cf241a844a718", size = 2582306, upload-time = "2025-02-15T08:05:56.746Z" },
-]
-
-[[package]]
 name = "pillow"
 version = "10.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3108,10 +3077,14 @@ version = "0.1.0"
 source = { editable = "packages/worker-contracts" }
 dependencies = [
     { name = "pydantic" },
+    { name = "worker-core" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.8.0,<3.0.0" }]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
+    { name = "worker-core", editable = "packages/worker-core" },
+]
 
 [[package]]
 name = "worker-core"
@@ -3123,11 +3096,11 @@ name = "worker-correlation"
 version = "0.1.0"
 source = { editable = "packages/worker-correlation" }
 dependencies = [
-    { name = "starlette" },
+    { name = "worker-platform" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "starlette", specifier = ">=0.37.0,<1.0.0" }]
+requires-dist = [{ name = "worker-platform", editable = "packages/worker-platform" }]
 
 [[package]]
 name = "worker-database"
@@ -3159,6 +3132,7 @@ dependencies = [
     { name = "boto3" },
     { name = "pydantic" },
     { name = "sendgrid" },
+    { name = "worker-templates" },
 ]
 
 [package.metadata]
@@ -3167,6 +3141,7 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.34.0,<2.0.0" },
     { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
     { name = "sendgrid", specifier = ">=6.10.0,<7.0.0" },
+    { name = "worker-templates", editable = "packages/worker-templates" },
 ]
 
 [[package]]
@@ -3353,12 +3328,14 @@ source = { editable = "packages/worker-notifications" }
 dependencies = [
     { name = "pydantic" },
     { name = "redis" },
+    { name = "worker-email" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
     { name = "redis", specifier = ">=5.0.0,<6.0.0" },
+    { name = "worker-email", editable = "packages/worker-email" },
 ]
 
 [[package]]
@@ -3459,20 +3436,6 @@ requires-dist = [
 name = "worker-shared"
 version = "0.1.0"
 source = { editable = "packages/worker-shared" }
-dependencies = [
-    { name = "email-validator" },
-    { name = "phonenumbers" },
-    { name = "pydantic" },
-    { name = "python-dateutil" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "email-validator", specifier = ">=2.1.0,<3.0.0" },
-    { name = "phonenumbers", specifier = ">=8.13.0,<9.0.0" },
-    { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
-    { name = "python-dateutil", specifier = ">=2.9.0,<3.0.0" },
-]
 
 [[package]]
 name = "worker-storage"
@@ -3500,6 +3463,9 @@ dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "prometheus-client" },
     { name = "structlog" },
+    { name = "worker-logging" },
+    { name = "worker-metrics" },
+    { name = "worker-tracing" },
 ]
 
 [package.metadata]
@@ -3508,6 +3474,9 @@ requires-dist = [
     { name = "opentelemetry-sdk", specifier = ">=1.25.0,<2.0.0" },
     { name = "prometheus-client", specifier = ">=0.19.0,<1.0.0" },
     { name = "structlog", specifier = ">=24.1.0,<25.0.0" },
+    { name = "worker-logging", editable = "packages/worker-logging" },
+    { name = "worker-metrics", editable = "packages/worker-metrics" },
+    { name = "worker-tracing", editable = "packages/worker-tracing" },
 ]
 
 [[package]]
@@ -3538,10 +3507,14 @@ version = "0.1.0"
 source = { editable = "packages/worker-tenancy" }
 dependencies = [
     { name = "pydantic" },
+    { name = "worker-platform" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.8.0,<3.0.0" }]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
+    { name = "worker-platform", editable = "packages/worker-platform" },
+]
 
 [[package]]
 name = "worker-tracing"
