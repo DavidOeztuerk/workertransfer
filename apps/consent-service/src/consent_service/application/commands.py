@@ -63,6 +63,24 @@ def _correlation_id() -> str | None:
     return get_correlation_id()
 
 
+def _tenant_id() -> UUID | None:
+    """The tenant the auth middleware resolved from the JWT claim (ADR-0009).
+
+    None outside a request scope (CLI, tests) or when the claim is not a UUID.
+    A missing tenant must not stop the consent fact from being recorded: losing
+    an attribution is bad, losing the fact itself is worse.
+    """
+    from worker_platform.context import get_tenant_id
+
+    raw = get_tenant_id()
+    if raw is None:
+        return None
+    try:
+        return UUID(raw)
+    except ValueError:
+        return None
+
+
 @dataclass(frozen=True, slots=True)
 class GrantConsentCommand:
     subject_id: UUID
@@ -147,7 +165,7 @@ async def _record(
         await repos["audit"].append(
             AuditEvent(
                 actor_id=actor_id,
-                tenant_id=None,
+                tenant_id=_tenant_id(),
                 action=_AUDIT_ACTION[action],
                 target_id=subject_id,
                 correlation_id=_correlation_id(),
