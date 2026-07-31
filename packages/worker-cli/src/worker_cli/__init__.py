@@ -1,5 +1,6 @@
 """Worker CLI: Code generation for services, packages, and Clean Architecture components."""
 
+import re
 import subprocess
 from pathlib import Path
 from string import Template
@@ -38,6 +39,12 @@ def new_service(
         "module_name": module_name,
         "service_class": service_class,
         "service_title": name.replace("-", " ").title(),
+        # Aliases: older templates spelled these in PascalCase. Keeping both
+        # spellings means a stale template renders instead of silently emitting
+        # a literal "${ServiceClass}" into generated source.
+        "ServiceClass": service_class,
+        "ModuleName": module_name,
+        "ServiceName": name,
     }
 
     console.print(f"[green]Creating service {name} at {service_dir}[/green]")
@@ -77,6 +84,8 @@ def new_service(
         f"src/{module_name}/presentation/schemas",
         f"src/{module_name}/presentation/dependencies",
         f"src/{module_name}/presentation/health",
+        "migrations",
+        "migrations/versions",
         "tests",
         "tests/unit",
         "tests/integration",
@@ -135,19 +144,23 @@ def new_service(
             f"src/{module_name}/infrastructure/database/uow.py",
         ),
         (
-            "src/presentation/__init__.py.tmpl",
-            f"src/{module_name}/presentation/__init__.py",
+            "src/presentation/compose_api.py.tmpl",
+            f"src/{module_name}/presentation/compose_api.py",
         ),
         (
             "src/presentation/http/router.py.tmpl",
             f"src/{module_name}/presentation/http/router.py",
         ),
-        (
-            "src/presentation/health.py.tmpl",
-            f"src/{module_name}/presentation/health.py",
-        ),
-        ("tests/test_example.py.tmpl", "tests/test_example.py"),
-        ("tests/conftest.py.tmpl", "tests/conftest.py"),
+        # Per-service async Alembic (ADR-0010): the "next steps" told the user to
+        # run `alembic revision`, but nothing generated an alembic.ini for it.
+        ("alembic.ini.tmpl", "alembic.ini"),
+        ("migrations/env.py.tmpl", "migrations/env.py"),
+        ("migrations/script.py.mako.tmpl", "migrations/script.py.mako"),
+        ("tests/test_app.py.tmpl", "tests/test_app.py"),
+        # Testcontainers guard (ADR-0011): integration tests self-skip without Docker.
+        ("tests/integration/__init__.py.tmpl", "tests/integration/__init__.py"),
+        ("tests/integration/_docker.py.tmpl", "tests/integration/_docker.py"),
+        ("tests/integration/conftest.py.tmpl", "tests/integration/conftest.py"),
     ]
 
     for template_name, target_name in template_files:
@@ -435,9 +448,30 @@ def _generate_infrastructure(type: str, name: str, service: str, event: str) -> 
     console.print(f"[cyan]Created {target_file}[/cyan]")
 
 
+# Only Python output is checked for leftover placeholders. Compose files and
+# Dockerfiles use ${VAR} as *runtime* interpolation (docker compose substitutes
+# it from the environment), and alembic's script.py.mako keeps its Mako
+# placeholders until a revision is actually generated. In a .py file, however, a
+# surviving ${...} is a syntax error.
+_UNRESOLVED_PLACEHOLDER = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*\}")
+
+
 def _render_template(template_path: Path, target_path: Path, context: dict[str, str]) -> None:
     content = template_path.read_text()
     rendered = Template(content).safe_substitute(context)
+
+    # safe_substitute leaves unknown placeholders verbatim, which used to emit
+    # literal "${ServiceClass}" into generated Python — the scaffold could not
+    # even be parsed. Refuse to write such a file instead of shipping it.
+    if target_path.suffix == ".py":
+        leftovers = sorted(set(_UNRESOLVED_PLACEHOLDER.findall(rendered)))
+        if leftovers:
+            raise RuntimeError(
+                f"{template_path.name}: unresolved placeholders {leftovers}. "
+                "Add them to the render context or fix the template."
+            )
+
+    target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_text(rendered)
 
 
