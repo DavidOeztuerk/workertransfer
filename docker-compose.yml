@@ -1,0 +1,35 @@
+# Local development substrate. Deliberately minimal: one Postgres serving one
+# database per service (ADR-0004 forbids a shared database, so `identity` and
+# `consent` are separate databases even though they share a container here).
+#
+# Redis, RabbitMQ, MinIO, Jaeger and Prometheus are intentionally absent — no
+# service wires them yet, and unused infrastructure rots. They arrive with the
+# first real consumer (ULTRAPLAN Phase 9/10).
+#
+#   docker compose up -d      # start
+#   ./scripts/run-dev.sh      # migrate + run both services + the web app
+#   docker compose down -v    # stop and drop the volumes
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: workertransfer-postgres
+    environment:
+      POSTGRES_USER: worker
+      POSTGRES_PASSWORD: worker
+      # The entrypoint only creates POSTGRES_DB; the rest come from initdb.d.
+      POSTGRES_DB: identity
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # run-dev.sh waits on this before running migrations.
+      test: ["CMD-SHELL", "pg_isready -U worker -d identity"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  postgres-data:
