@@ -13,7 +13,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 1 | Foundation festigen (CI grün) | ✅ | ruff 0 ✅, mypy 0 ✅, CLI-Entrypoint ✅, Duplikate ✅, Smoke-Tests ✅, Premerge-Wrapper ✅ |
 | 2 | Identity & Tenancy | ✅ | OIDC/OAuth, JWT, Claims-Tenant, Audit, DB-Migration |
 | 2.5 | Stabilisierung & Plattform-Naht | ✅ | Cookie-Auth, Dep-Hygiene, Kanon Runde 2, Dev-Stack, Frontend-Gate, Generator |
-| 3 | Candidate Core | 🟧 | Profile/Resume/Portfolio + Consent-Ledger (3.1 in Arbeit) |
+| 3 | Candidate Core | 🟧 | Consent-Ledger ✅ (3.1); Profile/Resume/Portfolio offen |
 | 4 | Jobs & Applications | ⬜ | Jobs, Applications, Companies, Career-Sites |
 | 5 | Transfermarkt | ⬜ | Market-State-Machine, Konsensflows, Vertragsdraft |
 | 6 | Developer Intelligence | ⬜ | GitHub-Consent, Skill-Graph, Scout-Match |
@@ -215,23 +215,52 @@ was der Code tat.
 
 ### Phase 3 — Status: 🟧 in Arbeit
 
-- 🟧 **3.1 Consent-Ledger** (`apps/consent-service`) — Spec und Plan liegen vor
-  ([Design](superpowers/specs/2026-07-26-phase-3-substep-3.1-consent-ledger-design.md),
-  [Plan](superpowers/plans/2026-07-29-phase-3-substep-3.1-consent-ledger.md)).
-  Fertig: Workspace-Scaffold, Alembic-Gerüst, Domain-Value-Objects
-  (`SubjectId`, `Capability`, `ConsentEventId`, `Reason`, `ConsentAction`).
-  Offen: `ConsentEvent`-Aggregat, `project_state`, Ports, Migration `0001`,
-  Repositories, Commands/Mediator, Composition-Root, HTTP-Router — und
-  `presentation/compose_api.py` ist noch ein Platzhalter, der eine nackte `FastAPI()`
-  baut und `create_api_app` umgeht (keine Correlation-ID, keine Security-Header,
-  keine Problem-Details). ADR-0013 noch nicht geschrieben.
-  Zwei in der Spec offene Entscheidungen sind im Phase-2.5-Plan getroffen:
-  JWT-Verifikation gehört als Baustein nach `worker-auth` (nicht cross-service
-  importiert — ADR-0002/0004), und das geteilte HS256-Secret ist als
-  Trust-Domain-Annahme zu dokumentieren (→ ADR-0015).
+- ✅ **3.1 Consent-Ledger** (`apps/consent-service`) — 31.07.2026.
+  [Design](superpowers/specs/2026-07-26-phase-3-substep-3.1-consent-ledger-design.md) ·
+  [ADR-0013](adr/0013-consent-ledger-standalone.md) ·
+  [ADR-0015](adr/0015-shared-jwt-middleware.md) ·
+  [ADR-0016](adr/0016-per-service-declarative-base.md)
+
+  Append-only Ledger mit `POST /consent/{grant,revoke,delete,check}`.
+  Kernpunkte:
+  - **Append-only ist strukturell**, nicht per Konvention: `ConsentEvent` ist
+    `frozen`, das Repository bietet weder `update` noch `delete` — ein Test prüft
+    die Abwesenheit dieser Methoden.
+  - **Kein Status-Tisch.** `project_state()` (reine Funktion) definiert die Regeln,
+    `latest_effective()` führt dieselbe Reduktion als `DISTINCT ON` aus. Ein Ort,
+    an dem Consent wahr ist.
+  - **Revocation wirkt sofort** — kein Cache (Ansatz C der Spec wurde genau deshalb
+    verworfen). Integrationstest über HTTP: grant → check `true` → revoke → check
+    `false`.
+  - **Audit atomar** in derselben UoW (ADR-0012); Allowlist lässt den
+    Capability-Namen zu, nie die Daten dahinter (PII-Test über die Rohspalte).
+  - **`compose_api.py` läuft jetzt durch `create_api_app`** — der Platzhalter mit
+    nackter `FastAPI()` ist weg; `test_app.py` prüft Correlation-ID,
+    Security-Header und RFC-9457, damit er nicht zurückkommt.
+  - Selbstverwaltung: `actor_id == subject_id` erzwungen (403 sonst); `/check` steht
+    jedem authentifizierten Aufruf offen, weil genau das den Enabler ausmacht.
+
+  **Zwei Funde beim Bauen**, beide als ADR festgehalten:
+  - *ADR-0015*: die JWT-Middleware wandert nach `worker-auth`, statt kopiert zu
+    werden — eine Kopie hätte den gerade behobenen Header-only-Bug reproduziert.
+  - *ADR-0016*: `worker_database.Base` ist **eine** MetaData. identity- und
+    consent-service besitzen beide (korrekt) eine Tabelle `audit_events` →
+    `InvalidRequestError` bei der Test-Collection, und Autogenerate hätte die
+    Tabellen des jeweils anderen Service als löschbar gesehen. ADR-0010s Annahme
+    „Model-Import-Disziplin" war ein Topologie-Problem. Jeder Service hat jetzt
+    seine eigene `DeclarativeBase`.
+
+  Offen aus 3.1 (nicht blockierend): `mediator.py` wurde nicht gebaut — die
+  Handler werden wie in `identity-service` direkt aus dem Router aufgerufen; ein
+  Mediator lohnt erst mit Pipeline-Behaviors. `test_eventbus_seam.py` fehlt (die
+  Naht existiert in `compose_infrastructure`, hat aber noch keinen Publisher).
+  Die `worker new-service`-Templates erzeugen noch `worker_database.Base` statt
+  einer service-eigenen Base (ADR-0016-Folgearbeit).
 - ⬜ 3.2 Profile-Service · ⬜ 3.3 Resume-Service · ⬜ 3.4 Portfolio-Service
 - ⬜ 3.5 `worker-files`/`worker-storage` real machen (Workspace-Re-Include)
 
-Nächste Aktion: **Sub-step 3.1 fertigstellen.** Der Consent-Ledger ist der Enabler für
-jede Sichtbarkeit in den Phasen 3–6; ohne ihn kann Profile/Resume/Portfolio nicht
-consent-konform gebaut werden.
+Nächste Aktion: **Sub-step 3.2 — Profile-Service.** Der Consent-Ledger steht und ist
+damit als Enabler nutzbar: jeder Sichtbarkeits-, Versand- und Importpfad im
+Profile-Service konsultiert `POST /consent/check`, bevor er handelt. Der
+Profile-Service ist zugleich der erste echte Test für den reparierten Generator —
+er soll aus `worker new-service` entstehen, nicht aus Copy-Paste (kon.txt Regel Nr. 1).
