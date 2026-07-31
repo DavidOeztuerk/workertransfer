@@ -20,8 +20,10 @@ class AuditAction(StrEnum):
     REGISTER = "register"
     LOGIN_SUCCESS = "login_success"
     LOGIN_FAILURE = "login_failure"
-    TOKEN_REFRESH = "token_refresh"
-    TOKEN_REVOKE = "token_revoke"
+    # S105 fires on the member NAME containing "TOKEN"; these values are
+    # audit action labels, not credentials.
+    TOKEN_REFRESH = "token_refresh"  # noqa: S105
+    TOKEN_REVOKE = "token_revoke"  # noqa: S105
 
 
 # Only non-PII technical metadata may be recorded. Passwords, emails,

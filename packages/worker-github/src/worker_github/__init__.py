@@ -1,11 +1,14 @@
 """GitHub Intelligence: OAuth, Repo Scanner, Skill Analyzer, OSS Reputation."""
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, ClassVar
 
 import httpx
 from github import Github
+
+_logger = logging.getLogger("workertransfer.github")
 
 
 @dataclass
@@ -125,7 +128,9 @@ class GitHubClient:
                 for lang, bytes_count in langs.items():
                     stats.languages[lang] = stats.languages.get(lang, 0) + bytes_count
             except Exception:
-                pass
+                # A single unreadable repo must not abort the whole scan, but a
+                # silent skip hides rate-limits and revoked scopes.
+                _logger.debug("languages unavailable for %s", repo.full_name, exc_info=True)
 
             # Get commits
             try:
@@ -139,7 +144,7 @@ class GitHubClient:
                     if year not in stats.contribution_years:
                         stats.contribution_years.append(year)
             except Exception:
-                pass
+                _logger.debug("commits unavailable for %s", repo.full_name, exc_info=True)
 
         stats.contribution_years.sort()
         return stats
