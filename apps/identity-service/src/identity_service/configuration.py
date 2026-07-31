@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from pydantic import Field, SecretStr
+from typing import Self
+
+from pydantic import Field, SecretStr, model_validator
+from worker_auth import DEV_JWT_SECRET, assert_deployable_jwt_secret
 from worker_platform.configuration import PlatformSettings
 
 
@@ -11,7 +14,9 @@ class IdentityServiceSettings(PlatformSettings):
     port: int = 8001
 
     # Phase 2 security knobs (runtime-only; never committed defaults in prod).
-    jwt_secret: SecretStr = SecretStr("dev-only-secret-change-me-in-production-32bytes")
+    # "never in prod" used to be a comment only — `_reject_development_jwt_secret`
+    # below makes it a startup failure.
+    jwt_secret: SecretStr = SecretStr(DEV_JWT_SECRET)
     database_url: str = "postgresql+asyncpg://worker:worker@127.0.0.1:5432/identity"
     jwt_access_token_expire_minutes: int = 15
     jwt_refresh_token_expire_minutes: int = 1440
@@ -27,3 +32,12 @@ class IdentityServiceSettings(PlatformSettings):
     cors_allow_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
     )
+
+    @model_validator(mode="after")
+    def _reject_development_jwt_secret(self) -> Self:
+        assert_deployable_jwt_secret(
+            self.jwt_secret.get_secret_value(),
+            environment=str(self.environment),
+            service_name=self.service_name,
+        )
+        return self
