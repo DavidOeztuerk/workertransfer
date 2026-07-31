@@ -1,9 +1,12 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button, Card } from "@workertransfer/ui";
 
 import { type LoginInput, login } from "../auth/client";
+import { SESSION_QUERY_KEY } from "../auth/session";
 
 export function LoginRoute() {
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [tenantId, setTenantId] = useState("");
@@ -18,6 +21,9 @@ export function LoginRoute() {
     const result = await login(input);
     setBusy(false);
     if (result.ok) {
+      // The auth cookies are set now; drop the cached anonymous session so the
+      // next read of GET /me reflects the login, then hand over to the app.
+      await queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
       window.location.href = "/";
     } else {
       setError(result.message);

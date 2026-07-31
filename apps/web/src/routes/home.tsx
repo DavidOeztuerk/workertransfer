@@ -23,7 +23,10 @@ export function HomeRoute() {
           <a className="brand" href="/" aria-label="WorkerTransfer Startseite">
             worker<span>transfer</span>
           </a>
-          <nav aria-label="Hauptnavigation">
+          {/* Distinct label: RootLayout already owns the "Hauptnavigation"
+              landmark, and two identically-labelled navs are ambiguous to
+              screen readers. This one only jumps within the page. */}
+          <nav aria-label="Seitenabschnitte">
             <a href="#principles">Prinzipien</a>
             <a href="#roadmap">Produkt</a>
             <Button variant="secondary">Frühzugang vormerken</Button>

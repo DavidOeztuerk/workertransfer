@@ -1,11 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 
+import { renderWithProviders } from "./test/render";
 import { HomeRoute } from "./routes/home";
 import { LoginRoute } from "./routes/login";
 
 describe("HomeRoute", () => {
   it("states the consent-first product promise", () => {
-    render(<HomeRoute />);
+    renderWithProviders(<HomeRoute />);
 
     expect(
       screen.getByRole("heading", {
@@ -18,7 +19,7 @@ describe("HomeRoute", () => {
 
 describe("LoginRoute", () => {
   it("renders the German login heading", () => {
-    render(<LoginRoute />);
+    renderWithProviders(<LoginRoute />);
     expect(screen.getByRole("heading", { name: "Anmelden" })).toBeInTheDocument();
   });
 });
