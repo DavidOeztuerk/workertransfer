@@ -21,7 +21,6 @@ members = [
     "worker-database",
     "worker-email",
     "worker-events",
-    "worker-exceptions",
     "worker-github",
     "worker-health",
     "worker-identity-service",
@@ -35,7 +34,6 @@ members = [
     "worker-resilience",
     "worker-scheduler",
     "worker-search",
-    "worker-security",
     "worker-shared",
     "worker-storage",
     "worker-telemetry",
@@ -1933,20 +1931,6 @@ wheels = [
 ]
 
 [[package]]
-name = "passlib"
-version = "1.7.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b6/06/9da9ee59a67fae7761aab3ccc84fa4f3f33f125b370f1ccdb915bf967c11/passlib-1.7.4.tar.gz", hash = "sha256:defd50f72b65c5402ab2c573830a6978e5f202ad0d984793c8dde2c4152ebe04", size = 689844, upload-time = "2020-10-08T19:00:52.121Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/a4/ab6b7589382ca3df236e03faa71deac88cae040af60c071a78d254a62172/passlib-1.7.4-py2.py3-none-any.whl", hash = "sha256:aa6bca462b8d8bda89c70b382f0c298a20b5560af6cbfa2dce410c0a2fb669f1", size = 525554, upload-time = "2020-10-08T19:00:49.856Z" },
-]
-
-[package.optional-dependencies]
-bcrypt = [
-    { name = "bcrypt" },
-]
-
-[[package]]
 name = "pathspec"
 version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2278,15 +2262,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/56/fa/284e52a8c6dcbe25671f02d217bf2f85660db940088faf18ae7a05e97313/python_http_client-3.3.7.tar.gz", hash = "sha256:bf841ee45262747e00dec7ee9971dfb8c7d83083f5713596488d67739170cea0", size = 9377, upload-time = "2022-03-09T20:23:56.386Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/29/31/9b360138f4e4035ee9dac4fe1132b6437bd05751aaf1db2a2d83dc45db5f/python_http_client-3.3.7-py3-none-any.whl", hash = "sha256:ad371d2bbedc6ea15c26179c6222a78bc9308d272435ddf1d5c84f068f249a36", size = 8352, upload-time = "2022-03-09T20:23:54.862Z" },
-]
-
-[[package]]
-name = "python-json-logger"
-version = "2.0.7"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4f/da/95963cebfc578dabd323d7263958dfb68898617912bb09327dd30e9c8d13/python-json-logger-2.0.7.tar.gz", hash = "sha256:23e7ec02d34237c5aa1e29a070193a4ea87583bb4e7f8fd06d3de8264c4b2e1c", size = 10508, upload-time = "2023-02-21T17:40:06.209Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/35/a6/145655273568ee78a581e734cf35beb9e33a370b29c5d3c8fee3744de29f/python_json_logger-2.0.7-py3-none-any.whl", hash = "sha256:f380b826a991ebbe3de4d897aeec42760035ac760345e57b812938dc8b35e2bd", size = 8067, upload-time = "2023-02-21T17:40:05.117Z" },
 ]
 
 [[package]]
@@ -3160,21 +3135,6 @@ requires-dist = [
 ]
 
 [[package]]
-name = "worker-exceptions"
-version = "0.1.0"
-source = { editable = "packages/worker-exceptions" }
-dependencies = [
-    { name = "fastapi" },
-    { name = "pydantic" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = ">=0.110.0,<1.0.0" },
-    { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
-]
-
-[[package]]
 name = "worker-github"
 version = "0.1.0"
 source = { editable = "packages/worker-github" }
@@ -3256,19 +3216,11 @@ name = "worker-logging"
 version = "0.1.0"
 source = { editable = "packages/worker-logging" }
 dependencies = [
-    { name = "python-json-logger" },
-    { name = "structlog" },
-    { name = "worker-core" },
-    { name = "worker-correlation" },
+    { name = "worker-platform" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "python-json-logger", specifier = ">=2.0.0,<3.0.0" },
-    { name = "structlog", specifier = ">=24.1.0,<25.0.0" },
-    { name = "worker-core", editable = "packages/worker-core" },
-    { name = "worker-correlation", editable = "packages/worker-correlation" },
-]
+requires-dist = [{ name = "worker-platform", editable = "packages/worker-platform" }]
 
 [[package]]
 name = "worker-mcp"
@@ -3413,23 +3365,6 @@ requires-dist = [
     { name = "elasticsearch", specifier = ">=8.15.0,<9.0.0" },
     { name = "meilisearch", specifier = ">=0.30.0,<1.0.0" },
     { name = "qdrant-client", specifier = ">=1.9.0,<2.0.0" },
-]
-
-[[package]]
-name = "worker-security"
-version = "0.1.0"
-source = { editable = "packages/worker-security" }
-dependencies = [
-    { name = "cryptography" },
-    { name = "passlib", extra = ["bcrypt"] },
-    { name = "starlette" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "cryptography", specifier = ">=42.0.0,<50.0.0" },
-    { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4,<2.0.0" },
-    { name = "starlette", specifier = ">=0.37.0,<1.0.0" },
 ]
 
 [[package]]

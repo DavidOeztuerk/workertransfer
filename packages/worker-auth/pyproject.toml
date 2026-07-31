@@ -23,5 +23,4 @@ module-name = "worker_auth"
 worker-core = { workspace = true }
 worker-shared = { workspace = true }
 worker-config = { workspace = true }
-worker-security = { workspace = true }
 worker-correlation = { workspace = true }

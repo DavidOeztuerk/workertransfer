@@ -36,7 +36,6 @@ worker-shared = { workspace = true }
 worker-config = { workspace = true }
 worker-logging = { workspace = true }
 worker-correlation = { workspace = true }
-worker-security = { workspace = true }
 worker-auth = { workspace = true }
 worker-authorization = { workspace = true }
 worker-database = { workspace = true }
@@ -48,7 +47,6 @@ worker-metrics = { workspace = true }
 worker-tracing = { workspace = true }
 worker-telemetry = { workspace = true }
 worker-validation = { workspace = true }
-worker-exceptions = { workspace = true }
 worker-ratelimit = { workspace = true }
 worker-tenancy = { workspace = true }
 worker-resilience = { workspace = true }
