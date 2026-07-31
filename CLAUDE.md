@@ -82,6 +82,8 @@ Each service owns per-service async Alembic migrations under `apps/<service>/mig
 ### Request context (important)
 Correlation and tenant IDs flow through `contextvars` (`worker_platform.context`), set by `CorrelationIdMiddleware` and `TenantContextMiddleware`. **Tenant identity must never come from a browser header in production** — `DevelopmentHeaderTenantResolver` is local/dev/test only (`allow_development_tenant_header` is off by default and gated on environment). See `docs/product-scope.md` for the trust constraint.
 
+**A tenant is a company, and a natural person has none** (ADR-0017). Tenant is an *optional* attribute of a principal, carried only by company-based features (job ads, employer accounts, recruiting teams). It is not the scoping axis for personal data: user data is scoped by user/subject identity, and both axes coexist. The consent-ledger therefore has no `tenant_id` on `consent_events` by design — a consent belongs to the person and follows them across employers. Do not "fix" that by adding a tenant column. **Known deviation:** `identity-service` still treats tenant as mandatory *and* takes it from the request body (`RegisterBody.tenant_id`, `LoginBody.tenant_id`, `users.tenant_id NOT NULL`) — that contradicts both ADR-0017 and the product-scope trust constraint, and is not yet aligned.
+
 `AuthMiddleware` resolves the principal from an `Authorization: Bearer` header **or** the `access` cookie, in that order. Both carriers are needed: service-to-service and CLI callers send the header; the browser never sees the `httpOnly` token and can only replay it as a cookie (`credentials: "include"`). Any new service verifying identity-service tokens must accept both.
 
 ### CQRS
