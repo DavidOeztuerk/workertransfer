@@ -17,17 +17,27 @@ from worker_auth.password import (
     hash_password,
     verify_password,
 )
+from worker_auth.secrets import (
+    DEV_JWT_SECRET,
+    MIN_JWT_SECRET_LENGTH,
+    InsecureJwtSecret,
+    assert_deployable_jwt_secret,
+)
 
 __all__ = [
     "DEFAULT_COOKIE_NAME",
+    "DEV_JWT_SECRET",
+    "MIN_JWT_SECRET_LENGTH",
     "BcryptPasswordHasher",
     "ExpiredToken",
+    "InsecureJwtSecret",
     "InvalidToken",
     "JwtAuthMiddleware",
     "PasswordHashError",
     "PasswordTooLong",
     "TokenManager",
     "TokenPayload",
+    "assert_deployable_jwt_secret",
     "extract_bearer_token",
     "extract_cookie_token",
     "hash_password",
