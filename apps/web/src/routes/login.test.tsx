@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { renderWithProviders } from "../test/render";
 import { LoginRoute } from "./login";
 
 afterEach(() => vi.restoreAllMocks());
@@ -22,7 +23,7 @@ function stubLocation() {
 
 describe("LoginRoute", () => {
   it("renders the German heading", () => {
-    render(<LoginRoute />);
+    renderWithProviders(<LoginRoute />);
     expect(screen.getByRole("heading", { name: "Anmelden" })).toBeInTheDocument();
   });
 
@@ -33,7 +34,7 @@ describe("LoginRoute", () => {
     );
     const location = stubLocation();
 
-    render(<LoginRoute />);
+    renderWithProviders(<LoginRoute />);
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("E-Mail"), "a@b.com");
     await user.type(screen.getByLabelText("Passwort"), "strongpassword1");
@@ -58,7 +59,7 @@ describe("LoginRoute", () => {
     );
     const location = stubLocation();
 
-    render(<LoginRoute />);
+    renderWithProviders(<LoginRoute />);
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("E-Mail"), "a@b.com");
     await user.type(screen.getByLabelText("Passwort"), "wrong");

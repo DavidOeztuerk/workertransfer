@@ -93,9 +93,20 @@ async def test_register_login_me_refresh_logout_roundtrip(
         assert "user_id" in body
         assert body["roles"] == ["user"]
 
-        # /me without a token -> 401.
-        me_anon = await client.get("/me")
-        assert me_anon.status_code == 401
+        # The browser path: the access token is httpOnly, so apps/web can only
+        # send it back as a cookie (credentials: "include") and never as an
+        # Authorization header. The client jar replays it automatically, so this
+        # request carries no explicit header at all.
+        me_cookie = await client.get("/me")
+        assert me_cookie.status_code == 200, me_cookie.text
+        assert me_cookie.json() == body
+
+        # /me with neither header nor cookie -> 401. Needs a separate client:
+        # the logged-in jar above replays its cookies on every request, which
+        # is exactly the behaviour asserted just above.
+        async with AsyncClient(transport=transport, base_url="http://test") as anon:
+            me_anon = await anon.get("/me")
+            assert me_anon.status_code == 401
 
         rf = await client.post("/auth/refresh")
         assert rf.status_code == 200, rf.text

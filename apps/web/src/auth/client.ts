@@ -52,3 +52,9 @@ export async function fetchMe(): Promise<MeResponse | null> {
   if (!res.ok) return null;
   return (await res.json()) as MeResponse;
 }
+
+// Idempotent by design on the backend (204 even without a refresh cookie), so a
+// failed call still leaves the caller free to drop its cached session.
+export async function logout(): Promise<void> {
+  await fetch(`${API_BASE_URL}/auth/logout`, { method: "POST", credentials: "include" });
+}
