@@ -26,7 +26,7 @@
 - [x] 6 Handler: eigenes Profil schreiben/lesen (TDD)
 - [x] 7 Handler: Fremdabruf + Liste mit Consent-Gate (TDD)
 - [x] 8 Contracts-DTOs + HTTP-Endpunkte
-- [ ] 9 Integrationstests (Docker) inkl. Widerruf wirkt sofort
+- [x] 9 Integrationstests (Docker) inkl. Widerruf wirkt sofort
 - [ ] 10 Frontend: Profil bearbeiten + Sichtbarkeit schalten (TDD)
 - [ ] 11 Frontend: Kandidatenliste für Unternehmen (TDD)
 - [ ] 12 Playwright-E2E, self-skip ohne laufenden Stack
@@ -70,3 +70,9 @@
   7 App-Tests. Nebenbei: worker_auth exportiert jetzt get_request_user — bis
   dahin schrieb jeder Service seine eigene Fassung (identity eine Funktion,
   consent ein getattr mitten im Router). 408 passed / 3 skipped.
+- 9 Integrationstests gegen echte Dienste. Der erste Lauf fand sofort einen
+  Fehler, den 41 Unit-Tests nicht sehen konnten: der Router las
+  `principal.user_id`, der Prinzipal heißt aber `TokenPayload.sub`. Keine
+  Unit-Test-Fassung hatte den Router je über die echte Middleware aufgerufen.
+  Drei Fixture-Runden bis grün: DROP DATABASE gegen belegte Pools, dann
+  asyncpg-Pools an der Event-Schleife des ersten Tests. 413 passed / 3 skipped.
