@@ -28,6 +28,8 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 from worker_database import Base
 
 from ._docker import _docker_available
@@ -106,30 +108,91 @@ async def test_x_tenant_id_header_ignored_in_production_mode(
                 "email": "tenant-source@example.com",
                 "password": "strongpassword1",
                 "display_name": "Tenant Source",
-                "tenant_id": str(tenant),
             },
             headers=spoof_header,
         )
         assert register.status_code == 201, register.text
 
+        # Email confirmation is a later task; activate directly via the DB so
+        # this test can still exercise login end to end — same seam used below
+        # for the out-of-band membership grant.
+        activate_engine = create_async_engine(postgres_url)
+        try:
+            async with activate_engine.begin() as conn:
+                await conn.execute(
+                    text("UPDATE users SET status = 'active' WHERE email = :email"),
+                    {"email": "tenant-source@example.com"},
+                )
+        finally:
+            await activate_engine.dispose()
+
         login = await client.post(
             "/auth/login",
-            json={
-                "email": "tenant-source@example.com",
-                "password": "strongpassword1",
-                "tenant_id": str(tenant),
-            },
+            json={"email": "tenant-source@example.com", "password": "strongpassword1"},
             headers=spoof_header,
         )
         assert login.status_code == 200, login.text
         access = login.cookies.get("access")
         assert access is not None
 
-        # Protected endpoint + a *different* spoof X-Tenant-ID: must be ignored.
+        # Logging in makes you a person, not a company — even while shouting a
+        # tenant header at every request (ADR-0017).
         me = await client.get(
             "/me",
-            headers={"Authorization": f"Bearer {access}", "X-Tenant-ID": str(uuid4())},
+            headers={"Authorization": f"Bearer {access}", "X-Tenant-ID": str(tenant)},
         )
         assert me.status_code == 200, me.text
-        # The tenant comes from the CLAIM, not the header.
+        assert me.json()["tenant_id"] is None
+        user_id = me.json()["user_id"]
+
+        # Asking for a company without being a member is refused, header or not.
+        denied = await client.post(
+            f"/auth/company/{tenant}",
+            headers={"Authorization": f"Bearer {access}", **spoof_header},
+        )
+        assert denied.status_code == 403, denied.text
+
+    # Grant the membership out-of-band: writing memberships belongs to a future
+    # company-service, so the DB is the honest seam for this test. Since
+    # migration 0003, membership.tenant_id is FK-constrained to tenants(id), so
+    # the row must exist first — same as any real company-service write would.
+    engine = create_async_engine(postgres_url)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(
+                text("INSERT INTO tenants (id, name, domain) VALUES (:t, 'Tenant Source Co', :d)"),
+                {"t": str(tenant), "d": f"tenant-source-{tenant}.example"},
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO user_tenant_memberships (id, user_id, tenant_id) "
+                    "VALUES (gen_random_uuid(), :u, :t)"
+                ),
+                {"u": user_id, "t": str(tenant)},
+            )
+    finally:
+        await engine.dispose()
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        login = await client.post(
+            "/auth/login",
+            json={"email": "tenant-source@example.com", "password": "strongpassword1"},
+        )
+        access = login.cookies.get("access")
+
+        switched = await client.post(
+            f"/auth/company/{tenant}",
+            headers={"Authorization": f"Bearer {access}", **spoof_header},
+        )
+        assert switched.status_code == 200, switched.text
+        tenant_access = switched.cookies.get("access")
+        assert tenant_access is not None
+
+        # Now a tenant IS active — and it is the one membership allowed, never
+        # the one the header keeps claiming.
+        me = await client.get(
+            "/me",
+            headers={"Authorization": f"Bearer {tenant_access}", "X-Tenant-ID": str(uuid4())},
+        )
+        assert me.status_code == 200, me.text
         assert me.json()["tenant_id"] == str(tenant)

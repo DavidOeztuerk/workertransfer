@@ -18,12 +18,32 @@ the conventions that every future service will use.
 
 ## Start locally
 
+The whole stack — Postgres, every backend service and the web app — comes up with
+one command. Each service container runs its own migrations on start, so a fresh
+clone needs nothing else:
+
+```bash
+docker compose up --build
+docker compose down        # add -v to drop the databases
+```
+
+| | |
+|---|---|
+| Web app | http://localhost:5173 |
+| identity-service | http://localhost:8001 |
+| consent-service | http://localhost:8002 |
+
+Source is bind-mounted and the services run under `--reload`, so edits apply
+without a rebuild. Rebuild only when a dependency changes.
+
+To run a single service on the host instead:
+
 ```bash
 uv sync --all-packages --all-groups
 uv run worker-identity
 ```
 
-The reference service then exposes:
+Every service exposes:
 
 - `GET /health/live`
 - `GET /health/ready`
