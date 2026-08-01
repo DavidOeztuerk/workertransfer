@@ -33,7 +33,8 @@ Person ist ein Account — sie besitzt ihn, bevor ein Unternehmen es tut.
 
 **Der aktive Tenant entsteht durch einen verifizierten Wechsel.**
 `POST /auth/login` liefert ein reines Personen-Token ohne Tenant-Claim.
-`POST /auth/tenant/{id}` prüft die Mitgliedschaft und stellt erst dann ein neues
+`POST /auth/company/{id}` prüft die Mitgliedschaft (in ADR-0019 von
+`/auth/tenant/{id}` umbenannt: an der öffentlichen Grenze steht das Domänenwort) und stellt erst dann ein neues
 Token-Paar mit `tenant_id` aus. Der Client *nennt* das Unternehmen, der Server
 *entscheidet* — damit stammt der Tenant im Token weiterhin nie aus einer
 Client-Angabe, sondern aus einer geprüften Relation. ADR-0009 und
@@ -67,8 +68,9 @@ herausfindbar sein.
   Token ohne das Feld unterscheidbar bleibt. Betrifft auch `consent-service`,
   das dieselbe `TokenManager`-Klasse zum Verifizieren nutzt (ADR-0015).
 - Das Login-Formular hat kein Mandant-Feld mehr.
-- **Mitgliedschaften anzulegen ist bewusst nicht über HTTP möglich.** Das gehört
-  zum company-service, den es noch nicht gibt. Vorhanden sind das Aggregat, der
+- **Mitgliedschaften entstehen seit ADR-0019 beim Anlegen eines Unternehmens**
+  (`POST /companies`); der Ersteller wird `admin`. Weitere Mitglieder einzuladen
+  gehört weiterhin zur nächsten Scheibe. Vorhanden sind das Aggregat, der
   Repository-Port und der Lesezugriff, den der Wechsel braucht.
 
 ## Verifikation
