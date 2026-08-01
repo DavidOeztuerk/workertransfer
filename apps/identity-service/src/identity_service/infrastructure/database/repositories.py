@@ -63,6 +63,21 @@ class SqlAlchemyUserRepository:
         )
         await self._session.flush()
 
+    async def save(self, user: User) -> None:
+        """Schreibt die veränderlichen Felder des Aggregats zurück.
+
+        _to_domain liefert ein losgelöstes Objekt, keine Session-gebundene Zeile.
+        Ohne diesen Weg wäre jede Mutation (etwa User.activate) nur eine
+        Änderung im Arbeitsspeicher und beim nächsten Request verschwunden.
+        """
+        row = await self._session.get(UserModel, user.id.value)
+        if row is None:
+            return
+        row.status = user.status
+        row.display_name = user.display_name
+        row.roles = list(user.roles)
+        await self._session.flush()
+
 
 class SqlAlchemyMembershipRepository:
     """Reads which companies a person may act for. Writes belong to a future

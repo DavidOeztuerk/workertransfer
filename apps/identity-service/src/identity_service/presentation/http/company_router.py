@@ -56,7 +56,7 @@ def build_company_router(deps: dict[str, Any]) -> APIRouter:
             if isinstance(err, AccountNotConfirmed):
                 raise HTTPException(status.HTTP_403_FORBIDDEN, err.message)
             if isinstance(err, PublicEmailDomain):
-                raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, err.message)
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, err.message)
             if isinstance(err, DomainAlreadyClaimed):
                 raise HTTPException(status.HTTP_409_CONFLICT, err.message)
             raise HTTPException(
