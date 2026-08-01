@@ -73,6 +73,11 @@ class SqlAlchemyUserRepository:
         row = await self._session.get(UserModel, user.id.value)
         if row is None:
             return
+        # Alle veränderlichen Felder, nicht nur die, die heute jemand ändert:
+        # ein künftiger Passwort-Wechsel würde sonst lautlos verlorengehen —
+        # dieselbe Falle, gegen die diese Methode existiert.
+        row.email = user.email.value
+        row.password_hash = user.password_hash.value
         row.status = user.status
         row.display_name = user.display_name
         row.roles = list(user.roles)

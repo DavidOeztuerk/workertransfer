@@ -53,16 +53,37 @@ jemanden den Arbeitsplatz kosten kann. `product-scope.md` gibt die
 Auffindbarkeit der Person, nicht dem Anfragenden. `POST /auth/resend-verification`
 antwortet aus demselben Grund immer `202`.
 
+**Gleicher Statuscode heißt nicht gleiche Antwort — die Laufzeit zählt mit.**
+`handle_register` hasht das Passwort auch dann, wenn die Adresse längst vergeben
+ist, und `handle_login` hasht auch bei unbekannter Adresse. Ohne das kehrt der
+Duplikatpfad zurück, bevor bcrypt (12 Runden, ~300 ms) je läuft: zwei Anfragen,
+identischer Statuscode, aber ~10 ms gegen ~300 ms. Der Enumerationskanal wäre
+damit nicht geschlossen, sondern nur vom Statuscode in die Uhr gewandert. Auch
+das kam aus dem Code-Review, nicht aus dem Entwurf.
+
 **Ein unbestätigtes Konto bekommt `403`, kein `401`.** Bei korrektem Passwort
 verrät das nichts, was das Passwort nicht ohnehin beweist — und ohne diesen Fall
 wäre ein Konto, dessen Bestätigungsmail im Spam liegt, eine Sackgasse.
 Gesperrte Konten bleiben beim generischen `401`.
 
-**Der Mailversand liegt außerhalb der Transaktion.** Konto und Token committen;
-scheitert der Versand, wird geloggt und trotzdem `201` geantwortet. Ein `500`
-würde offen lassen, ob das Konto existiert — es existiert. Der Reparaturweg ist
-„erneut senden". Eine Mail ist kein Audit-Ereignis und gehört nicht in die UoW,
-die ADR-0012 schützt.
+**Der Mailversand liegt außerhalb der Transaktion — durchgesetzt, nicht nur
+behauptet.** Die Handler *sammeln* Versandaufträge (`OutgoingMail`) in einer
+Outbox-Liste; der Router leert sie mit `dispatch_all()` **nach** dem `async with
+request_scope(...)`, also nach dem Commit im `__aexit__` der UoW.
+
+Der erste Anlauf hatte genau das verfehlt: der Handler verschickte selbst und
+trug einen Kommentar, der das Gegenteil behauptete. Da der Handler innerhalb des
+`request_scope` läuft, ging der Bestätigungslink damit **vor** dem Commit raus —
+ein fehlgeschlagener Commit hätte die Person mit einem Link auf eine
+zurückgerollte Token-Zeile zurückgelassen, ohne Konto und ohne Reparaturweg.
+Nebenbei hielt ein nicht erreichbarer SMTP-Server zehn Sekunden lang eine
+Postgres-Verbindung. Aufgedeckt hat das erst ein unabhängiges Code-Review.
+
+Scheitert der Versand danach, wird geloggt und trotzdem `201` geantwortet. Ein
+`500` würde offen lassen, ob das Konto existiert — es existiert. Der
+Reparaturweg ist „erneut senden". Eine Mail ist kein Audit-Ereignis und gehört
+nicht in die UoW, die ADR-0012 schützt. Geloggt wird die `user_id`, nie die
+Empfängeradresse: `AUDIT_METADATA_ALLOWLIST` schließt E-Mails genau deshalb aus.
 
 **`worker-email` wird nicht verwendet.** Sein `SMTPBackend.send()` ruft
 unbedingt `server.login()` auf — Mailpit und die meisten Entwicklungs-Catcher
@@ -86,6 +107,15 @@ ein Image, das eine Textmail verschicken soll. Stattdessen ein schlanker
 - Migration `0003` legt für jede verwaiste `tenant_id` eine Platzhalter-Zeile an
   (`<uuid>.invalid`, per RFC 2606 nie auflösbar), bevor der Fremdschlüssel
   entsteht. Nichts wird stillschweigend gelöscht.
+- `UserRepository.save()` schreibt **alle** veränderlichen Felder zurück, nicht
+  nur die, die heute jemand ändert. Ein künftiger Passwort-Wechsel verlöre sonst
+  lautlos seine Wirkung — dieselbe Falle, gegen die die Methode existiert.
+- **Offen und bewusst vertagt:** `handle_refresh` übernimmt den Tenant aus dem
+  Refresh-Token-Claim und prüft die Mitgliedschaft nicht erneut. Wer aus einem
+  Unternehmen entfernt wird, behielte durch Rotation unbegrenzt ein
+  tenant-gebundenes Token. Heute unerreichbar, weil kein Entfernungspfad
+  existiert — die Einladungs-Scheibe muss ihn zusammen mit dieser Prüfung
+  bauen, sonst entsteht das Loch mit ihr.
 - **Aggregate kommen losgelöst aus dem Repository.** `_to_domain` baut ein neues
   Objekt; eine Mutation erreicht die Datenbank nur über `UserRepository.save()`.
   Das ist beim Bauen teuer aufgefallen: `verify-email` meldete `200`, während

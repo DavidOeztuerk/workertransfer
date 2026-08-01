@@ -50,12 +50,14 @@ __all__ = [
     "AuthenticateUserCommand",
     "CreateCompanyCommand",
     "ListMembershipsQuery",
+    "OutgoingMail",
     "RefreshTokenCommand",
     "RegisterUserCommand",
     "ResendVerificationCommand",
     "RevokeTokenCommand",
     "SwitchTenantCommand",
     "VerifyEmailCommand",
+    "dispatch_all",
     "handle_create_company",
     "handle_list_memberships",
     "handle_register",
@@ -83,23 +85,32 @@ class RegisterUserCommand:
 
 
 async def handle_register(
-    cmd: RegisterUserCommand, *, deps: dict[str, Any], repos: dict[str, Any]
+    cmd: RegisterUserCommand,
+    *,
+    deps: dict[str, Any],
+    repos: dict[str, Any],
+    outbox: list[OutgoingMail],
 ) -> Result[User | None]:
     hasher = deps["hasher"]
     policy: PasswordPolicy = PasswordPolicy()
     now = deps["clock"].now()
     try:
         policy.validate(cmd.password)
+        # Immer hashen, auch wenn die Adresse längst vergeben ist. bcrypt mit 12
+        # Runden braucht ~300 ms; ein früher Ausstieg wäre in ~10 ms zurück und
+        # würde über die Antwortzeit verraten, was der gleiche Statuscode gerade
+        # verbirgt. Der Enumerationskanal wandert sonst nur in die Uhr.
+        password_hash = hasher.hash(cmd.password)
         existing = await repos["users"].get_by_email(cmd.email)
         if existing is not None:
             # Kein zweites Konto — aber dieselbe Antwort wie im Normalfall, damit
             # der Endpunkt nicht verrät, wer hier ein Konto hat. Der echte Besitzer
             # erfährt von dem Versuch.
-            await _send_duplicate_notice(existing, deps)
+            outbox.append(_duplicate_notice(existing))
             return Result.ok(None)
         user = User.register(
             email=Email(cmd.email),
-            password_hash=hasher.hash(cmd.password),
+            password_hash=password_hash,
             display_name=cmd.display_name,
             now=now,
         )
@@ -130,27 +141,50 @@ async def handle_register(
     except DomainError as exc:
         return Result.fail(exc)
     await _publish_user_events(user, deps)
-    # Outside the UoW the router (Task 18) drives: a dead mailbox must not undo
-    # an otherwise successful registration — the repair path is "resend", not
-    # rolling back the account (Spec §5).
-    await _dispatch_mail(
-        deps,
-        to=user.email.value,
-        subject="Bitte bestätige deine E-Mail-Adresse",
-        body=_confirmation_body(deps, raw_token),
+    # Nur einreihen. Versandt wird nach dem Commit (dispatch_all im Router):
+    # sonst ginge der Bestätigungslink raus, bevor die Token-Zeile committet
+    # ist — ein fehlgeschlagener Commit ließe die Person mit einem Link auf
+    # nichts zurück.
+    outbox.append(
+        OutgoingMail(
+            to=user.email.value,
+            subject="Bitte bestätige deine E-Mail-Adresse",
+            body=_confirmation_body(deps, raw_token),
+            user_ref=str(user.id.value),
+        )
     )
     return Result.ok(user)
 
 
-async def _send_duplicate_notice(existing: User, deps: dict[str, Any]) -> None:
-    """Warnt den echten Besitzer statt dem Anfragenden irgendetwas zu verraten.
+@dataclass(frozen=True, slots=True)
+class OutgoingMail:
+    """Ein Versandauftrag, der die Transaktion überleben soll.
 
-    Discoverability liegt bei der Person, nicht beim Anfragenden
-    (product-scope.md) — die Antwort an den Aufrufer bleibt in jedem Fall
-    identisch zur erfolgreichen Registrierung.
+    Handler sammeln, der Router versendet — NACH dem Commit. `user_ref` dient
+    dem Log, damit ein Fehlschlag nicht die Empfängeradresse in die Logs
+    schreibt (AUDIT_METADATA_ALLOWLIST schließt E-Mails genau deshalb aus).
     """
-    await _dispatch_mail(
-        deps,
+
+    to: str
+    subject: str
+    body: str
+    user_ref: str
+
+
+async def dispatch_all(mails: list[OutgoingMail], deps: dict[str, Any]) -> None:
+    """Versendet nach dem Commit. Ein Fehlschlag darf nichts rückgängig machen —
+    der Reparaturweg ist "erneut senden" (Spec §5)."""
+    mailer = deps["mailer"]
+    for mail in mails:
+        try:
+            await mailer.send(to=mail.to, subject=mail.subject, body=mail.body)
+        except Exception:
+            _logger.exception("Failed to send mail for user %s", mail.user_ref)
+
+
+def _duplicate_notice(existing: User) -> OutgoingMail:
+    """Warnt den echten Besitzer statt dem Anfragenden irgendetwas zu verraten."""
+    return OutgoingMail(
         to=existing.email.value,
         subject="Registrierungsversuch mit deiner E-Mail-Adresse",
         body=(
@@ -159,6 +193,7 @@ async def _send_duplicate_notice(existing: User, deps: dict[str, Any]) -> None:
             "warst, melde dich einfach an. War es nicht du, kannst du diese "
             "Nachricht ignorieren.\n"
         ),
+        user_ref=str(existing.id.value),
     )
 
 
@@ -168,18 +203,6 @@ def _confirmation_body(deps: dict[str, Any], raw_token: str) -> str:
         "Willkommen bei WorkerTransfer! Bitte bestätige deine E-Mail-Adresse "
         f"über folgenden Link:\n\n{base}/verify?token={raw_token}\n"
     )
-
-
-async def _dispatch_mail(deps: dict[str, Any], *, to: str, subject: str, body: str) -> None:
-    """Versand ist bewusst kein Teil der UoW (Spec §5): eine tote Mailbox darf
-    eine sonst erfolgreiche Registrierung nicht rückgängig machen — der
-    Reparaturweg ist "erneut senden". Und eine Mail ist kein Audit-Ereignis,
-    das ADR-0012 in derselben Transaktion schützen müsste.
-    """
-    try:
-        await deps["mailer"].send(to=to, subject=subject, body=body)
-    except Exception:
-        _logger.exception("Failed to send mail to %s", to)
 
 
 @dataclass(frozen=True, slots=True)
@@ -235,7 +258,11 @@ class ResendVerificationCommand:
 
 
 async def handle_resend(
-    cmd: ResendVerificationCommand, *, deps: dict[str, Any], repos: dict[str, Any]
+    cmd: ResendVerificationCommand,
+    *,
+    deps: dict[str, Any],
+    repos: dict[str, Any],
+    outbox: list[OutgoingMail],
 ) -> Result[None]:
     clock = deps["clock"]
     now = clock.now()
@@ -259,11 +286,13 @@ async def handle_resend(
             consumed_at=None,
         )
     )
-    await _dispatch_mail(
-        deps,
-        to=user.email.value,
-        subject="Bitte bestätige deine E-Mail-Adresse",
-        body=_confirmation_body(deps, raw_token),
+    outbox.append(
+        OutgoingMail(
+            to=user.email.value,
+            subject="Bitte bestätige deine E-Mail-Adresse",
+            body=_confirmation_body(deps, raw_token),
+            user_ref=str(user.id.value),
+        )
     )
     return Result.ok(None)
 
@@ -298,6 +327,10 @@ async def handle_login(
     try:
         user = await repos["users"].get_by_email(cmd.email)
         if user is None:
+            # Genauso teuer wie ein echter Vergleich: ohne das wäre eine
+            # unbekannte Adresse an der Antwortzeit erkennbar (bcrypt ~300 ms
+            # gegen ~10 ms), und der gleiche 401 würde nichts mehr verbergen.
+            hasher.hash(cmd.password)
             await _audit_failure("unknown_user", actor_id=None)
             raise InvalidCredentials()
         if not user.verify_password(cmd.password, hasher):

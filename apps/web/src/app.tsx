@@ -62,8 +62,12 @@ function CompanySwitcher({ activeTenantId }: { activeTenantId: string | null }) 
       >
         {/* "als Person" ist der Standardzustand — ein Unternehmen wird bewusst
             gewählt (ADR-0017). Zurückwechseln heißt neu anmelden, weil der
-            Tenant im Token steckt. */}
-        <option value="">Ich selbst</option>
+            Tenant im Token steckt und es keinen Endpunkt gibt, der ihn wieder
+            entfernt. Solange eines aktiv ist, wäre die Option also eine Lüge:
+            sie würde POST /auth/company/ auslösen und wortlos 404 liefern. */}
+        <option value="" disabled={activeTenantId !== null}>
+          {activeTenantId === null ? "Ich selbst" : "Ich selbst (Abmelden nötig)"}
+        </option>
         {companies.map((company) => (
           <option key={company.id} value={company.id}>
             {company.name}
