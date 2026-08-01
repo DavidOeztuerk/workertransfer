@@ -147,7 +147,7 @@ async def test_x_tenant_id_header_ignored_in_production_mode(
 
         # Asking for a company without being a member is refused, header or not.
         denied = await client.post(
-            f"/auth/tenant/{tenant}",
+            f"/auth/company/{tenant}",
             headers={"Authorization": f"Bearer {access}", **spoof_header},
         )
         assert denied.status_code == 403, denied.text
@@ -181,7 +181,7 @@ async def test_x_tenant_id_header_ignored_in_production_mode(
         access = login.cookies.get("access")
 
         switched = await client.post(
-            f"/auth/tenant/{tenant}",
+            f"/auth/company/{tenant}",
             headers={"Authorization": f"Bearer {access}", **spoof_header},
         )
         assert switched.status_code == 200, switched.text
