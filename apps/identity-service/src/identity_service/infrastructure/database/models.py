@@ -15,7 +15,14 @@ from worker_shared import utc_now
 from identity_service.domain.audit import AuditAction
 from identity_service.domain.user import AccountStatus
 
-__all__ = ["AuditEventModel", "SessionModel", "UserModel", "UserTenantMembershipModel"]
+__all__ = [
+    "AuditEventModel",
+    "EmailVerificationTokenModel",
+    "SessionModel",
+    "TenantModel",
+    "UserModel",
+    "UserTenantMembershipModel",
+]
 
 
 class UserModel(Base, TimestampMixin, VersionMixin):
@@ -44,6 +51,37 @@ class UserModel(Base, TimestampMixin, VersionMixin):
     )
 
 
+class TenantModel(Base):
+    """A company. See domain/company.py (Company/EmailDomain)."""
+
+    __tablename__ = "tenants"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    domain: Mapped[str] = mapped_column(CITEXT, nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class EmailVerificationTokenModel(Base):
+    """Single-use email confirmation token. See domain/verification.py."""
+
+    __tablename__ = "email_verification_tokens"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
 class UserTenantMembershipModel(Base):
     """Which companies a person may act for. See domain/membership.py."""
 
@@ -56,7 +94,13 @@ class UserTenantMembershipModel(Base):
         nullable=False,
         index=True,
     )
-    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role: Mapped[str] = mapped_column(String(16), nullable=False, default="member")
     granted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )

@@ -153,10 +153,16 @@ async def test_x_tenant_id_header_ignored_in_production_mode(
         assert denied.status_code == 403, denied.text
 
     # Grant the membership out-of-band: writing memberships belongs to a future
-    # company-service, so the DB is the honest seam for this test.
+    # company-service, so the DB is the honest seam for this test. Since
+    # migration 0003, membership.tenant_id is FK-constrained to tenants(id), so
+    # the row must exist first — same as any real company-service write would.
     engine = create_async_engine(postgres_url)
     try:
         async with engine.begin() as conn:
+            await conn.execute(
+                text("INSERT INTO tenants (id, name, domain) VALUES (:t, 'Tenant Source Co', :d)"),
+                {"t": str(tenant), "d": f"tenant-source-{tenant}.example"},
+            )
             await conn.execute(
                 text(
                     "INSERT INTO user_tenant_memberships (id, user_id, tenant_id) "
