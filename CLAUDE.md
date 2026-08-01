@@ -31,11 +31,19 @@ Two Python services exist: `identity-service` and `consent-service`. A React app
 
 ### Everything at once
 ```bash
-docker compose up -d      # Postgres, one database per service
-./scripts/run-dev.sh      # migrate + identity-service + consent-service + Vite
+docker compose up --build # Postgres + every service + the web app, migrations included
+docker compose down       # stop (add -v to drop the databases)
 make check                # the full six-step gate (Python then frontend), fail-fast
 make fix                  # ruff format + ruff check --fix
 ```
+`docker compose up` is the whole local stack — there is no companion script. Each
+service container migrates itself on start (`docker/entrypoint.sh`), so a fresh
+clone needs no manual `alembic` or `psql`. Source is bind-mounted and both
+services run under `--reload`, so host edits apply without a rebuild; rebuild
+only when a dependency changes. **Adding a service:** add its database to
+`scripts/initdb/`, copy a service block in `docker-compose.yml` and change four
+values — no new Dockerfile (`docker/service.Dockerfile` is shared and takes
+`SERVICE_DIR` as a build arg). `docker/web.Dockerfile` runs Vite.
 
 ### Python
 ```bash

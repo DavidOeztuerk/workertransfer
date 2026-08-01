@@ -1,23 +1,63 @@
-# Local development substrate. Deliberately minimal: one Postgres serving one
-# database per service (ADR-0004 forbids a shared database, so `identity` and
-# `consent` are separate databases even though they share a container here).
+# The complete local stack: database, every backend service, and the web app.
 #
-# Redis, RabbitMQ, MinIO, Jaeger and Prometheus are intentionally absent — no
+#   docker compose up --build     # start everything
+#   docker compose down           # stop, keep the data
+#   docker compose down -v        # stop and drop the databases
+#
+# There is no companion script. `up` migrates each service and starts it; a
+# fresh clone needs nothing else.
+#
+# Source is bind-mounted and every service runs with reload, so edits on the
+# host take effect without a rebuild. Rebuild only when a dependency changes.
+#
+# Redis, RabbitMQ, MinIO, Jaeger and Prometheus are deliberately absent — no
 # service wires them yet, and unused infrastructure rots. They arrive with the
 # first real consumer (ULTRAPLAN Phase 9/10).
 #
-#   docker compose up -d      # start
-#   ./scripts/run-dev.sh      # migrate + run both services + the web app
-#   docker compose down -v    # stop and drop the volumes
+# ---------------------------------------------------------------------------
+# ADDING A SERVICE — three steps, no new Dockerfile:
+#   1. scripts/initdb/01-create-service-databases.sql: add its database, then
+#      recreate the volume once (`docker compose down -v && docker compose up`).
+#   2. Copy the consent-service block below and change four things: the service
+#      name, SERVICE_DIR (its apps/<dir>), WORKER_PORT + the published port, and
+#      the uvicorn module in `command`.
+#   3. Add it to `web.depends_on` if the frontend calls it.
+# ---------------------------------------------------------------------------
+
+x-service: &service
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+  volumes:
+    - ./:/app
+    # Anonymous volume: keeps the host's .venv (macOS binaries, wrong platform)
+    # from shadowing anything under /app. The container's environment lives at
+    # /opt/venv and is untouched by the bind mount above.
+    - /app/.venv
+
+x-service-env: &service-env
+  WORKER_ENVIRONMENT: local
+  # 0.0.0.0, not the 127.0.0.1 default: inside a container the loopback default
+  # would make the published port answer nothing.
+  WORKER_HOST: "0.0.0.0"
+  # identity-service signs, every other service verifies — one shared secret
+  # until the gateway lands (ADR-0007/0015). Override via a .env file or the
+  # environment; the services refuse this default in production/staging.
+  WORKER_JWT_SECRET: ${WORKER_JWT_SECRET:-dev-only-secret-change-me-in-production-32bytes}
+  # The browser origin of the Vite dev server. Comma-separated is accepted.
+  WORKER_CORS_ALLOW_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
 
 services:
   postgres:
     image: postgres:17-alpine
     container_name: workertransfer-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: worker
       POSTGRES_PASSWORD: worker
-      # The entrypoint only creates POSTGRES_DB; the rest come from initdb.d.
+      # The entrypoint only creates POSTGRES_DB; every further service database
+      # comes from initdb (ADR-0004 forbids a shared database).
       POSTGRES_DB: identity
     ports:
       - "5432:5432"
@@ -25,11 +65,111 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./scripts/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      # run-dev.sh waits on this before running migrations.
+      # Every service waits on this before migrating.
       test: ["CMD-SHELL", "pg_isready -U worker -d identity"]
       interval: 2s
       timeout: 3s
       retries: 30
+
+  identity-service:
+    <<: *service
+    container_name: workertransfer-identity
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        SERVICE_DIR: identity-service
+    environment:
+      <<: *service-env
+      WORKER_PORT: "8001"
+      WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/identity
+    ports:
+      - "8001:8001"
+    command:
+      - uvicorn
+      - identity_service.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8001"
+      - --reload
+      - --reload-dir
+      - /app/apps/identity-service/src
+      - --reload-dir
+      - /app/packages
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;urllib.request.urlopen("http://localhost:8001/health/live")
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 40s
+
+  consent-service:
+    <<: *service
+    container_name: workertransfer-consent
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        SERVICE_DIR: consent-service
+    environment:
+      <<: *service-env
+      WORKER_PORT: "8002"
+      WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/consent
+    ports:
+      - "8002:8002"
+    command:
+      - uvicorn
+      - consent_service.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8002"
+      - --reload
+      - --reload-dir
+      - /app/apps/consent-service/src
+      - --reload-dir
+      - /app/packages
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;urllib.request.urlopen("http://localhost:8002/health/live")
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 40s
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    container_name: workertransfer-web
+    restart: unless-stopped
+    depends_on:
+      identity-service:
+        condition: service_healthy
+      consent-service:
+        condition: service_healthy
+    environment:
+      # Read by the browser, so it must be a host-visible URL — the compose
+      # service name `identity-service` resolves only inside the network.
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8001}
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./:/app
+      # Anonymous volumes so the image's installed dependencies survive the bind
+      # mount above. Without these the host's node_modules (or its absence)
+      # would replace them and Vite would not start.
+      - /app/node_modules
+      - /app/apps/web/node_modules
+      - /app/packages/ui/node_modules
 
 volumes:
   postgres-data:

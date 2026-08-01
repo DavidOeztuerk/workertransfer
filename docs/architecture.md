@@ -22,7 +22,8 @@ workertransfer/
 │   ├── worker-*/             composable infrastructure libraries
 │   └── ui/                   shared React components (pnpm)
 ├── docs/                     ADRs, architecture, product constraints, vision
-├── scripts/                  run-dev.sh, database bootstrap
+├── docker/                   shared service Dockerfile, web Dockerfile, entrypoint
+├── scripts/                  database bootstrap (initdb)
 ├── tests/                    repo-level architectural guards
 └── .github/workflows/        repeatable CI (backend + frontend jobs)
 ```
