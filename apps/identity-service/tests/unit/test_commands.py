@@ -9,12 +9,16 @@ from uuid import UUID, uuid4
 
 from identity_service.application.commands import (
     AuthenticateUserCommand,
+    CreateCompanyCommand,
+    ListMembershipsQuery,
     RefreshTokenCommand,
     RegisterUserCommand,
     ResendVerificationCommand,
     RevokeTokenCommand,
     SwitchTenantCommand,
     VerifyEmailCommand,
+    handle_create_company,
+    handle_list_memberships,
     handle_login,
     handle_refresh,
     handle_register,
@@ -25,6 +29,7 @@ from identity_service.application.commands import (
 )
 from identity_service.application.ports import AuthPrincipal, TokenPair
 from identity_service.domain.audit import AuditAction
+from identity_service.domain.membership import MembershipRole
 from identity_service.domain.session import SessionView
 from identity_service.domain.user import AccountStatus, User
 from identity_service.domain.value_objects import Email, PasswordHash
@@ -59,12 +64,34 @@ class _FakeUsers:
 class _FakeMemberships:
     def __init__(self, members: set[tuple[UUID, UUID]] | None = None) -> None:
         self.members = members or set()
+        self.added: list[Any] = []
 
     async def is_member(self, user_id: UUID, tenant_id: UUID) -> bool:
         return (user_id, tenant_id) in self.members
 
     async def list_for_user(self, user_id: UUID) -> list[UUID]:
         return [t for u, t in self.members if u == user_id]
+
+    async def add(self, user_id: UUID, tenant_id: UUID, role: Any) -> None:
+        self.members.add((user_id, tenant_id))
+        self.added.append((user_id, tenant_id, role))
+
+    async def list_for_user_detailed(self, user_id: UUID) -> list[Any]:
+        return [entry for entry in self.added if entry[0] == user_id]
+
+
+class _FakeCompanies:
+    def __init__(self) -> None:
+        self.by_domain: dict[str, Any] = {}
+
+    async def add(self, company: Any) -> None:
+        self.by_domain[company.domain.value] = company
+
+    async def get_by_domain(self, domain: str) -> Any:
+        return self.by_domain.get(domain.lower())
+
+    async def get_by_id(self, company_id: UUID) -> Any:
+        return next((c for c in self.by_domain.values() if c.id == company_id), None)
 
 
 class _FakeSessions:
@@ -227,6 +254,7 @@ async def test_register_creates_user_and_audit() -> None:
     repos = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -262,6 +290,7 @@ async def test_registering_a_known_address_reports_success_and_warns_the_owner()
     repos = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -292,6 +321,7 @@ async def test_login_success_returns_token_pair_and_persists_session_audit() -> 
     repos = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -328,6 +358,7 @@ async def test_login_unknown_user_audits_failure_with_none_actor() -> None:
     repos = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -355,6 +386,7 @@ async def test_login_bad_password_audits_failure_with_user_actor() -> None:
     repos = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -393,6 +425,7 @@ async def test_login_disabled_user_audits_failure() -> None:
     repos = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -431,6 +464,7 @@ async def test_refresh_rotates_jti_and_revokes_old_session() -> None:
     repos = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -473,6 +507,7 @@ async def test_refresh_rejects_revoked_session() -> None:
     repos = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -505,6 +540,7 @@ async def test_refresh_rejects_bad_token_without_auditing_pii() -> None:
     repos = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -530,6 +566,7 @@ async def test_revoke_revokes_session_and_is_idempotent() -> None:
     repos = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -607,6 +644,7 @@ async def test_login_issues_a_token_without_a_tenant() -> None:
     repos: dict[str, Any] = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -631,6 +669,7 @@ async def test_switching_to_a_company_you_belong_to_mints_a_tenant_token() -> No
     repos: dict[str, Any] = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -658,6 +697,7 @@ async def test_switching_to_a_company_you_do_not_belong_to_is_refused_and_audite
     repos: dict[str, Any] = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -687,6 +727,7 @@ async def test_membership_of_one_company_does_not_grant_another() -> None:
     repos: dict[str, Any] = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -715,6 +756,7 @@ async def test_the_tenant_session_is_separate_from_the_person_session() -> None:
     repos: dict[str, Any] = {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -744,6 +786,7 @@ def _confirm_repos() -> dict[str, Any]:
     return {
         "users": _FakeUsers(),
         "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -963,3 +1006,124 @@ async def test_switching_tenant_with_an_unconfirmed_account_returns_a_result() -
 
     assert not is_success(res)
     assert fail_err(res).code == "email_not_confirmed"
+
+
+# --- Unternehmensanlage (ADR-0017/0018) -------------------------------------
+
+
+async def _confirmed_user(repos: dict[str, Any], deps: dict[str, Any], email: str) -> User:
+    """Registrieren und über den echten Token-Weg bestätigen."""
+    await handle_register(
+        RegisterUserCommand(email=email, password="strongpassword1", display_name="C"),
+        deps=deps,
+        repos=repos,
+    )
+    raw = _raw_token_from(deps["mailer"])
+    await handle_verify_email(VerifyEmailCommand(token=raw), deps=deps, repos=repos)
+    user = await repos["users"].get_by_email(email)
+    assert user is not None
+    return user
+
+
+async def test_creating_a_company_derives_the_domain_and_makes_the_creator_admin() -> None:
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=_FakeMailer())
+    user = await _confirmed_user(repos, deps, "anna@firma.de")
+    repos["audit"].events.clear()
+
+    res = await handle_create_company(
+        CreateCompanyCommand(user_id=user.id.value, name="Firma GmbH"), deps=deps, repos=repos
+    )
+
+    assert is_success(res)
+    # Die Domain kommt aus der Adresse, nicht aus dem Kommando.
+    assert res.value.domain.value == "firma.de"
+    assert repos["memberships"].added[0][2] is MembershipRole.ADMIN
+    audit = repos["audit"].events[-1]
+    assert audit.action is AuditAction.COMPANY_CREATED
+    # Anders als persönliche Handlungen trägt diese Zeile einen Tenant.
+    assert audit.tenant_id == res.value.id
+
+
+async def test_a_pending_account_cannot_create_a_company() -> None:
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=_FakeMailer())
+    user = await _register(repos, deps, "unbestaetigt@firma.de")
+
+    res = await handle_create_company(
+        CreateCompanyCommand(user_id=user.id.value, name="Firma"), deps=deps, repos=repos
+    )
+
+    assert not is_success(res)
+    # Eine unbestätigte Adresse beweist keine Domain.
+    assert fail_err(res).code == "account_not_confirmed"
+
+
+async def test_a_public_domain_cannot_be_claimed() -> None:
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=_FakeMailer())
+    user = await _confirmed_user(repos, deps, "max@gmail.com")
+
+    res = await handle_create_company(
+        CreateCompanyCommand(user_id=user.id.value, name="Nicht Google"), deps=deps, repos=repos
+    )
+
+    assert not is_success(res)
+    assert fail_err(res).code == "public_email_domain"
+
+
+async def test_a_private_address_still_registers_and_confirms_normally() -> None:
+    """Der Wechselwillige und der Arbeitssuchende brauchen kein Unternehmen —
+    die Sperrliste gilt NUR beim Beanspruchen einer Domain."""
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=_FakeMailer())
+
+    user = await _confirmed_user(repos, deps, "privat@gmx.de")
+
+    assert user.status is AccountStatus.ACTIVE
+
+
+async def test_a_taken_domain_is_refused() -> None:
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=_FakeMailer())
+    first = await _confirmed_user(repos, deps, "bob@firma.de")
+    await handle_create_company(
+        CreateCompanyCommand(user_id=first.id.value, name="Erste"), deps=deps, repos=repos
+    )
+    second = await _confirmed_user(repos, deps, "carla@firma.de")
+
+    res = await handle_create_company(
+        CreateCompanyCommand(user_id=second.id.value, name="Zweite"), deps=deps, repos=repos
+    )
+
+    assert not is_success(res)
+    assert fail_err(res).code == "domain_already_claimed"
+
+
+async def test_a_blank_name_is_refused() -> None:
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=_FakeMailer())
+    user = await _confirmed_user(repos, deps, "leer@firma.de")
+
+    res = await handle_create_company(
+        CreateCompanyCommand(user_id=user.id.value, name="   "), deps=deps, repos=repos
+    )
+
+    assert not is_success(res)
+    assert fail_err(res).code == "invalid_company_name"
+
+
+async def test_listing_memberships_returns_what_the_creator_got() -> None:
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=_FakeMailer())
+    user = await _confirmed_user(repos, deps, "dora@firma.de")
+    await handle_create_company(
+        CreateCompanyCommand(user_id=user.id.value, name="Firma GmbH"), deps=deps, repos=repos
+    )
+
+    res = await handle_list_memberships(
+        ListMembershipsQuery(user_id=user.id.value), deps=deps, repos=repos
+    )
+
+    assert is_success(res)
+    assert len(res.value) == 1
