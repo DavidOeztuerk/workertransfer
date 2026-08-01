@@ -17,6 +17,7 @@ from identity_service.application.commands import (
     RevokeTokenCommand,
     SwitchTenantCommand,
     VerifyEmailCommand,
+    dispatch_all,
     handle_create_company,
     handle_list_memberships,
     handle_login,
@@ -34,6 +35,21 @@ from identity_service.domain.session import SessionView
 from identity_service.domain.user import AccountStatus, User
 from identity_service.domain.value_objects import Email, PasswordHash
 from identity_service.infrastructure.tokens import hash_token
+
+
+async def _register_via(cmd: Any, *, deps: dict[str, Any], repos: dict[str, Any]) -> Any:
+    """Spiegelt den Router: Handler sammelt, Versand passiert danach."""
+    outbox: list[Any] = []
+    result = await handle_register(cmd, deps=deps, repos=repos, outbox=outbox)
+    await dispatch_all(outbox, deps)
+    return result
+
+
+async def _resend_via(cmd: Any, *, deps: dict[str, Any], repos: dict[str, Any]) -> Any:
+    outbox: list[Any] = []
+    result = await handle_resend(cmd, deps=deps, repos=repos, outbox=outbox)
+    await dispatch_all(outbox, deps)
+    return result
 
 
 def is_success(result: Any) -> bool:
@@ -137,7 +153,13 @@ class _FakeAudit:
 
 
 class _StupidHasher:
+    def __init__(self) -> None:
+        # Zählt Aufrufe: die Zeitangleichung gegen Enumeration lässt sich so
+        # deterministisch prüfen, ohne eine Uhr zu messen.
+        self.hash_calls = 0
+
     def hash(self, plain: str) -> PasswordHash:
+        self.hash_calls += 1
         return PasswordHash("h$" + plain)
 
     def verify(self, plain: str, hashed: PasswordHash) -> bool:
@@ -266,7 +288,7 @@ async def test_register_creates_user_and_audit() -> None:
     deps = _deps(clock, tokens, bus, hasher)
     cmd = RegisterUserCommand(email="A@B.com", password="strongpassword1", display_name="A")
 
-    res = await handle_register(cmd, deps=deps, repos=repos)
+    res = await _register_via(cmd, deps=deps, repos=repos)
 
     assert is_success(res)
     assert fail_err(res) is None
@@ -301,10 +323,10 @@ async def test_registering_a_known_address_reports_success_and_warns_the_owner()
     }
     deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
     cmd = RegisterUserCommand(email="dup@example.com", password="strongpassword1", display_name="D")
-    await handle_register(cmd, deps=deps, repos=repos)
+    await _register_via(cmd, deps=deps, repos=repos)
     mailer.sent.clear()
 
-    second = await handle_register(cmd, deps=deps, repos=repos)
+    second = await _register_via(cmd, deps=deps, repos=repos)
 
     assert is_success(second)
     # Kein zweites Konto und kein zweiter Bestätigungs-Token.
@@ -395,7 +417,7 @@ async def test_login_bad_password_audits_failure_with_user_actor() -> None:
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
     }
-    seeded = await handle_register(
+    seeded = await _register_via(
         RegisterUserCommand(
             email="bob@example.com",
             password="strongpassword1",
@@ -434,7 +456,7 @@ async def test_login_disabled_user_audits_failure() -> None:
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
     }
-    seeded = await handle_register(
+    seeded = await _register_via(
         RegisterUserCommand(
             email="cara@example.com",
             password="strongpassword1",
@@ -609,7 +631,7 @@ async def test_revoke_revokes_session_and_is_idempotent() -> None:
 
 
 async def _register(repos: dict[str, Any], deps: dict[str, Any], email: str) -> User:
-    res = await handle_register(
+    res = await _register_via(
         RegisterUserCommand(email=email, password="strongpassword1", display_name="X"),
         deps=deps,
         repos=repos,
@@ -624,7 +646,7 @@ async def _register_active(repos: dict[str, Any], deps: dict[str, Any], email: s
     Die E-Mail-Bestätigung hat ihre eigenen Tests; diese hier prüfen Login,
     Refresh und Revoke und wollen nur ein benutzbares Konto.
     """
-    res = await handle_register(
+    res = await _register_via(
         RegisterUserCommand(email=email, password="strongpassword1", display_name="X"),
         deps=deps,
         repos=repos,
@@ -808,7 +830,7 @@ async def test_registration_creates_a_token_and_sends_a_mail() -> None:
     repos = _confirm_repos()
     deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
 
-    res = await handle_register(
+    res = await _register_via(
         RegisterUserCommand(email="neu@example.com", password="strongpassword1", display_name="N"),
         deps=deps,
         repos=repos,
@@ -829,7 +851,7 @@ async def test_verify_activates_the_account_and_consumes_the_token() -> None:
     mailer = _FakeMailer()
     repos = _confirm_repos()
     deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
-    await handle_register(
+    await _register_via(
         RegisterUserCommand(email="v@example.com", password="strongpassword1", display_name="V"),
         deps=deps,
         repos=repos,
@@ -850,7 +872,7 @@ async def test_a_consumed_token_cannot_be_reused() -> None:
     mailer = _FakeMailer()
     repos = _confirm_repos()
     deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
-    await handle_register(
+    await _register_via(
         RegisterUserCommand(email="w@example.com", password="strongpassword1", display_name="W"),
         deps=deps,
         repos=repos,
@@ -869,7 +891,7 @@ async def test_an_expired_token_is_refused() -> None:
     repos = _confirm_repos()
     clock = _Clock()
     deps = _deps(clock, _FakeTokens(), _Bus(), mailer=mailer)
-    await handle_register(
+    await _register_via(
         RegisterUserCommand(email="x@example.com", password="strongpassword1", display_name="X"),
         deps=deps,
         repos=repos,
@@ -903,14 +925,14 @@ async def test_resend_invalidates_the_previous_token() -> None:
     mailer = _FakeMailer()
     repos = _confirm_repos()
     deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
-    await handle_register(
+    await _register_via(
         RegisterUserCommand(email="y@example.com", password="strongpassword1", display_name="Y"),
         deps=deps,
         repos=repos,
     )
     first = _raw_token_from(mailer)
 
-    await handle_resend(ResendVerificationCommand(email="y@example.com"), deps=deps, repos=repos)
+    await _resend_via(ResendVerificationCommand(email="y@example.com"), deps=deps, repos=repos)
     second = _raw_token_from(mailer)
 
     assert first != second
@@ -922,13 +944,13 @@ async def test_the_old_link_stops_working_after_a_resend() -> None:
     mailer = _FakeMailer()
     repos = _confirm_repos()
     deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
-    await handle_register(
+    await _register_via(
         RegisterUserCommand(email="yy@example.com", password="strongpassword1", display_name="Y"),
         deps=deps,
         repos=repos,
     )
     first = _raw_token_from(mailer)
-    await handle_resend(ResendVerificationCommand(email="yy@example.com"), deps=deps, repos=repos)
+    await _resend_via(ResendVerificationCommand(email="yy@example.com"), deps=deps, repos=repos)
 
     res = await handle_verify_email(VerifyEmailCommand(token=first), deps=deps, repos=repos)
 
@@ -941,7 +963,7 @@ async def test_resend_for_an_unknown_address_reports_success_without_sending() -
     repos = _confirm_repos()
     deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
 
-    res = await handle_resend(
+    res = await _resend_via(
         ResendVerificationCommand(email="niemand@example.com"), deps=deps, repos=repos
     )
 
@@ -953,7 +975,7 @@ async def test_resend_for_an_already_active_account_sends_nothing() -> None:
     mailer = _FakeMailer()
     repos = _confirm_repos()
     deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
-    await handle_register(
+    await _register_via(
         RegisterUserCommand(email="z@example.com", password="strongpassword1", display_name="Z"),
         deps=deps,
         repos=repos,
@@ -963,7 +985,7 @@ async def test_resend_for_an_already_active_account_sends_nothing() -> None:
     )
     mailer.sent.clear()
 
-    res = await handle_resend(
+    res = await _resend_via(
         ResendVerificationCommand(email="z@example.com"), deps=deps, repos=repos
     )
 
@@ -983,7 +1005,7 @@ async def test_a_failing_mailer_does_not_fail_the_registration() -> None:
     deps = _deps(_Clock(), _FakeTokens(), _Bus())
     deps["mailer"] = _BrokenMailer()
 
-    res = await handle_register(
+    res = await _register_via(
         RegisterUserCommand(email="m@example.com", password="strongpassword1", display_name="M"),
         deps=deps,
         repos=repos,
@@ -1017,7 +1039,7 @@ async def test_switching_tenant_with_an_unconfirmed_account_returns_a_result() -
 
 async def _confirmed_user(repos: dict[str, Any], deps: dict[str, Any], email: str) -> User:
     """Registrieren und über den echten Token-Weg bestätigen."""
-    await handle_register(
+    await _register_via(
         RegisterUserCommand(email=email, password="strongpassword1", display_name="C"),
         deps=deps,
         repos=repos,
@@ -1131,3 +1153,70 @@ async def test_listing_memberships_returns_what_the_creator_got() -> None:
 
     assert is_success(res)
     assert len(res.value) == 1
+
+
+# --- Grenzen, die der Code-Review aufgedeckt hat ----------------------------
+
+
+async def test_the_handler_enqueues_instead_of_sending() -> None:
+    """Der Versand gehört hinter den Commit.
+
+    Sendete der Handler selbst, ginge der Bestätigungslink raus, bevor die
+    Token-Zeile committet ist — ein fehlgeschlagener Commit ließe die Person
+    mit einem Link auf nichts zurück.
+    """
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
+    outbox: list[Any] = []
+
+    await handle_register(
+        RegisterUserCommand(email="q@example.com", password="strongpassword1", display_name="Q"),
+        deps=deps,
+        repos=repos,
+        outbox=outbox,
+    )
+
+    assert len(outbox) == 1
+    assert mailer.sent == [], "der Handler darf nichts verschicken"
+
+    await dispatch_all(outbox, deps)
+
+    assert len(mailer.sent) == 1
+
+
+async def test_a_known_address_costs_the_same_work_as_a_new_one() -> None:
+    """Kein Enumerationskanal über die Antwortzeit.
+
+    Ein früher Ausstieg vor dem Hashing wäre in Bruchteilen der Zeit zurück —
+    bcrypt mit 12 Runden braucht ~300 ms. Der gleiche Statuscode verbirgt dann
+    nichts mehr. Gezählt statt gemessen, damit der Test nicht flackert.
+    """
+    hasher = _StupidHasher()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), hasher=hasher, mailer=_FakeMailer())
+    cmd = RegisterUserCommand(
+        email="gleich@example.com", password="strongpassword1", display_name="G"
+    )
+    await _register_via(cmd, deps=deps, repos=repos)
+    calls_after_first = hasher.hash_calls
+
+    await _register_via(cmd, deps=deps, repos=repos)
+
+    assert hasher.hash_calls == calls_after_first + 1
+
+
+async def test_an_unknown_login_costs_the_same_work_as_a_known_one() -> None:
+    hasher = _StupidHasher()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), hasher=hasher, mailer=_FakeMailer())
+    await _register_active(repos, deps, "bekannt@example.com")
+    baseline = hasher.hash_calls
+
+    await handle_login(
+        AuthenticateUserCommand(email="unbekannt@example.com", password="strongpassword1"),
+        deps=deps,
+        repos=repos,
+    )
+
+    assert hasher.hash_calls == baseline + 1

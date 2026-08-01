@@ -11,12 +11,14 @@ from worker_contracts import RegisterUserV1, ResendVerificationV1, VerifyEmailV1
 
 from identity_service.application.commands import (
     AuthenticateUserCommand,
+    OutgoingMail,
     RefreshTokenCommand,
     RegisterUserCommand,
     ResendVerificationCommand,
     RevokeTokenCommand,
     SwitchTenantCommand,
     VerifyEmailCommand,
+    dispatch_all,
     handle_login,
     handle_refresh,
     handle_register,
@@ -70,8 +72,12 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
     @router.post("/register", status_code=status.HTTP_201_CREATED)
     async def register(body: RegisterUserV1) -> dict[str, str]:
         cmd = RegisterUserCommand(body.email, body.password, body.display_name)
+        # Mails werden gesammelt und ERST NACH dem Commit versandt: die UoW
+        # committet im __aexit__ des request_scope, ein Versand innerhalb würde
+        # den Bestätigungslink verschicken, bevor die Token-Zeile existiert.
+        outbox: list[OutgoingMail] = []
         async with request_scope(session_factory) as (_uow, repos):
-            result = await handle_register(cmd, deps=deps, repos=repos)
+            result = await handle_register(cmd, deps=deps, repos=repos, outbox=outbox)
         if not result.is_success:
             err = result.error
             raise HTTPException(
@@ -82,6 +88,7 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
         # zu fragen (product-scope.md) — auf einem Transfermarkt genau die
         # Information, die jemanden den Arbeitsplatz kosten kann. Der echte
         # Besitzer bekommt stattdessen eine Warnmail.
+        await dispatch_all(outbox, deps)
         return {"status": "registered"}
 
     @router.post("/login")
@@ -124,8 +131,17 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
         # Immer 202 — auch bei unbekannter Adresse und bei längst bestätigtem
         # Konto. Sonst wäre dieser Endpunkt der Enumerationskanal, den
         # /auth/register gerade schließt.
+        outbox: list[OutgoingMail] = []
         async with request_scope(session_factory) as (_uow, repos):
-            await handle_resend(ResendVerificationCommand(email=body.email), deps=deps, repos=repos)
+            await handle_resend(
+                ResendVerificationCommand(email=body.email),
+                deps=deps,
+                repos=repos,
+                outbox=outbox,
+            )
+        # Erst nach dem Commit — sonst ginge der neue Link raus, bevor die
+        # Entwertung des alten committet ist.
+        await dispatch_all(outbox, deps)
         return {"status": "accepted"}
 
     @router.post("/refresh")
