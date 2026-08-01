@@ -16,12 +16,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 
 from worker_core import DomainError
 
 from identity_service.domain.value_objects import TenantId, UserId
 
-__all__ = ["NotAMember", "TenantMembership"]
+__all__ = ["MembershipRole", "NotAMember", "TenantMembership"]
 
 
 class NotAMember(DomainError):
@@ -31,8 +32,17 @@ class NotAMember(DomainError):
         super().__init__("not_a_member", "The user is not a member of this tenant")
 
 
+class MembershipRole(StrEnum):
+    """Durchgesetzt wird der Unterschied erst in Scheibe C (Einladungen); wer
+    ein Unternehmen anlegt, ist ab jetzt aber bereits als ADMIN vermerkt."""
+
+    ADMIN = "admin"
+    MEMBER = "member"
+
+
 @dataclass(frozen=True, slots=True)
 class TenantMembership:
     user_id: UserId
     tenant_id: TenantId
     granted_at: datetime
+    role: MembershipRole
