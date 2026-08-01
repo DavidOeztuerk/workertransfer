@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
@@ -10,19 +11,24 @@ from identity_service.application.commands import (
     AuthenticateUserCommand,
     RefreshTokenCommand,
     RegisterUserCommand,
+    ResendVerificationCommand,
     RevokeTokenCommand,
     SwitchTenantCommand,
+    VerifyEmailCommand,
     handle_login,
     handle_refresh,
     handle_register,
+    handle_resend,
     handle_revoke,
     handle_switch_tenant,
+    handle_verify_email,
 )
 from identity_service.application.ports import AuthPrincipal, TokenPair
 from identity_service.domain.audit import AuditAction
 from identity_service.domain.session import SessionView
 from identity_service.domain.user import AccountStatus, User
 from identity_service.domain.value_objects import Email, PasswordHash
+from identity_service.infrastructure.tokens import hash_token
 
 
 def is_success(result: Any) -> bool:
@@ -139,6 +145,37 @@ class _FakeTokens:
         )
 
 
+class _FakeTokenRepo:
+    """Spiegelt VerificationTokenRepository über ein dict, keyed by hash."""
+
+    def __init__(self) -> None:
+        self.rows: dict[str, Any] = {}
+
+    async def add(self, token: Any) -> None:
+        self.rows[token.token_hash] = token
+
+    async def get_by_hash(self, token_hash: str) -> Any:
+        return self.rows.get(token_hash)
+
+    async def consume(self, token_id: Any, at: Any) -> None:
+        for key, row in list(self.rows.items()):
+            if row.token_id == token_id and row.consumed_at is None:
+                self.rows[key] = replace(row, consumed_at=at)
+
+    async def consume_open_for(self, user_id: Any, purpose: Any, at: Any) -> None:
+        for key, row in list(self.rows.items()):
+            if row.user_id == user_id and row.purpose is purpose and row.consumed_at is None:
+                self.rows[key] = replace(row, consumed_at=at)
+
+
+class _FakeMailer:
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, str, str]] = []
+
+    async def send(self, *, to: str, subject: str, body: str) -> None:
+        self.sent.append((to, subject, body))
+
+
 class _Clock:
     def __init__(self, start: datetime | None = None) -> None:
         self._t = start or datetime(2026, 7, 16, 12, 0, 0, tzinfo=UTC)
@@ -160,17 +197,25 @@ class _Bus:
 
 class _Settings:
     jwt_refresh_token_expire_minutes = 60
+    public_web_url = "http://localhost:5173"
 
 
 def _deps(
-    clock: _Clock, tokens: _FakeTokens, bus: _Bus, hasher: _StupidHasher | None = None
+    clock: _Clock,
+    tokens: _FakeTokens,
+    bus: _Bus,
+    hasher: _StupidHasher | None = None,
+    mailer: _FakeMailer | None = None,
 ) -> dict[str, Any]:
     return {
         "hasher": hasher or _StupidHasher(),
+        # Achtung: deps["tokens"] ist der JWT-Aussteller, repos["tokens"] das
+        # Verifikations-Token-Repository. Gleicher Name, zwei Dinge.
         "tokens": tokens,
         "clock": clock,
         "eventbus": bus,
         "settings": _Settings(),
+        "mailer": mailer or _FakeMailer(),
     }
 
 
@@ -181,6 +226,7 @@ async def test_register_creates_user_and_audit() -> None:
     bus = _Bus()
     repos = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -203,26 +249,39 @@ async def test_register_creates_user_and_audit() -> None:
     assert len(bus.published) == 1
 
 
-async def test_register_rejects_duplicate_email() -> None:
-    hasher = _StupidHasher()
-    tokens = _FakeTokens()
-    clock = _Clock()
-    bus = _Bus()
+async def test_registering_a_known_address_reports_success_and_warns_the_owner() -> None:
+    """Kein Enumerationskanal.
+
+    Ein 409 würde "ist diese Person hier?" beantworten, ohne den Consent-Ledger
+    zu fragen — auf einem Transfermarkt die Information, die jemanden den
+    Arbeitsplatz kosten kann (product-scope.md: Auffindbarkeit gehört der
+    Person). Die Antwort ist deshalb identisch; der echte Besitzer erfährt vom
+    Versuch.
+    """
+    mailer = _FakeMailer()
     repos = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
     }
-    deps = _deps(clock, tokens, bus, hasher)
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
     cmd = RegisterUserCommand(email="dup@example.com", password="strongpassword1", display_name="D")
     await handle_register(cmd, deps=deps, repos=repos)
+    mailer.sent.clear()
 
     second = await handle_register(cmd, deps=deps, repos=repos)
 
-    assert not is_success(second)
-    assert fail_err(second) is not None
-    assert fail_err(second).code == "user_already_exists"
+    assert is_success(second)
+    # Kein zweites Konto und kein zweiter Bestätigungs-Token.
+    assert len(repos["users"].by_email) == 1
+    assert len(repos["tokens"].rows) == 1
+    # Aber der Besitzer wird gewarnt.
+    assert len(mailer.sent) == 1
+    to, _subject, body = mailer.sent[0]
+    assert to == "dup@example.com"
+    assert "versucht" in body.lower()
 
 
 async def test_login_success_returns_token_pair_and_persists_session_audit() -> None:
@@ -232,6 +291,7 @@ async def test_login_success_returns_token_pair_and_persists_session_audit() -> 
     bus = _Bus()
     repos = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -267,6 +327,7 @@ async def test_login_unknown_user_audits_failure_with_none_actor() -> None:
     bus = _Bus()
     repos = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -293,6 +354,7 @@ async def test_login_bad_password_audits_failure_with_user_actor() -> None:
     bus = _Bus()
     repos = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -330,6 +392,7 @@ async def test_login_disabled_user_audits_failure() -> None:
     bus = _Bus()
     repos = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -367,6 +430,7 @@ async def test_refresh_rotates_jti_and_revokes_old_session() -> None:
     bus = _Bus()
     repos = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -408,6 +472,7 @@ async def test_refresh_rejects_revoked_session() -> None:
     bus = _Bus()
     repos = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -439,6 +504,7 @@ async def test_refresh_rejects_bad_token_without_auditing_pii() -> None:
     bus = _Bus()
     repos = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -463,6 +529,7 @@ async def test_revoke_revokes_session_and_is_idempotent() -> None:
     bus = _Bus()
     repos = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -539,6 +606,7 @@ async def test_login_issues_a_token_without_a_tenant() -> None:
     deps = _deps(clock, tokens, bus, hasher)
     repos: dict[str, Any] = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -562,6 +630,7 @@ async def test_switching_to_a_company_you_belong_to_mints_a_tenant_token() -> No
     deps = _deps(clock, tokens, bus, hasher)
     repos: dict[str, Any] = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -588,6 +657,7 @@ async def test_switching_to_a_company_you_do_not_belong_to_is_refused_and_audite
     deps = _deps(clock, tokens, bus, hasher)
     repos: dict[str, Any] = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -616,6 +686,7 @@ async def test_membership_of_one_company_does_not_grant_another() -> None:
     deps = _deps(clock, tokens, bus, hasher)
     repos: dict[str, Any] = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -643,6 +714,7 @@ async def test_the_tenant_session_is_separate_from_the_person_session() -> None:
     deps = _deps(clock, tokens, bus, hasher)
     repos: dict[str, Any] = {
         "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
         "memberships": _FakeMemberships(),
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
@@ -663,3 +735,231 @@ async def test_the_tenant_session_is_separate_from_the_person_session() -> None:
     rows = list(repos["sessions"].rows.values())
     assert len(rows) == 2
     assert sorted([r.tenant_id is None for r in rows]) == [False, True]
+
+
+# --- E-Mail-Bestätigung -----------------------------------------------------
+
+
+def _confirm_repos() -> dict[str, Any]:
+    return {
+        "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
+
+
+def _raw_token_from(mailer: _FakeMailer) -> str:
+    """Der Klartext existiert nur in der Mail — genau wie in Produktion."""
+    body = mailer.sent[-1][2]
+    return body.split("/verify?token=", 1)[1].split()[0]
+
+
+async def test_registration_creates_a_token_and_sends_a_mail() -> None:
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
+
+    res = await handle_register(
+        RegisterUserCommand(email="neu@example.com", password="strongpassword1", display_name="N"),
+        deps=deps,
+        repos=repos,
+    )
+
+    assert is_success(res)
+    assert len(repos["tokens"].rows) == 1
+    assert len(mailer.sent) == 1
+    to, _subject, _body = mailer.sent[0]
+    assert to == "neu@example.com"
+    # Der Klartext steht in der Mail, in der Datenbank nur sein Hash.
+    raw = _raw_token_from(mailer)
+    assert hash_token(raw) in repos["tokens"].rows
+    assert raw not in repos["tokens"].rows
+
+
+async def test_verify_activates_the_account_and_consumes_the_token() -> None:
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
+    await handle_register(
+        RegisterUserCommand(email="v@example.com", password="strongpassword1", display_name="V"),
+        deps=deps,
+        repos=repos,
+    )
+    raw = _raw_token_from(mailer)
+    repos["audit"].events.clear()
+
+    res = await handle_verify_email(VerifyEmailCommand(token=raw), deps=deps, repos=repos)
+
+    assert is_success(res)
+    user = await repos["users"].get_by_email("v@example.com")
+    assert user is not None and user.status is AccountStatus.ACTIVE
+    assert repos["tokens"].rows[hash_token(raw)].is_consumed() is True
+    assert repos["audit"].events[-1].action is AuditAction.EMAIL_VERIFIED
+
+
+async def test_a_consumed_token_cannot_be_reused() -> None:
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
+    await handle_register(
+        RegisterUserCommand(email="w@example.com", password="strongpassword1", display_name="W"),
+        deps=deps,
+        repos=repos,
+    )
+    raw = _raw_token_from(mailer)
+    await handle_verify_email(VerifyEmailCommand(token=raw), deps=deps, repos=repos)
+
+    second = await handle_verify_email(VerifyEmailCommand(token=raw), deps=deps, repos=repos)
+
+    assert not is_success(second)
+    assert fail_err(second).code == "token_invalid"
+
+
+async def test_an_expired_token_is_refused() -> None:
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    clock = _Clock()
+    deps = _deps(clock, _FakeTokens(), _Bus(), mailer=mailer)
+    await handle_register(
+        RegisterUserCommand(email="x@example.com", password="strongpassword1", display_name="X"),
+        deps=deps,
+        repos=repos,
+    )
+    raw = _raw_token_from(mailer)
+    clock.advance(timedelta(hours=25))
+
+    res = await handle_verify_email(VerifyEmailCommand(token=raw), deps=deps, repos=repos)
+
+    assert not is_success(res)
+    # Abgelaufen ist von ungültig unterscheidbar, damit die Oberfläche gezielt
+    # "erneut senden" anbieten kann — der Token kennt ohnehin nur der Empfänger.
+    assert fail_err(res).code == "token_expired"
+
+
+async def test_an_unknown_token_is_refused() -> None:
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus())
+
+    res = await handle_verify_email(
+        VerifyEmailCommand(token="niemals-ausgestellt"), deps=deps, repos=repos
+    )
+
+    assert not is_success(res)
+    assert fail_err(res).code == "token_invalid"
+
+
+async def test_resend_invalidates_the_previous_token() -> None:
+    """Sonst blieben beliebig viele gültige Links gleichzeitig in Umlauf, und
+    der älteste — womöglich fehlgeleitete — funktionierte weiter."""
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
+    await handle_register(
+        RegisterUserCommand(email="y@example.com", password="strongpassword1", display_name="Y"),
+        deps=deps,
+        repos=repos,
+    )
+    first = _raw_token_from(mailer)
+
+    await handle_resend(ResendVerificationCommand(email="y@example.com"), deps=deps, repos=repos)
+    second = _raw_token_from(mailer)
+
+    assert first != second
+    assert repos["tokens"].rows[hash_token(first)].is_consumed() is True
+    assert repos["tokens"].rows[hash_token(second)].is_consumed() is False
+
+
+async def test_the_old_link_stops_working_after_a_resend() -> None:
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
+    await handle_register(
+        RegisterUserCommand(email="yy@example.com", password="strongpassword1", display_name="Y"),
+        deps=deps,
+        repos=repos,
+    )
+    first = _raw_token_from(mailer)
+    await handle_resend(ResendVerificationCommand(email="yy@example.com"), deps=deps, repos=repos)
+
+    res = await handle_verify_email(VerifyEmailCommand(token=first), deps=deps, repos=repos)
+
+    assert not is_success(res)
+    assert fail_err(res).code == "token_invalid"
+
+
+async def test_resend_for_an_unknown_address_reports_success_without_sending() -> None:
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
+
+    res = await handle_resend(
+        ResendVerificationCommand(email="niemand@example.com"), deps=deps, repos=repos
+    )
+
+    assert is_success(res)
+    assert mailer.sent == []
+
+
+async def test_resend_for_an_already_active_account_sends_nothing() -> None:
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
+    await handle_register(
+        RegisterUserCommand(email="z@example.com", password="strongpassword1", display_name="Z"),
+        deps=deps,
+        repos=repos,
+    )
+    await handle_verify_email(
+        VerifyEmailCommand(token=_raw_token_from(mailer)), deps=deps, repos=repos
+    )
+    mailer.sent.clear()
+
+    res = await handle_resend(
+        ResendVerificationCommand(email="z@example.com"), deps=deps, repos=repos
+    )
+
+    assert is_success(res)
+    assert mailer.sent == []
+
+
+async def test_a_failing_mailer_does_not_fail_the_registration() -> None:
+    """Das Konto existiert, also darf die Antwort nicht behaupten, es sei
+    schiefgegangen. Der Reparaturweg ist "erneut senden" (Spec §5)."""
+
+    class _BrokenMailer:
+        async def send(self, *, to: str, subject: str, body: str) -> None:
+            raise OSError("smtp down")
+
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus())
+    deps["mailer"] = _BrokenMailer()
+
+    res = await handle_register(
+        RegisterUserCommand(email="m@example.com", password="strongpassword1", display_name="M"),
+        deps=deps,
+        repos=repos,
+    )
+
+    assert is_success(res)
+    assert len(repos["users"].by_email) == 1
+    assert len(repos["tokens"].rows) == 1
+
+
+async def test_switching_tenant_with_an_unconfirmed_account_returns_a_result() -> None:
+    """Regression: handle_switch_tenant fing nur AccountDisabled, sodass der
+    neuere EmailNotConfirmed unbehandelt durchgeschlagen wäre statt ein
+    Result.fail zu werden."""
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus())
+    user = await _register(repos, deps, "pending@example.com")
+    tenant = uuid4()
+    repos["memberships"].members.add((user.id.value, tenant))
+
+    res = await handle_switch_tenant(
+        SwitchTenantCommand(user_id=user.id.value, tenant_id=tenant), deps=deps, repos=repos
+    )
+
+    assert not is_success(res)
+    assert fail_err(res).code == "email_not_confirmed"

@@ -65,7 +65,11 @@ async def test_register_login_me_refresh_logout_roundtrip(
             "/auth/register",
             json={"email": email, "password": password, "display_name": "E"},
         )
-        assert dup.status_code == 409, dup.text
+        # Identisch zur ersten Antwort — kein Enumerationskanal. Ein 409 würde
+        # "ist diese Person hier?" beantworten, ohne den Consent-Ledger zu
+        # fragen (product-scope.md). Der echte Besitzer bekommt stattdessen eine
+        # Warnmail; dass kein zweites Konto entsteht, prüfen die Unit-Tests.
+        assert dup.status_code == 201, dup.text
 
         # Email confirmation is a later task; activate directly via the DB so
         # this test can still exercise login end to end — same seam
