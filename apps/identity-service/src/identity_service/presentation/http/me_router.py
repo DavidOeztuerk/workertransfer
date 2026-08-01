@@ -28,7 +28,10 @@ def build_me_router(deps: dict[str, Any]) -> APIRouter:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "not authenticated")
         return {
             "user_id": str(principal.user_id),
-            "tenant_id": str(principal.tenant_id),
+            # null while acting as a person; a company is only active after
+            # POST /auth/tenant/{id} (ADR-0017). str(None) would have shipped
+            # the literal "None" to the browser.
+            "tenant_id": str(principal.tenant_id) if principal.tenant_id is not None else None,
             "roles": list(principal.roles),
         }
 

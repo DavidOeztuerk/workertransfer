@@ -10,18 +10,18 @@ from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from worker_database import Base, TimestampMixin, VersionMixin
+from worker_shared import utc_now
 
 from identity_service.domain.audit import AuditAction
 from identity_service.domain.user import AccountStatus
 
-__all__ = ["AuditEventModel", "SessionModel", "UserModel"]
+__all__ = ["AuditEventModel", "SessionModel", "UserModel", "UserTenantMembershipModel"]
 
 
 class UserModel(Base, TimestampMixin, VersionMixin):
     __tablename__ = "users"
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
     email: Mapped[str] = mapped_column(CITEXT, nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -37,9 +37,31 @@ class UserModel(Base, TimestampMixin, VersionMixin):
     roles: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
 
     __table_args__ = (
-        # unique email per tenant (two tenants may share the same local-part)
-        UniqueConstraint("tenant_id", "email", name="uq_users_tenant_email"),
+        # Globally unique: a person is one account, and they own it before any
+        # company does (ADR-0017). Per-tenant uniqueness would be unenforceable
+        # anyway now that users carry no tenant.
+        UniqueConstraint("email", name="uq_users_email"),
     )
+
+
+class UserTenantMembershipModel(Base):
+    """Which companies a person may act for. See domain/membership.py."""
+
+    __tablename__ = "user_tenant_memberships"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    granted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+    __table_args__ = (UniqueConstraint("user_id", "tenant_id", name="uq_membership_user_tenant"),)
 
 
 class SessionModel(Base, TimestampMixin):
@@ -52,7 +74,8 @@ class SessionModel(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
-    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    # Only set once a tenant was switched to; a plain person session has none.
+    tenant_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True, index=True)
     refresh_jti: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -63,7 +86,8 @@ class AuditEventModel(Base, TimestampMixin):
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     actor_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True, index=True)
-    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    # NULL when a person acted for themselves rather than for a company.
+    tenant_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True, index=True)
     action: Mapped[AuditAction] = mapped_column(
         Enum(
             AuditAction,

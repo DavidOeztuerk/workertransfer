@@ -56,18 +56,12 @@ Unternehmen handelt für eine Person) die Zuordnung ohne Migration mitschreibt.
 
 - Der Ledger braucht **keine** Migration. Der beim Review vermutete Defekt war
   keiner; es fehlte die Begründung, nicht die Spalte.
-- **Offene Abweichung in `identity-service`:** dort ist Tenant heute
-  verpflichtend und wird zusätzlich vom Client geliefert —
-  `RegisterBody.tenant_id` und `LoginBody.tenant_id` sind Request-Body-Felder,
-  `users.tenant_id`/`sessions.tenant_id` sind `NOT NULL`,
-  `AuthPrincipal.tenant_id` ist nicht optional. Das widerspricht dieser ADR und
-  zusätzlich `product-scope.md` („Tenant identity will come from authenticated
-  claims, never from a browser-controlled request header") — ein Body-Feld ist
-  genauso client-kontrolliert wie ein Header und nicht einmal durch
-  `allow_development_tenant_header` gegated. Die Angleichung ist ein eigener,
-  bewusst geschnittener Schritt: sie berührt Migration, Domäne, JWT-Claims und
-  die Eindeutigkeit von E-Mail-Adressen (`uq_users_tenant_email` trägt bei
-  `NULL` nicht, weil Postgres `NULL`-Werte als verschieden behandelt).
+- **`identity-service` wurde angeglichen** — siehe ADR-0018. Beim Verfassen
+  dieser ADR war Tenant dort noch verpflichtend und kam zusätzlich aus dem
+  Request-Body von `/auth/register` und `/auth/login`, was neben dieser ADR auch
+  `product-scope.md` widersprach (ein Body ist genauso client-kontrolliert wie
+  ein Header). Aufgelöst durch eine Mitgliedschafts-Relation, global eindeutige
+  E-Mail und einen verifizierten Tenant-Wechsel.
 - `ClaimTenantResolver` ist bereits korrekt: fehlt der Claim, liefert er `None`,
   statt zu scheitern. Am Kernel ist nichts zu ändern.
 - Neue Services entscheiden bewusst, ob eine Tabelle eine Tenant-Achse braucht.

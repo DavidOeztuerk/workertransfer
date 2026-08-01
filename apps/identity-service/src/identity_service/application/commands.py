@@ -22,6 +22,7 @@ from worker_core import DomainError, Result
 
 from identity_service.application.ports import TokenPair
 from identity_service.domain.audit import AuditAction, AuditEvent
+from identity_service.domain.membership import NotAMember
 from identity_service.domain.password_policy import PasswordPolicy
 from identity_service.domain.user import (
     AccountDisabled,
@@ -29,13 +30,15 @@ from identity_service.domain.user import (
     User,
     UserAlreadyExists,
 )
-from identity_service.domain.value_objects import Email, TenantId
+from identity_service.domain.value_objects import Email
 
 __all__ = [
     "AuthenticateUserCommand",
     "RefreshTokenCommand",
     "RegisterUserCommand",
     "RevokeTokenCommand",
+    "SwitchTenantCommand",
+    "handle_switch_tenant",
 ]
 
 
@@ -52,7 +55,6 @@ class RegisterUserCommand:
     email: str
     password: str
     display_name: str
-    tenant_id: UUID
 
 
 async def handle_register(
@@ -62,7 +64,7 @@ async def handle_register(
     policy: PasswordPolicy = PasswordPolicy()
     try:
         policy.validate(cmd.password)
-        existing = await repos["users"].get_by_email(cmd.tenant_id, cmd.email)
+        existing = await repos["users"].get_by_email(cmd.email)
         if existing is not None:
             # Audit the failed attempt too, but keep the 409 semantics in the router.
             raise UserAlreadyExists(cmd.email)
@@ -70,7 +72,6 @@ async def handle_register(
             email=Email(cmd.email),
             password_hash=hasher.hash(cmd.password),
             display_name=cmd.display_name,
-            tenant_id=TenantId(cmd.tenant_id),
             now=deps["clock"].now(),
         )
         await repos["users"].add(user)
@@ -78,7 +79,8 @@ async def handle_register(
             AuditEvent(
                 occurred_at=deps["clock"].now(),
                 actor_id=user.id.value,
-                tenant_id=user.tenant_id.value,
+                # Registering is an act of a person, not of a company (ADR-0017).
+                tenant_id=None,
                 action=AuditAction.REGISTER,
                 target_id=None,
                 correlation_id=_correlation_id(),
@@ -95,7 +97,6 @@ async def handle_register(
 class AuthenticateUserCommand:
     email: str
     password: str
-    tenant_id: UUID
 
 
 async def handle_login(
@@ -111,7 +112,7 @@ async def handle_login(
             AuditEvent(
                 occurred_at=now,
                 actor_id=actor_id,
-                tenant_id=cmd.tenant_id,
+                tenant_id=None,
                 action=AuditAction.LOGIN_FAILURE,
                 target_id=None,
                 correlation_id=_correlation_id(),
@@ -120,7 +121,7 @@ async def handle_login(
         )
 
     try:
-        user = await repos["users"].get_by_email(cmd.tenant_id, cmd.email)
+        user = await repos["users"].get_by_email(cmd.email)
         if user is None:
             await _audit_failure("unknown_user", actor_id=None)
             raise InvalidCredentials()
@@ -135,15 +136,18 @@ async def handle_login(
 
         jti = secrets.token_urlsafe(16)
         user.record_login(jti=jti, now=now)
+        # Logging in makes you yourself, never a company. Acting for a company is
+        # a second, explicit step (POST /auth/tenant/{id}) that verifies
+        # membership before it puts a tenant in the token — ADR-0017.
         await repos["sessions"].add(
             user_id=user.id.value,
-            tenant_id=user.tenant_id.value,
+            tenant_id=None,
             refresh_jti=jti,
             expires_at=now + timedelta(minutes=deps["settings"].jwt_refresh_token_expire_minutes),
         )
         pair: TokenPair = tokens.issue_pair(
             user_id=user.id.value,
-            tenant_id=user.tenant_id.value,
+            tenant_id=None,
             roles=list(user.roles),
             permissions=[],
             session_jti=jti,
@@ -152,7 +156,7 @@ async def handle_login(
             AuditEvent(
                 occurred_at=now,
                 actor_id=user.id.value,
-                tenant_id=user.tenant_id.value,
+                tenant_id=None,
                 action=AuditAction.LOGIN_SUCCESS,
                 target_id=None,
                 correlation_id=_correlation_id(),
@@ -251,6 +255,79 @@ async def handle_revoke(
             )
         )
     return Result.ok(None)
+
+
+@dataclass(frozen=True, slots=True)
+class SwitchTenantCommand:
+    user_id: UUID
+    tenant_id: UUID
+
+
+async def handle_switch_tenant(
+    cmd: SwitchTenantCommand, *, deps: dict[str, Any], repos: dict[str, Any]
+) -> Result[TokenPair]:
+    """Mint a token pair that acts for a company, after verifying membership.
+
+    The client names the company it wants; the server decides whether it may.
+    That is what keeps ``product-scope.md`` intact — the tenant in the token was
+    never taken from the request, it was derived from a checked membership.
+    """
+    tokens = deps["tokens"]
+    clock = deps["clock"]
+    now = clock.now()
+
+    if not await repos["memberships"].is_member(cmd.user_id, cmd.tenant_id):
+        await repos["audit"].append(
+            AuditEvent(
+                occurred_at=now,
+                actor_id=cmd.user_id,
+                # The tenant the caller *asked* for is the point of the record,
+                # even though — especially though — it was refused.
+                tenant_id=cmd.tenant_id,
+                action=AuditAction.TENANT_SWITCH_DENIED,
+                target_id=None,
+                correlation_id=_correlation_id(),
+                metadata={},
+            )
+        )
+        return Result.fail(NotAMember())
+
+    user = await repos["users"].get_by_id(cmd.user_id)
+    if user is None:
+        return Result.fail(InvalidCredentials())
+    try:
+        user.assert_can_log_in()
+    except AccountDisabled as exc:
+        return Result.fail(exc)
+
+    # A fresh session rather than an edit of the old one: the old refresh token
+    # keeps working as a person, and the tenant-bound one can be revoked alone.
+    jti = secrets.token_urlsafe(16)
+    await repos["sessions"].add(
+        user_id=cmd.user_id,
+        tenant_id=cmd.tenant_id,
+        refresh_jti=jti,
+        expires_at=now + timedelta(minutes=deps["settings"].jwt_refresh_token_expire_minutes),
+    )
+    pair: TokenPair = tokens.issue_pair(
+        user_id=cmd.user_id,
+        tenant_id=cmd.tenant_id,
+        roles=list(user.roles),
+        permissions=[],
+        session_jti=jti,
+    )
+    await repos["audit"].append(
+        AuditEvent(
+            occurred_at=now,
+            actor_id=cmd.user_id,
+            tenant_id=cmd.tenant_id,
+            action=AuditAction.TENANT_SWITCH,
+            target_id=None,
+            correlation_id=_correlation_id(),
+            metadata={},
+        )
+    )
+    return Result.ok(pair)
 
 
 async def _publish_user_events(user: User, deps: dict[str, Any]) -> None:

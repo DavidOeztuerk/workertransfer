@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Cookie, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, HTTPException, Request, Response, status
 from pydantic import BaseModel
 
 from identity_service.application.commands import (
@@ -13,30 +13,35 @@ from identity_service.application.commands import (
     RefreshTokenCommand,
     RegisterUserCommand,
     RevokeTokenCommand,
+    SwitchTenantCommand,
     handle_login,
     handle_refresh,
     handle_register,
     handle_revoke,
+    handle_switch_tenant,
 )
 from identity_service.application.ports import TokenPair
+from identity_service.domain.membership import NotAMember
 from identity_service.domain.user import (
     AccountDisabled,
     InvalidCredentials,
     UserAlreadyExists,
 )
+from identity_service.presentation.auth_middleware import get_request_user
 
 
 class RegisterBody(BaseModel):
+    # No tenant_id: a tenant is a company, registering is an act of a person
+    # (ADR-0017) — and a client-supplied tenant would be exactly the trust
+    # problem product-scope.md forbids for headers.
     email: str
     password: str
     display_name: str
-    tenant_id: UUID
 
 
 class LoginBody(BaseModel):
     email: str
     password: str
-    tenant_id: UUID
 
 
 def build_auth_router(deps: dict[str, Any]) -> APIRouter:
@@ -67,7 +72,7 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
 
     @router.post("/register", status_code=status.HTTP_201_CREATED)
     async def register(body: RegisterBody) -> dict[str, str]:
-        cmd = RegisterUserCommand(body.email, body.password, body.display_name, body.tenant_id)
+        cmd = RegisterUserCommand(body.email, body.password, body.display_name)
         async with request_scope(session_factory) as (_uow, repos):
             result = await handle_register(cmd, deps=deps, repos=repos)
         if not result.is_success:
@@ -81,7 +86,7 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
 
     @router.post("/login")
     async def login(body: LoginBody, response: Response) -> dict[str, str]:
-        cmd = AuthenticateUserCommand(body.email, body.password, body.tenant_id)
+        cmd = AuthenticateUserCommand(body.email, body.password)
         async with request_scope(session_factory) as (_uow, repos):
             result = await handle_login(cmd, deps=deps, repos=repos)
         if not result.is_success:
@@ -112,6 +117,34 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
             )
         _set_cookies(response, result.value)
         return {"status": "ok"}
+
+    @router.post("/tenant/{tenant_id}")
+    async def switch_tenant(
+        tenant_id: UUID, request: Request, response: Response
+    ) -> dict[str, str]:
+        """Act for a company from now on — if the caller is a member of it.
+
+        The caller may ask for any tenant; membership decides. That is what keeps
+        the tenant out of client control even though the client names it.
+        """
+        principal = get_request_user(request.scope)
+        if principal is None:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "not authenticated")
+        cmd = SwitchTenantCommand(user_id=principal.user_id, tenant_id=tenant_id)
+        async with request_scope(session_factory) as (_uow, repos):
+            result = await handle_switch_tenant(cmd, deps=deps, repos=repos)
+        if not result.is_success:
+            err = result.error
+            if isinstance(err, NotAMember):
+                # 403, not 404: never reveal whether the company exists.
+                raise HTTPException(status.HTTP_403_FORBIDDEN, "not a member of this tenant")
+            if isinstance(err, (InvalidCredentials, AccountDisabled)):
+                raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, err.message if err is not None else "invalid"
+            )
+        _set_cookies(response, result.value)
+        return {"status": "ok", "tenant_id": str(tenant_id)}
 
     @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
     async def logout(

@@ -14,12 +14,13 @@ export type LoginResult = { ok: true } | { ok: false; message: string };
 export interface LoginInput {
   email: string;
   password: string;
-  tenantId: string;
 }
 
 export interface MeResponse {
   user_id: string;
-  tenant_id: string;
+  // null while acting as a person. A tenant is a company (ADR-0017) and only
+  // becomes active after switching into one the user is a member of.
+  tenant_id: string | null;
   roles: readonly string[];
 }
 
@@ -31,7 +32,6 @@ export async function login(input: LoginInput): Promise<LoginResult> {
     body: JSON.stringify({
       email: input.email,
       password: input.password,
-      tenant_id: input.tenantId,
     }),
   });
   if (res.ok) {

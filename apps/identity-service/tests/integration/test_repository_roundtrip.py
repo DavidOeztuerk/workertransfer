@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from identity_service.domain.audit import AuditAction, AuditEvent
 from identity_service.domain.user import AccountStatus, User
-from identity_service.domain.value_objects import Email, PasswordHash, TenantId
+from identity_service.domain.value_objects import Email, PasswordHash
 from identity_service.infrastructure.database.repositories import (
     SqlAlchemyAuditRepository,
     SqlAlchemySessionRepository,
@@ -22,18 +22,16 @@ pytestmark = pytest.mark.skipif(not _docker_available(), reason="Docker not avai
 
 async def test_user_repository_add_then_get_by_email(session: object) -> None:
     repo = SqlAlchemyUserRepository(session)  # type: ignore[arg-type]
-    tenant = uuid4()
     user = User.register(
         email=Email("repo@example.com"),
         password_hash=PasswordHash("$2b$12$x"),
         display_name="Repo",
-        tenant_id=TenantId(tenant),
         now=datetime.now(UTC),
     )
     await repo.add(user)
     await session.commit()  # type: ignore[attr-defined]
 
-    found = await repo.get_by_email(tenant, "REPO@example.com")  # CITEXT case-insensitive
+    found = await repo.get_by_email("REPO@example.com")  # CITEXT case-insensitive
     assert found is not None
     assert found.email == Email("repo@example.com")
     assert found.status is AccountStatus.ACTIVE
@@ -51,7 +49,6 @@ async def test_session_audit_repositories_roundtrip(session: object) -> None:
         email=Email(f"{tenant}@example.com"),
         password_hash=PasswordHash("$2b$12$s"),
         display_name="Session",
-        tenant_id=TenantId(tenant),
         now=datetime.now(UTC),
     )
     await user_repo.add(user)

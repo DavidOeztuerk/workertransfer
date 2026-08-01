@@ -24,6 +24,10 @@ class AuditAction(StrEnum):
     # audit action labels, not credentials.
     TOKEN_REFRESH = "token_refresh"  # noqa: S105
     TOKEN_REVOKE = "token_revoke"  # noqa: S105
+    # Switching into a company is a privilege change and belongs in the trail —
+    # including the refusals, which are the interesting ones.
+    TENANT_SWITCH = "tenant_switch"
+    TENANT_SWITCH_DENIED = "tenant_switch_denied"
 
 
 # Only non-PII technical metadata may be recorded. Passwords, emails,

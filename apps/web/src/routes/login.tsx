@@ -9,7 +9,6 @@ export function LoginRoute() {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [tenantId, setTenantId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -17,7 +16,7 @@ export function LoginRoute() {
     e.preventDefault();
     setError(null);
     setBusy(true);
-    const input: LoginInput = { email, password, tenantId };
+    const input: LoginInput = { email, password };
     const result = await login(input);
     setBusy(false);
     if (result.ok) {
@@ -54,15 +53,9 @@ export function LoginRoute() {
                 required
               />
             </label>
-            <label>
-              Mandant-ID
-              <input
-                value={tenantId}
-                onChange={(e) => setTenantId(e.target.value)}
-                required
-                placeholder="00000000-0000-0000-0000-000000000000"
-              />
-            </label>
+            {/* Kein Mandant-Feld: sich anzumelden ist ein Akt einer Person, und
+                ein Unternehmen wird erst danach bewusst gewählt (ADR-0017).
+                Eine UUID abzutippen war ohnehin nichts, was ein Mensch tut. */}
             {error !== null ? <p role="alert">{error}</p> : null}
             <Button type="submit" disabled={busy}>
               {busy ? "Anmeldung läuft…" : "Anmelden"}

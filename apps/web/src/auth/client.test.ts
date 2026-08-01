@@ -16,7 +16,6 @@ describe("login", () => {
     const r = await login({
       email: "a@b.com",
       password: "strongpassword1",
-      tenantId: "11111111-1111-1111-1111-111111111111",
     });
     expect(r).toEqual({ ok: true });
   });
@@ -26,13 +25,12 @@ describe("login", () => {
     const r = await login({
       email: "a@b.com",
       password: "wrong",
-      tenantId: "11111111-1111-1111-1111-111111111111",
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.message.length).toBeGreaterThan(0);
   });
 
-  it("sends tenant_id (snake_case) and posts with credentials", async () => {
+  it("posts with credentials and sends no tenant", async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     vi.stubGlobal(
       "fetch",
@@ -44,12 +42,12 @@ describe("login", () => {
     await login({
       email: "a@b.com",
       password: "strongpassword1",
-      tenantId: "11111111-1111-1111-1111-111111111111",
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toMatch(/\/auth\/login$/);
     const body = String(calls[0]?.init.body ?? "");
-    expect(body).toContain('"tenant_id"');
+    // A tenant is a company and is never chosen at login (ADR-0017).
+    expect(body).not.toContain('"tenant_id"');
     expect(String(calls[0]?.init.credentials)).toBe("include");
   });
 });

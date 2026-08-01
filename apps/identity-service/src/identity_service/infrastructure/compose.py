@@ -17,6 +17,7 @@ from identity_service.infrastructure.auth.jwt_service import JwTokenService
 from identity_service.infrastructure.clock import SystemClock
 from identity_service.infrastructure.database.repositories import (
     SqlAlchemyAuditRepository,
+    SqlAlchemyMembershipRepository,
     SqlAlchemySessionRepository,
     SqlAlchemyUserRepository,
 )
@@ -36,6 +37,7 @@ async def request_scope(
     async with uow:
         repos = {
             "users": SqlAlchemyUserRepository(uow.session),
+            "memberships": SqlAlchemyMembershipRepository(uow.session),
             "sessions": SqlAlchemySessionRepository(uow.session),
             "audit": SqlAlchemyAuditRepository(uow.session),
         }

@@ -11,18 +11,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from identity_service.domain.audit import AuditEvent
 from identity_service.domain.session import SessionView
 from identity_service.domain.user import AccountStatus, User
-from identity_service.domain.value_objects import Email, PasswordHash, TenantId, UserId
+from identity_service.domain.value_objects import Email, PasswordHash, UserId
 from identity_service.infrastructure.database.models import (
     AuditEventModel,
     SessionModel,
     UserModel,
+    UserTenantMembershipModel,
 )
 
 
 def _to_domain(row: UserModel) -> User:
     return User(
         id=UserId(row.id),
-        tenant_id=TenantId(row.tenant_id),
         email=Email(row.email),
         password_hash=PasswordHash(row.password_hash),
         display_name=row.display_name,
@@ -35,10 +35,9 @@ class SqlAlchemyUserRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def get_by_email(self, tenant_id: UUID, email: str) -> User | None:
-        stmt = select(UserModel).where(
-            UserModel.tenant_id == tenant_id, UserModel.email == email.lower()
-        )
+    async def get_by_email(self, email: str) -> User | None:
+        # Email is globally unique now (ADR-0017), so no tenant narrows this.
+        stmt = select(UserModel).where(UserModel.email == email.lower())
         row = (await self._session.execute(stmt)).scalar_one_or_none()
         return _to_domain(row) if row is not None else None
 
@@ -50,7 +49,6 @@ class SqlAlchemyUserRepository:
         self._session.add(
             UserModel(
                 id=user.id.value,
-                tenant_id=user.tenant_id.value,
                 email=user.email.value,
                 password_hash=user.password_hash.value,
                 display_name=user.display_name,
@@ -61,12 +59,33 @@ class SqlAlchemyUserRepository:
         await self._session.flush()
 
 
+class SqlAlchemyMembershipRepository:
+    """Reads which companies a person may act for. Writes belong to a future
+    company-service — this slice only needs to answer "may they?"."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def is_member(self, user_id: UUID, tenant_id: UUID) -> bool:
+        stmt = select(UserTenantMembershipModel.id).where(
+            UserTenantMembershipModel.user_id == user_id,
+            UserTenantMembershipModel.tenant_id == tenant_id,
+        )
+        return (await self._session.execute(stmt)).scalar_one_or_none() is not None
+
+    async def list_for_user(self, user_id: UUID) -> list[UUID]:
+        stmt = select(UserTenantMembershipModel.tenant_id).where(
+            UserTenantMembershipModel.user_id == user_id
+        )
+        return list((await self._session.execute(stmt)).scalars().all())
+
+
 class SqlAlchemySessionRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def add(
-        self, *, user_id: UUID, tenant_id: UUID, refresh_jti: str, expires_at: datetime
+        self, *, user_id: UUID, tenant_id: UUID | None, refresh_jti: str, expires_at: datetime
     ) -> None:
         self._session.add(
             SessionModel(
