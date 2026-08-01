@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Self
+from typing import Annotated, Self
 
 from pydantic import Field, SecretStr, model_validator
+from pydantic_settings import NoDecode
 from worker_auth import DEV_JWT_SECRET, assert_deployable_jwt_secret
 from worker_platform.configuration import PlatformSettings
 
@@ -29,7 +30,10 @@ class IdentityServiceSettings(PlatformSettings):
     # (same-origin behind the gateway, ULTRAPLAN Phase 10). Override via
     # WORKER_CORS_ALLOW_ORIGINS in any environment (the env value replaces the
     # default list; pydantic-settings parses JSON or comma-separated origins).
-    cors_allow_origins: list[str] = Field(
+    # Annotated[..., NoDecode] must be repeated here: overriding the field drops
+    # the base class's annotation, and without it pydantic-settings json.loads
+    # the raw env value again — the failure that killed both services at startup.
+    cors_allow_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
     )
 
