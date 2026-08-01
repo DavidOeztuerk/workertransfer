@@ -179,8 +179,8 @@ was der Code tat.
   `worker-logging` → Reexport; sein `configure_logging` hängte bei jedem Aufruf einen
   neuen Handler an (jede Logzeile doppelt). packages/ 36 → 34.
 - ✅ **A4 Dev-Umgebung.** `docker-compose.yml` (Postgres, eine DB pro Service),
-  `scripts/initdb/`, `.env.example`. `run-dev.sh` migriert jetzt vor dem Start und
-  startet beide Services. **Bugfix:** das Skript setzte `IDENTITY_JWT_SECRET` —
+  `scripts/initdb/`, `.env.example`. (Später ersetzt: der Stack startet vollständig
+  aus Compose, jeder Service-Container migriert sich selbst, `run-dev.sh` entfiel.) **Bugfix:** das Skript setzte `IDENTITY_JWT_SECRET` —
   `PlatformSettings` liest `env_prefix="WORKER_"`, die Variable wurde also ignoriert
   (verifiziert: `applied? False`). Korrekt ist `WORKER_JWT_SECRET`.
 - ✅ **A5 CI ehrlich.** Es gab genau **einen** Python-Job — `apps/web` und `packages/ui`
