@@ -1,33 +1,29 @@
-"""Database models for profile-service."""
+"""SQLAlchemy-Modelle für profile-service."""
 
 from __future__ import annotations
 
-from uuid import UUID, uuid4
+from datetime import datetime
+from uuid import UUID
 
-from sqlalchemy import String
+from sqlalchemy import Boolean, DateTime, Text
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from profile_service.infrastructure.database.base import Base, TimestampMixin
+from profile_service.infrastructure.database.base import Base
 
-__all__ = ["ExampleModel"]
+__all__ = ["ProfileModel"]
 
 
-class ExampleModel(Base, TimestampMixin):
-    """Platzhalter — durch die eigenen Tabellen dieses Service ersetzen.
+class ProfileModel(Base):
+    __tablename__ = "profiles"
 
-    Bewusst minimal. Das vorherige Beispiel führte Indizes, Soft-Delete, eine
-    tenant_id-Spalte und Domänen-Mapping vor — und war dabei nicht einmal
-    importierbar (`postgresql_where` auf einem UniqueConstraint, dazu ein
-    Lambda auf einen undefinierten Namen). Ein Beispiel, das mehr zeigt als es
-    trägt, lädt außerdem dazu ein, Entscheidungen zu kopieren, die nicht
-    allgemein gelten: ein Tenant ist ein Unternehmen, personenbezogene Daten
-    werden nicht über ihn getrennt (ADR-0017).
-
-    Die Mixins für Soft-Delete und Versionierung stehen in base.py bereit,
-    falls dieser Service sie braucht.
-    """
-
-    __tablename__ = "examples"
-
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # id IST die subject_id aus dem Token — ein Profil je Person.
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    headline: Mapped[str] = mapped_column(Text, nullable=False)
+    bio: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    location: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    remote_ok: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    skills: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

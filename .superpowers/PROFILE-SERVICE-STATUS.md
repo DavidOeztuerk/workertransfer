@@ -20,8 +20,8 @@
 - [x] 0 Spec schreiben + committen
 - [x] 1 Generator reparieren (fehlende base.py, Docker-Templates raus, Import-Test)
 - [x] 2 profile-service via `worker new-service` erzeugen + Workspace/Compose einhängen
-- [ ] 3 Domäne: Profile-Aggregat + Wertobjekte (TDD)
-- [ ] 4 Migration 0001 + Modelle + Repository
+- [x] 3 Domäne: Profile-Aggregat + Wertobjekte (TDD)
+- [x] 4 Migration 0001 + Modelle + Repository
 - [ ] 5 ConsentGate-Port + HTTP-Adapter (TDD)
 - [ ] 6 Handler: eigenes Profil schreiben/lesen (TDD)
 - [ ] 7 Handler: Fremdabruf + Liste mit Consent-Gate (TDD)
@@ -53,3 +53,10 @@
   pytest läuft jetzt im importlib-Modus — sonst kollidieren drei
   `tests/test_app.py` über die Servicegrenzen hinweg.
   357 passed / 3 skipped.
+- 3 Domäne: Profile-Aggregat + Skills-Wertobjekt, 17 Unit-Tests.
+  Skills entdoppelt case-insensitiv VOR der Mengenprüfung (31x "Python" ist eine
+  Fähigkeit, kein Fehler). update() prüft alles, bevor es irgendetwas schreibt.
+- 4 Migration 0001 + Modelle + Repository, 6 Integrationstests gegen Postgres.
+  Cursor trägt (updated_at, id) — mit dem Zeitstempel allein überspringt das
+  Blättern Profile, die in derselben Sekunde geändert wurden. Kaputter Cursor
+  = Anfang, kein 400.
