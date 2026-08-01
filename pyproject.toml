@@ -36,7 +36,6 @@ worker-shared = { workspace = true }
 worker-config = { workspace = true }
 worker-logging = { workspace = true }
 worker-correlation = { workspace = true }
-worker-security = { workspace = true }
 worker-auth = { workspace = true }
 worker-authorization = { workspace = true }
 worker-database = { workspace = true }
@@ -48,7 +47,6 @@ worker-metrics = { workspace = true }
 worker-tracing = { workspace = true }
 worker-telemetry = { workspace = true }
 worker-validation = { workspace = true }
-worker-exceptions = { workspace = true }
 worker-ratelimit = { workspace = true }
 worker-tenancy = { workspace = true }
 worker-resilience = { workspace = true }
@@ -68,17 +66,25 @@ consent-service = { workspace = true }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["apps", "packages"]
+# "tests" holds repo-level architectural guards (workspace dependency hygiene)
+# that belong to no single package.
+testpaths = ["tests", "apps", "packages"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py314"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "ASYNC", "RUF"]
+# "S" (flake8-bandit) is deliberate for a consent-first product: it flags hardcoded
+# secrets, weak hashing, unsafe subprocess/deserialisation and SQL built by string
+# concatenation. It was previously absent while per-file-ignores already excused
+# S101 in tests, which made that ignore a silent no-op.
+select = ["E", "F", "I", "B", "UP", "ASYNC", "RUF", "S"]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**/*.py" = ["S101"]
+# assert is the point of a test; S105/S106 are fixtures, not real secrets; test
+# helpers legitimately shell out (e.g. probing for a Docker daemon, ADR-0011).
+"**/tests/**/*.py" = ["S101", "S105", "S106", "S603", "S607"]
 
 [tool.mypy]
 python_version = "3.14"

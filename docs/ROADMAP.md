@@ -10,9 +10,10 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | # | Phase | Status | DoD-Kurz |
 |---|-------|--------|----------|
 | 0 | Repo-Disziplin & Betriebsamskeit | ✅ | Roadmap, ADRs, Skills, Glossar |
-| 1 | Foundation festigen (CI grün) | ✅ | ruff 0 ✅, mypy 0 ✅, CLI läuft ✅, Duplikate ✅, Smoke-Tests ✅, Premerge-Wrapper ✅ |
+| 1 | Foundation festigen (CI grün) | ✅ | ruff 0 ✅, mypy 0 ✅, CLI-Entrypoint ✅, Duplikate ✅, Smoke-Tests ✅, Premerge-Wrapper ✅ |
 | 2 | Identity & Tenancy | ✅ | OIDC/OAuth, JWT, Claims-Tenant, Audit, DB-Migration |
-| 3 | Candidate Core | ⬜ | Profile/Resume/Portfolio + Consent-Ledger |
+| 2.5 | Stabilisierung & Plattform-Naht | ✅ | Cookie-Auth, Dep-Hygiene, Kanon Runde 2, Dev-Stack, Frontend-Gate, Generator |
+| 3 | Candidate Core | 🟧 | Consent-Ledger ✅ (3.1); Profile/Resume/Portfolio offen |
 | 4 | Jobs & Applications | ⬜ | Jobs, Applications, Companies, Career-Sites |
 | 5 | Transfermarkt | ⬜ | Market-State-Machine, Konsensflows, Vertragsdraft |
 | 6 | Developer Intelligence | ⬜ | GitHub-Consent, Skill-Graph, Scout-Match |
@@ -46,10 +47,15 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
   mypy-overrides für 19 externe ungetypte Libs. `uv run mypy packages apps`=0.)
 - ✅ 1.3 CLI reparieren (`worker_cli.main`), smoke-testen
   (15.07.2026. `packages/worker-cli/src/worker_cli/main.py` re-exportiert das
-  Typer `app`; Entry `worker_cli.main:app` löst jetzt. `new-service` erzeugt
-  vollständiges Clean-Arch-Skelett, `new-package` gültiges Paket. Sub-Befehle
-  command/query/entity/event/consumer/publisher nutzen leere `cqrs`/`domain`/
-  `infrastructure`-Templates = Folge-Defizit.)
+  Typer `app`; Entry `worker_cli.main:app` löst jetzt. `new-package` erzeugt ein
+  gültiges Paket. Sub-Befehle command/query/entity/event/consumer/publisher nutzen
+  leere `cqrs`/`domain`/`infrastructure`-Templates = Folge-Defizit.
+  **Korrektur 31.07.2026 (Phase 2.5/A6):** die damalige Aussage „`new-service`
+  erzeugt vollständiges Clean-Arch-Skelett" war **falsch**. Der Smoke-Test prüfte
+  nur `--help`; die erzeugte Ausgabe hat nie jemand kompiliert. Sie enthielt
+  wörtliche `${ServiceClass}`-Platzhalter und verdrahtete die nicht existierende
+  `PlatformBuilder`-API — 45 ruff-Fehler, überwiegend `invalid-syntax`. Repariert
+  und per Test abgesichert in Phase 2.5.)
 - ✅ 1.4 Duplikate auflösen (correlation, cqrs, health, config, tenancy) — Kanon
   = worker-platform; ADR-0002
   (15.07.2026. Kanon-Auflösung nach [ADR-0005](adr/0005-canon-resolution-duplicates.md).
@@ -143,6 +149,118 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 - Folge-Defizit (nicht blockierend): per-IP-Rate-Limiting fehlt — TODO-Marker in
   `build_auth_router` (Phase-10, `worker-ratelimit`).
 
-Nächste Aktion: **Phase 3 starten — Candidate Core.** Profile/Resume/Portfolio +
-Consent-Ledger als nächster vertikaler Slice; Identity-Service bleibt Voraussetzung
-für authentifizierte Candidate-Endpunkte.
+### Phase 2.5 — Status: ✅ erledigt (31.07.2026)
+
+Nicht im ursprünglichen ULTRAPLAN vorgesehen. Eingeschoben, weil eine Bestandsaufnahme
+vor Phase 3 mehrere Fundament-Defizite fand, auf denen Service #3 sonst aufgebaut hätte.
+Kein neues Feature — nur die Differenz zwischen dem, was die Docs behaupteten, und dem,
+was der Code tat.
+
+- ✅ **A1 Cookie-Auth durchgängig.** `AuthMiddleware` las **nur** `Authorization: Bearer`,
+  `POST /auth/login` liefert das Token aber als `httpOnly`-Cookie und `apps/web` sendet
+  keinen Header → `GET /me` gab aus dem Browser **immer 401**. Die Phase-2-DoD
+  („Frontend `/login`") war insoweit überzeichnet: der Flow war nie durchgängig.
+  Cookie-Fallback ergänzt, 7 Unit-Tests (ohne Docker) + Integrationspfad. Frontend
+  konsumiert `fetchMe` jetzt über `useSession`; vorher war TanStack Query zwar
+  eingebunden, aber **nirgends benutzt** — die App kannte keinen Login-Zustand.
+- ✅ **A2 Dependency-Hygiene.** 7 Pakete importierten Geschwister, die sie nicht
+  deklarierten (`worker-contracts`→`worker-core`, `worker-correlation`→`worker-platform`,
+  `worker-telemetry`→3, …). Funktionierte nur, weil `uv sync --all-packages` alles in
+  *ein* venv flacht; einzeln installiert wäre jeder Service gebrochen.
+  `tests/test_workspace_dependencies.py` hält es fixiert (verifiziert: schlägt an,
+  wenn man die Deklaration wieder entfernt). `worker-shared` war eine **0-Byte-Datei**,
+  von der beide Services abhingen — enthält jetzt `utc_now`/`Page`/`Cursor`/`Money`
+  (19 Tests, stdlib-only).
+- ✅ **A3 Kanon-Auflösung Runde 2** — [ADR-0014](adr/0014-kernel-duplicates-round-2.md).
+  ADR-0005 hatte nur Pakete *mit* Importeuren betrachtet; vier weitere duplizierten den
+  Kernel. `worker-exceptions` exportierte eine **gleichnamige** Funktion mit
+  abweichender Problem-Shape (kein `correlationId`, `str(exc)` im `detail`) →
+  gelöscht. `worker-security` (falsche Middleware-Basisklasse) → gelöscht.
+  `worker-logging` → Reexport; sein `configure_logging` hängte bei jedem Aufruf einen
+  neuen Handler an (jede Logzeile doppelt). packages/ 36 → 34.
+- ✅ **A4 Dev-Umgebung.** `docker-compose.yml` (Postgres, eine DB pro Service),
+  `scripts/initdb/`, `.env.example`. (Später ersetzt: der Stack startet vollständig
+  aus Compose, jeder Service-Container migriert sich selbst, `run-dev.sh` entfiel.) **Bugfix:** das Skript setzte `IDENTITY_JWT_SECRET` —
+  `PlatformSettings` liest `env_prefix="WORKER_"`, die Variable wurde also ignoriert
+  (verifiziert: `applied? False`). Korrekt ist `WORKER_JWT_SECRET`.
+- ✅ **A5 CI ehrlich.** Es gab genau **einen** Python-Job — `apps/web` und `packages/ui`
+  waren komplett ungegated, TS-Fehler mergten grün. Neuer `frontend-quality`-Job
+  (install/check/test/build, Node 24); `make check` deckt jetzt alle sechs
+  AGENTS.md-Schritte ab. `packages/ui` hatte **kein** `test`-Script (turbo lief dort
+  ins Leere) → 12 Tests. ruff `S` aktiviert; der vorhandene `S101`-Ignore war
+  mangels `S` in `select` toter Konfigurationstext. 14 Befunde einzeln bewertet:
+  3 echte Fixes (2× stilles `except: pass`, `/tmp/storage`-Default), Rest begründet
+  annotiert.
+- ✅ **A6 Service-Generator** — kon.txt „Regel Nr. 1". `worker new-service` hat **nie**
+  lauffähigen Code erzeugt: Templates verlangten `${ServiceClass}`, der Kontext lieferte
+  `service_class` → `safe_substitute` schrieb den Platzhalter wörtlich in die Ausgabe
+  (45 ruff-Fehler, meist `invalid-syntax`). Zusätzlich verdrahteten sie
+  `worker_platform.builder.PlatformBuilder` — die von **ADR-0003 verworfene** und nicht
+  existierende API. Phase 1.3 hatte nur `--help` smoke-getestet; die Ausgabe hat nie
+  jemand kompiliert. Templates jetzt Spiegel von `identity-service` (Composition-Root
+  via `create_api_app`, Alembic ADR-0010, Testcontainers ADR-0011); der Renderer
+  verweigert `.py`-Dateien mit ungelösten Platzhaltern. 10 Tests.
+
+**Offene Folge-Defizite aus 2.5** (dokumentiert, nicht blockierend):
+- Die Alt-Templates `domain/`, `application/`, `infrastructure/` im Generator tragen
+  eigene Lint-Schulden und definieren einen **lokalen** `Mediator`/`PipelineBehavior`,
+  der `worker_platform.application.cqrs` dupliziert — ein ADR-0002-Verstoß, der sonst in
+  jeden generierten Service eingebacken wird.
+- `worker-github` bleibt unimportierbar (Source nutzt PyGithub, deklariert ist
+  `githubkit`). Wird erst in Phase 6 gebraucht; Fix gehört dorthin.
+- `worker-ai`/`worker-files` bleiben aus dem Workspace exkludiert (ML-/C-Wheels ohne
+  Python-3.14-Rad). Für Phase 7 über optionale Extras zu lösen, analog weasyprint.
+- Kein `Authorization`-Header **und** kein Cookie ⇒ 401; per-IP-Rate-Limiting am
+  Auth-Rand weiterhin offen (Phase 10, TODO-Marker in `build_auth_router`).
+
+### Phase 3 — Status: 🟧 in Arbeit
+
+- ✅ **3.1 Consent-Ledger** (`apps/consent-service`) — 31.07.2026.
+  [Design](superpowers/specs/2026-07-26-phase-3-substep-3.1-consent-ledger-design.md) ·
+  [ADR-0013](adr/0013-consent-ledger-standalone.md) ·
+  [ADR-0015](adr/0015-shared-jwt-middleware.md) ·
+  [ADR-0016](adr/0016-per-service-declarative-base.md)
+
+  Append-only Ledger mit `POST /consent/{grant,revoke,delete,check}`.
+  Kernpunkte:
+  - **Append-only ist strukturell**, nicht per Konvention: `ConsentEvent` ist
+    `frozen`, das Repository bietet weder `update` noch `delete` — ein Test prüft
+    die Abwesenheit dieser Methoden.
+  - **Kein Status-Tisch.** `project_state()` (reine Funktion) definiert die Regeln,
+    `latest_effective()` führt dieselbe Reduktion als `DISTINCT ON` aus. Ein Ort,
+    an dem Consent wahr ist.
+  - **Revocation wirkt sofort** — kein Cache (Ansatz C der Spec wurde genau deshalb
+    verworfen). Integrationstest über HTTP: grant → check `true` → revoke → check
+    `false`.
+  - **Audit atomar** in derselben UoW (ADR-0012); Allowlist lässt den
+    Capability-Namen zu, nie die Daten dahinter (PII-Test über die Rohspalte).
+  - **`compose_api.py` läuft jetzt durch `create_api_app`** — der Platzhalter mit
+    nackter `FastAPI()` ist weg; `test_app.py` prüft Correlation-ID,
+    Security-Header und RFC-9457, damit er nicht zurückkommt.
+  - Selbstverwaltung: `actor_id == subject_id` erzwungen (403 sonst); `/check` steht
+    jedem authentifizierten Aufruf offen, weil genau das den Enabler ausmacht.
+
+  **Zwei Funde beim Bauen**, beide als ADR festgehalten:
+  - *ADR-0015*: die JWT-Middleware wandert nach `worker-auth`, statt kopiert zu
+    werden — eine Kopie hätte den gerade behobenen Header-only-Bug reproduziert.
+  - *ADR-0016*: `worker_database.Base` ist **eine** MetaData. identity- und
+    consent-service besitzen beide (korrekt) eine Tabelle `audit_events` →
+    `InvalidRequestError` bei der Test-Collection, und Autogenerate hätte die
+    Tabellen des jeweils anderen Service als löschbar gesehen. ADR-0010s Annahme
+    „Model-Import-Disziplin" war ein Topologie-Problem. Jeder Service hat jetzt
+    seine eigene `DeclarativeBase`.
+
+  Offen aus 3.1 (nicht blockierend): `mediator.py` wurde nicht gebaut — die
+  Handler werden wie in `identity-service` direkt aus dem Router aufgerufen; ein
+  Mediator lohnt erst mit Pipeline-Behaviors. `test_eventbus_seam.py` fehlt (die
+  Naht existiert in `compose_infrastructure`, hat aber noch keinen Publisher).
+  Die `worker new-service`-Templates erzeugen noch `worker_database.Base` statt
+  einer service-eigenen Base (ADR-0016-Folgearbeit).
+- ⬜ 3.2 Profile-Service · ⬜ 3.3 Resume-Service · ⬜ 3.4 Portfolio-Service
+- ⬜ 3.5 `worker-files`/`worker-storage` real machen (Workspace-Re-Include)
+
+Nächste Aktion: **Sub-step 3.2 — Profile-Service.** Der Consent-Ledger steht und ist
+damit als Enabler nutzbar: jeder Sichtbarkeits-, Versand- und Importpfad im
+Profile-Service konsultiert `POST /consent/check`, bevor er handelt. Der
+Profile-Service ist zugleich der erste echte Test für den reparierten Generator —
+er soll aus `worker new-service` entstehen, nicht aus Copy-Paste (kon.txt Regel Nr. 1).

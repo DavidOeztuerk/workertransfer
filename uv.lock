@@ -21,7 +21,6 @@ members = [
     "worker-database",
     "worker-email",
     "worker-events",
-    "worker-exceptions",
     "worker-github",
     "worker-health",
     "worker-identity-service",
@@ -35,7 +34,6 @@ members = [
     "worker-resilience",
     "worker-scheduler",
     "worker-search",
-    "worker-security",
     "worker-shared",
     "worker-storage",
     "worker-telemetry",
@@ -339,19 +337,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/9a/8e/82a0fe20a541c03148528be8cac2408564a6c9a0cc7e9171802bc1d26985/attrs-26.1.0.tar.gz", hash = "sha256:d03ceb89cb322a8fd706d4fb91940737b6642aa36998fe130a9bc96c985eff32", size = 952055, upload-time = "2026-03-19T14:22:25.026Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/64/b4/17d4b0b2a2dc85a6df63d1157e028ed19f90d4cd97c36717afef2bc2f395/attrs-26.1.0-py3-none-any.whl", hash = "sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309", size = 67548, upload-time = "2026-03-19T14:22:23.645Z" },
-]
-
-[[package]]
-name = "authlib"
-version = "1.7.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cryptography" },
-    { name = "joserfc" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/36/98/7d93f30d029643c0275dbc0bd6d5a6f670661ee6c9a94d93af7ab4887600/authlib-1.7.2.tar.gz", hash = "sha256:2cea25fefcd4e7173bdf1372c0afc265c8034b23a8cd5dcb6a9164b826c64231", size = 176511, upload-time = "2026-05-06T08:10:23.116Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/fb/95/adcb68e20c34162e9135f370d6e31737719c2b6f94bc953fe7ed1f10fe21/authlib-1.7.2-py2.py3-none-any.whl", hash = "sha256:3e1faedc9d87e7d56a164eca3ccb6ace0d61b94abe83e92242f8dc8bba9b4a9f", size = 259548, upload-time = "2026-05-06T08:10:21.436Z" },
 ]
 
 [[package]]
@@ -668,6 +653,7 @@ dependencies = [
     { name = "worker-events" },
     { name = "worker-platform" },
     { name = "worker-shared" },
+    { name = "worker-tenancy" },
 ]
 
 [package.metadata]
@@ -687,6 +673,7 @@ requires-dist = [
     { name = "worker-events", editable = "packages/worker-events" },
     { name = "worker-platform", editable = "packages/worker-platform" },
     { name = "worker-shared", editable = "packages/worker-shared" },
+    { name = "worker-tenancy", editable = "packages/worker-tenancy" },
 ]
 
 [[package]]
@@ -762,15 +749,6 @@ wheels = [
 ]
 
 [[package]]
-name = "dnspython"
-version = "2.8.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/8c/8b/57666417c0f90f08bcafa776861060426765fdb422eb10212086fb811d26/dnspython-2.8.0.tar.gz", hash = "sha256:181d3c6996452cb1189c4046c61599b84a5a86e099562ffde77d26984ff26d0f", size = 368251, upload-time = "2025-09-07T18:58:00.022Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ba/5a/18ad964b0086c6e62e2e7500f7edc89e3faa45033c71c1893d34eed2b2de/dnspython-2.8.0-py3-none-any.whl", hash = "sha256:01d9bbc4a2d76bf0db7c1f729812ded6d912bd318d3b1cf81d30c0f845dbf3af", size = 331094, upload-time = "2025-09-07T18:57:58.071Z" },
-]
-
-[[package]]
 name = "docker"
 version = "7.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -809,19 +787,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/6b/79/365e306017a9fcfbbefab1a3b588d2404bea8806b36766ff0f886509a20e/elasticsearch-8.19.3.tar.gz", hash = "sha256:e84dd618a220cac25b962790085045dd27ac72e01c0a5d81bd29a2d47a71f03f", size = 800298, upload-time = "2025-12-23T12:56:00.72Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/56/0f/ac126833c385b06166d41c486e4911f58ad7791fd1a53dd6e0b8d16ff214/elasticsearch-8.19.3-py3-none-any.whl", hash = "sha256:fe1db2555811192e8a1be78b01234d0a49d32b185ea7eeeb6f059331dee32838", size = 952820, upload-time = "2025-12-23T12:55:56.796Z" },
-]
-
-[[package]]
-name = "email-validator"
-version = "2.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "dnspython" },
-    { name = "idna" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f5/22/900cb125c76b7aaa450ce02fd727f452243f2e91a61af068b40adba60ea9/email_validator-2.3.0.tar.gz", hash = "sha256:9fc05c37f2f6cf439ff414f8fc46d917929974a82244c20eb10231ba60c54426", size = 51238, upload-time = "2025-08-26T13:09:06.831Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/15/545e2b6cf2e3be84bc1ed85613edd75b8aea69807a71c26f4ca6a9258e82/email_validator-2.3.0-py3-none-any.whl", hash = "sha256:80f13f623413e6b197ae73bb10bf4eb0908faf509ad8362c5edeb0be7fd450b4", size = 35604, upload-time = "2025-08-26T13:09:05.858Z" },
 ]
 
 [[package]]
@@ -1250,18 +1215,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d3/59/322338183ecda247fb5d1763a6cbe46eff7222eaeebafd9fa65d4bf5cb11/jmespath-1.1.0.tar.gz", hash = "sha256:472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d", size = 27377, upload-time = "2026-01-22T16:35:26.279Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/2f/967ba146e6d58cf6a652da73885f52fc68001525b4197effc174321d70b4/jmespath-1.1.0-py3-none-any.whl", hash = "sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64", size = 20419, upload-time = "2026-01-22T16:35:24.919Z" },
-]
-
-[[package]]
-name = "joserfc"
-version = "1.7.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cryptography" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d4/c6/b1cac0280f8efc57626ea8804866b37099f23cae11b1485a42b213245e31/joserfc-1.7.3.tar.gz", hash = "sha256:116955c2587139dba20621fd0bd7fc9255fa960c9fe7f43c43ebef2e801dcfcf", size = 233821, upload-time = "2026-07-08T12:41:42.66Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/f5/650b59d1b74f5befb7a7a7e7d7c92a26b94256df3541e2b4914152cd177a/joserfc-1.7.3-py3-none-any.whl", hash = "sha256:7c39f3f2c943dbc03122747fa8ebbd8e156e54904cf25651b452f4d2634a6075", size = 70982, upload-time = "2026-07-08T12:41:41.521Z" },
 ]
 
 [[package]]
@@ -1955,35 +1908,12 @@ wheels = [
 ]
 
 [[package]]
-name = "passlib"
-version = "1.7.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b6/06/9da9ee59a67fae7761aab3ccc84fa4f3f33f125b370f1ccdb915bf967c11/passlib-1.7.4.tar.gz", hash = "sha256:defd50f72b65c5402ab2c573830a6978e5f202ad0d984793c8dde2c4152ebe04", size = 689844, upload-time = "2020-10-08T19:00:52.121Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/a4/ab6b7589382ca3df236e03faa71deac88cae040af60c071a78d254a62172/passlib-1.7.4-py2.py3-none-any.whl", hash = "sha256:aa6bca462b8d8bda89c70b382f0c298a20b5560af6cbfa2dce410c0a2fb669f1", size = 525554, upload-time = "2020-10-08T19:00:49.856Z" },
-]
-
-[package.optional-dependencies]
-bcrypt = [
-    { name = "bcrypt" },
-]
-
-[[package]]
 name = "pathspec"
 version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5a/82/42f767fc1c1143d6fd36efb827202a2d997a375e160a71eb2888a925aac1/pathspec-1.1.1.tar.gz", hash = "sha256:17db5ecd524104a120e173814c90367a96a98d07c45b2e10c2f3919fff91bf5a", size = 135180, upload-time = "2026-04-27T01:46:08.907Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl", hash = "sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189", size = 57328, upload-time = "2026-04-27T01:46:07.06Z" },
-]
-
-[[package]]
-name = "phonenumbers"
-version = "8.13.55"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/6e/23/b4c886487ca212ca87768433a43e2b3099c1c2fa5d9e21d2fbce187cc3c2/phonenumbers-8.13.55.tar.gz", hash = "sha256:57c989dda3eabab1b5a9e3d24438a39ebd032fa0172bf68bfd90ab70b3d5e08b", size = 2296624, upload-time = "2025-02-15T08:06:03.465Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/50/dc/a7f0a9d5ad8b98bc5406deb00207b268d6d2edd215c21642e8f2ecc6f0ce/phonenumbers-8.13.55-py2.py3-none-any.whl", hash = "sha256:25feaf46135f0fb1e61b69513dc97c477285ba98a69204bf5a8cf241a844a718", size = 2582306, upload-time = "2025-02-15T08:05:56.746Z" },
 ]
 
 [[package]]
@@ -2309,15 +2239,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/56/fa/284e52a8c6dcbe25671f02d217bf2f85660db940088faf18ae7a05e97313/python_http_client-3.3.7.tar.gz", hash = "sha256:bf841ee45262747e00dec7ee9971dfb8c7d83083f5713596488d67739170cea0", size = 9377, upload-time = "2022-03-09T20:23:56.386Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/29/31/9b360138f4e4035ee9dac4fe1132b6437bd05751aaf1db2a2d83dc45db5f/python_http_client-3.3.7-py3-none-any.whl", hash = "sha256:ad371d2bbedc6ea15c26179c6222a78bc9308d272435ddf1d5c84f068f249a36", size = 8352, upload-time = "2022-03-09T20:23:54.862Z" },
-]
-
-[[package]]
-name = "python-json-logger"
-version = "2.0.7"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4f/da/95963cebfc578dabd323d7263958dfb68898617912bb09327dd30e9c8d13/python-json-logger-2.0.7.tar.gz", hash = "sha256:23e7ec02d34237c5aa1e29a070193a4ea87583bb4e7f8fd06d3de8264c4b2e1c", size = 10508, upload-time = "2023-02-21T17:40:06.209Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/35/a6/145655273568ee78a581e734cf35beb9e33a370b29c5d3c8fee3744de29f/python_json_logger-2.0.7-py3-none-any.whl", hash = "sha256:f380b826a991ebbe3de4d897aeec42760035ac760345e57b812938dc8b35e2bd", size = 8067, upload-time = "2023-02-21T17:40:05.117Z" },
 ]
 
 [[package]]
@@ -3012,22 +2933,18 @@ name = "worker-auth"
 version = "0.1.0"
 source = { editable = "packages/worker-auth" }
 dependencies = [
-    { name = "authlib" },
     { name = "bcrypt" },
-    { name = "cryptography" },
     { name = "pydantic" },
-    { name = "pydantic-settings" },
     { name = "pyjwt" },
+    { name = "starlette" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "authlib", specifier = ">=1.3.0,<2.0.0" },
     { name = "bcrypt", specifier = ">=4.0.0,<5.0.0" },
-    { name = "cryptography", specifier = ">=42.0.0,<50.0.0" },
     { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
-    { name = "pydantic-settings", specifier = ">=2.4.0,<3.0.0" },
     { name = "pyjwt", specifier = ">=2.8.0,<3.0.0" },
+    { name = "starlette", specifier = ">=0.37.0,<1.0.0" },
 ]
 
 [[package]]
@@ -3108,10 +3025,14 @@ version = "0.1.0"
 source = { editable = "packages/worker-contracts" }
 dependencies = [
     { name = "pydantic" },
+    { name = "worker-core" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.8.0,<3.0.0" }]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
+    { name = "worker-core", editable = "packages/worker-core" },
+]
 
 [[package]]
 name = "worker-core"
@@ -3123,11 +3044,11 @@ name = "worker-correlation"
 version = "0.1.0"
 source = { editable = "packages/worker-correlation" }
 dependencies = [
-    { name = "starlette" },
+    { name = "worker-platform" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "starlette", specifier = ">=0.37.0,<1.0.0" }]
+requires-dist = [{ name = "worker-platform", editable = "packages/worker-platform" }]
 
 [[package]]
 name = "worker-database"
@@ -3159,6 +3080,7 @@ dependencies = [
     { name = "boto3" },
     { name = "pydantic" },
     { name = "sendgrid" },
+    { name = "worker-templates" },
 ]
 
 [package.metadata]
@@ -3167,6 +3089,7 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.34.0,<2.0.0" },
     { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
     { name = "sendgrid", specifier = ">=6.10.0,<7.0.0" },
+    { name = "worker-templates", editable = "packages/worker-templates" },
 ]
 
 [[package]]
@@ -3182,21 +3105,6 @@ dependencies = [
 requires-dist = [
     { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0,<3.0.0" },
-]
-
-[[package]]
-name = "worker-exceptions"
-version = "0.1.0"
-source = { editable = "packages/worker-exceptions" }
-dependencies = [
-    { name = "fastapi" },
-    { name = "pydantic" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = ">=0.110.0,<1.0.0" },
-    { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
 ]
 
 [[package]]
@@ -3248,6 +3156,7 @@ dependencies = [
     { name = "uvicorn", extra = ["standard"] },
     { name = "worker-auth" },
     { name = "worker-config" },
+    { name = "worker-contracts" },
     { name = "worker-core" },
     { name = "worker-database" },
     { name = "worker-events" },
@@ -3268,6 +3177,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.40.0,<1.0.0" },
     { name = "worker-auth", editable = "packages/worker-auth" },
     { name = "worker-config", editable = "packages/worker-config" },
+    { name = "worker-contracts", editable = "packages/worker-contracts" },
     { name = "worker-core", editable = "packages/worker-core" },
     { name = "worker-database", editable = "packages/worker-database" },
     { name = "worker-events", editable = "packages/worker-events" },
@@ -3281,19 +3191,11 @@ name = "worker-logging"
 version = "0.1.0"
 source = { editable = "packages/worker-logging" }
 dependencies = [
-    { name = "python-json-logger" },
-    { name = "structlog" },
-    { name = "worker-core" },
-    { name = "worker-correlation" },
+    { name = "worker-platform" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "python-json-logger", specifier = ">=2.0.0,<3.0.0" },
-    { name = "structlog", specifier = ">=24.1.0,<25.0.0" },
-    { name = "worker-core", editable = "packages/worker-core" },
-    { name = "worker-correlation", editable = "packages/worker-correlation" },
-]
+requires-dist = [{ name = "worker-platform", editable = "packages/worker-platform" }]
 
 [[package]]
 name = "worker-mcp"
@@ -3353,12 +3255,14 @@ source = { editable = "packages/worker-notifications" }
 dependencies = [
     { name = "pydantic" },
     { name = "redis" },
+    { name = "worker-email" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
     { name = "redis", specifier = ">=5.0.0,<6.0.0" },
+    { name = "worker-email", editable = "packages/worker-email" },
 ]
 
 [[package]]
@@ -3439,40 +3343,9 @@ requires-dist = [
 ]
 
 [[package]]
-name = "worker-security"
-version = "0.1.0"
-source = { editable = "packages/worker-security" }
-dependencies = [
-    { name = "cryptography" },
-    { name = "passlib", extra = ["bcrypt"] },
-    { name = "starlette" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "cryptography", specifier = ">=42.0.0,<50.0.0" },
-    { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4,<2.0.0" },
-    { name = "starlette", specifier = ">=0.37.0,<1.0.0" },
-]
-
-[[package]]
 name = "worker-shared"
 version = "0.1.0"
 source = { editable = "packages/worker-shared" }
-dependencies = [
-    { name = "email-validator" },
-    { name = "phonenumbers" },
-    { name = "pydantic" },
-    { name = "python-dateutil" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "email-validator", specifier = ">=2.1.0,<3.0.0" },
-    { name = "phonenumbers", specifier = ">=8.13.0,<9.0.0" },
-    { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
-    { name = "python-dateutil", specifier = ">=2.9.0,<3.0.0" },
-]
 
 [[package]]
 name = "worker-storage"
@@ -3500,6 +3373,9 @@ dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "prometheus-client" },
     { name = "structlog" },
+    { name = "worker-logging" },
+    { name = "worker-metrics" },
+    { name = "worker-tracing" },
 ]
 
 [package.metadata]
@@ -3508,6 +3384,9 @@ requires-dist = [
     { name = "opentelemetry-sdk", specifier = ">=1.25.0,<2.0.0" },
     { name = "prometheus-client", specifier = ">=0.19.0,<1.0.0" },
     { name = "structlog", specifier = ">=24.1.0,<25.0.0" },
+    { name = "worker-logging", editable = "packages/worker-logging" },
+    { name = "worker-metrics", editable = "packages/worker-metrics" },
+    { name = "worker-tracing", editable = "packages/worker-tracing" },
 ]
 
 [[package]]
@@ -3538,10 +3417,14 @@ version = "0.1.0"
 source = { editable = "packages/worker-tenancy" }
 dependencies = [
     { name = "pydantic" },
+    { name = "worker-platform" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.8.0,<3.0.0" }]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
+    { name = "worker-platform", editable = "packages/worker-platform" },
+]
 
 [[package]]
 name = "worker-tracing"

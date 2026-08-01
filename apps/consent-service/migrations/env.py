@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from consent_service.infrastructure.database import models  # noqa: F401
-from worker_database import Base
+from consent_service.infrastructure.database.base import Base
 
 config = context.config
 if config.config_file_name is not None:

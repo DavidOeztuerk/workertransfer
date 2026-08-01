@@ -14,7 +14,6 @@ monkeypatch env (no leak). Skips if Docker/testcontainers is unavailable.
 from __future__ import annotations
 
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 from alembic import command
@@ -59,14 +58,12 @@ def migrated_schema(postgres_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     command.upgrade(cfg, "head")
 
 
-async def _audit_actions_for_tenant(engine: AsyncEngine, tenant: uuid4) -> list[tuple[str, object]]:
+async def _all_audit_rows(engine: AsyncEngine) -> list[tuple[str, object]]:
+    # Filtering by tenant is no longer possible: personal actions carry no tenant
+    # (ADR-0017), so register/login rows have tenant_id NULL by design. Each test
+    # gets a freshly migrated schema, so reading the whole table is unambiguous.
     async with engine.connect() as conn:
-        rows = (
-            await conn.execute(
-                text("SELECT action, actor_id FROM audit_events WHERE tenant_id = :t"),
-                {"t": str(tenant)},
-            )
-        ).all()
+        rows = (await conn.execute(text("SELECT action, actor_id FROM audit_events"))).all()
     return [(r[0], r[1]) for r in rows]
 
 
@@ -80,30 +77,38 @@ async def test_successful_login_persists_register_and_login_success_audits(
 
     app = build_app(IdentityServiceSettings())
     transport = ASGITransport(app=app)
-    tenant = uuid4()
     email = "audit@example.com"
     password = "strongpassword1"
 
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         reg = await client.post(
             "/auth/register",
-            json={
-                "email": email,
-                "password": password,
-                "display_name": "AU",
-                "tenant_id": str(tenant),
-            },
+            json={"email": email, "password": password, "display_name": "AU"},
         )
         assert reg.status_code == 201, reg.text
+
+        # Email confirmation is a later task; activate directly via the DB so
+        # this test can still exercise login end to end — same seam
+        # test_tenant_source.py uses for its out-of-band membership grant.
+        activate_engine = create_async_engine(postgres_url)
+        try:
+            async with activate_engine.begin() as conn:
+                await conn.execute(
+                    text("UPDATE users SET status = 'active' WHERE email = :email"),
+                    {"email": email},
+                )
+        finally:
+            await activate_engine.dispose()
+
         login = await client.post(
             "/auth/login",
-            json={"email": email, "password": password, "tenant_id": str(tenant)},
+            json={"email": email, "password": password},
         )
         assert login.status_code == 200, login.text
 
     engine = create_async_engine(postgres_url)
     try:
-        actions = [action for action, _actor in await _audit_actions_for_tenant(engine, tenant)]
+        actions = [action for action, _actor in await _all_audit_rows(engine)]
     finally:
         await engine.dispose()
 
@@ -121,22 +126,17 @@ async def test_failed_login_persists_login_failure_audit_with_null_actor(
 
     app = build_app(IdentityServiceSettings())
     transport = ASGITransport(app=app)
-    tenant = uuid4()
 
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         login = await client.post(
             "/auth/login",
-            json={
-                "email": "nope@example.com",
-                "password": "wrongpassword1",
-                "tenant_id": str(tenant),
-            },
+            json={"email": "nope@example.com", "password": "wrongpassword1"},
         )
         assert login.status_code == 401, login.text
 
     engine = create_async_engine(postgres_url)
     try:
-        rows = await _audit_actions_for_tenant(engine, tenant)
+        rows = await _all_audit_rows(engine)
     finally:
         await engine.dispose()
 

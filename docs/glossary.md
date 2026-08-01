@@ -12,10 +12,21 @@ mit englischen Fachbegriffen.
 - **Current Employer** — Die Firma, in der ein kandidat aktuell beschäftigt ist.
   Über Übernahmen ist in Phase 5 (Transfermarkt) ein direkter Kontakt inkl.
   Spielerfirma vorgesehen.
+- **Tenant / Mandant** — Ein **Unternehmen** als handelnde Einheit: Träger von
+  Stellenausschreibungen, Arbeitgeberkonten, Recruiting-Teams und aller weiteren
+  unternehmensbasierten Funktionen. Eine **natürliche Person hat keinen
+  Tenant** — Tenant ist ein optionales Attribut eines Prinzipals, kein
+  Pflichtfeld (ADR-0017). Kommt ausschließlich aus authentifizierten Claims,
+  nie aus Header oder Request-Body.
+- **Subject** — Die natürliche Person, über deren Daten eine Einwilligung
+  entscheidet, identifiziert durch `SubjectId`. Die personenbezogene
+  Scoping-Achse: Nutzerdaten werden über das Subject getrennt, nicht über den
+  Tenant. Beide Achsen bestehen nebeneinander und ersetzen einander nicht.
 - **Consent-Ledger** — Das append-only Verzeichnis über erteilte, entzogene und
   gelöschte Einwilligungen. **Enabler**, nicht Feature: jede Sichtbarkeit,
   jeder Versand, jeder Datenimport fragt den Ledger ab. Revocation zieht die
-  Capability sofort zurück.
+  Capability sofort zurück. Subjekt-, nicht mandantengescopet: eine Einwilligung
+  gehört der Person und folgt ihr über Arbeitgeberwechsel hinweg (ADR-0017).
 - **Verified Signal** — Ein kompetenznachweisendes Signal aus tatsächlicher Arbeit
   (z. B. GitHub Commits, PRs, Reviews, Security Advisories, OSS-Repos), das nur
   mit Zustimmung geholt und jederzeit widerrufbar ist.

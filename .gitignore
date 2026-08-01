@@ -18,6 +18,7 @@ node_modules/
 dist/
 build/
 *.egg-info/
-kon.txt
-IMPLEMENTATION_PLAN.md
+# kon.txt and IMPLEMENTATION_PLAN.md now live in docs/vision/ so every clone can
+# read the project vision. Kon2.txt stays out: it is a corrupted terminal
+# transcript of one session, not a source document.
 Kon2.txt
