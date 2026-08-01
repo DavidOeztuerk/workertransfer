@@ -37,6 +37,16 @@ class IdentityServiceSettings(PlatformSettings):
         default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
     )
 
+    smtp_host: str = "localhost"
+    smtp_port: int = 1025
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_use_tls: bool = False
+    mail_from: str = "noreply@workertransfer.local"
+    # Basis für den Bestätigungslink in der Mail. Muss die Adresse sein, die der
+    # Browser sieht — nicht der Compose-Servicename.
+    public_web_url: str = "http://localhost:5173"
+
     @model_validator(mode="after")
     def _reject_development_jwt_secret(self) -> Self:
         assert_deployable_jwt_secret(
