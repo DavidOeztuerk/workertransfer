@@ -18,7 +18,7 @@
 
 ## Aufgaben
 - [x] 0 Spec schreiben + committen
-- [ ] 1 Generator reparieren (fehlende base.py, Docker-Templates raus, Import-Test)
+- [x] 1 Generator reparieren (fehlende base.py, Docker-Templates raus, Import-Test)
 - [ ] 2 profile-service via `worker new-service` erzeugen + Workspace/Compose einhängen
 - [ ] 3 Domäne: Profile-Aggregat + Wertobjekte (TDD)
 - [ ] 4 Migration 0001 + Modelle + Repository
@@ -35,3 +35,9 @@
 
 ## Log
 - 0 Spec: docs/superpowers/specs/2026-08-01-profile-service-design.md
+- 1 Generator repariert (Commit folgt). Gefunden: base.py wurde nie geschrieben;
+  das Beispielmodell war doppelt kaputt (`postgresql_where` auf UniqueConstraint,
+  Lambda auf undefinierten Namen) — beides unsichtbar für `ast.parse`.
+  Neuer Test importiert jetzt `<service>.main`, nicht nur die Modelle.
+  Docker-Templates je Service entfernt; der Generator druckt stattdessen den
+  Compose-Block. 353 passed / 3 skipped.

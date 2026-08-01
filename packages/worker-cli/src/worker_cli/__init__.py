@@ -100,8 +100,10 @@ def new_service(
     # they are rendered into src/{module_name}/... so the package import path is correct.
     template_files = [
         ("pyproject.toml.tmpl", "pyproject.toml"),
-        ("Dockerfile.tmpl", "Dockerfile"),
-        ("docker-compose.yml.tmpl", "docker-compose.yml"),
+        # Kein Dockerfile und keine docker-compose.yml je Service: das Repo hat
+        # ein geteiltes docker/service.Dockerfile und EINE Root-Compose. Ein
+        # generierter Service brächte sonst konkurrierende Infrastruktur mit.
+        # Der Compose-Block zum Einfügen wird am Ende ausgegeben.
         (".env.example.tmpl", ".env.example"),
         ("README.md.tmpl", "README.md"),
         # Package root __init__.py has no template; created as an empty stub below.
@@ -130,6 +132,10 @@ def new_service(
         (
             "src/infrastructure/database/__init__.py.tmpl",
             f"src/{module_name}/infrastructure/database/__init__.py",
+        ),
+        (
+            "src/infrastructure/database/base.py.tmpl",
+            f"src/{module_name}/infrastructure/database/base.py",
         ),
         (
             "src/infrastructure/database/models.py.tmpl",
@@ -176,11 +182,30 @@ def new_service(
 
     console.print(f"[green]✓ Service {name} created successfully![/green]")
     console.print("  Next steps:")
-    console.print(f"  1. cd {service_dir}")
-    console.print("  2. uv sync")
-    console.print("  3. uv run alembic revision --autogenerate -m 'initial'")
-    console.print("  4. uv run alembic upgrade head")
-    console.print(f"  5. uv run {module_name}")
+    console.print("  1. Add the service to the workspace members in the root pyproject.toml")
+    console.print("  2. uv sync --all-packages --all-groups")
+    console.print(f"  3. uv run alembic -c apps/{name}/alembic.ini revision -m 'init'")
+    console.print("  4. Add this block to docker-compose.yml (no per-service Dockerfile:")
+    console.print("     docker/service.Dockerfile is shared and takes SERVICE_DIR):")
+    console.print("")
+    console.print(f"       {module_name.replace('_', '-')}:")
+    console.print("         <<: *service")
+    console.print(f"         container_name: workertransfer-{name.replace('-service', '')}")
+    console.print("         build:")
+    console.print("           context: .")
+    console.print("           dockerfile: docker/service.Dockerfile")
+    console.print(f"           args: {{ SERVICE_DIR: {name} }}")
+    console.print("         environment:")
+    console.print("           <<: *service-env")
+    console.print('           WORKER_PORT: "8003"   # pick a free port')
+    db_name = module_name.replace("_service", "")
+    dsn = f"postgresql+asyncpg://worker:worker@postgres:5432/{db_name}"
+    console.print(f"           WORKER_DATABASE_URL: {dsn}")
+    console.print('         ports: ["8003:8003"]')
+    cmd = f"[uvicorn, {module_name}.main:app, --host, 0.0.0.0, --port, '8003', --reload]"
+    console.print(f"         command: {cmd}")
+    console.print("")
+    console.print("  5. Add its database to scripts/initdb/01-create-service-databases.sql")
 
 
 @app.command()
