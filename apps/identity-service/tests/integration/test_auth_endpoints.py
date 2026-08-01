@@ -67,6 +67,19 @@ async def test_register_login_me_refresh_logout_roundtrip(
         )
         assert dup.status_code == 409, dup.text
 
+        # Email confirmation is a later task; activate directly via the DB so
+        # this test can still exercise login end to end — same seam
+        # test_tenant_source.py uses for its out-of-band membership grant.
+        activate_engine = create_async_engine(postgres_url)
+        try:
+            async with activate_engine.begin() as conn:
+                await conn.execute(
+                    text("UPDATE users SET status = 'active' WHERE email = :email"),
+                    {"email": email},
+                )
+        finally:
+            await activate_engine.dispose()
+
         login = await client.post(
             "/auth/login",
             json={"email": email, "password": password},

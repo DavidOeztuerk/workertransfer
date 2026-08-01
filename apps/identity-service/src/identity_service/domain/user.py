@@ -15,6 +15,9 @@ from identity_service.domain.value_objects import Email, PasswordHash, UserId
 __all__ = [
     "AccountDisabled",
     "AccountStatus",
+    "AlreadyActive",
+    "EmailNotConfirmed",
+    "EmailVerified",
     "InvalidCredentials",
     "User",
     "UserAlreadyExists",
@@ -46,6 +49,19 @@ class AccountDisabled(DomainError):
         super().__init__("account_disabled", "Account is not active")
 
 
+class AlreadyActive(DomainError):
+    def __init__(self) -> None:
+        super().__init__("already_active", "This account is already confirmed")
+
+
+class EmailNotConfirmed(DomainError):
+    """Unbestätigt ist nicht gesperrt. Der Router bildet das auf 403 ab, damit
+    jemand, der nur die Mail übersehen hat, nicht in einer Sackgasse landet."""
+
+    def __init__(self) -> None:
+        super().__init__("email_not_confirmed", "Confirm your email address to sign in")
+
+
 def _event_dict(event: DomainEvent) -> dict[str, object]:
     return {k: getattr(event, k) for k in event.__dataclass_fields__}
 
@@ -71,6 +87,18 @@ class UserRegistered(DomainEvent):
 class UserLoggedIn(DomainEvent):
     user_id: UUID = field(kw_only=True)
     jti: str = field(kw_only=True)
+
+    def to_dict(self) -> dict[str, object]:
+        base = _event_dict(self)
+        base["event_id"] = str(self.event_id)
+        base["user_id"] = str(self.user_id)
+        base["occurred_at"] = self.occurred_at.isoformat()
+        return base
+
+
+@dataclass(frozen=True, slots=True)
+class EmailVerified(DomainEvent):
+    user_id: UUID = field(kw_only=True)
 
     def to_dict(self) -> dict[str, object]:
         base = _event_dict(self)
@@ -122,7 +150,7 @@ class User:
             password_hash=password_hash,
             display_name=display_name,
             roles=roles,
-            status=AccountStatus.ACTIVE,  # Phase 2: synchronous activation, no email verification
+            status=AccountStatus.PENDING,  # bestätigt wird per E-Mail-Token
             _events=[],
         )
         user._events.append(
@@ -138,8 +166,17 @@ class User:
         return hasher.verify(plain, self.password_hash)
 
     def assert_can_log_in(self) -> None:
+        if self.status is AccountStatus.PENDING:
+            raise EmailNotConfirmed()
         if self.status is not AccountStatus.ACTIVE:
             raise AccountDisabled()
+
+    def activate(self, *, now: datetime) -> None:
+        """Schaltet das Konto nach bestätigter E-Mail frei."""
+        if self.status is AccountStatus.ACTIVE:
+            raise AlreadyActive()
+        self.status = AccountStatus.ACTIVE
+        self._events.append(EmailVerified(user_id=self.id.value, occurred_at=now))
 
     def record_login(self, *, jti: str, now: datetime) -> None:
         self._events.append(

@@ -34,7 +34,8 @@ async def test_user_repository_add_then_get_by_email(session: object) -> None:
     found = await repo.get_by_email("REPO@example.com")  # CITEXT case-insensitive
     assert found is not None
     assert found.email == Email("repo@example.com")
-    assert found.status is AccountStatus.ACTIVE
+    # Accounts start unconfirmed since Task 4; activate() is what flips this.
+    assert found.status is AccountStatus.PENDING
 
 
 async def test_session_audit_repositories_roundtrip(session: object) -> None:
