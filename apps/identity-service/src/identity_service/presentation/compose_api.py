@@ -21,6 +21,7 @@ from worker_tenancy import ClaimTenantResolver
 from identity_service.configuration import IdentityServiceSettings
 from identity_service.infrastructure.compose import compose_infrastructure
 from identity_service.presentation.auth_middleware import AuthMiddleware
+from identity_service.presentation.http.company_router import build_company_router
 from identity_service.presentation.http.me_router import build_me_router
 from identity_service.presentation.http.router import build_auth_router
 
@@ -46,7 +47,7 @@ def build_app(settings: IdentityServiceSettings) -> FastAPI:
         tenant_resolver=ClaimTenantResolver(),
         auth_middleware=AuthMiddleware,
         auth_middleware_kwargs={"tokens": deps["tokens"]},
-        routers=(build_auth_router(deps), build_me_router(deps)),
+        routers=(build_auth_router(deps), build_me_router(deps), build_company_router(deps)),
     )
 
 

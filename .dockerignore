@@ -1,0 +1,21 @@
+# Build context hygiene. Everything here is either host-specific, rebuilt inside
+# the image, or irrelevant to it — and .venv/node_modules alone are hundreds of
+# megabytes that would be copied on every build.
+.git
+.github
+.venv
+**/.venv
+node_modules
+**/node_modules
+**/__pycache__
+**/*.pyc
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.turbo
+**/.turbo
+**/dist
+**/build
+**/*.egg-info
+.env
+*.log

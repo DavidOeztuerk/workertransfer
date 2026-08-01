@@ -19,19 +19,6 @@ export function HomeRoute() {
   return (
     <main>
       <section className="hero" aria-labelledby="hero-title">
-        <div className="hero__navigation">
-          <a className="brand" href="/" aria-label="WorkerTransfer Startseite">
-            worker<span>transfer</span>
-          </a>
-          {/* Distinct label: RootLayout already owns the "Hauptnavigation"
-              landmark, and two identically-labelled navs are ambiguous to
-              screen readers. This one only jumps within the page. */}
-          <nav aria-label="Seitenabschnitte">
-            <a href="#principles">Prinzipien</a>
-            <a href="#roadmap">Produkt</a>
-            <Button variant="secondary">Frühzugang vormerken</Button>
-          </nav>
-        </div>
 
         <div className="hero__content">
           <p className="eyebrow">Talent mobility, menschenzentriert</p>

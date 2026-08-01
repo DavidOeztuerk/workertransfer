@@ -31,11 +31,19 @@ Two Python services exist: `identity-service` and `consent-service`. A React app
 
 ### Everything at once
 ```bash
-docker compose up -d      # Postgres, one database per service
-./scripts/run-dev.sh      # migrate + identity-service + consent-service + Vite
+docker compose up --build # Postgres + every service + the web app, migrations included
+docker compose down       # stop (add -v to drop the databases)
 make check                # the full six-step gate (Python then frontend), fail-fast
 make fix                  # ruff format + ruff check --fix
 ```
+`docker compose up` is the whole local stack — there is no companion script. Each
+service container migrates itself on start (`docker/entrypoint.sh`), so a fresh
+clone needs no manual `alembic` or `psql`. Source is bind-mounted and both
+services run under `--reload`, so host edits apply without a rebuild; rebuild
+only when a dependency changes. **Adding a service:** add its database to
+`scripts/initdb/`, copy a service block in `docker-compose.yml` and change four
+values — no new Dockerfile (`docker/service.Dockerfile` is shared and takes
+`SERVICE_DIR` as a build arg). `docker/web.Dockerfile` runs Vite.
 
 ### Python
 ```bash
@@ -82,7 +90,13 @@ Each service owns per-service async Alembic migrations under `apps/<service>/mig
 ### Request context (important)
 Correlation and tenant IDs flow through `contextvars` (`worker_platform.context`), set by `CorrelationIdMiddleware` and `TenantContextMiddleware`. **Tenant identity must never come from a browser header in production** — `DevelopmentHeaderTenantResolver` is local/dev/test only (`allow_development_tenant_header` is off by default and gated on environment). See `docs/product-scope.md` for the trust constraint.
 
-**A tenant is a company, and a natural person has none** (ADR-0017). Tenant is an *optional* attribute of a principal, carried only by company-based features (job ads, employer accounts, recruiting teams). It is not the scoping axis for personal data: user data is scoped by user/subject identity, and both axes coexist. The consent-ledger therefore has no `tenant_id` on `consent_events` by design — a consent belongs to the person and follows them across employers. Do not "fix" that by adding a tenant column. **Known deviation:** `identity-service` still treats tenant as mandatory *and* takes it from the request body (`RegisterBody.tenant_id`, `LoginBody.tenant_id`, `users.tenant_id NOT NULL`) — that contradicts both ADR-0017 and the product-scope trust constraint, and is not yet aligned.
+**A tenant is a company, and a natural person has none** (ADR-0017). Tenant is an *optional* attribute of a principal, carried only by company-based features (job ads, employer accounts, recruiting teams). It is not the scoping axis for personal data: user data is scoped by user/subject identity, and both axes coexist. The consent-ledger therefore has no `tenant_id` on `consent_events` by design — a consent belongs to the person and follows them across employers. Do not "fix" that by adding a tenant column.
+
+Company membership is a relation (`user_tenant_memberships`), not a column on `users` — one person may act for several companies (ADR-0018). Email is globally unique. `POST /auth/login` returns a person token with **no** tenant claim; `POST /auth/company/{id}` verifies membership and only then mints a token carrying `tenant_id`. So the client names the company but the server decides, and the tenant in the token never came from client input. `AuthPrincipal.tenant_id`, `TokenPayload.tenant_id`, `sessions.tenant_id` and `audit_events.tenant_id` are all nullable, and `None` means "acted as a person" — not "missing". Companies are created via `POST /companies` — with **only a name** in the body. The domain is derived server-side from the creator's confirmed email address, so it is proven before the company exists and cannot be forged (ADR-0019). The creator becomes `admin`. Inviting further members is not built yet, and `admin` vs `member` is not enforced anywhere.
+
+**Registration is open to any email address, private ones very much included** — the transfer market's normal user is a person with no company. The freemail blocklist applies at exactly one place: claiming a domain as a company. Accounts start `PENDING` and are activated by a token mailed to them (`POST /auth/verify-email`); `POST /auth/register` and `POST /auth/resend-verification` answer identically whether or not the address is known, because a differing answer would reveal platform membership without asking the consent-ledger. A confirmed-but-unconfirmed login gets `403 email_not_confirmed`, not `401`.
+
+**Aggregates come back detached from the repositories** — `_to_domain` builds a new object. A mutation reaches the database only via an explicit `save()`. Forgetting it costs nothing at test time (the fakes return the same instance) and silently loses the write in production.
 
 `AuthMiddleware` resolves the principal from an `Authorization: Bearer` header **or** the `access` cookie, in that order. Both carriers are needed: service-to-service and CLI callers send the header; the browser never sees the `httpOnly` token and can only replay it as a cookie (`credentials: "include"`). Any new service verifying identity-service tokens must accept both.
 

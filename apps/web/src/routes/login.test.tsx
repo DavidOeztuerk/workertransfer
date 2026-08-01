@@ -38,10 +38,6 @@ describe("LoginRoute", () => {
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("E-Mail"), "a@b.com");
     await user.type(screen.getByLabelText("Passwort"), "strongpassword1");
-    await user.type(
-      screen.getByLabelText("Mandant-ID"),
-      "11111111-1111-1111-1111-111111111111"
-    );
     await user.click(screen.getByRole("button", { name: "Anmelden" }));
 
     // Successful login sets the redirect target; the form did not throw and the
@@ -63,14 +59,20 @@ describe("LoginRoute", () => {
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("E-Mail"), "a@b.com");
     await user.type(screen.getByLabelText("Passwort"), "wrong");
-    await user.type(
-      screen.getByLabelText("Mandant-ID"),
-      "11111111-1111-1111-1111-111111111111"
-    );
     await user.click(screen.getByRole("button", { name: "Anmelden" }));
 
     await screen.findByRole("alert");
     expect(screen.getByText("Anmeldung fehlgeschlagen")).toBeInTheDocument();
     expect(location.href).toBe("");
+  });
+
+  it("does not ask the user for a company id", () => {
+    // A tenant is a company and a person has none (ADR-0017). Making someone
+    // type a company UUID to log in was both wrong and unusable.
+    renderWithProviders(<LoginRoute />);
+
+    expect(screen.queryByLabelText("Mandant-ID")).toBeNull();
+    expect(screen.getByLabelText("E-Mail")).toBeInTheDocument();
+    expect(screen.getByLabelText("Passwort")).toBeInTheDocument();
   });
 });

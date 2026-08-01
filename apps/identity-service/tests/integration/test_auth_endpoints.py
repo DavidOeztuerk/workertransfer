@@ -51,26 +51,42 @@ async def test_register_login_me_refresh_logout_roundtrip(
     settings = IdentityServiceSettings()
     app = build_app(settings)
     transport = ASGITransport(app=app)
-    tenant = "11111111-1111-1111-1111-111111111111"
     email = "roundtrip@example.com"
     password = "strongpassword1"
 
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         reg = await client.post(
             "/auth/register",
-            json={"email": email, "password": password, "display_name": "E", "tenant_id": tenant},
+            json={"email": email, "password": password, "display_name": "E"},
         )
         assert reg.status_code == 201, reg.text
 
         dup = await client.post(
             "/auth/register",
-            json={"email": email, "password": password, "display_name": "E", "tenant_id": tenant},
+            json={"email": email, "password": password, "display_name": "E"},
         )
-        assert dup.status_code == 409, dup.text
+        # Identisch zur ersten Antwort — kein Enumerationskanal. Ein 409 würde
+        # "ist diese Person hier?" beantworten, ohne den Consent-Ledger zu
+        # fragen (product-scope.md). Der echte Besitzer bekommt stattdessen eine
+        # Warnmail; dass kein zweites Konto entsteht, prüfen die Unit-Tests.
+        assert dup.status_code == 201, dup.text
+
+        # Email confirmation is a later task; activate directly via the DB so
+        # this test can still exercise login end to end — same seam
+        # test_tenant_source.py uses for its out-of-band membership grant.
+        activate_engine = create_async_engine(postgres_url)
+        try:
+            async with activate_engine.begin() as conn:
+                await conn.execute(
+                    text("UPDATE users SET status = 'active' WHERE email = :email"),
+                    {"email": email},
+                )
+        finally:
+            await activate_engine.dispose()
 
         login = await client.post(
             "/auth/login",
-            json={"email": email, "password": password, "tenant_id": tenant},
+            json={"email": email, "password": password},
         )
         assert login.status_code == 200, login.text
         # httpx AsyncClient keeps the cookie jar across requests.
@@ -82,14 +98,15 @@ async def test_register_login_me_refresh_logout_roundtrip(
         # Wrong password -> 401, audit-only reason (no leak).
         bad = await client.post(
             "/auth/login",
-            json={"email": email, "password": "wrongpassword99", "tenant_id": tenant},
+            json={"email": email, "password": "wrongpassword99"},
         )
         assert bad.status_code == 401
 
         me = await client.get("/me", headers={"Authorization": f"Bearer {access}"})
         assert me.status_code == 200, me.text
         body = me.json()
-        assert body["tenant_id"] == tenant
+        # A person acts for no company until they switch into one (ADR-0017).
+        assert body["tenant_id"] is None
         assert "user_id" in body
         assert body["roles"] == ["user"]
 

@@ -43,8 +43,10 @@ Kurzfassung dessen, was heute wirklich läuft:
   exkludiert, `worker-github` ist unimportierbar.
 - **Gates**: `make check` = ruff format → ruff check → mypy → pytest → `pnpm check`
   → `pnpm test`. CI hat einen Backend- **und** einen Frontend-Job.
-- **Lokal**: `docker compose up -d && ./scripts/run-dev.sh` migriert und startet
-  beide Services plus Vite.
+- **Lokal**: `docker compose up --build` startet Postgres, jeden Service und die
+  Web-App. Jeder Service-Container migriert sich beim Start selbst; ein separates
+  Skript gibt es nicht. Ein neuer Service braucht kein eigenes Dockerfile —
+  `docker/service.Dockerfile` ist geteilt und nimmt `SERVICE_DIR` als Build-Arg.
 
 <details>
 <summary>Historischer Stand vom 12.07.2026 (Ausgangspunkt von Phase 1)</summary>
@@ -242,7 +244,8 @@ deckte. Kein neues Feature; nur die Differenz zwischen Behauptung und Realität.
 - Dependency-Deklarationen repariert + dauerhafter Wächter; `worker-shared` gefüllt.
 - Kanon-Auflösung Runde 2 (ADR-0014): `worker-security`/`worker-exceptions` gelöscht,
   `worker-logging` als Reexport.
-- `docker-compose.yml` + migrierendes `run-dev.sh` + `.env.example`.
+- `docker-compose.yml` + `.env.example`; der Stack startet später vollständig aus
+  Compose heraus (Services migrieren sich selbst, `run-dev.sh` entfiel).
 - Frontend-Gate in CI (vorher komplett ungegated); ruff `S` aktiviert.
 - Service-Generator repariert — er hat **nie** parsebaren Code erzeugt.
 **DoD erfüllt:** `make check` (Python + Frontend) grün; Generator-Ausgabe per Test

@@ -50,7 +50,8 @@ transportneutralen `TokenPayload`.
 `consent-service` verifiziert nur; beide lesen dasselbe `WORKER_JWT_SECRET`
 (ADR-0007). Das ist eine bewusste Annahme, keine Nachlässigkeit: solange alle
 Services in einer Vertrauensdomäne laufen, ist ein symmetrisches Secret angemessen.
-`.env.example` und `scripts/run-dev.sh` machen es explizit.
+`.env.example` und `docker-compose.yml` machen es explizit (ein `WORKER_JWT_SECRET`
+für alle Service-Container).
 
 ## Konsequenzen
 
