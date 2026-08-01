@@ -25,7 +25,7 @@
 - [x] 5 ConsentGate-Port + HTTP-Adapter (TDD)
 - [x] 6 Handler: eigenes Profil schreiben/lesen (TDD)
 - [x] 7 Handler: Fremdabruf + Liste mit Consent-Gate (TDD)
-- [ ] 8 Contracts-DTOs + HTTP-Endpunkte
+- [x] 8 Contracts-DTOs + HTTP-Endpunkte
 - [ ] 9 Integrationstests (Docker) inkl. Widerruf wirkt sofort
 - [ ] 10 Frontend: Profil bearbeiten + Sichtbarkeit schalten (TDD)
 - [ ] 11 Frontend: Kandidatenliste für Unternehmen (TDD)
@@ -66,3 +66,7 @@
   als Erfolgswert tragen (.value wirft) — handle_get_my_profile gibt deshalb
   direkt Profile|None zurück statt Result. Dieselbe Falle steckt latent in
   identity's handle_register (Result.ok(None)), dort liest nur niemand .value.
+- 8 Contracts (ProfileV1/SaveProfileV1/ProfilePageV1), Router, Composition-Root,
+  7 App-Tests. Nebenbei: worker_auth exportiert jetzt get_request_user — bis
+  dahin schrieb jeder Service seine eigene Fassung (identity eine Funktion,
+  consent ein getattr mitten im Router). 408 passed / 3 skipped.

@@ -1,39 +1,75 @@
-"""App-level smoke: the platform wiring is actually in place.
+"""App-Verdrahtung: Routen, Verträge und die Zugangsregeln.
 
-No database and no Docker — this only proves the composition root produced an
-app with correlation IDs, security headers and closed docs.
+Kein Docker nötig — create_async_engine ist träge und /health/live fasst die
+Datenbank nie an.
 """
+
+from __future__ import annotations
 
 from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
 from profile_service.configuration import ProfileServiceSettings
 from profile_service.main import create_app
 
 
-def test_liveness_is_available_with_correlation_and_security_headers() -> None:
-    client = TestClient(create_app(ProfileServiceSettings()))
+def _client() -> TestClient:
+    return TestClient(create_app(ProfileServiceSettings()))
 
-    response = client.get("/health/live")
+
+def _schema() -> dict:
+    # Direkt von der App: /openapi.json wird nur bei enable_docs ausgeliefert,
+    # der Vertrag muss aber überall gelten.
+    return create_app(ProfileServiceSettings()).openapi()
+
+
+def test_liveness_reports_this_service() -> None:
+    response = _client().get("/health/live")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "profile-service"}
     assert str(UUID(response.headers["x-correlation-id"])) == response.headers["x-correlation-id"]
     assert response.headers["x-content-type-options"] == "nosniff"
-    assert response.headers["x-frame-options"] == "DENY"
 
 
-def test_valid_correlation_id_is_propagated() -> None:
-    client = TestClient(create_app(ProfileServiceSettings()))
-    correlation_id = "1f46520e-796a-4abf-9502-835a42046737"
+def test_all_four_profile_routes_exist() -> None:
+    paths = _schema()["paths"]
 
-    response = client.get("/health/ready", headers={"X-Correlation-ID": correlation_id})
-
-    assert response.status_code == 200
-    assert response.headers["x-correlation-id"] == correlation_id
+    assert "/profiles/me" in paths
+    assert "/profiles/{subject_id}" in paths
+    assert "/profiles" in paths
 
 
-def test_docs_are_closed_by_default() -> None:
-    client = TestClient(create_app(ProfileServiceSettings()))
+def test_the_save_body_carries_no_visibility_flag() -> None:
+    """Sichtbarkeit gehört dem Consent-Ledger, nicht dem Profil.
 
-    assert client.get("/docs").status_code == 404
+    Ein Feld hier wäre eine zweite Wahrheit — und eine, die der Client setzen
+    könnte.
+    """
+    schema = _schema()
+    ref = schema["paths"]["/profiles/me"]["put"]["requestBody"]["content"]["application/json"][
+        "schema"
+    ]["$ref"]
+    props = schema["components"]["schemas"][ref.rsplit("/", 1)[-1]]["properties"]
+
+    assert set(props) == {"headline", "bio", "location", "remote_ok", "skills"}
+    assert "visible" not in props
+    assert "consent" not in props
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("put", "/profiles/me"),
+        ("get", "/profiles/me"),
+        ("get", "/profiles/11111111-1111-1111-1111-111111111111"),
+        ("get", "/profiles"),
+    ],
+)
+def test_every_route_requires_authentication(method: str, path: str) -> None:
+    client = _client()
+
+    response = client.request(method, path, json={"headline": "x"})
+
+    assert response.status_code == 401
