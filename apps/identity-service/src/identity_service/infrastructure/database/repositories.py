@@ -9,12 +9,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from identity_service.domain.audit import AuditEvent
+from identity_service.domain.company import Company, EmailDomain
+from identity_service.domain.membership import MembershipRole, MembershipView
 from identity_service.domain.session import SessionView
 from identity_service.domain.user import AccountStatus, User
 from identity_service.domain.value_objects import Email, PasswordHash, UserId
+from identity_service.domain.verification import TokenPurpose, VerificationToken
 from identity_service.infrastructure.database.models import (
     AuditEventModel,
+    EmailVerificationTokenModel,
     SessionModel,
+    TenantModel,
     UserModel,
     UserTenantMembershipModel,
 )
@@ -79,6 +84,34 @@ class SqlAlchemyMembershipRepository:
         )
         return list((await self._session.execute(stmt)).scalars().all())
 
+    async def add(self, user_id: UUID, tenant_id: UUID, role: MembershipRole) -> None:
+        self._session.add(
+            UserTenantMembershipModel(user_id=user_id, tenant_id=tenant_id, role=role.value)
+        )
+        await self._session.flush()
+
+    async def list_for_user_detailed(self, user_id: UUID) -> list[MembershipView]:
+        stmt = (
+            select(
+                UserTenantMembershipModel.tenant_id,
+                TenantModel.name,
+                TenantModel.domain,
+                UserTenantMembershipModel.role,
+            )
+            .join(TenantModel, TenantModel.id == UserTenantMembershipModel.tenant_id)
+            .where(UserTenantMembershipModel.user_id == user_id)
+        )
+        rows = (await self._session.execute(stmt)).all()
+        return [
+            MembershipView(
+                tenant_id=row.tenant_id,
+                name=row.name,
+                domain=row.domain,
+                role=MembershipRole(row.role),
+            )
+            for row in rows
+        ]
+
 
 class SqlAlchemySessionRepository:
     def __init__(self, session: AsyncSession) -> None:
@@ -135,3 +168,79 @@ class SqlAlchemyAuditRepository:
             )
         )
         await self._session.flush()
+
+
+class SqlAlchemyVerificationTokenRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, token: VerificationToken) -> None:
+        self._session.add(
+            EmailVerificationTokenModel(
+                id=token.token_id,
+                user_id=token.user_id,
+                token_hash=token.token_hash,
+                purpose=token.purpose.value,
+                expires_at=token.expires_at,
+                consumed_at=token.consumed_at,
+            )
+        )
+        await self._session.flush()
+
+    async def get_by_hash(self, token_hash: str) -> VerificationToken | None:
+        stmt = select(EmailVerificationTokenModel).where(
+            EmailVerificationTokenModel.token_hash == token_hash
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            return None
+        return VerificationToken(
+            token_id=row.id,
+            user_id=row.user_id,
+            token_hash=row.token_hash,
+            purpose=TokenPurpose(row.purpose),
+            expires_at=row.expires_at,
+            consumed_at=row.consumed_at,
+        )
+
+    async def consume(self, token_id: UUID, at: datetime) -> None:
+        row = await self._session.get(EmailVerificationTokenModel, token_id)
+        if row is not None and row.consumed_at is None:
+            row.consumed_at = at
+            await self._session.flush()
+
+    async def consume_open_for(self, user_id: UUID, purpose: TokenPurpose, at: datetime) -> None:
+        """Entwertet offene Tokens, bevor ein neues ausgestellt wird — sonst
+        blieben beliebig viele gültige Links gleichzeitig in Umlauf."""
+        stmt = select(EmailVerificationTokenModel).where(
+            EmailVerificationTokenModel.user_id == user_id,
+            EmailVerificationTokenModel.purpose == purpose.value,
+            EmailVerificationTokenModel.consumed_at.is_(None),
+        )
+        for row in (await self._session.execute(stmt)).scalars().all():
+            row.consumed_at = at
+        await self._session.flush()
+
+
+class SqlAlchemyCompanyRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, company: Company) -> None:
+        self._session.add(
+            TenantModel(id=company.id, name=company.name, domain=company.domain.value)
+        )
+        await self._session.flush()
+
+    async def get_by_domain(self, domain: str) -> Company | None:
+        stmt = select(TenantModel).where(TenantModel.domain == domain)
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        return self._to_domain(row) if row is not None else None
+
+    async def get_by_id(self, company_id: UUID) -> Company | None:
+        row = await self._session.get(TenantModel, company_id)
+        return self._to_domain(row) if row is not None else None
+
+    @staticmethod
+    def _to_domain(row: TenantModel) -> Company:
+        return Company(id=row.id, name=row.name, domain=EmailDomain(row.domain))

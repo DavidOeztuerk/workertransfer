@@ -8,17 +8,22 @@ from typing import Protocol
 from uuid import UUID
 
 from identity_service.domain.audit import AuditEvent
+from identity_service.domain.company import Company
+from identity_service.domain.membership import MembershipRole, MembershipView
 from identity_service.domain.session import SessionView
 from identity_service.domain.user import User
+from identity_service.domain.verification import TokenPurpose, VerificationToken
 
 __all__ = [
     "AuditRepository",
     "AuthPrincipal",
+    "CompanyRepository",
     "Mailer",
     "MembershipRepository",
     "SessionRepository",
     "TokenPair",
     "UserRepository",
+    "VerificationTokenRepository",
 ]
 
 
@@ -48,6 +53,23 @@ class UserRepository(Protocol):
 class MembershipRepository(Protocol):
     async def is_member(self, user_id: UUID, tenant_id: UUID) -> bool: ...
     async def list_for_user(self, user_id: UUID) -> list[UUID]: ...
+    async def add(self, user_id: UUID, tenant_id: UUID, role: MembershipRole) -> None: ...
+    async def list_for_user_detailed(self, user_id: UUID) -> list[MembershipView]: ...
+
+
+class VerificationTokenRepository(Protocol):
+    async def add(self, token: VerificationToken) -> None: ...
+    async def get_by_hash(self, token_hash: str) -> VerificationToken | None: ...
+    async def consume(self, token_id: UUID, at: datetime) -> None: ...
+    async def consume_open_for(
+        self, user_id: UUID, purpose: TokenPurpose, at: datetime
+    ) -> None: ...
+
+
+class CompanyRepository(Protocol):
+    async def add(self, company: Company) -> None: ...
+    async def get_by_domain(self, domain: str) -> Company | None: ...
+    async def get_by_id(self, company_id: UUID) -> Company | None: ...
 
 
 class SessionRepository(Protocol):
