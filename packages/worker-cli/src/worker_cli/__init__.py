@@ -49,47 +49,25 @@ def new_service(
 
     console.print(f"[green]Creating service {name} at {service_dir}[/green]")
 
-    # Create directory structure
+    # Nur Verzeichnisse, die der erzeugte Service auch benutzt. Die frühere
+    # Liste legte über dreißig leere Ordner an (cache, messaging, specifications,
+    # dependencies …) — git trackt sie ohnehin nicht, und sie suggerieren eine
+    # Struktur, die dieser Service vielleicht nie braucht. Was fehlt, legt man
+    # an, wenn man es füllt.
     dirs = [
         "src",
         f"src/{module_name}",
         f"src/{module_name}/domain",
-        f"src/{module_name}/domain/entities",
-        f"src/{module_name}/domain/value_objects",
-        f"src/{module_name}/domain/aggregates",
-        f"src/{module_name}/domain/events",
-        f"src/{module_name}/domain/specifications",
-        f"src/{module_name}/domain/exceptions",
-        f"src/{module_name}/domain/services",
-        f"src/{module_name}/domain/repositories",
         f"src/{module_name}/application",
-        f"src/{module_name}/application/commands",
-        f"src/{module_name}/application/queries",
-        f"src/{module_name}/application/handlers",
-        f"src/{module_name}/application/dtos",
-        f"src/{module_name}/application/validators",
-        f"src/{module_name}/application/behaviors",
-        f"src/{module_name}/application/ports",
         f"src/{module_name}/infrastructure",
         f"src/{module_name}/infrastructure/database",
-        f"src/{module_name}/infrastructure/messaging",
-        f"src/{module_name}/infrastructure/cache",
-        f"src/{module_name}/infrastructure/repositories",
-        f"src/{module_name}/infrastructure/configurations",
-        f"src/{module_name}/infrastructure/external",
-        f"src/{module_name}/infrastructure/events",
         f"src/{module_name}/presentation",
         f"src/{module_name}/presentation/http",
-        f"src/{module_name}/presentation/middleware",
-        f"src/{module_name}/presentation/schemas",
-        f"src/{module_name}/presentation/dependencies",
-        f"src/{module_name}/presentation/health",
         "migrations",
         "migrations/versions",
         "tests",
         "tests/unit",
         "tests/integration",
-        "tests/contract",
     ]
 
     for d in dirs:
@@ -111,19 +89,9 @@ def new_service(
         ("src/main.py.tmpl", f"src/{module_name}/main.py"),
         ("src/configuration.py.tmpl", f"src/{module_name}/configuration.py"),
         ("src/domain/__init__.py.tmpl", f"src/{module_name}/domain/__init__.py"),
-        ("src/domain/base.py.tmpl", f"src/{module_name}/domain/base.py"),
-        ("src/domain/entities/example.py.tmpl", f"src/{module_name}/domain/entities/example.py"),
         (
             "src/application/__init__.py.tmpl",
             f"src/{module_name}/application/__init__.py",
-        ),
-        (
-            "src/application/mediator.py.tmpl",
-            f"src/{module_name}/application/mediator.py",
-        ),
-        (
-            "src/application/behaviors.py.tmpl",
-            f"src/{module_name}/application/behaviors.py",
         ),
         (
             "src/infrastructure/__init__.py.tmpl",
@@ -142,14 +110,6 @@ def new_service(
             f"src/{module_name}/infrastructure/database/models.py",
         ),
         (
-            "src/infrastructure/database/repositories.py.tmpl",
-            f"src/{module_name}/infrastructure/database/repositories.py",
-        ),
-        (
-            "src/infrastructure/database/uow.py.tmpl",
-            f"src/{module_name}/infrastructure/database/uow.py",
-        ),
-        (
             "src/presentation/compose_api.py.tmpl",
             f"src/{module_name}/presentation/compose_api.py",
         ),
@@ -164,7 +124,8 @@ def new_service(
         ("migrations/script.py.mako.tmpl", "migrations/script.py.mako"),
         ("tests/test_app.py.tmpl", "tests/test_app.py"),
         # Testcontainers guard (ADR-0011): integration tests self-skip without Docker.
-        ("tests/integration/__init__.py.tmpl", "tests/integration/__init__.py"),
+        # Kein __init__.py: pytest läuft im importlib-Modus, ein Paketmarker
+        # ließe dieselbe conftest unter zwei Namen registrieren.
         ("tests/integration/_docker.py.tmpl", "tests/integration/_docker.py"),
         ("tests/integration/conftest.py.tmpl", "tests/integration/conftest.py"),
     ]

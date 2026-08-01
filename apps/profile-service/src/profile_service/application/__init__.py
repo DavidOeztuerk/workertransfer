@@ -1,4 +1,4 @@
-"""Application-Schicht von ${service_name}.
+"""Application-Schicht von profile-service.
 
 Commands, Queries und ihre Handler liegen hier. Der Mediator kommt aus
 `worker_platform.application.cqrs` — ein service-eigener wäre ein Duplikat,

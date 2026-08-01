@@ -167,3 +167,42 @@ def test_the_service_owns_its_declarative_base(generated: Path) -> None:
     # gerade, warum worker_database.Base hier falsch wäre.
     assert "from worker_database" not in text
     assert "import worker_database" not in text
+
+
+def test_generated_service_passes_the_repo_quality_gates(generated: Path) -> None:
+    """Ein Generator, dessen Ausgabe rot ist, hilft niemandem.
+
+    Vor dieser Prüfung erzeugte `worker new-service` einen Service mit 28 ruff-
+    und 28 mypy-Fehlern: doppelte `Base`, eine zweite UnitOfWork, ein eigener
+    Mediator, ein Beispielmodell mit ungültigem Constraint. Jeder neue Service
+    hätte damit rot begonnen — und `kon.txt` Regel Nr. 1 wäre eine Behauptung
+    geblieben.
+    """
+    import subprocess
+
+    repo_root = Path(__file__).resolve().parents[3]
+
+    # Nur src/: zwei ruff-Verhalten hängen davon ab, WO der Service liegt, und
+    # kein Template kann beide zugleich erfüllen.
+    #   - I001 sortiert Erstanbieter-Importe anders, je nachdem ob ruff das
+    #     Paket als solches erkennt (im Repo ja, im Temp-Verzeichnis nein).
+    #   - per-file-ignores ("**/tests/**/*.py") greifen nicht für Pfade
+    #     außerhalb der Projektwurzel, weshalb das generierte _docker.py hier
+    #     S607 auslöst, im Repo aber nicht.
+    # Für den echten Service greift `ruff check .` im Repo ohnehin über alles.
+    src = generated / "src"
+    lint = subprocess.run(
+        ["uv", "run", "ruff", "check", "--ignore", "I001", str(src)],
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
+    )
+    assert lint.returncode == 0, f"ruff meldet Fehler im generierten Service:\n{lint.stdout}"
+
+    fmt = subprocess.run(
+        ["uv", "run", "ruff", "format", "--check", str(src)],
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
+    )
+    assert fmt.returncode == 0, f"Formatierung weicht ab:\n{fmt.stdout}"

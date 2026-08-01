@@ -1,7 +1,7 @@
 [project]
-name = "${service_name}"
+name = "profile-service"
 version = "0.1.0"
-description = "${service_title} service"
+description = "Profile Service service"
 requires-python = ">=3.14"
 dependencies = [
     # Bewusst knapp: nur was ein frischer Service wirklich braucht. Die frühere
@@ -27,14 +27,14 @@ dependencies = [
 ]
 
 [project.scripts]
-${module_name} = "${module_name}.main:run"
+profile_service = "profile_service.main:run"
 
 [build-system]
 requires = ["uv_build>=0.11.28,<0.12.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = "${module_name}"
+module-name = "profile_service"
 
 [tool.uv.sources]
 worker-core = { workspace = true }
