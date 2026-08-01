@@ -1,8 +1,11 @@
 """Search abstraction: Elasticsearch, Meilisearch, Vector search."""
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, cast
+
+_logger = logging.getLogger("workertransfer.search")
 
 
 @dataclass
@@ -150,7 +153,10 @@ class MeilisearchEngine(SearchEngine):
         try:
             await cast("Any", self._client).create_index(index, {"primaryKey": "id"})
         except Exception:
-            pass
+            # Meilisearch rejects a re-create of an existing index; that is the
+            # idempotent happy path. Anything else is worth seeing, so log it
+            # instead of returning True over a silent failure.
+            _logger.debug("create_index(%s) failed or already existed", index, exc_info=True)
         return True
 
 
@@ -213,5 +219,5 @@ class VectorSearchEngine(SearchEngine):
                 ),
             )
         except Exception:
-            pass
+            _logger.debug("create_collection(%s) failed or already existed", index, exc_info=True)
         return True

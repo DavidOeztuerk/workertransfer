@@ -22,7 +22,9 @@ class ExpiredToken(InvalidToken):
 
 class TokenPayload(BaseModel):
     sub: UUID
-    tenant_id: UUID
+    # Optional: a tenant is a company, and a natural person acts without one
+    # (ADR-0017). The claim is present only once a tenant was switched to.
+    tenant_id: UUID | None = None
     roles: list[str] = []
     permissions: list[str] = []
     exp: int
@@ -48,25 +50,27 @@ class TokenManager:
         self.refresh_token_expire_minutes = refresh_token_expire_minutes
 
     def create_access_token(
-        self, user_id: UUID, tenant_id: UUID, roles: list[str], permissions: list[str]
+        self, user_id: UUID, tenant_id: UUID | None, roles: list[str], permissions: list[str]
     ) -> str:
         return self._encode(
             user_id=user_id,
             tenant_id=tenant_id,
             roles=roles,
             permissions=permissions,
-            token_type="access",
+            token_type="access",  # noqa: S106 - JWT claim discriminator, not a secret
             expire_minutes=self.access_token_expire_minutes,
             jti=str(uuid4()),
         )
 
-    def create_refresh_token(self, user_id: UUID, tenant_id: UUID, *, session_jti: str) -> str:
+    def create_refresh_token(
+        self, user_id: UUID, tenant_id: UUID | None, *, session_jti: str
+    ) -> str:
         return self._encode(
             user_id=user_id,
             tenant_id=tenant_id,
             roles=[],
             permissions=[],
-            token_type="refresh",
+            token_type="refresh",  # noqa: S106 - JWT claim discriminator, not a secret
             expire_minutes=self.refresh_token_expire_minutes,
             jti=session_jti,
         )
@@ -89,7 +93,7 @@ class TokenManager:
         self,
         *,
         user_id: UUID,
-        tenant_id: UUID,
+        tenant_id: UUID | None,
         roles: list[str],
         permissions: list[str],
         token_type: str,
@@ -99,7 +103,9 @@ class TokenManager:
         now = datetime.now(UTC)
         payload: dict[str, Any] = {
             "sub": str(user_id),
-            "tenant_id": str(tenant_id),
+            # None, not omitted: an explicit null says "acting as a person",
+            # which a missing key could not distinguish from an older token.
+            "tenant_id": str(tenant_id) if tenant_id is not None else None,
             "roles": roles,
             "permissions": permissions,
             "exp": int((now + timedelta(minutes=expire_minutes)).timestamp()),

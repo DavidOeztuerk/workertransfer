@@ -17,7 +17,19 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
-    pass
+    """Shared declarative base.
+
+    Convenient, but every model registered on it shares ONE MetaData. Two
+    services that both own a table called ``audit_events`` collide the moment
+    both model modules are imported in one process — which is exactly what pytest
+    does in this monorepo. It also breaks Alembic autogenerate: a service would
+    see the other service's tables as "missing" and try to drop them.
+
+    A new service should declare its own ``class Base(DeclarativeBase)`` in its
+    ``infrastructure/database`` package instead (ADR-0004: each service owns its
+    own data, so it should own its own MetaData too). See
+    ``apps/consent-service/.../database/base.py``.
+    """
 
 
 class TimestampMixin:
@@ -99,3 +111,15 @@ class UnitOfWork:
 
     async def flush(self) -> None:
         await self.session.flush()
+
+
+__all__ = [
+    "Base",
+    "SoftDeleteMixin",
+    "TenantMixin",
+    "TimestampMixin",
+    "UnitOfWork",
+    "VersionMixin",
+    "create_engine",
+    "create_session_factory",
+]

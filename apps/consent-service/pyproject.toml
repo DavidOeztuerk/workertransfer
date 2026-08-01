@@ -19,6 +19,7 @@ dependencies = [
   "worker-database",
   "worker-events",
   "worker-contracts",
+  "worker-tenancy",
 ]
 
 [project.scripts]

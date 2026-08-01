@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   backend-quality:
@@ -24,3 +24,21 @@ jobs:
       # Docker daemon. ubuntu-latest has Docker, so the integration tests run
       # here; on Docker-less runners they self-skip (ADR-0011 offline-skip).
       - run: uv run pytest
+
+  frontend-quality:
+    # apps/web and packages/ui were previously ungated: TypeScript errors,
+    # failing Vitest suites and broken Vite builds could all merge green because
+    # CI only ran the Python job. AGENTS.md already declares `pnpm check` and
+    # `pnpm test` as binding steps 5 and 6 of the verification order.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build

@@ -80,3 +80,71 @@ select {
   background: var(--wt-surface-raised);
   box-shadow: var(--wt-shadow);
 }
+
+/* Formularfelder — bis hierher gab es im Designsystem keine, weshalb jedes
+   Auth-Formular ungestylt war. */
+.wt-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.wt-field__label {
+  color: var(--wt-ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.wt-field__input {
+  min-height: 2.9rem;
+  width: 100%;
+  border: 1px solid var(--wt-line);
+  border-radius: var(--wt-radius-sm);
+  padding: 0.6rem 0.85rem;
+  color: var(--wt-ink);
+  background: var(--wt-surface-raised);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.wt-field__input::placeholder {
+  color: color-mix(in srgb, var(--wt-muted), transparent 25%);
+}
+
+.wt-field__input:focus-visible {
+  border-color: var(--wt-green);
+  outline: none;
+  /* Ring statt Outline, damit der Rahmenradius erhalten bleibt. */
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wt-mint), transparent 45%);
+}
+
+.wt-field__input[aria-invalid="true"] {
+  border-color: #b4392f;
+}
+
+.wt-field__input[aria-invalid="true"]:focus-visible {
+  box-shadow: 0 0 0 3px rgba(180, 57, 47, 0.22);
+}
+
+.wt-field__hint {
+  margin: 0;
+  color: var(--wt-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.wt-field__error {
+  margin: 0;
+  color: #b4392f;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.wt-button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.wt-button[disabled]:hover {
+  transform: none;
+}

@@ -1,35 +1,17 @@
-"""Structured JSON logging with correlation IDs, trace IDs, and context enrichment."""
+"""Thin re-export of the platform logging canon (ADR-0002, ADR-0005, ADR-0014).
 
-import logging
+`worker_platform.logging` is the single implementation of structured JSON logging
+enriched with correlation and tenant context. This package used to carry its own
+copy whose `configure_logging` attached a fresh StreamHandler on every call — two
+calls meant every record logged twice. The canonical version is idempotent via a
+handler sentinel.
 
-from worker_correlation import get_correlation_id, get_tenant_id
+Kept as a re-export rather than deleted so `worker-telemetry` (its only consumer)
+keeps working; new code should import `worker_platform.logging` directly.
+"""
 
+from __future__ import annotations
 
-class ContextJsonFormatter(logging.Formatter):
-    def format(self, record: logging.LogRecord) -> str:
-        import json
-        from datetime import UTC, datetime
+from worker_platform.logging import ContextJsonFormatter, configure_logging
 
-        payload = {
-            "timestamp": datetime.now(UTC).isoformat(),
-            "level": record.levelname,
-            "logger": record.name,
-            "message": record.getMessage(),
-        }
-        if correlation_id := get_correlation_id():
-            payload["correlation_id"] = correlation_id
-        if tenant_id := get_tenant_id():
-            payload["tenant_id"] = tenant_id
-        if record.exc_info:
-            payload["exception"] = self.formatException(record.exc_info)
-        return json.dumps(payload, default=str, separators=(",", ":"))
-
-
-def configure_logging(level: str = "INFO") -> None:
-    logger = logging.getLogger("workertransfer")
-    logger.setLevel(getattr(logging, level))
-    logger.propagate = False
-
-    handler = logging.StreamHandler()
-    handler.setFormatter(ContextJsonFormatter())
-    logger.addHandler(handler)
+__all__ = ["ContextJsonFormatter", "configure_logging"]

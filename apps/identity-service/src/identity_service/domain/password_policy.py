@@ -1,5 +1,6 @@
-"""Mini password policy (Phase 2). worker-security is headers-middleware-only, so the
-readable-policy floor lives in the domain until a shared policy module exists."""
+"""Mini password policy (Phase 2). The readable-policy floor lives in the domain
+until a shared policy module exists (worker-security was deleted in ADR-0014: it
+only duplicated the platform's security-headers middleware)."""
 
 from __future__ import annotations
 

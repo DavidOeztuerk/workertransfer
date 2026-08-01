@@ -24,18 +24,20 @@ class JwTokenService:
         )
 
     def issue_access_token(
-        self, user_id: UUID, tenant_id: UUID, roles: list[str], permissions: list[str]
+        self, user_id: UUID, tenant_id: UUID | None, roles: list[str], permissions: list[str]
     ) -> str:
         return self._manager.create_access_token(user_id, tenant_id, roles, permissions)
 
-    def issue_refresh_token(self, user_id: UUID, tenant_id: UUID, *, session_jti: str) -> str:
+    def issue_refresh_token(
+        self, user_id: UUID, tenant_id: UUID | None, *, session_jti: str
+    ) -> str:
         return self._manager.create_refresh_token(user_id, tenant_id, session_jti=session_jti)
 
     def issue_pair(
         self,
         *,
         user_id: UUID,
-        tenant_id: UUID,
+        tenant_id: UUID | None,
         roles: list[str],
         permissions: list[str],
         session_jti: str,

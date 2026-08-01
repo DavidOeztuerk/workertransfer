@@ -1,13 +1,12 @@
 [project]
 name = "worker-logging"
 version = "0.1.0"
-description = "Structured JSON logging with correlation IDs, trace IDs, and context enrichment"
+description = "Thin re-export of worker_platform.logging (canon per ADR-0014)"
 requires-python = ">=3.14"
+# structlog and python-json-logger were declared but never used (the canon is
+# stdlib logging). worker-correlation itself only re-exports worker_platform.
 dependencies = [
-    "structlog>=24.1.0,<25.0.0",
-    "python-json-logger>=2.0.0,<3.0.0",
-    "worker-core",
-    "worker-correlation",
+    "worker-platform",
 ]
 
 [build-system]
@@ -18,5 +17,4 @@ build-backend = "uv_build"
 module-name = "worker_logging"
 
 [tool.uv.sources]
-worker-core = { workspace = true }
-worker-correlation = { workspace = true }
+worker-platform = { workspace = true }
