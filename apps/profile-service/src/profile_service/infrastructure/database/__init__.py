@@ -1,4 +1,4 @@
-"""Datenbank-Schicht von ${service_name}.
+"""Datenbank-Schicht von profile-service.
 
 Absichtlich leer. Die frühere Fassung brachte hier eine zweite `Base`, eigene
 Mixins, `DatabaseSettings` und eine `UnitOfWork` unter — alles doppelt: Base und

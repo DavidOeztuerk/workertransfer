@@ -1,0 +1,22 @@
+"""Profile Service configuration.
+
+Extends the platform settings base (ADR-0002). Every field is read from the
+environment with the WORKER_ prefix — WORKER_PORT, WORKER_DATABASE_URL,
+WORKER_JWT_SECRET. A variable without that prefix is silently ignored.
+"""
+
+from __future__ import annotations
+
+from pydantic import SecretStr
+from worker_platform.configuration import PlatformSettings
+
+
+class ProfileServiceSettings(PlatformSettings):
+    service_name: str = "profile-service"
+    port: int = 8000
+
+    database_url: str = "postgresql+asyncpg://worker:worker@127.0.0.1:5432/profile_service"
+
+    # HS256 secret issued by identity-service; this service only verifies
+    # (ADR-0007). Runtime-only — never commit a real value.
+    jwt_secret: SecretStr = SecretStr("dev-only-secret-change-me-in-production-32bytes")

@@ -19,7 +19,7 @@
 ## Aufgaben
 - [x] 0 Spec schreiben + committen
 - [x] 1 Generator reparieren (fehlende base.py, Docker-Templates raus, Import-Test)
-- [ ] 2 profile-service via `worker new-service` erzeugen + Workspace/Compose einhängen
+- [x] 2 profile-service via `worker new-service` erzeugen + Workspace/Compose einhängen
 - [ ] 3 Domäne: Profile-Aggregat + Wertobjekte (TDD)
 - [ ] 4 Migration 0001 + Modelle + Repository
 - [ ] 5 ConsentGate-Port + HTTP-Adapter (TDD)
@@ -41,3 +41,15 @@
   Neuer Test importiert jetzt `<service>.main`, nicht nur die Modelle.
   Docker-Templates je Service entfernt; der Generator druckt stattdessen den
   Compose-Block. 353 passed / 3 skipped.
+- 2 profile-service erzeugt und eingehängt (Workspace, initdb `profile`, Compose :8003).
+  Der Generator brauchte dafür VIER weitere Reparaturen, alle vorher unsichtbar:
+  (a) pyproject deklarierte 20 Pakete inkl. gelöschter (worker-cqrs/-exceptions),
+      `uv sync` scheiterte daran;
+  (b) database/__init__.py brachte eine ZWEITE Base, Mixins, DatabaseSettings und
+      eine UnitOfWork mit — Duplikate von base.py und worker_database;
+  (c) domain/application/__init__ verwiesen auf gelöschte Module;
+  (d) 30 leere Verzeichnisse, Beispiel-Entity/Repository/Mediator, alle rot.
+  Neu: Gate-Test prüft, dass generiertes src/ ruff+format besteht.
+  pytest läuft jetzt im importlib-Modus — sonst kollidieren drei
+  `tests/test_app.py` über die Servicegrenzen hinweg.
+  357 passed / 3 skipped.

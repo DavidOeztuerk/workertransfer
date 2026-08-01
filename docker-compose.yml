@@ -170,6 +170,47 @@ services:
       retries: 30
       start_period: 40s
 
+  profile-service:
+    <<: *service
+    container_name: workertransfer-profile
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        SERVICE_DIR: profile-service
+    environment:
+      <<: *service-env
+      WORKER_PORT: "8003"
+      WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/profile
+      # Der Profile-Service fragt den Ledger, bevor er ein fremdes Profil zeigt
+      # (ADR-0013, synchron und ohne Cache). Servicename, nicht localhost:
+      # der Aufruf läuft im Compose-Netz.
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+    ports:
+      - "8003:8003"
+    command:
+      - uvicorn
+      - profile_service.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8003"
+      - --reload
+      - --reload-dir
+      - /app/apps/profile-service/src
+      - --reload-dir
+      - /app/packages
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;urllib.request.urlopen("http://localhost:8003/health/live")
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 40s
+
   web:
     build:
       context: .
@@ -180,6 +221,8 @@ services:
       identity-service:
         condition: service_healthy
       consent-service:
+        condition: service_healthy
+      profile-service:
         condition: service_healthy
     environment:
       # Read by the browser, so it must be a host-visible URL — the compose

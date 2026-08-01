@@ -9,12 +9,12 @@ supplies only its own routers and adapters.
 from __future__ import annotations
 
 from fastapi import FastAPI
-from ${module_name}.configuration import ${service_class}Settings
-from ${module_name}.presentation.http.router import build_router
+from profile_service.configuration import ProfileServiceSettings
+from profile_service.presentation.http.router import build_router
 from worker_platform.presentation.app import create_api_app
 
 
-def build_app(settings: ${service_class}Settings) -> FastAPI:
+def build_app(settings: ProfileServiceSettings) -> FastAPI:
     return create_api_app(settings, routers=(build_router(),))
 
 
