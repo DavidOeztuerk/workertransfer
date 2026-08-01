@@ -868,7 +868,13 @@ async def test_verify_activates_the_account_and_consumes_the_token() -> None:
     assert repos["audit"].events[-1].action is AuditAction.EMAIL_VERIFIED
 
 
-async def test_a_consumed_token_cannot_be_reused() -> None:
+async def test_clicking_the_same_link_twice_is_not_an_error() -> None:
+    """Der zweite Klick ist kein Fehler.
+
+    Das Konto ist genau so freigeschaltet, wie der Klick es wollte — eine rote
+    Fehlermeldung wäre eine Lüge über den Zustand. Wer den Token hat, hatte
+    ohnehin die Mail, hier wird also nichts verraten.
+    """
     mailer = _FakeMailer()
     repos = _confirm_repos()
     deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
@@ -882,8 +888,9 @@ async def test_a_consumed_token_cannot_be_reused() -> None:
 
     second = await handle_verify_email(VerifyEmailCommand(token=raw), deps=deps, repos=repos)
 
-    assert not is_success(second)
-    assert fail_err(second).code == "token_invalid"
+    assert is_success(second)
+    user = await repos["users"].get_by_email("w@example.com")
+    assert user is not None and user.status is AccountStatus.ACTIVE
 
 
 async def test_an_expired_token_is_refused() -> None:
@@ -1220,3 +1227,29 @@ async def test_an_unknown_login_costs_the_same_work_as_a_known_one() -> None:
     )
 
     assert hasher.hash_calls == baseline + 1
+
+
+async def test_a_token_invalidated_by_a_resend_stays_dead() -> None:
+    """Verbraucht + Konto noch PENDING heißt: durch erneutes Senden entwertet.
+
+    Anders als beim Doppelklick darf dieser Link NICHT mehr freischalten —
+    sonst wäre die Entwertung wirkungslos und ein fehlgeleiteter alter Link
+    weiterhin brauchbar.
+    """
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
+    await _register_via(
+        RegisterUserCommand(email="alt@example.com", password="strongpassword1", display_name="A"),
+        deps=deps,
+        repos=repos,
+    )
+    first = _raw_token_from(mailer)
+    await _resend_via(ResendVerificationCommand(email="alt@example.com"), deps=deps, repos=repos)
+
+    res = await handle_verify_email(VerifyEmailCommand(token=first), deps=deps, repos=repos)
+
+    assert not is_success(res)
+    assert fail_err(res).code == "token_invalid"
+    user = await repos["users"].get_by_email("alt@example.com")
+    assert user is not None and user.status is AccountStatus.PENDING
