@@ -21,6 +21,7 @@ from profile_service.application.handlers import (
 )
 from profile_service.domain.profile import Profile
 from profile_service.infrastructure.consent import ConsentUnavailable
+from worker_auth import get_request_user, resolve_token
 from worker_contracts import ProfilePageV1, ProfileV1, SaveProfileV1
 
 __all__ = ["build_router"]
@@ -44,8 +45,6 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
     request_scope = deps["request_scope"]
 
     def _principal(request: Request) -> Any:
-        from worker_auth import get_request_user
-
         principal = get_request_user(request.scope)
         if principal is None:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "not authenticated")
@@ -57,8 +56,6 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
         Bevorzugt der Header; sonst das Cookie, das der Browser schickt — die
         Oberfläche sieht das httpOnly-Token nie und kann es nur so zurückgeben.
         """
-        from worker_auth import resolve_token
-
         token = resolve_token(request.scope)
         if token is None:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "not authenticated")
@@ -77,7 +74,7 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
     async def save_my_profile(body: SaveProfileV1, request: Request) -> ProfileV1:
         principal = _principal(request)
         cmd = SaveMyProfileCommand(
-            subject_id=principal.user_id,
+            subject_id=principal.sub,
             headline=body.headline,
             bio=body.bio,
             location=body.location,
@@ -98,7 +95,7 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
     async def my_profile(request: Request) -> ProfileV1 | None:
         principal = _principal(request)
         async with request_scope(session_factory) as (_uow, repos):
-            profile = await handle_get_my_profile(principal.user_id, repos=repos)
+            profile = await handle_get_my_profile(principal.sub, repos=repos)
         # null statt 404: „noch keins angelegt" ist ein Zustand, den die
         # Oberfläche als leeres Formular zeigt, kein Fehler.
         return _dto(profile) if profile is not None else None
