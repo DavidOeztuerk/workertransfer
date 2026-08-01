@@ -6,6 +6,7 @@ import {
   createRouter,
   useRouter,
 } from "@tanstack/react-router";
+import { Button } from "@workertransfer/ui";
 
 import { useCompanies, useSwitchCompany } from "./auth/companies";
 import { useLogout, useSession } from "./auth/session";
@@ -21,26 +22,58 @@ export function RootLayout() {
   const { user, isLoading } = useSession();
   const logout = useLogout();
 
+  const onHome = current === "/";
+
   return (
     <>
-      <nav aria-label="Hauptnavigation">
-        <Link to="/">Start</Link>
-        {isLoading ? null : user !== null ? (
-          <>
-            <span>Angemeldet</span>
-            <CompanySwitcher activeTenantId={user.tenant_id} />
-            <Link to="/company/new">Unternehmen anlegen</Link>
-            <button type="button" onClick={() => logout.mutate()} disabled={logout.isPending}>
-              {logout.isPending ? "Abmeldung läuft…" : "Abmelden"}
-            </button>
-          </>
-        ) : current !== "/login" ? (
-          <>
-            <Link to="/login">Anmelden</Link>
-            <Link to="/register">Registrieren</Link>
-          </>
-        ) : null}
-      </nav>
+      {/* Ein Header für alle Seiten. Vorher trug die Startseite ihre eigene
+          Kopfzeile im Hero, während diese hier als nackter Streifen darüber
+          stand — zwei gestapelte Navigationen, eine davon ungestylt. Auf der
+          Startseite liegt der Header jetzt transparent über dem Hero. */}
+      <header className={`site-header${onHome ? " site-header--on-hero" : ""}`}>
+        <a className="brand" href="/" aria-label="WorkerTransfer Startseite">
+          worker<span>transfer</span>
+        </a>
+        <nav aria-label="Hauptnavigation">
+          {/* Die Abschnittslinks lebten in der alten Hero-Kopfzeile und wären
+              mit ihr verschwunden. Sie gehören nur auf die Startseite — auf
+              /login zeigen sie ins Leere. */}
+          {onHome ? (
+            <>
+              <a className="site-header__link" href="#principles">
+                Prinzipien
+              </a>
+              <a className="site-header__link" href="#roadmap">
+                Produkt
+              </a>
+            </>
+          ) : null}
+          {isLoading ? null : user !== null ? (
+            <>
+              <CompanySwitcher activeTenantId={user.tenant_id} />
+              <Link className="site-header__link" to="/company/new">
+                Unternehmen anlegen
+              </Link>
+              <Button variant="quiet" onClick={() => logout.mutate()} disabled={logout.isPending}>
+                {logout.isPending ? "Abmeldung läuft…" : "Abmelden"}
+              </Button>
+            </>
+          ) : (
+            <>
+              {current !== "/login" ? (
+                <Link className="site-header__link" to="/login">
+                  Anmelden
+                </Link>
+              ) : null}
+              {current !== "/register" ? (
+                <Link className="site-header__cta" to="/register">
+                  Registrieren
+                </Link>
+              ) : null}
+            </>
+          )}
+        </nav>
+      </header>
       <Outlet />
     </>
   );
