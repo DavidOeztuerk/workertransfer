@@ -78,7 +78,12 @@ async def test_grant_then_check_then_revoke_is_immediate(
         # The heart of the product promise: no cache, no eventual window.
         after = await client.post("/consent/check", json=body, headers=auth)
         assert after.json()["granted"] is False
-        assert after.json()["reason"] == "subject withdrew consent"
+        # The withdrawal reason is NOT part of the answer: /check is open to any
+        # authenticated caller about any subject, and the reason is free text the
+        # subject wrote about themselves. The revoke response returned it to the
+        # subject; the cross-subject read must not.
+        assert "reason" not in after.json()
+        assert revoked.json()["reason"] == "subject withdrew consent"
 
 
 async def test_check_on_an_untouched_pair_is_false_not_404(
@@ -92,12 +97,13 @@ async def test_check_on_an_untouched_pair_is_false_not_404(
             headers={"Authorization": f"Bearer {token}"},
         )
     assert response.status_code == 200
+    # Absence is a state, not a 404 — and the shape is ConsentCheckResultV1,
+    # which carries no `reason` at all.
     assert response.json() == {
         "subject_id": response.json()["subject_id"],
         "capability": "never.touched:x",
         "granted": False,
         "deleted": False,
-        "reason": "no consent event",
     }
 
 
