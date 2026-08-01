@@ -27,7 +27,7 @@
 - [x] 7 Handler: Fremdabruf + Liste mit Consent-Gate (TDD)
 - [x] 8 Contracts-DTOs + HTTP-Endpunkte
 - [x] 9 Integrationstests (Docker) inkl. Widerruf wirkt sofort
-- [ ] 10 Frontend: Profil bearbeiten + Sichtbarkeit schalten (TDD)
+- [x] 10 Frontend: Profil bearbeiten + Sichtbarkeit schalten (TDD)
 - [ ] 11 Frontend: Kandidatenliste für Unternehmen (TDD)
 - [ ] 12 Playwright-E2E, self-skip ohne laufenden Stack
 - [ ] 13 scripts/validate.sh — ein Befehl, der alles prüft und den Stand meldet
@@ -76,3 +76,8 @@
   Unit-Test-Fassung hatte den Router je über die echte Middleware aufgerufen.
   Drei Fixture-Runden bis grün: DROP DATABASE gegen belegte Pools, dann
   asyncpg-Pools an der Event-Schleife des ersten Tests. 413 passed / 3 skipped.
+- 10 Frontend TDD: profile/client.ts (10 Tests), Route /profile (9 Tests),
+  Switch + TextArea im UI-Paket (6 Tests). Der Ladezustand kam aus einem
+  fehlschlagenden Test, nicht aus Politur: das Formular rendert nicht mehr leer
+  und füllt sich nach — wer in der Lücke tippt, verliert sonst die Eingabe.
+  Je Dienst eine eigene VITE_-Basis-URL (8001/8002/8003). 66 Frontend-Tests.
