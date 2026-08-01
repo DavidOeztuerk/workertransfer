@@ -148,3 +148,87 @@ select {
 .wt-button[disabled]:hover {
   transform: none;
 }
+
+/* Mehrzeiliges Feld: erbt alles von .wt-field__input, nur die Höhe und das
+   Zeilenverhalten sind anders. */
+.wt-field__input--multiline {
+  min-height: 7rem;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.55;
+}
+
+/* Schalter mit sofortiger Wirkung. Bewusst ein Button, keine Checkbox — eine
+   Checkbox verspricht, dass die Änderung erst mit dem Absenden gilt. */
+.wt-switch {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.wt-switch__control {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wt-switch__control[disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.wt-switch__track {
+  flex: none;
+  display: block;
+  width: 2.75rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: var(--wt-border, #d6d3cd);
+  transition: background 140ms ease;
+}
+
+.wt-switch__control[aria-checked="true"] .wt-switch__track {
+  background: var(--wt-accent, #1f6f5c);
+}
+
+.wt-switch__thumb {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0.175rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  transition: transform 140ms ease;
+}
+
+.wt-switch__control[aria-checked="true"] .wt-switch__thumb {
+  transform: translateX(1.25rem);
+}
+
+.wt-switch__control:focus-visible {
+  outline: 2px solid var(--wt-accent, #1f6f5c);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.wt-switch__hint {
+  margin: 0;
+  color: var(--wt-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.wt-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.92rem;
+}

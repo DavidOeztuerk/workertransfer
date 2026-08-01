@@ -13,6 +13,7 @@ import { useLogout, useSession } from "./auth/session";
 import { CompanyNewRoute } from "./routes/company-new";
 import { HomeRoute } from "./routes/home";
 import { LoginRoute } from "./routes/login";
+import { ProfileRoute } from "./routes/profile";
 import { RegisterRoute } from "./routes/register";
 import { VerifyRoute } from "./routes/verify";
 
@@ -51,6 +52,9 @@ export function RootLayout() {
           {isLoading ? null : user !== null ? (
             <>
               <CompanySwitcher activeTenantId={user.tenant_id} />
+              <Link className="site-header__link" to="/profile">
+                Mein Profil
+              </Link>
               <Link className="site-header__link" to="/company/new">
                 Unternehmen anlegen
               </Link>
@@ -112,6 +116,11 @@ function CompanySwitcher({ activeTenantId }: { activeTenantId: string | null }) 
   );
 }
 
+function ProfileWithSession() {
+  const { user } = useSession();
+  return <ProfileRoute principal={user} />;
+}
+
 function CompanyNewWithSession() {
   // The route needs the principal; the component takes it as a prop so it stays
   // testable without a live session.
@@ -137,6 +146,11 @@ const verifyRoute = createRoute({
   path: "/verify",
   component: VerifyRoute,
 });
+const profileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/profile",
+  component: ProfileWithSession,
+});
 const companyNewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/company/new",
@@ -148,6 +162,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   registerRoute,
   verifyRoute,
+  profileRoute,
   companyNewRoute,
 ]);
 

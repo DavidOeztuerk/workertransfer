@@ -228,6 +228,8 @@ services:
       # Read by the browser, so it must be a host-visible URL — the compose
       # service name `identity-service` resolves only inside the network.
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8001}
+      VITE_CONSENT_BASE_URL: ${VITE_CONSENT_BASE_URL:-http://localhost:8002}
+      VITE_PROFILE_BASE_URL: ${VITE_PROFILE_BASE_URL:-http://localhost:8003}
     ports:
       - "5173:5173"
     volumes:
