@@ -17,12 +17,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from uuid import UUID
 
 from worker_core import DomainError
 
 from identity_service.domain.value_objects import TenantId, UserId
 
-__all__ = ["MembershipRole", "NotAMember", "TenantMembership"]
+__all__ = ["MembershipRole", "MembershipView", "NotAMember", "TenantMembership"]
 
 
 class NotAMember(DomainError):
@@ -45,4 +46,19 @@ class TenantMembership:
     user_id: UserId
     tenant_id: TenantId
     granted_at: datetime
+    role: MembershipRole
+
+
+@dataclass(frozen=True, slots=True)
+class MembershipView:
+    """Read model for the tenant-switch API: plain types, not value objects.
+
+    Deliberately distinct from ``TenantMembership`` — this is what a caller
+    needs to render a company picker (name, domain, role), not the aggregate
+    the domain reasons about.
+    """
+
+    tenant_id: UUID
+    name: str
+    domain: str
     role: MembershipRole
