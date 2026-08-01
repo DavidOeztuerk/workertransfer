@@ -116,6 +116,22 @@ ein Image, das eine Textmail verschicken soll. Stattdessen ein schlanker
   tenant-gebundenes Token. Heute unerreichbar, weil kein Entfernungspfad
   existiert — die Einladungs-Scheibe muss ihn zusammen mit dieser Prüfung
   bauen, sonst entsteht das Loch mit ihr.
+- **Abmelden löscht beide Cookies.** Ein früherer Kommentar behauptete, das
+  Access-Cookie werde „beim nächsten geschützten Request abgelehnt, sobald die
+  Session weg ist" — das prüft niemand: `verify_access_token` validiert nur
+  Signatur und Ablauf und sieht die `sessions`-Tabelle nie. Ohne das Löschen
+  blieb man nach dem Abmelden bis zu 15 Minuten angemeldet.
+  **Rest-Risiko, bewusst getragen:** ein *kopiertes* Access-Token (aus einem
+  Bearer-Header, nicht aus dem Cookie-Jar) bleibt bis zum Ablauf gültig. Das
+  ist der Preis zustandsloser JWTs; es zu schließen hieße, jeden Request gegen
+  die Sessions-Tabelle zu prüfen. Die kurze Laufzeit von 15 Minuten ist die
+  Gegenmaßnahme, eine echte Widerrufsliste eine spätere Entscheidung.
+- **Ein zweiter Klick auf den Bestätigungslink ist Erfolg, kein Fehler.** Ist
+  das Konto bereits aktiv, antwortet `/auth/verify-email` mit `200`: der
+  Zustand ist genau der gewünschte, und wer den Token hat, hatte ohnehin die
+  Mail. Ist das Konto dagegen noch `PENDING`, wurde der Token durch ein
+  erneutes Senden entwertet — dann bleibt es bei `400`, sonst wäre die
+  Entwertung wirkungslos.
 - **Aggregate kommen losgelöst aus dem Repository.** `_to_domain` baut ein neues
   Objekt; eine Mutation erreicht die Datenbank nur über `UserRepository.save()`.
   Das ist beim Bauen teuer aufgefallen: `verify-email` meldete `200`, während

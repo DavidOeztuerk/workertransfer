@@ -202,8 +202,14 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
                 await handle_revoke(cmd, deps=deps, repos=repos)
         resp = Response(status_code=status.HTTP_204_NO_CONTENT)
         resp.delete_cookie("refresh", path="/auth")
-        # Do not clear the access cookie here — it is short-lived and will be
-        # rejected on the next protected request once the session jti is gone.
+        # Auch das Access-Cookie löschen. Der frühere Kommentar behauptete, es
+        # werde "beim nächsten geschützten Request abgelehnt, sobald die Session
+        # weg ist" — das prüft niemand: verify_access_token validiert nur
+        # Signatur und Ablauf und sieht die sessions-Tabelle nie. Ohne das
+        # Löschen blieb man nach dem Abmelden bis zu 15 Minuten angemeldet, auf
+        # einem geteilten Rechner ein echtes Problem. Pfad muss zum Setzen
+        # passen (dort ohne path, also "/").
+        resp.delete_cookie("access", path="/")
         return resp
 
     return router

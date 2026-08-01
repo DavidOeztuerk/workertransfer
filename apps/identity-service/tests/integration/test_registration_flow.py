@@ -275,3 +275,69 @@ async def test_registering_a_known_address_answers_the_same_and_warns_the_owner(
     assert first.json() == second.json()
     assert len(outbox) == 1
     assert "versucht" in outbox[0][2].lower()
+
+
+async def test_logging_out_actually_ends_the_session(
+    postgres_url: str,
+    migrated_schema: None,
+    outbox: list[tuple[str, str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: /auth/logout löschte nur das refresh-Cookie.
+
+    Das access-Cookie blieb stehen, und verify_access_token prüft nur Signatur
+    und Ablauf — nie die sessions-Tabelle. /me antwortete danach weiter mit 200,
+    der Browser zeigte weiter "angemeldet", und niemand bekam einen Fehler zu
+    sehen. Auf einem geteilten Rechner hieß das: bis zu 15 Minuten offen.
+    """
+    transport = ASGITransport(app=_app(monkeypatch))
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.post(
+            "/auth/register",
+            json={
+                "email": "bye@flow-firma.de",
+                "password": "strongpassword1",
+                "display_name": "B",
+            },
+        )
+        await client.post("/auth/verify-email", json={"token": _token_from(outbox)})
+        await client.post(
+            "/auth/login", json={"email": "bye@flow-firma.de", "password": "strongpassword1"}
+        )
+        before = await client.get("/me")
+        assert before.status_code == 200, before.text
+
+        logout = await client.post("/auth/logout")
+        assert logout.status_code == 204, logout.text
+
+        # Derselbe Client, derselbe Cookie-Jar — genau das, was der Browser tut.
+        after = await client.get("/me")
+
+    assert after.status_code == 401, after.text
+
+
+async def test_clicking_the_confirmation_link_twice_stays_successful(
+    postgres_url: str,
+    migrated_schema: None,
+    outbox: list[tuple[str, str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ein Reload der Bestätigungsseite darf keine rote Fehlermeldung zeigen."""
+    transport = ASGITransport(app=_app(monkeypatch))
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.post(
+            "/auth/register",
+            json={
+                "email": "zweimal@flow-firma.de",
+                "password": "strongpassword1",
+                "display_name": "Z",
+            },
+        )
+        token = _token_from(outbox)
+        first = await client.post("/auth/verify-email", json={"token": token})
+        second = await client.post("/auth/verify-email", json={"token": token})
+
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text

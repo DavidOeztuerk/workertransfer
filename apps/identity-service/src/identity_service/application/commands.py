@@ -217,19 +217,24 @@ async def handle_verify_email(
     now = clock.now()
     try:
         record = await repos["tokens"].get_by_hash(hash_token(cmd.token))
-        if (
-            record is None
-            or record.purpose is not TokenPurpose.EMAIL_VERIFY
-            or record.is_consumed()
-        ):
-            # Unbekannt und bereits verbraucht sehen von außen absichtlich gleich
-            # aus (TokenInvalid) — sonst würde der Endpunkt zum Orakel.
+        if record is None or record.purpose is not TokenPurpose.EMAIL_VERIFY:
+            # Ein unbekannter Token verrät nichts über seinen Grund — sonst
+            # würde der Endpunkt zum Orakel.
             raise TokenInvalid()
-        if record.is_expired(now):
-            raise TokenExpired()
         user = await repos["users"].get_by_id(record.user_id)
         if user is None:
             raise TokenInvalid()
+        if record.is_consumed():
+            # Zweimal auf denselben Link zu klicken ist kein Fehler: das Konto
+            # ist genau so freigeschaltet, wie der Klick es wollte. Wer den
+            # Token hat, hatte ohnehin die Mail — hier wird nichts verraten.
+            if user.status is AccountStatus.ACTIVE:
+                return Result.ok(None)
+            # Noch PENDING heißt: der Token wurde durch ein erneutes Senden
+            # entwertet. Der alte Link darf dann nicht mehr freischalten.
+            raise TokenInvalid()
+        if record.is_expired(now):
+            raise TokenExpired()
         user.activate(now=now)
         # Ohne save() bliebe die Freischaltung im Arbeitsspeicher: das Aggregat
         # kommt losgelöst aus dem Repository.
