@@ -37,3 +37,18 @@ def test_a_fresh_clone_still_runs_locally() -> None:
     settings = IdentityServiceSettings(environment="local", jwt_secret=SecretStr(DEV_JWT_SECRET))
 
     assert settings.port == 8001
+
+
+def test_cors_origins_accept_a_comma_separated_env_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Der service-eigene Standard darf die CSV-Behandlung nicht verlieren.
+
+    IdentityServiceSettings überschreibt cors_allow_origins; ohne das erneute
+    Annotated[..., NoDecode] json.loads pydantic-settings den rohen Env-Wert und
+    der Service startet gar nicht erst. Die allgemeine Regel prüft der Kernel —
+    dass DIESER Service sie nicht verliert, gehört hierher.
+    """
+    monkeypatch.setenv("WORKER_CORS_ALLOW_ORIGINS", "http://a:1,http://b:2")
+
+    settings = IdentityServiceSettings(jwt_secret=_REAL_SECRET)
+
+    assert settings.cors_allow_origins == ["http://a:1", "http://b:2"]

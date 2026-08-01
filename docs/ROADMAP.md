@@ -256,8 +256,27 @@ was der Code tat.
   Naht existiert in `compose_infrastructure`, hat aber noch keinen Publisher).
   Die `worker new-service`-Templates erzeugen noch `worker_database.Base` statt
   einer service-eigenen Base (ADR-0016-Folgearbeit).
+- ✅ **3.1b Identity-Angleichung & Onboarding** (01.08.2026, PR #2 + #3 gemergt).
+  Tenant ist ein Unternehmen, natürliche Personen haben keinen (**ADR-0017**);
+  Mitgliedschaft als eigene Relation plus verifizierter Wechsel über
+  `POST /auth/company/{id}` (**ADR-0018**); Registrierung, E-Mail-Bestätigung und
+  Unternehmensanlage über die abgeleitete Firmendomain (**ADR-0019**).
+  Migrationen `0002`/`0003`. Mailpit im Compose-Stack; der ganze Weg von der
+  Registrierung bis zum Tenant-Wechsel ist integrationsgetestet **ohne einen
+  einzigen SQL-INSERT**. Frontend: `/register`, `/verify`, `/company/new`, eine
+  konsolidierte Kopfzeile und `Field` als erstes Formular-Primitiv im
+  Designsystem.
+  **Unterwegs gefunden und behoben:** die Freischaltung wurde nie gespeichert
+  (losgelöstes Aggregat ohne `save()`); der Mailversand lief in der offenen
+  Transaktion; die Doppelregistrierung war an der Antwortzeit erkennbar;
+  Abmelden ließ das Access-Cookie stehen und beendete die Sitzung nicht.
 - ⬜ 3.2 Profile-Service · ⬜ 3.3 Resume-Service · ⬜ 3.4 Portfolio-Service
 - ⬜ 3.5 `worker-files`/`worker-storage` real machen (Workspace-Re-Include)
+- ⬜ **Scheibe C — Einladungen & Rollen.** Ein Unternehmen kann entstehen, aber
+  niemand außer dem Gründer hineinkommen; `admin` gegen `member` wird nirgends
+  durchgesetzt. **Muss zusammen mit dem Entfernungspfad die fehlende
+  Mitgliedschaftsprüfung in `handle_refresh` mitbringen** — heute latent, weil
+  niemand entfernt werden kann (siehe ADR-0019, Konsequenzen).
 
 Nächste Aktion: **Sub-step 3.2 — Profile-Service.** Der Consent-Ledger steht und ist
 damit als Enabler nutzbar: jeder Sichtbarkeits-, Versand- und Importpfad im
