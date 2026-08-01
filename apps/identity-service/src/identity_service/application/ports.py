@@ -14,6 +14,7 @@ from identity_service.domain.user import User
 __all__ = [
     "AuditRepository",
     "AuthPrincipal",
+    "Mailer",
     "MembershipRepository",
     "SessionRepository",
     "TokenPair",
@@ -59,3 +60,9 @@ class SessionRepository(Protocol):
 
 class AuditRepository(Protocol):
     async def append(self, event: AuditEvent) -> None: ...
+
+
+class Mailer(Protocol):
+    """Versand ist ein Port, damit die Application kein SMTP kennt."""
+
+    async def send(self, *, to: str, subject: str, body: str) -> None: ...
