@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-from uuid import uuid4
 
 import pytest
 from identity_service.domain.user import (
@@ -9,7 +8,7 @@ from identity_service.domain.user import (
     UserLoggedIn,
     UserRegistered,
 )
-from identity_service.domain.value_objects import Email, PasswordHash, TenantId, UserId
+from identity_service.domain.value_objects import Email, PasswordHash, UserId
 
 
 class _FakeHasher:
@@ -34,7 +33,6 @@ def test_register_creates_active_user_with_event() -> None:
         email=Email("alice@example.com"),
         password_hash=PasswordHash("$2b$12$x"),
         display_name="Alice",
-        tenant_id=TenantId(uuid4()),
         now=_now(),
     )
     assert user.status is AccountStatus.ACTIVE
@@ -54,7 +52,6 @@ def test_verify_password_delegates_to_hasher() -> None:
         email=Email("b@example.com"),
         password_hash=h,
         display_name="B",
-        tenant_id=TenantId(uuid4()),
         now=_now(),
     )
     assert user.verify_password("s3cret", hasher) is True
@@ -66,7 +63,6 @@ def test_assert_can_log_in_requires_active() -> None:
         email=Email("c@example.com"),
         password_hash=PasswordHash("$2b$12$y"),
         display_name="C",
-        tenant_id=TenantId(uuid4()),
         now=_now(),
     )
     user.status = AccountStatus.SUSPENDED
@@ -88,7 +84,6 @@ def test_record_login_emits_event_and_does_not_store_password() -> None:
         email=Email("d@example.com"),
         password_hash=PasswordHash("$2b$12$z"),
         display_name="D",
-        tenant_id=TenantId(uuid4()),
         now=_now(),
     )
     # Command-Handler 1: RegisterUserHandler pulls its own event at persist.

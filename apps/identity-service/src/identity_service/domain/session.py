@@ -17,7 +17,8 @@ __all__ = ["SessionView"]
 @dataclass(frozen=True, slots=True)
 class SessionView:
     user_id: UUID
-    tenant_id: UUID
+    # None for a plain person session; set only for a tenant-bound one (ADR-0017).
+    tenant_id: UUID | None
     refresh_jti: str
     expires_at: datetime
     revoked_at: datetime | None

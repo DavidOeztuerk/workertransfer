@@ -11,10 +11,12 @@ from identity_service.application.commands import (
     RefreshTokenCommand,
     RegisterUserCommand,
     RevokeTokenCommand,
+    SwitchTenantCommand,
     handle_login,
     handle_refresh,
     handle_register,
     handle_revoke,
+    handle_switch_tenant,
 )
 from identity_service.application.ports import AuthPrincipal, TokenPair
 from identity_service.domain.audit import AuditAction
@@ -33,13 +35,30 @@ def fail_err(result: Any) -> Any:
 
 class _FakeUsers:
     def __init__(self) -> None:
-        self.by_email: dict[tuple[UUID, str], User] = {}
+        # Keyed by email alone: a person is one account platform-wide (ADR-0017).
+        self.by_email: dict[str, User] = {}
+        self.by_id: dict[UUID, User] = {}
 
-    async def get_by_email(self, tenant_id: UUID, email: str) -> User | None:
-        return self.by_email.get((tenant_id, email.lower()))
+    async def get_by_email(self, email: str) -> User | None:
+        return self.by_email.get(email.lower())
+
+    async def get_by_id(self, user_id: UUID) -> User | None:
+        return self.by_id.get(user_id)
 
     async def add(self, user: User) -> None:
-        self.by_email[(user.tenant_id.value, user.email.value)] = user
+        self.by_email[user.email.value] = user
+        self.by_id[user.id.value] = user
+
+
+class _FakeMemberships:
+    def __init__(self, members: set[tuple[UUID, UUID]] | None = None) -> None:
+        self.members = members or set()
+
+    async def is_member(self, user_id: UUID, tenant_id: UUID) -> bool:
+        return (user_id, tenant_id) in self.members
+
+    async def list_for_user(self, user_id: UUID) -> list[UUID]:
+        return [t for u, t in self.members if u == user_id]
 
 
 class _FakeSessions:
@@ -47,7 +66,7 @@ class _FakeSessions:
         self.rows: dict[str, SessionView] = {}
 
     async def add(
-        self, *, user_id: UUID, tenant_id: UUID, refresh_jti: str, expires_at: datetime
+        self, *, user_id: UUID, tenant_id: UUID | None, refresh_jti: str, expires_at: datetime
     ) -> None:
         self.rows[refresh_jti] = SessionView(
             user_id=user_id,
@@ -93,16 +112,18 @@ class _FakeTokens:
 
     def __init__(self) -> None:
         self.invalid_tokens: set[str] = set()
+        self.issued_tenants: list[UUID | None] = []
 
     def issue_pair(
         self,
         *,
         user_id: UUID,
-        tenant_id: UUID,
+        tenant_id: UUID | None,
         roles: list[str],
         permissions: list[str],
         session_jti: str,
     ) -> TokenPair:
+        self.issued_tenants.append(tenant_id)
         # Encode jti into both tokens so verify_* can recover it.
         return TokenPair(access=f"acc:{session_jti}", refresh=f"ref:{session_jti}")
 
@@ -112,7 +133,7 @@ class _FakeTokens:
         jti = token[len("ref:") :]
         return AuthPrincipal(
             user_id=UUID("00000000-0000-0000-0000-000000000001"),
-            tenant_id=UUID("00000000-0000-0000-0000-000000000002"),
+            tenant_id=None,
             roles=("user",),
             jti=jti,
         )
@@ -158,12 +179,14 @@ async def test_register_creates_user_and_audit() -> None:
     tokens = _FakeTokens()
     clock = _Clock()
     bus = _Bus()
-    repos = {"users": _FakeUsers(), "sessions": _FakeSessions(), "audit": _FakeAudit()}
+    repos = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
     deps = _deps(clock, tokens, bus, hasher)
-    tenant = uuid4()
-    cmd = RegisterUserCommand(
-        email="A@B.com", password="strongpassword1", display_name="A", tenant_id=tenant
-    )
+    cmd = RegisterUserCommand(email="A@B.com", password="strongpassword1", display_name="A")
 
     res = await handle_register(cmd, deps=deps, repos=repos)
 
@@ -185,12 +208,14 @@ async def test_register_rejects_duplicate_email() -> None:
     tokens = _FakeTokens()
     clock = _Clock()
     bus = _Bus()
-    repos = {"users": _FakeUsers(), "sessions": _FakeSessions(), "audit": _FakeAudit()}
+    repos = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
     deps = _deps(clock, tokens, bus, hasher)
-    tenant = uuid4()
-    cmd = RegisterUserCommand(
-        email="dup@example.com", password="strongpassword1", display_name="D", tenant_id=tenant
-    )
+    cmd = RegisterUserCommand(email="dup@example.com", password="strongpassword1", display_name="D")
     await handle_register(cmd, deps=deps, repos=repos)
 
     second = await handle_register(cmd, deps=deps, repos=repos)
@@ -205,15 +230,18 @@ async def test_login_success_returns_token_pair_and_persists_session_audit() -> 
     tokens = _FakeTokens()
     clock = _Clock()
     bus = _Bus()
-    repos = {"users": _FakeUsers(), "sessions": _FakeSessions(), "audit": _FakeAudit()}
-    tenant = uuid4()
+    repos = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
     # Seed a registered user directly into the fake users repo.
     await handle_register(
         RegisterUserCommand(
             email="alice@example.com",
             password="strongpassword1",
             display_name="Alice",
-            tenant_id=tenant,
         ),
         deps=_deps(clock, tokens, bus, hasher),
         repos=repos,
@@ -222,9 +250,7 @@ async def test_login_success_returns_token_pair_and_persists_session_audit() -> 
     bus.published.clear()
 
     res = await handle_login(
-        AuthenticateUserCommand(
-            email="ALICE@example.com", password="strongpassword1", tenant_id=tenant
-        ),
+        AuthenticateUserCommand(email="ALICE@example.com", password="strongpassword1"),
         deps=_deps(clock, tokens, bus, hasher),
         repos=repos,
     )
@@ -246,12 +272,15 @@ async def test_login_unknown_user_audits_failure_with_none_actor() -> None:
     tokens = _FakeTokens()
     clock = _Clock()
     bus = _Bus()
-    repos = {"users": _FakeUsers(), "sessions": _FakeSessions(), "audit": _FakeAudit()}
+    repos = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
 
     res = await handle_login(
-        AuthenticateUserCommand(
-            email="nobody@example.com", password="whatever12345", tenant_id=uuid4()
-        ),
+        AuthenticateUserCommand(email="nobody@example.com", password="whatever12345"),
         deps=_deps(clock, tokens, bus, hasher),
         repos=repos,
     )
@@ -269,14 +298,17 @@ async def test_login_bad_password_audits_failure_with_user_actor() -> None:
     tokens = _FakeTokens()
     clock = _Clock()
     bus = _Bus()
-    repos = {"users": _FakeUsers(), "sessions": _FakeSessions(), "audit": _FakeAudit()}
-    tenant = uuid4()
+    repos = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
     seeded = await handle_register(
         RegisterUserCommand(
             email="bob@example.com",
             password="strongpassword1",
             display_name="Bob",
-            tenant_id=tenant,
         ),
         deps=_deps(clock, tokens, bus, hasher),
         repos=repos,
@@ -286,9 +318,7 @@ async def test_login_bad_password_audits_failure_with_user_actor() -> None:
     bus.published.clear()
 
     res = await handle_login(
-        AuthenticateUserCommand(
-            email="bob@example.com", password="wrongpassword99", tenant_id=tenant
-        ),
+        AuthenticateUserCommand(email="bob@example.com", password="wrongpassword99"),
         deps=_deps(clock, tokens, bus, hasher),
         repos=repos,
     )
@@ -305,14 +335,17 @@ async def test_login_disabled_user_audits_failure() -> None:
     tokens = _FakeTokens()
     clock = _Clock()
     bus = _Bus()
-    repos = {"users": _FakeUsers(), "sessions": _FakeSessions(), "audit": _FakeAudit()}
-    tenant = uuid4()
+    repos = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
     seeded = await handle_register(
         RegisterUserCommand(
             email="cara@example.com",
             password="strongpassword1",
             display_name="Cara",
-            tenant_id=tenant,
         ),
         deps=_deps(clock, tokens, bus, hasher),
         repos=repos,
@@ -323,9 +356,7 @@ async def test_login_disabled_user_audits_failure() -> None:
     bus.published.clear()
 
     res = await handle_login(
-        AuthenticateUserCommand(
-            email="cara@example.com", password="strongpassword1", tenant_id=tenant
-        ),
+        AuthenticateUserCommand(email="cara@example.com", password="strongpassword1"),
         deps=_deps(clock, tokens, bus, hasher),
         repos=repos,
     )
@@ -341,22 +372,23 @@ async def test_refresh_rotates_jti_and_revokes_old_session() -> None:
     tokens = _FakeTokens()
     clock = _Clock()
     bus = _Bus()
-    repos = {"users": _FakeUsers(), "sessions": _FakeSessions(), "audit": _FakeAudit()}
-    tenant = uuid4()
+    repos = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
     await handle_register(
         RegisterUserCommand(
             email="rob@example.com",
             password="strongpassword1",
             display_name="Rob",
-            tenant_id=tenant,
         ),
         deps=_deps(clock, tokens, bus, hasher),
         repos=repos,
     )
     login = await handle_login(
-        AuthenticateUserCommand(
-            email="rob@example.com", password="strongpassword1", tenant_id=tenant
-        ),
+        AuthenticateUserCommand(email="rob@example.com", password="strongpassword1"),
         deps=_deps(clock, tokens, bus, hasher),
         repos=repos,
     )
@@ -389,22 +421,23 @@ async def test_refresh_rejects_revoked_session() -> None:
     tokens = _FakeTokens()
     clock = _Clock()
     bus = _Bus()
-    repos = {"users": _FakeUsers(), "sessions": _FakeSessions(), "audit": _FakeAudit()}
-    tenant = uuid4()
+    repos = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
     await handle_register(
         RegisterUserCommand(
             email="x@example.com",
             password="strongpassword1",
             display_name="X",
-            tenant_id=tenant,
         ),
         deps=_deps(clock, tokens, bus, hasher),
         repos=repos,
     )
     login = await handle_login(
-        AuthenticateUserCommand(
-            email="x@example.com", password="strongpassword1", tenant_id=tenant
-        ),
+        AuthenticateUserCommand(email="x@example.com", password="strongpassword1"),
         deps=_deps(clock, tokens, bus, hasher),
         repos=repos,
     )
@@ -427,7 +460,12 @@ async def test_refresh_rejects_bad_token_without_auditing_pii() -> None:
     tokens = _FakeTokens()
     clock = _Clock()
     bus = _Bus()
-    repos = {"users": _FakeUsers(), "sessions": _FakeSessions(), "audit": _FakeAudit()}
+    repos = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
 
     res = await handle_refresh(
         RefreshTokenCommand(refresh_token="not-a-real-token"),
@@ -446,22 +484,23 @@ async def test_revoke_revokes_session_and_is_idempotent() -> None:
     tokens = _FakeTokens()
     clock = _Clock()
     bus = _Bus()
-    repos = {"users": _FakeUsers(), "sessions": _FakeSessions(), "audit": _FakeAudit()}
-    tenant = uuid4()
+    repos = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
     await handle_register(
         RegisterUserCommand(
             email="y@example.com",
             password="strongpassword1",
             display_name="Y",
-            tenant_id=tenant,
         ),
         deps=_deps(clock, tokens, bus, hasher),
         repos=repos,
     )
     login = await handle_login(
-        AuthenticateUserCommand(
-            email="y@example.com", password="strongpassword1", tenant_id=tenant
-        ),
+        AuthenticateUserCommand(email="y@example.com", password="strongpassword1"),
         deps=_deps(clock, tokens, bus, hasher),
         repos=repos,
     )
@@ -487,3 +526,149 @@ async def test_revoke_revokes_session_and_is_idempotent() -> None:
     )
     assert is_success(res2)
     assert repos["audit"].events == []
+
+
+# --- Tenant switching (ADR-0017) ------------------------------------------
+
+
+async def _register(repos: dict[str, Any], deps: dict[str, Any], email: str) -> User:
+    res = await handle_register(
+        RegisterUserCommand(email=email, password="strongpassword1", display_name="X"),
+        deps=deps,
+        repos=repos,
+    )
+    user: User = res.value
+    return user
+
+
+async def test_login_issues_a_token_without_a_tenant() -> None:
+    # A person logging in is not acting for any company yet.
+    tokens = _FakeTokens()
+    clock, bus, hasher = _Clock(), _Bus(), _StupidHasher()
+    deps = _deps(clock, tokens, bus, hasher)
+    repos: dict[str, Any] = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
+    await _register(repos, deps, "solo@example.com")
+
+    res = await handle_login(
+        AuthenticateUserCommand(email="solo@example.com", password="strongpassword1"),
+        deps=deps,
+        repos=repos,
+    )
+
+    assert is_success(res)
+    assert tokens.issued_tenants == [None]
+    assert all(ev.tenant_id is None for ev in repos["audit"].events)
+
+
+async def test_switching_to_a_company_you_belong_to_mints_a_tenant_token() -> None:
+    tokens = _FakeTokens()
+    clock, bus, hasher = _Clock(), _Bus(), _StupidHasher()
+    deps = _deps(clock, tokens, bus, hasher)
+    repos: dict[str, Any] = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
+    user = await _register(repos, deps, "recruiter@example.com")
+    tenant = uuid4()
+    repos["memberships"].members.add((user.id.value, tenant))
+    repos["audit"].events.clear()
+    tokens.issued_tenants.clear()
+
+    res = await handle_switch_tenant(
+        SwitchTenantCommand(user_id=user.id.value, tenant_id=tenant), deps=deps, repos=repos
+    )
+
+    assert is_success(res)
+    assert tokens.issued_tenants == [tenant]
+    assert [ev.action for ev in repos["audit"].events] == [AuditAction.TENANT_SWITCH]
+    assert repos["audit"].events[0].tenant_id == tenant
+
+
+async def test_switching_to_a_company_you_do_not_belong_to_is_refused_and_audited() -> None:
+    tokens = _FakeTokens()
+    clock, bus, hasher = _Clock(), _Bus(), _StupidHasher()
+    deps = _deps(clock, tokens, bus, hasher)
+    repos: dict[str, Any] = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
+    user = await _register(repos, deps, "outsider@example.com")
+    repos["audit"].events.clear()
+    tokens.issued_tenants.clear()
+    stranger = uuid4()
+
+    res = await handle_switch_tenant(
+        SwitchTenantCommand(user_id=user.id.value, tenant_id=stranger), deps=deps, repos=repos
+    )
+
+    assert not is_success(res)
+    assert fail_err(res).code == "not_a_member"
+    # No token was minted...
+    assert tokens.issued_tenants == []
+    # ...and the refusal is on the record, with the tenant that was asked for.
+    assert [ev.action for ev in repos["audit"].events] == [AuditAction.TENANT_SWITCH_DENIED]
+    assert repos["audit"].events[0].tenant_id == stranger
+
+
+async def test_membership_of_one_company_does_not_grant_another() -> None:
+    tokens = _FakeTokens()
+    clock, bus, hasher = _Clock(), _Bus(), _StupidHasher()
+    deps = _deps(clock, tokens, bus, hasher)
+    repos: dict[str, Any] = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
+    user = await _register(repos, deps, "multi@example.com")
+    allowed, forbidden = uuid4(), uuid4()
+    repos["memberships"].members.add((user.id.value, allowed))
+
+    ok = await handle_switch_tenant(
+        SwitchTenantCommand(user_id=user.id.value, tenant_id=allowed), deps=deps, repos=repos
+    )
+    denied = await handle_switch_tenant(
+        SwitchTenantCommand(user_id=user.id.value, tenant_id=forbidden), deps=deps, repos=repos
+    )
+
+    assert is_success(ok)
+    assert not is_success(denied)
+
+
+async def test_the_tenant_session_is_separate_from_the_person_session() -> None:
+    # The person's refresh token keeps working; the tenant-bound one is its own
+    # row, so it can be revoked without logging the person out entirely.
+    tokens = _FakeTokens()
+    clock, bus, hasher = _Clock(), _Bus(), _StupidHasher()
+    deps = _deps(clock, tokens, bus, hasher)
+    repos: dict[str, Any] = {
+        "users": _FakeUsers(),
+        "memberships": _FakeMemberships(),
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
+    user = await _register(repos, deps, "two@example.com")
+    tenant = uuid4()
+    repos["memberships"].members.add((user.id.value, tenant))
+    await handle_login(
+        AuthenticateUserCommand(email="two@example.com", password="strongpassword1"),
+        deps=deps,
+        repos=repos,
+    )
+
+    await handle_switch_tenant(
+        SwitchTenantCommand(user_id=user.id.value, tenant_id=tenant), deps=deps, repos=repos
+    )
+
+    rows = list(repos["sessions"].rows.values())
+    assert len(rows) == 2
+    assert sorted([r.tenant_id is None for r in rows]) == [False, True]

@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 from worker_core import DomainError, DomainEvent
 
 from identity_service.domain.services import PasswordHashing
-from identity_service.domain.value_objects import Email, PasswordHash, TenantId, UserId
+from identity_service.domain.value_objects import Email, PasswordHash, UserId
 
 __all__ = [
     "AccountDisabled",
@@ -32,9 +32,8 @@ class AccountStatus(StrEnum):
 
 class UserAlreadyExists(DomainError):
     def __init__(self, email: str) -> None:
-        super().__init__(
-            "user_already_exists", f"A user with email {email!r} already exists in this tenant"
-        )
+        # Globally, not per tenant: a person is one account (ADR-0017).
+        super().__init__("user_already_exists", f"A user with email {email!r} already exists")
 
 
 class InvalidCredentials(DomainError):
@@ -56,7 +55,6 @@ class UserRegistered(DomainEvent):
     # kw_only required: DomainEvent base contributes event_id/occurred_at defaults,
     # own non-default fields would otherwise follow a default (init-ordering error).
     user_id: UUID = field(kw_only=True)
-    tenant_id: UUID = field(kw_only=True)
     email: str = field(
         kw_only=True
     )  # PII: stays in the domain event, never crosses into AuditEvent
@@ -65,7 +63,6 @@ class UserRegistered(DomainEvent):
         base = _event_dict(self)
         base["event_id"] = str(self.event_id)
         base["user_id"] = str(self.user_id)
-        base["tenant_id"] = str(self.tenant_id)
         base["occurred_at"] = self.occurred_at.isoformat()
         return base
 
@@ -73,14 +70,12 @@ class UserRegistered(DomainEvent):
 @dataclass(frozen=True, slots=True)
 class UserLoggedIn(DomainEvent):
     user_id: UUID = field(kw_only=True)
-    tenant_id: UUID = field(kw_only=True)
     jti: str = field(kw_only=True)
 
     def to_dict(self) -> dict[str, object]:
         base = _event_dict(self)
         base["event_id"] = str(self.event_id)
         base["user_id"] = str(self.user_id)
-        base["tenant_id"] = str(self.tenant_id)
         base["occurred_at"] = self.occurred_at.isoformat()
         return base
 
@@ -96,7 +91,6 @@ class User:
     ``self.id.value`` (see ADR-aligned Phase-2 note in the plan, Task 9)."""
 
     id: UserId
-    tenant_id: TenantId
     email: Email
     password_hash: PasswordHash
     display_name: str
@@ -117,13 +111,13 @@ class User:
         email: Email,
         password_hash: PasswordHash,
         display_name: str,
-        tenant_id: TenantId,
         now: datetime,
         roles: tuple[str, ...] = ("user",),
     ) -> User:
+        # No tenant: registering is an act of a natural person (ADR-0017).
+        # Company membership is granted afterwards, in its own aggregate.
         user = cls(
             id=UserId(uuid4()),
-            tenant_id=tenant_id,
             email=email,
             password_hash=password_hash,
             display_name=display_name,
@@ -134,7 +128,6 @@ class User:
         user._events.append(
             UserRegistered(
                 user_id=user.id.value,
-                tenant_id=user.tenant_id.value,
                 email=user.email.value,
                 occurred_at=now,
             )
@@ -152,7 +145,6 @@ class User:
         self._events.append(
             UserLoggedIn(
                 user_id=self.id.value,
-                tenant_id=self.tenant_id.value,
                 jti=jti,
                 occurred_at=now,
             )
