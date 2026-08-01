@@ -12,11 +12,12 @@ domain state commit together (atomicity, ADR-0012).
 
 from __future__ import annotations
 
+import logging
 import secrets
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from worker_core import DomainError, Result
 
@@ -26,20 +27,34 @@ from identity_service.domain.membership import NotAMember
 from identity_service.domain.password_policy import PasswordPolicy
 from identity_service.domain.user import (
     AccountDisabled,
+    AccountStatus,
     InvalidCredentials,
     User,
-    UserAlreadyExists,
 )
 from identity_service.domain.value_objects import Email
+from identity_service.domain.verification import (
+    TokenExpired,
+    TokenInvalid,
+    TokenPurpose,
+    VerificationToken,
+)
+from identity_service.infrastructure.tokens import generate_token, hash_token
 
 __all__ = [
     "AuthenticateUserCommand",
     "RefreshTokenCommand",
     "RegisterUserCommand",
+    "ResendVerificationCommand",
     "RevokeTokenCommand",
     "SwitchTenantCommand",
+    "VerifyEmailCommand",
+    "handle_register",
+    "handle_resend",
     "handle_switch_tenant",
+    "handle_verify_email",
 ]
+
+_logger = logging.getLogger("workertransfer.identity.commands")
 
 
 def _correlation_id() -> str | None:
@@ -59,25 +74,29 @@ class RegisterUserCommand:
 
 async def handle_register(
     cmd: RegisterUserCommand, *, deps: dict[str, Any], repos: dict[str, Any]
-) -> Result[User]:
+) -> Result[User | None]:
     hasher = deps["hasher"]
     policy: PasswordPolicy = PasswordPolicy()
+    now = deps["clock"].now()
     try:
         policy.validate(cmd.password)
         existing = await repos["users"].get_by_email(cmd.email)
         if existing is not None:
-            # Audit the failed attempt too, but keep the 409 semantics in the router.
-            raise UserAlreadyExists(cmd.email)
+            # Kein zweites Konto — aber dieselbe Antwort wie im Normalfall, damit
+            # der Endpunkt nicht verrät, wer hier ein Konto hat. Der echte Besitzer
+            # erfährt von dem Versuch.
+            await _send_duplicate_notice(existing, deps)
+            return Result.ok(None)
         user = User.register(
             email=Email(cmd.email),
             password_hash=hasher.hash(cmd.password),
             display_name=cmd.display_name,
-            now=deps["clock"].now(),
+            now=now,
         )
         await repos["users"].add(user)
         await repos["audit"].append(
             AuditEvent(
-                occurred_at=deps["clock"].now(),
+                occurred_at=now,
                 actor_id=user.id.value,
                 # Registering is an act of a person, not of a company (ADR-0017).
                 tenant_id=None,
@@ -87,10 +106,153 @@ async def handle_register(
                 metadata={},
             )
         )
+        raw_token, token_hash = generate_token()
+        await repos["tokens"].add(
+            VerificationToken(
+                token_id=uuid4(),
+                user_id=user.id.value,
+                token_hash=token_hash,
+                purpose=TokenPurpose.EMAIL_VERIFY,
+                expires_at=now + timedelta(hours=24),
+                consumed_at=None,
+            )
+        )
     except DomainError as exc:
         return Result.fail(exc)
     await _publish_user_events(user, deps)
+    # Outside the UoW the router (Task 18) drives: a dead mailbox must not undo
+    # an otherwise successful registration — the repair path is "resend", not
+    # rolling back the account (Spec §5).
+    await _dispatch_mail(
+        deps,
+        to=user.email.value,
+        subject="Bitte bestätige deine E-Mail-Adresse",
+        body=_confirmation_body(deps, raw_token),
+    )
     return Result.ok(user)
+
+
+async def _send_duplicate_notice(existing: User, deps: dict[str, Any]) -> None:
+    """Warnt den echten Besitzer statt dem Anfragenden irgendetwas zu verraten.
+
+    Discoverability liegt bei der Person, nicht beim Anfragenden
+    (product-scope.md) — die Antwort an den Aufrufer bleibt in jedem Fall
+    identisch zur erfolgreichen Registrierung.
+    """
+    await _dispatch_mail(
+        deps,
+        to=existing.email.value,
+        subject="Registrierungsversuch mit deiner E-Mail-Adresse",
+        body=(
+            "Jemand hat versucht, mit deiner E-Mail-Adresse ein neues Konto bei "
+            "WorkerTransfer anzulegen. Du hast bereits ein Konto — falls du das "
+            "warst, melde dich einfach an. War es nicht du, kannst du diese "
+            "Nachricht ignorieren.\n"
+        ),
+    )
+
+
+def _confirmation_body(deps: dict[str, Any], raw_token: str) -> str:
+    base = deps["settings"].public_web_url.rstrip("/")
+    return (
+        "Willkommen bei WorkerTransfer! Bitte bestätige deine E-Mail-Adresse "
+        f"über folgenden Link:\n\n{base}/verify?token={raw_token}\n"
+    )
+
+
+async def _dispatch_mail(deps: dict[str, Any], *, to: str, subject: str, body: str) -> None:
+    """Versand ist bewusst kein Teil der UoW (Spec §5): eine tote Mailbox darf
+    eine sonst erfolgreiche Registrierung nicht rückgängig machen — der
+    Reparaturweg ist "erneut senden". Und eine Mail ist kein Audit-Ereignis,
+    das ADR-0012 in derselben Transaktion schützen müsste.
+    """
+    try:
+        await deps["mailer"].send(to=to, subject=subject, body=body)
+    except Exception:
+        _logger.exception("Failed to send mail to %s", to)
+
+
+@dataclass(frozen=True, slots=True)
+class VerifyEmailCommand:
+    token: str
+
+
+async def handle_verify_email(
+    cmd: VerifyEmailCommand, *, deps: dict[str, Any], repos: dict[str, Any]
+) -> Result[None]:
+    clock = deps["clock"]
+    now = clock.now()
+    try:
+        record = await repos["tokens"].get_by_hash(hash_token(cmd.token))
+        if (
+            record is None
+            or record.purpose is not TokenPurpose.EMAIL_VERIFY
+            or record.is_consumed()
+        ):
+            # Unbekannt und bereits verbraucht sehen von außen absichtlich gleich
+            # aus (TokenInvalid) — sonst würde der Endpunkt zum Orakel.
+            raise TokenInvalid()
+        if record.is_expired(now):
+            raise TokenExpired()
+        user = await repos["users"].get_by_id(record.user_id)
+        if user is None:
+            raise TokenInvalid()
+        user.activate(now=now)
+        await repos["tokens"].consume(record.token_id, now)
+        await repos["audit"].append(
+            AuditEvent(
+                occurred_at=now,
+                actor_id=user.id.value,
+                tenant_id=None,
+                action=AuditAction.EMAIL_VERIFIED,
+                target_id=None,
+                correlation_id=_correlation_id(),
+                metadata={},
+            )
+        )
+    except DomainError as exc:
+        return Result.fail(exc)
+    await _publish_user_events(user, deps)
+    return Result.ok(None)
+
+
+@dataclass(frozen=True, slots=True)
+class ResendVerificationCommand:
+    email: str
+
+
+async def handle_resend(
+    cmd: ResendVerificationCommand, *, deps: dict[str, Any], repos: dict[str, Any]
+) -> Result[None]:
+    clock = deps["clock"]
+    now = clock.now()
+    user = await repos["users"].get_by_email(cmd.email)
+    if user is None or user.status is not AccountStatus.PENDING:
+        # Dieselbe Antwort wie im Normalfall — kein Enumerationskanal, und ein
+        # bereits bestätigtes Konto braucht keinen neuen Link.
+        return Result.ok(None)
+
+    # Sonst blieben beliebig viele gültige Links gleichzeitig in Umlauf, und der
+    # älteste — womöglich fehlgeleitete — funktionierte weiter (Spec §4.3).
+    await repos["tokens"].consume_open_for(user.id.value, TokenPurpose.EMAIL_VERIFY, now)
+    raw_token, token_hash = generate_token()
+    await repos["tokens"].add(
+        VerificationToken(
+            token_id=uuid4(),
+            user_id=user.id.value,
+            token_hash=token_hash,
+            purpose=TokenPurpose.EMAIL_VERIFY,
+            expires_at=now + timedelta(hours=24),
+            consumed_at=None,
+        )
+    )
+    await _dispatch_mail(
+        deps,
+        to=user.email.value,
+        subject="Bitte bestätige deine E-Mail-Adresse",
+        body=_confirmation_body(deps, raw_token),
+    )
+    return Result.ok(None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,7 +459,11 @@ async def handle_switch_tenant(
         return Result.fail(InvalidCredentials())
     try:
         user.assert_can_log_in()
-    except AccountDisabled as exc:
+    except DomainError as exc:
+        # DomainError, nicht nur AccountDisabled: seit der E-Mail-Bestätigung
+        # wirft assert_can_log_in auch EmailNotConfirmed, und ein enger except
+        # hätte den unbehandelt durchschlagen lassen statt ihn in ein Result zu
+        # verwandeln. Heute unerreichbar (ohne Login kein Token), morgen nicht.
         return Result.fail(exc)
 
     # A fresh session rather than an edit of the old one: the old refresh token
