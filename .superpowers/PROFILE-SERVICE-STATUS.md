@@ -22,9 +22,9 @@
 - [x] 2 profile-service via `worker new-service` erzeugen + Workspace/Compose einhängen
 - [x] 3 Domäne: Profile-Aggregat + Wertobjekte (TDD)
 - [x] 4 Migration 0001 + Modelle + Repository
-- [ ] 5 ConsentGate-Port + HTTP-Adapter (TDD)
-- [ ] 6 Handler: eigenes Profil schreiben/lesen (TDD)
-- [ ] 7 Handler: Fremdabruf + Liste mit Consent-Gate (TDD)
+- [x] 5 ConsentGate-Port + HTTP-Adapter (TDD)
+- [x] 6 Handler: eigenes Profil schreiben/lesen (TDD)
+- [x] 7 Handler: Fremdabruf + Liste mit Consent-Gate (TDD)
 - [ ] 8 Contracts-DTOs + HTTP-Endpunkte
 - [ ] 9 Integrationstests (Docker) inkl. Widerruf wirkt sofort
 - [ ] 10 Frontend: Profil bearbeiten + Sichtbarkeit schalten (TDD)
@@ -60,3 +60,9 @@
   Cursor trägt (updated_at, id) — mit dem Zeitstempel allein überspringt das
   Blättern Profile, die in derselben Sekunde geändert wurden. Kaputter Cursor
   = Anfang, kein 400.
+- 5 ConsentGate-Port + HttpConsentGate (9 Tests). Fail closed bei Ausfall,
+  auch bei 401/500 — ein `False` wäre eine Aussage über die Person.
+- 6/7 Handler (41 Unit-Tests gesamt). Fund: worker_core.Result kann kein None
+  als Erfolgswert tragen (.value wirft) — handle_get_my_profile gibt deshalb
+  direkt Profile|None zurück statt Result. Dieselbe Falle steckt latent in
+  identity's handle_register (Result.ok(None)), dort liest nur niemand .value.
