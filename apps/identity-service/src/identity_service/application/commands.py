@@ -23,7 +23,13 @@ from worker_core import DomainError, Result
 
 from identity_service.application.ports import TokenPair
 from identity_service.domain.audit import AuditAction, AuditEvent
-from identity_service.domain.membership import NotAMember
+from identity_service.domain.company import (
+    AccountNotConfirmed,
+    Company,
+    DomainAlreadyClaimed,
+    EmailDomain,
+)
+from identity_service.domain.membership import MembershipRole, MembershipView, NotAMember
 from identity_service.domain.password_policy import PasswordPolicy
 from identity_service.domain.user import (
     AccountDisabled,
@@ -42,12 +48,16 @@ from identity_service.infrastructure.tokens import generate_token, hash_token
 
 __all__ = [
     "AuthenticateUserCommand",
+    "CreateCompanyCommand",
+    "ListMembershipsQuery",
     "RefreshTokenCommand",
     "RegisterUserCommand",
     "ResendVerificationCommand",
     "RevokeTokenCommand",
     "SwitchTenantCommand",
     "VerifyEmailCommand",
+    "handle_create_company",
+    "handle_list_memberships",
     "handle_register",
     "handle_resend",
     "handle_switch_tenant",
@@ -494,6 +504,70 @@ async def handle_switch_tenant(
         )
     )
     return Result.ok(pair)
+
+
+@dataclass(frozen=True, slots=True)
+class CreateCompanyCommand:
+    user_id: UUID
+    name: str
+
+
+async def handle_create_company(
+    cmd: CreateCompanyCommand, *, deps: dict[str, Any], repos: dict[str, Any]
+) -> Result[Company]:
+    """Legt ein Unternehmen an, dessen Domain bereits bewiesen ist.
+
+    Die Domain stammt aus der bestätigten Adresse des Erstellers — sie steht
+    nicht im Request und kann daher nicht gefälscht werden (ADR-0017/0018).
+    Weil sie vor dem Anlegen bewiesen ist, gibt es keinen unverifizierten
+    Unternehmenszustand, den später jeder Lesepfad mitprüfen müsste.
+    """
+    try:
+        user = await repos["users"].get_by_id(cmd.user_id)
+        if user is None:
+            raise InvalidCredentials()
+        if user.status is not AccountStatus.ACTIVE:
+            # Eine unbestätigte Adresse beweist keine Domain.
+            raise AccountNotConfirmed()
+
+        domain = EmailDomain.from_email(user.email)
+        if await repos["companies"].get_by_domain(domain.value) is not None:
+            raise DomainAlreadyClaimed(domain.value)
+
+        # Company.create prüft den Namen und lehnt Freemail-Domains ab.
+        company = Company.create(name=cmd.name, domain=domain)
+        await repos["companies"].add(company)
+        await repos["memberships"].add(
+            user_id=cmd.user_id, tenant_id=company.id, role=MembershipRole.ADMIN
+        )
+        await repos["audit"].append(
+            AuditEvent(
+                occurred_at=deps["clock"].now(),
+                actor_id=cmd.user_id,
+                # Anders als bei persönlichen Handlungen trägt diese Zeile einen
+                # Tenant: sie betrifft ein Unternehmen (ADR-0017).
+                tenant_id=company.id,
+                action=AuditAction.COMPANY_CREATED,
+                target_id=None,
+                correlation_id=_correlation_id(),
+                metadata={},
+            )
+        )
+    except DomainError as exc:
+        return Result.fail(exc)
+    return Result.ok(company)
+
+
+@dataclass(frozen=True, slots=True)
+class ListMembershipsQuery:
+    user_id: UUID
+
+
+async def handle_list_memberships(
+    query: ListMembershipsQuery, *, deps: dict[str, Any], repos: dict[str, Any]
+) -> Result[list[MembershipView]]:
+    rows = await repos["memberships"].list_for_user_detailed(query.user_id)
+    return Result.ok(rows)
 
 
 async def _publish_user_events(user: User, deps: dict[str, Any]) -> None:
