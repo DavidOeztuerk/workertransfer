@@ -60,6 +60,10 @@ class _FakeUsers:
         self.by_email[user.email.value] = user
         self.by_id[user.id.value] = user
 
+    async def save(self, user: User) -> None:
+        self.by_email[user.email.value] = user
+        self.by_id[user.id.value] = user
+
 
 class _FakeMemberships:
     def __init__(self, members: set[tuple[UUID, UUID]] | None = None) -> None:

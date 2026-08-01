@@ -29,6 +29,8 @@ x-service: &service
   depends_on:
     postgres:
       condition: service_healthy
+    mailpit:
+      condition: service_healthy
   volumes:
     - ./:/app
     # Anonymous volume: keeps the host's .venv (macOS binaries, wrong platform)
@@ -47,6 +49,14 @@ x-service-env: &service-env
   WORKER_JWT_SECRET: ${WORKER_JWT_SECRET:-dev-only-secret-change-me-in-production-32bytes}
   # The browser origin of the Vite dev server. Comma-separated is accepted.
   WORKER_CORS_ALLOW_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+  # Mail goes to the catcher, never outward. No credentials: Mailpit speaks no
+  # AUTH, and the mailer only calls login() when both are set.
+  WORKER_SMTP_HOST: mailpit
+  WORKER_SMTP_PORT: "1025"
+  WORKER_MAIL_FROM: noreply@workertransfer.local
+  # The base for confirmation links — must be what the BROWSER can reach, not a
+  # compose service name.
+  WORKER_PUBLIC_WEB_URL: ${WORKER_PUBLIC_WEB_URL:-http://localhost:5173}
 
 services:
   postgres:
@@ -70,6 +80,21 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  mailpit:
+    # Fängt jede ausgehende Mail ab und zeigt sie unter :8025. Kein Versand nach
+    # außen — eine Entwicklungsumgebung darf niemanden anschreiben.
+    image: axllent/mailpit:latest
+    container_name: workertransfer-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP — hier hinein sprechen die Services
+      - "8025:8025" # Weboberfläche — hier liest man die Mails
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   identity-service:
     <<: *service

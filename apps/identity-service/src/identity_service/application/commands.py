@@ -208,6 +208,9 @@ async def handle_verify_email(
         if user is None:
             raise TokenInvalid()
         user.activate(now=now)
+        # Ohne save() bliebe die Freischaltung im Arbeitsspeicher: das Aggregat
+        # kommt losgelöst aus dem Repository.
+        await repos["users"].save(user)
         await repos["tokens"].consume(record.token_id, now)
         await repos["audit"].append(
             AuditEvent(
