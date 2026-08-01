@@ -790,17 +790,49 @@ class EmailVerified(DomainEvent):
     COMPANY_CREATED = "company_created"
 ```
 
-- [ ] **Step 5: Run the identity unit tests**
+- [ ] **Step 5: Repair the tests this change breaks — in this task**
+
+`handle_register` liefert ab jetzt ein `PENDING`-Konto, also scheitert jeder
+bestehende Test in `test_commands.py`, der nach dem Registrieren sofort
+anmeldet (Login-, Refresh- und Revoke-Tests, rund ein halbes Dutzend).
+
+**Jeder Commit bleibt grün** — ein rot committeter Task würde CI brechen und den
+nächsten Task auf einer kaputten Basis starten. Deshalb hier ein Helfer in
+`test_commands.py` einführen und an allen betroffenen Stellen einsetzen:
+
+```python
+async def _register_active(repos: dict[str, Any], deps: dict[str, Any], email: str) -> User:
+    """Registrieren und sofort freischalten.
+
+    Die E-Mail-Bestätigung hat ihre eigenen Tests; diese hier prüfen Login,
+    Refresh und Revoke und wollen nur ein benutzbares Konto.
+    """
+    res = await handle_register(
+        RegisterUserCommand(email=email, password="strongpassword1", display_name="X"),
+        deps=deps,
+        repos=repos,
+    )
+    user: User = res.value
+    user.activate(now=deps["clock"].now())
+    return user
+```
+
+Die betroffenen Tests rufen statt `handle_register(...)` künftig
+`_register_active(...)` auf. **Nicht** anpassen: die Registrierungstests selbst —
+die sollen `PENDING` sehen.
+
+- [ ] **Step 6: Run the identity unit tests**
 
 Run: `uv run pytest apps/identity-service/tests/unit -v`
-Expected: PASS. **Erwartete Folgefehler:** `test_commands.py` erwartet an mehreren Stellen ein sofort anmeldbares Konto. Diese Tests in Task 5 mitziehen — hier zunächst nur `test_user.py` grün machen und die anderen mit `-k` ausklammern, falls nötig.
+Expected: PASS, **keine** Fehler. Wenn hier etwas rot ist, ist der Task nicht fertig.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add apps/identity-service/src/identity_service/domain/user.py \
         apps/identity-service/src/identity_service/domain/audit.py \
-        apps/identity-service/tests/unit/test_user.py
+        apps/identity-service/tests/unit/test_user.py \
+        apps/identity-service/tests/unit/test_commands.py
 git commit -m "feat(identity): Konten starten PENDING und werden per activate() freigeschaltet"
 ```
 
