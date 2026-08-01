@@ -8,8 +8,11 @@ import {
 } from "@tanstack/react-router";
 
 import { useLogout, useSession } from "./auth/session";
+import { CompanyNewRoute } from "./routes/company-new";
 import { HomeRoute } from "./routes/home";
 import { LoginRoute } from "./routes/login";
+import { RegisterRoute } from "./routes/register";
+import { VerifyRoute } from "./routes/verify";
 
 export function RootLayout() {
   const router = useRouter();
@@ -29,12 +32,22 @@ export function RootLayout() {
             </button>
           </>
         ) : current !== "/login" ? (
-          <Link to="/login">Anmelden</Link>
+          <>
+            <Link to="/login">Anmelden</Link>
+            <Link to="/register">Registrieren</Link>
+          </>
         ) : null}
       </nav>
       <Outlet />
     </>
   );
+}
+
+function CompanyNewWithSession() {
+  // The route needs the principal; the component takes it as a prop so it stays
+  // testable without a live session.
+  const { user } = useSession();
+  return <CompanyNewRoute principal={user} />;
 }
 
 const rootRoute = createRootRoute({ component: RootLayout });
@@ -45,7 +58,29 @@ const loginRoute = createRoute({
   component: LoginRoute,
 });
 
-const routeTree = rootRoute.addChildren([homeRoute, loginRoute]);
+const registerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/register",
+  component: RegisterRoute,
+});
+const verifyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/verify",
+  component: VerifyRoute,
+});
+const companyNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/company/new",
+  component: CompanyNewWithSession,
+});
+
+const routeTree = rootRoute.addChildren([
+  homeRoute,
+  loginRoute,
+  registerRoute,
+  verifyRoute,
+  companyNewRoute,
+]);
 
 export const router = createRouter({ routeTree });
 

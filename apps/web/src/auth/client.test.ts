@@ -61,7 +61,7 @@ describe("fetchMe", () => {
   it("returns the principal on 200", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => ok({ user_id: "u", tenant_id: "t", roles: ["user"] }))
+      vi.fn(async () => ok({ user_id: "u", email: "a@b.com", tenant_id: "t", roles: ["user"] }))
     );
     const me = await fetchMe();
     expect(me?.tenant_id).toBe("t");
