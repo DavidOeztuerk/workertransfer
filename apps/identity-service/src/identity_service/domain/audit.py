@@ -28,6 +28,8 @@ class AuditAction(StrEnum):
     # including the refusals, which are the interesting ones.
     TENANT_SWITCH = "tenant_switch"
     TENANT_SWITCH_DENIED = "tenant_switch_denied"
+    EMAIL_VERIFIED = "email_verified"
+    COMPANY_CREATED = "company_created"
 
 
 # Only non-PII technical metadata may be recorded. Passwords, emails,

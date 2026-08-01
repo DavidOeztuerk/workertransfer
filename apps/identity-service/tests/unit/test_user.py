@@ -4,6 +4,8 @@ import pytest
 from identity_service.domain.user import (
     AccountDisabled,
     AccountStatus,
+    AlreadyActive,
+    EmailNotConfirmed,
     User,
     UserLoggedIn,
     UserRegistered,
@@ -28,14 +30,16 @@ def _now() -> datetime:
     return datetime(2026, 7, 16, 12, 0, 0, tzinfo=UTC)
 
 
-def test_register_creates_active_user_with_event() -> None:
+def test_register_creates_pending_user_with_event() -> None:
+    # Email confirmation gates activation now — a freshly registered account
+    # is not usable until activate() runs (see test_activate_* below).
     user = User.register(
         email=Email("alice@example.com"),
         password_hash=PasswordHash("$2b$12$x"),
         display_name="Alice",
         now=_now(),
     )
-    assert user.status is AccountStatus.ACTIVE
+    assert user.status is AccountStatus.PENDING
     assert user.email == Email("alice@example.com")
     assert isinstance(user.id, UserId)
     events = user.pull_events()
@@ -99,3 +103,72 @@ def test_record_login_emits_event_and_does_not_store_password() -> None:
     assert login_events[0].jti == "jti-1"
     # the event payload never carries the password or plaintext:
     assert "password" not in login_events[0].to_dict()
+
+
+async def test_registration_starts_pending() -> None:
+    user = User.register(
+        email=Email("p@example.com"),
+        password_hash=PasswordHash("$2b$12$p"),
+        display_name="P",
+        now=_now(),
+    )
+
+    assert user.status is AccountStatus.PENDING
+
+
+async def test_activate_makes_the_account_usable_and_emits_an_event() -> None:
+    user = User.register(
+        email=Email("q@example.com"),
+        password_hash=PasswordHash("$2b$12$q"),
+        display_name="Q",
+        now=_now(),
+    )
+    user.pull_events()
+
+    user.activate(now=_now())
+
+    assert user.status is AccountStatus.ACTIVE
+    events = user.pull_events()
+    assert [type(e).__name__ for e in events] == ["EmailVerified"]
+
+
+async def test_activating_twice_is_refused() -> None:
+    user = User.register(
+        email=Email("r@example.com"),
+        password_hash=PasswordHash("$2b$12$r"),
+        display_name="R",
+        now=_now(),
+    )
+    user.activate(now=_now())
+
+    with pytest.raises(AlreadyActive):
+        user.activate(now=_now())
+
+
+async def test_a_pending_account_is_refused_with_a_distinguishable_error() -> None:
+    # EmailNotConfirmed statt AccountDisabled: der Router braucht den
+    # Unterschied, um 403 statt 401 zu antworten (Spec §4.4). Ein gesperrtes
+    # Konto und ein unbestätigtes sind nicht dasselbe Problem.
+    user = User.register(
+        email=Email("s@example.com"),
+        password_hash=PasswordHash("$2b$12$s"),
+        display_name="S",
+        now=_now(),
+    )
+
+    with pytest.raises(EmailNotConfirmed):
+        user.assert_can_log_in()
+
+
+async def test_a_disabled_account_stays_generic() -> None:
+    user = User.register(
+        email=Email("t@example.com"),
+        password_hash=PasswordHash("$2b$12$t"),
+        display_name="T",
+        now=_now(),
+    )
+    user.activate(now=_now())
+    user.status = AccountStatus.DISABLED
+
+    with pytest.raises(AccountDisabled):
+        user.assert_can_log_in()

@@ -113,6 +113,19 @@ async def test_x_tenant_id_header_ignored_in_production_mode(
         )
         assert register.status_code == 201, register.text
 
+        # Email confirmation is a later task; activate directly via the DB so
+        # this test can still exercise login end to end — same seam used below
+        # for the out-of-band membership grant.
+        activate_engine = create_async_engine(postgres_url)
+        try:
+            async with activate_engine.begin() as conn:
+                await conn.execute(
+                    text("UPDATE users SET status = 'active' WHERE email = :email"),
+                    {"email": "tenant-source@example.com"},
+                )
+        finally:
+            await activate_engine.dispose()
+
         login = await client.post(
             "/auth/login",
             json={"email": "tenant-source@example.com", "password": "strongpassword1"},

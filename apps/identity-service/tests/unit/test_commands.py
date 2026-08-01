@@ -236,16 +236,9 @@ async def test_login_success_returns_token_pair_and_persists_session_audit() -> 
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
     }
-    # Seed a registered user directly into the fake users repo.
-    await handle_register(
-        RegisterUserCommand(
-            email="alice@example.com",
-            password="strongpassword1",
-            display_name="Alice",
-        ),
-        deps=_deps(clock, tokens, bus, hasher),
-        repos=repos,
-    )
+    # Seed a registered, activated user directly into the fake users repo —
+    # login requires a confirmed account since Task 4.
+    await _register_active(repos, _deps(clock, tokens, bus, hasher), "alice@example.com")
     repos["audit"].events.clear()
     bus.published.clear()
 
@@ -378,15 +371,7 @@ async def test_refresh_rotates_jti_and_revokes_old_session() -> None:
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
     }
-    await handle_register(
-        RegisterUserCommand(
-            email="rob@example.com",
-            password="strongpassword1",
-            display_name="Rob",
-        ),
-        deps=_deps(clock, tokens, bus, hasher),
-        repos=repos,
-    )
+    await _register_active(repos, _deps(clock, tokens, bus, hasher), "rob@example.com")
     login = await handle_login(
         AuthenticateUserCommand(email="rob@example.com", password="strongpassword1"),
         deps=_deps(clock, tokens, bus, hasher),
@@ -427,15 +412,7 @@ async def test_refresh_rejects_revoked_session() -> None:
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
     }
-    await handle_register(
-        RegisterUserCommand(
-            email="x@example.com",
-            password="strongpassword1",
-            display_name="X",
-        ),
-        deps=_deps(clock, tokens, bus, hasher),
-        repos=repos,
-    )
+    await _register_active(repos, _deps(clock, tokens, bus, hasher), "x@example.com")
     login = await handle_login(
         AuthenticateUserCommand(email="x@example.com", password="strongpassword1"),
         deps=_deps(clock, tokens, bus, hasher),
@@ -490,15 +467,7 @@ async def test_revoke_revokes_session_and_is_idempotent() -> None:
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
     }
-    await handle_register(
-        RegisterUserCommand(
-            email="y@example.com",
-            password="strongpassword1",
-            display_name="Y",
-        ),
-        deps=_deps(clock, tokens, bus, hasher),
-        repos=repos,
-    )
+    await _register_active(repos, _deps(clock, tokens, bus, hasher), "y@example.com")
     login = await handle_login(
         AuthenticateUserCommand(email="y@example.com", password="strongpassword1"),
         deps=_deps(clock, tokens, bus, hasher),
@@ -541,6 +510,28 @@ async def _register(repos: dict[str, Any], deps: dict[str, Any], email: str) -> 
     return user
 
 
+async def _register_active(repos: dict[str, Any], deps: dict[str, Any], email: str) -> User:
+    """Registrieren und sofort freischalten.
+
+    Die E-Mail-Bestätigung hat ihre eigenen Tests; diese hier prüfen Login,
+    Refresh und Revoke und wollen nur ein benutzbares Konto.
+    """
+    res = await handle_register(
+        RegisterUserCommand(email=email, password="strongpassword1", display_name="X"),
+        deps=deps,
+        repos=repos,
+    )
+    user: User = res.value
+    user.activate(now=deps["clock"].now())
+    # A real command handler would persist + publish activation in its own
+    # transaction before login's transaction ever reloads the user. _FakeUsers
+    # hands back the same in-memory instance instead of a fresh aggregate, so
+    # EmailVerified would otherwise still be sitting unpublished and leak into
+    # whatever the caller's next handler (login) publishes. Drain it here.
+    user.pull_events()
+    return user
+
+
 async def test_login_issues_a_token_without_a_tenant() -> None:
     # A person logging in is not acting for any company yet.
     tokens = _FakeTokens()
@@ -552,7 +543,7 @@ async def test_login_issues_a_token_without_a_tenant() -> None:
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
     }
-    await _register(repos, deps, "solo@example.com")
+    await _register_active(repos, deps, "solo@example.com")
 
     res = await handle_login(
         AuthenticateUserCommand(email="solo@example.com", password="strongpassword1"),
@@ -575,7 +566,7 @@ async def test_switching_to_a_company_you_belong_to_mints_a_tenant_token() -> No
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
     }
-    user = await _register(repos, deps, "recruiter@example.com")
+    user = await _register_active(repos, deps, "recruiter@example.com")
     tenant = uuid4()
     repos["memberships"].members.add((user.id.value, tenant))
     repos["audit"].events.clear()
@@ -629,7 +620,7 @@ async def test_membership_of_one_company_does_not_grant_another() -> None:
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
     }
-    user = await _register(repos, deps, "multi@example.com")
+    user = await _register_active(repos, deps, "multi@example.com")
     allowed, forbidden = uuid4(), uuid4()
     repos["memberships"].members.add((user.id.value, allowed))
 
@@ -656,7 +647,7 @@ async def test_the_tenant_session_is_separate_from_the_person_session() -> None:
         "sessions": _FakeSessions(),
         "audit": _FakeAudit(),
     }
-    user = await _register(repos, deps, "two@example.com")
+    user = await _register_active(repos, deps, "two@example.com")
     tenant = uuid4()
     repos["memberships"].members.add((user.id.value, tenant))
     await handle_login(
