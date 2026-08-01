@@ -7,36 +7,33 @@ from uuid import UUID
 
 from fastapi import APIRouter, Cookie, HTTPException, Request, Response, status
 from pydantic import BaseModel
+from worker_contracts import RegisterUserV1, ResendVerificationV1, VerifyEmailV1
 
 from identity_service.application.commands import (
     AuthenticateUserCommand,
     RefreshTokenCommand,
     RegisterUserCommand,
+    ResendVerificationCommand,
     RevokeTokenCommand,
     SwitchTenantCommand,
+    VerifyEmailCommand,
     handle_login,
     handle_refresh,
     handle_register,
+    handle_resend,
     handle_revoke,
     handle_switch_tenant,
+    handle_verify_email,
 )
 from identity_service.application.ports import TokenPair
 from identity_service.domain.membership import NotAMember
 from identity_service.domain.user import (
     AccountDisabled,
+    EmailNotConfirmed,
     InvalidCredentials,
-    UserAlreadyExists,
 )
+from identity_service.domain.verification import TokenExpired
 from identity_service.presentation.auth_middleware import get_request_user
-
-
-class RegisterBody(BaseModel):
-    # No tenant_id: a tenant is a company, registering is an act of a person
-    # (ADR-0017) — and a client-supplied tenant would be exactly the trust
-    # problem product-scope.md forbids for headers.
-    email: str
-    password: str
-    display_name: str
 
 
 class LoginBody(BaseModel):
@@ -71,17 +68,20 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
         )
 
     @router.post("/register", status_code=status.HTTP_201_CREATED)
-    async def register(body: RegisterBody) -> dict[str, str]:
+    async def register(body: RegisterUserV1) -> dict[str, str]:
         cmd = RegisterUserCommand(body.email, body.password, body.display_name)
         async with request_scope(session_factory) as (_uow, repos):
             result = await handle_register(cmd, deps=deps, repos=repos)
         if not result.is_success:
             err = result.error
-            if isinstance(err, UserAlreadyExists):
-                raise HTTPException(status.HTTP_409_CONFLICT, "user already exists")
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST, err.message if err is not None else "invalid"
             )
+        # Auch bei bereits vergebener Adresse: identische Antwort, kein 409.
+        # Ein 409 beantwortet "ist diese Person hier?" ohne den Consent-Ledger
+        # zu fragen (product-scope.md) — auf einem Transfermarkt genau die
+        # Information, die jemanden den Arbeitsplatz kosten kann. Der echte
+        # Besitzer bekommt stattdessen eine Warnmail.
         return {"status": "registered"}
 
     @router.post("/login")
@@ -91,6 +91,11 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
             result = await handle_login(cmd, deps=deps, repos=repos)
         if not result.is_success:
             err = result.error
+            if isinstance(err, EmailNotConfirmed):
+                # Bei korrektem Passwort verrät das nichts, was das Passwort
+                # nicht ohnehin beweist — und ohne diesen Fall wäre ein
+                # unbestätigtes Konto eine Sackgasse.
+                raise HTTPException(status.HTTP_403_FORBIDDEN, "email not confirmed")
             if isinstance(err, (InvalidCredentials, AccountDisabled)):
                 raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
             raise HTTPException(
@@ -98,6 +103,30 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
             )
         _set_cookies(response, result.value)
         return {"status": "ok"}
+
+    @router.post("/verify-email")
+    async def verify_email(body: VerifyEmailV1) -> dict[str, str]:
+        async with request_scope(session_factory) as (_uow, repos):
+            result = await handle_verify_email(
+                VerifyEmailCommand(token=body.token), deps=deps, repos=repos
+            )
+        if not result.is_success:
+            if isinstance(result.error, TokenExpired):
+                # 410 statt 400, damit die Oberfläche gezielt "erneut senden"
+                # anbieten kann. Der Token kennt ohnehin nur der Empfänger, die
+                # Unterscheidung verrät also nichts.
+                raise HTTPException(status.HTTP_410_GONE, "confirmation link expired")
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid confirmation link")
+        return {"status": "ok"}
+
+    @router.post("/resend-verification", status_code=status.HTTP_202_ACCEPTED)
+    async def resend(body: ResendVerificationV1) -> dict[str, str]:
+        # Immer 202 — auch bei unbekannter Adresse und bei längst bestätigtem
+        # Konto. Sonst wäre dieser Endpunkt der Enumerationskanal, den
+        # /auth/register gerade schließt.
+        async with request_scope(session_factory) as (_uow, repos):
+            await handle_resend(ResendVerificationCommand(email=body.email), deps=deps, repos=repos)
+        return {"status": "accepted"}
 
     @router.post("/refresh")
     async def refresh(
@@ -118,7 +147,7 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
         _set_cookies(response, result.value)
         return {"status": "ok"}
 
-    @router.post("/tenant/{tenant_id}")
+    @router.post("/company/{tenant_id}")
     async def switch_tenant(
         tenant_id: UUID, request: Request, response: Response
     ) -> dict[str, str]:
@@ -164,4 +193,4 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
     return router
 
 
-__all__ = ["LoginBody", "RegisterBody", "build_auth_router"]
+__all__ = ["LoginBody", "build_auth_router"]
