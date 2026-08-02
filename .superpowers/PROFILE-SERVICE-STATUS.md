@@ -28,7 +28,7 @@
 - [x] 8 Contracts-DTOs + HTTP-Endpunkte
 - [x] 9 Integrationstests (Docker) inkl. Widerruf wirkt sofort
 - [x] 10 Frontend: Profil bearbeiten + Sichtbarkeit schalten (TDD)
-- [ ] 11 Frontend: Kandidatenliste für Unternehmen (TDD)
+- [x] 11 Frontend: Kandidatenliste für Unternehmen (TDD)
 - [ ] 12 Playwright-E2E, self-skip ohne laufenden Stack
 - [ ] 13 scripts/validate.sh — ein Befehl, der alles prüft und den Stand meldet
 - [ ] 14 ADR-0020 + ROADMAP/CLAUDE.md nachziehen
@@ -81,3 +81,8 @@
   fehlschlagenden Test, nicht aus Politur: das Formular rendert nicht mehr leer
   und füllt sich nach — wer in der Lücke tippt, verliert sonst die Eingabe.
   Je Dienst eine eigene VITE_-Basis-URL (8001/8002/8003). 66 Frontend-Tests.
+- 11 Kandidatenliste: listCandidates (5 Tests) + Route (7 Tests). Vier
+  unterscheidbare Fehlergründe statt einer Meldung, weil die Seite auf jeden
+  anders antwortet. 503 zeigt nichts statt einer leeren Liste — eine leere Liste
+  wäre eine Behauptung über Menschen. Keine Gesamtzahl: sie verriete, wie viele
+  gerade NICHT freigegeben sind. 78 Frontend-Tests.

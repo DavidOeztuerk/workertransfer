@@ -114,6 +114,68 @@ export async function saveMyProfile(input: ProfileInput): Promise<SaveResult> {
   return { ok: true, profile: (await res.json()) as Profile };
 }
 
+export type CandidatePage =
+  | { ok: true; items: Profile[]; nextCursor: string | null }
+  | {
+      ok: false;
+      reason: "no-company" | "unauthenticated" | "consent-unavailable" | "offline";
+      message: string;
+    };
+
+/**
+ * Eine Seite freigegebener Profile — nur für Unternehmen.
+ *
+ * Die Gründe sind unterscheidbar, weil die Seite auf jeden davon anders
+ * antwortet: „kein Unternehmen aktiv" ist behebbar (umschalten), „Ledger
+ * schweigt" ist es nicht, und eine leere Seite ist überhaupt kein Fehler.
+ * Alles in eine Meldung zu werfen würde die Person raten lassen, was zu tun ist.
+ */
+export async function listCandidates(cursor?: string): Promise<CandidatePage> {
+  const url = cursor
+    ? `${PROFILE_BASE_URL}/profiles?cursor=${encodeURIComponent(cursor)}`
+    : `${PROFILE_BASE_URL}/profiles`;
+  let res: Response;
+  try {
+    res = await fetch(url, { credentials: "include" });
+  } catch {
+    return { ok: false, reason: "offline", message: "Keine Verbindung zum Server." };
+  }
+
+  if (res.status === 401) {
+    return {
+      ok: false,
+      reason: "unauthenticated",
+      message: "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
+    };
+  }
+  if (res.status === 403) {
+    return {
+      ok: false,
+      reason: "no-company",
+      message: "Profile sehen nur Unternehmen. Wechsle oben auf ein Unternehmen.",
+    };
+  }
+  if (res.status === 503) {
+    // Nicht als leere Liste zeigen: das wäre die Behauptung, niemand habe
+    // freigegeben — und genau das weiß in diesem Moment niemand.
+    return {
+      ok: false,
+      reason: "consent-unavailable",
+      message: "Der Consent-Ledger antwortet gerade nicht. Wir zeigen lieber nichts als das Falsche.",
+    };
+  }
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason: "offline",
+      message: await problemMessage(res, "Die Liste konnte nicht geladen werden."),
+    };
+  }
+
+  const body = (await res.json()) as { items?: Profile[]; next_cursor?: string | null };
+  return { ok: true, items: body.items ?? [], nextCursor: body.next_cursor ?? null };
+}
+
 /**
  * Ist das Profil dieser Person freigegeben?
  *

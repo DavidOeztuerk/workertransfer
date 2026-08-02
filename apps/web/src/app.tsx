@@ -10,6 +10,7 @@ import { Button } from "@workertransfer/ui";
 
 import { useCompanies, useSwitchCompany } from "./auth/companies";
 import { useLogout, useSession } from "./auth/session";
+import { CandidatesRoute } from "./routes/candidates";
 import { CompanyNewRoute } from "./routes/company-new";
 import { HomeRoute } from "./routes/home";
 import { LoginRoute } from "./routes/login";
@@ -55,6 +56,11 @@ export function RootLayout() {
               <Link className="site-header__link" to="/profile">
                 Mein Profil
               </Link>
+              {user.tenant_id !== null ? (
+                <Link className="site-header__link" to="/candidates">
+                  Kandidaten
+                </Link>
+              ) : null}
               <Link className="site-header__link" to="/company/new">
                 Unternehmen anlegen
               </Link>
@@ -121,6 +127,11 @@ function ProfileWithSession() {
   return <ProfileRoute principal={user} />;
 }
 
+function CandidatesWithSession() {
+  const { user } = useSession();
+  return <CandidatesRoute principal={user} />;
+}
+
 function CompanyNewWithSession() {
   // The route needs the principal; the component takes it as a prop so it stays
   // testable without a live session.
@@ -151,6 +162,11 @@ const profileRoute = createRoute({
   path: "/profile",
   component: ProfileWithSession,
 });
+const candidatesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/candidates",
+  component: CandidatesWithSession,
+});
 const companyNewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/company/new",
@@ -163,6 +179,7 @@ const routeTree = rootRoute.addChildren([
   registerRoute,
   verifyRoute,
   profileRoute,
+  candidatesRoute,
   companyNewRoute,
 ]);
 

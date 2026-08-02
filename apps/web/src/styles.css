@@ -467,3 +467,41 @@ h1 {
   display: grid;
   gap: 1.1rem;
 }
+
+/* Kandidatenliste: Karten in einer flexiblen Spaltenzahl, damit die Seite auf
+   dem Laptop nicht zu einer endlosen Kolonne wird. */
+.candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+}
+
+.candidates__headline {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.candidates__meta {
+  margin: 0 0 0.6rem;
+  color: var(--wt-muted);
+  font-size: 0.85rem;
+}
+
+.candidates__skills {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.candidates__skills li {
+  border: 1px solid var(--wt-border, #d6d3cd);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.78rem;
+}
