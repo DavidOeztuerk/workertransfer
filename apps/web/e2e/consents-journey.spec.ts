@@ -90,6 +90,10 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
 
   await recruiter.goto("/candidates");
   const card = recruiter.locator("li").filter({ hasText: headline });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(card).toBeVisible();
   // Erst warten, dann klicken. `click()` hat nur das actionTimeout (15 s);
   // unter Last — elf Container, Vite und Chromium auf einer Maschine — braucht
   // die Kandidatenliste länger, und der Test scheiterte am Klick statt am
@@ -100,6 +104,10 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
 
   await candidate.goto("/markt");
   const row = candidate.locator("li").filter({ hasText: /ob du ansprechbar bist/i });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(row).toBeVisible();
   await row.getByRole("button", { name: /Freigeben/i }).click();
   await expect(row.getByText(/Freigegeben/i)).toBeVisible();
 
@@ -110,11 +118,19 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
 
   // Zurückziehen wirkt sofort — der nächste Zugriff des Unternehmens ist leer.
   const marketEntry = candidate.locator("li").filter({ hasText: "Marktstatus ·" });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(marketEntry).toBeVisible();
   await marketEntry.getByRole("button", { name: /Zurückziehen/i }).click();
   await expect(candidate.getByText(new RegExp(`Marktstatus · ${companyName}`))).toHaveCount(0);
 
   await recruiter.goto("/candidates");
   const afterCard = recruiter.locator("li").filter({ hasText: headline });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(afterCard).toBeVisible();
   await expect(afterCard.getByText(/Marktstatus gerade nicht einsehbar/)).toBeVisible();
 
   // Das Profil steht weiterhin da: zurückgezogen wurde genau eine Freigabe.
@@ -191,4 +207,42 @@ test("die Suche findet nur, was freigegeben ist", async ({ browser }) => {
   await visibleContext.close();
   await hiddenContext.close();
   await recruiterContext.close();
+});
+
+
+test("die Auskunft nennt jeden Abschnitt — auch die leeren", async ({ browser }) => {
+  const email = uniqueEmail("kandidat.example");
+  const stamp = Date.now();
+  const headline = `E2E Auskunft ${stamp}`;
+
+  const context = await browser.newContext();
+  const person = await context.newPage();
+  await registerAndConfirm(person, email, "E2E Auskunft");
+  await login(person, email);
+
+  await person.goto("/profile");
+  await person.getByLabel(/Überschrift/i).fill(headline);
+  await person.getByRole("button", { name: /Speichern/i }).click();
+  await expect(person.getByText(/Profil gespeichert/i)).toBeVisible();
+  await person.getByRole("switch").click();
+  await expect(person.getByRole("switch")).toBeChecked();
+
+  await person.goto("/meine-daten");
+
+  // Jeder Abschnitt steht da — auch die, zu denen es nichts gibt. „Kein
+  // Lebenslauf" ist eine Auskunft und fehlt sonst.
+  await expect(person.getByText(/^profil — enthalten$/)).toBeVisible();
+  await expect(person.getByText(/^lebenslauf — enthalten$/)).toBeVisible();
+  await expect(person.getByText(/^portfolio — enthalten$/)).toBeVisible();
+  await expect(person.getByText(/^freigaben verlauf — enthalten$/)).toBeVisible();
+  // Nichts fehlt: bei laufendem Stack gibt es keine Warnung.
+  await expect(person.getByRole("alert")).toHaveCount(0);
+
+  // Die Datei entsteht im Browser — der Download beweist, dass sie zustande kommt.
+  const download = person.waitForEvent("download");
+  await person.getByRole("button", { name: /Als JSON herunterladen/i }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/^workertransfer-meine-daten-\d{4}-\d{2}-\d{2}\.json$/);
+
+  await context.close();
 });

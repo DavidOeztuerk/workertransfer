@@ -11,6 +11,7 @@ Deliberately free of domain types: a consumer must not need to import
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -20,6 +21,7 @@ __all__ = [
     "ConsentCheckV1",
     "ConsentGrantV1",
     "ConsentGrantedV1",
+    "ConsentHistoryEntryV1",
     "ConsentRevokeV1",
     "ConsentStateV1",
 ]
@@ -103,3 +105,19 @@ class ConsentGrantedV1(BaseModel):
 
     capability: str
     granted_at: datetime
+
+
+class ConsentHistoryEntryV1(BaseModel):
+    """Ein Ereignis aus der eigenen Geschichte.
+
+    MIT `reason` — anders als `ConsentGrantedV1` und `ConsentCheckResultV1`. Der
+    Widerrufsgrund ist Freitext, den die Person über sich selbst geschrieben
+    hat; ihr gegenüber gibt es keinen Grund, ihn zurückzuhalten. Nach außen
+    bleibt er verborgen. Das ist der Unterschied zwischen „gehört ihr" und
+    „geht andere an".
+    """
+
+    capability: str
+    action: Literal["GRANT", "REVOKE", "DELETE"]
+    recorded_at: datetime
+    reason: str | None = None

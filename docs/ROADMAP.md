@@ -583,7 +583,44 @@ Sonst wäre es eine Liste, und Listen übersieht man. Und schlägt eine Abfrage
 fehl, sagt die Seite das, statt „nichts liegt an" zu behaupten: das ist die eine
 Aussage, die nach einem Fehler falsch sein kann und in Sicherheit wiegt.
 
+### Querschnitt — „Meine Daten" ✅ (02.08.2026)
+
+[Design](superpowers/specs/2026-08-02-my-data-design.md).
+Eine Person konnte sehr genau steuern, wer was sieht — aber nicht sehen, **was
+überhaupt über sie gespeichert ist**, und es nicht mitnehmen. Bei einer
+Plattform, deren These „du entscheidest" lautet, die auffälligste verbliebene
+Lücke: wer nicht weiß, was da ist, entscheidet über etwas, das er nicht kennt.
+
+Zwölf Abschnitte aus acht Diensten, **zusammengesetzt im Browser** (ADR-0004),
+als JSON zum Mitnehmen. Ein neuer Endpunkt: `GET /consent/me/history`.
+
+**Die Geschichte gehört in die Auskunft, nicht in die Übersicht.**
+`/consent/me` zeigt bewusst nur, was gilt — eine Historie verrät, wer *einmal*
+gefragt hat. In einer Auskunft an die betroffene Person ist genau das richtig,
+inklusive Widerrufsgrund: nach außen bleibt er verborgen, ihr gegenüber gibt es
+keinen Grund dafür.
+
+**Die tragende Eigenschaft:** ein fehlender Abschnitt wird nicht weggelassen,
+sondern als fehlend ausgewiesen — und die Seite sagt es vor dem Herunterladen.
+Stillschweigend auszulassen wäre hier der schlimmste Fehler: die Datei sähe
+vollständig aus.
+
 ### Weiterhin offen, quer durch alle Phasen
+
+- **Ein E2E-Wackelkandidat ist offen: die Anmeldung.** Bei einem Lauf über die
+  ganze Suite (rund fünf Minuten, elf Container, Vite und Chromium auf einer
+  Maschine) scheitert gelegentlich ein Test daran, dass nach dem Anmelden der
+  Link „Mein Profil" nicht erscheint — 30 Sekunden lang gar nicht im DOM.
+  Derselbe Test läuft allein in Sekunden durch.
+  Ein **zweiter**, anderer Wackler ist behoben: Klicks auf Listeneinträge hatten
+  nur das `actionTimeout` (15 s) statt des expect-Budgets. 15 Stellen warten
+  jetzt erst auf den Eintrag.
+  Der Verdacht bei der Anmeldung ist Last (bcrypt mit Kostenfaktor 12 auf einer
+  ausgelasteten Maschine), **belegt ist er nicht**. Der nächste Schritt wäre,
+  die Anmelde-Hilfe so zu ändern, dass sie bei einem Fehlschlag die Meldung der
+  Seite zeigt, statt blind in die Zeitüberschreitung zu laufen — dann sagt der
+  übernächste Fehlschlag, woran es lag. `scripts/validate.sh` zählt die
+  Wackelkandidaten und nennt sie, damit sie nicht lautlos verschwinden.
 
 - **Kein S3-Backend**, solange keine Umgebung eines braucht (ADR-0021).
 - **Keine personalisierten Karriere-Seiten** (siehe 4.4).

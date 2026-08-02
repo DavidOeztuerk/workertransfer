@@ -66,6 +66,10 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   await recruiter.getByLabel(/Beschreibung/i).fill("Was zu tun ist.");
   await recruiter.getByRole("button", { name: /Entwurf anlegen/i }).click();
   const jobRow = recruiter.locator("li").filter({ hasText: jobTitle });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(jobRow).toBeVisible();
   await jobRow.getByRole("button", { name: /Veröffentlichen/i }).click();
   await expect(jobRow.getByText("Veröffentlicht")).toBeVisible();
 
@@ -89,6 +93,10 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   await candidate.getByLabel(/Suchbegriff/i).fill(jobTitle);
   await candidate.getByRole("button", { name: /Suchen/i }).click();
   const jobCard = candidate.locator("li").filter({ hasText: jobTitle });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(jobCard).toBeVisible();
   await jobCard.getByRole("button", { name: /^Bewerben$/ }).click();
   await jobCard.getByRole("button", { name: /Bewerbung abschicken/i }).click();
   await expect(jobCard.getByText(/Bewerbung abgeschickt/i)).toBeVisible();
@@ -100,6 +108,10 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   // Zurückziehen.
   await candidate.goto("/applications");
   const applicationRow = candidate.locator("li").filter({ hasText: /Abgeschickt/ });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(applicationRow).toBeVisible();
   await applicationRow.getByRole("button", { name: /Zurückziehen/i }).click();
   await expect(candidate.getByText(/sieht deine Daten nicht mehr/i)).toBeVisible();
 
