@@ -612,3 +612,11 @@ h1 {
   color: var(--wt-muted);
   font-size: 0.8rem;
 }
+
+/* Suchfilter: nebeneinander, solange Platz ist. */
+.jobs__filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1rem;
+  align-items: end;
+}
