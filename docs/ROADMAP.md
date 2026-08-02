@@ -607,6 +607,21 @@ vollständig aus.
 
 ### Weiterhin offen, quer durch alle Phasen
 
+- **Ein E2E-Wackelkandidat ist offen: die Anmeldung.** Bei einem Lauf über die
+  ganze Suite (rund fünf Minuten, elf Container, Vite und Chromium auf einer
+  Maschine) scheitert gelegentlich ein Test daran, dass nach dem Anmelden der
+  Link „Mein Profil" nicht erscheint — 30 Sekunden lang gar nicht im DOM.
+  Derselbe Test läuft allein in Sekunden durch.
+  Ein **zweiter**, anderer Wackler ist behoben: Klicks auf Listeneinträge hatten
+  nur das `actionTimeout` (15 s) statt des expect-Budgets. 15 Stellen warten
+  jetzt erst auf den Eintrag.
+  Der Verdacht bei der Anmeldung ist Last (bcrypt mit Kostenfaktor 12 auf einer
+  ausgelasteten Maschine), **belegt ist er nicht**. Der nächste Schritt wäre,
+  die Anmelde-Hilfe so zu ändern, dass sie bei einem Fehlschlag die Meldung der
+  Seite zeigt, statt blind in die Zeitüberschreitung zu laufen — dann sagt der
+  übernächste Fehlschlag, woran es lag. `scripts/validate.sh` zählt die
+  Wackelkandidaten und nennt sie, damit sie nicht lautlos verschwinden.
+
 - **Kein S3-Backend**, solange keine Umgebung eines braucht (ADR-0021).
 - **Keine personalisierten Karriere-Seiten** (siehe 4.4).
 - **`worker-github` unimportierbar** (`from github import Github`, deklariert ist
