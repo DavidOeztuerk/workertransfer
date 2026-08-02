@@ -4,18 +4,28 @@
 //
 // Je Dienst eine eigene Variable statt eines Gateways: die Dienste laufen auf
 // eigenen Ports und haben eigene Datenbanken (ADR-0004). Ein gemeinsames
-// Präfix würde jetzt eine Zusammenlegung suggerieren, die es nicht gibt.
+// Präfix würde eine Zusammenlegung suggerieren, die es nicht gibt.
 
-function resolve(raw: string | undefined, fallback: string): string {
-  return typeof raw === "string" && raw.length > 0 ? raw : fallback;
+/**
+ * Der Ersatz nimmt den Host der Seite, nicht `127.0.0.1`.
+ *
+ * Cookies unterscheiden `localhost` und `127.0.0.1` als verschiedene Hosts,
+ * Ports dagegen ignorieren sie. Ein fester Ersatz auf `127.0.0.1` liefert
+ * deshalb bei einer Seite auf `localhost` keine Verbindungsfehler, sondern
+ * etwas Schlimmeres: Anfragen ohne Sitzungscookie, die wortlos mit 401
+ * antworten. Genau so ist die E2E-Reise einmal gescheitert — der Dienst lief,
+ * das Token war gültig, und trotzdem war niemand angemeldet.
+ */
+function fallback(port: number): string {
+  const host = typeof window === "undefined" ? "127.0.0.1" : window.location.hostname;
+  return `http://${host}:${port}`;
 }
 
-export const API_BASE_URL = resolve(import.meta.env.VITE_API_BASE_URL, "http://127.0.0.1:8001");
-export const CONSENT_BASE_URL = resolve(
-  import.meta.env.VITE_CONSENT_BASE_URL,
-  "http://127.0.0.1:8002"
-);
-export const PROFILE_BASE_URL = resolve(
-  import.meta.env.VITE_PROFILE_BASE_URL,
-  "http://127.0.0.1:8003"
-);
+function resolve(raw: string | undefined, port: number): string {
+  return typeof raw === "string" && raw.length > 0 ? raw : fallback(port);
+}
+
+export const API_BASE_URL = resolve(import.meta.env.VITE_API_BASE_URL, 8001);
+export const CONSENT_BASE_URL = resolve(import.meta.env.VITE_CONSENT_BASE_URL, 8002);
+export const PROFILE_BASE_URL = resolve(import.meta.env.VITE_PROFILE_BASE_URL, 8003);
+export const RESUME_BASE_URL = resolve(import.meta.env.VITE_RESUME_BASE_URL, 8004);
