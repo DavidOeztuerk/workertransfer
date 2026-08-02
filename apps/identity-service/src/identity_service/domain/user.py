@@ -10,11 +10,14 @@ from uuid import UUID, uuid4
 from worker_core import DomainError, DomainEvent
 
 from identity_service.domain.services import PasswordHashing
-from identity_service.domain.value_objects import Email, PasswordHash, TenantId, UserId
+from identity_service.domain.value_objects import Email, PasswordHash, UserId
 
 __all__ = [
     "AccountDisabled",
     "AccountStatus",
+    "AlreadyActive",
+    "EmailNotConfirmed",
+    "EmailVerified",
     "InvalidCredentials",
     "User",
     "UserAlreadyExists",
@@ -32,9 +35,8 @@ class AccountStatus(StrEnum):
 
 class UserAlreadyExists(DomainError):
     def __init__(self, email: str) -> None:
-        super().__init__(
-            "user_already_exists", f"A user with email {email!r} already exists in this tenant"
-        )
+        # Globally, not per tenant: a person is one account (ADR-0017).
+        super().__init__("user_already_exists", f"A user with email {email!r} already exists")
 
 
 class InvalidCredentials(DomainError):
@@ -47,6 +49,19 @@ class AccountDisabled(DomainError):
         super().__init__("account_disabled", "Account is not active")
 
 
+class AlreadyActive(DomainError):
+    def __init__(self) -> None:
+        super().__init__("already_active", "This account is already confirmed")
+
+
+class EmailNotConfirmed(DomainError):
+    """Unbestätigt ist nicht gesperrt. Der Router bildet das auf 403 ab, damit
+    jemand, der nur die Mail übersehen hat, nicht in einer Sackgasse landet."""
+
+    def __init__(self) -> None:
+        super().__init__("email_not_confirmed", "Confirm your email address to sign in")
+
+
 def _event_dict(event: DomainEvent) -> dict[str, object]:
     return {k: getattr(event, k) for k in event.__dataclass_fields__}
 
@@ -56,7 +71,6 @@ class UserRegistered(DomainEvent):
     # kw_only required: DomainEvent base contributes event_id/occurred_at defaults,
     # own non-default fields would otherwise follow a default (init-ordering error).
     user_id: UUID = field(kw_only=True)
-    tenant_id: UUID = field(kw_only=True)
     email: str = field(
         kw_only=True
     )  # PII: stays in the domain event, never crosses into AuditEvent
@@ -65,7 +79,6 @@ class UserRegistered(DomainEvent):
         base = _event_dict(self)
         base["event_id"] = str(self.event_id)
         base["user_id"] = str(self.user_id)
-        base["tenant_id"] = str(self.tenant_id)
         base["occurred_at"] = self.occurred_at.isoformat()
         return base
 
@@ -73,14 +86,24 @@ class UserRegistered(DomainEvent):
 @dataclass(frozen=True, slots=True)
 class UserLoggedIn(DomainEvent):
     user_id: UUID = field(kw_only=True)
-    tenant_id: UUID = field(kw_only=True)
     jti: str = field(kw_only=True)
 
     def to_dict(self) -> dict[str, object]:
         base = _event_dict(self)
         base["event_id"] = str(self.event_id)
         base["user_id"] = str(self.user_id)
-        base["tenant_id"] = str(self.tenant_id)
+        base["occurred_at"] = self.occurred_at.isoformat()
+        return base
+
+
+@dataclass(frozen=True, slots=True)
+class EmailVerified(DomainEvent):
+    user_id: UUID = field(kw_only=True)
+
+    def to_dict(self) -> dict[str, object]:
+        base = _event_dict(self)
+        base["event_id"] = str(self.event_id)
+        base["user_id"] = str(self.user_id)
         base["occurred_at"] = self.occurred_at.isoformat()
         return base
 
@@ -96,7 +119,6 @@ class User:
     ``self.id.value`` (see ADR-aligned Phase-2 note in the plan, Task 9)."""
 
     id: UserId
-    tenant_id: TenantId
     email: Email
     password_hash: PasswordHash
     display_name: str
@@ -117,24 +139,23 @@ class User:
         email: Email,
         password_hash: PasswordHash,
         display_name: str,
-        tenant_id: TenantId,
         now: datetime,
         roles: tuple[str, ...] = ("user",),
     ) -> User:
+        # No tenant: registering is an act of a natural person (ADR-0017).
+        # Company membership is granted afterwards, in its own aggregate.
         user = cls(
             id=UserId(uuid4()),
-            tenant_id=tenant_id,
             email=email,
             password_hash=password_hash,
             display_name=display_name,
             roles=roles,
-            status=AccountStatus.ACTIVE,  # Phase 2: synchronous activation, no email verification
+            status=AccountStatus.PENDING,  # bestätigt wird per E-Mail-Token
             _events=[],
         )
         user._events.append(
             UserRegistered(
                 user_id=user.id.value,
-                tenant_id=user.tenant_id.value,
                 email=user.email.value,
                 occurred_at=now,
             )
@@ -145,14 +166,22 @@ class User:
         return hasher.verify(plain, self.password_hash)
 
     def assert_can_log_in(self) -> None:
+        if self.status is AccountStatus.PENDING:
+            raise EmailNotConfirmed()
         if self.status is not AccountStatus.ACTIVE:
             raise AccountDisabled()
+
+    def activate(self, *, now: datetime) -> None:
+        """Schaltet das Konto nach bestätigter E-Mail frei."""
+        if self.status is AccountStatus.ACTIVE:
+            raise AlreadyActive()
+        self.status = AccountStatus.ACTIVE
+        self._events.append(EmailVerified(user_id=self.id.value, occurred_at=now))
 
     def record_login(self, *, jti: str, now: datetime) -> None:
         self._events.append(
             UserLoggedIn(
                 user_id=self.id.value,
-                tenant_id=self.tenant_id.value,
                 jti=jti,
                 occurred_at=now,
             )

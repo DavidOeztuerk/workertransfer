@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Correlation ID propagation via contextvars and middleware"
 requires-python = ">=3.14"
 dependencies = [
-    "starlette>=0.37.0,<1.0.0",
+    "worker-platform",
 ]
 
 [build-system]
@@ -16,3 +16,4 @@ module-name = "worker_correlation"
 
 [tool.uv.sources]
 worker-core = { workspace = true }
+worker-platform = { workspace = true }

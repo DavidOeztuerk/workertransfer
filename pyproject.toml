@@ -18,7 +18,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["apps/identity-service", "packages/worker-*", "packages/worker-cli"]
+members = ["apps/identity-service", "apps/consent-service", "apps/profile-service", "apps/resume-service", "packages/worker-*", "packages/worker-cli"]
 # Phase-1 deficit: worker-files is a shell whose declared C-backend deps
 # (pillow, python-magic) and He adapt (boto3, minio, azure, ...) have no active
 # workspace consumer (no app/service depends on it; its Phase-1 smoke skips on
@@ -36,7 +36,6 @@ worker-shared = { workspace = true }
 worker-config = { workspace = true }
 worker-logging = { workspace = true }
 worker-correlation = { workspace = true }
-worker-security = { workspace = true }
 worker-auth = { workspace = true }
 worker-authorization = { workspace = true }
 worker-database = { workspace = true }
@@ -48,7 +47,6 @@ worker-metrics = { workspace = true }
 worker-tracing = { workspace = true }
 worker-telemetry = { workspace = true }
 worker-validation = { workspace = true }
-worker-exceptions = { workspace = true }
 worker-ratelimit = { workspace = true }
 worker-tenancy = { workspace = true }
 worker-resilience = { workspace = true }
@@ -64,26 +62,46 @@ worker-notifications = { workspace = true }
 worker-email = { workspace = true }
 worker-github = { workspace = true }
 worker-cli = { workspace = true }
+consent-service = { workspace = true }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["apps", "packages"]
+# "tests" holds repo-level architectural guards (workspace dependency hygiene)
+# that belong to no single package.
+testpaths = ["tests", "apps", "packages"]
+# importlib statt des Prepend-Modus: sonst leitet pytest Modulnamen aus Pfaden
+# ab, und drei Services mit je einem tests/test_app.py kollidieren
+# ("import file mismatch"). Mit importlib trägt jede Testdatei ihren vollen
+# Pfad als Identität — Services dürfen ihre Tests gleich benennen, was der
+# Generator ohnehin tut.
+addopts = "--import-mode=importlib"
 
 [tool.ruff]
 line-length = 100
 target-version = "py314"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "ASYNC", "RUF"]
+# "S" (flake8-bandit) is deliberate for a consent-first product: it flags hardcoded
+# secrets, weak hashing, unsafe subprocess/deserialisation and SQL built by string
+# concatenation. It was previously absent while per-file-ignores already excused
+# S101 in tests, which made that ignore a silent no-op.
+select = ["E", "F", "I", "B", "UP", "ASYNC", "RUF", "S"]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**/*.py" = ["S101"]
+# assert is the point of a test; S105/S106 are fixtures, not real secrets; test
+# helpers legitimately shell out (e.g. probing for a Docker daemon, ADR-0011).
+"**/tests/**/*.py" = ["S101", "S105", "S106", "S603", "S607"]
 
 [tool.mypy]
 python_version = "3.14"
 strict = true
 warn_unreachable = true
-exclude = ["tests", "packages/worker-files", "packages/worker-ai"]
+# `apps/.*/migrations` als Muster, nicht je Service ein Eintrag: jedes
+# migrations-Verzeichnis enthält ein `env.py`, und zwei davon im selben Lauf
+# sind für mypy dasselbe Modul zweimal ("Duplicate module named 'env'"). Mit
+# einer Aufzählung bricht der vierte Service den Typcheck, ohne dass jemand
+# ahnt, warum. Alembic-Umgebungsdateien haben ohnehin keinen Typvertrag.
+exclude = ["tests", "packages/worker-files", "packages/worker-ai", "apps/.*/migrations"]
 
 # Untyped third-party libraries (no py.typed marker / no stubs available).
 # Strict mode stays on; we only silence import-untyped for these specific modules.

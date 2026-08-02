@@ -1,5 +1,6 @@
 """Worker CLI: Code generation for services, packages, and Clean Architecture components."""
 
+import re
 import subprocess
 from pathlib import Path
 from string import Template
@@ -38,49 +39,35 @@ def new_service(
         "module_name": module_name,
         "service_class": service_class,
         "service_title": name.replace("-", " ").title(),
+        # Aliases: older templates spelled these in PascalCase. Keeping both
+        # spellings means a stale template renders instead of silently emitting
+        # a literal "${ServiceClass}" into generated source.
+        "ServiceClass": service_class,
+        "ModuleName": module_name,
+        "ServiceName": name,
     }
 
     console.print(f"[green]Creating service {name} at {service_dir}[/green]")
 
-    # Create directory structure
+    # Nur Verzeichnisse, die der erzeugte Service auch benutzt. Die frühere
+    # Liste legte über dreißig leere Ordner an (cache, messaging, specifications,
+    # dependencies …) — git trackt sie ohnehin nicht, und sie suggerieren eine
+    # Struktur, die dieser Service vielleicht nie braucht. Was fehlt, legt man
+    # an, wenn man es füllt.
     dirs = [
         "src",
         f"src/{module_name}",
         f"src/{module_name}/domain",
-        f"src/{module_name}/domain/entities",
-        f"src/{module_name}/domain/value_objects",
-        f"src/{module_name}/domain/aggregates",
-        f"src/{module_name}/domain/events",
-        f"src/{module_name}/domain/specifications",
-        f"src/{module_name}/domain/exceptions",
-        f"src/{module_name}/domain/services",
-        f"src/{module_name}/domain/repositories",
         f"src/{module_name}/application",
-        f"src/{module_name}/application/commands",
-        f"src/{module_name}/application/queries",
-        f"src/{module_name}/application/handlers",
-        f"src/{module_name}/application/dtos",
-        f"src/{module_name}/application/validators",
-        f"src/{module_name}/application/behaviors",
-        f"src/{module_name}/application/ports",
         f"src/{module_name}/infrastructure",
         f"src/{module_name}/infrastructure/database",
-        f"src/{module_name}/infrastructure/messaging",
-        f"src/{module_name}/infrastructure/cache",
-        f"src/{module_name}/infrastructure/repositories",
-        f"src/{module_name}/infrastructure/configurations",
-        f"src/{module_name}/infrastructure/external",
-        f"src/{module_name}/infrastructure/events",
         f"src/{module_name}/presentation",
         f"src/{module_name}/presentation/http",
-        f"src/{module_name}/presentation/middleware",
-        f"src/{module_name}/presentation/schemas",
-        f"src/{module_name}/presentation/dependencies",
-        f"src/{module_name}/presentation/health",
+        "migrations",
+        "migrations/versions",
         "tests",
         "tests/unit",
         "tests/integration",
-        "tests/contract",
     ]
 
     for d in dirs:
@@ -91,8 +78,10 @@ def new_service(
     # they are rendered into src/{module_name}/... so the package import path is correct.
     template_files = [
         ("pyproject.toml.tmpl", "pyproject.toml"),
-        ("Dockerfile.tmpl", "Dockerfile"),
-        ("docker-compose.yml.tmpl", "docker-compose.yml"),
+        # Kein Dockerfile und keine docker-compose.yml je Service: das Repo hat
+        # ein geteiltes docker/service.Dockerfile und EINE Root-Compose. Ein
+        # generierter Service brächte sonst konkurrierende Infrastruktur mit.
+        # Der Compose-Block zum Einfügen wird am Ende ausgegeben.
         (".env.example.tmpl", ".env.example"),
         ("README.md.tmpl", "README.md"),
         # Package root __init__.py has no template; created as an empty stub below.
@@ -100,19 +89,9 @@ def new_service(
         ("src/main.py.tmpl", f"src/{module_name}/main.py"),
         ("src/configuration.py.tmpl", f"src/{module_name}/configuration.py"),
         ("src/domain/__init__.py.tmpl", f"src/{module_name}/domain/__init__.py"),
-        ("src/domain/base.py.tmpl", f"src/{module_name}/domain/base.py"),
-        ("src/domain/entities/example.py.tmpl", f"src/{module_name}/domain/entities/example.py"),
         (
             "src/application/__init__.py.tmpl",
             f"src/{module_name}/application/__init__.py",
-        ),
-        (
-            "src/application/mediator.py.tmpl",
-            f"src/{module_name}/application/mediator.py",
-        ),
-        (
-            "src/application/behaviors.py.tmpl",
-            f"src/{module_name}/application/behaviors.py",
         ),
         (
             "src/infrastructure/__init__.py.tmpl",
@@ -123,31 +102,32 @@ def new_service(
             f"src/{module_name}/infrastructure/database/__init__.py",
         ),
         (
+            "src/infrastructure/database/base.py.tmpl",
+            f"src/{module_name}/infrastructure/database/base.py",
+        ),
+        (
             "src/infrastructure/database/models.py.tmpl",
             f"src/{module_name}/infrastructure/database/models.py",
         ),
         (
-            "src/infrastructure/database/repositories.py.tmpl",
-            f"src/{module_name}/infrastructure/database/repositories.py",
-        ),
-        (
-            "src/infrastructure/database/uow.py.tmpl",
-            f"src/{module_name}/infrastructure/database/uow.py",
-        ),
-        (
-            "src/presentation/__init__.py.tmpl",
-            f"src/{module_name}/presentation/__init__.py",
+            "src/presentation/compose_api.py.tmpl",
+            f"src/{module_name}/presentation/compose_api.py",
         ),
         (
             "src/presentation/http/router.py.tmpl",
             f"src/{module_name}/presentation/http/router.py",
         ),
-        (
-            "src/presentation/health.py.tmpl",
-            f"src/{module_name}/presentation/health.py",
-        ),
-        ("tests/test_example.py.tmpl", "tests/test_example.py"),
-        ("tests/conftest.py.tmpl", "tests/conftest.py"),
+        # Per-service async Alembic (ADR-0010): the "next steps" told the user to
+        # run `alembic revision`, but nothing generated an alembic.ini for it.
+        ("alembic.ini.tmpl", "alembic.ini"),
+        ("migrations/env.py.tmpl", "migrations/env.py"),
+        ("migrations/script.py.mako.tmpl", "migrations/script.py.mako"),
+        ("tests/test_app.py.tmpl", "tests/test_app.py"),
+        # Testcontainers guard (ADR-0011): integration tests self-skip without Docker.
+        # Kein __init__.py: pytest läuft im importlib-Modus, ein Paketmarker
+        # ließe dieselbe conftest unter zwei Namen registrieren.
+        ("tests/integration/_docker.py.tmpl", "tests/integration/_docker.py"),
+        ("tests/integration/conftest.py.tmpl", "tests/integration/conftest.py"),
     ]
 
     for template_name, target_name in template_files:
@@ -163,11 +143,30 @@ def new_service(
 
     console.print(f"[green]✓ Service {name} created successfully![/green]")
     console.print("  Next steps:")
-    console.print(f"  1. cd {service_dir}")
-    console.print("  2. uv sync")
-    console.print("  3. uv run alembic revision --autogenerate -m 'initial'")
-    console.print("  4. uv run alembic upgrade head")
-    console.print(f"  5. uv run {module_name}")
+    console.print("  1. Add the service to the workspace members in the root pyproject.toml")
+    console.print("  2. uv sync --all-packages --all-groups")
+    console.print(f"  3. uv run alembic -c apps/{name}/alembic.ini revision -m 'init'")
+    console.print("  4. Add this block to docker-compose.yml (no per-service Dockerfile:")
+    console.print("     docker/service.Dockerfile is shared and takes SERVICE_DIR):")
+    console.print("")
+    console.print(f"       {module_name.replace('_', '-')}:")
+    console.print("         <<: *service")
+    console.print(f"         container_name: workertransfer-{name.replace('-service', '')}")
+    console.print("         build:")
+    console.print("           context: .")
+    console.print("           dockerfile: docker/service.Dockerfile")
+    console.print(f"           args: {{ SERVICE_DIR: {name} }}")
+    console.print("         environment:")
+    console.print("           <<: *service-env")
+    console.print('           WORKER_PORT: "8003"   # pick a free port')
+    db_name = module_name.replace("_service", "")
+    dsn = f"postgresql+asyncpg://worker:worker@postgres:5432/{db_name}"
+    console.print(f"           WORKER_DATABASE_URL: {dsn}")
+    console.print('         ports: ["8003:8003"]')
+    cmd = f"[uvicorn, {module_name}.main:app, --host, 0.0.0.0, --port, '8003', --reload]"
+    console.print(f"         command: {cmd}")
+    console.print("")
+    console.print("  5. Add its database to scripts/initdb/01-create-service-databases.sql")
 
 
 @app.command()
@@ -307,8 +306,10 @@ def migrate(
             "(per-service Alembic, see ADR-0010): run `worker new-service`"
         )
         raise typer.Exit(1)
-    result = subprocess.run(
-        ["uv", "run", "alembic", "revision", "--autogenerate", "-m", message],
+    # S603/S607: fixed argv, no shell=True; `uv` is resolved from PATH on
+    # purpose so the project's own venv provides alembic (ADR-0010).
+    result = subprocess.run(  # noqa: S603
+        ["uv", "run", "alembic", "revision", "--autogenerate", "-m", message],  # noqa: S607
         cwd=str(service_dir),
     )
     if result.returncode == 0:
@@ -330,8 +331,10 @@ def upgrade(
             "(per-service Alembic, see ADR-0010)."
         )
         raise typer.Exit(1)
-    result = subprocess.run(
-        ["uv", "run", "alembic", "upgrade", revision],
+    # S603/S607: fixed argv, no shell=True; `uv` is resolved from PATH on
+    # purpose so the project's own venv provides alembic (ADR-0010).
+    result = subprocess.run(  # noqa: S603
+        ["uv", "run", "alembic", "upgrade", revision],  # noqa: S607
         cwd=str(service_dir),
     )
     if result.returncode == 0:
@@ -431,9 +434,30 @@ def _generate_infrastructure(type: str, name: str, service: str, event: str) -> 
     console.print(f"[cyan]Created {target_file}[/cyan]")
 
 
+# Only Python output is checked for leftover placeholders. Compose files and
+# Dockerfiles use ${VAR} as *runtime* interpolation (docker compose substitutes
+# it from the environment), and alembic's script.py.mako keeps its Mako
+# placeholders until a revision is actually generated. In a .py file, however, a
+# surviving ${...} is a syntax error.
+_UNRESOLVED_PLACEHOLDER = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*\}")
+
+
 def _render_template(template_path: Path, target_path: Path, context: dict[str, str]) -> None:
     content = template_path.read_text()
     rendered = Template(content).safe_substitute(context)
+
+    # safe_substitute leaves unknown placeholders verbatim, which used to emit
+    # literal "${ServiceClass}" into generated Python — the scaffold could not
+    # even be parsed. Refuse to write such a file instead of shipping it.
+    if target_path.suffix == ".py":
+        leftovers = sorted(set(_UNRESOLVED_PLACEHOLDER.findall(rendered)))
+        if leftovers:
+            raise RuntimeError(
+                f"{template_path.name}: unresolved placeholders {leftovers}. "
+                "Add them to the render context or fix the template."
+            )
+
+    target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_text(rendered)
 
 

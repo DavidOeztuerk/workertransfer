@@ -14,10 +14,16 @@ coverage.xml
 htmlcov/
 
 node_modules/
+# Der Web-Container legt seinen pnpm-Store im bind-gemounteten Repo ab.
+.pnpm-store/
+# Playwright-Artefakte: Traces und Screenshots eines Laufs, keine Quellen.
+test-results/
+playwright-report/
 .turbo/
 dist/
 build/
 *.egg-info/
-kon.txt
-IMPLEMENTATION_PLAN.md
+# kon.txt and IMPLEMENTATION_PLAN.md now live in docs/vision/ so every clone can
+# read the project vision. Kon2.txt stays out: it is a corrupted terminal
+# transcript of one session, not a source document.
 Kon2.txt

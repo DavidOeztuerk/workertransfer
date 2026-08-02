@@ -80,3 +80,155 @@ select {
   background: var(--wt-surface-raised);
   box-shadow: var(--wt-shadow);
 }
+
+/* Formularfelder — bis hierher gab es im Designsystem keine, weshalb jedes
+   Auth-Formular ungestylt war. */
+.wt-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.wt-field__label {
+  color: var(--wt-ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.wt-field__input {
+  min-height: 2.9rem;
+  width: 100%;
+  border: 1px solid var(--wt-line);
+  border-radius: var(--wt-radius-sm);
+  padding: 0.6rem 0.85rem;
+  color: var(--wt-ink);
+  background: var(--wt-surface-raised);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.wt-field__input::placeholder {
+  color: color-mix(in srgb, var(--wt-muted), transparent 25%);
+}
+
+.wt-field__input:focus-visible {
+  border-color: var(--wt-green);
+  outline: none;
+  /* Ring statt Outline, damit der Rahmenradius erhalten bleibt. */
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wt-mint), transparent 45%);
+}
+
+.wt-field__input[aria-invalid="true"] {
+  border-color: #b4392f;
+}
+
+.wt-field__input[aria-invalid="true"]:focus-visible {
+  box-shadow: 0 0 0 3px rgba(180, 57, 47, 0.22);
+}
+
+.wt-field__hint {
+  margin: 0;
+  color: var(--wt-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.wt-field__error {
+  margin: 0;
+  color: #b4392f;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.wt-button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.wt-button[disabled]:hover {
+  transform: none;
+}
+
+/* Mehrzeiliges Feld: erbt alles von .wt-field__input, nur die Höhe und das
+   Zeilenverhalten sind anders. */
+.wt-field__input--multiline {
+  min-height: 7rem;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.55;
+}
+
+/* Schalter mit sofortiger Wirkung. Bewusst ein Button, keine Checkbox — eine
+   Checkbox verspricht, dass die Änderung erst mit dem Absenden gilt. */
+.wt-switch {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.wt-switch__control {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wt-switch__control[disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.wt-switch__track {
+  flex: none;
+  display: block;
+  width: 2.75rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: var(--wt-border, #d6d3cd);
+  transition: background 140ms ease;
+}
+
+.wt-switch__control[aria-checked="true"] .wt-switch__track {
+  background: var(--wt-accent, #1f6f5c);
+}
+
+.wt-switch__thumb {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0.175rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  transition: transform 140ms ease;
+}
+
+.wt-switch__control[aria-checked="true"] .wt-switch__thumb {
+  transform: translateX(1.25rem);
+}
+
+.wt-switch__control:focus-visible {
+  outline: 2px solid var(--wt-accent, #1f6f5c);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.wt-switch__hint {
+  margin: 0;
+  color: var(--wt-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.wt-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.92rem;
+}

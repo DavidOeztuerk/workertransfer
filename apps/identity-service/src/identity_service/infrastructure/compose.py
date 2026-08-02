@@ -17,9 +17,14 @@ from identity_service.infrastructure.auth.jwt_service import JwTokenService
 from identity_service.infrastructure.clock import SystemClock
 from identity_service.infrastructure.database.repositories import (
     SqlAlchemyAuditRepository,
+    SqlAlchemyCompanyRepository,
+    SqlAlchemyInvitationRepository,
+    SqlAlchemyMembershipRepository,
     SqlAlchemySessionRepository,
     SqlAlchemyUserRepository,
+    SqlAlchemyVerificationTokenRepository,
 )
+from identity_service.infrastructure.mail import SmtpMailer
 
 
 @asynccontextmanager
@@ -36,8 +41,12 @@ async def request_scope(
     async with uow:
         repos = {
             "users": SqlAlchemyUserRepository(uow.session),
+            "memberships": SqlAlchemyMembershipRepository(uow.session),
+            "invitations": SqlAlchemyInvitationRepository(uow.session),
             "sessions": SqlAlchemySessionRepository(uow.session),
             "audit": SqlAlchemyAuditRepository(uow.session),
+            "tokens": SqlAlchemyVerificationTokenRepository(uow.session),
+            "companies": SqlAlchemyCompanyRepository(uow.session),
         }
         yield uow, repos
 
@@ -79,4 +88,15 @@ def compose_infrastructure(
         ),
         "clock": SystemClock(),
         "eventbus": bus,
+        # settings.smtp_password is a SecretStr | None (never logged); calling
+        # .get_secret_value() unconditionally on None crashes every service
+        # start, so it is only unwrapped when a password is actually set.
+        "mailer": SmtpMailer(
+            host=settings.smtp_host,
+            port=settings.smtp_port,
+            mail_from=settings.mail_from,
+            username=settings.smtp_username,
+            password=settings.smtp_password.get_secret_value() if settings.smtp_password else None,
+            use_tls=settings.smtp_use_tls,
+        ),
     }

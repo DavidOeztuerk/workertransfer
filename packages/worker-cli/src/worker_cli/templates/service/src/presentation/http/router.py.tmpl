@@ -1,11 +1,18 @@
-"""HTTP presentation layer."""
+"""HTTP endpoints for the ${service_title}."""
+
+from __future__ import annotations
 
 from fastapi import APIRouter
 
-router = APIRouter()
+
+def build_router() -> APIRouter:
+    router = APIRouter(prefix="/${module_name}", tags=["${service_name}"])
+
+    @router.get("/example")
+    async def example() -> dict[str, str]:
+        return {"service": "${service_name}"}
+
+    return router
 
 
-@router.get("/example")
-async def example_endpoint() -> dict[str, str]:
-    """Example endpoint."""
-    return {"message": "Hello from ${service_name}!"}
+__all__ = ["build_router"]

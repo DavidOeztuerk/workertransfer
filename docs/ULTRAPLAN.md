@@ -1,16 +1,55 @@
 # WorkerTransfer — Ultraplan
 
-Ein stufenweiser Masterplan zum Ausbau des WorkerTransfer-Repositorys von der
-heutigen Foundation zu dem in `kon.txt` beschriebenen AI-first Workforce
+Ein stufenweiser Masterplan zum Ausbau des WorkerTransfer-Repositorys zu dem in
+[`docs/vision/kon.txt`](vision/kon.txt) beschriebenen AI-first Workforce
 Operating System.
 
 Dieses Dokument ist ein **lebendes, ausführbares Dokument**. Jede Phase hat eine
 Definition of Done (DoD). Wir arbeiten sie Phase für Phase ab, committen nach
 jedem Schritt, und halten die Definition-of-Done-Kriterien ein, bevor wir weitergehen.
 
+> **Der Leitsatz, der am leichtesten verloren geht** — `kon.txt`, Regel Nr. 1:
+> *„Wir schreiben keinen einzigen Microservice, bevor die Plattform existiert."*
+> Der Sinn von Phase 0/1 war, dass `worker new-service <name>` einen **fertigen**
+> Service erzeugt, damit Service 3 bis 21 nie handkopiert werden. Diese Regel war
+> bereits gerissen: `apps/consent-service` wurde von Hand aus `identity-service`
+> kopiert, und der Generator erzeugte Code, der nicht einmal parste (Phase 2.5/A6).
+> Neue Services kommen aus dem Generator, nicht aus Copy-Paste.
+
 ---
 
-## 0. Stand heute (verifiziert am 12.07.2026)
+## 0. Stand (verifiziert am 31.07.2026)
+
+**Phasen 0, 1, 2 und 2.5 sind abgeschlossen; Phase 3 Sub-step 3.1 ist in Arbeit.**
+Der Stand pro Phase steht in [`ROADMAP.md`](ROADMAP.md) — dort auch die vollständige
+Liste der in Phase 2.5 gefundenen Fundament-Defizite und der offenen Folge-Punkte.
+
+Kurzfassung dessen, was heute wirklich läuft:
+
+- **`worker-platform`** (Kernel, 11 Module): `create_api_app()` mit Compose-Hook
+  (`tenant_resolver`, `auth_middleware`, `routers`), Correlation-/Tenant-/
+  Security-Middleware als rohes ASGI, async CQRS-`Mediator`, RFC-9457-Problem-Details,
+  Health-Router, `PlatformSettings` (`WORKER_`-Prefix), JSON-Logging mit Kontext.
+- **`identity-service`** — vollständiger Auth-Slice: `POST /auth/{register,login,
+  refresh,logout}`, `GET /me`, User-/Session-/Audit-Aggregate, bcrypt + HS256,
+  Alembic `0001`, Testcontainers-Integrationstests. Token wird per Header **oder**
+  `access`-Cookie akzeptiert.
+- **`consent-service`** — ~10 %: Scaffold, Alembic-Gerüst (`versions/` noch leer),
+  Domain-Value-Objects. `compose_api.py` ist noch ein Platzhalter.
+- **`apps/web`** — zwei Routen (`/`, `/login`), Session-State über TanStack Query,
+  `packages/ui` mit `Button`/`Card`. Kein i18n-Layer.
+- **34 `worker-*`-Pakete**, die meisten mit genau einem Smoke-Test und **ohne**
+  Produktionskonsumenten. `worker-ai`/`worker-files` sind aus dem Workspace
+  exkludiert, `worker-github` ist unimportierbar.
+- **Gates**: `make check` = ruff format → ruff check → mypy → pytest → `pnpm check`
+  → `pnpm test`. CI hat einen Backend- **und** einen Frontend-Job.
+- **Lokal**: `docker compose up --build` startet Postgres, jeden Service und die
+  Web-App. Jeder Service-Container migriert sich beim Start selbst; ein separates
+  Skript gibt es nicht. Ein neuer Service braucht kein eigenes Dockerfile —
+  `docker/service.Dockerfile` ist geteilt und nimmt `SERVICE_DIR` als Build-Arg.
+
+<details>
+<summary>Historischer Stand vom 12.07.2026 (Ausgangspunkt von Phase 1)</summary>
 
 ### Läuft und ist real
 - **`worker-platform`** (493 LOC, 11 Module) — der reife Kernel:
@@ -71,6 +110,8 @@ jedem Schritt, und halten die Definition-of-Done-Kriterien ein, bevor wir weiter
 3. **Stufenweiser Masterplan** — Foundation → Identity → Profile →
    Jobs/Applications → Transfermarkt → GitHub-Intelligence → AI Agents →
    Contracts → MCP → Frontend.
+
+</details>
 
 ---
 
@@ -195,7 +236,27 @@ Tenant-Kontext ersetzen.
 Claim, Audit-Event persistiert, Identity-Service hat DB-Migration, Tests
 für Domain + Integration (Testcontainers). CI grün.
 
+### Phase 2.5 — Stabilisierung & Plattform-Naht ✅ (nachträglich eingeschoben)
+**Warum:** Eine Bestandsaufnahme vor Phase 3 fand mehrere Defizite, auf denen
+Service #3 sonst aufgebaut hätte — und mehrere Doku-Aussagen, die der Code nicht
+deckte. Kein neues Feature; nur die Differenz zwischen Behauptung und Realität.
+- Cookie-Auth durchgängig (`GET /me` war aus dem Browser **immer** 401).
+- Dependency-Deklarationen repariert + dauerhafter Wächter; `worker-shared` gefüllt.
+- Kanon-Auflösung Runde 2 (ADR-0014): `worker-security`/`worker-exceptions` gelöscht,
+  `worker-logging` als Reexport.
+- `docker-compose.yml` + `.env.example`; der Stack startet später vollständig aus
+  Compose heraus (Services migrieren sich selbst, `run-dev.sh` entfiel).
+- Frontend-Gate in CI (vorher komplett ungegated); ruff `S` aktiviert.
+- Service-Generator repariert — er hat **nie** parsebaren Code erzeugt.
+**DoD erfüllt:** `make check` (Python + Frontend) grün; Generator-Ausgabe per Test
+abgesichert; alle Funde in ROADMAP dokumentiert.
+
 ### Phase 3 — Candidate Core (Profile, Resume, Documents, Consent)
+**Stand 01.08.2026:** 3.1 (Consent-Ledger) und 3.1b (Identity-Angleichung +
+Onboarding) sind fertig und gemergt — ADR-0013 bis ADR-0019. Registrierung,
+E-Mail-Bestätigung, Unternehmensanlage und Tenant-Wechsel laufen über die
+Oberfläche; der Stack startet vollständig aus `docker compose up`. Offen:
+3.2–3.5 sowie Scheibe C (Einladungen/Rollen).
 - `apps/profile-service` — kandidateneigenes Profil, Documents, **Consent
   Ledger** (ohne Consent keine Sichtbarkeit — product-scope.md).
 - `apps/resume-service` — CV-Builder, Versionierung, Export, Templates via
