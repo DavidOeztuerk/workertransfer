@@ -206,8 +206,10 @@ was der Code tat.
   eigene Lint-Schulden und definieren einen **lokalen** `Mediator`/`PipelineBehavior`,
   der `worker_platform.application.cqrs` dupliziert — ein ADR-0002-Verstoß, der sonst in
   jeden generierten Service eingebacken wird.
-- `worker-github` bleibt unimportierbar (Source nutzt PyGithub, deklariert ist
-  `githubkit`). Wird erst in Phase 6 gebraucht; Fix gehört dorthin.
+- ~~`worker-github` bleibt unimportierbar~~ — **erledigt am 03.08.2026 durch
+  Löschen, nicht durch Reparieren** (ADR-0022). Die damalige Einschätzung „Fix
+  gehört in Phase 6" war falsch: repariert hätte der Import 318 Zeilen scharf
+  gestellt, die einen Menschen zu einer Zahl zwischen 0 und 100 verrechnen.
 - `worker-ai` bleibt aus dem Workspace exkludiert (ML-Wheels ohne
   Python-3.14-Rad). Für Phase 7 über optionale Extras zu lösen, analog weasyprint.
 - Kein `Authorization`-Header **und** kein Cookie ⇒ 401; per-IP-Rate-Limiting am
@@ -607,22 +609,34 @@ vollständig aus.
 
 ### Weiterhin offen, quer durch alle Phasen
 
-- **Ein E2E-Wackelkandidat ist offen: die Anmeldung.** Bei einem Lauf über die
-  ganze Suite (rund fünf Minuten, elf Container, Vite und Chromium auf einer
-  Maschine) scheitert gelegentlich ein Test daran, dass nach dem Anmelden der
-  Link „Mein Profil" nicht erscheint — 30 Sekunden lang gar nicht im DOM.
-  Derselbe Test läuft allein in Sekunden durch.
-  Ein **zweiter**, anderer Wackler ist behoben: Klicks auf Listeneinträge hatten
-  nur das `actionTimeout` (15 s) statt des expect-Budgets. 15 Stellen warten
-  jetzt erst auf den Eintrag.
-  Der Verdacht bei der Anmeldung ist Last (bcrypt mit Kostenfaktor 12 auf einer
-  ausgelasteten Maschine), **belegt ist er nicht**. Der nächste Schritt wäre,
-  die Anmelde-Hilfe so zu ändern, dass sie bei einem Fehlschlag die Meldung der
-  Seite zeigt, statt blind in die Zeitüberschreitung zu laufen — dann sagt der
-  übernächste Fehlschlag, woran es lag. `scripts/validate.sh` zählt die
-  Wackelkandidaten und nennt sie, damit sie nicht lautlos verschwinden.
+- **`worker-github` ist gelöscht** (03.08.2026, **ADR-0022**). Nicht repariert:
+  es war unimportierbar, hatte keinen Konsumenten — und verrechnete einen
+  Menschen zu einer Zahl zwischen 0 und 100, aus zehn Dimensionen mit
+  Gewichten, die niemand begründet hat. „Können in einer Sprache" maß es als
+  Anteil an geschriebenen **Bytes**. Ein Import-Fix hätte 318 Zeilen scharf
+  gestellt, die genau die Art von Aussage produzieren, gegen die diese
+  Plattform gebaut ist. Die ADR sagt, was in Phase 6 wiederkommen darf (Belege
+  mit Herkunft, Einwilligung zuerst) und was nicht (ein Gesamtscore).
+  Damit ein Skip weniger; übrig bleibt `worker-ai`.
 
+- **Die E2E-Wackelkandidaten waren zwei Fehler, kein „Last".** Erledigt
+  (03.08.2026), und die Diagnose ist die Geschichte wert:
+  1. Klicks auf Listeneinträge hatten nur das `actionTimeout` (15 s) statt des
+     expect-Budgets. 15 Stellen warten jetzt erst auf den Eintrag.
+  2. **Der eigentliche Fund:** die Bestätigungsseite hat drei Überschriften —
+     „Wird bestätigt…", „E-Mail bestätigt", „Bestätigung fehlgeschlagen". Die
+     Testhilfe prüfte auf `/bestätigt/i` und war damit schon bei der
+     **Ladeanzeige** zufrieden. Sie lief weiter, während die Bestätigung noch
+     lief oder gerade scheiterte; beim Anmelden kam dann „email not confirmed",
+     an einer Stelle ohne Bezug zur Ursache.
+  Aufgefallen ist das erst, nachdem die Anmelde-Hilfe auf **beide** Ausgänge
+  wartet und bei einem Fehlschlag die Meldung der Seite in die Ausnahme
+  schreibt, statt stumm in die Zeitüberschreitung zu laufen. Vorher war jeder
+  Fehlschlag gleich aussagelos, und der Verdacht fiel auf die Maschine.
+  Ergebnis: 14 von 14 grün, **ohne** Wiederholung — und die Suite braucht 3,5
+  statt 9,5 Minuten, weil ein großer Teil der alten Laufzeit Wartezeit auf
+  Zeitüberschreitungen war.
+  Nebenbei: neun byte-identische Kopien von `login`/`registerAndConfirm` sind zu
+  einer in `e2e/stack.ts` geworden.
 - **Kein S3-Backend**, solange keine Umgebung eines braucht (ADR-0021).
 - **Keine personalisierten Karriere-Seiten** (siehe 4.4).
-- **`worker-github` unimportierbar** (`from github import Github`, deklariert ist
-  `githubkit`) — wird erst in Phase 6 gebraucht.

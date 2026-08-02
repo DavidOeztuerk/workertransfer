@@ -5,38 +5,14 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  login,
+  registerAndConfirm,
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
-  verificationTokenFor,
 } from "./stack";
 
 skipWithoutStack();
-
-const PASSWORD = "e2e-Passwort-mit-Laenge-1!";
-
-async function registerAndConfirm(
-  page: import("@playwright/test").Page,
-  email: string,
-  displayName: string
-) {
-  await page.goto("/register");
-  await page.getByLabel(/E-Mail/i).fill(email);
-  await page.getByLabel(/Passwort/i).first().fill(PASSWORD);
-  await page.getByLabel(/Anzeigename/i).fill(displayName);
-  await page.getByRole("button", { name: /Registrieren/i }).click();
-  const token = await verificationTokenFor(email);
-  await page.goto(`/verify?token=${token}`);
-  await expect(page.getByRole("heading", { name: /bestätigt/i })).toBeVisible();
-}
-
-async function login(page: import("@playwright/test").Page, email: string) {
-  await page.goto("/login");
-  await page.getByLabel(/E-Mail/i).fill(email);
-  await page.getByLabel(/Passwort/i).fill(PASSWORD);
-  await page.getByRole("button", { name: /Anmelden/i }).click();
-  await expect(page.getByRole("link", { name: /Mein Profil/i })).toBeVisible();
-}
 
 test("Profil und Portfolio sind zwei getrennte Freigaben", async ({ browser }) => {
   const candidateEmail = uniqueEmail("kandidat.example");

@@ -12,48 +12,14 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  login,
+  registerAndConfirm,
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
-  verificationTokenFor,
 } from "./stack";
 
 skipWithoutStack();
-
-const PASSWORD = "e2e-Passwort-mit-Laenge-1!";
-
-async function registerAndConfirm(
-  page: import("@playwright/test").Page,
-  email: string,
-  displayName: string
-) {
-  await page.goto("/register");
-  await page.getByLabel(/E-Mail/i).fill(email);
-  await page.getByLabel(/Passwort/i).first().fill(PASSWORD);
-  // Pflichtfeld. Fehlt es, blockt die native Formularvalidierung das Absenden
-  // lautlos — kein POST, keine Meldung, und der Test hängt an der Mail, die nie
-  // kommt. Genau so ist dieser Test beim ersten Lauf gescheitert.
-  await page.getByLabel(/Anzeigename/i).fill(displayName);
-  await page.getByRole("button", { name: /Registrieren/i }).click();
-  // Die Antwort ist absichtlich dieselbe für bekannte und unbekannte Adressen —
-  // deshalb wird hier nicht auf eine Erfolgsmeldung gewartet, sondern auf die
-  // Mail, die es nur bei einer echten Neuanlage gibt.
-  const token = await verificationTokenFor(email);
-  await page.goto(`/verify?token=${token}`);
-  // Genau die Erfolgsmeldung der Bestätigungsseite. Ein weiches
-  // /anmelden/i träfe den "Anmelden"-Link in der Kopfzeile und ließe eine
-  // GESCHEITERTE Bestätigung wie eine geglückte aussehen — der Test wäre
-  // dann erst viel später und an falscher Stelle rot geworden.
-  await expect(page.getByRole("heading", { name: /bestätigt/i })).toBeVisible();
-}
-
-async function login(page: import("@playwright/test").Page, email: string) {
-  await page.goto("/login");
-  await page.getByLabel(/E-Mail/i).fill(email);
-  await page.getByLabel(/Passwort/i).fill(PASSWORD);
-  await page.getByRole("button", { name: /Anmelden/i }).click();
-  await expect(page.getByRole("link", { name: /Mein Profil/i })).toBeVisible();
-}
 
 test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort", async ({
   browser,
