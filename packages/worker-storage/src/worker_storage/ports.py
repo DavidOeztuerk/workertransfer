@@ -41,3 +41,13 @@ class Storage(Protocol):
         interessiert.
         """
         ...
+
+    async def list_names(self, prefix: str) -> list[str]:
+        """Die Namen unter einem Präfix — ohne das Präfix selbst.
+
+        Für das Aufräumen: wer wissen will, was übrig ist, muss sehen können,
+        was da ist. Bewusst nur eine Ebene und ohne Paginierung — die
+        Aufrufstelle räumt hinter einer einzelnen Person auf, nicht hinter
+        einem ganzen Speicher.
+        """
+        ...
