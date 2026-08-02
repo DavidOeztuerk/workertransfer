@@ -148,7 +148,9 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
                 status.HTTP_403_FORBIDDEN,
                 "reading other portfolios requires an active company",
             )
-        query = GetPortfolioQuery(subject_id=subject_id, bearer=_bearer(request))
+        query = GetPortfolioQuery(
+            subject_id=subject_id, tenant_id=principal.tenant_id, bearer=_bearer(request)
+        )
         async with request_scope(session_factory) as (_uow, repos):
             try:
                 result = await handle_get_visible_portfolio(query, deps=deps, repos=repos)
@@ -217,7 +219,9 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
                     "reading other portfolios requires an active company",
                 )
             try:
-                allowed = await deps["consent"].may_see(subject_id, bearer=_bearer(request))
+                allowed = await deps["consent"].may_see(
+                    subject_id, tenant_id=principal.tenant_id, bearer=_bearer(request)
+                )
             except ConsentUnavailable as exc:
                 raise HTTPException(
                     status.HTTP_503_SERVICE_UNAVAILABLE, "consent ledger unavailable"

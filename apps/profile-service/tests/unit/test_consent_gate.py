@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
 from profile_service.infrastructure.consent import ConsentUnavailable, HttpConsentGate
 
 SUBJECT = uuid4()
+TENANT = UUID("22222222-2222-2222-2222-222222222222")
 BEARER = "token-abc"
 
 
@@ -24,7 +25,7 @@ async def test_a_granted_capability_opens_the_gate() -> None:
             json={"subject_id": str(SUBJECT), "capability": "x", "granted": True, "deleted": False},
         )
 
-    assert await _gate(handler).may_see(SUBJECT, bearer=BEARER) is True
+    assert await _gate(handler).may_see(SUBJECT, tenant_id=TENANT, bearer=BEARER) is True
 
 
 async def test_a_withheld_capability_closes_it() -> None:
@@ -39,7 +40,7 @@ async def test_a_withheld_capability_closes_it() -> None:
             },
         )
 
-    assert await _gate(handler).may_see(SUBJECT, bearer=BEARER) is False
+    assert await _gate(handler).may_see(SUBJECT, tenant_id=TENANT, bearer=BEARER) is False
 
 
 async def test_a_deleted_consent_closes_it_too() -> None:
@@ -52,7 +53,7 @@ async def test_a_deleted_consent_closes_it_too() -> None:
             json={"subject_id": str(SUBJECT), "capability": "x", "granted": True, "deleted": True},
         )
 
-    assert await _gate(handler).may_see(SUBJECT, bearer=BEARER) is False
+    assert await _gate(handler).may_see(SUBJECT, tenant_id=TENANT, bearer=BEARER) is False
 
 
 async def test_the_callers_token_is_forwarded() -> None:
@@ -65,7 +66,7 @@ async def test_the_callers_token_is_forwarded() -> None:
             json={"subject_id": str(SUBJECT), "capability": "x", "granted": True, "deleted": False},
         )
 
-    await _gate(handler).may_see(SUBJECT, bearer=BEARER)
+    await _gate(handler).may_see(SUBJECT, tenant_id=TENANT, bearer=BEARER)
 
     # Der Service handelt im Auftrag des Aufrufers, nicht mit eigenem Konto —
     # ein Service-Account wäre ein zweiter Vertrauensweg ohne Gewinn.
@@ -84,7 +85,7 @@ async def test_the_asked_capability_is_the_visibility_one() -> None:
             json={"subject_id": str(SUBJECT), "capability": "x", "granted": True, "deleted": False},
         )
 
-    await _gate(handler).may_see(SUBJECT, bearer=BEARER)
+    await _gate(handler).may_see(SUBJECT, tenant_id=TENANT, bearer=BEARER)
 
     assert seen["capability"] == "profile.visibility:public"
     assert seen["subject_id"] == str(SUBJECT)
@@ -102,7 +103,7 @@ async def test_an_unreachable_ledger_fails_closed() -> None:
         raise httpx.ConnectError("consent-service down")
 
     with pytest.raises(ConsentUnavailable):
-        await _gate(handler).may_see(SUBJECT, bearer=BEARER)
+        await _gate(handler).may_see(SUBJECT, tenant_id=TENANT, bearer=BEARER)
 
 
 async def test_a_server_error_from_the_ledger_fails_closed() -> None:
@@ -110,7 +111,7 @@ async def test_a_server_error_from_the_ledger_fails_closed() -> None:
         return httpx.Response(500, text="boom")
 
     with pytest.raises(ConsentUnavailable):
-        await _gate(handler).may_see(SUBJECT, bearer=BEARER)
+        await _gate(handler).may_see(SUBJECT, tenant_id=TENANT, bearer=BEARER)
 
 
 async def test_an_unauthorised_call_fails_closed_rather_than_denying() -> None:
@@ -120,7 +121,7 @@ async def test_an_unauthorised_call_fails_closed_rather_than_denying() -> None:
         return httpx.Response(401, json={"detail": "not authenticated"})
 
     with pytest.raises(ConsentUnavailable):
-        await _gate(handler).may_see(SUBJECT, bearer=BEARER)
+        await _gate(handler).may_see(SUBJECT, tenant_id=TENANT, bearer=BEARER)
 
 
 async def test_a_nonsense_body_fails_closed() -> None:
@@ -128,4 +129,4 @@ async def test_a_nonsense_body_fails_closed() -> None:
         return httpx.Response(200, text="kein json")
 
     with pytest.raises(ConsentUnavailable):
-        await _gate(handler).may_see(SUBJECT, bearer=BEARER)
+        await _gate(handler).may_see(SUBJECT, tenant_id=TENANT, bearer=BEARER)

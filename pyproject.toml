@@ -18,7 +18,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["apps/identity-service", "apps/consent-service", "apps/profile-service", "apps/resume-service", "apps/portfolio-service", "apps/jobs-service", "packages/worker-*", "packages/worker-cli"]
+members = ["apps/identity-service", "apps/consent-service", "apps/profile-service", "apps/resume-service", "apps/portfolio-service", "apps/jobs-service", "apps/applications-service", "packages/worker-*", "packages/worker-cli"]
 # worker-ai bleibt ausgeschlossen: seine ML-Wheels haben keinen
 # Python-3.14-Build. worker-files wurde in Sub-step 3.5 GELÖSCHT und
 # worker-storage neu geschrieben — beide waren Hüllen ohne Konsumenten, die

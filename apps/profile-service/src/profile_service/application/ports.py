@@ -11,11 +11,20 @@ from uuid import UUID
 
 from profile_service.domain.profile import Profile
 
-__all__ = ["ConsentGate", "ProfileRepository"]
+__all__ = ["ConsentGate", "ProfileRepository", "tenant_capability"]
 
-#: Die eine Capability, die dieses Slice kennt (ADR-0013, Spec §5).
-#: Feinere Abstufungen kämen additiv dazu, ohne diese zu brechen.
+#: „Für alle Unternehmen" — der Schalter auf /profile.
 VISIBILITY_CAPABILITY = "profile.visibility:public"
+
+
+def tenant_capability(tenant_id: UUID) -> str:
+    """„Für dieses eine Unternehmen" — entsteht mit einer Bewerbung (4.2).
+
+    Die additive Verfeinerung, die ADR-0020 vorgesehen hat. `:public` bleibt,
+    was es war; hier kommt eine zweite Möglichkeit dazu, nicht eine Lockerung
+    der ersten.
+    """
+    return f"profile.visibility:tenant:{tenant_id}"
 
 
 class ConsentGate(Protocol):
@@ -27,7 +36,7 @@ class ConsentGate(Protocol):
     niemand treffen kann.
     """
 
-    async def may_see(self, subject_id: UUID, *, bearer: str) -> bool: ...
+    async def may_see(self, subject_id: UUID, *, tenant_id: UUID, bearer: str) -> bool: ...
 
 
 class ProfileRepository(Protocol):
