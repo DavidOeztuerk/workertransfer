@@ -13,8 +13,8 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 1 | Foundation festigen (CI grün) | ✅ | ruff 0 ✅, mypy 0 ✅, CLI-Entrypoint ✅, Duplikate ✅, Smoke-Tests ✅, Premerge-Wrapper ✅ |
 | 2 | Identity & Tenancy | ✅ | OIDC/OAuth, JWT, Claims-Tenant, Audit, DB-Migration |
 | 2.5 | Stabilisierung & Plattform-Naht | ✅ | Cookie-Auth, Dep-Hygiene, Kanon Runde 2, Dev-Stack, Frontend-Gate, Generator |
-| 3 | Candidate Core | 🟧 | 3.1–3.4 ✅ (Consent, Profile, Resume, Portfolio); offen: 3.5 Dateien |
-| 4 | Jobs & Applications | ⬜ | Jobs, Applications, Companies, Career-Sites |
+| 3 | Candidate Core | ✅ | 3.1–3.5 komplett (Consent, Profile, Resume, Portfolio, Ablage) |
+| 4 | Jobs & Applications | 🟧 | Jobs ✅ (4.1); Applications, Companies, Career-Sites offen |
 | 5 | Transfermarkt | ⬜ | Market-State-Machine, Konsensflows, Vertragsdraft |
 | 6 | Developer Intelligence | ⬜ | GitHub-Consent, Skill-Graph, Scout-Match |
 | 7 | AI Agent Plattform | ⬜ | 23 Agenten (draft-only), plan-act-reflect, MCP |
