@@ -11,9 +11,15 @@ vi.mock("../profile/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../profile/client")>();
   return { ...actual, listCandidates: vi.fn() };
 });
+vi.mock("../resume/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../resume/client")>();
+  return { ...actual, requestResume: vi.fn() };
+});
 
 const client = await import("../profile/client");
 const listCandidates = vi.mocked(client.listCandidates);
+const resumeClient = await import("../resume/client");
+const requestResume = vi.mocked(resumeClient.requestResume);
 
 const TENANT = "22222222-2222-2222-2222-222222222222";
 
@@ -37,6 +43,16 @@ function candidate(id: string, headline: string, extra: Partial<Profile> = {}): 
 beforeEach(() => {
   vi.clearAllMocks();
   listCandidates.mockResolvedValue({ ok: true, items: [], nextCursor: null });
+  requestResume.mockResolvedValue({
+    ok: true,
+    request: {
+      id: "r",
+      subject_id: "a",
+      tenant_id: TENANT,
+      status: "PENDING",
+      created_at: "2026-08-02T10:00:00Z",
+    },
+  });
 });
 
 describe("CandidatesRoute", () => {
@@ -130,5 +146,61 @@ describe("CandidatesRoute", () => {
     await screen.findByText("Senior Python");
     expect(screen.queryByText(/von \d+/)).toBeNull();
     expect(screen.queryByText(/insgesamt/i)).toBeNull();
+  });
+});
+
+describe("CandidatesRoute — Lebenslauf anfragen", () => {
+  it("offers a request per candidate", async () => {
+    listCandidates.mockResolvedValue({
+      ok: true,
+      items: [candidate("a", "Senior Python")],
+      nextCursor: null,
+    });
+
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+
+    expect(
+      await screen.findByRole("button", { name: /Lebenslauf anfragen/i })
+    ).toBeInTheDocument();
+  });
+
+  it("asks through the server with the subject id, nothing else", async () => {
+    const user = userEvent.setup();
+    listCandidates.mockResolvedValue({
+      ok: true,
+      items: [candidate("a", "Senior Python")],
+      nextCursor: null,
+    });
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+
+    await user.click(await screen.findByRole("button", { name: /Lebenslauf anfragen/i }));
+
+    await waitFor(() => expect(requestResume).toHaveBeenCalledWith("a"));
+  });
+
+  it("keeps a rejected request visible instead of pretending it worked", async () => {
+    const user = userEvent.setup();
+    listCandidates.mockResolvedValue({
+      ok: true,
+      items: [candidate("a", "Senior Python")],
+      nextCursor: null,
+    });
+    requestResume.mockResolvedValue({
+      ok: false,
+      reason: "already-asked",
+      message: "Ihr habt diese Person bereits gefragt.",
+    });
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+
+    await user.click(await screen.findByRole("button", { name: /Lebenslauf anfragen/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("bereits gefragt");
+  });
+
+  it("does not offer the request to someone without a company", async () => {
+    renderWithProviders(<CandidatesRoute principal={principal(null)} />);
+
+    await screen.findByText(/Unternehmen/i);
+    expect(screen.queryByRole("button", { name: /Lebenslauf anfragen/i })).toBeNull();
   });
 });

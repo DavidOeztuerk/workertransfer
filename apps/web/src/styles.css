@@ -505,3 +505,64 @@ h1 {
   padding: 0.15rem 0.6rem;
   font-size: 0.78rem;
 }
+
+/* Anfragen: eine Zeile je Vorgang, Aktionen rechts. */
+.requests {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.requests__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--wt-border, #d6d3cd);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.requests__title {
+  margin: 0 0 0.2rem;
+  font-weight: 600;
+}
+
+.requests__meta {
+  margin: 0;
+  color: var(--wt-muted);
+  font-size: 0.85rem;
+}
+
+.requests__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Stationen: jede in einem eigenen Rahmen, damit die Felder nicht ineinander
+   laufen, wenn es fünf davon sind. */
+.resume__position {
+  border: 1px solid var(--wt-border, #d6d3cd);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+}
+
+.resume__position legend {
+  padding: 0 0.4rem;
+  font-size: 0.85rem;
+  color: var(--wt-muted);
+}
+
+.candidates__asked {
+  margin: 0.75rem 0 0;
+  color: var(--wt-accent, #1f6f5c);
+  font-size: 0.85rem;
+  font-weight: 600;
+}

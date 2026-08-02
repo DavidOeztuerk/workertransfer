@@ -1,8 +1,10 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
+import { useState } from "react";
 import { Button, Card } from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
 import { type CandidatePage, type Profile, listCandidates } from "../profile/client";
+import { requestResume } from "../resume/client";
 
 export interface CandidatesRouteProps {
   principal?: MeResponse | null;
@@ -80,6 +82,7 @@ export function CandidatesRoute({ principal = null }: CandidatesRouteProps) {
                     ))}
                   </ul>
                 ) : null}
+                <ResumeRequestButton subjectId={profile.subject_id} />
               </Card>
             </li>
           ))}
@@ -107,5 +110,52 @@ export function CandidatesRoute({ principal = null }: CandidatesRouteProps) {
         </Button>
       ) : null}
     </main>
+  );
+}
+
+
+/**
+ * Nach dem Lebenslauf fragen.
+ *
+ * Die Anfrage nennt nur die Subject-ID — welches Unternehmen fragt, steht im
+ * Token, und welche Berechtigung daraus folgt, entscheidet der Server. Die
+ * Oberfläche baut nie einen Capability-String.
+ */
+function ResumeRequestButton({ subjectId }: { subjectId: string }) {
+  const [message, setMessage] = useState<string | null>(null);
+  const [asked, setAsked] = useState(false);
+
+  const ask = useMutation({
+    mutationFn: () => requestResume(subjectId),
+    onSuccess: (result) => {
+      if (result.ok) {
+        setMessage(null);
+        setAsked(true);
+      } else {
+        // Auch "schon gefragt" ist ein Ergebnis, kein Fehler der Oberfläche —
+        // es bleibt stehen, statt den Knopf einfach wieder anzubieten.
+        setMessage(result.message);
+        setAsked(result.reason === "already-asked");
+      }
+    },
+  });
+
+  if (asked && message === null) {
+    return <p className="candidates__asked">Anfrage gestellt. Die Person entscheidet.</p>;
+  }
+
+  return (
+    <>
+      {message !== null ? (
+        <p className="auth__alert" role="alert">
+          {message}
+        </p>
+      ) : null}
+      {!asked ? (
+        <Button variant="quiet" onClick={() => ask.mutate()} disabled={ask.isPending}>
+          {ask.isPending ? "Wird gefragt…" : "Lebenslauf anfragen"}
+        </Button>
+      ) : null}
+    </>
   );
 }
