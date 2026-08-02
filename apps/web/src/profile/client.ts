@@ -8,10 +8,16 @@
 // Wie im Auth-Client wird nie geworfen, wo ein Formular abgelehnt werden kann:
 // das Ergebnis ist eine unterscheidbare Union, damit die Seite nicht raten muss.
 
-import { CONSENT_BASE_URL, PROFILE_BASE_URL } from "../env";
+import {
+  type ConsentResult,
+  PROFILE_VISIBILITY,
+  isGranted,
+  setGranted,
+} from "../consent/client";
+import { PROFILE_BASE_URL } from "../env";
 
 /** Die eine Capability, die dieses Slice kennt — muss zum Server passen. */
-export const VISIBILITY_CAPABILITY = "profile.visibility:public";
+export const VISIBILITY_CAPABILITY = PROFILE_VISIBILITY;
 
 export interface Profile {
   subject_id: string;
@@ -179,59 +185,20 @@ export async function listCandidates(cursor?: string): Promise<CandidatePage> {
 /**
  * Ist das Profil dieser Person freigegeben?
  *
- * Schweigt der Ledger, lautet die Antwort `false`. Das ist bewusst asymmetrisch
- * zum Server, der in diesem Fall 503 meldet statt zu verbergen: hier zeigt die
- * Antwort nur einen Schalter an, und ein Schalter, der versehentlich „sichtbar"
- * behauptet, wäre die gefährlichere Lüge.
+ * Dünne Hülle über den gemeinsamen Ledger-Aufrufen: die Capability gehört
+ * hierher, die HTTP-Mechanik nicht.
  */
-export async function getVisibility(subjectId: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${CONSENT_BASE_URL}/consent/check`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ subject_id: subjectId, capability: VISIBILITY_CAPABILITY }),
-    });
-    if (!res.ok) return false;
-    const body = (await res.json()) as { granted?: unknown; deleted?: unknown };
-    return body.granted === true && body.deleted !== true;
-  } catch {
-    return false;
-  }
+export function getVisibility(subjectId: string): Promise<boolean> {
+  return isGranted(subjectId, PROFILE_VISIBILITY);
 }
 
-export type VisibilityResult = { ok: true; granted: boolean } | { ok: false; message: string };
+export type VisibilityResult = ConsentResult;
 
-const WITHDRAWAL_REASON = "Über die Profil-Einstellungen zurückgezogen";
-
-/**
- * Freigeben oder zurückziehen — geschrieben wird ausschließlich im Ledger.
- *
- * Der Widerruf trägt immer eine Begründung, weil der Vertrag sie verlangt: eine
- * Entziehung muss erklärbar sein, eine Erteilung nicht. Die Voreinstellung hier
- * ist ehrlich statt erfunden — sie sagt, wo der Widerruf ausgelöst wurde.
- */
-export async function setVisibility(
-  subjectId: string,
-  granted: boolean
-): Promise<VisibilityResult> {
-  const path = granted ? "/consent/grant" : "/consent/revoke";
-  const body = granted
-    ? { subject_id: subjectId, capability: VISIBILITY_CAPABILITY }
-    : { subject_id: subjectId, capability: VISIBILITY_CAPABILITY, reason: WITHDRAWAL_REASON };
-  try {
-    const res = await fetch(`${CONSENT_BASE_URL}${path}`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      return { ok: false, message: await problemMessage(res, "Die Freigabe konnte nicht geändert werden.") };
-    }
-    const state = (await res.json()) as { granted?: unknown };
-    return { ok: true, granted: state.granted === true };
-  } catch {
-    return { ok: false, message: "Keine Verbindung zum Consent-Ledger." };
-  }
+export function setVisibility(subjectId: string, granted: boolean): Promise<VisibilityResult> {
+  return setGranted(
+    subjectId,
+    PROFILE_VISIBILITY,
+    granted,
+    "Über die Profil-Einstellungen zurückgezogen"
+  );
 }
