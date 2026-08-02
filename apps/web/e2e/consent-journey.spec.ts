@@ -66,7 +66,7 @@ test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort",
   // ist der Punkt, an dem der Server den Tenant ins Token schreibt (ADR-0018).
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
-  await expect(recruiter.getByRole("link", { name: /Kandidaten/i })).toBeVisible();
+  await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/candidates");
   await expect(recruiter.getByText(headline)).toBeVisible();

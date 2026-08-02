@@ -761,3 +761,54 @@ h1 {
 .overview li a:hover {
   border-color: var(--wt-accent, #1f6f5c);
 }
+
+/* Aufklappbares Kopfzeilen-Menü. Natives <details>: Tastatur, Escape und
+   Fokus kann der Browser bereits, und ein selbstgebautes Menü, das es nicht
+   kann, wäre schlechter als eine Liste. */
+.site-header__menu {
+  position: relative;
+}
+
+.site-header__menu > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.site-header__menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.site-header__menu > summary::after {
+  content: "▾";
+  margin-left: 0.3rem;
+  font-size: 0.75em;
+}
+
+.site-header__menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  z-index: 20;
+  min-width: 13rem;
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.4rem;
+  border: 1px solid var(--wt-border, #d6d3cd);
+  border-radius: 10px;
+  background: var(--wt-surface, #fdfcfa);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+}
+
+.site-header__menu-item {
+  display: block;
+  padding: 0.5rem 0.7rem;
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.site-header__menu-item:hover,
+.site-header__menu-item:focus-visible {
+  background: var(--wt-border, #ece9e4);
+}

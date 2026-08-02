@@ -607,6 +607,26 @@ sondern als fehlend ausgewiesen — und die Seite sagt es vor dem Herunterladen.
 Stillschweigend auszulassen wäre hier der schlimmste Fehler: die Datei sähe
 vollständig aus.
 
+### Querschnitt — Kopfzeile aufgeräumt ✅ (03.08.2026)
+
+Nach zehn neuen Seiten in dieser Session standen **siebzehn Einträge**
+nebeneinander in der Kopfzeile. Siebzehn gleichwertige Einträge sind keine
+Navigation, sondern eine Liste.
+
+Oben bleibt jetzt, was den Transfermarkt ausmacht — Stellen, Marktstatus,
+Gespräche. Alles Verwaltende liegt in zwei aufklappbaren Menüs („Mein Konto",
+„Unternehmen"), **als natives `<details>`**: Tastatur, Escape und Fokus kann der
+Browser bereits, und ein selbstgebautes Menü, das das *nicht* kann, wäre
+schlechter als eine Liste. Der Anfragen-Zähler steht an der Zusammenfassung,
+nicht an einem Eintrag darin — eine Anfrage, die man erst nach dem Aufklappen
+sieht, erreicht niemanden.
+
+Nebenwirkung, die auffiel: neun E2E-Reisen warteten auf Navigationslinks als
+Signal für den Unternehmenswechsel. Die liegen jetzt im Menü und sind zugeklappt
+unsichtbar. Ersetzt durch die Menü-Zusammenfassung, die es nur mit aktivem
+Unternehmen gibt — ein ehrlicheres Signal als ein Link, der auch ohne Wechsel
+existieren könnte.
+
 ### Weiterhin offen, quer durch alle Phasen
 
 - **`worker-github` ist gelöscht** (03.08.2026, **ADR-0022**). Nicht repariert:
