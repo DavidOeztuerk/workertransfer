@@ -416,6 +416,44 @@ services:
       retries: 30
       start_period: 40s
 
+  transfer-service:
+    <<: *service
+    container_name: workertransfer-transfer
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        SERVICE_DIR: transfer-service
+    environment:
+      <<: *service-env
+      WORKER_PORT: "8009"
+      WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/transfer
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+    ports:
+      - "8009:8009"
+    command:
+      - uvicorn
+      - transfer_service.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8009"
+      - --reload
+      - --reload-dir
+      - /app/apps/transfer-service/src
+      - --reload-dir
+      - /app/packages
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;urllib.request.urlopen("http://localhost:8009/health/live")
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 40s
+
   web:
     build:
       context: .
@@ -439,6 +477,8 @@ services:
         condition: service_healthy
       companies-service:
         condition: service_healthy
+      transfer-service:
+        condition: service_healthy
     environment:
       # pnpm will purge node_modules when the lockfile changed since the image
       # was built, and without a TTY it aborts instead of asking — der Container
@@ -454,6 +494,7 @@ services:
       VITE_JOBS_BASE_URL: ${VITE_JOBS_BASE_URL:-http://localhost:8006}
       VITE_APPLICATIONS_BASE_URL: ${VITE_APPLICATIONS_BASE_URL:-http://localhost:8007}
       VITE_COMPANIES_BASE_URL: ${VITE_COMPANIES_BASE_URL:-http://localhost:8008}
+      VITE_TRANSFER_BASE_URL: ${VITE_TRANSFER_BASE_URL:-http://localhost:8009}
     ports:
       - "5173:5173"
     volumes:
