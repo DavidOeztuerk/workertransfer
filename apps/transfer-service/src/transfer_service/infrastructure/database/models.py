@@ -11,7 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from transfer_service.infrastructure.database.base import Base
 
-__all__ = ["MarketStatusModel", "TransferModel"]
+__all__ = ["MarketRequestModel", "MarketStatusModel", "TransferModel"]
 
 
 class MarketStatusModel(Base):
@@ -44,3 +44,21 @@ class TransferModel(Base):
     offer_fee_cents: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class MarketRequestModel(Base):
+    """Die Anfrage eines Unternehmens nach einem Marktstatus.
+
+    Kein `revoked_at`: der Widerruf lebt im Ledger. Ihn hier zu spiegeln hieße,
+    zwei Wahrheiten über dieselbe Frage zu führen.
+    """
+
+    __tablename__ = "market_requests"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    subject_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    requested_by: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -44,6 +44,7 @@ from worker_contracts.resume import (
 from worker_contracts.transfer import (
     ExpressInterestV1,
     MakeOfferV1,
+    MarketRequestV1,
     MarketStatusV1,
     SaveMarketStatusV1,
     TransferV1,
@@ -72,6 +73,7 @@ __all__ = [
     "JobPageV1",
     "JobV1",
     "MakeOfferV1",
+    "MarketRequestV1",
     "MarketStatusV1",
     "MembershipV1",
     "Message",
