@@ -59,9 +59,25 @@ export function skipWithoutStack(): void {
   });
 }
 
+function nonce(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 /** Eindeutig je Lauf: der Stack wird zwischen Läufen nicht zurückgesetzt. */
 export function uniqueEmail(domain: string): string {
-  return `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@${domain}`;
+  return `e2e-${nonce()}@${domain}`;
+}
+
+/**
+ * Eine Domain, die es in diesem Stack noch nie gab.
+ *
+ * Nötig für alles, was ein Unternehmen anlegt: die Domain wird beansprucht und
+ * ist danach vergeben (ADR-0019). Mit einer festen Domain besteht der Test
+ * genau einmal und scheitert ab dem zweiten Lauf an einem Konflikt, der nichts
+ * mit dem Prüfgegenstand zu tun hat.
+ */
+export function uniqueCompanyDomain(): string {
+  return `arbeitgeber-${nonce()}.example`;
 }
 
 interface MailpitMessage {

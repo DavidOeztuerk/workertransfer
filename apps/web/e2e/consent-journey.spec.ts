@@ -11,7 +11,12 @@
 
 import { expect, test } from "@playwright/test";
 
-import { skipWithoutStack, uniqueEmail, verificationTokenFor } from "./stack";
+import {
+  skipWithoutStack,
+  uniqueCompanyDomain,
+  uniqueEmail,
+  verificationTokenFor,
+} from "./stack";
 
 skipWithoutStack();
 
@@ -51,8 +56,12 @@ test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort",
 }) => {
   const candidateEmail = uniqueEmail("kandidat.example");
   // Keine Freemail-Domain: nur auf einer eigenen Domain lässt sich ein
-  // Unternehmen beanspruchen (ADR-0019).
-  const recruiterEmail = uniqueEmail("arbeitgeber-e2e.example");
+  // Unternehmen beanspruchen (ADR-0019). Und je Lauf eine neue, weil die
+  // Domain danach vergeben ist — mit einer festen bestünde der Test genau
+  // einmal.
+  const companyDomain = uniqueCompanyDomain();
+  const recruiterEmail = uniqueEmail(companyDomain);
+  const companyName = `E2E Arbeitgeber ${Date.now()}`;
   const headline = `E2E Kandidat ${Date.now()}`;
 
   const candidateContext = await browser.newContext();
@@ -79,14 +88,14 @@ test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort",
   await login(recruiter, recruiterEmail);
 
   await recruiter.goto("/company/new");
-  await recruiter.getByLabel(/Name des Unternehmens/i).fill("E2E Arbeitgeber");
+  await recruiter.getByLabel(/Name des Unternehmens/i).fill(companyName);
   await recruiter.getByRole("button", { name: /Unternehmen anlegen/i }).click();
   await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
 
   // Ohne aktives Unternehmen zeigt die Seite nur einen Hinweis — der Wechsel
   // ist der Punkt, an dem der Server den Tenant ins Token schreibt (ADR-0018).
   await recruiter.goto("/");
-  await recruiter.getByLabel(/Handeln als/i).selectOption({ label: "E2E Arbeitgeber" });
+  await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
   await expect(recruiter.getByRole("link", { name: /Kandidaten/i })).toBeVisible();
 
   await recruiter.goto("/candidates");
