@@ -1,15 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Button, Card, Field, Switch, TextArea } from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
 import {
   type Portfolio,
   type PortfolioItem,
+  attachmentUrl,
   getMyPortfolio,
   getPortfolioVisibility,
   saveMyPortfolio,
   setPortfolioVisibility,
+  uploadAttachment,
 } from "../portfolio/client";
 
 export interface PortfolioRouteProps {
@@ -23,9 +25,11 @@ interface Row {
   url: string;
   role: string;
   year: string;
+  /** Name der hochgeladenen Datei, vom Server vergeben. */
+  attachment: string | null;
 }
 
-const EMPTY: Row = { title: "", summary: "", url: "", role: "", year: "" };
+const EMPTY: Row = { title: "", summary: "", url: "", role: "", year: "", attachment: null };
 
 function toRows(portfolio: Portfolio | null | undefined): Row[] {
   if (portfolio === null || portfolio === undefined) return [];
@@ -35,6 +39,7 @@ function toRows(portfolio: Portfolio | null | undefined): Row[] {
     url: item.url ?? "",
     role: item.role,
     year: item.year === null ? "" : String(item.year),
+    attachment: item.attachment,
   }));
 }
 
@@ -52,6 +57,7 @@ function toItem(row: Row): PortfolioItem {
     url: row.url.trim() === "" ? null : row.url.trim(),
     role: row.role,
     year: year === "" ? null : Number(year),
+    attachment: row.attachment,
   };
 }
 
@@ -210,6 +216,12 @@ export function PortfolioRoute({ principal = null }: PortfolioRouteProps) {
                 value={row.year}
                 onChange={(e) => update(index, { year: e.target.value })}
               />
+              <AttachmentField
+                subjectId={subjectId}
+                name={row.attachment}
+                onUploaded={(name) => update(index, { attachment: name })}
+                onError={setError}
+              />
               <Button
                 type="button"
                 variant="quiet"
@@ -241,5 +253,79 @@ export function PortfolioRoute({ principal = null }: PortfolioRouteProps) {
         </form>
       </Card>
     </main>
+  );
+}
+
+
+/**
+ * Eine Datei anhängen.
+ *
+ * Der lokale Dateiname wird nicht angezeigt: er wandert nicht zum Server, und
+ * ihn hier zu zeigen würde suggerieren, dass er das täte. Sichtbar ist, was
+ * wahr ist — dass eine Datei hängt, und wohin sie zeigt.
+ *
+ * Hochgeladen wird sofort, gespeichert erst mit dem Formular. Ein Anhang, den
+ * niemand mehr referenziert, wird beim nächsten Speichern aufgeräumt — deshalb
+ * kostet ein Wechsel nichts.
+ */
+function AttachmentField({
+  subjectId,
+  name,
+  onUploaded,
+  onError,
+}: {
+  subjectId: string;
+  name: string | null;
+  onUploaded: (name: string) => void;
+  onError: (message: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  // htmlFor statt eines umschließenden <label>: die Hinweise darunter würden
+  // sonst Teil des zugänglichen Namens, und der lautete dann „Datei Optional.
+  // PNG, JPEG oder PDF, höchstens 5 MB."
+  const id = useId();
+
+  async function onPick(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Auch bei einem abgebrochenen Dialog feuert change — dann gibt es keine
+    // Datei, und es ist nichts passiert.
+    if (file === undefined) return;
+    setBusy(true);
+    const result = await uploadAttachment(file);
+    setBusy(false);
+    // Das Feld zurücksetzen, damit dieselbe Datei erneut gewählt werden kann:
+    // ohne das feuert change beim zweiten Mal nicht.
+    event.target.value = "";
+    if (result.ok) onUploaded(result.name);
+    else onError(result.message);
+  }
+
+  return (
+    <div className="wt-field">
+      <label className="wt-field__label" htmlFor={id}>
+        Datei
+      </label>
+      <input
+        id={id}
+        type="file"
+        accept="image/png,image/jpeg,application/pdf"
+        onChange={onPick}
+      />
+      <p className="wt-field__hint">
+        {busy
+          ? "Wird hochgeladen…"
+          : name === null
+            ? "Optional. PNG, JPEG oder PDF, höchstens 5 MB."
+            : null}
+      </p>
+      {name !== null && !busy ? (
+        <p className="wt-field__hint">
+          Datei angehängt —{" "}
+          <a href={attachmentUrl(subjectId, name)} target="_blank" rel="noreferrer noopener">
+            ansehen
+          </a>
+        </p>
+      ) : null}
+    </div>
   );
 }

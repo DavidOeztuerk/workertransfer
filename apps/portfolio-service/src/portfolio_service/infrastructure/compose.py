@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from worker_database import UnitOfWork
+from worker_storage import LocalStorage
 
 from portfolio_service.configuration import PortfolioServiceSettings
 from portfolio_service.infrastructure.clock import SystemClock
@@ -36,4 +38,8 @@ def compose_infrastructure(
         "clock": SystemClock(),
         # Bei jedem Fremdabruf gefragt, ohne Cache (ADR-0013).
         "consent": HttpConsentGate(base_url=settings.consent_base_url),
+        # Erster echter Konsument der Ablage (ADR-0021). LocalStorage, weil es
+        # das Backend ist, das läuft; `Storage` ist die Naht für ein zweites.
+        "storage": LocalStorage(Path(settings.storage_root)),
+        "max_attachment_bytes": settings.max_attachment_bytes,
     }

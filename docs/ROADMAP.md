@@ -208,7 +208,7 @@ was der Code tat.
   jeden generierten Service eingebacken wird.
 - `worker-github` bleibt unimportierbar (Source nutzt PyGithub, deklariert ist
   `githubkit`). Wird erst in Phase 6 gebraucht; Fix gehört dorthin.
-- `worker-ai`/`worker-files` bleiben aus dem Workspace exkludiert (ML-/C-Wheels ohne
+- `worker-ai` bleibt aus dem Workspace exkludiert (ML-Wheels ohne
   Python-3.14-Rad). Für Phase 7 über optionale Extras zu lösen, analog weasyprint.
 - Kein `Authorization`-Header **und** kein Cookie ⇒ 401; per-IP-Rate-Limiting am
   Auth-Rand weiterhin offen (Phase 10, TODO-Marker in `build_auth_router`).
@@ -334,9 +334,39 @@ was der Code tat.
   Oberfläche: `/portfolio` mit eigenem Freigabeschalter; eine fünfte
   Playwright-Reise belegt im Browser, dass die Profilfreigabe das Portfolio
   nicht öffnet und erst die zweite Freigabe es tut.
-  **Dateien** bleiben 3.5 vorbehalten; ohne `worker-files`/`worker-storage`
-  ist das Portfolio Text und Links.
-- ⬜ 3.5 `worker-files`/`worker-storage` real machen (Workspace-Re-Include)
+  **Dateien** warten auf einen Konsumenten der Ablage (siehe 3.5); heute ist
+  das Portfolio Text und Links.
+- ✅ **3.5 Ablage real gemacht** — 02.08.2026, **ADR-0021**. „Re-include" war die
+  falsche Handlung: die beiden Pakete waren nicht ausgeschlossen, weil Python
+  3.14 neu ist, sondern weil sie sich für jede denkbare Zukunft gleichzeitig
+  gerüstet hatten — fünf schwere Abhängigkeiten (pillow, python-magic, boto3,
+  minio, azure-storage-blob) über 400 Zeilen ohne einen einzigen Konsumenten.
+  `worker-files` ist **gelöscht**; `worker-storage` ist neu geschrieben als Port
+  plus `LocalStorage`, mit **einer** Abhängigkeit (`worker-core`) und wieder im
+  Workspace, ohne Ausnahme in mypy oder CI.
+  Typerkennung aus den ersten Bytes statt aus dem, was der Client behauptet —
+  ein `Content-Type`-Header und eine Dateiendung sind beide frei wählbar, die
+  Signatur nicht. `write + rename` statt direktem Schreiben, damit ein Absturz
+  keine halbe Datei unter dem richtigen Namen hinterlässt.
+  **Kein S3-Backend**, noch nicht: es zu bauen, bevor eine Umgebung es braucht,
+  wäre genau der Fehler, der zu diesem ADR geführt hat. Der Port ist die Naht.
+  **Erster Konsument ist da:** `portfolio-service` nimmt Anhänge entgegen
+  (`POST /portfolios/me/attachments`) und liefert sie aus
+  (`GET /portfolios/{id}/attachments/{name}`) — mit **derselben** Consent-Prüfung
+  wie das Portfolio selbst, damit der Anhang kein zweiter Weg an dieselben Daten
+  wird. Der Schlüssel entsteht aus Person UND Name, also greift ein fremder Name
+  strukturell nur ins eigene Verzeichnis. Der Name wird vom Server vergeben und
+  die Endung folgt dem erkannten Typ: den Namen des Clients zu übernehmen hieße,
+  fremden Text zu einem Teil eines Pfades zu machen. Ausgeliefert wird als
+  Download, nicht inline — ein PDF kann Skripte enthalten.
+  Verwaiste Dateien werden beim Speichern aufgeräumt — **nach** dem Commit:
+  andersherum wären bei einem fehlgeschlagenen Commit Dateien gelöscht, auf die
+  die gespeicherten Einträge weiterhin zeigen, und aus dem Aufräumen würde
+  Datenverlust. Scheitert das Aufräumen, bleibt eine Datei liegen: sie kostet
+  Platz und sonst nichts.
+  Oberfläche: ein Datei-Feld je Arbeit, das sofort hochlädt. Der lokale
+  Dateiname wird bewusst nicht angezeigt — er wandert nicht zum Server, und ihn
+  zu zeigen würde suggerieren, dass er es täte.
 - ✅ **Scheibe C — Einladungen & Rollen** (02.08.2026). Ein Administrator lädt
   eine **Adresse** ein (nicht ein Konto: die Person muss noch keines haben, und
   beim Einladen darf nicht verraten werden, ob sie eines hat). Angenommen wird

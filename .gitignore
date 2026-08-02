@@ -27,3 +27,4 @@ build/
 # read the project vision. Kon2.txt stays out: it is a corrupted terminal
 # transcript of one session, not a source document.
 Kon2.txt
+var/

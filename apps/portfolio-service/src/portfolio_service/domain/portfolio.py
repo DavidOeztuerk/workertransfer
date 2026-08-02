@@ -11,6 +11,7 @@ Wer es sehen darf, entscheidet der Consent-Ledger, nicht dieses Modul
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import urlparse
@@ -20,6 +21,7 @@ from worker_core import DomainError
 
 __all__ = [
     "MAX_ITEMS",
+    "InvalidAttachment",
     "InvalidText",
     "InvalidUrl",
     "InvalidYear",
@@ -34,6 +36,13 @@ MAX_SUMMARY = 1000
 MAX_ROLE = 160
 MAX_URL = 2000
 MIN_YEAR = 1900
+MAX_ATTACHMENT_NAME = 80
+
+#: Der Name einer hochgeladenen Datei, wie ihn der Server vergeben hat. Kein
+#: Pfad und keine URL: er wird beim Ausliefern mit der subject_id zu einem
+#: Ablageschlüssel zusammengesetzt, und diese Struktur ist es, die verhindert,
+#: dass jemand mit einem fremden Namen an eine fremde Datei kommt.
+_ATTACHMENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 #: Nur diese beiden. Ein Portfolio-Link wird von fremden Menschen angeklickt;
 #: `javascript:` und `data:` sind in einem Feld, das später in einem Browser
@@ -54,6 +63,11 @@ class InvalidUrl(DomainError):
 class InvalidYear(DomainError):
     def __init__(self, detail: str) -> None:
         super().__init__("invalid_year", detail)
+
+
+class InvalidAttachment(DomainError):
+    def __init__(self) -> None:
+        super().__init__("invalid_attachment", "That is not a valid attachment name")
 
 
 class TooManyItems(DomainError):
@@ -88,6 +102,24 @@ def _url(value: str | None) -> str | None:
     return cleaned
 
 
+def _attachment(value: str | None) -> str | None:
+    """Nur ein Name, kein Pfad.
+
+    Der Client bekommt ihn vom Upload zurück und schickt ihn beim Speichern
+    mit. Ließe man einen Pfad zu, könnte jemand mit `../` aus seinem eigenen
+    Verzeichnis herauszeigen — die Ablage würde das zwar auch abfangen, aber
+    eine Prüfung an der Grenze ist billiger als eine Ausnahme in der Tiefe.
+    """
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    if len(cleaned) > MAX_ATTACHMENT_NAME or not _ATTACHMENT_RE.match(cleaned):
+        raise InvalidAttachment()
+    return cleaned
+
+
 def _year(value: int | None, *, now: datetime) -> int | None:
     if value is None:
         return None
@@ -105,6 +137,8 @@ class PortfolioItem:
     url: str | None = None
     role: str = ""
     year: int | None = None
+    #: Name einer hochgeladenen Datei, vom Server vergeben. `None` heißt „keine".
+    attachment: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -115,6 +149,7 @@ class PortfolioItem:
         )
         object.__setattr__(self, "role", _text("Role", self.role, required=False, limit=MAX_ROLE))
         object.__setattr__(self, "url", _url(self.url))
+        object.__setattr__(self, "attachment", _attachment(self.attachment))
         # Die Obergrenze des Jahres braucht die Gegenwart, und ein Wertobjekt
         # hat keine Uhr: sie hineinzureichen wäre eine versteckte Abhängigkeit,
         # sich `datetime.now()` zu holen dasselbe, nur unsichtbarer. Der Eintrag

@@ -90,11 +90,12 @@ def test_uv_sources_entries_resolve_to_real_packages() -> None:
             if dependency not in workspace_dirs:
                 offenders.append(f"{name} -> {dependency}")
 
-    # worker-ai and worker-files are excluded from the workspace on purpose
+    # worker-ai is excluded from the workspace on purpose (ML wheels without a
+    # Python-3.14 build). worker-files was deleted in Sub-step 3.5 (ADR-0021).
     # (heavy C/ML wheels with no consumer); orphaned references to them are
     # tolerated because uv only resolves a source entry when something depends
     # on that name. Anything else is a typo.
-    tolerated = {"worker-ai", "worker-files"}
+    tolerated = {"worker-ai"}
     unexpected = [o for o in offenders if o.split(" -> ")[1] not in tolerated]
     assert not unexpected, "Unknown [tool.uv.sources] workspace targets:\n  " + "\n  ".join(
         unexpected
