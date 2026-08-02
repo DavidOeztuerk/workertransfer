@@ -35,6 +35,7 @@ __all__ = [
     "handle_check",
     "handle_delete",
     "handle_grant",
+    "handle_list_mine",
     "handle_revoke",
 ]
 
@@ -238,3 +239,30 @@ async def handle_check(
 
     latest = await repos["consent"].latest_effective(subject, cap)
     return Result.ok(project_state([latest] if latest is not None else []))
+
+
+async def handle_list_mine(
+    subject_id: UUID, *, repos: dict[str, Any]
+) -> list[tuple[Capability, ConsentEvent]]:
+    """Was gerade gilt — nur für die Person selbst.
+
+    Kein `subject_id`-Parameter von außen: der Aufrufer kann nur die eigene
+    Liste holen, weil er nichts anderes angeben kann. Was man nicht angeben
+    kann, kann man nicht fälschen — dieselbe Regel wie bei `tenant_id`
+    (ADR-0018) und der Firmendomain (ADR-0019).
+
+    Widerrufene und gelöschte Fähigkeiten fallen heraus: die Seite beantwortet
+    „was gilt", nicht „was war". Eine Historie zeigt, wer EINMAL gefragt hat,
+    und das ist mehr, als hier versprochen wird.
+    """
+    subject = SubjectId(subject_id)
+    events: list[ConsentEvent] = list(await repos["consent"].latest_per_capability(subject))
+    effective: list[tuple[Capability, ConsentEvent]] = []
+    for event in events:
+        # Dieselbe Reduktion wie bei `/check`, nur auf einen Strom der Länge 1
+        # angewandt: die Liste darf keine zweite Auslegung dessen sein, was
+        # „gilt" heißt.
+        if project_state([event]).granted:
+            effective.append((event.capability, event))
+    effective.sort(key=lambda pair: pair[0].value)
+    return effective

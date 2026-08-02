@@ -9,6 +9,7 @@ from worker_contracts.companies import CompanyProfileV1, SaveCompanyProfileV1
 from worker_contracts.consent import (
     ConsentCheckResultV1,
     ConsentCheckV1,
+    ConsentGrantedV1,
     ConsentGrantV1,
     ConsentRevokeV1,
     ConsentStateV1,
@@ -64,6 +65,7 @@ __all__ = [
     "ConsentCheckResultV1",
     "ConsentCheckV1",
     "ConsentGrantV1",
+    "ConsentGrantedV1",
     "ConsentRevokeV1",
     "ConsentStateV1",
     "CreateCompanyV1",

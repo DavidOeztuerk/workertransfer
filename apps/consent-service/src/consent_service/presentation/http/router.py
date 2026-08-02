@@ -17,6 +17,7 @@ from worker_auth import get_request_user
 from worker_contracts import (
     ConsentCheckResultV1,
     ConsentCheckV1,
+    ConsentGrantedV1,
     ConsentGrantV1,
     ConsentRevokeV1,
     ConsentStateV1,
@@ -32,6 +33,7 @@ from consent_service.application.commands import (
     handle_check,
     handle_delete,
     handle_grant,
+    handle_list_mine,
     handle_revoke,
 )
 from consent_service.domain.consent_event import ConsentMetadataError, ReasonRequired
@@ -129,6 +131,28 @@ def build_consent_router(deps: dict[str, Any]) -> APIRouter:
         if not result.is_success:
             raise _to_http(result.error)
         return _state_dto(body.subject_id, body.capability, result.value)
+
+    @router.get("/me")
+    async def mine(request: Request) -> list[ConsentGrantedV1]:
+        """Was gerade gilt — und zwar nur die eigenen Freigaben.
+
+        Kein `subject_id`-Parameter, weder im Pfad noch in der Abfrage: die
+        Person kann nur ihre eigene Liste holen, weil sie nichts anderes
+        angeben kann. Eine fremde Liste enthielte, welche ANDEREN Unternehmen
+        Zugriff haben — eine Aussage über einen Menschen, die niemand außer ihm
+        treffen darf.
+
+        Anders als `/check`, das jedem authentifizierten Aufrufer über jeden
+        offensteht: dort ist die Antwort ein einzelnes Ja/Nein zu einer Frage,
+        die der Aufrufer schon gestellt hat. Hier wäre sie eine Übersicht.
+        """
+        subject_id = _actor_id(request)
+        async with request_scope(session_factory) as (_uow, repos):
+            granted = await handle_list_mine(subject_id, repos=repos)
+        return [
+            ConsentGrantedV1(capability=capability.value, granted_at=event.recorded_at)
+            for capability, event in granted
+        ]
 
     @router.post("/check")
     async def check(body: ConsentCheckV1, request: Request) -> ConsentCheckResultV1:
