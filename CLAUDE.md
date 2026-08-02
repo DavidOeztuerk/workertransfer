@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The project is run as a **staged masterplan** — read [`docs/ULTRAPLAN.md`](docs/ULTRAPLAN.md) first (foundation state, target architecture, ten phases each with a Definition of Done, risk register). [`docs/ROADMAP.md`](docs/ROADMAP.md) is the pull-through status index. ADRs in [`docs/adr/`](docs/adr/): ADR-0002 (worker-platform = kernel, worker-* = libraries), ADR-0003 (Composition-Root per service, NOT a fluent `PlatformBuilder`), ADR-0004 (versioned contracts, no scraping, consent-first). Terms in [`docs/glossary.md`](docs/glossary.md). Domain skills under [`docs/skills/`](docs/skills/) (worker-cli, consent-ledger, transfer-market) alongside opencode-specific ones in `.opencode/skill/`.
 
-**Verified state (2026-08-02).** Phases 1, 2 and 2.5 are complete; **Phase 3 sub-steps 3.1 (Consent-Ledger), 3.1b (Onboarding), 3.2 (Profile-Service) and 3.3 (Resume-Service) are done**. Next up is 3.4 (Portfolio-Service).
+**Verified state (2026-08-02).** Phases 1, 2 and 2.5 are complete; **Phase 3 sub-steps 3.1 through 3.4 are done** (Consent-Ledger, Onboarding, Profile, Resume, Portfolio, plus company invitations/roles). Open: 3.5 — make `worker-files`/`worker-storage` real, which is what portfolio file uploads wait on.
 
 `identity-service` is the reference and the only fully-wired service: `POST /auth/{register,login,refresh,logout}` (bcrypt, PyJWT HS256, tokens delivered as `httpOnly` cookies — ADR-0006/0007) and `GET /me`, with the tenant coming only from the JWT claim in production. `AuthMiddleware` accepts the token from **either** an `Authorization: Bearer` header **or** the `access` cookie — the browser only ever has the cookie.
 
@@ -29,7 +29,7 @@ Full detail, including the Phase-2.5 findings, is in [`docs/ROADMAP.md`](docs/RO
 
 WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). The repo is a **dual-ecosystem monorepo**: Python (`uv` workspace, 34 packages) and frontend (`pnpm` + `turbo`).
 
-Four Python services exist: `identity-service`, `consent-service`, `profile-service` and `resume-service`. A React app lives in `apps/web` (`/`, `/login`, `/register`, `/verify`, `/profile`, `/resume`, `/candidates`, `/company/new`). The vision documents in [`docs/vision/`](docs/vision/) (`kon.txt`, `IMPLEMENTATION_PLAN.md`) describe a 30+ package / 21 service future state — **treat them as intent, not as description**. One rule from them is load-bearing and easy to lose: *no microservice is written before the platform can generate it* — new services should come out of `worker new-service`, not out of copy-paste.
+Five Python services exist: `identity-service`, `consent-service`, `profile-service`, `resume-service` and `portfolio-service`. A React app lives in `apps/web` (`/`, `/login`, `/register`, `/verify`, `/invitation`, `/profile`, `/portfolio`, `/resume`, `/candidates`, `/company/new`, `/company/team`). The vision documents in [`docs/vision/`](docs/vision/) (`kon.txt`, `IMPLEMENTATION_PLAN.md`) describe a 30+ package / 21 service future state — **treat them as intent, not as description**. One rule from them is load-bearing and easy to lose: *no microservice is written before the platform can generate it* — new services should come out of `worker new-service`, not out of copy-paste.
 
 ## Commands
 

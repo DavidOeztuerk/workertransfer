@@ -20,6 +20,7 @@ from worker_contracts.identity import (
     VerifyEmailV1,
 )
 from worker_contracts.messages import Command, Event, Message, Query
+from worker_contracts.portfolio import PortfolioItemV1, PortfolioV1, SavePortfolioV1
 from worker_contracts.profile import ProfilePageV1, ProfileV1, SaveProfileV1
 from worker_contracts.resume import (
     EducationV1,
@@ -46,6 +47,8 @@ __all__ = [
     "InviteMemberV1",
     "MembershipV1",
     "Message",
+    "PortfolioItemV1",
+    "PortfolioV1",
     "PositionV1",
     "ProfilePageV1",
     "ProfileV1",
@@ -54,6 +57,7 @@ __all__ = [
     "ResendVerificationV1",
     "ResumeRequestV1",
     "ResumeV1",
+    "SavePortfolioV1",
     "SaveProfileV1",
     "SaveResumeV1",
     "VerifyEmailV1",
