@@ -36,7 +36,7 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
-  await expect(recruiter.getByRole("link", { name: /Unsere Stellen/i })).toBeVisible();
+  await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
   await recruiter.goto("/company/jobs");
   await recruiter.getByLabel("Titel").fill(jobTitle);
   await recruiter.getByLabel(/Beschreibung/i).fill("Was zu tun ist.");
@@ -75,7 +75,18 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   await expect(jobCard).toBeVisible();
   await jobCard.getByRole("button", { name: /^Bewerben$/ }).click();
   await jobCard.getByRole("button", { name: /Bewerbung abschicken/i }).click();
-  await expect(jobCard.getByText(/Bewerbung abgeschickt/i)).toBeVisible();
+  // Auf BEIDE Ausgänge warten — Bestätigung oder Fehlermeldung. Nur auf die
+  // Bestätigung zu warten meldet nach 30 Sekunden bloß, dass sie fehlt, und
+  // verschweigt, ob die Bewerbung abgelehnt wurde oder ob überhaupt etwas
+  // ankam. Dieselbe Lehre wie bei der Anmelde-Hilfe in stack.ts, und dort hat
+  // sie einen echten Fehler sichtbar gemacht.
+  const sent = jobCard.getByText(/Bewerbung abgeschickt/i);
+  const rejected = jobCard.getByRole("alert");
+  await expect(sent.or(rejected).first()).toBeVisible();
+  if (await rejected.isVisible()) {
+    throw new Error(`Bewerbung abgelehnt: ${await rejected.innerText()}`);
+  }
+  await expect(sent).toBeVisible();
 
   // Jetzt sieht das Unternehmen das Profil — allein wegen der Bewerbung.
   await recruiter.goto("/candidates");

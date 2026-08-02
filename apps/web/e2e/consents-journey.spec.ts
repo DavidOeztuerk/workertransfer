@@ -56,7 +56,7 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
-  await expect(recruiter.getByRole("link", { name: /Kandidaten/i })).toBeVisible();
+  await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
 
   // Ein Unternehmensprofil, damit die Seite einen Namen statt einer UUID zeigt.
   await recruiter.goto("/company/profile");
@@ -165,7 +165,7 @@ test("die Suche findet nur, was freigegeben ist", async ({ browser }) => {
   await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
-  await expect(recruiter.getByRole("link", { name: /Kandidaten/i })).toBeVisible();
+  await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/candidates");
   await recruiter.getByLabel("Fähigkeiten").fill(skill);

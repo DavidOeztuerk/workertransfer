@@ -29,7 +29,7 @@ test("eine veröffentlichte Stelle findet auch, wer kein Konto hat", async ({ br
   await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
-  await expect(recruiter.getByRole("link", { name: /Unsere Stellen/i })).toBeVisible();
+  await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
 
   // Erst das Unternehmensprofil: ohne es bleibt die Stelle anonym.
   await recruiter.goto("/company/profile");

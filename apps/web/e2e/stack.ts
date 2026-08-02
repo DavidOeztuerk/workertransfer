@@ -248,7 +248,11 @@ export async function login(page: Page, email: string): Promise<void> {
   await page.getByLabel(/Passwort/i).fill(E2E_PASSWORD);
   await page.getByRole("button", { name: /Anmelden/i }).click();
 
-  const signedIn = page.getByRole("link", { name: /Mein Profil/i });
+  // Die Zusammenfassung des Konto-Menüs statt „Mein Profil": der Link liegt
+  // jetzt IM Menü und ist zugeklappt nicht sichtbar. Die Zusammenfassung gibt
+  // es nur angemeldet und sie ist immer sichtbar — ein besseres Signal als ein
+  // Eintrag, der hinter einem Aufklapper liegt.
+  const signedIn = page.locator("summary", { hasText: "Mein Konto" });
   const failure = page.getByRole("alert");
   try {
     await expect(signedIn.or(failure).first()).toBeVisible();
@@ -267,4 +271,19 @@ export async function login(page: Page, email: string): Promise<void> {
     throw new Error(`Anmeldung als ${email} abgelehnt: ${await failure.innerText()}`);
   }
   await expect(signedIn).toBeVisible();
+}
+
+
+/**
+ * Warten, bis der Wechsel auf ein Unternehmen wirklich gilt.
+ *
+ * `selectOption` stößt ihn nur an: der Server stellt ein neues Token aus, das
+ * Cookie wird ersetzt, die Sitzung neu geladen. Sofort weiterzuklicken gewinnt
+ * das Rennen etwa jedes zweite Mal. Das Unternehmens-Menü erscheint erst mit
+ * aktivem Tenant und ist damit das ehrliche Signal.
+ */
+export async function switchToCompany(page: Page, companyName: string): Promise<void> {
+  await page.goto("/");
+  await page.getByLabel(/Handeln als/i).selectOption({ label: companyName });
+  await expect(page.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
 }
