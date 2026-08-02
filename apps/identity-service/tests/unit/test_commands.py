@@ -167,11 +167,19 @@ class _StupidHasher:
 
 
 class _FakeTokens:
-    """Round-trips jti into the principal so refresh/revoke logic is testable."""
+    """Merkt sich je jti, was ausgestellt wurde, und gibt es beim Prüfen zurück.
+
+    Die frühere Fassung lieferte immer dieselbe Benutzer-ID und `tenant_id=None`,
+    egal was ausgestellt worden war. Damit ließ sich über `handle_refresh` nichts
+    aussagen, was mit dem Tenant zu tun hat — und genau dort saß eine Lücke:
+    der Refresh übernahm den Tenant ungeprüft. Ein Fake, der die Eingabe
+    wegwirft, kann den Fehler nicht finden, den er verstecken hilft.
+    """
 
     def __init__(self) -> None:
         self.invalid_tokens: set[str] = set()
         self.issued_tenants: list[UUID | None] = []
+        self._issued: dict[str, tuple[UUID, UUID | None, tuple[str, ...]]] = {}
 
     def issue_pair(
         self,
@@ -183,6 +191,7 @@ class _FakeTokens:
         session_jti: str,
     ) -> TokenPair:
         self.issued_tenants.append(tenant_id)
+        self._issued[session_jti] = (user_id, tenant_id, tuple(roles))
         # Encode jti into both tokens so verify_* can recover it.
         return TokenPair(access=f"acc:{session_jti}", refresh=f"ref:{session_jti}")
 
@@ -190,12 +199,10 @@ class _FakeTokens:
         if token in self.invalid_tokens or not token.startswith("ref:"):
             raise ValueError("invalid")
         jti = token[len("ref:") :]
-        return AuthPrincipal(
-            user_id=UUID("00000000-0000-0000-0000-000000000001"),
-            tenant_id=None,
-            roles=("user",),
-            jti=jti,
+        user_id, tenant_id, roles = self._issued.get(
+            jti, (UUID("00000000-0000-0000-0000-000000000001"), None, ("user",))
         )
+        return AuthPrincipal(user_id=user_id, tenant_id=tenant_id, roles=roles, jti=jti)
 
 
 class _FakeTokenRepo:
@@ -1253,3 +1260,92 @@ async def test_a_token_invalidated_by_a_resend_stays_dead() -> None:
     assert fail_err(res).code == "token_invalid"
     user = await repos["users"].get_by_email("alt@example.com")
     assert user is not None and user.status is AccountStatus.PENDING
+
+
+async def test_refresh_drops_the_company_when_the_membership_is_gone() -> None:
+    """Ein entzogener Zugang darf sich nicht per Refresh verlängern.
+
+    `handle_switch_tenant` prüft die Mitgliedschaft, bevor es einen
+    Unternehmens-Token ausstellt. Wenn `handle_refresh` den Tenant danach blind
+    aus dem alten Token übernimmt, ist diese Prüfung genau einmal wirksam: wer
+    einmal drin war, bleibt drin, solange er alle 24 Stunden erneuert.
+
+    Fallen gelassen wird nur der Tenant, nicht die Sitzung — die Person selbst
+    ist ja weiterhin angemeldet. Sie handelt danach als Person, was der
+    Normalzustand ist (ADR-0017).
+    """
+    hasher = _StupidHasher()
+    tokens = _FakeTokens()
+    clock = _Clock()
+    bus = _Bus()
+    memberships = _FakeMemberships()
+    repos = {
+        "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
+        "memberships": memberships,
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
+    deps = _deps(clock, tokens, bus, hasher)
+    await _register_active(repos, deps, "ex@firma.example")
+    login = await handle_login(
+        AuthenticateUserCommand(email="ex@firma.example", password="strongpassword1"),
+        deps=deps,
+        repos=repos,
+    )
+    user_id = tokens.verify_refresh_token(login.value.refresh).user_id
+    tenant_id = uuid4()
+    await memberships.add(user_id, tenant_id, "admin")
+    switched = await handle_switch_tenant(
+        SwitchTenantCommand(user_id=user_id, tenant_id=tenant_id),
+        deps=deps,
+        repos=repos,
+    )
+    assert is_success(switched)
+    assert tokens.verify_refresh_token(switched.value.refresh).tenant_id == tenant_id
+
+    # Der Zugang wird entzogen.
+    memberships.members.discard((user_id, tenant_id))
+
+    refreshed = await handle_refresh(
+        RefreshTokenCommand(refresh_token=switched.value.refresh), deps=deps, repos=repos
+    )
+
+    assert is_success(refreshed)
+    assert tokens.verify_refresh_token(refreshed.value.refresh).tenant_id is None
+
+
+async def test_refresh_keeps_the_company_while_the_membership_holds() -> None:
+    hasher = _StupidHasher()
+    tokens = _FakeTokens()
+    clock = _Clock()
+    bus = _Bus()
+    memberships = _FakeMemberships()
+    repos = {
+        "users": _FakeUsers(),
+        "tokens": _FakeTokenRepo(),
+        "companies": _FakeCompanies(),
+        "memberships": memberships,
+        "sessions": _FakeSessions(),
+        "audit": _FakeAudit(),
+    }
+    deps = _deps(clock, tokens, bus, hasher)
+    await _register_active(repos, deps, "bleibt@firma.example")
+    login = await handle_login(
+        AuthenticateUserCommand(email="bleibt@firma.example", password="strongpassword1"),
+        deps=deps,
+        repos=repos,
+    )
+    user_id = tokens.verify_refresh_token(login.value.refresh).user_id
+    tenant_id = uuid4()
+    await memberships.add(user_id, tenant_id, "member")
+    switched = await handle_switch_tenant(
+        SwitchTenantCommand(user_id=user_id, tenant_id=tenant_id), deps=deps, repos=repos
+    )
+
+    refreshed = await handle_refresh(
+        RefreshTokenCommand(refresh_token=switched.value.refresh), deps=deps, repos=repos
+    )
+
+    assert tokens.verify_refresh_token(refreshed.value.refresh).tenant_id == tenant_id
