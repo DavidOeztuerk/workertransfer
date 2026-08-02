@@ -30,6 +30,26 @@ _CONSENT_DIR = _TRANSFER_DIR.parent / "consent-service"
 _CONSENT_DB = "consent_for_market_request_test"
 SECRET = "test-secret-with-at-least-thirty-two-bytes-xx"
 
+
+class RecordingNotifier:
+    """Merkt sich, wer benachrichtigt worden wäre — und kann scheitern.
+
+    `fail` ist der Punkt: eine misslungene Benachrichtigung darf den Vorgang
+    nicht kippen, der sie ausgelöst hat.
+    """
+
+    def __init__(self) -> None:
+        self.sent: list[tuple[UUID, str]] = []
+        self.fail = False
+
+    async def notify(self, user_id: UUID, kind: str) -> None:
+        if self.fail:
+            raise RuntimeError("identity-service nicht erreichbar")
+        self.sent.append((user_id, kind))
+
+
+NOTIFIER = RecordingNotifier()
+
 #: Eine Schleife fürs ganze Modul — asyncpg-Pools binden an die Schleife ihrer
 #: Erzeugung.
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -114,6 +134,12 @@ def stack(postgres_url: str) -> Iterator[tuple[Any, Any]]:
 
         patch.setattr(compose_module, "HttpConsentGate", _in_process_gate)
 
+        def _recording_notifier(*, base_url: str, secret: str) -> Any:
+            _ = (base_url, secret)
+            return NOTIFIER
+
+        patch.setattr(compose_module, "HttpNotifier", _recording_notifier)
+
         from transfer_service.configuration import TransferServiceSettings
         from transfer_service.presentation.compose_api import build_app as build_transfer
 
@@ -129,6 +155,8 @@ def stack(postgres_url: str) -> Iterator[tuple[Any, Any]]:
 def apps(stack: tuple[Any, Any], postgres_url: str) -> tuple[Any, Any]:
     _truncate_all(postgres_url)
     _truncate_all(_sibling(postgres_url, _CONSENT_DB))
+    NOTIFIER.sent.clear()
+    NOTIFIER.fail = False
     return stack
 
 
@@ -357,3 +385,48 @@ async def test_unavailable_means_no_even_with_a_granted_request(apps: tuple[Any,
         app, "POST", "/transfers", company_token, json={"subject_id": str(person), "message": "Hi"}
     )
     assert blocked.status_code == 404
+
+
+async def test_the_person_is_told_that_someone_asked(apps: tuple[Any, Any]) -> None:
+    """Ohne diesen Ruf erfährt sie es nur, wenn sie zufällig vorbeischaut."""
+    app, person, _person_token, _tenant, company_token = await _prepare(apps)
+
+    await _call(app, "POST", f"/market/{person}/requests", company_token)
+
+    assert NOTIFIER.sent == [(person, "market_request")]
+
+
+async def test_a_broken_notifier_does_not_break_the_request(apps: tuple[Any, Any]) -> None:
+    """Die genaue Umkehrung der Consent-Regel, und aus demselben Grund richtig.
+
+    Beim Ledger geht es um Erlaubnis — im Zweifel nein. Hier geht es um
+    Höflichkeit, und einen Vorgang scheitern zu lassen, weil eine Mail nicht
+    rausging, wäre grotesk.
+    """
+    app, person, person_token, _tenant, company_token = await _prepare(apps)
+    NOTIFIER.fail = True
+
+    asked = await _call(app, "POST", f"/market/{person}/requests", company_token)
+
+    assert asked.status_code == 201, asked.text
+    # Und der Vorgang steht wirklich in der Datenbank, nicht nur in der Antwort.
+    mine = await _call(app, "GET", "/market/me/requests", person_token)
+    assert [r["status"] for r in mine.json()] == ["PENDING"]
+
+
+async def test_the_company_is_never_mailed(apps: tuple[Any, Any]) -> None:
+    """Eine Mail an einen Firmenverteiler mit dem Namen eines Menschen wäre
+    derselbe Leck-Kanal, nur andersherum."""
+    app, person, person_token, _tenant, company_token = await _prepare(apps)
+    asked = await _call(app, "POST", f"/market/{person}/requests", company_token)
+    NOTIFIER.sent.clear()
+
+    await _call(app, "POST", f"/market/requests/{asked.json()['id']}/grant", person_token)
+    started = await _call(
+        app, "POST", "/transfers", company_token, json={"subject_id": str(person), "message": "Hi"}
+    )
+    await _call(app, "POST", f"/transfers/{started.json()['id']}/accept-talk", person_token)
+
+    # Nur der Zug des Unternehmens (der Transfer) erreicht jemanden — und zwar
+    # die Person. Ihre eigenen Züge lösen nichts aus.
+    assert NOTIFIER.sent == [(person, "transfer_update")]

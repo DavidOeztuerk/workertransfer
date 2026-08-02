@@ -7,6 +7,7 @@ durch den Consent-Ledger, je Unternehmen einzeln.
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 from uuid import UUID
 
@@ -109,6 +110,24 @@ def _to_http(error: Any) -> HTTPException:
         return HTTPException(status.HTTP_409_CONFLICT, error.message)
     message = error.message if error is not None else "request refused"
     return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, message)
+
+
+async def _notify(deps: dict[str, Any], user_id: UUID, kind: str) -> None:
+    """Benachrichtigen darf nichts kippen — und das steht HIER, nicht nur im Adapter.
+
+    Der HTTP-Adapter schluckt seine Fehler bereits. Sich darauf zu verlassen
+    hieße, die Zusage an der Wahl der Implementierung aufzuhängen: ein anderer
+    Adapter, ein Tippfehler in den Einstellungen, ein Fake im Test — und ein
+    Vorgang scheitert, weil eine Mail nicht rausging. Ein Integrationstest mit
+    einem absichtlich kaputten Notifier hat genau das gezeigt.
+    """
+    try:
+        await deps["notify"].notify(user_id, kind)
+    except Exception:
+        _logger.warning("Benachrichtigung konnte nicht abgesetzt werden", exc_info=True)
+
+
+_logger = logging.getLogger("workertransfer.resume.notify")
 
 
 def build_router(deps: dict[str, Any]) -> APIRouter:
@@ -287,7 +306,10 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             if not result.is_success:
                 raise _to_http(result.error)
             await uow.commit()
-            return _request_dto(result.value)
+        # Nach dem Commit und ohne Rückwirkung: eine misslungene Mail darf die
+        # Anfrage nicht rückgängig machen.
+        await _notify(deps, subject_id, "resume_request")
+        return _request_dto(result.value)
 
     @router.get("/resumes/requests")
     async def company_requests(request: Request) -> list[ResumeRequestV1]:

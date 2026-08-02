@@ -16,6 +16,7 @@ from applications_service.infrastructure.database.repositories import (
     SqlAlchemyApplicationRepository,
 )
 from applications_service.infrastructure.jobs import HttpJobLookup
+from applications_service.infrastructure.notify import HttpNotifier
 
 __all__ = ["compose_infrastructure", "request_scope"]
 
@@ -37,5 +38,11 @@ def compose_infrastructure(
         "request_scope": request_scope,
         "clock": SystemClock(),
         "consent": HttpConsentWriter(base_url=settings.consent_base_url),
+        # Feuern und vergessen: ein Fehlschlag hier darf niemals den
+        # Vorgang scheitern lassen, der ihn ausgelöst hat.
+        "notify": HttpNotifier(
+            base_url=settings.identity_base_url,
+            secret=settings.notify_secret.get_secret_value(),
+        ),
         "jobs": HttpJobLookup(base_url=settings.jobs_base_url),
     }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 from uuid import UUID
 
@@ -122,6 +123,24 @@ def _transfer_http(error: Any) -> HTTPException:
     return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, message)
 
 
+async def _notify(deps: dict[str, Any], user_id: UUID, kind: str) -> None:
+    """Benachrichtigen darf nichts kippen — und das steht HIER, nicht nur im Adapter.
+
+    Der HTTP-Adapter schluckt seine Fehler bereits. Sich darauf zu verlassen
+    hieße, die Zusage an der Wahl der Implementierung aufzuhängen: ein anderer
+    Adapter, ein Tippfehler in den Einstellungen, ein Fake im Test — und ein
+    Vorgang scheitert, weil eine Mail nicht rausging. Ein Integrationstest mit
+    einem absichtlich kaputten Notifier hat genau das gezeigt.
+    """
+    try:
+        await deps["notify"].notify(user_id, kind)
+    except Exception:
+        _logger.warning("Benachrichtigung konnte nicht abgesetzt werden", exc_info=True)
+
+
+_logger = logging.getLogger("workertransfer.transfer.notify")
+
+
 def build_router(deps: dict[str, Any]) -> APIRouter:
     router = APIRouter(tags=["market"])
     session_factory = deps["session_factory"]
@@ -197,9 +216,12 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             if not result.is_success:
                 raise _request_http(result.error)
             await uow.commit()
-            # Das anfragende Unternehmen bekommt kein `active`: es hat die
-            # Antwort schon in Form des Status, den es sieht oder nicht sieht.
-            return _request_dto(result.value, active=None)
+        # Nach dem Commit und ohne Rückwirkung: eine misslungene Mail darf die
+        # Anfrage nicht rückgängig machen.
+        await _notify(deps, subject_id, "market_request")
+        # Das anfragende Unternehmen bekommt kein `active`: es hat die Antwort
+        # schon in Form des Status, den es sieht oder nicht sieht.
+        return _request_dto(result.value, active=None)
 
     @router.get("/market/me/requests")
     async def my_requests(request: Request) -> list[MarketRequestV1]:
@@ -345,7 +367,9 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             if not result.is_success:
                 raise _transfer_http(result.error)
             await uow.commit()
-            return _transfer_dto(result.value)
+            transfer = result.value
+        await _notify(deps, transfer.subject_id, "transfer_update")
+        return _transfer_dto(transfer)
 
     @router.get("/transfers/me")
     async def my_transfers(request: Request) -> list[TransferV1]:
@@ -381,7 +405,13 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             if not result.is_success:
                 raise _transfer_http(result.error)
             await uow.commit()
-            return _transfer_dto(result.value)
+            transfer = result.value
+        # Nur Züge des Unternehmens werden gemeldet. Die Person erfährt vom
+        # Unternehmen nichts per Mail: es ist die Seite, die etwas will, und
+        # eine Mail an einen Firmenverteiler mit dem Namen eines Menschen wäre
+        # derselbe Leck-Kanal, nur andersherum.
+        await _notify(deps, transfer.subject_id, "transfer_update")
+        return _transfer_dto(transfer)
 
     # Getrennte Endpunkte statt eines `PATCH status`: jeder Übergang gehört
     # einer Seite, und ein gemeinsamer müsste bei jedem Aufruf herausfinden, wer
@@ -424,7 +454,9 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             if not result.is_success:
                 raise _transfer_http(result.error)
             await uow.commit()
-            return _transfer_dto(result.value)
+            transfer = result.value
+        await _notify(deps, transfer.subject_id, "transfer_update")
+        return _transfer_dto(transfer)
 
     @router.post("/transfers/{transfer_id}/complete")
     async def complete(transfer_id: UUID, request: Request) -> TransferV1:
