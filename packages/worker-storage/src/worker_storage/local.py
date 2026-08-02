@@ -79,3 +79,21 @@ class LocalStorage:
         path = self._path(key)
         # missing_ok: Löschen ist idempotent.
         await asyncio.to_thread(lambda: path.unlink(missing_ok=True))
+
+    async def list_names(self, prefix: str) -> list[str]:
+        directory = self._path(prefix)
+
+        def _names() -> list[str]:
+            if not directory.is_dir():
+                # Kein Verzeichnis heißt: da war noch nie etwas. Ein Fehler wäre
+                # hier eine Unterscheidung, die keine Aufrufstelle braucht.
+                return []
+            return sorted(
+                entry.name
+                for entry in directory.iterdir()
+                # Halbfertige Schreibvorgänge gehören niemandem: sie hier
+                # aufzuführen würde sie als Anhänge ausgeben.
+                if entry.is_file() and not entry.name.startswith(".")
+            )
+
+        return await asyncio.to_thread(_names)

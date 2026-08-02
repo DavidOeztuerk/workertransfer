@@ -86,3 +86,34 @@ async def test_a_symlinked_root_cannot_be_used_to_escape(tmp_path: Path) -> None
 
     with pytest.raises(InvalidKey):
         await storage.put("link/../../outside/x.png", b"bytes", content_type="image/png")
+
+
+async def test_listing_a_prefix_names_what_is_there(storage: LocalStorage) -> None:
+    await storage.put("person/a.png", b"x", content_type="image/png")
+    await storage.put("person/b.png", b"y", content_type="image/png")
+    await storage.put("andere/c.png", b"z", content_type="image/png")
+
+    assert await storage.list_names("person") == ["a.png", "b.png"]
+
+
+async def test_listing_an_untouched_prefix_is_empty_not_an_error(
+    storage: LocalStorage,
+) -> None:
+    # Kein Verzeichnis heißt: da war noch nie etwas.
+    assert await storage.list_names("noch-nie") == []
+
+
+async def test_a_half_written_file_is_not_listed(storage: LocalStorage, tmp_path: Path) -> None:
+    """Halbfertige Schreibvorgänge gehören niemandem.
+
+    Sie aufzuführen würde sie als Anhänge ausgeben — und ein Aufräumer, der sie
+    für verwaist hält, löscht sie mitten im Schreiben.
+    """
+    await storage.put("person/a.png", b"x", content_type="image/png")
+
+    def _leave_partial() -> None:
+        (tmp_path / "person" / ".b.png.partial").write_bytes(b"halb")
+
+    await asyncio.to_thread(_leave_partial)
+
+    assert await storage.list_names("person") == ["a.png"]

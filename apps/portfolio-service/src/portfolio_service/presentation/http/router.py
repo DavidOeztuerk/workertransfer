@@ -6,6 +6,7 @@ aktiven Tenant (nur Unternehmen lesen) und die Einwilligung der Person.
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
@@ -31,6 +32,8 @@ __all__ = ["build_router"]
 #: Eine Antwort für „gibt es nicht" und „ist nicht freigegeben". Sie darf sich
 #: zwischen den Fällen nicht unterscheiden — sonst wäre der Statuscode ein
 #: Orakel über jede geratene UUID (ADR-0020 §1).
+_logger = logging.getLogger("workertransfer.portfolio.attachments")
+
 _NOT_VISIBLE = "No such portfolio"
 
 #: Die Endung folgt dem erkannten Typ, nicht dem hochgeladenen Dateinamen.
@@ -104,7 +107,29 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
                 message = error.message if error is not None else "invalid portfolio"
                 raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, message)
             await uow.commit()
-            return _dto(result.value)
+            saved = result.value
+
+        # ERST committen, DANN aufräumen. Andersherum wären bei einem
+        # fehlgeschlagenen Commit Dateien gelöscht, auf die die gespeicherten
+        # Einträge weiterhin zeigen — aus einem Aufräumen würde Datenverlust.
+        # Scheitert stattdessen das Aufräumen, bleibt eine verwaiste Datei
+        # liegen: sie kostet Platz und sonst nichts.
+        await _remove_orphans(subject_id, saved)
+        return _dto(saved)
+
+    async def _remove_orphans(subject_id: Any, portfolio: Portfolio) -> None:
+        referenced = {item.attachment for item in portfolio.items if item.attachment is not None}
+        try:
+            stored = await deps["storage"].list_names(str(subject_id))
+            for name in stored:
+                if name not in referenced:
+                    await deps["storage"].delete(_storage_key(subject_id, name))
+        except OSError:
+            # Ein Anhang, dessen Eintrag gelöscht wurde, ist nicht mehr
+            # erreichbar — er wird nirgends mehr referenziert. Das Aufräumen
+            # spart Platz; es scheitern zu lassen wäre eine Fehlermeldung für
+            # etwas, das die Person gerade erfolgreich getan hat.
+            _logger.warning("Aufräumen der Anhänge fehlgeschlagen", exc_info=True)
 
     @router.get("/portfolios/me")
     async def get_my_portfolio(request: Request) -> PortfolioV1 | None:

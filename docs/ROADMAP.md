@@ -359,8 +359,14 @@ was der Code tat.
   die Endung folgt dem erkannten Typ: den Namen des Clients zu übernehmen hieße,
   fremden Text zu einem Teil eines Pfades zu machen. Ausgeliefert wird als
   Download, nicht inline — ein PDF kann Skripte enthalten.
-  **Noch offen:** verwaiste Dateien aufräumen (ein Anhang, dessen Eintrag
-  gelöscht wurde, bleibt liegen) und die Oberfläche fürs Hochladen.
+  Verwaiste Dateien werden beim Speichern aufgeräumt — **nach** dem Commit:
+  andersherum wären bei einem fehlgeschlagenen Commit Dateien gelöscht, auf die
+  die gespeicherten Einträge weiterhin zeigen, und aus dem Aufräumen würde
+  Datenverlust. Scheitert das Aufräumen, bleibt eine Datei liegen: sie kostet
+  Platz und sonst nichts.
+  Oberfläche: ein Datei-Feld je Arbeit, das sofort hochlädt. Der lokale
+  Dateiname wird bewusst nicht angezeigt — er wandert nicht zum Server, und ihn
+  zu zeigen würde suggerieren, dass er es täte.
 - ✅ **Scheibe C — Einladungen & Rollen** (02.08.2026). Ein Administrator lädt
   eine **Adresse** ein (nicht ein Konto: die Person muss noch keines haben, und
   beim Einladen darf nicht verraten werden, ob sie eines hat). Angenommen wird

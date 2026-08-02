@@ -427,3 +427,81 @@ async def test_an_attachment_is_delivered_as_a_download(apps: tuple[Any, Any]) -
 
     assert response.headers["content-disposition"].startswith("attachment;")
     assert response.headers["content-type"] == "application/pdf"
+
+
+async def _save_with_attachment(app: Any, token: str, name: str | None) -> httpx.Response:
+    return await _call(
+        app,
+        "PUT",
+        "/portfolios/me",
+        token,
+        json={
+            "items": [
+                {
+                    "title": "Ein Werkzeug",
+                    "summary": "",
+                    "url": None,
+                    "role": "",
+                    "year": None,
+                    "attachment": name,
+                }
+            ]
+        },
+    )
+
+
+async def test_an_attachment_nobody_references_is_removed_on_save(
+    apps: tuple[Any, Any],
+) -> None:
+    """Aufgeräumt wird NACH dem Commit.
+
+    Andersherum wären bei einem fehlgeschlagenen Commit Dateien gelöscht, auf
+    die die gespeicherten Einträge weiterhin zeigen — aus einem Aufräumen würde
+    Datenverlust.
+    """
+    portfolio_app, _consent = apps
+    person = uuid4()
+    token = _token(person, tenant_id=None)
+
+    first = (await _upload(portfolio_app, token, PNG)).json()["name"]
+    second = (await _upload(portfolio_app, token, PNG)).json()["name"]
+    assert (await _save_with_attachment(portfolio_app, token, first)).status_code == 200
+
+    # Die zweite Datei zeigt niemand an — sie ist mit dem Speichern weg.
+    orphan = await _call(portfolio_app, "GET", f"/portfolios/{person}/attachments/{second}", token)
+    assert orphan.status_code == 404
+
+    # Die referenzierte bleibt.
+    kept = await _call(portfolio_app, "GET", f"/portfolios/{person}/attachments/{first}", token)
+    assert kept.status_code == 200
+
+
+async def test_removing_the_reference_removes_the_file(apps: tuple[Any, Any]) -> None:
+    portfolio_app, _consent = apps
+    person = uuid4()
+    token = _token(person, tenant_id=None)
+    name = (await _upload(portfolio_app, token, PNG)).json()["name"]
+    await _save_with_attachment(portfolio_app, token, name)
+
+    await _save_with_attachment(portfolio_app, token, None)
+
+    gone = await _call(portfolio_app, "GET", f"/portfolios/{person}/attachments/{name}", token)
+    assert gone.status_code == 404
+
+
+async def test_one_persons_cleanup_does_not_touch_another(apps: tuple[Any, Any]) -> None:
+    """Aufgeräumt wird unter der eigenen subject_id — dem Präfix, sonst nichts."""
+    portfolio_app, _consent = apps
+    other = uuid4()
+    other_token = _token(other, tenant_id=None)
+    other_name = (await _upload(portfolio_app, other_token, PNG)).json()["name"]
+    await _save_with_attachment(portfolio_app, other_token, other_name)
+
+    mine = _token(uuid4(), tenant_id=None)
+    await _upload(portfolio_app, mine, PNG)
+    await _save_with_attachment(portfolio_app, mine, None)
+
+    still_there = await _call(
+        portfolio_app, "GET", f"/portfolios/{other}/attachments/{other_name}", other_token
+    )
+    assert still_there.status_code == 200
