@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 __all__ = [
     "EducationV1",
     "PositionV1",
+    "ResumeRequestV1",
     "ResumeV1",
     "SaveResumeV1",
 ]
@@ -54,3 +55,25 @@ class ResumeV1(BaseModel):
     positions: list[PositionV1]
     education: list[EducationV1]
     updated_at: datetime
+
+
+class ResumeRequestV1(BaseModel):
+    """Ein Anfragevorgang.
+
+    `status` sagt, was geschehen ist. `active` sagt, was gilt — es kommt frisch
+    aus dem Ledger und kann von `status` abweichen: nach einem Widerruf bleibt
+    `GRANTED` stehen, während `active` auf `false` fällt. Genau diese Trennung
+    ist der Grund, warum die Berechtigung nicht im Vorgang gespeichert wird.
+
+    `active` ist nur für die betroffene Person gefüllt; das anfragende
+    Unternehmen sieht `None`, denn es hat die Antwort schon in Form der Daten,
+    die es bekommt oder nicht bekommt.
+    """
+
+    id: UUID
+    subject_id: UUID
+    tenant_id: UUID
+    status: str
+    created_at: datetime
+    answered_at: datetime | None = None
+    active: bool | None = None
