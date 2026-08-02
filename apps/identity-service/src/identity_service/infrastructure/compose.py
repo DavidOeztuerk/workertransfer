@@ -18,6 +18,7 @@ from identity_service.infrastructure.clock import SystemClock
 from identity_service.infrastructure.database.repositories import (
     SqlAlchemyAuditRepository,
     SqlAlchemyCompanyRepository,
+    SqlAlchemyInvitationRepository,
     SqlAlchemyMembershipRepository,
     SqlAlchemySessionRepository,
     SqlAlchemyUserRepository,
@@ -41,6 +42,7 @@ async def request_scope(
         repos = {
             "users": SqlAlchemyUserRepository(uow.session),
             "memberships": SqlAlchemyMembershipRepository(uow.session),
+            "invitations": SqlAlchemyInvitationRepository(uow.session),
             "sessions": SqlAlchemySessionRepository(uow.session),
             "audit": SqlAlchemyAuditRepository(uow.session),
             "tokens": SqlAlchemyVerificationTokenRepository(uow.session),

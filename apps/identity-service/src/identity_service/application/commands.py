@@ -29,6 +29,7 @@ from identity_service.domain.company import (
     DomainAlreadyClaimed,
     EmailDomain,
 )
+from identity_service.domain.invitation import Invitation, InvitationInvalid
 from identity_service.domain.membership import MembershipRole, MembershipView, NotAMember
 from identity_service.domain.password_policy import PasswordPolicy
 from identity_service.domain.user import (
@@ -58,12 +59,15 @@ __all__ = [
     "SwitchTenantCommand",
     "VerifyEmailCommand",
     "dispatch_all",
+    "handle_accept_invitation",
     "handle_create_company",
+    "handle_invite_member",
     "handle_list_memberships",
     "handle_register",
     "handle_resend",
     "handle_switch_tenant",
     "handle_verify_email",
+    "handle_withdraw_invitation",
 ]
 
 _logger = logging.getLogger("workertransfer.identity.commands")
@@ -643,3 +647,176 @@ async def _publish_user_events(user: User, deps: dict[str, Any]) -> None:
     eventbus = deps["eventbus"]
     for ev in user.pull_events():
         await eventbus.publish(ev)
+
+
+@dataclass(frozen=True, slots=True)
+class InviteMemberCommand:
+    tenant_id: UUID
+    inviter_id: UUID
+    email: str
+    role: str
+
+
+async def handle_invite_member(
+    cmd: InviteMemberCommand,
+    *,
+    deps: dict[str, Any],
+    repos: dict[str, Any],
+    outbox: list[OutgoingMail],
+) -> Result[Invitation]:
+    """Lädt eine Adresse in ein Unternehmen ein.
+
+    Die Rolle des Einladenden wird hier gelesen, nicht aus dem Token genommen:
+    im Token steht nur, für welches Unternehmen jemand handelt, nicht mit
+    welcher Berechtigung. Wer aus dem Unternehmen entfernt wurde, hat gar keine
+    Rolle mehr — und `role_of` liefert dann `None`.
+    """
+    now = deps["clock"].now()
+    inviter_role = await repos["memberships"].role_of(cmd.inviter_id, cmd.tenant_id)
+    if inviter_role is None:
+        return Result.fail(NotAMember())
+
+    try:
+        email = Email(cmd.email)
+        role = MembershipRole(cmd.role)
+    except DomainError, ValueError:
+        return Result.fail(InvitationInvalid())
+
+    try:
+        # Erneutes Einladen ersetzt die offene Einladung, statt eine zweite
+        # anzulegen: sonst hätte eine zurückgezogene Einladung einen noch
+        # gültigen Zwilling, und das Zurückziehen wäre wirkungslos.
+        open_invitation = await repos["invitations"].find_open(cmd.tenant_id, email)
+        if open_invitation is not None:
+            open_invitation.withdraw(by_role=inviter_role)
+            await repos["invitations"].save(open_invitation)
+
+        invitation = Invitation.issue(
+            tenant_id=cmd.tenant_id,
+            email=email,
+            role=role,
+            inviter_role=inviter_role,
+            invited_by=cmd.inviter_id,
+            now=now,
+        )
+    except DomainError as exc:
+        return Result.fail(exc)
+
+    raw_token, token_hash = generate_token()
+    await repos["invitations"].add(invitation, token_hash)
+    await repos["audit"].append(
+        AuditEvent(
+            occurred_at=now,
+            actor_id=cmd.inviter_id,
+            tenant_id=cmd.tenant_id,
+            action=AuditAction.MEMBER_INVITED,
+            target_id=invitation.id,
+            correlation_id=_correlation_id(),
+            # Die Adresse steht bewusst NICHT dabei: die Allowlist schließt
+            # E-Mails aus, und eine Einladung ist kein Grund, sie ins Protokoll
+            # zu schreiben.
+            metadata={"role": str(role)},
+        )
+    )
+    outbox.append(
+        OutgoingMail(
+            to=email.value,
+            subject="Du wurdest zu einem Unternehmen eingeladen",
+            body=_invitation_body(deps, raw_token),
+            user_ref=str(invitation.id),
+        )
+    )
+    return Result.ok(invitation)
+
+
+def _invitation_body(deps: dict[str, Any], raw_token: str) -> str:
+    base = deps["settings"].public_web_url.rstrip("/")
+    return (
+        "Du wurdest eingeladen, für ein Unternehmen bei WorkerTransfer zu "
+        "handeln. Über folgenden Link kannst du die Einladung annehmen:\n\n"
+        f"{base}/invitation?token={raw_token}\n\n"
+        "Du brauchst dafür ein Konto mit genau dieser E-Mail-Adresse. Hast du "
+        "noch keines, registriere dich zuerst und öffne den Link danach "
+        "erneut.\n"
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class AcceptInvitationCommand:
+    token: str
+    user_id: UUID
+
+
+async def handle_accept_invitation(
+    cmd: AcceptInvitationCommand, *, deps: dict[str, Any], repos: dict[str, Any]
+) -> Result[Invitation]:
+    """Nimmt eine Einladung an — wenn die angemeldete Adresse die eingeladene ist.
+
+    Das Token allein reicht nicht. Tokens werden weitergeleitet, und wer den
+    Link hat, ist nicht, wer eingeladen wurde.
+    """
+    now = deps["clock"].now()
+    # Die Adresse kommt aus der Datenbank, nicht aus dem Request und auch nicht
+    # aus dem Token: sie ist der einzige Beweis, dass die angemeldete Person die
+    # eingeladene ist, und darf deshalb nicht vom Aufrufer stammen.
+    user = await repos["users"].get_by_id(cmd.user_id)
+    if user is None:
+        return Result.fail(InvitationInvalid())
+    invitation = await repos["invitations"].get_by_token_hash(hash_token(cmd.token))
+    if invitation is None:
+        return Result.fail(InvitationInvalid())
+    try:
+        invitation.accept(by_email=user.email, now=now)
+    except DomainError as exc:
+        return Result.fail(exc)
+
+    await repos["invitations"].save(invitation)
+    await repos["memberships"].add(cmd.user_id, invitation.tenant_id, invitation.role)
+    await repos["audit"].append(
+        AuditEvent(
+            occurred_at=now,
+            actor_id=cmd.user_id,
+            tenant_id=invitation.tenant_id,
+            action=AuditAction.MEMBER_JOINED,
+            target_id=invitation.id,
+            correlation_id=_correlation_id(),
+            metadata={"role": str(invitation.role)},
+        )
+    )
+    return Result.ok(invitation)
+
+
+@dataclass(frozen=True, slots=True)
+class WithdrawInvitationCommand:
+    tenant_id: UUID
+    invitation_id: UUID
+    actor_id: UUID
+
+
+async def handle_withdraw_invitation(
+    cmd: WithdrawInvitationCommand, *, deps: dict[str, Any], repos: dict[str, Any]
+) -> Result[Invitation]:
+    role = await repos["memberships"].role_of(cmd.actor_id, cmd.tenant_id)
+    if role is None:
+        return Result.fail(NotAMember())
+    invitation = await repos["invitations"].get(cmd.invitation_id)
+    # Eine fremde Einladung verhält sich wie eine, die es nicht gibt.
+    if invitation is None or invitation.tenant_id != cmd.tenant_id:
+        return Result.fail(InvitationInvalid())
+    try:
+        invitation.withdraw(by_role=role)
+    except DomainError as exc:
+        return Result.fail(exc)
+    await repos["invitations"].save(invitation)
+    await repos["audit"].append(
+        AuditEvent(
+            occurred_at=deps["clock"].now(),
+            actor_id=cmd.actor_id,
+            tenant_id=cmd.tenant_id,
+            action=AuditAction.INVITATION_WITHDRAWN,
+            target_id=invitation.id,
+            correlation_id=_correlation_id(),
+            metadata={},
+        )
+    )
+    return Result.ok(invitation)

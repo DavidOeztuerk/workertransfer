@@ -8,8 +8,12 @@ from worker_contracts.consent import (
     ConsentStateV1,
 )
 from worker_contracts.identity import (
+    AcceptInvitationV1,
+    CompanyMemberV1,
     CompanyV1,
     CreateCompanyV1,
+    InvitationV1,
+    InviteMemberV1,
     MembershipV1,
     RegisterUserV1,
     ResendVerificationV1,
@@ -26,7 +30,9 @@ from worker_contracts.resume import (
 )
 
 __all__ = [
+    "AcceptInvitationV1",
     "Command",
+    "CompanyMemberV1",
     "CompanyV1",
     "ConsentCheckResultV1",
     "ConsentCheckV1",
@@ -36,6 +42,8 @@ __all__ = [
     "CreateCompanyV1",
     "EducationV1",
     "Event",
+    "InvitationV1",
+    "InviteMemberV1",
     "MembershipV1",
     "Message",
     "PositionV1",
