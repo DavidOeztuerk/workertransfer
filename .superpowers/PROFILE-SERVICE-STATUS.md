@@ -31,7 +31,7 @@
 - [x] 11 Frontend: Kandidatenliste für Unternehmen (TDD)
 - [x] 12 Playwright-E2E, self-skip ohne laufenden Stack
 - [ ] 13 scripts/validate.sh — ein Befehl, der alles prüft und den Stand meldet
-- [ ] 14 ADR-0020 + ROADMAP/CLAUDE.md nachziehen
+- [x] 14 ADR-0020 + ROADMAP/CLAUDE.md nachziehen
 
 ## Log
 - 0 Spec: docs/superpowers/specs/2026-08-01-profile-service-design.md
@@ -92,3 +92,6 @@
   "database profile does not exist"), und der Web-Container startet nicht, wenn
   sich die Lockfile geändert hat — pnpm will node_modules löschen und bricht
   ohne TTY ab. Beides im Compose dokumentiert bzw. behoben (CI=true).
+- 14 ADR-0020 (Consent als Enabler in der Praxis), ROADMAP 3.2 abgeschlossen,
+  CLAUDE.md entstaubt: sie behauptete noch, consent-service sei zu 10% gebaut
+  und apps/web habe zwei Routen. Alle 15 Aufgaben erledigt.
