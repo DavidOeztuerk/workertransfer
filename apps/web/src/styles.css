@@ -738,3 +738,26 @@ h1 {
   padding: 0.75rem 0;
   border-bottom: 1px solid var(--wt-border, #d6d3cd);
 }
+
+/* „Was liegt an": jede Zeile eine Handlung, kein Fließtext. */
+.overview {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.overview li a {
+  display: block;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--wt-border, #d6d3cd);
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  font-weight: 600;
+}
+
+.overview li a:hover {
+  border-color: var(--wt-accent, #1f6f5c);
+}

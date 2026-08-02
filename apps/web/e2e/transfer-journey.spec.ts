@@ -93,11 +93,24 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
   await card.getByRole("button", { name: /Marktstatus anfragen/i }).click();
   await expect(card.getByText(/Marktstatus angefragt/i)).toBeVisible();
 
+  // Die Startseite sagt der Person, dass etwas ansteht — ohne dass sie danach
+  // sucht. Zusammengesetzt im Browser aus vier Diensten.
+  await candidate.goto("/");
+  await expect(
+    candidate.getByText(/Unternehmen möchte(n)? sehen, ob du ansprechbar bist/)
+  ).toBeVisible();
+
   // Die Person entscheidet.
   await candidate.goto("/markt");
   const row = candidate.locator("li").filter({ hasText: /ob du ansprechbar bist/i });
   await row.getByRole("button", { name: /Freigeben/i }).click();
   await expect(row.getByText(/Freigegeben/i)).toBeVisible();
+
+  // Beantwortet heißt: verschwindet aus „Was liegt an".
+  await candidate.goto("/");
+  await expect(
+    candidate.getByText(/Unternehmen möchte(n)? sehen, ob du ansprechbar bist/)
+  ).toHaveCount(0);
 
   // Jetzt erst sieht das Unternehmen den Status — und darf zugehen.
   await recruiter.goto("/candidates");
