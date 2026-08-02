@@ -84,33 +84,56 @@ export function uniqueCompanyDomain(): string {
 
 interface MailpitMessage {
   ID: string;
+  Subject: string;
   To: Array<{ Address: string }>;
 }
 
 /**
- * Den Bestätigungs-Token aus der zuletzt an `address` zugestellten Mail lesen.
+ * Ein Token aus der zuletzt an `address` zugestellten Mail dieser Art.
  *
- * Wartet, statt einmal zu schauen: der Versand läuft nach dem Commit und damit
- * nach der HTTP-Antwort, auf die der Browser reagiert hat.
+ * Der Betreff ist Teil der Suche, nicht nur die Adresse. Vorher wurde die
+ * neueste Mail an die Adresse genommen und daraus irgendein `token=`
+ * herausgelesen — seit es zwei Sorten Links gibt (Bestätigung und Einladung),
+ * greift das mal die eine und mal die andere, je nachdem welche Mail beim
+ * Nachsehen schon da war. Der Test schlug dann an einer Stelle fehl, die mit
+ * der Ursache nichts zu tun hatte.
+ *
+ * Gewartet wird, statt einmal zu schauen: der Versand läuft nach dem Commit
+ * und damit nach der HTTP-Antwort, auf die der Browser reagiert hat.
  */
-export async function verificationTokenFor(address: string): Promise<string> {
+async function tokenFromMail(
+  address: string,
+  subjectPart: string,
+  linkPath: string
+): Promise<string> {
+  const pattern = new RegExp(`${linkPath}\\?token=([A-Za-z0-9_-]+)`);
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     const list = (await (await fetch(`${MAILPIT_URL}/api/v1/messages?limit=50`)).json()) as {
       messages?: MailpitMessage[];
     };
-    const hit = (list.messages ?? []).find((message) =>
-      message.To.some((to) => to.Address.toLowerCase() === address.toLowerCase())
+    const hit = (list.messages ?? []).find(
+      (message) =>
+        message.Subject.includes(subjectPart) &&
+        message.To.some((to) => to.Address.toLowerCase() === address.toLowerCase())
     );
     if (hit !== undefined) {
       const body = (await (await fetch(`${MAILPIT_URL}/api/v1/message/${hit.ID}`)).json()) as {
         Text?: string;
         HTML?: string;
       };
-      const token = /[?&]token=([A-Za-z0-9_-]+)/.exec(`${body.Text ?? ""}${body.HTML ?? ""}`)?.[1];
+      const token = pattern.exec(`${body.Text ?? ""}${body.HTML ?? ""}`)?.[1];
       if (token !== undefined) return token;
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  throw new Error(`Keine Bestätigungsmail für ${address} in Mailpit gefunden`);
+  throw new Error(`Keine ${subjectPart}-Mail für ${address} in Mailpit gefunden`);
+}
+
+export function verificationTokenFor(address: string): Promise<string> {
+  return tokenFromMail(address, "bestätige deine E-Mail-Adresse", "/verify");
+}
+
+export function invitationTokenFor(address: string): Promise<string> {
+  return tokenFromMail(address, "eingeladen", "/invitation");
 }

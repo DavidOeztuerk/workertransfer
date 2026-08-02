@@ -333,6 +333,9 @@ was der Code tat.
   und ziehen zurück, Mitglieder sehen die Mannschaft. Die Firmendomain spielt
   dabei bewusst keine Rolle — sie beweist, wem die Domain gehört (ADR-0019); wen
   das Unternehmen danach hereinlässt, ist seine Entscheidung.
+  Oberfläche: `/company/team` (Mannschaft, Einladen, Zurückziehen) und
+  `/invitation` (Annehmen über den Link aus der Mail), dazu eine vierte
+  Playwright-Reise.
   **Offen:** ein Mitglied wieder zu entfernen. Der gefährliche Teil davon —
   dass ein entzogener Zugang beim Refresh wirkt — ist bereits erledigt.
   ✅ **Die Mitgliedschaftsprüfung in `handle_refresh` ist vorgezogen und erledigt**
