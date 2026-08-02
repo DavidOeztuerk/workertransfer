@@ -5,12 +5,14 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from resume_service.domain.request import RequestStatus, ResumeRequest
 from resume_service.domain.resume import Education, MonthDate, Position, Resume
-from resume_service.infrastructure.database.models import ResumeModel
+from resume_service.infrastructure.database.models import ResumeModel, ResumeRequestModel
 
-__all__ = ["SqlAlchemyResumeRepository"]
+__all__ = ["SqlAlchemyResumeRepository", "SqlAlchemyResumeRequestRepository"]
 
 
 def _month_to_json(value: MonthDate | None) -> str | None:
@@ -96,3 +98,70 @@ class SqlAlchemyResumeRepository:
         row.positions = [_position_to_json(entry) for entry in resume.positions]
         row.education = [_education_to_json(entry) for entry in resume.education]
         row.updated_at = resume.updated_at
+
+
+def _request_to_domain(row: ResumeRequestModel) -> ResumeRequest:
+    return ResumeRequest(
+        id=row.id,
+        subject_id=row.subject_id,
+        tenant_id=row.tenant_id,
+        requested_by=row.requested_by,
+        status=RequestStatus(row.status),
+        created_at=row.created_at,
+        answered_at=row.answered_at,
+    )
+
+
+class SqlAlchemyResumeRequestRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get(self, request_id: UUID) -> ResumeRequest | None:
+        row = await self._session.get(ResumeRequestModel, request_id)
+        return None if row is None else _request_to_domain(row)
+
+    async def find(self, subject_id: UUID, tenant_id: UUID) -> ResumeRequest | None:
+        stmt = select(ResumeRequestModel).where(
+            ResumeRequestModel.subject_id == subject_id,
+            ResumeRequestModel.tenant_id == tenant_id,
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        return None if row is None else _request_to_domain(row)
+
+    async def add(self, request: ResumeRequest) -> None:
+        self._session.add(
+            ResumeRequestModel(
+                id=request.id,
+                subject_id=request.subject_id,
+                tenant_id=request.tenant_id,
+                requested_by=request.requested_by,
+                status=str(request.status),
+                created_at=request.created_at,
+                answered_at=request.answered_at,
+            )
+        )
+
+    async def save(self, request: ResumeRequest) -> None:
+        row = await self._session.get(ResumeRequestModel, request.id)
+        if row is None:
+            await self.add(request)
+            return
+        row.status = str(request.status)
+        row.answered_at = request.answered_at
+
+    async def for_subject(self, subject_id: UUID) -> list[ResumeRequest]:
+        return await self._listed(ResumeRequestModel.subject_id == subject_id)
+
+    async def for_tenant(self, tenant_id: UUID) -> list[ResumeRequest]:
+        return await self._listed(ResumeRequestModel.tenant_id == tenant_id)
+
+    async def _listed(self, condition: Any) -> list[ResumeRequest]:
+        # Neueste zuerst: eine offene Anfrage von heute ist wichtiger als eine
+        # beantwortete von vorletztem Monat.
+        stmt = (
+            select(ResumeRequestModel)
+            .where(condition)
+            .order_by(ResumeRequestModel.created_at.desc())
+        )
+        rows = (await self._session.execute(stmt)).scalars()
+        return [_request_to_domain(row) for row in rows]
