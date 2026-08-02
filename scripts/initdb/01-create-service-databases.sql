@@ -6,3 +6,4 @@
 -- database here, recreate the volume: `docker compose down -v && docker compose up -d`.
 CREATE DATABASE consent OWNER worker;
 CREATE DATABASE profile OWNER worker;
+CREATE DATABASE resume OWNER worker;

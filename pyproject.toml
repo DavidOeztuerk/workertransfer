@@ -18,7 +18,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["apps/identity-service", "apps/consent-service", "apps/profile-service", "packages/worker-*", "packages/worker-cli"]
+members = ["apps/identity-service", "apps/consent-service", "apps/profile-service", "apps/resume-service", "packages/worker-*", "packages/worker-cli"]
 # Phase-1 deficit: worker-files is a shell whose declared C-backend deps
 # (pillow, python-magic) and He adapt (boto3, minio, azure, ...) have no active
 # workspace consumer (no app/service depends on it; its Phase-1 smoke skips on
@@ -96,7 +96,12 @@ select = ["E", "F", "I", "B", "UP", "ASYNC", "RUF", "S"]
 python_version = "3.14"
 strict = true
 warn_unreachable = true
-exclude = ["tests", "packages/worker-files", "packages/worker-ai", "apps/identity-service/migrations", "apps/consent-service/migrations"]
+# `apps/.*/migrations` als Muster, nicht je Service ein Eintrag: jedes
+# migrations-Verzeichnis enthält ein `env.py`, und zwei davon im selben Lauf
+# sind für mypy dasselbe Modul zweimal ("Duplicate module named 'env'"). Mit
+# einer Aufzählung bricht der vierte Service den Typcheck, ohne dass jemand
+# ahnt, warum. Alembic-Umgebungsdateien haben ohnehin keinen Typvertrag.
+exclude = ["tests", "packages/worker-files", "packages/worker-ai", "apps/.*/migrations"]
 
 # Untyped third-party libraries (no py.typed marker / no stubs available).
 # Strict mode stays on; we only silence import-untyped for these specific modules.

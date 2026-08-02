@@ -26,7 +26,10 @@
 #   2. Copy the consent-service block below and change four things: the service
 #      name, SERVICE_DIR (its apps/<dir>), WORKER_PORT + the published port, and
 #      the uvicorn module in `command`.
-#   3. Add it to `web.depends_on` if the frontend calls it.
+#   3. Add it to `web.depends_on` if the frontend calls it, und ergänze eine
+#      VITE_<NAME>_BASE_URL. ACHTUNG: `docker compose restart web` übernimmt
+#      neue Variablen NICHT — es startet den Container mit seiner alten
+#      Konfiguration. Nötig ist `docker compose up -d web`.
 # ---------------------------------------------------------------------------
 
 x-service: &service
@@ -216,6 +219,46 @@ services:
       retries: 30
       start_period: 40s
 
+  resume-service:
+    <<: *service
+    container_name: workertransfer-resume
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        SERVICE_DIR: resume-service
+    environment:
+      <<: *service-env
+      WORKER_PORT: "8004"
+      WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/resume
+      # Der Lebenslauf wird je Unternehmen einzeln freigegeben; die Berechtigung
+      # steht im Ledger (Capability resume.visibility:tenant:<id>).
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+    ports:
+      - "8004:8004"
+    command:
+      - uvicorn
+      - resume_service.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8004"
+      - --reload
+      - --reload-dir
+      - /app/apps/resume-service/src
+      - --reload-dir
+      - /app/packages
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;urllib.request.urlopen("http://localhost:8004/health/live")
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 40s
+
   web:
     build:
       context: .
@@ -229,6 +272,8 @@ services:
         condition: service_healthy
       profile-service:
         condition: service_healthy
+      resume-service:
+        condition: service_healthy
     environment:
       # pnpm will purge node_modules when the lockfile changed since the image
       # was built, and without a TTY it aborts instead of asking — der Container
@@ -239,6 +284,7 @@ services:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8001}
       VITE_CONSENT_BASE_URL: ${VITE_CONSENT_BASE_URL:-http://localhost:8002}
       VITE_PROFILE_BASE_URL: ${VITE_PROFILE_BASE_URL:-http://localhost:8003}
+      VITE_RESUME_BASE_URL: ${VITE_RESUME_BASE_URL:-http://localhost:8004}
     ports:
       - "5173:5173"
     volumes:

@@ -17,6 +17,13 @@ from worker_contracts.identity import (
 )
 from worker_contracts.messages import Command, Event, Message, Query
 from worker_contracts.profile import ProfilePageV1, ProfileV1, SaveProfileV1
+from worker_contracts.resume import (
+    EducationV1,
+    PositionV1,
+    ResumeRequestV1,
+    ResumeV1,
+    SaveResumeV1,
+)
 
 __all__ = [
     "Command",
@@ -27,14 +34,19 @@ __all__ = [
     "ConsentRevokeV1",
     "ConsentStateV1",
     "CreateCompanyV1",
+    "EducationV1",
     "Event",
     "MembershipV1",
     "Message",
+    "PositionV1",
     "ProfilePageV1",
     "ProfileV1",
     "Query",
     "RegisterUserV1",
     "ResendVerificationV1",
+    "ResumeRequestV1",
+    "ResumeV1",
     "SaveProfileV1",
+    "SaveResumeV1",
     "VerifyEmailV1",
 ]
