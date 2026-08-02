@@ -418,3 +418,90 @@ h1 {
     font-size: 1.55rem;
   }
 }
+
+/* Innenseiten: eine schmale Spalte, weil es hier um ein Formular geht und
+   nicht um eine Landepage. */
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+}
+
+.page--narrow {
+  max-width: 46rem;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.page__header {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.page__header h1 {
+  margin: 0;
+}
+
+.page__lead {
+  margin: 0;
+  color: var(--wt-muted);
+  line-height: 1.6;
+  max-width: 40rem;
+}
+
+.page__note {
+  margin: 0;
+  color: var(--wt-accent, #1f6f5c);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Die Freigabe steht über dem Formular und ist der eigentliche Punkt der
+   Seite — sie bekommt einen eigenen Akzent, damit sie nicht wie eine
+   Fußnote zum Formular aussieht. */
+.profile__release {
+  border-left: 3px solid var(--wt-accent, #1f6f5c);
+}
+
+.page--narrow form {
+  display: grid;
+  gap: 1.1rem;
+}
+
+/* Kandidatenliste: Karten in einer flexiblen Spaltenzahl, damit die Seite auf
+   dem Laptop nicht zu einer endlosen Kolonne wird. */
+.candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+}
+
+.candidates__headline {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.candidates__meta {
+  margin: 0 0 0.6rem;
+  color: var(--wt-muted);
+  font-size: 0.85rem;
+}
+
+.candidates__skills {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.candidates__skills li {
+  border: 1px solid var(--wt-border, #d6d3cd);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.78rem;
+}

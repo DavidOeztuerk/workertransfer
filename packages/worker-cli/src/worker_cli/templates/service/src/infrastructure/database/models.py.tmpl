@@ -1,48 +1,33 @@
-"""Database models."""
+"""Database models for ${service_name}."""
 
-from sqlalchemy import String, Index, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from __future__ import annotations
+
 from uuid import UUID, uuid4
-from datetime import datetime, UTC
-from ${module_name}.infrastructure.database.base import Base, TimestampMixin, SoftDeleteMixin, VersionMixin
 
-class ExampleModel(Base, TimestampMixin, SoftDeleteMixin, VersionMixin):
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from ${module_name}.infrastructure.database.base import Base, TimestampMixin
+
+__all__ = ["ExampleModel"]
+
+
+class ExampleModel(Base, TimestampMixin):
+    """Platzhalter — durch die eigenen Tabellen dieses Service ersetzen.
+
+    Bewusst minimal. Das vorherige Beispiel führte Indizes, Soft-Delete, eine
+    tenant_id-Spalte und Domänen-Mapping vor — und war dabei nicht einmal
+    importierbar (`postgresql_where` auf einem UniqueConstraint, dazu ein
+    Lambda auf einen undefinierten Namen). Ein Beispiel, das mehr zeigt als es
+    trägt, lädt außerdem dazu ein, Entscheidungen zu kopieren, die nicht
+    allgemein gelten: ein Tenant ist ein Unternehmen, personenbezogene Daten
+    werden nicht über ihn getrennt (ADR-0017).
+
+    Die Mixins für Soft-Delete und Versionierung stehen in base.py bereit,
+    falls dieser Service sie braucht.
+    """
+
     __tablename__ = "examples"
-    __table_args__ = (
-        Index("ix_examples_tenant_id", "tenant_id"),
-        UniqueConstraint("tenant_id", "email", name="uq_examples_tenant_email", postgresql_where=lambda: deleted_at.is_(None)),
-    )
-    
+
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(index=True, nullable=False)
-    email: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
-    
-    # Relationships
-    # related_items: Mapped[list["RelatedModel"]] = relationship(back_populates="example")
-    
-    def to_domain(self) -> "ExampleEntity":
-        from ${module_name}.domain.entities.example import ExampleEntity
-        from ${module_name}.domain.value_objects.example import Email
-        return ExampleEntity(
-            id=self.id,
-            tenant_id=self.tenant_id,
-            email=Email(self.email),
-            name=self.name,
-            is_active=self.is_active,
-            version=self.version,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )
-    
-    @classmethod
-    def from_domain(cls, entity: "ExampleEntity") -> "ExampleModel":
-        return cls(
-            id=entity.id,
-            tenant_id=entity.tenant_id,
-            email=entity.email.value,
-            name=entity.name,
-            is_active=entity.is_active,
-            version=entity.version,
-        )

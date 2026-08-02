@@ -18,7 +18,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["apps/identity-service", "apps/consent-service", "packages/worker-*", "packages/worker-cli"]
+members = ["apps/identity-service", "apps/consent-service", "apps/profile-service", "packages/worker-*", "packages/worker-cli"]
 # Phase-1 deficit: worker-files is a shell whose declared C-backend deps
 # (pillow, python-magic) and He adapt (boto3, minio, azure, ...) have no active
 # workspace consumer (no app/service depends on it; its Phase-1 smoke skips on
@@ -69,6 +69,12 @@ asyncio_mode = "auto"
 # "tests" holds repo-level architectural guards (workspace dependency hygiene)
 # that belong to no single package.
 testpaths = ["tests", "apps", "packages"]
+# importlib statt des Prepend-Modus: sonst leitet pytest Modulnamen aus Pfaden
+# ab, und drei Services mit je einem tests/test_app.py kollidieren
+# ("import file mismatch"). Mit importlib trägt jede Testdatei ihren vollen
+# Pfad als Identität — Services dürfen ihre Tests gleich benennen, was der
+# Generator ohnehin tut.
+addopts = "--import-mode=importlib"
 
 [tool.ruff]
 line-length = 100

@@ -4,26 +4,26 @@ version = "0.1.0"
 description = "${service_title} service"
 requires-python = ">=3.14"
 dependencies = [
-    "fastapi>=0.110.0,<1.0.0",
-    "uvicorn[standard]>=0.30.0,<1.0.0",
+    # Bewusst knapp: nur was ein frischer Service wirklich braucht. Die frühere
+    # Liste deklarierte zwanzig Pakete, darunter worker-cqrs (gelöscht,
+    # ADR-0005) und worker-exceptions (gelöscht, ADR-0014) — `uv sync` scheiterte
+    # daran, und jeder generierte Service zog unbenutzte Abhängigkeiten in sein
+    # Image. Was zusätzlich gebraucht wird, deklariert der Service selbst;
+    # tests/test_workspace_dependencies.py erzwingt das ohnehin.
+    "fastapi>=0.115.0,<1.0.0",
+    "uvicorn[standard]>=0.40.0,<1.0.0",
+    "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
+    "asyncpg>=0.30.0,<1.0.0",
+    "alembic>=1.13.0,<2.0.0",
+    "psycopg[binary]>=3.1.0,<4.0.0",
+    "pydantic>=2.8.0,<3.0.0",
+    "pydantic-settings>=2.4.0,<3.0.0",
     "worker-core",
     "worker-platform",
     "worker-database",
-    "worker-cache",
-    "worker-cqrs",
-    "worker-events",
-    "worker-messaging",
     "worker-auth",
-    "worker-authorization",
-    "worker-health",
-    "worker-metrics",
-    "worker-tracing",
-    "worker-telemetry",
-    "worker-validation",
-    "worker-exceptions",
-    "worker-ratelimit",
     "worker-tenancy",
-    "worker-resilience",
+    "worker-shared",
 ]
 
 [project.scripts]
@@ -40,18 +40,6 @@ module-name = "${module_name}"
 worker-core = { workspace = true }
 worker-platform = { workspace = true }
 worker-database = { workspace = true }
-worker-cache = { workspace = true }
-worker-cqrs = { workspace = true }
-worker-events = { workspace = true }
-worker-messaging = { workspace = true }
 worker-auth = { workspace = true }
-worker-authorization = { workspace = true }
-worker-health = { workspace = true }
-worker-metrics = { workspace = true }
-worker-tracing = { workspace = true }
-worker-telemetry = { workspace = true }
-worker-validation = { workspace = true }
-worker-exceptions = { workspace = true }
-worker-ratelimit = { workspace = true }
 worker-tenancy = { workspace = true }
-worker-resilience = { workspace = true }
+worker-shared = { workspace = true }

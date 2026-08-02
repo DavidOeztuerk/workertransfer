@@ -16,8 +16,13 @@
 #
 # ---------------------------------------------------------------------------
 # ADDING A SERVICE — three steps, no new Dockerfile:
-#   1. scripts/initdb/01-create-service-databases.sql: add its database, then
-#      recreate the volume once (`docker compose down -v && docker compose up`).
+#   1. scripts/initdb/01-create-service-databases.sql: add its database.
+#      ACHTUNG: initdb läuft NUR bei leerem Volume. Auf einem Stack, der schon
+#      lief, passiert also nichts, und der neue Service dreht sich in
+#      "database ... does not exist" im Kreis. Entweder einmal
+#      `docker compose down -v && docker compose up`, oder ohne Datenverlust:
+#        docker compose exec postgres psql -U worker -d postgres \
+#          -c 'CREATE DATABASE <name> OWNER worker;'
 #   2. Copy the consent-service block below and change four things: the service
 #      name, SERVICE_DIR (its apps/<dir>), WORKER_PORT + the published port, and
 #      the uvicorn module in `command`.
@@ -170,6 +175,47 @@ services:
       retries: 30
       start_period: 40s
 
+  profile-service:
+    <<: *service
+    container_name: workertransfer-profile
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        SERVICE_DIR: profile-service
+    environment:
+      <<: *service-env
+      WORKER_PORT: "8003"
+      WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/profile
+      # Der Profile-Service fragt den Ledger, bevor er ein fremdes Profil zeigt
+      # (ADR-0013, synchron und ohne Cache). Servicename, nicht localhost:
+      # der Aufruf läuft im Compose-Netz.
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+    ports:
+      - "8003:8003"
+    command:
+      - uvicorn
+      - profile_service.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8003"
+      - --reload
+      - --reload-dir
+      - /app/apps/profile-service/src
+      - --reload-dir
+      - /app/packages
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;urllib.request.urlopen("http://localhost:8003/health/live")
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 40s
+
   web:
     build:
       context: .
@@ -181,10 +227,18 @@ services:
         condition: service_healthy
       consent-service:
         condition: service_healthy
+      profile-service:
+        condition: service_healthy
     environment:
+      # pnpm will purge node_modules when the lockfile changed since the image
+      # was built, and without a TTY it aborts instead of asking — der Container
+      # startet dann gar nicht. CI=true heißt hier nur "frag nicht nach".
+      CI: "true"
       # Read by the browser, so it must be a host-visible URL — the compose
       # service name `identity-service` resolves only inside the network.
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8001}
+      VITE_CONSENT_BASE_URL: ${VITE_CONSENT_BASE_URL:-http://localhost:8002}
+      VITE_PROFILE_BASE_URL: ${VITE_PROFILE_BASE_URL:-http://localhost:8003}
     ports:
       - "5173:5173"
     volumes:

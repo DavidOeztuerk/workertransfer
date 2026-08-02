@@ -13,7 +13,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 1 | Foundation festigen (CI grün) | ✅ | ruff 0 ✅, mypy 0 ✅, CLI-Entrypoint ✅, Duplikate ✅, Smoke-Tests ✅, Premerge-Wrapper ✅ |
 | 2 | Identity & Tenancy | ✅ | OIDC/OAuth, JWT, Claims-Tenant, Audit, DB-Migration |
 | 2.5 | Stabilisierung & Plattform-Naht | ✅ | Cookie-Auth, Dep-Hygiene, Kanon Runde 2, Dev-Stack, Frontend-Gate, Generator |
-| 3 | Candidate Core | 🟧 | Consent-Ledger ✅ (3.1); Profile/Resume/Portfolio offen |
+| 3 | Candidate Core | 🟧 | Consent-Ledger ✅ (3.1); Profile-Service ✅ (3.2); Resume/Portfolio offen |
 | 4 | Jobs & Applications | ⬜ | Jobs, Applications, Companies, Career-Sites |
 | 5 | Transfermarkt | ⬜ | Market-State-Machine, Konsensflows, Vertragsdraft |
 | 6 | Developer Intelligence | ⬜ | GitHub-Consent, Skill-Graph, Scout-Match |
@@ -270,7 +270,33 @@ was der Code tat.
   (losgelöstes Aggregat ohne `save()`); der Mailversand lief in der offenen
   Transaktion; die Doppelregistrierung war an der Antwortzeit erkennbar;
   Abmelden ließ das Access-Cookie stehen und beendete die Sitzung nicht.
-- ⬜ 3.2 Profile-Service · ⬜ 3.3 Resume-Service · ⬜ 3.4 Portfolio-Service
+- ✅ **3.2 Profile-Service** (`apps/profile-service`) — 02.08.2026.
+  [Design](superpowers/specs/2026-08-01-profile-service-design.md) · **ADR-0020**.
+  Aus `worker new-service` erzeugt, nicht kopiert — und damit zugleich der erste
+  echte Test des Generators (siehe unten).
+  Ein Profil je Person (`subject_id` IST der Schlüssel), Cursor-Pagination über
+  `(updated_at, subject_id)`, und **keine Sichtbarkeit im Aggregat**: die steht
+  ausschließlich im Ledger. Vier Endpunkte, deren Statuscodes den Entwurf tragen —
+  `404` für „verborgen ODER nicht vorhanden" (bis auf die Korrelations-ID
+  byteweise dieselbe Antwort), `403` für „kein aktives Unternehmen" (Aussage über
+  den Aufrufer, nicht über das Ziel), `503` wenn der Ledger schweigt.
+  **Die Sofortwirkung ist belegt, nicht behauptet:**
+  `tests/integration/test_consent_gated_reads.py` fährt Consent- und
+  Profile-Service mit je eigener Datenbank hoch und prüft anlegen → freigeben →
+  `200` → widerrufen → `404` ohne Wartezeit dazwischen.
+  Frontend: `/profile` (bearbeiten + Freigabeschalter) und `/candidates`
+  (Kandidatenliste, nur mit aktivem Unternehmen), testgetrieben; `Switch` und
+  `TextArea` neu im Designsystem. Dazu eine Playwright-Reise durch den Browser
+  über alle drei Dienste und `scripts/validate.sh` als ein Befehl, der alles
+  prüft, durchläuft statt abzubrechen und übersprungene Tests benennt.
+  **Unterwegs gefunden und behoben:** der Router las `principal.user_id`, der
+  Prinzipal heißt `TokenPayload.sub` — `PUT /profiles/me` war für jeden
+  angemeldeten Aufrufer kaputt, und 41 Unit-Tests konnten das nicht sehen, weil
+  keiner den Router je über die echte Middleware aufrief. `get_request_user` sitzt
+  jetzt in `worker-auth` statt in drei Kopien. Zwei Betriebsfallen im Compose:
+  `scripts/initdb` läuft nur bei leerem Volume, und der Web-Container startet
+  nicht mehr, sobald sich die Lockfile geändert hat (pnpm ohne TTY).
+- ⬜ 3.3 Resume-Service · ⬜ 3.4 Portfolio-Service
 - ⬜ 3.5 `worker-files`/`worker-storage` real machen (Workspace-Re-Include)
 - ⬜ **Scheibe C — Einladungen & Rollen.** Ein Unternehmen kann entstehen, aber
   niemand außer dem Gründer hineinkommen; `admin` gegen `member` wird nirgends
@@ -278,8 +304,17 @@ was der Code tat.
   Mitgliedschaftsprüfung in `handle_refresh` mitbringen** — heute latent, weil
   niemand entfernt werden kann (siehe ADR-0019, Konsequenzen).
 
-Nächste Aktion: **Sub-step 3.2 — Profile-Service.** Der Consent-Ledger steht und ist
-damit als Enabler nutzbar: jeder Sichtbarkeits-, Versand- und Importpfad im
-Profile-Service konsultiert `POST /consent/check`, bevor er handelt. Der
-Profile-Service ist zugleich der erste echte Test für den reparierten Generator —
-er soll aus `worker new-service` entstehen, nicht aus Copy-Paste (kon.txt Regel Nr. 1).
+Nächste Aktion: **Sub-step 3.3 — Resume-Service.** Das Profil ist bewusst schmal
+gehalten (Überschrift, Freitext, Ort, Remote, Fähigkeiten); strukturierte
+Berufserfahrung gehört in den Lebenslauf und würde hier nur doppelt gepflegt.
+Der Weg ist derselbe wie bei 3.2: `worker new-service`, Consent vor jedem
+fremden Zugriff, Integrationstest gegen echte Dienste.
+
+**Der Generator hat seinen ersten echten Test bestanden** — allerdings erst nach
+Reparatur. Der Testlauf davor fand sechs Defekte, die ein reiner `ast.parse`-Test
+nicht sehen konnte: eine fehlende `base.py`, `postgresql_where` an einem
+`UniqueConstraint`, 20 deklarierte Abhängigkeiten (darunter die gelöschten
+`worker-cqrs`/`worker-exceptions`), eine zweite `Base` samt UoW im
+`database/__init__.py`, `__init__`-Dateien mit Importen auf entfernte Module,
+28 ruff- und 28 mypy-Fehler. Die Tests prüfen jetzt Importierbarkeit und die
+Qualitätsgates, nicht mehr nur Syntax.
