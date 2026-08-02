@@ -15,6 +15,7 @@ vi.mock("../portfolio/client", async (importOriginal) => {
     saveMyPortfolio: vi.fn(),
     getPortfolioVisibility: vi.fn(),
     setPortfolioVisibility: vi.fn(),
+    uploadAttachment: vi.fn(),
   };
 });
 
@@ -23,6 +24,7 @@ const getMyPortfolio = vi.mocked(client.getMyPortfolio);
 const saveMyPortfolio = vi.mocked(client.saveMyPortfolio);
 const getPortfolioVisibility = vi.mocked(client.getPortfolioVisibility);
 const setPortfolioVisibility = vi.mocked(client.setPortfolioVisibility);
+const uploadAttachment = vi.mocked(client.uploadAttachment);
 
 const SUBJECT = "11111111-1111-1111-1111-111111111111";
 
@@ -40,6 +42,7 @@ function portfolio(): Portfolio {
         url: "https://example.org/werkzeug",
         role: "Entwicklung",
         year: 2024,
+        attachment: null,
       },
     ],
     updated_at: "2026-08-02T10:00:00Z",
@@ -127,5 +130,74 @@ describe("PortfolioRoute", () => {
     renderWithProviders(<PortfolioRoute principal={null} />);
 
     expect(screen.getByText(/anmelden/i)).toBeInTheDocument();
+  });
+});
+
+describe("PortfolioRoute — Anhänge", () => {
+  it("uploads immediately and keeps the name for the save", async () => {
+    const user = userEvent.setup();
+    uploadAttachment.mockResolvedValue({
+      ok: true,
+      name: "abc123.png",
+      contentType: "image/png",
+      size: 4,
+    });
+    renderWithProviders(<PortfolioRoute principal={principal()} />);
+
+    await user.click(await screen.findByRole("button", { name: /Arbeit hinzufügen/i }));
+    await user.type(screen.getByLabelText(/Titel/i), "Mit Datei");
+    await user.upload(
+      screen.getByLabelText("Datei"),
+      new File([new Uint8Array([1, 2, 3, 4])], "bild.png", { type: "image/png" })
+    );
+    await screen.findByText(/Datei angehängt/i);
+    await user.click(screen.getByRole("button", { name: /^Speichern$/ }));
+
+    await waitFor(() => expect(saveMyPortfolio).toHaveBeenCalled());
+    expect(saveMyPortfolio.mock.calls[0]?.[0][0]?.attachment).toBe("abc123.png");
+  });
+
+  it("never shows the local file name — it never went to the server", async () => {
+    const user = userEvent.setup();
+    uploadAttachment.mockResolvedValue({
+      ok: true,
+      name: "abc123.png",
+      contentType: "image/png",
+      size: 4,
+    });
+    renderWithProviders(<PortfolioRoute principal={principal()} />);
+
+    await user.click(await screen.findByRole("button", { name: /Arbeit hinzufügen/i }));
+    await user.upload(
+      screen.getByLabelText("Datei"),
+      new File([new Uint8Array([1])], "streng-geheim.png", { type: "image/png" })
+    );
+
+    await screen.findByText(/Datei angehängt/i);
+    expect(screen.queryByText(/streng-geheim/)).toBeNull();
+  });
+
+  it("says why a file was refused instead of failing quietly", async () => {
+    // Die Datei trägt einen erlaubten Typ und heißt .png — nur ihre Bytes sind
+    // HTML. Genau so sieht der Angriff aus, und genau deshalb entscheidet der
+    // SERVER: `accept` im Dialog ist eine Bequemlichkeit, keine Prüfung. (Sie
+    // filtert im Test sogar so gut, dass eine .txt-Datei gar nicht erst
+    // ankäme — der interessante Fall kommt an und wird trotzdem abgelehnt.)
+    const user = userEvent.setup();
+    uploadAttachment.mockResolvedValue({
+      ok: false,
+      message: "Only PNG, JPEG and PDF files are accepted",
+    });
+    renderWithProviders(<PortfolioRoute principal={principal()} />);
+
+    await user.click(await screen.findByRole("button", { name: /Arbeit hinzufügen/i }));
+    await user.upload(
+      screen.getByLabelText("Datei"),
+      new File(["<html><script>alert(1)</script></html>"], "harmlos.png", {
+        type: "image/png",
+      })
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("PNG");
   });
 });

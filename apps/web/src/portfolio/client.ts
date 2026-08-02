@@ -19,6 +19,8 @@ export interface PortfolioItem {
   url: string | null;
   role: string;
   year: number | null;
+  /** Name einer hochgeladenen Datei — vom Server vergeben, nie selbst gewählt. */
+  attachment: string | null;
 }
 
 export interface Portfolio {
@@ -136,4 +138,47 @@ export async function getPortfolio(subjectId: string): Promise<PortfolioResult> 
   } catch {
     return { ok: false, message: "Keine Verbindung zum Server." };
   }
+}
+
+
+export type UploadResult =
+  | { ok: true; name: string; contentType: string; size: number }
+  | { ok: false; message: string };
+
+/**
+ * Eine Datei hochladen und ihren Namen zurückbekommen.
+ *
+ * Der Name kommt vom Server: den lokalen Dateinamen mitzuschicken hieße, ihn zu
+ * einem Teil eines Pfades zu machen. Die Oberfläche zeigt ihn deshalb auch
+ * nicht an — sie zeigt „Datei angehängt" und einen Link.
+ */
+export async function uploadAttachment(file: File): Promise<UploadResult> {
+  const body = new FormData();
+  body.append("file", file);
+  try {
+    const res = await fetch(`${PORTFOLIO_BASE_URL}/portfolios/me/attachments`, {
+      method: "POST",
+      credentials: "include",
+      // Kein content-type: den Multipart-Rahmen setzt der Browser samt boundary.
+      body,
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: await problemMessage(
+          res,
+          "Die Datei wurde nicht angenommen. Erlaubt sind PNG, JPEG und PDF."
+        ),
+      };
+    }
+    const stored = (await res.json()) as { name: string; content_type: string; size: number };
+    return { ok: true, name: stored.name, contentType: stored.content_type, size: stored.size };
+  } catch {
+    return { ok: false, message: "Keine Verbindung zum Server." };
+  }
+}
+
+/** Wo eine Datei liegt. Zusammengesetzt wie serverseitig: Person und Name. */
+export function attachmentUrl(subjectId: string, name: string): string {
+  return `${PORTFOLIO_BASE_URL}/portfolios/${subjectId}/attachments/${name}`;
 }

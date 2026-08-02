@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The project is run as a **staged masterplan** — read [`docs/ULTRAPLAN.md`](docs/ULTRAPLAN.md) first (foundation state, target architecture, ten phases each with a Definition of Done, risk register). [`docs/ROADMAP.md`](docs/ROADMAP.md) is the pull-through status index. ADRs in [`docs/adr/`](docs/adr/): ADR-0002 (worker-platform = kernel, worker-* = libraries), ADR-0003 (Composition-Root per service, NOT a fluent `PlatformBuilder`), ADR-0004 (versioned contracts, no scraping, consent-first). Terms in [`docs/glossary.md`](docs/glossary.md). Domain skills under [`docs/skills/`](docs/skills/) (worker-cli, consent-ledger, transfer-market) alongside opencode-specific ones in `.opencode/skill/`.
 
-**Verified state (2026-08-02).** Phases 1, 2 and 2.5 are complete; **Phase 3 sub-steps 3.1 through 3.4 are done** (Consent-Ledger, Onboarding, Profile, Resume, Portfolio, plus company invitations/roles). Open: 3.5 — make `worker-files`/`worker-storage` real, which is what portfolio file uploads wait on.
+**Verified state (2026-08-02).** Phases 1, 2 and 2.5 are complete; **Phase 3 sub-steps 3.1 through 3.5 are done** (Consent-Ledger, Onboarding, Profile, Resume, Portfolio, company invitations/roles, and the storage rewrite). `portfolio-service` is its first consumer (attachments, gated by the *same* consent as the portfolio itself). Open: no S3 backend until an environment needs one, orphaned files are not collected, and the upload UI is not built (ADR-0021).
 
 `identity-service` is the reference and the only fully-wired service: `POST /auth/{register,login,refresh,logout}` (bcrypt, PyJWT HS256, tokens delivered as `httpOnly` cookies — ADR-0006/0007) and `GET /me`, with the tenant coming only from the JWT claim in production. `AuthMiddleware` accepts the token from **either** an `Authorization: Bearer` header **or** the `access` cookie — the browser only ever has the cookie.
 
@@ -20,7 +20,7 @@ Some `worker-*` siblings are **thin re-export layers** over the kernel, not priv
 
 Caveats worth knowing before you depend on anything:
 - **`worker-github` is unimportable** — its source does `from github import Github` (PyGithub) while the declared dep is `githubkit`. Its smoke test skips.
-- **`worker-ai` and `worker-files` are excluded from the uv workspace** (`pyproject.toml` `[tool.uv.workspace] exclude`) because their ML/C wheels have no Python-3.14 build; they are also excluded from mypy.
+- **`worker-ai` is excluded from the uv workspace** (`pyproject.toml` `[tool.uv.workspace] exclude`) because its ML wheels have no Python-3.14 build; it is also excluded from mypy. `worker-files` was **deleted** and `worker-storage` rewritten in Sub-step 3.5 — both were shells without a consumer that together declared five heavy dependencies (pillow, python-magic, boto3, minio, azure-storage-blob), which is precisely what made them unbuildable (ADR-0021). `worker-storage` is back in the workspace with one dependency and one backend that is actually used.
 - Most `worker-*` packages have exactly one smoke test and **no production consumer**. A directory existing proves nothing — verify before depending.
 
 Full detail, including the Phase-2.5 findings, is in [`docs/ROADMAP.md`](docs/ROADMAP.md).
