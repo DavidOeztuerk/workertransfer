@@ -18,7 +18,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["apps/identity-service", "apps/consent-service", "apps/profile-service", "apps/resume-service", "packages/worker-*", "packages/worker-cli"]
+members = ["apps/identity-service", "apps/consent-service", "apps/profile-service", "apps/resume-service", "apps/portfolio-service", "packages/worker-*", "packages/worker-cli"]
 # Phase-1 deficit: worker-files is a shell whose declared C-backend deps
 # (pillow, python-magic) and He adapt (boto3, minio, azure, ...) have no active
 # workspace consumer (no app/service depends on it; its Phase-1 smoke skips on
