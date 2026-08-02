@@ -18,6 +18,7 @@ from profile_service.domain.profile import Profile, Skills
 
 __all__ = [
     "MAX_PAGE_SIZE",
+    "MAX_SKILL_FILTERS",
     "GetProfileQuery",
     "ListProfilesQuery",
     "ProfileNotVisible",
@@ -132,12 +133,20 @@ async def handle_get_visible_profile(
     return Result.ok(profile)
 
 
+#: Ohne Deckel baut ein Aufrufer mit einer URL eine beliebig teure Abfrage.
+#: Dieselbe Überlegung wie beim Seitendeckel.
+MAX_SKILL_FILTERS = 10
+
+
 @dataclass(frozen=True, slots=True)
 class ListProfilesQuery:
     limit: int
     cursor: str | None
     tenant_id: UUID
     bearer: str
+    skills: tuple[str, ...] = ()
+    location: str = ""
+    remote_only: bool = False
 
 
 async def handle_list_visible_profiles(
@@ -151,7 +160,14 @@ async def handle_list_visible_profiles(
     schützt.
     """
     limit = max(1, min(query.limit or DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE))
-    candidates, next_cursor = await repos["profiles"].page(limit=limit, cursor=query.cursor)
+    skills = tuple(s for s in (s.strip() for s in query.skills) if s)[:MAX_SKILL_FILTERS]
+    candidates, next_cursor = await repos["profiles"].page(
+        limit=limit,
+        cursor=query.cursor,
+        skills=skills,
+        location=query.location,
+        remote_only=query.remote_only,
+    )
     if not candidates:
         return Result.ok(([], next_cursor))
 

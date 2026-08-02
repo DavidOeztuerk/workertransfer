@@ -1,9 +1,15 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button, Card } from "@workertransfer/ui";
+import { Button, Card, Field } from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
-import { type CandidatePage, type Profile, listCandidates } from "../profile/client";
+import {
+  type CandidateFilters,
+  type CandidatePage,
+  NO_FILTERS,
+  type Profile,
+  listCandidates,
+} from "../profile/client";
 import {
   type MarketRequest,
   getMarketStatus,
@@ -23,9 +29,21 @@ export function CandidatesRoute({ principal = null }: CandidatesRouteProps) {
   // in den Logs des Ledgers.
   const hasCompany = principal?.tenant_id != null;
 
+  // Zwei Zustände, mit Absicht: was im Formular steht, und wonach gerade
+  // gesucht wird. Sonst liefe bei jedem Tastendruck eine Abfrage — und die
+  // Liste flackerte, während jemand ein Wort tippt.
+  const [draft, setDraft] = useState<{ skills: string; location: string; remoteOnly: boolean }>({
+    skills: "",
+    location: "",
+    remoteOnly: false,
+  });
+  const [filters, setFilters] = useState<CandidateFilters>(NO_FILTERS);
+  const hasFilters =
+    filters.skills.length > 0 || filters.location !== "" || filters.remoteOnly;
+
   const query = useInfiniteQuery<CandidatePage>({
-    queryKey: ["candidates", principal?.tenant_id ?? null],
-    queryFn: ({ pageParam }) => listCandidates(pageParam as string | undefined),
+    queryKey: ["candidates", principal?.tenant_id ?? null, filters],
+    queryFn: ({ pageParam }) => listCandidates(pageParam as string | undefined, filters),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => (last.ok ? (last.nextCursor ?? undefined) : undefined),
     enabled: hasCompany,
@@ -83,6 +101,61 @@ export function CandidatesRoute({ principal = null }: CandidatesRouteProps) {
         </Card>
       ) : null}
 
+      <Card>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setFilters({
+              skills: draft.skills.split(",").map((entry) => entry.trim()),
+              location: draft.location,
+              remoteOnly: draft.remoteOnly,
+            });
+          }}
+        >
+          <Field
+            label="Fähigkeiten"
+            hint="Mit Komma trennen. Es zählt, wer ALLE davon kann."
+            placeholder="Python, Kubernetes"
+            value={draft.skills}
+            onChange={(e) => setDraft((current) => ({ ...current, skills: e.target.value }))}
+          />
+          <Field
+            label="Ort"
+            hint="Ein Teil genügt."
+            placeholder="Berlin"
+            value={draft.location}
+            onChange={(e) => setDraft((current) => ({ ...current, location: e.target.value }))}
+          />
+          <label className="market__choice">
+            <input
+              type="checkbox"
+              checked={draft.remoteOnly}
+              onChange={(e) => setDraft((current) => ({ ...current, remoteOnly: e.target.checked }))}
+            />
+            <span>
+              <strong>Nur wer Remote angegeben hat</strong>
+              <span className="market__hint">
+                Ohne Haken erscheinen alle. Es gibt keinen Filter für „nur vor Ort" — ein fehlender
+                Haken heißt „nicht ja gesagt", nicht „lehnt ab".
+              </span>
+            </span>
+          </label>
+          <Button type="submit">Suchen</Button>
+          {hasFilters ? (
+            <Button
+              type="button"
+              variant="quiet"
+              onClick={() => {
+                setDraft({ skills: "", location: "", remoteOnly: false });
+                setFilters(NO_FILTERS);
+              }}
+            >
+              Filter zurücksetzen
+            </Button>
+          ) : null}
+        </form>
+      </Card>
+
       {query.isPending ? <p role="status">Wird geladen…</p> : null}
 
       {items.length > 0 ? (
@@ -116,10 +189,17 @@ export function CandidatesRoute({ principal = null }: CandidatesRouteProps) {
 
       {!query.isPending && failure === undefined && items.length === 0 ? (
         <Card>
-          <p>
-            Im Moment hat niemand sein Profil freigegeben. Das ist kein Fehler — es ist die
-            Voreinstellung.
-          </p>
+          {hasFilters ? (
+            // Eine leere Trefferliste sagt etwas über die SUCHE, nicht über die
+            // Plattform. Beides zu vermischen hieße, aus „niemand passt" ein
+            // „hier ist niemand" zu machen.
+            <p>Auf diese Suche passt gerade niemand, der sein Profil freigegeben hat.</p>
+          ) : (
+            <p>
+              Im Moment hat niemand sein Profil freigegeben. Das ist kein Fehler — es ist die
+              Voreinstellung.
+            </p>
+          )}
         </Card>
       ) : null}
 

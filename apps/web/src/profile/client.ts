@@ -136,10 +136,43 @@ export type CandidatePage =
  * schweigt" ist es nicht, und eine leere Seite ist überhaupt kein Fehler.
  * Alles in eine Meldung zu werfen würde die Person raten lassen, was zu tun ist.
  */
-export async function listCandidates(cursor?: string): Promise<CandidatePage> {
-  const url = cursor
-    ? `${PROFILE_BASE_URL}/profiles?cursor=${encodeURIComponent(cursor)}`
-    : `${PROFILE_BASE_URL}/profiles`;
+export interface CandidateFilters {
+  /** Mit UND verknüpft: wer zwei eingibt, sucht jemanden, der beides kann. */
+  skills: string[];
+  location: string;
+  /** Nur `true` filtert. Es gibt kein „nur ohne Remote" — siehe Server. */
+  remoteOnly: boolean;
+}
+
+export const NO_FILTERS: CandidateFilters = { skills: [], location: "", remoteOnly: false };
+
+/**
+ * Die Filter wandern in die URL, nicht in den Cursor.
+ *
+ * Ein Cursor, der Suchbedingungen einpackt, ist ein zweiter Ort, an dem die
+ * Abfrage steht — und beim ersten Mal, wenn beide auseinanderlaufen, blättert
+ * jemand still durch die falsche Menge.
+ */
+export function candidateQuery(cursor?: string, filters: CandidateFilters = NO_FILTERS): string {
+  const params = new URLSearchParams();
+  if (cursor !== undefined && cursor !== "") params.set("cursor", cursor);
+  for (const skill of filters.skills) {
+    const trimmed = skill.trim();
+    if (trimmed !== "") params.append("skill", trimmed);
+  }
+  if (filters.location.trim() !== "") params.set("location", filters.location.trim());
+  // `remote=false` wird gar nicht erst gesendet: es wäre kein Filter, sondern
+  // Rauschen in der URL.
+  if (filters.remoteOnly) params.set("remote", "true");
+  const query = params.toString();
+  return query === "" ? "" : `?${query}`;
+}
+
+export async function listCandidates(
+  cursor?: string,
+  filters: CandidateFilters = NO_FILTERS
+): Promise<CandidatePage> {
+  const url = `${PROFILE_BASE_URL}/profiles${candidateQuery(cursor, filters)}`;
   let res: Response;
   try {
     res = await fetch(url, { credentials: "include" });

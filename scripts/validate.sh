@@ -60,6 +60,7 @@ fi
 # --- Was blieb ungeprüft? ----------------------------------------------------
 # Skips sind keine Erfolge. Diese Zahl ist die ehrlichste Kennzahl im Bericht.
 pytest_log="$log_dir/pytest.log"
+playwright_log="$log_dir/playwright.log"
 skipped=0
 if [[ -f "$pytest_log" ]]; then
   skipped=$(grep -oE '[0-9]+ skipped' "$pytest_log" | tail -1 | grep -oE '[0-9]+' || true)
@@ -78,6 +79,19 @@ for entry in "${RESULTS[@]}"; do
     printf '  %s✗%s %s  %s(%s)%s\n' "$RED" "$OFF" "$name" "$YELLOW" "$log" "$OFF"
   fi
 done
+
+# Wiederholte Tests sind keine Erfolge. Ein Wackelkandidat, der beim zweiten
+# Versuch grün wird, ist eine offene Frage — und verschwindet sonst lautlos.
+flaky=0
+if [[ -n "${playwright_log:-}" && -f "$playwright_log" ]]; then
+  flaky=$(grep -oE '[0-9]+ flaky' "$playwright_log" | tail -1 | grep -oE '[0-9]+' || true)
+  flaky=${flaky:-0}
+fi
+
+if [[ "$flaky" -gt 0 ]]; then
+  printf '\n  %s!%s %s E2E-Test(s) erst im zweiten Anlauf grün.' "$YELLOW" "$OFF" "$flaky"
+  printf '\n    Das zählt nicht als bestanden — nachsehen, woran es lag.\n'
+fi
 
 if [[ "$skipped" -gt 0 ]]; then
   printf '\n  %s!%s %s Python-Tests übersprungen.' "$YELLOW" "$OFF" "$skipped"

@@ -46,8 +46,27 @@ class _FakeProfiles:
     async def save(self, profile: Profile) -> None:
         self.rows[profile.subject_id] = profile
 
-    async def page(self, *, limit: int, cursor: str | None) -> tuple[list[Profile], str | None]:
-        ordered = sorted(self.rows.values(), key=lambda p: p.updated_at, reverse=True)
+    async def page(
+        self,
+        *,
+        limit: int,
+        cursor: str | None,
+        skills: tuple[str, ...] = (),
+        location: str = "",
+        remote_only: bool = False,
+    ) -> tuple[list[Profile], str | None]:
+        # Die Filter werden hier WIRKLICH angewandt. Ein Fake, der seine
+        # Eingaben wegwirft, besteht auch dann, wenn der Handler sie gar nicht
+        # weiterreicht — und versteckt damit genau den Fehler, den er finden
+        # soll.
+        rows = list(self.rows.values())
+        for skill in skills:
+            rows = [p for p in rows if skill.casefold() in {s.casefold() for s in p.skills.value}]
+        if location != "":
+            rows = [p for p in rows if location.strip().casefold() in p.location.casefold()]
+        if remote_only:
+            rows = [p for p in rows if p.remote_ok]
+        ordered = sorted(rows, key=lambda p: p.updated_at, reverse=True)
         start = int(cursor) if cursor else 0
         window = ordered[start : start + limit]
         nxt = str(start + limit) if start + limit < len(ordered) else None

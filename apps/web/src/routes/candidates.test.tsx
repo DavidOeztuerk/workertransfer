@@ -184,7 +184,13 @@ describe("CandidatesRoute", () => {
 
     await user.click(await screen.findByRole("button", { name: /Mehr laden/i }));
 
-    await waitFor(() => expect(listCandidates).toHaveBeenLastCalledWith("cursor-1"));
+    await waitFor(() =>
+      expect(listCandidates).toHaveBeenLastCalledWith("cursor-1", {
+        skills: [],
+        location: "",
+        remoteOnly: false,
+      })
+    );
     expect(await screen.findByText("Data Engineer")).toBeInTheDocument();
     // Die vorige Seite bleibt stehen — sonst wäre "mehr" ein Austausch.
     expect(screen.getByText("Senior Python")).toBeInTheDocument();
@@ -365,5 +371,93 @@ describe("the market status on a candidate card", () => {
 
     const note = await screen.findByText(/Marktstatus gerade nicht einsehbar/);
     expect(note.textContent).not.toMatch(/zurückgezogen|gelöscht|existiert/i);
+  });
+});
+
+describe("die Suche auf /candidates", () => {
+  beforeEach(() => {
+    listCandidates.mockResolvedValue({
+      ok: true,
+      items: [candidate("a", "Senior Python")],
+      nextCursor: null,
+    });
+  });
+
+  it("searches only when asked, not on every keystroke", async () => {
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+    const user = userEvent.setup();
+    await screen.findByText("Senior Python");
+    listCandidates.mockClear();
+
+    await user.type(screen.getByLabelText(/Fähigkeiten/), "Python");
+
+    expect(listCandidates).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Suchen" }));
+
+    await waitFor(() =>
+      expect(listCandidates).toHaveBeenCalledWith(undefined, {
+        skills: ["Python"],
+        location: "",
+        remoteOnly: false,
+      })
+    );
+  });
+
+  it("splits several skills on commas", async () => {
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+    const user = userEvent.setup();
+    await screen.findByText("Senior Python");
+
+    await user.type(screen.getByLabelText(/Fähigkeiten/), "Python, Kubernetes");
+    await user.click(screen.getByRole("button", { name: "Suchen" }));
+
+    await waitFor(() =>
+      expect(listCandidates).toHaveBeenLastCalledWith(undefined, {
+        skills: ["Python", "Kubernetes"],
+        location: "",
+        remoteOnly: false,
+      })
+    );
+  });
+
+  it("explains that there is no filter for on-site only", async () => {
+    // Ein fehlender Haken heißt „nicht ja gesagt", nicht „lehnt ab".
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+
+    expect(await screen.findByText(/nicht ja gesagt/)).toBeInTheDocument();
+  });
+
+  it("says an empty result is about the search, not about the platform", async () => {
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+    const user = userEvent.setup();
+    await screen.findByText("Senior Python");
+    listCandidates.mockResolvedValue({ ok: true, items: [], nextCursor: null });
+
+    await user.type(screen.getByLabelText(/Fähigkeiten/), "Cobol");
+    await user.click(screen.getByRole("button", { name: "Suchen" }));
+
+    expect(await screen.findByText(/Auf diese Suche passt gerade niemand/)).toBeInTheDocument();
+    expect(screen.queryByText(/hat niemand sein Profil freigegeben/)).toBeNull();
+  });
+
+  it("offers a reset only once something is filtered", async () => {
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+    const user = userEvent.setup();
+    await screen.findByText("Senior Python");
+    expect(screen.queryByRole("button", { name: /zurücksetzen/i })).toBeNull();
+
+    await user.type(screen.getByLabelText("Ort"), "Berlin");
+    await user.click(screen.getByRole("button", { name: "Suchen" }));
+
+    await user.click(await screen.findByRole("button", { name: /zurücksetzen/i }));
+
+    await waitFor(() =>
+      expect(listCandidates).toHaveBeenLastCalledWith(undefined, {
+        skills: [],
+        location: "",
+        remoteOnly: false,
+      })
+    );
   });
 });
