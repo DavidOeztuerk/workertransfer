@@ -12,6 +12,7 @@ import { useCompanies, useSwitchCompany } from "./auth/companies";
 import { useLogout, useSession } from "./auth/session";
 import { CandidatesRoute } from "./routes/candidates";
 import { CompanyTransfersRoute } from "./routes/company-transfers";
+import { ConsentsRoute } from "./routes/consents";
 import { CompanyNewRoute } from "./routes/company-new";
 import { HomeRoute } from "./routes/home";
 import { LoginRoute } from "./routes/login";
@@ -115,6 +116,9 @@ export function RootLayout() {
               <Link className="site-header__link" to="/company/new">
                 Unternehmen anlegen
               </Link>
+              <Link className="site-header__link" to="/freigaben">
+                Meine Freigaben
+              </Link>
               <Link className="site-header__link" to="/einstellungen">
                 Einstellungen
               </Link>
@@ -194,6 +198,11 @@ function ResumeWithSession() {
 function CandidatesWithSession() {
   const { user } = useSession();
   return <CandidatesRoute principal={user} />;
+}
+
+function ConsentsWithSession() {
+  const { user } = useSession();
+  return <ConsentsRoute principal={user} />;
 }
 
 function SettingsWithSession() {
@@ -303,6 +312,11 @@ const applicationsRoute = createRoute({
   path: "/applications",
   component: ApplicationsWithSession,
 });
+const consentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/freigaben",
+  component: ConsentsWithSession,
+});
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/einstellungen",
@@ -361,6 +375,7 @@ const routeTree = rootRoute.addChildren([
   jobsRoute,
   careerRoute,
   applicationsRoute,
+  consentsRoute,
   settingsRoute,
   marketRoute,
   transfersRoute,

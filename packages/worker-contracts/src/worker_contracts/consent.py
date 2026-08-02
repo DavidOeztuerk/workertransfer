@@ -10,6 +10,7 @@ Deliberately free of domain types: a consumer must not need to import
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -18,6 +19,7 @@ __all__ = [
     "ConsentCheckResultV1",
     "ConsentCheckV1",
     "ConsentGrantV1",
+    "ConsentGrantedV1",
     "ConsentRevokeV1",
     "ConsentStateV1",
 ]
@@ -86,3 +88,18 @@ class ConsentCheckResultV1(BaseModel):
     capability: str
     granted: bool
     deleted: bool = False
+
+
+class ConsentGrantedV1(BaseModel):
+    """Eine derzeit wirksame Freigabe.
+
+    Ohne `reason`: widerrufene Fähigkeiten stehen gar nicht in dieser Liste, und
+    ein Grund hätte hier nichts zu suchen — er ist Freitext, den ein Mensch über
+    sich selbst geschrieben hat.
+
+    `granted_at` ist der Zeitpunkt der WIRKSAMEN Erteilung, nicht der ersten:
+    wer widerruft und später erneut erteilt, hat seit dem zweiten Mal erteilt.
+    """
+
+    capability: str
+    granted_at: datetime

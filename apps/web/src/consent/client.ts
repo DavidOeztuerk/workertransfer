@@ -68,3 +68,61 @@ export async function setGranted(
     return { ok: false, message: "Keine Verbindung zum Consent-Ledger." };
   }
 }
+
+export interface GrantedConsent {
+  capability: string;
+  granted_at: string;
+}
+
+export type MyConsentsResult =
+  | { ok: true; consents: GrantedConsent[] }
+  | { ok: false; message: string };
+
+/**
+ * Was gerade gilt — nur die eigenen Freigaben.
+ *
+ * Ein Fehler wird NICHT als leere Liste gezeigt. „Du hast nichts freigegeben"
+ * ist eine Aussage, und auf genau dieser Seite wäre sie die beruhigendste
+ * falsche Antwort, die das System geben kann.
+ */
+export async function listMyConsents(): Promise<MyConsentsResult> {
+  try {
+    const res = await fetch(`${CONSENT_BASE_URL}/consent/me`, { credentials: "include" });
+    if (!res.ok) {
+      return { ok: false, message: "Deine Freigaben ließen sich nicht laden." };
+    }
+    return { ok: true, consents: (await res.json()) as GrantedConsent[] };
+  } catch {
+    return { ok: false, message: "Keine Verbindung zum Consent-Ledger." };
+  }
+}
+
+export interface ParsedCapability {
+  /** Der Bereich in Worten, oder `null`, wenn die Form unbekannt ist. */
+  area: string | null;
+  /** Die Tenant-UUID, wenn die Freigabe einem Unternehmen gilt. */
+  tenantId: string | null;
+  /** Gilt sie allen Unternehmen? */
+  public: boolean;
+}
+
+const AREAS: Record<string, string> = {
+  profile: "Profil",
+  resume: "Lebenslauf",
+  portfolio: "Arbeiten",
+  market: "Marktstatus",
+};
+
+/**
+ * `resume.visibility:tenant:<uuid>` → lesbare Teile.
+ *
+ * Unbekannte Formen ergeben `area: null` — die Oberfläche zeigt sie dann roh
+ * an, statt sie zu verschlucken. Eine Freigabe zu verbergen, weil ihr Format
+ * nicht erkannt wurde, wäre auf dieser Seite der schlimmste denkbare Fehler.
+ */
+export function parseCapability(capability: string): ParsedCapability {
+  const match = /^([a-z]+)\.visibility:(public|tenant:([0-9a-fA-F-]{36}))$/.exec(capability);
+  if (match === null) return { area: null, tenantId: null, public: false };
+  const area = AREAS[match[1] ?? ""] ?? null;
+  return { area, tenantId: match[3] ?? null, public: match[2] === "public" };
+}

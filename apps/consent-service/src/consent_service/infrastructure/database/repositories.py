@@ -94,6 +94,28 @@ class SqlAlchemyConsentEventRepository:
         row = (await self._session.execute(stmt)).scalars().first()
         return _to_domain(row) if row is not None else None
 
+    async def latest_per_capability(self, subject_id: SubjectId) -> Sequence[ConsentEvent]:
+        """Wie `latest_effective`, nur ohne Einschränkung auf eine Fähigkeit.
+
+        Die ORDER BY muss mit den DISTINCT-ON-Spalten beginnen und danach
+        derselben Ordnung folgen wie `project_state` — `(recorded_at,
+        event_id)`, absteigend. Weicht sie ab, sagt diese Liste bei zwei
+        Ereignissen im selben Zeittakt etwas anderes als `/check`.
+        """
+        stmt = (
+            select(ConsentEventModel)
+            .where(ConsentEventModel.subject_id == subject_id.value)
+            .distinct(ConsentEventModel.subject_id, ConsentEventModel.capability)
+            .order_by(
+                ConsentEventModel.subject_id,
+                ConsentEventModel.capability,
+                ConsentEventModel.recorded_at.desc(),
+                ConsentEventModel.event_id.desc(),
+            )
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [_to_domain(row) for row in rows]
+
 
 class SqlAlchemyAuditRepository:
     def __init__(self, session: AsyncSession) -> None:
