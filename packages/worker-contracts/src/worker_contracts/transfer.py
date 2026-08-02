@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 __all__ = [
     "ExpressInterestV1",
     "MakeOfferV1",
+    "MarketRequestV1",
     "MarketStatusV1",
     "SaveMarketStatusV1",
     "TransferV1",
@@ -71,3 +72,25 @@ class TransferV1(BaseModel):
     offer_fee_cents: int | None
     created_at: datetime
     updated_at: datetime
+
+
+class MarketRequestV1(BaseModel):
+    """Die Anfrage eines Unternehmens nach einem Marktstatus.
+
+    `status` sagt, was geschehen ist. `active` sagt, was gilt — es kommt frisch
+    aus dem Ledger und kann von `status` abweichen: nach einem Widerruf bleibt
+    `GRANTED` stehen, während `active` auf `false` fällt. Genau diese Trennung
+    ist der Grund, warum die Berechtigung nicht im Vorgang gespeichert wird.
+
+    `active` ist nur für die betroffene Person gefüllt; das anfragende
+    Unternehmen sieht `None` — es hat die Antwort schon in Form des Status, den
+    es bekommt oder nicht bekommt.
+    """
+
+    id: UUID
+    subject_id: UUID
+    tenant_id: UUID
+    status: Literal["PENDING", "GRANTED", "DECLINED"]
+    created_at: datetime
+    answered_at: datetime | None = None
+    active: bool | None = None

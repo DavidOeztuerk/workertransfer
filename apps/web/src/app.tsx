@@ -11,6 +11,7 @@ import { Button } from "@workertransfer/ui";
 import { useCompanies, useSwitchCompany } from "./auth/companies";
 import { useLogout, useSession } from "./auth/session";
 import { CandidatesRoute } from "./routes/candidates";
+import { CompanyTransfersRoute } from "./routes/company-transfers";
 import { CompanyNewRoute } from "./routes/company-new";
 import { HomeRoute } from "./routes/home";
 import { LoginRoute } from "./routes/login";
@@ -25,7 +26,9 @@ import { CompanyJobsRoute } from "./routes/company-jobs";
 import { CompanyProfileRoute } from "./routes/company-profile";
 import { InvitationRoute } from "./routes/invitation";
 import { JobsRoute } from "./routes/jobs";
+import { MarketRoute } from "./routes/market";
 import { RegisterRoute } from "./routes/register";
+import { TransfersRoute } from "./routes/transfers";
 import { VerifyRoute } from "./routes/verify";
 
 export function RootLayout() {
@@ -77,6 +80,12 @@ export function RootLayout() {
               <Link className="site-header__link" to="/applications">
                 Bewerbungen
               </Link>
+              <Link className="site-header__link" to="/markt">
+                Marktstatus
+              </Link>
+              <Link className="site-header__link" to="/transfers">
+                Gespräche
+              </Link>
               <Link className="site-header__link" to="/resume">
                 Lebenslauf
                 {/* Ohne diesen Hinweis erfährt jemand von einer Anfrage nur,
@@ -90,6 +99,9 @@ export function RootLayout() {
                   </Link>
                   <Link className="site-header__link" to="/company/team">
                     Mannschaft
+                  </Link>
+                  <Link className="site-header__link" to="/company/transfers">
+                    Transfers
                   </Link>
                   <Link className="site-header__link" to="/company/jobs">
                     Unsere Stellen
@@ -180,6 +192,21 @@ function CandidatesWithSession() {
   return <CandidatesRoute principal={user} />;
 }
 
+function MarketWithSession() {
+  const { user } = useSession();
+  return <MarketRoute principal={user} />;
+}
+
+function TransfersWithSession() {
+  const { user } = useSession();
+  return <TransfersRoute principal={user} />;
+}
+
+function CompanyTransfersWithSession() {
+  const { user } = useSession();
+  return <CompanyTransfersRoute principal={user} />;
+}
+
 function ApplicationsWithSession() {
   const { user } = useSession();
   return <ApplicationsRoute principal={user} />;
@@ -267,6 +294,21 @@ const applicationsRoute = createRoute({
   path: "/applications",
   component: ApplicationsWithSession,
 });
+const marketRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/markt",
+  component: MarketWithSession,
+});
+const transfersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/transfers",
+  component: TransfersWithSession,
+});
+const companyTransfersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/company/transfers",
+  component: CompanyTransfersWithSession,
+});
 const companyJobsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/company/jobs",
@@ -305,6 +347,9 @@ const routeTree = rootRoute.addChildren([
   jobsRoute,
   careerRoute,
   applicationsRoute,
+  marketRoute,
+  transfersRoute,
+  companyTransfersRoute,
   companyJobsRoute,
   companyProfileRoute,
   teamRoute,
