@@ -87,6 +87,8 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
 
   await recruiter.goto("/candidates");
   const card = recruiter.locator("li").filter({ hasText: headline });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout.
+  await expect(card).toBeVisible();
   // Der Marktstatus ist eine eigene Freigabe, getrennt vom Lebenslauf. Vorher
   // gibt es hier nichts zu sehen und nichts anzubieten.
   await expect(card.getByRole("button", { name: /Interesse zeigen/i })).toHaveCount(0);
