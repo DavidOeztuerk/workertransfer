@@ -59,7 +59,7 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
   // Warten, bis der Wechsel wirklich gilt: `selectOption` stößt ihn nur an.
-  await expect(recruiter.getByRole("link", { name: /Kandidaten/i })).toBeVisible();
+  await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/candidates");
   const card = recruiter.locator("li").filter({ hasText: headline });
@@ -188,7 +188,7 @@ test("ohne Freigabe des Marktstatus gibt es nichts zu sehen und nichts zu tun", 
   await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
-  await expect(recruiter.getByRole("link", { name: /Kandidaten/i })).toBeVisible();
+  await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/candidates");
   const card = recruiter.locator("li").filter({ hasText: headline });

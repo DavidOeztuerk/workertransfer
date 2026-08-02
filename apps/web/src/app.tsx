@@ -6,6 +6,8 @@ import {
   createRouter,
   useRouter,
 } from "@tanstack/react-router";
+import type { ReactNode } from "react";
+
 import { Button } from "@workertransfer/ui";
 
 import { useCompanies, useSwitchCompany } from "./auth/companies";
@@ -34,6 +36,37 @@ import { RegisterRoute } from "./routes/register";
 import { SettingsRoute } from "./routes/settings";
 import { TransfersRoute } from "./routes/transfers";
 import { VerifyRoute } from "./routes/verify";
+
+/**
+ * Ein aufklappbares Menü in der Kopfzeile — als natives `<details>`.
+ *
+ * Kein eigenes Menü-Bauteil mit Tastatursteuerung, Fokusfalle und
+ * Escape-Behandlung: `<details>` kann das alles schon, und ein selbstgebautes
+ * Menü, das es NICHT kann, ist schlechter als eine Liste. Wenn `packages/ui`
+ * eines Tages ein richtiges Menü hat, tritt es hier an die Stelle.
+ *
+ * Der Zähler steht an der Zusammenfassung, nicht am Eintrag darin: eine
+ * Anfrage, die man erst nach dem Aufklappen sieht, erreicht niemanden.
+ */
+function HeaderMenu({
+  label,
+  badge,
+  children,
+}: {
+  label: string;
+  badge?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <details className="site-header__menu">
+      <summary className="site-header__link">
+        {label}
+        {badge}
+      </summary>
+      <div className="site-header__menu-panel">{children}</div>
+    </details>
+  );
+}
 
 export function RootLayout() {
   const router = useRouter();
@@ -75,58 +108,62 @@ export function RootLayout() {
           {isLoading ? null : user !== null ? (
             <>
               <CompanySwitcher activeTenantId={user.tenant_id} />
-              <Link className="site-header__link" to="/profile">
-                Mein Profil
-              </Link>
-              <Link className="site-header__link" to="/portfolio">
-                Arbeiten
-              </Link>
-              <Link className="site-header__link" to="/applications">
-                Bewerbungen
-              </Link>
+              {/* Oben bleibt, was den Transfermarkt ausmacht — das ist der
+                  Grund, aus dem jemand hier ist. Alles Verwaltende liegt eine
+                  Ebene tiefer. Vorher standen siebzehn Einträge nebeneinander,
+                  und siebzehn gleichwertige Einträge sind keine Navigation,
+                  sondern eine Liste. */}
               <Link className="site-header__link" to="/markt">
                 Marktstatus
               </Link>
               <Link className="site-header__link" to="/transfers">
                 Gespräche
               </Link>
-              <Link className="site-header__link" to="/resume">
-                Lebenslauf
-                {/* Ohne diesen Hinweis erfährt jemand von einer Anfrage nur,
-                    wenn er zufällig /resume aufruft. */}
-                <PendingRequestBadge />
-              </Link>
+              <HeaderMenu label="Mein Konto" badge={<PendingRequestBadge />}>
+                <Link className="site-header__menu-item" to="/profile">
+                  Mein Profil
+                </Link>
+                <Link className="site-header__menu-item" to="/resume">
+                  Lebenslauf
+                </Link>
+                <Link className="site-header__menu-item" to="/portfolio">
+                  Arbeiten
+                </Link>
+                <Link className="site-header__menu-item" to="/applications">
+                  Bewerbungen
+                </Link>
+                <Link className="site-header__menu-item" to="/freigaben">
+                  Meine Freigaben
+                </Link>
+                <Link className="site-header__menu-item" to="/meine-daten">
+                  Meine Daten
+                </Link>
+                <Link className="site-header__menu-item" to="/einstellungen">
+                  Einstellungen
+                </Link>
+                <Link className="site-header__menu-item" to="/company/new">
+                  Unternehmen anlegen
+                </Link>
+              </HeaderMenu>
               {user.tenant_id !== null ? (
-                <>
-                  <Link className="site-header__link" to="/candidates">
+                <HeaderMenu label="Unternehmen">
+                  <Link className="site-header__menu-item" to="/candidates">
                     Kandidaten
                   </Link>
-                  <Link className="site-header__link" to="/company/team">
-                    Mannschaft
-                  </Link>
-                  <Link className="site-header__link" to="/company/transfers">
+                  <Link className="site-header__menu-item" to="/company/transfers">
                     Transfers
                   </Link>
-                  <Link className="site-header__link" to="/company/jobs">
+                  <Link className="site-header__menu-item" to="/company/jobs">
                     Unsere Stellen
                   </Link>
-                  <Link className="site-header__link" to="/company/profile">
+                  <Link className="site-header__menu-item" to="/company/profile">
                     Unser Unternehmen
                   </Link>
-                </>
+                  <Link className="site-header__menu-item" to="/company/team">
+                    Mannschaft
+                  </Link>
+                </HeaderMenu>
               ) : null}
-              <Link className="site-header__link" to="/company/new">
-                Unternehmen anlegen
-              </Link>
-              <Link className="site-header__link" to="/freigaben">
-                Meine Freigaben
-              </Link>
-              <Link className="site-header__link" to="/meine-daten">
-                Meine Daten
-              </Link>
-              <Link className="site-header__link" to="/einstellungen">
-                Einstellungen
-              </Link>
               <Button variant="quiet" onClick={() => logout.mutate()} disabled={logout.isPending}>
                 {logout.isPending ? "Abmeldung läuft…" : "Abmelden"}
               </Button>
