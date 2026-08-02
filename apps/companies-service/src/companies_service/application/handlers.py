@@ -12,11 +12,12 @@ from uuid import UUID
 
 from worker_core import DomainError, Result
 
-from companies_service.domain.company_profile import CompanyProfile
+from companies_service.domain.company_profile import CompanyProfile, slug_from
 
 __all__ = [
     "ProfileNotFound",
     "SaveCompanyProfileCommand",
+    "handle_get_by_slug",
     "handle_get_own_profile",
     "handle_get_public_profile",
     "handle_save_profile",
@@ -45,8 +46,11 @@ async def handle_save_profile(
     try:
         existing: CompanyProfile | None = await repos["profiles"].get(cmd.tenant_id)
         if existing is None:
+            # Das Kürzel entsteht genau einmal, beim ersten Speichern.
+            slug = await repos["profiles"].free_slug(slug_from(cmd.display_name))
             profile = CompanyProfile.create(
                 cmd.tenant_id,
+                slug=slug,
                 display_name=cmd.display_name,
                 about=cmd.about,
                 website=cmd.website,
@@ -76,6 +80,14 @@ async def handle_get_own_profile(
     """Kein `Result`: „noch keins angelegt" ist ein Zustand, kein Fehler."""
     profile: CompanyProfile | None = await repos["profiles"].get(tenant_id)
     return profile
+
+
+async def handle_get_by_slug(slug: str, *, repos: dict[str, Any]) -> Result[CompanyProfile]:
+    """Die Karriere-Seite. `404`, wenn es das Kürzel nicht gibt."""
+    profile: CompanyProfile | None = await repos["profiles"].get_by_slug(slug)
+    if profile is None:
+        return Result.fail(ProfileNotFound())
+    return Result.ok(profile)
 
 
 async def handle_get_public_profile(

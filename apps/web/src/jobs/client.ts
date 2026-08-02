@@ -34,6 +34,10 @@ export interface JobInput {
 
 export interface SearchFilters {
   q?: string;
+  /** Nur die Stellen eines Unternehmens — für die Karriere-Seite. */
+  company?: string;
+  /** Seitengröße; der Server deckelt sie ohnehin bei 50. */
+  limit?: number;
   location?: string;
   remote?: RemoteMode | "";
   employment?: EmploymentType | "";
@@ -118,6 +122,8 @@ export async function searchJobs(filters: SearchFilters = {}): Promise<SearchRes
   if (filters.location) params.set("location", filters.location);
   if (filters.remote) params.set("remote", filters.remote);
   if (filters.employment) params.set("employment", filters.employment);
+  if (filters.company) params.set("company", filters.company);
+  if (filters.limit !== undefined) params.set("limit", String(filters.limit));
   if (filters.cursor) params.set("cursor", filters.cursor);
   const query = params.toString();
   try {

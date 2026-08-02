@@ -11,6 +11,8 @@ könnte. Ein Unternehmen macht eine Aussage über sich selbst.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import urlparse
@@ -24,6 +26,7 @@ __all__ = [
     "InvalidText",
     "InvalidUrl",
     "TooManyEntries",
+    "slug_from",
 ]
 
 MAX_DISPLAY_NAME = 160
@@ -36,6 +39,28 @@ MAX_ENTRIES = 20
 #: Menschen angeklickt, und `javascript:` in einem Feld, das im Browser landet,
 #: ist kein Randfall.
 ALLOWED_SCHEMES = frozenset({"http", "https"})
+
+MAX_SLUG = 60
+_SLUG_STRIP = re.compile(r"[^a-z0-9]+")
+
+
+def slug_from(display_name: str) -> str:
+    """Ein Kürzel für die Karriere-Seite, abgeleitet aus dem Anzeigenamen.
+
+    Abgeleitet und nicht eingegeben: ein freies Feld lädt zum Besetzen fremder
+    Namen ein. Umlaute werden zerlegt und ihre Grundbuchstaben behalten — „Grün"
+    wird `gruen` nur mit einer Ersetzungstabelle, `grun` ohne; letzteres ist
+    ehrlicher als eine Tabelle, die bei der nächsten Sprache falsch liegt.
+
+    Bleibt nichts übrig (etwa bei einem rein chinesischen Namen), fällt das
+    Kürzel auf `unternehmen` zurück — der Zähler beim Speichern macht daraus
+    `unternehmen-2` und so weiter. Eine leere Adresse wäre schlimmer als eine
+    unpersönliche.
+    """
+    folded = unicodedata.normalize("NFKD", display_name.casefold())
+    ascii_only = folded.encode("ascii", "ignore").decode()
+    slug = _SLUG_STRIP.sub("-", ascii_only).strip("-")[:MAX_SLUG].strip("-")
+    return slug or "unternehmen"
 
 
 class InvalidText(DomainError):
@@ -109,6 +134,10 @@ class CompanyProfile:
     """Ein Profil je Unternehmen; `tenant_id` IST der Schlüssel."""
 
     tenant_id: UUID
+    #: Die Adresse der Karriere-Seite. Einmal vergeben und danach
+    #: unveränderlich — sie ist ein Versprechen, und ein Kürzel, das dem
+    #: Anzeigenamen folgt, bricht jeden geteilten Link.
+    slug: str
     display_name: str
     about: str
     website: str | None
@@ -122,6 +151,7 @@ class CompanyProfile:
         cls,
         tenant_id: UUID,
         *,
+        slug: str,
         display_name: str,
         about: str,
         website: str | None,
@@ -132,6 +162,7 @@ class CompanyProfile:
         checked = _validated(display_name, about, website, locations, benefits)
         return cls(
             tenant_id=tenant_id,
+            slug=slug,
             display_name=checked.display_name,
             about=checked.about,
             website=checked.website,

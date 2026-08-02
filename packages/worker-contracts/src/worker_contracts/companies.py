@@ -27,6 +27,8 @@ class SaveCompanyProfileV1(BaseModel):
 
 class CompanyProfileV1(BaseModel):
     tenant_id: UUID
+    #: Die Adresse der Karriere-Seite — vom Server vergeben, unveränderlich.
+    slug: str
     display_name: str
     about: str
     website: str | None

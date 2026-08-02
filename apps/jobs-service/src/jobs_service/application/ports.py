@@ -22,6 +22,7 @@ class JobRepository(Protocol):
         location: str | None,
         remote: str | None,
         employment: str | None,
+        company: UUID | None,
         limit: int,
         cursor: str | None,
     ) -> tuple[list[Job], str | None]: ...
