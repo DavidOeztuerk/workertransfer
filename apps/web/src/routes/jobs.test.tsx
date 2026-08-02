@@ -7,6 +7,10 @@ import type { Job } from "../jobs/client";
 import { renderWithProviders } from "../test/render";
 import { JobsRoute } from "./jobs";
 
+vi.mock("../companies/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../companies/client")>();
+  return { ...actual, getCompanyProfile: vi.fn() };
+});
 vi.mock("../applications/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../applications/client")>();
   return { ...actual, apply: vi.fn() };
@@ -20,6 +24,8 @@ const client = await import("../jobs/client");
 const searchJobs = vi.mocked(client.searchJobs);
 const applicationsClient = await import("../applications/client");
 const apply = vi.mocked(applicationsClient.apply);
+const companiesClient = await import("../companies/client");
+const getCompanyProfile = vi.mocked(companiesClient.getCompanyProfile);
 
 function job(overrides: Partial<Job> = {}): Job {
   return {
@@ -44,6 +50,7 @@ function principal(): MeResponse {
 beforeEach(() => {
   vi.clearAllMocks();
   searchJobs.mockResolvedValue({ ok: true, items: [], nextCursor: null });
+  getCompanyProfile.mockResolvedValue(null);
   apply.mockResolvedValue({
     ok: true,
     application: {
@@ -209,5 +216,54 @@ describe("JobsRoute — bewerben", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("antwortet gerade nicht");
     expect(alert.textContent).not.toMatch(/abgelehnt/i);
+  });
+});
+
+describe("JobsRoute — wer sucht", () => {
+  it("names the company on the card", async () => {
+    searchJobs.mockResolvedValue({ ok: true, items: [job({ tenant_id: "t1" })], nextCursor: null });
+    getCompanyProfile.mockResolvedValue({
+      tenant_id: "t1",
+      slug: "muster",
+      display_name: "Muster",
+      about: "",
+      website: "https://muster.example",
+      locations: [],
+      benefits: ["Homeoffice"],
+      updated_at: "2026-08-02T10:00:00Z",
+    });
+
+    renderWithProviders(<JobsRoute principal={null} />);
+
+    expect(await screen.findByText("Muster")).toBeInTheDocument();
+    expect(screen.getByText(/Homeoffice/)).toBeInTheDocument();
+  });
+
+  it("shows nothing rather than a placeholder when there is no profile", async () => {
+    // „Unbekanntes Unternehmen" wäre eine Aussage, die niemand gemacht hat.
+    searchJobs.mockResolvedValue({ ok: true, items: [job()], nextCursor: null });
+    getCompanyProfile.mockResolvedValue(null);
+
+    renderWithProviders(<JobsRoute principal={null} />);
+
+    await screen.findByText("Backend-Entwicklerin");
+    expect(screen.queryByText(/unbekannt/i)).toBeNull();
+  });
+
+  it("asks once per company, not once per job", async () => {
+    // Der Query-Key hängt am Unternehmen; mehrere Stellen desselben
+    // Arbeitgebers teilen sich eine Abfrage.
+    searchJobs.mockResolvedValue({
+      ok: true,
+      items: [job({ id: "a", tenant_id: "t1" }), job({ id: "b", tenant_id: "t1" })],
+      nextCursor: null,
+    });
+    getCompanyProfile.mockResolvedValue(null);
+
+    renderWithProviders(<JobsRoute principal={null} />);
+
+    await screen.findAllByText("Backend-Entwicklerin");
+    await waitFor(() => expect(getCompanyProfile).toHaveBeenCalled());
+    expect(getCompanyProfile).toHaveBeenCalledTimes(1);
   });
 });

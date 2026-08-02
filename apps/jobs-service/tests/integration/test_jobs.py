@@ -201,3 +201,31 @@ async def test_a_broken_cursor_starts_from_the_beginning(app: Any) -> None:
     response = await _call(app, "GET", "/jobs?cursor=nicht-base64!!")
 
     assert response.status_code == 200
+
+
+async def test_the_company_filter_narrows_to_one_employer(app: Any) -> None:
+    """Für die Karriere-Seite: dieselbe Menge mit einer Bedingung mehr.
+
+    Ein eigener Endpunkt hätte einen zweiten Filter, der irgendwann vom ersten
+    abweicht — dann zeigte die Karriere-Seite etwas anderes als die Suche.
+    """
+    marker = uuid4().hex[:8]
+    mine, theirs = uuid4(), uuid4()
+    for tenant, label in ((mine, "meine"), (theirs, "fremde")):
+        draft = await _draft(app, _token(tenant), title=f"Filter {marker} {label}")
+        await _call(app, "POST", f"/jobs/{draft['id']}/publish", _token(tenant))
+
+    only_mine = await _call(app, "GET", f"/jobs?q={marker}&company={mine}")
+
+    assert only_mine.status_code == 200, only_mine.text
+    assert [item["title"] for item in only_mine.json()["items"]] == [f"Filter {marker} meine"]
+
+
+async def test_the_company_filter_never_shows_drafts(app: Any) -> None:
+    tenant = uuid4()
+    token = _token(tenant)
+    await _draft(app, token, title=f"Entwurf {uuid4().hex[:8]}")
+
+    response = await _call(app, "GET", f"/jobs?company={tenant}")
+
+    assert response.json()["items"] == []

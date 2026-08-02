@@ -20,7 +20,9 @@ import { ResumeRoute } from "./routes/resume";
 import { TeamRoute } from "./routes/team";
 import { PendingRequestBadge } from "./resume/pending-badge";
 import { ApplicationsRoute } from "./routes/applications";
+import { CareerRoute } from "./routes/career";
 import { CompanyJobsRoute } from "./routes/company-jobs";
+import { CompanyProfileRoute } from "./routes/company-profile";
 import { InvitationRoute } from "./routes/invitation";
 import { JobsRoute } from "./routes/jobs";
 import { RegisterRoute } from "./routes/register";
@@ -91,6 +93,9 @@ export function RootLayout() {
                   </Link>
                   <Link className="site-header__link" to="/company/jobs">
                     Unsere Stellen
+                  </Link>
+                  <Link className="site-header__link" to="/company/profile">
+                    Unser Unternehmen
                   </Link>
                 </>
               ) : null}
@@ -187,6 +192,11 @@ function JobsWithSession() {
   return <JobsRoute principal={user} />;
 }
 
+function CompanyProfileWithSession() {
+  const { user } = useSession();
+  return <CompanyProfileRoute principal={user} />;
+}
+
 function CompanyJobsWithSession() {
   const { user } = useSession();
   return <CompanyJobsRoute principal={user} />;
@@ -242,6 +252,11 @@ const candidatesRoute = createRoute({
   path: "/candidates",
   component: CandidatesWithSession,
 });
+const careerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/karriere/$slug",
+  component: CareerRoute,
+});
 const jobsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/jobs",
@@ -256,6 +271,11 @@ const companyJobsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/company/jobs",
   component: CompanyJobsWithSession,
+});
+const companyProfileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/company/profile",
+  component: CompanyProfileWithSession,
 });
 const teamRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -283,8 +303,10 @@ const routeTree = rootRoute.addChildren([
   resumeRoute,
   candidatesRoute,
   jobsRoute,
+  careerRoute,
   applicationsRoute,
   companyJobsRoute,
+  companyProfileRoute,
   teamRoute,
   invitationRoute,
   companyNewRoute,

@@ -159,6 +159,7 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
         location: str | None = None,
         remote: str | None = None,
         employment: str | None = None,
+        company: UUID | None = None,
         limit: int = Query(default=20, ge=1, le=MAX_PAGE_SIZE),
         cursor: str | None = None,
     ) -> JobPageV1:
@@ -173,6 +174,7 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             location=location,
             remote=remote,
             employment=employment,
+            company=company,
             limit=limit,
             cursor=cursor,
         )

@@ -111,6 +111,7 @@ class SqlAlchemyJobRepository:
         location: str | None,
         remote: str | None,
         employment: str | None,
+        company: UUID | None,
         limit: int,
         cursor: str | None,
     ) -> tuple[list[Job], str | None]:
@@ -132,6 +133,11 @@ class SqlAlchemyJobRepository:
             stmt = stmt.where(JobModel.remote == remote)
         if employment:
             stmt = stmt.where(JobModel.employment == employment)
+        if company is not None:
+            # Für die Karriere-Seite: dieselbe Menge mit einer Bedingung
+            # mehr. Ein eigener Endpunkt hätte einen zweiten Filter, der
+            # irgendwann vom ersten abweicht.
+            stmt = stmt.where(JobModel.tenant_id == company)
 
         position = decode_cursor(cursor) if cursor else None
         if position is not None:

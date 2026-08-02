@@ -14,7 +14,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 2 | Identity & Tenancy | ✅ | OIDC/OAuth, JWT, Claims-Tenant, Audit, DB-Migration |
 | 2.5 | Stabilisierung & Plattform-Naht | ✅ | Cookie-Auth, Dep-Hygiene, Kanon Runde 2, Dev-Stack, Frontend-Gate, Generator |
 | 3 | Candidate Core | ✅ | 3.1–3.5 komplett (Consent, Profile, Resume, Portfolio, Ablage) |
-| 4 | Jobs & Applications | 🟧 | Jobs ✅ (4.1); Applications, Companies, Career-Sites offen |
+| 4 | Jobs & Applications | ✅ | 4.1–4.4 komplett (Jobs, Bewerbungen, Unternehmen, Karriere-Seiten) |
 | 5 | Transfermarkt | ⬜ | Market-State-Machine, Konsensflows, Vertragsdraft |
 | 6 | Developer Intelligence | ⬜ | GitHub-Consent, Skill-Graph, Scout-Match |
 | 7 | AI Agent Plattform | ⬜ | 23 Agenten (draft-only), plan-act-reflect, MCP |
