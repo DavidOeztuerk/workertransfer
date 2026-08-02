@@ -1,33 +1,40 @@
-"""Database models for applications-service."""
+"""SQLAlchemy-Modelle für applications-service."""
 
 from __future__ import annotations
 
-from uuid import UUID, uuid4
+from datetime import datetime
+from uuid import UUID
 
-from sqlalchemy import String
+from sqlalchemy import Boolean, DateTime, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from applications_service.infrastructure.database.base import Base, TimestampMixin
+from applications_service.infrastructure.database.base import Base
 
-__all__ = ["ExampleModel"]
+__all__ = ["ApplicationModel"]
 
 
-class ExampleModel(Base, TimestampMixin):
-    """Platzhalter — durch die eigenen Tabellen dieses Service ersetzen.
+class ApplicationModel(Base):
+    """Eine Bewerbung. Enthält KEINE Profildaten — nur einen Verweis."""
 
-    Bewusst minimal. Das vorherige Beispiel führte Indizes, Soft-Delete, eine
-    tenant_id-Spalte und Domänen-Mapping vor — und war dabei nicht einmal
-    importierbar (`postgresql_where` auf einem UniqueConstraint, dazu ein
-    Lambda auf einen undefinierten Namen). Ein Beispiel, das mehr zeigt als es
-    trägt, lädt außerdem dazu ein, Entscheidungen zu kopieren, die nicht
-    allgemein gelten: ein Tenant ist ein Unternehmen, personenbezogene Daten
-    werden nicht über ihn getrennt (ADR-0017).
+    __tablename__ = "applications"
 
-    Die Mixins für Soft-Delete und Versionierung stehen in base.py bereit,
-    falls dieser Service sie braucht.
-    """
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    job_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    subject_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    shares_resume: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    shares_portfolio: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    __tablename__ = "examples"
-
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    __table_args__ = (
+        # Genau eine Bewerbung je (Person, Stelle). Zweimal auf dieselbe Stelle
+        # zu bewerben ist kein Ausdruck von Interesse, sondern ein Versehen —
+        # und in der Datenbank, nicht nur im Handler, damit zwei gleichzeitige
+        # Absendungen nicht beide durchkommen.
+        UniqueConstraint("job_id", "subject_id", name="uq_application_job_subject"),
+    )
