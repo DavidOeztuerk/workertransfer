@@ -16,6 +16,7 @@ from resume_service.infrastructure.database.repositories import (
     SqlAlchemyResumeRepository,
     SqlAlchemyResumeRequestRepository,
 )
+from resume_service.infrastructure.notify import HttpNotifier
 
 __all__ = ["compose_infrastructure", "request_scope"]
 
@@ -45,4 +46,10 @@ def compose_infrastructure(settings: ResumeServiceSettings, engine: AsyncEngine)
         # und hier auch beschrieben, damit der Capability-String an genau einer
         # Stelle entsteht.
         "consent": HttpConsentGate(base_url=settings.consent_base_url),
+        # Feuern und vergessen: ein Fehlschlag hier darf niemals den
+        # Vorgang scheitern lassen, der ihn ausgelöst hat.
+        "notify": HttpNotifier(
+            base_url=settings.identity_base_url,
+            secret=settings.notify_secret.get_secret_value(),
+        ),
     }

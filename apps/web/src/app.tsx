@@ -28,6 +28,7 @@ import { InvitationRoute } from "./routes/invitation";
 import { JobsRoute } from "./routes/jobs";
 import { MarketRoute } from "./routes/market";
 import { RegisterRoute } from "./routes/register";
+import { SettingsRoute } from "./routes/settings";
 import { TransfersRoute } from "./routes/transfers";
 import { VerifyRoute } from "./routes/verify";
 
@@ -114,6 +115,9 @@ export function RootLayout() {
               <Link className="site-header__link" to="/company/new">
                 Unternehmen anlegen
               </Link>
+              <Link className="site-header__link" to="/einstellungen">
+                Einstellungen
+              </Link>
               <Button variant="quiet" onClick={() => logout.mutate()} disabled={logout.isPending}>
                 {logout.isPending ? "Abmeldung läuft…" : "Abmelden"}
               </Button>
@@ -190,6 +194,11 @@ function ResumeWithSession() {
 function CandidatesWithSession() {
   const { user } = useSession();
   return <CandidatesRoute principal={user} />;
+}
+
+function SettingsWithSession() {
+  const { user } = useSession();
+  return <SettingsRoute principal={user} />;
 }
 
 function MarketWithSession() {
@@ -294,6 +303,11 @@ const applicationsRoute = createRoute({
   path: "/applications",
   component: ApplicationsWithSession,
 });
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/einstellungen",
+  component: SettingsWithSession,
+});
 const marketRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/markt",
@@ -347,6 +361,7 @@ const routeTree = rootRoute.addChildren([
   jobsRoute,
   careerRoute,
   applicationsRoute,
+  settingsRoute,
   marketRoute,
   transfersRoute,
   companyTransfersRoute,
