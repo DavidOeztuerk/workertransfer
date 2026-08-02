@@ -584,3 +584,31 @@ h1 {
   font-weight: 700;
   line-height: 1;
 }
+
+/* Mannschaft und Einladungen: eine Zeile je Person. */
+.team {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.team li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--wt-border, #d6d3cd);
+  padding-bottom: 0.5rem;
+}
+
+.team li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.team__role {
+  margin-left: auto;
+  color: var(--wt-muted);
+  font-size: 0.8rem;
+}
