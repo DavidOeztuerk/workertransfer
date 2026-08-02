@@ -147,3 +147,41 @@ export function verificationTokenFor(address: string): Promise<string> {
 export function invitationTokenFor(address: string): Promise<string> {
   return tokenFromMail(address, "eingeladen", "/invitation");
 }
+
+interface MailpitDetail {
+  Text?: string;
+  HTML?: string;
+  Subject?: string;
+}
+
+/**
+ * Die zuletzt an `address` zugestellte Mail — ohne Filter auf den Betreff.
+ *
+ * Anders als `tokenFromMail`: dort wird eine bestimmte Sorte gesucht, hier soll
+ * gerade geprüft werden, WAS überhaupt ankommt. Ein Filter würde die Frage
+ * beantworten, bevor sie gestellt ist.
+ */
+export async function lastMailFor(
+  address: string,
+  { after = 0 }: { after?: number } = {}
+): Promise<{ subject: string; text: string } | null> {
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    const list = (await (await fetch(`${MAILPIT_URL}/api/v1/messages?limit=50`)).json()) as {
+      messages?: (MailpitMessage & { Created?: string })[];
+    };
+    const hit = (list.messages ?? []).find(
+      (message) =>
+        message.To.some((to) => to.Address.toLowerCase() === address.toLowerCase()) &&
+        new Date(message.Created ?? 0).getTime() >= after
+    );
+    if (hit !== undefined) {
+      const body = (await (
+        await fetch(`${MAILPIT_URL}/api/v1/message/${hit.ID}`)
+      ).json()) as MailpitDetail;
+      return { subject: hit.Subject, text: `${body.Text ?? ""}${body.HTML ?? ""}` };
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return null;
+}

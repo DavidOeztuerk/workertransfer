@@ -47,6 +47,15 @@ class IdentityServiceSettings(PlatformSettings):
     # Browser sieht — nicht der Compose-Servicename.
     public_web_url: str = "http://localhost:5173"
 
+    # Gemeinsames Geheimnis für `POST /notifications`: Dienste haben es aus der
+    # Umgebung, ein Browser nicht. Ausdrücklich eine Zwischenlösung, bis es
+    # echte Dienstidentitäten gibt (Härtung, Phase 10) — ohne sie wäre der
+    # Endpunkt ein Weg, beliebigen Menschen Mails zu schicken.
+    #
+    # Leer heißt: der Endpunkt ist zu. Nicht „offen für alle" — eine
+    # Voreinstellung, die im Zweifel öffnet, ist genau die falsche.
+    notify_secret: SecretStr = SecretStr("")
+
     @model_validator(mode="after")
     def _reject_development_jwt_secret(self) -> Self:
         assert_deployable_jwt_secret(
