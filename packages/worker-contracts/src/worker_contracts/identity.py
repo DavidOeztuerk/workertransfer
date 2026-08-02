@@ -22,6 +22,8 @@ __all__ = [
     "InvitationV1",
     "InviteMemberV1",
     "MembershipV1",
+    "NotificationPreferencesV1",
+    "NotifyV1",
     "RegisterUserV1",
     "ResendVerificationV1",
     "VerifyEmailV1",
@@ -101,3 +103,32 @@ class CompanyMemberV1(BaseModel):
     user_id: UUID
     display_name: str
     role: str
+
+
+class NotifyV1(BaseModel):
+    """„Sag dieser Person, dass es etwas Neues gibt."
+
+    Bewusst OHNE Textfeld. Was die Mail sagt, entscheidet allein der
+    identity-service, und sie sagt für jede Art dasselbe: eine Mail landet
+    womöglich im Postfach beim aktuellen Arbeitgeber, und eine Zeile mit einem
+    Firmennamen darin wäre genau die Auskunft, gegen die diese Plattform gebaut
+    ist. Gäbe es hier ein `message`, wäre der Tag absehbar, an dem jemand „nur
+    diese eine Zeile" mitschickt.
+    """
+
+    user_id: UUID
+    kind: Literal["resume_request", "market_request", "application_update", "transfer_update"]
+
+
+class NotificationPreferencesV1(BaseModel):
+    """Vier Schalter, alle standardmäßig an.
+
+    Die einzige Voreinstellung in diesem System, die nicht zurückhaltend ist —
+    wer nicht erfährt, dass gefragt wurde, hat keine Wahl, sondern nur den
+    Anschein einer.
+    """
+
+    resume_request: bool = True
+    market_request: bool = True
+    application_update: bool = True
+    transfer_update: bool = True
