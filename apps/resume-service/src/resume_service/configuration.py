@@ -27,6 +27,10 @@ class ResumeServiceSettings(PlatformSettings):
     # Wo der Consent-Ledger erreichbar ist. Im Compose-Netz der Servicename,
     # nicht localhost — der Aufruf läuft container-zu-container.
     consent_base_url: str = "http://127.0.0.1:8002"
+    identity_base_url: str = "http://127.0.0.1:8001"
+    # Leer heißt: es wird nicht benachrichtigt. Kein stiller Ausfall —
+    # der Endpunkt wäre ohne Geheimnis ohnehin zu.
+    notify_secret: SecretStr = SecretStr("")
 
     @model_validator(mode="after")
     def _reject_development_jwt_secret(self) -> Self:

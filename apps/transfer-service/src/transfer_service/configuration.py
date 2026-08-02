@@ -22,6 +22,10 @@ class TransferServiceSettings(PlatformSettings):
 
     # Wo der Consent-Ledger erreichbar ist. Im Compose-Netz der Servicename.
     consent_base_url: str = "http://127.0.0.1:8002"
+    identity_base_url: str = "http://127.0.0.1:8001"
+    # Leer heißt: es wird nicht benachrichtigt. Kein stiller Ausfall —
+    # der Endpunkt wäre ohne Geheimnis ohnehin zu.
+    notify_secret: SecretStr = SecretStr("")
 
     # HS256 secret issued by identity-service; this service only verifies
     # (ADR-0007). Runtime-only — never commit a real value.

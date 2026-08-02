@@ -62,6 +62,10 @@ x-service-env: &service-env
   WORKER_SMTP_HOST: mailpit
   WORKER_SMTP_PORT: "1025"
   WORKER_MAIL_FROM: noreply@workertransfer.local
+  # Gemeinsames Geheimnis für POST /notifications (identity-service). Nur
+  # die Dienste kennen es, ein Browser nicht. Zwischenlösung bis zu echten
+  # Dienstidentitäten (Härtung, Phase 10). LEER heißt: der Endpunkt ist zu.
+  WORKER_NOTIFY_SECRET: ${WORKER_NOTIFY_SECRET:-local-notify-secret}
   # The base for confirmation links — must be what the BROWSER can reach, not a
   # compose service name.
   WORKER_PUBLIC_WEB_URL: ${WORKER_PUBLIC_WEB_URL:-http://localhost:5173}
@@ -234,6 +238,7 @@ services:
       # Der Lebenslauf wird je Unternehmen einzeln freigegeben; die Berechtigung
       # steht im Ledger (Capability resume.visibility:tenant:<id>).
       WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      WORKER_IDENTITY_BASE_URL: http://identity-service:8001
     ports:
       - "8004:8004"
     command:
@@ -353,6 +358,7 @@ services:
       WORKER_PORT: "8007"
       WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/applications
       WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      WORKER_IDENTITY_BASE_URL: http://identity-service:8001
       WORKER_JOBS_BASE_URL: http://jobs-service:8006
     ports:
       - "8007:8007"
@@ -429,6 +435,7 @@ services:
       WORKER_PORT: "8009"
       WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/transfer
       WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      WORKER_IDENTITY_BASE_URL: http://identity-service:8001
     ports:
       - "8009:8009"
     command:

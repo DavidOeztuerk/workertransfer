@@ -726,3 +726,15 @@ h1 {
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+
+/* Einstellungen: die Schalter untereinander, mit Luft dazwischen. Sie wirken
+   sofort — deshalb steht kein Speichern-Knopf darunter. */
+.settings__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--wt-border, #d6d3cd);
+}

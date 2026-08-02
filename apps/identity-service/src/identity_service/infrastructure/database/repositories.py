@@ -12,6 +12,7 @@ from identity_service.domain.audit import AuditEvent
 from identity_service.domain.company import Company, EmailDomain
 from identity_service.domain.invitation import Invitation, InvitationStatus
 from identity_service.domain.membership import MembershipRole, MembershipView
+from identity_service.domain.notification import NotificationKind, NotificationPreference
 from identity_service.domain.session import SessionView
 from identity_service.domain.user import AccountStatus, User
 from identity_service.domain.value_objects import Email, PasswordHash, UserId
@@ -20,6 +21,7 @@ from identity_service.infrastructure.database.models import (
     AuditEventModel,
     EmailVerificationTokenModel,
     InvitationModel,
+    NotificationPreferenceModel,
     SessionModel,
     TenantModel,
     UserModel,
@@ -400,3 +402,43 @@ class SqlAlchemyInvitationRepository:
             return
         row.status = str(invitation.status)
         row.accepted_at = invitation.accepted_at
+
+
+class SqlAlchemyNotificationPreferenceRepository:
+    """Fehlt die Zeile, gilt die Voreinstellung — sie wird nicht vorsorglich angelegt.
+
+    Eine Zeile je Konto bei der Registrierung zu schreiben hieße, für jeden
+    Menschen einen Datensatz zu führen, der nichts aussagt, was die
+    Voreinstellung nicht auch sagt.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get(self, user_id: UUID) -> NotificationPreference:
+        row = await self._session.get(NotificationPreferenceModel, user_id)
+        if row is None:
+            return NotificationPreference.default(user_id)
+        return NotificationPreference(
+            user_id=row.user_id,
+            kinds={
+                NotificationKind.RESUME_REQUEST: row.resume_request,
+                NotificationKind.MARKET_REQUEST: row.market_request,
+                NotificationKind.APPLICATION_UPDATE: row.application_update,
+                NotificationKind.TRANSFER_UPDATE: row.transfer_update,
+            },
+            last_sent_at=row.last_sent_at,
+        )
+
+    async def save(self, preference: NotificationPreference) -> None:
+        row = await self._session.get(NotificationPreferenceModel, preference.user_id)
+        if row is None:
+            row = NotificationPreferenceModel(user_id=preference.user_id)
+            self._session.add(row)
+        # Alle veränderlichen Felder schreiben: ein vergessenes kostet im Test
+        # nichts und verliert in Produktion lautlos den Schreibvorgang.
+        row.resume_request = preference.wants(NotificationKind.RESUME_REQUEST)
+        row.market_request = preference.wants(NotificationKind.MARKET_REQUEST)
+        row.application_update = preference.wants(NotificationKind.APPLICATION_UPDATE)
+        row.transfer_update = preference.wants(NotificationKind.TRANSFER_UPDATE)
+        row.last_sent_at = preference.last_sent_at

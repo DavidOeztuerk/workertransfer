@@ -20,6 +20,7 @@ from identity_service.infrastructure.database.repositories import (
     SqlAlchemyCompanyRepository,
     SqlAlchemyInvitationRepository,
     SqlAlchemyMembershipRepository,
+    SqlAlchemyNotificationPreferenceRepository,
     SqlAlchemySessionRepository,
     SqlAlchemyUserRepository,
     SqlAlchemyVerificationTokenRepository,
@@ -47,6 +48,7 @@ async def request_scope(
             "audit": SqlAlchemyAuditRepository(uow.session),
             "tokens": SqlAlchemyVerificationTokenRepository(uow.session),
             "companies": SqlAlchemyCompanyRepository(uow.session),
+            "notifications": SqlAlchemyNotificationPreferenceRepository(uow.session),
         }
         yield uow, repos
 
