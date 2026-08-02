@@ -10,7 +10,7 @@ resource would misrepresent an append-only ledger.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal, cast
 
 from fastapi import APIRouter, HTTPException, Request, status
 from worker_auth import get_request_user
@@ -19,6 +19,7 @@ from worker_contracts import (
     ConsentCheckV1,
     ConsentGrantedV1,
     ConsentGrantV1,
+    ConsentHistoryEntryV1,
     ConsentRevokeV1,
     ConsentStateV1,
 )
@@ -34,6 +35,7 @@ from consent_service.application.commands import (
     handle_delete,
     handle_grant,
     handle_list_mine,
+    handle_my_history,
     handle_revoke,
 )
 from consent_service.domain.consent_event import ConsentMetadataError, ReasonRequired
@@ -152,6 +154,31 @@ def build_consent_router(deps: dict[str, Any]) -> APIRouter:
         return [
             ConsentGrantedV1(capability=capability.value, granted_at=event.recorded_at)
             for capability, event in granted
+        ]
+
+    @router.get("/me/history")
+    async def my_history(request: Request) -> list[ConsentHistoryEntryV1]:
+        """Die eigene Geschichte — für die Auskunft, nicht für die Übersicht.
+
+        `/consent/me` zeigt bewusst nur, was GILT: eine Historie verrät, wer
+        einmal gefragt hat, und das ist mehr, als eine Übersichtsseite
+        verspricht. Hier ist es genau richtig — die Auskunft geht an die
+        betroffene Person selbst.
+        """
+        subject_id = _actor_id(request)
+        async with request_scope(session_factory) as (_uow, repos):
+            events = await handle_my_history(subject_id, repos=repos)
+        return [
+            ConsentHistoryEntryV1(
+                capability=event.capability.value,
+                # `ConsentAction` ist eine StrEnum mit genau diesen drei Werten;
+                # der Vertrag hält sie als Literal fest, damit ein vierter
+                # Zustand hier auffällt und nicht stillschweigend durchrutscht.
+                action=cast('Literal["GRANT", "REVOKE", "DELETE"]', str(event.action)),
+                recorded_at=event.recorded_at,
+                reason=event.reason.value if event.reason is not None else None,
+            )
+            for event in events
         ]
 
     @router.post("/check")

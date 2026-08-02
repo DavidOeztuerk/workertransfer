@@ -223,3 +223,91 @@ async def test_without_a_token_there_is_no_list(postgres_url: str, migrated_sche
         response = await client.get("/consent/me")
 
     assert response.status_code == 401
+
+
+async def test_the_history_keeps_what_the_list_drops(
+    postgres_url: str, migrated_schema: None
+) -> None:
+    """`/consent/me` sagt, was gilt. Die Geschichte sagt, was war.
+
+    Beides ist richtig — an verschiedenen Orten. Eine Übersichtsseite, die
+    zeigt, wer EINMAL gefragt hat, verspricht mehr, als sie soll; eine
+    Auskunft, die es verschweigt, verspricht weniger.
+    """
+    client, subject, auth = _client(postgres_url)
+    body = {"subject_id": subject, "capability": "profile.visibility:public"}
+    async with client:
+        await client.post("/consent/grant", json=body, headers=auth)
+        await client.post("/consent/revoke", json={**body, "reason": "doch nicht"}, headers=auth)
+        listed = (await client.get("/consent/me", headers=auth)).json()
+        history = (await client.get("/consent/me/history", headers=auth)).json()
+
+    assert listed == []
+    assert [entry["action"] for entry in history] == ["GRANT", "REVOKE"]
+
+
+async def test_the_history_carries_the_reason_the_others_withhold(
+    postgres_url: str, migrated_schema: None
+) -> None:
+    """Freitext, den die Person über sich selbst geschrieben hat.
+
+    Ihr gegenüber gibt es keinen Grund, ihn zurückzuhalten — `/check` und
+    `/consent/me` kennen ihn trotzdem nicht. Das ist der Unterschied zwischen
+    „gehört ihr" und „geht andere an".
+    """
+    client, subject, auth = _client(postgres_url)
+    body = {"subject_id": subject, "capability": "profile.visibility:public"}
+    async with client:
+        await client.post("/consent/grant", json=body, headers=auth)
+        await client.post(
+            "/consent/revoke",
+            json={**body, "reason": "moechte nicht mehr gefunden werden"},
+            headers=auth,
+        )
+        history = (await client.get("/consent/me/history", headers=auth)).json()
+        checked = await client.post("/consent/check", json=body, headers=auth)
+
+    assert history[-1]["reason"] == "moechte nicht mehr gefunden werden"
+    assert "reason" not in checked.json()
+
+
+async def test_the_history_is_oldest_first(postgres_url: str, migrated_schema: None) -> None:
+    """Eine Geschichte liest man von vorn."""
+    client, subject, auth = _client(postgres_url)
+    body = {"subject_id": subject, "capability": "profile.visibility:public"}
+    async with client:
+        await client.post("/consent/grant", json=body, headers=auth)
+        await client.post("/consent/revoke", json={**body, "reason": "eins"}, headers=auth)
+        await client.post("/consent/grant", json=body, headers=auth)
+        history = (await client.get("/consent/me/history", headers=auth)).json()
+
+    stamps = [entry["recorded_at"] for entry in history]
+    assert stamps == sorted(stamps)
+    assert [entry["action"] for entry in history] == ["GRANT", "REVOKE", "GRANT"]
+
+
+async def test_nobody_gets_someone_elses_history(postgres_url: str, migrated_schema: None) -> None:
+    client, subject, auth = _client(postgres_url)
+    other_client, _other, other_auth = _client(postgres_url)
+    async with client:
+        await client.post(
+            "/consent/grant",
+            json={"subject_id": subject, "capability": "profile.visibility:public"},
+            headers=auth,
+        )
+    async with other_client:
+        by_query = await other_client.get(
+            f"/consent/me/history?subject_id={subject}", headers=other_auth
+        )
+
+    assert by_query.json() == []
+
+
+async def test_without_a_token_there_is_no_history(
+    postgres_url: str, migrated_schema: None
+) -> None:
+    client, _subject, _auth = _client(postgres_url)
+    async with client:
+        response = await client.get("/consent/me/history")
+
+    assert response.status_code == 401

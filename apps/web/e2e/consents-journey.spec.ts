@@ -192,3 +192,41 @@ test("die Suche findet nur, was freigegeben ist", async ({ browser }) => {
   await hiddenContext.close();
   await recruiterContext.close();
 });
+
+
+test("die Auskunft nennt jeden Abschnitt — auch die leeren", async ({ browser }) => {
+  const email = uniqueEmail("kandidat.example");
+  const stamp = Date.now();
+  const headline = `E2E Auskunft ${stamp}`;
+
+  const context = await browser.newContext();
+  const person = await context.newPage();
+  await registerAndConfirm(person, email, "E2E Auskunft");
+  await login(person, email);
+
+  await person.goto("/profile");
+  await person.getByLabel(/Überschrift/i).fill(headline);
+  await person.getByRole("button", { name: /Speichern/i }).click();
+  await expect(person.getByText(/Profil gespeichert/i)).toBeVisible();
+  await person.getByRole("switch").click();
+  await expect(person.getByRole("switch")).toBeChecked();
+
+  await person.goto("/meine-daten");
+
+  // Jeder Abschnitt steht da — auch die, zu denen es nichts gibt. „Kein
+  // Lebenslauf" ist eine Auskunft und fehlt sonst.
+  await expect(person.getByText(/^profil — enthalten$/)).toBeVisible();
+  await expect(person.getByText(/^lebenslauf — enthalten$/)).toBeVisible();
+  await expect(person.getByText(/^portfolio — enthalten$/)).toBeVisible();
+  await expect(person.getByText(/^freigaben verlauf — enthalten$/)).toBeVisible();
+  // Nichts fehlt: bei laufendem Stack gibt es keine Warnung.
+  await expect(person.getByRole("alert")).toHaveCount(0);
+
+  // Die Datei entsteht im Browser — der Download beweist, dass sie zustande kommt.
+  const download = person.waitForEvent("download");
+  await person.getByRole("button", { name: /Als JSON herunterladen/i }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/^workertransfer-meine-daten-\d{4}-\d{2}-\d{2}\.json$/);
+
+  await context.close();
+});
