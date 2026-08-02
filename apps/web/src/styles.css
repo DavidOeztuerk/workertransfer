@@ -636,3 +636,93 @@ h1 {
   margin: 0 0 0.35rem;
   font-size: 0.9rem;
 }
+
+/* Marktstatus: die drei Zustände als Radiogruppe, jeder mit seinem Satz. Ein
+   Auswahlfeld hätte die Erklärungen verschluckt — und genau hier ist die
+   Erklärung die halbe Entscheidung. */
+.market__choices {
+  border: 1px solid var(--wt-border, #d6d3cd);
+  border-radius: 8px;
+  padding: 0.9rem 1.1rem;
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.market__choices legend {
+  padding: 0 0.4rem;
+  font-size: 0.85rem;
+  color: var(--wt-muted);
+}
+
+.market__choice {
+  display: flex;
+  gap: 0.65rem;
+  align-items: start;
+  cursor: pointer;
+}
+
+.market__choice > span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.market__hint {
+  color: var(--wt-muted);
+  font-size: 0.85rem;
+}
+
+/* Der Marktstatus-Teil einer Kandidatenkarte, abgesetzt von der
+   Lebenslauf-Anfrage darüber: es sind zwei Freigaben, und sie sollen auch wie
+   zwei aussehen. */
+.candidates__market {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--wt-border, #d6d3cd);
+  display: grid;
+  gap: 0.6rem;
+  justify-items: start;
+}
+
+.transfer {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.transfer h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.transfer__message {
+  margin: 0;
+  font-style: italic;
+}
+
+.transfer__note {
+  margin: 0;
+  color: var(--wt-muted);
+  font-size: 0.9rem;
+}
+
+.transfer__offer {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0;
+}
+
+.transfer__offer dt {
+  color: var(--wt-muted);
+  font-size: 0.85rem;
+}
+
+.transfer__offer dd {
+  margin: 0;
+}
+
+.transfer__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
