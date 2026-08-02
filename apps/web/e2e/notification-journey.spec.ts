@@ -82,6 +82,7 @@ test("eine Anfrage erreicht die Person per Mail — und die Mail verrät nicht, 
 
   await recruiter.goto("/candidates");
   const card = recruiter.locator("li").filter({ hasText: headline });
+  await expect(card).toBeVisible();
   await card.getByRole("button", { name: /Marktstatus anfragen/i }).click();
   await expect(card.getByText(/Marktstatus angefragt/i)).toBeVisible();
 
@@ -157,6 +158,7 @@ test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser })
   const since = Date.now();
   await recruiter.goto("/candidates");
   const card = recruiter.locator("li").filter({ hasText: headline });
+  await expect(card).toBeVisible();
   await card.getByRole("button", { name: /Marktstatus anfragen/i }).click();
   // Der Vorgang läuft trotzdem: die Mail ist Höflichkeit, nicht Bedingung.
   await expect(card.getByText(/Marktstatus angefragt/i)).toBeVisible();
