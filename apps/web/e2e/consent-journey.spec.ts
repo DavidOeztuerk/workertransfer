@@ -40,7 +40,11 @@ async function registerAndConfirm(
   // Mail, die es nur bei einer echten Neuanlage gibt.
   const token = await verificationTokenFor(email);
   await page.goto(`/verify?token=${token}`);
-  await expect(page.getByText(/bestätigt|aktiv|anmelden/i).first()).toBeVisible();
+  // Genau die Erfolgsmeldung der Bestätigungsseite. Ein weiches
+  // /anmelden/i träfe den "Anmelden"-Link in der Kopfzeile und ließe eine
+  // GESCHEITERTE Bestätigung wie eine geglückte aussehen — der Test wäre
+  // dann erst viel später und an falscher Stelle rot geworden.
+  await expect(page.getByRole("heading", { name: /bestätigt/i })).toBeVisible();
 }
 
 async function login(page: import("@playwright/test").Page, email: string) {

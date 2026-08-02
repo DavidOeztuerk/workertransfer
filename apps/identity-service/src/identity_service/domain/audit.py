@@ -30,11 +30,20 @@ class AuditAction(StrEnum):
     TENANT_SWITCH_DENIED = "tenant_switch_denied"
     EMAIL_VERIFIED = "email_verified"
     COMPANY_CREATED = "company_created"
+    # Ein Unternehmen zu betreten ist eine Rechteänderung und gehört ins
+    # Protokoll — Einladung, Beitritt und Rücknahme jeweils einzeln, weil sie
+    # verschiedene Personen auslösen.
+    MEMBER_INVITED = "member_invited"
+    MEMBER_JOINED = "member_joined"
+    INVITATION_WITHDRAWN = "invitation_withdrawn"
+    MEMBER_REMOVED = "member_removed"
 
 
 # Only non-PII technical metadata may be recorded. Passwords, emails,
 # consent payloads, and tokens are forbidden by construction.
-AUDIT_METADATA_ALLOWLIST: frozenset[str] = frozenset({"reason", "ip", "user_agent"})
+# `role` ist "admin" oder "member" — technische Metadaten über eine
+# Berechtigung, keine Angabe über die Person.
+AUDIT_METADATA_ALLOWLIST: frozenset[str] = frozenset({"reason", "ip", "user_agent", "role"})
 
 
 class AuditMetadataError(DomainError):
