@@ -105,6 +105,10 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
   // Die Person entscheidet.
   await candidate.goto("/markt");
   const row = candidate.locator("li").filter({ hasText: /ob du ansprechbar bist/i });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(row).toBeVisible();
   await row.getByRole("button", { name: /Freigeben/i }).click();
   await expect(row.getByText(/Freigegeben/i)).toBeVisible();
 
@@ -117,6 +121,10 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
   // Jetzt erst sieht das Unternehmen den Status — und darf zugehen.
   await recruiter.goto("/candidates");
   const openCard = recruiter.locator("li").filter({ hasText: headline });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(openCard).toBeVisible();
   await expect(openCard.getByText(/Hört zu/)).toBeVisible();
   await openCard.getByRole("button", { name: /Interesse zeigen/i }).click();
   await expect(openCard.getByText(/Interesse hinterlegt/i)).toBeVisible();
@@ -208,6 +216,10 @@ test("ohne Freigabe des Marktstatus gibt es nichts zu sehen und nichts zu tun", 
 
   await recruiter.goto("/candidates");
   const card = recruiter.locator("li").filter({ hasText: headline });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(card).toBeVisible();
   await card.getByRole("button", { name: /Marktstatus anfragen/i }).click();
   await expect(card.getByText(/Marktstatus angefragt/i)).toBeVisible();
 
@@ -215,11 +227,19 @@ test("ohne Freigabe des Marktstatus gibt es nichts zu sehen und nichts zu tun", 
   // sucht, ist die heikelste Angabe im ganzen System.
   await candidate.goto("/markt");
   const row = candidate.locator("li").filter({ hasText: /ob du ansprechbar bist/i });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(row).toBeVisible();
   await row.getByRole("button", { name: /Ablehnen/i }).click();
   await expect(row.getByText(/Abgelehnt/i)).toBeVisible();
 
   await recruiter.goto("/candidates");
   const shut = recruiter.locator("li").filter({ hasText: headline });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(shut).toBeVisible();
   await expect(shut.getByText(/Marktstatus abgelehnt/)).toBeVisible();
   await expect(shut.getByText(/Sucht aktiv/)).toHaveCount(0);
   await expect(shut.getByRole("button", { name: /Interesse zeigen/i })).toHaveCount(0);

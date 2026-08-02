@@ -29,6 +29,7 @@ import { CompanyProfileRoute } from "./routes/company-profile";
 import { InvitationRoute } from "./routes/invitation";
 import { JobsRoute } from "./routes/jobs";
 import { MarketRoute } from "./routes/market";
+import { MyDataRoute } from "./routes/my-data";
 import { RegisterRoute } from "./routes/register";
 import { SettingsRoute } from "./routes/settings";
 import { TransfersRoute } from "./routes/transfers";
@@ -120,6 +121,9 @@ export function RootLayout() {
               <Link className="site-header__link" to="/freigaben">
                 Meine Freigaben
               </Link>
+              <Link className="site-header__link" to="/meine-daten">
+                Meine Daten
+              </Link>
               <Link className="site-header__link" to="/einstellungen">
                 Einstellungen
               </Link>
@@ -199,6 +203,11 @@ function ResumeWithSession() {
 function CandidatesWithSession() {
   const { user } = useSession();
   return <CandidatesRoute principal={user} />;
+}
+
+function MyDataWithSession() {
+  const { user } = useSession();
+  return <MyDataRoute principal={user} />;
 }
 
 function ConsentsWithSession() {
@@ -325,6 +334,11 @@ const applicationsRoute = createRoute({
   path: "/applications",
   component: ApplicationsWithSession,
 });
+const myDataRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/meine-daten",
+  component: MyDataWithSession,
+});
 const consentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/freigaben",
@@ -389,6 +403,7 @@ const routeTree = rootRoute.addChildren([
   careerRoute,
   applicationsRoute,
   consentsRoute,
+  myDataRoute,
   settingsRoute,
   marketRoute,
   transfersRoute,

@@ -36,6 +36,7 @@ __all__ = [
     "handle_delete",
     "handle_grant",
     "handle_list_mine",
+    "handle_my_history",
     "handle_revoke",
 ]
 
@@ -266,3 +267,14 @@ async def handle_list_mine(
             effective.append((event.capability, event))
     effective.sort(key=lambda pair: pair[0].value)
     return effective
+
+
+async def handle_my_history(subject_id: UUID, *, repos: dict[str, Any]) -> list[ConsentEvent]:
+    """Jedes Ereignis der eigenen Geschichte, älteste zuerst.
+
+    Kein `subject_id` von außen — wie bei `handle_list_mine`. Und anders als
+    dort ohne Filterung auf Wirksames: eine Auskunft ist der Ort, an dem die
+    Vergangenheit hingehört.
+    """
+    events: list[ConsentEvent] = list(await repos["consent"].stream(SubjectId(subject_id)))
+    return events

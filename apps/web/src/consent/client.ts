@@ -126,3 +126,29 @@ export function parseCapability(capability: string): ParsedCapability {
   const area = AREAS[match[1] ?? ""] ?? null;
   return { area, tenantId: match[3] ?? null, public: match[2] === "public" };
 }
+
+
+export interface ConsentHistoryEntry {
+  capability: string;
+  action: "GRANT" | "REVOKE" | "DELETE";
+  recorded_at: string;
+  /** Nur der betroffenen Person gegenüber gefüllt. */
+  reason: string | null;
+}
+
+export type ConsentHistoryResult =
+  | { ok: true; events: ConsentHistoryEntry[] }
+  | { ok: false; message: string };
+
+/** Die eigene Geschichte — für die Auskunft, nicht für die Übersicht. */
+export async function listMyConsentHistory(): Promise<ConsentHistoryResult> {
+  try {
+    const res = await fetch(`${CONSENT_BASE_URL}/consent/me/history`, {
+      credentials: "include",
+    });
+    if (!res.ok) return { ok: false, message: "Die Historie ließ sich nicht laden." };
+    return { ok: true, events: (await res.json()) as ConsentHistoryEntry[] };
+  } catch {
+    return { ok: false, message: "Keine Verbindung zum Consent-Ledger." };
+  }
+}

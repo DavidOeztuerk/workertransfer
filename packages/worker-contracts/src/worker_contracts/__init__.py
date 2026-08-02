@@ -11,6 +11,7 @@ from worker_contracts.consent import (
     ConsentCheckV1,
     ConsentGrantedV1,
     ConsentGrantV1,
+    ConsentHistoryEntryV1,
     ConsentRevokeV1,
     ConsentStateV1,
 )
@@ -66,6 +67,7 @@ __all__ = [
     "ConsentCheckV1",
     "ConsentGrantV1",
     "ConsentGrantedV1",
+    "ConsentHistoryEntryV1",
     "ConsentRevokeV1",
     "ConsentStateV1",
     "CreateCompanyV1",
