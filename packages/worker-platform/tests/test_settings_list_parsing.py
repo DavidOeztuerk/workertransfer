@@ -13,7 +13,11 @@ kernel was fixed.
 
 from __future__ import annotations
 
+from typing import Annotated
+
 import pytest
+from pydantic import Field
+from pydantic_settings import NoDecode
 from worker_platform.configuration import PlatformSettings
 
 
@@ -60,17 +64,33 @@ def test_the_other_cors_lists_parse_the_same_way(monkeypatch: pytest.MonkeyPatch
     assert settings.cors_expose_headers == ["x-correlation-id"]
 
 
+class _SettingsWithOwnDefault(PlatformSettings):
+    """Reproduziert die Form, die den ersten Fix überlebt hat.
+
+    Ein Service, der `cors_allow_origins` überschreibt, um einen eigenen
+    Standard zu setzen, verliert dabei `Annotated[..., NoDecode]` der
+    Basisklasse — und pydantic-settings ruft wieder json.loads auf den rohen
+    Env-Wert. Der Fall wird hier lokal nachgebaut statt einen Service zu
+    importieren: der Kernel darf keine App kennen (ADR-0002).
+    """
+
+    cors_allow_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:5173"]
+    )
+
+
 def test_a_subclass_that_overrides_the_field_still_parses_csv(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The regression that survived the first fix: identity-service overrides
-    # cors_allow_origins to add a dev default, which drops Annotated[..., NoDecode].
-    from identity_service.configuration import IdentityServiceSettings
-
-    monkeypatch.setenv("WORKER_JWT_SECRET", "test-secret-with-at-least-thirty-two-bytes")
     monkeypatch.setenv("WORKER_CORS_ALLOW_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
 
-    assert IdentityServiceSettings().cors_allow_origins == [
+    assert _SettingsWithOwnDefault().cors_allow_origins == [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
+
+
+def test_a_subclass_keeps_its_own_default_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("WORKER_CORS_ALLOW_ORIGINS", raising=False)
+
+    assert _SettingsWithOwnDefault().cors_allow_origins == ["http://localhost:5173"]
