@@ -3,7 +3,14 @@ import { useState } from "react";
 import { Button, Card, Field } from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
-import { type Role, inviteMember, listInvitations, listMembers, withdrawInvitation } from "../auth/team";
+import {
+  type Role,
+  inviteMember,
+  listInvitations,
+  listMembers,
+  removeMember,
+  withdrawInvitation,
+} from "../auth/team";
 
 export interface TeamRouteProps {
   principal?: MeResponse | null;
@@ -26,14 +33,18 @@ export function TeamRoute({ principal = null }: TeamRouteProps) {
 
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("member");
-  const [error, setError] = useState<string | null>(null);
+  // Zwei Fehlerzustände, nicht einer: die Meldungen gehören zu verschiedenen
+  // Karten, und ein gemeinsamer Zustand rendert dieselbe Meldung zweimal auf
+  // der Seite — einmal neben der Mannschaft und einmal unter dem Formular.
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [memberError, setMemberError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
   const invite = useMutation({
     mutationFn: () => inviteMember(tenantId as string, email, role),
     onSuccess: (result) => {
       if (result.ok) {
-        setError(null);
+        setInviteError(null);
         // Bewusst dieselbe Meldung, ob die Adresse ein Konto hat oder nicht:
         // der Server antwortet in beiden Fällen gleich, und ein Unterschied
         // hier wäre genau das Leck, das er vermeidet.
@@ -42,7 +53,7 @@ export function TeamRoute({ principal = null }: TeamRouteProps) {
         void queryClient.invalidateQueries({ queryKey: ["team", "invitations", tenantId] });
       } else {
         setSent(false);
-        setError(result.message);
+        setInviteError(result.message);
       }
     },
   });
@@ -50,9 +61,16 @@ export function TeamRoute({ principal = null }: TeamRouteProps) {
   const withdraw = useMutation({
     mutationFn: (invitationId: string) => withdrawInvitation(tenantId as string, invitationId),
     onSuccess: (result) => {
-      if (!result.ok) setError(result.message);
-      else setError(null);
+      setInviteError(result.ok ? null : result.message);
       void queryClient.invalidateQueries({ queryKey: ["team", "invitations", tenantId] });
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: (memberId: string) => removeMember(tenantId as string, memberId),
+    onSuccess: (result) => {
+      setMemberError(result.ok ? null : result.message);
+      void queryClient.invalidateQueries({ queryKey: ["team", "members", tenantId] });
     },
   });
 
@@ -103,9 +121,23 @@ export function TeamRoute({ principal = null }: TeamRouteProps) {
                 <span className="team__role">
                   {entry.role === "admin" ? "Administrator" : "Mitglied"}
                 </span>
+                {isAdmin ? (
+                  <Button
+                    variant="quiet"
+                    onClick={() => remove.mutate(entry.user_id)}
+                    disabled={remove.isPending}
+                  >
+                    {entry.user_id === principal?.user_id ? "Verlassen" : "Entfernen"}
+                  </Button>
+                ) : null}
               </li>
             ))}
           </ul>
+        ) : null}
+        {memberError !== null ? (
+          <p className="auth__alert" role="alert">
+            {memberError}
+          </p>
         ) : null}
       </Card>
 
@@ -141,12 +173,12 @@ export function TeamRoute({ principal = null }: TeamRouteProps) {
               </select>
             </label>
 
-            {error !== null ? (
+            {inviteError !== null ? (
               <p className="auth__alert" role="alert">
-                {error}
+                {inviteError}
               </p>
             ) : null}
-            {sent && error === null ? (
+            {sent && inviteError === null ? (
               <p className="page__note">Einladung verschickt.</p>
             ) : null}
 

@@ -198,3 +198,46 @@ export async function acceptInvitation(token: string): Promise<AcceptResult> {
   }
   return { ok: true, membership: (await res.json()) as Membership };
 }
+
+
+export type RemoveResult =
+  | { ok: true }
+  | { ok: false; reason: "last-admin" | "not-admin" | "offline"; message: string };
+
+/**
+ * Ein Mitglied entfernen — oder sich selbst.
+ *
+ * `409` heißt nicht „du darfst nicht", sondern „nicht dieses Mitglied, nicht
+ * jetzt": der letzte Administrator kann nicht gehen. Das getrennt zu halten
+ * ist der Unterschied zwischen „such dir jemanden mit mehr Rechten" und
+ * „mach vorher jemanden zum Administrator".
+ */
+export async function removeMember(tenantId: string, memberId: string): Promise<RemoveResult> {
+  let res: Response;
+  try {
+    res = await send(`/companies/${tenantId}/members/${memberId}`, { method: "DELETE" });
+  } catch {
+    return { ok: false, reason: "offline", message: "Keine Verbindung zum Server." };
+  }
+  if (res.status === 204) return { ok: true };
+  if (res.status === 409) {
+    return {
+      ok: false,
+      reason: "last-admin",
+      message:
+        "Ein Unternehmen braucht mindestens einen Administrator. Mache zuerst jemanden zum Administrator.",
+    };
+  }
+  if (res.status === 403) {
+    return {
+      ok: false,
+      reason: "not-admin",
+      message: "Entfernen darf nur, wer Administrator dieses Unternehmens ist.",
+    };
+  }
+  return {
+    ok: false,
+    reason: "offline",
+    message: await problemMessage(res, "Das Mitglied ließ sich nicht entfernen."),
+  };
+}

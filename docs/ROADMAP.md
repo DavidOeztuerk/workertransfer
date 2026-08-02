@@ -336,8 +336,13 @@ was der Code tat.
   Oberfläche: `/company/team` (Mannschaft, Einladen, Zurückziehen) und
   `/invitation` (Annehmen über den Link aus der Mail), dazu eine vierte
   Playwright-Reise.
-  **Offen:** ein Mitglied wieder zu entfernen. Der gefährliche Teil davon —
-  dass ein entzogener Zugang beim Refresh wirkt — ist bereits erledigt.
+  Entfernen ist dabei: `DELETE /companies/{id}/members/{user}`, nur für
+  Administratoren, und **der letzte Administrator kann nicht gehen** — ein
+  Unternehmen ohne Administrator wäre nicht gelöscht, sondern verwaist (Domain
+  beansprucht, niemand kann mehr einladen, auflösbar nur noch von Hand). Der
+  Entzug wirkt beim nächsten Refresh; ein bereits ausgestelltes Access-Token
+  bleibt bis zu seinem Ablauf gültig — derselbe bekannte Rest wie beim Abmelden.
+  Damit ist Scheibe C abgeschlossen.
   ✅ **Die Mitgliedschaftsprüfung in `handle_refresh` ist vorgezogen und erledigt**
   (02.08.2026). Sie war als Folgearbeit zum Entfernungspfad notiert, wurde aber
   vorher gebaut: so ist der Entfernungspfad vom ersten Tag an sicher, statt eine

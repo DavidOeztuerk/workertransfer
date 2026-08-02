@@ -15,6 +15,7 @@ vi.mock("../auth/team", async (importOriginal) => {
     listInvitations: vi.fn(),
     inviteMember: vi.fn(),
     withdrawInvitation: vi.fn(),
+    removeMember: vi.fn(),
   };
 });
 
@@ -23,6 +24,7 @@ const listMembers = vi.mocked(client.listMembers);
 const listInvitations = vi.mocked(client.listInvitations);
 const inviteMember = vi.mocked(client.inviteMember);
 const withdrawInvitation = vi.mocked(client.withdrawInvitation);
+const removeMember = vi.mocked(client.removeMember);
 
 const TENANT = "11111111-1111-1111-1111-111111111111";
 const ME = "33333333-3333-3333-3333-333333333333";
@@ -53,6 +55,7 @@ beforeEach(() => {
   listInvitations.mockResolvedValue({ ok: true, invitations: [] });
   inviteMember.mockResolvedValue({ ok: true, invitation: invitation() });
   withdrawInvitation.mockResolvedValue({ ok: true });
+  removeMember.mockResolvedValue({ ok: true });
 });
 
 describe("TeamRoute", () => {
@@ -139,5 +142,63 @@ describe("TeamRoute", () => {
 
     expect(await screen.findByText(/Unternehmen/i)).toBeInTheDocument();
     expect(listMembers).not.toHaveBeenCalled();
+  });
+});
+
+describe("TeamRoute — entfernen", () => {
+  it("calls it leaving when it is yourself, removing when it is someone else", async () => {
+    // Dieselbe Handlung, aber nicht dasselbe Erlebnis: sich selbst zu
+    // entfernen heißt gehen, und ein Knopf, der bei beidem "Entfernen" sagt,
+    // liest sich in der eigenen Zeile wie ein Versehen.
+    listMembers.mockResolvedValue({
+      ok: true,
+      members: [member("admin"), member("member", "other", "Kollege")],
+    });
+
+    renderWithProviders(<TeamRoute principal={principal(TENANT)} />);
+
+    await screen.findByText("Kollege");
+    expect(screen.getByRole("button", { name: /Verlassen/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Entfernen/i })).toBeInTheDocument();
+  });
+
+  it("removes through the server with the member id", async () => {
+    const user = userEvent.setup();
+    listMembers.mockResolvedValue({
+      ok: true,
+      members: [member("admin"), member("member", "other", "Kollege")],
+    });
+    renderWithProviders(<TeamRoute principal={principal(TENANT)} />);
+
+    await user.click(await screen.findByRole("button", { name: /Entfernen/i }));
+
+    await waitFor(() => expect(removeMember).toHaveBeenCalledWith(TENANT, "other"));
+  });
+
+  it("does not offer it to a plain member", async () => {
+    listMembers.mockResolvedValue({
+      ok: true,
+      members: [member("member"), member("admin", "other", "Chefin2")],
+    });
+
+    renderWithProviders(<TeamRoute principal={principal(TENANT)} />);
+
+    await screen.findByText("Chefin2");
+    expect(screen.queryByRole("button", { name: /Entfernen/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Verlassen/i })).toBeNull();
+  });
+
+  it("says what to do when the last admin cannot leave", async () => {
+    const user = userEvent.setup();
+    removeMember.mockResolvedValue({
+      ok: false,
+      reason: "last-admin",
+      message: "Ein Unternehmen braucht mindestens einen Administrator.",
+    });
+    renderWithProviders(<TeamRoute principal={principal(TENANT)} />);
+
+    await user.click(await screen.findByRole("button", { name: /Verlassen/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("mindestens einen Administrator");
   });
 });
