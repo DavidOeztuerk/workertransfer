@@ -58,7 +58,6 @@ worker-agents = { workspace = true }
 worker-templates = { workspace = true }
 worker-notifications = { workspace = true }
 worker-email = { workspace = true }
-worker-github = { workspace = true }
 worker-cli = { workspace = true }
 consent-service = { workspace = true }
 
