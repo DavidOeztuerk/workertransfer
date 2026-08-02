@@ -19,6 +19,7 @@ import { ProfileRoute } from "./routes/profile";
 import { ResumeRoute } from "./routes/resume";
 import { TeamRoute } from "./routes/team";
 import { PendingRequestBadge } from "./resume/pending-badge";
+import { ApplicationsRoute } from "./routes/applications";
 import { CompanyJobsRoute } from "./routes/company-jobs";
 import { InvitationRoute } from "./routes/invitation";
 import { JobsRoute } from "./routes/jobs";
@@ -70,6 +71,9 @@ export function RootLayout() {
               </Link>
               <Link className="site-header__link" to="/portfolio">
                 Arbeiten
+              </Link>
+              <Link className="site-header__link" to="/applications">
+                Bewerbungen
               </Link>
               <Link className="site-header__link" to="/resume">
                 Lebenslauf
@@ -171,6 +175,18 @@ function CandidatesWithSession() {
   return <CandidatesRoute principal={user} />;
 }
 
+function ApplicationsWithSession() {
+  const { user } = useSession();
+  return <ApplicationsRoute principal={user} />;
+}
+
+function JobsWithSession() {
+  // Die Seite braucht keine Anmeldung — der Prinzipal entscheidet nur, ob
+  // „Bewerben" angeboten wird.
+  const { user } = useSession();
+  return <JobsRoute principal={user} />;
+}
+
 function CompanyJobsWithSession() {
   const { user } = useSession();
   return <CompanyJobsRoute principal={user} />;
@@ -229,7 +245,12 @@ const candidatesRoute = createRoute({
 const jobsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/jobs",
-  component: JobsRoute,
+  component: JobsWithSession,
+});
+const applicationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/applications",
+  component: ApplicationsWithSession,
 });
 const companyJobsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -262,6 +283,7 @@ const routeTree = rootRoute.addChildren([
   resumeRoute,
   candidatesRoute,
   jobsRoute,
+  applicationsRoute,
   companyJobsRoute,
   teamRoute,
   invitationRoute,

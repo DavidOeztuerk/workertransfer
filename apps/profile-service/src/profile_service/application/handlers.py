@@ -109,6 +109,8 @@ async def handle_get_my_profile(subject_id: UUID, *, repos: dict[str, Any]) -> P
 @dataclass(frozen=True, slots=True)
 class GetProfileQuery:
     subject_id: UUID
+    #: Das Unternehmen des Aufrufers — aus dem Token, nie aus dem Request.
+    tenant_id: UUID
     bearer: str
 
 
@@ -123,7 +125,9 @@ async def handle_get_visible_profile(
     # ConsentUnavailable fliegt bewusst durch: der Router macht daraus 503.
     # Es hier zu False zu machen hieße zu behaupten, die Person habe nicht
     # eingewilligt — das wissen wir nicht.
-    if not await deps["consent"].may_see(query.subject_id, bearer=query.bearer):
+    if not await deps["consent"].may_see(
+        query.subject_id, tenant_id=query.tenant_id, bearer=query.bearer
+    ):
         return Result.fail(ProfileNotVisible())
     return Result.ok(profile)
 
@@ -132,6 +136,7 @@ async def handle_get_visible_profile(
 class ListProfilesQuery:
     limit: int
     cursor: str | None
+    tenant_id: UUID
     bearer: str
 
 
@@ -153,7 +158,10 @@ async def handle_list_visible_profiles(
     # Parallel: eine Seite bedeutet `limit` Abfragen an einen Service im selben
     # Netz. Nacheinander wären das aufsummierte Latenzen ohne Grund.
     verdicts = await asyncio.gather(
-        *(deps["consent"].may_see(p.subject_id, bearer=query.bearer) for p in candidates)
+        *(
+            deps["consent"].may_see(p.subject_id, tenant_id=query.tenant_id, bearer=query.bearer)
+            for p in candidates
+        )
     )
     visible = [profile for profile, allowed in zip(candidates, verdicts, strict=True) if allowed]
     return Result.ok((visible, next_cursor))

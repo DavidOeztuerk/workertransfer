@@ -13,7 +13,7 @@ from uuid import UUID
 import httpx
 from worker_contracts import ConsentCheckV1
 
-from portfolio_service.application.ports import VISIBILITY_CAPABILITY
+from portfolio_service.application.ports import VISIBILITY_CAPABILITY, tenant_capability
 
 __all__ = ["ConsentUnavailable", "HttpConsentGate"]
 
@@ -40,8 +40,19 @@ class HttpConsentGate:
         self._transport = transport
         self._timeout = timeout
 
-    async def may_see(self, subject_id: UUID, *, bearer: str) -> bool:
-        body = ConsentCheckV1(subject_id=subject_id, capability=VISIBILITY_CAPABILITY)
+    async def may_see(self, subject_id: UUID, *, tenant_id: UUID, bearer: str) -> bool:
+        """Öffentlich freigegeben ODER diesem Unternehmen (durch eine Bewerbung).
+
+        Nacheinander statt parallel: die öffentliche Freigabe ist der häufige
+        Fall, und wer sie hat, braucht die zweite Frage nicht. `tenant_id`
+        kommt aus dem Token des Aufrufers, nie aus einem Request.
+        """
+        if await self._granted(subject_id, VISIBILITY_CAPABILITY, bearer=bearer):
+            return True
+        return await self._granted(subject_id, tenant_capability(tenant_id), bearer=bearer)
+
+    async def _granted(self, subject_id: UUID, capability: str, *, bearer: str) -> bool:
+        body = ConsentCheckV1(subject_id=subject_id, capability=capability)
         try:
             async with httpx.AsyncClient(
                 transport=self._transport, timeout=self._timeout

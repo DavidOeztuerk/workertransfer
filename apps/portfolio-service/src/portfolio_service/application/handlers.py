@@ -63,6 +63,8 @@ async def handle_get_my_portfolio(subject_id: UUID, *, repos: dict[str, Any]) ->
 @dataclass(frozen=True, slots=True)
 class GetPortfolioQuery:
     subject_id: UUID
+    #: Das Unternehmen des Aufrufers — aus dem Token, nie aus dem Request.
+    tenant_id: UUID
     bearer: str
 
 
@@ -75,6 +77,8 @@ async def handle_get_visible_portfolio(
         # und er meldete dem Ledger geratene Subject-IDs.
         return Result.fail(PortfolioNotVisible())
     # ConsentUnavailable fliegt bewusst durch: der Router macht daraus 503.
-    if not await deps["consent"].may_see(query.subject_id, bearer=query.bearer):
+    if not await deps["consent"].may_see(
+        query.subject_id, tenant_id=query.tenant_id, bearer=query.bearer
+    ):
         return Result.fail(PortfolioNotVisible())
     return Result.ok(portfolio)
