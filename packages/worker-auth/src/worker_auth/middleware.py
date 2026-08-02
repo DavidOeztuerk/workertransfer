@@ -24,9 +24,20 @@ from typing import Any
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-__all__ = ["JwtAuthMiddleware", "extract_bearer_token", "extract_cookie_token", "resolve_token"]
+__all__ = [
+    "DEFAULT_COOKIE_NAME",
+    "DEFAULT_STATE_KEY",
+    "JwtAuthMiddleware",
+    "extract_bearer_token",
+    "extract_cookie_token",
+    "get_request_user",
+    "resolve_token",
+]
 
 DEFAULT_COOKIE_NAME = "access"
+
+#: Schlüssel unter dem der Prinzipal in scope["state"] landet.
+DEFAULT_STATE_KEY = "user"
 
 
 def extract_bearer_token(scope: Scope) -> str | None:
@@ -89,7 +100,7 @@ class JwtAuthMiddleware:
         *,
         verify: Callable[[str], Any],
         cookie_name: str = DEFAULT_COOKIE_NAME,
-        state_key: str = "user",
+        state_key: str = DEFAULT_STATE_KEY,
     ) -> None:
         self.app = app
         self._verify = verify
@@ -112,3 +123,19 @@ class JwtAuthMiddleware:
             return self._verify(token)
         except Exception:
             return None
+
+
+def get_request_user(scope: Scope, *, state_key: str = DEFAULT_STATE_KEY) -> Any:
+    """Den von `JwtAuthMiddleware` gesetzten Prinzipal lesen.
+
+    Gehört hierher, weil dieselbe Middleware ihn setzt. Bis hierher schrieb
+    jeder Service seine eigene Fassung: identity eine Funktion, consent ein
+    `getattr(request.state, "user", None)` mitten im Router. Drei Kopien
+    derselben zwei Zeilen sind genau die Drift, die ADR-0014 dokumentiert.
+
+    Gibt `None` zurück, wenn niemand angemeldet ist — die Middleware macht aus
+    einem fehlenden oder ungültigen Token bewusst keinen 401, damit jede Route
+    selbst entscheidet.
+    """
+    state = scope.get("state") or {}
+    return state.get(state_key)

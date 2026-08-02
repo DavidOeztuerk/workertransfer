@@ -1,19 +1,6 @@
-"""Application layer exports."""
+"""Application-Schicht von ${service_name}.
 
-from .mediator import Mediator
-from .behaviors import (
-    ValidationBehavior,
-    LoggingBehavior,
-    TransactionBehavior,
-    AuthorizationBehavior,
-    CachingBehavior,
-)
-
-__all__ = [
-    "Mediator",
-    "ValidationBehavior",
-    "LoggingBehavior",
-    "TransactionBehavior",
-    "AuthorizationBehavior",
-    "CachingBehavior",
-]
+Commands, Queries und ihre Handler liegen hier. Der Mediator kommt aus
+`worker_platform.application.cqrs` — ein service-eigener wäre ein Duplikat,
+genau deshalb wurde `worker-cqrs` gelöscht (ADR-0005).
+"""

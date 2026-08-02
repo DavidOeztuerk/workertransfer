@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
+from worker_auth import get_request_user
 from worker_contracts import (
     ConsentCheckResultV1,
     ConsentCheckV1,
@@ -41,7 +42,7 @@ __all__ = ["build_consent_router"]
 
 
 def _actor_id(request: Request) -> Any:
-    principal = getattr(request.state, "user", None)
+    principal = get_request_user(request.scope)
     if principal is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "not authenticated")
     return principal.sub

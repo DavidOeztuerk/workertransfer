@@ -16,6 +16,7 @@ from worker_contracts.identity import (
     VerifyEmailV1,
 )
 from worker_contracts.messages import Command, Event, Message, Query
+from worker_contracts.profile import ProfilePageV1, ProfileV1, SaveProfileV1
 
 __all__ = [
     "Command",
@@ -29,8 +30,11 @@ __all__ = [
     "Event",
     "MembershipV1",
     "Message",
+    "ProfilePageV1",
+    "ProfileV1",
     "Query",
     "RegisterUserV1",
     "ResendVerificationV1",
+    "SaveProfileV1",
     "VerifyEmailV1",
 ]
