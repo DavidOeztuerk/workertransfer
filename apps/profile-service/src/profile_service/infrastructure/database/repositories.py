@@ -6,7 +6,7 @@ import base64
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from profile_service.domain.profile import Profile, Skills
@@ -91,14 +91,47 @@ class SqlAlchemyProfileRepository:
             row.updated_at = profile.updated_at
         await self._session.flush()
 
-    async def page(self, *, limit: int, cursor: str | None) -> tuple[list[Profile], str | None]:
+    async def page(
+        self,
+        *,
+        limit: int,
+        cursor: str | None,
+        skills: tuple[str, ...] = (),
+        location: str = "",
+        remote_only: bool = False,
+    ) -> tuple[list[Profile], str | None]:
         """Eine Seite, zuletzt geänderte zuerst.
 
         Liefert `limit + 1` Zeilen, um ohne zweite Abfrage zu wissen, ob es
         weitergeht. Die Consent-Filterung passiert danach in der Application-
         Schicht — das Repository kennt keine Sichtbarkeit.
+
+        Die Filter verengen eine Menge, die es schon gibt: sichtbar wird
+        dadurch nichts, was ohne sie verborgen wäre.
         """
         stmt = select(ProfileModel).order_by(ProfileModel.updated_at.desc(), ProfileModel.id.desc())
+        for skill in skills:
+            # Groß-/Kleinschreibung egal, weil `Skills` beim Speichern schon
+            # case-insensitiv entdoppelt: „Python" und „python" sind dort
+            # dieselbe Fähigkeit. Eine Suche, die sie unterscheidet,
+            # widerspräche der eigenen Datenhaltung.
+            #
+            # Verglichen wird zur Abfragezeit statt über eine gespiegelte
+            # Kleinschreibspalte: die wäre eine zweite Kopie derselben Daten,
+            # die sich ändern können. Der Preis ist ein Scan. Wird das eng, ist
+            # ein GIN-Index über genau diesen Ausdruck die Antwort — keine
+            # zweite Spalte.
+            element = func.jsonb_array_elements_text(ProfileModel.skills).column_valued("skill")
+            stmt = stmt.where(
+                select(element).where(func.lower(element) == skill.casefold()).exists()
+            )
+        if location != "":
+            stmt = stmt.where(ProfileModel.location.ilike(f"%{location.strip()}%"))
+        if remote_only:
+            # Nur in eine Richtung: `remote_ok = false` heißt „nicht ja gesagt",
+            # nicht „lehne ab". Ein Filter darauf schlösse Menschen aus, die
+            # schlicht nichts angekreuzt haben.
+            stmt = stmt.where(ProfileModel.remote_ok.is_(True))
         position = decode_cursor(cursor) if cursor else None
         if position is not None:
             stamp, subject = position

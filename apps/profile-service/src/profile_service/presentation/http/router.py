@@ -7,7 +7,7 @@ Einwilligung der betroffenen Person.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from profile_service.application.handlers import (
@@ -142,6 +142,19 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
         request: Request,
         limit: int = Query(default=20, ge=1, le=50),
         cursor: str | None = Query(default=None),
+        # Mehrfach angebbar und mit UND verknüpft: wer „Python" und
+        # „Kubernetes" eingibt, sucht jemanden, der beides kann. ODER liefert
+        # bei zwei Begriffen mehr Ergebnisse als bei einem — technisch
+        # einfacher und praktisch nutzlos.
+        # `None` statt `[]` als Vorgabe: eine veränderliche Vorgabe in einer
+        # Signatur wird geteilt, und ein einziger versehentlicher `append`
+        # würde sie über alle Requests hinweg mitschleppen.
+        # Der `Annotated`-Stil statt eines Aufrufs in der Vorgabe: bei einem
+        # veränderlichen Typ ist das die Form, die FastAPI und der Linter
+        # gleichermaßen akzeptieren.
+        skill: Annotated[list[str] | None, Query()] = None,
+        location: str = Query(default="", max_length=120),
+        remote: bool = Query(default=False),
     ) -> ProfilePageV1:
         tenant_id = _require_company(request)
         bearer = _bearer(request)
@@ -149,7 +162,13 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             async with request_scope(session_factory) as (_uow, repos):
                 result = await handle_list_visible_profiles(
                     ListProfilesQuery(
-                        limit=limit, cursor=cursor, tenant_id=tenant_id, bearer=bearer
+                        limit=limit,
+                        cursor=cursor,
+                        tenant_id=tenant_id,
+                        bearer=bearer,
+                        skills=tuple(skill or []),
+                        location=location,
+                        remote_only=remote,
                     ),
                     deps=deps,
                     repos=repos,

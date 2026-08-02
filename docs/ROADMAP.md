@@ -535,6 +535,24 @@ Der tragende Test: **die Liste und `/check` dürfen sich nie uneinig sein.**
 Zwei Wege an dieselbe Auskunft, die auseinanderlaufen können, sind schlimmer
 als kein zweiter Weg.
 
+### Querschnitt — Kandidatensuche ✅ (02.08.2026)
+
+[Design](superpowers/specs/2026-08-02-candidate-search-design.md).
+`/candidates` zeigte jedes freigegebene Profil nach Änderungsdatum, zwanzig auf
+einmal. Wer jemanden mit Python in Berlin suchte, blätterte — der Unterschied
+zwischen einer Vorführung und einem Produkt.
+
+Drei Filter: Fähigkeiten (**UND**, Groß-/Kleinschreibung egal), Ort
+(Teilstring), Remote (**nur in eine Richtung** — `remote_ok = false` heißt
+„nicht ja gesagt", nicht „lehne ab", und ein Filter darauf schlösse Menschen
+aus, die schlicht nichts angekreuzt haben).
+
+**Keine neue Einwilligungsfrage:** durchsucht wird ausschließlich, was ohnehin
+jedem Unternehmen sichtbar ist. Erst filtern, dann den Ledger fragen — die
+Reihenfolge umzudrehen wäre schneller und hieße, die Sichtbarkeit in die
+Datenbank des Profildienstes zu legen. Ein Integrationstest legt zwei Profile
+mit derselben Fähigkeit an, gibt eines frei, und der Filter findet genau eines.
+
 ### Weiterhin offen, quer durch alle Phasen
 
 - **Kein S3-Backend**, solange keine Umgebung eines braucht (ADR-0021).

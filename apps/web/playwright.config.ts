@@ -30,6 +30,19 @@ export default defineConfig({
   // Das ist eine Toleranz und keine Reparatur — steht hier, damit niemand aus
   // dem grünen Lauf schließt, es sei etwas behoben worden.
   expect: { timeout: 30_000 },
+  // Ein Wiederholungsversuch — und zwar als TOLERANZ deklariert, nicht als
+  // Reparatur. Gemessen scheitert bei einem Lauf über die ganze Suite (rund
+  // fünf Minuten, elf Container, Vite und Chromium auf einer Maschine) etwa
+  // ein Test an der ANMELDUNG: der Link „Mein Profil" erscheint nicht, weil die
+  // Sitzung nicht rechtzeitig steht. Derselbe Test läuft allein in 2,4 Sekunden
+  // durch.
+  //
+  // Die Gefahr ist bekannt: ein Wiederholungsversuch kann einen echten,
+  // sporadischen Fehler verstecken. Deshalb bleibt ein wiederholter Test im
+  // Bericht als „flaky" stehen, und `scripts/validate.sh` nennt die Zahl —
+  // ein grüner Lauf mit drei Wackelkandidaten ist kein grüner Lauf, genau wie
+  // einer mit zwanzig Skips keiner ist.
+  retries: 1,
   use: {
     // Ohne dieses Limit erbt eine Aktion das Zeitlimit des ganzen Tests: ein
     // fill() auf ein Feld, das es auf dieser Seite gar nicht gibt, verbrennt
