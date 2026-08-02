@@ -14,6 +14,7 @@ import { CandidatesRoute } from "./routes/candidates";
 import { CompanyNewRoute } from "./routes/company-new";
 import { HomeRoute } from "./routes/home";
 import { LoginRoute } from "./routes/login";
+import { PortfolioRoute } from "./routes/portfolio";
 import { ProfileRoute } from "./routes/profile";
 import { ResumeRoute } from "./routes/resume";
 import { TeamRoute } from "./routes/team";
@@ -59,6 +60,9 @@ export function RootLayout() {
               <CompanySwitcher activeTenantId={user.tenant_id} />
               <Link className="site-header__link" to="/profile">
                 Mein Profil
+              </Link>
+              <Link className="site-header__link" to="/portfolio">
+                Arbeiten
               </Link>
               <Link className="site-header__link" to="/resume">
                 Lebenslauf
@@ -142,6 +146,11 @@ function ProfileWithSession() {
   return <ProfileRoute principal={user} />;
 }
 
+function PortfolioWithSession() {
+  const { user } = useSession();
+  return <PortfolioRoute principal={user} />;
+}
+
 function ResumeWithSession() {
   const { user } = useSession();
   return <ResumeRoute principal={user} />;
@@ -187,6 +196,11 @@ const profileRoute = createRoute({
   path: "/profile",
   component: ProfileWithSession,
 });
+const portfolioRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/portfolio",
+  component: PortfolioWithSession,
+});
 const resumeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/resume",
@@ -219,6 +233,7 @@ const routeTree = rootRoute.addChildren([
   registerRoute,
   verifyRoute,
   profileRoute,
+  portfolioRoute,
   resumeRoute,
   candidatesRoute,
   teamRoute,

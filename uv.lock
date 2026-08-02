@@ -9,6 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "consent-service",
+    "portfolio-service",
     "profile-service",
     "resume-service",
     "worker-agents",
@@ -1847,6 +1848,49 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5e/77/65b857a69ed876e1951e88aaba60f5ce6120c33703f7cb61a3c894b8c1b6/portalocker-3.2.0.tar.gz", hash = "sha256:1f3002956a54a8c3730586c5c77bf18fae4149e07eaf1c29fc3faf4d5a3f89ac", size = 95644, upload-time = "2025-06-14T13:20:40.03Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4b/a6/38c8e2f318bf67d338f4d629e93b0b4b9af331f455f0390ea8ce4a099b26/portalocker-3.2.0-py3-none-any.whl", hash = "sha256:3cdc5f565312224bc570c49337bd21428bba0ef363bbcf58b9ef4a9f11779968", size = 22424, upload-time = "2025-06-14T13:20:38.083Z" },
+]
+
+[[package]]
+name = "portfolio-service"
+version = "0.1.0"
+source = { editable = "apps/portfolio-service" }
+dependencies = [
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "worker-auth" },
+    { name = "worker-contracts" },
+    { name = "worker-core" },
+    { name = "worker-database" },
+    { name = "worker-platform" },
+    { name = "worker-shared" },
+    { name = "worker-tenancy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = ">=1.13.0,<2.0.0" },
+    { name = "asyncpg", specifier = ">=0.30.0,<1.0.0" },
+    { name = "fastapi", specifier = ">=0.115.0,<1.0.0" },
+    { name = "httpx", specifier = ">=0.27.0,<1.0.0" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.1.0,<4.0.0" },
+    { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
+    { name = "pydantic-settings", specifier = ">=2.4.0,<3.0.0" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0,<3.0.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.40.0,<1.0.0" },
+    { name = "worker-auth", editable = "packages/worker-auth" },
+    { name = "worker-contracts", editable = "packages/worker-contracts" },
+    { name = "worker-core", editable = "packages/worker-core" },
+    { name = "worker-database", editable = "packages/worker-database" },
+    { name = "worker-platform", editable = "packages/worker-platform" },
+    { name = "worker-shared", editable = "packages/worker-shared" },
+    { name = "worker-tenancy", editable = "packages/worker-tenancy" },
 ]
 
 [[package]]

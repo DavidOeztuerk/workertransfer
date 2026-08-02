@@ -13,7 +13,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 1 | Foundation festigen (CI grün) | ✅ | ruff 0 ✅, mypy 0 ✅, CLI-Entrypoint ✅, Duplikate ✅, Smoke-Tests ✅, Premerge-Wrapper ✅ |
 | 2 | Identity & Tenancy | ✅ | OIDC/OAuth, JWT, Claims-Tenant, Audit, DB-Migration |
 | 2.5 | Stabilisierung & Plattform-Naht | ✅ | Cookie-Auth, Dep-Hygiene, Kanon Runde 2, Dev-Stack, Frontend-Gate, Generator |
-| 3 | Candidate Core | 🟧 | Consent-Ledger ✅ (3.1); Profile ✅ (3.2); Resume ✅ (3.3); Portfolio offen |
+| 3 | Candidate Core | 🟧 | 3.1–3.4 ✅ (Consent, Profile, Resume, Portfolio); offen: 3.5 Dateien |
 | 4 | Jobs & Applications | ⬜ | Jobs, Applications, Companies, Career-Sites |
 | 5 | Transfermarkt | ⬜ | Market-State-Machine, Konsensflows, Vertragsdraft |
 | 6 | Developer Intelligence | ⬜ | GitHub-Consent, Skill-Graph, Scout-Match |
@@ -319,7 +319,23 @@ was der Code tat.
   antworten. Der Ersatz nimmt jetzt den Host der Seite. Zweitens: `docker compose
   restart` übernimmt neue Umgebungsvariablen nicht — dafür braucht es
   `docker compose up -d`.
-- ⬜ 3.4 Portfolio-Service
+- ✅ **3.4 Portfolio-Service** (`apps/portfolio-service`) — 02.08.2026. [Design](superpowers/specs/2026-08-02-portfolio-service-design.md).
+  Freigabe **wie beim Profil** (eine Capability `portfolio.visibility:public`
+  für alle Unternehmen), nicht wie beim Lebenslauf je Unternehmen: ein Portfolio
+  ist absichtlich ein Schaufenster, und was nicht gezeigt werden darf, gehört
+  nicht hinein. Verworfen: Sichtbarkeit je Eintrag — sie verlagert eine
+  schwierige Entscheidung in ein Formularfeld, das beim zwölften Eintrag niemand
+  mehr bewusst setzt.
+  Getrennte Capability trotz gemeinsamem Schalter in der Oberfläche, damit sie
+  einzeln widerrufbar bleibt; ein Test belegt, dass die Profilfreigabe das
+  Portfolio NICHT öffnet.
+  **Nur `http`/`https` in Links** — ein Portfolio-Link wird von fremden Menschen
+  angeklickt, `javascript:` und `data:` sind dort kein Randfall.
+  Oberfläche: `/portfolio` mit eigenem Freigabeschalter; eine fünfte
+  Playwright-Reise belegt im Browser, dass die Profilfreigabe das Portfolio
+  nicht öffnet und erst die zweite Freigabe es tut.
+  **Dateien** warten auf einen Konsumenten der Ablage (siehe 3.5); heute ist
+  das Portfolio Text und Links.
 - ✅ **3.5 Ablage real gemacht** — 02.08.2026, **ADR-0021**. „Re-include" war die
   falsche Handlung: die beiden Pakete waren nicht ausgeschlossen, weil Python
   3.14 neu ist, sondern weil sie sich für jede denkbare Zukunft gleichzeitig
