@@ -40,7 +40,7 @@ tests/                repo-level architectural guards
 ```
 
 Most `worker-*` packages have one smoke test and no production consumer. `worker-ai`
-and `worker-files` are **excluded from the uv workspace**; `worker-github` is
+is **excluded from the uv workspace** (`worker-files` was deleted, ADR-0021); `worker-github` is
 unimportable (PyGithub vs. githubkit mismatch). Verify before depending on any of them.
 
 ## Python workspace

@@ -20,7 +20,7 @@ Some `worker-*` siblings are **thin re-export layers** over the kernel, not priv
 
 Caveats worth knowing before you depend on anything:
 - **`worker-github` is unimportable** — its source does `from github import Github` (PyGithub) while the declared dep is `githubkit`. Its smoke test skips.
-- **`worker-ai` and `worker-files` are excluded from the uv workspace** (`pyproject.toml` `[tool.uv.workspace] exclude`) because their ML/C wheels have no Python-3.14 build; they are also excluded from mypy.
+- **`worker-ai` is excluded from the uv workspace** (`pyproject.toml` `[tool.uv.workspace] exclude`) because its ML wheels have no Python-3.14 build; it is also excluded from mypy. `worker-files` was **deleted** and `worker-storage` rewritten in Sub-step 3.5 — both were shells without a consumer that together declared five heavy dependencies (pillow, python-magic, boto3, minio, azure-storage-blob), which is precisely what made them unbuildable (ADR-0021). `worker-storage` is back in the workspace with one dependency and one backend that is actually used.
 - Most `worker-*` packages have exactly one smoke test and **no production consumer**. A directory existing proves nothing — verify before depending.
 
 Full detail, including the Phase-2.5 findings, is in [`docs/ROADMAP.md`](docs/ROADMAP.md).
