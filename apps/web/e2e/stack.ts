@@ -13,6 +13,7 @@ export const CONSENT_URL = process.env.E2E_CONSENT_URL ?? "http://localhost:8002
 export const PROFILE_URL = process.env.E2E_PROFILE_URL ?? "http://localhost:8003";
 export const RESUME_URL = process.env.E2E_RESUME_URL ?? "http://localhost:8004";
 export const PORTFOLIO_URL = process.env.E2E_PORTFOLIO_URL ?? "http://localhost:8005";
+export const JOBS_URL = process.env.E2E_JOBS_URL ?? "http://localhost:8006";
 export const MAILPIT_URL = process.env.E2E_MAILPIT_URL ?? "http://localhost:8025";
 
 const REQUIRED: ReadonlyArray<readonly [string, string]> = [
@@ -22,6 +23,7 @@ const REQUIRED: ReadonlyArray<readonly [string, string]> = [
   ["profile-service", `${PROFILE_URL}/health/live`],
   ["resume-service", `${RESUME_URL}/health/live`],
   ["portfolio-service", `${PORTFOLIO_URL}/health/live`],
+  ["jobs-service", `${JOBS_URL}/health/live`],
   ["mailpit", `${MAILPIT_URL}/api/v1/messages?limit=1`],
 ];
 

@@ -19,7 +19,9 @@ import { ProfileRoute } from "./routes/profile";
 import { ResumeRoute } from "./routes/resume";
 import { TeamRoute } from "./routes/team";
 import { PendingRequestBadge } from "./resume/pending-badge";
+import { CompanyJobsRoute } from "./routes/company-jobs";
 import { InvitationRoute } from "./routes/invitation";
+import { JobsRoute } from "./routes/jobs";
 import { RegisterRoute } from "./routes/register";
 import { VerifyRoute } from "./routes/verify";
 
@@ -42,6 +44,11 @@ export function RootLayout() {
           worker<span>transfer</span>
         </a>
         <nav aria-label="Hauptnavigation">
+          {/* Stellen sind öffentlich — der Link gehört nicht hinter die
+              Anmeldung, sonst wäre er das Gegenteil dessen, was er verspricht. */}
+          <Link className="site-header__link" to="/jobs">
+            Stellen
+          </Link>
           {/* Die Abschnittslinks lebten in der alten Hero-Kopfzeile und wären
               mit ihr verschwunden. Sie gehören nur auf die Startseite — auf
               /login zeigen sie ins Leere. */}
@@ -77,6 +84,9 @@ export function RootLayout() {
                   </Link>
                   <Link className="site-header__link" to="/company/team">
                     Mannschaft
+                  </Link>
+                  <Link className="site-header__link" to="/company/jobs">
+                    Unsere Stellen
                   </Link>
                 </>
               ) : null}
@@ -161,6 +171,11 @@ function CandidatesWithSession() {
   return <CandidatesRoute principal={user} />;
 }
 
+function CompanyJobsWithSession() {
+  const { user } = useSession();
+  return <CompanyJobsRoute principal={user} />;
+}
+
 function TeamWithSession() {
   const { user } = useSession();
   return <TeamRoute principal={user} />;
@@ -211,6 +226,16 @@ const candidatesRoute = createRoute({
   path: "/candidates",
   component: CandidatesWithSession,
 });
+const jobsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/jobs",
+  component: JobsRoute,
+});
+const companyJobsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/company/jobs",
+  component: CompanyJobsWithSession,
+});
 const teamRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/company/team",
@@ -236,6 +261,8 @@ const routeTree = rootRoute.addChildren([
   portfolioRoute,
   resumeRoute,
   candidatesRoute,
+  jobsRoute,
+  companyJobsRoute,
   teamRoute,
   invitationRoute,
   companyNewRoute,

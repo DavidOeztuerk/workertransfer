@@ -8,3 +8,4 @@ CREATE DATABASE consent OWNER worker;
 CREATE DATABASE profile OWNER worker;
 CREATE DATABASE resume OWNER worker;
 CREATE DATABASE portfolio OWNER worker;
+CREATE DATABASE jobs OWNER worker;

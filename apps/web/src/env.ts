@@ -30,3 +30,4 @@ export const CONSENT_BASE_URL = resolve(import.meta.env.VITE_CONSENT_BASE_URL, 8
 export const PROFILE_BASE_URL = resolve(import.meta.env.VITE_PROFILE_BASE_URL, 8003);
 export const RESUME_BASE_URL = resolve(import.meta.env.VITE_RESUME_BASE_URL, 8004);
 export const PORTFOLIO_BASE_URL = resolve(import.meta.env.VITE_PORTFOLIO_BASE_URL, 8005);
+export const JOBS_BASE_URL = resolve(import.meta.env.VITE_JOBS_BASE_URL, 8006);
