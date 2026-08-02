@@ -90,6 +90,10 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
 
   await recruiter.goto("/candidates");
   const card = recruiter.locator("li").filter({ hasText: headline });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(card).toBeVisible();
   // Erst warten, dann klicken. `click()` hat nur das actionTimeout (15 s);
   // unter Last — elf Container, Vite und Chromium auf einer Maschine — braucht
   // die Kandidatenliste länger, und der Test scheiterte am Klick statt am
@@ -100,6 +104,10 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
 
   await candidate.goto("/markt");
   const row = candidate.locator("li").filter({ hasText: /ob du ansprechbar bist/i });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(row).toBeVisible();
   await row.getByRole("button", { name: /Freigeben/i }).click();
   await expect(row.getByText(/Freigegeben/i)).toBeVisible();
 
@@ -110,11 +118,19 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
 
   // Zurückziehen wirkt sofort — der nächste Zugriff des Unternehmens ist leer.
   const marketEntry = candidate.locator("li").filter({ hasText: "Marktstatus ·" });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(marketEntry).toBeVisible();
   await marketEntry.getByRole("button", { name: /Zurückziehen/i }).click();
   await expect(candidate.getByText(new RegExp(`Marktstatus · ${companyName}`))).toHaveCount(0);
 
   await recruiter.goto("/candidates");
   const afterCard = recruiter.locator("li").filter({ hasText: headline });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(afterCard).toBeVisible();
   await expect(afterCard.getByText(/Marktstatus gerade nicht einsehbar/)).toBeVisible();
 
   // Das Profil steht weiterhin da: zurückgezogen wurde genau eine Freigabe.

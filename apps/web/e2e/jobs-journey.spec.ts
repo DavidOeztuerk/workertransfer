@@ -67,6 +67,10 @@ test("eine veröffentlichte Stelle findet auch, wer kein Konto hat", async ({ br
   await recruiter.getByLabel("Ort", { exact: true }).fill("Hamburg");
   await recruiter.getByRole("button", { name: /Entwurf anlegen/i }).click();
   const row = recruiter.locator("li").filter({ hasText: title });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(row).toBeVisible();
   await expect(row.getByText(/Entwurf/)).toBeVisible();
 
   // Ein anonymer Besucher: eigener Kontext, kein Cookie, keine Anmeldung.

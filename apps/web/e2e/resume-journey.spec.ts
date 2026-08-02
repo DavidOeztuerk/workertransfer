@@ -97,6 +97,10 @@ test("ein Lebenslauf erreicht nur das Unternehmen, dem er freigegeben wurde", as
 
   await recruiter.goto("/candidates");
   const card = recruiter.locator("li").filter({ hasText: headline });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(card).toBeVisible();
   await card.getByRole("button", { name: /Lebenslauf anfragen/i }).click();
   await expect(card.getByText(/Anfrage gestellt/i)).toBeVisible();
 
@@ -109,6 +113,10 @@ test("ein Lebenslauf erreicht nur das Unternehmen, dem er freigegeben wurde", as
   // Die Person entscheidet — vorher gibt es nichts zu sehen.
   await candidate.goto("/resume");
   const row = candidate.locator("li").filter({ hasText: /fragt nach deinem Lebenslauf/i });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(row).toBeVisible();
   await row.getByRole("button", { name: /Freigeben/i }).click();
   await expect(row.getByText(/Freigegeben/i)).toBeVisible();
 
