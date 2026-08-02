@@ -630,3 +630,9 @@ h1 {
   border-top: 1px solid var(--wt-border, #d6d3cd);
   padding-top: 1rem;
 }
+
+/* Wer sucht — direkt unter dem Stellentitel. */
+.jobs__hiring {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+}

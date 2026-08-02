@@ -55,6 +55,12 @@ test("eine veröffentlichte Stelle findet auch, wer kein Konto hat", async ({ br
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
   await expect(recruiter.getByRole("link", { name: /Unsere Stellen/i })).toBeVisible();
 
+  // Erst das Unternehmensprofil: ohne es bleibt die Stelle anonym.
+  await recruiter.goto("/company/profile");
+  await recruiter.getByLabel(/Anzeigename/i).fill(companyName);
+  await recruiter.getByRole("button", { name: /Speichern/i }).click();
+  await expect(recruiter.getByText(/Profil gespeichert/i)).toBeVisible();
+
   await recruiter.goto("/company/jobs");
   await recruiter.getByLabel("Titel").fill(title);
   await recruiter.getByLabel(/Beschreibung/i).fill("Was zu tun ist.");
@@ -79,6 +85,8 @@ test("eine veröffentlichte Stelle findet auch, wer kein Konto hat", async ({ br
   await anonymous.getByLabel(/Suchbegriff/i).fill(title);
   await anonymous.getByRole("button", { name: /Suchen/i }).click();
   await expect(anonymous.getByText(title)).toBeVisible();
+  // Und wer sucht, steht daneben — auch für jemanden ohne Konto.
+  await expect(anonymous.getByText(companyName, { exact: true })).toBeVisible();
 
   // Geschlossen heißt: für die Öffentlichkeit wieder weg.
   await row.getByRole("button", { name: /Schließen/i }).click();
