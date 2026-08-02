@@ -29,7 +29,11 @@ async function registerAndConfirm(
   await page.getByRole("button", { name: /Registrieren/i }).click();
   const token = await verificationTokenFor(email);
   await page.goto(`/verify?token=${token}`);
-  await expect(page.getByText(/bestätigt|aktiv|anmelden/i).first()).toBeVisible();
+  // Genau die Erfolgsmeldung der Bestätigungsseite. Ein weiches
+  // /anmelden/i träfe den "Anmelden"-Link in der Kopfzeile und ließe eine
+  // GESCHEITERTE Bestätigung wie eine geglückte aussehen — der Test wäre
+  // dann erst viel später und an falscher Stelle rot geworden.
+  await expect(page.getByRole("heading", { name: /bestätigt/i })).toBeVisible();
 }
 
 async function login(page: import("@playwright/test").Page, email: string) {
@@ -82,6 +86,14 @@ test("ein Lebenslauf erreicht nur das Unternehmen, dem er freigegeben wurde", as
   await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
+  // Warten, bis der Wechsel wirklich gilt. `selectOption` stößt ihn nur an: der
+  // Server stellt ein neues Token aus, das Cookie wird ersetzt, die Sitzung neu
+  // geladen. Sofort weiterzuklicken gewinnt das Rennen etwa jedes zweite Mal —
+  // /candidates zeigt dann "Profile sehen nur Unternehmen", die Karte fehlt,
+  // und der Test läuft in einen Timeout an einer Stelle, die mit der Ursache
+  // nichts zu tun hat. Der Kandidatenlink erscheint erst mit aktivem
+  // Unternehmen und ist damit das ehrliche Signal.
+  await expect(recruiter.getByRole("link", { name: /Kandidaten/i })).toBeVisible();
 
   await recruiter.goto("/candidates");
   const card = recruiter.locator("li").filter({ hasText: headline });

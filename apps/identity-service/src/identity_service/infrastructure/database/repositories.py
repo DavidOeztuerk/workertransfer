@@ -5,11 +5,12 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from identity_service.domain.audit import AuditEvent
 from identity_service.domain.company import Company, EmailDomain
+from identity_service.domain.invitation import Invitation, InvitationStatus
 from identity_service.domain.membership import MembershipRole, MembershipView
 from identity_service.domain.session import SessionView
 from identity_service.domain.user import AccountStatus, User
@@ -18,6 +19,7 @@ from identity_service.domain.verification import TokenPurpose, VerificationToken
 from identity_service.infrastructure.database.models import (
     AuditEventModel,
     EmailVerificationTokenModel,
+    InvitationModel,
     SessionModel,
     TenantModel,
     UserModel,
@@ -109,6 +111,62 @@ class SqlAlchemyMembershipRepository:
             UserTenantMembershipModel(user_id=user_id, tenant_id=tenant_id, role=role.value)
         )
         await self._session.flush()
+
+    async def role_of(self, user_id: UUID, tenant_id: UUID) -> MembershipRole | None:
+        """Die Rolle, oder `None` wenn keine Mitgliedschaft besteht.
+
+        Getrennt von `is_member`, weil der Aufrufer beides braucht und ein
+        `is_member` mit anschließendem Rollen-Lookup zwei Abfragen wären, die
+        auseinanderlaufen können.
+        """
+        stmt = select(UserTenantMembershipModel.role).where(
+            UserTenantMembershipModel.user_id == user_id,
+            UserTenantMembershipModel.tenant_id == tenant_id,
+        )
+        role = (await self._session.execute(stmt)).scalar_one_or_none()
+        return None if role is None else MembershipRole(role)
+
+    async def count_admins_for_update(self, tenant_id: UUID) -> int:
+        """Zählt die Administratoren und sperrt die Zeilen bis zum Commit.
+
+        Ohne die Sperre könnten zwei Administratoren, die gleichzeitig
+        „Verlassen" drücken, beide zwei sehen und beide durchkommen — das
+        Unternehmen bliebe ohne Administrator zurück, also genau in dem
+        verwaisten Zustand, den die Regel verhindern soll. Der Fall ist selten,
+        die Folge unumkehrbar ohne Datenbankzugriff; deshalb wird er gesperrt
+        und nicht gehofft.
+        """
+        stmt = (
+            select(UserTenantMembershipModel.id)
+            .where(
+                UserTenantMembershipModel.tenant_id == tenant_id,
+                UserTenantMembershipModel.role == str(MembershipRole.ADMIN),
+            )
+            .with_for_update()
+        )
+        return len((await self._session.execute(stmt)).all())
+
+    async def remove(self, user_id: UUID, tenant_id: UUID) -> None:
+        await self._session.execute(
+            delete(UserTenantMembershipModel).where(
+                UserTenantMembershipModel.user_id == user_id,
+                UserTenantMembershipModel.tenant_id == tenant_id,
+            )
+        )
+
+    async def list_members(self, tenant_id: UUID) -> list[tuple[UUID, str, MembershipRole]]:
+        stmt = (
+            select(
+                UserTenantMembershipModel.user_id,
+                UserModel.display_name,
+                UserTenantMembershipModel.role,
+            )
+            .join(UserModel, UserModel.id == UserTenantMembershipModel.user_id)
+            .where(UserTenantMembershipModel.tenant_id == tenant_id)
+            .order_by(UserTenantMembershipModel.granted_at)
+        )
+        rows = (await self._session.execute(stmt)).all()
+        return [(row[0], row[1], MembershipRole(row[2])) for row in rows]
 
     async def list_for_user_detailed(self, user_id: UUID) -> list[MembershipView]:
         stmt = (
@@ -264,3 +322,81 @@ class SqlAlchemyCompanyRepository:
     @staticmethod
     def _to_domain(row: TenantModel) -> Company:
         return Company(id=row.id, name=row.name, domain=EmailDomain(row.domain))
+
+
+def _invitation_to_domain(row: InvitationModel) -> Invitation:
+    return Invitation(
+        id=row.id,
+        tenant_id=row.tenant_id,
+        email=Email(row.email),
+        role=MembershipRole(row.role),
+        invited_by=row.invited_by,
+        status=InvitationStatus(row.status),
+        created_at=row.created_at,
+        expires_at=row.expires_at,
+        accepted_at=row.accepted_at,
+    )
+
+
+class SqlAlchemyInvitationRepository:
+    """Der Token lebt nur als Hash hier.
+
+    Der Klartext geht per Mail raus. Wer die Datenbank liest, kann damit keine
+    Einladung annehmen — dieselbe Regel wie bei den Bestätigungs-Tokens.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, invitation: Invitation, token_hash: str) -> None:
+        self._session.add(
+            InvitationModel(
+                id=invitation.id,
+                tenant_id=invitation.tenant_id,
+                email=invitation.email.value,
+                role=str(invitation.role),
+                invited_by=invitation.invited_by,
+                status=str(invitation.status),
+                token_hash=token_hash,
+                created_at=invitation.created_at,
+                expires_at=invitation.expires_at,
+                accepted_at=invitation.accepted_at,
+            )
+        )
+
+    async def get_by_token_hash(self, token_hash: str) -> Invitation | None:
+        stmt = select(InvitationModel).where(InvitationModel.token_hash == token_hash)
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        return None if row is None else _invitation_to_domain(row)
+
+    async def get(self, invitation_id: UUID) -> Invitation | None:
+        row = await self._session.get(InvitationModel, invitation_id)
+        return None if row is None else _invitation_to_domain(row)
+
+    async def find_open(self, tenant_id: UUID, email: Email) -> Invitation | None:
+        stmt = select(InvitationModel).where(
+            InvitationModel.tenant_id == tenant_id,
+            InvitationModel.email == email.value,
+            InvitationModel.status == str(InvitationStatus.PENDING),
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        return None if row is None else _invitation_to_domain(row)
+
+    async def list_open(self, tenant_id: UUID) -> list[Invitation]:
+        stmt = (
+            select(InvitationModel)
+            .where(
+                InvitationModel.tenant_id == tenant_id,
+                InvitationModel.status == str(InvitationStatus.PENDING),
+            )
+            .order_by(InvitationModel.created_at.desc())
+        )
+        rows = (await self._session.execute(stmt)).scalars()
+        return [_invitation_to_domain(row) for row in rows]
+
+    async def save(self, invitation: Invitation) -> None:
+        row = await self._session.get(InvitationModel, invitation.id)
+        if row is None:
+            return
+        row.status = str(invitation.status)
+        row.accepted_at = invitation.accepted_at

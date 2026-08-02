@@ -16,7 +16,9 @@ import { HomeRoute } from "./routes/home";
 import { LoginRoute } from "./routes/login";
 import { ProfileRoute } from "./routes/profile";
 import { ResumeRoute } from "./routes/resume";
+import { TeamRoute } from "./routes/team";
 import { PendingRequestBadge } from "./resume/pending-badge";
+import { InvitationRoute } from "./routes/invitation";
 import { RegisterRoute } from "./routes/register";
 import { VerifyRoute } from "./routes/verify";
 
@@ -65,9 +67,14 @@ export function RootLayout() {
                 <PendingRequestBadge />
               </Link>
               {user.tenant_id !== null ? (
-                <Link className="site-header__link" to="/candidates">
-                  Kandidaten
-                </Link>
+                <>
+                  <Link className="site-header__link" to="/candidates">
+                    Kandidaten
+                  </Link>
+                  <Link className="site-header__link" to="/company/team">
+                    Mannschaft
+                  </Link>
+                </>
               ) : null}
               <Link className="site-header__link" to="/company/new">
                 Unternehmen anlegen
@@ -145,6 +152,11 @@ function CandidatesWithSession() {
   return <CandidatesRoute principal={user} />;
 }
 
+function TeamWithSession() {
+  const { user } = useSession();
+  return <TeamRoute principal={user} />;
+}
+
 function CompanyNewWithSession() {
   // The route needs the principal; the component takes it as a prop so it stays
   // testable without a live session.
@@ -185,6 +197,16 @@ const candidatesRoute = createRoute({
   path: "/candidates",
   component: CandidatesWithSession,
 });
+const teamRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/company/team",
+  component: TeamWithSession,
+});
+const invitationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/invitation",
+  component: InvitationRoute,
+});
 const companyNewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/company/new",
@@ -199,6 +221,8 @@ const routeTree = rootRoute.addChildren([
   profileRoute,
   resumeRoute,
   candidatesRoute,
+  teamRoute,
+  invitationRoute,
   companyNewRoute,
 ]);
 

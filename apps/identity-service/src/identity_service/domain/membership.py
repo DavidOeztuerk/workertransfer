@@ -23,7 +23,14 @@ from worker_core import DomainError
 
 from identity_service.domain.value_objects import TenantId, UserId
 
-__all__ = ["MembershipRole", "MembershipView", "NotAMember", "TenantMembership"]
+__all__ = [
+    "LastAdminMayNotLeave",
+    "MembershipRole",
+    "MembershipView",
+    "NotAMember",
+    "OnlyAdminsMayRemove",
+    "TenantMembership",
+]
 
 
 class NotAMember(DomainError):
@@ -62,3 +69,25 @@ class MembershipView:
     name: str
     domain: str
     role: MembershipRole
+
+
+class OnlyAdminsMayRemove(DomainError):
+    def __init__(self) -> None:
+        super().__init__("only_admins_may_remove", "Only an administrator may remove members")
+
+
+class LastAdminMayNotLeave(DomainError):
+    """Ein Unternehmen ohne Administrator kann niemanden mehr hereinlassen.
+
+    Es wäre nicht gelöscht, sondern verwaist: die Domain bleibt beansprucht
+    (ADR-0019), die Daten bleiben, aber niemand kann mehr einladen oder
+    entfernen. Diese Sackgasse entsteht mit einem einzigen Klick und lässt sich
+    danach nur noch von Hand in der Datenbank auflösen — deshalb wird sie
+    verhindert, nicht später repariert.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "last_admin_may_not_leave",
+            "A company needs at least one administrator; promote someone first",
+        )

@@ -148,3 +148,29 @@ class AuditEventModel(Base, TimestampMixin):
     # the DB column keeps the name ``metadata`` for compatibility with the
     # domain AuditEvent.metadata schema, JSONB queries, and migration 0001.
     meta: Mapped[dict[str, str]] = mapped_column("metadata", JSONB, nullable=False, default=dict)
+
+
+class InvitationModel(Base):
+    """Eine Einladung in ein Unternehmen. Siehe domain/invitation.py."""
+
+    __tablename__ = "company_invitations"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    email: Mapped[str] = mapped_column(CITEXT, nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    invited_by: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    # Nur der Hash: der Klartext geht per Mail raus und steht nirgends in der
+    # Datenbank.
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -17,7 +17,12 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   reporter: process.env.CI ? [["github"], ["list"]] : [["list"]],
-  timeout: 60_000,
+  // Großzügig, weil eine Reise viel echte Arbeit ist: zwei Registrierungen
+  // mit bcrypt, zwei Mail-Zustellungen samt Abholen, Unternehmensanlage,
+  // Wechsel, und Aufrufe über vier Dienste. 60 s reichten im guten Fall und
+  // machten aus normaler Schwankung unter Docker-auf-macOS ein Rot, das
+  // nichts über den Code aussagt.
+  timeout: 150_000,
   expect: { timeout: 15_000 },
   use: {
     baseURL: process.env.E2E_WEB_URL ?? "http://localhost:5173",
