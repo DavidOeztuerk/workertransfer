@@ -41,6 +41,7 @@ from worker_contracts.resume import (
     ResumeV1,
     SaveResumeV1,
 )
+from worker_contracts.transfer import MarketStatusV1, SaveMarketStatusV1
 
 __all__ = [
     "AcceptInvitationV1",
@@ -63,6 +64,7 @@ __all__ = [
     "InviteMemberV1",
     "JobPageV1",
     "JobV1",
+    "MarketStatusV1",
     "MembershipV1",
     "Message",
     "PortfolioItemV1",
@@ -77,6 +79,7 @@ __all__ = [
     "ResumeV1",
     "SaveCompanyProfileV1",
     "SaveJobV1",
+    "SaveMarketStatusV1",
     "SavePortfolioV1",
     "SaveProfileV1",
     "SaveResumeV1",
