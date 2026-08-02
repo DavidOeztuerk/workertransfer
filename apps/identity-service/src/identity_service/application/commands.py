@@ -37,6 +37,11 @@ from identity_service.domain.membership import (
     NotAMember,
     OnlyAdminsMayRemove,
 )
+from identity_service.domain.notification import (
+    NotificationKind,
+    notification_body,
+    notification_subject,
+)
 from identity_service.domain.password_policy import PasswordPolicy
 from identity_service.domain.user import (
     AccountDisabled,
@@ -884,3 +889,54 @@ async def handle_remove_member(
         )
     )
     return Result.ok(None)
+
+
+# ---------------------------------------------------------------------------
+# Benachrichtigungen
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class NotifyCommand:
+    user_id: UUID
+    kind: NotificationKind
+
+
+async def handle_notify(cmd: NotifyCommand, *, deps: dict[str, Any], repos: dict[str, Any]) -> bool:
+    """„Sag dieser Person, dass es etwas Neues gibt."
+
+    Gibt zurück, ob wirklich gesendet wurde — für Tests und Protokoll. Der
+    Endpunkt gibt diese Auskunft NICHT weiter: der Aufrufer soll aus der Antwort
+    nicht ableiten können, ob es die Person gibt oder ob sie Mails will.
+
+    Was die Mail sagt, entscheidet allein `domain/notification.py`, und sie sagt
+    für jede Art dasselbe. Der Aufrufer hat auf den Text keinen Zugriff — sonst
+    wäre der Tag, an dem jemand „nur diese eine Zeile" ergänzt, absehbar.
+    """
+    user = await repos["users"].get_by_id(cmd.user_id)
+    if user is None or user.status is not AccountStatus.ACTIVE:
+        # Ein unbestätigtes Konto bekommt keine Post über Vorgänge — die
+        # Adresse ist noch nicht als seine erwiesen.
+        return False
+
+    preference = await repos["notifications"].get(cmd.user_id)
+    now = deps["clock"].now()
+    if not preference.may_send(cmd.kind, now=now):
+        return False
+
+    preference.mark_sent(now)
+    await repos["notifications"].save(preference)
+    return True
+
+
+async def deliver_notification(email: str, kind: NotificationKind, *, deps: dict[str, Any]) -> None:
+    """Der Versand, getrennt vom Vorgang — er läuft nach dem Commit.
+
+    Vorher zu senden hieße, über etwas zu benachrichtigen, das gleich
+    zurückgerollt wird. Dieselbe Reihenfolge wie bei der Bestätigungsmail.
+    """
+    await deps["mailer"].send(
+        to=email,
+        subject=notification_subject(kind),
+        body=notification_body(kind, web_url=deps["settings"].public_web_url.rstrip("/")),
+    )
