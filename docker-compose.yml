@@ -259,6 +259,44 @@ services:
       retries: 30
       start_period: 40s
 
+  portfolio-service:
+    <<: *service
+    container_name: workertransfer-portfolio
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        SERVICE_DIR: portfolio-service
+    environment:
+      <<: *service-env
+      WORKER_PORT: "8005"
+      WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/portfolio
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+    ports:
+      - "8005:8005"
+    command:
+      - uvicorn
+      - portfolio_service.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8005"
+      - --reload
+      - --reload-dir
+      - /app/apps/portfolio-service/src
+      - --reload-dir
+      - /app/packages
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;urllib.request.urlopen("http://localhost:8005/health/live")
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 40s
+
   web:
     build:
       context: .
@@ -274,6 +312,8 @@ services:
         condition: service_healthy
       resume-service:
         condition: service_healthy
+      portfolio-service:
+        condition: service_healthy
     environment:
       # pnpm will purge node_modules when the lockfile changed since the image
       # was built, and without a TTY it aborts instead of asking — der Container
@@ -285,6 +325,7 @@ services:
       VITE_CONSENT_BASE_URL: ${VITE_CONSENT_BASE_URL:-http://localhost:8002}
       VITE_PROFILE_BASE_URL: ${VITE_PROFILE_BASE_URL:-http://localhost:8003}
       VITE_RESUME_BASE_URL: ${VITE_RESUME_BASE_URL:-http://localhost:8004}
+      VITE_PORTFOLIO_BASE_URL: ${VITE_PORTFOLIO_BASE_URL:-http://localhost:8005}
     ports:
       - "5173:5173"
     volumes:

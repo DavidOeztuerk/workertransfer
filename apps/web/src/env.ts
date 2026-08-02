@@ -29,3 +29,4 @@ export const API_BASE_URL = resolve(import.meta.env.VITE_API_BASE_URL, 8001);
 export const CONSENT_BASE_URL = resolve(import.meta.env.VITE_CONSENT_BASE_URL, 8002);
 export const PROFILE_BASE_URL = resolve(import.meta.env.VITE_PROFILE_BASE_URL, 8003);
 export const RESUME_BASE_URL = resolve(import.meta.env.VITE_RESUME_BASE_URL, 8004);
+export const PORTFOLIO_BASE_URL = resolve(import.meta.env.VITE_PORTFOLIO_BASE_URL, 8005);
