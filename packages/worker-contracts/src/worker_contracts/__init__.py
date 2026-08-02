@@ -1,5 +1,10 @@
 """Shared API contracts: DTOs, Events, Messages, Versioning."""
 
+from worker_contracts.applications import (
+    AdvanceApplicationV1,
+    ApplicationV1,
+    SubmitApplicationV1,
+)
 from worker_contracts.consent import (
     ConsentCheckResultV1,
     ConsentCheckV1,
@@ -38,6 +43,8 @@ from worker_contracts.resume import (
 
 __all__ = [
     "AcceptInvitationV1",
+    "AdvanceApplicationV1",
+    "ApplicationV1",
     "AttachmentV1",
     "Command",
     "CompanyMemberV1",
@@ -70,5 +77,6 @@ __all__ = [
     "SavePortfolioV1",
     "SaveProfileV1",
     "SaveResumeV1",
+    "SubmitApplicationV1",
     "VerifyEmailV1",
 ]

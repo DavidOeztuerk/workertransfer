@@ -61,7 +61,14 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "not authenticated")
         return token
 
-    def _require_company(request: Request) -> None:
+    def _require_company(request: Request) -> Any:
+        """Gibt den Tenant zurück, statt nur zu prüfen.
+
+        Er wird gebraucht: seit 4.2 kann ein Profil auch NUR diesem einen
+        Unternehmen freigegeben sein (durch eine Bewerbung). Ihn hier
+        herauszureichen ist der einzige Weg, der sicherstellt, dass er aus dem
+        Token stammt und nicht aus dem Request.
+        """
         principal = _principal(request)
         if principal.tenant_id is None:
             # Aussage über den Aufrufer, nicht über das Ziel — verrät nichts.
@@ -69,6 +76,7 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
                 status.HTTP_403_FORBIDDEN,
                 "reading other profiles requires an active company",
             )
+        return principal.tenant_id
 
     @router.put("/profiles/me")
     async def save_my_profile(body: SaveProfileV1, request: Request) -> ProfileV1:
@@ -104,7 +112,7 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
     async def foreign_profile(subject_id: str, request: Request) -> ProfileV1:
         from uuid import UUID
 
-        _require_company(request)
+        tenant_id = _require_company(request)
         bearer = _bearer(request)
         try:
             parsed = UUID(subject_id)
@@ -115,7 +123,9 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
         try:
             async with request_scope(session_factory) as (_uow, repos):
                 result = await handle_get_visible_profile(
-                    GetProfileQuery(subject_id=parsed, bearer=bearer), deps=deps, repos=repos
+                    GetProfileQuery(subject_id=parsed, tenant_id=tenant_id, bearer=bearer),
+                    deps=deps,
+                    repos=repos,
                 )
         except ConsentUnavailable:
             # Weder zeigen noch 404: wir wissen es nicht, und beides wäre eine
@@ -133,12 +143,14 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
         limit: int = Query(default=20, ge=1, le=50),
         cursor: str | None = Query(default=None),
     ) -> ProfilePageV1:
-        _require_company(request)
+        tenant_id = _require_company(request)
         bearer = _bearer(request)
         try:
             async with request_scope(session_factory) as (_uow, repos):
                 result = await handle_list_visible_profiles(
-                    ListProfilesQuery(limit=limit, cursor=cursor, bearer=bearer),
+                    ListProfilesQuery(
+                        limit=limit, cursor=cursor, tenant_id=tenant_id, bearer=bearer
+                    ),
                     deps=deps,
                     repos=repos,
                 )

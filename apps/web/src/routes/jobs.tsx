@@ -1,6 +1,9 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button, Card, Field } from "@workertransfer/ui";
+import { Button, Card, Field, TextArea } from "@workertransfer/ui";
+
+import { apply } from "../applications/client";
+import type { MeResponse } from "../auth/client";
 
 import {
   type EmploymentType,
@@ -33,7 +36,14 @@ interface Filters {
 
 const EMPTY: Filters = { q: "", location: "", remote: "", employment: "" };
 
-export function JobsRoute() {
+export interface JobsRouteProps {
+  // Injizierbar, damit der Test ohne laufende Sitzung rendern kann. `null`
+  // heißt „nicht angemeldet" — und die Seite funktioniert dann trotzdem, sie
+  // bietet nur kein Bewerben an.
+  principal?: MeResponse | null;
+}
+
+export function JobsRoute({ principal = null }: JobsRouteProps) {
   // Zwei Zustände: was im Formular steht und wonach gesucht wurde. Sonst
   // liefe bei jedem Tastendruck eine Abfrage.
   const [form, setForm] = useState<Filters>(EMPTY);
@@ -118,6 +128,13 @@ export function JobsRoute() {
                   {REMOTE_LABEL[job.remote]} · {EMPLOYMENT_LABEL[job.employment]}
                 </p>
                 <p>{job.description}</p>
+                {principal !== null ? (
+                  <ApplyBox jobId={job.id} />
+                ) : (
+                  <p className="candidates__meta">
+                    Zum Bewerben <a href="/login">anmelden</a>.
+                  </p>
+                )}
               </Card>
             </li>
           ))}
@@ -140,5 +157,114 @@ export function JobsRoute() {
         </Button>
       ) : null}
     </main>
+  );
+}
+
+
+/**
+ * Bewerben — und damit die eigenen Daten diesem einen Unternehmen freigeben.
+ *
+ * Die Kästchen benennen, was mitgeht. Das Profil steht bewusst nicht zur Wahl:
+ * eine Bewerbung ohne jede Angabe zur Person ist keine, und ein Kästchen dafür
+ * wäre eine Wahl, die niemand ernsthaft trifft.
+ */
+function ApplyBox({ jobId }: { jobId: string }) {
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [resume, setResume] = useState(true);
+  const [portfolio, setPortfolio] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
+  const send = useMutation({
+    mutationFn: () =>
+      apply({
+        job_id: jobId,
+        message,
+        shares_resume: resume,
+        shares_portfolio: portfolio,
+      }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        setError(null);
+        setSent(true);
+        setOpen(false);
+      } else {
+        setError(result.message);
+      }
+    },
+  });
+
+  if (sent && error === null) {
+    return (
+      <p className="page__note">
+        Bewerbung abgeschickt. Zurückziehen kannst du sie jederzeit unter{" "}
+        <a href="/applications">Meine Bewerbungen</a> — dann sieht das Unternehmen deine Daten
+        nicht mehr.
+      </p>
+    );
+  }
+
+  if (!open) {
+    return (
+      <>
+        {error !== null ? (
+          <p className="auth__alert" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <Button variant="quiet" onClick={() => setOpen(true)}>
+          Bewerben
+        </Button>
+      </>
+    );
+  }
+
+  return (
+    <form
+      className="jobs__apply"
+      onSubmit={(e) => {
+        e.preventDefault();
+        send.mutate();
+      }}
+    >
+      <TextArea
+        label="Anschreiben"
+        hint="Optional. Was dich mit dieser Stelle verbindet."
+        rows={4}
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        maxLength={4000}
+      />
+      <p className="wt-field__hint">
+        Dein Profil geht immer mit — ohne es wäre es keine Bewerbung. Was du zusätzlich
+        freigibst, entscheidest du:
+      </p>
+      <label className="wt-checkbox">
+        <input type="checkbox" checked={resume} onChange={(e) => setResume(e.target.checked)} />
+        <span>Lebenslauf</span>
+      </label>
+      <label className="wt-checkbox">
+        <input
+          type="checkbox"
+          checked={portfolio}
+          onChange={(e) => setPortfolio(e.target.checked)}
+        />
+        <span>Meine Arbeiten</span>
+      </label>
+
+      {error !== null ? (
+        <p className="auth__alert" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      <Button type="submit" disabled={send.isPending}>
+        {send.isPending ? "Wird gesendet…" : "Bewerbung abschicken"}
+      </Button>
+      <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        Abbrechen
+      </Button>
+    </form>
   );
 }

@@ -1,0 +1,1 @@
+"""applications_service package."""

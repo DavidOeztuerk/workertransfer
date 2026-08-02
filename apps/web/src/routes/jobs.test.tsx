@@ -2,10 +2,15 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { MeResponse } from "../auth/client";
 import type { Job } from "../jobs/client";
 import { renderWithProviders } from "../test/render";
 import { JobsRoute } from "./jobs";
 
+vi.mock("../applications/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../applications/client")>();
+  return { ...actual, apply: vi.fn() };
+});
 vi.mock("../jobs/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../jobs/client")>();
   return { ...actual, searchJobs: vi.fn() };
@@ -13,6 +18,8 @@ vi.mock("../jobs/client", async (importOriginal) => {
 
 const client = await import("../jobs/client");
 const searchJobs = vi.mocked(client.searchJobs);
+const applicationsClient = await import("../applications/client");
+const apply = vi.mocked(applicationsClient.apply);
 
 function job(overrides: Partial<Job> = {}): Job {
   return {
@@ -30,9 +37,28 @@ function job(overrides: Partial<Job> = {}): Job {
   };
 }
 
+function principal(): MeResponse {
+  return { user_id: "u", email: "anna@example.com", tenant_id: null, roles: ["user"] };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   searchJobs.mockResolvedValue({ ok: true, items: [], nextCursor: null });
+  apply.mockResolvedValue({
+    ok: true,
+    application: {
+      id: "a",
+      job_id: "j1",
+      tenant_id: "t",
+      subject_id: "u",
+      message: "",
+      shares_resume: true,
+      shares_portfolio: false,
+      status: "submitted",
+      created_at: "2026-08-02T10:00:00Z",
+      updated_at: "2026-08-02T10:00:00Z",
+    },
+  });
 });
 
 describe("JobsRoute", () => {
@@ -113,5 +139,75 @@ describe("JobsRoute", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("fehlgeschlagen");
     expect(screen.queryByText(/nichts gefunden/i)).toBeNull();
+  });
+});
+
+describe("JobsRoute — bewerben", () => {
+  it("offers applying only to someone who is logged in", async () => {
+    searchJobs.mockResolvedValue({ ok: true, items: [job()], nextCursor: null });
+
+    renderWithProviders(<JobsRoute principal={null} />);
+
+    await screen.findByText("Backend-Entwicklerin");
+    expect(screen.queryByRole("button", { name: /^Bewerben$/ })).toBeNull();
+    expect(screen.getByText(/anmelden/i)).toBeInTheDocument();
+  });
+
+  it("does not offer a checkbox for the profile — it is not a choice", async () => {
+    const user = userEvent.setup();
+    searchJobs.mockResolvedValue({ ok: true, items: [job()], nextCursor: null });
+
+    renderWithProviders(<JobsRoute principal={principal()} />);
+
+    await user.click(await screen.findByRole("button", { name: /^Bewerben$/ }));
+    expect(screen.getByLabelText(/Lebenslauf/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Profil$/i)).toBeNull();
+  });
+
+  it("sends what was ticked", async () => {
+    const user = userEvent.setup();
+    searchJobs.mockResolvedValue({ ok: true, items: [job({ id: "j1" })], nextCursor: null });
+    renderWithProviders(<JobsRoute principal={principal()} />);
+
+    await user.click(await screen.findByRole("button", { name: /^Bewerben$/ }));
+    await user.click(screen.getByLabelText(/Meine Arbeiten/i));
+    await user.click(screen.getByRole("button", { name: /Bewerbung abschicken/i }));
+
+    await waitFor(() => expect(apply).toHaveBeenCalled());
+    expect(apply.mock.calls[0]?.[0]).toMatchObject({
+      job_id: "j1",
+      shares_resume: true,
+      shares_portfolio: true,
+    });
+  });
+
+  it("says how to undo it, right where it was done", async () => {
+    // Die Freigabe ist der Punkt; wo man sie zurücknimmt, gehört daneben.
+    const user = userEvent.setup();
+    searchJobs.mockResolvedValue({ ok: true, items: [job()], nextCursor: null });
+    renderWithProviders(<JobsRoute principal={principal()} />);
+
+    await user.click(await screen.findByRole("button", { name: /^Bewerben$/ }));
+    await user.click(screen.getByRole("button", { name: /Bewerbung abschicken/i }));
+
+    expect(await screen.findByText(/Zurückziehen kannst du sie jederzeit/i)).toBeInTheDocument();
+  });
+
+  it("does not call a silent dependency a rejection", async () => {
+    const user = userEvent.setup();
+    searchJobs.mockResolvedValue({ ok: true, items: [job()], nextCursor: null });
+    apply.mockResolvedValue({
+      ok: false,
+      reason: "unavailable",
+      message: "Ein beteiligter Dienst antwortet gerade nicht.",
+    });
+    renderWithProviders(<JobsRoute principal={principal()} />);
+
+    await user.click(await screen.findByRole("button", { name: /^Bewerben$/ }));
+    await user.click(screen.getByRole("button", { name: /Bewerbung abschicken/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("antwortet gerade nicht");
+    expect(alert.textContent).not.toMatch(/abgelehnt/i);
   });
 });
