@@ -319,7 +319,21 @@ was der Code tat.
   antworten. Der Ersatz nimmt jetzt den Host der Seite. Zweitens: `docker compose
   restart` übernimmt neue Umgebungsvariablen nicht — dafür braucht es
   `docker compose up -d`.
-- ⬜ 3.4 Portfolio-Service
+- 🟧 **3.4 Portfolio-Service** (`apps/portfolio-service`) — Scheibe A fertig,
+  02.08.2026. [Design](superpowers/specs/2026-08-02-portfolio-service-design.md).
+  Freigabe **wie beim Profil** (eine Capability `portfolio.visibility:public`
+  für alle Unternehmen), nicht wie beim Lebenslauf je Unternehmen: ein Portfolio
+  ist absichtlich ein Schaufenster, und was nicht gezeigt werden darf, gehört
+  nicht hinein. Verworfen: Sichtbarkeit je Eintrag — sie verlagert eine
+  schwierige Entscheidung in ein Formularfeld, das beim zwölften Eintrag niemand
+  mehr bewusst setzt.
+  Getrennte Capability trotz gemeinsamem Schalter in der Oberfläche, damit sie
+  einzeln widerrufbar bleibt; ein Test belegt, dass die Profilfreigabe das
+  Portfolio NICHT öffnet.
+  **Nur `http`/`https` in Links** — ein Portfolio-Link wird von fremden Menschen
+  angeklickt, `javascript:` und `data:` sind dort kein Randfall.
+  **Offen (Scheibe B):** die Oberfläche. **Dateien** bleiben 3.5 vorbehalten;
+  ohne `worker-files`/`worker-storage` ist das Portfolio Text und Links.
 - ⬜ 3.5 `worker-files`/`worker-storage` real machen (Workspace-Re-Include)
 - ✅ **Scheibe C — Einladungen & Rollen** (02.08.2026). Ein Administrator lädt
   eine **Adresse** ein (nicht ein Konto: die Person muss noch keines haben, und
