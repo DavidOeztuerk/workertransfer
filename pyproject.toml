@@ -19,15 +19,13 @@ dev = [
 
 [tool.uv.workspace]
 members = ["apps/identity-service", "apps/consent-service", "apps/profile-service", "apps/resume-service", "packages/worker-*", "packages/worker-cli"]
-# Phase-1 deficit: worker-files is a shell whose declared C-backend deps
-# (pillow, python-magic) and He adapt (boto3, minio, azure, ...) have no active
-# workspace consumer (no app/service depends on it; its Phase-1 smoke skips on
-# missing system libmagic). Excluded from the workspace so uv lock / uv sync
-# --all-packages no longer resolve it (CI was failing building Pillow from
-# source on Python 3.14/ubuntu-latest — no wheel + missing libjpeg headers).
-# Re-include in Phase 3 Sub-step 3.5 when an actual consumer is wired. The shell
-# code and smoke test remain on disk; pytest skips its import.
-exclude = ["packages/worker-files", "packages/worker-ai"]
+# worker-ai bleibt ausgeschlossen: seine ML-Wheels haben keinen
+# Python-3.14-Build. worker-files wurde in Sub-step 3.5 GELÖSCHT und
+# worker-storage neu geschrieben — beide waren Hüllen ohne Konsumenten, die
+# zusammen fünf schwere Abhängigkeiten deklarierten (pillow, python-magic,
+# boto3, minio, azure-storage-blob). Genau die machten sie unbaubar und damit
+# unbenutzbar. Siehe ADR-0021.
+exclude = ["packages/worker-ai"]
 
 [tool.uv.sources]
 worker-core = { workspace = true }
@@ -101,7 +99,7 @@ warn_unreachable = true
 # sind für mypy dasselbe Modul zweimal ("Duplicate module named 'env'"). Mit
 # einer Aufzählung bricht der vierte Service den Typcheck, ohne dass jemand
 # ahnt, warum. Alembic-Umgebungsdateien haben ohnehin keinen Typvertrag.
-exclude = ["tests", "packages/worker-files", "packages/worker-ai", "apps/.*/migrations"]
+exclude = ["tests", "packages/worker-ai", "apps/.*/migrations"]
 
 # Untyped third-party libraries (no py.typed marker / no stubs available).
 # Strict mode stays on; we only silence import-untyped for these specific modules.
