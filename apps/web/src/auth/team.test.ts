@@ -6,6 +6,7 @@ import {
   inviteMember,
   listInvitations,
   listMembers,
+  removeMember,
   withdrawInvitation,
 } from "./team";
 
@@ -139,5 +140,24 @@ describe("listInvitations", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.invitations[0]).not.toHaveProperty("token");
+  });
+});
+
+describe("removeMember", () => {
+  it("keeps 'last admin' apart from 'not allowed'", async () => {
+    // Der eine Fall heißt "mach vorher jemanden zum Administrator", der andere
+    // "such dir jemanden mit mehr Rechten". Eine gemeinsame Meldung ließe die
+    // Person raten, was zu tun ist.
+    vi.stubGlobal("fetch", vi.fn(async () => respond(409, { detail: "needs an admin" })));
+    await expect(removeMember(TENANT, "u")).resolves.toMatchObject({ reason: "last-admin" });
+
+    vi.stubGlobal("fetch", vi.fn(async () => respond(403, { detail: "only admins" })));
+    await expect(removeMember(TENANT, "u")).resolves.toMatchObject({ reason: "not-admin" });
+  });
+
+  it("accepts the empty 204 body", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => respond(204, null)));
+
+    await expect(removeMember(TENANT, "u")).resolves.toEqual({ ok: true });
   });
 });

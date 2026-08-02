@@ -36,6 +36,7 @@ class AuditAction(StrEnum):
     MEMBER_INVITED = "member_invited"
     MEMBER_JOINED = "member_joined"
     INVITATION_WITHDRAWN = "invitation_withdrawn"
+    MEMBER_REMOVED = "member_removed"
 
 
 # Only non-PII technical metadata may be recorded. Passwords, emails,

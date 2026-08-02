@@ -30,7 +30,13 @@ from identity_service.domain.company import (
     EmailDomain,
 )
 from identity_service.domain.invitation import Invitation, InvitationInvalid
-from identity_service.domain.membership import MembershipRole, MembershipView, NotAMember
+from identity_service.domain.membership import (
+    LastAdminMayNotLeave,
+    MembershipRole,
+    MembershipView,
+    NotAMember,
+    OnlyAdminsMayRemove,
+)
 from identity_service.domain.password_policy import PasswordPolicy
 from identity_service.domain.user import (
     AccountDisabled,
@@ -64,6 +70,7 @@ __all__ = [
     "handle_invite_member",
     "handle_list_memberships",
     "handle_register",
+    "handle_remove_member",
     "handle_resend",
     "handle_switch_tenant",
     "handle_verify_email",
@@ -820,3 +827,63 @@ async def handle_withdraw_invitation(
         )
     )
     return Result.ok(invitation)
+
+
+@dataclass(frozen=True, slots=True)
+class RemoveMemberCommand:
+    tenant_id: UUID
+    member_id: UUID
+    actor_id: UUID
+
+
+async def handle_remove_member(
+    cmd: RemoveMemberCommand, *, deps: dict[str, Any], repos: dict[str, Any]
+) -> Result[None]:
+    """Entfernt ein Mitglied aus einem Unternehmen.
+
+    Zwei Regeln, und beide schützen nicht den Entfernten, sondern das
+    Unternehmen: nur Administratoren dürfen entfernen, und der letzte
+    Administrator darf nicht gehen. Ein Unternehmen ohne Administrator ist nicht
+    gelöscht, sondern verwaist — die Domain bleibt beansprucht, niemand kann
+    mehr einladen, und aufzulösen wäre das nur noch von Hand in der Datenbank.
+
+    Wirkung: der Tenant fällt beim nächsten Refresh weg (siehe `handle_refresh`).
+    Ein bereits ausgestelltes Access-Token bleibt bis zu seinem Ablauf gültig —
+    das ist derselbe bekannte Rest wie beim Abmelden, und er ist hier
+    dokumentiert statt verschwiegen.
+    """
+    actor_role = await repos["memberships"].role_of(cmd.actor_id, cmd.tenant_id)
+    if actor_role is None:
+        return Result.fail(NotAMember())
+    if actor_role is not MembershipRole.ADMIN:
+        return Result.fail(OnlyAdminsMayRemove())
+
+    member_role = await repos["memberships"].role_of(cmd.member_id, cmd.tenant_id)
+    if member_role is None:
+        # Wer nicht drin ist, kann nicht entfernt werden — und die Antwort darf
+        # nicht verraten, ob es die Person überhaupt gibt.
+        return Result.fail(NotAMember())
+
+    if member_role is MembershipRole.ADMIN:
+        admins = [
+            role
+            for _user, _name, role in await repos["memberships"].list_members(cmd.tenant_id)
+            if role is MembershipRole.ADMIN
+        ]
+        if len(admins) <= 1:
+            return Result.fail(LastAdminMayNotLeave())
+
+    await repos["memberships"].remove(cmd.member_id, cmd.tenant_id)
+    await repos["audit"].append(
+        AuditEvent(
+            occurred_at=deps["clock"].now(),
+            actor_id=cmd.actor_id,
+            tenant_id=cmd.tenant_id,
+            action=AuditAction.MEMBER_REMOVED,
+            target_id=cmd.member_id,
+            correlation_id=_correlation_id(),
+            # Ob jemand sich selbst entfernt hat, ist der interessante Fall.
+            metadata={"reason": "self" if cmd.actor_id == cmd.member_id else "by_admin"},
+        )
+    )
+    return Result.ok(None)

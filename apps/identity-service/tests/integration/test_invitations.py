@@ -292,3 +292,118 @@ async def test_a_withdrawn_invitation_cannot_be_used(
         await _register_and_login(invitee, invited, "Neu", postgres_url)
         refused = await invitee.post("/invitations/accept", json={"token": token})
         assert refused.status_code == 404, refused.text
+
+
+async def test_a_member_can_be_removed_and_loses_the_company_on_refresh(
+    stack: tuple[Any, _CollectingMailer], postgres_url: str
+) -> None:
+    """Entfernen wirkt beim nächsten Refresh, nicht erst beim Ablauf.
+
+    Das ist die Regel aus PR #8, hier zum ersten Mal auf dem Weg, für den sie
+    gebaut wurde: vorher konnte niemand entfernt werden.
+    """
+    app, mailer = stack
+    transport = ASGITransport(app=app)
+    domain = f"firma-{uuid4().hex[:8]}.example"
+    member_email = f"kollege@{domain}"
+
+    async with AsyncClient(transport=transport, base_url="http://test") as admin:
+        await _register_and_login(admin, f"chef@{domain}", "Chefin", postgres_url)
+        tenant_id = await _company_for(admin, "Firma")
+        await admin.post(f"/auth/company/{tenant_id}")
+        await admin.post(
+            f"/companies/{tenant_id}/invitations", json={"email": member_email, "role": "member"}
+        )
+        token = _token_from(mailer.sent[-1][2])
+
+        async with AsyncClient(transport=transport, base_url="http://test") as member:
+            member_id = await _register_and_login(member, member_email, "Kollege", postgres_url)
+            await member.post("/invitations/accept", json={"token": token})
+            await member.post(f"/auth/company/{tenant_id}")
+            assert (await member.get("/me")).json()["tenant_id"] == str(tenant_id)
+
+            removed = await admin.delete(f"/companies/{tenant_id}/members/{member_id}")
+            assert removed.status_code == 204, removed.text
+
+            refreshed = await member.post("/auth/refresh")
+            assert refreshed.status_code == 200, refreshed.text
+            me = await member.get("/me")
+            # Die Sitzung überlebt, das Unternehmen nicht.
+            assert me.status_code == 200
+            assert me.json()["tenant_id"] is None
+            assert (await member.get("/me/companies")).json() == []
+
+
+async def test_the_last_admin_cannot_leave(
+    stack: tuple[Any, _CollectingMailer], postgres_url: str
+) -> None:
+    """Ein Unternehmen ohne Administrator wäre nicht gelöscht, sondern verwaist."""
+    app, _mailer = stack
+    transport = ASGITransport(app=app)
+    domain = f"firma-{uuid4().hex[:8]}.example"
+
+    async with AsyncClient(transport=transport, base_url="http://test") as admin:
+        admin_id = await _register_and_login(admin, f"chef@{domain}", "Chefin", postgres_url)
+        tenant_id = await _company_for(admin, "Firma")
+        await admin.post(f"/auth/company/{tenant_id}")
+
+        refused = await admin.delete(f"/companies/{tenant_id}/members/{admin_id}")
+
+        assert refused.status_code == 409, refused.text
+        members = await admin.get(f"/companies/{tenant_id}/members")
+        assert len(members.json()) == 1
+
+
+async def test_a_member_may_not_remove_anyone(
+    stack: tuple[Any, _CollectingMailer], postgres_url: str
+) -> None:
+    app, mailer = stack
+    transport = ASGITransport(app=app)
+    domain = f"firma-{uuid4().hex[:8]}.example"
+    member_email = f"kollege@{domain}"
+
+    async with AsyncClient(transport=transport, base_url="http://test") as admin:
+        admin_id = await _register_and_login(admin, f"chef@{domain}", "Chefin", postgres_url)
+        tenant_id = await _company_for(admin, "Firma")
+        await admin.post(f"/auth/company/{tenant_id}")
+        await admin.post(
+            f"/companies/{tenant_id}/invitations", json={"email": member_email, "role": "member"}
+        )
+        token = _token_from(mailer.sent[-1][2])
+
+    async with AsyncClient(transport=transport, base_url="http://test") as member:
+        await _register_and_login(member, member_email, "Kollege", postgres_url)
+        await member.post("/invitations/accept", json={"token": token})
+        await member.post(f"/auth/company/{tenant_id}")
+
+        refused = await member.delete(f"/companies/{tenant_id}/members/{admin_id}")
+
+        assert refused.status_code == 403, refused.text
+
+
+async def test_an_admin_may_leave_once_someone_else_is_admin(
+    stack: tuple[Any, _CollectingMailer], postgres_url: str
+) -> None:
+    """Die Regel schützt das Unternehmen, nicht den Posten."""
+    app, mailer = stack
+    transport = ASGITransport(app=app)
+    domain = f"firma-{uuid4().hex[:8]}.example"
+    successor_email = f"nachfolge@{domain}"
+
+    async with AsyncClient(transport=transport, base_url="http://test") as admin:
+        admin_id = await _register_and_login(admin, f"chef@{domain}", "Chefin", postgres_url)
+        tenant_id = await _company_for(admin, "Firma")
+        await admin.post(f"/auth/company/{tenant_id}")
+        await admin.post(
+            f"/companies/{tenant_id}/invitations",
+            json={"email": successor_email, "role": "admin"},
+        )
+        token = _token_from(mailer.sent[-1][2])
+
+        async with AsyncClient(transport=transport, base_url="http://test") as successor:
+            await _register_and_login(successor, successor_email, "Nachfolge", postgres_url)
+            await successor.post("/invitations/accept", json={"token": token})
+
+        left = await admin.delete(f"/companies/{tenant_id}/members/{admin_id}")
+
+        assert left.status_code == 204, left.text

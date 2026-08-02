@@ -27,12 +27,14 @@ from identity_service.application.commands import (
     InviteMemberCommand,
     ListMembershipsQuery,
     OutgoingMail,
+    RemoveMemberCommand,
     WithdrawInvitationCommand,
     dispatch_all,
     handle_accept_invitation,
     handle_create_company,
     handle_invite_member,
     handle_list_memberships,
+    handle_remove_member,
     handle_withdraw_invitation,
 )
 from identity_service.domain.company import (
@@ -46,7 +48,11 @@ from identity_service.domain.invitation import (
     NotYourInvitation,
     OnlyAdminsMayInvite,
 )
-from identity_service.domain.membership import NotAMember
+from identity_service.domain.membership import (
+    LastAdminMayNotLeave,
+    NotAMember,
+    OnlyAdminsMayRemove,
+)
 from identity_service.presentation.auth_middleware import get_request_user
 
 __all__ = ["build_company_router"]
@@ -119,7 +125,12 @@ def build_company_router(deps: dict[str, Any]) -> APIRouter:
             # Wie eine fremde Ressource: wer nicht Mitglied ist, soll nicht
             # unterscheiden können, ob es das Unternehmen gibt.
             return HTTPException(status.HTTP_404_NOT_FOUND, "no such company")
-        if isinstance(err, OnlyAdminsMayInvite):
+        if isinstance(err, LastAdminMayNotLeave):
+            # 409, nicht 403: der Aufrufer DARF entfernen, nur dieses eine
+            # Mitglied gerade nicht. Ein 403 würde ihm die Berechtigung
+            # absprechen, die er hat.
+            return HTTPException(status.HTTP_409_CONFLICT, err.message)
+        if isinstance(err, OnlyAdminsMayInvite | OnlyAdminsMayRemove):
             # Aussage über den Aufrufer, nicht über die Ressource — 403 verrät
             # hier nichts, was er nicht schon weiß.
             return HTTPException(status.HTTP_403_FORBIDDEN, err.message)
@@ -198,6 +209,28 @@ def build_company_router(deps: dict[str, Any]) -> APIRouter:
             CompanyMemberV1(user_id=user_id, display_name=name, role=str(member_role))
             for user_id, name, member_role in members
         ]
+
+    @router.delete(
+        "/companies/{tenant_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT
+    )
+    async def remove_member(tenant_id: UUID, member_id: UUID, request: Request) -> None:
+        """Entfernt ein Mitglied — oder einen selbst.
+
+        Der letzte Administrator kann nicht gehen: ein Unternehmen ohne
+        Administrator ist nicht gelöscht, sondern verwaist.
+
+        Die Wirkung tritt beim nächsten Refresh ein (`handle_refresh` prüft die
+        Mitgliedschaft erneut). Ein bereits ausgestelltes Access-Token bleibt bis
+        zu seinem Ablauf gültig — derselbe bekannte Rest wie beim Abmelden.
+        """
+        principal = _require_user(request)
+        cmd = RemoveMemberCommand(
+            tenant_id=tenant_id, member_id=member_id, actor_id=principal.user_id
+        )
+        async with request_scope(session_factory) as (_uow, repos):
+            result = await handle_remove_member(cmd, deps=deps, repos=repos)
+        if not result.is_success:
+            raise _to_http(result.error)
 
     @router.post("/invitations/accept")
     async def accept_invitation(body: AcceptInvitationV1, request: Request) -> MembershipV1:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from identity_service.domain.audit import AuditEvent
@@ -125,6 +125,14 @@ class SqlAlchemyMembershipRepository:
         )
         role = (await self._session.execute(stmt)).scalar_one_or_none()
         return None if role is None else MembershipRole(role)
+
+    async def remove(self, user_id: UUID, tenant_id: UUID) -> None:
+        await self._session.execute(
+            delete(UserTenantMembershipModel).where(
+                UserTenantMembershipModel.user_id == user_id,
+                UserTenantMembershipModel.tenant_id == tenant_id,
+            )
+        )
 
     async def list_members(self, tenant_id: UUID) -> list[tuple[UUID, str, MembershipRole]]:
         stmt = (
