@@ -119,3 +119,71 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   await candidateContext.close();
   await recruiterContext.close();
 });
+
+
+test("die Suche findet nur, was freigegeben ist", async ({ browser }) => {
+  const visibleEmail = uniqueEmail("kandidat.example");
+  const hiddenEmail = uniqueEmail("kandidat.example");
+  const companyDomain = uniqueCompanyDomain();
+  const recruiterEmail = uniqueEmail(companyDomain);
+  const companyName = `E2E Suche ${Date.now()}`;
+  const stamp = Date.now();
+  const skill = `Suchskill${stamp}`;
+  const visibleHeadline = `E2E Sichtbar ${stamp}`;
+  const hiddenHeadline = `E2E Verborgen ${stamp}`;
+
+  // Zwei Personen mit DERSELBEN Fähigkeit — eine gibt frei, eine nicht.
+  const visibleContext = await browser.newContext();
+  const visible = await visibleContext.newPage();
+  await registerAndConfirm(visible, visibleEmail, "E2E Sichtbar");
+  await login(visible, visibleEmail);
+  await visible.goto("/profile");
+  await visible.getByLabel(/Überschrift/i).fill(visibleHeadline);
+  await visible.getByLabel(/Fähigkeiten/i).fill(skill);
+  await visible.getByLabel(/Ort/i).fill("Berlin");
+  await visible.getByRole("button", { name: /Speichern/i }).click();
+  await expect(visible.getByText(/Profil gespeichert/i)).toBeVisible();
+  await visible.getByRole("switch").click();
+  await expect(visible.getByRole("switch")).toBeChecked();
+
+  const hiddenContext = await browser.newContext();
+  const hidden = await hiddenContext.newPage();
+  await registerAndConfirm(hidden, hiddenEmail, "E2E Verborgen");
+  await login(hidden, hiddenEmail);
+  await hidden.goto("/profile");
+  await hidden.getByLabel(/Überschrift/i).fill(hiddenHeadline);
+  await hidden.getByLabel(/Fähigkeiten/i).fill(skill);
+  await hidden.getByLabel(/Ort/i).fill("Berlin");
+  await hidden.getByRole("button", { name: /Speichern/i }).click();
+  await expect(hidden.getByText(/Profil gespeichert/i)).toBeVisible();
+  // Kein Klick auf den Schalter: dieses Profil bleibt verborgen.
+
+  const recruiterContext = await browser.newContext();
+  const recruiter = await recruiterContext.newPage();
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter");
+  await login(recruiter, recruiterEmail);
+  await recruiter.goto("/company/new");
+  await recruiter.getByLabel(/Name des Unternehmens/i).fill(companyName);
+  await recruiter.getByRole("button", { name: /Unternehmen anlegen/i }).click();
+  await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
+  await recruiter.goto("/");
+  await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
+  await expect(recruiter.getByRole("link", { name: /Kandidaten/i })).toBeVisible();
+
+  await recruiter.goto("/candidates");
+  await recruiter.getByLabel("Fähigkeiten").fill(skill);
+  await recruiter.getByRole("button", { name: "Suchen" }).click();
+
+  // Der Punkt: derselbe Filter, zwei passende Profile, ein Treffer.
+  await expect(recruiter.getByText(visibleHeadline)).toBeVisible();
+  await expect(recruiter.getByText(hiddenHeadline)).toHaveCount(0);
+
+  // Und eine Suche ohne Treffer redet über die Suche, nicht über die Plattform.
+  await recruiter.getByLabel("Fähigkeiten").fill(`Nichts${stamp}`);
+  await recruiter.getByRole("button", { name: "Suchen" }).click();
+  await expect(recruiter.getByText(/Auf diese Suche passt gerade niemand/)).toBeVisible();
+
+  await visibleContext.close();
+  await hiddenContext.close();
+  await recruiterContext.close();
+});

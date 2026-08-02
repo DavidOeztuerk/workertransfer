@@ -157,7 +157,15 @@ def _token(user_id: UUID, *, tenant_id: UUID | None) -> str:
     return TokenManager(secret=SECRET).create_access_token(user_id, tenant_id, ["user"], [])
 
 
-async def _save_profile(profile_app: Any, token: str, headline: str = "Senior Python") -> None:
+async def _save_profile(
+    profile_app: Any,
+    token: str,
+    headline: str = "Senior Python",
+    *,
+    location: str = "Berlin",
+    remote_ok: bool = True,
+    skills: list[str] | None = None,
+) -> None:
     transport = ASGITransport(app=profile_app)
     async with AsyncClient(transport=transport, base_url="http://profile") as client:
         response = await client.put(
@@ -165,9 +173,9 @@ async def _save_profile(profile_app: Any, token: str, headline: str = "Senior Py
             json={
                 "headline": headline,
                 "bio": "Hallo",
-                "location": "Berlin",
-                "remote_ok": True,
-                "skills": ["Python"],
+                "location": location,
+                "remote_ok": remote_ok,
+                "skills": skills if skills is not None else ["Python"],
             },
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -284,3 +292,111 @@ async def test_the_list_shows_only_released_profiles(apps: tuple[Any, Any]) -> N
     assert response.status_code == 200, response.text
     headlines = [item["headline"] for item in response.json()["items"]]
     assert headlines == ["Sichtbar"]
+
+
+async def _released(profile_app: Any, consent_app: Any, headline: str, **profile: Any) -> UUID:
+    """Eine Person mit Profil UND Freigabe — alles andere ist unsichtbar."""
+    subject = uuid4()
+    token = _token(subject, tenant_id=None)
+    await _save_profile(profile_app, token, headline, **profile)
+    await _set_consent(consent_app, token, subject, grant=True)
+    return subject
+
+
+async def _search(profile_app: Any, token: str, query: str) -> list[str]:
+    transport = ASGITransport(app=profile_app)
+    async with AsyncClient(transport=transport, base_url="http://profile") as client:
+        response = await client.get(
+            f"/profiles?{query}", headers={"Authorization": f"Bearer {token}"}
+        )
+    assert response.status_code == 200, response.text
+    return sorted(item["headline"] for item in response.json()["items"])
+
+
+async def test_skills_are_matched_regardless_of_case(apps: tuple[Any, Any]) -> None:
+    """`Skills` entdoppelt beim Speichern case-insensitiv — eine Suche, die
+    Groß- und Kleinschreibung unterscheidet, widerspräche der eigenen
+    Datenhaltung."""
+    profile_app, consent_app = apps
+    await _released(profile_app, consent_app, "Pythonista", skills=["Python", "SQL"])
+    company_token = _token(uuid4(), tenant_id=uuid4())
+
+    assert await _search(profile_app, company_token, "skill=python") == ["Pythonista"]
+    assert await _search(profile_app, company_token, "skill=PYTHON") == ["Pythonista"]
+
+
+async def test_several_skills_are_joined_with_and(apps: tuple[Any, Any]) -> None:
+    """ODER lieferte bei zwei Begriffen mehr Ergebnisse als bei einem."""
+    profile_app, consent_app = apps
+    await _released(profile_app, consent_app, "Beides", skills=["Python", "Kubernetes"])
+    await _released(profile_app, consent_app, "Nur Python", skills=["Python"])
+    company_token = _token(uuid4(), tenant_id=uuid4())
+
+    assert await _search(profile_app, company_token, "skill=python") == ["Beides", "Nur Python"]
+    assert await _search(profile_app, company_token, "skill=python&skill=kubernetes") == ["Beides"]
+
+
+async def test_the_location_matches_a_part_of_the_text(apps: tuple[Any, Any]) -> None:
+    profile_app, consent_app = apps
+    await _released(profile_app, consent_app, "Hauptstadt", location="Berlin-Mitte")
+    await _released(profile_app, consent_app, "Süden", location="München")
+    company_token = _token(uuid4(), tenant_id=uuid4())
+
+    assert await _search(profile_app, company_token, "location=berlin") == ["Hauptstadt"]
+
+
+async def test_remote_filters_only_in_one_direction(apps: tuple[Any, Any]) -> None:
+    """`remote_ok = false` heißt „nicht ja gesagt", nicht „lehne ab".
+
+    Deshalb gibt es keinen Filter, der genau diese Leute heraussucht — er
+    schlösse Menschen aus, die schlicht nichts angekreuzt haben.
+    """
+    profile_app, consent_app = apps
+    await _released(profile_app, consent_app, "Remote", remote_ok=True)
+    await _released(profile_app, consent_app, "Vor Ort", remote_ok=False)
+    company_token = _token(uuid4(), tenant_id=uuid4())
+
+    assert await _search(profile_app, company_token, "remote=true") == ["Remote"]
+    # `remote=false` ist kein Ausschluss, sondern schlicht kein Filter.
+    assert await _search(profile_app, company_token, "remote=false") == ["Remote", "Vor Ort"]
+
+
+async def test_a_filter_never_reaches_past_the_ledger(apps: tuple[Any, Any]) -> None:
+    """Der eigentliche Punkt: gefiltert wird eine Menge, die es schon gibt.
+
+    Ein Profil ohne Freigabe taucht auch dann nicht auf, wenn der Filter exakt
+    auf es passt — sonst wäre die Suche ein Weg, an der Einwilligung vorbei.
+    """
+    profile_app, consent_app = apps
+    hidden = uuid4()
+    await _save_profile(
+        profile_app, _token(hidden, tenant_id=None), "Verborgen", skills=["Haskell"]
+    )
+    await _released(profile_app, consent_app, "Sichtbar", skills=["Haskell"])
+    company_token = _token(uuid4(), tenant_id=uuid4())
+
+    assert await _search(profile_app, company_token, "skill=haskell") == ["Sichtbar"]
+
+
+async def test_a_filter_that_matches_nobody_is_empty_not_an_error(
+    apps: tuple[Any, Any],
+) -> None:
+    profile_app, consent_app = apps
+    await _released(profile_app, consent_app, "Jemand", skills=["Python"])
+    company_token = _token(uuid4(), tenant_id=uuid4())
+
+    assert await _search(profile_app, company_token, "skill=cobol") == []
+
+
+async def test_more_than_ten_skills_do_not_make_an_arbitrarily_expensive_query(
+    apps: tuple[Any, Any],
+) -> None:
+    """Ohne Deckel baut ein Aufrufer mit einer URL eine beliebig teure Abfrage."""
+    profile_app, consent_app = apps
+    await _released(profile_app, consent_app, "Jemand", skills=["Python"])
+    company_token = _token(uuid4(), tenant_id=uuid4())
+    many = "&".join(f"skill=nichts{i}" for i in range(30))
+
+    # Die ersten zehn greifen und passen auf niemanden; der Rest wird
+    # verworfen, statt die Abfrage wachsen zu lassen.
+    assert await _search(profile_app, company_token, many) == []
