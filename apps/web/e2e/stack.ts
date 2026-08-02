@@ -5,7 +5,8 @@
 // einer Maschine ohne Docker sagt nichts über den Code; ein grünes, das eine
 // Lücke verschweigt, wäre schlimmer. Deshalb überspringen statt bestehen.
 
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 export const WEB_URL = process.env.E2E_WEB_URL ?? "http://localhost:5173";
 export const IDENTITY_URL = process.env.E2E_IDENTITY_URL ?? "http://localhost:8001";
@@ -184,4 +185,86 @@ export async function lastMailFor(
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   return null;
+}
+
+
+/**
+ * Das Passwort aller Testkonten. Eines für alle: es prüft nichts, es muss nur
+ * die Regeln erfüllen.
+ */
+export const E2E_PASSWORD = "e2e-Passwort-mit-Laenge-1!";
+
+export async function registerAndConfirm(
+  page: Page,
+  email: string,
+  displayName: string
+): Promise<void> {
+  await page.goto("/register");
+  await page.getByLabel(/E-Mail/i).fill(email);
+  await page.getByLabel(/Passwort/i).first().fill(E2E_PASSWORD);
+  // Pflichtfeld. Fehlt es, blockt die native Formularvalidierung das Absenden
+  // lautlos — kein POST, keine Meldung, und der Test hängt an der Mail, die nie
+  // kommt. Genau so ist die erste Reise beim ersten Lauf gescheitert.
+  await page.getByLabel(/Anzeigename/i).fill(displayName);
+  await page.getByRole("button", { name: /Registrieren/i }).click();
+  // Die Antwort ist absichtlich dieselbe für bekannte und unbekannte Adressen —
+  // deshalb wird hier nicht auf eine Erfolgsmeldung gewartet, sondern auf die
+  // Mail, die es nur bei einer echten Neuanlage gibt.
+  const token = await verificationTokenFor(email);
+  await page.goto(`/verify?token=${token}`);
+  // GENAU die Erfolgsüberschrift, buchstabengetreu.
+  //
+  // Die Seite hat drei: „Wird bestätigt…" (lädt), „E-Mail bestätigt" (fertig)
+  // und „Bestätigung fehlgeschlagen". Ein weiches /bestätigt/i trifft AUCH die
+  // erste — die Hilfe war also zufrieden, während die Bestätigung noch lief
+  // oder gerade scheiterte, und der Test lief weiter. Beim Anmelden kam dann
+  // „email not confirmed", und zwar an einer Stelle, die mit der Ursache nichts
+  // zu tun hatte.
+  //
+  // Der Vorgänger dieses Kommentars warnte vor genau diesem Fehler in einer
+  // anderen Ausprägung (/anmelden/i traf den Link in der Kopfzeile). Die Lehre
+  // ist dieselbe und hier zweimal bezahlt: eine Erfolgsmeldung prüft man
+  // buchstabengetreu, nicht mit einem Teilstring.
+  await expect(page.getByRole("heading", { name: "E-Mail bestätigt", exact: true })).toBeVisible();
+}
+
+/**
+ * Anmelden — und bei einem Fehlschlag sagen, woran es lag.
+ *
+ * Vorher wartete diese Hilfe stumpf auf den Link „Mein Profil" und lief nach
+ * 30 Sekunden in eine Zeitüberschreitung, die nichts verriet: nicht, ob die
+ * Anmeldung abgelehnt wurde, nicht, ob die Seite überhaupt geladen hat. Genau
+ * dieser Fehlschlag ist mehrfach im Suite-Lauf aufgetreten und war jedes Mal
+ * gleich aussagelos.
+ *
+ * Jetzt wird auf BEIDE Ausgänge gewartet — Erfolg oder Fehlermeldung — und wenn
+ * keiner eintritt, steht in der Ausnahme, was stattdessen auf der Seite stand.
+ * Das behebt den Wackelkandidaten nicht; es sorgt dafür, dass der nächste
+ * Fehlschlag ihn erklärt.
+ */
+export async function login(page: Page, email: string): Promise<void> {
+  await page.goto("/login");
+  await page.getByLabel(/E-Mail/i).fill(email);
+  await page.getByLabel(/Passwort/i).fill(E2E_PASSWORD);
+  await page.getByRole("button", { name: /Anmelden/i }).click();
+
+  const signedIn = page.getByRole("link", { name: /Mein Profil/i });
+  const failure = page.getByRole("alert");
+  try {
+    await expect(signedIn.or(failure).first()).toBeVisible();
+  } catch {
+    const seen = await page
+      .locator("main")
+      .first()
+      .innerText()
+      .catch(() => "(keine Seite lesbar)");
+    throw new Error(
+      `Anmeldung als ${email}: weder Profil-Link noch Fehlermeldung erschienen.\n` +
+        `URL: ${page.url()}\nSeite:\n${seen.slice(0, 500)}`
+    );
+  }
+  if (await failure.isVisible()) {
+    throw new Error(`Anmeldung als ${email} abgelehnt: ${await failure.innerText()}`);
+  }
+  await expect(signedIn).toBeVisible();
 }
