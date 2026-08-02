@@ -13,6 +13,7 @@ from transfer_service.configuration import TransferServiceSettings
 from transfer_service.infrastructure.clock import SystemClock
 from transfer_service.infrastructure.consent import HttpConsentGate
 from transfer_service.infrastructure.database.repositories import (
+    SqlAlchemyMarketRequestRepository,
     SqlAlchemyMarketStatusRepository,
     SqlAlchemyTransferRepository,
 )
@@ -30,6 +31,7 @@ async def request_scope(
             uow,
             {
                 "market": SqlAlchemyMarketStatusRepository(uow.session),
+                "requests": SqlAlchemyMarketRequestRepository(uow.session),
                 "transfers": SqlAlchemyTransferRepository(uow.session),
             },
         )

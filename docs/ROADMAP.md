@@ -15,7 +15,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 2.5 | Stabilisierung & Plattform-Naht | ✅ | Cookie-Auth, Dep-Hygiene, Kanon Runde 2, Dev-Stack, Frontend-Gate, Generator |
 | 3 | Candidate Core | ✅ | 3.1–3.5 komplett (Consent, Profile, Resume, Portfolio, Ablage) |
 | 4 | Jobs & Applications | ✅ | 4.1–4.4 komplett (Jobs, Bewerbungen, Unternehmen, Karriere-Seiten) |
-| 5 | Transfermarkt | ⬜ | Market-State-Machine, Konsensflows, Vertragsdraft |
+| 5 | Transfermarkt | 🟧 | 5.1–5.3 ✅ (Marktstatus, Vorgang, Tür + Oberfläche); Verträge, Unterschrift, KI-Beratung offen |
 | 6 | Developer Intelligence | ⬜ | GitHub-Consent, Skill-Graph, Scout-Match |
 | 7 | AI Agent Plattform | ⬜ | 23 Agenten (draft-only), plan-act-reflect, MCP |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
@@ -213,7 +213,7 @@ was der Code tat.
 - Kein `Authorization`-Header **und** kein Cookie ⇒ 401; per-IP-Rate-Limiting am
   Auth-Rand weiterhin offen (Phase 10, TODO-Marker in `build_auth_router`).
 
-### Phase 3 — Status: 🟧 in Arbeit
+### Phase 3 — Status: ✅ erledigt (3.1–3.5)
 
 - ✅ **3.1 Consent-Ledger** (`apps/consent-service`) — 31.07.2026.
   [Design](superpowers/specs/2026-07-26-phase-3-substep-3.1-consent-ledger-design.md) ·
@@ -398,13 +398,6 @@ was der Code tat.
   `tenant_id=None` zurück und konnte über den Tenant im Refresh deshalb gar
   nichts aussagen.
 
-Nächste Aktion: **Sub-step 3.4 — Portfolio-Service.** Profil und Lebenslauf
-decken ab, wer jemand ist und wo er war; das Portfolio zeigt, was dabei
-entstanden ist. Der Weg ist derselbe wie bei 3.2 und 3.3: `worker new-service`,
-Consent vor jedem fremden Zugriff, Integrationstest gegen echte Dienste. Ob die
-Freigabe wie beim Profil öffentlich oder wie beim Lebenslauf je Unternehmen
-läuft, ist die erste Entwurfsfrage — beide Formen stehen als Muster bereit.
-
 Teilweise geschlossen: Eine offene Anfrage zeigt die Kopfzeile jetzt als Zähler
 am Lebenslauf-Link, damit der Anfragefluss nicht ins Leere läuft. **Eine Mail
 gibt es weiterhin nicht** — der Weg existiert (identity-service, Mailpit), aber
@@ -420,3 +413,97 @@ nicht sehen konnte: eine fehlende `base.py`, `postgresql_where` an einem
 `database/__init__.py`, `__init__`-Dateien mit Importen auf entfernte Module,
 28 ruff- und 28 mypy-Fehler. Die Tests prüfen jetzt Importierbarkeit und die
 Qualitätsgates, nicht mehr nur Syntax.
+
+### Phase 3 — Nachtrag 3.4 und 3.5
+
+- ✅ **3.4 Portfolio-Service** — 02.08.2026.
+  [Design](superpowers/specs/2026-08-02-portfolio-service-design.md).
+  Arbeiten mit Links und Anhängen. Die Freigabe läuft wie beim Profil
+  (`portfolio.visibility:public`), nicht wie beim Lebenslauf: ein Portfolio ist
+  ein Aushang, kein Dossier.
+- ✅ **3.5 Ablage** — 02.08.2026. **ADR-0021**: `worker-files` gelöscht,
+  `worker-storage` auf einen `Storage`-Port plus `LocalStorage` eingedampft.
+  Der Inhaltstyp kommt aus den Magic Bytes, nicht aus dem, was der Browser
+  behauptet; PNG/JPEG/PDF und sonst nichts. Eine Ablehnung verrät nicht, was
+  erkannt wurde.
+
+### Phase 4 — Status: ✅ erledigt (4.1–4.4)
+
+- ✅ **4.1 Jobs-Service** — Stellen sind **öffentlich lesbar**; der
+  Consent-Ledger kommt nicht vor, weil niemand betroffen ist, der einwilligen
+  könnte. [Design](superpowers/specs/2026-08-02-jobs-service-design.md).
+- ✅ **4.2 Applications-Service** — der Punkt, an dem beide Achsen
+  aufeinandertreffen. **Verweisen statt kopieren:** eine Bewerbung erteilt
+  empfängerbezogene Einwilligungen und widerruft sie beim Zurückziehen. Eine
+  Kopie ließe sich nicht widerrufen, und wer einmal kopiert hat, hat für immer.
+  [Design](superpowers/specs/2026-08-02-applications-service-design.md).
+- ✅ **4.3 Companies-Service** — Arbeitgeberprofile. Getrennt von `tenants` im
+  identity-service: das eine weiß, wer ein Unternehmen ist, das andere, wie es
+  sich zeigt. [Design](superpowers/specs/2026-08-02-companies-service-design.md).
+- ✅ **4.4 Karriere-Seiten** — Pfad statt Subdomain (`/karriere/<kürzel>`), weil
+  eine Subdomain eine Betriebsentscheidung ist und kein Anwendungscode. Das
+  Kürzel ist abgeleitet und unveränderlich: **die Adresse ist ein Versprechen.**
+  Ausdrücklich **keine** personalisierte Seite je Bewerber — sie verriete jedem
+  mit dem Link, dass diese Person auf der Plattform ist und dieses Unternehmen
+  um sie wirbt. [Design](superpowers/specs/2026-08-02-career-pages-design.md).
+
+### Phase 5 — Status: 🟧 in Arbeit (5.1–5.3 ✅)
+
+- ✅ **5.1 Marktstatus** — 02.08.2026.
+  [Design](superpowers/specs/2026-08-02-transfer-service-design.md).
+  Die Zustandsliste des ULTRAPLAN mischte **drei Gegenstände** in einer Reihe:
+  die Person, ihr Arbeitsverhältnis, den Arbeitgeber und einen einzelnen
+  Vorgang. Als ein Feld modelliert wäre das auf eine Weise falsch, die man
+  später nicht mehr auseinanderbekommt. Aufgeteilt: Marktstatus (drei Zustände,
+  alle Übergänge erlaubt, Voreinstellung `UNAVAILABLE`), Transfer als eigener
+  Vorgang, „Under Contract" als Angabe statt Zustand.
+  Sichtbarkeit **nur empfängerbezogen**, es gibt bewusst kein
+  `market.visibility:public`: ein Lebenslauf verrät, wo jemand war — der
+  Marktstatus verrät, dass er weg will.
+- ✅ **5.2 Transfer-Vorgang** — 02.08.2026 (PR #17).
+  [Design](superpowers/specs/2026-08-02-transfer-deals-design.md).
+  **Der Fund, der den Plan verändert hat:** der ULTRAPLAN verlangt „beschäftigt →
+  Firma muss mitwirken". Das lässt sich so nicht bauen — **die Plattform weiß
+  nicht, wo jemand arbeitet**, und soll es nicht wissen: ein Datensatz, der
+  „arbeitet bei X" mit „hört zu" verbindet, wäre genau die Auskunft, die jemanden
+  den Arbeitsplatz kostet, in einer einzigen Tabelle.
+  Stattdessen bestätigt die **Person selbst** die Freigabe. Schwächer (niemand
+  prüft es) und sicherer.
+  **Ablehnen geht immer**, aus jedem laufenden Zustand, von beiden Seiten — ein
+  Verfahren, aus dem man nicht aussteigen kann, ist kein Verfahren, sondern eine
+  Falle. Genau ein laufender Vorgang je (Person, Unternehmen), als Teilindex.
+  Die Ablöse wird festgehalten, nicht bewegt.
+- ✅ **5.3 Die Tür und die Oberfläche** — 02.08.2026.
+  [Design](superpowers/specs/2026-08-02-market-access-and-ui-design.md).
+  **Der Fund:** der Transfermarkt war **unerreichbar**. Ein Vorgang setzt
+  `market.visibility:tenant:<id>` voraus — aber kein Endpunkt und keine Seite
+  erteilte diese Freigabe je. 5.1 hat es offen gelassen, 5.2 hat es
+  vorausgesetzt. Technisch fertig, praktisch tot.
+  Jetzt fragt das Unternehmen (`POST /market/{id}/requests`), die Person
+  antwortet. **Nicht** an der Lebenslauf-Freigabe mitgehängt, und **nicht** die
+  Kontaktaufnahme selbst: sonst bekäme eine Person, die gerade nicht
+  angesprochen werden will, genau die Ansprache, gegen die `unavailable`
+  existiert. Zwei Stufen, jede einzeln mit Nein beantwortbar.
+  Oberfläche: `/markt`, `/transfers`, `/company/transfers`, `/candidates`
+  erweitert; zwei Playwright-Reisen über den vollständigen Weg.
+  **Zwei Fehler, die nur der Browser fand:** ein `useQuery` hinter einem frühen
+  Rückgabesprung (`Rendered more hooks than during the previous render`), und
+  eine Oberfläche, die den Abschluss beim Unternehmen vermutete, während die
+  Bestätigung der Person ihn selbst auslöst. Beide haben jetzt einen Test, der
+  ohne den Fix rot wird.
+
+Offen in Phase 5: Vertragsentwürfe (`worker-templates`), digitale Unterschrift
+und `worker-player-advisor` (KI-Entwürfe, niemals autonome Verhandlung). Alle
+drei sind eigene Schnitte; der erste bringt eine rechtliche Abwägung mit.
+
+### Weiterhin offen, quer durch alle Phasen
+
+- **Benachrichtigungen.** Eine Marktstatus-Anfrage, eine Lebenslauf-Anfrage oder
+  ein Transfer erreicht nur, wer sich anmeldet. Der Weg existiert
+  (identity-service, Mailpit), aber Benachrichtigungen sind ein Querschnittsthema
+  mit eigenen Einstellungen und eigenem Consent und gehören nicht nebenbei in
+  einen Fachschnitt.
+- **Kein S3-Backend**, solange keine Umgebung eines braucht (ADR-0021).
+- **Keine personalisierten Karriere-Seiten** (siehe 4.4).
+- **`worker-github` unimportierbar** (`from github import Github`, deklariert ist
+  `githubkit`) — wird erst in Phase 6 gebraucht.
