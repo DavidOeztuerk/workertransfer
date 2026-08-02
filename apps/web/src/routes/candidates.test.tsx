@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MeResponse } from "../auth/client";
+import type { MarketRequest, MarketStatus } from "../market/client";
 import type { Profile } from "../profile/client";
 import { renderWithProviders } from "../test/render";
 import { CandidatesRoute } from "./candidates";
@@ -15,11 +16,59 @@ vi.mock("../resume/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../resume/client")>();
   return { ...actual, requestResume: vi.fn() };
 });
+vi.mock("../market/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../market/client")>();
+  return {
+    ...actual,
+    listCompanyMarketRequests: vi.fn(),
+    requestMarketStatus: vi.fn(),
+    getMarketStatus: vi.fn(),
+  };
+});
+vi.mock("../transfers/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../transfers/client")>();
+  return { ...actual, expressInterest: vi.fn() };
+});
 
 const client = await import("../profile/client");
 const listCandidates = vi.mocked(client.listCandidates);
 const resumeClient = await import("../resume/client");
 const requestResume = vi.mocked(resumeClient.requestResume);
+const marketClient = await import("../market/client");
+const listCompanyMarketRequests = vi.mocked(marketClient.listCompanyMarketRequests);
+const requestMarketStatus = vi.mocked(marketClient.requestMarketStatus);
+const getMarketStatus = vi.mocked(marketClient.getMarketStatus);
+const transfersClient = await import("../transfers/client");
+const expressInterest = vi.mocked(transfersClient.expressInterest);
+
+function marketRequest(
+  subjectId: string,
+  status: "PENDING" | "GRANTED" | "DECLINED"
+): MarketRequest {
+  return {
+    id: `req-${subjectId}`,
+    subject_id: subjectId,
+    tenant_id: TENANT,
+    status,
+    created_at: "2026-08-02T10:00:00Z",
+    answered_at: null,
+    active: null,
+  };
+}
+
+function marketStatus(
+  overrides: Partial<MarketStatus> = {}
+): MarketStatus {
+  return {
+    subject_id: "a",
+    availability: "listening",
+    employed: true,
+    note: "",
+    is_approachable: true,
+    updated_at: "2026-08-02T10:00:00Z",
+    ...overrides,
+  };
+}
 
 const TENANT = "22222222-2222-2222-2222-222222222222";
 
@@ -51,6 +100,26 @@ beforeEach(() => {
       tenant_id: TENANT,
       status: "PENDING",
       created_at: "2026-08-02T10:00:00Z",
+    },
+  });
+  listCompanyMarketRequests.mockResolvedValue({ ok: true, requests: [] });
+  requestMarketStatus.mockResolvedValue({ ok: true, request: marketRequest("a", "PENDING") });
+  getMarketStatus.mockResolvedValue({ ok: true, status: marketStatus() });
+  expressInterest.mockResolvedValue({
+    ok: true,
+    transfer: {
+      id: "t",
+      subject_id: "a",
+      tenant_id: TENANT,
+      status: "interested",
+      requires_release: true,
+      release_confirmed: false,
+      message: "",
+      offer_note: "",
+      offer_start_on: null,
+      offer_fee_cents: null,
+      created_at: "2026-08-02T10:00:00Z",
+      updated_at: "2026-08-02T10:00:00Z",
     },
   });
 });
@@ -202,5 +271,99 @@ describe("CandidatesRoute — Lebenslauf anfragen", () => {
 
     await screen.findByText(/Unternehmen/i);
     expect(screen.queryByRole("button", { name: /Lebenslauf anfragen/i })).toBeNull();
+  });
+});
+
+describe("the market status on a candidate card", () => {
+  beforeEach(() => {
+    listCandidates.mockResolvedValue({
+      ok: true,
+      items: [candidate("a", "Senior Python")],
+      nextCursor: null,
+    });
+  });
+
+  it("survives a session that arrives late", async () => {
+    // Genau der Fall aus der Praxis: der erste Render hat noch kein
+    // Unternehmen (die Sitzung lädt), der zweite hat eines. Stand ein Hook
+    // hinter dem frühen Rückgabesprung, warf React beim zweiten Render
+    // "Rendered more hooks than during the previous render" — und die ganze
+    // Seite war weg. Die anderen Tests sehen das nie: sie rendern nur einmal.
+    const view = renderWithProviders(<CandidatesRoute principal={principal(null)} />);
+    expect(await screen.findByText(/Profile sehen nur Unternehmen/)).toBeInTheDocument();
+
+    view.rerender(<CandidatesRoute principal={principal(TENANT)} />);
+
+    expect(await screen.findByText("Senior Python")).toBeInTheDocument();
+  });
+
+  it("asks separately from the resume — one grant must not carry the other", async () => {
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Marktstatus anfragen" }));
+
+    await waitFor(() => expect(requestMarketStatus).toHaveBeenCalledWith("a"));
+    expect(requestResume).not.toHaveBeenCalled();
+  });
+
+  it("does not consult the ledger for a person who was never asked", async () => {
+    // Sonst sähe der Ledger bei jedem Seitenaufruf eine Prüfung zu jeder Person.
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+
+    expect(await screen.findByRole("button", { name: "Marktstatus anfragen" })).toBeInTheDocument();
+    expect(getMarketStatus).not.toHaveBeenCalled();
+  });
+
+  it("shows a pending ask instead of offering it again", async () => {
+    listCompanyMarketRequests.mockResolvedValue({
+      ok: true,
+      requests: [marketRequest("a", "PENDING")],
+    });
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+
+    expect(await screen.findByText(/Marktstatus angefragt/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Marktstatus anfragen" })).toBeNull();
+  });
+
+  it("offers the conversation once the status is visible and approachable", async () => {
+    listCompanyMarketRequests.mockResolvedValue({
+      ok: true,
+      requests: [marketRequest("a", "GRANTED")],
+    });
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Interesse zeigen" }));
+
+    await waitFor(() => expect(expressInterest).toHaveBeenCalled());
+  });
+
+  it("withholds the conversation from someone who is not approachable", async () => {
+    // Die Freigabe erlaubt zu sehen, nicht zu stören.
+    listCompanyMarketRequests.mockResolvedValue({
+      ok: true,
+      requests: [marketRequest("a", "GRANTED")],
+    });
+    getMarketStatus.mockResolvedValue({
+      ok: true,
+      status: marketStatus({ availability: "unavailable", is_approachable: false }),
+    });
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+
+    expect(await screen.findByText(/Gerade nicht ansprechbar/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Interesse zeigen" })).toBeNull();
+  });
+
+  it("does not invent a reason when the status is gone", async () => {
+    listCompanyMarketRequests.mockResolvedValue({
+      ok: true,
+      requests: [marketRequest("a", "GRANTED")],
+    });
+    getMarketStatus.mockResolvedValue({ ok: true, status: null });
+    renderWithProviders(<CandidatesRoute principal={principal(TENANT)} />);
+
+    const note = await screen.findByText(/Marktstatus gerade nicht einsehbar/);
+    expect(note.textContent).not.toMatch(/zurückgezogen|gelöscht|existiert/i);
   });
 });
