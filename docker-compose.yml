@@ -272,6 +272,8 @@ services:
       WORKER_PORT: "8005"
       WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/portfolio
       WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      # Ein Volume, kein Pfad im Image: der wäre beim nächsten Deploy weg.
+      WORKER_STORAGE_ROOT: /var/lib/workertransfer/portfolio-attachments
     ports:
       - "8005:8005"
     command:
@@ -286,6 +288,10 @@ services:
       - /app/apps/portfolio-service/src
       - --reload-dir
       - /app/packages
+    volumes:
+      - ./:/app
+      - /app/.venv
+      - portfolio-attachments:/var/lib/workertransfer/portfolio-attachments
     healthcheck:
       test:
         - CMD
@@ -338,4 +344,5 @@ services:
       - /app/packages/ui/node_modules
 
 volumes:
+  portfolio-attachments:
   postgres-data:

@@ -20,6 +20,7 @@ def _to_json(entry: PortfolioItem) -> dict[str, Any]:
         "url": entry.url,
         "role": entry.role,
         "year": entry.year,
+        "attachment": entry.attachment,
     }
 
 
@@ -30,6 +31,7 @@ def _from_json(raw: dict[str, Any]) -> PortfolioItem:
         url=raw.get("url"),
         role=raw.get("role", ""),
         year=raw.get("year"),
+        attachment=raw.get("attachment"),
     )
 
 
