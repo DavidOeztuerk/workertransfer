@@ -13,7 +13,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-__all__ = ["MarketStatusV1", "SaveMarketStatusV1"]
+__all__ = [
+    "ExpressInterestV1",
+    "MakeOfferV1",
+    "MarketStatusV1",
+    "SaveMarketStatusV1",
+    "TransferV1",
+]
 
 AvailabilityV1 = Literal["open", "listening", "unavailable"]
 
@@ -32,4 +38,36 @@ class MarketStatusV1(BaseModel):
     employed: bool
     note: str
     is_approachable: bool
+    updated_at: datetime
+
+
+class ExpressInterestV1(BaseModel):
+    subject_id: UUID
+    message: str = Field(default="", max_length=2000)
+
+
+class MakeOfferV1(BaseModel):
+    note: str = Field(default="", max_length=2000)
+    start_on: str | None = Field(default=None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+    #: In Cent, und festgehalten statt bewegt: die Plattform führt kein Geld.
+    fee_cents: int | None = Field(default=None, ge=0)
+
+
+class TransferV1(BaseModel):
+    id: UUID
+    subject_id: UUID
+    tenant_id: UUID
+    status: Literal[
+        "interested", "talking", "offered", "accepted", "completed", "declined", "withdrawn"
+    ]
+    #: Ob eine Freigabe des aktuellen Arbeitgebers nötig ist — beim Anlegen aus
+    #: dem Marktstatus kopiert. Die Plattform kontaktiert diesen Arbeitgeber
+    #: NICHT; sie weiß nicht, wer er ist, und soll es nicht wissen.
+    requires_release: bool
+    release_confirmed: bool
+    message: str
+    offer_note: str
+    offer_start_on: str | None
+    offer_fee_cents: int | None
+    created_at: datetime
     updated_at: datetime
