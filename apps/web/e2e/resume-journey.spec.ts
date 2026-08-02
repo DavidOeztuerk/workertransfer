@@ -65,7 +65,7 @@ test("ein Lebenslauf erreicht nur das Unternehmen, dem er freigegeben wurde", as
   // und der Test läuft in einen Timeout an einer Stelle, die mit der Ursache
   // nichts zu tun hat. Der Kandidatenlink erscheint erst mit aktivem
   // Unternehmen und ist damit das ehrliche Signal.
-  await expect(recruiter.getByRole("link", { name: /Kandidaten/i })).toBeVisible();
+  await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/candidates");
   const card = recruiter.locator("li").filter({ hasText: headline });
