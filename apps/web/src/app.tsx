@@ -16,6 +16,7 @@ import { HomeRoute } from "./routes/home";
 import { LoginRoute } from "./routes/login";
 import { ProfileRoute } from "./routes/profile";
 import { ResumeRoute } from "./routes/resume";
+import { PendingRequestBadge } from "./resume/pending-badge";
 import { RegisterRoute } from "./routes/register";
 import { VerifyRoute } from "./routes/verify";
 
@@ -59,6 +60,9 @@ export function RootLayout() {
               </Link>
               <Link className="site-header__link" to="/resume">
                 Lebenslauf
+                {/* Ohne diesen Hinweis erfährt jemand von einer Anfrage nur,
+                    wenn er zufällig /resume aufruft. */}
+                <PendingRequestBadge />
               </Link>
               {user.tenant_id !== null ? (
                 <Link className="site-header__link" to="/candidates">
