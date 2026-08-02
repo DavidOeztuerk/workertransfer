@@ -517,6 +517,24 @@ ausgelöst hat. Ein Test mit absichtlich kaputtem Notifier zeigte, dass diese
 Zusage zunächst nur im Adapter lebte — jetzt steht sie im Router jedes rufenden
 Dienstes.
 
+### Querschnitt — „Meine Freigaben" ✅ (02.08.2026)
+
+[Design](superpowers/specs/2026-08-02-my-consents-design.md).
+Der Ledger konnte `grant`, `revoke`, `delete` und `check` — aber nicht *„zeig
+mir, was gerade gilt."* Damit fehlte einer Plattform, die sich über
+Einwilligung definiert, genau die Seite, auf der Einwilligung sichtbar wird:
+die Freigaben lagen über vier Seiten verstreut, und die aus einer Bewerbung
+(4.2) standen auf keiner davon.
+
+`GET /consent/me` und `/freigaben`. **Nur die eigenen** — es gibt keinen
+`subject_id`-Parameter, weder im Pfad noch in der Abfrage: eine fremde Liste
+enthielte, welche *anderen* Unternehmen Zugriff haben. Nur Wirksames, keine
+Historie, kein Widerrufsgrund.
+
+Der tragende Test: **die Liste und `/check` dürfen sich nie uneinig sein.**
+Zwei Wege an dieselbe Auskunft, die auseinanderlaufen können, sind schlimmer
+als kein zweiter Weg.
+
 ### Weiterhin offen, quer durch alle Phasen
 
 - **Kein S3-Backend**, solange keine Umgebung eines braucht (ADR-0021).

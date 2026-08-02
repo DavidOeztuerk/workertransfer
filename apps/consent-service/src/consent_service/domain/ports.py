@@ -33,6 +33,16 @@ class ConsentEventRepository(Protocol):
         """The single most recent fact for one (subject, capability) pair."""
         ...
 
+    async def latest_per_capability(self, subject_id: SubjectId) -> Sequence[ConsentEvent]:
+        """The newest fact for EVERY capability of one subject.
+
+        Dieselbe Reduktion wie `latest_effective`, nur über alle Fähigkeiten
+        statt über eine. Bewusst dieselbe Ordnung — zwei Wege an dieselbe
+        Auskunft, die sich uneinig werden können, sind schlimmer als kein
+        zweiter Weg.
+        """
+        ...
+
 
 class AuditRepository(Protocol):
     async def append(self, event: AuditEvent) -> None: ...
