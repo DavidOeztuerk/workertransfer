@@ -26,7 +26,10 @@
 #   2. Copy the consent-service block below and change four things: the service
 #      name, SERVICE_DIR (its apps/<dir>), WORKER_PORT + the published port, and
 #      the uvicorn module in `command`.
-#   3. Add it to `web.depends_on` if the frontend calls it.
+#   3. Add it to `web.depends_on` if the frontend calls it, und ergänze eine
+#      VITE_<NAME>_BASE_URL. ACHTUNG: `docker compose restart web` übernimmt
+#      neue Variablen NICHT — es startet den Container mit seiner alten
+#      Konfiguration. Nötig ist `docker compose up -d web`.
 # ---------------------------------------------------------------------------
 
 x-service: &service

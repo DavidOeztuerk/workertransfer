@@ -13,7 +13,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 1 | Foundation festigen (CI grün) | ✅ | ruff 0 ✅, mypy 0 ✅, CLI-Entrypoint ✅, Duplikate ✅, Smoke-Tests ✅, Premerge-Wrapper ✅ |
 | 2 | Identity & Tenancy | ✅ | OIDC/OAuth, JWT, Claims-Tenant, Audit, DB-Migration |
 | 2.5 | Stabilisierung & Plattform-Naht | ✅ | Cookie-Auth, Dep-Hygiene, Kanon Runde 2, Dev-Stack, Frontend-Gate, Generator |
-| 3 | Candidate Core | 🟧 | Consent-Ledger ✅ (3.1); Profile-Service ✅ (3.2); Resume/Portfolio offen |
+| 3 | Candidate Core | 🟧 | Consent-Ledger ✅ (3.1); Profile ✅ (3.2); Resume ✅ (3.3); Portfolio offen |
 | 4 | Jobs & Applications | ⬜ | Jobs, Applications, Companies, Career-Sites |
 | 5 | Transfermarkt | ⬜ | Market-State-Machine, Konsensflows, Vertragsdraft |
 | 6 | Developer Intelligence | ⬜ | GitHub-Consent, Skill-Graph, Scout-Match |
@@ -296,7 +296,30 @@ was der Code tat.
   jetzt in `worker-auth` statt in drei Kopien. Zwei Betriebsfallen im Compose:
   `scripts/initdb` läuft nur bei leerem Volume, und der Web-Container startet
   nicht mehr, sobald sich die Lockfile geändert hat (pnpm ohne TTY).
-- ⬜ 3.3 Resume-Service · ⬜ 3.4 Portfolio-Service
+- ✅ **3.3 Resume-Service** (`apps/resume-service`) — 02.08.2026.
+  [Design](superpowers/specs/2026-08-02-resume-service-design.md).
+  Der Lebenslauf wird **nicht veröffentlicht**: ein Unternehmen fragt, die Person
+  antwortet, und die Freigabe gilt genau diesem einen Unternehmen — als
+  Capability `resume.visibility:tenant:<uuid>` im Ledger. Am Consent-Service war
+  dafür nichts zu ändern; sein Capability-Muster erlaubt das dritte Segment
+  bereits.
+  Die tragende Trennung: **der Vorgang ist keine Berechtigung.** `GRANTED` heißt
+  „wurde einmal erteilt", nicht „gilt gerade" — `ResumeRequest` hat deshalb weder
+  `is_active` noch `revoked_at`. Nach einem Widerruf bleibt der Vorgang `GRANTED`
+  und der Lesezugriff läuft trotzdem ins Leere.
+  Domäne monatsgenau statt taggenau, `ended_on = None` heißt „läuft noch", genau
+  eine offene Station, Reihenfolge aus den Daten statt aus einer `sort_order`.
+  „Einmal fragen" steht als Unique-Index in der Datenbank, nicht nur im Handler.
+  Frontend: `/resume` (bearbeiten + eingegangene Anfragen) und „Lebenslauf
+  anfragen" je Kandidatenkarte, testgetrieben; dazu eine zweite Playwright-Reise.
+  **Unterwegs gefunden:** der Ersatzwert in `env.ts` zeigte auf `127.0.0.1`,
+  während die Seite auf `localhost` läuft — Cookies behandeln das als
+  verschiedene Hosts. Eine fehlende `VITE_*`-Variable erzeugte damit keinen
+  Verbindungsfehler, sondern Anfragen ohne Sitzungscookie, die wortlos mit 401
+  antworten. Der Ersatz nimmt jetzt den Host der Seite. Zweitens: `docker compose
+  restart` übernimmt neue Umgebungsvariablen nicht — dafür braucht es
+  `docker compose up -d`.
+- ⬜ 3.4 Portfolio-Service
 - ⬜ 3.5 `worker-files`/`worker-storage` real machen (Workspace-Re-Include)
 - ⬜ **Scheibe C — Einladungen & Rollen.** Ein Unternehmen kann entstehen, aber
   niemand außer dem Gründer hineinkommen; `admin` gegen `member` wird nirgends
@@ -304,11 +327,18 @@ was der Code tat.
   Mitgliedschaftsprüfung in `handle_refresh` mitbringen** — heute latent, weil
   niemand entfernt werden kann (siehe ADR-0019, Konsequenzen).
 
-Nächste Aktion: **Sub-step 3.3 — Resume-Service.** Das Profil ist bewusst schmal
-gehalten (Überschrift, Freitext, Ort, Remote, Fähigkeiten); strukturierte
-Berufserfahrung gehört in den Lebenslauf und würde hier nur doppelt gepflegt.
-Der Weg ist derselbe wie bei 3.2: `worker new-service`, Consent vor jedem
-fremden Zugriff, Integrationstest gegen echte Dienste.
+Nächste Aktion: **Sub-step 3.4 — Portfolio-Service.** Profil und Lebenslauf
+decken ab, wer jemand ist und wo er war; das Portfolio zeigt, was dabei
+entstanden ist. Der Weg ist derselbe wie bei 3.2 und 3.3: `worker new-service`,
+Consent vor jedem fremden Zugriff, Integrationstest gegen echte Dienste. Ob die
+Freigabe wie beim Profil öffentlich oder wie beim Lebenslauf je Unternehmen
+läuft, ist die erste Entwurfsfrage — beide Formen stehen als Muster bereit.
+
+Offen und bewusst zurückgestellt: Benachrichtigungen. Eine Anfrage nach dem
+Lebenslauf erreicht die Person heute nur, wenn sie `/resume` aufruft. Der
+Mailweg existiert (identity-service, Mailpit), aber Benachrichtigungen sind ein
+Querschnittsthema mit eigenen Einstellungen und eigenem Consent — sie gehören
+nicht nebenbei in einen Fachschnitt.
 
 **Der Generator hat seinen ersten echten Test bestanden** — allerdings erst nach
 Reparatur. Der Testlauf davor fand sechs Defekte, die ein reiner `ast.parse`-Test
