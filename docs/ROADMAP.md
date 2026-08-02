@@ -350,8 +350,17 @@ was der Code tat.
   keine halbe Datei unter dem richtigen Namen hinterlässt.
   **Kein S3-Backend**, noch nicht: es zu bauen, bevor eine Umgebung es braucht,
   wäre genau der Fehler, der zu diesem ADR geführt hat. Der Port ist die Naht.
-  **Offen:** ein Dienst, der die Ablage benutzt — Datei-Anhänge im Portfolio
-  sind der vorgesehene erste Konsument.
+  **Erster Konsument ist da:** `portfolio-service` nimmt Anhänge entgegen
+  (`POST /portfolios/me/attachments`) und liefert sie aus
+  (`GET /portfolios/{id}/attachments/{name}`) — mit **derselben** Consent-Prüfung
+  wie das Portfolio selbst, damit der Anhang kein zweiter Weg an dieselben Daten
+  wird. Der Schlüssel entsteht aus Person UND Name, also greift ein fremder Name
+  strukturell nur ins eigene Verzeichnis. Der Name wird vom Server vergeben und
+  die Endung folgt dem erkannten Typ: den Namen des Clients zu übernehmen hieße,
+  fremden Text zu einem Teil eines Pfades zu machen. Ausgeliefert wird als
+  Download, nicht inline — ein PDF kann Skripte enthalten.
+  **Noch offen:** verwaiste Dateien aufräumen (ein Anhang, dessen Eintrag
+  gelöscht wurde, bleibt liegen) und die Oberfläche fürs Hochladen.
 - ✅ **Scheibe C — Einladungen & Rollen** (02.08.2026). Ein Administrator lädt
   eine **Adresse** ein (nicht ein Konto: die Person muss noch keines haben, und
   beim Einladen darf nicht verraten werden, ob sie eines hat). Angenommen wird

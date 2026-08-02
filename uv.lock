@@ -1862,6 +1862,7 @@ dependencies = [
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "python-multipart" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "uvicorn", extra = ["standard"] },
     { name = "worker-auth" },
@@ -1870,6 +1871,7 @@ dependencies = [
     { name = "worker-database" },
     { name = "worker-platform" },
     { name = "worker-shared" },
+    { name = "worker-storage" },
     { name = "worker-tenancy" },
 ]
 
@@ -1882,6 +1884,7 @@ requires-dist = [
     { name = "psycopg", extras = ["binary"], specifier = ">=3.1.0,<4.0.0" },
     { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
     { name = "pydantic-settings", specifier = ">=2.4.0,<3.0.0" },
+    { name = "python-multipart", specifier = ">=0.0.20,<1.0.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0,<3.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.40.0,<1.0.0" },
     { name = "worker-auth", editable = "packages/worker-auth" },
@@ -1890,6 +1893,7 @@ requires-dist = [
     { name = "worker-database", editable = "packages/worker-database" },
     { name = "worker-platform", editable = "packages/worker-platform" },
     { name = "worker-shared", editable = "packages/worker-shared" },
+    { name = "worker-storage", editable = "packages/worker-storage" },
     { name = "worker-tenancy", editable = "packages/worker-tenancy" },
 ]
 

@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 import pytest
 from portfolio_service.domain.portfolio import (
     MAX_ITEMS,
+    InvalidAttachment,
     InvalidText,
     InvalidUrl,
     InvalidYear,
@@ -26,6 +27,7 @@ def item(**overrides: object) -> PortfolioItem:
         "url": "https://example.org/werkzeug",
         "role": "Entwicklung",
         "year": 2024,
+        "attachment": None,
     }
     values.update(overrides)
     return PortfolioItem(**values)  # type: ignore[arg-type]
@@ -122,3 +124,24 @@ class TestPortfolio:
             portfolio.update(items=[item(title="Gut"), item(url="javascript:alert(1)")], now=NOW)
 
         assert [entry.title for entry in portfolio.items] == ["Bleibt"]
+
+
+class TestAttachment:
+    def test_it_is_optional(self) -> None:
+        assert item().attachment is None
+        assert item(attachment="").attachment is None
+
+    def test_a_plain_name_passes(self) -> None:
+        assert item(attachment="a1b2c3.png").attachment == "a1b2c3.png"
+
+    @pytest.mark.parametrize(
+        "hostile",
+        ["../andere/datei.png", "a/b.png", "/etc/passwd", ".versteckt", "x" * 81],
+    )
+    def test_a_path_is_not_a_name(self, hostile: str) -> None:
+        # Der Client bekommt den Namen vom Upload zurück. Ließe man einen Pfad
+        # zu, könnte jemand aus seinem eigenen Verzeichnis herauszeigen — die
+        # Ablage fängt das zwar auch ab, aber eine Prüfung an der Grenze ist
+        # billiger als eine Ausnahme in der Tiefe.
+        with pytest.raises(InvalidAttachment):
+            item(attachment=hostile)

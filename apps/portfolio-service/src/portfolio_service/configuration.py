@@ -24,6 +24,15 @@ class PortfolioServiceSettings(PlatformSettings):
     # nicht localhost — der Aufruf läuft container-zu-container.
     consent_base_url: str = "http://127.0.0.1:8002"
 
+    # Wohin Anhänge geschrieben werden. Im Container ein Volume — ein Pfad im
+    # Image wäre beim nächsten Deploy weg.
+    storage_root: str = "./var/portfolio-attachments"
+
+    # 5 MiB. Groß genug für ein Bild oder ein kurzes PDF, klein genug, dass ein
+    # Upload den Prozess nicht blockiert: gelesen wird in den Speicher, nicht
+    # gestreamt.
+    max_attachment_bytes: int = 5 * 1024 * 1024
+
     # HS256 secret issued by identity-service; this service only verifies
     # (ADR-0007). Runtime-only — never commit a real value.
     jwt_secret: SecretStr = SecretStr(DEV_JWT_SECRET)

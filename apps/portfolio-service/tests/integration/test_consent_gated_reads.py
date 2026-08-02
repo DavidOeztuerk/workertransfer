@@ -297,3 +297,133 @@ async def test_a_hostile_link_never_reaches_the_database(apps: tuple[Any, Any]) 
 
     assert rejected.status_code == 422, rejected.text
     assert (await _call(portfolio_app, "GET", "/portfolios/me", token)).json() is None
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+
+
+async def _upload(app: Any, token: str, data: bytes, filename: str = "bild.png") -> httpx.Response:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://svc") as client:
+        return await client.post(
+            "/portfolios/me/attachments",
+            headers={"Authorization": f"Bearer {token}"},
+            files={"file": (filename, data, "image/png")},
+        )
+
+
+async def test_an_attachment_follows_the_same_consent_as_the_portfolio(
+    apps: tuple[Any, Any],
+) -> None:
+    """Sonst wäre der Anhang ein zweiter Weg an dieselben Daten.
+
+    Mit einem eigenen Filter, der irgendwann vom ersten abweicht.
+    """
+    portfolio_app, consent_app = apps
+    person = uuid4()
+    person_token = _token(person, tenant_id=None)
+    company_token = _token(uuid4(), tenant_id=uuid4())
+
+    uploaded = await _upload(portfolio_app, person_token, PNG)
+    assert uploaded.status_code == 201, uploaded.text
+    name = uploaded.json()["name"]
+    assert uploaded.json()["content_type"] == "image/png"
+
+    # Die eigene Datei ohne jede Einwilligung.
+    mine = await _call(
+        portfolio_app, "GET", f"/portfolios/{person}/attachments/{name}", person_token
+    )
+    assert mine.status_code == 200
+    assert mine.content == PNG
+
+    # Fremd und nicht freigegeben: dieselbe Antwort wie für eine Datei, die es
+    # nicht gibt.
+    blocked = await _call(
+        portfolio_app, "GET", f"/portfolios/{person}/attachments/{name}", company_token
+    )
+    assert blocked.status_code == 404
+
+    await _release(consent_app, person_token, person, grant=True)
+
+    visible = await _call(
+        portfolio_app, "GET", f"/portfolios/{person}/attachments/{name}", company_token
+    )
+    assert visible.status_code == 200
+    assert visible.content == PNG
+
+    await _release(consent_app, person_token, person, grant=False)
+
+    gone = await _call(
+        portfolio_app, "GET", f"/portfolios/{person}/attachments/{name}", company_token
+    )
+    assert gone.status_code == 404
+
+
+async def test_the_server_names_the_file_not_the_client(apps: tuple[Any, Any]) -> None:
+    """Den Namen des Clients zu übernehmen hieße, fremden Text zu einem Teil
+    eines Pfades zu machen — und die Dateiendung mit ihm."""
+    portfolio_app, _consent = apps
+
+    uploaded = await _upload(
+        portfolio_app, _token(uuid4(), tenant_id=None), PNG, filename="../../boes.php"
+    )
+
+    assert uploaded.status_code == 201, uploaded.text
+    name = uploaded.json()["name"]
+    assert "/" not in name
+    assert name.endswith(".png")
+    assert "boes" not in name
+
+
+async def test_a_file_that_only_claims_to_be_an_image_is_refused(
+    apps: tuple[Any, Any],
+) -> None:
+    portfolio_app, _consent = apps
+
+    refused = await _upload(
+        portfolio_app,
+        _token(uuid4(), tenant_id=None),
+        b"<html><script>alert(1)</script></html>",
+    )
+
+    assert refused.status_code == 422, refused.text
+
+
+async def test_a_name_from_another_person_does_not_reach_their_file(
+    apps: tuple[Any, Any],
+) -> None:
+    """Der Schlüssel wird aus Person UND Name gebildet.
+
+    Deshalb greift ein fremder Name höchstens ins eigene Verzeichnis — die
+    Trennung ist strukturell und hängt nicht daran, dass jemand eine Prüfung
+    nicht vergisst.
+    """
+    portfolio_app, consent_app = apps
+    owner = uuid4()
+    owner_token = _token(owner, tenant_id=None)
+    uploaded = await _upload(portfolio_app, owner_token, PNG)
+    name = uploaded.json()["name"]
+
+    other = uuid4()
+    other_token = _token(other, tenant_id=None)
+
+    # Derselbe Name, aber unter der eigenen subject_id: es gibt dort nichts.
+    response = await _call(
+        portfolio_app, "GET", f"/portfolios/{other}/attachments/{name}", other_token
+    )
+
+    assert response.status_code == 404
+    assert consent_app is not None
+
+
+async def test_an_attachment_is_delivered_as_a_download(apps: tuple[Any, Any]) -> None:
+    """Ein PDF kann Skripte enthalten; inline liefe es in unserem Ursprung."""
+    portfolio_app, _consent = apps
+    person = uuid4()
+    token = _token(person, tenant_id=None)
+    uploaded = await _upload(portfolio_app, token, b"%PDF-1.7\n" + b"0" * 32, filename="doc.pdf")
+    name = uploaded.json()["name"]
+
+    response = await _call(portfolio_app, "GET", f"/portfolios/{person}/attachments/{name}", token)
+
+    assert response.headers["content-disposition"].startswith("attachment;")
+    assert response.headers["content-type"] == "application/pdf"
