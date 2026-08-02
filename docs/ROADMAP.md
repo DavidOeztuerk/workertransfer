@@ -496,13 +496,29 @@ Offen in Phase 5: Vertragsentwürfe (`worker-templates`), digitale Unterschrift
 und `worker-player-advisor` (KI-Entwürfe, niemals autonome Verhandlung). Alle
 drei sind eigene Schnitte; der erste bringt eine rechtliche Abwägung mit.
 
+### Querschnitt — Benachrichtigungen ✅ (02.08.2026)
+
+[Design](superpowers/specs/2026-08-02-notifications-design.md).
+Die Lücke stand wortgleich unter 3.3, 4.2, 5.2 und 5.3: „Eine Anfrage erreicht
+nur, wer sich anmeldet." Jetzt melden sich vier Vorgänge.
+
+**Der Fund:** die naheliegende Mail — *„Acme GmbH möchte deinen Marktstatus
+sehen"* — ist die gefährlichste Zeile, die dieses System schreiben könnte. Eine
+Mail landet womöglich im Postfach beim aktuellen Arbeitgeber. Also sagt eine
+Benachrichtigung **nicht, worum es geht**: kein Firmenname, kein Vorgangstyp,
+keine Anzahl. `NotifyV1` hat deshalb gar kein Textfeld.
+Und weil auch der **Zeitpunkt** etwas verrät: höchstens eine Mail je Person und
+Stunde, über alle Arten hinweg.
+
+Im identity-service statt in einem eigenen Dienst — der bräuchte die
+E-Mail-Adresse, und sie zu vervielfachen wäre der Preis für eine Textmail.
+Feuern und vergessen: ein Fehlschlag darf niemals den Vorgang kippen, der ihn
+ausgelöst hat. Ein Test mit absichtlich kaputtem Notifier zeigte, dass diese
+Zusage zunächst nur im Adapter lebte — jetzt steht sie im Router jedes rufenden
+Dienstes.
+
 ### Weiterhin offen, quer durch alle Phasen
 
-- **Benachrichtigungen.** Eine Marktstatus-Anfrage, eine Lebenslauf-Anfrage oder
-  ein Transfer erreicht nur, wer sich anmeldet. Der Weg existiert
-  (identity-service, Mailpit), aber Benachrichtigungen sind ein Querschnittsthema
-  mit eigenen Einstellungen und eigenem Consent und gehören nicht nebenbei in
-  einen Fachschnitt.
 - **Kein S3-Backend**, solange keine Umgebung eines braucht (ADR-0021).
 - **Keine personalisierten Karriere-Seiten** (siehe 4.4).
 - **`worker-github` unimportierbar** (`from github import Github`, deklariert ist
