@@ -17,10 +17,18 @@ skipWithoutStack();
 
 const PASSWORD = "e2e-Passwort-mit-Laenge-1!";
 
-async function registerAndConfirm(page: import("@playwright/test").Page, email: string) {
+async function registerAndConfirm(
+  page: import("@playwright/test").Page,
+  email: string,
+  displayName: string
+) {
   await page.goto("/register");
   await page.getByLabel(/E-Mail/i).fill(email);
   await page.getByLabel(/Passwort/i).first().fill(PASSWORD);
+  // Pflichtfeld. Fehlt es, blockt die native Formularvalidierung das Absenden
+  // lautlos — kein POST, keine Meldung, und der Test hängt an der Mail, die nie
+  // kommt. Genau so ist dieser Test beim ersten Lauf gescheitert.
+  await page.getByLabel(/Anzeigename/i).fill(displayName);
   await page.getByRole("button", { name: /Registrieren/i }).click();
   // Die Antwort ist absichtlich dieselbe für bekannte und unbekannte Adressen —
   // deshalb wird hier nicht auf eine Erfolgsmeldung gewartet, sondern auf die
@@ -49,7 +57,7 @@ test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort",
 
   const candidateContext = await browser.newContext();
   const candidate = await candidateContext.newPage();
-  await registerAndConfirm(candidate, candidateEmail);
+  await registerAndConfirm(candidate, candidateEmail, "E2E Kandidat");
   await login(candidate, candidateEmail);
 
   await candidate.goto("/profile");
@@ -67,7 +75,7 @@ test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort",
 
   const recruiterContext = await browser.newContext();
   const recruiter = await recruiterContext.newPage();
-  await registerAndConfirm(recruiter, recruiterEmail);
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter");
   await login(recruiter, recruiterEmail);
 
   await recruiter.goto("/company/new");
@@ -99,7 +107,7 @@ test("ohne aktives Unternehmen führt die Kandidatenliste ins Leere, nicht zu Da
   page,
 }) => {
   const email = uniqueEmail("privat-e2e.example");
-  await registerAndConfirm(page, email);
+  await registerAndConfirm(page, email, "E2E Privatperson");
   await login(page, email);
 
   await page.goto("/candidates");
