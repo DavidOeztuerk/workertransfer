@@ -12,6 +12,7 @@ from companies_service.domain.company_profile import (
     InvalidText,
     InvalidUrl,
     TooManyEntries,
+    slug_from,
 )
 
 NOW = datetime(2026, 8, 2, tzinfo=UTC)
@@ -24,6 +25,7 @@ def profile(**overrides: object) -> CompanyProfile:
         "website": "https://muster.example",
         "locations": ["Berlin", "Hamburg"],
         "benefits": ["Homeoffice"],
+        "slug": "muster",
         "now": NOW,
     }
     values.update(overrides)
@@ -93,3 +95,27 @@ class TestUpdating:
 
         assert existing.display_name == "Bleibt"
         assert existing.locations == ("Berlin",)
+
+
+class TestSlug:
+    def test_it_comes_from_the_display_name(self) -> None:
+        assert slug_from("Muster GmbH") == "muster-gmbh"
+
+    def test_punctuation_and_repeats_collapse(self) -> None:
+        assert slug_from("  Muster  &  Co.  KG ") == "muster-co-kg"
+
+    def test_umlauts_lose_their_dots_rather_than_the_letter(self) -> None:
+        # Eine Ersetzungstabelle („ü" → „ue") läge bei der nächsten Sprache
+        # falsch; die Grundbuchstaben zu behalten ist ehrlicher.
+        assert slug_from("Grün AG") == "grun-ag"
+
+    def test_a_name_without_ascii_still_yields_an_address(self) -> None:
+        # Eine leere Adresse wäre schlimmer als eine unpersönliche; der Zähler
+        # beim Speichern macht daraus `unternehmen-2`.
+        assert slug_from("株式会社") == "unternehmen"
+
+    def test_it_never_starts_or_ends_with_a_dash(self) -> None:
+        assert slug_from("---Muster---") == "muster"
+
+    def test_it_stays_short_enough_for_a_url(self) -> None:
+        assert len(slug_from("A" * 200)) <= 60

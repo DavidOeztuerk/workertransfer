@@ -224,6 +224,7 @@ describe("JobsRoute — wer sucht", () => {
     searchJobs.mockResolvedValue({ ok: true, items: [job({ tenant_id: "t1" })], nextCursor: null });
     getCompanyProfile.mockResolvedValue({
       tenant_id: "t1",
+      slug: "muster",
       display_name: "Muster",
       about: "",
       website: "https://muster.example",

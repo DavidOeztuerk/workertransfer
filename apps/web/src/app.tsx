@@ -20,6 +20,7 @@ import { ResumeRoute } from "./routes/resume";
 import { TeamRoute } from "./routes/team";
 import { PendingRequestBadge } from "./resume/pending-badge";
 import { ApplicationsRoute } from "./routes/applications";
+import { CareerRoute } from "./routes/career";
 import { CompanyJobsRoute } from "./routes/company-jobs";
 import { CompanyProfileRoute } from "./routes/company-profile";
 import { InvitationRoute } from "./routes/invitation";
@@ -251,6 +252,11 @@ const candidatesRoute = createRoute({
   path: "/candidates",
   component: CandidatesWithSession,
 });
+const careerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/karriere/$slug",
+  component: CareerRoute,
+});
 const jobsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/jobs",
@@ -297,6 +303,7 @@ const routeTree = rootRoute.addChildren([
   resumeRoute,
   candidatesRoute,
   jobsRoute,
+  careerRoute,
   applicationsRoute,
   companyJobsRoute,
   companyProfileRoute,

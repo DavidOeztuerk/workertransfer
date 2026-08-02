@@ -180,6 +180,7 @@ class SearchJobsQuery:
     location: str | None = None
     remote: str | None = None
     employment: str | None = None
+    company: UUID | None = None
     limit: int = DEFAULT_PAGE_SIZE
     cursor: str | None = None
 
@@ -193,6 +194,7 @@ async def handle_search_jobs(
         location=query.location,
         remote=query.remote,
         employment=query.employment,
+        company=query.company,
         limit=limit,
         cursor=query.cursor,
     )

@@ -25,6 +25,7 @@ function principal(tenantId: string | null): MeResponse {
 function profile(): CompanyProfile {
   return {
     tenant_id: TENANT,
+    slug: "muster",
     display_name: "Muster",
     about: "Wer wir sind.",
     website: "https://muster.example",

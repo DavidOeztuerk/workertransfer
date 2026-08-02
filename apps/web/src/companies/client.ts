@@ -8,6 +8,8 @@ import { COMPANIES_BASE_URL } from "../env";
 
 export interface CompanyProfile {
   tenant_id: string;
+  /** Die Adresse der Karriere-Seite — vom Server vergeben, unveränderlich. */
+  slug: string;
   display_name: string;
   about: string;
   website: string | null;
@@ -108,4 +110,21 @@ export async function saveCompanyProfile(input: CompanyProfileInput): Promise<Sa
     };
   }
   return { ok: true, profile: (await res.json()) as CompanyProfile };
+}
+
+
+/**
+ * Die Karriere-Seite eines Unternehmens, über ihr Kürzel.
+ *
+ * `null` heißt „diese Adresse gibt es nicht" — die Seite zeigt dann, dass sie
+ * nichts gefunden hat, statt eines leeren Rahmens.
+ */
+export async function getCompanyBySlug(slug: string): Promise<CompanyProfile | null> {
+  try {
+    const res = await send(`/companies/by-slug/${encodeURIComponent(slug)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as CompanyProfile;
+  } catch {
+    return null;
+  }
 }

@@ -88,11 +88,29 @@ test("eine veröffentlichte Stelle findet auch, wer kein Konto hat", async ({ br
   // Und wer sucht, steht daneben — auch für jemanden ohne Konto.
   await expect(anonymous.getByText(companyName, { exact: true })).toBeVisible();
 
+  // Und dieselbe Stelle steht auf der Karriere-Seite des Unternehmens — einer
+  // Adresse, die man weitergeben kann, ohne dass der Empfänger ein Konto
+  // braucht. Das Kürzel holt der Recruiter; er ist angemeldet.
+  const slug = await recruiter.evaluate(async () => {
+    const res = await fetch(
+      `${window.location.origin.replace(":5173", ":8008")}/companies/me/profile`,
+      { credentials: "include" }
+    );
+    return ((await res.json()) as { slug: string }).slug;
+  });
+
+  await anonymous.goto(`/karriere/${slug}`);
+  await expect(anonymous.getByRole("heading", { name: companyName })).toBeVisible();
+  await expect(anonymous.getByText(title)).toBeVisible();
+
   // Geschlossen heißt: für die Öffentlichkeit wieder weg.
   await row.getByRole("button", { name: /Schließen/i }).click();
   await expect(row.getByText("Geschlossen")).toBeVisible();
 
-  await anonymous.reload();
+  // Ausdrücklich zurück zur Suche: der anonyme Browser steht gerade auf der
+  // Karriere-Seite, und ein reload() lädt diese neu. Dort gibt es kein
+  // Suchfeld, und der Test wartete darauf bis zum Zeitlimit.
+  await anonymous.goto("/jobs");
   await anonymous.getByLabel(/Suchbegriff/i).fill(title);
   await anonymous.getByRole("button", { name: /Suchen/i }).click();
   await expect(anonymous.getByText(/nichts gefunden/i)).toBeVisible();

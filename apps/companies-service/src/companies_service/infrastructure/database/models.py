@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, Text
+from sqlalchemy import DateTime, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -21,6 +21,8 @@ class CompanyProfileModel(Base):
     __tablename__ = "company_profiles"
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    # Eindeutig: das Kürzel IST die Adresse der Karriere-Seite.
+    slug: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
     display_name: Mapped[str] = mapped_column(Text, nullable=False)
     about: Mapped[str] = mapped_column(Text, nullable=False, default="")
     website: Mapped[str | None] = mapped_column(Text, nullable=True)

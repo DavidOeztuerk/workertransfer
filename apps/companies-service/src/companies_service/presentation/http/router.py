@@ -12,6 +12,7 @@ from uuid import UUID
 
 from companies_service.application.handlers import (
     SaveCompanyProfileCommand,
+    handle_get_by_slug,
     handle_get_own_profile,
     handle_get_public_profile,
     handle_save_profile,
@@ -27,6 +28,7 @@ __all__ = ["build_router"]
 def _dto(profile: CompanyProfile) -> CompanyProfileV1:
     return CompanyProfileV1(
         tenant_id=profile.tenant_id,
+        slug=profile.slug,
         display_name=profile.display_name,
         about=profile.about,
         website=profile.website,
@@ -87,6 +89,19 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
         async with request_scope(session_factory) as (_uow, repos):
             profile = await handle_get_own_profile(tenant_id, repos=repos)
             return None if profile is None else _dto(profile)
+
+    @router.get("/companies/by-slug/{slug}")
+    async def by_slug(slug: str) -> CompanyProfileV1:
+        """Die Karriere-Seite — öffentlich, ohne Anmeldung.
+
+        Steht vor der `{tenant_id}`-Route, weil `by-slug` sonst als UUID
+        gelesen würde und mit 422 endete.
+        """
+        async with request_scope(session_factory) as (_uow, repos):
+            result = await handle_get_by_slug(slug, repos=repos)
+            if not result.is_success:
+                raise HTTPException(status.HTTP_404_NOT_FOUND, "No such company profile")
+            return _dto(result.value)
 
     @router.get("/companies/{tenant_id}/profile")
     async def public_profile(tenant_id: UUID) -> CompanyProfileV1:
