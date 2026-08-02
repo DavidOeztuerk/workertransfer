@@ -87,7 +87,7 @@ Person sieht Anfrage  ──POST /resumes/requests/{id}/grant──────�
                         └─ Anfrage: GRANTED
                                                                        │
                       ──POST /resumes/requests/{id}/decline────────────┘
-                        └─ kein Ledger-Eintrag; Anfrage: DECLINED
+                        └─ widerruft im Ledger; Anfrage: DECLINED
 ```
 
 **Der Anfragestatus ist Anzeige, nicht Autorisierung.** Beim Lesen entscheidet
@@ -120,6 +120,16 @@ schließen kann.
 
 **Ohne Begründung.** Ein Freitextfeld hier würde entweder leer bleiben oder zu
 Rechtfertigung führen. Ein „nein" ist eine vollständige Antwort.
+
+**Und sie widerruft im Ledger**, obwohl es scheinbar nichts zu widerrufen gibt.
+Das ist keine Symbolik, sondern schließt die einzige Lücke, durch die dieses
+System nach außen offen scheitern könnte: gelingt beim Erteilen der
+Ledger-Aufruf und scheitert danach der Commit, existiert die Berechtigung,
+während der Vorgang `PENDING` bleibt. Weil die Ablehnung widerruft, führt dann
+**jede** Antwort der Person das System in einen sicheren Zustand zurück — auch
+das „nein". Der Ledger verträgt einen Widerruf ohne vorherige Erteilung. Die
+vollständige Lösung wäre ein Outbox-Mechanismus; bis dahin ist dies die
+Absicherung, die ohne einen kostet.
 
 **Und ohne Nachfassen.** Nach einer Ablehnung kann dasselbe Unternehmen keine
 neue Anfrage stellen (`409`). Ohne diese Regel wäre die Ablehnung wirkungslos:

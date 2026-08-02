@@ -150,12 +150,26 @@ async def handle_answer_request(
     except DomainError as exc:
         return Result.fail(exc)
 
+    # Erst der Ledger, dann der Vorgang: schlägt der Ledger fehl, fliegt
+    # ConsentUnavailable durch und die Transaktion wird nie committet. Der
+    # umgekehrte Weg könnte einen Vorgang auf GRANTED setzen, dem keine
+    # Berechtigung entspricht.
+    #
+    # Eine Lücke bleibt: gelingt der Ledger-Aufruf und scheitert danach der
+    # Commit, existiert die Berechtigung, während der Vorgang PENDING bleibt —
+    # der einzige Weg, auf dem dieses System nach außen OFFEN scheitern könnte.
+    # Deshalb widerruft auch die Ablehnung. Ein „nein" heißt dann nicht „es
+    # wurde nichts erteilt", sondern „dieses Unternehmen hat nichts", und jede
+    # Antwort führt das System in einen sicheren Zustand zurück. Der Ledger
+    # verträgt einen Widerruf ohne vorherige Erteilung: er hängt ein
+    # REVOKE-Ereignis an, und die Auskunft lautet danach wie vorher „nicht
+    # erteilt". Ein echter Outbox-Mechanismus wäre die vollständige Lösung.
     if cmd.grant:
-        # Erst der Ledger, dann der Vorgang: schlägt der Ledger fehl, fliegt
-        # ConsentUnavailable durch und die Transaktion wird nie committet. Der
-        # umgekehrte Weg könnte einen Vorgang auf GRANTED setzen, dem keine
-        # Berechtigung entspricht.
         await deps["consent"].grant_resume(request.subject_id, request.tenant_id, bearer=cmd.bearer)
+    else:
+        await deps["consent"].revoke_resume(
+            request.subject_id, request.tenant_id, bearer=cmd.bearer
+        )
     await repos["requests"].save(request)
     return Result.ok(request)
 

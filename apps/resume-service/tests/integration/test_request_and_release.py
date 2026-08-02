@@ -353,3 +353,45 @@ async def test_a_request_may_be_made_to_a_person_without_a_resume(
     asked = await _call(resume_app, "POST", f"/resumes/{candidate.id}/requests", company.token)
 
     assert asked.status_code == 201
+
+
+async def test_a_decline_leaves_the_company_with_nothing_in_the_ledger_too(
+    apps: tuple[Any, Any],
+) -> None:
+    """Die Ablehnung widerruft, statt nur nichts zu erteilen.
+
+    Klingt überflüssig — es gibt ja nichts zu widerrufen. Es schließt aber den
+    einzigen Weg, auf dem dieses System nach außen offen scheitern könnte:
+    gelingt beim Erteilen der Ledger-Aufruf und scheitert danach der Commit,
+    existiert die Berechtigung, während der Vorgang PENDING bleibt. Dann führt
+    jede Antwort der Person das System in einen sicheren Zustand zurück — auch
+    das "nein".
+    """
+    resume_app, consent_app, candidate, company = await _prepared(apps)
+    asked = await _call(resume_app, "POST", f"/resumes/{candidate.id}/requests", company.token)
+    request_id = asked.json()["id"]
+
+    # Der Zustand nach einem geglückten Ledger-Schreiben ohne Commit: die
+    # Berechtigung existiert, der Vorgang steht noch auf PENDING.
+    granted = await _call(
+        consent_app,
+        "POST",
+        "/consent/grant",
+        candidate.token,
+        json={
+            "subject_id": str(candidate.id),
+            "capability": f"resume.visibility:tenant:{company.tenant_id}",
+        },
+    )
+    assert granted.status_code == 200
+    assert (
+        await _call(resume_app, "GET", f"/resumes/{candidate.id}", company.token)
+    ).status_code == 200
+
+    declined = await _call(
+        resume_app, "POST", f"/resumes/requests/{request_id}/decline", candidate.token
+    )
+    assert declined.status_code == 200
+
+    gone = await _call(resume_app, "GET", f"/resumes/{candidate.id}", company.token)
+    assert gone.status_code == 404, gone.text
