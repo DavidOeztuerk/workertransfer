@@ -492,9 +492,22 @@ Qualitätsgates, nicht mehr nur Syntax.
   Bestätigung der Person ihn selbst auslöst. Beide haben jetzt einen Test, der
   ohne den Fix rot wird.
 
-Offen in Phase 5: Vertragsentwürfe (`worker-templates`), digitale Unterschrift
-und `worker-player-advisor` (KI-Entwürfe, niemals autonome Verhandlung). Alle
-drei sind eigene Schnitte; der erste bringt eine rechtliche Abwägung mit.
+Offen in Phase 5:
+
+- **Vertragsvorlagen** — [Entwurf steht, gebaut wird nichts](superpowers/specs/2026-08-02-contract-templates-design.md).
+  Festgelegt ist der Weg: die Plattform stellt **Vorlagen**, füllt aus, und
+  danach geht der Entwurf **in die Prüfung** — erst wenn dort alles stimmt,
+  steht er zur Unterschrift bereit. Sie erzeugt keinen Vertrag, und sie füllt
+  nur, was sie schon weiß und was beide Seiten schon vereinbart haben (Name,
+  Unternehmen, Startmonat, Ablöse, Rolle). Gehalt, Fristen, Probezeit bleiben
+  Platzhalter; eine Vorbelegung mit „üblichen Werten" sähe aus wie eine
+  Empfehlung und würde als eine gelesen.
+  Ab „in Prüfung" ist der Entwurf eingefroren — auch für Tippfehler, besonders
+  für Tippfehler.
+  **Gebaut wird davon nichts**, bis sieben rechtliche Fragen beantwortet sind;
+  die nach der Formvorschrift zuerst, weil sie den ganzen Schnitt umwerfen kann.
+- **Digitale Unterschrift** — hängt an derselben Frage.
+- **`worker-player-advisor`** — KI-Entwürfe, niemals autonome Verhandlung.
 
 ### Querschnitt — Benachrichtigungen ✅ (02.08.2026)
 
@@ -552,6 +565,23 @@ jedem Unternehmen sichtbar ist. Erst filtern, dann den Ledger fragen — die
 Reihenfolge umzudrehen wäre schneller und hieße, die Sichtbarkeit in die
 Datenbank des Profildienstes zu legen. Ein Integrationstest legt zwei Profile
 mit derselben Fähigkeit an, gibt eines frei, und der Filter findet genau eines.
+
+### Querschnitt — „Was liegt an" ✅ (02.08.2026)
+
+Nach dem Anmelden stand die Werbung. Wer schon da ist, muss nicht überzeugt
+werden — er muss wissen, was auf ihn wartet. Die Startseite zeigt Angemeldeten
+jetzt genau das.
+
+**Zusammengesetzt im Browser, nicht im Backend.** Ein Dienst, der diese
+Übersicht liefert, müsste über vier Dienstgrenzen hinweg lesen — genau das, was
+ADR-0004 ausschließt. Die Oberfläche fragt jeden Dienst nach dem, wofür er
+zuständig ist; es sind dieselben Abfragen wie auf den Einzelseiten, und der
+Cache teilt sie.
+
+**Gezählt wird nur, was eine Handlung erwartet** — nicht, was von selbst läuft.
+Sonst wäre es eine Liste, und Listen übersieht man. Und schlägt eine Abfrage
+fehl, sagt die Seite das, statt „nichts liegt an" zu behaupten: das ist die eine
+Aussage, die nach einem Fehler falsch sein kann und in Sicherheit wiegt.
 
 ### Weiterhin offen, quer durch alle Phasen
 
