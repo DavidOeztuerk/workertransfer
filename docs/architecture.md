@@ -12,13 +12,25 @@ does not make employment, ranking, or legal decisions autonomously.
 ```text
 workertransfer/
 ├── apps/                     deployable entry points
-│   └── identity-service/
+│   ├── identity-service/     auth vertical slice (the reference shape)
+│   ├── consent-service/      consent ledger (Phase 3, in progress)
+│   └── web/                  React app (pnpm workspace member)
 ├── packages/                 technical platform packages only
 │   ├── worker-core/          framework-free domain primitives
-│   └── worker-platform/      HTTP and application cross-cutting concerns
-├── docs/                     ADRs, architecture, product constraints
-└── .github/workflows/        repeatable CI
+│   ├── worker-platform/      the kernel: HTTP + application cross-cutting concerns
+│   ├── worker-shared/        domain-neutral primitives (clock, pagination, money)
+│   ├── worker-*/             composable infrastructure libraries
+│   └── ui/                   shared React components (pnpm)
+├── docs/                     ADRs, architecture, product constraints, vision
+├── docker/                   shared service Dockerfile, web Dockerfile, entrypoint
+├── scripts/                  database bootstrap (initdb)
+├── tests/                    repo-level architectural guards
+└── .github/workflows/        repeatable CI (backend + frontend jobs)
 ```
+
+Most `worker-*` packages are libraries with no consumer yet. The two services import
+seven or eight of them; the observability, messaging, cache and storage packages exist
+but nothing wires them into a running process.
 
 An `uv` workspace gives all Python packages one lockfile. Packages have their own
 `pyproject.toml` files and use explicit workspace dependencies.
@@ -70,9 +82,14 @@ repository abstraction that exposes another service's data.
 - consistent `application/problem+json` errors
 - an explicit asynchronous CQRS mediator with ordered pipeline behaviours
 
-The reference `identity-service` deliberately exposes only health probes. Identity
-credentials, OAuth/OIDC, sessions, and authorization are a subsequent vertical slice;
-adding an unaudited partial authentication flow would create misleading security.
+`identity-service` is the reference service and now carries a complete auth vertical
+slice (Phase 2): registration, login, refresh and logout with bcrypt hashing and HS256
+JWTs delivered as `httpOnly` cookies, a server-side session ledger for refresh-token
+rotation, claim-based tenant resolution, and audit events written inside the same
+transaction as the command that caused them. See ADR-0006 through ADR-0012.
+
+OIDC-as-provider is deliberately *deferred*, not dropped — ADR-0008 records why a
+self-hosted password flow was the right first slice and what the upgrade path is.
 
 ## Delivery sequence
 

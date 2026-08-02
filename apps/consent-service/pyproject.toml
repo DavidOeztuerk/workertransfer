@@ -1,0 +1,33 @@
+[project]
+name = "consent-service"
+version = "0.1.0"
+description = "WorkerTransfer consent service — append-only consent ledger"
+requires-python = ">=3.14"
+dependencies = [
+  "uvicorn[standard]>=0.40.0,<1.0.0",
+  "fastapi>=0.115.0,<1.0.0",
+  "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
+  "asyncpg>=0.30.0,<1.0.0",
+  "alembic>=1.13.0,<2.0.0",
+  "psycopg[binary]>=3.1.0,<4.0.0",
+  "pydantic>=2.8.0,<3.0.0",
+  "pydantic-settings>=2.4.0,<3.0.0",
+  "worker-core",
+  "worker-platform",
+  "worker-shared",
+  "worker-auth",
+  "worker-database",
+  "worker-events",
+  "worker-contracts",
+  "worker-tenancy",
+]
+
+[project.scripts]
+worker-consent = "consent_service.main:run"
+
+[build-system]
+requires = ["uv_build>=0.11.28,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "consent_service"

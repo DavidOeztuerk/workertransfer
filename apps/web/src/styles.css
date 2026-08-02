@@ -12,7 +12,8 @@ a {
   isolation: isolate;
   overflow: hidden;
   min-height: min(48rem, 100vh);
-  padding: 1.5rem clamp(1.25rem, 5vw, 6rem) 5.5rem;
+  /* Oben Platz für den überlagernden Header (site-header--on-hero). */
+  padding: 6.5rem clamp(1.25rem, 5vw, 6rem) 5.5rem;
   color: #f4fbf5;
   background: #105137;
 }
@@ -28,13 +29,6 @@ a {
   mask-image: linear-gradient(to bottom, black, transparent 72%);
 }
 
-.hero__navigation {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
 .brand {
   font-size: 1.25rem;
   font-weight: 850;
@@ -45,22 +39,10 @@ a {
   color: var(--wt-mint);
 }
 
-nav {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-nav .wt-button--secondary {
-  color: #f4fbf5;
-  border-color: rgba(244, 251, 245, 0.62);
-}
 
 .hero__content {
   max-width: 48rem;
-  padding-top: clamp(6rem, 16vh, 11rem);
+  padding-top: clamp(3rem, 10vh, 6rem);
 }
 
 .eyebrow {
@@ -210,4 +192,423 @@ h1 {
   .roadmap {
     gap: 0;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Kopfzeile — eine für alle Seiten. Auf der Startseite transparent über dem
+   Hero, sonst als eigene helle Leiste mit Trennlinie.
+   --------------------------------------------------------------------------- */
+.site-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem clamp(1.25rem, 5vw, 6rem);
+  border-bottom: 1px solid var(--wt-line);
+  background: var(--wt-surface);
+}
+
+.site-header--on-hero {
+  /* Über dem Hero statt davor: sonst schöbe ein weißer Streifen das Bild nach
+     unten — genau das Problem, das der eigene Hero-Header verdeckt hatte. */
+  position: absolute;
+  inset: 0 0 auto;
+  border-bottom: 0;
+  background: transparent;
+}
+
+.site-header--on-hero .brand,
+.site-header--on-hero nav {
+  color: #f4fbf5;
+}
+
+.site-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.site-header__link {
+  padding: 0.35rem 0;
+  border-bottom: 1px solid transparent;
+  transition: border-color 160ms ease;
+}
+
+.site-header__link:hover,
+.site-header__link:focus-visible {
+  border-bottom-color: currentColor;
+}
+
+.site-header__cta {
+  min-height: 2.4rem;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.4rem 1rem;
+  color: white;
+  background: var(--wt-green);
+  transition: background-color 160ms ease;
+}
+
+.site-header__cta:hover {
+  background: var(--wt-green-deep);
+}
+
+.site-header--on-hero .site-header__cta {
+  color: #0e3526;
+  background: var(--wt-mint);
+}
+
+.site-header--on-hero .wt-button--quiet {
+  color: #f4fbf5;
+}
+
+/* ---------------------------------------------------------------------------
+   Auth-Seiten — zweigeteilt: Markenpanel links, Formular rechts.
+   --------------------------------------------------------------------------- */
+.auth {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  min-height: calc(100vh - 4.6rem);
+}
+
+.auth__aside {
+  /* Explizite Rasterposition: das Panel steht im DOM NACH dem Formular
+     (Bedienreihenfolge), erscheint visuell aber links. */
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+  padding: clamp(2.5rem, 6vw, 5rem);
+  color: #f4fbf5;
+  background: var(--wt-green-deep);
+}
+
+.auth__aside::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 3.75rem 3.75rem;
+  content: "";
+  mask-image: linear-gradient(to bottom, black, transparent 78%);
+}
+
+.auth__aside::after {
+  position: absolute;
+  z-index: -1;
+  right: -8rem;
+  bottom: -10rem;
+  width: min(60%, 26rem);
+  aspect-ratio: 1;
+  border: 1px solid rgba(185, 245, 207, 0.55);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3rem rgba(185, 245, 207, 0.05);
+  content: "";
+}
+
+.auth__claim {
+  max-width: 22rem;
+  margin: 0;
+  font-size: clamp(1.7rem, 3vw, 2.6rem);
+  font-weight: 850;
+  letter-spacing: -0.05em;
+  line-height: 1.05;
+}
+
+.auth__support {
+  max-width: 26rem;
+  margin: 0;
+  color: rgba(244, 251, 245, 0.78);
+  line-height: 1.6;
+}
+
+.auth__panel {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(2rem, 5vw, 4rem) clamp(1.25rem, 4vw, 3rem);
+}
+
+.auth__form {
+  width: min(26rem, 100%);
+  display: grid;
+  gap: 1.15rem;
+  padding: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+.auth__form h1 {
+  margin: 0;
+  font-size: clamp(1.9rem, 3vw, 2.4rem);
+  line-height: 1.05;
+}
+
+.auth__form form {
+  display: grid;
+  gap: 1rem;
+}
+
+.auth__lead {
+  margin: 0;
+  color: var(--wt-muted);
+  line-height: 1.55;
+}
+
+.auth__alert {
+  margin: 0;
+  border: 1px solid rgba(180, 57, 47, 0.35);
+  border-radius: var(--wt-radius-sm);
+  padding: 0.7rem 0.85rem;
+  color: #8f2c24;
+  background: rgba(180, 57, 47, 0.07);
+  font-size: 0.9rem;
+}
+
+.auth__note {
+  margin: 0;
+  color: var(--wt-muted);
+  font-size: 0.9rem;
+}
+
+.auth__note a {
+  color: var(--wt-green);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+@media (max-width: 56rem) {
+  .auth {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .auth__panel {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .auth__aside {
+    /* Auf schmalen Schirmen nur noch ein Band ÜBER dem Formular — dafür muss
+       die Rasterposition wieder freigegeben werden. */
+    grid-column: 1;
+    grid-row: 1;
+    justify-content: flex-start;
+    padding: 2rem clamp(1.25rem, 5vw, 2.5rem);
+  }
+
+  .auth__aside::after {
+    display: none;
+  }
+
+  .auth__claim {
+    font-size: 1.55rem;
+  }
+}
+
+/* Innenseiten: eine schmale Spalte, weil es hier um ein Formular geht und
+   nicht um eine Landepage. */
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+}
+
+.page--narrow {
+  max-width: 46rem;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.page__header {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.page__header h1 {
+  margin: 0;
+}
+
+.page__lead {
+  margin: 0;
+  color: var(--wt-muted);
+  line-height: 1.6;
+  max-width: 40rem;
+}
+
+.page__note {
+  margin: 0;
+  color: var(--wt-accent, #1f6f5c);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Die Freigabe steht über dem Formular und ist der eigentliche Punkt der
+   Seite — sie bekommt einen eigenen Akzent, damit sie nicht wie eine
+   Fußnote zum Formular aussieht. */
+.profile__release {
+  border-left: 3px solid var(--wt-accent, #1f6f5c);
+}
+
+.page--narrow form {
+  display: grid;
+  gap: 1.1rem;
+}
+
+/* Kandidatenliste: Karten in einer flexiblen Spaltenzahl, damit die Seite auf
+   dem Laptop nicht zu einer endlosen Kolonne wird. */
+.candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+}
+
+.candidates__headline {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.candidates__meta {
+  margin: 0 0 0.6rem;
+  color: var(--wt-muted);
+  font-size: 0.85rem;
+}
+
+.candidates__skills {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.candidates__skills li {
+  border: 1px solid var(--wt-border, #d6d3cd);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+/* Anfragen: eine Zeile je Vorgang, Aktionen rechts. */
+.requests {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.requests__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--wt-border, #d6d3cd);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.requests__title {
+  margin: 0 0 0.2rem;
+  font-weight: 600;
+}
+
+.requests__meta {
+  margin: 0;
+  color: var(--wt-muted);
+  font-size: 0.85rem;
+}
+
+.requests__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Stationen: jede in einem eigenen Rahmen, damit die Felder nicht ineinander
+   laufen, wenn es fünf davon sind. */
+.resume__position {
+  border: 1px solid var(--wt-border, #d6d3cd);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+}
+
+.resume__position legend {
+  padding: 0 0.4rem;
+  font-size: 0.85rem;
+  color: var(--wt-muted);
+}
+
+.candidates__asked {
+  margin: 0.75rem 0 0;
+  color: var(--wt-accent, #1f6f5c);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* Zähler an einem Navigationslink. Klein, aber nicht dekorativ: er ist der
+   einzige Weg, auf dem eine Anfrage die Person heute erreicht. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  margin-left: 0.4rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--wt-accent, #1f6f5c);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Mannschaft und Einladungen: eine Zeile je Person. */
+.team {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.team li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--wt-border, #d6d3cd);
+  padding-bottom: 0.5rem;
+}
+
+.team li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.team__role {
+  margin-left: auto;
+  color: var(--wt-muted);
+  font-size: 0.8rem;
 }

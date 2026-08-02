@@ -1,13 +1,6 @@
-"""Domain layer exports."""
+"""Domänen-Schicht von ${service_name}.
 
-from .base import Entity, AggregateRoot, ValueObject, DomainEvent, Specification
-from .exceptions import DomainError
-
-__all__ = [
-    "Entity",
-    "AggregateRoot", 
-    "ValueObject",
-    "DomainEvent",
-    "Specification",
-    "DomainError",
-]
+Entitäten, Wertobjekte und Domänenfehler. Ohne FastAPI, ohne ORM, ohne
+Transport — die Bausteine dafür stehen in `worker_core` (`Entity`,
+`ValueObject`, `DomainEvent`, `Result`, `DomainError`).
+"""
