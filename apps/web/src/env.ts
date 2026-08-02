@@ -35,3 +35,4 @@ export const APPLICATIONS_BASE_URL = resolve(
   import.meta.env.VITE_APPLICATIONS_BASE_URL,
   8007
 );
+export const COMPANIES_BASE_URL = resolve(import.meta.env.VITE_COMPANIES_BASE_URL, 8008);

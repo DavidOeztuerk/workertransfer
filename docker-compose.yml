@@ -379,6 +379,43 @@ services:
       retries: 30
       start_period: 40s
 
+  companies-service:
+    <<: *service
+    container_name: workertransfer-companies
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        SERVICE_DIR: companies-service
+    environment:
+      <<: *service-env
+      WORKER_PORT: "8008"
+      WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/companies
+    ports:
+      - "8008:8008"
+    command:
+      - uvicorn
+      - companies_service.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8008"
+      - --reload
+      - --reload-dir
+      - /app/apps/companies-service/src
+      - --reload-dir
+      - /app/packages
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;urllib.request.urlopen("http://localhost:8008/health/live")
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 40s
+
   web:
     build:
       context: .
@@ -400,6 +437,8 @@ services:
         condition: service_healthy
       applications-service:
         condition: service_healthy
+      companies-service:
+        condition: service_healthy
     environment:
       # pnpm will purge node_modules when the lockfile changed since the image
       # was built, and without a TTY it aborts instead of asking — der Container
@@ -414,6 +453,7 @@ services:
       VITE_PORTFOLIO_BASE_URL: ${VITE_PORTFOLIO_BASE_URL:-http://localhost:8005}
       VITE_JOBS_BASE_URL: ${VITE_JOBS_BASE_URL:-http://localhost:8006}
       VITE_APPLICATIONS_BASE_URL: ${VITE_APPLICATIONS_BASE_URL:-http://localhost:8007}
+      VITE_COMPANIES_BASE_URL: ${VITE_COMPANIES_BASE_URL:-http://localhost:8008}
     ports:
       - "5173:5173"
     volumes:
