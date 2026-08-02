@@ -14,6 +14,7 @@ from transfer_service.infrastructure.clock import SystemClock
 from transfer_service.infrastructure.consent import HttpConsentGate
 from transfer_service.infrastructure.database.repositories import (
     SqlAlchemyMarketStatusRepository,
+    SqlAlchemyTransferRepository,
 )
 
 __all__ = ["compose_infrastructure", "request_scope"]
@@ -25,7 +26,13 @@ async def request_scope(
 ) -> AsyncIterator[tuple[UnitOfWork, dict[str, Any]]]:
     uow = UnitOfWork(session_factory)
     async with uow:
-        yield uow, {"market": SqlAlchemyMarketStatusRepository(uow.session)}
+        yield (
+            uow,
+            {
+                "market": SqlAlchemyMarketStatusRepository(uow.session),
+                "transfers": SqlAlchemyTransferRepository(uow.session),
+            },
+        )
 
 
 def compose_infrastructure(
