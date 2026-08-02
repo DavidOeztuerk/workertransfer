@@ -8,10 +8,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from transfer_service.domain.market_status import Availability, MarketStatus
+from transfer_service.domain.request import MarketRequest, RequestStatus
 from transfer_service.domain.transfer import Transfer, TransferStatus
-from transfer_service.infrastructure.database.models import MarketStatusModel, TransferModel
+from transfer_service.infrastructure.database.models import (
+    MarketRequestModel,
+    MarketStatusModel,
+    TransferModel,
+)
 
-__all__ = ["SqlAlchemyMarketStatusRepository", "SqlAlchemyTransferRepository"]
+__all__ = [
+    "SqlAlchemyMarketRequestRepository",
+    "SqlAlchemyMarketStatusRepository",
+    "SqlAlchemyTransferRepository",
+]
 
 
 def _to_domain(row: MarketStatusModel) -> MarketStatus:
@@ -129,3 +138,68 @@ class SqlAlchemyTransferRepository:
             .order_by(TransferModel.created_at.desc())
         )
         return [_transfer_to_domain(row) for row in (await self._session.execute(stmt)).scalars()]
+
+
+def _request_to_domain(row: MarketRequestModel) -> MarketRequest:
+    return MarketRequest(
+        id=row.id,
+        subject_id=row.subject_id,
+        tenant_id=row.tenant_id,
+        requested_by=row.requested_by,
+        status=RequestStatus(row.status),
+        created_at=row.created_at,
+        answered_at=row.answered_at,
+    )
+
+
+class SqlAlchemyMarketRequestRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get(self, request_id: UUID) -> MarketRequest | None:
+        row = await self._session.get(MarketRequestModel, request_id)
+        return None if row is None else _request_to_domain(row)
+
+    async def find(self, subject_id: UUID, tenant_id: UUID) -> MarketRequest | None:
+        stmt = select(MarketRequestModel).where(
+            MarketRequestModel.subject_id == subject_id,
+            MarketRequestModel.tenant_id == tenant_id,
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        return None if row is None else _request_to_domain(row)
+
+    async def add(self, request: MarketRequest) -> None:
+        self._session.add(
+            MarketRequestModel(
+                id=request.id,
+                subject_id=request.subject_id,
+                tenant_id=request.tenant_id,
+                requested_by=request.requested_by,
+                status=str(request.status),
+                created_at=request.created_at,
+                answered_at=request.answered_at,
+            )
+        )
+
+    async def save(self, request: MarketRequest) -> None:
+        row = await self._session.get(MarketRequestModel, request.id)
+        if row is None:
+            await self.add(request)
+            return
+        # Alle veränderlichen Felder schreiben.
+        row.status = str(request.status)
+        row.answered_at = request.answered_at
+
+    async def for_subject(self, subject_id: UUID) -> list[MarketRequest]:
+        return await self._listed(MarketRequestModel.subject_id == subject_id)
+
+    async def for_tenant(self, tenant_id: UUID) -> list[MarketRequest]:
+        return await self._listed(MarketRequestModel.tenant_id == tenant_id)
+
+    async def _listed(self, condition: object) -> list[MarketRequest]:
+        stmt = (
+            select(MarketRequestModel)
+            .where(condition)  # type: ignore[arg-type]
+            .order_by(MarketRequestModel.created_at.desc())
+        )
+        return [_request_to_domain(row) for row in (await self._session.execute(stmt)).scalars()]

@@ -1,36 +1,49 @@
-"""HTTP-Endpunkte für den Marktstatus."""
+"""HTTP-Endpunkte für den Marktstatus, seine Freigabe und die Vorgänge."""
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, status
 from transfer_service.application.handlers import (
+    AlreadyRequested,
     AlreadyRunning,
+    AnswerRequestCommand,
     ExpressInterestCommand,
     GetMarketStatusQuery,
     MakeOfferCommand,
     NotApproachable,
+    RequestMarketStatusCommand,
+    RevokeMarketAccessCommand,
     SaveMarketStatusCommand,
+    StatusNotVisible,
     TransferNotFound,
+    handle_answer_request,
     handle_company_action,
     handle_express_interest,
     handle_get_my_status,
     handle_get_visible_status,
     handle_list_for_subject,
     handle_list_for_tenant,
+    handle_list_requests_for_subject,
+    handle_list_requests_for_tenant,
     handle_make_offer,
     handle_person_action,
+    handle_request_market_status,
+    handle_revoke_market_access,
     handle_save_status,
 )
 from transfer_service.domain.market_status import MarketStatus
+from transfer_service.domain.request import AlreadyAnswered, MarketRequest
 from transfer_service.domain.transfer import NotYours, Transfer, TransitionNotAllowed
 from transfer_service.infrastructure.consent import ConsentUnavailable
 from worker_auth import get_request_user, resolve_token
 from worker_contracts import (
     ExpressInterestV1,
     MakeOfferV1,
+    MarketRequestV1,
     MarketStatusV1,
     SaveMarketStatusV1,
     TransferV1,
@@ -54,6 +67,28 @@ def _dto(status_: MarketStatus) -> MarketStatusV1:
         is_approachable=status_.is_approachable,
         updated_at=status_.updated_at,
     )
+
+
+def _request_dto(request: MarketRequest, *, active: bool | None) -> MarketRequestV1:
+    return MarketRequestV1(
+        id=request.id,
+        subject_id=request.subject_id,
+        tenant_id=request.tenant_id,
+        status=str(request.status),  # type: ignore[arg-type]
+        created_at=request.created_at,
+        answered_at=request.answered_at,
+        active=active,
+    )
+
+
+def _request_http(error: Any) -> HTTPException:
+    if isinstance(error, StatusNotVisible):
+        # Nicht vorhanden, nicht freigegeben, nicht meins — alles dasselbe.
+        raise HTTPException(status.HTTP_404_NOT_FOUND, _NOT_VISIBLE)
+    if isinstance(error, AlreadyRequested | AlreadyAnswered):
+        return HTTPException(status.HTTP_409_CONFLICT, error.message)
+    message = error.message if error is not None else "invalid request"
+    return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, message)
 
 
 def _transfer_dto(transfer: Transfer) -> TransferV1:
@@ -128,6 +163,139 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
         async with request_scope(session_factory) as (_uow, repos):
             return _dto(await handle_get_my_status(subject_id, deps=deps, repos=repos))
 
+    def _company(request: Request) -> Any:
+        principal = _principal(request)
+        if principal.tenant_id is None:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "this action requires an active company",
+            )
+        return principal.tenant_id
+
+    @router.post("/market/{subject_id}/requests", status_code=status.HTTP_201_CREATED)
+    async def request_status(subject_id: UUID, request: Request) -> MarketRequestV1:
+        """„Darf ich sehen, ob du gerade zuhörst?"
+
+        Die leichtere der beiden Fragen — die schwerere ist der Vorgang selbst.
+        Sie zu beantworten kostet nichts: wer `unavailable` ist und freigibt,
+        zeigt genau das, und niemand wurde gestört.
+        """
+        principal = _principal(request)
+        command = RequestMarketStatusCommand(
+            subject_id=subject_id,
+            tenant_id=_company(request),
+            requested_by=principal.sub,
+            bearer=_bearer(request),
+        )
+        async with request_scope(session_factory) as (uow, repos):
+            try:
+                result = await handle_request_market_status(command, deps=deps, repos=repos)
+            except ConsentUnavailable as exc:
+                raise HTTPException(
+                    status.HTTP_503_SERVICE_UNAVAILABLE, "consent ledger unavailable"
+                ) from exc
+            if not result.is_success:
+                raise _request_http(result.error)
+            await uow.commit()
+            # Das anfragende Unternehmen bekommt kein `active`: es hat die
+            # Antwort schon in Form des Status, den es sieht oder nicht sieht.
+            return _request_dto(result.value, active=None)
+
+    @router.get("/market/me/requests")
+    async def my_requests(request: Request) -> list[MarketRequestV1]:
+        """Wer hat gefragt — und was gilt gerade.
+
+        `active` kommt frisch aus dem Ledger und kann von `status` abweichen:
+        nach einem Widerruf bleibt `GRANTED` stehen, `active` fällt auf `false`.
+        Genau deshalb steht die Berechtigung nicht im Vorgang.
+        """
+        subject_id = _principal(request).sub
+        bearer = _bearer(request)
+        async with request_scope(session_factory) as (_uow, repos):
+            requests = await handle_list_requests_for_subject(subject_id, repos=repos)
+        granted = [r for r in requests if str(r.status) == "GRANTED"]
+        try:
+            # Nur für erteilte Anfragen fragen: für PENDING und DECLINED steht
+            # die Antwort fest, und jeder Aufruf kostet einen Round-Trip.
+            verdicts = await asyncio.gather(
+                *(
+                    deps["consent"].may_see(r.subject_id, tenant_id=r.tenant_id, bearer=bearer)
+                    for r in granted
+                )
+            )
+        except ConsentUnavailable as exc:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, "consent ledger unavailable"
+            ) from exc
+        active_by_id = dict(zip((r.id for r in granted), verdicts, strict=True))
+        return [_request_dto(r, active=active_by_id.get(r.id, False)) for r in requests]
+
+    @router.get("/market/requests")
+    async def company_requests(request: Request) -> list[MarketRequestV1]:
+        """Auch abgelehnte bleiben sichtbar.
+
+        Sonst sähen „abgelehnt" und „nie gefragt" gleich aus — und dann fragt
+        jemand erneut, im guten Glauben.
+        """
+        tenant_id = _company(request)
+        async with request_scope(session_factory) as (_uow, repos):
+            requests = await handle_list_requests_for_tenant(tenant_id, repos=repos)
+        return [_request_dto(r, active=None) for r in requests]
+
+    async def _answer(request_id: UUID, request: Request, *, grant: bool) -> MarketRequestV1:
+        command = AnswerRequestCommand(
+            request_id=request_id,
+            actor_id=_principal(request).sub,
+            bearer=_bearer(request),
+            grant=grant,
+        )
+        async with request_scope(session_factory) as (uow, repos):
+            try:
+                result = await handle_answer_request(command, deps=deps, repos=repos)
+            except ConsentUnavailable as exc:
+                raise HTTPException(
+                    status.HTTP_503_SERVICE_UNAVAILABLE, "consent ledger unavailable"
+                ) from exc
+            if not result.is_success:
+                raise _request_http(result.error)
+            await uow.commit()
+            return _request_dto(result.value, active=grant)
+
+    @router.post("/market/requests/{request_id}/grant")
+    async def grant_request(request_id: UUID, request: Request) -> MarketRequestV1:
+        return await _answer(request_id, request, grant=True)
+
+    @router.post("/market/requests/{request_id}/decline")
+    async def decline_request(request_id: UUID, request: Request) -> MarketRequestV1:
+        return await _answer(request_id, request, grant=False)
+
+    @router.post("/market/requests/{request_id}/revoke")
+    async def revoke_access(request_id: UUID, request: Request) -> MarketRequestV1:
+        """Der Widerruf wirkt im Ledger, nicht im Vorgang.
+
+        Ein laufender Transfer-Vorgang bleibt bestehen: er hat seine eigene Tür
+        und seine eigene Absage.
+        """
+        command = RevokeMarketAccessCommand(
+            request_id=request_id,
+            actor_id=_principal(request).sub,
+            bearer=_bearer(request),
+        )
+        async with request_scope(session_factory) as (uow, repos):
+            try:
+                result = await handle_revoke_market_access(command, deps=deps, repos=repos)
+            except ConsentUnavailable as exc:
+                raise HTTPException(
+                    status.HTTP_503_SERVICE_UNAVAILABLE, "consent ledger unavailable"
+                ) from exc
+            if not result.is_success:
+                raise _request_http(result.error)
+            await uow.commit()
+            return _request_dto(result.value, active=False)
+
+    # Reihenfolge ist hier tragend: `/market/requests` muss VOR
+    # `/market/{subject_id}` stehen, sonst schluckt der Platzhalter den
+    # festen Pfad und „requests" landet als UUID im Validator.
     @router.get("/market/{subject_id}")
     async def visible_status(subject_id: UUID, request: Request) -> MarketStatusV1:
         principal = _principal(request)
@@ -152,15 +320,6 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             if not result.is_success:
                 raise HTTPException(status.HTTP_404_NOT_FOUND, _NOT_VISIBLE)
             return _dto(result.value)
-
-    def _company(request: Request) -> Any:
-        principal = _principal(request)
-        if principal.tenant_id is None:
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN,
-                "this action requires an active company",
-            )
-        return principal.tenant_id
 
     @router.post("/transfers", status_code=status.HTTP_201_CREATED)
     async def express_interest(body: ExpressInterestV1, request: Request) -> TransferV1:

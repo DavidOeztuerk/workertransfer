@@ -9,25 +9,35 @@ from uuid import UUID
 from worker_core import DomainError, Result
 
 from transfer_service.domain.market_status import Availability, MarketStatus
+from transfer_service.domain.request import MarketRequest
 from transfer_service.domain.transfer import Transfer
 
 __all__ = [
+    "AlreadyRequested",
     "AlreadyRunning",
+    "AnswerRequestCommand",
     "ExpressInterestCommand",
     "GetMarketStatusQuery",
     "MakeOfferCommand",
     "NotApproachable",
+    "RequestMarketStatusCommand",
+    "RevokeMarketAccessCommand",
     "SaveMarketStatusCommand",
     "StatusNotVisible",
     "TransferNotFound",
+    "handle_answer_request",
     "handle_company_action",
     "handle_express_interest",
     "handle_get_my_status",
     "handle_get_visible_status",
     "handle_list_for_subject",
     "handle_list_for_tenant",
+    "handle_list_requests_for_subject",
+    "handle_list_requests_for_tenant",
     "handle_make_offer",
     "handle_person_action",
+    "handle_request_market_status",
+    "handle_revoke_market_access",
     "handle_save_status",
 ]
 
@@ -270,3 +280,134 @@ async def handle_list_for_subject(subject_id: UUID, *, repos: dict[str, Any]) ->
 async def handle_list_for_tenant(tenant_id: UUID, *, repos: dict[str, Any]) -> list[Transfer]:
     transfers: list[Transfer] = await repos["transfers"].for_tenant(tenant_id)
     return transfers
+
+
+class AlreadyRequested(DomainError):
+    """Einmal fragen.
+
+    Ohne diese Regel wäre eine Ablehnung wirkungslos: wer dreimal fragen darf,
+    hat kein Nein bekommen, sondern eine Verzögerung. Gilt auch nach einem
+    Widerruf — der ist eine stärkere Aussage als die Ablehnung, nicht eine
+    schwächere.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("already_requested", "This company has already asked")
+
+
+@dataclass(frozen=True, slots=True)
+class RequestMarketStatusCommand:
+    subject_id: UUID
+    tenant_id: UUID
+    requested_by: UUID
+    bearer: str
+
+
+async def handle_request_market_status(
+    cmd: RequestMarketStatusCommand, *, deps: dict[str, Any], repos: dict[str, Any]
+) -> Result[MarketRequest]:
+    """Ein Unternehmen fragt: „darf ich sehen, ob du gerade zuhörst?"
+
+    Voraussetzung ist die Profilfreigabe, nicht die Existenz eines
+    Marktstatus. Beides zu prüfen wäre ein Orakel: „hat schon einen Marktstatus
+    gepflegt" ist eine Information über die Person, die niemand erfragen können
+    soll — und sie wäre hier besonders verräterisch.
+    """
+    if not await deps["consent"].may_see_profile(cmd.subject_id, bearer=cmd.bearer):
+        return Result.fail(StatusNotVisible())
+    if await repos["requests"].find(cmd.subject_id, cmd.tenant_id) is not None:
+        return Result.fail(AlreadyRequested())
+
+    request = MarketRequest.open(
+        subject_id=cmd.subject_id,
+        tenant_id=cmd.tenant_id,
+        requested_by=cmd.requested_by,
+        now=deps["clock"].now(),
+    )
+    await repos["requests"].add(request)
+    return Result.ok(request)
+
+
+@dataclass(frozen=True, slots=True)
+class AnswerRequestCommand:
+    request_id: UUID
+    actor_id: UUID
+    bearer: str
+    grant: bool
+
+
+async def handle_answer_request(
+    cmd: AnswerRequestCommand, *, deps: dict[str, Any], repos: dict[str, Any]
+) -> Result[MarketRequest]:
+    request: MarketRequest | None = await repos["requests"].get(cmd.request_id)
+    # Eine fremde Anfrage-ID verhält sich wie eine fremde Subject-ID: nicht
+    # vorhanden und nicht meins sind von außen dasselbe.
+    if request is None or request.subject_id != cmd.actor_id:
+        return Result.fail(StatusNotVisible())
+
+    now = deps["clock"].now()
+    try:
+        if cmd.grant:
+            request.grant(by=cmd.actor_id, now=now)
+        else:
+            request.decline(by=cmd.actor_id, now=now)
+    except DomainError as exc:
+        return Result.fail(exc)
+
+    # Erst der Ledger, dann der Vorgang: schlägt der Ledger fehl, fliegt
+    # ConsentUnavailable durch und die Transaktion wird nie committet.
+    #
+    # Auch die Ablehnung widerruft. Gelingt der Ledger-Aufruf und scheitert
+    # danach der Commit, existierte sonst eine Berechtigung ohne sichtbaren
+    # Vorgang — der einzige Weg, auf dem dieses System nach außen OFFEN
+    # scheitern könnte. Und hier wäre er am teuersten: die Berechtigung sagt
+    # „diese Person hört zu".
+    if cmd.grant:
+        await deps["consent"].grant_market(request.subject_id, request.tenant_id, bearer=cmd.bearer)
+    else:
+        await deps["consent"].revoke_market(
+            request.subject_id, request.tenant_id, bearer=cmd.bearer
+        )
+    await repos["requests"].save(request)
+    return Result.ok(request)
+
+
+@dataclass(frozen=True, slots=True)
+class RevokeMarketAccessCommand:
+    request_id: UUID
+    actor_id: UUID
+    bearer: str
+
+
+async def handle_revoke_market_access(
+    cmd: RevokeMarketAccessCommand, *, deps: dict[str, Any], repos: dict[str, Any]
+) -> Result[MarketRequest]:
+    """Widerruf — nur im Ledger, der Vorgang bleibt unangetastet.
+
+    `GRANTED` heißt „wurde einmal erteilt". Diesen Zustand beim Widerruf zu
+    ändern würde die Geschichte umschreiben; ob der Zugriff gilt, sagt ohnehin
+    nur der Ledger.
+
+    Ein laufender Transfer-Vorgang bleibt bestehen: er hat seine eigene Tür und
+    seine eigene Absage. Wer auch ihn beenden will, lehnt ihn ab — das ist
+    immer möglich, aus jedem laufenden Zustand.
+    """
+    request: MarketRequest | None = await repos["requests"].get(cmd.request_id)
+    if request is None or request.subject_id != cmd.actor_id:
+        return Result.fail(StatusNotVisible())
+    await deps["consent"].revoke_market(request.subject_id, request.tenant_id, bearer=cmd.bearer)
+    return Result.ok(request)
+
+
+async def handle_list_requests_for_subject(
+    subject_id: UUID, *, repos: dict[str, Any]
+) -> list[MarketRequest]:
+    requests: list[MarketRequest] = await repos["requests"].for_subject(subject_id)
+    return requests
+
+
+async def handle_list_requests_for_tenant(
+    tenant_id: UUID, *, repos: dict[str, Any]
+) -> list[MarketRequest]:
+    requests: list[MarketRequest] = await repos["requests"].for_tenant(tenant_id)
+    return requests
