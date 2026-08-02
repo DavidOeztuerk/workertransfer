@@ -334,11 +334,12 @@ Consent vor jedem fremden Zugriff, Integrationstest gegen echte Dienste. Ob die
 Freigabe wie beim Profil öffentlich oder wie beim Lebenslauf je Unternehmen
 läuft, ist die erste Entwurfsfrage — beide Formen stehen als Muster bereit.
 
-Offen und bewusst zurückgestellt: Benachrichtigungen. Eine Anfrage nach dem
-Lebenslauf erreicht die Person heute nur, wenn sie `/resume` aufruft. Der
-Mailweg existiert (identity-service, Mailpit), aber Benachrichtigungen sind ein
-Querschnittsthema mit eigenen Einstellungen und eigenem Consent — sie gehören
-nicht nebenbei in einen Fachschnitt.
+Teilweise geschlossen: Eine offene Anfrage zeigt die Kopfzeile jetzt als Zähler
+am Lebenslauf-Link, damit der Anfragefluss nicht ins Leere läuft. **Eine Mail
+gibt es weiterhin nicht** — der Weg existiert (identity-service, Mailpit), aber
+Benachrichtigungen sind ein Querschnittsthema mit eigenen Einstellungen und
+eigenem Consent und gehören nicht nebenbei in einen Fachschnitt. Wer sich nicht
+anmeldet, erfährt von einer Anfrage also nach wie vor nichts.
 
 **Der Generator hat seinen ersten echten Test bestanden** — allerdings erst nach
 Reparatur. Der Testlauf davor fand sechs Defekte, die ein reiner `ast.parse`-Test

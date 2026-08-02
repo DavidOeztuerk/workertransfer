@@ -88,6 +88,12 @@ test("ein Lebenslauf erreicht nur das Unternehmen, dem er freigegeben wurde", as
   await card.getByRole("button", { name: /Lebenslauf anfragen/i }).click();
   await expect(card.getByText(/Anfrage gestellt/i)).toBeVisible();
 
+  // Die Anfrage muss die Person erreichen, ohne dass sie danach sucht.
+  await candidate.goto("/");
+  await expect(
+    candidate.getByLabel(/1 offene Anfrage/i)
+  ).toBeVisible();
+
   // Die Person entscheidet — vorher gibt es nichts zu sehen.
   await candidate.goto("/resume");
   const row = candidate.locator("li").filter({ hasText: /fragt nach deinem Lebenslauf/i });
