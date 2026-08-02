@@ -620,3 +620,13 @@ h1 {
   gap: 1rem;
   align-items: end;
 }
+
+/* Bewerbungsformular in einer Stellenkarte: schmal, damit es die Karte nicht
+   sprengt. */
+.jobs__apply {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  border-top: 1px solid var(--wt-border, #d6d3cd);
+  padding-top: 1rem;
+}
