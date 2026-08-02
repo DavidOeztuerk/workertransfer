@@ -19,3 +19,7 @@ export const PROFILE_BASE_URL = resolve(
   import.meta.env.VITE_PROFILE_BASE_URL,
   "http://127.0.0.1:8003"
 );
+export const RESUME_BASE_URL = resolve(
+  import.meta.env.VITE_RESUME_BASE_URL,
+  "http://127.0.0.1:8004"
+);
