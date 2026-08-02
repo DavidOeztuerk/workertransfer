@@ -21,6 +21,7 @@ from profile_service.domain.profile import InvalidHeadline, Profile
 from profile_service.infrastructure.consent import ConsentUnavailable
 
 NOW = datetime(2026, 8, 2, 12, 0, tzinfo=UTC)
+TENANT = UUID("22222222-2222-2222-2222-222222222222")
 BEARER = "token"
 
 
@@ -61,7 +62,7 @@ class _FakeGate:
         self.broken = broken
         self.asked: list[UUID] = []
 
-    async def may_see(self, subject_id: UUID, *, bearer: str) -> bool:
+    async def may_see(self, subject_id: UUID, *, tenant_id: UUID, bearer: str) -> bool:
         if self.broken:
             raise ConsentUnavailable("down")
         self.asked.append(subject_id)
@@ -168,7 +169,7 @@ class TestGetForeignProfile:
         gate = _FakeGate({subject})
 
         res = await handle_get_visible_profile(
-            GetProfileQuery(subject_id=subject, bearer=BEARER),
+            GetProfileQuery(subject_id=subject, tenant_id=TENANT, bearer=BEARER),
             deps=_deps(_Clock(), gate),
             repos=repos,
         )
@@ -181,12 +182,12 @@ class TestGetForeignProfile:
         repos = await self._stored(subject)
 
         withheld = await handle_get_visible_profile(
-            GetProfileQuery(subject_id=subject, bearer=BEARER),
+            GetProfileQuery(subject_id=subject, tenant_id=TENANT, bearer=BEARER),
             deps=_deps(_Clock(), _FakeGate()),
             repos=repos,
         )
         never_existed = await handle_get_visible_profile(
-            GetProfileQuery(subject_id=uuid4(), bearer=BEARER),
+            GetProfileQuery(subject_id=uuid4(), tenant_id=TENANT, bearer=BEARER),
             deps=_deps(_Clock(), _FakeGate()),
             repos=repos,
         )
@@ -202,7 +203,7 @@ class TestGetForeignProfile:
         gate = _FakeGate()
 
         await handle_get_visible_profile(
-            GetProfileQuery(subject_id=uuid4(), bearer=BEARER),
+            GetProfileQuery(subject_id=uuid4(), tenant_id=TENANT, bearer=BEARER),
             deps=_deps(_Clock(), gate),
             repos={"profiles": _FakeProfiles()},
         )
@@ -215,7 +216,7 @@ class TestGetForeignProfile:
 
         with pytest.raises(ConsentUnavailable):
             await handle_get_visible_profile(
-                GetProfileQuery(subject_id=subject, bearer=BEARER),
+                GetProfileQuery(subject_id=subject, tenant_id=TENANT, bearer=BEARER),
                 deps=_deps(_Clock(), _FakeGate(broken=True)),
                 repos=repos,
             )
@@ -240,7 +241,7 @@ class TestListProfiles:
         gate = _FakeGate({subjects[0], subjects[3]})
 
         res = await handle_list_visible_profiles(
-            ListProfilesQuery(limit=10, cursor=None, bearer=BEARER),
+            ListProfilesQuery(limit=10, cursor=None, tenant_id=TENANT, bearer=BEARER),
             deps=_deps(_Clock(), gate),
             repos=repos,
         )
@@ -254,7 +255,7 @@ class TestListProfiles:
         gate = _FakeGate({subjects[0]})
 
         res = await handle_list_visible_profiles(
-            ListProfilesQuery(limit=3, cursor=None, bearer=BEARER),
+            ListProfilesQuery(limit=3, cursor=None, tenant_id=TENANT, bearer=BEARER),
             deps=_deps(_Clock(), gate),
             repos=repos,
         )
@@ -266,7 +267,7 @@ class TestListProfiles:
         repos, _ = await self._many(3)
 
         res = await handle_list_visible_profiles(
-            ListProfilesQuery(limit=10, cursor=None, bearer=BEARER),
+            ListProfilesQuery(limit=10, cursor=None, tenant_id=TENANT, bearer=BEARER),
             deps=_deps(_Clock(), _FakeGate()),
             repos=repos,
         )
@@ -281,7 +282,7 @@ class TestListProfiles:
 
         with pytest.raises(ConsentUnavailable):
             await handle_list_visible_profiles(
-                ListProfilesQuery(limit=10, cursor=None, bearer=BEARER),
+                ListProfilesQuery(limit=10, cursor=None, tenant_id=TENANT, bearer=BEARER),
                 deps=_deps(_Clock(), _FakeGate(broken=True)),
                 repos=repos,
             )
@@ -291,7 +292,7 @@ class TestListProfiles:
         gate = _FakeGate(set(subjects))
 
         res = await handle_list_visible_profiles(
-            ListProfilesQuery(limit=9999, cursor=None, bearer=BEARER),
+            ListProfilesQuery(limit=9999, cursor=None, tenant_id=TENANT, bearer=BEARER),
             deps=_deps(_Clock(), gate),
             repos=repos,
         )

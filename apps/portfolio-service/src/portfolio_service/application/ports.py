@@ -7,12 +7,19 @@ from uuid import UUID
 
 from portfolio_service.domain.portfolio import Portfolio
 
-__all__ = ["ConsentGate", "PortfolioRepository"]
+__all__ = ["ConsentGate", "PortfolioRepository", "tenant_capability"]
 
-#: Die eine Capability dieses Slices. Getrennt von `profile.visibility:public`,
-#: damit sie einzeln widerrufbar ist — auch wenn der Schalter dafür in der
-#: Oberfläche neben dem des Profils sitzt.
+#: „Für alle Unternehmen" — der Schalter auf /portfolio. Getrennt von
+#: `profile.visibility:public`, damit sie einzeln widerrufbar ist.
 VISIBILITY_CAPABILITY = "portfolio.visibility:public"
+
+
+def tenant_capability(tenant_id: UUID) -> str:
+    """„Für dieses eine Unternehmen" — entsteht mit einer Bewerbung (4.2).
+
+    Die additive Verfeinerung aus ADR-0020: `:public` bleibt, was es war.
+    """
+    return f"portfolio.visibility:tenant:{tenant_id}"
 
 
 class PortfolioRepository(Protocol):
@@ -21,4 +28,4 @@ class PortfolioRepository(Protocol):
 
 
 class ConsentGate(Protocol):
-    async def may_see(self, subject_id: UUID, *, bearer: str) -> bool: ...
+    async def may_see(self, subject_id: UUID, *, tenant_id: UUID, bearer: str) -> bool: ...
