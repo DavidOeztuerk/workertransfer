@@ -321,9 +321,20 @@ was der Code tat.
   `docker compose up -d`.
 - ⬜ 3.4 Portfolio-Service
 - ⬜ 3.5 `worker-files`/`worker-storage` real machen (Workspace-Re-Include)
-- ⬜ **Scheibe C — Einladungen & Rollen.** Ein Unternehmen kann entstehen, aber
-  niemand außer dem Gründer hineinkommen; `admin` gegen `member` wird nirgends
-  durchgesetzt.
+- ✅ **Scheibe C — Einladungen & Rollen** (02.08.2026). Ein Administrator lädt
+  eine **Adresse** ein (nicht ein Konto: die Person muss noch keines haben, und
+  beim Einladen darf nicht verraten werden, ob sie eines hat). Angenommen wird
+  nur mit Token **und** passender Adresse — Tokens werden weitergeleitet, und
+  wer den Link hat, ist nicht, wer eingeladen wurde. Der Token steht weder in
+  der Antwort noch in der Liste offener Einladungen und in der Datenbank nur als
+  Hash. Erneutes Einladen ersetzt die offene Einladung (Teilindex auf
+  `status = 'pending'`), sonst hätte ein Rückzug einen noch gültigen Zwilling.
+  `admin` gegen `member` wird jetzt durchgesetzt: nur Administratoren laden ein
+  und ziehen zurück, Mitglieder sehen die Mannschaft. Die Firmendomain spielt
+  dabei bewusst keine Rolle — sie beweist, wem die Domain gehört (ADR-0019); wen
+  das Unternehmen danach hereinlässt, ist seine Entscheidung.
+  **Offen:** ein Mitglied wieder zu entfernen. Der gefährliche Teil davon —
+  dass ein entzogener Zugang beim Refresh wirkt — ist bereits erledigt.
   ✅ **Die Mitgliedschaftsprüfung in `handle_refresh` ist vorgezogen und erledigt**
   (02.08.2026). Sie war als Folgearbeit zum Entfernungspfad notiert, wurde aber
   vorher gebaut: so ist der Entfernungspfad vom ersten Tag an sicher, statt eine
