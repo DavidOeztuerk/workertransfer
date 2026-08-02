@@ -29,7 +29,7 @@
 - [x] 9 Integrationstests (Docker) inkl. Widerruf wirkt sofort
 - [x] 10 Frontend: Profil bearbeiten + Sichtbarkeit schalten (TDD)
 - [x] 11 Frontend: Kandidatenliste für Unternehmen (TDD)
-- [ ] 12 Playwright-E2E, self-skip ohne laufenden Stack
+- [x] 12 Playwright-E2E, self-skip ohne laufenden Stack
 - [ ] 13 scripts/validate.sh — ein Befehl, der alles prüft und den Stand meldet
 - [ ] 14 ADR-0020 + ROADMAP/CLAUDE.md nachziehen
 
@@ -86,3 +86,9 @@
   anders antwortet. 503 zeigt nichts statt einer leeren Liste — eine leere Liste
   wäre eine Behauptung über Menschen. Keine Gesamtzahl: sie verriete, wie viele
   gerade NICHT freigegeben sind. 78 Frontend-Tests.
+- 12/13 Playwright-E2E (Selbst-Skip nach ADR-0011 verifiziert) und
+  scripts/validate.sh. Beim ersten echten Lauf zwei Betriebsfallen gefunden:
+  scripts/initdb läuft nur bei leerem Volume (profile-service drehte sich in
+  "database profile does not exist"), und der Web-Container startet nicht, wenn
+  sich die Lockfile geändert hat — pnpm will node_modules löschen und bricht
+  ohne TTY ab. Beides im Compose dokumentiert bzw. behoben (CI=true).
