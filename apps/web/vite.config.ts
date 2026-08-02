@@ -8,5 +8,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
+    // Nur src/: e2e/ gehört Playwright. Vitests Voreinstellung würde die
+    // .spec.ts dort einsammeln und an `import { test } from
+    // "@playwright/test"` scheitern.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
 });
