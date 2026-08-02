@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from transfer_service.domain.market_status import Availability, MarketStatus
-from transfer_service.infrastructure.database.models import MarketStatusModel
+from transfer_service.domain.transfer import Transfer, TransferStatus
+from transfer_service.infrastructure.database.models import MarketStatusModel, TransferModel
 
-__all__ = ["SqlAlchemyMarketStatusRepository"]
+__all__ = ["SqlAlchemyMarketStatusRepository", "SqlAlchemyTransferRepository"]
 
 
 def _to_domain(row: MarketStatusModel) -> MarketStatus:
@@ -47,3 +49,83 @@ class SqlAlchemyMarketStatusRepository:
         row.employed = status.employed
         row.note = status.note
         row.updated_at = status.updated_at
+
+
+def _transfer_to_domain(row: TransferModel) -> Transfer:
+    return Transfer(
+        id=row.id,
+        subject_id=row.subject_id,
+        tenant_id=row.tenant_id,
+        status=TransferStatus(row.status),
+        requires_release=row.requires_release,
+        release_confirmed=row.release_confirmed,
+        message=row.message,
+        offer_note=row.offer_note,
+        offer_start_on=row.offer_start_on,
+        offer_fee_cents=row.offer_fee_cents,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+class SqlAlchemyTransferRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get(self, transfer_id: UUID) -> Transfer | None:
+        row = await self._session.get(TransferModel, transfer_id)
+        return None if row is None else _transfer_to_domain(row)
+
+    async def find_running(self, subject_id: UUID, tenant_id: UUID) -> Transfer | None:
+        stmt = select(TransferModel).where(
+            TransferModel.subject_id == subject_id,
+            TransferModel.tenant_id == tenant_id,
+            TransferModel.status.in_(["interested", "talking", "offered", "accepted"]),
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        return None if row is None else _transfer_to_domain(row)
+
+    async def add(self, transfer: Transfer) -> None:
+        self._session.add(
+            TransferModel(
+                id=transfer.id,
+                subject_id=transfer.subject_id,
+                tenant_id=transfer.tenant_id,
+                status=str(transfer.status),
+                requires_release=transfer.requires_release,
+                release_confirmed=transfer.release_confirmed,
+                message=transfer.message,
+                offer_note=transfer.offer_note,
+                offer_start_on=transfer.offer_start_on,
+                offer_fee_cents=transfer.offer_fee_cents,
+                created_at=transfer.created_at,
+                updated_at=transfer.updated_at,
+            )
+        )
+
+    async def save(self, transfer: Transfer) -> None:
+        row = await self._session.get(TransferModel, transfer.id)
+        if row is None:
+            await self.add(transfer)
+            return
+        # Alle veränderlichen Felder schreiben.
+        row.status = str(transfer.status)
+        row.release_confirmed = transfer.release_confirmed
+        row.offer_note = transfer.offer_note
+        row.offer_start_on = transfer.offer_start_on
+        row.offer_fee_cents = transfer.offer_fee_cents
+        row.updated_at = transfer.updated_at
+
+    async def for_subject(self, subject_id: UUID) -> list[Transfer]:
+        return await self._listed(TransferModel.subject_id == subject_id)
+
+    async def for_tenant(self, tenant_id: UUID) -> list[Transfer]:
+        return await self._listed(TransferModel.tenant_id == tenant_id)
+
+    async def _listed(self, condition: object) -> list[Transfer]:
+        stmt = (
+            select(TransferModel)
+            .where(condition)  # type: ignore[arg-type]
+            .order_by(TransferModel.created_at.desc())
+        )
+        return [_transfer_to_domain(row) for row in (await self._session.execute(stmt)).scalars()]
