@@ -252,6 +252,11 @@ deckte. Kein neues Feature; nur die Differenz zwischen Behauptung und Realität.
 abgesichert; alle Funde in ROADMAP dokumentiert.
 
 ### Phase 3 — Candidate Core (Profile, Resume, Documents, Consent)
+**Stand 01.08.2026:** 3.1 (Consent-Ledger) und 3.1b (Identity-Angleichung +
+Onboarding) sind fertig und gemergt — ADR-0013 bis ADR-0019. Registrierung,
+E-Mail-Bestätigung, Unternehmensanlage und Tenant-Wechsel laufen über die
+Oberfläche; der Stack startet vollständig aus `docker compose up`. Offen:
+3.2–3.5 sowie Scheibe C (Einladungen/Rollen).
 - `apps/profile-service` — kandidateneigenes Profil, Documents, **Consent
   Ledger** (ohne Consent keine Sichtbarkeit — product-scope.md).
 - `apps/resume-service` — CV-Builder, Versionierung, Export, Templates via
