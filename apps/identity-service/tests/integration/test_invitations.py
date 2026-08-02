@@ -407,3 +407,64 @@ async def test_an_admin_may_leave_once_someone_else_is_admin(
         left = await admin.delete(f"/companies/{tenant_id}/members/{admin_id}")
 
         assert left.status_code == 204, left.text
+
+
+async def test_two_admins_leaving_at_once_cannot_orphan_the_company(
+    stack: tuple[Any, _CollectingMailer], postgres_url: str
+) -> None:
+    """Zwei Administratoren gehen gleichzeitig — das Unternehmen behält einen.
+
+    ACHTUNG, damit niemand mehr aus diesem Test liest, als drinsteht: er
+    besteht auch OHNE die `SELECT ... FOR UPDATE`-Sperre. Nachgeprüft, indem
+    der Quellcode zurückgerollt und der Test erneut laufen gelassen wurde. Zwei
+    Anfragen über ASGI im selben Prozess und derselben Event-Schleife
+    serialisieren sich an ihren await-Punkten meistens von selbst; das echte
+    Rennen bräuchte zwei Prozesse und passendes Timing.
+
+    Er bleibt trotzdem stehen, weil er die INVARIANTE festhält — höchstens einer
+    darf gehen, mindestens einer bleibt — und die gilt unabhängig davon, wie das
+    Rennen ausgeht. Der tatsächliche Schutz ist die Sperre im Repository, nicht
+    dieser Test.
+    """
+    import asyncio
+
+    app, mailer = stack
+    transport = ASGITransport(app=app)
+    domain = f"firma-{uuid4().hex[:8]}.example"
+    second_email = f"zweite@{domain}"
+
+    async with AsyncClient(transport=transport, base_url="http://test") as first:
+        first_id = await _register_and_login(first, f"chef@{domain}", "Erste", postgres_url)
+        tenant_id = await _company_for(first, "Firma")
+        await first.post(f"/auth/company/{tenant_id}")
+        await first.post(
+            f"/companies/{tenant_id}/invitations", json={"email": second_email, "role": "admin"}
+        )
+        token = _token_from(mailer.sent[-1][2])
+
+        async with AsyncClient(transport=transport, base_url="http://test") as second:
+            second_id = await _register_and_login(second, second_email, "Zweite", postgres_url)
+            await second.post("/invitations/accept", json={"token": token})
+            await second.post(f"/auth/company/{tenant_id}")
+
+            results = await asyncio.gather(
+                first.delete(f"/companies/{tenant_id}/members/{first_id}"),
+                second.delete(f"/companies/{tenant_id}/members/{second_id}"),
+                return_exceptions=True,
+            )
+
+    codes = [r.status_code for r in results if hasattr(r, "status_code")]
+    # Höchstens einer darf gehen; das Unternehmen behält seinen Administrator.
+    assert codes.count(204) <= 1, codes
+
+    engine = create_engine(postgres_url.replace("postgresql+asyncpg://", "postgresql+psycopg://"))
+    with engine.connect() as conn:
+        remaining = conn.execute(
+            text(
+                "SELECT count(*) FROM user_tenant_memberships "
+                "WHERE tenant_id = :t AND role = 'admin'"
+            ),
+            {"t": str(tenant_id)},
+        ).scalar_one()
+    engine.dispose()
+    assert remaining >= 1

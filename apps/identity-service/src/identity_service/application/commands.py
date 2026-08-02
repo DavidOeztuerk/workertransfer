@@ -865,12 +865,9 @@ async def handle_remove_member(
         return Result.fail(NotAMember())
 
     if member_role is MembershipRole.ADMIN:
-        admins = [
-            role
-            for _user, _name, role in await repos["memberships"].list_members(cmd.tenant_id)
-            if role is MembershipRole.ADMIN
-        ]
-        if len(admins) <= 1:
+        # Sperrend gezählt: zwei Administratoren, die gleichzeitig gehen, sähen
+        # sonst beide zwei und kämen beide durch.
+        if await repos["memberships"].count_admins_for_update(cmd.tenant_id) <= 1:
             return Result.fail(LastAdminMayNotLeave())
 
     await repos["memberships"].remove(cmd.member_id, cmd.tenant_id)

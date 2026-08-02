@@ -126,6 +126,26 @@ class SqlAlchemyMembershipRepository:
         role = (await self._session.execute(stmt)).scalar_one_or_none()
         return None if role is None else MembershipRole(role)
 
+    async def count_admins_for_update(self, tenant_id: UUID) -> int:
+        """Zählt die Administratoren und sperrt die Zeilen bis zum Commit.
+
+        Ohne die Sperre könnten zwei Administratoren, die gleichzeitig
+        „Verlassen" drücken, beide zwei sehen und beide durchkommen — das
+        Unternehmen bliebe ohne Administrator zurück, also genau in dem
+        verwaisten Zustand, den die Regel verhindern soll. Der Fall ist selten,
+        die Folge unumkehrbar ohne Datenbankzugriff; deshalb wird er gesperrt
+        und nicht gehofft.
+        """
+        stmt = (
+            select(UserTenantMembershipModel.id)
+            .where(
+                UserTenantMembershipModel.tenant_id == tenant_id,
+                UserTenantMembershipModel.role == str(MembershipRole.ADMIN),
+            )
+            .with_for_update()
+        )
+        return len((await self._session.execute(stmt)).all())
+
     async def remove(self, user_id: UUID, tenant_id: UUID) -> None:
         await self._session.execute(
             delete(UserTenantMembershipModel).where(
