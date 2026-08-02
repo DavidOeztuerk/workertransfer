@@ -492,9 +492,22 @@ Qualitätsgates, nicht mehr nur Syntax.
   Bestätigung der Person ihn selbst auslöst. Beide haben jetzt einen Test, der
   ohne den Fix rot wird.
 
-Offen in Phase 5: Vertragsentwürfe (`worker-templates`), digitale Unterschrift
-und `worker-player-advisor` (KI-Entwürfe, niemals autonome Verhandlung). Alle
-drei sind eigene Schnitte; der erste bringt eine rechtliche Abwägung mit.
+Offen in Phase 5:
+
+- **Vertragsvorlagen** — [Entwurf steht, gebaut wird nichts](superpowers/specs/2026-08-02-contract-templates-design.md).
+  Festgelegt ist der Weg: die Plattform stellt **Vorlagen**, füllt aus, und
+  danach geht der Entwurf **in die Prüfung** — erst wenn dort alles stimmt,
+  steht er zur Unterschrift bereit. Sie erzeugt keinen Vertrag, und sie füllt
+  nur, was sie schon weiß und was beide Seiten schon vereinbart haben (Name,
+  Unternehmen, Startmonat, Ablöse, Rolle). Gehalt, Fristen, Probezeit bleiben
+  Platzhalter; eine Vorbelegung mit „üblichen Werten" sähe aus wie eine
+  Empfehlung und würde als eine gelesen.
+  Ab „in Prüfung" ist der Entwurf eingefroren — auch für Tippfehler, besonders
+  für Tippfehler.
+  **Gebaut wird davon nichts**, bis sieben rechtliche Fragen beantwortet sind;
+  die nach der Formvorschrift zuerst, weil sie den ganzen Schnitt umwerfen kann.
+- **Digitale Unterschrift** — hängt an derselben Frage.
+- **`worker-player-advisor`** — KI-Entwürfe, niemals autonome Verhandlung.
 
 ### Querschnitt — Benachrichtigungen ✅ (02.08.2026)
 
