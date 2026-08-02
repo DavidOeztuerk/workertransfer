@@ -323,9 +323,15 @@ was der Code tat.
 - ⬜ 3.5 `worker-files`/`worker-storage` real machen (Workspace-Re-Include)
 - ⬜ **Scheibe C — Einladungen & Rollen.** Ein Unternehmen kann entstehen, aber
   niemand außer dem Gründer hineinkommen; `admin` gegen `member` wird nirgends
-  durchgesetzt. **Muss zusammen mit dem Entfernungspfad die fehlende
-  Mitgliedschaftsprüfung in `handle_refresh` mitbringen** — heute latent, weil
-  niemand entfernt werden kann (siehe ADR-0019, Konsequenzen).
+  durchgesetzt.
+  ✅ **Die Mitgliedschaftsprüfung in `handle_refresh` ist vorgezogen und erledigt**
+  (02.08.2026). Sie war als Folgearbeit zum Entfernungspfad notiert, wurde aber
+  vorher gebaut: so ist der Entfernungspfad vom ersten Tag an sicher, statt eine
+  Lücke zu öffnen, die man danach schließen müsste. Ein entzogener Zugang wirkt
+  jetzt beim nächsten Refresh; die Sitzung überlebt und die Person handelt wieder
+  als Person. Nebenbei repariert: `_FakeTokens` gab in den Unit-Tests immer
+  `tenant_id=None` zurück und konnte über den Tenant im Refresh deshalb gar
+  nichts aussagen.
 
 Nächste Aktion: **Sub-step 3.4 — Portfolio-Service.** Profil und Lebenslauf
 decken ab, wer jemand ist und wo er war; das Portfolio zeigt, was dabei

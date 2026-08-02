@@ -405,18 +405,46 @@ async def handle_refresh(
     if row is None or row.revoked_at is not None or row.expires_at <= now:
         return Result.fail(InvalidCredentials())
 
+    # Re-check the membership instead of trusting the tenant in the old token.
+    # `handle_switch_tenant` verifies it once, when the company token is minted;
+    # carrying that claim forward blindly would make the check good exactly once.
+    # Whoever was let in would stay in for as long as they keep refreshing, long
+    # after the company removed them.
+    #
+    # Only the tenant is dropped, not the session: the person is still logged in
+    # and simply acts as themselves again, which is the default state (ADR-0017).
+    # Revoking the session would log someone out of their personal account
+    # because a company relationship ended.
+    tenant_id = principal.tenant_id
+    if tenant_id is not None and not await repos["memberships"].is_member(
+        principal.user_id, tenant_id
+    ):
+        tenant_id = None
+        await repos["audit"].append(
+            AuditEvent(
+                occurred_at=now,
+                actor_id=principal.user_id,
+                # The tenant that was dropped is the point of the record.
+                tenant_id=principal.tenant_id,
+                action=AuditAction.TENANT_SWITCH_DENIED,
+                target_id=None,
+                correlation_id=_correlation_id(),
+                metadata={"reason": "membership_gone_on_refresh"},
+            )
+        )
+
     # Rotate: revoke the old session, mint a new jti + tokens.
     await repos["sessions"].revoke(row.refresh_jti, now)
     new_jti = secrets.token_urlsafe(16)
     await repos["sessions"].add(
         user_id=principal.user_id,
-        tenant_id=principal.tenant_id,
+        tenant_id=tenant_id,
         refresh_jti=new_jti,
         expires_at=now + timedelta(minutes=deps["settings"].jwt_refresh_token_expire_minutes),
     )
     pair: TokenPair = tokens.issue_pair(
         user_id=principal.user_id,
-        tenant_id=principal.tenant_id,
+        tenant_id=tenant_id,
         roles=list(principal.roles),
         permissions=[],
         session_jti=new_jti,
@@ -425,7 +453,7 @@ async def handle_refresh(
         AuditEvent(
             occurred_at=now,
             actor_id=principal.user_id,
-            tenant_id=principal.tenant_id,
+            tenant_id=tenant_id,
             action=AuditAction.TOKEN_REFRESH,
             target_id=None,
             correlation_id=_correlation_id(),

@@ -196,3 +196,83 @@ async def test_x_tenant_id_header_ignored_in_production_mode(
         )
         assert me.status_code == 200, me.text
         assert me.json()["tenant_id"] == str(tenant)
+
+
+async def test_refresh_drops_a_company_whose_membership_was_removed(
+    postgres_url: str, migrated_schema: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ein Rauswurf muss beim nächsten Refresh wirken, nicht erst beim Ablauf.
+
+    `POST /auth/company/{id}` prüft die Mitgliedschaft. Übernimmt der Refresh
+    den Tenant danach ungeprüft aus dem alten Token, ist diese Prüfung genau
+    einmal wirksam — und wer alle 24 Stunden erneuert, bleibt beliebig lange in
+    dem Unternehmen, aus dem er entfernt wurde.
+
+    Die Sitzung selbst überlebt: die Person ist weiterhin angemeldet und handelt
+    danach als Person (ADR-0017). Sie abzumelden, weil eine Firmenbeziehung
+    endet, wäre die falsche Strafe.
+    """
+    monkeypatch.setenv("WORKER_JWT_SECRET", "test-secret-with-at-least-thirty-two-bytes-xx")
+
+    from identity_service.configuration import IdentityServiceSettings
+    from identity_service.presentation.compose_api import build_app
+
+    transport = ASGITransport(app=build_app(IdentityServiceSettings()))
+    tenant = uuid4()
+    email = f"removed-{tenant}@example.com"
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        register = await client.post(
+            "/auth/register",
+            json={"email": email, "password": "strongpassword1", "display_name": "Removed"},
+        )
+        assert register.status_code == 201, register.text
+
+    engine = create_async_engine(postgres_url)
+    try:
+        # Freischalten und Mitgliedschaft von Hand — beides sind Seams, die
+        # dieser Test nicht prüft; er prüft, was der Refresh damit macht.
+        async with engine.begin() as conn:
+            await conn.execute(
+                text("UPDATE users SET status = 'active' WHERE email = :e"), {"e": email}
+            )
+            user_id = (
+                await conn.execute(text("SELECT id FROM users WHERE email = :e"), {"e": email})
+            ).scalar_one()
+            await conn.execute(
+                text("INSERT INTO tenants (id, name, domain) VALUES (:t, 'Removed Co', :d)"),
+                {"t": str(tenant), "d": f"removed-{tenant}.example"},
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO user_tenant_memberships (id, user_id, tenant_id) "
+                    "VALUES (gen_random_uuid(), :u, :t)"
+                ),
+                {"u": str(user_id), "t": str(tenant)},
+            )
+
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            login = await client.post(
+                "/auth/login", json={"email": email, "password": "strongpassword1"}
+            )
+            assert login.status_code == 200, login.text
+            switched = await client.post(f"/auth/company/{tenant}")
+            assert switched.status_code == 200, switched.text
+            me = await client.get("/me")
+            assert me.json()["tenant_id"] == str(tenant)
+
+            # Der Rauswurf.
+            async with engine.begin() as conn:
+                await conn.execute(
+                    text("DELETE FROM user_tenant_memberships WHERE user_id = :u"),
+                    {"u": str(user_id)},
+                )
+
+            refreshed = await client.post("/auth/refresh")
+            assert refreshed.status_code == 200, refreshed.text
+
+            me = await client.get("/me")
+            assert me.status_code == 200, me.text
+            assert me.json()["tenant_id"] is None
+    finally:
+        await engine.dispose()
