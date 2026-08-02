@@ -15,6 +15,7 @@ import { CompanyTransfersRoute } from "./routes/company-transfers";
 import { ConsentsRoute } from "./routes/consents";
 import { CompanyNewRoute } from "./routes/company-new";
 import { HomeRoute } from "./routes/home";
+import { OverviewRoute } from "./routes/overview";
 import { LoginRoute } from "./routes/login";
 import { PortfolioRoute } from "./routes/portfolio";
 import { ProfileRoute } from "./routes/profile";
@@ -260,7 +261,19 @@ function CompanyNewWithSession() {
 }
 
 const rootRoute = createRootRoute({ component: RootLayout });
-const homeRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: HomeRoute });
+function HomeOrOverview() {
+  // Angemeldet zeigt die Startseite, was ansteht — nicht mehr die Werbung.
+  // Wer schon da ist, muss nicht überzeugt werden.
+  const { user, isLoading } = useSession();
+  if (isLoading) return null;
+  return user === null ? <HomeRoute /> : <OverviewRoute principal={user} />;
+}
+
+const homeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  component: HomeOrOverview,
+});
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",

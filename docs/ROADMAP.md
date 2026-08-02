@@ -566,6 +566,23 @@ Reihenfolge umzudrehen wäre schneller und hieße, die Sichtbarkeit in die
 Datenbank des Profildienstes zu legen. Ein Integrationstest legt zwei Profile
 mit derselben Fähigkeit an, gibt eines frei, und der Filter findet genau eines.
 
+### Querschnitt — „Was liegt an" ✅ (02.08.2026)
+
+Nach dem Anmelden stand die Werbung. Wer schon da ist, muss nicht überzeugt
+werden — er muss wissen, was auf ihn wartet. Die Startseite zeigt Angemeldeten
+jetzt genau das.
+
+**Zusammengesetzt im Browser, nicht im Backend.** Ein Dienst, der diese
+Übersicht liefert, müsste über vier Dienstgrenzen hinweg lesen — genau das, was
+ADR-0004 ausschließt. Die Oberfläche fragt jeden Dienst nach dem, wofür er
+zuständig ist; es sind dieselben Abfragen wie auf den Einzelseiten, und der
+Cache teilt sie.
+
+**Gezählt wird nur, was eine Handlung erwartet** — nicht, was von selbst läuft.
+Sonst wäre es eine Liste, und Listen übersieht man. Und schlägt eine Abfrage
+fehl, sagt die Seite das, statt „nichts liegt an" zu behaupten: das ist die eine
+Aussage, die nach einem Fehler falsch sein kann und in Sicherheit wiegt.
+
 ### Weiterhin offen, quer durch alle Phasen
 
 - **Kein S3-Backend**, solange keine Umgebung eines braucht (ADR-0021).
