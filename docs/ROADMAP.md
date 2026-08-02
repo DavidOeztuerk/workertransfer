@@ -206,8 +206,10 @@ was der Code tat.
   eigene Lint-Schulden und definieren einen **lokalen** `Mediator`/`PipelineBehavior`,
   der `worker_platform.application.cqrs` dupliziert — ein ADR-0002-Verstoß, der sonst in
   jeden generierten Service eingebacken wird.
-- `worker-github` bleibt unimportierbar (Source nutzt PyGithub, deklariert ist
-  `githubkit`). Wird erst in Phase 6 gebraucht; Fix gehört dorthin.
+- ~~`worker-github` bleibt unimportierbar~~ — **erledigt am 03.08.2026 durch
+  Löschen, nicht durch Reparieren** (ADR-0022). Die damalige Einschätzung „Fix
+  gehört in Phase 6" war falsch: repariert hätte der Import 318 Zeilen scharf
+  gestellt, die einen Menschen zu einer Zahl zwischen 0 und 100 verrechnen.
 - `worker-ai` bleibt aus dem Workspace exkludiert (ML-Wheels ohne
   Python-3.14-Rad). Für Phase 7 über optionale Extras zu lösen, analog weasyprint.
 - Kein `Authorization`-Header **und** kein Cookie ⇒ 401; per-IP-Rate-Limiting am
@@ -607,6 +609,16 @@ vollständig aus.
 
 ### Weiterhin offen, quer durch alle Phasen
 
+- **`worker-github` ist gelöscht** (03.08.2026, **ADR-0022**). Nicht repariert:
+  es war unimportierbar, hatte keinen Konsumenten — und verrechnete einen
+  Menschen zu einer Zahl zwischen 0 und 100, aus zehn Dimensionen mit
+  Gewichten, die niemand begründet hat. „Können in einer Sprache" maß es als
+  Anteil an geschriebenen **Bytes**. Ein Import-Fix hätte 318 Zeilen scharf
+  gestellt, die genau die Art von Aussage produzieren, gegen die diese
+  Plattform gebaut ist. Die ADR sagt, was in Phase 6 wiederkommen darf (Belege
+  mit Herkunft, Einwilligung zuerst) und was nicht (ein Gesamtscore).
+  Damit ein Skip weniger; übrig bleibt `worker-ai`.
+
 - **Die E2E-Wackelkandidaten waren zwei Fehler, kein „Last".** Erledigt
   (03.08.2026), und die Diagnose ist die Geschichte wert:
   1. Klicks auf Listeneinträge hatten nur das `actionTimeout` (15 s) statt des
@@ -628,5 +640,3 @@ vollständig aus.
   einer in `e2e/stack.ts` geworden.
 - **Kein S3-Backend**, solange keine Umgebung eines braucht (ADR-0021).
 - **Keine personalisierten Karriere-Seiten** (siehe 4.4).
-- **`worker-github` unimportierbar** (`from github import Github`, deklariert ist
-  `githubkit`) — wird erst in Phase 6 gebraucht.
