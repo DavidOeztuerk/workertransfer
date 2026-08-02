@@ -88,7 +88,13 @@ test("eine Einladung lässt genau die eingeladene Person herein", async ({ brows
   await registerAndConfirm(colleague, colleagueEmail, "E2E Kollege");
   await login(colleague, colleagueEmail);
   await colleague.goto(`/invitation?token=${token}`);
-  await expect(colleague.getByText(new RegExp(companyName))).toBeVisible();
+  // Die Überschrift, nicht irgendein Text: der Firmenname steht nach dem
+  // Beitritt auch als <option> im Unternehmenswechsler, und eine <option>
+  // gilt als versteckt — der Test scheiterte dann mit "Received: hidden",
+  // obwohl die Seite genau das zeigte, was sie sollte.
+  await expect(
+    colleague.getByRole("heading", { name: new RegExp(companyName) })
+  ).toBeVisible();
 
   // Der Beitritt wechselt die Sitzung NICHT — das muss die Person selbst tun.
   await actAsCompany(colleague, companyName);

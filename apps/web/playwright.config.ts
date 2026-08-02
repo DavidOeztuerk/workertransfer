@@ -23,8 +23,20 @@ export default defineConfig({
   // machten aus normaler Schwankung unter Docker-auf-macOS ein Rot, das
   // nichts über den Code aussagt.
   timeout: 150_000,
-  expect: { timeout: 15_000 },
+  // 30 s, nicht 15: gemessen scheitert etwa jeder dritte Lauf an der
+  // Anmeldung, wenn gleichzeitig elf Container und der Vite-Dev-Server auf
+  // derselben Maschine laufen. Der Vorgang selbst dauert unter einer Sekunde;
+  // es ist Wartezeit auf eine ausgelastete Maschine, keine Langsamkeit im Code.
+  // Das ist eine Toleranz und keine Reparatur — steht hier, damit niemand aus
+  // dem grünen Lauf schließt, es sei etwas behoben worden.
+  expect: { timeout: 30_000 },
   use: {
+    // Ohne dieses Limit erbt eine Aktion das Zeitlimit des ganzen Tests: ein
+    // fill() auf ein Feld, das es auf dieser Seite gar nicht gibt, verbrennt
+    // dann das gesamte Budget und meldet am Ende nur "Test timeout", ohne zu
+    // sagen wo. Genau so hat sich ein Navigationsfehler in dieser Reise sieben
+    // Minuten lang versteckt.
+    actionTimeout: 15_000,
     baseURL: process.env.E2E_WEB_URL ?? "http://localhost:5173",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

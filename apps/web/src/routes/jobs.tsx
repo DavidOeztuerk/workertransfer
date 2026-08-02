@@ -1,8 +1,9 @@
-import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button, Card, Field, TextArea } from "@workertransfer/ui";
 
 import { apply } from "../applications/client";
+import { getCompanyProfile } from "../companies/client";
 import type { MeResponse } from "../auth/client";
 
 import {
@@ -123,6 +124,7 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
             <li key={job.id}>
               <Card>
                 <h2 className="candidates__headline">{job.title}</h2>
+                <Hiring tenantId={job.tenant_id} />
                 <p className="candidates__meta">
                   {job.location !== "" ? job.location : "Ort nicht angegeben"} ·{" "}
                   {REMOTE_LABEL[job.remote]} · {EMPLOYMENT_LABEL[job.employment]}
@@ -266,5 +268,43 @@ function ApplyBox({ jobId }: { jobId: string }) {
         Abbrechen
       </Button>
     </form>
+  );
+}
+
+
+/**
+ * Wer sucht.
+ *
+ * Ohne Profil zeigt die Karte hier nichts — eine Stelle bleibt dann anonym.
+ * Das ist ein Zustand, den das Unternehmen selbst herbeigeführt hat, und ihn
+ * mit einem Platzhalter wie „Unbekanntes Unternehmen" zu füllen wäre eine
+ * Aussage, die niemand gemacht hat.
+ *
+ * Der Query-Key hängt am Unternehmen, nicht an der Stelle: mehrere Stellen
+ * desselben Arbeitgebers teilen sich damit eine Abfrage.
+ */
+function Hiring({ tenantId }: { tenantId: string }) {
+  const query = useQuery({
+    queryKey: ["company", "profile", tenantId],
+    queryFn: () => getCompanyProfile(tenantId),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const profile = query.data;
+  if (profile === undefined || profile === null) return null;
+
+  return (
+    <p className="jobs__hiring">
+      <strong>{profile.display_name}</strong>
+      {profile.website !== null ? (
+        <>
+          {" · "}
+          <a href={profile.website} target="_blank" rel="noreferrer noopener">
+            Website
+          </a>
+        </>
+      ) : null}
+      {profile.benefits.length > 0 ? <> {" · "}{profile.benefits.join(", ")}</> : null}
+    </p>
   );
 }

@@ -5,6 +5,7 @@ from worker_contracts.applications import (
     ApplicationV1,
     SubmitApplicationV1,
 )
+from worker_contracts.companies import CompanyProfileV1, SaveCompanyProfileV1
 from worker_contracts.consent import (
     ConsentCheckResultV1,
     ConsentCheckV1,
@@ -48,6 +49,7 @@ __all__ = [
     "AttachmentV1",
     "Command",
     "CompanyMemberV1",
+    "CompanyProfileV1",
     "CompanyV1",
     "ConsentCheckResultV1",
     "ConsentCheckV1",
@@ -73,6 +75,7 @@ __all__ = [
     "ResendVerificationV1",
     "ResumeRequestV1",
     "ResumeV1",
+    "SaveCompanyProfileV1",
     "SaveJobV1",
     "SavePortfolioV1",
     "SaveProfileV1",
