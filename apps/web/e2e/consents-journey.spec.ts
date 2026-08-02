@@ -90,6 +90,11 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
 
   await recruiter.goto("/candidates");
   const card = recruiter.locator("li").filter({ hasText: headline });
+  // Erst warten, dann klicken. `click()` hat nur das actionTimeout (15 s);
+  // unter Last — elf Container, Vite und Chromium auf einer Maschine — braucht
+  // die Kandidatenliste länger, und der Test scheiterte am Klick statt am
+  // Prüfgegenstand. Genau so ist er zweimal umgefallen.
+  await expect(card).toBeVisible();
   await card.getByRole("button", { name: /Marktstatus anfragen/i }).click();
   await expect(card.getByText(/Marktstatus angefragt/i)).toBeVisible();
 
