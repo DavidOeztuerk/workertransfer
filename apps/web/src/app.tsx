@@ -16,6 +16,7 @@ import { CandidatesRoute } from "./routes/candidates";
 import { CompanyTransfersRoute } from "./routes/company-transfers";
 import { ConsentsRoute } from "./routes/consents";
 import { CompanyNewRoute } from "./routes/company-new";
+import { GitHubRoute } from "./routes/github";
 import { HomeRoute } from "./routes/home";
 import { OverviewRoute } from "./routes/overview";
 import { LoginRoute } from "./routes/login";
@@ -129,6 +130,9 @@ export function RootLayout() {
                 <Link className="site-header__menu-item" to="/portfolio">
                   Arbeiten
                 </Link>
+                <Link className="site-header__menu-item" to="/github">
+                  GitHub
+                </Link>
                 <Link className="site-header__menu-item" to="/applications">
                   Bewerbungen
                 </Link>
@@ -240,6 +244,11 @@ function ResumeWithSession() {
 function CandidatesWithSession() {
   const { user } = useSession();
   return <CandidatesRoute principal={user} />;
+}
+
+function GitHubWithSession() {
+  const { user } = useSession();
+  return <GitHubRoute principal={user} />;
 }
 
 function MyDataWithSession() {
@@ -371,6 +380,11 @@ const applicationsRoute = createRoute({
   path: "/applications",
   component: ApplicationsWithSession,
 });
+const githubRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/github",
+  component: GitHubWithSession,
+});
 const myDataRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/meine-daten",
@@ -441,6 +455,7 @@ const routeTree = rootRoute.addChildren([
   applicationsRoute,
   consentsRoute,
   myDataRoute,
+  githubRoute,
   settingsRoute,
   marketRoute,
   transfersRoute,

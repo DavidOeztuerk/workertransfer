@@ -16,6 +16,7 @@ import {
   listCompanyMarketRequests,
   requestMarketStatus,
 } from "../market/client";
+import { getGitHub } from "../github/client";
 import { requestResume } from "../resume/client";
 import { expressInterest } from "../transfers/client";
 
@@ -181,6 +182,7 @@ export function CandidatesRoute({ principal = null }: CandidatesRouteProps) {
                   subjectId={profile.subject_id}
                   request={marketRequests.get(profile.subject_id)}
                 />
+                <GitHubEvidence subjectId={profile.subject_id} />
               </Card>
             </li>
           ))}
@@ -363,3 +365,54 @@ const AVAILABILITY: Record<string, string> = {
   listening: "Hört zu",
   unavailable: "Gerade nicht ansprechbar",
 };
+
+
+/**
+ * Die GitHub-Belege einer Person — wenn sie freigegeben sind.
+ *
+ * Kein „nicht verbunden" und kein „nicht freigegeben": beides ist von „gibt es
+ * nicht" ununterscheidbar, genau wie der Server es hält. Wer nichts auf GitHub
+ * hat, ist nicht schlechter, sondern woanders (ADR-0022) — deshalb steht hier
+ * lieber gar nichts als ein Hinweis auf eine Leerstelle.
+ */
+function GitHubEvidence({ subjectId }: { subjectId: string }) {
+  const query = useQuery({
+    queryKey: ["github", subjectId],
+    queryFn: () => getGitHub(subjectId),
+  });
+
+  const connection = query.data?.ok === true ? query.data.connection : null;
+  if (connection === null) return null;
+
+  return (
+    <div className="candidates__github">
+      <p className="requests__title">
+        <a href={`https://github.com/${connection.login}`} target="_blank" rel="noreferrer noopener">
+          github.com/{connection.login}
+        </a>
+      </p>
+      {connection.repositories.length === 0 ? (
+        <p className="requests__meta">Keine öffentlichen Repositories.</p>
+      ) : (
+        <ul className="candidates__repos">
+          {/* Die ersten fünf, nach letzter Änderung. Keine Auswahl nach
+              „Qualität" — die gibt es hier nicht, und eine Reihung wäre bereits
+              eine Wertung. */}
+          {connection.repositories.slice(0, 5).map((repo) => (
+            <li key={repo.name}>
+              <a href={repo.url} target="_blank" rel="noreferrer noopener">
+                {repo.name}
+              </a>
+              {repo.language !== null ? ` · ${repo.language}` : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="requests__meta">
+        {connection.fetched_at !== null
+          ? `Stand: ${new Date(connection.fetched_at).toLocaleDateString("de-DE")}`
+          : null}
+      </p>
+    </div>
+  );
+}

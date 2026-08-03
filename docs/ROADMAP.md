@@ -16,7 +16,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 3 | Candidate Core | ✅ | 3.1–3.5 komplett (Consent, Profile, Resume, Portfolio, Ablage) |
 | 4 | Jobs & Applications | ✅ | 4.1–4.4 komplett (Jobs, Bewerbungen, Unternehmen, Karriere-Seiten) |
 | 5 | Transfermarkt | 🟧 | 5.1–5.3 ✅ (Marktstatus, Vorgang, Tür + Oberfläche); Verträge, Unterschrift, KI-Beratung offen |
-| 6 | Developer Intelligence | ⬜ | GitHub-Consent, Skill-Graph, Scout-Match |
+| 6 | Developer Intelligence | 🟧 | 6.1 ✅ (GitHub als Beleg); Skill-Graph und Matching offen |
 | 7 | AI Agent Plattform | ⬜ | 23 Agenten (draft-only), plan-act-reflect, MCP |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ⬜ | Outbox/Inbox, cross-service Events |
@@ -626,6 +626,29 @@ Signal für den Unternehmenswechsel. Die liegen jetzt im Menü und sind zugeklap
 unsichtbar. Ersetzt durch die Menü-Zusammenfassung, die es nur mit aktivem
 Unternehmen gibt — ein ehrlicheres Signal als ein Link, der auch ohne Wechsel
 existieren könnte.
+
+### Phase 6 — Status: 🟧 in Arbeit
+
+- ✅ **6.1 GitHub als Beleg, nicht als Note** — 03.08.2026.
+  [Design](superpowers/specs/2026-08-03-github-evidence-design.md).
+  Beginnt da, wo **ADR-0022** es verlangt: bei der Einwilligung, nicht bei einer
+  Formel. Gezeigt werden öffentliche Repositories mit Link — keine Punktzahl,
+  kein Rang, keine abgeleitete Eigenschaft. Ein Test prüft, dass `Repository`
+  genau sechs Felder hat, damit ein `score` nicht unbemerkt hineinwächst.
+  **Die tragende Entscheidung: einmal lesen, nicht zusehen.** Kein
+  Hintergrundabgleich, kein Nachtlauf, kein Webhook. ADR-0004 verbietet
+  Scraping; der Buchstabe wäre mit einem periodischen Abruf eingehalten, der
+  Sinn nicht — eine Plattform, die einem Menschen dauerhaft hinterhersieht, tut
+  etwas anderes als eine, die einmal auf seine Bitte hinsieht.
+  Der Nachweis läuft über einen öffentlichen Gist (Beschreibung, nicht Inhalt),
+  weil es noch keine OAuth-App gibt. Wer den Namen auf ein anderes Konto ändert,
+  verliert ihn — sonst stünde fremde Arbeit unter dem eigenen Profil.
+  **Zwei Generator-Fehler kamen dabei ans Licht:** ein Servicename ohne
+  `-service` erzeugte das Modul `github` (genau der Name, an dem `worker-github`
+  zerbrochen ist), und die Vorlage verdrahtete die **Auth-Middleware nicht** —
+  jeder Endpunkt antwortete 401, obwohl ein gültiges Token mitkam. Jeder
+  bestehende Dienst hatte das von Hand nachgetragen. Beides jetzt in der Vorlage
+  bzw. als Riegel im Generator, beides mit Test.
 
 ### Weiterhin offen, quer durch alle Phasen
 

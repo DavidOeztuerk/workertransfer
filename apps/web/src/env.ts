@@ -37,3 +37,4 @@ export const APPLICATIONS_BASE_URL = resolve(
 );
 export const COMPANIES_BASE_URL = resolve(import.meta.env.VITE_COMPANIES_BASE_URL, 8008);
 export const TRANSFER_BASE_URL = resolve(import.meta.env.VITE_TRANSFER_BASE_URL, 8009);
+export const GITHUB_BASE_URL = resolve(import.meta.env.VITE_GITHUB_BASE_URL, 8010);
