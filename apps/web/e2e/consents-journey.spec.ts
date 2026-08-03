@@ -222,3 +222,39 @@ test("die Auskunft nennt jeden Abschnitt — auch die leeren", async ({ browser 
 
   await context.close();
 });
+
+
+test("GitHub verbinden verlangt einen Nachweis — und rechnet keine Note", async ({ browser }) => {
+  const email = uniqueEmail("kandidat.example");
+  const stamp = Date.now();
+
+  const context = await browser.newContext();
+  const person = await context.newPage();
+  await registerAndConfirm(person, email, "E2E GitHub");
+  await login(person, email);
+
+  await person.goto("/github");
+
+  // Die Zusage steht auf der Seite, auf der jemand sein Konto verbindet — nicht
+  // in einer ADR, die er nie liest.
+  await expect(person.getByText(/Belege, keine Noten/)).toBeVisible();
+  await expect(person.getByText(/kein Abgleich im Hintergrund/)).toBeVisible();
+
+  await person.getByLabel(/GitHub-Benutzername/).fill(`e2e-nutzer-${stamp}`);
+  await person.getByRole("button", { name: "Weiter" }).click();
+
+  // Ohne Gist keine Verbindung: ein Feld „mein GitHub-Name" ohne Nachweis wäre
+  // eine Einladung, sich mit fremder Arbeit zu schmücken.
+  const challenge = person.locator(".github__challenge");
+  await expect(challenge).toBeVisible();
+  await expect(challenge).toHaveText(/^workertransfer-verify-/);
+
+  await person.getByRole("button", { name: "Nachweis prüfen" }).click();
+  // GitHub kennt diesen Benutzer nicht — also bleibt es bei „nicht bewiesen",
+  // und nichts wird gezeigt.
+  await expect(person.getByRole("alert")).toBeVisible();
+  await person.reload();
+  await expect(person.locator(".github__challenge")).toBeVisible();
+
+  await context.close();
+});
