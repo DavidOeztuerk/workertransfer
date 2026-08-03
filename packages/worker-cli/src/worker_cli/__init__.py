@@ -19,6 +19,42 @@ def _alembic_dir_for(service: str) -> Path:
     return Path(f"apps/{service}")
 
 
+def _reject_bad_service_name(name: str) -> None:
+    """Zwei Fallen, die beide schon zugeschnappt sind.
+
+    **Die Endung.** Jeder Dienst hier heißt `<etwas>-service`, und der
+    Modulname folgt daraus. Ohne Endung entsteht `apps/github` mit dem Modul
+    `github` — ein Name, der sich von allen anderen unterscheidet und beim
+    Umbenennen jeden Import mitnimmt.
+
+    **Die Kollision.** Ein Modulname, den es als installiertes Paket schon
+    gibt, überschattet dieses Paket. Genau daran ist `worker-github`
+    zerbrochen: `from github import Github` griff ins Leere, weil PyGithub gar
+    nicht installiert war (ADR-0022) — und ein selbst erzeugtes Modul `github`
+    hätte denselben Namen ein zweites Mal belegt.
+    """
+    import importlib.util
+
+    if not re.fullmatch(r"[a-z][a-z0-9]*(-[a-z0-9]+)*", name):
+        console.print(f"[red]{name!r} ist kein kebab-case-Name (a-z, 0-9, Bindestrich)[/red]")
+        raise typer.Exit(1)
+    if not name.endswith("-service"):
+        console.print(
+            f"[red]{name!r} endet nicht auf '-service'.[/red] "
+            f"Gemeint war vermutlich [green]{name}-service[/green] — "
+            "jeder Dienst hier heißt so, und der Modulname folgt daraus."
+        )
+        raise typer.Exit(1)
+
+    module_name = name.replace("-", "_")
+    if importlib.util.find_spec(module_name) is not None:
+        console.print(
+            f"[red]Das Modul {module_name!r} gibt es bereits[/red] — ein erzeugtes Modul "
+            "gleichen Namens würde es überschatten. Anderen Namen wählen."
+        )
+        raise typer.Exit(1)
+
+
 @app.command()
 def new_service(
     name: str = typer.Argument(..., help="Service name (kebab-case)"),
@@ -26,6 +62,8 @@ def new_service(
     path: str = typer.Option("apps", help="Target directory"),
 ) -> None:
     """Create a new microservice with Clean Architecture"""
+    _reject_bad_service_name(name)
+
     service_dir = Path(path) / name
     if service_dir.exists():
         console.print(f"[red]Directory {service_dir} already exists[/red]")

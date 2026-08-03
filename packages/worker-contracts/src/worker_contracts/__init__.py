@@ -15,6 +15,11 @@ from worker_contracts.consent import (
     ConsentRevokeV1,
     ConsentStateV1,
 )
+from worker_contracts.github import (
+    ConnectGitHubV1,
+    GitHubConnectionV1,
+    RepositoryV1,
+)
 from worker_contracts.identity import (
     AcceptInvitationV1,
     CompanyMemberV1,
@@ -63,6 +68,7 @@ __all__ = [
     "CompanyMemberV1",
     "CompanyProfileV1",
     "CompanyV1",
+    "ConnectGitHubV1",
     "ConsentCheckResultV1",
     "ConsentCheckV1",
     "ConsentGrantV1",
@@ -74,6 +80,7 @@ __all__ = [
     "EducationV1",
     "Event",
     "ExpressInterestV1",
+    "GitHubConnectionV1",
     "InvitationV1",
     "InviteMemberV1",
     "JobPageV1",
@@ -92,6 +99,7 @@ __all__ = [
     "ProfileV1",
     "Query",
     "RegisterUserV1",
+    "RepositoryV1",
     "ResendVerificationV1",
     "ResumeRequestV1",
     "ResumeV1",

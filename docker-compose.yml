@@ -461,6 +461,50 @@ services:
       retries: 30
       start_period: 40s
 
+  github-service:
+    <<: *service
+    container_name: workertransfer-github
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        SERVICE_DIR: github-service
+    environment:
+      <<: *service-env
+      WORKER_PORT: "8010"
+      WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/github_service
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      # Optional. Ohne Token gilt GitHubs Limit von 60 Anfragen je Stunde
+      # und IP, mit Token 5000. Gebraucht wird es nicht — abgerufen wird
+      # nur auf Anstoß eines Menschen. Es gehört der Plattform, nicht einer
+      # Person: es liest ausschließlich Öffentliches.
+      WORKER_GITHUB_TOKEN: ${WORKER_GITHUB_TOKEN:-}
+      WORKER_IDENTITY_BASE_URL: http://identity-service:8001
+    ports:
+      - "8010:8010"
+    command:
+      - uvicorn
+      - github_service.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8010"
+      - --reload
+      - --reload-dir
+      - /app/apps/github-service/src
+      - --reload-dir
+      - /app/packages
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;urllib.request.urlopen("http://localhost:8010/health/live")
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 40s
+
   web:
     build:
       context: .
@@ -486,6 +530,8 @@ services:
         condition: service_healthy
       transfer-service:
         condition: service_healthy
+      github-service:
+        condition: service_healthy
     environment:
       # pnpm will purge node_modules when the lockfile changed since the image
       # was built, and without a TTY it aborts instead of asking — der Container
@@ -502,6 +548,7 @@ services:
       VITE_APPLICATIONS_BASE_URL: ${VITE_APPLICATIONS_BASE_URL:-http://localhost:8007}
       VITE_COMPANIES_BASE_URL: ${VITE_COMPANIES_BASE_URL:-http://localhost:8008}
       VITE_TRANSFER_BASE_URL: ${VITE_TRANSFER_BASE_URL:-http://localhost:8009}
+      VITE_GITHUB_BASE_URL: ${VITE_GITHUB_BASE_URL:-http://localhost:8010}
     ports:
       - "5173:5173"
     volumes:
