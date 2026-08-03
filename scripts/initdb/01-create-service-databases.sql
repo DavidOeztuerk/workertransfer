@@ -12,3 +12,4 @@ CREATE DATABASE jobs OWNER worker;
 CREATE DATABASE applications OWNER worker;
 CREATE DATABASE companies OWNER worker;
 CREATE DATABASE transfer OWNER worker;
+CREATE DATABASE github_service OWNER worker;

@@ -24,6 +24,14 @@ class GithubServiceSettings(PlatformSettings):
     # (ADR-0007). Runtime-only — never commit a real value.
     jwt_secret: SecretStr = SecretStr(DEV_JWT_SECRET)
 
+    consent_base_url: str = "http://127.0.0.1:8002"
+
+    # Optional. Ohne Token gilt GitHubs Limit von 60 Anfragen je Stunde und
+    # IP, mit Token 5000 — gebraucht wird es nicht, weil nur auf Anstoß eines
+    # Menschen abgerufen wird. Ein Token gehört zur Plattform, nicht zu einer
+    # Person: es liest ausschließlich Öffentliches.
+    github_token: SecretStr = SecretStr("")
+
     @model_validator(mode="after")
     def _reject_development_jwt_secret(self) -> Self:
         """Das Entwicklungs-Secret darf nirgends deployed werden.
