@@ -1,21 +1,43 @@
-"""Composition-Root for the Profile Service HTTP app (ADR-0003).
+"""Composition-Root der HTTP-App dieses Service (ADR-0003).
 
-Explicit, not a fluent builder: a reader sees in this one file exactly which
-cross-cutting behaviours are active and in which order. The kernel owns the
-middleware order (correlation -> auth -> tenant -> security); this service
-supplies only its own routers and adapters.
+Explizit statt fluent: wer diese Datei liest, sieht genau, welche
+Querschnittsbelange aktiv sind und in welcher Reihenfolge. Der Kernel bestimmt
+die Reihenfolge (correlation -> auth -> tenant -> security); der Service liefert
+nur seine eigenen Router und Adapter.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import FastAPI
+from worker_auth import JwtAuthMiddleware, TokenManager
+from worker_platform.presentation.app import create_api_app
+
 from ${module_name}.configuration import ${service_class}Settings
 from ${module_name}.presentation.http.router import build_router
-from worker_platform.presentation.app import create_api_app
 
 
 def build_app(settings: ${service_class}Settings) -> FastAPI:
-    return create_api_app(settings, routers=(build_router(),))
+    # Ohne diese Verdrahtung ist JEDER Endpunkt unauthentifiziert: der Prinzipal
+    # bleibt leer, `get_request_user` gibt None zurück, und jeder Zugriff, der
+    # eine Identität braucht, antwortet 401 — obwohl ein gültiges Token
+    # mitgeschickt wurde. Die Vorlage lieferte das lange nicht mit, und jeder
+    # Service musste es von Hand nachtragen; wer es vergaß, merkte es erst am
+    # ersten Integrationstest.
+    #
+    # Dieser Service stellt keine Tokens aus, er prüft nur (ADR-0007).
+    tokens = TokenManager(secret=settings.jwt_secret.get_secret_value())
+
+    def verify_access_token(token: str) -> Any:
+        return tokens.verify_token(token, expected_type="access")
+
+    return create_api_app(
+        settings,
+        auth_middleware=JwtAuthMiddleware,
+        auth_middleware_kwargs={"verify": verify_access_token},
+        routers=(build_router(),),
+    )
 
 
 __all__ = ["build_app"]
