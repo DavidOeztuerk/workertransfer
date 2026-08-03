@@ -18,6 +18,7 @@ export const JOBS_URL = process.env.E2E_JOBS_URL ?? "http://localhost:8006";
 export const APPLICATIONS_URL = process.env.E2E_APPLICATIONS_URL ?? "http://localhost:8007";
 export const COMPANIES_URL = process.env.E2E_COMPANIES_URL ?? "http://localhost:8008";
 export const TRANSFER_URL = process.env.E2E_TRANSFER_URL ?? "http://localhost:8009";
+export const GITHUB_URL = process.env.E2E_GITHUB_URL ?? "http://localhost:8010";
 export const MAILPIT_URL = process.env.E2E_MAILPIT_URL ?? "http://localhost:8025";
 
 const REQUIRED: ReadonlyArray<readonly [string, string]> = [
@@ -31,6 +32,7 @@ const REQUIRED: ReadonlyArray<readonly [string, string]> = [
   ["applications-service", `${APPLICATIONS_URL}/health/live`],
   ["companies-service", `${COMPANIES_URL}/health/live`],
   ["transfer-service", `${TRANSFER_URL}/health/live`],
+  ["github-service", `${GITHUB_URL}/health/live`],
   ["mailpit", `${MAILPIT_URL}/api/v1/messages?limit=1`],
 ];
 

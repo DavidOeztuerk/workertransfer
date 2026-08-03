@@ -206,3 +206,18 @@ def test_generated_service_passes_the_repo_quality_gates(generated: Path) -> Non
         cwd=repo_root,
     )
     assert fmt.returncode == 0, f"Formatierung weicht ab:\n{fmt.stdout}"
+
+
+def test_the_generated_app_wires_authentication(generated: Path) -> None:
+    """Ohne diese Verdrahtung antwortet JEDER Endpunkt 401.
+
+    Der Prinzipal bleibt leer, obwohl ein gültiges Token mitgeschickt wurde.
+    Die Vorlage lieferte es lange nicht mit; jeder Service musste es von Hand
+    nachtragen, und wer es vergaß, merkte es erst am ersten Integrationstest —
+    zuletzt beim github-service.
+    """
+    module = _module_name(generated)
+    source = (generated / "src" / module / "presentation" / "compose_api.py").read_text()
+
+    assert "auth_middleware=JwtAuthMiddleware" in source
+    assert 'expected_type="access"' in source
