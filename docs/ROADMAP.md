@@ -517,6 +517,21 @@ Umgehängt statt weiter mitgeschleppt:
   Ausdrücklich zurückgestellt.
 - **`worker-player-advisor` / Transferberater** → **Phase 7**. Ein
   KI-Entwurfserzeuger, und seit 7.1 gibt es die Naht dafür.
+  **Nachtrag 05.08.2026, nach Abschluss von Phase 7: nicht gebaut, und der
+  Grund ist kein Zeitmangel.** Der ULTRAPLAN führt den Transferberater unter
+  den *Candidate*-Agenten — er berät also die **Person**. Im Transfer-Vorgang
+  schreibt die Person aber nirgends Freitext: `accept-talk`, `accept-offer`,
+  `confirm-release` und `decline` sind vier Knöpfe. Die einzigen zwei
+  Freitextfelder (`ExpressInterestV1.message`, `MakeOfferV1.note`) gehören dem
+  **Unternehmen**. Der Agent hat also schlicht keine Fläche, an der er ansetzen
+  könnte; ihm eine zu geben hieße, der Person einen neuen Schreibschritt in den
+  Vorgang zu bauen — eine Produktentscheidung, keine Fortsetzung.
+  Und die naheliegende Umkehrung ist es erst recht nicht: Die
+  Interessensnachricht ist ein Text **über und an einen bestimmten Menschen**.
+  Damit ein Modell sie nützlich formuliert, müsste es etwas über diese Person
+  wissen — genau das, was ADR-0024 ausschließt. Ohne dieses Wissen bleibt eine
+  Floskel, und eine Floskel ist schlechter als der Satz, den ein Mensch selbst
+  tippt. Der Transferberater bleibt deshalb offen, mit Frage statt mit Termin.
 
 Zum Nachlesen, was für Verträge festgelegt ist:
 
