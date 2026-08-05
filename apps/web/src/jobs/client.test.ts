@@ -17,6 +17,7 @@ const input = {
   location: "Berlin",
   remote: "hybrid" as const,
   employment: "full_time" as const,
+  skills: ["Python"],
 };
 
 afterEach(() => {

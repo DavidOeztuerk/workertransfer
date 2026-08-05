@@ -7,6 +7,7 @@ import {
   login,
   registerAndConfirm,
   skipWithoutStack,
+  switchToCompany,
   uniqueCompanyDomain,
   uniqueEmail,
 } from "./stack";
@@ -97,4 +98,71 @@ test("eine veröffentlichte Stelle findet auch, wer kein Konto hat", async ({ br
 
   await recruiterContext.close();
   await anonymousContext.close();
+});
+
+// Die Passung. Nur hier prüfbar, weil genau das der Punkt ist: sie entsteht
+// im Browser aus zwei Antworten verschiedener Dienste und steht in keiner
+// einzigen davon. Kein Endpunkt liefert sie, also kann kein Endpunkttest sie
+// zeigen.
+test("die Passung sieht die Person — und niemand rechnet sie auf dem Server", async ({
+  browser,
+}) => {
+  const domain = uniqueCompanyDomain();
+  const recruiterEmail = uniqueEmail(domain);
+  const companyName = `E2E Passung ${Date.now()}`;
+  const title = `E2E Passung Stelle ${Date.now()}`;
+
+  const recruiterContext = await browser.newContext();
+  const recruiter = await recruiterContext.newPage();
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter");
+  await login(recruiter, recruiterEmail);
+  await recruiter.goto("/company/new");
+  await recruiter.getByLabel(/Name des Unternehmens/i).fill(companyName);
+  await recruiter.getByRole("button", { name: /Unternehmen anlegen/i }).click();
+  await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
+  await switchToCompany(recruiter, companyName);
+
+  await recruiter.goto("/company/jobs");
+  await recruiter.getByLabel("Titel").fill(title);
+  await recruiter.getByLabel(/Beschreibung/i).fill("Was zu tun ist.");
+  await recruiter.getByLabel(/Gesuchte Fähigkeiten/i).fill("Python, Kubernetes, Go");
+  await recruiter.getByRole("button", { name: /Entwurf anlegen/i }).click();
+  const row = recruiter.locator("li").filter({ hasText: title });
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: /Veröffentlichen/i }).click();
+  await expect(row.getByText("Veröffentlicht")).toBeVisible();
+
+  // Ohne Konto: die Anforderungen stehen da, aber niemand wird gezählt.
+  const anonymousContext = await browser.newContext();
+  const anonymous = await anonymousContext.newPage();
+  await anonymous.goto("/jobs");
+  await anonymous.getByLabel(/Suchbegriff/i).fill(title);
+  await anonymous.getByRole("button", { name: /Suchen/i }).click();
+  await expect(anonymous.getByText("Kubernetes")).toBeVisible();
+  await expect(anonymous.getByText(/von 3 genannten/)).toHaveCount(0);
+
+  // Mit Profil: die Liste wird abgehakt — und sagt, was fehlt.
+  const candidateEmail = uniqueEmail("kandidatin.example");
+  const candidateContext = await browser.newContext();
+  const candidate = await candidateContext.newPage();
+  await registerAndConfirm(candidate, candidateEmail, "E2E Kandidatin");
+  await login(candidate, candidateEmail);
+  await candidate.goto("/profile");
+  await candidate.getByLabel(/Überschrift/i).fill("Backend-Entwicklerin");
+  // Klein geschrieben, mit Leerzeichen: der Abgleich darf daran nicht scheitern.
+  await candidate.getByLabel(/Fähigkeiten/i).fill("python , Kubernetes");
+  await candidate.getByRole("button", { name: /Speichern/i }).click();
+  await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
+
+  await candidate.goto("/jobs");
+  await candidate.getByLabel(/Suchbegriff/i).fill(title);
+  await candidate.getByRole("button", { name: /Suchen/i }).click();
+  await expect(candidate.getByText(/2 von 3 genannten Fähigkeiten/)).toBeVisible();
+  // Keine Prozentzahl, nirgends — und der Name der fehlenden steht da.
+  await expect(candidate.locator('[data-match="missing"]')).toHaveText("Go");
+  await expect(candidate.getByText(/%/)).toHaveCount(0);
+
+  await recruiterContext.close();
+  await anonymousContext.close();
+  await candidateContext.close();
 });

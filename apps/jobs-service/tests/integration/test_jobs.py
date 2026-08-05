@@ -229,3 +229,66 @@ async def test_the_company_filter_never_shows_drafts(app: Any) -> None:
     response = await _call(app, "GET", f"/jobs?company={tenant}")
 
     assert response.json()["items"] == []
+
+
+async def test_the_required_skills_travel_to_the_public_view(app: Any) -> None:
+    """Sie gehen ganz nach draußen — abgeglichen wird im Browser.
+
+    Deshalb steht hier keine Suche nach Fähigkeiten und keine Kennzahl: die
+    Liste ist alles, was der Server dazu beiträgt.
+    """
+    token = _token(uuid4())
+    title = f"Fähigkeiten {uuid4().hex[:8]}"
+    draft = await _draft(app, token, title=title, skills=["  Python  ", "python", "", "Kubernetes"])
+    await _call(app, "POST", f"/jobs/{draft['id']}/publish", token)
+
+    public = await _call(app, "GET", f"/jobs/{draft['id']}")
+
+    assert public.status_code == 200, public.text
+    # Getrimmt, entdoppelt ohne Rücksicht auf Groß-/Kleinschreibung, leere weg.
+    assert public.json()["skills"] == ["Python", "Kubernetes"]
+    assert (await _call(app, "GET", f"/jobs?q={title}")).json()["items"][0]["skills"] == [
+        "Python",
+        "Kubernetes",
+    ]
+
+
+async def test_a_job_without_skills_reports_an_empty_list_not_null(app: Any) -> None:
+    """`null` würde im Browser durch jede `.length`-Prüfung fallen.
+
+    Und es wäre die falsche Aussage: die Stelle hat nichts aufgezählt — das ist
+    eine leere Liste, kein fehlender Wert.
+    """
+    body = _body(title=f"Ohne {uuid4().hex[:8]}")
+    body.pop("skills", None)
+    response = await _call(app, "POST", "/jobs", _token(uuid4()), json=body)
+
+    assert response.status_code == 201, response.text
+    assert response.json()["skills"] == []
+
+
+async def test_editing_replaces_the_list_instead_of_merging_it(app: Any) -> None:
+    token = _token(uuid4())
+    draft = await _draft(app, token, skills=["Python", "Go"])
+
+    fixed = await _call(
+        app, "PUT", f"/jobs/{draft['id']}", token, json=_body(skills=["Python", "Kubernetes"])
+    )
+
+    assert fixed.status_code == 200, fixed.text
+    # Go ist gestrichen und bleibt gestrichen.
+    assert fixed.json()["skills"] == ["Python", "Kubernetes"]
+
+
+async def test_too_many_skills_are_refused_as_input_not_stored_truncated(app: Any) -> None:
+    response = await _call(
+        app,
+        "POST",
+        "/jobs",
+        _token(uuid4()),
+        json=_body(skills=[f"skill-{index}" for index in range(21)]),
+    )
+
+    # 422: die Eingabe ist falsch. Stillschweigend zu kürzen hieße, eine Liste
+    # zu veröffentlichen, die das Unternehmen so nicht geschrieben hat.
+    assert response.status_code == 422, response.text

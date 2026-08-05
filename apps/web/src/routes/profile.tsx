@@ -10,6 +10,7 @@ import {
   saveMyProfile,
   setVisibility,
 } from "../profile/client";
+import { parseSkills } from "../skills";
 
 export interface ProfileRouteProps {
   // Injizierbar, damit der Test einen Prinzipal rendern kann, ohne eine
@@ -36,18 +37,6 @@ function toForm(profile: Profile | null): FormState {
     remote_ok: profile.remote_ok,
     skills: profile.skills.join(", "),
   };
-}
-
-/**
- * Kommagetrennt statt Chips: eine Zeile, die man aus dem Lebenslauf einfügen
- * kann. Leeres und Whitespace fällt weg — die Domäne entdoppelt zusätzlich, was
- * hier durchrutscht.
- */
-export function parseSkills(raw: string): string[] {
-  return raw
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
 }
 
 export function ProfileRoute({ principal = null }: ProfileRouteProps) {

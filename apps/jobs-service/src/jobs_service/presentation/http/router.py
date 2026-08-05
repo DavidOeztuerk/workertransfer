@@ -49,6 +49,7 @@ def _dto(job: Job) -> JobV1:
         location=job.location,
         remote=str(job.remote),  # type: ignore[arg-type]
         employment=str(job.employment),  # type: ignore[arg-type]
+        skills=list(job.skills.value),
         status=str(job.status),  # type: ignore[arg-type]
         published_at=job.published_at,
         updated_at=job.updated_at,
@@ -101,6 +102,7 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             location=body.location,
             remote=body.remote,
             employment=body.employment,
+            skills=tuple(body.skills),
         )
         async with request_scope(session_factory) as (uow, repos):
             result = await handle_create_job(command, deps=deps, repos=repos)
@@ -119,6 +121,7 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             location=body.location,
             remote=body.remote,
             employment=body.employment,
+            skills=tuple(body.skills),
         )
         async with request_scope(session_factory) as (uow, repos):
             result = await handle_update_job(command, deps=deps, repos=repos)

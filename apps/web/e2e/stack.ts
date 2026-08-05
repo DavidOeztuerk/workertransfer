@@ -227,7 +227,35 @@ export async function registerAndConfirm(
   // anderen Ausprägung (/anmelden/i traf den Link in der Kopfzeile). Die Lehre
   // ist dieselbe und hier zweimal bezahlt: eine Erfolgsmeldung prüft man
   // buchstabengetreu, nicht mit einem Teilstring.
-  await expect(page.getByRole("heading", { name: "E-Mail bestätigt", exact: true })).toBeVisible();
+  //
+  // Und wie beim Anmelden wird auf BEIDE Ausgänge gewartet. Nur auf den
+  // erhofften zu warten hieß: 30 Sekunden, dann „element(s) not found" — eine
+  // Meldung, die nicht unterscheidet, ob die Bestätigung fehlgeschlagen ist
+  // oder ob die Seite noch lud. Genau so ist dieser Schritt zuletzt umgefallen.
+  const confirmed = page.getByRole("heading", { name: "E-Mail bestätigt", exact: true });
+  const failed = page.getByRole("heading", { name: /Bestätigung fehlgeschlagen/i });
+  try {
+    await expect(confirmed.or(failed).first()).toBeVisible();
+  } catch {
+    const seen = await page
+      .locator("main")
+      .first()
+      .innerText()
+      .catch(() => "(keine Seite lesbar)");
+    throw new Error(
+      `Bestätigung für ${email}: weder Erfolg noch Fehlschlag erschienen.\n` +
+        `URL: ${page.url()}\nSeite:\n${seen.slice(0, 500)}`
+    );
+  }
+  if (await failed.isVisible()) {
+    const detail = await page
+      .locator("main")
+      .first()
+      .innerText()
+      .catch(() => "");
+    throw new Error(`Bestätigung für ${email} fehlgeschlagen: ${detail.slice(0, 300)}`);
+  }
+  await expect(confirmed).toBeVisible();
 }
 
 /**

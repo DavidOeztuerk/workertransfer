@@ -7,11 +7,15 @@ from uuid import uuid4
 
 import pytest
 from jobs_service.domain.job import (
+    MAX_SKILL_LENGTH,
+    MAX_SKILLS,
     EmploymentType,
     InvalidText,
     Job,
     JobStatus,
     RemoteMode,
+    Skills,
+    TooManySkills,
     TransitionNotAllowed,
 )
 
@@ -27,6 +31,7 @@ def job(**overrides: object) -> Job:
         "location": "Berlin",
         "remote": RemoteMode.HYBRID,
         "employment": EmploymentType.FULL_TIME,
+        "skills": Skills(["Python"]),
         "now": NOW,
     }
     values.update(overrides)
@@ -113,6 +118,7 @@ class TestEditing:
             location="Berlin",
             remote=RemoteMode.FULL,
             employment=EmploymentType.FULL_TIME,
+            skills=Skills(["Python", "Kubernetes"]),
             now=LATER,
         )
 
@@ -132,8 +138,66 @@ class TestEditing:
                 location="Hamburg",
                 remote=RemoteMode.NONE,
                 employment=EmploymentType.CONTRACT,
+                skills=Skills(["Rust"]),
                 now=LATER,
             )
 
         assert created.title == "Bleibt"
         assert created.location == "Berlin"
+        assert created.skills.value == ("Python",)
+
+
+class TestSkills:
+    """Was die Stelle verlangt — die Liste, gegen die im Browser abgeglichen wird.
+
+    Sie steht hier und nicht im Fließtext, weil ein Text nicht abgleichbar ist,
+    ohne ihn zu deuten. Eine Liste, die ein Mensch geschrieben hat, ist beides:
+    lesbar und vergleichbar — und sie behauptet nichts, was nicht jemand
+    hingeschrieben hat.
+    """
+
+    def test_entries_are_trimmed_and_blanks_dropped(self) -> None:
+        assert Skills(["  Python  ", "   ", "Go"]).value == ("Python", "Go")
+
+    def test_case_is_not_a_second_skill_and_the_first_spelling_wins(self) -> None:
+        # Der Abgleich im Browser vergleicht ohne Rücksicht auf Groß- und
+        # Kleinschreibung. Zwei Schreibweisen in EINER Liste wären deshalb ein
+        # Treffer, der doppelt zählt.
+        assert Skills(["Python", "python", "PYTHON"]).value == ("Python",)
+
+    def test_a_skill_may_not_be_longer_than_a_profile_may_hold(self) -> None:
+        with pytest.raises(TooManySkills):
+            Skills(["x" * (MAX_SKILL_LENGTH + 1)])
+
+    def test_duplicates_are_removed_before_counting(self) -> None:
+        # Sonst würde eine Ausschreibung mit 21-mal „Python" abgewiesen,
+        # obwohl daraus eine einzige Anforderung wird.
+        assert Skills(["Python"] * (MAX_SKILLS + 1)).value == ("Python",)
+
+    def test_too_many_distinct_skills_are_refused(self) -> None:
+        with pytest.raises(TooManySkills):
+            Skills([f"skill-{index}" for index in range(MAX_SKILLS + 1)])
+
+    def test_a_job_without_skills_is_allowed(self) -> None:
+        """Keine Pflicht: eine Stelle darf sagen, dass sie nichts aufzählt.
+
+        Eine erzwungene Liste wäre eine Liste, die jemand ausfüllt, um das
+        Formular loszuwerden — und der Abgleich verglich dann gegen Erfundenes.
+        """
+        assert job(skills=Skills([])).skills.value == ()
+
+    def test_editing_replaces_the_whole_list(self) -> None:
+        created = job(skills=Skills(["Python", "Go"]))
+
+        created.update(
+            title="Backend-Entwicklerin",
+            description="Was zu tun ist.",
+            location="Berlin",
+            remote=RemoteMode.HYBRID,
+            employment=EmploymentType.FULL_TIME,
+            skills=Skills(["Python", "Kubernetes"]),
+            now=LATER,
+        )
+
+        # Kein Zusammenführen: was gestrichen wurde, ist gestrichen.
+        assert created.skills.value == ("Python", "Kubernetes")
