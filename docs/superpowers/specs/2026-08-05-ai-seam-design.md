@@ -21,10 +21,46 @@ die niemand einschaltet.**
 Phase 7 nennt 23 Agenten, vier Provider, Memory in vier Sorten, Vektorsuche,
 plan-act-reflect. Das ist keine erste Stufe, das ist die Phase.
 
-Und mehrere der genannten Agenten sind nach ADR-0022 gar nicht baubar:
-**Candidate Ranking**, **Salary Recommendation**, **Team Analyzer**,
-**Skill Analyzer** sind allesamt Zahlen oder Rangfolgen über Menschen. Sie
-stehen hier nicht auf der Warteliste, sie stehen auf keiner.
+### Was ADR-0022 verbietet — und was nicht
+
+**Korrektur an einer früheren Fassung dieses Entwurfs.** Dort stand, vier der
+genannten Agenten seien „nicht baubar": Candidate Ranking, Salary
+Recommendation, Team Analyzer, Skill Analyzer. Das war zu pauschal, und die
+Ungenauigkeit ist gefährlich — sie verbietet Namen statt Formen und lädt damit
+zum Umbenennen ein.
+
+ADR-0022 verbietet **drei Formen**:
+
+1. **Eine Zahl, die einen Menschen zusammenfasst**, und jede Rangfolge daraus.
+2. **Abgeleitete Eigenschaften ohne Grundlage** — „leadership", „community"
+   aus Repository-Metadaten.
+3. **Stillschweigende Vollständigkeit** — wer nichts auf GitHub hat, ist nicht
+   schlechter, sondern woanders.
+
+Danach gilt für die vier:
+
+- **Candidate Ranking** ist der einzige, dessen **Name selbst** die verbotene
+  Sache ist: eine Rangfolge von Menschen bleibt eine, gleich woraus sie
+  gerechnet wurde. Nicht baubar, und zwar dauerhaft.
+- **Skill Analyzer** ist im ULTRAPLAN ein **Candidate**-Agent, also einer für
+  die Person selbst. Die gelöschte Umsetzung war verboten (`bytes_count /
+  total_bytes` ist eine Zahl je Fähigkeit je Mensch, und Bytes sind kein
+  Können). Der Name ist es nicht: „du hast in diesen drei Repositories Python
+  geschrieben, hier sind die Links" ist ein **Beleg mit Herkunft** und
+  ausdrücklich erlaubt. Genauso „hier ist deine Fähigkeitenliste, sollen wir sie
+  aufräumen?" — eine Hilfe für die Person an ihrer eigenen Angabe.
+- **Salary Recommendation** hängt daran, worüber die Zahl etwas sagt. Ein
+  Gehaltsband für eine **Rolle** fasst keinen Menschen zusammen. Ein Betrag für
+  **diese eine Person** tut es — und wäre zudem eine Empfehlung an den
+  Arbeitgeber, wie wenig er ihr bieten kann.
+- **Team Analyzer** ebenso: eine Aussage über eine Zusammensetzung ist etwas
+  anderes als eine Eigenschaft je Kopf. Die übliche Umsetzung macht das
+  Zweite.
+
+Drei von vier sind also nicht verboten, sondern **in ihrer üblichen Form
+verboten**. Keiner von ihnen steht auf der Warteliste dieses Schnitts — aber
+aus einem anderen Grund als „geht nicht": weil jeder davon eine eigene
+Abwägung braucht, und die gehört in den Schnitt, der ihn baut.
 
 Was zuerst kommt, ist die **Naht** und **ein** Agent, an dem sie sich beweist.
 
