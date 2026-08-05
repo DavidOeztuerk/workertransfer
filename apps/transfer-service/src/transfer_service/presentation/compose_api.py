@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import create_async_engine
 from transfer_service.configuration import TransferServiceSettings
-from transfer_service.infrastructure.compose import compose_infrastructure
+from transfer_service.infrastructure.compose import compose_infrastructure, outbox_runner
 from transfer_service.presentation.http.router import build_router
 from worker_auth import JwtAuthMiddleware, TokenManager
 from worker_platform.presentation.app import create_api_app
@@ -30,6 +30,10 @@ def build_app(settings: TransferServiceSettings) -> FastAPI:
         auth_middleware=JwtAuthMiddleware,
         auth_middleware_kwargs={"verify": verify_access_token},
         routers=(build_router(deps),),
+        # Der Outbox-Zusteller läuft im Dienst mit (ADR-0025). Kein eigener
+        # Prozess: ein weiteres Deployment und ein weiterer Gesundheitscheck
+        # wären ein hoher Preis für eine Schleife, die eine Tabelle liest.
+        background=(outbox_runner(deps, settings),),
     )
 
 

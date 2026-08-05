@@ -18,4 +18,3 @@ module-name = "worker_scheduler"
 [tool.uv.sources]
 worker-core = { workspace = true }
 worker-cache = { workspace = true }
-worker-messaging = { workspace = true }

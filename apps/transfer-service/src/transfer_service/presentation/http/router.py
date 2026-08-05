@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from typing import Any
 from uuid import UUID
 
@@ -40,6 +39,7 @@ from transfer_service.domain.market_status import MarketStatus
 from transfer_service.domain.request import AlreadyAnswered, MarketRequest
 from transfer_service.domain.transfer import NotYours, Transfer, TransitionNotAllowed
 from transfer_service.infrastructure.consent import ConsentUnavailable
+from transfer_service.infrastructure.database.models import OUTBOX
 from worker_auth import get_request_user, resolve_token
 from worker_contracts import (
     ExpressInterestV1,
@@ -49,6 +49,7 @@ from worker_contracts import (
     SaveMarketStatusV1,
     TransferV1,
 )
+from worker_outbox import record
 
 __all__ = ["build_router"]
 
@@ -123,22 +124,19 @@ def _transfer_http(error: Any) -> HTTPException:
     return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, message)
 
 
-async def _notify(deps: dict[str, Any], user_id: UUID, kind: str) -> None:
-    """Benachrichtigen darf nichts kippen — und das steht HIER, nicht nur im Adapter.
-
-    Der HTTP-Adapter schluckt seine Fehler bereits. Sich darauf zu verlassen
-    hieße, die Zusage an der Wahl der Implementierung aufzuhängen: ein anderer
-    Adapter, ein Tippfehler in den Einstellungen, ein Fake im Test — und ein
-    Vorgang scheitert, weil eine Mail nicht rausging. Ein Integrationstest mit
-    einem absichtlich kaputten Notifier hat genau das gezeigt.
-    """
-    try:
-        await deps["notify"].notify(user_id, kind)
-    except Exception:
-        _logger.warning("Benachrichtigung konnte nicht abgesetzt werden", exc_info=True)
-
-
-_logger = logging.getLogger("workertransfer.transfer.notify")
+# `_notify` ist weg, und das ist der Kern von 9.1.
+#
+# Vorher stand hier ein Helfer, der nach dem Commit einen HTTP-Notifier rief
+# und JEDEN Fehler schluckte. Die Begründung war richtig — eine misslungene
+# Mail darf einen Vorgang nicht kippen — aber der Preis war, dass die Mail dann
+# für immer weg war: ein Neustart, ein Netzzucken, und im Protokoll stand eine
+# Warnung, die keiner liest.
+#
+# Die Zusage „darf nichts kippen" gilt unverändert. Sie wird jetzt nur anders
+# eingelöst: die Absicht wird VOR dem Commit in dieselbe Transaktion
+# geschrieben, und ein Zusteller im Hintergrund darf danach beliebig oft
+# scheitern (ADR-0025). Kein Aufruf mehr im Anfragepfad heißt nebenbei: keine
+# Zeitüberschreibung, die eine Antwort verzögert.
 
 
 def build_router(deps: dict[str, Any]) -> APIRouter:
@@ -215,10 +213,13 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
                 ) from exc
             if not result.is_success:
                 raise _request_http(result.error)
+            # VOR dem Commit, in DERSELBEN Transaktion (ADR-0025). Die alte
+            # Fassung rief hier nach dem Commit einen HTTP-Notifier, dessen
+            # Fehler geschluckt wurde — die Absage blieb, die Benachrichtigung
+            # war für immer weg. Jetzt gilt: kommt die Anfrage durch, liegt die
+            # Absicht fest; wird sie zurückgerollt, ist die Absicht auch weg.
+            await record(uow.session, OUTBOX, user_id=subject_id, kind="market_request")
             await uow.commit()
-        # Nach dem Commit und ohne Rückwirkung: eine misslungene Mail darf die
-        # Anfrage nicht rückgängig machen.
-        await _notify(deps, subject_id, "market_request")
         # Das anfragende Unternehmen bekommt kein `active`: es hat die Antwort
         # schon in Form des Status, den es sieht oder nicht sieht.
         return _request_dto(result.value, active=None)
@@ -366,9 +367,10 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
                 ) from exc
             if not result.is_success:
                 raise _transfer_http(result.error)
-            await uow.commit()
+            # VOR dem Commit, in DERSELBEN Transaktion (ADR-0025).
             transfer = result.value
-        await _notify(deps, transfer.subject_id, "transfer_update")
+            await record(uow.session, OUTBOX, user_id=transfer.subject_id, kind="transfer_update")
+            await uow.commit()
         return _transfer_dto(transfer)
 
     @router.get("/transfers/me")
@@ -404,13 +406,14 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             )
             if not result.is_success:
                 raise _transfer_http(result.error)
-            await uow.commit()
             transfer = result.value
-        # Nur Züge des Unternehmens werden gemeldet. Die Person erfährt vom
-        # Unternehmen nichts per Mail: es ist die Seite, die etwas will, und
-        # eine Mail an einen Firmenverteiler mit dem Namen eines Menschen wäre
-        # derselbe Leck-Kanal, nur andersherum.
-        await _notify(deps, transfer.subject_id, "transfer_update")
+            # Nur Züge des Unternehmens werden gemeldet. Die Person erfährt vom
+            # Unternehmen nichts per Mail: es ist die Seite, die etwas will, und
+            # eine Mail an einen Firmenverteiler mit dem Namen eines Menschen
+            # wäre derselbe Leck-Kanal, nur andersherum.
+            # VOR dem Commit, in DERSELBEN Transaktion (ADR-0025).
+            await record(uow.session, OUTBOX, user_id=transfer.subject_id, kind="transfer_update")
+            await uow.commit()
         return _transfer_dto(transfer)
 
     # Getrennte Endpunkte statt eines `PATCH status`: jeder Übergang gehört
@@ -453,9 +456,10 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             result = await handle_make_offer(command, deps=deps, repos=repos)
             if not result.is_success:
                 raise _transfer_http(result.error)
-            await uow.commit()
+            # VOR dem Commit, in DERSELBEN Transaktion (ADR-0025).
             transfer = result.value
-        await _notify(deps, transfer.subject_id, "transfer_update")
+            await record(uow.session, OUTBOX, user_id=transfer.subject_id, kind="transfer_update")
+            await uow.commit()
         return _transfer_dto(transfer)
 
     @router.post("/transfers/{transfer_id}/complete")

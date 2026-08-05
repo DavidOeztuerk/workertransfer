@@ -19,7 +19,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 6 | Developer Intelligence | ✅ | 6.1 (GitHub als Beleg), 6.2 (Passung im Browser), 6.3 (Vokabular) — Score, Ranking und Wechselwahrscheinlichkeit bewusst **nicht** gebaut (ADR-0022/0023) |
 | 7 | AI Agent Plattform | ✅ | 7.1 (Naht + Candidate-Agent), 7.2 (Company-Agent: die eigene Anzeige). DoD erfüllt, mit zwei begründeten Abweichungen (plan-act-reflect, „Consents und Logs"). **Candidate Ranking** ist nach ADR-0022 dauerhaft ausgeschlossen; Skill Analyzer, Salary Recommendation und Team Analyzer sind in ihrer ÜBLICHEN Form ausgeschlossen, nicht als Idee |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
-| 9 | Messaging/Notif./Search/Analytics | ⬜ | Outbox/Inbox, cross-service Events |
+| 9 | Messaging/Notif./Search/Analytics | 🟧 | 9.1 ✅ (Outbox: die Benachrichtigung geht nicht mehr verloren; `worker-messaging` gelöscht, ADR-0025). Offen: 9.2 (übrige Dienste), Suche, Analytics |
 | 10 | Frontend/Gateway/Infra/Hardening | ⬜ | UI, Gateway, K8s, OTel, Hardening |
 
 ### Phase 0 — Status: ✅ erledigt
@@ -764,6 +764,58 @@ existieren könnte.
   `scripts/validate.sh` ist jetzt **rot**, wenn keine einzige Reise gelaufen ist
   — ein einzelner übersprungener Test ist eine Entscheidung, alle sind ein
   Ausfall.
+
+### Phase 9 — Status: 🟧 in Arbeit
+
+- ✅ **9.1 Die Outbox: eine Benachrichtigung, die nicht verlorengeht** —
+  05.08.2026. **ADR-0025.** `packages/worker-outbox` + `worker-platform`
+  (`background=`) + `apps/transfer-service` als erster Konsument.
+  **Der Fehler, den es zu beheben gab.** Benachrichtigungen liefen als „feuern
+  und vergessen": nach dem Commit ein HTTP-Aufruf, dessen Fehler geschluckt
+  wurde. Die Begründung war richtig — eine misslungene Mail darf keinen Vorgang
+  kippen — aber der Preis war, dass die Mail dann **für immer weg** ist. Ein
+  Neustart von identity-service genügte, und niemand erfuhr, dass jemand nach
+  ihm gefragt hat. Für ein Produkt, dessen Mechanik auf „die Person
+  entscheidet" beruht, ist das kein Schönheitsfehler: wer nicht erfährt, dass
+  gefragt wurde, kann nicht antworten.
+  Die Outbox dreht die Zusage nicht um, sie löst den Widerspruch: die **Absicht**
+  wird in DERSELBEN Transaktion wie die fachliche Änderung geschrieben. Kommt
+  die Änderung durch, liegt die Absicht fest; wird sie zurückgerollt, ist sie
+  weg. Ein Zusteller im Hintergrund darf danach beliebig oft scheitern.
+  **Kein Broker — und der dritte Wiedergänger.** Der ULTRAPLAN sieht
+  `worker-messaging` vor (aio-pika/aiokafka/nats). Beim Nachsehen: 129 Zeilen,
+  **fünf** schwere Abhängigkeiten, drei Umsetzungen, **null Konsumenten**; die
+  einzigen Verweise waren zwei `[tool.uv.sources]`-Einträge, und die
+  installieren nichts. Wort für Wort `worker-files` (ADR-0021),
+  `worker-github` (ADR-0022) und `worker-ai` (ADR-0024). Gelöscht. Ein
+  Postgres, das jeder Dienst ohnehin betreibt, trägt eine Outbox mit einer
+  Tabelle; `worker-outbox` hat **eine** Abhängigkeit statt fünf.
+  Beim Löschen kam heraus, dass `aio_pika` transitiv noch zwei Stellen
+  versorgte: einen `RabbitMQHealthCheck` für einen Broker, den es nicht gibt,
+  und eine AioPika-Instrumentierung im Tracing. Beide entfernt — ein
+  Gesundheitscheck für etwas, das nicht existiert, kann nur eine Antwort geben,
+  und die sagt nichts.
+  Festgelegt und je mit Test belegt: **dieselbe Transaktion** (gegenbewiesen —
+  mit einem eingebauten `session.commit()` wird der Test rot); **Wiederholung
+  statt Verlust**; **Aufgeben heißt liegenlassen, nicht löschen**; **kein
+  Inhalt in der Tabelle** (nur `user_id` und `kind` — eine Outbox steht danach
+  in jedem Backup, ein `payload`-Feld wäre die Einladung, den Nachrichtentext
+  mitzuschreiben); nur die **Art** eines Fehlers, nie die Antwort des
+  Gegenübers; **älteste zuerst**, sonst kommt „Angebot zurückgezogen" vor
+  „Angebot gemacht"; und die Zusteller-Schleife **überlebt einen kaputten
+  Durchlauf**, denn stirbt sie, bleibt die Tabelle liegen und niemand merkt es.
+  Der Dauerläufer hängt an einem neuen `background=` von `create_api_app`. Zwei
+  Fallen dort, beide mit Test: das Herunterfahren muss auf die Aufgabe
+  **warten** (sonst bricht es mitten in einer Transaktion ab — der erste
+  Testentwurf war auch ohne das `await` grün und bewachte damit nichts), und
+  ein Absturz darf **nicht still** sein.
+  Zwei bestehende Integrationstests mussten sich ändern und wurden dabei
+  strenger: sie prüfen jetzt **zwei** Schritte statt einem — Absicht
+  festgehalten, dann zugestellt. Der Zwischenzustand war vorher nicht prüfbar,
+  weil es ihn nicht gab.
+  **Offen (9.2):** `applications-service` und `resume-service` benutzen
+  weiterhin den alten Weg; für sie kann eine Benachrichtigung bis dahin
+  verlorengehen.
 
 ### Phase 7 — Status: ✅ erledigt (05.08.2026)
 

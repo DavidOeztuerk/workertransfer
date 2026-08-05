@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 
 
 class HealthStatus(Enum):
@@ -52,19 +52,11 @@ class RedisHealthCheck:
             return HealthCheckResult(name="redis", status=HealthStatus.UNHEALTHY, message=str(e))
 
 
-class RabbitMQHealthCheck:
-    def __init__(self, url: str) -> None:
-        self._url = url
-
-    async def check(self) -> HealthCheckResult:
-        try:
-            import aio_pika
-
-            conn = await cast("Any", aio_pika).connect_robust(self._url)
-            await conn.close()
-            return HealthCheckResult(name="rabbitmq", status=HealthStatus.HEALTHY)
-        except Exception as e:
-            return HealthCheckResult(name="rabbitmq", status=HealthStatus.UNHEALTHY, message=str(e))
+# `RabbitMQHealthCheck` ist weg (ADR-0025). Er prüfte einen Broker, den
+# dieses System nicht betreibt — und zog dafür `aio_pika` in den Workspace,
+# transitiv über das ebenfalls gelöschte `worker-messaging`. Ein
+# Gesundheitscheck für etwas, das es nicht gibt, kann nur eine Antwort
+# geben, und die sagt nichts.
 
 
 async def run_health_checks(checks: list[HealthCheck]) -> dict[str, Any]:

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+import asyncio
+import contextlib
+import logging
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Mapping
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import APIRouter, FastAPI
@@ -33,6 +37,7 @@ def create_api_app(
     throttle_limits: Mapping[tuple[str, str], Limit] | None = None,
     trust_forwarded_for: bool = False,
     routers: Iterable[APIRouter] = (),
+    background: Iterable[Callable[[], Awaitable[None]]] = (),
 ) -> FastAPI:
     """Create a secure, observable HTTP entry point with no business endpoints.
 
@@ -51,6 +56,7 @@ def create_api_app(
         docs_url=docs_url,
         redoc_url=None,
         openapi_url=openapi_url,
+        lifespan=_lifespan_for(background),
     )
     register_exception_handlers(app)
     app.include_router(create_health_router(settings.service_name, readiness_checks))
@@ -96,6 +102,55 @@ def create_api_app(
     app.add_middleware(CorrelationIdMiddleware)
     _add_cors_middleware(app, settings)
     return app
+
+
+_logger = logging.getLogger("workertransfer.platform.background")
+
+
+def _lifespan_for(
+    background: Iterable[Callable[[], Awaitable[None]]],
+) -> Callable[[FastAPI], Any]:
+    """Dauerläufer, die mit der App leben — und mit ihr enden.
+
+    Gebraucht für den Outbox-Zusteller: eine Schleife, die eine Tabelle liest
+    und zustellt. Sie gehört in den Dienst und nicht in einen eigenen Prozess —
+    ein weiteres Deployment, ein weiterer Gesundheitscheck und ein weiterer Ort
+    zum Vergessen wären ein hoher Preis für eine `while`-Schleife.
+
+    Zwei Dinge, die hier leicht falsch gemacht werden:
+
+    1. **Abbrechen und WARTEN.** Nur `cancel()` zu rufen und weiterzugehen
+       beendet den Prozess, während die Aufgabe noch mitten in einer
+       Datenbank-Transaktion steckt. Deshalb das `await` hinter dem Abbruch.
+    2. **Ein Absturz darf nicht still sein.** Eine Hintergrundaufgabe, die eine
+       Ausnahme wirft, stirbt lautlos; die App läuft weiter und beantwortet
+       Anfragen, aber es stellt niemand mehr zu. Genau der Zustand, den die
+       Outbox abschaffen soll — deshalb wird er protokolliert.
+    """
+    runners = tuple(background)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        tasks = [asyncio.create_task(_guarded(runner)) for runner in runners]
+        try:
+            yield
+        finally:
+            for task in tasks:
+                task.cancel()
+            for task in tasks:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+
+    return lifespan
+
+
+async def _guarded(runner: Callable[[], Awaitable[None]]) -> None:
+    try:
+        await runner()
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        _logger.exception("Hintergrundaufgabe beendet sich mit einem Fehler")
 
 
 def _add_cors_middleware(app: FastAPI, settings: PlatformSettings) -> None:

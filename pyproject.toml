@@ -41,7 +41,6 @@ worker-authorization = { workspace = true }
 worker-database = { workspace = true }
 worker-cache = { workspace = true }
 worker-events = { workspace = true }
-worker-messaging = { workspace = true }
 worker-health = { workspace = true }
 worker-metrics = { workspace = true }
 worker-tracing = { workspace = true }
@@ -53,6 +52,7 @@ worker-resilience = { workspace = true }
 worker-storage = { workspace = true }
 worker-search = { workspace = true }
 worker-skills = { workspace = true }
+worker-outbox = { workspace = true }
 worker-contracts = { workspace = true }
 worker-scheduler = { workspace = true }
 worker-ai = { workspace = true }
@@ -113,7 +113,6 @@ module = [
   "elasticsearch.*",
   "meilisearch.*",
   "qdrant_client.*",
-  "aiokafka.*",
   "boto3.*",
   "casbin.*",
   "casbin_sqlalchemy_adapter.*",
