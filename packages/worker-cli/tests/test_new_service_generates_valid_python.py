@@ -169,6 +169,26 @@ def test_the_service_owns_its_declarative_base(generated: Path) -> None:
     assert "import worker_database" not in text
 
 
+def test_alembic_points_at_the_service_own_base(generated: Path) -> None:
+    """Die zweite Hälfte von ADR-0016 — und die, die gefehlt hat.
+
+    `base.py` war längst richtig, `migrations/env.py` holte die Base aber
+    weiter aus `worker_database`. `target_metadata` zeigte damit auf eine
+    LEERE MetaData, und `alembic revision --autogenerate` hätte daraus eine
+    Migration gebaut, die jede Tabelle löscht.
+
+    Aufgefallen ist es nie, weil `upgrade head` nur vorhandene Skripte ausführt
+    — der Stack lief grün über einem Generator, der beim ersten Autogenerate
+    ein Datengrab ausgehoben hätte. Acht bestehende Dienste hatten denselben
+    Fehler geerbt.
+    """
+    module = _module_name(generated)
+    env = (generated / "migrations" / "env.py").read_text()
+
+    assert f"from {module}.infrastructure.database.base import Base" in env
+    assert "from worker_database import Base" not in env
+
+
 def test_generated_service_passes_the_repo_quality_gates(generated: Path) -> None:
     """Ein Generator, dessen Ausgabe rot ist, hilft niemandem.
 

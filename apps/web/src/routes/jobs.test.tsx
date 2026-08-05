@@ -19,9 +19,27 @@ vi.mock("../jobs/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../jobs/client")>();
   return { ...actual, searchJobs: vi.fn() };
 });
+vi.mock("../profile/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../profile/client")>();
+  return { ...actual, getMyProfile: vi.fn() };
+});
 
 const client = await import("../jobs/client");
 const searchJobs = vi.mocked(client.searchJobs);
+const profileClient = await import("../profile/client");
+const getMyProfile = vi.mocked(profileClient.getMyProfile);
+
+function myProfile(skills: string[]) {
+  return {
+    subject_id: "u",
+    headline: "Entwicklerin",
+    bio: "",
+    location: "Berlin",
+    remote_ok: true,
+    skills,
+    updated_at: "2026-08-02T10:00:00Z",
+  };
+}
 const applicationsClient = await import("../applications/client");
 const apply = vi.mocked(applicationsClient.apply);
 const companiesClient = await import("../companies/client");
@@ -36,6 +54,7 @@ function job(overrides: Partial<Job> = {}): Job {
     location: "Berlin",
     remote: "hybrid",
     employment: "full_time",
+    skills: [],
     status: "published",
     published_at: "2026-08-02T10:00:00Z",
     updated_at: "2026-08-02T10:00:00Z",
@@ -51,6 +70,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   searchJobs.mockResolvedValue({ ok: true, items: [], nextCursor: null });
   getCompanyProfile.mockResolvedValue(null);
+  getMyProfile.mockResolvedValue(null);
   apply.mockResolvedValue({
     ok: true,
     application: {
@@ -216,6 +236,98 @@ describe("JobsRoute — bewerben", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("antwortet gerade nicht");
     expect(alert.textContent).not.toMatch(/abgelehnt/i);
+  });
+});
+
+describe("JobsRoute — Passung", () => {
+  const WITH_SKILLS = { skills: ["Python", "Kubernetes", "Go"] };
+
+  it("names what you have and what you lack — and no percentage anywhere", async () => {
+    // Eine Prozentzahl sieht aus wie eine Messung und ist eine Division. Sie
+    // verschweigt genau das, was zählt: WELCHE Fähigkeit fehlt.
+    searchJobs.mockResolvedValue({ ok: true, items: [job(WITH_SKILLS)], nextCursor: null });
+    getMyProfile.mockResolvedValue(myProfile(["python", "Kubernetes"]));
+
+    renderWithProviders(<JobsRoute principal={principal()} />);
+
+    expect(await screen.findByText(/2 von 3/)).toBeInTheDocument();
+    expect(screen.getByText(/^Go$/)).toBeInTheDocument();
+    expect(screen.queryByText(/%/)).toBeNull();
+  });
+
+  it("marks the missing one as missing, not merely as absent from the list", async () => {
+    searchJobs.mockResolvedValue({ ok: true, items: [job(WITH_SKILLS)], nextCursor: null });
+    getMyProfile.mockResolvedValue(myProfile(["Python"]));
+
+    renderWithProviders(<JobsRoute principal={principal()} />);
+
+    // Der fehlende Teil ist der, der etwas nützt: er sagt, was man tun könnte.
+    const missing = await screen.findByText(/^Go$/);
+    expect(missing).toHaveAttribute("data-match", "missing");
+    expect(screen.getByText(/^Python$/)).toHaveAttribute("data-match", "have");
+  });
+
+  it("asks nothing about a person who is not logged in", async () => {
+    // Ohne Anmeldung gibt es kein Profil, also nichts zu vergleichen — die
+    // Fähigkeiten stehen trotzdem da, sie gehören zur Ausschreibung.
+    searchJobs.mockResolvedValue({ ok: true, items: [job(WITH_SKILLS)], nextCursor: null });
+
+    renderWithProviders(<JobsRoute principal={null} />);
+
+    expect(await screen.findByText(/^Go$/)).toBeInTheDocument();
+    expect(screen.queryByText(/von 3/)).toBeNull();
+    expect(getMyProfile).not.toHaveBeenCalled();
+  });
+
+  it("says 'nichts eingetragen' instead of '0 von 3'", async () => {
+    // „0 von 3" wäre eine Aussage über den Menschen, die nicht stimmt: er hat
+    // nichts gesagt, nicht nichts gekonnt.
+    searchJobs.mockResolvedValue({ ok: true, items: [job(WITH_SKILLS)], nextCursor: null });
+    getMyProfile.mockResolvedValue(myProfile([]));
+
+    renderWithProviders(<JobsRoute principal={principal()} />);
+
+    expect(await screen.findByText(/Profil/i)).toBeInTheDocument();
+    expect(screen.queryByText(/0 von 3/)).toBeNull();
+  });
+
+  it("points at the profile of someone who has none at all, not just an empty one", async () => {
+    // `getMyProfile()` liefert `null` für „noch keins angelegt". Ohne diesen
+    // Fall bliebe die Seite genau dort stumm, wo ein Satz die ganze Funktion
+    // erklärt.
+    searchJobs.mockResolvedValue({ ok: true, items: [job(WITH_SKILLS)], nextCursor: null });
+    getMyProfile.mockResolvedValue(null);
+
+    renderWithProviders(<JobsRoute principal={principal()} />);
+
+    expect(await screen.findByText(/Trage Fähigkeiten in deinem/i)).toBeInTheDocument();
+    expect(screen.queryByText(/von 3/)).toBeNull();
+  });
+
+  it("shows no skill line at all when the job names none", async () => {
+    searchJobs.mockResolvedValue({ ok: true, items: [job({ skills: [] })], nextCursor: null });
+    getMyProfile.mockResolvedValue(myProfile(["Python"]));
+
+    renderWithProviders(<JobsRoute principal={principal()} />);
+
+    await screen.findByText("Backend-Entwicklerin");
+    expect(screen.queryByText(/von 0/)).toBeNull();
+    expect(screen.queryByText(/genannten Fähigkeiten/)).toBeNull();
+  });
+
+  it("asks for the profile once, not once per job", async () => {
+    searchJobs.mockResolvedValue({
+      ok: true,
+      items: [job({ id: "a", ...WITH_SKILLS }), job({ id: "b", ...WITH_SKILLS })],
+      nextCursor: null,
+    });
+    getMyProfile.mockResolvedValue(myProfile(["Python"]));
+
+    renderWithProviders(<JobsRoute principal={principal()} />);
+
+    await screen.findAllByText("Backend-Entwicklerin");
+    await waitFor(() => expect(getMyProfile).toHaveBeenCalled());
+    expect(getMyProfile).toHaveBeenCalledTimes(1);
   });
 });
 

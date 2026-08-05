@@ -18,19 +18,32 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from worker_core import DomainError
+from worker_skills import canonical_all
 
 __all__ = [
+    "MAX_SKILLS",
+    "MAX_SKILL_LENGTH",
     "EmploymentType",
     "InvalidText",
     "Job",
     "JobStatus",
     "RemoteMode",
+    "Skills",
+    "TooManySkills",
     "TransitionNotAllowed",
 ]
 
 MAX_TITLE = 160
 MAX_DESCRIPTION = 20000
 MAX_LOCATION = 160
+#: Zwanzig Anforderungen sind schon eine Wunschliste; danach liest sie ohnehin
+#: niemand mehr durch.
+MAX_SKILLS = 20
+#: **Dieselbe Grenze wie im Profil**, und das ist keine Kosmetik: eine
+#: Anforderung, die länger ist, als eine Person sie überhaupt eintragen kann,
+#: wäre garantiert nie ein Treffer. `tests/test_skill_limits_align.py` hält das
+#: fest, weil man es hier nicht sieht.
+MAX_SKILL_LENGTH = 50
 
 
 class RemoteMode(StrEnum):
@@ -71,6 +84,51 @@ class TransitionNotAllowed(DomainError):
         )
 
 
+class TooManySkills(DomainError):
+    def __init__(self, reason: str) -> None:
+        super().__init__("invalid_skills", reason)
+
+
+@dataclass(frozen=True, slots=True)
+class Skills:
+    """Was die Stelle verlangt — normalisiert und reihenfolgetreu.
+
+    Eine zweite Umsetzung derselben Regeln wie in `profile-service`, absichtlich
+    kopiert statt geteilt: Fähigkeiten an einer Stelle sind ein Job-Modell und
+    bleiben im Dienst, dem sie gehören (Sharing-Regel). Was zwischen beiden
+    stimmen muss, ist nicht der Code, sondern **die Grenze** (siehe
+    `MAX_SKILL_LENGTH`) und die Art zu vergleichen — und verglichen wird nicht
+    hier, sondern im Browser, ohne Rücksicht auf Groß- und Kleinschreibung.
+    """
+
+    value: tuple[str, ...]
+
+    def __init__(self, raw: list[str] | tuple[str, ...]) -> None:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        # Erst umbenennen, DANN entdoppeln (ADR-0023). Andersherum würde aus
+        # „Postgres, PostgreSQL" zweimal derselbe Eintrag, und die Anzeige
+        # zählte eine Anforderung doppelt.
+        for entry in canonical_all(list(raw)):
+            item = entry.strip()
+            if not item:
+                continue
+            if len(item) > MAX_SKILL_LENGTH:
+                raise TooManySkills(f"A skill must not exceed {MAX_SKILL_LENGTH} characters")
+            # Groß-/Kleinschreibung ist keine zweite Anforderung. Die erste
+            # Schreibweise gewinnt — so hat das Unternehmen sie geschrieben,
+            # und so steht sie später in der Liste, die die Person sieht.
+            key = item.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(item)
+        # Erst entdoppeln, dann zählen.
+        if len(cleaned) > MAX_SKILLS:
+            raise TooManySkills(f"At most {MAX_SKILLS} skills are allowed")
+        object.__setattr__(self, "value", tuple(cleaned))
+
+
 def _text(field: str, value: str, *, required: bool, limit: int) -> str:
     cleaned = value.strip()
     if required and not cleaned:
@@ -89,6 +147,7 @@ class Job:
     location: str
     remote: RemoteMode
     employment: EmploymentType
+    skills: Skills
     status: JobStatus
     published_at: datetime | None
     created_at: datetime
@@ -104,6 +163,7 @@ class Job:
         location: str,
         remote: RemoteMode,
         employment: EmploymentType,
+        skills: Skills,
         now: datetime,
     ) -> Job:
         checked_title, checked_description, checked_location = _validated(
@@ -117,6 +177,7 @@ class Job:
             location=checked_location,
             remote=remote,
             employment=employment,
+            skills=skills,
             status=JobStatus.DRAFT,
             published_at=None,
             created_at=now,
@@ -131,6 +192,7 @@ class Job:
         location: str,
         remote: RemoteMode,
         employment: EmploymentType,
+        skills: Skills,
         now: datetime,
     ) -> None:
         """Bearbeiten ist auch nach dem Veröffentlichen erlaubt.
@@ -148,6 +210,8 @@ class Job:
         self.location = checked_location
         self.remote = remote
         self.employment = employment
+        # Ersetzen, nicht zusammenführen: was gestrichen wurde, ist gestrichen.
+        self.skills = skills
         self.updated_at = now
 
     def publish(self, *, now: datetime) -> None:

@@ -141,3 +141,25 @@ class TestProfile:
         assert profile.headline == "Original"
         assert profile.bio == ""
         assert profile.remote_ok is False
+
+
+class TestTheVocabulary:
+    """Dieselbe Tabelle wie in `jobs-service` — und das ist der ganze Punkt.
+
+    Der Abgleich im Browser hält die Liste der Stelle gegen die der Person.
+    Würden beide Seiten verschieden normalisiert, fände er zufällige Treffer
+    (ADR-0023). Das Umbenennen sitzt deshalb IM Wertobjekt und nicht im Router:
+    so gilt es auch für eine alte Zeile, die aus der Datenbank kommt.
+    """
+
+    def test_a_known_spelling_becomes_the_known_name(self) -> None:
+        assert Skills(["postgres", "golang"]).value == ("PostgreSQL", "Go")
+
+    def test_renaming_happens_before_deduplication(self) -> None:
+        # Andersherum stünde zweimal derselbe Eintrag in der Liste.
+        assert Skills(["Postgres", "psql"]).value == ("PostgreSQL",)
+
+    def test_what_the_vocabulary_does_not_know_stays_as_typed(self) -> None:
+        # Eine Liste erlaubter Fähigkeiten wäre eine Behauptung darüber, welche
+        # Arbeit es gibt.
+        assert Skills(["Altenpflege light"]).value == ("Altenpflege light",)

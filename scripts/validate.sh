@@ -102,6 +102,37 @@ if [[ "$skipped" -gt 0 ]]; then
   fi
 fi
 
+# Übersprungene E2E-Reisen sind KEIN Erfolg — und sie waren hier bis zum
+# 05.08.2026 unsichtbar. Die Reihe übersprang sich vollständig (16 von 16), weil
+# zwei Dienste nach einer neuen Abhängigkeit nicht mehr starteten, und dieses
+# Skript meldete trotzdem „Alles grün". Ein Bericht, der ein Loch nicht zeigt,
+# ist schlechter als keiner: er erzeugt Vertrauen, das nicht gedeckt ist.
+#
+# Deshalb ist ein vollständig übersprungener Lauf jetzt ROT und nicht nur ein
+# Hinweis. Ein einzelner übersprungener Test ist eine Entscheidung; alle sind
+# ein Ausfall.
+e2e_skipped=0
+if [[ $WITH_E2E -eq 1 && -f "$playwright_log" ]]; then
+  e2e_skipped=$(grep -oE '[0-9]+ skipped' "$playwright_log" | tail -1 | grep -oE '[0-9]+' || true)
+  e2e_skipped=${e2e_skipped:-0}
+fi
+
+if [[ "$e2e_skipped" -gt 0 ]]; then
+  e2e_passed=$(grep -oE '[0-9]+ passed' "$playwright_log" | tail -1 | grep -oE '[0-9]+' || true)
+  e2e_passed=${e2e_passed:-0}
+  printf '\n  %s!%s %s E2E-Reise(n) übersprungen, %s gelaufen.' \
+    "$YELLOW" "$OFF" "$e2e_skipped" "$e2e_passed"
+  if [[ "$e2e_passed" -eq 0 ]]; then
+    printf '\n    %sKEINE einzige Reise ist gelaufen.%s Meist antwortet ein Dienst nicht:\n' "$RED" "$OFF"
+    printf '    "docker compose ps" und dann "docker compose logs <dienst>".\n'
+    printf '    Nach einer NEUEN Abhängigkeit reicht ein Neustart nicht — das Image\n'
+    printf '    muss neu gebaut werden ("docker compose up -d --build <dienst>").\n'
+    FAILED=1
+  else
+    printf '\n'
+  fi
+fi
+
 if [[ $WITH_E2E -eq 0 ]]; then
   if [[ $docker_up -eq 1 ]]; then
     printf '  %s!%s Der Stack läuft — "scripts/validate.sh --e2e" prüft auch die Reise\n    durch den Browser.\n' "$YELLOW" "$OFF"

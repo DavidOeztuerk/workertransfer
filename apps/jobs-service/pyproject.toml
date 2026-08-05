@@ -19,6 +19,10 @@ dependencies = [
     "pydantic>=2.8.0,<3.0.0",
     "pydantic-settings>=2.4.0,<3.0.0",
     "worker-core",
+    # Das Vokabular: „Postgres" und „PostgreSQL" sind dasselbe Wort. Beide
+    # Seiten des Abgleichs MÜSSEN dieselbe Tabelle benutzen, sonst findet er
+    # zufällige Treffer (ADR-0023).
+    "worker-skills",
     "worker-platform",
     "worker-database",
     "worker-auth",
@@ -39,6 +43,7 @@ module-name = "jobs_service"
 
 [tool.uv.sources]
 worker-core = { workspace = true }
+worker-skills = { workspace = true }
 worker-platform = { workspace = true }
 worker-database = { workspace = true }
 worker-auth = { workspace = true }

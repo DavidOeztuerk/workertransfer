@@ -16,7 +16,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 3 | Candidate Core | ✅ | 3.1–3.5 komplett (Consent, Profile, Resume, Portfolio, Ablage) |
 | 4 | Jobs & Applications | ✅ | 4.1–4.4 komplett (Jobs, Bewerbungen, Unternehmen, Karriere-Seiten) |
 | 5 | Transfermarkt | 🟧 | 5.1–5.3 ✅ (Marktstatus, Vorgang, Tür + Oberfläche); Verträge, Unterschrift, KI-Beratung offen |
-| 6 | Developer Intelligence | 🟧 | 6.1 ✅ (GitHub als Beleg); Skill-Graph und Matching offen |
+| 6 | Developer Intelligence | ✅ | 6.1 (GitHub als Beleg), 6.2 (Passung im Browser), 6.3 (Vokabular) — Score, Ranking und Wechselwahrscheinlichkeit bewusst **nicht** gebaut (ADR-0022/0023) |
 | 7 | AI Agent Plattform | ⬜ | 23 Agenten (draft-only), plan-act-reflect, MCP |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ⬜ | Outbox/Inbox, cross-service Events |
@@ -201,19 +201,21 @@ was der Code tat.
   via `create_api_app`, Alembic ADR-0010, Testcontainers ADR-0011); der Renderer
   verweigert `.py`-Dateien mit ungelösten Platzhaltern. 10 Tests.
 
-**Offene Folge-Defizite aus 2.5** (dokumentiert, nicht blockierend):
-- Die Alt-Templates `domain/`, `application/`, `infrastructure/` im Generator tragen
-  eigene Lint-Schulden und definieren einen **lokalen** `Mediator`/`PipelineBehavior`,
-  der `worker_platform.application.cqrs` dupliziert — ein ADR-0002-Verstoß, der sonst in
-  jeden generierten Service eingebacken wird.
+**Folge-Defizite aus 2.5**:
+- ~~Alt-Templates mit lokalem `Mediator`/`PipelineBehavior`~~ — **erledigt.** Beim
+  Nachprüfen am 05.08.2026 existierten sie nicht mehr: die Vorlagen verweisen
+  ausdrücklich auf `worker_platform.application.cqrs`, und `application/__init__.py`
+  sagt im Docstring, warum ein service-eigener Mediator ein Duplikat wäre. Der
+  Eintrag stand seit dem Umbau der Vorlagen zu Unrecht als offen.
 - ~~`worker-github` bleibt unimportierbar~~ — **erledigt am 03.08.2026 durch
   Löschen, nicht durch Reparieren** (ADR-0022). Die damalige Einschätzung „Fix
   gehört in Phase 6" war falsch: repariert hätte der Import 318 Zeilen scharf
   gestellt, die einen Menschen zu einer Zahl zwischen 0 und 100 verrechnen.
 - `worker-ai` bleibt aus dem Workspace exkludiert (ML-Wheels ohne
   Python-3.14-Rad). Für Phase 7 über optionale Extras zu lösen, analog weasyprint.
-- Kein `Authorization`-Header **und** kein Cookie ⇒ 401; per-IP-Rate-Limiting am
-  Auth-Rand weiterhin offen (Phase 10, TODO-Marker in `build_auth_router`).
+- ~~per-IP-Rate-Limiting am Auth-Rand offen~~ — **erledigt am 05.08.2026.** Kein
+  `Authorization`-Header **und** kein Cookie ⇒ 401; und der Anmeldeweg hat jetzt
+  eine Bremse. Siehe „Bremse am Auth-Rand" unten.
 
 ### Phase 3 — Status: ✅ erledigt (3.1–3.5)
 
@@ -254,10 +256,13 @@ was der Code tat.
 
   Offen aus 3.1 (nicht blockierend): `mediator.py` wurde nicht gebaut — die
   Handler werden wie in `identity-service` direkt aus dem Router aufgerufen; ein
-  Mediator lohnt erst mit Pipeline-Behaviors. `test_eventbus_seam.py` fehlt (die
-  Naht existiert in `compose_infrastructure`, hat aber noch keinen Publisher).
-  Die `worker new-service`-Templates erzeugen noch `worker_database.Base` statt
-  einer service-eigenen Base (ADR-0016-Folgearbeit).
+  Mediator lohnt erst mit Pipeline-Behaviors. `test_eventbus_seam.py` fehlt —
+  und bleibt weg, solange es keinen Publisher gibt: ein Test auf eine Naht ohne
+  Gegenstück prüft, dass nichts passiert, und das tut er auch, wenn die Naht
+  falsch ist.
+  ~~Die Templates erzeugen noch `worker_database.Base`~~ — **erledigt am
+  05.08.2026, und der Rest des Fehlers war größer als die Notiz.** Siehe „Acht
+  Dienste, ein Datengrab" unten.
 - ✅ **3.1b Identity-Angleichung & Onboarding** (01.08.2026, PR #2 + #3 gemergt).
   Tenant ist ein Unternehmen, natürliche Personen haben keinen (**ADR-0017**);
   Mitgliedschaft als eigene Relation plus verifizierter Wechsel über
@@ -649,6 +654,140 @@ existieren könnte.
   jeder Endpunkt antwortete 401, obwohl ein gültiges Token mitkam. Jeder
   bestehende Dienst hatte das von Hand nachgetragen. Beides jetzt in der Vorlage
   bzw. als Riegel im Generator, beides mit Test.
+
+- ✅ **6.2 Passung — in die andere Richtung** — 05.08.2026.
+  [Design](superpowers/specs/2026-08-03-matching-design.md).
+  Der ULTRAPLAN nennt „Scout-Match", und das übliche Bild dahinter — eine
+  Kandidatenliste mit Prozentzahl — ist **der Gesamtscore aus ADR-0022 durch
+  die Hintertür**. Deshalb umgekehrt gebaut: **die Passung sieht die Person,
+  nicht das Unternehmen, und sie ordnet Stellen, nicht Menschen.**
+  Gezeigt wird eine Liste, keine Zahl: „Du hast 2 von 3 genannten Fähigkeiten:
+  Python ✓ · Kubernetes ✓ · Go ✗". Kein Prozentwert — eine Prozentzahl sieht
+  aus wie eine Messung, ist eine Division und verschweigt genau das, was zählt,
+  nämlich **welche** Fähigkeit fehlt.
+  **Gerechnet wird im Browser** (`apps/web/src/jobs/match.ts`), aus dem eigenen
+  Profil und der Liste der Stelle. Damit existiert die Passung nirgends als
+  Datensatz: was es nicht gibt, kann auch nicht ausgewertet werden.
+  Neu in der Domäne ist nur `Job.skills` (≤ 20 Einträge, je ≤ 50 Zeichen,
+  getrimmt und ohne Rücksicht auf Groß-/Kleinschreibung entdoppelt) plus
+  Migration `0002_job_skills`.
+  **Beim Bauen fiel eine Zahl auf, die der Entwurf falsch hatte:** er sah 60
+  Zeichen je Anforderung vor, das Profil lässt 50 zu. Eine Anforderung, die
+  länger ist, als eine Person sie eintragen kann, wäre garantiert nie ein
+  Treffer — eine Zeile, die für niemanden je ein Haken werden kann. Das sieht
+  man in keiner der beiden Dateien, deshalb hält es
+  `tests/test_skill_limits_align.py` fest: kleiner darf die Stelle sein,
+  größer nicht.
+  Wer nicht angemeldet ist, sieht die Anforderungen ohne Abgleich; wer
+  angemeldet ist und **nichts eingetragen** hat, bekommt einen Hinweis auf sein
+  Profil statt „0 von 3" — das wäre eine Aussage über ihn, die nicht stimmt: er
+  hat nichts gesagt, nicht nichts gekonnt.
+  **Und dieselbe Lehre zum dritten Mal:** die Testhilfe `registerAndConfirm`
+  wartete nur auf die Erfolgsüberschrift und lief bei einem Fehlschlag 30
+  Sekunden in ein nichtssagendes „element(s) not found". Sie wartet jetzt — wie
+  `login` — auf **beide** Ausgänge und sagt, welcher eingetreten ist.
+
+- ✅ **6.3 Skill-Graph: das Vokabular, nicht das Urteil** — 05.08.2026.
+  [Design](superpowers/specs/2026-08-05-skill-graph-design.md) · **ADR-0023**.
+  Der ULTRAPLAN wollte hier Fähigkeiten aus Commits ableiten, zehn Dimensionen
+  berechnen, eine **Wechselwahrscheinlichkeit** und einen Match-Score. Nach
+  ADR-0022 und 6.2 bleibt davon eines übrig — und es ist das einzige, das
+  niemandem etwas unterstellt: **ein Vokabular.**
+  Der Bedarf war nicht theoretisch, 6.2 hat ihn erzeugt: die Stelle verlangt
+  „PostgreSQL", im Profil steht „Postgres", Ergebnis ✗ — eine Lücke, die es
+  nicht gibt, gezeigt an einen Menschen, der sich deshalb womöglich nicht
+  bewirbt.
+  `packages/worker-skills`: eine Tabelle und eine Funktion, **ohne eine einzige
+  Abhängigkeit**. Angewandt **im `Skills`-Wertobjekt** von `profile-service`
+  und `jobs-service`, nicht im Router — damit gilt es auch für Zeilen, die vor
+  diesem Schnitt geschrieben wurden, und es braucht **kein
+  Datenmigrations-Skript**. Reihenfolge tragend: erst umbenennen, dann
+  entdoppeln.
+  **Die Grenze steht in ADR-0023 und wird von Tests bewacht:** „Postgres" =
+  „PostgreSQL" ist eine Aussage über *Sprache*; „React heißt, du kannst auch
+  JavaScript" wäre eine über einen *Menschen* — sie schreibt ihm etwas zu, dem
+  er nicht widersprechen kann. Kein Niveau, kein Gewicht, keine Verwandtschaft,
+  keine Wechselwahrscheinlichkeit.
+  Und: es **lehnt nie ab und erfindet nie**. Unbekanntes bleibt wie getippt —
+  eine Liste erlaubter Fähigkeiten wäre eine Behauptung darüber, welche Arbeit
+  es gibt, und läge bei jedem Beruf außerhalb der IT falsch.
+  Der erste Test fand einen Fehler in der Tabelle selbst: „postgresql" stand als
+  eigener Alias von „PostgreSQL" — ein Name, der zugleich sein eigener Alias
+  ist, und damit der Anfang einer Kette.
+
+- ✅ **Und ein Fund, den erst 6.3 ausgelöst hat: der grüne Bericht über einem
+  leeren Lauf.** Nach dem Hinzufügen von `worker-skills` starteten
+  `profile-service` und `jobs-service` nicht mehr — `ModuleNotFoundError`, weil
+  der Quellcode zwar per Bind-Mount im Container liegt, **das venv aber im
+  Image** (`/opt/venv`, absichtlich außerhalb von `/app`). Ein neues
+  Workspace-Paket braucht also `docker compose up -d --build`, kein `restart`.
+  Beide Container standen dabei auf „running" — uvicorn startete in einer
+  Schleife neu.
+  Die Folge war schlimmer als der Ausfall: `skipWithoutStack()` übersprang
+  **alle 16 E2E-Reisen**, und `make validate-e2e` meldete trotzdem *„Alles
+  grün"*. Genau das Skript, das es „nicht beim ersten Fehler abbricht und die
+  übersprungenen Tests benennt" verspricht, zählte nur Python-Skips.
+  `scripts/validate.sh` ist jetzt **rot**, wenn keine einzige Reise gelaufen ist
+  — ein einzelner übersprungener Test ist eine Entscheidung, alle sind ein
+  Ausfall.
+
+### Aufräumen: alles Bekannte behoben (05.08.2026)
+
+Ausgelöst durch eine berechtigte Rückfrage — *„wieso findest du solche Fehler
+und behebst sie nicht sofort?"*. Die Antwort war in einem Fall gut (ein Fix
+ohne fehlschlagenden Test ist eine Vermutung) und in den anderen nur bequem.
+Also: alles, was in dieser Datei als offen stand, geprüft und geschlossen.
+
+- ✅ **Die Bestätigungsseite schickte ihren Token zweimal.** Beleg: 2 von 120
+  POSTs auf `/auth/verify-email` kamen im E2E-Lauf als HTTP 400 „ungültig"
+  zurück. Der Token ist einmalig — der zweite Aufruf verbraucht ihn nicht, er
+  scheitert, und wessen Antwort zuletzt ankommt, entscheidet, was die Person
+  sieht. Im schlechten Fall „Bestätigung fehlgeschlagen", während ihr Konto
+  gerade freigeschaltet wurde.
+  **Warum er beim ersten Anlauf nicht behoben wurde:** ein Test mit
+  `<StrictMode>` war auch am ungefixten Code grün, und ein Test, der nicht
+  fehlschlagen kann, bewacht nichts. **Was ihn reproduzierbar machte:** nicht
+  StrictMode, sondern schlicht ein **zweiter Aufbau** — `render` → `unmount` →
+  `render`. Damit war der Test rot, und der Riegel sind drei Zeilen: eine
+  modulweite `Map` von Token auf **Zusage**, sodass ein zweiter Aufbau
+  dasselbe Ergebnis bekommt statt eines zweiten Aufrufs. Ein `useRef` hätte
+  nicht gereicht — er stirbt mit der Komponente, und genau darum geht es.
+
+- ✅ **Acht Dienste, ein Datengrab.** Beim Nachprüfen der Notiz „die Templates
+  erzeugen noch `worker_database.Base`" stellte sich heraus: die Vorlage war
+  nur die halbe Wahrheit. `base.py` war längst richtig, aber
+  **`migrations/env.py` holte die Base weiter aus `worker_database`** — in der
+  Vorlage *und* in acht von zehn Diensten. `target_metadata` zeigte damit auf
+  eine **leere** MetaData, und `alembic revision --autogenerate` hätte daraus
+  eine Migration gebaut, die **jede Tabelle löscht**.
+  Gemerkt hat es nie jemand, weil `upgrade head` nur die vorhandenen Skripte
+  ausführt: der Stack lief grün über einem Generator, der beim ersten
+  Autogenerate ein Datengrab ausgehoben hätte.
+  Behoben in allen acht plus der Vorlage. Gesichert durch
+  `tests/test_migration_metadata.py` — und zwar auf **Identität** der Base, nicht
+  auf „Metadata nicht leer": der erste Entwurf dieses Tests war
+  reihenfolgeabhängig, weil `identity-service` seine Modelle tatsächlich auf
+  `worker_database.Base` registriert und die geteilte MetaData damit voll
+  aussah, sobald seine Tests zuerst liefen. Drei statt acht Fehlschläge — ein
+  Test, der den Fehler je nach Laufreihenfolge verschwinden lässt.
+
+- ✅ **Bremse am Auth-Rand** — der einzige `TODO`-Marker, der im Code stand.
+  `worker_platform.presentation.throttle`: gleitendes Fenster je Herkunft, als
+  Middleware **weiter außen als die Authentifizierung**. Das ist der Punkt und
+  nicht Kosmetik: läge sie innen, würde für jeden Rateversuch erst bcrypt
+  gerechnet, und die Bremse wäre der teuerste Teil des Angriffs. Der Test
+  beweist es ohne Datenbank — zehnmal 500 (Handler erreicht), dann 429 (nicht
+  erreicht).
+  **Je Herkunft, nie je Adresse:** eine Bremse je E-Mail-Adresse wäre zweimal
+  falsch — sie verriete durch ihr Verhalten, dass es die Adresse gibt, und ein
+  Fremder könnte damit eine bestimmte Person aussperren.
+  Der abgelehnte Versuch wird **nicht** mitgezählt, sonst hielte sich eine
+  Sperre selbst am Leben. Genau diesen Fehler hat `worker-ratelimit` (unbenutzt,
+  braucht Redis, das nicht im Stack steht) — deshalb eine eigene Umsetzung mit
+  einer Abhängigkeit weniger statt drei, die niemand einschaltet (ADR-0021).
+  **Aus in LOCAL/TEST**, weil im Compose-Stack jede Anfrage von derselben
+  Gateway-Adresse kommt: dort träfe sie die eigene Testreihe statt eines
+  Angreifers. Ausdrücklich einschaltbar (`WORKER_AUTH_THROTTLE_ENABLED=true`).
 
 ### Weiterhin offen, quer durch alle Phasen
 

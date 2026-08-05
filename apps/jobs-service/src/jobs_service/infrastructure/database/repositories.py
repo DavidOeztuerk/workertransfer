@@ -9,7 +9,7 @@ from uuid import UUID
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from jobs_service.domain.job import EmploymentType, Job, JobStatus, RemoteMode
+from jobs_service.domain.job import EmploymentType, Job, JobStatus, RemoteMode, Skills
 from jobs_service.infrastructure.database.models import JobModel
 
 __all__ = ["SqlAlchemyJobRepository", "decode_cursor", "encode_cursor"]
@@ -48,6 +48,7 @@ def _to_domain(row: JobModel) -> Job:
         location=row.location,
         remote=RemoteMode(row.remote),
         employment=EmploymentType(row.employment),
+        skills=Skills(list(row.skills)),
         status=JobStatus(row.status),
         published_at=row.published_at,
         created_at=row.created_at,
@@ -73,6 +74,7 @@ class SqlAlchemyJobRepository:
                 location=job.location,
                 remote=str(job.remote),
                 employment=str(job.employment),
+                skills=list(job.skills.value),
                 status=str(job.status),
                 published_at=job.published_at,
                 created_at=job.created_at,
@@ -92,6 +94,7 @@ class SqlAlchemyJobRepository:
         row.location = job.location
         row.remote = str(job.remote)
         row.employment = str(job.employment)
+        row.skills = list(job.skills.value)
         row.status = str(job.status)
         row.published_at = job.published_at
         row.updated_at = job.updated_at
