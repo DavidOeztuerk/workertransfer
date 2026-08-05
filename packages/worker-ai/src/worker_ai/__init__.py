@@ -1,246 +1,198 @@
-"""AI Runtime: Provider abstraction, Tool calling, Memory, Prompt templates, Streaming."""
+"""Die Naht zur KI: ein Entwurf, den ein Mensch anfordert und danach ändert.
+
+Neu geschrieben nach **ADR-0024**. Die frühere Fassung hielt vier Anbieter,
+Tool-Calling, Memory und Vektorsuche vorrätig — 246 Zeilen mit acht schweren
+Abhängigkeiten, ohne einen einzigen Konsumenten, unbaubar unter Python 3.14 und
+deshalb aus dem Workspace ausgeschlossen. Dieselbe Geschichte wie
+`worker-files` (ADR-0021), und dieselbe Antwort: **eine Umsetzung, die wirklich
+benutzt wird, statt vier, die niemand einschaltet.**
+
+Was hier bewusst NICHT steht:
+
+- **Kein Memory, keine Vektorsuche.** Beides speichert, und dieser Schnitt
+  speichert nichts — weder den Prompt noch die Antwort.
+- **Keine Bewertung, keine Zusammenfassung ÜBER einen Menschen.** Das Modell
+  hilft jemandem zu sagen, was er sagen will; es sagt nichts über ihn
+  (ADR-0022).
+- **Kein Protokoll des Inhalts.** `product-scope.md` verbietet CVs und Verträge
+  im Log; der Freitext einer Person gehört in dieselbe Klasse. Was hier
+  fehlschlägt, wird ohne Prompt und ohne Antwort gemeldet.
+"""
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Protocol
+
+import httpx
+
+__all__ = [
+    "AnthropicDrafter",
+    "DraftContext",
+    "DrafterUnavailable",
+    "NullDrafter",
+    "TextDrafter",
+]
+
+#: Kurz gehalten, absichtlich. Ein Entwurf, den man nicht auf einen Blick
+#: prüfen kann, wird nicht geprüft, sondern übernommen.
+MAX_OUTPUT_TOKENS = 700
+TIMEOUT_SECONDS = 30.0
 
 
-@dataclass
-class Message:
-    role: str  # system, user, assistant, tool
-    content: str | None = None
-    tool_calls: list[ToolCall] | None = None
-    tool_call_id: str | None = None
-    name: str | None = None
+class DrafterUnavailable(Exception):
+    """Der Anbieter hat nicht geantwortet — oder es ist keiner eingerichtet.
+
+    Ein eigener Fehler und **kein stiller Rückfall auf eine Vorlage**: ein
+    Entwurf, der nicht vom Modell kommt, aber so aussieht, wäre die schlechtere
+    Antwort. Die Meldung trägt nie den Prompt und nie die Antwort.
+    """
 
 
-@dataclass
-class ToolCall:
-    id: str
-    type: str = "function"
-    function: FunctionCall | None = None
+@dataclass(frozen=True, slots=True)
+class DraftContext:
+    """Was in den Prompt darf — und damit auch: was nicht.
+
+    Diese Klasse IST die Grenze. Sie trägt, was die Person selbst über sich
+    geschrieben hat, und sonst nichts: **kein Name, keine E-Mail-Adresse, keine
+    `subject_id`, kein Arbeitgeber, kein Lebenslauf, keine Bewerbung, kein
+    Marktstatus.**
+
+    Als Datenklasse und nicht als freies `dict`, weil ein `dict` beim nächsten
+    Feature stillschweigend einen Schlüssel mehr trägt.
+    """
+
+    headline: str = ""
+    bio: str = ""
+    skills: tuple[str, ...] = field(default_factory=tuple)
+    #: Was die Person will („kürzer", „sachlicher"). Freitext von ihr, an sie
+    #: gerichtet.
+    wish: str = ""
 
 
-@dataclass
-class FunctionCall:
-    name: str
-    arguments: str  # JSON string
+class TextDrafter(Protocol):
+    async def draft(self, context: DraftContext) -> str: ...
 
 
-@dataclass
-class Tool:
-    type: str = "function"
-    function: FunctionSchema | None = None
+class NullDrafter:
+    """Kein Anbieter eingerichtet — die Funktion ist ehrlich aus.
+
+    Die Voreinstellung. Eine, die im Zweifel einen fremden Dienst anruft, wäre
+    die falsche: der Text einer Person verlässt die Plattform dann, weil
+    jemand vergessen hat, etwas abzuschalten.
+    """
+
+    async def draft(self, context: DraftContext) -> str:
+        _ = context
+        raise DrafterUnavailable("no drafting provider configured")
 
 
-@dataclass
-class FunctionSchema:
-    name: str
-    description: str
-    parameters: dict[str, Any]  # JSON Schema
+#: Was das Modell tun soll — und woran es sich zu halten hat.
+#:
+#: „Schreibe ALS die Person" ist der Kern: der Entwurf ist ein Vorschlag für
+#: ihren eigenen Text, keine Beschreibung von außen. Deshalb auch das Verbot,
+#: etwas hinzuzuerfinden — ein Profil, in dem eine Fähigkeit steht, die die
+#: Person nie genannt hat, ist eine Falschaussage über sie, und sie merkt es
+#: womöglich erst im Gespräch.
+_SYSTEM = (
+    "Du hilfst einer Person, ihren eigenen Profiltext auf einer "
+    "Job-Plattform zu formulieren. Schreibe in der Ich-Form, auf Deutsch, "
+    "sachlich und ohne Werbesprache.\n"
+    "Regeln:\n"
+    "- Erfinde NICHTS hinzu. Benutze nur, was unten steht. Wenn dort wenig "
+    "steht, schreibe wenig.\n"
+    "- Keine Superlative, keine Behauptungen über Erfahrung in Jahren, keine "
+    "Bewertung der Person.\n"
+    "- Höchstens 120 Wörter.\n"
+    "- Gib nur den Text zurück, ohne Anrede, ohne Überschrift, ohne "
+    "Erklärung."
+)
 
 
-@dataclass
-class CompletionOptions:
-    temperature: float = 0.7
-    max_tokens: int | None = None
-    top_p: float = 1.0
-    stop: list[str] | None = None
-    tools: list[Tool] | None = None
-    tool_choice: str | dict[str, Any] | None = "auto"
+def build_prompt(context: DraftContext) -> str:
+    """Der Prompt, wörtlich — damit ein Test ihn prüfen kann.
+
+    Getrennt vom Versand, weil die interessante Frage nicht ist, ob HTTP
+    funktioniert, sondern **was hinausgeht**.
+    """
+    parts = [
+        f"Bisherige Überschrift: {context.headline}" if context.headline else "",
+        f"Bisheriger Text: {context.bio}" if context.bio else "",
+        f"Fähigkeiten: {', '.join(context.skills)}" if context.skills else "",
+        f"Wunsch der Person: {context.wish}" if context.wish else "",
+    ]
+    return "\n".join(part for part in parts if part)
 
 
-@dataclass
-class CompletionResponse:
-    message: Message
-    usage: Usage | None = None
-    finish_reason: str = "stop"
+class AnthropicDrafter:
+    """Der eine Anbieter.
 
+    Ein Aufruf, ein Text. Keine Wiederholung: wer gedrückt hat, sieht einen
+    Fehler und drückt noch einmal — ein stiller zweiter Versuch verdoppelt die
+    Kosten und die Wartezeit, ohne dass jemand darum gebeten hat.
+    """
 
-@dataclass
-class Usage:
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-
-
-class LLMProvider(ABC):
-    @abstractmethod
-    async def complete(
-        self, messages: list[Message], options: CompletionOptions
-    ) -> CompletionResponse: ...
-
-    @abstractmethod
-    def stream_complete(
-        self, messages: list[Message], options: CompletionOptions
-    ) -> AsyncGenerator[CompletionResponse]: ...
-
-    @abstractmethod
-    async def embed(self, texts: list[str]) -> list[list[float]]: ...
-
-
-class OpenAIProvider(LLMProvider):
-    def __init__(self, api_key: str, model: str = "gpt-4-turbo-preview"):
-        import openai
-
-        self._client = openai.AsyncOpenAI(api_key=api_key)
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model: str = "claude-sonnet-5",
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
+        self._api_key = api_key
         self._model = model
+        self._client = client
 
-    async def complete(
-        self, messages: list[Message], options: CompletionOptions
-    ) -> CompletionResponse:
-        response = await self._client.chat.completions.create(  # type: ignore[call-overload]
-            model=self._model,
-            messages=[m.__dict__ for m in messages],
-            temperature=options.temperature,
-            max_tokens=options.max_tokens,
-            top_p=options.top_p,
-            stop=options.stop,
-            tools=[t.__dict__ for t in options.tools] if options.tools else None,
-            tool_choice=options.tool_choice,
-        )
-        msg = response.choices[0].message
-        return CompletionResponse(
-            message=Message(
-                role=msg.role,
-                content=msg.content,
-                tool_calls=[
-                    ToolCall(
-                        id=tc.id,
-                        function=FunctionCall(
-                            name=tc.function.name, arguments=tc.function.arguments
-                        ),
-                    )
-                    for tc in msg.tool_calls or []
-                ],
-            ),
-            usage=Usage(
-                prompt_tokens=response.usage.prompt_tokens,
-                completion_tokens=response.usage.completion_tokens,
-                total_tokens=response.usage.total_tokens,
-            ),
-            finish_reason=response.choices[0].finish_reason,
-        )
-
-    async def stream_complete(
-        self, messages: list[Message], options: CompletionOptions
-    ) -> AsyncGenerator[CompletionResponse]:
-        stream = await self._client.chat.completions.create(  # type: ignore[call-overload]
-            model=self._model,
-            messages=[m.__dict__ for m in messages],
-            temperature=options.temperature,
-            max_tokens=options.max_tokens,
-            top_p=options.top_p,
-            stop=options.stop,
-            tools=[t.__dict__ for t in options.tools] if options.tools else None,
-            tool_choice=options.tool_choice,
-            stream=True,
-        )
-        async for chunk in stream:
-            if chunk.choices[0].delta.content:
-                yield CompletionResponse(
-                    message=Message(role="assistant", content=chunk.choices[0].delta.content),
-                    finish_reason=chunk.choices[0].finish_reason or "stop",
+    async def draft(self, context: DraftContext) -> str:
+        body = {
+            "model": self._model,
+            "max_tokens": MAX_OUTPUT_TOKENS,
+            "system": _SYSTEM,
+            "messages": [{"role": "user", "content": build_prompt(context)}],
+        }
+        headers = {
+            "x-api-key": self._api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+        try:
+            if self._client is not None:
+                response = await self._client.post(
+                    "https://api.anthropic.com/v1/messages", json=body, headers=headers
                 )
-
-    async def embed(self, texts: list[str]) -> list[list[float]]:
-        response = await self._client.embeddings.create(model="text-embedding-3-small", input=texts)
-        return [d.embedding for d in response.data]
-
-
-class AnthropicProvider(LLMProvider):
-    def __init__(self, api_key: str, model: str = "claude-3-opus-20240229"):
-        import anthropic
-
-        self._client = anthropic.AsyncAnthropic(api_key=api_key)
-        self._model = model
-
-    async def complete(
-        self, messages: list[Message], options: CompletionOptions
-    ) -> CompletionResponse:
-        # Convert to Anthropic format
-        from anthropic.types import TextBlock
-
-        system = ""
-        user_messages: list[dict[str, str | None]] = []
-        for m in messages:
-            if m.role == "system":
-                system = m.content or ""
             else:
-                user_messages.append({"role": m.role, "content": m.content})
+                async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+                    response = await client.post(
+                        "https://api.anthropic.com/v1/messages", json=body, headers=headers
+                    )
+        except httpx.HTTPError as exc:
+            # Nur die Fehlerart, nie der Inhalt: der Prompt trägt den Freitext
+            # einer Person und gehört nicht ins Protokoll.
+            raise DrafterUnavailable(f"provider unreachable ({type(exc).__name__})") from None
 
-        response = await self._client.messages.create(
-            model=self._model,
-            system=system,
-            messages=user_messages,  # type: ignore[arg-type]
-            max_tokens=options.max_tokens or 4096,
-            temperature=options.temperature,
-            top_p=options.top_p,
-            stop_sequences=options.stop,  # type: ignore[arg-type]
-        )
-        first_block = response.content[0] if response.content else None
-        text = first_block.text if isinstance(first_block, TextBlock) else ""
-        return CompletionResponse(
-            message=Message(role="assistant", content=text),
-            usage=Usage(
-                prompt_tokens=response.usage.input_tokens,
-                completion_tokens=response.usage.output_tokens,
-                total_tokens=response.usage.input_tokens + response.usage.output_tokens,
-            ),
-            finish_reason=response.stop_reason or "stop",
-        )
+        if response.status_code != 200:
+            raise DrafterUnavailable(f"provider answered {response.status_code}")
 
-    async def stream_complete(
-        self, messages: list[Message], options: CompletionOptions
-    ) -> AsyncGenerator[CompletionResponse]:
-        raise NotImplementedError("Anthropic streaming not implemented in Phase 1 scaffold")
-        yield CompletionResponse(Message(role="assistant"))  # type: ignore[unreachable]  # pragma: no cover
-
-    async def embed(self, texts: list[str]) -> list[list[float]]:
-        raise NotImplementedError("Anthropic embeddings not available")
+        return _text_of(response.json())
 
 
-class OllamaProvider(LLMProvider):
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3"):
-        import ollama
+def _text_of(payload: object) -> str:
+    """Liest den Text aus der Antwort — und beschwert sich, statt zu raten.
 
-        self._client = ollama.AsyncClient(host=base_url)
-        self._model = model
-
-    async def complete(
-        self, messages: list[Message], options: CompletionOptions
-    ) -> CompletionResponse:
-        response = await self._client.chat(
-            model=self._model,
-            messages=[m.__dict__ for m in messages],
-            options={
-                "temperature": options.temperature,
-                "num_predict": options.max_tokens,
-            },
-        )
-        return CompletionResponse(
-            message=Message(role="assistant", content=response["message"]["content"]),
-            finish_reason="stop",
-        )
-
-    async def stream_complete(
-        self, messages: list[Message], options: CompletionOptions
-    ) -> AsyncGenerator[CompletionResponse]:
-        async for chunk in await self._client.chat(
-            model=self._model,
-            messages=[m.__dict__ for m in messages],
-            options={"temperature": options.temperature, "num_predict": options.max_tokens},
-            stream=True,
-        ):
-            if chunk["message"]["content"]:
-                yield CompletionResponse(
-                    message=Message(role="assistant", content=chunk["message"]["content"]),
-                )
-
-    async def embed(self, texts: list[str]) -> list[list[float]]:
-        import ollama
-
-        return [ollama.embeddings(model="nomic-embed-text", prompt=t)["embedding"] for t in texts]
+    Eine leere Zeichenkette zurückzugeben, wenn die Antwort anders aussieht als
+    erwartet, hieße: die Person drückt, es passiert nichts, und niemand weiß
+    warum.
+    """
+    if not isinstance(payload, dict):
+        raise DrafterUnavailable("provider answered in an unexpected shape")
+    blocks = payload.get("content")
+    if not isinstance(blocks, list):
+        raise DrafterUnavailable("provider answered in an unexpected shape")
+    texts = [
+        block["text"]
+        for block in blocks
+        if isinstance(block, dict) and isinstance(block.get("text"), str)
+    ]
+    if not texts:
+        raise DrafterUnavailable("provider answered without text")
+    return "\n".join(texts).strip()

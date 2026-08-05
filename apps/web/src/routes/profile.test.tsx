@@ -17,6 +17,7 @@ vi.mock("../profile/client", async (importOriginal) => {
     saveMyProfile: vi.fn(),
     getVisibility: vi.fn(),
     setVisibility: vi.fn(),
+    draftProfileText: vi.fn(),
   };
 });
 
@@ -25,6 +26,7 @@ const getMyProfile = vi.mocked(client.getMyProfile);
 const saveMyProfile = vi.mocked(client.saveMyProfile);
 const getVisibility = vi.mocked(client.getVisibility);
 const setVisibility = vi.mocked(client.setVisibility);
+const draftProfileText = vi.mocked(client.draftProfileText);
 
 const SUBJECT = "11111111-1111-1111-1111-111111111111";
 
@@ -51,6 +53,7 @@ beforeEach(() => {
   getVisibility.mockResolvedValue(false);
   saveMyProfile.mockResolvedValue({ ok: true, profile: profile() });
   setVisibility.mockResolvedValue({ ok: true, granted: true });
+  draftProfileText.mockResolvedValue({ ok: true, draft: "Ich baue Backends." });
 });
 
 describe("ProfileRoute", () => {
@@ -96,7 +99,12 @@ describe("ProfileRoute", () => {
     await user.click(screen.getByRole("button", { name: /Speichern/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Headline exceeds 120 characters");
-    expect(screen.queryByText(/gespeichert/i)).toBeNull();
+    // Buchstabengetreu, nicht /gespeichert/i: der lockere Ausdruck traf auch
+    // den Hinweis der Formulierungshilfe („Gespeichert wird nichts"), und der
+    // Test wäre dann rot geworden, ohne dass etwas kaputt war. Dieselbe Lehre
+    // wie beim E2E-Wackler, den /bestätigt/i verursacht hat: eine
+    // Erfolgsmeldung prüft man wörtlich.
+    expect(screen.queryByText("Profil gespeichert.")).toBeNull();
   });
 
   it("shows the release state read from the ledger, not from the profile", async () => {
@@ -149,5 +157,80 @@ describe("ProfileRoute", () => {
 
     expect(screen.queryByLabelText(/Überschrift/i)).toBeNull();
     expect(screen.getByText(/anmelden/i)).toBeInTheDocument();
+  });
+});
+
+describe("ProfileRoute — Formulierungshilfe", () => {
+  it("asks for nothing until the person presses the button", async () => {
+    // Kein Vorschlag von selbst. Der Text geht an einen fremden Anbieter, und
+    // das passiert nur, wenn jemand es auslöst.
+    getMyProfile.mockResolvedValue(profile());
+
+    renderWithProviders(<ProfileRoute principal={principal()} />);
+
+    await screen.findByDisplayValue("Senior Python");
+    expect(draftProfileText).not.toHaveBeenCalled();
+  });
+
+  it("says at the button what leaves the platform — and what does not", async () => {
+    // Nicht in einer Datenschutzerklärung: wer drückt, soll es gelesen haben.
+    renderWithProviders(<ProfileRoute principal={principal()} />);
+
+    const hint = await screen.findByText(/gehen dafür an Anthropic/i);
+    expect(hint).toBeInTheDocument();
+    expect(hint.textContent).toMatch(/Name und Adresse nicht/i);
+    expect(hint.textContent).toMatch(/Gespeichert wird nichts/i);
+  });
+
+  it("puts the draft into the field and saves nothing on its own", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ProfileRoute principal={principal()} />);
+
+    await user.click(await screen.findByRole("button", { name: /Vorschlag holen/i }));
+
+    expect(await screen.findByDisplayValue("Ich baue Backends.")).toBeInTheDocument();
+    // Der Entwurf ist ein Vorschlag, kein Ergebnis: gespeichert wird erst,
+    // wenn die Person auf „Speichern" drückt.
+    expect(saveMyProfile).not.toHaveBeenCalled();
+  });
+
+  it("warns before it overwrites work that is already there", async () => {
+    // Ein Knopf, der ungefragt vorhandene Arbeit überschreibt, wird einmal
+    // gedrückt und danach nie wieder.
+    getMyProfile.mockResolvedValue(profile({ bio: "Mein eigener Text." }));
+
+    renderWithProviders(<ProfileRoute principal={principal()} />);
+
+    expect(
+      await screen.findByRole("button", { name: /ersetzt den Text oben/i })
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the text when the provider is silent", async () => {
+    const user = userEvent.setup();
+    getMyProfile.mockResolvedValue(profile({ bio: "Mein eigener Text." }));
+    draftProfileText.mockResolvedValue({
+      ok: false,
+      reason: "unavailable",
+      message: "Die Formulierungshilfe ist gerade nicht verfügbar. Dein Text bleibt unverändert.",
+    });
+
+    renderWithProviders(<ProfileRoute principal={principal()} />);
+    await user.click(await screen.findByRole("button", { name: /Vorschlag holen/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/nicht verfügbar/i);
+    // Und der Text steht noch da.
+    expect(screen.getByDisplayValue("Mein eigener Text.")).toBeInTheDocument();
+  });
+
+  it("does not submit the profile form", async () => {
+    // `type="button"` fehlt schnell, und dann speichert der Hilfsknopf das
+    // Profil, statt zu helfen.
+    const user = userEvent.setup();
+    renderWithProviders(<ProfileRoute principal={principal()} />);
+
+    await user.click(await screen.findByRole("button", { name: /Vorschlag holen/i }));
+
+    expect(saveMyProfile).not.toHaveBeenCalled();
   });
 });
