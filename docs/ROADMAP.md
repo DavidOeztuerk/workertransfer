@@ -17,7 +17,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 4 | Jobs & Applications | ✅ | 4.1–4.4 komplett (Jobs, Bewerbungen, Unternehmen, Karriere-Seiten) |
 | 5 | Transfermarkt | 🟧 | 5.1–5.3 ✅ (Marktstatus, Vorgang, Tür + Oberfläche); Verträge, Unterschrift, KI-Beratung offen |
 | 6 | Developer Intelligence | ✅ | 6.1 (GitHub als Beleg), 6.2 (Passung im Browser), 6.3 (Vokabular) — Score, Ranking und Wechselwahrscheinlichkeit bewusst **nicht** gebaut (ADR-0022/0023) |
-| 7 | AI Agent Plattform | 🟧 | 7.1 ✅ (Naht + erster Agent: Formulierungshilfe). Candidate Ranking, Salary Recommendation, Team Analyzer, Skill Analyzer sind nach ADR-0022 **nicht** baubar |
+| 7 | AI Agent Plattform | 🟧 | 7.1 ✅ (Naht + erster Agent: Formulierungshilfe). **Candidate Ranking** ist nach ADR-0022 dauerhaft ausgeschlossen; Skill Analyzer, Salary Recommendation und Team Analyzer sind in ihrer ÜBLICHEN Form ausgeschlossen, nicht als Idee |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ⬜ | Outbox/Inbox, cross-service Events |
 | 10 | Frontend/Gateway/Infra/Hardening | ⬜ | UI, Gateway, K8s, OTel, Hardening |
@@ -754,10 +754,31 @@ existieren könnte.
   `NullDrafter` ist die Voreinstellung: ohne Schlüssel wird kein fremder Dienst
   angerufen, und die Oberfläche sagt es. Der Hinweis, was hinausgeht, steht **am
   Knopf** und nennt den Anbieter — nicht in einer Datenschutzerklärung.
-  **Vier der im ULTRAPLAN genannten Agenten sind nach ADR-0022 nicht baubar**
-  und stehen auf keiner Warteliste: Candidate Ranking, Salary Recommendation,
-  Team Analyzer, Skill Analyzer. Alle vier sind Zahlen oder Rangfolgen über
-  Menschen.
+  **Was ADR-0022 für die übrigen Agenten heißt — präzise, nachdem eine erste
+  Fassung dieses Eintrags es zu pauschal sagte.** Dort stand, vier Agenten
+  seien „nicht baubar". Die ADR verbietet aber eine **Form**, keinen **Namen**:
+  eine Zahl, die einen Menschen zusammenfasst, jede Rangfolge daraus,
+  abgeleitete Eigenschaften ohne Grundlage, stillschweigende Vollständigkeit.
+  Namen zu verbieten wäre sogar schädlich — es lädt zum Umbenennen ein.
+  - **Candidate Ranking** ist der einzige, dessen Name selbst die verbotene
+    Sache ist. Dauerhaft ausgeschlossen.
+  - **Skill Analyzer** steht im ULTRAPLAN in der **Candidate**-Liste, ist also
+    ein Agent für die Person selbst. Verboten war die gelöschte *Umsetzung*
+    (`bytes_count / total_bytes` — eine Zahl je Fähigkeit je Mensch, und Bytes
+    sind kein Können). Erlaubt wäre „du hast in diesen drei Repositories Python
+    geschrieben, hier sind die Links" — ein Beleg mit Herkunft, den die ADR
+    ausdrücklich zulässt.
+  - **Salary Recommendation** hängt daran, worüber die Zahl etwas sagt: ein
+    Gehaltsband für eine *Rolle* fasst keinen Menschen zusammen, ein Betrag für
+    *diese eine Person* schon — und wäre eine Empfehlung an den Arbeitgeber,
+    wie wenig er ihr bieten kann.
+  - **Team Analyzer** ebenso: eine Aussage über eine Zusammensetzung ist etwas
+    anderes als eine Eigenschaft je Kopf; die übliche Umsetzung macht das
+    Zweite.
+  Drei von vier sind also nicht verboten, sondern **in ihrer üblichen Form**
+  verboten. Auf der Warteliste dieses Schnitts steht trotzdem keiner — aus
+  einem anderen Grund: jeder braucht eine eigene Abwägung, und die gehört in
+  den Schnitt, der ihn baut.
   Nebenbei repariert: ein bestehender Test prüfte die Erfolgsmeldung mit
   `/gespeichert/i` und wurde vom neuen Hinweis („Gespeichert wird nichts")
   mitgetroffen — dieselbe Lehre wie beim E2E-Wackler mit `/bestätigt/i`.
