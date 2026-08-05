@@ -104,6 +104,8 @@ pnpm dev      # Vite dev server (turbo parallel)
 - **Clean Architecture**: domain has no FastAPI, database, or transport dependencies
 - **Sharing rule**: only domain-neutral code goes in `packages/`; business models stay in owning service
 - **No number that summarises a person** (ADR-0022): no score, no percentage, no ranking of people. Job/profile fit is compared in the browser (`apps/web/src/jobs/match.ts`) and stored nowhere
+- **`worker-skills` renames, never infers** (ADR-0023): aliases only (`postgres` → `PostgreSQL`). No implications, levels, weights, or likelihood-to-switch. Unknown skills pass through unchanged
+- **Auth edge is throttled per origin, never per email address** (`worker_platform.presentation.throttle`): a per-address limit would both confirm the address exists and let a stranger lock a person out
 
 ## Verification order
 

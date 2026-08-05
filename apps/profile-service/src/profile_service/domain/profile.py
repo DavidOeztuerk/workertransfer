@@ -16,6 +16,7 @@ from datetime import datetime
 from uuid import UUID
 
 from worker_core import DomainError
+from worker_skills import canonical_all
 
 __all__ = [
     "InvalidBio",
@@ -62,7 +63,11 @@ class Skills:
     def __init__(self, raw: list[str] | tuple[str, ...]) -> None:
         cleaned: list[str] = []
         seen: set[str] = set()
-        for entry in raw:
+        # Erst umbenennen, DANN entdoppeln (ADR-0023): „Postgres" und
+        # „PostgreSQL" sind dasselbe Wort, und andersherum stünden sie zweimal
+        # in der Liste. Dieselbe Tabelle wie in `jobs-service` — der Abgleich
+        # im Browser hält beide Listen gegeneinander.
+        for entry in canonical_all(list(raw)):
             item = entry.strip()
             if not item:
                 continue

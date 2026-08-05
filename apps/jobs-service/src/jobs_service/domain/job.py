@@ -18,6 +18,7 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from worker_core import DomainError
+from worker_skills import canonical_all
 
 __all__ = [
     "MAX_SKILLS",
@@ -105,7 +106,10 @@ class Skills:
     def __init__(self, raw: list[str] | tuple[str, ...]) -> None:
         cleaned: list[str] = []
         seen: set[str] = set()
-        for entry in raw:
+        # Erst umbenennen, DANN entdoppeln (ADR-0023). Andersherum würde aus
+        # „Postgres, PostgreSQL" zweimal derselbe Eintrag, und die Anzeige
+        # zählte eine Anforderung doppelt.
+        for entry in canonical_all(list(raw)):
             item = entry.strip()
             if not item:
                 continue

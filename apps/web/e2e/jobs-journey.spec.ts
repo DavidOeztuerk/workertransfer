@@ -125,7 +125,10 @@ test("die Passung sieht die Person — und niemand rechnet sie auf dem Server", 
   await recruiter.goto("/company/jobs");
   await recruiter.getByLabel("Titel").fill(title);
   await recruiter.getByLabel(/Beschreibung/i).fill("Was zu tun ist.");
-  await recruiter.getByLabel(/Gesuchte Fähigkeiten/i).fill("Python, Kubernetes, Go");
+  // „PostgreSQL" hier, „postgres" gleich im Profil: das Vokabular (ADR-0023)
+  // muss beide auf denselben Namen bringen, sonst zeigt der Abgleich der
+  // Person eine Lücke, die es nicht gibt.
+  await recruiter.getByLabel(/Gesuchte Fähigkeiten/i).fill("Python, PostgreSQL, Go");
   await recruiter.getByRole("button", { name: /Entwurf anlegen/i }).click();
   const row = recruiter.locator("li").filter({ hasText: title });
   await expect(row).toBeVisible();
@@ -138,7 +141,7 @@ test("die Passung sieht die Person — und niemand rechnet sie auf dem Server", 
   await anonymous.goto("/jobs");
   await anonymous.getByLabel(/Suchbegriff/i).fill(title);
   await anonymous.getByRole("button", { name: /Suchen/i }).click();
-  await expect(anonymous.getByText("Kubernetes")).toBeVisible();
+  await expect(anonymous.getByText("PostgreSQL")).toBeVisible();
   await expect(anonymous.getByText(/von 3 genannten/)).toHaveCount(0);
 
   // Mit Profil: die Liste wird abgehakt — und sagt, was fehlt.
@@ -149,14 +152,21 @@ test("die Passung sieht die Person — und niemand rechnet sie auf dem Server", 
   await login(candidate, candidateEmail);
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill("Backend-Entwicklerin");
-  // Klein geschrieben, mit Leerzeichen: der Abgleich darf daran nicht scheitern.
-  await candidate.getByLabel(/Fähigkeiten/i).fill("python , Kubernetes");
+  // Klein geschrieben, mit Leerzeichen — und „postgres" statt „PostgreSQL".
+  // Beides darf den Abgleich nicht kosten.
+  await candidate.getByLabel(/Fähigkeiten/i).fill("python , postgres");
   await candidate.getByRole("button", { name: /Speichern/i }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
+  // Sichtbar umbenannt: die Person sieht, was gespeichert wurde. Das ist der
+  // Grund, warum das Vokabular nichts erfinden und nichts ablehnen darf — man
+  // sieht ja, was es tut.
+  await expect(candidate.getByLabel(/Fähigkeiten/i)).toHaveValue(/PostgreSQL/);
 
   await candidate.goto("/jobs");
   await candidate.getByLabel(/Suchbegriff/i).fill(title);
   await candidate.getByRole("button", { name: /Suchen/i }).click();
+  // Zwei von drei — und der zweite Haken ist der, den es ohne das Vokabular
+  // nicht gäbe.
   await expect(candidate.getByText(/2 von 3 genannten Fähigkeiten/)).toBeVisible();
   // Keine Prozentzahl, nirgends — und der Name der fehlenden steht da.
   await expect(candidate.locator('[data-match="missing"]')).toHaveText("Go");

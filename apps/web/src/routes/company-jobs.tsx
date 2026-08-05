@@ -150,7 +150,7 @@ export function CompanyJobsRoute({ principal = null }: CompanyJobsRouteProps) {
               gegen Erfundenes ab. */}
           <Field
             label="Gesuchte Fähigkeiten"
-            hint="Mit Komma getrennt, höchstens 20. Wer sich das ansieht, sieht, was ihm davon fehlt — eine Note vergibt niemand."
+            hint="Mit Komma getrennt, höchstens 20. Wer sich das ansieht, sieht, was ihm davon fehlt — eine Note vergibt niemand. Bekannte Schreibweisen vereinheitlichen wir, damit „Postgres“ und „PostgreSQL“ sich finden."
             value={draft.skills}
             onChange={(e) => setDraft({ ...draft, skills: e.target.value })}
           />

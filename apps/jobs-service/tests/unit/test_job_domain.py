@@ -201,3 +201,24 @@ class TestSkills:
 
         # Kein Zusammenführen: was gestrichen wurde, ist gestrichen.
         assert created.skills.value == ("Python", "Kubernetes")
+
+
+class TestTheVocabulary:
+    """Das Umbenennen (ADR-0023) sitzt IM Wertobjekt, nicht im Router.
+
+    Damit gilt es überall, wo es überhaupt ein `Skills` gibt: beim Speichern,
+    beim Lesen aus der Datenbank, in jedem Test. Läge es im Router, käme eine
+    alte Zeile aus der Datenbank weiter mit „Postgres" zurück — und der
+    Abgleich zeigte der Person eine Lücke, die es nicht gibt.
+    """
+
+    def test_a_known_spelling_becomes_the_known_name(self) -> None:
+        assert Skills(["postgres", "k8s"]).value == ("PostgreSQL", "Kubernetes")
+
+    def test_renaming_happens_before_deduplication(self) -> None:
+        # Andersherum stünde zweimal derselbe Eintrag in der Liste, und die
+        # Anzeige zählte eine Anforderung doppelt.
+        assert Skills(["Postgres", "PostgreSQL", "psql"]).value == ("PostgreSQL",)
+
+    def test_what_the_vocabulary_does_not_know_stays_as_typed(self) -> None:
+        assert Skills(["Hufbeschlag"]).value == ("Hufbeschlag",)
