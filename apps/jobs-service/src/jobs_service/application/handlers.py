@@ -13,7 +13,7 @@ from uuid import UUID
 
 from worker_core import DomainError, Result
 
-from jobs_service.domain.job import EmploymentType, Job, RemoteMode
+from jobs_service.domain.job import EmploymentType, Job, RemoteMode, Skills
 
 __all__ = [
     "MAX_PAGE_SIZE",
@@ -55,6 +55,7 @@ class CreateJobCommand:
     location: str
     remote: str
     employment: str
+    skills: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +75,7 @@ class UpdateJobCommand:
     location: str
     remote: str
     employment: str
+    skills: tuple[str, ...] = ()
 
 
 async def handle_create_job(
@@ -87,6 +89,7 @@ async def handle_create_job(
             location=cmd.location,
             remote=RemoteMode(cmd.remote),
             employment=EmploymentType(cmd.employment),
+            skills=Skills(cmd.skills),
             now=deps["clock"].now(),
         )
     except DomainError as exc:
@@ -116,6 +119,7 @@ async def handle_update_job(
             location=cmd.location,
             remote=RemoteMode(cmd.remote),
             employment=EmploymentType(cmd.employment),
+            skills=Skills(cmd.skills),
             now=deps["clock"].now(),
         )
     except DomainError as exc:

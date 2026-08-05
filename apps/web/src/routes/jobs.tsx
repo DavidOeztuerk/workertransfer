@@ -4,6 +4,7 @@ import { Button, Card, Field, TextArea } from "@workertransfer/ui";
 
 import { apply } from "../applications/client";
 import { getCompanyProfile } from "../companies/client";
+import { getMyProfile } from "../profile/client";
 import type { MeResponse } from "../auth/client";
 
 import {
@@ -13,6 +14,7 @@ import {
   type SearchResult,
   searchJobs,
 } from "../jobs/client";
+import { matchSkills } from "../jobs/match";
 
 /** Werte aus dem Vertrag sind keine Sätze für Menschen. */
 const REMOTE_LABEL: Record<RemoteMode, string> = {
@@ -57,6 +59,27 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => (last.ok ? (last.nextCursor ?? undefined) : undefined),
   });
+
+  // Einmal für die ganze Seite, nicht je Stelle — und derselbe Schlüssel wie
+  // auf der Profilseite, damit beide sich einen Stand teilen.
+  const profileQuery = useQuery({
+    queryKey: ["profile", "me"],
+    queryFn: getMyProfile,
+    enabled: principal !== null,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Drei Zustände, und die Unterscheidung trägt:
+  //   `null`         — nichts zu vergleichen: nicht angemeldet, oder die
+  //                    Antwort steht noch aus. Dann schweigt die Seite dazu,
+  //                    statt eine Lücke zu behaupten, die sie nicht kennt.
+  //   `[]`           — angemeldet, Antwort da, aber nichts eingetragen (kein
+  //                    Profil ODER eines ohne Fähigkeiten). Darüber MUSS die
+  //                    Seite sprechen, sonst bliebe sie stumm, wo ein Satz die
+  //                    ganze Funktion erklärt.
+  //   eine Liste     — abgleichen.
+  const mySkills: string[] | null =
+    principal === null || !profileQuery.isSuccess ? null : (profileQuery.data?.skills ?? []);
 
   const pages = query.data?.pages ?? [];
   const failure = pages.find((page) => !page.ok);
@@ -130,6 +153,7 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
                   {REMOTE_LABEL[job.remote]} · {EMPLOYMENT_LABEL[job.employment]}
                 </p>
                 <p>{job.description}</p>
+                <Requirements skills={job.skills} mine={mySkills} />
                 {principal !== null ? (
                   <ApplyBox jobId={job.id} />
                 ) : (
@@ -159,6 +183,69 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
         </Button>
       ) : null}
     </main>
+  );
+}
+
+
+/**
+ * Was die Stelle verlangt — und, wenn ein Profil da ist, was davon man hat.
+ *
+ * Die Passung wird der PERSON gezeigt, nicht dem Unternehmen, und sie ordnet
+ * Stellen, keine Menschen. Gerechnet wird hier im Browser: so gibt es sie
+ * nirgends als Datensatz, den später jemand auswertet.
+ *
+ * Kein Prozentwert. Eine Zahl sieht aus wie eine Messung und verschweigt, was
+ * zählt — welche Fähigkeit fehlt. Die Liste sagt es, und damit weiß die Person,
+ * was sie tun könnte.
+ */
+function Requirements({ skills, mine }: { skills: string[]; mine: string[] | null }) {
+  // Dieselbe Aufbereitung wie im Abgleich, damit die angezeigte Liste und die
+  // verglichene dieselbe ist. Liefen sie auseinander, stünde ein Eintrag da,
+  // der nie ein Haken werden kann.
+  const listed = skills.map((skill) => skill.trim()).filter((skill) => skill !== "");
+
+  // Nichts genannt: dann gibt es auch nichts abzugleichen. Ein „0 von 0" wäre
+  // eine Aussage über eine Stelle, die gar keine gemacht hat.
+  if (listed.length === 0) return null;
+
+  const match = mine === null || mine.length === 0 ? null : matchSkills(listed, mine);
+  const have = new Set(match?.have ?? []);
+
+  return (
+    <div className="jobs__skills">
+      {match !== null ? (
+        <p className="candidates__meta">
+          Du hast {match.have.length} von {listed.length} genannten Fähigkeiten:
+        </p>
+      ) : null}
+      {mine !== null && mine.length === 0 ? (
+        // Nicht „0 von 3": die Person hat nichts gesagt, nicht nichts gekonnt.
+        <p className="candidates__meta">
+          Trage Fähigkeiten in deinem <a href="/profile">Profil</a> ein, dann siehst du hier, was
+          davon du mitbringst.
+        </p>
+      ) : null}
+      <ul className="candidates__skills">
+        {listed.map((skill) => {
+          const state = match === null ? "unknown" : have.has(skill) ? "have" : "missing";
+          return (
+            <li key={skill}>
+              {state !== "unknown" ? (
+                <span aria-hidden="true">{state === "have" ? "✓ " : "✗ "}</span>
+              ) : null}
+              <span data-match={state}>{skill}</span>
+              {/* Das Zeichen ist Dekoration; wer vorgelesen bekommt, braucht
+                  das Wort. Sonst hörte man drei Namen und keinen Unterschied. */}
+              {state !== "unknown" ? (
+                <span className="wt-visually-hidden">
+                  {state === "have" ? " (hast du)" : " (fehlt dir)"}
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

@@ -28,6 +28,10 @@ class SaveJobV1(BaseModel):
     location: str = Field(default="", max_length=160)
     remote: RemoteModeV1 = "none"
     employment: EmploymentTypeV1 = "full_time"
+    #: Was die Stelle verlangt. Voreinstellung leer: eine Ausschreibung darf
+    #: sagen, dass sie nichts aufzählt. Die Grenzen prüft die Domäne — hier
+    #: steht nur ein Deckel gegen eine Liste, die nie ankommen sollte.
+    skills: list[str] = Field(default_factory=list, max_length=200)
 
 
 class JobV1(BaseModel):
@@ -38,6 +42,8 @@ class JobV1(BaseModel):
     location: str
     remote: RemoteModeV1
     employment: EmploymentTypeV1
+    #: Öffentlich wie die ganze Stelle: wer sucht, darf sagen, was er sucht.
+    skills: list[str] = Field(default_factory=list)
     status: Literal["draft", "published", "closed"]
     published_at: datetime | None
     updated_at: datetime
