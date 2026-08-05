@@ -5,7 +5,6 @@ from typing import Any, cast
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.aio_pika import AioPikaInstrumentor
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
@@ -34,7 +33,6 @@ def setup_tracing(service_name: str, otlp_endpoint: str = "http://localhost:4317
     SQLAlchemyInstrumentor.instrument()
     RedisInstrumentor().instrument()
     HTTPXClientInstrumentor.instrument()
-    AioPikaInstrumentor.instrument()
 
     return trace.get_tracer(__name__)
 

@@ -19,4 +19,3 @@ module-name = "worker_health"
 worker-core = { workspace = true }
 worker-database = { workspace = true }
 worker-cache = { workspace = true }
-worker-messaging = { workspace = true }
