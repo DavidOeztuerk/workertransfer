@@ -11,11 +11,14 @@ an authenticated tenant source in production.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import create_async_engine
+from worker_platform.configuration import Environment
 from worker_platform.presentation.app import create_api_app
+from worker_platform.presentation.throttle import Limit
 from worker_tenancy import ClaimTenantResolver
 
 from identity_service.configuration import IdentityServiceSettings
@@ -25,6 +28,40 @@ from identity_service.presentation.http.company_router import build_company_rout
 from identity_service.presentation.http.me_router import build_me_router
 from identity_service.presentation.http.notification_router import build_notification_router
 from identity_service.presentation.http.router import build_auth_router
+
+#: Die Grenzen des Auth-Rands, je Herkunft. Jede Zahl hat einen Grund:
+#:
+#: `login` bremst das Durchprobieren von Passwörtern — zehn Fehlversuche in
+#: fünf Minuten überschreitet niemand, der sein Passwort sucht.
+#: `verify-email` bremst das Raten von Bestätigungstoken.
+#: `refresh` ist großzügig: ein offener Browser erneuert regelmäßig, und eine
+#: Bremse, die den normalen Betrieb trifft, wird abgeschaltet.
+#: `register` bremst das Anlegen von Wegwerfkonten.
+#: `resend-verification` ist die strengste, und zwar nicht wegen uns: sie
+#: schickt eine Mail an eine Adresse, die der Aufrufer **nennt**. Ohne Bremse
+#: ist das ein Weg, einen fremden Posteingang zu fluten.
+AUTH_LIMITS: Mapping[tuple[str, str], Limit] = {
+    ("POST", "/auth/login"): Limit(times=10, seconds=300),
+    ("POST", "/auth/verify-email"): Limit(times=20, seconds=300),
+    ("POST", "/auth/refresh"): Limit(times=60, seconds=300),
+    ("POST", "/auth/register"): Limit(times=20, seconds=3600),
+    ("POST", "/auth/resend-verification"): Limit(times=5, seconds=3600),
+}
+
+
+def throttle_limits(
+    settings: IdentityServiceSettings,
+) -> Mapping[tuple[str, str], Limit] | None:
+    """Ob gebremst wird — und wenn ja, womit.
+
+    In LOCAL und TEST aus, weil dort jede Anfrage von derselben
+    Gateway-Adresse kommt und die Bremse die eigene Testreihe träfe statt eines
+    Angreifers. Ausdrücklich einschaltbar; siehe `auth_throttle_enabled`.
+    """
+    enabled = settings.auth_throttle_enabled
+    if enabled is None:
+        enabled = settings.environment not in {Environment.LOCAL, Environment.TEST}
+    return AUTH_LIMITS if enabled else None
 
 
 def build_app(settings: IdentityServiceSettings) -> FastAPI:
@@ -48,6 +85,8 @@ def build_app(settings: IdentityServiceSettings) -> FastAPI:
         tenant_resolver=ClaimTenantResolver(),
         auth_middleware=AuthMiddleware,
         auth_middleware_kwargs={"tokens": deps["tokens"]},
+        throttle_limits=throttle_limits(settings),
+        trust_forwarded_for=settings.trust_forwarded_for,
         routers=(
             build_auth_router(deps),
             build_me_router(deps),

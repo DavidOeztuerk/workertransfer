@@ -56,6 +56,20 @@ class IdentityServiceSettings(PlatformSettings):
     # Voreinstellung, die im Zweifel öffnet, ist genau die falsche.
     notify_secret: SecretStr = SecretStr("")
 
+    # Bremse am Auth-Rand. `None` heißt „aus der Umgebung ableiten": in LOCAL
+    # und TEST aus, sonst an.
+    #
+    # Aus in LOCAL, weil im Compose-Stack **jede** Browser-Anfrage von derselben
+    # Gateway-Adresse kommt. Eine Bremse je Herkunft würde dort die gesamte
+    # Testreihe als einen Angreifer behandeln — und wäre damit keine
+    # Sicherheitsmaßnahme, sondern nur ein Grund, sie wieder auszubauen.
+    # Ausdrücklich einschaltbar (`WORKER_AUTH_THROTTLE_ENABLED=true`), damit man
+    # sie auch lokal sehen kann.
+    auth_throttle_enabled: bool | None = None
+    # Nur setzen, wenn wirklich ein Proxy davorsteht. `X-Forwarded-For` ist frei
+    # wählbar; ihm ungefragt zu glauben hieße, gar keine Bremse zu haben.
+    trust_forwarded_for: bool = False
+
     @model_validator(mode="after")
     def _reject_development_jwt_secret(self) -> Self:
         assert_deployable_jwt_secret(

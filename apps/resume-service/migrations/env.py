@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # Import models so their tables register on Base.metadata (autogenerate target).
 from resume_service.infrastructure.database import models as _models  # registers tables
-from worker_database import Base
+from resume_service.infrastructure.database.base import Base
 
 config = context.config
 if config.config_file_name is not None:
