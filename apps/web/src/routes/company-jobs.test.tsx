@@ -40,6 +40,7 @@ function job(overrides: Partial<Job> = {}): Job {
     location: "Berlin",
     remote: "hybrid",
     employment: "full_time",
+    skills: [],
     status: "draft",
     published_at: null,
     updated_at: "2026-08-02T10:00:00Z",
@@ -106,6 +107,21 @@ describe("CompanyJobsRoute", () => {
     await waitFor(() => expect(createJob).toHaveBeenCalled());
     // Veröffentlicht wird bewusst in einem zweiten Schritt.
     expect(publishJob).not.toHaveBeenCalled();
+  });
+
+  it("sends the required skills as a list, not as a line of text", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CompanyJobsRoute principal={principal(TENANT)} />);
+
+    await user.type(await screen.findByLabelText(/Titel/i), "Neue Stelle");
+    await user.type(screen.getByLabelText(/Beschreibung/i), "Was zu tun ist.");
+    await user.type(screen.getByLabelText(/Fähigkeiten/i), "Python, Kubernetes ,, Go");
+    await user.click(screen.getByRole("button", { name: /Entwurf anlegen/i }));
+
+    await waitFor(() => expect(createJob).toHaveBeenCalled());
+    // Getrennt und getrimmt, Leeres weg — derselbe Zerleger wie im Profil,
+    // sonst verglichen sich später Sätze mit Wörtern.
+    expect(createJob.mock.calls[0]?.[0].skills).toEqual(["Python", "Kubernetes", "Go"]);
   });
 
   it("says a wrong state differently than a wrong form", async () => {

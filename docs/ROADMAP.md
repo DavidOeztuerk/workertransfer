@@ -16,7 +16,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 3 | Candidate Core | ✅ | 3.1–3.5 komplett (Consent, Profile, Resume, Portfolio, Ablage) |
 | 4 | Jobs & Applications | ✅ | 4.1–4.4 komplett (Jobs, Bewerbungen, Unternehmen, Karriere-Seiten) |
 | 5 | Transfermarkt | 🟧 | 5.1–5.3 ✅ (Marktstatus, Vorgang, Tür + Oberfläche); Verträge, Unterschrift, KI-Beratung offen |
-| 6 | Developer Intelligence | 🟧 | 6.1 ✅ (GitHub als Beleg); Skill-Graph und Matching offen |
+| 6 | Developer Intelligence | 🟧 | 6.1 ✅ (GitHub als Beleg), 6.2 ✅ (Passung im Browser); Skill-Graph offen |
 | 7 | AI Agent Plattform | ⬜ | 23 Agenten (draft-only), plan-act-reflect, MCP |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ⬜ | Outbox/Inbox, cross-service Events |
@@ -650,7 +650,54 @@ existieren könnte.
   bestehende Dienst hatte das von Hand nachgetragen. Beides jetzt in der Vorlage
   bzw. als Riegel im Generator, beides mit Test.
 
+- ✅ **6.2 Passung — in die andere Richtung** — 05.08.2026.
+  [Design](superpowers/specs/2026-08-03-matching-design.md).
+  Der ULTRAPLAN nennt „Scout-Match", und das übliche Bild dahinter — eine
+  Kandidatenliste mit Prozentzahl — ist **der Gesamtscore aus ADR-0022 durch
+  die Hintertür**. Deshalb umgekehrt gebaut: **die Passung sieht die Person,
+  nicht das Unternehmen, und sie ordnet Stellen, nicht Menschen.**
+  Gezeigt wird eine Liste, keine Zahl: „Du hast 2 von 3 genannten Fähigkeiten:
+  Python ✓ · Kubernetes ✓ · Go ✗". Kein Prozentwert — eine Prozentzahl sieht
+  aus wie eine Messung, ist eine Division und verschweigt genau das, was zählt,
+  nämlich **welche** Fähigkeit fehlt.
+  **Gerechnet wird im Browser** (`apps/web/src/jobs/match.ts`), aus dem eigenen
+  Profil und der Liste der Stelle. Damit existiert die Passung nirgends als
+  Datensatz: was es nicht gibt, kann auch nicht ausgewertet werden.
+  Neu in der Domäne ist nur `Job.skills` (≤ 20 Einträge, je ≤ 50 Zeichen,
+  getrimmt und ohne Rücksicht auf Groß-/Kleinschreibung entdoppelt) plus
+  Migration `0002_job_skills`.
+  **Beim Bauen fiel eine Zahl auf, die der Entwurf falsch hatte:** er sah 60
+  Zeichen je Anforderung vor, das Profil lässt 50 zu. Eine Anforderung, die
+  länger ist, als eine Person sie eintragen kann, wäre garantiert nie ein
+  Treffer — eine Zeile, die für niemanden je ein Haken werden kann. Das sieht
+  man in keiner der beiden Dateien, deshalb hält es
+  `tests/test_skill_limits_align.py` fest: kleiner darf die Stelle sein,
+  größer nicht.
+  Wer nicht angemeldet ist, sieht die Anforderungen ohne Abgleich; wer
+  angemeldet ist und **nichts eingetragen** hat, bekommt einen Hinweis auf sein
+  Profil statt „0 von 3" — das wäre eine Aussage über ihn, die nicht stimmt: er
+  hat nichts gesagt, nicht nichts gekonnt.
+  **Und dieselbe Lehre zum dritten Mal:** die Testhilfe `registerAndConfirm`
+  wartete nur auf die Erfolgsüberschrift und lief bei einem Fehlschlag 30
+  Sekunden in ein nichtssagendes „element(s) not found". Sie wartet jetzt — wie
+  `login` — auf **beide** Ausgänge und sagt, welcher eingetreten ist.
+
 ### Weiterhin offen, quer durch alle Phasen
+
+- **Offen und benannt: die Bestätigungsseite schickt ihren Token manchmal
+  zweimal** (gefunden 05.08.2026). Die verbesserte Testhilfe hat den bisherigen
+  Wackelkandidaten der `application-journey` endlich erklärt: nicht ein
+  Zeitproblem im Test, sondern **HTTP 400 „ungültig"** vom `identity-service` —
+  in zwei Suite-Läufen 2 von 120 POSTs auf `/auth/verify-email`. Der Token ist
+  einmalig; ein zweiter Aufruf verbraucht ihn nicht, er scheitert. Wessen
+  Antwort zuletzt ankommt, entscheidet, was die Seite anzeigt.
+  `VerifyRoute` feuert aus `useEffect(…, [])` und hat **keinen Riegel gegen ein
+  zweites Mal** — ein Remount (HMR im Dev-Server, StrictMode, ein Reload)
+  genügt. **Nicht repariert, weil sich der zweite Aufruf im Unit-Test nicht
+  hervorrufen ließ:** ein Test, der auch am ungefixten Code grün ist, bewacht
+  nichts, und eine Vermutung als Fix auszuliefern wäre schlechter als die
+  offene Notiz. Was fehlt, ist der Nachweis, wodurch der Remount ausgelöst
+  wird — danach ist der Riegel drei Zeilen.
 
 - **`worker-github` ist gelöscht** (03.08.2026, **ADR-0022**). Nicht repariert:
   es war unimportierbar, hatte keinen Konsumenten — und verrechnete einen

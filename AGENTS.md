@@ -103,6 +103,7 @@ pnpm dev      # Vite dev server (turbo parallel)
 - **Ruff ignores**: `S101` (assert) allowed in test files
 - **Clean Architecture**: domain has no FastAPI, database, or transport dependencies
 - **Sharing rule**: only domain-neutral code goes in `packages/`; business models stay in owning service
+- **No number that summarises a person** (ADR-0022): no score, no percentage, no ranking of people. Job/profile fit is compared in the browser (`apps/web/src/jobs/match.ts`) and stored nowhere
 
 ## Verification order
 

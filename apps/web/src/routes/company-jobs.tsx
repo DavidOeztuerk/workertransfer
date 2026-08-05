@@ -12,6 +12,7 @@ import {
   listOwnJobs,
   publishJob,
 } from "../jobs/client";
+import { parseSkills } from "../skills";
 
 export interface CompanyJobsRouteProps {
   principal?: MeResponse | null;
@@ -29,6 +30,8 @@ interface Draft {
   location: string;
   remote: RemoteMode;
   employment: EmploymentType;
+  /** Als Zeile im Formular; zerlegt wird erst beim Abschicken. */
+  skills: string;
 }
 
 const EMPTY: Draft = {
@@ -37,6 +40,7 @@ const EMPTY: Draft = {
   location: "",
   remote: "none",
   employment: "full_time",
+  skills: "",
 };
 
 export function CompanyJobsRoute({ principal = null }: CompanyJobsRouteProps) {
@@ -57,7 +61,7 @@ export function CompanyJobsRoute({ principal = null }: CompanyJobsRouteProps) {
   }
 
   const create = useMutation({
-    mutationFn: () => createJob(draft),
+    mutationFn: () => createJob({ ...draft, skills: parseSkills(draft.skills) }),
     onSuccess: (result) => {
       if (result.ok) {
         setError(null);
@@ -140,6 +144,15 @@ export function CompanyJobsRoute({ principal = null }: CompanyJobsRouteProps) {
             value={draft.location}
             onChange={(e) => setDraft({ ...draft, location: e.target.value })}
             maxLength={160}
+          />
+          {/* Freiwillig. Eine erzwungene Liste wäre eine, die jemand ausfüllt,
+              um das Formular loszuwerden — und Suchende glichen sich dann
+              gegen Erfundenes ab. */}
+          <Field
+            label="Gesuchte Fähigkeiten"
+            hint="Mit Komma getrennt, höchstens 20. Wer sich das ansieht, sieht, was ihm davon fehlt — eine Note vergibt niemand."
+            value={draft.skills}
+            onChange={(e) => setDraft({ ...draft, skills: e.target.value })}
           />
           <label className="wt-field">
             <span className="wt-field__label">Arbeitsform</span>

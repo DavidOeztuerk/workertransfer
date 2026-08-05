@@ -6,6 +6,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import DateTime, Index, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,6 +27,9 @@ class JobModel(Base):
     location: Mapped[str] = mapped_column(Text, nullable=False, default="")
     remote: Mapped[str] = mapped_column(String(16), nullable=False)
     employment: Mapped[str] = mapped_column(String(16), nullable=False)
+    #: Wie im Profil: eine Liste, keine Beziehungstabelle. Es wird nie danach
+    #: gesucht — verglichen wird im Browser, und dorthin geht sie ohnehin ganz.
+    skills: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

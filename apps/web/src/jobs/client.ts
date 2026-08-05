@@ -19,6 +19,8 @@ export interface Job {
   location: string;
   remote: RemoteMode;
   employment: EmploymentType;
+  /** Was die Stelle verlangt — die Liste, gegen die im Browser abgeglichen wird. */
+  skills: string[];
   status: JobStatus;
   published_at: string | null;
   updated_at: string;
@@ -30,6 +32,7 @@ export interface JobInput {
   location: string;
   remote: RemoteMode;
   employment: EmploymentType;
+  skills: string[];
 }
 
 export interface SearchFilters {
