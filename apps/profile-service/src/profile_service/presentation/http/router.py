@@ -21,8 +21,15 @@ from profile_service.application.handlers import (
 )
 from profile_service.domain.profile import Profile
 from profile_service.infrastructure.consent import ConsentUnavailable
+from worker_ai import DraftContext, DrafterUnavailable
 from worker_auth import get_request_user, resolve_token
-from worker_contracts import ProfilePageV1, ProfileV1, SaveProfileV1
+from worker_contracts import (
+    DraftProfileTextV1,
+    ProfilePageV1,
+    ProfileTextDraftV1,
+    ProfileV1,
+    SaveProfileV1,
+)
 
 __all__ = ["build_router"]
 
@@ -98,6 +105,44 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
                 err.message if err is not None else "invalid",
             )
         return _dto(result.value)
+
+    @router.post("/profiles/me/draft")
+    async def draft_my_text(body: DraftProfileTextV1, request: Request) -> ProfileTextDraftV1:
+        """Ein Entwurf für den EIGENEN Profiltext — auf Anforderung, nichts gespeichert.
+
+        Ein eigener Endpunkt und nicht ein Flag an `PUT /profiles/me`: der
+        Aufruf geht an einen fremden Anbieter und darf keinen Schreib- oder
+        Lesepfad blockieren. `GET /profiles/me` ruft nie einen Anbieter.
+
+        Was hinausgeht, steht in `DraftContext` — die Überschrift, der Freitext
+        und die Fähigkeiten, die die Person selbst eingetragen hat, plus ihr
+        Wunsch. **Kein Name, keine Adresse, keine `subject_id`.** Der Prompt
+        wird aus dem GESPEICHERTEN Profil gebaut, nicht aus dem Request: was
+        der Client nicht senden kann, kann er nicht in einen fremden Dienst
+        schleusen.
+        """
+        principal = _principal(request)
+        async with request_scope(session_factory) as (_uow, repos):
+            profile = await handle_get_my_profile(principal.sub, repos=repos)
+
+        context = DraftContext(
+            headline=profile.headline if profile is not None else "",
+            bio=profile.bio if profile is not None else "",
+            skills=profile.skills.value if profile is not None else (),
+            wish=body.wish,
+        )
+        try:
+            draft = await deps["drafter"].draft(context)
+        except DrafterUnavailable as exc:
+            # 503 und nicht 500: die Anfrage war in Ordnung, der Anbieter
+            # antwortet nicht ODER es ist keiner eingerichtet. Von außen ist das
+            # dasselbe — und beides heißt „später noch einmal", nicht „falsch
+            # gemacht". Die Meldung trägt nie den Prompt.
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "Der Entwurfsdienst ist gerade nicht verfügbar.",
+            ) from exc
+        return ProfileTextDraftV1(draft=draft)
 
     @router.get("/profiles/me")
     async def my_profile(request: Request) -> ProfileV1 | None:

@@ -17,7 +17,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 4 | Jobs & Applications | ✅ | 4.1–4.4 komplett (Jobs, Bewerbungen, Unternehmen, Karriere-Seiten) |
 | 5 | Transfermarkt | 🟧 | 5.1–5.3 ✅ (Marktstatus, Vorgang, Tür + Oberfläche); Verträge, Unterschrift, KI-Beratung offen |
 | 6 | Developer Intelligence | ✅ | 6.1 (GitHub als Beleg), 6.2 (Passung im Browser), 6.3 (Vokabular) — Score, Ranking und Wechselwahrscheinlichkeit bewusst **nicht** gebaut (ADR-0022/0023) |
-| 7 | AI Agent Plattform | ⬜ | 23 Agenten (draft-only), plan-act-reflect, MCP |
+| 7 | AI Agent Plattform | 🟧 | 7.1 ✅ (Naht + erster Agent: Formulierungshilfe). Candidate Ranking, Salary Recommendation, Team Analyzer, Skill Analyzer sind nach ADR-0022 **nicht** baubar |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ⬜ | Outbox/Inbox, cross-service Events |
 | 10 | Frontend/Gateway/Infra/Hardening | ⬜ | UI, Gateway, K8s, OTel, Hardening |
@@ -730,6 +730,37 @@ existieren könnte.
   `scripts/validate.sh` ist jetzt **rot**, wenn keine einzige Reise gelaufen ist
   — ein einzelner übersprungener Test ist eine Entscheidung, alle sind ein
   Ausfall.
+
+### Phase 7 — Status: 🟧 in Arbeit
+
+- ✅ **7.1 Die Naht zur KI: ein Entwurf, den die Person anfordert** — 05.08.2026.
+  [Design](superpowers/specs/2026-08-05-ai-seam-design.md) · **ADR-0024**.
+  `worker-ai` war 246 Zeilen mit **acht** schweren Abhängigkeiten, einem
+  Smoke-Test und **keinem Konsumenten** — aus Workspace und mypy
+  ausgeschlossen, der **letzte verbliebene Skip** der Testreihe. Wort für Wort
+  die Lage von `worker-files` vor ADR-0021, und dieselbe Antwort: neu
+  geschrieben mit **einer** Abhängigkeit (`httpx`), **einem** Anbieter und
+  einem echten Konsumenten. **Die Testreihe hat jetzt null Skips.**
+  **Der erste Agent hilft der Person zu sagen, was sie sagen will** — er sagt
+  nichts über sie. Das ist keine Feinheit: eine KI, die *über* jemanden
+  schreibt (aus Commits, aus dem Lebenslauf), verletzt die These der Plattform;
+  eine, die beim Formulieren hilft, bedient sie.
+  Vier Regeln, alle mit Test: **nur auf Anforderung** (kein Hintergrundlauf);
+  **es wird nichts gespeichert** (weder Prompt noch Antwort — der Entwurf lebt
+  im Formular, bis die Person speichert, und dann ist es ihr Text);
+  **`DraftContext` ist die Grenze** (Überschrift, Freitext, Fähigkeiten, Wunsch
+  — kein Name, keine Adresse, keine `subject_id`; ein Test nagelt die Feldmenge
+  fest); **nichts davon im Protokoll**.
+  `NullDrafter` ist die Voreinstellung: ohne Schlüssel wird kein fremder Dienst
+  angerufen, und die Oberfläche sagt es. Der Hinweis, was hinausgeht, steht **am
+  Knopf** und nennt den Anbieter — nicht in einer Datenschutzerklärung.
+  **Vier der im ULTRAPLAN genannten Agenten sind nach ADR-0022 nicht baubar**
+  und stehen auf keiner Warteliste: Candidate Ranking, Salary Recommendation,
+  Team Analyzer, Skill Analyzer. Alle vier sind Zahlen oder Rangfolgen über
+  Menschen.
+  Nebenbei repariert: ein bestehender Test prüfte die Erfolgsmeldung mit
+  `/gespeichert/i` und wurde vom neuen Hinweis („Gespeichert wird nichts")
+  mitgetroffen — dieselbe Lehre wie beim E2E-Wackler mit `/bestätigt/i`.
 
 ### Aufräumen: alles Bekannte behoben (05.08.2026)
 

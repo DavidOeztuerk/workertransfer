@@ -42,7 +42,13 @@ from worker_contracts.portfolio import (
     PortfolioV1,
     SavePortfolioV1,
 )
-from worker_contracts.profile import ProfilePageV1, ProfileV1, SaveProfileV1
+from worker_contracts.profile import (
+    DraftProfileTextV1,
+    ProfilePageV1,
+    ProfileTextDraftV1,
+    ProfileV1,
+    SaveProfileV1,
+)
 from worker_contracts.resume import (
     EducationV1,
     PositionV1,
@@ -77,6 +83,7 @@ __all__ = [
     "ConsentRevokeV1",
     "ConsentStateV1",
     "CreateCompanyV1",
+    "DraftProfileTextV1",
     "EducationV1",
     "Event",
     "ExpressInterestV1",
@@ -96,6 +103,7 @@ __all__ = [
     "PortfolioV1",
     "PositionV1",
     "ProfilePageV1",
+    "ProfileTextDraftV1",
     "ProfileV1",
     "Query",
     "RegisterUserV1",

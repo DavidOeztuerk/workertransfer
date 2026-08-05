@@ -224,6 +224,37 @@ test("die Auskunft nennt jeden Abschnitt — auch die leeren", async ({ browser 
 });
 
 
+// Die Formulierungshilfe (ADR-0024). Was hier prüfbar ist, ist NICHT der
+// Anbieter — das bräuchte ein Geheimnis und würde Geld kosten. Prüfbar ist der
+// Zustand „nicht eingerichtet", und der ist in jeder Umgebung ohne Schlüssel
+// der echte: kein Absturz, kein leerer Text, sondern eine Seite, die es sagt,
+// und ein Profiltext, der unverändert dasteht.
+test("ohne eingerichteten Anbieter bleibt der eigene Text unangetastet", async ({ page }) => {
+  const email = uniqueEmail("hilfe.example");
+  await registerAndConfirm(page, email, "E2E Hilfe");
+  await login(page, email);
+
+  await page.goto("/profile");
+  await page.getByLabel(/Überschrift/i).fill("Pflegefachkraft");
+  await page.getByLabel(/Über mich/i).fill("Mein eigener Text.");
+  await page.getByRole("button", { name: /^Speichern$/ }).click();
+  await expect(page.getByText(/Profil gespeichert/i)).toBeVisible();
+
+  await page.getByRole("button", { name: /Vorschlag holen/i }).click();
+
+  // Der Compose-Stack setzt WORKER_ANTHROPIC_API_KEY leer, und CI hat keinen
+  // Schlüssel — der geprüfte Zustand ist hier also immer „nicht eingerichtet".
+  // Wer lokal mit ANTHROPIC_API_KEY startet, prüft mit diesem Test etwas
+  // anderes; das ist der Preis dafür, dass die Reihe kein Geheimnis braucht.
+  //
+  // Eine `.or()`-Bedingung stand hier zuerst und war wertlos: das Textfeld ist
+  // immer sichtbar, also traf sie immer.
+  await expect(page.getByRole("alert")).toHaveText(/nicht verfügbar/i);
+  // Und der Text der Person steht unverändert da — kein leeres Feld, kein
+  // halber Entwurf.
+  await expect(page.getByLabel(/Über mich/i)).toHaveValue("Mein eigener Text.");
+});
+
 test("GitHub verbinden verlangt einen Nachweis — und rechnet keine Note", async ({ browser }) => {
   const email = uniqueEmail("kandidat.example");
   const stamp = Date.now();

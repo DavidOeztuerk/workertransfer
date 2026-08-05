@@ -120,6 +120,52 @@ export async function saveMyProfile(input: ProfileInput): Promise<SaveResult> {
   return { ok: true, profile: (await res.json()) as Profile };
 }
 
+/**
+ * Ein Entwurf für den EIGENEN Profiltext.
+ *
+ * Der Text geht an einen fremden Anbieter — das steht an dem Knopf, der das
+ * auslöst, und nicht in einer Datenschutzerklärung. Gespeichert wird nichts:
+ * der Entwurf lebt im Formular, bis die Person selbst speichert.
+ *
+ * Mitgeschickt wird nur ihr Wunsch. Der Zusammenhang (Überschrift, Text,
+ * Fähigkeiten) kommt serverseitig aus dem gespeicherten Profil — was der
+ * Client nicht senden kann, kann er nicht in einen fremden Dienst schleusen.
+ */
+export type DraftResult =
+  | { ok: true; draft: string }
+  | { ok: false; reason: "unavailable" | "unauthenticated" | "offline"; message: string };
+
+export async function draftProfileText(wish: string): Promise<DraftResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${PROFILE_BASE_URL}/profiles/me/draft`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ wish }),
+    });
+  } catch {
+    return { ok: false, reason: "offline", message: "Keine Verbindung zum Server." };
+  }
+  if (res.status === 401) {
+    return {
+      ok: false,
+      reason: "unauthenticated",
+      message: "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
+    };
+  }
+  if (!res.ok) {
+    // 503 heißt „nicht eingerichtet ODER Anbieter still" — von außen dasselbe,
+    // und beides heißt „später noch einmal", nicht „falsch gemacht".
+    return {
+      ok: false,
+      reason: "unavailable",
+      message: "Die Formulierungshilfe ist gerade nicht verfügbar. Dein Text bleibt unverändert.",
+    };
+  }
+  return { ok: true, draft: ((await res.json()) as { draft: string }).draft };
+}
+
 export type CandidatePage =
   | { ok: true; items: Profile[]; nextCursor: string | null }
   | {

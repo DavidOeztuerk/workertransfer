@@ -28,6 +28,15 @@ class ProfileServiceSettings(PlatformSettings):
     # nicht localhost — der Aufruf läuft container-zu-container.
     consent_base_url: str = "http://127.0.0.1:8002"
 
+    # Der Entwurfsdienst. **Leer heißt: die Funktion ist aus** — nicht „offen
+    # für alle", nicht „nimm einen Standardschlüssel". Ohne Schlüssel ruft der
+    # Dienst keinen fremden Anbieter an, und die Oberfläche sagt das (ADR-0024).
+    #
+    # Der Schlüssel steht ausschließlich in der Umgebung. Er landet nie im
+    # Repository und nie in einem Protokoll (`product-scope.md`).
+    anthropic_api_key: SecretStr = SecretStr("")
+    drafting_model: str = "claude-sonnet-5"
+
     @model_validator(mode="after")
     def _reject_development_jwt_secret(self) -> Self:
         assert_deployable_jwt_secret(
