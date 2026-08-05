@@ -976,6 +976,21 @@ Also: alles, was in dieser Datei als offen stand, geprüft und geschlossen.
   modulweite `Map` von Token auf **Zusage**, sodass ein zweiter Aufbau
   dasselbe Ergebnis bekommt statt eines zweiten Aufrufs. Ein `useRef` hätte
   nicht gereicht — er stirbt mit der Komponente, und genau darum geht es.
+  **Nachtrag 06.08.2026: dieselbe Seite gab es zweimal, und ich hatte nur eine
+  repariert.** `/invitation` trug den Fehler unverändert weiter — auch der
+  Einladungstoken ist einmalig. Aufgefallen ist er nicht durch Nachdenken,
+  sondern als **Wackler** im E2E-Lauf: einmal rot, beim zweiten Versuch grün,
+  also genau die Sorte Befund, die man wegzuklicken versucht ist. Die Folge
+  wäre schlimmer als bei `/verify` gewesen: „Einladung nicht angenommen" auf
+  dem Schirm, während die Person dem Unternehmen gerade beigetreten war.
+  Derselbe Riegel (`acceptOnce`), Test zuerst und **rot gesehen**, danach
+  gegengeprüft. Der Riegel legte prompt einen zweiten, kleineren Fehler frei:
+  die modulweite `Map` überlebt zwischen Tests, und `invitation.test.tsx`
+  benutzte viermal denselben Token `"abc123"` — zwei bestehende Tests wurden
+  rot, obwohl die Seite stimmte. `verify.test.tsx` macht es richtig vor und
+  zieht je Test einen frischen Token; nachgezogen.
+  Belegt: der E2E-Lauf ging von **17 grün + 1 Wackler** auf **18 grün, kein
+  Wackler** (und von 8,9 auf 4,6 Minuten).
 
 - ✅ **Acht Dienste, ein Datengrab.** Beim Nachprüfen der Notiz „die Templates
   erzeugen noch `worker_database.Base`" stellte sich heraus: die Vorlage war
