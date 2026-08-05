@@ -44,9 +44,11 @@ class LoginBody(BaseModel):
 
 
 def build_auth_router(deps: dict[str, Any]) -> APIRouter:
-    # TODO Phase-10: enforce per-IP rate-limiting (worker-ratelimit) on /auth/login
-    # and /auth/refresh before any external exposure; the auth flow currently has
-    # no brute-force throttle (rate-limiting was explicitly out of Phase-2 scope).
+    # Die Bremse gegen Durchprobieren steht NICHT hier, sondern als Middleware
+    # im Composition-Root (`AUTH_LIMITS` in `compose_api.py`). Dort, weil sie
+    # weiter außen greifen muss als die Authentifizierung: sonst würde für
+    # jeden Rateversuch erst bcrypt gerechnet, und die Bremse wäre der teuerste
+    # Teil des Angriffs.
     router = APIRouter(prefix="/auth", tags=["auth"])
     settings = deps["settings"]
     session_factory = deps["session_factory"]

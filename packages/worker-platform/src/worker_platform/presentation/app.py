@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from fastapi import APIRouter, FastAPI
@@ -20,6 +20,7 @@ from worker_platform.presentation.middleware import (
     TenantContextMiddleware,
     TenantResolver,
 )
+from worker_platform.presentation.throttle import Limit, ThrottleMiddleware
 
 
 def create_api_app(
@@ -29,6 +30,8 @@ def create_api_app(
     tenant_resolver: TenantResolver | None = None,
     auth_middleware: Any = None,
     auth_middleware_kwargs: dict[str, Any] | None = None,
+    throttle_limits: Mapping[tuple[str, str], Limit] | None = None,
+    trust_forwarded_for: bool = False,
     routers: Iterable[APIRouter] = (),
 ) -> FastAPI:
     """Create a secure, observable HTTP entry point with no business endpoints.
@@ -80,6 +83,16 @@ def create_api_app(
     app.add_middleware(TenantContextMiddleware, resolver=resolved_tenant)
     if auth_middleware is not None:
         app.add_middleware(auth_middleware, **(auth_middleware_kwargs or {}))
+    if throttle_limits:
+        # Weiter außen als die Authentifizierung, damit ein Ratespiel gebremst
+        # wird, BEVOR ein Passwort geprüft (und damit bcrypt gerechnet) wird —
+        # sonst wäre die Bremse selbst der teuerste Teil des Angriffs. Weiter
+        # innen als CorrelationId, damit die Absage eine Korrelations-ID trägt.
+        app.add_middleware(
+            ThrottleMiddleware,
+            limits=throttle_limits,
+            trust_forwarded_for=trust_forwarded_for,
+        )
     app.add_middleware(CorrelationIdMiddleware)
     _add_cors_middleware(app, settings)
     return app

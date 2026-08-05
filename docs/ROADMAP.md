@@ -201,19 +201,21 @@ was der Code tat.
   via `create_api_app`, Alembic ADR-0010, Testcontainers ADR-0011); der Renderer
   verweigert `.py`-Dateien mit ungelösten Platzhaltern. 10 Tests.
 
-**Offene Folge-Defizite aus 2.5** (dokumentiert, nicht blockierend):
-- Die Alt-Templates `domain/`, `application/`, `infrastructure/` im Generator tragen
-  eigene Lint-Schulden und definieren einen **lokalen** `Mediator`/`PipelineBehavior`,
-  der `worker_platform.application.cqrs` dupliziert — ein ADR-0002-Verstoß, der sonst in
-  jeden generierten Service eingebacken wird.
+**Folge-Defizite aus 2.5**:
+- ~~Alt-Templates mit lokalem `Mediator`/`PipelineBehavior`~~ — **erledigt.** Beim
+  Nachprüfen am 05.08.2026 existierten sie nicht mehr: die Vorlagen verweisen
+  ausdrücklich auf `worker_platform.application.cqrs`, und `application/__init__.py`
+  sagt im Docstring, warum ein service-eigener Mediator ein Duplikat wäre. Der
+  Eintrag stand seit dem Umbau der Vorlagen zu Unrecht als offen.
 - ~~`worker-github` bleibt unimportierbar~~ — **erledigt am 03.08.2026 durch
   Löschen, nicht durch Reparieren** (ADR-0022). Die damalige Einschätzung „Fix
   gehört in Phase 6" war falsch: repariert hätte der Import 318 Zeilen scharf
   gestellt, die einen Menschen zu einer Zahl zwischen 0 und 100 verrechnen.
 - `worker-ai` bleibt aus dem Workspace exkludiert (ML-Wheels ohne
   Python-3.14-Rad). Für Phase 7 über optionale Extras zu lösen, analog weasyprint.
-- Kein `Authorization`-Header **und** kein Cookie ⇒ 401; per-IP-Rate-Limiting am
-  Auth-Rand weiterhin offen (Phase 10, TODO-Marker in `build_auth_router`).
+- ~~per-IP-Rate-Limiting am Auth-Rand offen~~ — **erledigt am 05.08.2026.** Kein
+  `Authorization`-Header **und** kein Cookie ⇒ 401; und der Anmeldeweg hat jetzt
+  eine Bremse. Siehe „Bremse am Auth-Rand" unten.
 
 ### Phase 3 — Status: ✅ erledigt (3.1–3.5)
 
@@ -254,10 +256,13 @@ was der Code tat.
 
   Offen aus 3.1 (nicht blockierend): `mediator.py` wurde nicht gebaut — die
   Handler werden wie in `identity-service` direkt aus dem Router aufgerufen; ein
-  Mediator lohnt erst mit Pipeline-Behaviors. `test_eventbus_seam.py` fehlt (die
-  Naht existiert in `compose_infrastructure`, hat aber noch keinen Publisher).
-  Die `worker new-service`-Templates erzeugen noch `worker_database.Base` statt
-  einer service-eigenen Base (ADR-0016-Folgearbeit).
+  Mediator lohnt erst mit Pipeline-Behaviors. `test_eventbus_seam.py` fehlt —
+  und bleibt weg, solange es keinen Publisher gibt: ein Test auf eine Naht ohne
+  Gegenstück prüft, dass nichts passiert, und das tut er auch, wenn die Naht
+  falsch ist.
+  ~~Die Templates erzeugen noch `worker_database.Base`~~ — **erledigt am
+  05.08.2026, und der Rest des Fehlers war größer als die Notiz.** Siehe „Acht
+  Dienste, ein Datengrab" unten.
 - ✅ **3.1b Identity-Angleichung & Onboarding** (01.08.2026, PR #2 + #3 gemergt).
   Tenant ist ein Unternehmen, natürliche Personen haben keinen (**ADR-0017**);
   Mitgliedschaft als eigene Relation plus verifizierter Wechsel über
@@ -682,22 +687,65 @@ existieren könnte.
   Sekunden in ein nichtssagendes „element(s) not found". Sie wartet jetzt — wie
   `login` — auf **beide** Ausgänge und sagt, welcher eingetreten ist.
 
-### Weiterhin offen, quer durch alle Phasen
+### Aufräumen: alles Bekannte behoben (05.08.2026)
 
-- **Offen und benannt: die Bestätigungsseite schickt ihren Token manchmal
-  zweimal** (gefunden 05.08.2026). Die verbesserte Testhilfe hat den bisherigen
-  Wackelkandidaten der `application-journey` endlich erklärt: nicht ein
-  Zeitproblem im Test, sondern **HTTP 400 „ungültig"** vom `identity-service` —
-  in zwei Suite-Läufen 2 von 120 POSTs auf `/auth/verify-email`. Der Token ist
-  einmalig; ein zweiter Aufruf verbraucht ihn nicht, er scheitert. Wessen
-  Antwort zuletzt ankommt, entscheidet, was die Seite anzeigt.
-  `VerifyRoute` feuert aus `useEffect(…, [])` und hat **keinen Riegel gegen ein
-  zweites Mal** — ein Remount (HMR im Dev-Server, StrictMode, ein Reload)
-  genügt. **Nicht repariert, weil sich der zweite Aufruf im Unit-Test nicht
-  hervorrufen ließ:** ein Test, der auch am ungefixten Code grün ist, bewacht
-  nichts, und eine Vermutung als Fix auszuliefern wäre schlechter als die
-  offene Notiz. Was fehlt, ist der Nachweis, wodurch der Remount ausgelöst
-  wird — danach ist der Riegel drei Zeilen.
+Ausgelöst durch eine berechtigte Rückfrage — *„wieso findest du solche Fehler
+und behebst sie nicht sofort?"*. Die Antwort war in einem Fall gut (ein Fix
+ohne fehlschlagenden Test ist eine Vermutung) und in den anderen nur bequem.
+Also: alles, was in dieser Datei als offen stand, geprüft und geschlossen.
+
+- ✅ **Die Bestätigungsseite schickte ihren Token zweimal.** Beleg: 2 von 120
+  POSTs auf `/auth/verify-email` kamen im E2E-Lauf als HTTP 400 „ungültig"
+  zurück. Der Token ist einmalig — der zweite Aufruf verbraucht ihn nicht, er
+  scheitert, und wessen Antwort zuletzt ankommt, entscheidet, was die Person
+  sieht. Im schlechten Fall „Bestätigung fehlgeschlagen", während ihr Konto
+  gerade freigeschaltet wurde.
+  **Warum er beim ersten Anlauf nicht behoben wurde:** ein Test mit
+  `<StrictMode>` war auch am ungefixten Code grün, und ein Test, der nicht
+  fehlschlagen kann, bewacht nichts. **Was ihn reproduzierbar machte:** nicht
+  StrictMode, sondern schlicht ein **zweiter Aufbau** — `render` → `unmount` →
+  `render`. Damit war der Test rot, und der Riegel sind drei Zeilen: eine
+  modulweite `Map` von Token auf **Zusage**, sodass ein zweiter Aufbau
+  dasselbe Ergebnis bekommt statt eines zweiten Aufrufs. Ein `useRef` hätte
+  nicht gereicht — er stirbt mit der Komponente, und genau darum geht es.
+
+- ✅ **Acht Dienste, ein Datengrab.** Beim Nachprüfen der Notiz „die Templates
+  erzeugen noch `worker_database.Base`" stellte sich heraus: die Vorlage war
+  nur die halbe Wahrheit. `base.py` war längst richtig, aber
+  **`migrations/env.py` holte die Base weiter aus `worker_database`** — in der
+  Vorlage *und* in acht von zehn Diensten. `target_metadata` zeigte damit auf
+  eine **leere** MetaData, und `alembic revision --autogenerate` hätte daraus
+  eine Migration gebaut, die **jede Tabelle löscht**.
+  Gemerkt hat es nie jemand, weil `upgrade head` nur die vorhandenen Skripte
+  ausführt: der Stack lief grün über einem Generator, der beim ersten
+  Autogenerate ein Datengrab ausgehoben hätte.
+  Behoben in allen acht plus der Vorlage. Gesichert durch
+  `tests/test_migration_metadata.py` — und zwar auf **Identität** der Base, nicht
+  auf „Metadata nicht leer": der erste Entwurf dieses Tests war
+  reihenfolgeabhängig, weil `identity-service` seine Modelle tatsächlich auf
+  `worker_database.Base` registriert und die geteilte MetaData damit voll
+  aussah, sobald seine Tests zuerst liefen. Drei statt acht Fehlschläge — ein
+  Test, der den Fehler je nach Laufreihenfolge verschwinden lässt.
+
+- ✅ **Bremse am Auth-Rand** — der einzige `TODO`-Marker, der im Code stand.
+  `worker_platform.presentation.throttle`: gleitendes Fenster je Herkunft, als
+  Middleware **weiter außen als die Authentifizierung**. Das ist der Punkt und
+  nicht Kosmetik: läge sie innen, würde für jeden Rateversuch erst bcrypt
+  gerechnet, und die Bremse wäre der teuerste Teil des Angriffs. Der Test
+  beweist es ohne Datenbank — zehnmal 500 (Handler erreicht), dann 429 (nicht
+  erreicht).
+  **Je Herkunft, nie je Adresse:** eine Bremse je E-Mail-Adresse wäre zweimal
+  falsch — sie verriete durch ihr Verhalten, dass es die Adresse gibt, und ein
+  Fremder könnte damit eine bestimmte Person aussperren.
+  Der abgelehnte Versuch wird **nicht** mitgezählt, sonst hielte sich eine
+  Sperre selbst am Leben. Genau diesen Fehler hat `worker-ratelimit` (unbenutzt,
+  braucht Redis, das nicht im Stack steht) — deshalb eine eigene Umsetzung mit
+  einer Abhängigkeit weniger statt drei, die niemand einschaltet (ADR-0021).
+  **Aus in LOCAL/TEST**, weil im Compose-Stack jede Anfrage von derselben
+  Gateway-Adresse kommt: dort träfe sie die eigene Testreihe statt eines
+  Angreifers. Ausdrücklich einschaltbar (`WORKER_AUTH_THROTTLE_ENABLED=true`).
+
+### Weiterhin offen, quer durch alle Phasen
 
 - **`worker-github` ist gelöscht** (03.08.2026, **ADR-0022**). Nicht repariert:
   es war unimportierbar, hatte keinen Konsumenten — und verrechnete einen
