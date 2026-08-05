@@ -49,4 +49,6 @@ def _drafter(settings: ProfileServiceSettings) -> TextDrafter:
     key = settings.anthropic_api_key.get_secret_value()
     if not key:
         return NullDrafter()
-    return AnthropicDrafter(api_key=key, model=settings.drafting_model)
+    return AnthropicDrafter(
+        api_key=key, model=settings.drafting_model, base_url=settings.drafting_base_url
+    )

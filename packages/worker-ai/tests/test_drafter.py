@@ -163,3 +163,47 @@ class TestTheProvider:
 
         assert seen["header"] == "geheim"
         assert "geheim" not in str(seen["body"])
+
+
+class TestWhereTheCallGoes:
+    async def test_it_goes_to_anthropic_by_default(self) -> None:
+        seen: dict[str, str] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["url"] = str(request.url)
+            return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}]})
+
+        await AnthropicDrafter(api_key="k", client=_client(handler)).draft(DraftContext(bio="x"))
+
+        assert seen["url"] == "https://api.anthropic.com/v1/messages"
+
+    async def test_a_gateway_can_stand_in_front_of_it(self) -> None:
+        """Überschreibbar — aber ausdrücklich KEIN Provider-Wechsel.
+
+        Wer dort etwas hinstellt, das anders antwortet als die Messages-API,
+        bekommt einen ehrlichen Fehler statt eines stillen Rückfalls.
+        """
+        seen: dict[str, str] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["url"] = str(request.url)
+            return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}]})
+
+        await AnthropicDrafter(
+            api_key="k", base_url="http://gateway.intern/v1/messages", client=_client(handler)
+        ).draft(DraftContext(bio="x"))
+
+        assert seen["url"] == "http://gateway.intern/v1/messages"
+
+    async def test_a_gateway_that_answers_differently_fails_honestly(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            _ = request
+            # Sieht aus wie OpenAI, nicht wie Anthropic.
+            return httpx.Response(200, json={"choices": [{"message": {"content": "hi"}}]})
+
+        drafter = AnthropicDrafter(
+            api_key="k", base_url="http://openai-proxy/v1", client=_client(handler)
+        )
+
+        with pytest.raises(DrafterUnavailable):
+            await drafter.draft(DraftContext(bio="x"))

@@ -27,6 +27,7 @@ from typing import Protocol
 import httpx
 
 __all__ = [
+    "ANTHROPIC_MESSAGES_URL",
     "AnthropicDrafter",
     "DraftContext",
     "DrafterUnavailable",
@@ -38,6 +39,10 @@ __all__ = [
 #: prüfen kann, wird nicht geprüft, sondern übernommen.
 MAX_OUTPUT_TOKENS = 700
 TIMEOUT_SECONDS = 30.0
+#: Wohin der Aufruf geht. Überschreibbar, damit ein Gateway oder ein Proxy
+#: davorstehen kann — **kein Provider-Wechsel**: wer dort etwas hinstellt, das
+#: anders antwortet als die Messages-API, bekommt `DrafterUnavailable`.
+ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages"
 
 
 class DrafterUnavailable(Exception):
@@ -137,10 +142,12 @@ class AnthropicDrafter:
         *,
         api_key: str,
         model: str = "claude-sonnet-5",
+        base_url: str = ANTHROPIC_MESSAGES_URL,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._api_key = api_key
         self._model = model
+        self._base_url = base_url
         self._client = client
 
     async def draft(self, context: DraftContext) -> str:
@@ -157,14 +164,10 @@ class AnthropicDrafter:
         }
         try:
             if self._client is not None:
-                response = await self._client.post(
-                    "https://api.anthropic.com/v1/messages", json=body, headers=headers
-                )
+                response = await self._client.post(self._base_url, json=body, headers=headers)
             else:
                 async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
-                    response = await client.post(
-                        "https://api.anthropic.com/v1/messages", json=body, headers=headers
-                    )
+                    response = await client.post(self._base_url, json=body, headers=headers)
         except httpx.HTTPError as exc:
             # Nur die Fehlerart, nie der Inhalt: der Prompt trägt den Freitext
             # einer Person und gehört nicht ins Protokoll.
