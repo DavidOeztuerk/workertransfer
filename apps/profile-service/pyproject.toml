@@ -21,6 +21,10 @@ dependencies = [
     # Der Consent-Client spricht HTTP mit consent-service (ADR-0013).
     "httpx>=0.27.0,<1.0.0",
     "worker-core",
+    # Das Vokabular: „Postgres" und „PostgreSQL" sind dasselbe Wort. Beide
+    # Seiten des Abgleichs MÜSSEN dieselbe Tabelle benutzen, sonst findet er
+    # zufällige Treffer (ADR-0023).
+    "worker-skills",
     "worker-platform",
     "worker-database",
     "worker-auth",
@@ -41,6 +45,7 @@ module-name = "profile_service"
 
 [tool.uv.sources]
 worker-core = { workspace = true }
+worker-skills = { workspace = true }
 worker-platform = { workspace = true }
 worker-database = { workspace = true }
 worker-auth = { workspace = true }

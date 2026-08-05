@@ -50,6 +50,7 @@ worker-tenancy = { workspace = true }
 worker-resilience = { workspace = true }
 worker-storage = { workspace = true }
 worker-search = { workspace = true }
+worker-skills = { workspace = true }
 worker-contracts = { workspace = true }
 worker-scheduler = { workspace = true }
 worker-ai = { workspace = true }

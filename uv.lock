@@ -42,6 +42,7 @@ members = [
     "worker-scheduler",
     "worker-search",
     "worker-shared",
+    "worker-skills",
     "worker-storage",
     "worker-telemetry",
     "worker-templates",
@@ -1212,6 +1213,7 @@ dependencies = [
     { name = "worker-database" },
     { name = "worker-platform" },
     { name = "worker-shared" },
+    { name = "worker-skills" },
     { name = "worker-tenancy" },
 ]
 
@@ -1231,6 +1233,7 @@ requires-dist = [
     { name = "worker-database", editable = "packages/worker-database" },
     { name = "worker-platform", editable = "packages/worker-platform" },
     { name = "worker-shared", editable = "packages/worker-shared" },
+    { name = "worker-skills", editable = "packages/worker-skills" },
     { name = "worker-tenancy", editable = "packages/worker-tenancy" },
 ]
 
@@ -1981,6 +1984,7 @@ dependencies = [
     { name = "worker-database" },
     { name = "worker-platform" },
     { name = "worker-shared" },
+    { name = "worker-skills" },
     { name = "worker-tenancy" },
 ]
 
@@ -2001,6 +2005,7 @@ requires-dist = [
     { name = "worker-database", editable = "packages/worker-database" },
     { name = "worker-platform", editable = "packages/worker-platform" },
     { name = "worker-shared", editable = "packages/worker-shared" },
+    { name = "worker-skills", editable = "packages/worker-skills" },
     { name = "worker-tenancy", editable = "packages/worker-tenancy" },
 ]
 
@@ -3455,6 +3460,11 @@ requires-dist = [
 name = "worker-shared"
 version = "0.1.0"
 source = { editable = "packages/worker-shared" }
+
+[[package]]
+name = "worker-skills"
+version = "0.1.0"
+source = { editable = "packages/worker-skills" }
 
 [[package]]
 name = "worker-storage"

@@ -191,7 +191,10 @@ export function ProfileRoute({ principal = null }: ProfileRouteProps) {
           />
           <Field
             label="Fähigkeiten"
-            hint="Mit Komma getrennt, zum Beispiel: Python, FastAPI, PostgreSQL"
+            // Der Hinweis erklärt, warum aus „postgres" nach dem Speichern
+            // „PostgreSQL" wird. Ohne ihn sähe es aus, als hätte die Seite
+            // etwas an der Eingabe verändert, ohne zu fragen.
+            hint="Mit Komma getrennt, zum Beispiel: Python, FastAPI, PostgreSQL. Bekannte Schreibweisen vereinheitlichen wir — aus „postgres“ wird „PostgreSQL“. Was wir nicht kennen, bleibt genau so stehen."
             value={form.skills}
             onChange={(e) => update("skills", e.target.value)}
           />

@@ -16,7 +16,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 3 | Candidate Core | ✅ | 3.1–3.5 komplett (Consent, Profile, Resume, Portfolio, Ablage) |
 | 4 | Jobs & Applications | ✅ | 4.1–4.4 komplett (Jobs, Bewerbungen, Unternehmen, Karriere-Seiten) |
 | 5 | Transfermarkt | 🟧 | 5.1–5.3 ✅ (Marktstatus, Vorgang, Tür + Oberfläche); Verträge, Unterschrift, KI-Beratung offen |
-| 6 | Developer Intelligence | 🟧 | 6.1 ✅ (GitHub als Beleg), 6.2 ✅ (Passung im Browser); Skill-Graph offen |
+| 6 | Developer Intelligence | ✅ | 6.1 (GitHub als Beleg), 6.2 (Passung im Browser), 6.3 (Vokabular) — Score, Ranking und Wechselwahrscheinlichkeit bewusst **nicht** gebaut (ADR-0022/0023) |
 | 7 | AI Agent Plattform | ⬜ | 23 Agenten (draft-only), plan-act-reflect, MCP |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ⬜ | Outbox/Inbox, cross-service Events |
@@ -686,6 +686,50 @@ existieren könnte.
   wartete nur auf die Erfolgsüberschrift und lief bei einem Fehlschlag 30
   Sekunden in ein nichtssagendes „element(s) not found". Sie wartet jetzt — wie
   `login` — auf **beide** Ausgänge und sagt, welcher eingetreten ist.
+
+- ✅ **6.3 Skill-Graph: das Vokabular, nicht das Urteil** — 05.08.2026.
+  [Design](superpowers/specs/2026-08-05-skill-graph-design.md) · **ADR-0023**.
+  Der ULTRAPLAN wollte hier Fähigkeiten aus Commits ableiten, zehn Dimensionen
+  berechnen, eine **Wechselwahrscheinlichkeit** und einen Match-Score. Nach
+  ADR-0022 und 6.2 bleibt davon eines übrig — und es ist das einzige, das
+  niemandem etwas unterstellt: **ein Vokabular.**
+  Der Bedarf war nicht theoretisch, 6.2 hat ihn erzeugt: die Stelle verlangt
+  „PostgreSQL", im Profil steht „Postgres", Ergebnis ✗ — eine Lücke, die es
+  nicht gibt, gezeigt an einen Menschen, der sich deshalb womöglich nicht
+  bewirbt.
+  `packages/worker-skills`: eine Tabelle und eine Funktion, **ohne eine einzige
+  Abhängigkeit**. Angewandt **im `Skills`-Wertobjekt** von `profile-service`
+  und `jobs-service`, nicht im Router — damit gilt es auch für Zeilen, die vor
+  diesem Schnitt geschrieben wurden, und es braucht **kein
+  Datenmigrations-Skript**. Reihenfolge tragend: erst umbenennen, dann
+  entdoppeln.
+  **Die Grenze steht in ADR-0023 und wird von Tests bewacht:** „Postgres" =
+  „PostgreSQL" ist eine Aussage über *Sprache*; „React heißt, du kannst auch
+  JavaScript" wäre eine über einen *Menschen* — sie schreibt ihm etwas zu, dem
+  er nicht widersprechen kann. Kein Niveau, kein Gewicht, keine Verwandtschaft,
+  keine Wechselwahrscheinlichkeit.
+  Und: es **lehnt nie ab und erfindet nie**. Unbekanntes bleibt wie getippt —
+  eine Liste erlaubter Fähigkeiten wäre eine Behauptung darüber, welche Arbeit
+  es gibt, und läge bei jedem Beruf außerhalb der IT falsch.
+  Der erste Test fand einen Fehler in der Tabelle selbst: „postgresql" stand als
+  eigener Alias von „PostgreSQL" — ein Name, der zugleich sein eigener Alias
+  ist, und damit der Anfang einer Kette.
+
+- ✅ **Und ein Fund, den erst 6.3 ausgelöst hat: der grüne Bericht über einem
+  leeren Lauf.** Nach dem Hinzufügen von `worker-skills` starteten
+  `profile-service` und `jobs-service` nicht mehr — `ModuleNotFoundError`, weil
+  der Quellcode zwar per Bind-Mount im Container liegt, **das venv aber im
+  Image** (`/opt/venv`, absichtlich außerhalb von `/app`). Ein neues
+  Workspace-Paket braucht also `docker compose up -d --build`, kein `restart`.
+  Beide Container standen dabei auf „running" — uvicorn startete in einer
+  Schleife neu.
+  Die Folge war schlimmer als der Ausfall: `skipWithoutStack()` übersprang
+  **alle 16 E2E-Reisen**, und `make validate-e2e` meldete trotzdem *„Alles
+  grün"*. Genau das Skript, das es „nicht beim ersten Fehler abbricht und die
+  übersprungenen Tests benennt" verspricht, zählte nur Python-Skips.
+  `scripts/validate.sh` ist jetzt **rot**, wenn keine einzige Reise gelaufen ist
+  — ein einzelner übersprungener Test ist eine Entscheidung, alle sind ein
+  Ausfall.
 
 ### Aufräumen: alles Bekannte behoben (05.08.2026)
 
