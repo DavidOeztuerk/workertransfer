@@ -15,9 +15,9 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 2.5 | Stabilisierung & Plattform-Naht | ✅ | Cookie-Auth, Dep-Hygiene, Kanon Runde 2, Dev-Stack, Frontend-Gate, Generator |
 | 3 | Candidate Core | ✅ | 3.1–3.5 komplett (Consent, Profile, Resume, Portfolio, Ablage) |
 | 4 | Jobs & Applications | ✅ | 4.1–4.4 komplett (Jobs, Bewerbungen, Unternehmen, Karriere-Seiten) |
-| 5 | Transfermarkt | 🟧 | 5.1–5.3 ✅ (Marktstatus, Vorgang, Tür + Oberfläche); Verträge, Unterschrift, KI-Beratung offen |
+| 5 | Transfermarkt | ✅ | 5.1–5.3 (Marktstatus, Vorgang, Tür + Oberfläche). DoD erfüllt; Verträge/Unterschrift gehören zu Phase 8, der Transferberater zu Phase 7 |
 | 6 | Developer Intelligence | ✅ | 6.1 (GitHub als Beleg), 6.2 (Passung im Browser), 6.3 (Vokabular) — Score, Ranking und Wechselwahrscheinlichkeit bewusst **nicht** gebaut (ADR-0022/0023) |
-| 7 | AI Agent Plattform | 🟧 | 7.1 ✅ (Naht + erster Agent: Formulierungshilfe). **Candidate Ranking** ist nach ADR-0022 dauerhaft ausgeschlossen; Skill Analyzer, Salary Recommendation und Team Analyzer sind in ihrer ÜBLICHEN Form ausgeschlossen, nicht als Idee |
+| 7 | AI Agent Plattform | ✅ | 7.1 (Naht + Candidate-Agent), 7.2 (Company-Agent: die eigene Anzeige). DoD erfüllt, mit zwei begründeten Abweichungen (plan-act-reflect, „Consents und Logs"). **Candidate Ranking** ist nach ADR-0022 dauerhaft ausgeschlossen; Skill Analyzer, Salary Recommendation und Team Analyzer sind in ihrer ÜBLICHEN Form ausgeschlossen, nicht als Idee |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ⬜ | Outbox/Inbox, cross-service Events |
 | 10 | Frontend/Gateway/Infra/Hardening | ⬜ | UI, Gateway, K8s, OTel, Hardening |
@@ -454,7 +454,7 @@ Qualitätsgates, nicht mehr nur Syntax.
   mit dem Link, dass diese Person auf der Plattform ist und dieses Unternehmen
   um sie wirbt. [Design](superpowers/specs/2026-08-02-career-pages-design.md).
 
-### Phase 5 — Status: 🟧 in Arbeit (5.1–5.3 ✅)
+### Phase 5 — Status: ✅ erledigt (05.08.2026, 5.1–5.3)
 
 - ✅ **5.1 Marktstatus** — 02.08.2026.
   [Design](superpowers/specs/2026-08-02-transfer-service-design.md).
@@ -499,7 +499,26 @@ Qualitätsgates, nicht mehr nur Syntax.
   Bestätigung der Person ihn selbst auslöst. Beide haben jetzt einen Test, der
   ohne den Fix rot wird.
 
-Offen in Phase 5:
+**Phase 5 ist gegen ihre eigene DoD erledigt.** Sie lautet: *„State-Machine-Tests,
+ein voller Happy-Path inkl. Consent-Checks; Soll-Bruch-Pfade (Ablehnung,
+Vertragsende) getestet."* Alles davon steht, mit zwei E2E-Reisen.
+
+Sie stand trotzdem lange auf 🟧, und das war ein Buchhaltungsfehler von mir:
+unter „offen" hingen drei Punkte, die **anderen Phasen gehören**. Der ULTRAPLAN
+nennt sie im Inhaltsteil von Phase 5, aber die DoD entscheidet — und Phase 8
+heißt wörtlich „Contracts, E-Signature & Verträge".
+
+Umgehängt statt weiter mitgeschleppt:
+
+- **Vertragsvorlagen** und **digitale Unterschrift** → **Phase 8**. Der Entwurf
+  steht ([Design](superpowers/specs/2026-08-02-contract-templates-design.md)),
+  gebaut wird nichts, bis sieben rechtliche Fragen beantwortet sind — die nach
+  der Formvorschrift zuerst, weil sie den ganzen Schnitt umwerfen kann.
+  Ausdrücklich zurückgestellt.
+- **`worker-player-advisor` / Transferberater** → **Phase 7**. Ein
+  KI-Entwurfserzeuger, und seit 7.1 gibt es die Naht dafür.
+
+Zum Nachlesen, was für Verträge festgelegt ist:
 
 - **Vertragsvorlagen** — [Entwurf steht, gebaut wird nichts](superpowers/specs/2026-08-02-contract-templates-design.md).
   Festgelegt ist der Weg: die Plattform stellt **Vorlagen**, füllt aus, und
@@ -632,7 +651,7 @@ unsichtbar. Ersetzt durch die Menü-Zusammenfassung, die es nur mit aktivem
 Unternehmen gibt — ein ehrlicheres Signal als ein Link, der auch ohne Wechsel
 existieren könnte.
 
-### Phase 6 — Status: 🟧 in Arbeit
+### Phase 6 — Status: ✅ erledigt (05.08.2026, 6.1–6.3)
 
 - ✅ **6.1 GitHub als Beleg, nicht als Note** — 03.08.2026.
   [Design](superpowers/specs/2026-08-03-github-evidence-design.md).
@@ -731,7 +750,15 @@ existieren könnte.
   — ein einzelner übersprungener Test ist eine Entscheidung, alle sind ein
   Ausfall.
 
-### Phase 7 — Status: 🟧 in Arbeit
+### Phase 7 — Status: ✅ erledigt (05.08.2026)
+
+Die DoD lautet: *„≥ 1 Candidate- + ≥ 1 Company-Agent läuft als
+Entwurfs-Erzeuger mit plan-act-reflect-Schleife, jedes externe Ergebnis fordert
+Human-Review an. Consents und Logs vorhanden. Tests."* — erfüllt durch 7.1
+(Candidate) und 7.2 (Company), mit **zwei ausdrücklich begründeten
+Abweichungen** bei plan-act-reflect und bei „Consents und Logs", die unter 7.2
+ausgeschrieben stehen. Die 21 übrigen Agenten aus `kon.txt` sind **nicht**
+Teil dieser DoD; wo ADR-0022 sie berührt, steht das unter 7.1.
 
 - ✅ **7.1 Die Naht zur KI: ein Entwurf, den die Person anfordert** — 05.08.2026.
   [Design](superpowers/specs/2026-08-05-ai-seam-design.md) · **ADR-0024**.
@@ -782,6 +809,84 @@ existieren könnte.
   Nebenbei repariert: ein bestehender Test prüfte die Erfolgsmeldung mit
   `/gespeichert/i` und wurde vom neuen Hinweis („Gespeichert wird nichts")
   mitgetroffen — dieselbe Lehre wie beim E2E-Wackler mit `/bestätigt/i`.
+
+- ✅ **7.2 Der Unternehmens-Agent: die eigene Anzeige verständlicher** —
+  05.08.2026. `POST /jobs/draft`, `JobDraftContext`, Knopf im
+  Ausschreibungsformular.
+  Die DoD verlangt „≥ 1 Candidate- **+ ≥ 1 Company**-Agent"; 7.1 lieferte nur
+  den ersten. Von den fünf Unternehmens-Agenten des ULTRAPLAN ist dies der
+  einzige, der **ohne eigene Abwägung** baubar war, und der Grund steht schon
+  im Namen: Scout, Candidate Ranking, Salary Recommendation und Team Analyzer
+  richten sich alle auf **Menschen**, dieser auf einen **Text, den das
+  Unternehmen selbst verfasst hat**. Damit ist er die exakte Spiegelung von
+  7.1 — dort hilft die KI einer Person zu sagen, was *sie* sagen will, hier
+  einem Unternehmen. Über niemanden sagt sie etwas.
+  Getrennte Klassen statt einer mit Verzweigungen: `DraftContext` (Person) und
+  `JobDraftContext` (Anzeige) bringen über das `Draftable`-Protokoll **ihre
+  eigenen Regeln** mit. Ein gemeinsamer Prompt mit `if` wäre die Stelle, an der
+  irgendwann „erfinde nichts über die Person" für eine Anzeige gilt — oder
+  schlimmer, andersherum. `_SYSTEM_JOB` verbietet zusätzlich, was eine Anzeige
+  falsch macht: **keine Anforderungen dazuerfinden** (sonst steht in der
+  Ausschreibung etwas, das niemand verlangen wollte, und Suchende gleichen sich
+  gegen Erfundenes ab), geschlechtsneutral, keine Superlative, keine
+  Altersangabe/Herkunft/Familiensituation.
+  `JobDraftContext` trägt **keine `tenant_id` und keinen Firmennamen** — der
+  Entwurf braucht beides nicht, und was nicht in der Klasse steht, kann nicht
+  hinausgehen. Zwei Tests nageln das an beiden Enden fest: einer die
+  `__dataclass_fields__` von `JobDraftContext` (analog zum Test auf
+  `DraftContext`), einer die Schlüsselmenge der Nutzlast im Browser. Beide
+  müssten geändert werden, damit je eine `tenant_id` mitreist.
+  `_company(request)` steht auch an diesem Endpunkt: ohne die Prüfung wäre er
+  ein Textgenerator für jeden Angemeldeten. Der Zusammenhang kommt aus dem
+  Request statt aus der Datenbank — beim Schreiben gibt es die Anzeige dort noch
+  nicht.
+
+  **Zwei Punkte der DoD, bewusst anders gelöst — und deshalb hier
+  aufgeschrieben statt stillschweigend übersprungen:**
+
+  - **„mit plan-act-reflect-Schleife" — nicht gebaut, mit Absicht.** Die
+    Schleife löst ein Problem, das diese beiden Agenten nicht haben: sie ist
+    für Agenten da, die *mehrere Schritte* tun und deren Zwischenergebnis
+    geprüft werden muss. Hier gibt es einen Aufruf und einen Text. Eine
+    Reflect-Stufe hieße konkret: das Modell bewertet seinen eigenen Entwurf und
+    schreibt ihn ohne Rückfrage um — also **zwei Aufrufe, doppelte Wartezeit,
+    doppelte Kosten**, und ein Ergebnis, das weiter von dem entfernt ist, was
+    die Person eingegeben hat. Die Prüfung, die es hier wirklich braucht, macht
+    ohnehin ein Mensch: der Entwurf landet im Formularfeld und wird erst durch
+    Speichern zu seinem Text. Das ist das Human-Review aus derselben DoD, und
+    es ist das strengere. Sollte je ein mehrschrittiger Agent dazukommen
+    (Transferberater), wird die Schleife dort gebraucht und dort gebaut.
+  - **„Consents und Logs vorhanden" — der Knopf *ist* die Einwilligung, und
+    das Protokoll wäre der Fehler.** Ein Eintrag im Consent-Ledger bedeutet
+    dort eine **stehende** Erlaubnis, die man später widerrufen kann. Genau die
+    gibt es hier nicht: es gibt einen Klick, einen Aufruf, einen Text, und
+    danach nichts mehr, das zu widerrufen wäre. Ein Ledger-Eintrag würde eine
+    dauerhafte Erlaubnis behaupten, die niemand gegeben hat — und in
+    `GET /consent/me` als solche erscheinen. Stattdessen steht der Hinweis
+    **am Knopf** und nennt Anbieter und Umfang, bevor gedrückt wird; informiert
+    und je Benutzung. Ein Inhaltsprotokoll ist aus demselben Grund verboten wie
+    CVs im Log (`product-scope.md`): der Freitext gehört derselben Klasse an.
+    Gemeldet wird die **Fehlerart**, nie Prompt oder Antwort.
+
+  Belegt mit laufendem Docker, also **null Skips** in beiden Reihen und echten
+  Testcontainers-Läufen — ein grüner Bericht über eine übersprungene Reihe ist
+  schlimmer als ein roter. Eine E2E-Reise prüft dabei genau den Zustand, der im
+  lokalen Stapel wirklich herrscht: **kein Schlüssel gesetzt.** Der Knopf
+  antwortet mit einem echten 503 aus dem `NullDrafter`, die Oberfläche sagt es,
+  und der Text des Unternehmens steht unverändert da. Das ist der gefährlichste
+  Fall, weil er still sein könnte: ein Knopf, der nichts tut, sieht aus wie
+  einer, der lädt.
+  **`scripts/validate.sh` nennt jetzt immer die Stückzahlen** (`pytest N
+  bestanden`, `playwright N Reisen`) statt nur Haken. Die Warnungen darin
+  schlugen bisher erst an, wenn etwas übersprungen wurde — ein Lauf, der
+  stillschweigend nur die Hälfte einsammelt, wäre durchgekommen.
+  Nebenbei behoben: der Kommentar an beiden Entwurfs-Knöpfen behauptete,
+  `type="button"` verhindere ein Absenden des umgebenden Formulars — `Button`
+  gibt das Attribut aber ohnehin vor, der Kommentar beschrieb also einen
+  Mechanismus, den es nicht gab. Ein Gegenbeweis zeigte es: der Test blieb grün,
+  als das Attribut entfernt wurde. Jetzt sagt der Kommentar die Wahrheit, und
+  ein Test hält das gerenderte Attribut fest — der scheitert, wenn beides
+  wegfällt (nachgewiesen, nicht angenommen).
 
 ### Aufräumen: alles Bekannte behoben (05.08.2026)
 

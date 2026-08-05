@@ -71,6 +71,43 @@ def test_every_variable_in_the_example_is_actually_read(example: Path) -> None:
     )
 
 
+@pytest.mark.parametrize("example", _EXAMPLES, ids=lambda path: path.parent.name)
+def test_every_setting_the_service_reads_is_in_the_example(example: Path) -> None:
+    """Die Gegenrichtung — und sie fehlte, bis sie etwas übersah.
+
+    Der Test darüber prüft: was in der Vorlage steht, wird auch gelesen. Das
+    allein reicht nicht. Als `jobs-service` die Formulierungshilfe bekam, las
+    es drei neue Variablen, von denen keine in seiner `.env.example` stand —
+    und `profile-service` fehlte `WORKER_DRAFTING_BASE_URL`. Beide Dateien
+    behaupten in ihrer eigenen Kopfzeile, die Variablen zu nennen, die der
+    Dienst **WIRKLICH liest**; damit waren beide unwahr.
+
+    Der Schaden ist der spiegelverkehrte zum anderen Test und genauso still:
+    dort stellt man etwas ein, das nichts tut, hier weiß man nicht, dass man
+    etwas einstellen KANN. Wer aus der Vorlage eine echte Umgebung baut,
+    bekommt dann eine Voreinstellung, die er nie gewählt hat — bei
+    `WORKER_ANTHROPIC_API_KEY` wäre das „aus", was gutgeht, bei einer künftigen
+    Einstellung mit unglücklicher Voreinstellung nicht.
+    """
+    service_dir = example.parent
+    settings = _settings_class(service_dir)
+    declared = _declared(example)
+
+    missing = sorted(
+        f"WORKER_{name.upper()}"
+        for name in settings.model_fields
+        if f"WORKER_{name.upper()}" not in declared
+    )
+
+    assert not missing, (
+        f"{service_dir.name}/.env.example nennt Einstellungen NICHT, die "
+        f"{settings.__name__} liest: {missing}. Die Datei sagt in ihrer "
+        "Kopfzeile, sie liste, was der Dienst wirklich liest — wer daraus eine "
+        "echte Umgebung baut, erfährt sonst nie, dass es diese Stellschrauben "
+        "gibt."
+    )
+
+
 def test_the_root_example_documents_only_settings_that_exist() -> None:
     """Auch die Wurzel-Vorlage, aus zwei Gründen.
 
