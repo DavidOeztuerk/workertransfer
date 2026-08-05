@@ -190,3 +190,41 @@ export function publishJob(jobId: string): Promise<JobResult> {
 export function closeJob(jobId: string): Promise<JobResult> {
   return write(`/jobs/${jobId}/close`, { method: "POST" });
 }
+
+/**
+ * Die eigene Anzeige verständlicher formulieren lassen.
+ *
+ * Der Unternehmens-Agent — und er sagt über niemanden etwas. Er arbeitet an
+ * einem Text, den das Unternehmen selbst verfasst hat.
+ */
+export type JobDraftResult =
+  | { ok: true; draft: string }
+  | { ok: false; message: string };
+
+export async function draftJobText(input: {
+  title: string;
+  description: string;
+  location: string;
+  skills: string[];
+  wish: string;
+}): Promise<JobDraftResult> {
+  try {
+    const res = await send("/jobs/draft", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (res.status === 403) {
+      return { ok: false, message: "Dafür musst du für ein Unternehmen handeln." };
+    }
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: "Die Formulierungshilfe ist gerade nicht verfügbar. Dein Text bleibt unverändert.",
+      };
+    }
+    return { ok: true, draft: ((await res.json()) as { draft: string }).draft };
+  } catch {
+    return { ok: false, message: "Keine Verbindung zum Server." };
+  }
+}

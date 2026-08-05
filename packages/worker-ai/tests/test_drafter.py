@@ -8,6 +8,7 @@ from worker_ai import (
     AnthropicDrafter,
     DraftContext,
     DrafterUnavailable,
+    JobDraftContext,
     NullDrafter,
     build_prompt,
 )
@@ -78,19 +79,19 @@ class TestTheSystemRules:
 
         Und zwar eine, die sie womöglich erst im Gespräch bemerkt.
         """
-        from worker_ai import _SYSTEM
+        from worker_ai import _SYSTEM_PERSON as _SYSTEM
 
         assert "Erfinde NICHTS hinzu" in _SYSTEM
 
     def test_the_model_is_told_not_to_judge(self) -> None:
-        from worker_ai import _SYSTEM
+        from worker_ai import _SYSTEM_PERSON as _SYSTEM
 
         assert "keine Bewertung der Person" in _SYSTEM
 
     def test_it_writes_as_the_person_not_about_her(self) -> None:
         # Der Kern: der Entwurf ist ein Vorschlag für IHREN Text, keine
         # Beschreibung von außen.
-        from worker_ai import _SYSTEM
+        from worker_ai import _SYSTEM_PERSON as _SYSTEM
 
         assert "Ich-Form" in _SYSTEM
 
@@ -163,6 +164,59 @@ class TestTheProvider:
 
         assert seen["header"] == "geheim"
         assert "geheim" not in str(seen["body"])
+
+
+class TestTheCompanyAgent:
+    """Der zweite Agent — und der einzige aus der Unternehmens-Liste des
+    ULTRAPLAN, der ohne eigene Abwägung baubar ist.
+
+    Scout, Candidate Ranking, Salary Recommendation und Team Analyzer richten
+    sich alle auf Personen. Dieser richtet sich auf einen Text, den das
+    Unternehmen selbst verfasst hat — er sagt über niemanden etwas.
+    """
+
+    def test_its_context_carries_no_person_and_no_company_identity(self) -> None:
+        assert set(JobDraftContext.__dataclass_fields__) == {
+            "title",
+            "description",
+            "skills",
+            "location",
+            "wish",
+        }
+
+    def test_it_has_its_own_rules_and_not_the_person_ones(self) -> None:
+        # Zwei Klassen können nicht versehentlich die Regeln der jeweils
+        # anderen bekommen. Ein gemeinsamer Prompt mit Verzweigungen wäre
+        # genau die Stelle, an der das passiert.
+        assert JobDraftContext().system != DraftContext().system
+        assert "Ich-Form" not in JobDraftContext().system
+
+    def test_it_may_not_invent_requirements(self) -> None:
+        """Eine erfundene Anforderung schreckt Menschen ab, die passen würden.
+
+        Und niemand merkt es — die Bewerbung, die deshalb nicht kam, taucht in
+        keiner Statistik auf.
+        """
+        assert "Erfinde KEINE Anforderungen" in JobDraftContext().system
+
+    def test_it_is_told_to_exclude_nobody(self) -> None:
+        rules = JobDraftContext().system
+        assert "geschlechtsneutral" in rules
+        assert "Altersangaben" in rules
+
+    async def test_it_goes_through_the_same_seam(self) -> None:
+        seen: dict[str, object] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["body"] = request.content.decode()
+            return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}]})
+
+        result = await AnthropicDrafter(api_key="k", client=_client(handler)).draft(
+            JobDraftContext(title="Pflegefachkraft", skills=("Altenpflege",))
+        )
+
+        assert result == "ok"
+        assert "Pflegefachkraft" in str(seen["body"])
 
 
 class TestWhereTheCallGoes:

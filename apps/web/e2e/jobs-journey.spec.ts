@@ -176,3 +176,47 @@ test("die Passung sieht die Person — und niemand rechnet sie auf dem Server", 
   await anonymousContext.close();
   await candidateContext.close();
 });
+
+// Der Unternehmens-Agent im Browser — und geprüft wird der Zustand, der im
+// lokalen Stapel WIRKLICH herrscht: **kein Schlüssel gesetzt**.
+//
+// Genau deshalb ist diese Reise etwas wert. Der Fall „Funktion ist aus" ist der
+// gefährlichste, weil er still sein könnte: ein Knopf, der gedrückt wird und
+// nichts tut, sieht aus wie ein Knopf, der lädt. Der Unit-Test prüft das gegen
+// einen erfundenen Client; hier läuft es durch jobs-service, durch den
+// `NullDrafter` und als echtes 503 zurück.
+test("ohne Anbieter sagt die Formulierungshilfe es — statt still nichts zu tun", async ({
+  browser,
+}) => {
+  const domain = uniqueCompanyDomain();
+  const recruiterEmail = uniqueEmail(domain);
+  const companyName = `E2E Entwurf ${Date.now()}`;
+  const eigenerText = `Unser eigener Text ${Date.now()}.`;
+
+  const context = await browser.newContext();
+  const recruiter = await context.newPage();
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter");
+  await login(recruiter, recruiterEmail);
+  await recruiter.goto("/company/new");
+  await recruiter.getByLabel(/Name des Unternehmens/i).fill(companyName);
+  await recruiter.getByRole("button", { name: /Unternehmen anlegen/i }).click();
+  await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
+  await switchToCompany(recruiter, companyName);
+
+  await recruiter.goto("/company/jobs");
+  await recruiter.getByLabel(/Beschreibung/i).fill(eigenerText);
+
+  // Der Hinweis steht AM KNOPF und nennt, was hinausginge — nicht in einer
+  // Datenschutzerklärung. Wer drückt, hat es gelesen.
+  await expect(recruiter.getByText(/nichts über Bewerbende/i)).toBeVisible();
+
+  await recruiter.getByRole("button", { name: /Vorschlag holen/i }).click();
+
+  // Ehrlich aus: eine Meldung, kein stiller Fehlschlag.
+  await expect(recruiter.getByRole("alert")).toContainText(/nicht verfügbar/i);
+  // Und der Text des Unternehmens steht unverändert da. Ein Fehlschlag, der
+  // die Arbeit löscht, wäre schlimmer als gar keine Funktion.
+  await expect(recruiter.getByLabel(/Beschreibung/i)).toHaveValue(eigenerText);
+
+  await context.close();
+});

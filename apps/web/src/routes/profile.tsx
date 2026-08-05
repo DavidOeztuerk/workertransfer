@@ -281,8 +281,10 @@ function DraftHelp({
           {problem}
         </p>
       ) : null}
-      {/* type="button": im selben <form> wie „Speichern“ würde ein Knopf ohne
-          das Attribut absenden — und das Profil speichern, statt zu helfen. */}
+      {/* type="button" ausgeschrieben, obwohl `Button` es ohnehin so vorgibt:
+          dieser Knopf steht im selben <form> wie „Speichern“, und wer hier
+          liest, soll nicht erst das UI-Paket aufschlagen müssen, um zu wissen,
+          welcher der beiden absendet. */}
       <Button type="button" variant="quiet" onClick={() => ask.mutate()} disabled={ask.isPending}>
         {ask.isPending
           ? "Wird geschrieben…"

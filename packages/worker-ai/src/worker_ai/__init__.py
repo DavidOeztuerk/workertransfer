@@ -30,7 +30,9 @@ __all__ = [
     "ANTHROPIC_MESSAGES_URL",
     "AnthropicDrafter",
     "DraftContext",
+    "Draftable",
     "DrafterUnavailable",
+    "JobDraftContext",
     "NullDrafter",
     "TextDrafter",
 ]
@@ -74,9 +76,36 @@ class DraftContext:
     #: gerichtet.
     wish: str = ""
 
+    @property
+    def system(self) -> str:
+        return _SYSTEM_PERSON
+
+    @property
+    def prompt(self) -> str:
+        return build_prompt(self)
+
+
+class Draftable(Protocol):
+    """Was ein Zusammenhang können muss: sich selbst erklären.
+
+    Jede Sorte Entwurf bringt ihre **eigenen Regeln** mit, statt einen
+    gemeinsamen Prompt zu teilen. Das ist Absicht: die Regeln für einen
+    Profiltext („schreibe in der Ich-Form", „erfinde nichts über die Person")
+    und die für eine Stellenanzeige („schreibe für das Unternehmen", „keine
+    Anforderungen dazuerfinden") haben nichts miteinander zu tun. Ein
+    gemeinsamer Prompt mit Verzweigungen wäre die Stelle, an der irgendwann eine
+    Regel für die falsche Seite gilt.
+    """
+
+    @property
+    def system(self) -> str: ...
+
+    @property
+    def prompt(self) -> str: ...
+
 
 class TextDrafter(Protocol):
-    async def draft(self, context: DraftContext) -> str: ...
+    async def draft(self, context: Draftable) -> str: ...
 
 
 class NullDrafter:
@@ -87,7 +116,7 @@ class NullDrafter:
     jemand vergessen hat, etwas abzuschalten.
     """
 
-    async def draft(self, context: DraftContext) -> str:
+    async def draft(self, context: Draftable) -> str:
         _ = context
         raise DrafterUnavailable("no drafting provider configured")
 
@@ -99,7 +128,7 @@ class NullDrafter:
 #: etwas hinzuzuerfinden — ein Profil, in dem eine Fähigkeit steht, die die
 #: Person nie genannt hat, ist eine Falschaussage über sie, und sie merkt es
 #: womöglich erst im Gespräch.
-_SYSTEM = (
+_SYSTEM_PERSON = (
     "Du hilfst einer Person, ihren eigenen Profiltext auf einer "
     "Job-Plattform zu formulieren. Schreibe in der Ich-Form, auf Deutsch, "
     "sachlich und ohne Werbesprache.\n"
@@ -129,6 +158,64 @@ def build_prompt(context: DraftContext) -> str:
     return "\n".join(part for part in parts if part)
 
 
+#: Der Company-Agent. Er hilft einem Unternehmen, **seine eigene Anzeige**
+#: verständlicher zu schreiben — und sagt nichts über Menschen.
+#:
+#: Das ist der einzige Unternehmens-Agent aus dem ULTRAPLAN, der ohne Abwägung
+#: gebaut werden kann. Scout, Candidate Ranking, Salary Recommendation und Team
+#: Analyzer richten sich alle auf Personen; dieser richtet sich auf einen Text,
+#: den das Unternehmen selbst verfasst hat.
+_SYSTEM_JOB = (
+    "Du hilfst einem Unternehmen, seine eigene Stellenanzeige verständlicher "
+    "zu formulieren. Schreibe auf Deutsch, sachlich, ohne Werbesprache.\n"
+    "Regeln:\n"
+    "- Erfinde KEINE Anforderungen, Aufgaben oder Leistungen hinzu. Benutze "
+    "nur, was unten steht.\n"
+    "- Schreibe geschlechtsneutral und sprich Bewerbende direkt an.\n"
+    "- Keine Superlative (\u201eWeltmarktf\u00fchrer\u201c, \u201eRockstar\u201c), keine "
+    "Floskeln (\u201edynamisches Team\u201c).\n"
+    "- Nenne keine Altersangaben, keine Herkunft, keine Familiensituation und "
+    "nichts, was eine Personengruppe ausschließt.\n"
+    "- Höchstens 250 Wörter.\n"
+    "- Gib nur den Text der Beschreibung zurück, ohne Titel, ohne Erklärung."
+)
+
+
+@dataclass(frozen=True, slots=True)
+class JobDraftContext:
+    """Der Zusammenhang einer Stellenanzeige.
+
+    Getrennt von `DraftContext` und nicht als gemeinsame Klasse mit
+    Verzweigungen: hier steht, was ein UNTERNEHMEN über sich geschrieben hat,
+    dort, was eine PERSON über sich geschrieben hat. Zwei Klassen können nicht
+    versehentlich die Regeln der jeweils anderen bekommen.
+
+    Kein `tenant_id`, kein Firmenname, keine Adresse: der Entwurf braucht sie
+    nicht, und was nicht in der Klasse steht, kann nicht hinausgehen.
+    """
+
+    title: str = ""
+    description: str = ""
+    skills: tuple[str, ...] = field(default_factory=tuple)
+    location: str = ""
+    wish: str = ""
+
+    @property
+    def system(self) -> str:
+        return _SYSTEM_JOB
+
+    @property
+    def prompt(self) -> str:
+        parts = [
+            f"Titel: {self.title}" if self.title else "",
+            f"Bisherige Beschreibung: {self.description}" if self.description else "",
+            f"Gesuchte Fähigkeiten: {', '.join(self.skills)}" if self.skills else "",
+            f"Ort: {self.location}" if self.location else "",
+            f"Wunsch: {self.wish}" if self.wish else "",
+        ]
+        return "\n".join(part for part in parts if part)
+
+
 class AnthropicDrafter:
     """Der eine Anbieter.
 
@@ -150,12 +237,12 @@ class AnthropicDrafter:
         self._base_url = base_url
         self._client = client
 
-    async def draft(self, context: DraftContext) -> str:
+    async def draft(self, context: Draftable) -> str:
         body = {
             "model": self._model,
             "max_tokens": MAX_OUTPUT_TOKENS,
-            "system": _SYSTEM,
-            "messages": [{"role": "user", "content": build_prompt(context)}],
+            "system": context.system,
+            "messages": [{"role": "user", "content": context.prompt}],
         }
         headers = {
             "x-api-key": self._api_key,
