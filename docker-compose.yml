@@ -204,6 +204,7 @@ services:
       # (`ANTHROPIC_API_KEY=... docker compose up`) und steht nie im
       # Repository.
       WORKER_ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      WORKER_DRAFTING_MODEL: "${WORKER_DRAFTING_MODEL:-claude-sonnet-5}"
     ports:
       - "8003:8003"
     command:
