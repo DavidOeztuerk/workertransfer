@@ -63,9 +63,21 @@ Vorgehen, nicht verhandelbar:
   passiert.
 - Für jede Löschzusage ein Integrationstest, der beweist, dass die Zeilen
   wirklich weg sind — nicht, dass ein Endpunkt 200 sagt.
-- Ein Test, der beweist, dass die aufbewahrungspflichtigen Daten NICHT gelöscht
-  wurden. Der ist wichtiger als der Löschtest: hier ist der Fehler
-  unwiderruflich.
+- ACHTUNG, das ist die tragende Entscheidung der ADR (§3): die VOREINSTELLUNG
+  LÖSCHT VOLLSTÄNDIG — auch `applications.status = 'hired'` und bezahlte
+  Transfers. Die Aufbewahrungsausnahme ist EIN benannter Schalter je Dienst und
+  steht auf AUS. Also:
+  * je Zeilenklasse ein Test, dass auch `hired` und die bezahlten Transfers
+    fallen (das ist die Umkehrung eines früheren Entwurfs — hier rutscht man
+    leicht in die Vorsichtsannahme zurück),
+  * ein Test, der den Schalter auf AUS festnagelt (der billigste Test im
+    Schnitt und der, der die Entscheidung bewacht, die am leichtesten
+    verlorengeht),
+  * ein Test, der den IM TEST umgelegten Schalter auf genau zwei Zeilenklassen
+    begrenzt — nie in der Voreinstellung umlegen.
+- Der Schalter ist eine benannte Konstante, KEIN Konfigurationswert: bei einem
+  Löschversprechen wäre „in Produktion anders als im Test" der schlimmste
+  denkbare Zustand.
 - Die Kaskade läuft über die Outbox (worker-outbox, ADR-0025): record() VOR dem
   Commit in derselben Transaktion.
 
@@ -94,14 +106,21 @@ schließe den Kreis. Lies ADR-0027, CLAUDE.md und docs/frontend.md.
 
 - Eine Seite, auf der eine Person die Löschung ihres Kontos verlangt. Deutsch,
   hartkodiert wie der Rest, `@workertransfer/ui`.
-- Der Text muss VOR dem Klick sagen, was gelöscht wird, was bleibt und warum
-  (Aufbewahrungspflichten), und dass es nicht sofort geht. Nicht in einer
-  Datenschutzerklärung — an der Stelle, wo gedrückt wird. Dieselbe Regel wie
-  beim Entwurfsdienst (ADR-0024).
+- Der Text muss VOR dem Klick sagen, was gelöscht wird und dass es nicht sofort
+  geht. Nicht in einer Datenschutzerklärung — an der Stelle, wo gedrückt wird
+  (dieselbe Regel wie beim Entwurfsdienst, ADR-0024). In der VOREINSTELLUNG
+  bleibt nichts stehen, also verspricht der Text auch keine Ausnahme; erst ein
+  umgelegter Aufbewahrungsschalter (ADR-0027 §3) bringt einen Zusatz.
+- Sag ehrlich, was das fürs Unternehmen heißt: löscht ein Mensch sein Konto,
+  verschwindet auch die Bewerbung, über die er eingestellt wurde.
 - Löschen ist unwiderruflich: eine bewusste Bestätigung, kein einzelner Klick.
   Aber auch kein Hürdenlauf — wer löschen will, darf das.
 - Eine E2E-Reise, die den ganzen Weg geht: verlangen → Kaskade läuft → die
   Daten sind weg → der Nachweis im Ledger steht noch.
+- Der letzte Admin legt sein Unternehmen stumm (ADR-0027 §7): die Anzeigen
+  werden zurückgezogen, aber diese Absicht zählt NICHT in den
+  Vollständigkeitsnachweis der Löschung — sonst hielte ein stiller jobs-service
+  die Löschung eines Menschen offen.
 - ROADMAP 10.5 von ⛔ auf ✅ und den Eintrag ehrlich schreiben: was gelöscht
   wird, was bleibt, und was noch offen ist.
 ```
@@ -118,3 +137,4 @@ schließe den Kreis. Lies ADR-0027, CLAUDE.md und docs/frontend.md.
   Wenn etwas rot ist, war es vorher grün.
 - **Die Hausregel, die am häufigsten gebrochen wurde:** nicht raten, messen.
   Eine Erklärung, die nicht überprüft wurde, ist keine Erklärung.
+
