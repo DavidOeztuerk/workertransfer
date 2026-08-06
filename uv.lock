@@ -38,7 +38,6 @@ members = [
     "worker-notifications",
     "worker-outbox",
     "worker-platform",
-    "worker-ratelimit",
     "worker-resilience",
     "worker-scheduler",
     "worker-shared",
@@ -3167,21 +3166,6 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.128.0,<1.0.0" },
     { name = "pydantic-settings", specifier = ">=2.12.0,<3.0.0" },
-]
-
-[[package]]
-name = "worker-ratelimit"
-version = "0.1.0"
-source = { editable = "packages/worker-ratelimit" }
-dependencies = [
-    { name = "pydantic" },
-    { name = "redis" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
-    { name = "redis", specifier = ">=5.0.0,<6.0.0" },
 ]
 
 [[package]]

@@ -46,7 +46,6 @@ worker-metrics = { workspace = true }
 worker-tracing = { workspace = true }
 worker-telemetry = { workspace = true }
 worker-validation = { workspace = true }
-worker-ratelimit = { workspace = true }
 worker-tenancy = { workspace = true }
 worker-resilience = { workspace = true }
 worker-storage = { workspace = true }

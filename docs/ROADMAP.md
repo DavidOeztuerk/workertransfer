@@ -20,7 +20,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 7 | AI Agent Plattform | ✅ | 7.1 (Naht + Candidate-Agent), 7.2 (Company-Agent: die eigene Anzeige). DoD erfüllt, mit zwei begründeten Abweichungen (plan-act-reflect, „Consents und Logs"). **Candidate Ranking** ist nach ADR-0022 dauerhaft ausgeschlossen; Skill Analyzer, Salary Recommendation und Team Analyzer sind in ihrer ÜBLICHEN Form ausgeschlossen, nicht als Idee |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ✅ | 9.1–9.3 (Outbox in allen drei Diensten, Suche geprüft, Kennzahlen). DoD erfüllt; `worker-messaging` und `worker-search` gelöscht (ADR-0025/0026) |
-| 10 | Frontend/Gateway/Infra/Hardening | ⬜ | UI, Gateway, K8s, OTel, Hardening |
+| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1 ✅ (Auth-Rand gebremst, `worker-ratelimit` gelöscht). Offen: Gateway, OTel, K8s/Helm, Hardening-Checkliste |
 
 ### Phase 0 — Status: ✅ erledigt
 - ✅ `docs/ULTRAPLAN.md` + `docs/ROADMAP.md`
@@ -870,6 +870,32 @@ weichen — `worker-messaging` (fünf Abhängigkeiten, null Konsumenten) und
   dieselbe Strenge wie bei `DraftContext`) und `403` ohne aktives Unternehmen.
   Bewusst nicht gebaut: Dashboards, Zeitreihen, Trichter-Auswertungen und
   **jede Form von Verhaltens-Tracking**.
+
+### Phase 10 — Status: 🟧 in Arbeit
+
+- ✅ **10.1 Der Auth-Rand ist gebremst; `worker-ratelimit` gelöscht** —
+  06.08.2026. Der ULTRAPLAN führt unter Phase 10 eine **Phase-2-Folge**: den
+  TODO-Marker in `build_auth_router` einlösen und `worker-ratelimit`
+  (Token-Bucket, Redis) an `/auth/login` und `/auth/refresh` anbinden, *bevor*
+  ein Gateway externen Verkehr zulässt.
+  **Eingelöst ist er, aber anders.** Beim Aufräumen dieser Woche entstand
+  `worker_platform.presentation.throttle` — ein gleitendes Fenster, in-process,
+  ohne Redis — und `identity-service` bremst damit fünf Endpunkte
+  (`/auth/login`, `/refresh`, `/register`, `/verify-email`,
+  `/resend-verification`). Die Bremse sitzt bewusst **weiter außen als die
+  Authentifizierung**: sonst würde bcbrypt gerechnet, bevor gebremst wird, und
+  die Bremse wäre selbst der teuerste Teil des Angriffs.
+  `worker-ratelimit` blieb damit 75 Zeilen mit Redis-Abhängigkeit und **null
+  Konsumenten** — der fünfte Fall nach `worker-files`, `worker-github`,
+  `worker-messaging` und `worker-search`. Gelöscht.
+  **Die Grenze, die dabei bleibt, und sie gehört hierher:** ein Zähler im
+  Prozess gilt nur für DIESEN Prozess. Läuft identity-service einmal, stimmt
+  die Rechnung; skaliert man auf drei Instanzen, hat jede ihr eigenes Fenster
+  und das effektive Limit verdreifacht sich. Das ist heute richtig — der Dienst
+  läuft einfach — und muss **neu entschieden werden, sobald das Gateway steht
+  oder mehr als eine Instanz läuft**. Dann ist ein geteilter Zähler (Redis) die
+  richtige Antwort, oder die Bremse gehört ins Gateway. Aufgeschrieben, damit
+  es nicht übersehen wird.
 
 ### Phase 7 — Status: ✅ erledigt (05.08.2026)
 
