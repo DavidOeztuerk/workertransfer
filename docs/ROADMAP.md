@@ -19,7 +19,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 6 | Developer Intelligence | ✅ | 6.1 (GitHub als Beleg), 6.2 (Passung im Browser), 6.3 (Vokabular) — Score, Ranking und Wechselwahrscheinlichkeit bewusst **nicht** gebaut (ADR-0022/0023) |
 | 7 | AI Agent Plattform | ✅ | 7.1 (Naht + Candidate-Agent), 7.2 (Company-Agent: die eigene Anzeige). DoD erfüllt, mit zwei begründeten Abweichungen (plan-act-reflect, „Consents und Logs"). **Candidate Ranking** ist nach ADR-0022 dauerhaft ausgeschlossen; Skill Analyzer, Salary Recommendation und Team Analyzer sind in ihrer ÜBLICHEN Form ausgeschlossen, nicht als Idee |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
-| 9 | Messaging/Notif./Search/Analytics | 🟧 | 9.1 ✅ (Outbox: die Benachrichtigung geht nicht mehr verloren; `worker-messaging` gelöscht, ADR-0025). Offen: 9.2 (übrige Dienste), Suche, Analytics |
+| 9 | Messaging/Notif./Search/Analytics | ✅ | 9.1–9.3 (Outbox in allen drei Diensten, Suche geprüft, Kennzahlen). DoD erfüllt; `worker-messaging` und `worker-search` gelöscht (ADR-0025/0026) |
 | 10 | Frontend/Gateway/Infra/Hardening | ⬜ | UI, Gateway, K8s, OTel, Hardening |
 
 ### Phase 0 — Status: ✅ erledigt
@@ -765,7 +765,16 @@ existieren könnte.
   — ein einzelner übersprungener Test ist eine Entscheidung, alle sind ein
   Ausfall.
 
-### Phase 9 — Status: 🟧 in Arbeit
+### Phase 9 — Status: ✅ erledigt (06.08.2026)
+
+Die DoD lautet: *„Cross-Service-Event fließt via Outbox, Notification geht raus,
+Suche findet, Analytics aggregiert datenschutzkonform. Tests
+(Testcontainers)."* — alle vier erfüllt. **Nicht** gebaut wurden die vier
+Dienste aus dem Inhaltsteil (`messaging-`, `notifications-`, `search-`,
+`analytics-service`): die DoD entscheidet, und was sie verlangt, gibt es
+bereits oder ist an der richtigen Stelle entstanden. Zwei Hüllen mussten dafür
+weichen — `worker-messaging` (fünf Abhängigkeiten, null Konsumenten) und
+`worker-search` (drei Suchmaschinen, null Konsumenten).
 
 - ✅ **9.1 Die Outbox: eine Benachrichtigung, die nicht verlorengeht** —
   05.08.2026. **ADR-0025.** `packages/worker-outbox` + `worker-platform`
@@ -813,9 +822,54 @@ existieren könnte.
   strenger: sie prüfen jetzt **zwei** Schritte statt einem — Absicht
   festgehalten, dann zugestellt. Der Zwischenzustand war vorher nicht prüfbar,
   weil es ihn nicht gab.
-  **Offen (9.2):** `applications-service` und `resume-service` benutzen
-  weiterhin den alten Weg; für sie kann eine Benachrichtigung bis dahin
-  verlorengehen.
+- ✅ **9.2 Die beiden übrigen Dienste ziehen nach** — 06.08.2026.
+  `applications-service` und `resume-service` benutzen denselben Weg wie
+  transfer-service: Tabelle an der eigenen `Base`, Migration, `record()` VOR
+  dem Commit, Zusteller am `background=`. Damit gibt es im System **keinen**
+  Pfad mehr, auf dem eine Benachrichtigung stillschweigend verlorengeht.
+  **Der eigentliche Befund war ein anderer:** beide Dienste hatten
+  **überhaupt keinen Test auf den Notifier**. Die Zusage „die Person wird
+  benachrichtigt" war dort nie geprüft — die Umstellung wäre also eine reine
+  Behauptung geblieben. Jetzt hat jeder einen Integrationstest mit kaputtem
+  Zusteller (Zeile bleibt liegen → Dienst wieder da → Zustellung), und für
+  `applications-service` ist er **gegenbewiesen**: ohne `record()` wird er rot.
+  Die zehn Zeilen `outbox_runner` sind je Dienst kopiert, nicht geteilt — ein
+  gemeinsames Paket wäre ein Kopplungspunkt über eine Dienstgrenze hinweg
+  (ADR-0003/0004), dieselbe Abwägung wie beim Consent- und Notify-Adapter.
+  Der `.env.example`-Wächter hat auch hier zugeschlagen und das fehlende
+  `WORKER_OUTBOX_INTERVAL_SECONDS` in **beiden** Dateien gefunden — zum dritten
+  Mal in dieser Woche ein eigener Fehler, den ein Wächter fing statt ich.
+
+- ✅ **9.3 Suche geprüft, Kennzahlen gebaut** — 06.08.2026. **ADR-0026.**
+  **Die Suche gab es schon.** `jobs-service` sucht über Titel, Beschreibung und
+  Ort, `profile-service` über Fähigkeiten und Ort — mit Tests und einer
+  E2E-Reise („die Suche findet nur, was freigegeben ist"). Daneben stand
+  `worker-search`: 223 Zeilen, **drei** Suchmaschinen (elasticsearch,
+  meilisearch, qdrant-client), **null Konsumenten** — zum vierten Mal dasselbe
+  Muster. Gelöscht; sechs Abhängigkeiten weniger.
+  **Die Kennzahlen sind die eigentliche Entscheidung.** Der naheliegende Reflex
+  wäre k-Anonymität gewesen — Zahlen erst ab einer Mindestgröße. Für diesen
+  Fall ist das aber das falsche Werkzeug: ein Unternehmen sieht seine
+  Bewerbungen ohnehin **einzeln**. Eine Schwelle auf der Summe verdeckte etwas,
+  das daneben im Klartext steht — Theater, das vom eigentlichen Punkt ablenkt.
+  Die Grenze liegt **nicht bei der Aggregation, sondern bei der
+  Zusammenführung**: zulässig ist eine Zahl, die keine Auskunft erzeugt, die
+  der Fragende nicht ohnehin hat. „12 Bewerbungen, davon 3 abgelehnt" auf die
+  eigenen Stellen ist Bequemlichkeit. „Ihre Bewerber haben sich bei 7 anderen
+  Firmen beworben" oder „60 % suchen aktiv" wäre eine Aussage über Menschen aus
+  Quellen, die einzeln freigegeben wurden — und keine Aggregation macht das
+  wieder gut.
+  Gebaut als `GET /companies/me/application-stats` **dort, wo die Daten liegen**,
+  nicht als eigener `analytics-service`: der müsste Vorgänge kopieren oder
+  dienstübergreifend lesen, gegen ADR-0004, und schüfe einen zweiten Ort, an
+  dem personenbezogene Daten liegen und gelöscht werden müssten — für eine
+  Zahl, die ein `GROUP BY` beantwortet. Gezählt wird in der Datenbank; die
+  Zeilen werden gar nicht geladen.
+  Drei Tests: die Abgrenzung (ein fremdes Unternehmen sieht seine eigene leere
+  Zahl), die **Feldmenge der Antwort** (`by_status`, `total` — sonst nichts,
+  dieselbe Strenge wie bei `DraftContext`) und `403` ohne aktives Unternehmen.
+  Bewusst nicht gebaut: Dashboards, Zeitreihen, Trichter-Auswertungen und
+  **jede Form von Verhaltens-Tracking**.
 
 ### Phase 7 — Status: ✅ erledigt (05.08.2026)
 

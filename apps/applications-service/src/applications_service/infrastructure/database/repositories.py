@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from applications_service.domain.application import (
@@ -93,3 +93,17 @@ class SqlAlchemyApplicationRepository:
             .order_by(ApplicationModel.created_at.desc())
         )
         return [_to_domain(row) for row in (await self._session.execute(stmt)).scalars()]
+
+    async def count_by_status(self, tenant_id: UUID) -> dict[str, int]:
+        """Zählt die EIGENEN Bewerbungen je Status (ADR-0026).
+
+        `GROUP BY` in der Datenbank statt Laden und Zählen in Python: die Liste
+        könnte groß werden, und sie ganz zu holen, nur um sie zu zählen, hieße
+        personenbezogene Zeilen ohne Not durch den Dienst zu tragen.
+        """
+        rows = await self._session.execute(
+            select(ApplicationModel.status, func.count())
+            .where(ApplicationModel.tenant_id == tenant_id)
+            .group_by(ApplicationModel.status)
+        )
+        return {status: count for status, count in rows.all()}

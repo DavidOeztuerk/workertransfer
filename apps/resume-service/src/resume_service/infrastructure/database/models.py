@@ -10,10 +10,16 @@ from sqlalchemy import DateTime, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
+from worker_outbox import build_outbox_table
 
 from resume_service.infrastructure.database.base import Base
 
-__all__ = ["ResumeModel", "ResumeRequestModel"]
+__all__ = ["OUTBOX", "ResumeModel", "ResumeRequestModel"]
+
+#: Die Outbox — an DIESE `Base`, damit sie in DIESEN Migrationen auftaucht.
+#: Es gibt keine gemeinsame Datenbank, also auch keine gemeinsame Outbox
+#: (ADR-0004/0025).
+OUTBOX = build_outbox_table(Base)
 
 
 class ResumeModel(Base):

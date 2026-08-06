@@ -50,7 +50,6 @@ worker-ratelimit = { workspace = true }
 worker-tenancy = { workspace = true }
 worker-resilience = { workspace = true }
 worker-storage = { workspace = true }
-worker-search = { workspace = true }
 worker-skills = { workspace = true }
 worker-outbox = { workspace = true }
 worker-contracts = { workspace = true }
@@ -110,9 +109,6 @@ exclude = ["tests", "apps/.*/migrations"]
 module = [
   "apscheduler.*",
   "redis.*",
-  "elasticsearch.*",
-  "meilisearch.*",
-  "qdrant_client.*",
   "boto3.*",
   "casbin.*",
   "casbin_sqlalchemy_adapter.*",
@@ -120,7 +116,6 @@ module = [
   "weasyprint.*",
   "pdfplumber.*",
   "docx.*",
-  "meilisearch_sdk.*",
   "magic.*",
   "bs4.*",
 ]

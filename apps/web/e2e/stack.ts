@@ -53,6 +53,20 @@ let stackIsUp = false;
 const PROBE_TIMEOUT_MS = 10_000;
 const PROBE_ATTEMPTS = 3;
 
+//: Wie lange auf eine Mail gewartet wird.
+//:
+//: Seit ADR-0025 geht eine Benachrichtigung NICHT mehr synchron im Request
+//: raus, sondern über die Outbox: Zeile schreiben → Zusteller (Takt 5 s) →
+//: HTTP an identity-service → SMTP. Die Zusage lautet seither „innerhalb des
+//: Taktes", nicht „sofort" — und 20 Sekunden waren dafür zu knapp bemessen.
+//: Unter Last ist genau das passiert: der Lauf brauchte statt 4,6 ganze 48,6
+//: Minuten, und die Reise fiel um, obwohl die Mail nur später kam.
+//:
+//: Die Reisen prüfen „die Mail kommt an", nicht „die Mail kommt in 20 Sekunden
+//: an". Ein zu knapper Zeitrahmen macht daraus eine Aussage über die
+//: Geschwindigkeit der Maschine.
+const MAIL_TIMEOUT_MS = 60_000;
+
 async function reachable(url: string): Promise<boolean> {
   for (let attempt = 1; attempt <= PROBE_ATTEMPTS; attempt += 1) {
     try {
@@ -147,7 +161,7 @@ async function tokenFromMail(
   linkPath: string
 ): Promise<string> {
   const pattern = new RegExp(`${linkPath}\\?token=([A-Za-z0-9_-]+)`);
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + MAIL_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const list = (await (await fetch(`${MAILPIT_URL}/api/v1/messages?limit=50`)).json()) as {
       messages?: MailpitMessage[];
@@ -184,6 +198,7 @@ interface MailpitDetail {
   Subject?: string;
 }
 
+
 /**
  * Die zuletzt an `address` zugestellte Mail — ohne Filter auf den Betreff.
  *
@@ -195,7 +210,7 @@ export async function lastMailFor(
   address: string,
   { after = 0 }: { after?: number } = {}
 ): Promise<{ subject: string; text: string } | null> {
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + MAIL_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const list = (await (await fetch(`${MAILPIT_URL}/api/v1/messages?limit=50`)).json()) as {
       messages?: (MailpitMessage & { Created?: string })[];

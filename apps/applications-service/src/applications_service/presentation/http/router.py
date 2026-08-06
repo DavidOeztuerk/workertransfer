@@ -7,7 +7,6 @@ und dort greift der Consent-Ledger.
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 from uuid import UUID
 
@@ -18,6 +17,7 @@ from applications_service.application.handlers import (
     SubmitApplicationCommand,
     WithdrawApplicationCommand,
     handle_advance,
+    handle_company_stats,
     handle_list_for_job,
     handle_list_mine,
     handle_submit,
@@ -25,11 +25,18 @@ from applications_service.application.handlers import (
 )
 from applications_service.domain.application import Application, NotYours, TransitionNotAllowed
 from applications_service.infrastructure.consent import ConsentUnavailable
+from applications_service.infrastructure.database.models import OUTBOX
 from applications_service.infrastructure.jobs import JobsUnavailable
 from fastapi import APIRouter, HTTPException, Request, status
 from worker_auth import get_request_user, resolve_token
-from worker_contracts import AdvanceApplicationV1, ApplicationV1, SubmitApplicationV1
+from worker_contracts import (
+    AdvanceApplicationV1,
+    ApplicationStatsV1,
+    ApplicationV1,
+    SubmitApplicationV1,
+)
 from worker_core import DomainError
+from worker_outbox import record
 
 __all__ = ["build_router"]
 
@@ -67,22 +74,14 @@ def _to_http(error: Any) -> HTTPException:
     return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, message)
 
 
-async def _notify(deps: dict[str, Any], user_id: UUID, kind: str) -> None:
-    """Benachrichtigen darf nichts kippen — und das steht HIER, nicht nur im Adapter.
-
-    Der HTTP-Adapter schluckt seine Fehler bereits. Sich darauf zu verlassen
-    hieße, die Zusage an der Wahl der Implementierung aufzuhängen: ein anderer
-    Adapter, ein Tippfehler in den Einstellungen, ein Fake im Test — und ein
-    Vorgang scheitert, weil eine Mail nicht rausging. Ein Integrationstest mit
-    einem absichtlich kaputten Notifier hat genau das gezeigt.
-    """
-    try:
-        await deps["notify"].notify(user_id, kind)
-    except Exception:
-        _logger.warning("Benachrichtigung konnte nicht abgesetzt werden", exc_info=True)
-
-
-_logger = logging.getLogger("workertransfer.applications.notify")
+# `_notify` ist weg (ADR-0025).
+#
+# Vorher stand hier ein Helfer, der nach dem Commit einen HTTP-Notifier rief und
+# JEDEN Fehler schluckte. Die Begründung war richtig — eine misslungene Mail darf
+# einen Vorgang nicht kippen — aber der Preis war, dass die Mail dann für immer
+# weg war. Die Zusage gilt unverändert, sie wird nur anders eingelöst: die
+# Absicht geht VOR dem Commit in dieselbe Transaktion, ein Zusteller im
+# Hintergrund darf danach beliebig oft scheitern.
 
 
 def build_router(deps: dict[str, Any]) -> APIRouter:
@@ -172,6 +171,27 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             await uow.commit()
             return _dto(result.value)
 
+    @router.get("/companies/me/application-stats")
+    async def company_stats(request: Request) -> ApplicationStatsV1:
+        """Zahlen über die eigenen Bewerbungen — und über sonst nichts.
+
+        Die DoD von Phase 9 verlangt „Analytics aggregiert datenschutzkonform".
+        Datenschutzkonform heißt hier nicht „anonymisiert", sondern: **es kommt
+        keine Auskunft heraus, die der Fragende nicht ohnehin hat.** Das
+        Unternehmen sieht seine Bewerbungen einzeln in der Liste; die Summe
+        darüber ist eine Bequemlichkeit, keine neue Information.
+
+        Die Grenze verläuft nicht bei der Aggregation, sondern bei der
+        **Zusammenführung**: eine Zahl, die Bewerbungen mit Marktstatus,
+        Lebenslauf oder Vorgängen bei anderen Firmen verrechnet, wäre eine
+        Aussage über Menschen aus Quellen, die einzeln freigegeben wurden. So
+        etwas gibt es hier nicht und soll es nicht geben (ADR-0022/0026).
+        """
+        tenant_id = _company(request)
+        async with request_scope(session_factory) as (_uow, repos):
+            by_status = await handle_company_stats(tenant_id, repos=repos)
+        return ApplicationStatsV1(by_status=by_status, total=sum(by_status.values()))
+
     @router.get("/jobs/{job_id}/applications")
     async def for_job(job_id: UUID, request: Request) -> list[ApplicationV1]:
         tenant_id = _company(request)
@@ -190,11 +210,14 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
             result = await handle_advance(command, deps=deps, repos=repos)
             if not result.is_success:
                 raise _to_http(result.error)
-            await uow.commit()
             application = result.value
-        # Nur der Zug des Unternehmens wird gemeldet — der Rückzug durch die
-        # Person nicht: sie weiß, was sie getan hat.
-        await _notify(deps, application.subject_id, "application_update")
+            # Nur der Zug des Unternehmens wird gemeldet — der Rückzug durch
+            # die Person nicht: sie weiß, was sie getan hat.
+            # VOR dem Commit, in DERSELBEN Transaktion (ADR-0025).
+            await record(
+                uow.session, OUTBOX, user_id=application.subject_id, kind="application_update"
+            )
+            await uow.commit()
         return _dto(application)
 
     return router

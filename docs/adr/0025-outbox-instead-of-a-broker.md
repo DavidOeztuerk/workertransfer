@@ -3,7 +3,8 @@
 - **Status:** angenommen
 - **Datum:** 2026-08-05
 - **Betrifft:** `packages/worker-outbox` (neu), `packages/worker-messaging` (gelöscht),
-  `worker-platform` (`background=`), `apps/transfer-service` (erster Konsument)
+  `worker-platform` (`background=`), `apps/transfer-service` (erster Konsument),
+  seit 9.2 auch `apps/applications-service` und `apps/resume-service`
 - **Verwandt:** ADR-0004 (keine gemeinsame Datenbank), ADR-0021 / ADR-0022 / ADR-0024
   (dieselbe Aufräumregel, dreimal vorher angewandt)
 
@@ -87,14 +88,31 @@ Zustand, den diese Tabelle abschafft.
   (`WORKER_OUTBOX_INTERVAL_SECONDS`, Voreinstellung 5 s). Für eine E-Mail
   belanglos; für etwas, das sofort sein muss, wäre die Outbox das falsche
   Werkzeug.
+  **Das ist keine Theorie geblieben.** Eine E2E-Reise wartete 20 Sekunden auf
+  die Mail — bemessen für den alten, synchronen Versand. Unter Last (ein Lauf
+  brauchte statt 4,6 ganze 48,6 Minuten) fiel sie um, obwohl die Mail nur
+  später kam. Der Zeitrahmen steht jetzt auf 60 Sekunden und heißt
+  `MAIL_TIMEOUT_MS`, mit dem Grund daneben: die Reisen prüfen „die Mail kommt
+  an", nicht „die Mail kommt in 20 Sekunden an". Wer die Plattform von Hand
+  testet, sollte dasselbe wissen — eine Benachrichtigung kann bis zu einen Takt
+  auf sich warten lassen.
 - Tests, die den Notifier synchron beobachteten, prüfen jetzt zwei Schritte:
   Absicht festgehalten, dann zugestellt. Das ist strenger als vorher — der
   Zwischenzustand war früher nicht prüfbar, weil es ihn nicht gab.
 - Fünf Abhängigkeiten weniger im Workspace (aio-pika, aiokafka, nats-py,
   msgspec, pamqp).
-- **Offen:** `applications-service` und `resume-service` benutzen weiterhin den
-  alten Weg. Sie ziehen in 9.2 nach; bis dahin gilt für sie unverändert, dass
-  eine Benachrichtigung verlorengehen kann.
+- **Nachgezogen in 9.2 (06.08.2026):** `applications-service` und
+  `resume-service` benutzen denselben Weg. Damit gibt es im System **keinen**
+  Pfad mehr, auf dem eine Benachrichtigung stillschweigend verlorengeht.
+  Dabei kam heraus, dass beide Dienste **überhaupt keinen Test auf den
+  Notifier** hatten — die Zusage „die Person wird benachrichtigt" war dort nie
+  geprüft, weder vorher noch nachher. Jetzt hat jeder einen Integrationstest
+  mit kaputtem Zusteller, und für `applications-service` ist er gegenbewiesen:
+  ohne `record()` wird er rot.
+  Die zehn Zeilen Verdrahtung (`outbox_runner`) sind je Dienst **kopiert**, nicht
+  geteilt. Ein gemeinsames Paket dafür wäre ein Kopplungspunkt über eine
+  Dienstgrenze hinweg, und der Preis wäre höher als der der Kopie
+  (ADR-0003/0004) — dieselbe Abwägung wie beim Consent- und Notify-Adapter.
 - Sollte je ein Anwendungsfall echtes Broker-Verhalten brauchen (Fan-out an
   viele Abnehmer, Themen, Rückstau über Stunden), ist diese Entscheidung neu zu
   treffen. Sie hält fest, dass es diesen Fall **heute nicht gibt** — nicht,

@@ -25,6 +25,10 @@ class ApplicationsServiceSettings(PlatformSettings):
     identity_base_url: str = "http://127.0.0.1:8001"
     # Leer heißt: es wird nicht benachrichtigt. Kein stiller Ausfall —
     # der Endpunkt wäre ohne Geheimnis ohnehin zu.
+    # Wie oft der Outbox-Zusteller nachsieht (ADR-0025). Sekunden, nicht
+    # Millisekunden: eine Benachrichtigung ist keine Echtzeitsache.
+    outbox_interval_seconds: float = 5.0
+
     notify_secret: SecretStr = SecretStr("")
 
     # Wo der Jobs-Service erreichbar ist: eine Bewerbung braucht die Stelle,
