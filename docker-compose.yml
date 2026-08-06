@@ -574,6 +574,39 @@ services:
       - /app/apps/web/node_modules
       - /app/packages/ui/node_modules
 
+  # --- Gateway ---------------------------------------------------------------
+  # Ein Eingang für alles: http://localhost:8080 spricht dieselben Pfade wie die
+  # Einzelports, nur ohne dass jemand wissen muss, welcher Dienst welchen
+  # bedient. Die Einzelports bleiben offen — E2E und Fehlersuche greifen direkt
+  # zu, und ein Gateway, das man zum Debuggen umgehen kann, wird auch benutzt.
+  #
+  # KEINE Businesslogik hier (ULTRAPLAN Phase 10): Traefik routet, prüft aber
+  # keine Rechte. Die Authentifizierung bleibt in den Diensten, wo sie den
+  # Kontext hat — ein Gateway, das Rechte kennt, ist ein zweiter Ort, an dem
+  # sie falsch sein können.
+  gateway:
+    image: traefik:v3.3
+    container_name: workertransfer-gateway
+    restart: unless-stopped
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "8080:80"
+      # Dashboard: zeigt, welche Regel gewonnen hat. Lokal unverzichtbar,
+      # sobald sich zwei Pfade überschneiden — und das tun sie hier.
+      - "8081:8080"
+    volumes:
+      - ./docker/traefik:/etc/traefik:ro
+    depends_on:
+      identity-service:
+        condition: service_healthy
+      jobs-service:
+        condition: service_healthy
+      applications-service:
+        condition: service_healthy
+      companies-service:
+        condition: service_healthy
+
 volumes:
   portfolio-attachments:
   postgres-data:

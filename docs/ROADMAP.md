@@ -20,7 +20,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 7 | AI Agent Plattform | ✅ | 7.1 (Naht + Candidate-Agent), 7.2 (Company-Agent: die eigene Anzeige). DoD erfüllt, mit zwei begründeten Abweichungen (plan-act-reflect, „Consents und Logs"). **Candidate Ranking** ist nach ADR-0022 dauerhaft ausgeschlossen; Skill Analyzer, Salary Recommendation und Team Analyzer sind in ihrer ÜBLICHEN Form ausgeschlossen, nicht als Idee |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ✅ | 9.1–9.3 (Outbox in allen drei Diensten, Suche geprüft, Kennzahlen). DoD erfüllt; `worker-messaging` und `worker-search` gelöscht (ADR-0025/0026) |
-| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1 ✅ (Auth-Rand gebremst, `worker-ratelimit` gelöscht). Offen: Gateway, OTel, K8s/Helm, Hardening-Checkliste |
+| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1 ✅ (Auth-Rand gebremst), 10.2 ✅ (Gateway routet). Offen: OTel, K8s/Helm, Hardening-Checkliste |
 
 ### Phase 0 — Status: ✅ erledigt
 - ✅ `docs/ULTRAPLAN.md` + `docs/ROADMAP.md`
@@ -872,6 +872,32 @@ weichen — `worker-messaging` (fünf Abhängigkeiten, null Konsumenten) und
   **jede Form von Verhaltens-Tracking**.
 
 ### Phase 10 — Status: 🟧 in Arbeit
+
+- ✅ **10.2 Das Gateway routet** — 06.08.2026. Traefik im Compose,
+  `http://localhost:8080` spricht dieselben Pfade wie die Einzelports.
+  **Der Inhalt der Arbeit war nicht das Aufsetzen, sondern ein Befund: die
+  Pfade der Dienste sind NICHT disjunkt.** `/companies/{id}/members` gehört
+  identity-service, `/companies/{id}/profile` gehört companies-service — sie
+  unterscheiden sich erst im letzten Segment. `/companies/me/jobs` gehört
+  jobs-service, `/companies/me/application-stats` applications-service,
+  `/jobs/{id}/applications` wieder applications, `/jobs/{id}` aber jobs.
+  Präfix-Routing allein reicht dafür nicht; die genaueren Regeln tragen eine
+  höhere `priority`, statt sich auf Traefiks Sortierung nach Regel-Länge zu
+  verlassen — darauf sollte niemand angewiesen sein, der eine Route ergänzt.
+  Belegt statt behauptet: `/companies/me/jobs` liefert über das Gateway
+  **dieselbe** Antwort wie jobs-service direkt (RFC-9457-Problem), während
+  identity-service auf demselben Pfad `{"detail":"Not Found"}` sagt. Ein 401
+  allein hätte nichts bewiesen — beide antworten mit 401.
+  **Konfiguration als Datei, nicht als Compose-Labels** (`docker/traefik/`):
+  genau diese `dynamic.yml` geht nach Staging und Produktion und bekommt dort
+  andere Hosts und TLS. Labels lägen verstreut in einer `docker-compose.yml`,
+  die es dort nicht gibt.
+  **Keine Businesslogik im Gateway** (ULTRAPLAN Phase 10): Traefik routet,
+  prüft aber keine Rechte. Die Authentifizierung bleibt in den Diensten, wo sie
+  den Kontext hat — ein Gateway, das Rechte kennt, wäre ein zweiter Ort, an dem
+  sie falsch sein können. Die Einzelports bleiben offen: E2E und Fehlersuche
+  greifen direkt zu, und ein Gateway, das man zum Debuggen umgehen kann, wird
+  auch benutzt.
 
 - ✅ **10.1 Der Auth-Rand ist gebremst; `worker-ratelimit` gelöscht** —
   06.08.2026. Der ULTRAPLAN führt unter Phase 10 eine **Phase-2-Folge**: den
