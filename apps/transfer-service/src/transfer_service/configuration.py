@@ -32,6 +32,15 @@ class TransferServiceSettings(PlatformSettings):
 
     notify_secret: SecretStr = SecretStr("")
 
+    # Gemeinsames Geheimnis für `POST /internal/erasure` (ADR-0027 §4.4).
+    # **Ausdrücklich ein anderes als `notify_secret`**: „darf eine Mail
+    # anstoßen" und „darf alles über einen Menschen löschen" dürfen nicht
+    # dasselbe Papier sein.
+    #
+    # Leer heißt: der Endpunkt ist zu. Bis es echte Dienstidentitäten gibt, ist
+    # das die Zwischenlösung — und die Voreinstellung schließt.
+    erasure_secret: SecretStr = SecretStr("")
+
     # HS256 secret issued by identity-service; this service only verifies
     # (ADR-0007). Runtime-only — never commit a real value.
     jwt_secret: SecretStr = SecretStr(DEV_JWT_SECRET)

@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from jobs_service.configuration import JobsServiceSettings
 from jobs_service.infrastructure.compose import compose_infrastructure
 from jobs_service.presentation.http.router import build_router
+from jobs_service.presentation.http.withdrawal_router import build_withdrawal_router
 from sqlalchemy.ext.asyncio import create_async_engine
 from worker_auth import JwtAuthMiddleware, TokenManager
 from worker_platform.presentation.app import create_api_app
@@ -34,7 +35,7 @@ def build_app(settings: JobsServiceSettings) -> FastAPI:
         tenant_resolver=ClaimTenantResolver(),
         auth_middleware=JwtAuthMiddleware,
         auth_middleware_kwargs={"verify": verify_access_token},
-        routers=(build_router(deps),),
+        routers=(build_router(deps), build_withdrawal_router(deps)),
     )
 
 

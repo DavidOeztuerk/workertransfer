@@ -22,8 +22,9 @@ from worker_platform.presentation.throttle import Limit
 from worker_tenancy import ClaimTenantResolver
 
 from identity_service.configuration import IdentityServiceSettings
-from identity_service.infrastructure.compose import compose_infrastructure
+from identity_service.infrastructure.compose import compose_infrastructure, erasure_runner
 from identity_service.presentation.auth_middleware import AuthMiddleware
+from identity_service.presentation.http.account_router import build_account_router
 from identity_service.presentation.http.company_router import build_company_router
 from identity_service.presentation.http.me_router import build_me_router
 from identity_service.presentation.http.notification_router import build_notification_router
@@ -92,7 +93,12 @@ def build_app(settings: IdentityServiceSettings) -> FastAPI:
             build_me_router(deps),
             build_company_router(deps),
             build_notification_router(deps),
+            build_account_router(deps),
         ),
+        # Der Löschzusteller läuft im Dienst mit (ADR-0025/0027). Ohne
+        # Versuchsobergrenze und mit wachsendem Abstand — eine Löschung darf
+        # nicht aufgeben, und ein toter Empfänger darf kein Dauerfeuer werden.
+        background=(erasure_runner(deps, settings),),
     )
 
 

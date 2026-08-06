@@ -21,6 +21,7 @@ dependencies = [
   "worker-tenancy",
   "worker-config",
   "worker-contracts",
+  "worker-outbox",
 ]
 
 [project.scripts]

@@ -104,6 +104,18 @@ Stack laufen lassen, das erzeugt Wackler, die wie echte Fehler aussehen.
 Die Löschung ist im Backend umgesetzt (ADR-0027). Baue die Oberfläche und
 schließe den Kreis. Lies ADR-0027, CLAUDE.md und docs/frontend.md.
 
+Was in Prompt 2 entstanden ist und du NICHT raten sollst:
+- Der Endpunkt heißt `POST /account/erasure` (identity-service). Nur für sich
+  selbst, und ausdrücklich OHNE Begründungsfeld — von einem Menschen, der sein
+  Konto löschen will, eine Begründung zu verlangen, wäre ein Hebel gegen ihn.
+- Er widerruft sofort jede Sitzung und sperrt das Konto; die eigentliche
+  Löschung läuft danach über die Outbox (neun Absichten, erzwungene
+  Reihenfolge). Die Oberfläche muss also mit „abgemeldet, Löschung läuft"
+  umgehen, nicht mit einer Antwort „fertig".
+- `POST /consent/delete` ist ZURÜCKGEZOGEN. Verweise nirgends darauf.
+- Die Antwort meldet `retained` zurück. In der Voreinstellung ist die Liste
+  leer — der Text darf keine Ausnahme versprechen, die es nicht gibt.
+
 - Eine Seite, auf der eine Person die Löschung ihres Kontos verlangt. Deutsch,
   hartkodiert wie der Rest, `@workertransfer/ui`.
 - Der Text muss VOR dem Klick sagen, was gelöscht wird und dass es nicht sofort

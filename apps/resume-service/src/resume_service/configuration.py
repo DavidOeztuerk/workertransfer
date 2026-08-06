@@ -36,6 +36,15 @@ class ResumeServiceSettings(PlatformSettings):
 
     notify_secret: SecretStr = SecretStr("")
 
+    # Gemeinsames Geheimnis für `POST /internal/erasure` (ADR-0027 §4.4).
+    # **Ausdrücklich ein anderes als `notify_secret`**: „darf eine Mail
+    # anstoßen" und „darf alles über einen Menschen löschen" dürfen nicht
+    # dasselbe Papier sein.
+    #
+    # Leer heißt: der Endpunkt ist zu. Bis es echte Dienstidentitäten gibt, ist
+    # das die Zwischenlösung — und die Voreinstellung schließt.
+    erasure_secret: SecretStr = SecretStr("")
+
     @model_validator(mode="after")
     def _reject_development_jwt_secret(self) -> Self:
         assert_deployable_jwt_secret(

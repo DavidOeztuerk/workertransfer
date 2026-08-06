@@ -47,15 +47,26 @@ class TestConstruction:
                 recorded_at=NOW,
             )
 
-    def test_delete_requires_a_reason(self) -> None:
-        with pytest.raises(ReasonRequired):
-            ConsentEvent(
-                event_id=ConsentEventId(uuid4()),
-                subject_id=_subject(),
-                capability=_capability(),
-                action=ConsentAction.DELETE,
-                recorded_at=NOW,
-            )
+    def test_delete_does_not_require_a_reason(self) -> None:
+        """Die Umkehrung, und sie ist Absicht (ADR-0027 §1).
+
+        Seit die Kontolöschung der einzige Erzeuger von `DELETE` ist, hieße
+        „Grund verpflichtend", von einem Menschen, der sein Konto löschen will,
+        eine Begründung zu verlangen — ein Hebel gegen ihn. Der Freitext wäre
+        außerdem ausgerechnet das Einzige, das §5 danach wieder entfernen
+        müsste.
+
+        Für `REVOKE` bleibt es dabei: ein Widerruf muss erklärbar sein.
+        """
+        event = ConsentEvent(
+            event_id=ConsentEventId(uuid4()),
+            subject_id=_subject(),
+            capability=_capability(),
+            action=ConsentAction.DELETE,
+            recorded_at=NOW,
+        )
+
+        assert event.reason is None
 
     def test_revoke_and_delete_carry_their_reason(self) -> None:
         reason = Reason("subject withdrew consent")

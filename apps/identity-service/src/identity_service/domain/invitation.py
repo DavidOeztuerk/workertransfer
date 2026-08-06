@@ -84,7 +84,9 @@ class Invitation:
     tenant_id: UUID
     email: Email
     role: MembershipRole
-    invited_by: UUID
+    #: `None`, wenn die einladende Person ihr Konto gelöscht hat (ADR-0027 §2).
+    #: Die Einladung gehört dem Unternehmen und bleibt gültig.
+    invited_by: UUID | None
     status: InvitationStatus
     created_at: datetime
     expires_at: datetime

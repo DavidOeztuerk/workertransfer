@@ -29,6 +29,15 @@ class ProfileServiceSettings(PlatformSettings):
     # nicht localhost — der Aufruf läuft container-zu-container.
     consent_base_url: str = "http://127.0.0.1:8002"
 
+    # Gemeinsames Geheimnis für `POST /internal/erasure` (ADR-0027 §4.4).
+    # **Ausdrücklich ein anderes als `notify_secret`**: „darf eine Mail
+    # anstoßen" und „darf alles über einen Menschen löschen" dürfen nicht
+    # dasselbe Papier sein.
+    #
+    # Leer heißt: der Endpunkt ist zu. Bis es echte Dienstidentitäten gibt, ist
+    # das die Zwischenlösung — und die Voreinstellung schließt.
+    erasure_secret: SecretStr = SecretStr("")
+
     # Der Entwurfsdienst. **Leer heißt: die Funktion ist aus** — nicht „offen
     # für alle", nicht „nimm einen Standardschlüssel". Ohne Schlüssel ruft der
     # Dienst keinen fremden Anbieter an, und die Oberfläche sagt das (ADR-0024).

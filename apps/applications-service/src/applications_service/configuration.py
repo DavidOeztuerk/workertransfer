@@ -31,6 +31,15 @@ class ApplicationsServiceSettings(PlatformSettings):
 
     notify_secret: SecretStr = SecretStr("")
 
+    # Gemeinsames Geheimnis für `POST /internal/erasure` (ADR-0027 §4.4).
+    # **Ausdrücklich ein anderes als `notify_secret`**: „darf eine Mail
+    # anstoßen" und „darf alles über einen Menschen löschen" dürfen nicht
+    # dasselbe Papier sein.
+    #
+    # Leer heißt: der Endpunkt ist zu. Bis es echte Dienstidentitäten gibt, ist
+    # das die Zwischenlösung — und die Voreinstellung schließt.
+    erasure_secret: SecretStr = SecretStr("")
+
     # Wo der Jobs-Service erreichbar ist: eine Bewerbung braucht die Stelle,
     # und die lebt in einer anderen Datenbank (ADR-0004).
     jobs_base_url: str = "http://127.0.0.1:8006"

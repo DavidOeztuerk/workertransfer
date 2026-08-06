@@ -66,6 +66,11 @@ x-service-env: &service-env
   # die Dienste kennen es, ein Browser nicht. Zwischenlösung bis zu echten
   # Dienstidentitäten (Härtung, Phase 10). LEER heißt: der Endpunkt ist zu.
   WORKER_NOTIFY_SECRET: ${WORKER_NOTIFY_SECRET:-local-notify-secret}
+  # Gemeinsames Geheimnis für die Löschkaskade, POST /internal/erasure
+  # (ADR-0027 §4.4). AUSDRÜCKLICH EIN ANDERES als WORKER_NOTIFY_SECRET: „darf
+  # eine Mail anstoßen" und „darf alles über einen Menschen löschen" dürfen
+  # nicht dasselbe Papier sein. LEER hieße: der Endpunkt ist zu.
+  WORKER_ERASURE_SECRET: ${WORKER_ERASURE_SECRET:-local-erasure-secret}
   # The base for confirmation links — must be what the BROWSER can reach, not a
   # compose service name.
   WORKER_PUBLIC_WEB_URL: ${WORKER_PUBLIC_WEB_URL:-http://localhost:5173}
@@ -123,6 +128,17 @@ services:
       <<: *service-env
       WORKER_PORT: "8001"
       WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/identity
+      # Wohin die Löschbefehle gehen (ADR-0027 §4). jobs-service steht dabei,
+      # ist aber KEIN Empfänger der Kaskade — er bekommt nur die Absicht aus
+      # §7, wenn ein Unternehmen ohne Administrator zurückbleibt.
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      WORKER_PROFILE_BASE_URL: http://profile-service:8003
+      WORKER_RESUME_BASE_URL: http://resume-service:8004
+      WORKER_PORTFOLIO_BASE_URL: http://portfolio-service:8005
+      WORKER_JOBS_BASE_URL: http://jobs-service:8006
+      WORKER_APPLICATIONS_BASE_URL: http://applications-service:8007
+      WORKER_TRANSFER_BASE_URL: http://transfer-service:8009
+      WORKER_GITHUB_BASE_URL: http://github-service:8010
     ports:
       - "8001:8001"
     command:

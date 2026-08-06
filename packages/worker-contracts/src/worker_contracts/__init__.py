@@ -16,6 +16,11 @@ from worker_contracts.consent import (
     ConsentRevokeV1,
     ConsentStateV1,
 )
+from worker_contracts.erasure import (
+    CompanyWithdrawalV1,
+    ErasureResultV1,
+    ErasureV1,
+)
 from worker_contracts.github import (
     ConnectGitHubV1,
     GitHubConnectionV1,
@@ -82,6 +87,7 @@ __all__ = [
     "CompanyMemberV1",
     "CompanyProfileV1",
     "CompanyV1",
+    "CompanyWithdrawalV1",
     "ConnectGitHubV1",
     "ConsentCheckResultV1",
     "ConsentCheckV1",
@@ -94,6 +100,8 @@ __all__ = [
     "DraftJobTextV1",
     "DraftProfileTextV1",
     "EducationV1",
+    "ErasureResultV1",
+    "ErasureV1",
     "Event",
     "ExpressInterestV1",
     "GitHubConnectionV1",
