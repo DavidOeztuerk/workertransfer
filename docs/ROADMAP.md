@@ -20,7 +20,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 7 | AI Agent Plattform | ✅ | 7.1 (Naht + Candidate-Agent), 7.2 (Company-Agent: die eigene Anzeige). DoD erfüllt, mit zwei begründeten Abweichungen (plan-act-reflect, „Consents und Logs"). **Candidate Ranking** ist nach ADR-0022 dauerhaft ausgeschlossen; Skill Analyzer, Salary Recommendation und Team Analyzer sind in ihrer ÜBLICHEN Form ausgeschlossen, nicht als Idee |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ✅ | 9.1–9.3 (Outbox in allen drei Diensten, Suche geprüft, Kennzahlen). DoD erfüllt; `worker-messaging` und `worker-search` gelöscht (ADR-0025/0026) |
-| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1–10.4 ✅ (Auth-Rand, Gateway, OTel, Dependency-Scanning). Offen: K8s/Helm, Kontolöschung (Art. 17), starlette-CVEs |
+| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1–10.4 ✅ (Auth-Rand, Gateway, OTel, Dependency-Scanning). ⛔ Löschung (Art. 17) wird entgegengenommen, aber NICHT ausgeführt. Offen: K8s/Helm, starlette-CVEs |
 
 ### Phase 0 — Status: ✅ erledigt
 - ✅ `docs/ULTRAPLAN.md` + `docs/ROADMAP.md`
@@ -872,6 +872,40 @@ weichen — `worker-messaging` (fünf Abhängigkeiten, null Konsumenten) und
   **jede Form von Verhaltens-Tracking**.
 
 ### Phase 10 — Status: 🟧 in Arbeit
+
+- ⛔ **10.5 Das Recht auf Löschung ist NICHT eingelöst — Befund, nicht Aufgabe**
+  — 06.08.2026 festgestellt.
+  Beim Durchgehen der Hardening-Liste („Retention/Deletion/Export") kam heraus:
+  **Auskunft und Export gibt es** (`/meine-daten` baut den Datenexport),
+  **Löschung nicht.**
+  `POST /consent/delete` existiert und klingt danach — aber der Handler
+  schreibt nur ein **Ereignis** ins Ledger (`ConsentAction.DELETE`), und der
+  projizierte Zustand trägt danach `deleted=True`. **Kein einziger Dienst
+  reagiert darauf.** Weder `profile-service` noch `resume-service` noch
+  `portfolio-service` löschen daraufhin etwas; ein Konto lässt sich überhaupt
+  nicht löschen (kein Endpunkt, keine Oberfläche).
+  **Das ist schlimmer als eine fehlende Funktion.** Eine fehlende Funktion
+  sieht man; hier nimmt die Plattform ein Löschverlangen entgegen,
+  protokolliert es ordentlich — und tut nichts. Wer darauf vertraut, hält seine
+  Daten für gelöscht, während sie liegen bleiben. Auf einer Plattform, deren
+  ganze These „die Person entscheidet" lautet, ist das der schwerste offene
+  Punkt, den diese Datei kennt.
+  **Warum hier nichts gebaut wurde:** die Umsetzung ist keine Fleißarbeit,
+  sondern eine Reihe echter Entscheidungen, und jede braucht eine Antwort,
+  bevor Code entsteht — sonst löscht man das Falsche, und zwar unwiderruflich:
+  - **Was heißt „löschen" bei laufenden Vorgängen?** Ein Unternehmen mit einer
+    angenommenen Bewerbung hat Aufbewahrungspflichten. Löschen und
+    aufbewahren-Müssen widersprechen sich; einer von beiden gewinnt, und das
+    muss jemand entscheiden.
+  - **Wie kaskadiert es über zehn Dienste ohne gemeinsame Datenbank?** Die
+    Outbox aus 9.1 wäre das Werkzeug — aber „mindestens einmal" heißt hier:
+    ein Dienst könnte die Löschung zweimal ausführen (harmlos) oder sie
+    verpassen (nicht harmlos), und es braucht einen Nachweis, dass sie überall
+    ankam.
+  - **Was bleibt stehen?** Das Consent-Ledger selbst ist der Beleg, dass
+    gelöscht wurde. Es mitzulöschen hieße, den Nachweis zu vernichten.
+  Gehört in eine eigene ADR und einen eigenen Schnitt. Bis dahin steht hier
+  ⛔ statt ⬜: **es fehlt nicht nur, es täuscht.**
 
 - ✅ **10.4 Dependency-Scanning — und was es sofort fand** — 06.08.2026.
   Dependabot (uv, npm, docker, actions) und ein dritter CI-Job
