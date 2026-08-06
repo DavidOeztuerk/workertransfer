@@ -55,10 +55,7 @@ worker-contracts = { workspace = true }
 worker-scheduler = { workspace = true }
 worker-ai = { workspace = true }
 worker-mcp = { workspace = true }
-worker-agents = { workspace = true }
 worker-templates = { workspace = true }
-worker-notifications = { workspace = true }
-worker-email = { workspace = true }
 worker-cli = { workspace = true }
 consent-service = { workspace = true }
 github-service = { workspace = true }

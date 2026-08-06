@@ -20,7 +20,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 7 | AI Agent Plattform | ✅ | 7.1 (Naht + Candidate-Agent), 7.2 (Company-Agent: die eigene Anzeige). DoD erfüllt, mit zwei begründeten Abweichungen (plan-act-reflect, „Consents und Logs"). **Candidate Ranking** ist nach ADR-0022 dauerhaft ausgeschlossen; Skill Analyzer, Salary Recommendation und Team Analyzer sind in ihrer ÜBLICHEN Form ausgeschlossen, nicht als Idee |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ✅ | 9.1–9.3 (Outbox in allen drei Diensten, Suche geprüft, Kennzahlen). DoD erfüllt; `worker-messaging` und `worker-search` gelöscht (ADR-0025/0026) |
-| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1–10.3 ✅ (Auth-Rand gebremst, Gateway routet, OTel sichtbar). Offen: K8s/Helm, Hardening-Checkliste |
+| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1–10.4 ✅ (Auth-Rand, Gateway, OTel, Dependency-Scanning). Offen: K8s/Helm, Kontolöschung (Art. 17), starlette-CVEs |
 
 ### Phase 0 — Status: ✅ erledigt
 - ✅ `docs/ULTRAPLAN.md` + `docs/ROADMAP.md`
@@ -873,6 +873,40 @@ weichen — `worker-messaging` (fünf Abhängigkeiten, null Konsumenten) und
 
 ### Phase 10 — Status: 🟧 in Arbeit
 
+- ✅ **10.4 Dependency-Scanning — und was es sofort fand** — 06.08.2026.
+  Dependabot (uv, npm, docker, actions) und ein dritter CI-Job
+  `dependency-audit`. Die Hardening-Liste nennt „Dependency-Scanning"; bis
+  heute gab es weder das eine noch das andere.
+  **Zwei eigene Fehler, abgefangen BEVOR sie schadeten.** Mein erster
+  `uv export` lieferte **3 statt 115** Abhängigkeiten — der Scan wäre über
+  nichts gelaufen und hätte grün gemeldet, genau das Muster, das diese Woche
+  dreimal auffiel. Ursache: die Abhängigkeiten stecken in den Workspace-
+  MITGLIEDERN, nicht im Wurzelprojekt (`dependencies = []`). Behoben mit
+  `--all-packages`, und der Job bricht jetzt ab, wenn weniger als 50 Einträge
+  herauskommen. Und ich hätte den Job fast ungeprüft geschoben — dann wäre die
+  CI rot gewesen.
+  **Der Scan fand 13 Lücken in vier Paketen.** Drei davon kamen aus Paketen
+  ohne jeden Konsumenten: `worker-agents` (149 Zeilen) zog `langchain-core`
+  mit zwei CVEs, `worker-email` zog `aiohttp` — und `worker-email` wurde nur
+  von `worker-notifications` benutzt, das selbst niemand benutzt.
+  `identity-service` verschickt seine Mails über sein eigenes
+  `infrastructure/mail.py`. Alle drei gelöscht: **von 13 auf 8 Funde, von 115
+  auf 88 Abhängigkeiten** — der sechste, siebte und achte Fall dieses Musters,
+  diesmal mit Sicherheitsfolge statt nur Ballast.
+  Zu **langchain** noch eine Klarstellung, weil die Annahme naheliegt, es sei
+  bewusst für Agenten ohne fremden Anbieter gewählt worden: `kon.txt` nennt
+  langchain **an keiner Stelle**. Die Vision listet vier Anbieter (Anthropic,
+  OpenAI, Gemini, **Ollama**), MCP und ein Agent SDK. Und langchain ersetzt
+  keinen Anbieter — es ist eine Abstraktion darüber und ruft am Ende genauso
+  einen. Der Weg „ohne fremden Dienst" heißt **Ollama**, also ein lokales
+  Modell; die Naht dafür ist `worker-ai` (ADR-0024) und verträgt einen zweiten
+  Provider.
+  `cryptography` aktualisiert (49 → 50). **`starlette` bleibt offen**, und das
+  steht auch so im Job: die Behebungen liegen in 1.x, FastAPI pinnt `<0.53` —
+  geprüft, nicht vermutet (`uv lock --upgrade-package` ließ 0.52.1 stehen).
+  Die fünf IDs sind **namentlich ausgenommen**, statt den Scan zu entschärfen:
+  ohne `--strict` rutschte jeder künftige Fund mit durch.
+
 - ✅ **10.3 OTel ist sichtbar — und `worker-tracing` funktionierte nicht** —
   06.08.2026. Jaeger im Compose (`http://localhost:16686`), Traces aus den
   Diensten über OTLP.
@@ -952,6 +986,25 @@ weichen — `worker-messaging` (fünf Abhängigkeiten, null Konsumenten) und
   oder mehr als eine Instanz läuft**. Dann ist ein geteilter Zähler (Redis) die
   richtige Antwort, oder die Bremse gehört ins Gateway. Aufgeschrieben, damit
   es nicht übersehen wird.
+
+### Phase 8 — Status: ⬜ nicht begonnen, und zwar mit Grund
+
+Diese Phase hatte als **einzige keinen eigenen Abschnitt** — sie stand nur als
+Zeile in der Tabelle, und in Statusberichten fiel sie unter „auf Wunsch
+zurückgestellt" heraus. Das war unvollständig: **zurückgestellt ist nicht
+erledigt**, und eine Phase, die in keiner Übersicht auftaucht, wird vergessen.
+
+Der Entwurf steht ([Vertragsvorlagen](superpowers/specs/2026-08-02-contract-templates-design.md)),
+**gebaut wird nichts**, bis sieben rechtliche Fragen beantwortet sind — die zur
+**Formvorschrift zuerst**, weil ihre Antwort den ganzen Schnitt umwerfen kann.
+Ein Arbeitsvertrag, der der Schriftform bedarf, macht jede digitale Unterschrift
+zur Attrappe; das lässt sich nicht nachträglich reparieren.
+
+Festgelegt ist der Weg, nicht die Umsetzung: die Plattform stellt **Vorlagen**,
+füllt nur, was beide Seiten schon vereinbart haben (Name, Unternehmen,
+Startmonat, Ablöse, Rolle), und schickt den Entwurf **in die Prüfung**. Gehalt,
+Fristen und Probezeit bleiben Platzhalter — eine Vorbelegung mit „üblichen
+Werten" sähe aus wie eine Empfehlung und würde als eine gelesen.
 
 ### Phase 7 — Status: ✅ erledigt (05.08.2026)
 
