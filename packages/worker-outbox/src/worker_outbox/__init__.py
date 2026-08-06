@@ -47,16 +47,20 @@ from typing import Protocol
 from uuid import UUID, uuid4
 
 from sqlalchemy import Column, DateTime, Integer, String, Table, Uuid, select, update
+from sqlalchemy import true as sql_true
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
 __all__ = [
     "MAX_ATTEMPTS",
+    "Deferred",
     "Delivery",
     "OutboxDispatcher",
     "OutboxEntry",
     "build_outbox_table",
     "record",
+    "run_forever",
+    "run_with_backoff",
 ]
 
 _logger = logging.getLogger("workertransfer.outbox")
@@ -66,6 +70,23 @@ _logger = logging.getLogger("workertransfer.outbox")
 #: ist abfragbar. Eine Zeile, die still verschwindet, ist genau der Zustand,
 #: den diese Tabelle abschaffen soll.
 MAX_ATTEMPTS = 10
+
+
+class Deferred(Exception):
+    """„Noch nicht dran" — kein Fehlschlag, und deshalb kein verbrauchter Versuch.
+
+    Es gibt Absichten, deren Reihenfolge zueinander tragend ist: die
+    Abschlussnachricht einer Löschung darf erst raus, wenn alle Empfänger
+    quittiert haben, und das Konto darf erst danach fallen (ADR-0027 §6). Diese
+    Reihenfolge ist *erzwungen*, nicht empfohlen — der Zusteller stellt eine
+    Zeile zurück, statt sie zuzustellen.
+
+    Warum eine eigene Ausnahme und nicht einfach ein Fehlschlag: ein Fehlschlag
+    erhöht `attempts` und schreibt `last_error`. Dann sähe geordnetes Warten
+    genauso aus wie ein kaputter Empfänger, und unter `MAX_ATTEMPTS` würde die
+    Reihenfolge die Zustellung sogar abwürgen — die Zeile wäre „aufgegeben",
+    weil sie brav gewartet hat.
+    """
 
 
 def build_outbox_table(base: type[DeclarativeBase], *, name: str = "outbox") -> Table:
@@ -166,8 +187,16 @@ class OutboxDispatcher:
         table: Table,
         delivery: Delivery,
         batch_size: int = 50,
-        max_attempts: int = MAX_ATTEMPTS,
+        max_attempts: int | None = MAX_ATTEMPTS,
     ) -> None:
+        """`max_attempts=None` heißt: **nie aufgeben** (ADR-0027 §4.3).
+
+        Die Voreinstellung bleibt, wie sie war. Für eine Benachrichtigung ist
+        „nach zehn Versuchen liegenlassen" richtig: die Zeile verschwindet nicht,
+        sie wird nur nicht mehr versucht. Für eine **Löschung** wäre genau das
+        das stille Scheitern, gegen das ADR-0027 antritt — eine Zusage, die
+        niemand mehr einlöst, und niemand sieht es.
+        """
         self._session_factory = session_factory
         self._table = table
         self._delivery = delivery
@@ -183,7 +212,13 @@ class OutboxDispatcher:
                 self._table.c.attempts,
             )
             .where(self._table.c.delivered_at.is_(None))
-            .where(self._table.c.attempts < self._max_attempts)
+            # `None` filtert gar nicht: die Zeile bleibt fällig, egal wie oft
+            # sie schon scheiterte.
+            .where(
+                sql_true()
+                if self._max_attempts is None
+                else self._table.c.attempts < self._max_attempts
+            )
             # Älteste zuerst: eine Benachrichtigung, die überholt wird, kommt in
             # der falschen Reihenfolge an.
             .order_by(self._table.c.created_at)
@@ -208,6 +243,11 @@ class OutboxDispatcher:
     async def _deliver(self, session: AsyncSession, entry: OutboxEntry) -> bool:
         try:
             await self._delivery.notify(entry.user_id, entry.kind)
+        except Deferred:
+            # Kein Versuch, kein Fehler, keine Spur: die Zeile war nicht dran.
+            # Sie beim nächsten Takt erneut anzubieten IST die Umsetzung der
+            # Reihenfolge aus ADR-0027 §6.
+            return False
         except Exception as exc:
             # Nur die Art, nie der Inhalt — und gekürzt, damit ein
             # geschwätziger Fehler die Spalte nicht sprengt.
@@ -250,3 +290,34 @@ async def run_forever(
             # liegen und niemand merkt es — genau der Zustand von vorher.
             _logger.warning("Outbox-Durchlauf fehlgeschlagen", exc_info=True)
         await sleep(interval_seconds)
+
+
+async def run_with_backoff(
+    dispatcher: OutboxDispatcher,
+    *,
+    interval_seconds: float,
+    max_interval_seconds: float,
+    sleep: Callable[[float], Awaitable[None]],
+    should_stop: Callable[[], bool] = lambda: False,
+) -> None:
+    """Wie `run_forever`, nur mit wachsendem Abstand, solange nichts vorangeht.
+
+    Der Gegenpart zu `max_attempts=None`: wer nie aufgibt, darf nicht im
+    Sekundentakt gegen eine Wand laufen. Ein Dienst, der seit Stunden nicht
+    antwortet, wird seltener gefragt; sobald **irgendetwas** zugestellt wurde,
+    ist der Takt wieder eng — sonst zahlte die nächste Löschung den Preis dafür,
+    dass die vorige auf einen toten Empfänger gewartet hat.
+
+    Der Abstand hängt am Zusteller, nicht an der Zeile: eine Spalte
+    `next_attempt_at` wäre die genauere Lösung und ein Schema für alle Nutzer
+    der Tabelle. Für „nicht hämmern" reicht der gröbere Weg.
+    """
+    delay = interval_seconds
+    while not should_stop():
+        try:
+            delivered = await dispatcher.drain_once()
+        except Exception:
+            _logger.warning("Outbox-Durchlauf fehlgeschlagen", exc_info=True)
+            delivered = 0
+        delay = interval_seconds if delivered else min(delay * 2, max_interval_seconds)
+        await sleep(delay)

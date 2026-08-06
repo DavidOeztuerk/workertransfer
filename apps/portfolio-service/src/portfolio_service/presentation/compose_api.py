@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import FastAPI
 from portfolio_service.configuration import PortfolioServiceSettings
 from portfolio_service.infrastructure.compose import compose_infrastructure
+from portfolio_service.presentation.http.erasure_router import build_erasure_router
 from portfolio_service.presentation.http.router import build_router
 from sqlalchemy.ext.asyncio import create_async_engine
 from worker_auth import JwtAuthMiddleware, TokenManager
@@ -32,7 +33,7 @@ def build_app(settings: PortfolioServiceSettings) -> FastAPI:
         tenant_resolver=ClaimTenantResolver(),
         auth_middleware=JwtAuthMiddleware,
         auth_middleware_kwargs={"verify": verify_access_token},
-        routers=(build_router(deps),),
+        routers=(build_router(deps), build_erasure_router(deps)),
     )
 
 

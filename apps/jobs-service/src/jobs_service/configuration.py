@@ -25,6 +25,13 @@ class JobsServiceSettings(PlatformSettings):
     # (ADR-0007). Runtime-only — never commit a real value.
     jwt_secret: SecretStr = SecretStr(DEV_JWT_SECRET)
 
+    # Gemeinsames Geheimnis für `POST /internal/company-withdrawal` (ADR-0027 §7).
+    # Derselbe Schlüssel wie die Löschkaskade, aber ein anderer Endpunkt: dieser
+    # Dienst ist kein Empfänger der Kaskade.
+    #
+    # Leer heißt: der Endpunkt ist zu.
+    erasure_secret: SecretStr = SecretStr("")
+
     # Die Formulierungshilfe für die eigene Anzeige (ADR-0024). Leer heißt: aus.
     anthropic_api_key: SecretStr = SecretStr("")
     drafting_model: str = "claude-sonnet-5"

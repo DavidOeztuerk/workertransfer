@@ -26,6 +26,15 @@ class GithubServiceSettings(PlatformSettings):
 
     consent_base_url: str = "http://127.0.0.1:8002"
 
+    # Gemeinsames Geheimnis für `POST /internal/erasure` (ADR-0027 §4.4).
+    # **Ausdrücklich ein anderes als `notify_secret`**: „darf eine Mail
+    # anstoßen" und „darf alles über einen Menschen löschen" dürfen nicht
+    # dasselbe Papier sein.
+    #
+    # Leer heißt: der Endpunkt ist zu. Bis es echte Dienstidentitäten gibt, ist
+    # das die Zwischenlösung — und die Voreinstellung schließt.
+    erasure_secret: SecretStr = SecretStr("")
+
     # Optional. Ohne Token gilt GitHubs Limit von 60 Anfragen je Stunde und
     # IP, mit Token 5000 — gebraucht wird es nicht, weil nur auf Anstoß eines
     # Menschen abgerufen wird. Ein Token gehört zur Plattform, nicht zu einer

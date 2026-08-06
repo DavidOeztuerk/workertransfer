@@ -56,6 +56,34 @@ class IdentityServiceSettings(PlatformSettings):
     # Voreinstellung, die im Zweifel öffnet, ist genau die falsche.
     notify_secret: SecretStr = SecretStr("")
 
+    # Gemeinsames Geheimnis für die Löschkaskade (ADR-0027 §4.4).
+    # **Ausdrücklich ein anderes als `notify_secret`**: „darf eine Mail
+    # anstoßen" und „darf alles über einen Menschen löschen" dürfen nicht
+    # dasselbe Papier sein. Leer heißt: es wird nichts zugestellt — und zwar
+    # als *Fehlschlag*, nicht als stilles Überspringen. Eine Zeile, die als
+    # zugestellt gälte, obwohl niemand gelöscht hat, wäre der schlimmste Fall.
+    erasure_secret: SecretStr = SecretStr("")
+
+    # Wohin die Löschbefehle gehen. Im Compose-Netz die Servicenamen.
+    # jobs-service ist **kein** Empfänger der Kaskade — er hält nichts
+    # Personenbezogenes (ADR-0027 §2) und bekommt nur die Absicht aus §7,
+    # wenn ein Unternehmen ohne Administrator zurückbleibt.
+    consent_base_url: str = "http://127.0.0.1:8002"
+    profile_base_url: str = "http://127.0.0.1:8003"
+    resume_base_url: str = "http://127.0.0.1:8004"
+    portfolio_base_url: str = "http://127.0.0.1:8005"
+    applications_base_url: str = "http://127.0.0.1:8007"
+    transfer_base_url: str = "http://127.0.0.1:8009"
+    github_base_url: str = "http://127.0.0.1:8010"
+    jobs_base_url: str = "http://127.0.0.1:8006"
+
+    # Wie oft der Löschzusteller nachsieht, und wie weit der Abstand wachsen
+    # darf, solange nichts vorangeht (ADR-0027 §4.3). Ohne Versuchsobergrenze
+    # braucht es das: wer nie aufgibt, darf nicht im Sekundentakt gegen eine
+    # Wand laufen.
+    erasure_interval_seconds: float = 5.0
+    erasure_max_interval_seconds: float = 300.0
+
     # Bremse am Auth-Rand. `None` heißt „aus der Umgebung ableiten": in LOCAL
     # und TEST aus, sonst an.
     #

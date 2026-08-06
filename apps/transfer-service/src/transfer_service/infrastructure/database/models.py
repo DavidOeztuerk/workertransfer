@@ -64,7 +64,10 @@ class MarketRequestModel(Base):
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
     subject_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
     tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
-    requested_by: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    #: NULL heißt: die Person, die gefragt hat, hat ihr Konto gelöscht. Die
+    #: Anfrage bleibt — sie gehört dem Unternehmen und handelt von einem
+    #: Dritten (ADR-0027 §2). Es heißt NICHT „niemand hat gefragt".
+    requested_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

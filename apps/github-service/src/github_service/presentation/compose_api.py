@@ -13,6 +13,7 @@ from typing import Any
 from fastapi import FastAPI
 from github_service.configuration import GithubServiceSettings
 from github_service.infrastructure.compose import compose_infrastructure
+from github_service.presentation.http.erasure_router import build_erasure_router
 from github_service.presentation.http.router import build_router
 from sqlalchemy.ext.asyncio import create_async_engine
 from worker_auth import JwtAuthMiddleware, TokenManager
@@ -35,7 +36,7 @@ def build_app(settings: GithubServiceSettings) -> FastAPI:
         settings,
         auth_middleware=JwtAuthMiddleware,
         auth_middleware_kwargs={"verify": verify_access_token},
-        routers=(build_router(deps),),
+        routers=(build_router(deps), build_erasure_router(deps)),
     )
 
 

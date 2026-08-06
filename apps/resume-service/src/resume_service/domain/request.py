@@ -52,7 +52,9 @@ class ResumeRequest:
     #: Wer im Unternehmen gefragt hat. Das Unternehmen trägt die Berechtigung,
     #: die Person die Spur — ohne dieses Feld steht im Protokoll nur
     #: „irgendwer bei Acme".
-    requested_by: UUID
+    #: `None` nach der Löschung des Kontos, das gefragt hat (ADR-0027 §2).
+    #: Der Vorgang bleibt dem Unternehmen, der Name der Person fällt weg.
+    requested_by: UUID | None
     status: RequestStatus
     created_at: datetime
     answered_at: datetime | None
