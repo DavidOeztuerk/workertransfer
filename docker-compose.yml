@@ -69,6 +69,9 @@ x-service-env: &service-env
   # The base for confirmation links — must be what the BROWSER can reach, not a
   # compose service name.
   WORKER_PUBLIC_WEB_URL: ${WORKER_PUBLIC_WEB_URL:-http://localhost:5173}
+  # Traces nach Jaeger. LEER hieße AUS — hier gesetzt, weil der Kollektor im
+  # Stapel läuft; in Produktion zeigt er auf den dortigen Endpunkt.
+  WORKER_OTLP_ENDPOINT: ${WORKER_OTLP_ENDPOINT:-http://jaeger:4317}
 
 services:
   postgres:
@@ -573,6 +576,26 @@ services:
       - /app/node_modules
       - /app/apps/web/node_modules
       - /app/packages/ui/node_modules
+
+  # --- Beobachtbarkeit -------------------------------------------------------
+  # Jaeger all-in-one statt OTel-Collector + Jaeger: der Collector lohnt sich,
+  # wenn mehrere Ziele beliefert oder Daten gefiltert werden. Hier gibt es ein
+  # Ziel. Ein Glied weniger in der Kette ist ein Glied weniger, das schweigt.
+  # Jaeger bringt den OTLP-Empfänger selbst mit (4317).
+  jaeger:
+    image: jaegertracing/all-in-one:1.60.0
+    container_name: workertransfer-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # Oberfläche — hier sieht man die Spuren
+      - "4317:4317"   # OTLP/gRPC — hierhin senden die Dienste
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:16686/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   # --- Gateway ---------------------------------------------------------------
   # Ein Eingang für alles: http://localhost:8080 spricht dieselben Pfade wie die

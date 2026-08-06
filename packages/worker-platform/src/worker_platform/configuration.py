@@ -29,6 +29,12 @@ class PlatformSettings(BaseSettings):
     )
 
     service_name: str = "unnamed-service"
+
+    #: Wohin Traces gehen (OTLP/gRPC, z. B. `http://jaeger:4317`).
+    #: LEER heißt AUS — dieselbe Regel wie beim Entwurfsdienst: eine
+    #: Voreinstellung, die im Zweifel nach außen spricht, ist die falsche.
+    #: Ohne Endpunkt wird nichts instrumentiert und nichts gesendet.
+    otlp_endpoint: str = ""
     service_version: str = "0.1.0"
     environment: Environment = Environment.LOCAL
     host: str = "127.0.0.1"

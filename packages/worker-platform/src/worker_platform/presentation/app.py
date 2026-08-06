@@ -48,6 +48,7 @@ def create_api_app(
     """
 
     configure_logging()
+    _setup_tracing_if_configured(settings)
     docs_url = "/docs" if settings.enable_docs else None
     openapi_url = "/openapi.json" if settings.enable_docs else None
     app = FastAPI(
@@ -58,6 +59,7 @@ def create_api_app(
         openapi_url=openapi_url,
         lifespan=_lifespan_for(background),
     )
+    _instrument_app_if_configured(app, settings)
     register_exception_handlers(app)
     app.include_router(create_health_router(settings.service_name, readiness_checks))
     for router in routers:
@@ -105,6 +107,51 @@ def create_api_app(
 
 
 _logger = logging.getLogger("workertransfer.platform.background")
+
+
+def _instrument_app_if_configured(app: FastAPI, settings: PlatformSettings) -> None:
+    """Die FastAPI-Instrumentierung braucht die App, nicht nur den Aufruf.
+
+    `FastAPIInstrumentor().instrument()` global setzt nur an Apps an, die
+    DANACH entstehen — und traf diese hier nicht. Sichtbar wurde das daran,
+    dass in Jaeger zwar Datenbank-Spans ankamen (`connect`), aber kein
+    einziger HTTP-Span. Ein halber Trace ist schlimmer als keiner: er sieht
+    aus, als funktioniere die Beobachtung.
+    """
+    if not settings.otlp_endpoint:
+        return
+    try:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+        FastAPIInstrumentor.instrument_app(app)
+    except Exception:
+        _logger.warning("HTTP-Instrumentierung fehlgeschlagen", exc_info=True)
+
+
+def _setup_tracing_if_configured(settings: PlatformSettings) -> None:
+    """Traces nur, wenn ein Ziel eingerichtet ist — sonst gar nichts.
+
+    Dieselbe Regel wie beim Entwurfsdienst (ADR-0024): eine Voreinstellung, die
+    im Zweifel nach außen spricht, ist die falsche. Ohne
+    `WORKER_OTLP_ENDPOINT` wird nicht instrumentiert, kein Exporter gebaut und
+    nichts gesendet.
+
+    Der Import steht INNEN, nicht oben: `worker-tracing` zieht das halbe
+    OpenTelemetry-SDK, und ein Dienst ohne Tracing soll es nicht laden müssen.
+
+    Ein Fehlschlag hier darf den Dienst nicht am Start hindern. Beobachtung ist
+    kein Selbstzweck — ein Kollektor, der gerade nicht da ist, wäre ein
+    absurder Grund, die Anmeldung auszusetzen. Er wird gemeldet, nicht
+    geworfen.
+    """
+    if not settings.otlp_endpoint:
+        return
+    try:
+        from worker_tracing import setup_tracing
+
+        setup_tracing(settings.service_name, settings.otlp_endpoint)
+    except Exception:
+        _logger.warning("Tracing konnte nicht eingerichtet werden", exc_info=True)
 
 
 def _lifespan_for(

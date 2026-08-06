@@ -20,7 +20,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 7 | AI Agent Plattform | ✅ | 7.1 (Naht + Candidate-Agent), 7.2 (Company-Agent: die eigene Anzeige). DoD erfüllt, mit zwei begründeten Abweichungen (plan-act-reflect, „Consents und Logs"). **Candidate Ranking** ist nach ADR-0022 dauerhaft ausgeschlossen; Skill Analyzer, Salary Recommendation und Team Analyzer sind in ihrer ÜBLICHEN Form ausgeschlossen, nicht als Idee |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ✅ | 9.1–9.3 (Outbox in allen drei Diensten, Suche geprüft, Kennzahlen). DoD erfüllt; `worker-messaging` und `worker-search` gelöscht (ADR-0025/0026) |
-| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1 ✅ (Auth-Rand gebremst), 10.2 ✅ (Gateway routet). Offen: OTel, K8s/Helm, Hardening-Checkliste |
+| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1–10.3 ✅ (Auth-Rand gebremst, Gateway routet, OTel sichtbar). Offen: K8s/Helm, Hardening-Checkliste |
 
 ### Phase 0 — Status: ✅ erledigt
 - ✅ `docs/ULTRAPLAN.md` + `docs/ROADMAP.md`
@@ -872,6 +872,36 @@ weichen — `worker-messaging` (fünf Abhängigkeiten, null Konsumenten) und
   **jede Form von Verhaltens-Tracking**.
 
 ### Phase 10 — Status: 🟧 in Arbeit
+
+- ✅ **10.3 OTel ist sichtbar — und `worker-tracing` funktionierte nicht** —
+  06.08.2026. Jaeger im Compose (`http://localhost:16686`), Traces aus den
+  Diensten über OTLP.
+  **Der Befund ist der interessante Teil.** `worker-tracing` hatte wie fünf
+  Pakete vor ihm **null Konsumenten** — aber hier war Löschen die falsche
+  Antwort: die DoD verlangt OTel, und es gibt keine eingebaute Alternative.
+  Also angeschlossen. Beim ersten Start kam heraus, dass das Paket **gar nicht
+  lief**: `FastAPIInstrumentor.instrument()` statt `FastAPIInstrumentor()`
+  `.instrument()` — ein `TypeError`, seit das Paket angelegt wurde. Nie
+  aufgefallen, weil es nie jemand benutzt hat. **Ein Paket, das existiert, ist
+  damit noch keines, das funktioniert** — dieselbe Lehre wie bei den fünf
+  gelöschten, nur andersherum bewiesen.
+  Danach ein zweiter, feinerer Fehler: es kamen zwar Datenbank-Spans
+  (`connect`), aber **kein einziger HTTP-Span**. Die globale Instrumentierung
+  setzt nur an Apps an, die danach entstehen. Ein halber Trace ist schlimmer
+  als keiner — er sieht aus, als funktioniere die Beobachtung. Jetzt wird die
+  App-Instanz instrumentiert, und Jaeger zeigt `GET /jobs`, `GET /health/live`
+  und die Datenbank-Spans.
+  **LEER heißt AUS** (`WORKER_OTLP_ENDPOINT`): ohne Endpunkt wird nicht
+  instrumentiert, kein Exporter gebaut, nichts gesendet — dieselbe Regel wie
+  beim Entwurfsdienst. Der Import steht INNEN, damit ein Dienst ohne Tracing
+  das OpenTelemetry-SDK nicht laden muss. Und ein Fehlschlag beim Einrichten
+  hindert den Dienst **nicht** am Start: ein Kollektor, der gerade fehlt, wäre
+  ein absurder Grund, die Anmeldung auszusetzen. Genau dieser Fehlerfang hat
+  den `TypeError` oben abgefangen, statt den Dienst umzuwerfen.
+  Jaeger all-in-one statt Collector + Jaeger: der Collector lohnt sich bei
+  mehreren Zielen; hier gibt es eines, und ein Glied weniger in der Kette ist
+  eines weniger, das schweigt. Tote Instrumentierungen (Redis, aio-pika)
+  entfernt — es gibt weder das eine noch das andere.
 
 - ✅ **10.2 Das Gateway routet** — 06.08.2026. Traefik im Compose,
   `http://localhost:8080` spricht dieselben Pfade wie die Einzelports.
