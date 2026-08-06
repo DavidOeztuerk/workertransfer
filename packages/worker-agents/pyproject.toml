@@ -19,4 +19,3 @@ module-name = "worker_agents"
 worker-core = { workspace = true }
 worker-ai = { workspace = true }
 worker-mcp = { workspace = true }
-worker-search = { workspace = true }

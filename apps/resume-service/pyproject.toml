@@ -21,6 +21,7 @@ dependencies = [
     "worker-core",
     "worker-platform",
     "worker-database",
+    "worker-outbox",
     "worker-auth",
     "worker-tenancy",
     "worker-shared",
@@ -42,6 +43,7 @@ module-name = "resume_service"
 worker-core = { workspace = true }
 worker-platform = { workspace = true }
 worker-database = { workspace = true }
+worker-outbox = { workspace = true }
 worker-auth = { workspace = true }
 worker-tenancy = { workspace = true }
 worker-shared = { workspace = true }

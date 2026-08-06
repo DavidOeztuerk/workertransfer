@@ -8,10 +8,16 @@ from uuid import UUID
 from sqlalchemy import Boolean, DateTime, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
+from worker_outbox import build_outbox_table
 
 from applications_service.infrastructure.database.base import Base
 
-__all__ = ["ApplicationModel"]
+__all__ = ["OUTBOX", "ApplicationModel"]
+
+#: Die Outbox — an DIESE `Base`, damit sie in DIESEN Migrationen auftaucht.
+#: Es gibt keine gemeinsame Datenbank, also auch keine gemeinsame Outbox
+#: (ADR-0004/0025).
+OUTBOX = build_outbox_table(Base)
 
 
 class ApplicationModel(Base):

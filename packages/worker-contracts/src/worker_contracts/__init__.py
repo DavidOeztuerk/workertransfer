@@ -2,6 +2,7 @@
 
 from worker_contracts.applications import (
     AdvanceApplicationV1,
+    ApplicationStatsV1,
     ApplicationV1,
     SubmitApplicationV1,
 )
@@ -74,6 +75,7 @@ from worker_contracts.transfer import (
 __all__ = [
     "AcceptInvitationV1",
     "AdvanceApplicationV1",
+    "ApplicationStatsV1",
     "ApplicationV1",
     "AttachmentV1",
     "Command",

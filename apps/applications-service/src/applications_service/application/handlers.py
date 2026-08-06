@@ -184,3 +184,15 @@ async def handle_list_for_job(
     applications: list[Application] = await repos["applications"].for_job(job_id)
     # Fremde Stellen liefern nichts, statt zu verraten, dass es sie gibt.
     return [entry for entry in applications if entry.tenant_id == tenant_id]
+
+
+async def handle_company_stats(tenant_id: UUID, *, repos: dict[str, Any]) -> dict[str, int]:
+    """Kennzahlen über die EIGENEN Vorgänge (ADR-0026).
+
+    Kein Consent-Aufruf, und das ist kein Versehen: gezählt wird, was das
+    Unternehmen ohnehin schon einzeln sieht. Eine Einwilligung abzufragen, um
+    etwas zu zählen, das bereits sichtbar ist, wäre Theater — und würde den
+    Ledger mit einer Frage belasten, die er nicht beantworten soll.
+    """
+    counts: dict[str, int] = await repos["applications"].count_by_status(tenant_id)
+    return counts

@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from resume_service.configuration import ResumeServiceSettings
-from resume_service.infrastructure.compose import compose_infrastructure
+from resume_service.infrastructure.compose import compose_infrastructure, outbox_runner
 from resume_service.presentation.http.router import build_router
 from sqlalchemy.ext.asyncio import create_async_engine
 from worker_auth import JwtAuthMiddleware, TokenManager
@@ -40,6 +40,8 @@ def build_app(settings: ResumeServiceSettings) -> FastAPI:
         auth_middleware=JwtAuthMiddleware,
         auth_middleware_kwargs={"verify": verify_access_token},
         routers=(build_router(deps),),
+        # Der Outbox-Zusteller läuft im Dienst mit (ADR-0025).
+        background=(outbox_runner(deps, settings),),
     )
 
 

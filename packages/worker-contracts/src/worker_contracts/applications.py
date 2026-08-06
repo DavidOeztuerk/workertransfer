@@ -42,3 +42,22 @@ class AdvanceApplicationV1(BaseModel):
     #: Nur die drei, die dem Unternehmen gehören. `submitted` und `withdrawn`
     #: sind Handlungen der Person und stehen hier bewusst nicht.
     status: Literal["reviewing", "rejected", "hired"]
+
+
+class ApplicationStatsV1(BaseModel):
+    """Kennzahlen über die EIGENEN Vorgänge eines Unternehmens (ADR-0026).
+
+    Was hier steht, sieht das Unternehmen ohnehin schon einzeln in seiner
+    Bewerbungsliste — die Zahl ist eine Bequemlichkeit, keine neue Auskunft.
+    Genau deshalb ist sie zulässig.
+
+    Was hier bewusst NICHT steht: irgendetwas über die Menschen dahinter. Kein
+    Durchschnittsalter, keine Herkunft, keine Angabe, wie oft sich jemand
+    anderswo beworben hat, kein Marktstatus. Solche Zahlen führten Quellen
+    zusammen, die einzeln freigegeben wurden — und genau das ist die Grenze.
+    """
+
+    #: Je Status eine Anzahl. Ein Dictionary und keine festen Felder, damit ein
+    #: neuer Status nicht durch die Grenze bricht.
+    by_status: dict[str, int] = Field(default_factory=dict)
+    total: int = 0
