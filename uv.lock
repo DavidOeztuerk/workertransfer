@@ -1505,21 +1505,6 @@ wheels = [
 ]
 
 [[package]]
-name = "opentelemetry-instrumentation-aio-pika"
-version = "0.64b0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-instrumentation" },
-    { name = "opentelemetry-semantic-conventions" },
-    { name = "wrapt" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/46/e7/38a8f8c7fabe8dce1d51ba6c3b7451e639d34f051d739710c09bb49c1a36/opentelemetry_instrumentation_aio_pika-0.64b0.tar.gz", hash = "sha256:79bb25ad6a113bb4bee27bc11295c2c761f0b3468890d1d7c9ff1203ae4076f6", size = 10190, upload-time = "2026-06-24T15:19:13.716Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b6/ab/88dc22f4ff64935a91bf0e9f0b2309a608df96e724cc6e9acf131b92e35c/opentelemetry_instrumentation_aio_pika-0.64b0-py3-none-any.whl", hash = "sha256:b5d36d411a3e7bf1e6cd6c8359cbad3aba7edc34bf947469c0ee6e5f0291aebf", size = 11676, upload-time = "2026-06-24T15:18:18.321Z" },
-]
-
-[[package]]
 name = "opentelemetry-instrumentation-asgi"
 version = "0.64b0"
 source = { registry = "https://pypi.org/simple" }
@@ -1565,21 +1550,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/0d/2a/2893a8781b93894f1e8014904c0342da7e4302de6597c2d5c0cb6c1a552e/opentelemetry_instrumentation_httpx-0.64b0.tar.gz", hash = "sha256:c2cfcd03d3665762860ebd0c28038c6e47fbb48d7942dec31dd75fc634d25c92", size = 23555, upload-time = "2026-06-24T15:19:29.107Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/06/29/a20309bd3f5a8051b61ca475e78623410c3b077e3deccae19aa4f8b5b9a2/opentelemetry_instrumentation_httpx-0.64b0-py3-none-any.whl", hash = "sha256:04829e5723941b5ceb0c88b44d63983e226b5c75b2b2e34a57739fdd0e060608", size = 16336, upload-time = "2026-06-24T15:18:41.412Z" },
-]
-
-[[package]]
-name = "opentelemetry-instrumentation-redis"
-version = "0.64b0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-instrumentation" },
-    { name = "opentelemetry-semantic-conventions" },
-    { name = "wrapt" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/09/89/9b556b53faf2b5a23f2bb844e087e6577704129bd5964decc3fb9d7a1309/opentelemetry_instrumentation_redis-0.64b0.tar.gz", hash = "sha256:c37e194c1e8ff59944d5c2f18014ee18f244a103958b1f2482099525ae9099f9", size = 17045, upload-time = "2026-06-24T15:19:38.281Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/85/f2/96cd02f91303ea0d387aa46c615365877875ca47f9796e9fb1503ec1e0e6/opentelemetry_instrumentation_redis-0.64b0-py3-none-any.whl", hash = "sha256:5458a541986f665b9d7e641421fa5d0c286f1813b452faab6f84503823719d52", size = 14642, upload-time = "2026-06-24T15:18:54.141Z" },
 ]
 
 [[package]]
@@ -3160,12 +3130,14 @@ source = { editable = "packages/worker-platform" }
 dependencies = [
     { name = "fastapi" },
     { name = "pydantic-settings" },
+    { name = "worker-tracing" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.128.0,<1.0.0" },
     { name = "pydantic-settings", specifier = ">=2.12.0,<3.0.0" },
+    { name = "worker-tracing", editable = "packages/worker-tracing" },
 ]
 
 [[package]]
@@ -3288,10 +3260,8 @@ source = { editable = "packages/worker-tracing" }
 dependencies = [
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp" },
-    { name = "opentelemetry-instrumentation-aio-pika" },
     { name = "opentelemetry-instrumentation-fastapi" },
     { name = "opentelemetry-instrumentation-httpx" },
-    { name = "opentelemetry-instrumentation-redis" },
     { name = "opentelemetry-instrumentation-sqlalchemy" },
     { name = "opentelemetry-sdk" },
 ]
@@ -3300,10 +3270,8 @@ dependencies = [
 requires-dist = [
     { name = "opentelemetry-api", specifier = ">=1.25.0,<2.0.0" },
     { name = "opentelemetry-exporter-otlp", specifier = ">=1.25.0,<2.0.0" },
-    { name = "opentelemetry-instrumentation-aio-pika", specifier = ">=0.45.0,<1.0.0" },
     { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.45.0,<1.0.0" },
     { name = "opentelemetry-instrumentation-httpx", specifier = ">=0.45.0,<1.0.0" },
-    { name = "opentelemetry-instrumentation-redis", specifier = ">=0.45.0,<1.0.0" },
     { name = "opentelemetry-instrumentation-sqlalchemy", specifier = ">=0.45.0,<1.0.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.25.0,<2.0.0" },
 ]
