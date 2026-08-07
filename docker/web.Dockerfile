@@ -4,7 +4,7 @@
 # esbuild and rollup ship platform-specific binaries, and the musl variants are
 # a recurring source of "works on my machine" in this exact spot.
 
-FROM node:24-bookworm-slim
+FROM node:25-bookworm-slim
 
 # corepack picks the pnpm version pinned in the root package.json
 # ("packageManager": "pnpm@…"), so the container cannot drift from CI.
