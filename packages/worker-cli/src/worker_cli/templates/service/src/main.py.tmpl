@@ -1,0 +1,21 @@
+"""Deployable entry point for the ${service_title}."""
+
+from __future__ import annotations
+
+import uvicorn
+from fastapi import FastAPI
+
+from ${module_name}.configuration import ${service_class}Settings
+from ${module_name}.presentation.compose_api import build_app
+
+
+def create_app(settings: ${service_class}Settings | None = None) -> FastAPI:
+    return build_app(settings or ${service_class}Settings())
+
+
+app = create_app()
+
+
+def run() -> None:
+    settings = ${service_class}Settings()
+    uvicorn.run(build_app(settings), host=settings.host, port=settings.port)

@@ -1,0 +1,19 @@
+[project]
+name = "worker-shared"
+version = "0.1.0"
+description = "Domain-neutral primitives: UTC clock, pagination, cursors, money"
+requires-python = ">=3.14"
+# Intentionally empty: the implemented primitives are stdlib-only. pydantic,
+# python-dateutil, phonenumbers and email-validator were declared for types
+# that were never written; they come back with the first real consumer.
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_shared"
+
+[tool.uv.sources]
+worker-core = { workspace = true }

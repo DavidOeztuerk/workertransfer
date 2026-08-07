@@ -1,0 +1,24 @@
+[project]
+name = "worker-tracing"
+version = "0.1.0"
+description = "OpenTelemetry tracing with context propagation and sampling"
+requires-python = ">=3.14"
+dependencies = [
+    "opentelemetry-api>=1.25.0,<2.0.0",
+    "opentelemetry-sdk>=1.25.0,<2.0.0",
+    "opentelemetry-exporter-otlp>=1.25.0,<2.0.0",
+    "opentelemetry-instrumentation-fastapi>=0.45.0,<1.0.0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.45.0,<1.0.0",
+    "opentelemetry-instrumentation-httpx>=0.45.0,<1.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.28,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_tracing"
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-correlation = { workspace = true }

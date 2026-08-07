@@ -1,0 +1,21 @@
+[project]
+name = "worker-tenancy"
+version = "0.1.0"
+description = "Multi-tenancy: Tenant resolution, Context, Isolation strategies"
+requires-python = ">=3.14"
+dependencies = [
+    "worker-platform",
+    "pydantic>=2.8.0,<3.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_tenancy"
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-correlation = { workspace = true }
+worker-platform = { workspace = true }

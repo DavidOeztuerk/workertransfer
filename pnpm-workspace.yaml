@@ -1,0 +1,12 @@
+packages:
+  - apps/web
+  - packages/ui
+# esbuild ships a platform-specific binary and needs its postinstall to run.
+# Without an explicit decision pnpm 11 aborts `install` with
+# ERR_PNPM_IGNORED_BUILDS and writes an unanswered `allowBuilds` placeholder
+# into this file. Answering it here keeps `pnpm install --frozen-lockfile`
+# non-interactive, which the CI frontend job depends on.
+allowBuilds:
+  esbuild: true
+onlyBuiltDependencies:
+  - esbuild

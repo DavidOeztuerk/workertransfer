@@ -1,0 +1,141 @@
+"""Shared API contracts: DTOs, Events, Messages, Versioning."""
+
+from worker_contracts.applications import (
+    AdvanceApplicationV1,
+    ApplicationStatsV1,
+    ApplicationV1,
+    SubmitApplicationV1,
+)
+from worker_contracts.companies import CompanyProfileV1, SaveCompanyProfileV1
+from worker_contracts.consent import (
+    ConsentCheckResultV1,
+    ConsentCheckV1,
+    ConsentGrantedV1,
+    ConsentGrantV1,
+    ConsentHistoryEntryV1,
+    ConsentRevokeV1,
+    ConsentStateV1,
+)
+from worker_contracts.erasure import (
+    CompanyWithdrawalV1,
+    ErasureResultV1,
+    ErasureV1,
+)
+from worker_contracts.github import (
+    ConnectGitHubV1,
+    GitHubConnectionV1,
+    RepositoryV1,
+)
+from worker_contracts.identity import (
+    AcceptInvitationV1,
+    CompanyMemberV1,
+    CompanyV1,
+    CreateCompanyV1,
+    InvitationV1,
+    InviteMemberV1,
+    MembershipV1,
+    NotificationPreferencesV1,
+    NotifyV1,
+    RegisterUserV1,
+    ResendVerificationV1,
+    VerifyEmailV1,
+)
+from worker_contracts.jobs import (
+    DraftJobTextV1,
+    JobPageV1,
+    JobTextDraftV1,
+    JobV1,
+    SaveJobV1,
+)
+from worker_contracts.messages import Command, Event, Message, Query
+from worker_contracts.portfolio import (
+    AttachmentV1,
+    PortfolioItemV1,
+    PortfolioV1,
+    SavePortfolioV1,
+)
+from worker_contracts.profile import (
+    DraftProfileTextV1,
+    ProfilePageV1,
+    ProfileTextDraftV1,
+    ProfileV1,
+    SaveProfileV1,
+)
+from worker_contracts.resume import (
+    EducationV1,
+    PositionV1,
+    ResumeRequestV1,
+    ResumeV1,
+    SaveResumeV1,
+)
+from worker_contracts.transfer import (
+    ExpressInterestV1,
+    MakeOfferV1,
+    MarketRequestV1,
+    MarketStatusV1,
+    SaveMarketStatusV1,
+    TransferV1,
+)
+
+__all__ = [
+    "AcceptInvitationV1",
+    "AdvanceApplicationV1",
+    "ApplicationStatsV1",
+    "ApplicationV1",
+    "AttachmentV1",
+    "Command",
+    "CompanyMemberV1",
+    "CompanyProfileV1",
+    "CompanyV1",
+    "CompanyWithdrawalV1",
+    "ConnectGitHubV1",
+    "ConsentCheckResultV1",
+    "ConsentCheckV1",
+    "ConsentGrantV1",
+    "ConsentGrantedV1",
+    "ConsentHistoryEntryV1",
+    "ConsentRevokeV1",
+    "ConsentStateV1",
+    "CreateCompanyV1",
+    "DraftJobTextV1",
+    "DraftProfileTextV1",
+    "EducationV1",
+    "ErasureResultV1",
+    "ErasureV1",
+    "Event",
+    "ExpressInterestV1",
+    "GitHubConnectionV1",
+    "InvitationV1",
+    "InviteMemberV1",
+    "JobPageV1",
+    "JobTextDraftV1",
+    "JobV1",
+    "MakeOfferV1",
+    "MarketRequestV1",
+    "MarketStatusV1",
+    "MembershipV1",
+    "Message",
+    "NotificationPreferencesV1",
+    "NotifyV1",
+    "PortfolioItemV1",
+    "PortfolioV1",
+    "PositionV1",
+    "ProfilePageV1",
+    "ProfileTextDraftV1",
+    "ProfileV1",
+    "Query",
+    "RegisterUserV1",
+    "RepositoryV1",
+    "ResendVerificationV1",
+    "ResumeRequestV1",
+    "ResumeV1",
+    "SaveCompanyProfileV1",
+    "SaveJobV1",
+    "SaveMarketStatusV1",
+    "SavePortfolioV1",
+    "SaveProfileV1",
+    "SaveResumeV1",
+    "SubmitApplicationV1",
+    "TransferV1",
+    "VerifyEmailV1",
+]

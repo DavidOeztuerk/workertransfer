@@ -1,0 +1,26 @@
+- generic [ref=f7e2]:
+  - banner [ref=f7e3]:
+    - link "WorkerTransfer Startseite" [ref=f7e4] [cursor=pointer]:
+      - /url: /
+      - text: workertransfer
+    - navigation "Hauptnavigation" [ref=f7e5]:
+      - link "Registrieren" [ref=f7e6] [cursor=pointer]:
+        - /url: /register
+  - main [ref=f7e7]:
+    - complementary [ref=f7e8]:
+      - paragraph [ref=f7e9]: Wechseln ist eine Entscheidung, kein Zufall.
+      - paragraph [ref=f7e10]: Du bestimmst, wer dich sieht, wer dich anspricht und was du teilst.
+    - region [ref=f7e12]:
+      - heading "Anmelden" [level=1] [ref=f7e13]
+      - generic [ref=f7e14]:
+        - generic [ref=f7e15]:
+          - generic [ref=f7e16]: E-Mail
+          - textbox "E-Mail" [ref=f7e17]
+        - generic [ref=f7e18]:
+          - generic [ref=f7e19]: Passwort
+          - textbox "Passwort" [ref=f7e20]
+        - button "Anmelden" [ref=f7e21] [cursor=pointer]
+      - paragraph [ref=f7e22]:
+        - text: Noch kein Konto?
+        - link "Jetzt registrieren" [ref=f7e23] [cursor=pointer]:
+          - /url: /register

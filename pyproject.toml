@@ -1,0 +1,118 @@
+[project]
+name = "workertransfer"
+version = "0.1.0"
+description = "Consent-first talent mobility platform"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  # Nur für Tests: die Outbox-Zusagen (dieselbe Transaktion, Wiederholung)
+  # hängen an SQLAlchemy, nicht am Dialekt — dafür genügt eine Datenbank im
+  # Speicher, und sie läuft ohne Docker. Reines Python, keine Laufzeitfolgen.
+  "aiosqlite>=0.20.0,<1.0.0",
+  "httpx>=0.27.0,<1.0.0",
+  "httpx2>=2.5.0,<3.0.0",
+  "mypy>=1.19.1,<2.0.0",
+  "pytest>=9.0.2,<10.0.0",
+  "pytest-asyncio>=1.3.0,<2.0.0",
+  "ruff>=0.15.0,<1.0.0",
+  "testcontainers[postgres]>=4.0.0,<5.0.0",
+]
+
+[tool.uv.workspace]
+members = ["apps/identity-service", "apps/consent-service", "apps/profile-service", "apps/resume-service", "apps/portfolio-service", "apps/jobs-service", "apps/applications-service", "apps/companies-service", "apps/transfer-service", "apps/github-service", "packages/worker-*", "packages/worker-cli"]
+# Nichts mehr ausgeschlossen. `worker-ai` war es bis zum 05.08.2026, weil seine
+# ML-Wheels keinen Python-3.14-Build hatten — acht schwere Abhängigkeiten für
+# 246 Zeilen ohne Konsumenten. In Sub-step 7.1 neu geschrieben mit EINER
+# Abhängigkeit und einem echten Konsumenten (ADR-0024); davor traf es
+# worker-files/worker-storage aus demselben Grund (ADR-0021).
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-platform = { workspace = true }
+worker-shared = { workspace = true }
+worker-config = { workspace = true }
+worker-logging = { workspace = true }
+worker-correlation = { workspace = true }
+worker-auth = { workspace = true }
+worker-authorization = { workspace = true }
+worker-database = { workspace = true }
+worker-cache = { workspace = true }
+worker-events = { workspace = true }
+worker-health = { workspace = true }
+worker-metrics = { workspace = true }
+worker-tracing = { workspace = true }
+worker-telemetry = { workspace = true }
+worker-validation = { workspace = true }
+worker-tenancy = { workspace = true }
+worker-resilience = { workspace = true }
+worker-storage = { workspace = true }
+worker-skills = { workspace = true }
+worker-outbox = { workspace = true }
+worker-contracts = { workspace = true }
+worker-scheduler = { workspace = true }
+worker-ai = { workspace = true }
+worker-mcp = { workspace = true }
+worker-templates = { workspace = true }
+worker-cli = { workspace = true }
+consent-service = { workspace = true }
+github-service = { workspace = true }
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# "tests" holds repo-level architectural guards (workspace dependency hygiene)
+# that belong to no single package.
+testpaths = ["tests", "apps", "packages"]
+# importlib statt des Prepend-Modus: sonst leitet pytest Modulnamen aus Pfaden
+# ab, und drei Services mit je einem tests/test_app.py kollidieren
+# ("import file mismatch"). Mit importlib trägt jede Testdatei ihren vollen
+# Pfad als Identität — Services dürfen ihre Tests gleich benennen, was der
+# Generator ohnehin tut.
+addopts = "--import-mode=importlib"
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+# "S" (flake8-bandit) is deliberate for a consent-first product: it flags hardcoded
+# secrets, weak hashing, unsafe subprocess/deserialisation and SQL built by string
+# concatenation. It was previously absent while per-file-ignores already excused
+# S101 in tests, which made that ignore a silent no-op.
+select = ["E", "F", "I", "B", "UP", "ASYNC", "RUF", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# assert is the point of a test; S105/S106 are fixtures, not real secrets; test
+# helpers legitimately shell out (e.g. probing for a Docker daemon, ADR-0011).
+"**/tests/**/*.py" = ["S101", "S105", "S106", "S603", "S607"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+warn_unreachable = true
+# `apps/.*/migrations` als Muster, nicht je Service ein Eintrag: jedes
+# migrations-Verzeichnis enthält ein `env.py`, und zwei davon im selben Lauf
+# sind für mypy dasselbe Modul zweimal ("Duplicate module named 'env'"). Mit
+# einer Aufzählung bricht der vierte Service den Typcheck, ohne dass jemand
+# ahnt, warum. Alembic-Umgebungsdateien haben ohnehin keinen Typvertrag.
+exclude = ["tests", "apps/.*/migrations"]
+
+# Untyped third-party libraries (no py.typed marker / no stubs available).
+# Strict mode stays on; we only silence import-untyped for these specific modules.
+[[tool.mypy.overrides]]
+module = [
+  "apscheduler.*",
+  "redis.*",
+  "boto3.*",
+  "casbin.*",
+  "casbin_sqlalchemy_adapter.*",
+  "sendgrid.*",
+  "weasyprint.*",
+  "pdfplumber.*",
+  "docx.*",
+  "magic.*",
+  "bs4.*",
+]
+ignore_missing_imports = true

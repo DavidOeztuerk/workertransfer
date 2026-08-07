@@ -1,0 +1,32 @@
+[project]
+name = "worker-templates"
+version = "0.1.0"
+description = "Document templates: Contract generation, Letters, CV, PDF rendering"
+requires-python = ">=3.14"
+dependencies = [
+    "jinja2>=3.1.0,<4.0.0",
+    "pydantic>=2.8.0,<3.0.0",
+]
+
+# PDF rendering (weasyprint) is an optional extra: it pulls native Pango/Cairo/
+# libffi and has no wheel for Python 3.14 on ubuntu-latest, so building it from
+# source fails CI. worker_templates.__init__ imports jinja2 eagerly (pure
+# Python, wheel available); weasyprint is lazily imported inside
+# PDFRenderer.html_to_pdf only. `uv sync` without --extra pdf installs neither
+# weasyprint nor its native deps, and the shell + smoke (which constructs
+# PDFRenderer but never calls html_to_pdf) stay importable. Activated when a
+# Phase-3/5/8 consumer actually renders PDFs.
+[project.optional-dependencies]
+pdf = ["weasyprint>=60.0,<61.0"]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_templates"
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-config = { workspace = true }
+worker-storage = { workspace = true }

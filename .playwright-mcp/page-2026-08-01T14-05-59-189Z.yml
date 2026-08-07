@@ -1,0 +1,16 @@
+- generic [ref=e2]:
+  - navigation "Hauptnavigation" [ref=e3]:
+    - link "Start" [ref=e4] [cursor=pointer]:
+      - /url: /
+  - main [ref=e5]:
+    - region [ref=e6]:
+      - generic [ref=e7]:
+        - heading "Anmelden" [level=1] [ref=e8]
+        - generic [ref=e9]:
+          - generic [ref=e10]:
+            - text: E-Mail
+            - textbox "E-Mail" [ref=e11]
+          - generic [ref=e12]:
+            - text: Passwort
+            - textbox "Passwort" [ref=e13]
+          - button "Anmelden" [ref=e14] [cursor=pointer]

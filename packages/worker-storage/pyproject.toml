@@ -1,0 +1,23 @@
+[project]
+name = "worker-storage"
+version = "0.1.0"
+description = "Ablage für Dateien: ein Port und ein Backend, das benutzt wird"
+requires-python = ">=3.14"
+dependencies = [
+    # Nur worker-core (für DomainError). Die frühere Fassung deklarierte boto3,
+    # minio UND azure-storage-blob gleichzeitig, dazu pillow und python-magic —
+    # ohne einen einzigen Konsumenten, und mit C-Erweiterungen, die sich für
+    # Python 3.14 nicht bauen ließen. Ein zusätzliches Backend bringt seine
+    # Abhängigkeit mit, wenn es gebraucht wird.
+    "worker-core",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_storage"
+
+[tool.uv.sources]
+worker-core = { workspace = true }

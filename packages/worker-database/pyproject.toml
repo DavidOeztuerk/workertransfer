@@ -1,0 +1,26 @@
+[project]
+name = "worker-database"
+version = "0.1.0"
+description = "Database layer: SQLAlchemy 2, Alembic, Unit of Work, Repository, Multi-tenancy, Soft delete, Auditing, Outbox"
+requires-python = ">=3.14"
+dependencies = [
+    "sqlalchemy>=2.0.0,<3.0.0",
+    "asyncpg>=0.29.0,<1.0.0",
+    "alembic>=1.13.0,<2.0.0",
+    "pydantic>=2.8.0,<3.0.0",
+    "pydantic-settings>=2.4.0,<3.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_database"
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-shared = { workspace = true }
+worker-config = { workspace = true }
+worker-correlation = { workspace = true }
+worker-tenancy = { workspace = true }
