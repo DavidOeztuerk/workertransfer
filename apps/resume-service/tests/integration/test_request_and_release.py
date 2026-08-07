@@ -11,6 +11,7 @@ erste nicht mehr, ohne Wartezeit dazwischen.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -395,3 +396,53 @@ async def test_a_decline_leaves_the_company_with_nothing_in_the_ledger_too(
 
     gone = await _call(resume_app, "GET", f"/resumes/{candidate.id}", company.token)
     assert gone.status_code == 404, gone.text
+
+
+async def test_the_notification_survives_a_broken_notifier(apps: tuple[Any, Any]) -> None:
+    """Der Gewinn von 9.2 — und der Fall, den die alte Fassung verlor.
+
+    Vorher lief die Benachrichtigung als „feuern und vergessen": ein
+    HTTP-Aufruf nach dem Commit, dessen Fehler geschluckt wurde. Ein Neustart
+    von identity-service genügte, und die Person erfuhr nie, dass ein
+    Unternehmen nach ihrem Lebenslauf gefragt hat — und ohne diese Nachricht
+    kann sie nicht antworten, was den ganzen Vorgang stillstehen lässt.
+
+    Diese Zusage war hier vorher **gar nicht geprüft**: der Dienst hatte keinen
+    einzigen Test auf den Notifier.
+    """
+    from resume_service.infrastructure.database.models import OUTBOX
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from worker_outbox import OutboxDispatcher
+
+    resume_app, _consent, candidate, company = await _prepared(apps)
+
+    asked = await _call(resume_app, "POST", f"/resumes/{candidate.id}/requests", company.token)
+    assert asked.status_code == 201, asked.text
+
+    engine = create_async_engine(os.environ["WORKER_DATABASE_URL"])
+    try:
+        sessions = async_sessionmaker(engine, expire_on_commit=False)
+
+        class Broken:
+            async def notify(self, user_id: UUID, kind: str) -> None:
+                raise ConnectionError("identity-service startet gerade neu")
+
+        class Working:
+            def __init__(self) -> None:
+                self.sent: list[tuple[UUID, str]] = []
+
+            async def notify(self, user_id: UUID, kind: str) -> None:
+                self.sent.append((user_id, kind))
+
+        # Erster Anlauf scheitert — die Zeile bleibt liegen, statt verloren zu
+        # gehen. Das ist der ganze Unterschied zu vorher.
+        broken = OutboxDispatcher(session_factory=sessions, table=OUTBOX, delivery=Broken())
+        assert await broken.drain_once() == 0
+
+        # Der Dienst ist wieder da, niemand musste etwas nachtragen.
+        working = Working()
+        good = OutboxDispatcher(session_factory=sessions, table=OUTBOX, delivery=working)
+        assert await good.drain_once() == 1
+        assert working.sent == [(candidate.id, "resume_request")]
+    finally:
+        await engine.dispose()

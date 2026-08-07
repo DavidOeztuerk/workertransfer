@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Self
 
 from pydantic import SecretStr, model_validator
+from worker_ai import ANTHROPIC_MESSAGES_URL
 from worker_auth import DEV_JWT_SECRET, assert_deployable_jwt_secret
 from worker_platform.configuration import PlatformSettings
 
@@ -23,6 +24,18 @@ class JobsServiceSettings(PlatformSettings):
     # HS256 secret issued by identity-service; this service only verifies
     # (ADR-0007). Runtime-only — never commit a real value.
     jwt_secret: SecretStr = SecretStr(DEV_JWT_SECRET)
+
+    # Gemeinsames Geheimnis für `POST /internal/company-withdrawal` (ADR-0027 §7).
+    # Derselbe Schlüssel wie die Löschkaskade, aber ein anderer Endpunkt: dieser
+    # Dienst ist kein Empfänger der Kaskade.
+    #
+    # Leer heißt: der Endpunkt ist zu.
+    erasure_secret: SecretStr = SecretStr("")
+
+    # Die Formulierungshilfe für die eigene Anzeige (ADR-0024). Leer heißt: aus.
+    anthropic_api_key: SecretStr = SecretStr("")
+    drafting_model: str = "claude-sonnet-5"
+    drafting_base_url: str = ANTHROPIC_MESSAGES_URL
 
     @model_validator(mode="after")
     def _reject_development_jwt_secret(self) -> Self:

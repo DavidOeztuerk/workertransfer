@@ -10,12 +10,15 @@ from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from worker_database import Base, TimestampMixin, VersionMixin
+from worker_outbox import build_outbox_table
 from worker_shared import utc_now
 
 from identity_service.domain.audit import AuditAction
+from identity_service.domain.company import TenantStatus
 from identity_service.domain.user import AccountStatus
 
 __all__ = [
+    "OUTBOX",
     "AuditEventModel",
     "EmailVerificationTokenModel",
     "NotificationPreferenceModel",
@@ -24,6 +27,12 @@ __all__ = [
     "UserModel",
     "UserTenantMembershipModel",
 ]
+
+#: Die Outbox — identity-service hatte bisher keine (ADR-0027 V2). Sie trägt
+#: hier **keine** Benachrichtigungen: dieser Dienst ist deren Empfänger, nicht
+#: ihr Absender. Was hier hineinkommt, sind Löschabsichten — und genau dafür
+#: reicht die Tabelle, weil ein Löschbefehl keinen Inhalt hat (ADR-0027 §4).
+OUTBOX = build_outbox_table(Base)
 
 
 class UserModel(Base, TimestampMixin, VersionMixin):
@@ -60,6 +69,12 @@ class TenantModel(Base):
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     domain: Mapped[str] = mapped_column(CITEXT, nullable=False, unique=True)
+    #: Stillgelegt, wenn die letzte Person mit `role='admin'` ihr Konto löscht
+    #: (ADR-0027 §7). Nicht gelöscht: ein Unternehmen ist keine natürliche
+    #: Person (ADR-0017), und seine Anzeigen gehören ihm auch dann noch.
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=TenantStatus.ACTIVE.value
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
@@ -165,8 +180,14 @@ class InvitationModel(Base):
     )
     email: Mapped[str] = mapped_column(CITEXT, nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False)
-    invited_by: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    #: `SET NULL`, nicht `CASCADE` — und der Unterschied ist keine Feinheit
+    #: (ADR-0027 §2). Mit `CASCADE` verschwanden die offenen Einladungen eines
+    #: Unternehmens, sobald ein Recruiter sein **privates** Konto löschte. Die
+    #: Einladung gehört aber dem Unternehmen; was fällt, ist der Name daran.
+    #: `NULL` heißt „die Person, die einlud, gibt es nicht mehr" — nicht
+    #: „niemand hat eingeladen".
+    invited_by: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     # Nur der Hash: der Klartext geht per Mail raus und steht nirgends in der

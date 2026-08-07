@@ -28,11 +28,9 @@ from worker_core import DomainError
 from consent_service.application.commands import (
     CheckConsentQuery,
     ConsentSubjectMismatch,
-    DeleteConsentCommand,
     GrantConsentCommand,
     RevokeConsentCommand,
     handle_check,
-    handle_delete,
     handle_grant,
     handle_list_mine,
     handle_my_history,
@@ -116,20 +114,6 @@ def build_consent_router(deps: dict[str, Any]) -> APIRouter:
         )
         async with request_scope(session_factory) as (_uow, repos):
             result = await handle_revoke(cmd, deps=deps, repos=repos)
-        if not result.is_success:
-            raise _to_http(result.error)
-        return _state_dto(body.subject_id, body.capability, result.value)
-
-    @router.post("/delete")
-    async def delete(body: ConsentRevokeV1, request: Request) -> ConsentStateV1:
-        cmd = DeleteConsentCommand(
-            subject_id=body.subject_id,
-            capability=body.capability,
-            actor_id=_actor_id(request),
-            reason=body.reason,
-        )
-        async with request_scope(session_factory) as (_uow, repos):
-            result = await handle_delete(cmd, deps=deps, repos=repos)
         if not result.is_success:
             raise _to_http(result.error)
         return _state_dto(body.subject_id, body.capability, result.value)

@@ -24,6 +24,15 @@ class PortfolioServiceSettings(PlatformSettings):
     # nicht localhost — der Aufruf läuft container-zu-container.
     consent_base_url: str = "http://127.0.0.1:8002"
 
+    # Gemeinsames Geheimnis für `POST /internal/erasure` (ADR-0027 §4.4).
+    # **Ausdrücklich ein anderes als `notify_secret`**: „darf eine Mail
+    # anstoßen" und „darf alles über einen Menschen löschen" dürfen nicht
+    # dasselbe Papier sein.
+    #
+    # Leer heißt: der Endpunkt ist zu. Bis es echte Dienstidentitäten gibt, ist
+    # das die Zwischenlösung — und die Voreinstellung schließt.
+    erasure_secret: SecretStr = SecretStr("")
+
     # Wohin Anhänge geschrieben werden. Im Container ein Volume — ein Pfad im
     # Image wäre beim nächsten Deploy weg.
     storage_root: str = "./var/portfolio-attachments"

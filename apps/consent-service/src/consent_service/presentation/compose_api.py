@@ -22,6 +22,7 @@ from worker_tenancy import ClaimTenantResolver
 
 from consent_service.configuration import ConsentServiceSettings
 from consent_service.infrastructure.compose import compose_infrastructure
+from consent_service.presentation.http.erasure_router import build_erasure_router
 from consent_service.presentation.http.router import build_consent_router
 
 
@@ -45,7 +46,7 @@ def build_app(settings: ConsentServiceSettings) -> FastAPI:
         tenant_resolver=ClaimTenantResolver(),
         auth_middleware=JwtAuthMiddleware,
         auth_middleware_kwargs={"verify": verify_access_token},
-        routers=(build_consent_router(deps),),
+        routers=(build_consent_router(deps), build_erasure_router(deps)),
     )
 
 

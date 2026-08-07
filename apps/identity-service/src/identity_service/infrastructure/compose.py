@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -25,6 +26,8 @@ from identity_service.infrastructure.database.repositories import (
     SqlAlchemyUserRepository,
     SqlAlchemyVerificationTokenRepository,
 )
+from identity_service.infrastructure.erasure import HttpErasureDelivery
+from identity_service.infrastructure.erasure_dispatch import ErasureDispatch
 from identity_service.infrastructure.mail import SmtpMailer
 
 
@@ -101,4 +104,55 @@ def compose_infrastructure(
             password=settings.smtp_password.get_secret_value() if settings.smtp_password else None,
             use_tls=settings.smtp_use_tls,
         ),
+        "erasure_delivery": HttpErasureDelivery(
+            targets={
+                "consent": settings.consent_base_url,
+                "profile": settings.profile_base_url,
+                "resume": settings.resume_base_url,
+                "portfolio": settings.portfolio_base_url,
+                "applications": settings.applications_base_url,
+                "transfer": settings.transfer_base_url,
+                "github": settings.github_base_url,
+                "jobs": settings.jobs_base_url,
+            },
+            secret=settings.erasure_secret.get_secret_value(),
+        ),
     }
+
+
+def erasure_runner(deps: dict[str, Any], settings: IdentityServiceSettings) -> Any:
+    """Der Dauerläufer der Löschkaskade.
+
+    Zwei Abweichungen vom Benachrichtigungs-Zusteller, beide aus ADR-0027 §4.3:
+
+    * **Keine Versuchsobergrenze.** Für eine Mail ist „nach zehn Versuchen
+      liegenlassen" richtig; für eine Löschung wäre es das stille Scheitern,
+      gegen das die ganze Konstruktion antritt.
+    * **Wachsender Abstand.** Der Gegenpart dazu — wer nie aufgibt, darf nicht
+      im Sekundentakt gegen eine Wand laufen.
+    """
+    from worker_outbox import OutboxDispatcher, run_with_backoff
+
+    from identity_service.infrastructure.database.models import OUTBOX
+
+    dispatcher = OutboxDispatcher(
+        session_factory=deps["session_factory"],
+        table=OUTBOX,
+        delivery=ErasureDispatch(
+            session_factory=deps["session_factory"],
+            delivery=deps["erasure_delivery"],
+            mailer=deps["mailer"],
+            clock=deps["clock"],
+        ),
+        max_attempts=None,
+    )
+
+    async def run() -> None:
+        await run_with_backoff(
+            dispatcher,
+            interval_seconds=settings.erasure_interval_seconds,
+            max_interval_seconds=settings.erasure_max_interval_seconds,
+            sleep=asyncio.sleep,
+        )
+
+    return run

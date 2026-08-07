@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+import asyncio
+import contextlib
+import logging
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Mapping
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import APIRouter, FastAPI
@@ -33,6 +37,7 @@ def create_api_app(
     throttle_limits: Mapping[tuple[str, str], Limit] | None = None,
     trust_forwarded_for: bool = False,
     routers: Iterable[APIRouter] = (),
+    background: Iterable[Callable[[], Awaitable[None]]] = (),
 ) -> FastAPI:
     """Create a secure, observable HTTP entry point with no business endpoints.
 
@@ -43,6 +48,7 @@ def create_api_app(
     """
 
     configure_logging()
+    _setup_tracing_if_configured(settings)
     docs_url = "/docs" if settings.enable_docs else None
     openapi_url = "/openapi.json" if settings.enable_docs else None
     app = FastAPI(
@@ -51,7 +57,9 @@ def create_api_app(
         docs_url=docs_url,
         redoc_url=None,
         openapi_url=openapi_url,
+        lifespan=_lifespan_for(background),
     )
+    _instrument_app_if_configured(app, settings)
     register_exception_handlers(app)
     app.include_router(create_health_router(settings.service_name, readiness_checks))
     for router in routers:
@@ -96,6 +104,100 @@ def create_api_app(
     app.add_middleware(CorrelationIdMiddleware)
     _add_cors_middleware(app, settings)
     return app
+
+
+_logger = logging.getLogger("workertransfer.platform.background")
+
+
+def _instrument_app_if_configured(app: FastAPI, settings: PlatformSettings) -> None:
+    """Die FastAPI-Instrumentierung braucht die App, nicht nur den Aufruf.
+
+    `FastAPIInstrumentor().instrument()` global setzt nur an Apps an, die
+    DANACH entstehen — und traf diese hier nicht. Sichtbar wurde das daran,
+    dass in Jaeger zwar Datenbank-Spans ankamen (`connect`), aber kein
+    einziger HTTP-Span. Ein halber Trace ist schlimmer als keiner: er sieht
+    aus, als funktioniere die Beobachtung.
+    """
+    if not settings.otlp_endpoint:
+        return
+    try:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+        FastAPIInstrumentor.instrument_app(app)
+    except Exception:
+        _logger.warning("HTTP-Instrumentierung fehlgeschlagen", exc_info=True)
+
+
+def _setup_tracing_if_configured(settings: PlatformSettings) -> None:
+    """Traces nur, wenn ein Ziel eingerichtet ist — sonst gar nichts.
+
+    Dieselbe Regel wie beim Entwurfsdienst (ADR-0024): eine Voreinstellung, die
+    im Zweifel nach außen spricht, ist die falsche. Ohne
+    `WORKER_OTLP_ENDPOINT` wird nicht instrumentiert, kein Exporter gebaut und
+    nichts gesendet.
+
+    Der Import steht INNEN, nicht oben: `worker-tracing` zieht das halbe
+    OpenTelemetry-SDK, und ein Dienst ohne Tracing soll es nicht laden müssen.
+
+    Ein Fehlschlag hier darf den Dienst nicht am Start hindern. Beobachtung ist
+    kein Selbstzweck — ein Kollektor, der gerade nicht da ist, wäre ein
+    absurder Grund, die Anmeldung auszusetzen. Er wird gemeldet, nicht
+    geworfen.
+    """
+    if not settings.otlp_endpoint:
+        return
+    try:
+        from worker_tracing import setup_tracing
+
+        setup_tracing(settings.service_name, settings.otlp_endpoint)
+    except Exception:
+        _logger.warning("Tracing konnte nicht eingerichtet werden", exc_info=True)
+
+
+def _lifespan_for(
+    background: Iterable[Callable[[], Awaitable[None]]],
+) -> Callable[[FastAPI], Any]:
+    """Dauerläufer, die mit der App leben — und mit ihr enden.
+
+    Gebraucht für den Outbox-Zusteller: eine Schleife, die eine Tabelle liest
+    und zustellt. Sie gehört in den Dienst und nicht in einen eigenen Prozess —
+    ein weiteres Deployment, ein weiterer Gesundheitscheck und ein weiterer Ort
+    zum Vergessen wären ein hoher Preis für eine `while`-Schleife.
+
+    Zwei Dinge, die hier leicht falsch gemacht werden:
+
+    1. **Abbrechen und WARTEN.** Nur `cancel()` zu rufen und weiterzugehen
+       beendet den Prozess, während die Aufgabe noch mitten in einer
+       Datenbank-Transaktion steckt. Deshalb das `await` hinter dem Abbruch.
+    2. **Ein Absturz darf nicht still sein.** Eine Hintergrundaufgabe, die eine
+       Ausnahme wirft, stirbt lautlos; die App läuft weiter und beantwortet
+       Anfragen, aber es stellt niemand mehr zu. Genau der Zustand, den die
+       Outbox abschaffen soll — deshalb wird er protokolliert.
+    """
+    runners = tuple(background)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        tasks = [asyncio.create_task(_guarded(runner)) for runner in runners]
+        try:
+            yield
+        finally:
+            for task in tasks:
+                task.cancel()
+            for task in tasks:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+
+    return lifespan
+
+
+async def _guarded(runner: Callable[[], Awaitable[None]]) -> None:
+    try:
+        await runner()
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        _logger.exception("Hintergrundaufgabe beendet sich mit einem Fehler")
 
 
 def _add_cors_middleware(app: FastAPI, settings: PlatformSettings) -> None:

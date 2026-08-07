@@ -36,31 +36,72 @@ const REQUIRED: ReadonlyArray<readonly [string, string]> = [
   ["mailpit", `${MAILPIT_URL}/api/v1/messages?limit=1`],
 ];
 
-let cached: string | null | undefined;
+//: Nur der positive Befund wird gemerkt — siehe `missingService`.
+let stackIsUp = false;
+
+//: Geduldig, und das ist der Punkt. Vorher stand hier EIN Versuch mit 2
+//: Sekunden — und weil das Ergebnis unten zwischengespeichert wird, schaltete
+//: ein einziger Aussetzer die GESAMTE restliche Reihe ab: 12 von 18 Dateien
+//: übersprangen sich, obwohl der Stapel lief (dieselben Dateien liefen einzeln
+//: durch). Der Vite-Dev-Server übersetzt beim ersten Zugriff und braucht unter
+//: Last leicht länger als zwei Sekunden.
+//:
+//: Ein Dienst, der nach drei Sekunden antwortet, LÄUFT. Die Frage hier ist
+//: „steht der Stapel?" und nicht „ist er schnell?" — und die falsche Antwort
+//: ist teuer: sie erzeugt einen Bericht über einen Lauf, der nie stattgefunden
+//: hat.
+const PROBE_TIMEOUT_MS = 10_000;
+const PROBE_ATTEMPTS = 3;
+
+//: Wie lange auf eine Mail gewartet wird.
+//:
+//: Seit ADR-0025 geht eine Benachrichtigung NICHT mehr synchron im Request
+//: raus, sondern über die Outbox: Zeile schreiben → Zusteller (Takt 5 s) →
+//: HTTP an identity-service → SMTP. Die Zusage lautet seither „innerhalb des
+//: Taktes", nicht „sofort" — und 20 Sekunden waren dafür zu knapp bemessen.
+//: Unter Last ist genau das passiert: der Lauf brauchte statt 4,6 ganze 48,6
+//: Minuten, und die Reise fiel um, obwohl die Mail nur später kam.
+//:
+//: Die Reisen prüfen „die Mail kommt an", nicht „die Mail kommt in 20 Sekunden
+//: an". Ein zu knapper Zeitrahmen macht daraus eine Aussage über die
+//: Geschwindigkeit der Maschine.
+const MAIL_TIMEOUT_MS = 60_000;
 
 async function reachable(url: string): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2_000);
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-/** `null`, wenn alles läuft — sonst der Grund fürs Überspringen. */
-export async function missingService(): Promise<string | null> {
-  if (cached !== undefined) return cached;
-  for (const [name, url] of REQUIRED) {
-    if (!(await reachable(url))) {
-      cached = name;
-      return cached;
+  for (let attempt = 1; attempt <= PROBE_ATTEMPTS; attempt += 1) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) return true;
+    } catch {
+      // Nächster Versuch — ein abgebrochener Aufruf ist kein Beweis.
+    }
+    if (attempt < PROBE_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
     }
   }
-  cached = null;
-  return cached;
+  return false;
+}
+
+/** `null`, wenn alles läuft — sonst der Grund fürs Überspringen.
+ *
+ * Zwischengespeichert wird nur ein **positives** Ergebnis. Ein negatives ist
+ * die teure Antwort: es überspringt eine Datei, und über die Reihe hinweg
+ * womöglich alle. Fehlt der Stapel wirklich, kostet die Wiederholung je Datei
+ * einen Anlauf gegen den erstbesten nicht erreichbaren Dienst — bezahlbar.
+ * Blieb er dagegen nur einmal hängen, laufen die restlichen Dateien.
+ */
+export async function missingService(): Promise<string | null> {
+  if (stackIsUp) return null;
+  for (const [name, url] of REQUIRED) {
+    if (!(await reachable(url))) {
+      return name;
+    }
+  }
+  stackIsUp = true;
+  return null;
 }
 
 /** In einer Datei einmal aufrufen; überspringt sie, wenn der Stack fehlt. */
@@ -120,7 +161,7 @@ async function tokenFromMail(
   linkPath: string
 ): Promise<string> {
   const pattern = new RegExp(`${linkPath}\\?token=([A-Za-z0-9_-]+)`);
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + MAIL_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const list = (await (await fetch(`${MAILPIT_URL}/api/v1/messages?limit=50`)).json()) as {
       messages?: MailpitMessage[];
@@ -157,6 +198,7 @@ interface MailpitDetail {
   Subject?: string;
 }
 
+
 /**
  * Die zuletzt an `address` zugestellte Mail — ohne Filter auf den Betreff.
  *
@@ -168,7 +210,7 @@ export async function lastMailFor(
   address: string,
   { after = 0 }: { after?: number } = {}
 ): Promise<{ subject: string; text: string } | null> {
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + MAIL_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const list = (await (await fetch(`${MAILPIT_URL}/api/v1/messages?limit=50`)).json()) as {
       messages?: (MailpitMessage & { Created?: string })[];

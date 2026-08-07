@@ -7,7 +7,6 @@ durch den Consent-Ledger, je Unternehmen einzeln.
 from __future__ import annotations
 
 import asyncio
-import logging
 from typing import Any
 from uuid import UUID
 
@@ -32,9 +31,11 @@ from resume_service.application.handlers import (
 from resume_service.domain.request import ResumeRequest
 from resume_service.domain.resume import Education, MonthDate, Position, Resume
 from resume_service.infrastructure.consent import ConsentUnavailable
+from resume_service.infrastructure.database.models import OUTBOX
 from worker_auth import get_request_user, resolve_token
 from worker_contracts import EducationV1, PositionV1, ResumeRequestV1, ResumeV1, SaveResumeV1
 from worker_core import DomainError
+from worker_outbox import record
 
 __all__ = ["build_router"]
 
@@ -112,22 +113,14 @@ def _to_http(error: Any) -> HTTPException:
     return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, message)
 
 
-async def _notify(deps: dict[str, Any], user_id: UUID, kind: str) -> None:
-    """Benachrichtigen darf nichts kippen — und das steht HIER, nicht nur im Adapter.
-
-    Der HTTP-Adapter schluckt seine Fehler bereits. Sich darauf zu verlassen
-    hieße, die Zusage an der Wahl der Implementierung aufzuhängen: ein anderer
-    Adapter, ein Tippfehler in den Einstellungen, ein Fake im Test — und ein
-    Vorgang scheitert, weil eine Mail nicht rausging. Ein Integrationstest mit
-    einem absichtlich kaputten Notifier hat genau das gezeigt.
-    """
-    try:
-        await deps["notify"].notify(user_id, kind)
-    except Exception:
-        _logger.warning("Benachrichtigung konnte nicht abgesetzt werden", exc_info=True)
-
-
-_logger = logging.getLogger("workertransfer.resume.notify")
+# `_notify` ist weg (ADR-0025).
+#
+# Vorher stand hier ein Helfer, der nach dem Commit einen HTTP-Notifier rief und
+# JEDEN Fehler schluckte. Die Begründung war richtig — eine misslungene Mail darf
+# einen Vorgang nicht kippen — aber der Preis war, dass die Mail dann für immer
+# weg war. Die Zusage gilt unverändert, sie wird nur anders eingelöst: die
+# Absicht geht VOR dem Commit in dieselbe Transaktion, ein Zusteller im
+# Hintergrund darf danach beliebig oft scheitern.
 
 
 def build_router(deps: dict[str, Any]) -> APIRouter:
@@ -305,10 +298,10 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
                 ) from exc
             if not result.is_success:
                 raise _to_http(result.error)
+            # VOR dem Commit, in DERSELBEN Transaktion (ADR-0025): kommt die
+            # Anfrage durch, liegt die Benachrichtigung fest.
+            await record(uow.session, OUTBOX, user_id=subject_id, kind="resume_request")
             await uow.commit()
-        # Nach dem Commit und ohne Rückwirkung: eine misslungene Mail darf die
-        # Anfrage nicht rückgängig machen.
-        await _notify(deps, subject_id, "resume_request")
         return _request_dto(result.value)
 
     @router.get("/resumes/requests")

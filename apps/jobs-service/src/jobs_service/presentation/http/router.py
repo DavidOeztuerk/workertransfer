@@ -28,8 +28,15 @@ from jobs_service.application.handlers import (
     handle_update_job,
 )
 from jobs_service.domain.job import Job, TransitionNotAllowed
+from worker_ai import DrafterUnavailable, JobDraftContext
 from worker_auth import get_request_user
-from worker_contracts import JobPageV1, JobV1, SaveJobV1
+from worker_contracts import (
+    DraftJobTextV1,
+    JobPageV1,
+    JobTextDraftV1,
+    JobV1,
+    SaveJobV1,
+)
 from worker_core import DomainError
 
 __all__ = ["build_router"]
@@ -86,6 +93,41 @@ def build_router(deps: dict[str, Any]) -> APIRouter:
                 "posting a job requires an active company",
             )
         return principal.tenant_id
+
+    @router.post("/jobs/draft")
+    async def draft_job_text(body: DraftJobTextV1, request: Request) -> JobTextDraftV1:
+        """Die eigene Anzeige verständlicher formulieren lassen.
+
+        Der einzige Unternehmens-Agent aus dem ULTRAPLAN, der ohne eigene
+        Abwägung baubar ist: Scout, Candidate Ranking, Salary Recommendation
+        und Team Analyzer richten sich alle auf **Personen**. Dieser richtet
+        sich auf einen Text, den das Unternehmen selbst verfasst hat — er sagt
+        über niemanden etwas (ADR-0022/0024).
+
+        `_company(request)` steht auch hier: ausschreiben darf, wer für ein
+        Unternehmen handelt. Ohne die Prüfung wäre der Endpunkt ein
+        Textgenerator für jeden Angemeldeten.
+
+        Der Zusammenhang kommt aus dem Request und nicht aus der Datenbank —
+        beim Schreiben gibt es die Anzeige dort noch nicht. Unbedenklich, weil
+        es Angaben des Unternehmens über sich selbst sind.
+        """
+        _ = _company(request)
+        context = JobDraftContext(
+            title=body.title,
+            description=body.description,
+            skills=tuple(body.skills),
+            location=body.location,
+            wish=body.wish,
+        )
+        try:
+            draft = await deps["drafter"].draft(context)
+        except DrafterUnavailable as exc:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "Der Entwurfsdienst ist gerade nicht verfügbar.",
+            ) from exc
+        return JobTextDraftV1(draft=draft)
 
     @router.post("/jobs", status_code=status.HTTP_201_CREATED)
     async def create_job(body: SaveJobV1, request: Request) -> JobV1:

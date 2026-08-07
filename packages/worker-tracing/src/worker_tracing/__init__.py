@@ -5,10 +5,8 @@ from typing import Any, cast
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.aio_pika import AioPikaInstrumentor
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -29,12 +27,17 @@ def setup_tracing(service_name: str, otlp_endpoint: str = "http://localhost:4317
 
     trace.set_tracer_provider(provider)
 
-    # Auto-instrument
-    FastAPIInstrumentor.instrument()
-    SQLAlchemyInstrumentor.instrument()
-    RedisInstrumentor().instrument()
-    HTTPXClientInstrumentor.instrument()
-    AioPikaInstrumentor.instrument()
+    # Instrumentoren sind INSTANZEN, keine Klassen: `Instrumentor.instrument()`
+    # wirft `missing 1 required positional argument: 'self'`. Genau so stand es
+    # hier, seit das Paket angelegt wurde — und fiel nie auf, weil es keinen
+    # Konsumenten hatte. Ein Paket, das existiert, ist damit noch nicht eines,
+    # das funktioniert.
+    FastAPIInstrumentor().instrument()
+    SQLAlchemyInstrumentor().instrument()
+    # Kein Redis-Instrumentor: es gibt kein Redis (ADR-0025/0026 haben die
+    # letzten Pakete entfernt, die eines vorsahen). Ein Instrumentor für
+    # etwas, das nicht läuft, zieht nur eine Abhängigkeit.
+    HTTPXClientInstrumentor().instrument()
 
     return trace.get_tracer(__name__)
 

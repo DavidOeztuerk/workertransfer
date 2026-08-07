@@ -29,11 +29,9 @@ from consent_service.domain.value_objects import Capability, ConsentAction, Reas
 __all__ = [
     "CheckConsentQuery",
     "ConsentSubjectMismatch",
-    "DeleteConsentCommand",
     "GrantConsentCommand",
     "RevokeConsentCommand",
     "handle_check",
-    "handle_delete",
     "handle_grant",
     "handle_list_mine",
     "handle_my_history",
@@ -100,14 +98,6 @@ class RevokeConsentCommand:
 
 
 @dataclass(frozen=True, slots=True)
-class DeleteConsentCommand:
-    subject_id: UUID
-    capability: str
-    actor_id: UUID
-    reason: str
-
-
-@dataclass(frozen=True, slots=True)
 class CheckConsentQuery:
     subject_id: UUID
     capability: str
@@ -145,14 +135,17 @@ async def _record(
                 reason=parsed_reason,
             )
         else:
-            # REVOKE and DELETE require a reason. The command types make it
-            # non-optional, but this is checked rather than asserted: `assert` is
-            # stripped under python -O, and losing the guarantee in production is
-            # exactly where it matters.
+            # REVOKE requires a reason. The command type makes it non-optional,
+            # but this is checked rather than asserted: `assert` is stripped
+            # under python -O, and losing the guarantee in production is exactly
+            # where it matters.
+            #
+            # DELETE kommt hier nicht mehr vor: sein einziger Erzeuger ist die
+            # Kontolöschung (`application/erasure.py`, ADR-0027 §1), und die
+            # verlangt keinen Grund.
             if parsed_reason is None:
                 raise ReasonRequired(action)
-            factory = ConsentEvent.revoke if action is ConsentAction.REVOKE else ConsentEvent.delete
-            event = factory(
+            event = ConsentEvent.revoke(
                 subject_id=subject,
                 capability=cap,
                 recorded_at=now,
@@ -200,20 +193,6 @@ async def handle_revoke(
 ) -> Result[ConsentState]:
     return await _record(
         action=ConsentAction.REVOKE,
-        subject_id=cmd.subject_id,
-        capability=cmd.capability,
-        actor_id=cmd.actor_id,
-        reason=cmd.reason,
-        deps=deps,
-        repos=repos,
-    )
-
-
-async def handle_delete(
-    cmd: DeleteConsentCommand, *, deps: dict[str, Any], repos: dict[str, Any]
-) -> Result[ConsentState]:
-    return await _record(
-        action=ConsentAction.DELETE,
         subject_id=cmd.subject_id,
         capability=cmd.capability,
         actor_id=cmd.actor_id,

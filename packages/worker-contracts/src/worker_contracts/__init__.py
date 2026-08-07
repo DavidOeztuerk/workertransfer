@@ -2,6 +2,7 @@
 
 from worker_contracts.applications import (
     AdvanceApplicationV1,
+    ApplicationStatsV1,
     ApplicationV1,
     SubmitApplicationV1,
 )
@@ -14,6 +15,11 @@ from worker_contracts.consent import (
     ConsentHistoryEntryV1,
     ConsentRevokeV1,
     ConsentStateV1,
+)
+from worker_contracts.erasure import (
+    CompanyWithdrawalV1,
+    ErasureResultV1,
+    ErasureV1,
 )
 from worker_contracts.github import (
     ConnectGitHubV1,
@@ -34,7 +40,13 @@ from worker_contracts.identity import (
     ResendVerificationV1,
     VerifyEmailV1,
 )
-from worker_contracts.jobs import JobPageV1, JobV1, SaveJobV1
+from worker_contracts.jobs import (
+    DraftJobTextV1,
+    JobPageV1,
+    JobTextDraftV1,
+    JobV1,
+    SaveJobV1,
+)
 from worker_contracts.messages import Command, Event, Message, Query
 from worker_contracts.portfolio import (
     AttachmentV1,
@@ -42,7 +54,13 @@ from worker_contracts.portfolio import (
     PortfolioV1,
     SavePortfolioV1,
 )
-from worker_contracts.profile import ProfilePageV1, ProfileV1, SaveProfileV1
+from worker_contracts.profile import (
+    DraftProfileTextV1,
+    ProfilePageV1,
+    ProfileTextDraftV1,
+    ProfileV1,
+    SaveProfileV1,
+)
 from worker_contracts.resume import (
     EducationV1,
     PositionV1,
@@ -62,12 +80,14 @@ from worker_contracts.transfer import (
 __all__ = [
     "AcceptInvitationV1",
     "AdvanceApplicationV1",
+    "ApplicationStatsV1",
     "ApplicationV1",
     "AttachmentV1",
     "Command",
     "CompanyMemberV1",
     "CompanyProfileV1",
     "CompanyV1",
+    "CompanyWithdrawalV1",
     "ConnectGitHubV1",
     "ConsentCheckResultV1",
     "ConsentCheckV1",
@@ -77,13 +97,18 @@ __all__ = [
     "ConsentRevokeV1",
     "ConsentStateV1",
     "CreateCompanyV1",
+    "DraftJobTextV1",
+    "DraftProfileTextV1",
     "EducationV1",
+    "ErasureResultV1",
+    "ErasureV1",
     "Event",
     "ExpressInterestV1",
     "GitHubConnectionV1",
     "InvitationV1",
     "InviteMemberV1",
     "JobPageV1",
+    "JobTextDraftV1",
     "JobV1",
     "MakeOfferV1",
     "MarketRequestV1",
@@ -96,6 +121,7 @@ __all__ = [
     "PortfolioV1",
     "PositionV1",
     "ProfilePageV1",
+    "ProfileTextDraftV1",
     "ProfileV1",
     "Query",
     "RegisterUserV1",

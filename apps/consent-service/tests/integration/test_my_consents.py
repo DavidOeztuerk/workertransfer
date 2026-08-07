@@ -24,6 +24,7 @@ pytestmark = pytest.mark.skipif(not _docker_available(), reason="Docker not avai
 
 _SERVICE_DIR = Path(__file__).resolve().parents[2]
 SECRET = "integration-secret-with-at-least-thirty-two-bytes"
+ERASURE_SECRET = "erasure-secret-with-at-least-thirty-two-bytes"
 
 
 @pytest.fixture(scope="module")
@@ -37,6 +38,7 @@ def migrated_schema(postgres_url: str) -> None:
 def _client(postgres_url: str) -> tuple[AsyncClient, str, dict[str, str]]:
     os.environ["WORKER_DATABASE_URL"] = postgres_url
     os.environ["WORKER_JWT_SECRET"] = SECRET
+    os.environ["WORKER_ERASURE_SECRET"] = ERASURE_SECRET
 
     from consent_service.configuration import ConsentServiceSettings
     from consent_service.presentation.compose_api import build_app
@@ -124,13 +126,23 @@ async def test_a_re_grant_shows_the_second_time_not_the_first(
 
 
 async def test_a_deleted_capability_is_not_listed(postgres_url: str, migrated_schema: None) -> None:
+    """`DELETE` entsteht jetzt ausschließlich aus der Kontolöschung (ADR-0027 §1).
+
+    Vorher fuhr dieser Test über `POST /consent/delete` — einen Endpunkt, der
+    kapabilitätsbezogen war und deshalb nie bedeuten konnte, wonach er klang.
+    Die Liste verhält sich unverändert; nur der Weg dorthin ist jetzt der
+    einzige, den es geben soll.
+    """
     client, subject, auth = _client(postgres_url)
     body = {"subject_id": subject, "capability": "profile.visibility:public"}
     async with client:
         await client.post("/consent/grant", json=body, headers=auth)
-        await client.post(
-            "/consent/delete", json={**body, "reason": "loeschung verlangt"}, headers=auth
+        erased = await client.post(
+            "/internal/erasure",
+            json={"user_id": subject},
+            headers={"X-Erasure-Secret": ERASURE_SECRET},
         )
+        assert erased.status_code == 200, erased.text
         listed = await client.get("/consent/me", headers=auth)
 
     assert listed.json() == []
@@ -156,7 +168,7 @@ async def test_the_list_and_the_check_never_disagree(
                 json={"subject_id": subject, "capability": capability},
                 headers=auth,
             )
-        # Zwei davon wieder zurücknehmen, auf beiden Wegen.
+        # Zwei davon wieder zurücknehmen.
         await client.post(
             "/consent/revoke",
             json={
@@ -167,11 +179,11 @@ async def test_the_list_and_the_check_never_disagree(
             headers=auth,
         )
         await client.post(
-            "/consent/delete",
+            "/consent/revoke",
             json={
                 "subject_id": subject,
                 "capability": f"market.visibility:tenant:{tenant}",
-                "reason": "loeschung",
+                "reason": "auch nicht mehr",
             },
             headers=auth,
         )
@@ -190,6 +202,49 @@ async def test_the_list_and_the_check_never_disagree(
                 checked.add(capability)
 
     assert listed == checked
+
+
+async def test_after_an_erasure_the_list_and_the_check_still_agree(
+    postgres_url: str, migrated_schema: None
+) -> None:
+    """Dieselbe Zusage, jetzt für `DELETE` — dessen einziger Erzeuger die
+    Kontolöschung ist (ADR-0027 §1).
+
+    Vorher deckte der Test darüber den DELETE-Fall mit ab, weil es einen
+    Endpunkt dafür gab. Ihn ersatzlos zu streichen hätte die Zusage für genau
+    die Aktion aufgegeben, die am Ende jeder Kette steht.
+    """
+    client, subject, auth = _client(postgres_url)
+    tenant = uuid4()
+    capabilities = [
+        "profile.visibility:public",
+        f"resume.visibility:tenant:{tenant}",
+    ]
+    async with client:
+        for capability in capabilities:
+            await client.post(
+                "/consent/grant",
+                json={"subject_id": subject, "capability": capability},
+                headers=auth,
+            )
+        await client.post(
+            "/internal/erasure",
+            json={"user_id": subject},
+            headers={"X-Erasure-Secret": ERASURE_SECRET},
+        )
+
+        listed = (await client.get("/consent/me", headers=auth)).json()
+        states = []
+        for capability in capabilities:
+            answer = await client.post(
+                "/consent/check",
+                json={"subject_id": subject, "capability": capability},
+                headers=auth,
+            )
+            states.append(answer.json())
+
+    assert listed == []
+    assert all(not state["granted"] and state["deleted"] for state in states)
 
 
 async def test_nobody_can_ask_for_someone_elses_list(
