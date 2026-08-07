@@ -134,10 +134,15 @@ describe("MyDataRoute", () => {
     expect(await screen.findByText(/freigaben verlauf — enthalten/)).toBeTruthy();
   });
 
-  it("says that deleting is a different path, not a neighbouring button", async () => {
+  it("points to deleting as a different path — a link, never a neighbouring button", async () => {
+    // Der Weg existiert jetzt (ADR-0027), und die Karte darf ihn nicht länger
+    // als „gibt es nicht" beschreiben. Aber er bleibt ein VERWEIS: ein
+    // Löschknopf neben „Als JSON herunterladen" wäre genau die Nachbarschaft,
+    // in der ein Fehlklick unwiderruflich wird.
     renderWithProviders(<MyDataRoute principal={principal()} />);
 
-    expect(await screen.findByText(/Löschen ist ein eigener Weg/)).toBeTruthy();
+    const link = await screen.findByRole("link", { name: /Konto löschen/i });
+    expect(link.getAttribute("href")).toBe("/konto-loeschen");
     expect(screen.queryByRole("button", { name: /löschen/i })).toBeNull();
   });
 });

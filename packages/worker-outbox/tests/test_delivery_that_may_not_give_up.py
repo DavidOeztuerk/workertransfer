@@ -160,19 +160,60 @@ class TestDeferredIsNotAFailure:
         assert (await _row(sessions)).delivered_at is not None
 
 
-class TestTheIntervalGrowsWhileNothingMoves:
-    async def test_a_dead_recipient_is_retried_ever_more_slowly(self) -> None:
+class TestTheIntervalGrowsOnlyAgainstAWall:
+    """Der Abstand wächst gegen eine **Wand**, nicht gegen **Ruhe**.
+
+    Der Unterschied ist keine Feinheit, und er hat diese Fassung eine
+    E2E-Reise gekostet: die erste Umsetzung verlängerte den Takt, sobald ein
+    Durchlauf nichts zustellte — und das ist bei einer leeren Tabelle IMMER
+    der Fall. Auf einem ruhigen System stand der Zusteller damit nach wenigen
+    Minuten auf der Obergrenze, und die nächste Löschung fing bis zu fünf
+    Minuten lang gar nicht erst an. Gemessen, nicht vermutet: die Kaskade
+    lief, sie lief nur zu spät.
+
+    „Nichts zu tun" ist kein Fehlschlag. Zurückgehalten wird nur, wenn etwas
+    fällig war und **nichts davon** durchging.
+    """
+
+    async def test_an_idle_queue_never_slows_the_next_erasure_down(self) -> None:
+        """Der Fehler, den die E2E-Reise gefunden hat.
+
+        Ein Mensch, der auf einem ruhigen System löscht, darf nicht warten,
+        weil vorher niemand gelöscht hat.
+        """
         slept: list[float] = []
 
-        class Nothing:
-            async def drain_once(self) -> int:
-                return 0
+        class Idle:
+            async def drain_detailed(self) -> tuple[int, int]:
+                # nichts war fällig, nichts ging raus
+                return (0, 0)
 
         async def fake_sleep(seconds: float) -> None:
             slept.append(seconds)
 
         await run_with_backoff(
-            Nothing(),  # type: ignore[arg-type]
+            Idle(),  # type: ignore[arg-type]
+            interval_seconds=1.0,
+            max_interval_seconds=8.0,
+            sleep=fake_sleep,
+            should_stop=lambda: len(slept) >= 5,
+        )
+
+        assert slept == [1.0, 1.0, 1.0, 1.0, 1.0]
+
+    async def test_a_dead_recipient_is_retried_ever_more_slowly(self) -> None:
+        slept: list[float] = []
+
+        class Wall:
+            async def drain_detailed(self) -> tuple[int, int]:
+                # eine Zeile war fällig, keine ging raus
+                return (1, 0)
+
+        async def fake_sleep(seconds: float) -> None:
+            slept.append(seconds)
+
+        await run_with_backoff(
+            Wall(),  # type: ignore[arg-type]
             interval_seconds=1.0,
             max_interval_seconds=8.0,
             sleep=fake_sleep,
@@ -186,11 +227,11 @@ class TestTheIntervalGrowsWhileNothingMoves:
         """Nach einem Erfolg wieder eng: sonst zahlt die nächste Löschung den
         Preis dafür, dass die vorige auf einen toten Dienst gewartet hat."""
         slept: list[float] = []
-        delivered = iter([0, 0, 1, 0])
+        results = iter([(1, 0), (1, 0), (1, 1), (1, 0)])
 
         class Sometimes:
-            async def drain_once(self) -> int:
-                return next(delivered, 0)
+            async def drain_detailed(self) -> tuple[int, int]:
+                return next(results, (0, 0))
 
         async def fake_sleep(seconds: float) -> None:
             slept.append(seconds)

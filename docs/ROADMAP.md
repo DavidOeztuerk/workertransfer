@@ -20,7 +20,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 7 | AI Agent Plattform | ✅ | 7.1 (Naht + Candidate-Agent), 7.2 (Company-Agent: die eigene Anzeige). DoD erfüllt, mit zwei begründeten Abweichungen (plan-act-reflect, „Consents und Logs"). **Candidate Ranking** ist nach ADR-0022 dauerhaft ausgeschlossen; Skill Analyzer, Salary Recommendation und Team Analyzer sind in ihrer ÜBLICHEN Form ausgeschlossen, nicht als Idee |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ✅ | 9.1–9.3 (Outbox in allen drei Diensten, Suche geprüft, Kennzahlen). DoD erfüllt; `worker-messaging` und `worker-search` gelöscht (ADR-0025/0026) |
-| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1–10.5 ✅ (Auth-Rand, Gateway, OTel, Dependency-Scanning, Löschung im Backend nach ADR-0027). Offen: Löschung-Oberfläche, K8s/Helm, starlette-CVEs |
+| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1–10.5 ✅ (Auth-Rand, Gateway, OTel, Dependency-Scanning, Löschung nach ADR-0027 samt Oberfläche). Offen: K8s/Helm, starlette-CVEs |
 
 ### Phase 0 — Status: ✅ erledigt
 - ✅ `docs/ULTRAPLAN.md` + `docs/ROADMAP.md`
@@ -921,10 +921,20 @@ weichen — `worker-messaging` (fünf Abhängigkeiten, null Konsumenten) und
   irgendein Dienst eine Tabelle mit `subject_id` oder `user_id` bekommt, die
   nicht in der Empfängerliste steht — dieselbe Bauart wie
   `test_workspace_dependencies.py`.
+  **Die Oberfläche schließt den Kreis** (`/konto-loeschen`). Der Text steht
+  **vor** dem Knopf, nicht in einer Datenschutzerklärung — dieselbe Regel wie
+  beim Entwurfsdienst (ADR-0024): was gelöscht wird, dass es **nicht sofort**
+  geht, und die unbequeme Folge offen ausgesprochen — *auch die Bewerbung, über
+  die du eingestellt wurdest, verschwindet aus der Liste des Unternehmens.* Er
+  verspricht **keine Ausnahme**, weil es in der Voreinstellung keine gibt; ein
+  Satz über Aufbewahrungspflichten wäre eine Zusage über einen Schalter, der auf
+  AUS steht. Bestätigt wird in **zwei Schritten** mit anders formuliertem
+  zweitem Knopf — bewusst, aber kein Hürdenlauf: kein abzutippendes Wort, keine
+  Bedenkzeit, kein erneutes Passwort. Danach: abgemeldet, „läuft" statt
+  „erledigt", **kein Fortschrittsbalken** (§6). `/meine-daten` verweist auf den
+  Weg, ohne ihn zur Pflichtreihenfolge zu machen — und bleibt ein Link, nie ein
+  Knopf neben „Herunterladen".
   **Was noch offen ist, ehrlich:**
-  - **Die Oberfläche fehlt.** Es gibt keinen Knopf; die Löschung ist heute nur
-    über die API erreichbar. Das ist Prompt 3 (`docs/prompts-loeschung.md`) und
-    ein eigener Schnitt.
   - **Die eine Rechtsfrage** aus ADR-0027 ist weiter offen. Sie ändert nicht
     den Entwurf, nur die Stellung des Schalters — und blockiert deshalb nichts.
   - **§3.4 ist vorbereitet, nicht gebaut:** bei umgelegtem Schalter meldet der

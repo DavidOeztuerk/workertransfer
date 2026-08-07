@@ -231,6 +231,19 @@ class OutboxDispatcher:
 
     async def drain_once(self) -> int:
         """Ein Durchlauf. Gibt zurück, wie viele wirklich zugestellt wurden."""
+        _attempted, delivered = await self.drain_detailed()
+        return delivered
+
+    async def drain_detailed(self) -> tuple[int, int]:
+        """Wie `drain_once`, aber mit `(fällig, zugestellt)`.
+
+        Die zweite Zahl allein kann „nichts zu tun" nicht von „nichts ging
+        durch" unterscheiden — und wer den Takt danach steuert, verlangsamt
+        einen ruhigen Dienst genauso wie einen blockierten. Genau das ist
+        passiert: auf einem System ohne Löschungen stand der Zusteller nach
+        wenigen Minuten auf der Obergrenze, und die nächste Löschung fing
+        minutenlang gar nicht erst an.
+        """
         delivered = 0
         async with self._session_factory() as session:
             entries = await self.pending(session)
@@ -238,7 +251,7 @@ class OutboxDispatcher:
                 if await self._deliver(session, entry):
                     delivered += 1
             await session.commit()
-        return delivered
+        return len(entries), delivered
 
     async def _deliver(self, session: AsyncSession, entry: OutboxEntry) -> bool:
         try:
@@ -308,6 +321,13 @@ async def run_with_backoff(
     ist der Takt wieder eng — sonst zahlte die nächste Löschung den Preis dafür,
     dass die vorige auf einen toten Empfänger gewartet hat.
 
+    **Der Abstand wächst gegen eine Wand, nicht gegen Ruhe.** Eine leere
+    Tabelle stellt nichts zu, ist aber kein Fehlschlag. Die erste Fassung
+    unterschied das nicht und verlangsamte sich deshalb auf einem gesunden,
+    ruhigen System bis zur Obergrenze — die nächste Löschung fing dann
+    minutenlang gar nicht erst an. Aufgefallen ist das in der E2E-Reise, nicht
+    im Komponententest: dort ist immer sofort etwas zu tun.
+
     Der Abstand hängt am Zusteller, nicht an der Zeile: eine Spalte
     `next_attempt_at` wäre die genauere Lösung und ein Schema für alle Nutzer
     der Tabelle. Für „nicht hämmern" reicht der gröbere Weg.
@@ -315,9 +335,10 @@ async def run_with_backoff(
     delay = interval_seconds
     while not should_stop():
         try:
-            delivered = await dispatcher.drain_once()
+            attempted, delivered = await dispatcher.drain_detailed()
         except Exception:
             _logger.warning("Outbox-Durchlauf fehlgeschlagen", exc_info=True)
-            delivered = 0
-        delay = interval_seconds if delivered else min(delay * 2, max_interval_seconds)
+            attempted, delivered = 1, 0
+        blocked = attempted > 0 and delivered == 0
+        delay = min(delay * 2, max_interval_seconds) if blocked else interval_seconds
         await sleep(delay)
