@@ -36,7 +36,11 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: "24"
+          # Dieselbe Hauptversion wie `docker/web.Dockerfile`. Läuft der
+          # Container auf 25 und die CI auf 24, prüft niemand mehr das, was
+          # ausgeliefert wird — und der Unterschied fällt erst auf, wenn er
+          # etwas kaputt macht.
+          node-version: "25"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
@@ -103,7 +107,8 @@ jobs:
       - name: Node einrichten
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          # Mit `frontend-quality` und dem Container gleichziehen.
+          node-version: 25
 
       - uses: pnpm/action-setup@v6
 
