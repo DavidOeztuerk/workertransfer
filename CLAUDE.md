@@ -70,6 +70,8 @@ only when a dependency changes. **Adding a service:** add its database to
 values — no new Dockerfile (`docker/service.Dockerfile` is shared and takes
 `SERVICE_DIR` as a build arg). `docker/web.Dockerfile` runs Vite.
 
+**CI builds no Docker image at all** — the three jobs cover Python, frontend and dependencies, and the containers appear in none of them. A green CI on a Dockerfile change therefore proves nothing; only `docker compose build <service>` does. That is how a Dependabot bump to `node:25` passed CI while breaking the web image: node 25 no longer ships `corepack`, and a second failure hid behind the first — the image still carries yarn shims, so installing corepack needs `--force`. Keep `node-version` in `ci.yml` (two places) equal to the Dockerfile's major, or CI tests something else than what ships.
+
 ### Python
 ```bash
 uv sync --all-packages --all-groups   # install everything (workspace + dev groups)
