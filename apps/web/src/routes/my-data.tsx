@@ -156,9 +156,14 @@ export function MyDataRoute({ principal = null }: MyDataRouteProps) {
       <Card>
         <h2>Was hier nicht steht</h2>
         <p className="requests__meta">
-          Löschen ist ein eigener Weg mit eigenen Fragen — Aufbewahrungspflichten, und Vorgänge
-          wie Bewerbungen und Transfers, die nicht allein dir gehören. Er steht bewusst nicht
-          neben einem Herunterladen-Knopf.
+          Löschen ist ein eigener Weg und steht bewusst nicht als Knopf neben einem
+          Herunterladen-Knopf: hier lässt sich nichts falsch anklicken, was sich nicht rückgängig
+          machen ließe. Was dabei passiert, steht vollständig auf{" "}
+          <a href="/konto-loeschen">Konto löschen</a> — vor dem Klick, nicht danach.
+        </p>
+        <p className="page__note">
+          Du musst hier nichts herunterladen, bevor du löschst. Der Verweis geht in beide
+          Richtungen, damit niemand glaubt, es gäbe eine Pflichtreihenfolge.
         </p>
       </Card>
     </main>

@@ -32,6 +32,7 @@ import { CompanyProfileRoute } from "./routes/company-profile";
 import { InvitationRoute } from "./routes/invitation";
 import { JobsRoute } from "./routes/jobs";
 import { MarketRoute } from "./routes/market";
+import { AccountDeletionRoute } from "./routes/account-deletion";
 import { MyDataRoute } from "./routes/my-data";
 import { RegisterRoute } from "./routes/register";
 import { SettingsRoute } from "./routes/settings";
@@ -145,6 +146,9 @@ export function RootLayout() {
                 <Link className="site-header__menu-item" to="/einstellungen">
                   Einstellungen
                 </Link>
+                <Link className="site-header__menu-item" to="/konto-loeschen">
+                  Konto löschen
+                </Link>
                 <Link className="site-header__menu-item" to="/company/new">
                   Unternehmen anlegen
                 </Link>
@@ -249,6 +253,11 @@ function CandidatesWithSession() {
 function GitHubWithSession() {
   const { user } = useSession();
   return <GitHubRoute principal={user} />;
+}
+
+function AccountDeletionWithSession() {
+  const { user } = useSession();
+  return <AccountDeletionRoute principal={user} />;
 }
 
 function MyDataWithSession() {
@@ -395,6 +404,11 @@ const consentsRoute = createRoute({
   path: "/freigaben",
   component: ConsentsWithSession,
 });
+const accountDeletionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/konto-loeschen",
+  component: AccountDeletionWithSession,
+});
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/einstellungen",
@@ -457,6 +471,7 @@ const routeTree = rootRoute.addChildren([
   myDataRoute,
   githubRoute,
   settingsRoute,
+  accountDeletionRoute,
   marketRoute,
   transfersRoute,
   companyTransfersRoute,
