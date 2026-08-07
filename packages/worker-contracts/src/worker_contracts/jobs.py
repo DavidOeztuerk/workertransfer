@@ -13,7 +13,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-__all__ = ["JobPageV1", "JobV1", "SaveJobV1"]
+__all__ = ["DraftJobTextV1", "JobPageV1", "JobTextDraftV1", "JobV1", "SaveJobV1"]
 
 #: Als Literale statt als freier String: ein Tippfehler soll an der Grenze
 #: auffallen und nicht als unbekannter Wert in der Datenbank landen.
@@ -52,3 +52,23 @@ class JobV1(BaseModel):
 class JobPageV1(BaseModel):
     items: list[JobV1]
     next_cursor: str | None = None
+
+
+class DraftJobTextV1(BaseModel):
+    """Der Auftrag: die Anzeige, wie sie im Formular steht, plus ein Wunsch.
+
+    Anders als beim Profil kommt der Zusammenhang HIER aus dem Request — die
+    Anzeige gibt es beim Schreiben ja noch nicht in der Datenbank. Das ist
+    unbedenklich: es sind Angaben des Unternehmens über sich selbst, keine
+    Daten über eine Person.
+    """
+
+    title: str = Field(default="", max_length=160)
+    description: str = Field(default="", max_length=20000)
+    location: str = Field(default="", max_length=160)
+    skills: list[str] = Field(default_factory=list, max_length=200)
+    wish: str = Field(default="", max_length=200)
+
+
+class JobTextDraftV1(BaseModel):
+    draft: str

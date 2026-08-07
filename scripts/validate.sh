@@ -70,11 +70,51 @@ fi
 docker_up=0
 curl -sf --max-time 2 http://localhost:8003/health/live >/dev/null 2>&1 && docker_up=1
 
+# Wie viel ist wirklich gelaufen? Ein Haken ohne Zahl daneben beantwortet die
+# Frage nicht, und genau die ist hier die interessante: „grün" über einem Lauf,
+# der nichts getan hat, sieht identisch aus wie „grün" über 900 Tests. Die
+# Warnungen weiter unten schlagen erst an, wenn etwas ÜBERSPRUNGEN wurde — ein
+# Lauf, der stillschweigend nur die Hälfte sammelt, käme durch. Deshalb steht
+# die Zahl jetzt immer da, nicht nur im Ausnahmefall.
+#
+# Drei Feinheiten, die eine naive Fassung falsch zählen ließen — und eine
+# falsche Zahl ist schlimmer als keine, weil man ihr glaubt:
+#   1. Die Protokolle sind eingefärbt; die ANSI-Folgen stehen ZWISCHEN Wort und
+#      Zahl und zerreißen jedes Muster. Deshalb erst entfärben.
+#   2. vitest meldet zwei Zeilen mit „passed" — „Test Files 41 passed" und
+#      „Tests 336 passed". Ohne das genauere Muster käme die Dateizahl heraus.
+#   3. `pnpm -r` läuft über zwei Pakete, also gibt es zwei „Tests"-Zeilen. Die
+#      letzte zu nehmen hieße, das zuletzt fertige Paket zu melden — hier wird
+#      summiert.
+count_from() {
+  local log="$1" pattern="$2" mode="${3:-last}" nums
+  [[ -f "$log" ]] || return 0
+  nums=$(sed -E $'s/\x1b\\[[0-9;]*[a-zA-Z]//g' "$log" | grep -oE "$pattern" |
+    grep -oE '[0-9]+' || true)
+  [[ -n "$nums" ]] || return 0
+  if [[ "$mode" == "sum" ]]; then
+    awk '{s+=$1} END {if (NR) print s}' <<<"$nums"
+  else
+    tail -1 <<<"$nums"
+  fi
+}
+
+vitest_log="$log_dir/vitest.log"
+pytest_passed=$(count_from "$pytest_log" '[0-9]+ passed')
+vitest_passed=$(count_from "$vitest_log" 'Tests +[0-9]+ passed' sum)
+e2e_ran=$(count_from "$playwright_log" '[0-9]+ passed')
+
 printf '\n%s── Stand ─────────────────────────────────────────%s\n' "$BOLD" "$OFF"
 for entry in "${RESULTS[@]}"; do
   IFS='|' read -r status name log <<<"$entry"
+  case "$name" in
+    pytest) tally="${pytest_passed:-?} bestanden" ;;
+    vitest) tally="${vitest_passed:-?} bestanden" ;;
+    playwright) tally="${e2e_ran:-?} Reisen" ;;
+    *) tally="" ;;
+  esac
   if [[ "$status" == "ok" ]]; then
-    printf '  %s✓%s %s\n' "$GREEN" "$OFF" "$name"
+    printf '  %s✓%s %s %s%s%s\n' "$GREEN" "$OFF" "$name" "$BOLD" "$tally" "$OFF"
   else
     printf '  %s✗%s %s  %s(%s)%s\n' "$RED" "$OFF" "$name" "$YELLOW" "$log" "$OFF"
   fi

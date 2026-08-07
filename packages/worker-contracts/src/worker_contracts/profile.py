@@ -12,7 +12,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-__all__ = ["ProfilePageV1", "ProfileV1", "SaveProfileV1"]
+__all__ = [
+    "DraftProfileTextV1",
+    "ProfilePageV1",
+    "ProfileTextDraftV1",
+    "ProfileV1",
+    "SaveProfileV1",
+]
 
 
 class SaveProfileV1(BaseModel):
@@ -47,3 +53,24 @@ class ProfilePageV1(BaseModel):
 
     items: list[ProfileV1]
     next_cursor: str | None = None
+
+
+class DraftProfileTextV1(BaseModel):
+    """Was die Person sich wünscht — mehr geht nicht in den Auftrag.
+
+    Kein `subject_id`, kein Name, keine Adresse: der Rest des Zusammenhangs
+    kommt aus dem gespeicherten Profil und aus dem Token. Was der Client nicht
+    senden kann, kann er nicht in einen fremden Dienst schleusen.
+    """
+
+    wish: str = Field(default="", max_length=200)
+
+
+class ProfileTextDraftV1(BaseModel):
+    """Ein Vorschlag, kein Ergebnis.
+
+    Nichts daran wird gespeichert — weder hier noch im Profil. Er lebt im
+    Formular, bis die Person selbst speichert, und dann ist es ihr Text.
+    """
+
+    draft: str

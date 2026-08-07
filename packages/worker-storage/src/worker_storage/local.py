@@ -77,8 +77,31 @@ class LocalStorage:
 
     async def delete(self, key: str) -> None:
         path = self._path(key)
-        # missing_ok: Löschen ist idempotent.
-        await asyncio.to_thread(lambda: path.unlink(missing_ok=True))
+
+        def _unlink() -> None:
+            # missing_ok: Löschen ist idempotent.
+            path.unlink(missing_ok=True)
+            # Und das Verzeichnis hinterher, wenn es leer zurückbleibt: ein
+            # leerer Ordner, der nach einer `subject_id` heißt, ist immer noch
+            # die Auskunft „diesen Menschen gab es hier" (ADR-0027 §2).
+            #
+            # Hier drin und nicht am Port: „Verzeichnis" ist ein Begriff des
+            # Dateisystems. Ein Objektspeicher kennt ihn nicht — dort
+            # verschwindet ein Präfix von selbst, sobald das letzte Objekt weg
+            # ist. Ein `rmdir` am Port wäre das lokale Backend, das in die Naht
+            # durchschlägt, die es verbergen soll (ADR-0021).
+            root = self._root.resolve()
+            directory = path.parent
+            while directory != root and directory.is_relative_to(root):
+                try:
+                    directory.rmdir()
+                except OSError:
+                    # Nicht leer, gibt es nicht, oder jemand schreibt gerade
+                    # hinein: alles kein Fehler dieses Aufrufs.
+                    break
+                directory = directory.parent
+
+        await asyncio.to_thread(_unlink)
 
     async def list_names(self, prefix: str) -> list[str]:
         directory = self._path(prefix)

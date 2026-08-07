@@ -8,6 +8,10 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+  # Nur für Tests: die Outbox-Zusagen (dieselbe Transaktion, Wiederholung)
+  # hängen an SQLAlchemy, nicht am Dialekt — dafür genügt eine Datenbank im
+  # Speicher, und sie läuft ohne Docker. Reines Python, keine Laufzeitfolgen.
+  "aiosqlite>=0.20.0,<1.0.0",
   "httpx>=0.27.0,<1.0.0",
   "httpx2>=2.5.0,<3.0.0",
   "mypy>=1.19.1,<2.0.0",
@@ -19,13 +23,11 @@ dev = [
 
 [tool.uv.workspace]
 members = ["apps/identity-service", "apps/consent-service", "apps/profile-service", "apps/resume-service", "apps/portfolio-service", "apps/jobs-service", "apps/applications-service", "apps/companies-service", "apps/transfer-service", "apps/github-service", "packages/worker-*", "packages/worker-cli"]
-# worker-ai bleibt ausgeschlossen: seine ML-Wheels haben keinen
-# Python-3.14-Build. worker-files wurde in Sub-step 3.5 GELÖSCHT und
-# worker-storage neu geschrieben — beide waren Hüllen ohne Konsumenten, die
-# zusammen fünf schwere Abhängigkeiten deklarierten (pillow, python-magic,
-# boto3, minio, azure-storage-blob). Genau die machten sie unbaubar und damit
-# unbenutzbar. Siehe ADR-0021.
-exclude = ["packages/worker-ai"]
+# Nichts mehr ausgeschlossen. `worker-ai` war es bis zum 05.08.2026, weil seine
+# ML-Wheels keinen Python-3.14-Build hatten — acht schwere Abhängigkeiten für
+# 246 Zeilen ohne Konsumenten. In Sub-step 7.1 neu geschrieben mit EINER
+# Abhängigkeit und einem echten Konsumenten (ADR-0024); davor traf es
+# worker-files/worker-storage aus demselben Grund (ADR-0021).
 
 [tool.uv.sources]
 worker-core = { workspace = true }
@@ -39,26 +41,21 @@ worker-authorization = { workspace = true }
 worker-database = { workspace = true }
 worker-cache = { workspace = true }
 worker-events = { workspace = true }
-worker-messaging = { workspace = true }
 worker-health = { workspace = true }
 worker-metrics = { workspace = true }
 worker-tracing = { workspace = true }
 worker-telemetry = { workspace = true }
 worker-validation = { workspace = true }
-worker-ratelimit = { workspace = true }
 worker-tenancy = { workspace = true }
 worker-resilience = { workspace = true }
 worker-storage = { workspace = true }
-worker-search = { workspace = true }
 worker-skills = { workspace = true }
+worker-outbox = { workspace = true }
 worker-contracts = { workspace = true }
 worker-scheduler = { workspace = true }
 worker-ai = { workspace = true }
 worker-mcp = { workspace = true }
-worker-agents = { workspace = true }
 worker-templates = { workspace = true }
-worker-notifications = { workspace = true }
-worker-email = { workspace = true }
 worker-cli = { workspace = true }
 consent-service = { workspace = true }
 github-service = { workspace = true }
@@ -100,7 +97,7 @@ warn_unreachable = true
 # sind für mypy dasselbe Modul zweimal ("Duplicate module named 'env'"). Mit
 # einer Aufzählung bricht der vierte Service den Typcheck, ohne dass jemand
 # ahnt, warum. Alembic-Umgebungsdateien haben ohnehin keinen Typvertrag.
-exclude = ["tests", "packages/worker-ai", "apps/.*/migrations"]
+exclude = ["tests", "apps/.*/migrations"]
 
 # Untyped third-party libraries (no py.typed marker / no stubs available).
 # Strict mode stays on; we only silence import-untyped for these specific modules.
@@ -108,10 +105,6 @@ exclude = ["tests", "packages/worker-ai", "apps/.*/migrations"]
 module = [
   "apscheduler.*",
   "redis.*",
-  "elasticsearch.*",
-  "meilisearch.*",
-  "qdrant_client.*",
-  "aiokafka.*",
   "boto3.*",
   "casbin.*",
   "casbin_sqlalchemy_adapter.*",
@@ -119,7 +112,6 @@ module = [
   "weasyprint.*",
   "pdfplumber.*",
   "docx.*",
-  "meilisearch_sdk.*",
   "magic.*",
   "bs4.*",
 ]

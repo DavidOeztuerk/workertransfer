@@ -113,5 +113,9 @@ def test_the_subject_still_gets_its_own_reason_back() -> None:
     # reason there discloses nothing the caller did not just write.
     schema = _schema()
 
-    for path in ("/consent/grant", "/consent/revoke", "/consent/delete"):
+    # `/consent/delete` steht hier nicht mehr: der kapabilitätsbezogene
+    # Endpunkt ist zurückgezogen (ADR-0027 §1). Die Kontolöschung hat kein
+    # Begründungsfeld — weder in der Anfrage noch in der Antwort.
+    for path in ("/consent/grant", "/consent/revoke"):
         assert "reason" in _response_properties(schema, path), path
+    assert "/consent/delete" not in schema["paths"]

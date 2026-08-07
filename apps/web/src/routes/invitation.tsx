@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { type Membership, acceptInvitation } from "../auth/team";
+import { type AcceptResult, type Membership, acceptInvitation } from "../auth/team";
 import { AuthLayout } from "./auth-layout";
 
 type State =
@@ -11,6 +11,35 @@ type State =
 const CLAIM = "Ein Unternehmen entscheidet, wen es hereinlässt.";
 const SUPPORT =
   "Die Einladung gilt genau für die Adresse, an die sie ging — ein weitergeleiteter Link öffnet nichts.";
+
+/**
+ * Je Token genau ein Aufruf — modulweit, nicht je Aufbau der Komponente.
+ *
+ * Wortgleich zur Bestätigungsseite, und aus demselben Grund: der
+ * Einladungstoken ist **einmalig**. Der zweite Aufruf nimmt die Einladung nicht
+ * noch einmal an, er scheitert. Und weil beide Antworten in denselben Zustand
+ * schreiben, entscheidet die zuletzt eintreffende, was die Person sieht — im
+ * schlechten Fall „Einladung nicht angenommen", während sie dem Unternehmen
+ * gerade beigetreten ist.
+ *
+ * Diese Seite wurde beim Reparieren von `/verify` übersehen; aufgefallen ist
+ * sie als **Wackler** im E2E-Lauf (einmal rot, beim zweiten Versuch grün) —
+ * genau die Sorte Befund, die man wegzuklicken versucht ist.
+ *
+ * Ein `useRef` reichte nicht: er stirbt mit der Komponente, und ein zweiter
+ * Aufbau ist genau der Fall. Gemerkt wird die **Zusage**, nicht nur die
+ * Tatsache — so bekommt der zweite Aufbau dasselbe Ergebnis wie der erste,
+ * statt gar keines.
+ */
+const attempts = new Map<string, Promise<AcceptResult>>();
+
+function acceptOnce(token: string): Promise<AcceptResult> {
+  const running = attempts.get(token);
+  if (running !== undefined) return running;
+  const started = acceptInvitation(token);
+  attempts.set(token, started);
+  return started;
+}
 
 export function InvitationRoute() {
   const [state, setState] = useState<State>({ phase: "working" });
@@ -25,7 +54,7 @@ export function InvitationRoute() {
       });
       return;
     }
-    void acceptInvitation(token).then((result) => {
+    void acceptOnce(token).then((result) => {
       if (result.ok) {
         setState({ phase: "joined", membership: result.membership });
       } else {

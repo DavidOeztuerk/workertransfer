@@ -9,6 +9,7 @@ import {
   type RemoteMode,
   closeJob,
   createJob,
+  draftJobText,
   listOwnJobs,
   publishJob,
 } from "../jobs/client";
@@ -166,6 +167,10 @@ export function CompanyJobsRoute({ principal = null }: CompanyJobsRouteProps) {
               <option value="full">Vollständig remote</option>
             </select>
           </label>
+          <JobDraftHelp
+            draft={draft}
+            onDraft={(text) => setDraft((current) => ({ ...current, description: text }))}
+          />
           {/* Angelegt wird immer ein Entwurf. Veröffentlichen ist ein zweiter,
               bewusster Schritt — ein Knopf, der beides täte, würde die Stelle
               draußen haben, bevor jemand sie gelesen hat. */}
@@ -212,5 +217,73 @@ export function CompanyJobsRoute({ principal = null }: CompanyJobsRouteProps) {
         ) : null}
       </Card>
     </main>
+  );
+}
+
+/**
+ * Der Unternehmens-Agent — und der Unterschied zum Profil-Agenten ist der Punkt.
+ *
+ * Beide schreiben einen Entwurf auf Knopfdruck und speichern nichts. Aber der
+ * hier arbeitet an einem Text, den das Unternehmen **selbst verfasst hat**, und
+ * sagt über keine Person etwas. Das ist der Grund, warum genau dieser der
+ * einzige Unternehmens-Agent aus dem ULTRAPLAN ist, der ohne eigene Abwägung
+ * gebaut werden konnte: Scout, Candidate Ranking, Salary Recommendation und
+ * Team Analyzer richten sich alle auf Menschen (ADR-0022/0024).
+ *
+ * Der Hinweis nennt deshalb auch nicht „deine Daten“, sondern was wirklich
+ * hinausgeht: der Anzeigentext. Und er nennt, was der Entwurf nicht tun wird —
+ * Anforderungen dazuerfinden. Wer die Regel kennt, prüft den Vorschlag darauf.
+ */
+function JobDraftHelp({ draft, onDraft }: { draft: Draft; onDraft: (text: string) => void }) {
+  const [wish, setWish] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+  const hasText = draft.description.trim() !== "";
+
+  const ask = useMutation({
+    mutationFn: () =>
+      draftJobText({
+        title: draft.title,
+        description: draft.description,
+        location: draft.location,
+        skills: parseSkills(draft.skills),
+        wish,
+      }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        setProblem(null);
+        onDraft(result.draft);
+      } else {
+        setProblem(result.message);
+      }
+    },
+  });
+
+  return (
+    <div className="draft-help">
+      <Field
+        label={hasText ? "Anzeige umformulieren lassen" : "Beim Schreiben helfen lassen"}
+        hint="Optional: was euch wichtig ist („kürzer“, „weniger Floskeln“). Titel, Beschreibung, Ort und die gesuchten Fähigkeiten gehen dafür an Anthropic — nichts über Bewerbende. Anforderungen erfindet der Vorschlag keine dazu, und gespeichert wird er erst, wenn ihr den Entwurf anlegt."
+        value={wish}
+        onChange={(e) => setWish(e.target.value)}
+        maxLength={200}
+      />
+      {problem !== null ? (
+        <p className="auth__alert" role="alert">
+          {problem}
+        </p>
+      ) : null}
+      {/* type="button" ausgeschrieben, obwohl `Button` es ohnehin so vorgibt:
+          dieser Knopf steht im selben <form> wie „Entwurf anlegen", und wer
+          hier liest, soll nicht erst das UI-Paket aufschlagen müssen, um zu
+          wissen, welcher der beiden absendet. Ein Test hält das Attribut fest —
+          änderte sich die Vorgabe, legte dieser Knopf sonst die Stelle an. */}
+      <Button type="button" variant="quiet" onClick={() => ask.mutate()} disabled={ask.isPending}>
+        {ask.isPending
+          ? "Wird geschrieben…"
+          : hasText
+            ? "Vorschlag holen (ersetzt die Beschreibung)"
+            : "Vorschlag holen"}
+      </Button>
+    </div>
   );
 }

@@ -1,17 +1,19 @@
 [project]
 name = "worker-ai"
 version = "0.1.0"
-description = "AI Runtime: Provider abstraction, Tool calling, Memory, Prompt templates, Streaming"
+description = "AI seam: one text-drafting port, one provider, nothing stored"
 requires-python = ">=3.14"
+# EINE Abhängigkeit. Die frühere Fassung deklarierte acht (openai, anthropic,
+# google-generativeai, ollama, pydantic-ai, chromadb, sentence-transformers,
+# pydantic) für 246 Zeilen ohne einen einzigen Konsumenten — und war genau
+# deshalb unbaubar unter Python 3.14 und aus dem Workspace ausgeschlossen.
+# Siehe ADR-0024, und davor ADR-0021 für denselben Fehler bei worker-files.
+#
+# `httpx` statt des Anbieter-SDK: der Aufruf ist ein POST mit JSON. Ein SDK
+# brächte einen eigenen Auth-, Retry- und Typ-Apparat mit, von dem hier nichts
+# gebraucht wird — und httpx steht ohnehin in jedem Dienst.
 dependencies = [
-    "openai>=1.0.0,<2.0.0",
-    "anthropic>=0.30.0,<1.0.0",
-    "google-generativeai>=0.5.0,<1.0.0",
-    "ollama>=0.2.0,<1.0.0",
-    "pydantic>=2.8.0,<3.0.0",
-    "pydantic-ai>=0.1.0,<1.0.0",
-    "chromadb>=0.5.0,<1.0.0",
-    "sentence-transformers>=3.0.0,<4.0.0",
+    "httpx>=0.27.0,<1.0.0",
 ]
 
 [build-system]
@@ -20,9 +22,3 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-name = "worker_ai"
-
-[tool.uv.sources]
-worker-core = { workspace = true }
-worker-config = { workspace = true }
-worker-cache = { workspace = true }
-worker-mcp = { workspace = true }

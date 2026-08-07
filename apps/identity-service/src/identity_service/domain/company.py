@@ -12,6 +12,7 @@ keinen unverifizierten Zustand.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from uuid import UUID, uuid4
 
 from worker_core import DomainError
@@ -26,7 +27,25 @@ __all__ = [
     "EmailDomain",
     "InvalidCompanyName",
     "PublicEmailDomain",
+    "TenantStatus",
 ]
+
+
+class TenantStatus(StrEnum):
+    """Zwei Zustände, und `DORMANT` ist kein „gelöscht".
+
+    Löscht die einzige Person mit `role='admin'` ihr Konto, wird das Unternehmen
+    **stillgelegt** und seine Anzeigen zurückgezogen (ADR-0027 §7). Nicht: die
+    Löschung blockieren, bis jemand anderes Admin ist — ein persönliches Recht
+    darf nicht an einer Organisationsfrage hängen.
+
+    Und eine unbeaufsichtigte Stellenanzeige ist schlechter als keine:
+    Bewerbungen liefen an niemanden.
+    """
+
+    ACTIVE = "active"
+    DORMANT = "dormant"
+
 
 #: Absichtlich kurz und erweiterbar. Vollständigkeit ist nicht erreichbar; die
 #: Liste verhindert die offensichtlichen Fälle, in denen jemand einen

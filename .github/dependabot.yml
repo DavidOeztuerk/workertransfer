@@ -1,0 +1,42 @@
+# Abhängigkeiten aktuell halten — automatisch, aber nicht automatisch gemergt.
+#
+# Warum überhaupt: die Hardening-Liste aus ULTRAPLAN Phase 10 nennt
+# „Dependency-Scanning", und bis heute gab es weder das eine noch das andere.
+# Eine Lücke in einer Bibliothek ist die häufigste Art, wie ein System
+# angreifbar wird, ohne dass jemand einen Fehler gemacht hat.
+#
+# Wöchentlich, nicht täglich: ein Schwall PRs wird weggeklickt, und dann fällt
+# auch der auf, der wichtig gewesen wäre.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Gebündelt statt einzeln: fünfzehn PRs für Patch-Versionen prüft
+      # niemand. Sicherheitsrelevante kommen weiter einzeln — Dependabot
+      # trennt sie selbst heraus.
+      python-minor-und-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      js-minor-und-patch:
+        update-types: [minor, patch]
+
+  # Die Basis-Images altern genauso, und niemand sieht es ihnen an.
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

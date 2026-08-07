@@ -1,0 +1,117 @@
+# Routen des Gateways — die Landkarte des Systems an EINER Stelle.
+#
+# Bewusst eine Datei und keine Compose-Labels: für Staging und Produktion wird
+# genau diese Datei kopiert und bekommt andere Hosts und TLS. Labels lägen
+# verstreut in einer docker-compose.yml, die es dort gar nicht gibt.
+#
+# **Der Grund, warum diese Datei nicht trivial ist:** die Pfade der Dienste
+# sind NICHT disjunkt. `/companies/{id}/members` gehört identity-service,
+# `/companies/{id}/profile` gehört companies-service — sie unterscheiden sich
+# erst im letzten Segment. Präfix-Routing allein reicht also nicht; die
+# genaueren Regeln brauchen eine höhere `priority`, sonst gewinnt die kürzeste.
+# Traefik sortiert sonst nach Regel-Länge, und darauf sollte sich niemand
+# verlassen müssen, der hier eine Route ergänzt.
+
+http:
+  routers:
+    # --- Die Ausnahmen zuerst (hohe priority) ------------------------------
+    applications-of-a-job:
+      rule: "PathRegexp(`^/jobs/[^/]+/applications`)"
+      service: applications
+      priority: 100
+    company-job-list:
+      rule: "PathPrefix(`/companies/me/jobs`)"
+      service: jobs
+      priority: 100
+    company-application-stats:
+      rule: "PathPrefix(`/companies/me/application-stats`)"
+      service: applications
+      priority: 100
+    company-own-profile:
+      rule: "PathPrefix(`/companies/me/profile`) || PathPrefix(`/companies/by-slug`)"
+      service: companies
+      priority: 100
+    company-public-profile:
+      rule: "PathRegexp(`^/companies/[^/]+/profile`)"
+      service: companies
+      priority: 90
+
+    # --- Die Regelfälle (niedrige priority) --------------------------------
+    identity:
+      rule: "PathPrefix(`/auth`) || PathPrefix(`/me`) || PathPrefix(`/companies`) || PathPrefix(`/notifications`)"
+      service: identity
+      priority: 10
+    consent:
+      rule: "PathPrefix(`/consent`)"
+      service: consent
+      priority: 10
+    profiles:
+      rule: "PathPrefix(`/profiles`)"
+      service: profile
+      priority: 10
+    resumes:
+      rule: "PathPrefix(`/resumes`)"
+      service: resume
+      priority: 10
+    portfolios:
+      rule: "PathPrefix(`/portfolios`)"
+      service: portfolio
+      priority: 10
+    jobs:
+      rule: "PathPrefix(`/jobs`)"
+      service: jobs
+      priority: 10
+    applications:
+      rule: "PathPrefix(`/applications`)"
+      service: applications
+      priority: 10
+    transfer:
+      rule: "PathPrefix(`/market`) || PathPrefix(`/transfers`)"
+      service: transfer
+      priority: 10
+    github:
+      rule: "PathPrefix(`/github`)"
+      service: github
+      priority: 10
+
+    # Alles Übrige ist die Oberfläche. Als schwächste Regel, damit ein neuer
+    # API-Pfad sie nie versehentlich übernimmt.
+    web:
+      rule: "PathPrefix(`/`)"
+      service: web
+      priority: 1
+
+  services:
+    identity:
+      loadBalancer:
+        servers: [{ url: "http://identity-service:8001" }]
+    consent:
+      loadBalancer:
+        servers: [{ url: "http://consent-service:8002" }]
+    profile:
+      loadBalancer:
+        servers: [{ url: "http://profile-service:8003" }]
+    resume:
+      loadBalancer:
+        servers: [{ url: "http://resume-service:8004" }]
+    portfolio:
+      loadBalancer:
+        servers: [{ url: "http://portfolio-service:8005" }]
+    jobs:
+      loadBalancer:
+        servers: [{ url: "http://jobs-service:8006" }]
+    applications:
+      loadBalancer:
+        servers: [{ url: "http://applications-service:8007" }]
+    companies:
+      loadBalancer:
+        servers: [{ url: "http://companies-service:8008" }]
+    transfer:
+      loadBalancer:
+        servers: [{ url: "http://transfer-service:8009" }]
+    github:
+      loadBalancer:
+        servers: [{ url: "http://github-service:8010" }]
+    web:
+      loadBalancer:
+        servers: [{ url: "http://web:5173" }]

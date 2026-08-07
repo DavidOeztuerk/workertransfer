@@ -1,0 +1,17 @@
+[project]
+name = "worker-outbox"
+version = "0.1.0"
+description = "Transactional outbox: an intent recorded in the same transaction as the change that caused it"
+requires-python = ">=3.14"
+# Eine Abhängigkeit — SQLAlchemy, das ohnehin in jedem Dienst steckt. KEIN
+# Broker: aio-pika, aiokafka und nats-py standen zusammen in
+# `worker-messaging`, drei Umsetzungen ohne einen einzigen Konsumenten
+# (ADR-0025). Ein Postgres, das jeder Dienst schon hat, trägt eine Outbox.
+dependencies = ["sqlalchemy[asyncio]>=2.0.30,<3.0.0"]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_outbox"

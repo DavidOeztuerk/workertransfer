@@ -1,0 +1,29 @@
+# Statische Konfiguration. Was hier steht, gilt beim Start; die Routen liegen
+# in `dynamic.yml` und werden im Betrieb nachgeladen.
+
+entryPoints:
+  web:
+    address: ":80"
+
+providers:
+  # Datei statt Docker-Labels: dieselbe `dynamic.yml` geht nach Staging und
+  # Produktion, wo es keine docker-compose.yml gibt.
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
+
+# Das Dashboard ist LOKAL an, damit man sieht, welche Regel gewonnen hat —
+# und in Produktion aus. Ein offenes Dashboard verrät die ganze Landkarte.
+api:
+  dashboard: true
+  insecure: true
+
+log:
+  level: INFO
+
+# Zugriffsprotokoll ohne Inhalte: Pfad und Status, kein Körper, keine Cookies.
+# Was hier landete, läge dauerhaft im Protokoll (product-scope.md).
+accessLog:
+  fields:
+    headers:
+      defaultMode: drop

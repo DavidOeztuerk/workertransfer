@@ -12,6 +12,7 @@ genau das der einzige Weg, und damit war der Transfermarkt praktisch tot.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -158,6 +159,30 @@ def apps(stack: tuple[Any, Any], postgres_url: str) -> tuple[Any, Any]:
     NOTIFIER.sent.clear()
     NOTIFIER.fail = False
     return stack
+
+
+async def _drain_outbox() -> int:
+    """Stellt zu, was in der Outbox liegt — im Dienst macht das der Dauerläufer.
+
+    Er läuft hier nicht mit: die Tests sprechen die App über ASGITransport an,
+    ohne Lifespan. Das ist sogar nützlich — so lässt sich der Zwischenzustand
+    prüfen, den es in der alten Fassung gar nicht gab: Absicht festgehalten,
+    aber noch nicht zugestellt.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from transfer_service.infrastructure.database.models import OUTBOX
+    from worker_outbox import OutboxDispatcher
+
+    engine = create_async_engine(os.environ["WORKER_DATABASE_URL"])
+    try:
+        dispatcher = OutboxDispatcher(
+            session_factory=async_sessionmaker(engine, expire_on_commit=False),
+            table=OUTBOX,
+            delivery=NOTIFIER,
+        )
+        return await dispatcher.drain_once()
+    finally:
+        await engine.dispose()
 
 
 def _token(user_id: UUID, *, tenant_id: UUID | None) -> str:
@@ -388,11 +413,20 @@ async def test_unavailable_means_no_even_with_a_granted_request(apps: tuple[Any,
 
 
 async def test_the_person_is_told_that_someone_asked(apps: tuple[Any, Any]) -> None:
-    """Ohne diesen Ruf erfährt sie es nur, wenn sie zufällig vorbeischaut."""
+    """Ohne diesen Ruf erfährt sie es nur, wenn sie zufällig vorbeischaut.
+
+    Seit 9.1 in zwei Schritten: die Anfrage schreibt die ABSICHT in derselben
+    Transaktion, der Zusteller macht daraus eine Mail. Der Test prüft beide —
+    denn nur zusammen ergeben sie „sie erfährt es".
+    """
     app, person, _person_token, _tenant, company_token = await _prepare(apps)
 
     await _call(app, "POST", f"/market/{person}/requests", company_token)
 
+    # Im Anfragepfad wird NICHT mehr zugestellt: keine Zeitüberschreitung, die
+    # die Antwort verzögert.
+    assert NOTIFIER.sent == []
+    assert await _drain_outbox() == 1
     assert NOTIFIER.sent == [(person, "market_request")]
 
 
@@ -414,11 +448,41 @@ async def test_a_broken_notifier_does_not_break_the_request(apps: tuple[Any, Any
     assert [r["status"] for r in mine.json()] == ["PENDING"]
 
 
+async def test_a_broken_notifier_no_longer_loses_the_notification(
+    apps: tuple[Any, Any],
+) -> None:
+    """Der eigentliche Gewinn von 9.1 — und der Fall, den die alte Fassung verlor.
+
+    Vorher: der HTTP-Aufruf scheiterte, der Fehler wurde geschluckt, und die
+    Benachrichtigung war FÜR IMMER weg. Ein Neustart von identity-service
+    genügte, und die Person erfuhr nie, dass jemand nach ihr gefragt hat.
+
+    Jetzt bleibt die Absicht liegen, bis sie durchkommt — ohne dass jemand
+    eingreifen muss.
+    """
+    app, person, _person_token, _tenant, company_token = await _prepare(apps)
+    NOTIFIER.fail = True
+
+    await _call(app, "POST", f"/market/{person}/requests", company_token)
+
+    # Erster Anlauf: der Zusteller scheitert, die Zeile bleibt liegen.
+    assert await _drain_outbox() == 0
+
+    # Der Dienst ist wieder da — niemand musste etwas nachtragen.
+    NOTIFIER.fail = False
+    NOTIFIER.sent.clear()
+    assert await _drain_outbox() == 1
+    assert NOTIFIER.sent == [(person, "market_request")]
+
+
 async def test_the_company_is_never_mailed(apps: tuple[Any, Any]) -> None:
     """Eine Mail an einen Firmenverteiler mit dem Namen eines Menschen wäre
     derselbe Leck-Kanal, nur andersherum."""
     app, person, person_token, _tenant, company_token = await _prepare(apps)
     asked = await _call(app, "POST", f"/market/{person}/requests", company_token)
+    # Erst zustellen, dann den Mitschrieb leeren: die Anfrage von eben liegt
+    # sonst noch in der Outbox und taucht beim späteren Durchlauf mit auf.
+    await _drain_outbox()
     NOTIFIER.sent.clear()
 
     await _call(app, "POST", f"/market/requests/{asked.json()['id']}/grant", person_token)
@@ -427,6 +491,7 @@ async def test_the_company_is_never_mailed(apps: tuple[Any, Any]) -> None:
     )
     await _call(app, "POST", f"/transfers/{started.json()['id']}/accept-talk", person_token)
 
+    await _drain_outbox()
     # Nur der Zug des Unternehmens (der Transfer) erreicht jemanden — und zwar
     # die Person. Ihre eigenen Züge lösen nichts aus.
     assert NOTIFIER.sent == [(person, "transfer_update")]

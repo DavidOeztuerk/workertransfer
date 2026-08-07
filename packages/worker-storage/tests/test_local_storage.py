@@ -117,3 +117,59 @@ async def test_a_half_written_file_is_not_listed(storage: LocalStorage, tmp_path
     await asyncio.to_thread(_leave_partial)
 
     assert await storage.list_names("person") == ["a.png"]
+
+
+async def _exists(path: Path) -> bool:
+    """Im Thread, wie beim rglob oben: ASYNC240 verbietet blockierendes
+    pathlib in einer Coroutine, und die Regel gilt hier zu Recht auch für den
+    Test."""
+    return await asyncio.to_thread(path.exists)
+
+
+async def _is_dir(path: Path) -> bool:
+    return await asyncio.to_thread(path.is_dir)
+
+
+class TestTheEmptyDirectoryIsASpurToo:
+    """Ein leeres Verzeichnis, das nach einer `subject_id` heißt, bleibt eine
+    Auskunft: *diesen Menschen gab es hier*. Beim Löschen eines Kontos ist genau
+    das die Spur, die man übersieht (ADR-0027 §2).
+
+    Aufgeräumt wird **innerhalb von LocalStorage**, nicht über eine neue
+    Port-Methode: „Verzeichnis" ist ein Begriff des Dateisystems, den ein
+    Objektspeicher gar nicht kennt — dort verschwindet ein Präfix von selbst,
+    sobald das letzte Objekt weg ist. Ein `rmdir` am Port wäre das lokale
+    Backend, das in die Naht durchschlägt, die es verbergen soll (ADR-0021).
+    """
+
+    async def test_the_last_delete_takes_the_directory_with_it(
+        self, storage: LocalStorage, tmp_path: Path
+    ) -> None:
+        await storage.put("subject/a.png", b"eins", content_type="image/png")
+        await storage.put("subject/b.png", b"zwei", content_type="image/png")
+
+        await storage.delete("subject/a.png")
+        assert await _is_dir(tmp_path / "subject"), "solange noch etwas drin liegt: bleibt"
+
+        await storage.delete("subject/b.png")
+
+        assert not await _exists(tmp_path / "subject")
+
+    async def test_it_never_removes_the_root(self, storage: LocalStorage, tmp_path: Path) -> None:
+        """Sonst wäre der erste Anhang nach dem Aufräumen ein Schreibfehler."""
+        await storage.put("lose.png", b"bytes", content_type="image/png")
+
+        await storage.delete("lose.png")
+
+        assert await _exists(tmp_path)
+
+    async def test_a_directory_someone_else_uses_stays(
+        self, storage: LocalStorage, tmp_path: Path
+    ) -> None:
+        await storage.put("a/b/mein.png", b"bytes", content_type="image/png")
+        await storage.put("a/deins.png", b"bytes", content_type="image/png")
+
+        await storage.delete("a/b/mein.png")
+
+        assert not await _exists(tmp_path / "a" / "b")
+        assert await _is_dir(tmp_path / "a")

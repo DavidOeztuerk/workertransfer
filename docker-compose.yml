@@ -66,9 +66,17 @@ x-service-env: &service-env
   # die Dienste kennen es, ein Browser nicht. Zwischenlösung bis zu echten
   # Dienstidentitäten (Härtung, Phase 10). LEER heißt: der Endpunkt ist zu.
   WORKER_NOTIFY_SECRET: ${WORKER_NOTIFY_SECRET:-local-notify-secret}
+  # Gemeinsames Geheimnis für die Löschkaskade, POST /internal/erasure
+  # (ADR-0027 §4.4). AUSDRÜCKLICH EIN ANDERES als WORKER_NOTIFY_SECRET: „darf
+  # eine Mail anstoßen" und „darf alles über einen Menschen löschen" dürfen
+  # nicht dasselbe Papier sein. LEER hieße: der Endpunkt ist zu.
+  WORKER_ERASURE_SECRET: ${WORKER_ERASURE_SECRET:-local-erasure-secret}
   # The base for confirmation links — must be what the BROWSER can reach, not a
   # compose service name.
   WORKER_PUBLIC_WEB_URL: ${WORKER_PUBLIC_WEB_URL:-http://localhost:5173}
+  # Traces nach Jaeger. LEER hieße AUS — hier gesetzt, weil der Kollektor im
+  # Stapel läuft; in Produktion zeigt er auf den dortigen Endpunkt.
+  WORKER_OTLP_ENDPOINT: ${WORKER_OTLP_ENDPOINT:-http://jaeger:4317}
 
 services:
   postgres:
@@ -120,6 +128,17 @@ services:
       <<: *service-env
       WORKER_PORT: "8001"
       WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/identity
+      # Wohin die Löschbefehle gehen (ADR-0027 §4). jobs-service steht dabei,
+      # ist aber KEIN Empfänger der Kaskade — er bekommt nur die Absicht aus
+      # §7, wenn ein Unternehmen ohne Administrator zurückbleibt.
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      WORKER_PROFILE_BASE_URL: http://profile-service:8003
+      WORKER_RESUME_BASE_URL: http://resume-service:8004
+      WORKER_PORTFOLIO_BASE_URL: http://portfolio-service:8005
+      WORKER_JOBS_BASE_URL: http://jobs-service:8006
+      WORKER_APPLICATIONS_BASE_URL: http://applications-service:8007
+      WORKER_TRANSFER_BASE_URL: http://transfer-service:8009
+      WORKER_GITHUB_BASE_URL: http://github-service:8010
     ports:
       - "8001:8001"
     command:
@@ -198,6 +217,13 @@ services:
       # (ADR-0013, synchron und ohne Cache). Servicename, nicht localhost:
       # der Aufruf läuft im Compose-Netz.
       WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      # Die Formulierungshilfe (ADR-0024). LEER heißt: sie ist aus, und die
+      # Oberfläche sagt das — kein fremder Dienst wird angerufen. Der Schlüssel
+      # kommt ausschließlich aus der Umgebung des Entwicklers
+      # (`ANTHROPIC_API_KEY=... docker compose up`) und steht nie im
+      # Repository.
+      WORKER_ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      WORKER_DRAFTING_MODEL: "${WORKER_DRAFTING_MODEL:-claude-sonnet-5}"
     ports:
       - "8003:8003"
     command:
@@ -320,6 +346,13 @@ services:
       <<: *service-env
       WORKER_PORT: "8006"
       WORKER_DATABASE_URL: postgresql+asyncpg://worker:worker@postgres:5432/jobs
+      # Die Formulierungshilfe für die eigene Anzeige (ADR-0024) — der
+      # Company-Agent, Gegenstück zum Profil-Agenten im profile-service.
+      # LEER heißt: sie ist aus, und die Oberfläche sagt das. Derselbe
+      # Schlüssel aus der Entwicklerumgebung, aber jeder Dienst liest ihn
+      # selbst; ein gemeinsamer Vermittler-Dienst wäre eine Hülle.
+      WORKER_ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      WORKER_DRAFTING_MODEL: "${WORKER_DRAFTING_MODEL:-claude-sonnet-5}"
     ports:
       - "8006:8006"
     command:
@@ -559,6 +592,59 @@ services:
       - /app/node_modules
       - /app/apps/web/node_modules
       - /app/packages/ui/node_modules
+
+  # --- Beobachtbarkeit -------------------------------------------------------
+  # Jaeger all-in-one statt OTel-Collector + Jaeger: der Collector lohnt sich,
+  # wenn mehrere Ziele beliefert oder Daten gefiltert werden. Hier gibt es ein
+  # Ziel. Ein Glied weniger in der Kette ist ein Glied weniger, das schweigt.
+  # Jaeger bringt den OTLP-Empfänger selbst mit (4317).
+  jaeger:
+    image: jaegertracing/all-in-one:1.60.0
+    container_name: workertransfer-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # Oberfläche — hier sieht man die Spuren
+      - "4317:4317"   # OTLP/gRPC — hierhin senden die Dienste
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:16686/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # --- Gateway ---------------------------------------------------------------
+  # Ein Eingang für alles: http://localhost:8080 spricht dieselben Pfade wie die
+  # Einzelports, nur ohne dass jemand wissen muss, welcher Dienst welchen
+  # bedient. Die Einzelports bleiben offen — E2E und Fehlersuche greifen direkt
+  # zu, und ein Gateway, das man zum Debuggen umgehen kann, wird auch benutzt.
+  #
+  # KEINE Businesslogik hier (ULTRAPLAN Phase 10): Traefik routet, prüft aber
+  # keine Rechte. Die Authentifizierung bleibt in den Diensten, wo sie den
+  # Kontext hat — ein Gateway, das Rechte kennt, ist ein zweiter Ort, an dem
+  # sie falsch sein können.
+  gateway:
+    image: traefik:v3.3
+    container_name: workertransfer-gateway
+    restart: unless-stopped
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "8080:80"
+      # Dashboard: zeigt, welche Regel gewonnen hat. Lokal unverzichtbar,
+      # sobald sich zwei Pfade überschneiden — und das tun sie hier.
+      - "8081:8080"
+    volumes:
+      - ./docker/traefik:/etc/traefik:ro
+    depends_on:
+      identity-service:
+        condition: service_healthy
+      jobs-service:
+        condition: service_healthy
+      applications-service:
+        condition: service_healthy
+      companies-service:
+        condition: service_healthy
 
 volumes:
   portfolio-attachments:

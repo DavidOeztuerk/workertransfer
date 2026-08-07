@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Self
 
 from pydantic import SecretStr, model_validator
+from worker_ai import ANTHROPIC_MESSAGES_URL
 from worker_auth import DEV_JWT_SECRET, assert_deployable_jwt_secret
 from worker_platform.configuration import PlatformSettings
 
@@ -27,6 +28,28 @@ class ProfileServiceSettings(PlatformSettings):
     # Wo der Consent-Ledger erreichbar ist. Im Compose-Netz der Servicename,
     # nicht localhost — der Aufruf läuft container-zu-container.
     consent_base_url: str = "http://127.0.0.1:8002"
+
+    # Gemeinsames Geheimnis für `POST /internal/erasure` (ADR-0027 §4.4).
+    # **Ausdrücklich ein anderes als `notify_secret`**: „darf eine Mail
+    # anstoßen" und „darf alles über einen Menschen löschen" dürfen nicht
+    # dasselbe Papier sein.
+    #
+    # Leer heißt: der Endpunkt ist zu. Bis es echte Dienstidentitäten gibt, ist
+    # das die Zwischenlösung — und die Voreinstellung schließt.
+    erasure_secret: SecretStr = SecretStr("")
+
+    # Der Entwurfsdienst. **Leer heißt: die Funktion ist aus** — nicht „offen
+    # für alle", nicht „nimm einen Standardschlüssel". Ohne Schlüssel ruft der
+    # Dienst keinen fremden Anbieter an, und die Oberfläche sagt das (ADR-0024).
+    #
+    # Der Schlüssel steht ausschließlich in der Umgebung. Er landet nie im
+    # Repository und nie in einem Protokoll (`product-scope.md`).
+    anthropic_api_key: SecretStr = SecretStr("")
+    drafting_model: str = "claude-sonnet-5"
+    # Wohin der Aufruf geht. Ein Gateway oder Proxy, der dieselbe Messages-API
+    # spricht, lässt sich hier eintragen. **Kein Provider-Wechsel** — wer dort
+    # etwas hinstellt, das anders antwortet, bekommt einen ehrlichen Fehler.
+    drafting_base_url: str = ANTHROPIC_MESSAGES_URL
 
     @model_validator(mode="after")
     def _reject_development_jwt_secret(self) -> Self:

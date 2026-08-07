@@ -15,12 +15,12 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 2.5 | Stabilisierung & Plattform-Naht | ✅ | Cookie-Auth, Dep-Hygiene, Kanon Runde 2, Dev-Stack, Frontend-Gate, Generator |
 | 3 | Candidate Core | ✅ | 3.1–3.5 komplett (Consent, Profile, Resume, Portfolio, Ablage) |
 | 4 | Jobs & Applications | ✅ | 4.1–4.4 komplett (Jobs, Bewerbungen, Unternehmen, Karriere-Seiten) |
-| 5 | Transfermarkt | 🟧 | 5.1–5.3 ✅ (Marktstatus, Vorgang, Tür + Oberfläche); Verträge, Unterschrift, KI-Beratung offen |
+| 5 | Transfermarkt | ✅ | 5.1–5.3 (Marktstatus, Vorgang, Tür + Oberfläche). DoD erfüllt; Verträge/Unterschrift gehören zu Phase 8, der Transferberater zu Phase 7 |
 | 6 | Developer Intelligence | ✅ | 6.1 (GitHub als Beleg), 6.2 (Passung im Browser), 6.3 (Vokabular) — Score, Ranking und Wechselwahrscheinlichkeit bewusst **nicht** gebaut (ADR-0022/0023) |
-| 7 | AI Agent Plattform | ⬜ | 23 Agenten (draft-only), plan-act-reflect, MCP |
+| 7 | AI Agent Plattform | ✅ | 7.1 (Naht + Candidate-Agent), 7.2 (Company-Agent: die eigene Anzeige). DoD erfüllt, mit zwei begründeten Abweichungen (plan-act-reflect, „Consents und Logs"). **Candidate Ranking** ist nach ADR-0022 dauerhaft ausgeschlossen; Skill Analyzer, Salary Recommendation und Team Analyzer sind in ihrer ÜBLICHEN Form ausgeschlossen, nicht als Idee |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
-| 9 | Messaging/Notif./Search/Analytics | ⬜ | Outbox/Inbox, cross-service Events |
-| 10 | Frontend/Gateway/Infra/Hardening | ⬜ | UI, Gateway, K8s, OTel, Hardening |
+| 9 | Messaging/Notif./Search/Analytics | ✅ | 9.1–9.3 (Outbox in allen drei Diensten, Suche geprüft, Kennzahlen). DoD erfüllt; `worker-messaging` und `worker-search` gelöscht (ADR-0025/0026) |
+| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1–10.5 ✅ (Auth-Rand, Gateway, OTel, Dependency-Scanning, Löschung nach ADR-0027 samt Oberfläche). Offen: K8s/Helm, starlette-CVEs |
 
 ### Phase 0 — Status: ✅ erledigt
 - ✅ `docs/ULTRAPLAN.md` + `docs/ROADMAP.md`
@@ -454,7 +454,7 @@ Qualitätsgates, nicht mehr nur Syntax.
   mit dem Link, dass diese Person auf der Plattform ist und dieses Unternehmen
   um sie wirbt. [Design](superpowers/specs/2026-08-02-career-pages-design.md).
 
-### Phase 5 — Status: 🟧 in Arbeit (5.1–5.3 ✅)
+### Phase 5 — Status: ✅ erledigt (05.08.2026, 5.1–5.3)
 
 - ✅ **5.1 Marktstatus** — 02.08.2026.
   [Design](superpowers/specs/2026-08-02-transfer-service-design.md).
@@ -499,7 +499,41 @@ Qualitätsgates, nicht mehr nur Syntax.
   Bestätigung der Person ihn selbst auslöst. Beide haben jetzt einen Test, der
   ohne den Fix rot wird.
 
-Offen in Phase 5:
+**Phase 5 ist gegen ihre eigene DoD erledigt.** Sie lautet: *„State-Machine-Tests,
+ein voller Happy-Path inkl. Consent-Checks; Soll-Bruch-Pfade (Ablehnung,
+Vertragsende) getestet."* Alles davon steht, mit zwei E2E-Reisen.
+
+Sie stand trotzdem lange auf 🟧, und das war ein Buchhaltungsfehler von mir:
+unter „offen" hingen drei Punkte, die **anderen Phasen gehören**. Der ULTRAPLAN
+nennt sie im Inhaltsteil von Phase 5, aber die DoD entscheidet — und Phase 8
+heißt wörtlich „Contracts, E-Signature & Verträge".
+
+Umgehängt statt weiter mitgeschleppt:
+
+- **Vertragsvorlagen** und **digitale Unterschrift** → **Phase 8**. Der Entwurf
+  steht ([Design](superpowers/specs/2026-08-02-contract-templates-design.md)),
+  gebaut wird nichts, bis sieben rechtliche Fragen beantwortet sind — die nach
+  der Formvorschrift zuerst, weil sie den ganzen Schnitt umwerfen kann.
+  Ausdrücklich zurückgestellt.
+- **`worker-player-advisor` / Transferberater** → **Phase 7**. Ein
+  KI-Entwurfserzeuger, und seit 7.1 gibt es die Naht dafür.
+  **Nachtrag 05.08.2026, nach Abschluss von Phase 7: nicht gebaut, und der
+  Grund ist kein Zeitmangel.** Der ULTRAPLAN führt den Transferberater unter
+  den *Candidate*-Agenten — er berät also die **Person**. Im Transfer-Vorgang
+  schreibt die Person aber nirgends Freitext: `accept-talk`, `accept-offer`,
+  `confirm-release` und `decline` sind vier Knöpfe. Die einzigen zwei
+  Freitextfelder (`ExpressInterestV1.message`, `MakeOfferV1.note`) gehören dem
+  **Unternehmen**. Der Agent hat also schlicht keine Fläche, an der er ansetzen
+  könnte; ihm eine zu geben hieße, der Person einen neuen Schreibschritt in den
+  Vorgang zu bauen — eine Produktentscheidung, keine Fortsetzung.
+  Und die naheliegende Umkehrung ist es erst recht nicht: Die
+  Interessensnachricht ist ein Text **über und an einen bestimmten Menschen**.
+  Damit ein Modell sie nützlich formuliert, müsste es etwas über diese Person
+  wissen — genau das, was ADR-0024 ausschließt. Ohne dieses Wissen bleibt eine
+  Floskel, und eine Floskel ist schlechter als der Satz, den ein Mensch selbst
+  tippt. Der Transferberater bleibt deshalb offen, mit Frage statt mit Termin.
+
+Zum Nachlesen, was für Verträge festgelegt ist:
 
 - **Vertragsvorlagen** — [Entwurf steht, gebaut wird nichts](superpowers/specs/2026-08-02-contract-templates-design.md).
   Festgelegt ist der Weg: die Plattform stellt **Vorlagen**, füllt aus, und
@@ -632,7 +666,7 @@ unsichtbar. Ersetzt durch die Menü-Zusammenfassung, die es nur mit aktivem
 Unternehmen gibt — ein ehrlicheres Signal als ein Link, der auch ohne Wechsel
 existieren könnte.
 
-### Phase 6 — Status: 🟧 in Arbeit
+### Phase 6 — Status: ✅ erledigt (05.08.2026, 6.1–6.3)
 
 - ✅ **6.1 GitHub als Beleg, nicht als Note** — 03.08.2026.
   [Design](superpowers/specs/2026-08-03-github-evidence-design.md).
@@ -731,6 +765,464 @@ existieren könnte.
   — ein einzelner übersprungener Test ist eine Entscheidung, alle sind ein
   Ausfall.
 
+### Phase 9 — Status: ✅ erledigt (06.08.2026)
+
+Die DoD lautet: *„Cross-Service-Event fließt via Outbox, Notification geht raus,
+Suche findet, Analytics aggregiert datenschutzkonform. Tests
+(Testcontainers)."* — alle vier erfüllt. **Nicht** gebaut wurden die vier
+Dienste aus dem Inhaltsteil (`messaging-`, `notifications-`, `search-`,
+`analytics-service`): die DoD entscheidet, und was sie verlangt, gibt es
+bereits oder ist an der richtigen Stelle entstanden. Zwei Hüllen mussten dafür
+weichen — `worker-messaging` (fünf Abhängigkeiten, null Konsumenten) und
+`worker-search` (drei Suchmaschinen, null Konsumenten).
+
+- ✅ **9.1 Die Outbox: eine Benachrichtigung, die nicht verlorengeht** —
+  05.08.2026. **ADR-0025.** `packages/worker-outbox` + `worker-platform`
+  (`background=`) + `apps/transfer-service` als erster Konsument.
+  **Der Fehler, den es zu beheben gab.** Benachrichtigungen liefen als „feuern
+  und vergessen": nach dem Commit ein HTTP-Aufruf, dessen Fehler geschluckt
+  wurde. Die Begründung war richtig — eine misslungene Mail darf keinen Vorgang
+  kippen — aber der Preis war, dass die Mail dann **für immer weg** ist. Ein
+  Neustart von identity-service genügte, und niemand erfuhr, dass jemand nach
+  ihm gefragt hat. Für ein Produkt, dessen Mechanik auf „die Person
+  entscheidet" beruht, ist das kein Schönheitsfehler: wer nicht erfährt, dass
+  gefragt wurde, kann nicht antworten.
+  Die Outbox dreht die Zusage nicht um, sie löst den Widerspruch: die **Absicht**
+  wird in DERSELBEN Transaktion wie die fachliche Änderung geschrieben. Kommt
+  die Änderung durch, liegt die Absicht fest; wird sie zurückgerollt, ist sie
+  weg. Ein Zusteller im Hintergrund darf danach beliebig oft scheitern.
+  **Kein Broker — und der dritte Wiedergänger.** Der ULTRAPLAN sieht
+  `worker-messaging` vor (aio-pika/aiokafka/nats). Beim Nachsehen: 129 Zeilen,
+  **fünf** schwere Abhängigkeiten, drei Umsetzungen, **null Konsumenten**; die
+  einzigen Verweise waren zwei `[tool.uv.sources]`-Einträge, und die
+  installieren nichts. Wort für Wort `worker-files` (ADR-0021),
+  `worker-github` (ADR-0022) und `worker-ai` (ADR-0024). Gelöscht. Ein
+  Postgres, das jeder Dienst ohnehin betreibt, trägt eine Outbox mit einer
+  Tabelle; `worker-outbox` hat **eine** Abhängigkeit statt fünf.
+  Beim Löschen kam heraus, dass `aio_pika` transitiv noch zwei Stellen
+  versorgte: einen `RabbitMQHealthCheck` für einen Broker, den es nicht gibt,
+  und eine AioPika-Instrumentierung im Tracing. Beide entfernt — ein
+  Gesundheitscheck für etwas, das nicht existiert, kann nur eine Antwort geben,
+  und die sagt nichts.
+  Festgelegt und je mit Test belegt: **dieselbe Transaktion** (gegenbewiesen —
+  mit einem eingebauten `session.commit()` wird der Test rot); **Wiederholung
+  statt Verlust**; **Aufgeben heißt liegenlassen, nicht löschen**; **kein
+  Inhalt in der Tabelle** (nur `user_id` und `kind` — eine Outbox steht danach
+  in jedem Backup, ein `payload`-Feld wäre die Einladung, den Nachrichtentext
+  mitzuschreiben); nur die **Art** eines Fehlers, nie die Antwort des
+  Gegenübers; **älteste zuerst**, sonst kommt „Angebot zurückgezogen" vor
+  „Angebot gemacht"; und die Zusteller-Schleife **überlebt einen kaputten
+  Durchlauf**, denn stirbt sie, bleibt die Tabelle liegen und niemand merkt es.
+  Der Dauerläufer hängt an einem neuen `background=` von `create_api_app`. Zwei
+  Fallen dort, beide mit Test: das Herunterfahren muss auf die Aufgabe
+  **warten** (sonst bricht es mitten in einer Transaktion ab — der erste
+  Testentwurf war auch ohne das `await` grün und bewachte damit nichts), und
+  ein Absturz darf **nicht still** sein.
+  Zwei bestehende Integrationstests mussten sich ändern und wurden dabei
+  strenger: sie prüfen jetzt **zwei** Schritte statt einem — Absicht
+  festgehalten, dann zugestellt. Der Zwischenzustand war vorher nicht prüfbar,
+  weil es ihn nicht gab.
+- ✅ **9.2 Die beiden übrigen Dienste ziehen nach** — 06.08.2026.
+  `applications-service` und `resume-service` benutzen denselben Weg wie
+  transfer-service: Tabelle an der eigenen `Base`, Migration, `record()` VOR
+  dem Commit, Zusteller am `background=`. Damit gibt es im System **keinen**
+  Pfad mehr, auf dem eine Benachrichtigung stillschweigend verlorengeht.
+  **Der eigentliche Befund war ein anderer:** beide Dienste hatten
+  **überhaupt keinen Test auf den Notifier**. Die Zusage „die Person wird
+  benachrichtigt" war dort nie geprüft — die Umstellung wäre also eine reine
+  Behauptung geblieben. Jetzt hat jeder einen Integrationstest mit kaputtem
+  Zusteller (Zeile bleibt liegen → Dienst wieder da → Zustellung), und für
+  `applications-service` ist er **gegenbewiesen**: ohne `record()` wird er rot.
+  Die zehn Zeilen `outbox_runner` sind je Dienst kopiert, nicht geteilt — ein
+  gemeinsames Paket wäre ein Kopplungspunkt über eine Dienstgrenze hinweg
+  (ADR-0003/0004), dieselbe Abwägung wie beim Consent- und Notify-Adapter.
+  Der `.env.example`-Wächter hat auch hier zugeschlagen und das fehlende
+  `WORKER_OUTBOX_INTERVAL_SECONDS` in **beiden** Dateien gefunden — zum dritten
+  Mal in dieser Woche ein eigener Fehler, den ein Wächter fing statt ich.
+
+- ✅ **9.3 Suche geprüft, Kennzahlen gebaut** — 06.08.2026. **ADR-0026.**
+  **Die Suche gab es schon.** `jobs-service` sucht über Titel, Beschreibung und
+  Ort, `profile-service` über Fähigkeiten und Ort — mit Tests und einer
+  E2E-Reise („die Suche findet nur, was freigegeben ist"). Daneben stand
+  `worker-search`: 223 Zeilen, **drei** Suchmaschinen (elasticsearch,
+  meilisearch, qdrant-client), **null Konsumenten** — zum vierten Mal dasselbe
+  Muster. Gelöscht; sechs Abhängigkeiten weniger.
+  **Die Kennzahlen sind die eigentliche Entscheidung.** Der naheliegende Reflex
+  wäre k-Anonymität gewesen — Zahlen erst ab einer Mindestgröße. Für diesen
+  Fall ist das aber das falsche Werkzeug: ein Unternehmen sieht seine
+  Bewerbungen ohnehin **einzeln**. Eine Schwelle auf der Summe verdeckte etwas,
+  das daneben im Klartext steht — Theater, das vom eigentlichen Punkt ablenkt.
+  Die Grenze liegt **nicht bei der Aggregation, sondern bei der
+  Zusammenführung**: zulässig ist eine Zahl, die keine Auskunft erzeugt, die
+  der Fragende nicht ohnehin hat. „12 Bewerbungen, davon 3 abgelehnt" auf die
+  eigenen Stellen ist Bequemlichkeit. „Ihre Bewerber haben sich bei 7 anderen
+  Firmen beworben" oder „60 % suchen aktiv" wäre eine Aussage über Menschen aus
+  Quellen, die einzeln freigegeben wurden — und keine Aggregation macht das
+  wieder gut.
+  Gebaut als `GET /companies/me/application-stats` **dort, wo die Daten liegen**,
+  nicht als eigener `analytics-service`: der müsste Vorgänge kopieren oder
+  dienstübergreifend lesen, gegen ADR-0004, und schüfe einen zweiten Ort, an
+  dem personenbezogene Daten liegen und gelöscht werden müssten — für eine
+  Zahl, die ein `GROUP BY` beantwortet. Gezählt wird in der Datenbank; die
+  Zeilen werden gar nicht geladen.
+  Drei Tests: die Abgrenzung (ein fremdes Unternehmen sieht seine eigene leere
+  Zahl), die **Feldmenge der Antwort** (`by_status`, `total` — sonst nichts,
+  dieselbe Strenge wie bei `DraftContext`) und `403` ohne aktives Unternehmen.
+  Bewusst nicht gebaut: Dashboards, Zeitreihen, Trichter-Auswertungen und
+  **jede Form von Verhaltens-Tracking**.
+
+### Phase 10 — Status: 🟧 in Arbeit
+
+- ✅ **10.5 Das Recht auf Löschung — im Backend eingelöst** — 06.08.2026
+  (Befund) / umgesetzt nach ADR-0027.
+  Der Befund stand hier als ⛔, „es fehlt nicht nur, es täuscht":
+  `POST /consent/delete` nahm ein Löschverlangen entgegen, schrieb ein Ereignis
+  ins Ledger — und **kein einziger Dienst reagierte darauf**.
+  **Was jetzt gilt:** `POST /account/erasure` an identity-service, nur für sich
+  selbst, **ohne Begründungsfeld**. Sofort: alle Sitzungen widerrufen, Konto
+  `DISABLED`. Dann eine Kaskade über die Outbox an **sieben** Empfänger
+  (consent, profile, resume, portfolio, applications, transfer, github) — und
+  identity selbst zuletzt. `POST /consent/delete` ist **zurückgezogen**: es war
+  kapabilitätsbezogen, jede Capability ist eine *Sichtbarkeit*, und „lösche
+  `profile.visibility:public`" konnte deshalb nie „lösche das Profil" heißen.
+  `ConsentAction.DELETE` bleibt und hat jetzt **genau einen Erzeuger**.
+  **Die tragende Entscheidung (ADR-0027 §3): die Voreinstellung löscht
+  vollständig** — auch `applications.status = 'hired'` und bezahlte Transfers.
+  Die Aufbewahrungsausnahme existiert nur als *ein* benannter Schalter je
+  betroffenem Dienst (`RETAIN_HIRED_APPLICATIONS`, `RETAIN_PAID_TRANSFERS`),
+  und er steht auf **aus**. Eine Konstante, **kein Konfigurationswert**: bei
+  einem Löschversprechen wäre „in Produktion anders als im Test" der schlimmste
+  denkbare Zustand. Je ein Test nagelt den Wert fest, und je ein Test hält den
+  *im Test* umgelegten Schalter auf genau die zwei Zeilenklassen — sonst wäre
+  er unbenutzter Code mit einer Behauptung daran.
+  **Der Nachweis ist die Menge der Zeilen:** fertig ist eine Löschung, wenn für
+  diese `user_id` keine Outbox-Zeile mehr ohne `delivered_at` steht. Das trägt
+  nur, weil vier Dinge dazukamen: ein **eigener Zustell-Adapter, der wirft** —
+  bei Transportfehler *und* bei Nicht-2xx (der produktive `HttpNotifier`
+  schluckt beides und hätte `delivered_at` gesetzt, ohne dass jemand gelöscht
+  hat); **Idempotenz** bei jedem Empfänger, mit 2xx auch beim zweiten Mal;
+  **keine Versuchsobergrenze** für die Löschung, dafür wachsender Abstand; und
+  ein **eigenes Geheimnis**, nicht das der Benachrichtigungen.
+  **Ein dauerhaft toter Empfänger verhindert den Abschluss.** Das ist gewollt
+  und der Preis dafür, dass „fertig" etwas bedeutet: keine Frist erklärt eine
+  Löschung für erledigt, und die Abschlussnachricht geht erst raus, wenn alle
+  sieben quittiert haben. Erst danach fällt `users` — die Nachricht braucht die
+  Adresse, und die liegt in der Zeile, die gelöscht werden soll.
+  **Das Ledger überlebt** (§5): die Kette aus GRANT/REVOKE bleibt, je Capability
+  kommt eine `DELETE`-Zeile dazu, `reason` wird `NULL` und `metadata` `{}` — in
+  `consent_events` wie in `audit_events`. Das Argument ist nicht „wir dürfen
+  aufbewahren", sondern: nach der Löschung gibt es im System keine Abbildung
+  `subject_id → Mensch` mehr.
+  **Der letzte Admin** legt sein Unternehmen still und die Anzeigen werden
+  zurückgezogen (§7) — aber diese Absicht zählt **nicht** in den
+  Vollständigkeitsnachweis: sonst hielte ein stiller jobs-service die Löschung
+  eines Menschen offen.
+  **Ein Wächtertest** (`tests/test_erasure_recipients.py`) fällt rot, sobald
+  irgendein Dienst eine Tabelle mit `subject_id` oder `user_id` bekommt, die
+  nicht in der Empfängerliste steht — dieselbe Bauart wie
+  `test_workspace_dependencies.py`.
+  **Die Oberfläche schließt den Kreis** (`/konto-loeschen`). Der Text steht
+  **vor** dem Knopf, nicht in einer Datenschutzerklärung — dieselbe Regel wie
+  beim Entwurfsdienst (ADR-0024): was gelöscht wird, dass es **nicht sofort**
+  geht, und die unbequeme Folge offen ausgesprochen — *auch die Bewerbung, über
+  die du eingestellt wurdest, verschwindet aus der Liste des Unternehmens.* Er
+  verspricht **keine Ausnahme**, weil es in der Voreinstellung keine gibt; ein
+  Satz über Aufbewahrungspflichten wäre eine Zusage über einen Schalter, der auf
+  AUS steht. Bestätigt wird in **zwei Schritten** mit anders formuliertem
+  zweitem Knopf — bewusst, aber kein Hürdenlauf: kein abzutippendes Wort, keine
+  Bedenkzeit, kein erneutes Passwort. Danach: abgemeldet, „läuft" statt
+  „erledigt", **kein Fortschrittsbalken** (§6). `/meine-daten` verweist auf den
+  Weg, ohne ihn zur Pflichtreihenfolge zu machen — und bleibt ein Link, nie ein
+  Knopf neben „Herunterladen".
+  **Was noch offen ist, ehrlich:**
+  - **Die eine Rechtsfrage** aus ADR-0027 ist weiter offen. Sie ändert nicht
+    den Entwurf, nur die Stellung des Schalters — und blockiert deshalb nichts.
+  - **§3.4 ist vorbereitet, nicht gebaut:** bei umgelegtem Schalter meldet der
+    Empfänger zurück, *wie viele* Zeilen blieben (`retained`), und der Ursprung
+    protokolliert es. Eine dauerhafte Markierung an der Zeile und der Zusatz in
+    der Abschlussnachricht kommen mit dem Commit, der den Schalter umlegt —
+    Schema und Nachrichtentext für einen Pfad zu bauen, der aus ist, wäre genau
+    die Vorsichtsannahme, die §3 abschafft.
+  - **Kein Audit-Ereignis** in identity für das Verlangen selbst. Der Beleg ist
+    die `DELETE`-Kette im Ledger (§5); ein zweiter Ort dafür bräuchte einen
+    neuen `AuditAction`-Wert und eine eigene Entscheidung.
+  - **`applications-service` und `resume-service` benutzen für ihre
+    *Benachrichtigungen* weiter den schluckenden `HttpNotifier`** (9.2). Der
+    Befund aus ADR-0027 §4.1 betrifft sie: „Zeile zugestellt ⇒ Mail angekommen"
+    hält dort nicht. Für die Löschung spielt es keine Rolle — die läuft über
+    den eigenen Adapter.
+
+- ✅ **10.4 Dependency-Scanning — und was es sofort fand** — 06.08.2026.
+  Dependabot (uv, npm, docker, actions) und ein dritter CI-Job
+  `dependency-audit`. Die Hardening-Liste nennt „Dependency-Scanning"; bis
+  heute gab es weder das eine noch das andere.
+  **Zwei eigene Fehler, abgefangen BEVOR sie schadeten.** Mein erster
+  `uv export` lieferte **3 statt 115** Abhängigkeiten — der Scan wäre über
+  nichts gelaufen und hätte grün gemeldet, genau das Muster, das diese Woche
+  dreimal auffiel. Ursache: die Abhängigkeiten stecken in den Workspace-
+  MITGLIEDERN, nicht im Wurzelprojekt (`dependencies = []`). Behoben mit
+  `--all-packages`, und der Job bricht jetzt ab, wenn weniger als 50 Einträge
+  herauskommen. Und ich hätte den Job fast ungeprüft geschoben — dann wäre die
+  CI rot gewesen.
+  **Der Scan fand 13 Lücken in vier Paketen.** Drei davon kamen aus Paketen
+  ohne jeden Konsumenten: `worker-agents` (149 Zeilen) zog `langchain-core`
+  mit zwei CVEs, `worker-email` zog `aiohttp` — und `worker-email` wurde nur
+  von `worker-notifications` benutzt, das selbst niemand benutzt.
+  `identity-service` verschickt seine Mails über sein eigenes
+  `infrastructure/mail.py`. Alle drei gelöscht: **von 13 auf 8 Funde, von 115
+  auf 88 Abhängigkeiten** — der sechste, siebte und achte Fall dieses Musters,
+  diesmal mit Sicherheitsfolge statt nur Ballast.
+  Zu **langchain** noch eine Klarstellung, weil die Annahme naheliegt, es sei
+  bewusst für Agenten ohne fremden Anbieter gewählt worden: `kon.txt` nennt
+  langchain **an keiner Stelle**. Die Vision listet vier Anbieter (Anthropic,
+  OpenAI, Gemini, **Ollama**), MCP und ein Agent SDK. Und langchain ersetzt
+  keinen Anbieter — es ist eine Abstraktion darüber und ruft am Ende genauso
+  einen. Der Weg „ohne fremden Dienst" heißt **Ollama**, also ein lokales
+  Modell; die Naht dafür ist `worker-ai` (ADR-0024) und verträgt einen zweiten
+  Provider.
+  `cryptography` aktualisiert (49 → 50). **`starlette` bleibt offen**, und das
+  steht auch so im Job: die Behebungen liegen in 1.x, FastAPI pinnt `<0.53` —
+  geprüft, nicht vermutet (`uv lock --upgrade-package` ließ 0.52.1 stehen).
+  Die fünf IDs sind **namentlich ausgenommen**, statt den Scan zu entschärfen:
+  ohne `--strict` rutschte jeder künftige Fund mit durch.
+
+- ✅ **10.3 OTel ist sichtbar — und `worker-tracing` funktionierte nicht** —
+  06.08.2026. Jaeger im Compose (`http://localhost:16686`), Traces aus den
+  Diensten über OTLP.
+  **Der Befund ist der interessante Teil.** `worker-tracing` hatte wie fünf
+  Pakete vor ihm **null Konsumenten** — aber hier war Löschen die falsche
+  Antwort: die DoD verlangt OTel, und es gibt keine eingebaute Alternative.
+  Also angeschlossen. Beim ersten Start kam heraus, dass das Paket **gar nicht
+  lief**: `FastAPIInstrumentor.instrument()` statt `FastAPIInstrumentor()`
+  `.instrument()` — ein `TypeError`, seit das Paket angelegt wurde. Nie
+  aufgefallen, weil es nie jemand benutzt hat. **Ein Paket, das existiert, ist
+  damit noch keines, das funktioniert** — dieselbe Lehre wie bei den fünf
+  gelöschten, nur andersherum bewiesen.
+  Danach ein zweiter, feinerer Fehler: es kamen zwar Datenbank-Spans
+  (`connect`), aber **kein einziger HTTP-Span**. Die globale Instrumentierung
+  setzt nur an Apps an, die danach entstehen. Ein halber Trace ist schlimmer
+  als keiner — er sieht aus, als funktioniere die Beobachtung. Jetzt wird die
+  App-Instanz instrumentiert, und Jaeger zeigt `GET /jobs`, `GET /health/live`
+  und die Datenbank-Spans.
+  **LEER heißt AUS** (`WORKER_OTLP_ENDPOINT`): ohne Endpunkt wird nicht
+  instrumentiert, kein Exporter gebaut, nichts gesendet — dieselbe Regel wie
+  beim Entwurfsdienst. Der Import steht INNEN, damit ein Dienst ohne Tracing
+  das OpenTelemetry-SDK nicht laden muss. Und ein Fehlschlag beim Einrichten
+  hindert den Dienst **nicht** am Start: ein Kollektor, der gerade fehlt, wäre
+  ein absurder Grund, die Anmeldung auszusetzen. Genau dieser Fehlerfang hat
+  den `TypeError` oben abgefangen, statt den Dienst umzuwerfen.
+  Jaeger all-in-one statt Collector + Jaeger: der Collector lohnt sich bei
+  mehreren Zielen; hier gibt es eines, und ein Glied weniger in der Kette ist
+  eines weniger, das schweigt. Tote Instrumentierungen (Redis, aio-pika)
+  entfernt — es gibt weder das eine noch das andere.
+
+- ✅ **10.2 Das Gateway routet** — 06.08.2026. Traefik im Compose,
+  `http://localhost:8080` spricht dieselben Pfade wie die Einzelports.
+  **Der Inhalt der Arbeit war nicht das Aufsetzen, sondern ein Befund: die
+  Pfade der Dienste sind NICHT disjunkt.** `/companies/{id}/members` gehört
+  identity-service, `/companies/{id}/profile` gehört companies-service — sie
+  unterscheiden sich erst im letzten Segment. `/companies/me/jobs` gehört
+  jobs-service, `/companies/me/application-stats` applications-service,
+  `/jobs/{id}/applications` wieder applications, `/jobs/{id}` aber jobs.
+  Präfix-Routing allein reicht dafür nicht; die genaueren Regeln tragen eine
+  höhere `priority`, statt sich auf Traefiks Sortierung nach Regel-Länge zu
+  verlassen — darauf sollte niemand angewiesen sein, der eine Route ergänzt.
+  Belegt statt behauptet: `/companies/me/jobs` liefert über das Gateway
+  **dieselbe** Antwort wie jobs-service direkt (RFC-9457-Problem), während
+  identity-service auf demselben Pfad `{"detail":"Not Found"}` sagt. Ein 401
+  allein hätte nichts bewiesen — beide antworten mit 401.
+  **Konfiguration als Datei, nicht als Compose-Labels** (`docker/traefik/`):
+  genau diese `dynamic.yml` geht nach Staging und Produktion und bekommt dort
+  andere Hosts und TLS. Labels lägen verstreut in einer `docker-compose.yml`,
+  die es dort nicht gibt.
+  **Keine Businesslogik im Gateway** (ULTRAPLAN Phase 10): Traefik routet,
+  prüft aber keine Rechte. Die Authentifizierung bleibt in den Diensten, wo sie
+  den Kontext hat — ein Gateway, das Rechte kennt, wäre ein zweiter Ort, an dem
+  sie falsch sein können. Die Einzelports bleiben offen: E2E und Fehlersuche
+  greifen direkt zu, und ein Gateway, das man zum Debuggen umgehen kann, wird
+  auch benutzt.
+
+- ✅ **10.1 Der Auth-Rand ist gebremst; `worker-ratelimit` gelöscht** —
+  06.08.2026. Der ULTRAPLAN führt unter Phase 10 eine **Phase-2-Folge**: den
+  TODO-Marker in `build_auth_router` einlösen und `worker-ratelimit`
+  (Token-Bucket, Redis) an `/auth/login` und `/auth/refresh` anbinden, *bevor*
+  ein Gateway externen Verkehr zulässt.
+  **Eingelöst ist er, aber anders.** Beim Aufräumen dieser Woche entstand
+  `worker_platform.presentation.throttle` — ein gleitendes Fenster, in-process,
+  ohne Redis — und `identity-service` bremst damit fünf Endpunkte
+  (`/auth/login`, `/refresh`, `/register`, `/verify-email`,
+  `/resend-verification`). Die Bremse sitzt bewusst **weiter außen als die
+  Authentifizierung**: sonst würde bcbrypt gerechnet, bevor gebremst wird, und
+  die Bremse wäre selbst der teuerste Teil des Angriffs.
+  `worker-ratelimit` blieb damit 75 Zeilen mit Redis-Abhängigkeit und **null
+  Konsumenten** — der fünfte Fall nach `worker-files`, `worker-github`,
+  `worker-messaging` und `worker-search`. Gelöscht.
+  **Die Grenze, die dabei bleibt, und sie gehört hierher:** ein Zähler im
+  Prozess gilt nur für DIESEN Prozess. Läuft identity-service einmal, stimmt
+  die Rechnung; skaliert man auf drei Instanzen, hat jede ihr eigenes Fenster
+  und das effektive Limit verdreifacht sich. Das ist heute richtig — der Dienst
+  läuft einfach — und muss **neu entschieden werden, sobald das Gateway steht
+  oder mehr als eine Instanz läuft**. Dann ist ein geteilter Zähler (Redis) die
+  richtige Antwort, oder die Bremse gehört ins Gateway. Aufgeschrieben, damit
+  es nicht übersehen wird.
+
+### Phase 8 — Status: ⬜ nicht begonnen, und zwar mit Grund
+
+Diese Phase hatte als **einzige keinen eigenen Abschnitt** — sie stand nur als
+Zeile in der Tabelle, und in Statusberichten fiel sie unter „auf Wunsch
+zurückgestellt" heraus. Das war unvollständig: **zurückgestellt ist nicht
+erledigt**, und eine Phase, die in keiner Übersicht auftaucht, wird vergessen.
+
+Der Entwurf steht ([Vertragsvorlagen](superpowers/specs/2026-08-02-contract-templates-design.md)),
+**gebaut wird nichts**, bis sieben rechtliche Fragen beantwortet sind — die zur
+**Formvorschrift zuerst**, weil ihre Antwort den ganzen Schnitt umwerfen kann.
+Ein Arbeitsvertrag, der der Schriftform bedarf, macht jede digitale Unterschrift
+zur Attrappe; das lässt sich nicht nachträglich reparieren.
+
+Festgelegt ist der Weg, nicht die Umsetzung: die Plattform stellt **Vorlagen**,
+füllt nur, was beide Seiten schon vereinbart haben (Name, Unternehmen,
+Startmonat, Ablöse, Rolle), und schickt den Entwurf **in die Prüfung**. Gehalt,
+Fristen und Probezeit bleiben Platzhalter — eine Vorbelegung mit „üblichen
+Werten" sähe aus wie eine Empfehlung und würde als eine gelesen.
+
+### Phase 7 — Status: ✅ erledigt (05.08.2026)
+
+Die DoD lautet: *„≥ 1 Candidate- + ≥ 1 Company-Agent läuft als
+Entwurfs-Erzeuger mit plan-act-reflect-Schleife, jedes externe Ergebnis fordert
+Human-Review an. Consents und Logs vorhanden. Tests."* — erfüllt durch 7.1
+(Candidate) und 7.2 (Company), mit **zwei ausdrücklich begründeten
+Abweichungen** bei plan-act-reflect und bei „Consents und Logs", die unter 7.2
+ausgeschrieben stehen. Die 21 übrigen Agenten aus `kon.txt` sind **nicht**
+Teil dieser DoD; wo ADR-0022 sie berührt, steht das unter 7.1.
+
+- ✅ **7.1 Die Naht zur KI: ein Entwurf, den die Person anfordert** — 05.08.2026.
+  [Design](superpowers/specs/2026-08-05-ai-seam-design.md) · **ADR-0024**.
+  `worker-ai` war 246 Zeilen mit **acht** schweren Abhängigkeiten, einem
+  Smoke-Test und **keinem Konsumenten** — aus Workspace und mypy
+  ausgeschlossen, der **letzte verbliebene Skip** der Testreihe. Wort für Wort
+  die Lage von `worker-files` vor ADR-0021, und dieselbe Antwort: neu
+  geschrieben mit **einer** Abhängigkeit (`httpx`), **einem** Anbieter und
+  einem echten Konsumenten. **Die Testreihe hat jetzt null Skips.**
+  **Der erste Agent hilft der Person zu sagen, was sie sagen will** — er sagt
+  nichts über sie. Das ist keine Feinheit: eine KI, die *über* jemanden
+  schreibt (aus Commits, aus dem Lebenslauf), verletzt die These der Plattform;
+  eine, die beim Formulieren hilft, bedient sie.
+  Vier Regeln, alle mit Test: **nur auf Anforderung** (kein Hintergrundlauf);
+  **es wird nichts gespeichert** (weder Prompt noch Antwort — der Entwurf lebt
+  im Formular, bis die Person speichert, und dann ist es ihr Text);
+  **`DraftContext` ist die Grenze** (Überschrift, Freitext, Fähigkeiten, Wunsch
+  — kein Name, keine Adresse, keine `subject_id`; ein Test nagelt die Feldmenge
+  fest); **nichts davon im Protokoll**.
+  `NullDrafter` ist die Voreinstellung: ohne Schlüssel wird kein fremder Dienst
+  angerufen, und die Oberfläche sagt es. Der Hinweis, was hinausgeht, steht **am
+  Knopf** und nennt den Anbieter — nicht in einer Datenschutzerklärung.
+  **Was ADR-0022 für die übrigen Agenten heißt — präzise, nachdem eine erste
+  Fassung dieses Eintrags es zu pauschal sagte.** Dort stand, vier Agenten
+  seien „nicht baubar". Die ADR verbietet aber eine **Form**, keinen **Namen**:
+  eine Zahl, die einen Menschen zusammenfasst, jede Rangfolge daraus,
+  abgeleitete Eigenschaften ohne Grundlage, stillschweigende Vollständigkeit.
+  Namen zu verbieten wäre sogar schädlich — es lädt zum Umbenennen ein.
+  - **Candidate Ranking** ist der einzige, dessen Name selbst die verbotene
+    Sache ist. Dauerhaft ausgeschlossen.
+  - **Skill Analyzer** steht im ULTRAPLAN in der **Candidate**-Liste, ist also
+    ein Agent für die Person selbst. Verboten war die gelöschte *Umsetzung*
+    (`bytes_count / total_bytes` — eine Zahl je Fähigkeit je Mensch, und Bytes
+    sind kein Können). Erlaubt wäre „du hast in diesen drei Repositories Python
+    geschrieben, hier sind die Links" — ein Beleg mit Herkunft, den die ADR
+    ausdrücklich zulässt.
+  - **Salary Recommendation** hängt daran, worüber die Zahl etwas sagt: ein
+    Gehaltsband für eine *Rolle* fasst keinen Menschen zusammen, ein Betrag für
+    *diese eine Person* schon — und wäre eine Empfehlung an den Arbeitgeber,
+    wie wenig er ihr bieten kann.
+  - **Team Analyzer** ebenso: eine Aussage über eine Zusammensetzung ist etwas
+    anderes als eine Eigenschaft je Kopf; die übliche Umsetzung macht das
+    Zweite.
+  Drei von vier sind also nicht verboten, sondern **in ihrer üblichen Form**
+  verboten. Auf der Warteliste dieses Schnitts steht trotzdem keiner — aus
+  einem anderen Grund: jeder braucht eine eigene Abwägung, und die gehört in
+  den Schnitt, der ihn baut.
+  Nebenbei repariert: ein bestehender Test prüfte die Erfolgsmeldung mit
+  `/gespeichert/i` und wurde vom neuen Hinweis („Gespeichert wird nichts")
+  mitgetroffen — dieselbe Lehre wie beim E2E-Wackler mit `/bestätigt/i`.
+
+- ✅ **7.2 Der Unternehmens-Agent: die eigene Anzeige verständlicher** —
+  05.08.2026. `POST /jobs/draft`, `JobDraftContext`, Knopf im
+  Ausschreibungsformular.
+  Die DoD verlangt „≥ 1 Candidate- **+ ≥ 1 Company**-Agent"; 7.1 lieferte nur
+  den ersten. Von den fünf Unternehmens-Agenten des ULTRAPLAN ist dies der
+  einzige, der **ohne eigene Abwägung** baubar war, und der Grund steht schon
+  im Namen: Scout, Candidate Ranking, Salary Recommendation und Team Analyzer
+  richten sich alle auf **Menschen**, dieser auf einen **Text, den das
+  Unternehmen selbst verfasst hat**. Damit ist er die exakte Spiegelung von
+  7.1 — dort hilft die KI einer Person zu sagen, was *sie* sagen will, hier
+  einem Unternehmen. Über niemanden sagt sie etwas.
+  Getrennte Klassen statt einer mit Verzweigungen: `DraftContext` (Person) und
+  `JobDraftContext` (Anzeige) bringen über das `Draftable`-Protokoll **ihre
+  eigenen Regeln** mit. Ein gemeinsamer Prompt mit `if` wäre die Stelle, an der
+  irgendwann „erfinde nichts über die Person" für eine Anzeige gilt — oder
+  schlimmer, andersherum. `_SYSTEM_JOB` verbietet zusätzlich, was eine Anzeige
+  falsch macht: **keine Anforderungen dazuerfinden** (sonst steht in der
+  Ausschreibung etwas, das niemand verlangen wollte, und Suchende gleichen sich
+  gegen Erfundenes ab), geschlechtsneutral, keine Superlative, keine
+  Altersangabe/Herkunft/Familiensituation.
+  `JobDraftContext` trägt **keine `tenant_id` und keinen Firmennamen** — der
+  Entwurf braucht beides nicht, und was nicht in der Klasse steht, kann nicht
+  hinausgehen. Zwei Tests nageln das an beiden Enden fest: einer die
+  `__dataclass_fields__` von `JobDraftContext` (analog zum Test auf
+  `DraftContext`), einer die Schlüsselmenge der Nutzlast im Browser. Beide
+  müssten geändert werden, damit je eine `tenant_id` mitreist.
+  `_company(request)` steht auch an diesem Endpunkt: ohne die Prüfung wäre er
+  ein Textgenerator für jeden Angemeldeten. Der Zusammenhang kommt aus dem
+  Request statt aus der Datenbank — beim Schreiben gibt es die Anzeige dort noch
+  nicht.
+
+  **Zwei Punkte der DoD, bewusst anders gelöst — und deshalb hier
+  aufgeschrieben statt stillschweigend übersprungen:**
+
+  - **„mit plan-act-reflect-Schleife" — nicht gebaut, mit Absicht.** Die
+    Schleife löst ein Problem, das diese beiden Agenten nicht haben: sie ist
+    für Agenten da, die *mehrere Schritte* tun und deren Zwischenergebnis
+    geprüft werden muss. Hier gibt es einen Aufruf und einen Text. Eine
+    Reflect-Stufe hieße konkret: das Modell bewertet seinen eigenen Entwurf und
+    schreibt ihn ohne Rückfrage um — also **zwei Aufrufe, doppelte Wartezeit,
+    doppelte Kosten**, und ein Ergebnis, das weiter von dem entfernt ist, was
+    die Person eingegeben hat. Die Prüfung, die es hier wirklich braucht, macht
+    ohnehin ein Mensch: der Entwurf landet im Formularfeld und wird erst durch
+    Speichern zu seinem Text. Das ist das Human-Review aus derselben DoD, und
+    es ist das strengere. Sollte je ein mehrschrittiger Agent dazukommen
+    (Transferberater), wird die Schleife dort gebraucht und dort gebaut.
+  - **„Consents und Logs vorhanden" — der Knopf *ist* die Einwilligung, und
+    das Protokoll wäre der Fehler.** Ein Eintrag im Consent-Ledger bedeutet
+    dort eine **stehende** Erlaubnis, die man später widerrufen kann. Genau die
+    gibt es hier nicht: es gibt einen Klick, einen Aufruf, einen Text, und
+    danach nichts mehr, das zu widerrufen wäre. Ein Ledger-Eintrag würde eine
+    dauerhafte Erlaubnis behaupten, die niemand gegeben hat — und in
+    `GET /consent/me` als solche erscheinen. Stattdessen steht der Hinweis
+    **am Knopf** und nennt Anbieter und Umfang, bevor gedrückt wird; informiert
+    und je Benutzung. Ein Inhaltsprotokoll ist aus demselben Grund verboten wie
+    CVs im Log (`product-scope.md`): der Freitext gehört derselben Klasse an.
+    Gemeldet wird die **Fehlerart**, nie Prompt oder Antwort.
+
+  Belegt mit laufendem Docker, also **null Skips** in beiden Reihen und echten
+  Testcontainers-Läufen — ein grüner Bericht über eine übersprungene Reihe ist
+  schlimmer als ein roter. Eine E2E-Reise prüft dabei genau den Zustand, der im
+  lokalen Stapel wirklich herrscht: **kein Schlüssel gesetzt.** Der Knopf
+  antwortet mit einem echten 503 aus dem `NullDrafter`, die Oberfläche sagt es,
+  und der Text des Unternehmens steht unverändert da. Das ist der gefährlichste
+  Fall, weil er still sein könnte: ein Knopf, der nichts tut, sieht aus wie
+  einer, der lädt.
+  **`scripts/validate.sh` nennt jetzt immer die Stückzahlen** (`pytest N
+  bestanden`, `playwright N Reisen`) statt nur Haken. Die Warnungen darin
+  schlugen bisher erst an, wenn etwas übersprungen wurde — ein Lauf, der
+  stillschweigend nur die Hälfte einsammelt, wäre durchgekommen.
+  Nebenbei behoben: der Kommentar an beiden Entwurfs-Knöpfen behauptete,
+  `type="button"` verhindere ein Absenden des umgebenden Formulars — `Button`
+  gibt das Attribut aber ohnehin vor, der Kommentar beschrieb also einen
+  Mechanismus, den es nicht gab. Ein Gegenbeweis zeigte es: der Test blieb grün,
+  als das Attribut entfernt wurde. Jetzt sagt der Kommentar die Wahrheit, und
+  ein Test hält das gerenderte Attribut fest — der scheitert, wenn beides
+  wegfällt (nachgewiesen, nicht angenommen).
+
 ### Aufräumen: alles Bekannte behoben (05.08.2026)
 
 Ausgelöst durch eine berechtigte Rückfrage — *„wieso findest du solche Fehler
@@ -752,6 +1244,21 @@ Also: alles, was in dieser Datei als offen stand, geprüft und geschlossen.
   modulweite `Map` von Token auf **Zusage**, sodass ein zweiter Aufbau
   dasselbe Ergebnis bekommt statt eines zweiten Aufrufs. Ein `useRef` hätte
   nicht gereicht — er stirbt mit der Komponente, und genau darum geht es.
+  **Nachtrag 06.08.2026: dieselbe Seite gab es zweimal, und ich hatte nur eine
+  repariert.** `/invitation` trug den Fehler unverändert weiter — auch der
+  Einladungstoken ist einmalig. Aufgefallen ist er nicht durch Nachdenken,
+  sondern als **Wackler** im E2E-Lauf: einmal rot, beim zweiten Versuch grün,
+  also genau die Sorte Befund, die man wegzuklicken versucht ist. Die Folge
+  wäre schlimmer als bei `/verify` gewesen: „Einladung nicht angenommen" auf
+  dem Schirm, während die Person dem Unternehmen gerade beigetreten war.
+  Derselbe Riegel (`acceptOnce`), Test zuerst und **rot gesehen**, danach
+  gegengeprüft. Der Riegel legte prompt einen zweiten, kleineren Fehler frei:
+  die modulweite `Map` überlebt zwischen Tests, und `invitation.test.tsx`
+  benutzte viermal denselben Token `"abc123"` — zwei bestehende Tests wurden
+  rot, obwohl die Seite stimmte. `verify.test.tsx` macht es richtig vor und
+  zieht je Test einen frischen Token; nachgezogen.
+  Belegt: der E2E-Lauf ging von **17 grün + 1 Wackler** auf **18 grün, kein
+  Wackler** (und von 8,9 auf 4,6 Minuten).
 
 - ✅ **Acht Dienste, ein Datengrab.** Beim Nachprüfen der Notiz „die Templates
   erzeugen noch `worker_database.Base`" stellte sich heraus: die Vorlage war

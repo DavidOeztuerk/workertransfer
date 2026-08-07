@@ -9,9 +9,7 @@ dependencies = [
     "opentelemetry-exporter-otlp>=1.25.0,<2.0.0",
     "opentelemetry-instrumentation-fastapi>=0.45.0,<1.0.0",
     "opentelemetry-instrumentation-sqlalchemy>=0.45.0,<1.0.0",
-    "opentelemetry-instrumentation-redis>=0.45.0,<1.0.0",
     "opentelemetry-instrumentation-httpx>=0.45.0,<1.0.0",
-    "opentelemetry-instrumentation-aio-pika>=0.45.0,<1.0.0",
 ]
 
 [build-system]

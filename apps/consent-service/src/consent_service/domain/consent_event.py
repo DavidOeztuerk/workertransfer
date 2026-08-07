@@ -74,7 +74,13 @@ class ConsentEvent:
                 raise ConsentMetadataError(key)
         # Withdrawing a capability must always be explainable; granting one does
         # not need a justification.
-        if self.action is not ConsentAction.GRANT and self.reason is None:
+        #
+        # DELETE ausdrücklich nicht mehr (ADR-0027 §1): seit die Kontolöschung
+        # sein einziger Erzeuger ist, hieße „Grund verpflichtend", von einem
+        # Menschen, der sein Konto löschen will, eine Begründung zu verlangen —
+        # ein Hebel gegen ihn. Und der Freitext wäre ausgerechnet das Einzige,
+        # das §5 danach wieder entfernen müsste.
+        if self.action is ConsentAction.REVOKE and self.reason is None:
             raise ReasonRequired(self.action)
 
     @classmethod
@@ -130,7 +136,7 @@ class ConsentEvent:
         subject_id: SubjectId,
         capability: Capability,
         recorded_at: datetime,
-        reason: Reason,
+        reason: Reason | None = None,
         actor_id: UUID | None = None,
         metadata: dict[str, str] | None = None,
         event_id: ConsentEventId | None = None,

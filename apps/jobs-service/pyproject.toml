@@ -23,6 +23,7 @@ dependencies = [
     # Seiten des Abgleichs MÜSSEN dieselbe Tabelle benutzen, sonst findet er
     # zufällige Treffer (ADR-0023).
     "worker-skills",
+    "worker-ai",
     "worker-platform",
     "worker-database",
     "worker-auth",
@@ -44,6 +45,7 @@ module-name = "jobs_service"
 [tool.uv.sources]
 worker-core = { workspace = true }
 worker-skills = { workspace = true }
+worker-ai = { workspace = true }
 worker-platform = { workspace = true }
 worker-database = { workspace = true }
 worker-auth = { workspace = true }

@@ -863,3 +863,23 @@ h1 {
   gap: 0.25rem;
   font-size: 0.9rem;
 }
+
+/* Die Formulierungshilfe — abgesetzt, weil sie etwas anderes ist als der Rest
+   des Formulars.
+   Die Klasse wurde in Sub-step 7.1 vergeben und blieb bis 7.2 ohne Regel: der
+   Block lief also ungestylt mit und war von den Pflichtfeldern nicht zu
+   unterscheiden. Das ist hier nicht kosmetisch. Ein Feld, das aussieht wie die
+   danebenstehenden, wird ausgefüllt, weil man Formulare ausfüllt — und dieses
+   schickt Text an einen fremden Anbieter. Der abgesetzte Rahmen ist die
+   sichtbare Fassung von „nur auf Anforderung". */
+.draft-help {
+  margin: 1rem 0;
+  padding: 0.8rem 0.9rem;
+  border: 1px dashed var(--wt-border, #d6d3cd);
+  border-radius: 8px;
+  background: var(--wt-surface-muted, #f4f1ec);
+}
+
+.draft-help .wt-field {
+  margin-top: 0;
+}

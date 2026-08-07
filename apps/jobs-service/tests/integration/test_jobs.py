@@ -292,3 +292,29 @@ async def test_too_many_skills_are_refused_as_input_not_stored_truncated(app: An
     # 422: die Eingabe ist falsch. Stillschweigend zu kürzen hieße, eine Liste
     # zu veröffentlichen, die das Unternehmen so nicht geschrieben hat.
     assert response.status_code == 422, response.text
+
+
+async def test_the_draft_endpoint_needs_an_active_company(app: Any) -> None:
+    """Ohne die Prüfung wäre der Endpunkt ein Textgenerator für jeden Angemeldeten.
+
+    Aussage über den Aufrufer, nicht über ein fremdes Unternehmen — deshalb 403.
+    """
+    response = await _call(app, "POST", "/jobs/draft", _token(None), json={"title": "X"})
+
+    assert response.status_code == 403, response.text
+
+
+async def test_without_a_provider_the_draft_is_503_and_says_nothing_else(app: Any) -> None:
+    # Kein Schlüssel im Test, also `NullDrafter`: die Funktion ist ehrlich aus.
+    # 503 heißt „später noch einmal", nicht „falsch gemacht".
+    response = await _call(
+        app,
+        "POST",
+        "/jobs/draft",
+        _token(uuid4()),
+        json={"title": "Pflegefachkraft", "description": "Text", "wish": "kürzer"},
+    )
+
+    assert response.status_code == 503, response.text
+    # Und der eingesandte Text taucht in der Absage nicht auf.
+    assert "Pflegefachkraft" not in response.text

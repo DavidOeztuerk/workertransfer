@@ -12,6 +12,7 @@ es sieht es nicht mehr, der Vorgang bleibt. Eine Kopie könnte das nicht.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -456,3 +457,149 @@ async def test_a_foreign_company_cannot_move_an_application(
     # Nicht meins und nicht vorhanden sind von außen dasselbe.
     assert theirs.status_code == invented.status_code == 404
     assert theirs.json()["detail"] == invented.json()["detail"]
+
+
+async def test_the_notification_survives_a_broken_notifier(
+    apps: tuple[Any, Any, Any, FakeJobs],
+) -> None:
+    """Der Gewinn von 9.2 — und der Fall, den die alte Fassung verlor.
+
+    Vorher lief die Benachrichtigung als „feuern und vergessen": ein
+    HTTP-Aufruf nach dem Commit, dessen Fehler geschluckt wurde. Ein Neustart
+    von identity-service genügte, und die Person erfuhr nie, dass ihre
+    Bewerbung beantwortet wurde.
+
+    Diese Zusage war hier vorher **gar nicht geprüft** — der Dienst hatte
+    keinen einzigen Test auf den Notifier. Genau deshalb steht er jetzt da.
+    """
+    from applications_service.infrastructure.database.models import OUTBOX
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from worker_outbox import OutboxDispatcher
+
+    applications_app, profile_app, _consent, jobs = apps
+    person = uuid4()
+    person_token = _token(person, tenant_id=None)
+    company_token = _token(uuid4(), tenant_id=jobs.tenant_id)
+    job_id = uuid4()
+    jobs.open_jobs.add(job_id)
+    await _save_profile(profile_app, person_token, "Senior Python")
+    applied = await _call(
+        applications_app, "POST", "/applications", person_token, json={"job_id": str(job_id)}
+    )
+    assert applied.status_code == 201, applied.text
+
+    # Der Zug des Unternehmens: DAS wird gemeldet.
+    answered = await _call(
+        applications_app,
+        "POST",
+        f"/applications/{applied.json()['id']}/status",
+        company_token,
+        json={"status": "hired"},
+    )
+    assert answered.status_code == 200, answered.text
+
+    engine = create_async_engine(os.environ["WORKER_DATABASE_URL"])
+    try:
+        sessions = async_sessionmaker(engine, expire_on_commit=False)
+
+        class Broken:
+            async def notify(self, user_id: UUID, kind: str) -> None:
+                raise ConnectionError("identity-service startet gerade neu")
+
+        class Working:
+            def __init__(self) -> None:
+                self.sent: list[tuple[UUID, str]] = []
+
+            async def notify(self, user_id: UUID, kind: str) -> None:
+                self.sent.append((user_id, kind))
+
+        # Erster Anlauf scheitert — die Zeile bleibt liegen, statt verloren zu
+        # gehen. Das ist der ganze Unterschied zu vorher.
+        broken = OutboxDispatcher(session_factory=sessions, table=OUTBOX, delivery=Broken())
+        assert await broken.drain_once() == 0
+
+        # Der Dienst ist wieder da, niemand musste etwas nachtragen.
+        working = Working()
+        good = OutboxDispatcher(session_factory=sessions, table=OUTBOX, delivery=working)
+        assert await good.drain_once() == 1
+        assert working.sent == [(person, "application_update")]
+    finally:
+        await engine.dispose()
+
+
+async def test_the_stats_count_only_the_companys_own_applications(
+    apps: tuple[Any, Any, Any, FakeJobs],
+) -> None:
+    """Kennzahlen über die EIGENEN Vorgänge — und über sonst nichts (ADR-0026).
+
+    Zulässig ist die Zahl, weil das Unternehmen dieselben Bewerbungen ohnehin
+    einzeln in seiner Liste sieht. Sie ist eine Bequemlichkeit, keine neue
+    Auskunft. Deshalb prüft dieser Test vor allem die Abgrenzung: ein zweites
+    Unternehmen darf in derselben Zahl nicht auftauchen.
+    """
+    applications_app, profile_app, _consent, jobs = apps
+    company_token = _token(uuid4(), tenant_id=jobs.tenant_id)
+
+    job_id = uuid4()
+    jobs.open_jobs.add(job_id)
+    for _ in range(2):
+        person = uuid4()
+        token = _token(person, tenant_id=None)
+        await _save_profile(profile_app, token, "Senior Python")
+        applied = await _call(
+            applications_app, "POST", "/applications", token, json={"job_id": str(job_id)}
+        )
+        assert applied.status_code == 201, applied.text
+
+    # Eine davon beantworten, damit zwei Status vorkommen.
+    listed = await _call(applications_app, "GET", f"/jobs/{job_id}/applications", company_token)
+    await _call(
+        applications_app,
+        "POST",
+        f"/applications/{listed.json()[0]['id']}/status",
+        company_token,
+        json={"status": "rejected"},
+    )
+
+    stats = await _call(applications_app, "GET", "/companies/me/application-stats", company_token)
+    assert stats.status_code == 200, stats.text
+    body = stats.json()
+    assert body["total"] == 2
+    assert body["by_status"] == {"submitted": 1, "rejected": 1}
+
+    # Ein fremdes Unternehmen sieht seine eigene (leere) Zahl, nicht diese.
+    stranger = _token(uuid4(), tenant_id=uuid4())
+    theirs = await _call(applications_app, "GET", "/companies/me/application-stats", stranger)
+    assert theirs.status_code == 200, theirs.text
+    assert theirs.json() == {"by_status": {}, "total": 0}
+
+
+async def test_the_stats_say_nothing_about_the_people_behind_them(
+    apps: tuple[Any, Any, Any, FakeJobs],
+) -> None:
+    """Die eigentliche Grenze, und sie liegt nicht bei der Aggregation.
+
+    Eine Zahl, die Bewerbungen mit Marktstatus, Lebenslauf oder Vorgängen bei
+    ANDEREN Firmen verrechnet, wäre eine Aussage über Menschen aus Quellen, die
+    einzeln freigegeben wurden — und keine Aggregation macht das wieder gut.
+    Deshalb hält dieser Test die Feldmenge der Antwort fest: was es nicht gibt,
+    kann nicht herausgehen (dieselbe Strenge wie bei `DraftContext`).
+    """
+    applications_app, _profile, _consent, jobs = apps
+    company_token = _token(uuid4(), tenant_id=jobs.tenant_id)
+
+    stats = await _call(applications_app, "GET", "/companies/me/application-stats", company_token)
+
+    assert set(stats.json().keys()) == {"by_status", "total"}
+
+
+async def test_the_stats_need_an_active_company(
+    apps: tuple[Any, Any, Any, FakeJobs],
+) -> None:
+    # Aussage über den Aufrufer, nicht über ein fremdes Unternehmen — 403.
+    applications_app, _profile, _consent, _jobs = apps
+    person_token = _token(uuid4(), tenant_id=None)
+
+    response = await _call(applications_app, "GET", "/companies/me/application-stats", person_token)
+
+    assert response.status_code == 403, response.text

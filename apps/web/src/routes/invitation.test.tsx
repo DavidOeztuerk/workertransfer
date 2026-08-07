@@ -12,9 +12,19 @@ vi.mock("../auth/team", async (importOriginal) => {
 const client = await import("../auth/team");
 const acceptInvitation = vi.mocked(client.acceptInvitation);
 
-function withToken(token: string | null) {
+/** Setzt den Link — und gibt den Token zurück, den er trägt.
+ *
+ * Standardmäßig ein FRISCHER Token je Test, wie auf der Bestätigungsseite. Die
+ * Seite merkt sich je Token die Zusage modulweit (der Token ist einmalig), und
+ * ein zwischen Tests geteilter Token trüge das Ergebnis des vorigen Tests in
+ * den nächsten — der Mock des zweiten liefe dann ins Leere. Genau das ist beim
+ * Einbau des Riegels passiert: zwei bestehende Tests wurden rot, obwohl die
+ * Seite stimmte.
+ */
+function withToken(token: string | null = `token-${crypto.randomUUID()}`): string | null {
   const search = token === null ? "" : `?token=${token}`;
   window.history.replaceState({}, "", `/invitation${search}`);
+  return token;
 }
 
 beforeEach(() => {
@@ -26,13 +36,38 @@ beforeEach(() => {
 });
 
 describe("InvitationRoute", () => {
+  it("uses a single-use token exactly once, even across a second mount", async () => {
+    // Dieselbe Falle wie auf der Bestätigungsseite, und sie war hier noch
+    // offen: der Einladungstoken ist EINMALIG. Ein zweiter Aufbau (HMR,
+    // StrictMode, Reload, ein neu einhängender Router) schickt ihn erneut, der
+    // zweite Aufruf scheitert — und weil beide Antworten in denselben Zustand
+    // schreiben, entscheidet die zuletzt eintreffende. Im schlechten Fall
+    // steht „Einladung nicht angenommen" auf dem Schirm, während die Person
+    // dem Unternehmen gerade beigetreten ist.
+    //
+    // Gefunden als Wackler im E2E-Lauf: die Überschrift mit dem Firmennamen
+    // blieb beim ersten Anlauf aus, beim zweiten war sie da.
+    const token = withToken();
+    expect(token).not.toBeNull();
+
+    const first = renderWithProviders(<InvitationRoute />);
+    expect(await screen.findByRole("heading", { name: /Willkommen bei Firma/ })).toBeInTheDocument();
+
+    first.unmount();
+    renderWithProviders(<InvitationRoute />);
+
+    // Derselbe Ausgang wie beim ersten Mal — und kein zweiter Aufruf.
+    expect(await screen.findByRole("heading", { name: /Willkommen bei Firma/ })).toBeInTheDocument();
+    expect(acceptInvitation).toHaveBeenCalledTimes(1);
+  });
+
   it("accepts the token from the link", async () => {
-    withToken("abc123");
+    const token = withToken();
 
     renderWithProviders(<InvitationRoute />);
 
     expect(await screen.findByText(/Firma/)).toBeInTheDocument();
-    expect(acceptInvitation).toHaveBeenCalledWith("abc123");
+    expect(acceptInvitation).toHaveBeenCalledWith(token);
   });
 
   it("does not call the server without a token", async () => {
@@ -46,7 +81,7 @@ describe("InvitationRoute", () => {
 
   it("sends an anonymous visitor to the login instead of blaming the link", async () => {
     // Der häufigste Fall: die Mail wird geöffnet, bevor es ein Konto gibt.
-    withToken("abc123");
+    withToken();
     acceptInvitation.mockResolvedValue({
       ok: false,
       reason: "unauthenticated",
@@ -60,7 +95,7 @@ describe("InvitationRoute", () => {
   });
 
   it("passes a refusal through in the server's words", async () => {
-    withToken("abc123");
+    withToken();
     acceptInvitation.mockResolvedValue({
       ok: false,
       reason: "refused",
@@ -75,7 +110,7 @@ describe("InvitationRoute", () => {
   it("tells you to act for the company on purpose, rather than doing it silently", async () => {
     // Ein automatischer Wechsel würde jemanden ungefragt aus dem Unternehmen
     // herausbefördern, in dem er gerade arbeitet (ADR-0018).
-    withToken("abc123");
+    withToken();
 
     renderWithProviders(<InvitationRoute />);
 
