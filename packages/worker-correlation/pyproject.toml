@@ -1,0 +1,19 @@
+[project]
+name = "worker-correlation"
+version = "0.1.0"
+description = "Correlation ID propagation via contextvars and middleware"
+requires-python = ">=3.14"
+dependencies = [
+    "worker-platform",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_correlation"
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-platform = { workspace = true }

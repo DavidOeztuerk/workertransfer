@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+jobs:
+  backend-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages --all-groups --locked
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run mypy packages apps
+      # Testcontainers (identity-service integration suite) needs a reachable
+      # Docker daemon. ubuntu-latest has Docker, so the integration tests run
+      # here; on Docker-less runners they self-skip (ADR-0011 offline-skip).
+      - run: uv run pytest
+
+  frontend-quality:
+    # apps/web and packages/ui were previously ungated: TypeScript errors,
+    # failing Vitest suites and broken Vite builds could all merge green because
+    # CI only ran the Python job. AGENTS.md already declares `pnpm check` and
+    # `pnpm test` as binding steps 5 and 6 of the verification order.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build
+
+  # Bekannte Lücken in Abhängigkeiten — der dritte Job neben Backend und
+  # Frontend (ULTRAPLAN Phase 10, „Dependency-Scanning").
+  #
+  # Er läuft NICHT mit `continue-on-error`. Ein Scan, der rot sein darf, wird
+  # nach der zweiten Woche ignoriert, und dann ist er schlechter als keiner:
+  # er erzeugt das Gefühl, jemand schaue hin.
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: uv einrichten
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Python-Abhängigkeiten prüfen
+        # `uv export` statt `uv sync`: pip-audit braucht nur die Liste, nicht
+        # die installierte Umgebung. Ohne die Dev-Gruppe — ein Testwerkzeug
+        # läuft nie in Produktion, und ein Fund dort würde den Blick auf die
+        # echten verstellen.
+        run: |
+          # --all-packages: die Abhängigkeiten stecken in den Workspace-
+          # MITGLIEDERN, nicht im Wurzelprojekt (`dependencies = []`). Ohne das
+          # liefert der Export drei Zeilen, und der Scan prüfte praktisch
+          # nichts — ein grüner Bericht über eine leere Liste.
+          # --no-emit-workspace: die eigenen Pakete stehen in keiner
+          # Schwachstellendatenbank.
+          uv export --all-packages --no-dev --no-emit-workspace \
+            --format requirements-txt > requirements.txt
+          # Der Wächter gegen genau den Fehler von oben: eine kurze Liste ist
+          # hier kein gutes Zeichen, sondern ein kaputter Export.
+          lines=$(grep -c '==' requirements.txt || true)
+          echo "$lines Abhängigkeiten werden geprüft."
+          if [ "$lines" -lt 50 ]; then
+            echo "::error::Nur $lines Abhängigkeiten — der Export ist kaputt, nicht die Liste kurz."
+            exit 1
+          fi
+          # Die fünf starlette-IDs sind AUSDRÜCKLICH ausgenommen, nicht
+          # übersehen: die Behebungen liegen in starlette 1.x, und FastAPI
+          # pinnt `<0.53`. Ein Upgrade ist also nicht möglich, ohne FastAPI zu
+          # brechen — geprüft, nicht vermutet (`uv lock --upgrade-package`
+          # ließ 0.52.1 stehen).
+          #
+          # Ausgenommen statt den Scan zu entschärfen: ohne `--strict` oder mit
+          # `continue-on-error` würde JEDER künftige Fund mit durchrutschen.
+          # So bleibt der Job scharf und meldet alles Neue.
+          #
+          # ZU PRÜFEN, sobald FastAPI starlette 1.x unterstützt — dann müssen
+          # diese Zeilen weg.
+          uvx pip-audit --requirement requirements.txt --strict \
+            --ignore-vuln PYSEC-2026-161 \
+            --ignore-vuln PYSEC-2026-248 \
+            --ignore-vuln PYSEC-2026-249 \
+            --ignore-vuln PYSEC-2026-2280 \
+            --ignore-vuln PYSEC-2026-2281
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Frontend-Abhängigkeiten prüfen
+        # `--prod`: was nur beim Bauen läuft, erreicht keinen Browser.
+        # `moderate` als Schwelle, damit „low" nicht jede Woche blockiert.
+        run: pnpm audit --prod --audit-level moderate
+

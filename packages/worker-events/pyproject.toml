@@ -1,0 +1,22 @@
+[project]
+name = "worker-events"
+version = "0.1.0"
+description = "Event system: Domain/Integration/Application events, Event store, Outbox/Inbox pattern"
+requires-python = ">=3.14"
+dependencies = [
+    "pydantic>=2.8.0,<3.0.0",
+    "sqlalchemy>=2.0.0,<3.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_events"
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-shared = { workspace = true }
+worker-database = { workspace = true }
+worker-correlation = { workspace = true }

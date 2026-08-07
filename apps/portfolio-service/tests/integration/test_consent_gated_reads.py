@@ -1,0 +1,507 @@
+"""Das Versprechen dieses Slices, an echten Diensten belegt.
+
+Der Consent-Ledger läuft hier als echte ASGI-App mit eigener Datenbank; der
+Portfolio-Service spricht ihn über seinen normalen HTTP-Client an, nur dass der
+Transport in den Prozess statt ins Netz zeigt. Alles andere ist Produktion:
+dieselben Handler, dieselben Migrationen, dieselben Tokens.
+
+Der tragende Test ist `test_revocation_takes_effect_on_the_very_next_read` —
+ADR-0013 hat einen Cache ausdrücklich verworfen, weil ein Widerruf sofort
+wirken muss. Hier wird das nachgewiesen statt behauptet.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
+from uuid import UUID, uuid4
+
+import httpx
+import pytest
+from alembic import command
+from alembic.config import Config
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import create_engine, text
+from worker_auth import TokenManager
+
+_PORTFOLIO_DIR = Path(__file__).resolve().parents[2]
+_CONSENT_DIR = _PORTFOLIO_DIR.parent / "consent-service"
+_CONSENT_DB = "consent_for_portfolio_test"
+SECRET = "test-secret-with-at-least-thirty-two-bytes-xx"
+CAPABILITY = "portfolio.visibility:public"
+
+#: Eine Schleife fürs ganze Modul. Die Apps werden einmal gebaut und halten
+#: asyncpg-Pools, die an die Schleife ihrer Erzeugung gebunden sind; mit der
+#: Voreinstellung (eine Schleife je Test) bricht ab dem zweiten Test jede
+#: Abfrage mit "attached to a different loop".
+pytestmark = pytest.mark.asyncio(loop_scope="module")
+
+
+def _sync(url: str) -> str:
+    return url.replace("postgresql+asyncpg://", "postgresql+psycopg://")
+
+
+def _sibling(url: str, name: str) -> str:
+    return url.rsplit("/", 1)[0] + "/" + name
+
+
+def _migrate(service_dir: Path, url: str, patch: pytest.MonkeyPatch) -> None:
+    cfg = Config()
+    cfg.set_main_option("script_location", str(service_dir / "migrations"))
+    patch.setenv("WORKER_DATABASE_URL", url)
+    command.upgrade(cfg, "head")
+
+
+def _drop_database(admin_url: str, name: str) -> None:
+    admin = create_engine(admin_url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as conn:
+        # Die App-Pools geben ihre Verbindungen nicht her — build_app reicht die
+        # Engine nicht heraus. Ohne dieses Kappen scheitert DROP DATABASE.
+        conn.execute(
+            text(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = :name AND pid <> pg_backend_pid()"
+            ),
+            {"name": name},
+        )
+        conn.execute(text(f'DROP DATABASE IF EXISTS "{name}"'))
+    admin.dispose()
+
+
+def _truncate_all(url: str) -> None:
+    engine = create_engine(_sync(url), isolation_level="AUTOCOMMIT")
+    with engine.connect() as conn:
+        names = [
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT tablename FROM pg_tables WHERE schemaname = 'public' "
+                    "AND tablename <> 'alembic_version'"
+                )
+            )
+        ]
+        if names:
+            joined = ", ".join(f'"{name}"' for name in names)
+            conn.execute(text(f"TRUNCATE {joined} RESTART IDENTITY CASCADE"))
+    engine.dispose()
+
+
+@pytest.fixture(scope="module")
+def stack(postgres_url: str) -> Iterator[tuple[Any, Any]]:
+    """Beide Dienste einmal je Modul aufbauen.
+
+    Je Test neu wäre leichter zu lesen, geht aber nicht: die Apps halten
+    Verbindungspools offen, die `build_app` nicht herausgibt, und ein
+    DROP DATABASE gegen eine belegte Datenbank scheitert. Statt Container zu
+    wechseln, räumt `apps` die Tabellen zwischen den Tests aus — dieselbe
+    Isolation, ein Bruchteil der Zeit.
+    """
+    admin_url = _sync(postgres_url)
+    consent_url = _sibling(postgres_url, _CONSENT_DB)
+    _drop_database(admin_url, _CONSENT_DB)
+    admin = create_engine(admin_url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as conn:
+        # Zwei Datenbanken in einem Container — je Service eine (ADR-0004).
+        # Kein zweiter Container: die Trennung, um die es geht, ist die der
+        # Daten, und die ist damit vollständig.
+        conn.execute(text(f'CREATE DATABASE "{_CONSENT_DB}"'))
+    admin.dispose()
+
+    patch = pytest.MonkeyPatch()
+    try:
+        _migrate(_CONSENT_DIR, consent_url, patch)
+        _migrate(_PORTFOLIO_DIR, postgres_url, patch)
+        patch.setenv("WORKER_JWT_SECRET", SECRET)
+
+        from consent_service.configuration import ConsentServiceSettings
+        from consent_service.presentation.compose_api import build_app as build_consent
+
+        patch.setenv("WORKER_DATABASE_URL", consent_url)
+        consent_app = build_consent(ConsentServiceSettings())
+
+        # Der Portfolio-Service benutzt seinen echten HTTP-Client; nur der
+        # Transport zeigt in den Prozess statt ins Netz. Damit ist alles auf dem
+        # Weg dahin — DTO, Header, Statuscodes, Fail-closed — wirklich geprüft
+        # und nicht durch ein Fake ersetzt.
+        import portfolio_service.infrastructure.compose as compose_module
+        from portfolio_service.infrastructure.consent import HttpConsentGate
+
+        original = HttpConsentGate
+
+        def _in_process_gate(*, base_url: str) -> HttpConsentGate:
+            return original(base_url=base_url, transport=ASGITransport(app=consent_app))
+
+        patch.setattr(compose_module, "HttpConsentGate", _in_process_gate)
+
+        from portfolio_service.configuration import PortfolioServiceSettings
+        from portfolio_service.presentation.compose_api import build_app as build_portfolio
+
+        patch.setenv("WORKER_DATABASE_URL", postgres_url)
+        portfolio_app = build_portfolio(PortfolioServiceSettings())
+        yield portfolio_app, consent_app
+    finally:
+        patch.undo()
+        _drop_database(admin_url, _CONSENT_DB)
+
+
+@pytest.fixture
+def apps(stack: tuple[Any, Any], postgres_url: str) -> tuple[Any, Any]:
+    """Jeder Test beginnt bei null — in beiden Datenbanken."""
+    _truncate_all(postgres_url)
+    _truncate_all(_sibling(postgres_url, _CONSENT_DB))
+    return stack
+
+
+def _token(user_id: UUID, *, tenant_id: UUID | None) -> str:
+    return TokenManager(secret=SECRET).create_access_token(user_id, tenant_id, ["user"], [])
+
+
+async def _call(app: Any, method: str, path: str, token: str, **kwargs: Any) -> httpx.Response:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://svc") as client:
+        return await client.request(
+            method, path, headers={"Authorization": f"Bearer {token}"}, **kwargs
+        )
+
+
+async def _save(app: Any, token: str, title: str = "Ein Werkzeug") -> httpx.Response:
+    return await _call(
+        app,
+        "PUT",
+        "/portfolios/me",
+        token,
+        json={
+            "items": [
+                {
+                    "title": title,
+                    "summary": "Was es tut.",
+                    "url": "https://example.org/werkzeug",
+                    "role": "Entwicklung",
+                    "year": 2024,
+                }
+            ]
+        },
+    )
+
+
+async def _release(consent_app: Any, token: str, subject: UUID, *, grant: bool) -> None:
+    path = "/consent/grant" if grant else "/consent/revoke"
+    body: dict[str, Any] = {"subject_id": str(subject), "capability": CAPABILITY}
+    if not grant:
+        body["reason"] = "möchte nicht mehr gezeigt werden"
+    response = await _call(consent_app, "POST", path, token, json=body)
+    assert response.status_code == 200, response.text
+
+
+async def test_revocation_takes_effect_on_the_very_next_read(apps: tuple[Any, Any]) -> None:
+    """Kein Cache, keine Verzögerung — ADR-0013 dort geprüft, wo es zählt."""
+    portfolio_app, consent_app = apps
+    person = uuid4()
+    person_token = _token(person, tenant_id=None)
+    company_token = _token(uuid4(), tenant_id=uuid4())
+
+    assert (await _save(portfolio_app, person_token)).status_code == 200
+    await _release(consent_app, person_token, person, grant=True)
+
+    visible = await _call(portfolio_app, "GET", f"/portfolios/{person}", company_token)
+    assert visible.status_code == 200, visible.text
+    assert visible.json()["items"][0]["title"] == "Ein Werkzeug"
+
+    await _release(consent_app, person_token, person, grant=False)
+
+    gone = await _call(portfolio_app, "GET", f"/portfolios/{person}", company_token)
+    assert gone.status_code == 404, gone.text
+
+
+async def test_the_profile_release_does_not_open_the_portfolio(apps: tuple[Any, Any]) -> None:
+    """Zwei Capabilities, zwei Entscheidungen.
+
+    Der Schalter sitzt in der Oberfläche neben dem des Profils, aber es ist
+    nicht derselbe — sonst wäre „ich bin ansprechbar" stillschweigend auch
+    „schaut euch meine Arbeiten an".
+    """
+    portfolio_app, consent_app = apps
+    person = uuid4()
+    person_token = _token(person, tenant_id=None)
+    await _save(portfolio_app, person_token)
+
+    response = await _call(
+        consent_app,
+        "POST",
+        "/consent/grant",
+        person_token,
+        json={"subject_id": str(person), "capability": "profile.visibility:public"},
+    )
+    assert response.status_code == 200
+
+    company_token = _token(uuid4(), tenant_id=uuid4())
+    hidden = await _call(portfolio_app, "GET", f"/portfolios/{person}", company_token)
+
+    assert hidden.status_code == 404, hidden.text
+
+
+async def test_withheld_and_absent_are_indistinguishable(apps: tuple[Any, Any]) -> None:
+    portfolio_app, _consent = apps
+    person = uuid4()
+    await _save(portfolio_app, _token(person, tenant_id=None))
+    company_token = _token(uuid4(), tenant_id=uuid4())
+
+    withheld = await _call(portfolio_app, "GET", f"/portfolios/{person}", company_token)
+    never_existed = await _call(portfolio_app, "GET", f"/portfolios/{uuid4()}", company_token)
+
+    assert withheld.status_code == never_existed.status_code == 404
+
+    def _without_correlation(body: dict[str, Any]) -> dict[str, Any]:
+        return {key: value for key, value in body.items() if key != "correlationId"}
+
+    assert _without_correlation(withheld.json()) == _without_correlation(never_existed.json())
+
+
+async def test_a_private_person_may_not_read_a_foreign_portfolio(apps: tuple[Any, Any]) -> None:
+    portfolio_app, consent_app = apps
+    person = uuid4()
+    person_token = _token(person, tenant_id=None)
+    await _save(portfolio_app, person_token)
+    await _release(consent_app, person_token, person, grant=True)
+
+    response = await _call(
+        portfolio_app, "GET", f"/portfolios/{person}", _token(uuid4(), tenant_id=None)
+    )
+
+    assert response.status_code == 403, response.text
+
+
+async def test_the_owner_sees_their_own_without_any_consent(apps: tuple[Any, Any]) -> None:
+    portfolio_app, _consent = apps
+    token = _token(uuid4(), tenant_id=None)
+    await _save(portfolio_app, token)
+
+    response = await _call(portfolio_app, "GET", "/portfolios/me", token)
+
+    assert response.status_code == 200
+    assert response.json()["items"][0]["title"] == "Ein Werkzeug"
+
+
+async def test_a_hostile_link_never_reaches_the_database(apps: tuple[Any, Any]) -> None:
+    """Ein Portfolio-Link wird von fremden Menschen angeklickt."""
+    portfolio_app, _consent = apps
+    token = _token(uuid4(), tenant_id=None)
+
+    rejected = await _call(
+        portfolio_app,
+        "PUT",
+        "/portfolios/me",
+        token,
+        json={"items": [{"title": "Bös", "url": "javascript:alert(1)"}]},
+    )
+
+    assert rejected.status_code == 422, rejected.text
+    assert (await _call(portfolio_app, "GET", "/portfolios/me", token)).json() is None
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+
+
+async def _upload(app: Any, token: str, data: bytes, filename: str = "bild.png") -> httpx.Response:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://svc") as client:
+        return await client.post(
+            "/portfolios/me/attachments",
+            headers={"Authorization": f"Bearer {token}"},
+            files={"file": (filename, data, "image/png")},
+        )
+
+
+async def test_an_attachment_follows_the_same_consent_as_the_portfolio(
+    apps: tuple[Any, Any],
+) -> None:
+    """Sonst wäre der Anhang ein zweiter Weg an dieselben Daten.
+
+    Mit einem eigenen Filter, der irgendwann vom ersten abweicht.
+    """
+    portfolio_app, consent_app = apps
+    person = uuid4()
+    person_token = _token(person, tenant_id=None)
+    company_token = _token(uuid4(), tenant_id=uuid4())
+
+    uploaded = await _upload(portfolio_app, person_token, PNG)
+    assert uploaded.status_code == 201, uploaded.text
+    name = uploaded.json()["name"]
+    assert uploaded.json()["content_type"] == "image/png"
+
+    # Die eigene Datei ohne jede Einwilligung.
+    mine = await _call(
+        portfolio_app, "GET", f"/portfolios/{person}/attachments/{name}", person_token
+    )
+    assert mine.status_code == 200
+    assert mine.content == PNG
+
+    # Fremd und nicht freigegeben: dieselbe Antwort wie für eine Datei, die es
+    # nicht gibt.
+    blocked = await _call(
+        portfolio_app, "GET", f"/portfolios/{person}/attachments/{name}", company_token
+    )
+    assert blocked.status_code == 404
+
+    await _release(consent_app, person_token, person, grant=True)
+
+    visible = await _call(
+        portfolio_app, "GET", f"/portfolios/{person}/attachments/{name}", company_token
+    )
+    assert visible.status_code == 200
+    assert visible.content == PNG
+
+    await _release(consent_app, person_token, person, grant=False)
+
+    gone = await _call(
+        portfolio_app, "GET", f"/portfolios/{person}/attachments/{name}", company_token
+    )
+    assert gone.status_code == 404
+
+
+async def test_the_server_names_the_file_not_the_client(apps: tuple[Any, Any]) -> None:
+    """Den Namen des Clients zu übernehmen hieße, fremden Text zu einem Teil
+    eines Pfades zu machen — und die Dateiendung mit ihm."""
+    portfolio_app, _consent = apps
+
+    uploaded = await _upload(
+        portfolio_app, _token(uuid4(), tenant_id=None), PNG, filename="../../boes.php"
+    )
+
+    assert uploaded.status_code == 201, uploaded.text
+    name = uploaded.json()["name"]
+    assert "/" not in name
+    assert name.endswith(".png")
+    assert "boes" not in name
+
+
+async def test_a_file_that_only_claims_to_be_an_image_is_refused(
+    apps: tuple[Any, Any],
+) -> None:
+    portfolio_app, _consent = apps
+
+    refused = await _upload(
+        portfolio_app,
+        _token(uuid4(), tenant_id=None),
+        b"<html><script>alert(1)</script></html>",
+    )
+
+    assert refused.status_code == 422, refused.text
+
+
+async def test_a_name_from_another_person_does_not_reach_their_file(
+    apps: tuple[Any, Any],
+) -> None:
+    """Der Schlüssel wird aus Person UND Name gebildet.
+
+    Deshalb greift ein fremder Name höchstens ins eigene Verzeichnis — die
+    Trennung ist strukturell und hängt nicht daran, dass jemand eine Prüfung
+    nicht vergisst.
+    """
+    portfolio_app, consent_app = apps
+    owner = uuid4()
+    owner_token = _token(owner, tenant_id=None)
+    uploaded = await _upload(portfolio_app, owner_token, PNG)
+    name = uploaded.json()["name"]
+
+    other = uuid4()
+    other_token = _token(other, tenant_id=None)
+
+    # Derselbe Name, aber unter der eigenen subject_id: es gibt dort nichts.
+    response = await _call(
+        portfolio_app, "GET", f"/portfolios/{other}/attachments/{name}", other_token
+    )
+
+    assert response.status_code == 404
+    assert consent_app is not None
+
+
+async def test_an_attachment_is_delivered_as_a_download(apps: tuple[Any, Any]) -> None:
+    """Ein PDF kann Skripte enthalten; inline liefe es in unserem Ursprung."""
+    portfolio_app, _consent = apps
+    person = uuid4()
+    token = _token(person, tenant_id=None)
+    uploaded = await _upload(portfolio_app, token, b"%PDF-1.7\n" + b"0" * 32, filename="doc.pdf")
+    name = uploaded.json()["name"]
+
+    response = await _call(portfolio_app, "GET", f"/portfolios/{person}/attachments/{name}", token)
+
+    assert response.headers["content-disposition"].startswith("attachment;")
+    assert response.headers["content-type"] == "application/pdf"
+
+
+async def _save_with_attachment(app: Any, token: str, name: str | None) -> httpx.Response:
+    return await _call(
+        app,
+        "PUT",
+        "/portfolios/me",
+        token,
+        json={
+            "items": [
+                {
+                    "title": "Ein Werkzeug",
+                    "summary": "",
+                    "url": None,
+                    "role": "",
+                    "year": None,
+                    "attachment": name,
+                }
+            ]
+        },
+    )
+
+
+async def test_an_attachment_nobody_references_is_removed_on_save(
+    apps: tuple[Any, Any],
+) -> None:
+    """Aufgeräumt wird NACH dem Commit.
+
+    Andersherum wären bei einem fehlgeschlagenen Commit Dateien gelöscht, auf
+    die die gespeicherten Einträge weiterhin zeigen — aus einem Aufräumen würde
+    Datenverlust.
+    """
+    portfolio_app, _consent = apps
+    person = uuid4()
+    token = _token(person, tenant_id=None)
+
+    first = (await _upload(portfolio_app, token, PNG)).json()["name"]
+    second = (await _upload(portfolio_app, token, PNG)).json()["name"]
+    assert (await _save_with_attachment(portfolio_app, token, first)).status_code == 200
+
+    # Die zweite Datei zeigt niemand an — sie ist mit dem Speichern weg.
+    orphan = await _call(portfolio_app, "GET", f"/portfolios/{person}/attachments/{second}", token)
+    assert orphan.status_code == 404
+
+    # Die referenzierte bleibt.
+    kept = await _call(portfolio_app, "GET", f"/portfolios/{person}/attachments/{first}", token)
+    assert kept.status_code == 200
+
+
+async def test_removing_the_reference_removes_the_file(apps: tuple[Any, Any]) -> None:
+    portfolio_app, _consent = apps
+    person = uuid4()
+    token = _token(person, tenant_id=None)
+    name = (await _upload(portfolio_app, token, PNG)).json()["name"]
+    await _save_with_attachment(portfolio_app, token, name)
+
+    await _save_with_attachment(portfolio_app, token, None)
+
+    gone = await _call(portfolio_app, "GET", f"/portfolios/{person}/attachments/{name}", token)
+    assert gone.status_code == 404
+
+
+async def test_one_persons_cleanup_does_not_touch_another(apps: tuple[Any, Any]) -> None:
+    """Aufgeräumt wird unter der eigenen subject_id — dem Präfix, sonst nichts."""
+    portfolio_app, _consent = apps
+    other = uuid4()
+    other_token = _token(other, tenant_id=None)
+    other_name = (await _upload(portfolio_app, other_token, PNG)).json()["name"]
+    await _save_with_attachment(portfolio_app, other_token, other_name)
+
+    mine = _token(uuid4(), tenant_id=None)
+    await _upload(portfolio_app, mine, PNG)
+    await _save_with_attachment(portfolio_app, mine, None)
+
+    still_there = await _call(
+        portfolio_app, "GET", f"/portfolios/{other}/attachments/{other_name}", other_token
+    )
+    assert still_there.status_code == 200

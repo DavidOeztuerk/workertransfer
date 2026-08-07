@@ -1,0 +1,22 @@
+[project]
+name = "worker-cache"
+version = "0.1.0"
+description = "Caching: Memory, Redis, Distributed, Response cache, CQRS cache, Decorators"
+requires-python = ">=3.14"
+dependencies = [
+    "redis>=5.0.0,<6.0.0",
+    "aiocache>=0.12.0,<1.0.0",
+    "pydantic>=2.8.0,<3.0.0",
+    "pydantic-settings>=2.4.0,<3.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "worker_cache"
+
+[tool.uv.sources]
+worker-core = { workspace = true }
+worker-config = { workspace = true }

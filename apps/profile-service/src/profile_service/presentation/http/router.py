@@ -1,0 +1,228 @@
+"""HTTP-Endpunkte für Profile.
+
+Das eigene Profil steht jeder angemeldeten Person offen. Ein fremdes verlangt
+zweierlei: einen aktiven Tenant (nur Unternehmen lesen Profile) und die
+Einwilligung der betroffenen Person.
+"""
+
+from __future__ import annotations
+
+from typing import Annotated, Any
+
+from fastapi import APIRouter, HTTPException, Query, Request, status
+from profile_service.application.handlers import (
+    GetProfileQuery,
+    ListProfilesQuery,
+    SaveMyProfileCommand,
+    handle_get_my_profile,
+    handle_get_visible_profile,
+    handle_list_visible_profiles,
+    handle_save_my_profile,
+)
+from profile_service.domain.profile import Profile
+from profile_service.infrastructure.consent import ConsentUnavailable
+from worker_ai import DraftContext, DrafterUnavailable
+from worker_auth import get_request_user, resolve_token
+from worker_contracts import (
+    DraftProfileTextV1,
+    ProfilePageV1,
+    ProfileTextDraftV1,
+    ProfileV1,
+    SaveProfileV1,
+)
+
+__all__ = ["build_router"]
+
+
+def _dto(profile: Profile) -> ProfileV1:
+    return ProfileV1(
+        subject_id=profile.subject_id,
+        headline=profile.headline,
+        bio=profile.bio,
+        location=profile.location,
+        remote_ok=profile.remote_ok,
+        skills=list(profile.skills.value),
+        updated_at=profile.updated_at,
+    )
+
+
+def build_router(deps: dict[str, Any]) -> APIRouter:
+    router = APIRouter(tags=["profiles"])
+    session_factory = deps["session_factory"]
+    request_scope = deps["request_scope"]
+
+    def _principal(request: Request) -> Any:
+        principal = get_request_user(request.scope)
+        if principal is None:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "not authenticated")
+        return principal
+
+    def _bearer(request: Request) -> str:
+        """Das Token des Aufrufers, für die Weitergabe an den Ledger.
+
+        Bevorzugt der Header; sonst das Cookie, das der Browser schickt — die
+        Oberfläche sieht das httpOnly-Token nie und kann es nur so zurückgeben.
+        """
+        token = resolve_token(request.scope)
+        if token is None:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "not authenticated")
+        return token
+
+    def _require_company(request: Request) -> Any:
+        """Gibt den Tenant zurück, statt nur zu prüfen.
+
+        Er wird gebraucht: seit 4.2 kann ein Profil auch NUR diesem einen
+        Unternehmen freigegeben sein (durch eine Bewerbung). Ihn hier
+        herauszureichen ist der einzige Weg, der sicherstellt, dass er aus dem
+        Token stammt und nicht aus dem Request.
+        """
+        principal = _principal(request)
+        if principal.tenant_id is None:
+            # Aussage über den Aufrufer, nicht über das Ziel — verrät nichts.
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "reading other profiles requires an active company",
+            )
+        return principal.tenant_id
+
+    @router.put("/profiles/me")
+    async def save_my_profile(body: SaveProfileV1, request: Request) -> ProfileV1:
+        principal = _principal(request)
+        cmd = SaveMyProfileCommand(
+            subject_id=principal.sub,
+            headline=body.headline,
+            bio=body.bio,
+            location=body.location,
+            remote_ok=body.remote_ok,
+            skills=body.skills,
+        )
+        async with request_scope(session_factory) as (_uow, repos):
+            result = await handle_save_my_profile(cmd, deps=deps, repos=repos)
+        if not result.is_success:
+            err = result.error
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                err.message if err is not None else "invalid",
+            )
+        return _dto(result.value)
+
+    @router.post("/profiles/me/draft")
+    async def draft_my_text(body: DraftProfileTextV1, request: Request) -> ProfileTextDraftV1:
+        """Ein Entwurf für den EIGENEN Profiltext — auf Anforderung, nichts gespeichert.
+
+        Ein eigener Endpunkt und nicht ein Flag an `PUT /profiles/me`: der
+        Aufruf geht an einen fremden Anbieter und darf keinen Schreib- oder
+        Lesepfad blockieren. `GET /profiles/me` ruft nie einen Anbieter.
+
+        Was hinausgeht, steht in `DraftContext` — die Überschrift, der Freitext
+        und die Fähigkeiten, die die Person selbst eingetragen hat, plus ihr
+        Wunsch. **Kein Name, keine Adresse, keine `subject_id`.** Der Prompt
+        wird aus dem GESPEICHERTEN Profil gebaut, nicht aus dem Request: was
+        der Client nicht senden kann, kann er nicht in einen fremden Dienst
+        schleusen.
+        """
+        principal = _principal(request)
+        async with request_scope(session_factory) as (_uow, repos):
+            profile = await handle_get_my_profile(principal.sub, repos=repos)
+
+        context = DraftContext(
+            headline=profile.headline if profile is not None else "",
+            bio=profile.bio if profile is not None else "",
+            skills=profile.skills.value if profile is not None else (),
+            wish=body.wish,
+        )
+        try:
+            draft = await deps["drafter"].draft(context)
+        except DrafterUnavailable as exc:
+            # 503 und nicht 500: die Anfrage war in Ordnung, der Anbieter
+            # antwortet nicht ODER es ist keiner eingerichtet. Von außen ist das
+            # dasselbe — und beides heißt „später noch einmal", nicht „falsch
+            # gemacht". Die Meldung trägt nie den Prompt.
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "Der Entwurfsdienst ist gerade nicht verfügbar.",
+            ) from exc
+        return ProfileTextDraftV1(draft=draft)
+
+    @router.get("/profiles/me")
+    async def my_profile(request: Request) -> ProfileV1 | None:
+        principal = _principal(request)
+        async with request_scope(session_factory) as (_uow, repos):
+            profile = await handle_get_my_profile(principal.sub, repos=repos)
+        # null statt 404: „noch keins angelegt" ist ein Zustand, den die
+        # Oberfläche als leeres Formular zeigt, kein Fehler.
+        return _dto(profile) if profile is not None else None
+
+    @router.get("/profiles/{subject_id}")
+    async def foreign_profile(subject_id: str, request: Request) -> ProfileV1:
+        from uuid import UUID
+
+        tenant_id = _require_company(request)
+        bearer = _bearer(request)
+        try:
+            parsed = UUID(subject_id)
+        except ValueError:
+            # Gleiche Antwort wie für ein unbekanntes Profil — eine eigene
+            # Fehlermeldung für „keine gültige UUID" hilft nur beim Raten.
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "no such profile") from None
+        try:
+            async with request_scope(session_factory) as (_uow, repos):
+                result = await handle_get_visible_profile(
+                    GetProfileQuery(subject_id=parsed, tenant_id=tenant_id, bearer=bearer),
+                    deps=deps,
+                    repos=repos,
+                )
+        except ConsentUnavailable:
+            # Weder zeigen noch 404: wir wissen es nicht, und beides wäre eine
+            # Behauptung über die Person.
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, "consent service unavailable"
+            ) from None
+        if not result.is_success:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "no such profile")
+        return _dto(result.value)
+
+    @router.get("/profiles")
+    async def list_profiles(
+        request: Request,
+        limit: int = Query(default=20, ge=1, le=50),
+        cursor: str | None = Query(default=None),
+        # Mehrfach angebbar und mit UND verknüpft: wer „Python" und
+        # „Kubernetes" eingibt, sucht jemanden, der beides kann. ODER liefert
+        # bei zwei Begriffen mehr Ergebnisse als bei einem — technisch
+        # einfacher und praktisch nutzlos.
+        # `None` statt `[]` als Vorgabe: eine veränderliche Vorgabe in einer
+        # Signatur wird geteilt, und ein einziger versehentlicher `append`
+        # würde sie über alle Requests hinweg mitschleppen.
+        # Der `Annotated`-Stil statt eines Aufrufs in der Vorgabe: bei einem
+        # veränderlichen Typ ist das die Form, die FastAPI und der Linter
+        # gleichermaßen akzeptieren.
+        skill: Annotated[list[str] | None, Query()] = None,
+        location: str = Query(default="", max_length=120),
+        remote: bool = Query(default=False),
+    ) -> ProfilePageV1:
+        tenant_id = _require_company(request)
+        bearer = _bearer(request)
+        try:
+            async with request_scope(session_factory) as (_uow, repos):
+                result = await handle_list_visible_profiles(
+                    ListProfilesQuery(
+                        limit=limit,
+                        cursor=cursor,
+                        tenant_id=tenant_id,
+                        bearer=bearer,
+                        skills=tuple(skill or []),
+                        location=location,
+                        remote_only=remote,
+                    ),
+                    deps=deps,
+                    repos=repos,
+                )
+        except ConsentUnavailable:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, "consent service unavailable"
+            ) from None
+        profiles, next_cursor = result.value
+        return ProfilePageV1(items=[_dto(p) for p in profiles], next_cursor=next_cursor)
+
+    return router
