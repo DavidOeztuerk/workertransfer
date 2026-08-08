@@ -1,0 +1,118 @@
+# main zurück nach develop — der Rückweg, den der Fluss sonst nicht hat.
+#
+# WOZU: Dependabot öffnet seine PRs immer gegen den Default-Branch, also gegen
+# `main`. Werden sie dort gemergt, hat main Commits, die develop nie sieht —
+# und der nächste Feature-Zweig zweigt von einem veralteten develop ab. Genau
+# das ist passiert: nach einer Runde Dependabot lag develop 21 Commits zurück,
+# ohne dass jemand etwas falsch gemacht hätte.
+#
+# Der Fluss bleibt `feature → develop → main`. Dieser Lauf ist kein zweiter
+# Weg hinein, sondern das Nachziehen danach — wie der Rückweg nach einem
+# Hotfix.
+#
+# WARUM NUR FAST-FORWARD DIREKT GESCHOBEN WIRD: kann develop vorgespult
+# werden, ist es hinterher **byteweise identisch mit main** — und main hat die
+# CI bereits bestanden. Es entsteht kein Zustand, den niemand geprüft hat.
+# Geht das nicht (develop hat eigene Commits), wäre ein Merge-Commit nötig, und
+# der ist von nichts geprüft. Dann wird ein PR geöffnet, damit die CI läuft und
+# ein Mensch draufschaut, statt still etwas Ungeprüftes nach develop zu heben.
+#
+# KEINE SCHLEIFE: der Push geht auf `develop`, der Auslöser hört auf `main`.
+# Zudem lösen Pushes mit dem GITHUB_TOKEN grundsätzlich keine weiteren Läufe
+# aus.
+
+name: Rückführung main → develop
+
+on:
+  push:
+    branches: [main]
+  # Von Hand anstoßbar, damit man den Rückweg auch nachholen kann, ohne auf
+  # den nächsten Push nach main zu warten.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# Zwei gleichzeitige Rückführungen würden sich gegenseitig überholen.
+# `cancel-in-progress: false`: der laufende darf fertig werden — ein
+# abgebrochener Push hinterlässt sonst genau die Lücke, die dieser Lauf
+# schließen soll.
+concurrency:
+  group: rueckfuehrung-main-develop
+  cancel-in-progress: false
+
+jobs:
+  rueckfuehrung:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Die ganze Historie: ohne sie kennt der Lauf die gemeinsamen
+          # Vorfahren nicht und kann Fast-Forward nicht von Merge trennen.
+          fetch-depth: 0
+
+      - name: Git-Identität setzen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: develop nachziehen
+        id: nachziehen
+        run: |
+          set -euo pipefail
+          git fetch origin main develop
+
+          if git merge-base --is-ancestor origin/main origin/develop; then
+            echo "develop enthält main bereits — nichts zu tun."
+            echo "ergebnis=nichts" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git checkout -B develop origin/develop
+          if git merge --ff-only origin/main; then
+            git push origin develop
+            echo "develop auf $(git rev-parse --short HEAD) vorgespult."
+            echo "ergebnis=vorgespult" >> "$GITHUB_OUTPUT"
+          else
+            echo "Kein Fast-Forward möglich — develop trägt eigene Commits."
+            echo "ergebnis=pr" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: PR öffnen, wenn kein Fast-Forward möglich war
+        if: steps.nachziehen.outputs.ergebnis == 'pr'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Erst nachsehen: ein zweiter PR für denselben Rückweg wäre Lärm,
+          # und `gh pr create` bricht daran ohnehin ab.
+          offen=$(gh pr list --base develop --head main --state open --json number --jq 'length')
+          if [ "$offen" -gt 0 ]; then
+            echo "Es gibt bereits einen offenen Rückführungs-PR."
+            exit 0
+          fi
+          # Über eine Datei statt eines mehrzeiligen Arguments: ein Text, dessen
+          # Zeilen links am Rand beginnen, beendet den YAML-Block-Skalar und
+          # macht die ganze Datei ungültig.
+          printf '%s\n' \
+            "Automatisch geöffnet, weil develop **nicht vorgespult** werden konnte — es trägt eigene Commits." \
+            "" \
+            "Ein Merge-Commit hier wäre von nichts geprüft, deshalb dieser PR statt eines stillen Pushes: die CI läuft darüber, und ein Mensch sieht ihn." \
+            "" \
+            "Hintergrund: Dependabot öffnet seine PRs gegen den Default-Branch (\`main\`). Ohne Rückführung fällt develop still zurück, und der nächste Feature-Zweig startet veraltet." \
+            > "$RUNNER_TEMP/rueckfuehrung.md"
+          gh pr create \
+            --base develop --head main \
+            --title "Rückführung: main → develop" \
+            --body-file "$RUNNER_TEMP/rueckfuehrung.md"
+
+      - name: Ergebnis in die Zusammenfassung
+        if: always()
+        run: |
+          case "${{ steps.nachziehen.outputs.ergebnis }}" in
+            nichts)     echo "✅ develop war bereits auf Stand." >> "$GITHUB_STEP_SUMMARY" ;;
+            vorgespult) echo "✅ develop wurde auf main vorgespult." >> "$GITHUB_STEP_SUMMARY" ;;
+            pr)         echo "⚠️ Kein Fast-Forward möglich — PR nach develop geöffnet." >> "$GITHUB_STEP_SUMMARY" ;;
+            *)          echo "❌ Die Rückführung ist nicht durchgelaufen." >> "$GITHUB_STEP_SUMMARY" ;;
+          esac
