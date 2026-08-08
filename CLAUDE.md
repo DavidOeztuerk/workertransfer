@@ -105,7 +105,16 @@ make validate-e2e                                   # ... plus the browser journ
 `make validate` answers a different question than `make check`: it does not stop at the first failure, it reports every red step at once, it **names the skipped tests**, and it **prints how many tests actually ran** (`pytest N bestanden`, `playwright N Reisen`) — a green run with twenty skips is not a green run, and a green run that silently collected half the suite looks identical to a real one unless the count is on screen.
 
 ### CI
-`.github/workflows/ci.yml` has **two** jobs: `backend-quality` (uv sync --locked → ruff format → ruff check → mypy → pytest, Python 3.14) and `frontend-quality` (pnpm install --frozen-lockfile → check → test → build, Node 24). `ubuntu-latest` has Docker, so the Testcontainers integration suites really run there; without a daemon they self-skip (ADR-0011).
+`.github/workflows/ci.yml` has **three** jobs: `backend-quality` (uv sync --locked → ruff format → ruff check → mypy → pytest, Python 3.14), `frontend-quality` (pnpm install --frozen-lockfile → check → test → build, Node 25) and `dependency-audit` (`pip-audit` over the full `uv export --all-packages`, aborting if the export yields under 50 entries). `ubuntu-latest` has Docker, so the Testcontainers integration suites really run there; without a daemon they self-skip (ADR-0011).
+
+There is **no `dependabot.yml`** any more — deleted 08.08.2026 because its `uv` run never finished (see ROADMAP 10.4). No automatic version bumps arrive for any ecosystem; `dependency-audit` still reports vulnerabilities on every PR, and Dependabot *alerts* live in the repo settings, not in a file.
+
+### Branches and the one path back
+`feature → develop → main`, never a feature branch straight into main.
+
+A **hotfix** is the single exception: it branches off `main`, is merged into `main`, and never passes through develop. `.github/workflows/backmerge.yml` carries it back, and its trigger is deliberately narrow — a *merged* pull request into main whose head branch starts with **`hotfix/`**. The name is load-bearing: call the branch `fix/…` and the run never fires, so the correction silently stays out of develop and the next release PR can collide with it.
+
+It pushes to develop **only** when a fast-forward is possible (develop is then byte-identical to main, which CI already passed). With work in flight on develop the branches have diverged, so it prepares the merge on `hotfix-rueckweg/main-nach-develop` and puts a compare link in the run summary — for a hotfix that is the normal case, not the exception. A real conflict turns the run **red** rather than reporting green while the fix is missing from develop. It never opens the PR itself: GitHub forbids Actions from creating pull requests unless a repo setting is enabled, and that setting is off here.
 
 ## Architecture
 
