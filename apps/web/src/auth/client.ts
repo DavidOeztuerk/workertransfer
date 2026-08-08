@@ -107,10 +107,63 @@ export async function login(input: LoginInput): Promise<LoginResult> {
   return { ok: false, message };
 }
 
+/**
+ * Eine laufende Erneuerung, die sich gleichzeitige Aufrufer teilen.
+ *
+ * Nötig, weil der Refresh die jti ROTIERT: das alte Token wird entwertet, ein
+ * neues ausgegeben (ADR-0008, damit ein gestohlenes Token einmalig ist). Zwei
+ * gleichzeitige Erneuerungen hiessen deshalb, dass die zweite mit einem bereits
+ * entwerteten Token ankommt — und die Sitzung genau dadurch verliert, was die
+ * Erneuerung retten sollte. Die Sitzungsabfrage wird von TanStack Query
+ * entdoppelt, `my-data.tsx` ruft `fetchMe` aber daneben auf.
+ */
+let laufendeErneuerung: Promise<boolean> | null = null;
+
+async function erneuereSitzung(): Promise<boolean> {
+  laufendeErneuerung ??= (async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+      return res.ok;
+    } catch {
+      // Netzfehler ist keine Aussage über die Sitzung.
+      return false;
+    } finally {
+      // Erst NACH dem Auflösen freigeben, sonst startet der nächste Aufrufer
+      // eine zweite Rotation, während die erste noch unterwegs ist.
+      queueMicrotask(() => {
+        laufendeErneuerung = null;
+      });
+    }
+  })();
+  return laufendeErneuerung;
+}
+
+/**
+ * "Wer bin ich" — und ein 401 beantwortet das nicht endgültig.
+ *
+ * Das Access-Token lebt 15 Minuten, das Refresh-Token 24 Stunden (ADR-0007).
+ * Ohne den Versuch dazwischen ist man eine Viertelstunde nach dem Anmelden
+ * abgemeldet, lautlos und mitten im Ausfüllen eines Formulars — obwohl ein
+ * gültiges Refresh-Cookie danebenliegt. Der Endpunkt dafür gab es von Anfang
+ * an; angeschlossen war er nie.
+ *
+ * Nur bei 401 wird erneuert. Ein 503 heisst "der Dienst schweigt", nicht "deine
+ * Sitzung ist alt" — darauf zu rotieren hiesse, bei jeder Störung Token zu
+ * verbrennen.
+ */
 export async function fetchMe(): Promise<MeResponse | null> {
   const res = await fetch(`${API_BASE_URL}/me`, { credentials: "include" });
-  if (!res.ok) return null;
-  return (await res.json()) as MeResponse;
+  if (res.ok) return (await res.json()) as MeResponse;
+  if (res.status !== 401) return null;
+
+  if (!(await erneuereSitzung())) return null;
+
+  const zweiter = await fetch(`${API_BASE_URL}/me`, { credentials: "include" });
+  if (!zweiter.ok) return null;
+  return (await zweiter.json()) as MeResponse;
 }
 
 // Idempotent by design on the backend (204 even without a refresh cookie), so a
