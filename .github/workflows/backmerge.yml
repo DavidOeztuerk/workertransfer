@@ -1,33 +1,44 @@
-# main zurück nach develop — der Rückweg, den der Fluss sonst nicht hat.
+# Ein Hotfix zurück nach develop — der einzige Weg, auf dem main überhaupt noch
+# vor develop geraten kann.
 #
-# WOZU: Dependabot öffnet seine PRs immer gegen den Default-Branch, also gegen
-# `main`. Werden sie dort gemergt, hat main Commits, die develop nie sieht —
-# und der nächste Feature-Zweig zweigt von einem veralteten develop ab. Genau
-# das ist passiert: nach einer Runde Dependabot lag develop 21 Commits zurück,
-# ohne dass jemand etwas falsch gemacht hätte.
+# WOZU: der Fluss ist `feature → develop → main`. Ein Hotfix bricht ihn
+# bewusst: er zweigt von main ab, wird auf main gemergt und kommt nie über
+# develop. Ohne Rückweg steht die Korrektur danach in der Produktion, aber
+# nicht in der Entwicklung — der nächste PR `develop → main` würde sie
+# überschreiben wollen und kann darüber in Konflikt geraten.
 #
-# Der Fluss bleibt `feature → develop → main`. Dieser Lauf ist kein zweiter
-# Weg hinein, sondern das Nachziehen danach — wie der Rückweg nach einem
-# Hotfix.
+# WARUM NUR HOTFIXES: bis 08.08.2026 hörte dieser Lauf auf JEDEN Push nach
+# main. Damals stimmte das, weil Dependabot seine PRs gegen den Default-Branch
+# öffnete und develop dadurch 21 Commits zurückfiel. Seit `dependabot.yml`
+# gelöscht ist, bekommt main nur noch Merges AUS develop — und die brauchen
+# keinen Rückweg, weil develop den Inhalt bereits hat. Übrig bleibt genau der
+# Hotfix-Fall, und darauf zielt der Auslöser jetzt.
 #
 # WARUM NUR FAST-FORWARD DIREKT GESCHOBEN WIRD: kann develop vorgespult
 # werden, ist es hinterher **byteweise identisch mit main** — und main hat die
 # CI bereits bestanden. Es entsteht kein Zustand, den niemand geprüft hat.
-# Geht das nicht (develop hat eigene Commits), wäre ein Merge-Commit nötig, und
-# der ist von nichts geprüft. Dann wird ein PR geöffnet, damit die CI läuft und
-# ein Mensch draufschaut, statt still etwas Ungeprüftes nach develop zu heben.
 #
-# KEINE SCHLEIFE: der Push geht auf `develop`, der Auslöser hört auf `main`.
-# Zudem lösen Pushes mit dem GITHUB_TOKEN grundsätzlich keine weiteren Läufe
-# aus.
+# Beim Hotfix ist das eher die Ausnahme: läuft auf develop parallel Arbeit,
+# sind beide Zweige auseinandergelaufen, und es braucht einen Merge-Commit.
+# Der ist von keiner CI geprüft, deshalb wird er NICHT nach develop geschoben,
+# sondern auf einem eigenen Zweig vorbereitet (siehe unten). Der Rückfall ist
+# hier also der Normalfall, nicht die Notlösung.
+#
+# KEINE SCHLEIFE: der Push geht auf `develop`, der Auslöser hört auf
+# geschlossene PRs nach `main`. Zudem lösen Pushes mit dem GITHUB_TOKEN
+# grundsätzlich keine weiteren Läufe aus.
 
-name: Rückführung main → develop
+name: Hotfix zurück nach develop
 
 on:
-  push:
+  # Nicht `push`, sondern der geschlossene PR: nur so ist erkennbar, WOHER der
+  # Commit kam. Ein Push nach main sieht bei einem Hotfix genauso aus wie bei
+  # einem Release aus develop.
+  pull_request:
+    types: [closed]
     branches: [main]
-  # Von Hand anstoßbar, damit man den Rückweg auch nachholen kann, ohne auf
-  # den nächsten Push nach main zu warten.
+  # Von Hand anstoßbar — etwa wenn ein Hotfix ausnahmsweise ohne PR auf main
+  # landete oder der Rückweg nachgeholt werden muss.
   workflow_dispatch:
 
 permissions:
@@ -44,6 +55,17 @@ concurrency:
 
 jobs:
   rueckfuehrung:
+    # Nur ein WIRKLICH GEMERGTER Hotfix-PR — ein geschlossener PR ist nicht
+    # zwingend ein gemergter, und ein Release aus develop braucht keinen
+    # Rückweg.
+    #
+    # Die Namenskonvention `hotfix/…` ist damit tragend und nicht Kosmetik:
+    # heißt der Zweig anders, läuft die Rückführung nicht, und die Korrektur
+    # bleibt in develop aus.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       startsWith(github.event.pull_request.head.ref, 'hotfix/'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -100,7 +122,7 @@ jobs:
         id: zweig
         run: |
           set -euo pipefail
-          zweig="rueckfuehrung/main-nach-develop"
+          zweig="hotfix-rueckweg/main-nach-develop"
           git checkout -B "$zweig" origin/develop
           if git merge --no-edit origin/main; then
             git push --force-with-lease origin "$zweig"
@@ -119,31 +141,31 @@ jobs:
           zweig="${{ steps.zweig.outputs.zweig }}"
           case "${{ steps.nachziehen.outputs.ergebnis }}" in
             nichts)
-              echo "✅ develop war bereits auf Stand." >> "$GITHUB_STEP_SUMMARY"
+              echo "✅ develop enthielt den Hotfix bereits." >> "$GITHUB_STEP_SUMMARY"
               ;;
             vorgespult)
-              echo "✅ develop wurde auf main vorgespult." >> "$GITHUB_STEP_SUMMARY"
+              echo "✅ Hotfix ist in develop — develop wurde auf main vorgespult." >> "$GITHUB_STEP_SUMMARY"
               ;;
             pr)
               case "${{ steps.zweig.outputs.zustand }}" in
                 bereit)
                   {
-                    echo "### ⚠️ develop konnte nicht vorgespult werden"
+                    echo "### ⚠️ Der Hotfix ist NOCH NICHT in develop"
                     echo
-                    echo "develop trägt eigene Commits, ein Merge-Commit wäre also nötig — und der ist von keiner CI geprüft. Deshalb wurde er **nicht** nach develop geschoben, sondern auf einem eigenen Zweig vorbereitet:"
+                    echo "Auf develop läuft eigene Arbeit, ein Merge-Commit wäre also nötig — und der ist von keiner CI geprüft. Deshalb wurde er **nicht** nach develop geschoben, sondern auf einem eigenen Zweig vorbereitet:"
                     echo
                     echo "**\`$zweig\`**"
                     echo
                     echo "[→ PR daraus öffnen]($repo/compare/develop...$zweig?expand=1)"
                     echo
-                    echo "Dann läuft die CI darüber, und ein Mensch sieht ihn."
+                    echo "Solange der PR nicht durch ist, fehlt die Korrektur in develop — und der nächste Release-PR \`develop → main\` kann darüber stolpern."
                   } >> "$GITHUB_STEP_SUMMARY"
                   ;;
                 konflikt)
                   {
-                    echo "### ❌ Rückweg konfliktbehaftet"
+                    echo "### ❌ Hotfix-Rückweg konfliktbehaftet"
                     echo
-                    echo "main und develop lassen sich nicht ohne Handarbeit zusammenführen. Ein Lauf löst das nicht auf — das gehört einem Menschen."
+                    echo "Der Hotfix und die Arbeit auf develop lassen sich nicht ohne Handarbeit zusammenführen. Ein Lauf löst das nicht auf — das gehört einem Menschen. **Bis dahin fehlt die Korrektur in develop.**"
                     echo
                     echo "\`\`\`"
                     echo "git checkout develop && git merge origin/main"
@@ -153,7 +175,7 @@ jobs:
               esac
               ;;
             *)
-              echo "❌ Die Rückführung ist nicht durchgelaufen." >> "$GITHUB_STEP_SUMMARY"
+              echo "❌ Der Hotfix-Rückweg ist nicht durchgelaufen." >> "$GITHUB_STEP_SUMMARY"
               ;;
           esac
 
