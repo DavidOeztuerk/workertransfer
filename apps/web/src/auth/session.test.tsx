@@ -30,11 +30,16 @@ function SessionProbe() {
   );
 }
 
+/** Die Antwort von GET /auth/session — angemeldet. */
+const AKTIV = { user: PRINCIPAL, state: "active" };
+/** ... und für jemanden ohne jedes Cookie. */
+const ANONYM = { user: null, state: "anonymous" };
+
 describe("useSession", () => {
-  it("reports the principal when GET /me succeeds", async () => {
+  it("reports the principal when the session is active", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response(JSON.stringify(PRINCIPAL), { status: 200 }))
+      vi.fn(async () => new Response(JSON.stringify(AKTIV), { status: 200 }))
     );
     renderWithProviders(<SessionProbe />);
     expect(await screen.findByText(`angemeldet: ${PRINCIPAL.tenant_id}`)).toBeInTheDocument();
@@ -46,7 +51,7 @@ describe("useSession", () => {
       "fetch",
       vi.fn(async (url: string, init?: RequestInit) => {
         calls.push([url, init]);
-        return new Response(JSON.stringify(PRINCIPAL), { status: 200 });
+        return new Response(JSON.stringify(AKTIV), { status: 200 });
       })
     );
     renderWithProviders(<SessionProbe />);
@@ -55,20 +60,29 @@ describe("useSession", () => {
     const first = calls[0];
     expect(first).toBeDefined();
     const [url, init] = first!;
-    expect(url.endsWith("/me")).toBe(true);
+    // Die öffentliche Frage geht an /auth/session, nicht an das geschützte /me
+    // — sonst wäre jeder Seitenaufruf eines Abgemeldeten ein 401.
+    expect(url.endsWith("/auth/session")).toBe(true);
     expect(init?.credentials).toBe("include");
     // The token lives in an httpOnly cookie; the client must never try to
     // attach it as a header (it cannot read it in the first place).
     expect(init?.headers).toBeUndefined();
   });
 
-  it("treats a 401 as anonymous rather than an error", async () => {
+  it("meldet anonym — und stellt dafür GENAU EINE Anfrage", async () => {
+    // Der Grund für den ganzen Endpunkt: kein Fehlereintrag und kein zweiter
+    // Weg für jemanden, der bloss liest.
+    const wege: string[] = [];
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response("", { status: 401 }))
+      vi.fn(async (url: string) => {
+        wege.push(url);
+        return new Response(JSON.stringify(ANONYM), { status: 200 });
+      })
     );
     renderWithProviders(<SessionProbe />);
     expect(await screen.findByText("anonym")).toBeInTheDocument();
+    expect(wege).toHaveLength(1);
   });
 });
 
@@ -83,8 +97,8 @@ describe("useLogout", () => {
           return new Response("", { status: 204 });
         }
         return authenticated
-          ? new Response(JSON.stringify(PRINCIPAL), { status: 200 })
-          : new Response("", { status: 401 });
+          ? new Response(JSON.stringify(AKTIV), { status: 200 })
+          : new Response(JSON.stringify(ANONYM), { status: 200 });
       })
     );
 

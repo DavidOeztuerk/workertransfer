@@ -28,3 +28,6 @@ build/
 # transcript of one session, not a source document.
 Kon2.txt
 var/
+
+# Browser-Debug-Ausgabe des Playwright-MCP — gehört nicht ins Repository.
+.playwright-mcp/
