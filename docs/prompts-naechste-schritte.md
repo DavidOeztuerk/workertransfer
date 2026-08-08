@@ -74,8 +74,11 @@ bekommt.
 - **Zwei Stapel, zwei Fragen:** `docker compose up -d` ist der schnelle
   Entwicklungsweg (Bind-Mount, Reload) — Gateway `:8080`, Traefik-Übersicht
   `:8081`, Jaeger `:16686`, Mailpit `:8025`, Web `:5173`. `make k8s-up` ist die
-  Staging-Nachbildung auf kind — Anwendung auf **`:8090`**, gebautes
-  Frontend-Artefakt, kein Reload. Nie beide gleichzeitig.
+  Staging-Nachbildung auf kind — Anwendung auf **`:8090`**, Mailpit ebenfalls
+  auf `:8025`, gebautes Frontend-Artefakt, kein Reload. Nie beide gleichzeitig.
+- **Anmelden geht nur über Mailpit:** Registrierung legt das Konto `PENDING` an,
+  der Bestätigungslink liegt unter `:8025`. Ohne ihn kommt man in keine
+  Umgebung hinein.
 - **Offen und begründet:** eine Rechtsfrage (ADR-0027), §3.4 und ein
   Audit-Ereignis (ROADMAP 10.5), starlette-CVEs (warten auf FastAPI 1.x —
   `dependency-audit` meldet sie bei jedem PR; `dependabot.yml` ist seit
@@ -106,6 +109,13 @@ bekommt.
    neu gestartet, und jede Meldung lautete `timed out after 1s`. Im Chart ist
    die Grenze jetzt überall gesetzt; wer eine Prüfung ergänzt, muss sie
    mitsetzen.
+6. **Eine Oberfläche hinter demselben Ursprung wie die API prüft man mit einem
+   DIREKTLINK, nicht mit einem Klick.** `/jobs` ist beides — Seite und
+   API-Präfix. Ein Klick im Programm funktioniert immer (der Router schaltet im
+   Browser um, ohne zu fragen); nur das Eintippen der Adresse und F5 gehen
+   wirklich durchs Gateway. Genau diese Hälfte lieferte rohes JSON, und genau
+   diese Hälfte macht beim Entwickeln niemand. Gelöst über
+   `Sec-Fetch-Dest: document` in `docker/traefik/dynamic.yml`.
 
 ### Die Hausregel, die am häufigsten gebrochen wurde
 

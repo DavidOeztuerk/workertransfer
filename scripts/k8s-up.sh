@@ -94,6 +94,30 @@ grep -q "$BASE" /tmp/wt-config.js || {
 }
 gruen "Gateway routet auf zwei verschiedene Ziele, Laufzeitkonfiguration sitzt."
 
+schritt "Beweis 2b — Direktlink und Neuladen, nicht nur Klicken"
+# `/jobs` ist zugleich API-Präfix und Seite. Ein Klick IM Programm beweist
+# nichts darüber: da schaltet der Router im Browser um, ohne zu fragen. Nur der
+# Direktlink und F5 gehen wirklich durchs Gateway — und genau die fielen vorher
+# durch, mit rohem JSON statt der Seite.
+for pfad in /jobs /applications /transfers /github; do
+  navi=$(curl -s -o /tmp/wt-navi.html -w '%{http_code}' \
+    -H 'Sec-Fetch-Dest: document' -H 'Accept: text/html' "${BASE}${pfad}")
+  grep -q '<div id="root">' /tmp/wt-navi.html || {
+    rot "${pfad} als Direktlink lieferte nicht die Oberfläche (Status ${navi}):"
+    head -c 200 /tmp/wt-navi.html; echo
+    rot "Fehlt die Regel `web-navigation` in docker/traefik/dynamic.yml?"
+    exit 1
+  }
+  # Und dieselbe Adresse als Datenabruf muss weiterhin die API treffen.
+  api=$(curl -s -o /tmp/wt-api.json -w '%{http_code}' -H 'Sec-Fetch-Dest: empty' "${BASE}${pfad}")
+  grep -q '<div id="root">' /tmp/wt-api.json && {
+    rot "${pfad} liefert der Anwendung die Oberfläche statt Daten (Status ${api})."
+    exit 1
+  }
+  echo "  ${pfad}: Navigation -> Oberfläche, fetch -> API (${api})"
+done
+gruen "Direktlink und Datenabruf sind sauber getrennt."
+
 schritt "Beweis 3 — schreibend, und die Mail kommt an"
 # Erst DAS beweist, dass die Migrationen wirklich liefen: die beiden Lesepfade
 # oben antworten auch, wenn keine einzige Tabelle existiert.
@@ -128,9 +152,10 @@ printf '\n'
 gruen "Die lokale Staging-Umgebung läuft."
 cat <<TEXT
 
-  Anwendung        ${BASE}
+  Anwendung          ${BASE}
+  Mailpit            http://localhost:8025   (hier liegt der Bestätigungslink
+                     aus der Registrierung — ohne ihn kommt man nicht hinein)
   Traefik-Übersicht  kubectl port-forward deploy/gateway 8081:8080  -> http://localhost:8081
-  Mailpit            kubectl port-forward svc/mailpit 8025:8025     -> http://localhost:8025
   Jaeger             kubectl port-forward svc/jaeger 16686:16686    -> http://localhost:16686
 
   Abbauen: make k8s-down

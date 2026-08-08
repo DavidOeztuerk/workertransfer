@@ -121,6 +121,51 @@ Im Cluster zeigen alle zehn Basis-URLs auf **denselben** Ursprung, den des
 Gateways. Das beseitigt zwei Fehlerquellen mit: kein CORS und keine
 Cookie-Verwirrung zwischen Ports.
 
+### 5a. Ein Ursprung bringt eine Kollision hervor, die Compose versteckt
+
+Sobald Oberfläche und API **denselben** Ursprung haben, bedeutet `/jobs` zwei
+Dinge: die API-Ressource und die Seite. Dasselbe gilt für `/applications`,
+`/transfers` und `/github`. Nach Pfad allein ist das nicht zu trennen.
+
+Im Compose-Stapel fällt es nie auf — dort liegt die Oberfläche auf `:5173` und
+jobs-service auf `:8006`. Im Cluster tippt man `…:8090/jobs` in die Adresszeile
+und bekommt **rohes JSON statt der Seite**.
+
+Die Tücke ist, wie unauffällig das ist: **ein Klick im Programm funktioniert**,
+weil der Router im Browser umschaltet und gar keine Anfrage stellt. Nur der
+**Direktlink** und das **Neuladen** fallen durch — also genau das, was man
+weitergibt und was nach einem Absturz passiert. Beim Entwickeln macht man
+weder das eine noch das andere.
+
+Gelöst wird es nicht mit einer zweiten Pfadliste, sondern mit dem Kopf, der die
+Frage tatsächlich beantwortet: `Sec-Fetch-Dest: document` schickt der Browser
+ausschliesslich bei einer Navigation der obersten Ebene. `fetch`/XHR schicken
+`empty`; curl, CLI und Dienst-zu-Dienst schicken ihn gar nicht. Eine Regel mit
+`priority: 200` trennt damit „ein Mensch geht auf eine Seite" von „ein Programm
+holt Daten" — ohne eine Liste, die auseinanderlaufen kann.
+
+Geprüft, **bevor** die Regel entstand: kein Dienst antwortet je mit einer
+Weiterleitung, es gibt keinen OAuth-Rücksprung, und der Datenexport lädt über
+einen Blob statt über eine Navigation. Es gibt also keine Adresse, zu der ein
+Browser navigieren *muss* und die nicht zur Oberfläche gehört.
+
+Der Preis, bewusst bezahlt: eine API-Adresse zum Nachsehen in den Browser zu
+tippen liefert jetzt die Oberfläche. Dafür gibt es die Einzelports (Compose),
+`kubectl port-forward` — und curl, das die Regel nicht auslöst.
+
+`tests/test_k8s_matches_compose.py` nagelt fest, dass die Regel existiert, auf
+`web` zeigt und eine höhere `priority` trägt als jede API-Regel.
+
+### 5b. Mailpit hat einen Host-Port, sonst kommt niemand hinein
+
+Die Bestätigungsmail der Registrierung enthält den einzigen Weg, ein Konto
+freizuschalten. Läge Mailpit nur auf einer ClusterIP, bräuchte jede Anmeldung
+vorher ein `kubectl port-forward` in einem zweiten Fenster — und eine Umgebung
+mit dieser Hürde wird nicht benutzt. Also ein NodePort auf denselben Host-Port
+wie bei Compose (`:8025`), gebunden an `mailpit.nodePort`, das mit
+`mailpit.enabled` verschwindet. **Nur die Oberfläche**, nicht SMTP: Mails sollen
+aus dem Cluster kommen, nicht von aussen hineingeworfen werden können.
+
 ### 6. Das Geheimnis wird gewürfelt und behalten
 
 `WORKER_ENVIRONMENT` ist `staging`, und `assert_deployable_jwt_secret`

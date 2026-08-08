@@ -24,3 +24,10 @@ nodes:
       - containerPort: 30080
         hostPort: 8090
         protocol: TCP
+      # Mailpit-Oberfläche, unter derselben Nummer wie bei docker compose.
+      # Der Bestätigungslink aus der Registrierung liegt dort, und eine
+      # Umgebung, in der man sich nur mit einem zweiten Fenster voll
+      # `kubectl port-forward` anmelden kann, wird nicht benutzt.
+      - containerPort: 30825
+        hostPort: 8025
+        protocol: TCP

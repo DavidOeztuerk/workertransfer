@@ -50,9 +50,10 @@ make k8s-down    # delete the cluster and its data
 ```
 
 The app answers on **http://localhost:8090** — deliberately not 8080, which
-belongs to the compose gateway. Never run both at once. Staging and production
-differ from this by a different `values.yaml`, not a different structure
-(ADR-0028).
+belongs to the compose gateway. Never run both at once. Mailpit is on
+**http://localhost:8025**, where the registration confirmation link lands.
+Staging and production differ from this by a different `values.yaml`, not a
+different structure (ADR-0028).
 
 To run a single service on the host instead:
 
