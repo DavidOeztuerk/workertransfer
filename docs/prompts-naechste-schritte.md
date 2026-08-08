@@ -106,7 +106,8 @@ der Aufbewahrungsschalter ersatzlos.
   `:8081`, Jaeger `:16686`, Mailpit `:8025`, Web `:5173`.
 - **Offen und begründet:** eine Rechtsfrage (ADR-0027), §3.4 und ein
   Audit-Ereignis (ROADMAP 10.5), starlette-CVEs (warten auf FastAPI 1.x —
-  Dependabot meldet es), Phase 8 (sieben Rechtsfragen).
+  `dependency-audit` meldet sie bei jedem PR; `dependabot.yml` ist seit
+  08.08.2026 gelöscht, siehe ROADMAP 10.4), Phase 8 (sieben Rechtsfragen).
 
 ### Vier Fallen, die in diesem Repo Zeit gekostet haben
 
