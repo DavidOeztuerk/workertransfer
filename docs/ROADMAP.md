@@ -953,9 +953,37 @@ weichen — `worker-messaging` (fünf Abhängigkeiten, null Konsumenten) und
     den eigenen Adapter.
 
 - ✅ **10.4 Dependency-Scanning — und was es sofort fand** — 06.08.2026.
-  Dependabot (uv, npm, docker, actions) und ein dritter CI-Job
-  `dependency-audit`. Die Hardening-Liste nennt „Dependency-Scanning"; bis
-  heute gab es weder das eine noch das andere.
+  Ein dritter CI-Job `dependency-audit`. Die Hardening-Liste nennt
+  „Dependency-Scanning"; bis heute gab es weder das eine noch das andere.
+  **Nachtrag 08.08.2026: `.github/dependabot.yml` ist gelöscht.** Der Eintrag
+  hieß ursprünglich „Dependabot (uv, npm, docker, actions) und ein dritter
+  CI-Job" — der erste Teil stimmt nicht mehr.
+  **Warum:** der `uv`-Lauf wurde in diesem Repository **nie** fertig. Dreimal
+  beobachtet, jedes Mal dieselbe Schleife: der Updater startet
+  `pyenv exec python3 /opt/python/run.py` einmal je Manifest und Abhängigkeit
+  — bei 33 Workspace-Mitgliedern rund 55–67 Aufrufe pro Minute, ohne Ende, bis
+  GitHub nach `max-updater-run-time` (2700 s) selbst abbricht. npm, docker und
+  github-actions liefen im selben Stapel in 45 s bis 1 m 47 s durch; es lag
+  also nicht an Netz, Runner oder Last.
+  **Ein Versuch, gemessen und verworfen:** alle Python-Updates in EINE Gruppe
+  statt gebündelt/einzeln. Die Gruppe griff nachweislich (`in group
+  'python-alle'` im Protokoll) und änderte **nichts** — 328 Aufrufe in sechs
+  Minuten, gleiche Taktrate. Gruppierung betrifft, wie PRs gebündelt werden,
+  nicht wie aufgelöst wird.
+  **Was das kostet und was nicht:** es kommen keine automatischen
+  Versionssprünge mehr — für Python nicht, und nach dieser Entscheidung auch
+  nicht für JavaScript, Docker-Images und GitHub-Actions. Aktualisierungen
+  sind ab jetzt Handarbeit.
+  **Was bleibt:** `dependency-audit` läuft unverändert weiter und ist der Teil,
+  der wirklich zählt — `pip-audit` über den vollen `uv export --all-packages`,
+  mit dem Wächter gegen einen kaputten Export (<50 Einträge ⇒ Abbruch).
+  Sicherheitslücken werden also weiter bei jedem PR gemeldet. Ebenso
+  unberührt sind Dependabot-**Alerts** und -**Security-Updates**: die hängen an
+  den Repo-Einstellungen, nicht an dieser Datei.
+  **Bevor jemand die Datei wieder anlegt:** der uv-Teil wird erneut hängen,
+  solange Dependabot je Manifest einzeln auflöst. npm/docker/actions ließen
+  sich ohne uv-Block gefahrlos wieder aufnehmen — das war die Alternative und
+  wurde bewusst nicht gewählt.
   **Zwei eigene Fehler, abgefangen BEVOR sie schadeten.** Mein erster
   `uv export` lieferte **3 statt 115** Abhängigkeiten — der Scan wäre über
   nichts gelaufen und hätte grün gemeldet, genau das Muster, das diese Woche
