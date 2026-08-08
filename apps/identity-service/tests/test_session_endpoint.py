@@ -107,3 +107,44 @@ def test_die_sitzungsabfrage_wird_nicht_gebremst() -> None:
     # Die teuren bleiben gebremst — sonst hätte dieser Test sie mit entschärft.
     assert ("POST", "/auth/login") in AUTH_LIMITS
     assert ("POST", "/auth/register") in AUTH_LIMITS
+
+
+def test_ein_abgelehnter_refresh_raeumt_sein_totes_cookie_weg() -> None:
+    """Sonst versucht der Browser es bei JEDEM Seitenaufruf erneut — ewig.
+
+    Die Kette ohne diese Zeile: `/auth/session` sieht ein Refresh-Cookie und
+    meldet `renewable`; die Oberfläche ruft daraufhin `POST /auth/refresh`; das
+    Token trägt nicht mehr, also 401. Beim nächsten Seitenaufruf liegt dasselbe
+    tote Cookie noch da, und alles wiederholt sich. Ein Fehler, der sich selbst
+    am Leben hält.
+
+    Absichtlich nur das REFRESH-Cookie: es ist dasjenige, das `renewable`
+    auslöst. Ein totes Access-Cookie allein führt bereits zu `anonymous` und
+    stört niemanden — es läuft nach 15 Minuten von selbst ab, und es zusätzlich
+    zu löschen bräuchte einen zweiten Set-Cookie-Kopf an einer Ausnahme, die
+    nur einen tragen kann.
+    """
+    client = _client()
+
+    antwort = client.post("/auth/refresh", cookies={"refresh": "totes.token.hier"})
+
+    assert antwort.status_code == 401
+    gesetzt = antwort.headers.get("set-cookie", "")
+    assert "refresh=" in gesetzt, f"kein Set-Cookie zum Löschen: {gesetzt!r}"
+    # Max-Age=0 bzw. ein Ablauf in der Vergangenheit — beides löscht.
+    assert "Max-Age=0" in gesetzt or "01 Jan 1970" in gesetzt
+    # Der Pfad MUSS zum Setzen passen, sonst löscht der Browser nichts.
+    assert "Path=/auth" in gesetzt
+
+
+def test_nach_dem_aufraeumen_ist_der_zustand_wieder_anonymous() -> None:
+    """Der Beleg, dass die Schleife wirklich endet.
+
+    Ohne Refresh-Cookie meldet die Sitzungsabfrage `anonymous`, und die
+    Oberfläche stellt gar keine zweite Anfrage mehr.
+    """
+    client = _client()
+
+    antwort = client.get("/auth/session", cookies={"access": "totes.access.token"})
+
+    assert antwort.json() == {"user": None, "state": "anonymous"}

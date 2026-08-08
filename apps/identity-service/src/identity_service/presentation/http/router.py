@@ -199,10 +199,33 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
             return {"user": None, "state": "renewable"}
         return {"user": None, "state": "anonymous"}
 
+    #: Löscht das Refresh-Cookie — als Kopf, weil er an eine Ausnahme muss.
+    #:
+    #: Der Pfad MUSS zu `_set_cookies` passen (dort `path="/auth"`), sonst
+    #: löscht der Browser nichts und man sucht den Fehler im Server.
+    _REFRESH_ENTFERNEN = {
+        "Set-Cookie": "refresh=; Max-Age=0; Path=/auth; HttpOnly; SameSite=strict"
+    }
+
     @router.post("/refresh")
     async def refresh(
         response: Response, refresh: str | None = Cookie(default=None, alias="refresh")
     ) -> dict[str, str]:
+        """Erneuern — und bei endgültiger Ablehnung das tote Cookie wegräumen.
+
+        Ohne das Wegräumen hält sich der Fehler selbst am Leben:
+        `/auth/session` sieht ein Refresh-Cookie und meldet `renewable`, die
+        Oberfläche versucht zu erneuern, das Token trägt nicht mehr — 401. Beim
+        nächsten Seitenaufruf liegt dasselbe tote Cookie noch da, und alles
+        beginnt von vorn. Genau so sah es aus, nachdem der lokale Cluster neu
+        aufgesetzt worden war: die Cookies im Browser waren mit einem
+        Geheimnis signiert, das es nicht mehr gab.
+
+        Nur das REFRESH-Cookie: es allein löst `renewable` aus. Ein totes
+        Access-Cookie führt bereits zu `anonymous` und läuft ohnehin nach 15
+        Minuten ab — und ein zweiter Set-Cookie-Kopf ginge an einer Ausnahme
+        nicht, die nur einen tragen kann.
+        """
         if refresh is None:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
         cmd = RefreshTokenCommand(refresh_token=refresh)
@@ -211,9 +234,15 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
         if not result.is_success:
             err = result.error
             if isinstance(err, (InvalidCredentials, AccountDisabled)):
-                raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
+                raise HTTPException(
+                    status.HTTP_401_UNAUTHORIZED,
+                    "invalid credentials",
+                    headers=_REFRESH_ENTFERNEN,
+                )
             raise HTTPException(
-                status.HTTP_400_BAD_REQUEST, err.message if err is not None else "invalid"
+                status.HTTP_400_BAD_REQUEST,
+                err.message if err is not None else "invalid",
+                headers=_REFRESH_ENTFERNEN,
             )
         _set_cookies(response, result.value)
         return {"status": "ok"}
