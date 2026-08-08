@@ -141,18 +141,59 @@ async function erneuereSitzung(): Promise<boolean> {
   return laufendeErneuerung;
 }
 
+interface SessionResponse {
+  user: MeResponse | null;
+  state: "active" | "renewable" | "anonymous";
+}
+
 /**
- * "Wer bin ich" — und ein 401 beantwortet das nicht endgültig.
+ * "Ist gerade jemand angemeldet?" — die Frage, die jede Seite stellt.
  *
- * Das Access-Token lebt 15 Minuten, das Refresh-Token 24 Stunden (ADR-0007).
- * Ohne den Versuch dazwischen ist man eine Viertelstunde nach dem Anmelden
- * abgemeldet, lautlos und mitten im Ausfüllen eines Formulars — obwohl ein
- * gültiges Refresh-Cookie danebenliegt. Der Endpunkt dafür gab es von Anfang
- * an; angeschlossen war er nie.
+ * Sie geht bewusst an `GET /auth/session` und nicht an `/me`. `/me` heisst
+ * "gib mir mein Profil": eine geschützte Ressource, und ohne Nachweis ist 401
+ * die richtige Antwort. Diese Frage hier ist öffentlich — sie über `/me` zu
+ * stellen erzeugte für jeden abgemeldeten Besucher einen Fehlereintrag über
+ * einen völlig normalen Zustand.
  *
- * Nur bei 401 wird erneuert. Ein 503 heisst "der Dienst schweigt", nicht "deine
- * Sitzung ist alt" — darauf zu rotieren hiesse, bei jeder Störung Token zu
- * verbrennen.
+ * Drei Zustände, und der mittlere ist der Grund:
+ *
+ * - `anonymous` — es wird KEINE weitere Anfrage gestellt. Eine Anfrage, eine
+ *   200, fertig.
+ * - `renewable` — das Access-Token trägt nicht mehr, ein Refresh-Cookie liegt
+ *   aber vor. Ohne diesen Fall ist man eine Viertelstunde nach dem Anmelden
+ *   abgemeldet, lautlos und mitten im Ausfüllen eines Formulars (Access 15
+ *   Minuten, Refresh 24 Stunden, ADR-0007).
+ * - `active` — das Profil liegt der Antwort schon bei, kein zweiter Weg nötig.
+ *
+ * Erneuert wird also nur, wenn der Server sagt, dass es etwas zu erneuern gibt
+ * — nie auf gut Glück.
+ */
+export async function fetchSession(): Promise<MeResponse | null> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/auth/session`, { credentials: "include" });
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+
+  const session = (await res.json()) as SessionResponse;
+  if (session.state === "active") return session.user;
+  if (session.state !== "renewable") return null;
+
+  if (!(await erneuereSitzung())) return null;
+
+  const zweiter = await fetch(`${API_BASE_URL}/auth/session`, { credentials: "include" });
+  if (!zweiter.ok) return null;
+  return ((await zweiter.json()) as SessionResponse).user;
+}
+
+/**
+ * Das eigene Profil — geschützt, und hier ist 401 die richtige Antwort.
+ *
+ * Bleibt für Stellen, die wirklich das Profil brauchen (`/meine-daten`). Für
+ * die Frage "ist jemand angemeldet?" gibt es `fetchSession`; wer sie hier
+ * stellt, bekommt einen 401 auf einen normalen Zustand.
  */
 export async function fetchMe(): Promise<MeResponse | null> {
   const res = await fetch(`${API_BASE_URL}/me`, { credentials: "include" });

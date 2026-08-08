@@ -146,6 +146,59 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
         await dispatch_all(outbox, deps)
         return {"status": "accepted"}
 
+    @router.get("/session")
+    async def session_state(
+        request: Request,
+        refresh: str | None = Cookie(default=None, alias="refresh"),
+    ) -> dict[str, object]:
+        """Öffentlich, und antwortet IMMER 200 — auch für Anonyme.
+
+        `/me` heisst „gib mir mein Profil": eine geschützte Ressource, und ohne
+        Nachweis ist 401 die richtige Antwort. Die Oberfläche stellt bei jedem
+        Seitenaufruf aber eine andere Frage — „ist gerade jemand angemeldet?" —,
+        und die ist öffentlich. Sie über `/me` zu stellen erzeugte für jeden
+        abgemeldeten Besucher einen Fehlereintrag über einen völlig normalen
+        Zustand.
+
+        Drei Zustände, und der mittlere ist der Grund für diesen Endpunkt:
+
+        - ``active``    — angemeldet, das Profil liegt bei.
+        - ``renewable`` — das Access-Token trägt nicht mehr, aber ein
+          Refresh-Cookie liegt vor. Erst damit kann die Oberfläche
+          ``POST /auth/refresh`` GEZIELT aufrufen, statt auf gut Glück.
+        - ``anonymous`` — nichts da. Die Oberfläche fragt dann nicht weiter.
+
+        Ob das Refresh-Token inhaltlich trägt, wird hier NICHT geprüft: das tut
+        der Refresh selbst, und ein zweiter Ort, der Token bewertet, wäre ein
+        zweiter Ort, an dem er falsch liegen kann. Hier steht nur, ob ein
+        Versuch überhaupt Sinn ergibt.
+
+        Das Refresh-Cookie erreicht diesen Endpunkt nur, weil er unter `/auth`
+        liegt — genau der Pfad, auf den es beim Setzen begrenzt wurde. Ein
+        `/session` an der Wurzel bekäme es nie zu sehen.
+        """
+        principal = get_request_user(request.scope)
+        if principal is not None:
+            async with request_scope(session_factory) as (_uow, repos):
+                user = await repos["users"].get_by_id(principal.user_id)
+            return {
+                "user": {
+                    "user_id": str(principal.user_id),
+                    "email": user.email.value if user is not None else None,
+                    "tenant_id": (
+                        str(principal.tenant_id) if principal.tenant_id is not None else None
+                    ),
+                    "roles": list(principal.roles),
+                },
+                "state": "active",
+            }
+        # Ohne Anmeldung ist die Antwort byte-identisch, egal was an Cookies
+        # mitkam: der Endpunkt ist öffentlich und darf nichts verraten, woraus
+        # jemand auf die Existenz eines Kontos schliessen könnte.
+        if refresh is not None:
+            return {"user": None, "state": "renewable"}
+        return {"user": None, "state": "anonymous"}
+
     @router.post("/refresh")
     async def refresh(
         response: Response, refresh: str | None = Cookie(default=None, alias="refresh")

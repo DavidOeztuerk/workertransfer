@@ -1,11 +1,13 @@
-// Server state for "who am I". GET /me authorises via the httpOnly `access`
-// cookie, so the browser never holds the token itself — the query result *is*
-// the session. `null` means anonymous (a 401 is a state, not an error), which
-// is why fetchMe resolves rather than throws.
+// Server state for "is anyone signed in". The question goes to the public
+// GET /auth/session, not to the protected /me: /me means "give me my profile"
+// and answers 401 without credentials — correct for a protected resource, but
+// it turned every page view by a signed-out visitor into an error entry about
+// a perfectly normal state. `null` means anonymous, and an anonymous visitor
+// causes exactly ONE request (see fetchSession).
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { type MeResponse, fetchMe, logout } from "./client";
+import { type MeResponse, fetchSession, logout } from "./client";
 
 export const SESSION_QUERY_KEY = ["session"] as const;
 
@@ -17,7 +19,7 @@ export interface Session {
 export function useSession(): Session {
   const { data, isPending } = useQuery({
     queryKey: SESSION_QUERY_KEY,
-    queryFn: fetchMe,
+    queryFn: fetchSession,
     staleTime: 30_000,
   });
   return { user: data ?? null, isLoading: isPending };
