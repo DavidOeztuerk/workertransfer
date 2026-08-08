@@ -15,11 +15,32 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      # Gebündelt statt einzeln: fünfzehn PRs für Patch-Versionen prüft
-      # niemand. Sicherheitsrelevante kommen weiter einzeln — Dependabot
-      # trennt sie selbst heraus.
-      python-minor-und-patch:
-        update-types: [minor, patch]
+      # ALLES in eine Gruppe, nicht nur Minor und Patch.
+      #
+      # Der Grund ist nicht Bequemlichkeit, sondern ein Befund: der uv-Lauf
+      # wurde in diesem Repository noch nie fertig. Zweimal beobachtet, je
+      # ~27 Minuten ohne Ende, während npm, docker und github-actions in 1–3
+      # Minuten durchliefen. Im Protokoll startet der Updater in einer
+      # Schleife `pyenv exec python3 /opt/python/run.py`, rund 1.800 Mal —
+      # dieser Workspace hat 33 Mitglieder, und offenbar wird je Manifest und
+      # Abhängigkeit einzeln aufgelöst. Nach `max-updater-run-time` (2700 s)
+      # bricht GitHub selbst ab.
+      #
+      # Eine Gruppe statt zweier Wege (gebündelt für Minor/Patch, einzeln für
+      # Major) heißt: ein Auflösungsdurchgang statt vieler. OB das reicht, ist
+      # eine Vermutung und kein Wissen — es wird gemessen, nicht behauptet.
+      # Hilft es nicht, bleibt der ehrliche Stand: für Python kommen keine
+      # automatischen Versionssprünge, und die Sicherheitsprüfung übernimmt
+      # weiter der CI-Job `dependency-audit` (pip-audit über den vollen
+      # Export). Lücken werden also weiter gemeldet, nur Aktualisierungen
+      # nicht mehr vorgeschlagen.
+      #
+      # Der Preis der einen Gruppe: Major-Sprünge stecken mit im selben PR und
+      # sind nicht mehr einzeln abzulehnen. Bei fünfzehn Paketen wäre das ein
+      # schlechter Tausch; bei einem Lauf, der gar nichts liefert, ist es
+      # keiner.
+      python-alle:
+        patterns: ["*"]
 
   - package-ecosystem: npm
     directory: /
