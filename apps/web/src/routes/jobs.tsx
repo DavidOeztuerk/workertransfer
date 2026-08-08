@@ -1,10 +1,11 @@
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button, Card, Field, TextArea } from "@workertransfer/ui";
 
 import { apply } from "../applications/client";
 import { getCompanyProfile } from "../companies/client";
 import { getMyProfile } from "../profile/client";
+import { merkeStelle } from "../jobs/intent";
 import type { MeResponse } from "../auth/client";
 
 import {
@@ -12,6 +13,7 @@ import {
   type Job,
   type RemoteMode,
   type SearchResult,
+  getJob,
   searchJobs,
 } from "../jobs/client";
 import { matchSkills } from "../jobs/match";
@@ -38,6 +40,9 @@ interface Filters {
 }
 
 const EMPTY: Filters = { q: "", location: "", remote: "", employment: "" };
+
+/** Geprüft, bevor die ID in eine Anfrage geht — sie kommt aus der Adresszeile. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface JobsRouteProps {
   // Injizierbar, damit der Test ohne laufende Sitzung rendern kann. `null`
@@ -83,7 +88,30 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
 
   const pages = query.data?.pages ?? [];
   const failure = pages.find((page) => !page.ok);
-  const items: Job[] = pages.flatMap((page) => (page.ok ? page.items : []));
+  const gefunden: Job[] = pages.flatMap((page) => (page.ok ? page.items : []));
+
+  // Die Stelle, wegen der jemand sich gerade angemeldet hat (?stelle=<uuid>,
+  // gesetzt von login.tsx). Sie wird EINZELN geholt, statt in der Trefferliste
+  // gesucht zu werden: die Liste ist gefiltert und seitenweise, die gesuchte
+  // Stelle steht also womöglich gar nicht darin — und dann hätte das
+  // Zurückkommen leise nicht funktioniert.
+  const gesuchteStelle = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const roh = new URLSearchParams(window.location.search).get("stelle");
+    return roh !== null && UUID.test(roh) ? roh : null;
+  }, []);
+
+  const einzelne = useQuery({
+    queryKey: ["jobs", "einzeln", gesuchteStelle],
+    queryFn: () => getJob(gesuchteStelle as string),
+    enabled: gesuchteStelle !== null,
+  });
+
+  // Sie steht vorn und kommt in der Liste darunter kein zweites Mal vor.
+  const items: Job[] =
+    einzelne.data != null
+      ? [einzelne.data, ...gefunden.filter((j) => j.id !== einzelne.data?.id)]
+      : gefunden;
 
   return (
     <main className="page">
@@ -158,7 +186,20 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
                   <ApplyBox jobId={job.id} />
                 ) : (
                   <p className="candidates__meta">
-                    Zum Bewerben <a href="/login">anmelden</a>.
+                    Zum Bewerben{" "}
+                    <a
+                      href="/login"
+                      onClick={() => {
+                        // Die Stelle merken, BEVOR die Seite wechselt. Nach dem
+                        // Anmelden geht es genau hierher zurück — sonst müsste
+                        // man die Suche noch einmal machen, nur weil man kein
+                        // Konto hatte.
+                        merkeStelle(job.id);
+                      }}
+                    >
+                      anmelden
+                    </a>
+                    .
                   </p>
                 )}
               </Card>
