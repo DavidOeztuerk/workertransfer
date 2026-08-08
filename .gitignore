@@ -28,3 +28,8 @@ build/
 # transcript of one session, not a source document.
 Kon2.txt
 var/
+
+# Browser-Debug-Ausgabe des Playwright-MCP (Seitenabzüge, Konsolenprotokolle).
+# Erzeugt beim Nachsehen im Browser, gehört nicht ins Repository — 18 Dateien
+# waren versehentlich verfolgt.
+.playwright-mcp/
