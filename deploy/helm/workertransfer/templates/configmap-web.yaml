@@ -1,0 +1,39 @@
+{{/*
+Die Oberfläche — als GEBAUTES Artefakt, nicht als Vite-Dev-Server. Das ist der
+Unterschied zu docker compose und der Grund, warum diese Umgebung "Staging"
+heissen darf: geprüft wird, was ausgeliefert wird.
+
+Das kostet eine Kleinigkeit, die die Struktur bestimmt: `vite build` backt
+import.meta.env.VITE_* in das Bündel ein. Ein Image mit eingebackenen URLs
+KANN in zwei Umgebungen nicht dasselbe sein — das Versprechen "nur eine andere
+values.yaml" wäre für das Frontend gebrochen, und zwar unsichtbar.
+
+Deshalb liest apps/web/src/env.ts zuerst window.__WT_CONFIG__ (siehe
+apps/web/public/config.js) und erst danach VITE_*. Diese ConfigMap ist die
+echte Fassung dieser Datei; sie wird im Pod über die aus dem Image gelegt.
+*/}}
+{{- $origin := include "workertransfer.apiOrigin" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-web-config
+  labels:
+    {{- include "workertransfer.labels" . | nindent 4 }}
+data:
+  config.js: |
+    // Erzeugt vom Helm-Chart. Im Cluster zeigen alle zehn Basis-URLs auf
+    // DENSELBEN Ursprung: den des Gateways. Das ist nicht nur bequem, es
+    // beseitigt zwei Fehlerquellen — kein CORS (gleicher Origin) und keine
+    // Cookie-Verwirrung zwischen Ports.
+    window.__WT_CONFIG__ = {
+      API_BASE_URL: {{ $origin | quote }},
+      CONSENT_BASE_URL: {{ $origin | quote }},
+      PROFILE_BASE_URL: {{ $origin | quote }},
+      RESUME_BASE_URL: {{ $origin | quote }},
+      PORTFOLIO_BASE_URL: {{ $origin | quote }},
+      JOBS_BASE_URL: {{ $origin | quote }},
+      APPLICATIONS_BASE_URL: {{ $origin | quote }},
+      COMPANIES_BASE_URL: {{ $origin | quote }},
+      TRANSFER_BASE_URL: {{ $origin | quote }},
+      GITHUB_BASE_URL: {{ $origin | quote }}
+    };

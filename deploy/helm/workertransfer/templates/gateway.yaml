@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels:
+    {{- include "workertransfer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "workertransfer.labels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+      annotations:
+        {{/*
+        Traefik lädt dynamic.yml im Betrieb nach (watch: true), traefik.yml
+        aber nicht. Ohne diese Prüfsumme bliebe eine Änderung an der statischen
+        Konfiguration wirkungslos, und `helm upgrade` meldete trotzdem Erfolg.
+        */}}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-gateway.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: traefik
+          image: {{ .Values.gateway.image }}
+          args: ["--configFile=/etc/traefik/traefik.yml"]
+          ports:
+            - name: web
+              containerPort: 80
+            {{- if .Values.gateway.dashboard }}
+            - name: dashboard
+              containerPort: 8080
+            {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/traefik
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: web
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 20
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Release.Name }}-gateway
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  labels:
+    {{- include "workertransfer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  {{/*
+  NodePort statt LoadBalancer: kind hat keinen Cloud-Anbieter, der eine externe
+  Adresse vergäbe — ein LoadBalancer bliebe ewig auf <pending> stehen. Der
+  Port hier und die extraPortMappings in deploy/kind/cluster.yaml müssen
+  zusammenpassen.
+  */}}
+  type: NodePort
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: web
+      port: 80
+      targetPort: web
+      nodePort: {{ .Values.gateway.nodePort }}

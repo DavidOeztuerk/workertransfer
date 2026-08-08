@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    {{- include "workertransfer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        {{- include "workertransfer.labels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-web.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: web
+          image: "{{ .Values.webImage.repository }}:{{ .Values.webImage.tag }}"
+          imagePullPolicy: {{ .Values.webImage.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+          volumeMounts:
+            {{/*
+            subPath, damit nur diese eine Datei ersetzt wird und nicht das
+            ganze Verzeichnis mit index.html und den Bündeln darin.
+            */}}
+            - name: config
+              mountPath: /usr/share/nginx/html/config.js
+              subPath: config.js
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Release.Name }}-web-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    {{- include "workertransfer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: web
+  ports:
+    {{/*
+    Port 5173, obwohl nginx auf 80 lauscht: docker/traefik/dynamic.yml zeigt
+    auf http://web:5173, und diese Datei wird unverändert übernommen. Der
+    Unterschied wird hier aufgelöst, nicht in der Landkarte.
+    */}}
+    - name: http
+      port: 5173
+      targetPort: http

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: workertransfer
+description: >-
+  Die zehn Dienste, das Gateway und die Oberfläche als ein Release. Lokal gegen
+  kind, in Staging und Produktion mit einer anderen values.yaml — nicht mit
+  einer anderen Struktur.
+type: application
+
+# Version des Charts. Steigt, wenn sich die Templates ändern.
+version: 0.1.0
+
+# Die Software, die es ausliefert. Kein fester Wert, weil das Repo keine
+# Release-Nummern vergibt; `appVersion` folgt dem Image-Tag aus values.yaml.
+appVersion: "dev"
+
+kubeVersion: ">=1.29.0-0"
