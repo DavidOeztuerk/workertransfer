@@ -48,7 +48,11 @@ metadata:
     {{- include "workertransfer.labels" . | nindent 4 }}
     app.kubernetes.io/component: mailpit
 spec:
-  type: ClusterIP
+  {{/*
+  NodePort nur für die OBERFLÄCHE, nicht für SMTP: Mails sollen aus dem
+  Cluster kommen, nicht von aussen hineingeworfen werden können.
+  */}}
+  type: {{ if .Values.mailpit.nodePort }}NodePort{{ else }}ClusterIP{{ end }}
   selector:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: mailpit
@@ -59,6 +63,9 @@ spec:
     - name: http
       port: 8025
       targetPort: http
+      {{- if .Values.mailpit.nodePort }}
+      nodePort: {{ .Values.mailpit.nodePort }}
+      {{- end }}
 {{- end }}
 {{- if .Values.jaeger.enabled }}
 ---

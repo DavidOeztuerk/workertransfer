@@ -1,0 +1,29 @@
+- generic [ref=f4e2]:
+  - banner [ref=f4e3]:
+    - link "WorkerTransfer Startseite" [ref=f4e4] [cursor=pointer]:
+      - /url: /
+      - text: workertransfer
+    - navigation "Hauptnavigation" [ref=f4e5]:
+      - link "Stellen" [ref=f4e6] [cursor=pointer]:
+        - /url: /jobs
+  - main [ref=f4e7]:
+    - generic [ref=f4e8]:
+      - heading "Offene Stellen" [level=1] [ref=f4e9]
+      - paragraph [ref=f4e10]: Was hier steht, haben Unternehmen selbst veröffentlicht. Zum Lesen brauchst du kein Konto — erst zum Bewerben.
+    - generic [ref=f4e12]:
+      - generic [ref=f4e13]:
+        - generic [ref=f4e14]: Suchbegriff
+        - textbox "Suchbegriff" [ref=f4e15]:
+          - /placeholder: Python, Pflege, Vertrieb …
+      - generic [ref=f4e16]:
+        - generic [ref=f4e17]: Ort
+        - textbox "Ort" [ref=f4e18]
+      - generic [ref=f4e19]:
+        - generic [ref=f4e20]: Arbeitsform
+        - combobox "Arbeitsform" [ref=f4e21]:
+          - option "Egal" [selected]
+          - option "Vor Ort"
+          - option "Hybrid"
+          - option "Vollständig remote"
+      - button "Suchen" [ref=f4e22] [cursor=pointer]
+    - status [ref=f4e23]: Wird gesucht…

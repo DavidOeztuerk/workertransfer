@@ -122,6 +122,39 @@ def test_gateway_landkarte_kennt_nur_existierende_dienste() -> None:
     )
 
 
+def test_browser_navigation_gewinnt_gegen_jede_api_regel() -> None:
+    """Ohne diese Regel liefert ein Direktlink auf /jobs rohes JSON.
+
+    `/jobs`, `/applications`, `/transfers` und `/github` sind zugleich
+    API-Präfixe und Seiten der Oberfläche. Nach Pfad allein ist das nicht zu
+    trennen; `Sec-Fetch-Dest: document` trennt es, weil der Browser diesen Kopf
+    nur bei einer Navigation der obersten Ebene schickt.
+
+    Der Fehler wäre leicht zu übersehen: ein Klick IM Programm funktioniert
+    (der Router schaltet im Browser um), nur der Direktlink und das Neuladen
+    fallen durch. Genau die zwei Fälle, die niemand beim Entwickeln macht.
+    """
+    dynamic = yaml.safe_load(DYNAMIC.read_text(encoding="utf-8"))
+    routers = dynamic["http"]["routers"]
+
+    assert "web-navigation" in routers, (
+        "Die Regel `web-navigation` fehlt. Ohne sie beantwortet das Gateway "
+        "einen Direktlink auf /jobs mit JSON aus dem jobs-service."
+    )
+
+    navigation = routers["web-navigation"]
+    assert navigation["service"] == "web"
+    assert "Sec-Fetch-Dest" in navigation["rule"]
+
+    hoechste_api = max(
+        int(r.get("priority", 0)) for name, r in routers.items() if name != "web-navigation"
+    )
+    assert int(navigation["priority"]) > hoechste_api, (
+        f"web-navigation hat priority {navigation['priority']}, aber eine API-Regel "
+        f"hat {hoechste_api}. Dann gewinnt die API, und der Direktlink ist wieder kaputt."
+    )
+
+
 def test_jeder_dienst_hat_das_verzeichnis_das_er_behauptet() -> None:
     """SERVICE_DIR steuert, welche Alembic-Historie migriert wird.
 

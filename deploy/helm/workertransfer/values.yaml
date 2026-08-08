@@ -117,6 +117,16 @@ postgres:
 mailpit:
   enabled: true
   image: axllent/mailpit:latest
+  # Die Oberfläche auf einem Host-Port, wie bei docker compose (:8025).
+  #
+  # Ohne das wäre der Bestätigungslink aus der Registrierung nur über
+  # `kubectl port-forward` zu erreichen — und eine Umgebung, in der man sich
+  # nicht anmelden kann, ohne vorher ein zweites Fenster aufzumachen, wird
+  # nicht benutzt.
+  #
+  # Hängt an `enabled`: ist Mailpit aus, gibt es auch keinen Port. In
+  # Produktion ist damit nichts zu vergessen.
+  nodePort: 30825
 
 smtp:
   host: mailpit

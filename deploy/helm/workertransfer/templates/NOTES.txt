@@ -2,7 +2,11 @@
 
   Anwendung           {{ .Values.publicUrl }}
 {{- if .Values.mailpit.enabled }}
+{{- if .Values.mailpit.nodePort }}
+  Mailpit             http://localhost:8025 — dort liegt der Bestätigungslink
+{{- else }}
   Mailpit             kubectl port-forward svc/mailpit 8025:8025
+{{- end }}
 {{- end }}
 {{- if .Values.jaeger.enabled }}
   Jaeger              kubectl port-forward svc/jaeger 16686:16686

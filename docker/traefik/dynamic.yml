@@ -14,6 +14,42 @@
 
 http:
   routers:
+    # --- Zuerst: der Browser NAVIGIERT, er ruft keine API auf --------------
+    #
+    # `/jobs` heißt zwei verschiedene Dinge: die API-Ressource UND die Seite
+    # der Oberfläche. Dasselbe gilt für `/applications`, `/transfers` und
+    # `/github`. Nach Pfad allein ist das nicht zu unterscheiden.
+    #
+    # Auffällig wird es erst hinter EINEM Ursprung: im Compose-Stapel liegt die
+    # Oberfläche auf :5173 und die API auf :8006, da kollidiert nichts. Tippt
+    # man dagegen `…:8090/jobs` in die Adresszeile oder drückt F5, antwortet
+    # jobs-service mit rohem JSON statt der Seite. Ein Klick IM Programm
+    # funktioniert, weil der Router im Browser umschaltet und gar keine
+    # Anfrage stellt — die Hälfte, die durchfällt, ist der Direktlink und das
+    # Neuladen. Also genau das, was man teilt und was nach einem Absturz
+    # passiert.
+    #
+    # `Sec-Fetch-Dest: document` schickt der Browser AUSSCHLIESSLICH bei einer
+    # Navigation der obersten Ebene; `fetch`/XHR schicken `empty`, und curl,
+    # CLI und Dienst-zu-Dienst schicken den Kopf gar nicht. Die Regel trennt
+    # also „ein Mensch geht auf eine Seite" von „ein Programm holt Daten" —
+    # und nicht zwei Pfadlisten, die auseinanderlaufen könnten.
+    #
+    # Der Preis, bewusst bezahlt: eine API-Adresse zum Nachsehen in den Browser
+    # zu tippen liefert jetzt die Oberfläche. Dafür gibt es die Einzelports
+    # (Compose) bzw. `kubectl port-forward` — und curl, das die Regel nicht
+    # auslöst.
+    #
+    # Geprüft, bevor diese Regel entstand: kein Dienst antwortet je mit einer
+    # Weiterleitung, es gibt keinen OAuth-Rücksprung, und der Datenexport lädt
+    # über einen Blob statt über eine Navigation. Es gibt also keine Adresse,
+    # zu der ein Browser navigieren MUSS und die kein Teil der Oberfläche ist.
+    # Entsteht eine, gehört sie hier ausgenommen.
+    web-navigation:
+      rule: "HeaderRegexp(`Sec-Fetch-Dest`, `^document$`)"
+      service: web
+      priority: 200
+
     # --- Die Ausnahmen zuerst (hohe priority) ------------------------------
     applications-of-a-job:
       rule: "PathRegexp(`^/jobs/[^/]+/applications`)"

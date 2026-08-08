@@ -119,6 +119,7 @@ make k8s-lint    # helm lint + render, no cluster
 - Chart in `deploy/helm/workertransfer`, cluster in `deploy/kind/cluster.yaml`; app on **`:8090`** (8080 belongs to the compose gateway — never run both)
 - **One image for ten services**: they differ only in `SERVICE_DIR`, which the pod sets; built once *without* the build arg
 - **Routes and initdb SQL come from the compose files** via `--set-file`, never copied. Both are `required`
+- **`Sec-Fetch-Dest: document` routes to the SPA** (`web-navigation`, priority 200): behind one origin `/jobs` is both an API prefix and a page. Clicking works (client-side router), only deep links and reloads broke — with raw JSON. Do not replace it with a path list
 - **Probes must set `timeoutSeconds`** — the default is 1s and it restarted three healthy services
 - **The web image is built** (`docker/web-prod.Dockerfile`), so URLs come from `window.__WT_CONFIG__` at runtime, not from `VITE_*` at build time
 - CI builds no chart, just as it builds no image

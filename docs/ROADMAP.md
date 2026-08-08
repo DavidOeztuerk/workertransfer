@@ -931,10 +931,35 @@ weichen — `worker-messaging` (fünf Abhängigkeiten, null Konsumenten) und
   `mailpit.enabled=false`, `jaeger.enabled=false` und
   `secrets.existingSecret=…` zu **12 statt 36** Objekten, mit der Datenbank auf
   einem fremden Host, ohne erzeugtes Secret und mit abgeschaltetem Dashboard.
-  **Ein Wächtertest** (`tests/test_k8s_matches_compose.py`) fällt rot, sobald
-  `docker-compose.yml` und `values.yaml` auseinanderlaufen — bei Diensten, Ports,
-  Datenbanken und den Zielen in `dynamic.yml`. Ohne ihn fehlte ein neuer Dienst
-  im Cluster einfach, ohne Fehler und ohne roten Pod.
+  **Der zweite eigene Fehler kam erst im Browser heraus, und er ist der
+  lehrreichere.** Ein Ursprung für Oberfläche und API lässt `/jobs` zwei Dinge
+  bedeuten — die Ressource und die Seite; ebenso `/applications`, `/transfers`
+  und `/github`. Compose versteckt das (Oberfläche `:5173`, jobs-service
+  `:8006`); im Cluster lieferte `…:8090/jobs` **rohes JSON statt der Seite**.
+  Unauffällig war es, weil ein **Klick im Programm funktioniert** — da schaltet
+  der Router im Browser um, ohne zu fragen. Nur **Direktlink und Neuladen**
+  fielen durch, also genau das, was man weitergibt und was nach einem Absturz
+  passiert. Beim Entwickeln macht man weder das eine noch das andere; gefunden
+  wurde es, weil der Nutzer eine Adresse eingetippt hat statt zu klicken.
+  Gelöst mit dem Kopf, der die Frage wirklich beantwortet: `Sec-Fetch-Dest:
+  document` schickt der Browser nur bei einer Navigation der obersten Ebene,
+  `fetch` schickt `empty`, curl gar nichts. Keine zweite Pfadliste, die
+  auseinanderlaufen kann. Geprüft, bevor die Regel entstand: kein Dienst
+  antwortet je mit einer Weiterleitung, es gibt keinen OAuth-Rücksprung, und
+  der Datenexport lädt über einen Blob — es gibt also keine Adresse, zu der ein
+  Browser navigieren *muss* und die nicht zur Oberfläche gehört.
+  **Mailpit liegt auf `:8025`**, wie bei Compose. Die Bestätigungsmail enthält
+  den einzigen Weg, ein Konto freizuschalten; hinter einem `port-forward` wäre
+  jede Anmeldung ein zweites Fenster, und eine Umgebung mit dieser Hürde wird
+  nicht benutzt. Nur die Oberfläche bekommt den Port, nicht SMTP.
+  **Zwei Wächtertests** (`tests/test_k8s_matches_compose.py`) fallen rot, sobald
+  `docker-compose.yml` und `values.yaml` auseinanderlaufen — bei Diensten,
+  Ports, Datenbanken und den Zielen in `dynamic.yml` — oder sobald die
+  Navigationsregel fehlt oder ihre `priority` unter eine API-Regel rutscht.
+  Ohne den ersten fehlte ein neuer Dienst im Cluster einfach, ohne Fehler und
+  ohne roten Pod; ohne den zweiten wäre der Direktlink wieder still kaputt.
+  `scripts/k8s-up.sh` prüft beides zusätzlich am laufenden System (Beweis 2b),
+  weil ein Klick im Programm darüber nichts aussagt.
   **Kein GitOps, kein TLS, kein HPA** (ADR-0028 §7) — ohne Zielumgebung bzw.
   ohne Domain wäre das Konfiguration, die niemand ausführt, oder ein Zertifikat,
   das jeder wegklickt.
