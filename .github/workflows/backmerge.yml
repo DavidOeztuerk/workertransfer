@@ -79,40 +79,87 @@ jobs:
             echo "ergebnis=pr" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: PR öffnen, wenn kein Fast-Forward möglich war
+      # Kein Fast-Forward möglich: der Merge wird auf einem EIGENEN Zweig
+      # vorbereitet, nicht nach develop geschoben.
+      #
+      # Warum kein `gh pr create`: GitHub verbietet Actions das Anlegen von
+      # PRs, solange „Allow GitHub Actions to create and approve pull
+      # requests" in den Repo-Einstellungen aus ist — und das ist die
+      # Voreinstellung. Der erste echte Rückfall lief genau dagegen:
+      #
+      #   GitHub Actions is not permitted to create or approve pull requests
+      #
+      # Einen Zweig zu schieben darf der Lauf dagegen (`contents: write`).
+      # Der Zweig ist die eigentliche Arbeit — den PR daraus zu machen ist ein
+      # Klick, und die Zusammenfassung nennt den Link dafür.
+      #
+      # Konflikte werden hier NICHT aufgelöst: was ein Mensch entscheiden muss,
+      # entscheidet kein Lauf um drei Uhr nachts.
+      - name: Zweig für den Rückweg vorbereiten
         if: steps.nachziehen.outputs.ergebnis == 'pr'
-        env:
-          GH_TOKEN: ${{ github.token }}
+        id: zweig
         run: |
           set -euo pipefail
-          # Erst nachsehen: ein zweiter PR für denselben Rückweg wäre Lärm,
-          # und `gh pr create` bricht daran ohnehin ab.
-          offen=$(gh pr list --base develop --head main --state open --json number --jq 'length')
-          if [ "$offen" -gt 0 ]; then
-            echo "Es gibt bereits einen offenen Rückführungs-PR."
-            exit 0
+          zweig="rueckfuehrung/main-nach-develop"
+          git checkout -B "$zweig" origin/develop
+          if git merge --no-edit origin/main; then
+            git push --force-with-lease origin "$zweig"
+            echo "zustand=bereit" >> "$GITHUB_OUTPUT"
+          else
+            git merge --abort || true
+            echo "zustand=konflikt" >> "$GITHUB_OUTPUT"
           fi
-          # Über eine Datei statt eines mehrzeiligen Arguments: ein Text, dessen
-          # Zeilen links am Rand beginnen, beendet den YAML-Block-Skalar und
-          # macht die ganze Datei ungültig.
-          printf '%s\n' \
-            "Automatisch geöffnet, weil develop **nicht vorgespult** werden konnte — es trägt eigene Commits." \
-            "" \
-            "Ein Merge-Commit hier wäre von nichts geprüft, deshalb dieser PR statt eines stillen Pushes: die CI läuft darüber, und ein Mensch sieht ihn." \
-            "" \
-            "Hintergrund: Dependabot öffnet seine PRs gegen den Default-Branch (\`main\`). Ohne Rückführung fällt develop still zurück, und der nächste Feature-Zweig startet veraltet." \
-            > "$RUNNER_TEMP/rueckfuehrung.md"
-          gh pr create \
-            --base develop --head main \
-            --title "Rückführung: main → develop" \
-            --body-file "$RUNNER_TEMP/rueckfuehrung.md"
+          echo "zweig=$zweig" >> "$GITHUB_OUTPUT"
 
       - name: Ergebnis in die Zusammenfassung
         if: always()
         run: |
+          set -euo pipefail
+          repo="${{ github.server_url }}/${{ github.repository }}"
+          zweig="${{ steps.zweig.outputs.zweig }}"
           case "${{ steps.nachziehen.outputs.ergebnis }}" in
-            nichts)     echo "✅ develop war bereits auf Stand." >> "$GITHUB_STEP_SUMMARY" ;;
-            vorgespult) echo "✅ develop wurde auf main vorgespult." >> "$GITHUB_STEP_SUMMARY" ;;
-            pr)         echo "⚠️ Kein Fast-Forward möglich — PR nach develop geöffnet." >> "$GITHUB_STEP_SUMMARY" ;;
-            *)          echo "❌ Die Rückführung ist nicht durchgelaufen." >> "$GITHUB_STEP_SUMMARY" ;;
+            nichts)
+              echo "✅ develop war bereits auf Stand." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            vorgespult)
+              echo "✅ develop wurde auf main vorgespult." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            pr)
+              case "${{ steps.zweig.outputs.zustand }}" in
+                bereit)
+                  {
+                    echo "### ⚠️ develop konnte nicht vorgespult werden"
+                    echo
+                    echo "develop trägt eigene Commits, ein Merge-Commit wäre also nötig — und der ist von keiner CI geprüft. Deshalb wurde er **nicht** nach develop geschoben, sondern auf einem eigenen Zweig vorbereitet:"
+                    echo
+                    echo "**\`$zweig\`**"
+                    echo
+                    echo "[→ PR daraus öffnen]($repo/compare/develop...$zweig?expand=1)"
+                    echo
+                    echo "Dann läuft die CI darüber, und ein Mensch sieht ihn."
+                  } >> "$GITHUB_STEP_SUMMARY"
+                  ;;
+                konflikt)
+                  {
+                    echo "### ❌ Rückweg konfliktbehaftet"
+                    echo
+                    echo "main und develop lassen sich nicht ohne Handarbeit zusammenführen. Ein Lauf löst das nicht auf — das gehört einem Menschen."
+                    echo
+                    echo "\`\`\`"
+                    echo "git checkout develop && git merge origin/main"
+                    echo "\`\`\`"
+                  } >> "$GITHUB_STEP_SUMMARY"
+                  ;;
+              esac
+              ;;
+            *)
+              echo "❌ Die Rückführung ist nicht durchgelaufen." >> "$GITHUB_STEP_SUMMARY"
+              ;;
           esac
+
+      # Sichtbar rot, wenn der Rückweg Handarbeit braucht. Ein grüner Lauf, der
+      # develop still zurückfallen lässt, wäre genau der Zustand, gegen den
+      # diese Datei geschrieben ist.
+      - name: Rot, wenn ein Mensch ran muss
+        if: steps.zweig.outputs.zustand == 'konflikt'
+        run: exit 1
