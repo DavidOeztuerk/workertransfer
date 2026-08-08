@@ -36,6 +36,24 @@ docker compose down        # add -v to drop the databases
 Source is bind-mounted and the services run under `--reload`, so edits apply
 without a rebuild. Rebuild only when a dependency changes.
 
+### Or as a staging environment, on kind
+
+`docker compose` is the fast way to develop. To see what actually ships —
+built frontend artifact, no reload, code from the image — there is a Helm chart
+that runs against a local `kind` cluster, no cloud account and no domain needed
+(`brew install kind helm` first):
+
+```bash
+make k8s-up      # cluster + images + release, then proves it: pods ready,
+                 # GET /jobs, and a registration whose mail lands in Mailpit
+make k8s-down    # delete the cluster and its data
+```
+
+The app answers on **http://localhost:8090** — deliberately not 8080, which
+belongs to the compose gateway. Never run both at once. Staging and production
+differ from this by a different `values.yaml`, not a different structure
+(ADR-0028).
+
 To run a single service on the host instead:
 
 ```bash

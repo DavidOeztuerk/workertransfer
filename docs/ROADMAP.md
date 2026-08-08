@@ -20,7 +20,7 @@ Legende: ⬜ nicht begonnen · 🟧 in Arbeit · ✅ erledigt · ⛔ blockiert
 | 7 | AI Agent Plattform | ✅ | 7.1 (Naht + Candidate-Agent), 7.2 (Company-Agent: die eigene Anzeige). DoD erfüllt, mit zwei begründeten Abweichungen (plan-act-reflect, „Consents und Logs"). **Candidate Ranking** ist nach ADR-0022 dauerhaft ausgeschlossen; Skill Analyzer, Salary Recommendation und Team Analyzer sind in ihrer ÜBLICHEN Form ausgeschlossen, nicht als Idee |
 | 8 | Contracts & E-Signature | ⬜ | Templates, Rechtsprüfung, E-Sign, Audit |
 | 9 | Messaging/Notif./Search/Analytics | ✅ | 9.1–9.3 (Outbox in allen drei Diensten, Suche geprüft, Kennzahlen). DoD erfüllt; `worker-messaging` und `worker-search` gelöscht (ADR-0025/0026) |
-| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1–10.5 ✅ (Auth-Rand, Gateway, OTel, Dependency-Scanning, Löschung nach ADR-0027 samt Oberfläche). Offen: K8s/Helm, starlette-CVEs |
+| 10 | Frontend/Gateway/Infra/Hardening | 🟧 | 10.1–10.6 ✅ (Auth-Rand, Gateway, OTel, Dependency-Scanning, Löschung nach ADR-0027 samt Oberfläche, K8s/Helm gegen kind nach ADR-0028). Offen: starlette-CVEs |
 
 ### Phase 0 — Status: ✅ erledigt
 - ✅ `docs/ULTRAPLAN.md` + `docs/ROADMAP.md`
@@ -872,6 +872,83 @@ weichen — `worker-messaging` (fünf Abhängigkeiten, null Konsumenten) und
   **jede Form von Verhaltens-Tracking**.
 
 ### Phase 10 — Status: 🟧 in Arbeit
+
+- ✅ **10.6 K8s und Helm — eine Staging-Umgebung auf dem eigenen Rechner** —
+  08.08.2026. [Entwurf](superpowers/specs/2026-08-08-k8s-helm-lokales-staging-design.md)
+  · **ADR-0028**. `make k8s-up` erzeugt einen kind-Cluster, baut beide Images,
+  rollt das Chart aus — und **belegt** danach, statt zu behaupten.
+  **Der Beweis, gemessen:** 15 Pods `Running` und `1/1`, **null Neustarts**;
+  `GET /jobs` → `200 {"items":[],"next_cursor":null}`; `GET /` → das gebaute
+  `index.html` mit `/assets/index-*.js`; `POST /auth/register` → `201` und die
+  Bestätigungsmail liegt in Mailpit. Der Schreibweg ist der einzige, der etwas
+  über die **Migrationen** aussagt — die beiden Lesepfade antworten auch, wenn
+  keine einzige Tabelle existiert.
+  **Dass wirklich geroutet wird, ist belegt und nicht angenommen:** auf
+  `/companies/me/jobs` sagt identity-service direkt `404 {"detail":"Not Found"}`,
+  während das Gateway die 401 von jobs-service liefert. Ein 401 auf beiden
+  Seiten hätte nichts bewiesen (derselbe Fallstrick wie in 10.2).
+  **Ein Image für zehn Dienste.** Sie unterscheiden sich nur in `SERVICE_DIR`,
+  und `docker/entrypoint.sh` liest das aus der Umgebung — also wird einmal
+  **ohne** den Build-Arg gebaut und der Pod setzt ihn. Kein Dockerfile musste
+  sich ändern.
+  **Die Landkarte bleibt eine Datei.** Die Service-Objekte heissen wie die
+  Compose-Dienste, deshalb gilt `docker/traefik/dynamic.yml` wortwörtlich und
+  kommt per `--set-file` ins Chart; dasselbe für `scripts/initdb`. Beide sind
+  `required` — ein Chart, das ohne Routen installiert, wäre schlimmer als eines,
+  das sich weigert.
+  **`replicas: 1` ist eine Entscheidung, kein Anfangswert** (ADR-0028 §3), und
+  der zweite Grund war neu: `OutboxDispatcher.pending()` ist ein `SELECT … LIMIT
+  n` **ohne `FOR UPDATE SKIP LOCKED`**. Zwei Zusteller greifen dieselben Zeilen
+  — für die Löschkaskade folgenlos (dort ist Idempotenz zugesichert), für
+  Benachrichtigungen heisst es: jede Mail zweimal. Dazu die Auth-Bremse aus 10.1
+  und die Migration im initContainer. Wer skaliert, muss alle drei lösen.
+  **Ein eigener Fehler, gefunden weil gemessen wurde.** Der erste Ausrollversuch
+  startete drei laufende Dienste neu. Jede Meldung lautete
+  `timed out after 1s`: Kubernetes' `timeoutSeconds` steht voreingestellt auf
+  **eine Sekunde**, und sie war nirgends gesetzt. Eine Bereitschaftsprüfung, die
+  die Datenbank fragt, schafft das nicht, während zehn Python-Prozesse
+  gleichzeitig hochfahren — auch `pg_isready` lief in die Grenze, und eine
+  flatternde Datenbank nimmt jedem Dienst kurz die Route dorthin. Alle 36
+  Prüfungen tragen jetzt eine Zeitgrenze. Das ist **nicht** der Fall „Zeitgrenze
+  hochsetzen, Fehler weg": hier wurde eine fehlende Grenze gesetzt, keine echte
+  Störung zugedeckt — der Beleg ist, dass danach null Neustarts übrig blieben
+  und nur noch `connection refused` auf der Startup-Prüfung erscheint, wofür sie
+  da ist.
+  **Die Oberfläche ist ein gebautes Artefakt** (`docker/web-prod.Dockerfile`:
+  `vite build` → nginx mit SPA-Rückfall). Das erzwang eine Laufzeitkonfiguration:
+  `vite build` backt `VITE_*` in das Bündel, ein Image mit eingebackenen URLs
+  kann in zwei Umgebungen nicht dasselbe sein. `env.ts` löst deshalb in drei
+  Stufen auf — `window.__WT_CONFIG__` → `VITE_*` → Port-Rückfall —, und
+  `public/config.js` ist im Repository ein leeres Objekt, ändert also nichts an
+  `pnpm dev` und docker compose.
+  **`helm upgrade` meldet niemanden ab:** das Chart liest sein Secret per
+  `lookup` zurück, bevor es eines würfelt. Über drei Revisionen geprüft, das
+  JWT-Geheimnis blieb gleich. Gewürfelt werden muss es, weil
+  `WORKER_ENVIRONMENT` hier `staging` ist und `assert_deployable_jwt_secret` das
+  eingecheckte Entwicklungs-Geheimnis dort zu Recht verweigert.
+  **Belegt statt behauptet, dass nur eine andere `values.yaml` nötig ist:**
+  dieselben Templates rendern mit `postgres.enabled=false`,
+  `mailpit.enabled=false`, `jaeger.enabled=false` und
+  `secrets.existingSecret=…` zu **12 statt 36** Objekten, mit der Datenbank auf
+  einem fremden Host, ohne erzeugtes Secret und mit abgeschaltetem Dashboard.
+  **Ein Wächtertest** (`tests/test_k8s_matches_compose.py`) fällt rot, sobald
+  `docker-compose.yml` und `values.yaml` auseinanderlaufen — bei Diensten, Ports,
+  Datenbanken und den Zielen in `dynamic.yml`. Ohne ihn fehlte ein neuer Dienst
+  im Cluster einfach, ohne Fehler und ohne roten Pod.
+  **Kein GitOps, kein TLS, kein HPA** (ADR-0028 §7) — ohne Zielumgebung bzw.
+  ohne Domain wäre das Konfiguration, die niemand ausführt, oder ein Zertifikat,
+  das jeder wegklickt.
+  **Was offen bleibt, ehrlich:**
+  - **CI baut das Chart nicht**, genau wie sie kein Docker-Image baut. Eine
+    grüne CI beweist über `deploy/` nichts; `make k8s-lint` prüft nur, dass es
+    rendert.
+  - **Zwei Dockerfiles für dasselbe Frontend.** Sie beantworten verschiedene
+    Fragen, aber die Node-Version muss an zwei Stellen stimmen.
+  - **Der Cluster ist auf einem Notebook spürbar.** Fünfzehn Pods auf einem
+    Knoten belasten die Maschine deutlich; `docker compose` bleibt der
+    schnellere Entwicklungsweg und wird nicht ersetzt.
+  - **Kein `values-production.yaml`** — es gibt keine Produktionsumgebung, und
+    eine Datei mit erfundenen Hosts wäre wieder Konfiguration ohne Ausführer.
 
 - ✅ **10.5 Das Recht auf Löschung — im Backend eingelöst** — 06.08.2026
   (Befund) / umgesetzt nach ADR-0027.

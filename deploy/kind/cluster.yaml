@@ -1,0 +1,26 @@
+# Der lokale Cluster. Ein Knoten reicht: dieses Chart fährt jeden Dienst mit
+# genau einer Replik (siehe ADR-0028 und values.yaml), es gibt also nichts zu
+# verteilen. Ein zweiter Knoten wäre Wartezeit ohne Aussage.
+#
+# `kind create cluster --config deploy/kind/cluster.yaml`
+# — oder einfacher `make k8s-up`, das ihn miterzeugt.
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: workertransfer
+
+nodes:
+  - role: control-plane
+    # So kommt der Verkehr von aussen herein — ohne Ingress-Controller,
+    # ohne LoadBalancer, ohne `kubectl port-forward` in einem zweiten Fenster.
+    # Der Gateway-Service ist ein NodePort auf 30080; diese Zeile legt ihn auf
+    # einen Host-Port.
+    #
+    # 8090 und NICHT 8080: 8080 gehört dem Compose-Gateway. Zwei Umgebungen,
+    # die um denselben Port streiten, erzeugen genau die Sorte Fehlersuche, die
+    # in diesem Repo schon mehrfach Zeit gekostet hat — man sieht eine Antwort
+    # und weiss nicht, wer sie gegeben hat.
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 8090
+        protocol: TCP

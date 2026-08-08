@@ -109,6 +109,25 @@ make validate-e2e                                   # ... plus the browser journ
 
 There is **no `dependabot.yml`** any more — deleted 08.08.2026 because its `uv` run never finished (see ROADMAP 10.4). No automatic version bumps arrive for any ecosystem; `dependency-audit` still reports vulnerabilities on every PR, and Dependabot *alerts* live in the repo settings, not in a file.
 
+### Kubernetes — a staging environment on your own machine
+```bash
+make k8s-up      # kind cluster + both images + helm release + PROOF
+make k8s-down    # delete the cluster and its data
+make k8s-lint    # helm lint + render, no cluster needed
+```
+`deploy/helm/workertransfer` is the chart, `deploy/kind/cluster.yaml` the cluster. The app answers on **`http://localhost:8090`** — not 8080, which belongs to the compose gateway; two environments fighting over one port produce exactly the debugging session where you cannot tell who answered.
+
+Four things carry the design (ADR-0028), and each is easy to undo by "tidying up":
+
+- **One image for ten services.** They differ only in `SERVICE_DIR`, which `docker/entrypoint.sh` reads from the *environment* — so the image is built once **without** the build arg and the pod sets it. Ten images differing in one variable would not be ten times the software.
+- **The route map stays one file.** The k8s `Service` objects are named exactly like the compose services (`identity-service:8001`), so `docker/traefik/dynamic.yml` applies verbatim, delivered by `--set-file`. Re-expressing those non-disjoint paths and their `priority` values as Ingress rules would duplicate the map, and the copy would be wrong at the first new path. Same for `scripts/initdb/…sql`. Both are `required` — a chart that installs without routes would be worse than one that refuses.
+- **`replicaCount: 1` is a decision, not a starting value.** Three reasons: the auth throttle counts *in process* (ROADMAP 10.1), `OutboxDispatcher.pending()` has **no `FOR UPDATE SKIP LOCKED`** so two dispatchers grab the same rows and every mail goes out twice, and migration runs in an initContainer, i.e. per pod. Raising the number requires fixing all three first.
+- **The web image is a built artifact, and that forces a runtime config.** `vite build` bakes `import.meta.env.VITE_*` into the bundle, so an image with baked URLs cannot be the same in two environments. `apps/web/src/env.ts` therefore resolves in three steps — `window.__WT_CONFIG__` → `VITE_*` → port fallback — and `apps/web/public/config.js` is an empty object that changes nothing locally. Only the chart lays a real one over it. Do not "simplify" that back to a build arg.
+
+`WORKER_ENVIRONMENT` is `staging` here, and `assert_deployable_jwt_secret` refuses the committed dev secret in that environment — correctly, it is public in git. The chart rolls its own and **reads the existing Secret back via `lookup` before generating**, or every `helm upgrade` would log everyone out.
+
+**CI builds no chart**, exactly as it builds no Docker image. `make k8s-lint` proves it renders; only `make k8s-up` proves it runs.
+
 ### Branches and the one path back
 `feature → develop → main`, never a feature branch straight into main.
 

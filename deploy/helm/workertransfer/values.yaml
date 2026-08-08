@@ -1,0 +1,285 @@
+# Die Voreinstellung ist die LOKALE Staging-Umgebung (kind).
+#
+# Für Staging und Produktion wird nichts an dieser Struktur geändert, nur an den
+# Werten: `postgres.enabled: false` und ein echter Host, `mailpit.enabled:
+# false` und ein echter SMTP-Server, `secrets.existingSecret` statt der
+# Entwicklungswerte weiter unten, ein Registry-Präfix beim Image. Genau dieselbe
+# Trennung wie beim Gateway (docker/traefik/): was überall gleich ist, ist eine
+# Datei; was sich unterscheidet, ist ein Wert.
+
+# --- Das eine Image ---------------------------------------------------------
+# Alle zehn Dienste laufen aus DEMSELBEN Image. Sie unterscheiden sich nur in
+# SERVICE_DIR und im uvicorn-Modul, und beides steht unten in der Dienstliste.
+# Zehn Images, die sich in einer Umgebungsvariablen unterscheiden, wären kein
+# Zehnfaches an Software — nur zehnfacher Platz und zehnfache Ladezeit.
+image:
+  repository: workertransfer/service
+  tag: dev
+  # IfNotPresent, weil `kind load docker-image` das Image in den Knoten legt und
+  # es keine Registry gibt, aus der nachgeladen werden könnte. Always liesse
+  # jeden Pod in ImagePullBackOff laufen.
+  pullPolicy: IfNotPresent
+
+webImage:
+  repository: workertransfer/web
+  tag: dev
+  pullPolicy: IfNotPresent
+
+# --- Repliken: eins, und das ist eine ENTSCHEIDUNG --------------------------
+# Nicht "noch nicht skaliert", sondern "darf noch nicht skaliert werden".
+# Zwei belegte Gründe (ADR-0028, ROADMAP 10.1):
+#
+#   1. Die Auth-Bremse (worker_platform.presentation.throttle) zählt IM
+#      PROZESS. Bei drei Instanzen verdreifacht sich das effektive Limit —
+#      und niemand sieht es, weil jede einzelne Instanz korrekt rechnet.
+#   2. Der Outbox-Zusteller hat KEINE Sperre: OutboxDispatcher.pending() ist
+#      ein SELECT ... ORDER BY created_at LIMIT n ohne FOR UPDATE SKIP LOCKED.
+#      Zwei Zusteller greifen dieselben Zeilen. Für die Löschkaskade folgenlos
+#      (ADR-0027 §4 verlangt Idempotenz), für Benachrichtigungen heisst es:
+#      jede Mail zweimal.
+#
+# Wer diese Zahl erhöht, muss vorher BEIDES lösen — geteilter Zähler (Redis)
+# oder Bremse ins Gateway, und SKIP LOCKED im Zusteller. Die Zahl allein zu
+# ändern verändert Verhalten, das niemand angefordert hat.
+replicaCount: 1
+
+# --- Gemeinsame Umgebung ----------------------------------------------------
+# Entspricht dem x-service-env-Anker in docker-compose.yml.
+env:
+  WORKER_ENVIRONMENT: staging
+  # 0.0.0.0, nicht die Voreinstellung 127.0.0.1: im Container beantwortete der
+  # veröffentlichte Port sonst nichts.
+  WORKER_HOST: "0.0.0.0"
+  WORKER_MAIL_FROM: noreply@workertransfer.local
+  # Traces nach Jaeger. LEER hiesse AUS.
+  WORKER_OTLP_ENDPOINT: http://jaeger:4317
+
+# Der Ursprung, unter dem der BROWSER die Anwendung erreicht. Im kind-Cluster
+# ist das der Host-Port aus deploy/kind/cluster.yaml. In Staging und Produktion
+# steht hier der echte Name.
+#
+# Er wird an drei Stellen gebraucht, und alle drei müssen dasselbe sagen:
+#   - WORKER_PUBLIC_WEB_URL  (Bestätigungslinks in Mails)
+#   - WORKER_CORS_ALLOW_ORIGINS
+#   - die Laufzeitkonfiguration der Oberfläche (web.runtimeConfig)
+publicUrl: http://localhost:8090
+
+# --- Geheimnisse ------------------------------------------------------------
+# LEER heisst: das Chart würfelt eines und BEHÄLT es über Upgrades (es liest
+# das bestehende Secret zurück, bevor es ein neues erzeugt — sonst wäre jedes
+# `helm upgrade` eine Abmeldung aller Sitzungen).
+#
+# Das ist hier kein Komfort, sondern nötig: WORKER_ENVIRONMENT ist `staging`,
+# und `assert_deployable_jwt_secret` (worker-auth) VERWEIGERT dort genau das
+# eingecheckte Entwicklungs-Geheimnis aus docker-compose.yml — zu Recht, es
+# steht öffentlich in git. Ein Chart, das diesen Wert setzt, brächte alle zehn
+# Dienste in CrashLoopBackOff.
+#
+# In Produktion gehört hier `existingSecret` hin: ein Secret, das jemand
+# anders verwaltet, und das Chart fasst es nur an, um es zu lesen.
+secrets:
+  existingSecret: ""
+  jwtSecret: ""
+  # Zwei getrennte Geheimnisse, ausdrücklich (ADR-0027 §4.4): "darf eine Mail
+  # anstossen" und "darf alles über einen Menschen löschen" dürfen nicht
+  # dasselbe Papier sein.
+  notifySecret: ""
+  erasureSecret: ""
+  # Die Datenbank ist nur clusterintern erreichbar und hat keinen NodePort.
+  # Ein fester Wert hält `kubectl exec ... psql` einfach; wer das ändern will,
+  # setzt hier etwas anderes.
+  postgresPassword: worker
+
+# Der Schlüssel für die Formulierungshilfe (ADR-0024). LEER heisst: sie ist aus,
+# und die Oberfläche sagt das. Steht nie im Repository — beim lokalen Lauf
+# reicht ANTHROPIC_API_KEY=... make k8s-up.
+anthropicApiKey: ""
+draftingModel: claude-sonnet-5
+
+# --- Postgres ---------------------------------------------------------------
+# enabled: false in Staging/Produktion, dann zeigt `host` auf die verwaltete
+# Datenbank. Die Dienste merken davon nichts: sie kennen nur ihre
+# WORKER_DATABASE_URL, und die wird aus host/user/passwort zusammengesetzt.
+postgres:
+  enabled: true
+  image: postgres:17-alpine
+  host: postgres
+  port: 5432
+  user: worker
+  storage: 4Gi
+  # Nur der Vollständigkeit halber: der Entrypoint legt allein diese eine an,
+  # jede weitere Dienstdatenbank kommt aus scripts/initdb (ADR-0004 verbietet
+  # eine gemeinsame Datenbank).
+  bootstrapDatabase: identity
+
+# --- Mailpit ----------------------------------------------------------------
+# Fängt jede Mail ab. In Produktion aus, und smtp.host zeigt nach draussen.
+mailpit:
+  enabled: true
+  image: axllent/mailpit:latest
+
+smtp:
+  host: mailpit
+  port: 1025
+
+# --- Jaeger -----------------------------------------------------------------
+# All-in-one statt Collector + Jaeger: der Collector lohnt sich bei mehreren
+# Zielen. Hier gibt es eines, und ein Glied weniger in der Kette ist eines
+# weniger, das schweigt.
+jaeger:
+  enabled: true
+  image: jaegertracing/all-in-one:1.60.0
+
+# --- Gateway ----------------------------------------------------------------
+gateway:
+  image: traefik:v3.3
+  # Der NodePort, den deploy/kind/cluster.yaml auf den Host-Port 8090 legt.
+  nodePort: 30080
+  # Lokal an, damit man sieht, welche Regel gewonnen hat — und das tut man hier
+  # brauchen, weil die Pfade nicht disjunkt sind. In Produktion AUS: ein
+  # offenes Dashboard verrät die ganze Landkarte.
+  dashboard: true
+  logLevel: INFO
+  # Die Routen. Kommt NICHT aus dieser Datei, sondern per
+  #   --set-file gateway.dynamicConfig=docker/traefik/dynamic.yml
+  # aus der Datei, die auch Compose benutzt. Eine Landkarte, nicht zwei —
+  # sonst wäre die Kopie beim ersten neuen Pfad falsch.
+  dynamicConfig: ""
+
+# --- Oberfläche -------------------------------------------------------------
+web:
+  # Im Cluster zeigen alle zehn Basis-URLs auf DENSELBEN Ursprung: den des
+  # Gateways. Das ist nicht nur bequem, es beseitigt zwei Fehlerquellen —
+  # kein CORS (gleicher Origin) und keine Cookie-Verwirrung zwischen Ports.
+  #
+  # Leer heisst: publicUrl verwenden.
+  apiOrigin: ""
+
+# --- Die Dienste ------------------------------------------------------------
+# Eine Liste, über die vier Templates laufen (Deployment, Service,
+# Migrations-Job, ConfigMap) — dasselbe Prinzip wie der x-service-Anker in
+# docker-compose.yml. Einen Dienst hinzuzufügen ist ein Eintrag, keine Kopie.
+#
+# tests/test_k8s_matches_compose.py fällt rot, sobald diese Liste und
+# docker-compose.yml auseinanderlaufen.
+#
+#   name      — Name des K8s-Service. MUSS dem Compose-Dienstnamen entsprechen,
+#               weil docker/traefik/dynamic.yml genau diese Namen anspricht.
+#   dir       — apps/<dir>, wird als SERVICE_DIR gesetzt (Alembic-Historie)
+#   module    — das uvicorn-Ziel
+#   port      — Port, auf dem der Dienst lauscht
+#   database  — seine eigene Datenbank (ADR-0004: keine gemeinsame)
+#   env       — was nur dieser Dienst braucht
+services:
+  - name: identity-service
+    dir: identity-service
+    module: identity_service.main:app
+    port: 8001
+    database: identity
+    env:
+      # Wohin die Löschbefehle gehen (ADR-0027 §4). jobs-service steht dabei,
+      # ist aber KEIN Empfänger der Kaskade — er bekommt nur die Absicht aus
+      # §7, wenn ein Unternehmen ohne Administrator zurückbleibt.
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      WORKER_PROFILE_BASE_URL: http://profile-service:8003
+      WORKER_RESUME_BASE_URL: http://resume-service:8004
+      WORKER_PORTFOLIO_BASE_URL: http://portfolio-service:8005
+      WORKER_JOBS_BASE_URL: http://jobs-service:8006
+      WORKER_APPLICATIONS_BASE_URL: http://applications-service:8007
+      WORKER_TRANSFER_BASE_URL: http://transfer-service:8009
+      WORKER_GITHUB_BASE_URL: http://github-service:8010
+
+  - name: consent-service
+    dir: consent-service
+    module: consent_service.main:app
+    port: 8002
+    database: consent
+
+  - name: profile-service
+    dir: profile-service
+    module: profile_service.main:app
+    port: 8003
+    database: profile
+    env:
+      # Der Profile-Service fragt den Ledger, bevor er ein fremdes Profil zeigt
+      # (ADR-0013, synchron und ohne Cache).
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+    drafting: true
+
+  - name: resume-service
+    dir: resume-service
+    module: resume_service.main:app
+    port: 8004
+    database: resume
+    env:
+      # Der Lebenslauf wird je Unternehmen einzeln freigegeben; die Berechtigung
+      # steht im Ledger (Capability resume.visibility:tenant:<id>).
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      WORKER_IDENTITY_BASE_URL: http://identity-service:8001
+
+  - name: portfolio-service
+    dir: portfolio-service
+    module: portfolio_service.main:app
+    port: 8005
+    database: portfolio
+    env:
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      WORKER_STORAGE_ROOT: /var/lib/workertransfer/portfolio-attachments
+    # Anhänge überleben den Pod. Ein Pfad im Image wäre beim nächsten Deploy
+    # weg — dieselbe Überlegung wie das Volume in docker-compose.yml.
+    persistence:
+      size: 2Gi
+      mountPath: /var/lib/workertransfer/portfolio-attachments
+
+  - name: jobs-service
+    dir: jobs-service
+    module: jobs_service.main:app
+    port: 8006
+    database: jobs
+    drafting: true
+
+  - name: applications-service
+    dir: applications-service
+    module: applications_service.main:app
+    port: 8007
+    database: applications
+    env:
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      WORKER_IDENTITY_BASE_URL: http://identity-service:8001
+      WORKER_JOBS_BASE_URL: http://jobs-service:8006
+
+  - name: companies-service
+    dir: companies-service
+    module: companies_service.main:app
+    port: 8008
+    database: companies
+
+  - name: transfer-service
+    dir: transfer-service
+    module: transfer_service.main:app
+    port: 8009
+    database: transfer
+    env:
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      WORKER_IDENTITY_BASE_URL: http://identity-service:8001
+
+  - name: github-service
+    dir: github-service
+    module: github_service.main:app
+    port: 8010
+    # Nicht `github`: so heisst die Datenbank in scripts/initdb, und sie ist
+    # dort bewusst anders benannt als der Dienst.
+    database: github_service
+    env:
+      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      WORKER_IDENTITY_BASE_URL: http://identity-service:8001
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 128Mi
+  # Kein CPU-Limit: gedrosselte Python-Prozesse antworten langsamer, statt zu
+  # scheitern, und das sieht in einer Bereitschaftsprüfung wie ein kaputter
+  # Dienst aus. Speicher wird begrenzt, weil ein Leck sonst den Knoten mitnimmt.
+  limits:
+    memory: 768Mi
