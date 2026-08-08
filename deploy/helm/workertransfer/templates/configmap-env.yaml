@@ -1,0 +1,29 @@
+{{/*
+Was alle zehn Dienste gleich haben — das Gegenstück zum x-service-env-Anker in
+docker-compose.yml. Geheimnisse stehen NICHT hier, sondern im Secret.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-env
+  labels:
+    {{- include "workertransfer.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.env }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  WORKER_SMTP_HOST: {{ .Values.smtp.host | quote }}
+  WORKER_SMTP_PORT: {{ .Values.smtp.port | quote }}
+  {{/*
+  Die Basis für Bestätigungslinks — das muss sein, was der BROWSER erreicht,
+  nicht ein clusterinterner Servicename. Eine Mail mit http://identity-service
+  darin führt niemanden irgendwohin.
+  */}}
+  WORKER_PUBLIC_WEB_URL: {{ .Values.publicUrl | quote }}
+  {{/*
+  Im Cluster läuft alles über einen Ursprung, CORS wird also gar nicht
+  gebraucht. Der Eintrag steht trotzdem hier, weil `kubectl port-forward` beim
+  Fehlersuchen einen zweiten Ursprung erzeugt — und dann ist eine leere Liste
+  ein 20 Minuten teurer Irrweg.
+  */}}
+  WORKER_CORS_ALLOW_ORIGINS: {{ .Values.publicUrl | quote }}

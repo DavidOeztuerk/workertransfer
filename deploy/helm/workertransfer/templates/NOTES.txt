@@ -1,0 +1,38 @@
+{{ .Chart.Name }} {{ .Chart.Version }} ist ausgerollt — Release {{ .Release.Name }}.
+
+  Anwendung           {{ .Values.publicUrl }}
+{{- if .Values.mailpit.enabled }}
+  Mailpit             kubectl port-forward svc/mailpit 8025:8025
+{{- end }}
+{{- if .Values.jaeger.enabled }}
+  Jaeger              kubectl port-forward svc/jaeger 16686:16686
+{{- end }}
+{{- if .Values.gateway.dashboard }}
+  Traefik-Übersicht   kubectl port-forward deploy/gateway 8081:8080
+{{- end }}
+
+{{ .Values.services | len }} Dienste, jeder mit {{ .Values.replicaCount }} Replik(en).
+
+{{- if gt (int .Values.replicaCount) 1 }}
+
+  ACHTUNG: replicaCount ist {{ .Values.replicaCount }}.
+
+  Drei Dinge in diesem System vertragen das heute NICHT (ADR-0028 §3):
+    - die Auth-Bremse zählt im Prozess, das Limit vervielfacht sich
+    - der Outbox-Zusteller hat kein SKIP LOCKED, Mails gehen mehrfach raus
+    - migriert wird im initContainer, also je Pod
+
+  Das ist kein Hinweis auf eine Feineinstellung, sondern auf drei Änderungen
+  am Code, die vorher nötig sind.
+{{- end }}
+
+{{- if not .Values.secrets.existingSecret }}
+
+Die Geheimnisse hält dieses Release selbst und behält sie über Upgrades.
+Für eine echte Umgebung gehört dort `secrets.existingSecret` hin.
+{{- end }}
+
+Prüfen, ob es wirklich läuft — nicht nur, ob es ausgerollt ist:
+
+  curl -s {{ .Values.publicUrl }}/jobs
+  curl -s {{ .Values.publicUrl }}/config.js
