@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -21,6 +22,7 @@ def _problem(
     detail: str,
     correlation_id: str | None,
     errors: list[Any] | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     body: dict[str, Any] = {
         "type": f"https://workertransfer.dev/problems/{status}",
@@ -32,7 +34,20 @@ def _problem(
         body["correlationId"] = correlation_id
     if errors:
         body["errors"] = errors
-    return JSONResponse(status_code=status, content=body, media_type="application/problem+json")
+    # `headers` kommt HINZU und ersetzt nichts. Ohne diese Weitergabe fällt
+    # alles weg, was eine HTTPException an Kopfzeilen mitbringt — und das ist
+    # der vorgesehene Weg für `WWW-Authenticate` bei 401 (RFC 9110 verlangt es
+    # dort), `Retry-After` bei 429 und `Set-Cookie`, wenn eine Ablehnung ein
+    # totes Cookie wegräumen soll. Der Aufruf sah dann richtig aus und tat
+    # nichts: ein abgelehnter Refresh liess sein Cookie liegen, der Browser
+    # versuchte es beim nächsten Seitenaufruf erneut, und der Fehler hielt sich
+    # selbst am Leben.
+    return JSONResponse(
+        status_code=status,
+        content=body,
+        media_type="application/problem+json",
+        headers=dict(headers) if headers else None,
+    )
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -56,6 +71,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             title="Request failed",
             detail=detail,
             correlation_id=get_correlation_id(),
+            headers=exception.headers,
         )
 
     @app.exception_handler(Exception)
