@@ -53,11 +53,6 @@ describe("login", () => {
 });
 
 describe("fetchMe", () => {
-  it("returns null on 401", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ok({ detail: "no" }, 401)));
-    expect(await fetchMe()).toBeNull();
-  });
-
   it("returns the principal on 200", async () => {
     vi.stubGlobal(
       "fetch",
@@ -65,5 +60,82 @@ describe("fetchMe", () => {
     );
     const me = await fetchMe();
     expect(me?.tenant_id).toBe("t");
+  });
+
+  it("erneuert die Sitzung, wenn nur das Access-Token abgelaufen ist", async () => {
+    // Der eigentliche Fall, und er war ungedeckt: das Access-Token lebt 15
+    // Minuten, das Refresh-Token 24 Stunden (ADR-0007). Ohne diesen Weg ist
+    // man eine Viertelstunde nach dem Anmelden abgemeldet — lautlos, mitten im
+    // Ausfüllen eines Formulars.
+    const wege: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: RequestInfo | URL) => {
+        const pfad = String(url);
+        wege.push(pfad);
+        if (pfad.endsWith("/auth/refresh")) return ok({ status: "ok" });
+        // Erst nach dem Erneuern antwortet /me.
+        const schonErneuert = wege.some((w) => w.endsWith("/auth/refresh"));
+        return schonErneuert
+          ? ok({ user_id: "u", email: "a@b.com", tenant_id: null, roles: ["user"] })
+          : ok({ detail: "not authenticated" }, 401);
+      })
+    );
+
+    const me = await fetchMe();
+
+    expect(me?.user_id).toBe("u");
+    expect(wege.filter((w) => w.endsWith("/auth/refresh"))).toHaveLength(1);
+  });
+
+  it("gibt null zurück, wenn auch das Refresh-Token nicht mehr trägt", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ok({ detail: "invalid credentials" }, 401)));
+    expect(await fetchMe()).toBeNull();
+  });
+
+  it("versucht das Erneuern genau EINMAL, auch bei gleichzeitigen Aufrufen", async () => {
+    // Der Refresh rotiert die jti: das alte Token wird entwertet, ein neues
+    // ausgegeben (ADR-0008). Zwei gleichzeitige Erneuerungen hiessen deshalb,
+    // dass die zweite mit einem bereits entwerteten Token ankommt — und die
+    // Sitzung genau dadurch verliert, was sie retten sollte. `my-data.tsx`
+    // ruft fetchMe neben der Sitzungsabfrage auf, der Fall ist also real.
+    const wege: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: RequestInfo | URL) => {
+        const pfad = String(url);
+        wege.push(pfad);
+        if (pfad.endsWith("/auth/refresh")) {
+          await new Promise((r) => setTimeout(r, 10));
+          return ok({ status: "ok" });
+        }
+        const schonErneuert = wege.some((w) => w.endsWith("/auth/refresh"));
+        return schonErneuert
+          ? ok({ user_id: "u", email: "a@b.com", tenant_id: null, roles: ["user"] })
+          : ok({ detail: "not authenticated" }, 401);
+      })
+    );
+
+    const [a, b, c] = await Promise.all([fetchMe(), fetchMe(), fetchMe()]);
+
+    expect(wege.filter((w) => w.endsWith("/auth/refresh"))).toHaveLength(1);
+    expect(a?.user_id).toBe("u");
+    expect(b?.user_id).toBe("u");
+    expect(c?.user_id).toBe("u");
+  });
+
+  it("erneuert nicht bei anderen Fehlern als 401", async () => {
+    // Ein 503 heisst "der Dienst schweigt", nicht "deine Sitzung ist alt".
+    // Darauf zu erneuern hiesse, bei jeder Störung Token zu rotieren.
+    const wege: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: RequestInfo | URL) => {
+        wege.push(String(url));
+        return ok({ detail: "unavailable" }, 503);
+      })
+    );
+    expect(await fetchMe()).toBeNull();
+    expect(wege.filter((w) => w.endsWith("/auth/refresh"))).toHaveLength(0);
   });
 });
