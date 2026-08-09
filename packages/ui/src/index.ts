@@ -4,6 +4,7 @@ export { Button } from "./components/button";
 export { Card } from "./components/card";
 export { Checkbox } from "./components/checkbox";
 export { DescriptionList } from "./components/description-list";
+export { Dialog } from "./components/dialog";
 export { Empty } from "./components/empty";
 export { Field } from "./components/field";
 export { Fieldset, RadioGroup } from "./components/fieldset";
@@ -25,6 +26,7 @@ export type {
   DescriptionListItem,
   DescriptionListProps,
 } from "./components/description-list";
+export type { DialogProps } from "./components/dialog";
 export type { EmptyProps } from "./components/empty";
 export type { FieldProps } from "./components/field";
 export type { FieldsetProps, RadioGroupProps, RadioOption } from "./components/fieldset";
