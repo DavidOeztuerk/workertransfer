@@ -33,10 +33,28 @@ docker info >/dev/null 2>&1 || { rot "Docker läuft nicht."; exit 1; }
 schritt "Cluster"
 if kind get clusters 2>/dev/null | grep -qx "$CLUSTER"; then
   echo "kind-Cluster '$CLUSTER' existiert bereits."
+  # `kind get clusters` listet den Cluster auch, wenn sein Knoten ANGEHALTEN
+  # ist — und das ist der Normalfall, weil man ihn vor `uv run pytest` anhält
+  # (Testcontainers und der Cluster vertragen sich nicht). Ohne diese Zeilen
+  # meldet das Skript "existiert bereits", baut zehn Minuten lang Images und
+  # scheitert dann an einem `kind load` gegen einen Knoten, der nicht läuft.
+  if ! docker ps --filter "name=${CLUSTER}-control-plane" --format '{{.Names}}' | grep -q .; then
+    echo "... aber sein Knoten steht. Wird gestartet."
+    docker start "${CLUSTER}-control-plane" >/dev/null
+  fi
 else
   kind create cluster --config deploy/kind/cluster.yaml
 fi
 kubectl config use-context "kind-${CLUSTER}" >/dev/null
+
+# Auf den API-Server warten. Nach einem `docker start` antwortet er nach
+# wenigen Sekunden; die Pods brauchen danach noch ein bis zwei Minuten, was
+# `helm --wait` weiter unten abfängt.
+for _ in $(seq 1 60); do
+  kubectl get nodes >/dev/null 2>&1 && break
+  sleep 2
+done
+kubectl get nodes >/dev/null 2>&1 || { rot "Der Cluster antwortet nicht."; exit 1; }
 
 # ---------------------------------------------------------------------------
 schritt "Images bauen"
