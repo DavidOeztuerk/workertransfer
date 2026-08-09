@@ -666,6 +666,51 @@ unsichtbar. Ersetzt durch die Menü-Zusammenfassung, die es nur mit aktivem
 Unternehmen gibt — ein ehrlicheres Signal als ein Link, der auch ohne Wechsel
 existieren könnte.
 
+### Querschnitt — Das Design-System ✅ (10.08.2026)
+
+Erster von neun Schnitten der Oberflächen-Umstellung
+([Spezifikation](superpowers/specs/2026-08-09-oberflaeche-refactor-design.md),
+[Plan](superpowers/plans/2026-08-09-e1-designsystem.md), **ADR-0029**).
+`packages/ui` wächst von **5 auf 20 Bauteile** und von 22 auf **81 Testfälle**.
+**Keine Route angefasst** — die 385 Testfälle in `apps/web` sind unverändert
+grün.
+
+**Der Fund, der nicht auf der Liste stand: die Oberfläche hatte zwei Paletten.**
+`--wt-accent`, `--wt-border` und `--wt-surface-muted` wurden an 22 Stellen
+benutzt und **nirgends definiert**. Es griffen die Fallbacks, und die wichen von
+den echten Tokens ab — `#1f6f5c` gegen `--wt-green: #1b6a47`, `#d6d3cd` gegen
+`--wt-line: #dbe4db`. Welchen Grünton ein Element trug, entschied die Datei, in
+der es gestylt wurde. Die beiden Namen sind jetzt **Aliase**, keine zweiten
+Werte; drei Farben verschieben sich dabei sichtbar, und genau deshalb gilt der
+Screenshot-Beweis schon für diesen Schnitt.
+
+Zwei Wächter halten es fest: kein benutztes Token ohne Definition, **kein
+Fallback** (das war der Tarnweg), alle Definitionen in einer Datei. Beide prüfen
+zuerst, dass sie überhaupt etwas *lesen* — ein Wächter, der bei einer
+Umbenennung still auf null Vergleiche schrumpft, meldet Ordnung über Dateien,
+die er nicht mehr findet.
+
+**Natives Element vor selbstgebautem**, mit drei konkreten Gründen: `<select>`
+(das APG-Muster verlangt sonst `aria-activedescendant`, und kein Wähler braucht
+Autocomplete), `<dialog>` samt `showModal()` (der Browser liefert
+Fokuseinschluss, Esc, inerten Hintergrund und `aria-modal`), native Radios mit
+gemeinsamem `name` (erst der verdrahtet die Pfeiltasten).
+
+**Eine Beweisgrenze steht offen im ADR statt überspielt zu werden:** jsdom 30
+implementiert `showModal()` nicht (`TypeError: dialog.showModal is not a
+function`, jsdom-Issue #3294). Der Ersatz im Test-Setup ahmt die Fokusfalle
+**absichtlich nicht** nach — sonst wären die Tests Behauptungen über den eigenen
+Ersatz. Fokusfalle und Esc sind damit in diesem Schnitt **nicht bewiesen**; das
+kommt in echtem Chromium mit dem ersten Verbraucher.
+
+Drei Bauteile haben heute keinen Aufrufer (`Skeleton`, `Dialog`, `Toast`) und ein
+Ablaufdatum: der letzte E3-PR entscheidet je Bauteil Verbraucher oder Löschung.
+`Table` wurde trotz Lückenliste **nicht** gebaut — Zeilen in Tabellen zu
+verwandeln ändert das DOM, auf das die Routentests zeigen.
+
+`apps/web/src/styles.css` ist weiterhin **885 Zeilen** groß. Dieser Schnitt
+verschiebt nichts aus den Routen; das ist E2 und E3.
+
 ### Phase 6 — Status: ✅ erledigt (05.08.2026, 6.1–6.3)
 
 - ✅ **6.1 GitHub als Beleg, nicht als Note** — 03.08.2026.
