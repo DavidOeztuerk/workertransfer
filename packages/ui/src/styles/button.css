@@ -1,0 +1,52 @@
+.wt-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  border: 1px solid transparent;
+  border-radius: var(--wt-radius-pill);
+  padding: 0.65rem 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--wt-transition), border-color var(--wt-transition),
+    transform var(--wt-transition);
+}
+
+.wt-button:hover {
+  transform: translateY(-1px);
+}
+
+.wt-button:focus-visible {
+  outline: var(--wt-focus-outline);
+  outline-offset: 3px;
+}
+
+.wt-button--primary {
+  color: white;
+  background: var(--wt-green);
+}
+
+.wt-button--primary:hover {
+  background: var(--wt-green-deep);
+}
+
+.wt-button--secondary {
+  color: var(--wt-green-deep);
+  border-color: var(--wt-green);
+  background: transparent;
+}
+
+.wt-button--quiet {
+  color: var(--wt-ink);
+  background: transparent;
+}
+
+.wt-button[disabled] {
+  cursor: not-allowed;
+  opacity: var(--wt-disabled-opacity);
+}
+
+.wt-button[disabled]:hover {
+  transform: none;
+}
