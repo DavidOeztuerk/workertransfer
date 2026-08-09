@@ -65,13 +65,3 @@
   font-size: var(--wt-text-sm);
   line-height: var(--wt-leading-tight);
 }
-
-/* Bleibt hier, bis Aufgabe 8 die Checkbox-Komponente baut: drei Routen
-   benutzen diese Klasse heute mit einem rohen <input type="checkbox">, und E1
-   fasst keine Route an. */
-.wt-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  font-size: var(--wt-text-base);
-}

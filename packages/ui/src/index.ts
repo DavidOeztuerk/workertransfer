@@ -1,6 +1,7 @@
 export { Alert } from "./components/alert";
 export { Button } from "./components/button";
 export { Card } from "./components/card";
+export { Checkbox } from "./components/checkbox";
 export { Empty } from "./components/empty";
 export { Field } from "./components/field";
 export { LiveRegion, useAnnounce } from "./components/live-region";
@@ -12,6 +13,7 @@ export { TextArea } from "./components/text-area";
 export type { AlertProps, AlertVariant } from "./components/alert";
 export type { ButtonProps } from "./components/button";
 export type { CardProps } from "./components/card";
+export type { CheckboxProps } from "./components/checkbox";
 export type { EmptyProps } from "./components/empty";
 export type { FieldProps } from "./components/field";
 export type { LiveRegionProps } from "./components/live-region";
