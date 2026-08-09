@@ -107,10 +107,104 @@ export async function login(input: LoginInput): Promise<LoginResult> {
   return { ok: false, message };
 }
 
+/**
+ * Eine laufende Erneuerung, die sich gleichzeitige Aufrufer teilen.
+ *
+ * Nötig, weil der Refresh die jti ROTIERT: das alte Token wird entwertet, ein
+ * neues ausgegeben (ADR-0008, damit ein gestohlenes Token einmalig ist). Zwei
+ * gleichzeitige Erneuerungen hiessen deshalb, dass die zweite mit einem bereits
+ * entwerteten Token ankommt — und die Sitzung genau dadurch verliert, was die
+ * Erneuerung retten sollte. Die Sitzungsabfrage wird von TanStack Query
+ * entdoppelt, `my-data.tsx` ruft `fetchMe` aber daneben auf.
+ */
+let laufendeErneuerung: Promise<boolean> | null = null;
+
+async function erneuereSitzung(): Promise<boolean> {
+  laufendeErneuerung ??= (async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+      return res.ok;
+    } catch {
+      // Netzfehler ist keine Aussage über die Sitzung.
+      return false;
+    } finally {
+      // Erst NACH dem Auflösen freigeben, sonst startet der nächste Aufrufer
+      // eine zweite Rotation, während die erste noch unterwegs ist.
+      queueMicrotask(() => {
+        laufendeErneuerung = null;
+      });
+    }
+  })();
+  return laufendeErneuerung;
+}
+
+interface SessionResponse {
+  user: MeResponse | null;
+  state: "active" | "renewable" | "anonymous";
+}
+
+/**
+ * "Ist gerade jemand angemeldet?" — die Frage, die jede Seite stellt.
+ *
+ * Sie geht bewusst an `GET /auth/session` und nicht an `/me`. `/me` heisst
+ * "gib mir mein Profil": eine geschützte Ressource, und ohne Nachweis ist 401
+ * die richtige Antwort. Diese Frage hier ist öffentlich — sie über `/me` zu
+ * stellen erzeugte für jeden abgemeldeten Besucher einen Fehlereintrag über
+ * einen völlig normalen Zustand.
+ *
+ * Drei Zustände, und der mittlere ist der Grund:
+ *
+ * - `anonymous` — es wird KEINE weitere Anfrage gestellt. Eine Anfrage, eine
+ *   200, fertig.
+ * - `renewable` — das Access-Token trägt nicht mehr, ein Refresh-Cookie liegt
+ *   aber vor. Ohne diesen Fall ist man eine Viertelstunde nach dem Anmelden
+ *   abgemeldet, lautlos und mitten im Ausfüllen eines Formulars (Access 15
+ *   Minuten, Refresh 24 Stunden, ADR-0007).
+ * - `active` — das Profil liegt der Antwort schon bei, kein zweiter Weg nötig.
+ *
+ * Erneuert wird also nur, wenn der Server sagt, dass es etwas zu erneuern gibt
+ * — nie auf gut Glück.
+ */
+export async function fetchSession(): Promise<MeResponse | null> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/auth/session`, { credentials: "include" });
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+
+  const session = (await res.json()) as SessionResponse;
+  if (session.state === "active") return session.user;
+  if (session.state !== "renewable") return null;
+
+  if (!(await erneuereSitzung())) return null;
+
+  const zweiter = await fetch(`${API_BASE_URL}/auth/session`, { credentials: "include" });
+  if (!zweiter.ok) return null;
+  return ((await zweiter.json()) as SessionResponse).user;
+}
+
+/**
+ * Das eigene Profil — geschützt, und hier ist 401 die richtige Antwort.
+ *
+ * Bleibt für Stellen, die wirklich das Profil brauchen (`/meine-daten`). Für
+ * die Frage "ist jemand angemeldet?" gibt es `fetchSession`; wer sie hier
+ * stellt, bekommt einen 401 auf einen normalen Zustand.
+ */
 export async function fetchMe(): Promise<MeResponse | null> {
   const res = await fetch(`${API_BASE_URL}/me`, { credentials: "include" });
-  if (!res.ok) return null;
-  return (await res.json()) as MeResponse;
+  if (res.ok) return (await res.json()) as MeResponse;
+  if (res.status !== 401) return null;
+
+  if (!(await erneuereSitzung())) return null;
+
+  const zweiter = await fetch(`${API_BASE_URL}/me`, { credentials: "include" });
+  if (!zweiter.ok) return null;
+  return (await zweiter.json()) as MeResponse;
 }
 
 // Idempotent by design on the backend (204 even without a refresh cookie), so a

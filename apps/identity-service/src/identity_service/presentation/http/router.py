@@ -146,10 +146,86 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
         await dispatch_all(outbox, deps)
         return {"status": "accepted"}
 
+    @router.get("/session")
+    async def session_state(
+        request: Request,
+        refresh: str | None = Cookie(default=None, alias="refresh"),
+    ) -> dict[str, object]:
+        """Öffentlich, und antwortet IMMER 200 — auch für Anonyme.
+
+        `/me` heisst „gib mir mein Profil": eine geschützte Ressource, und ohne
+        Nachweis ist 401 die richtige Antwort. Die Oberfläche stellt bei jedem
+        Seitenaufruf aber eine andere Frage — „ist gerade jemand angemeldet?" —,
+        und die ist öffentlich. Sie über `/me` zu stellen erzeugte für jeden
+        abgemeldeten Besucher einen Fehlereintrag über einen völlig normalen
+        Zustand.
+
+        Drei Zustände, und der mittlere ist der Grund für diesen Endpunkt:
+
+        - ``active``    — angemeldet, das Profil liegt bei.
+        - ``renewable`` — das Access-Token trägt nicht mehr, aber ein
+          Refresh-Cookie liegt vor. Erst damit kann die Oberfläche
+          ``POST /auth/refresh`` GEZIELT aufrufen, statt auf gut Glück.
+        - ``anonymous`` — nichts da. Die Oberfläche fragt dann nicht weiter.
+
+        Ob das Refresh-Token inhaltlich trägt, wird hier NICHT geprüft: das tut
+        der Refresh selbst, und ein zweiter Ort, der Token bewertet, wäre ein
+        zweiter Ort, an dem er falsch liegen kann. Hier steht nur, ob ein
+        Versuch überhaupt Sinn ergibt.
+
+        Das Refresh-Cookie erreicht diesen Endpunkt nur, weil er unter `/auth`
+        liegt — genau der Pfad, auf den es beim Setzen begrenzt wurde. Ein
+        `/session` an der Wurzel bekäme es nie zu sehen.
+        """
+        principal = get_request_user(request.scope)
+        if principal is not None:
+            async with request_scope(session_factory) as (_uow, repos):
+                user = await repos["users"].get_by_id(principal.user_id)
+            return {
+                "user": {
+                    "user_id": str(principal.user_id),
+                    "email": user.email.value if user is not None else None,
+                    "tenant_id": (
+                        str(principal.tenant_id) if principal.tenant_id is not None else None
+                    ),
+                    "roles": list(principal.roles),
+                },
+                "state": "active",
+            }
+        # Ohne Anmeldung ist die Antwort byte-identisch, egal was an Cookies
+        # mitkam: der Endpunkt ist öffentlich und darf nichts verraten, woraus
+        # jemand auf die Existenz eines Kontos schliessen könnte.
+        if refresh is not None:
+            return {"user": None, "state": "renewable"}
+        return {"user": None, "state": "anonymous"}
+
+    #: Löscht das Refresh-Cookie — als Kopf, weil er an eine Ausnahme muss.
+    #:
+    #: Der Pfad MUSS zu `_set_cookies` passen (dort `path="/auth"`), sonst
+    #: löscht der Browser nichts und man sucht den Fehler im Server.
+    _REFRESH_ENTFERNEN = {
+        "Set-Cookie": "refresh=; Max-Age=0; Path=/auth; HttpOnly; SameSite=strict"
+    }
+
     @router.post("/refresh")
     async def refresh(
         response: Response, refresh: str | None = Cookie(default=None, alias="refresh")
     ) -> dict[str, str]:
+        """Erneuern — und bei endgültiger Ablehnung das tote Cookie wegräumen.
+
+        Ohne das Wegräumen hält sich der Fehler selbst am Leben:
+        `/auth/session` sieht ein Refresh-Cookie und meldet `renewable`, die
+        Oberfläche versucht zu erneuern, das Token trägt nicht mehr — 401. Beim
+        nächsten Seitenaufruf liegt dasselbe tote Cookie noch da, und alles
+        beginnt von vorn. Genau so sah es aus, nachdem der lokale Cluster neu
+        aufgesetzt worden war: die Cookies im Browser waren mit einem
+        Geheimnis signiert, das es nicht mehr gab.
+
+        Nur das REFRESH-Cookie: es allein löst `renewable` aus. Ein totes
+        Access-Cookie führt bereits zu `anonymous` und läuft ohnehin nach 15
+        Minuten ab — und ein zweiter Set-Cookie-Kopf ginge an einer Ausnahme
+        nicht, die nur einen tragen kann.
+        """
         if refresh is None:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
         cmd = RefreshTokenCommand(refresh_token=refresh)
@@ -158,9 +234,15 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
         if not result.is_success:
             err = result.error
             if isinstance(err, (InvalidCredentials, AccountDisabled)):
-                raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
+                raise HTTPException(
+                    status.HTTP_401_UNAUTHORIZED,
+                    "invalid credentials",
+                    headers=_REFRESH_ENTFERNEN,
+                )
             raise HTTPException(
-                status.HTTP_400_BAD_REQUEST, err.message if err is not None else "invalid"
+                status.HTTP_400_BAD_REQUEST,
+                err.message if err is not None else "invalid",
+                headers=_REFRESH_ENTFERNEN,
             )
         _set_cookies(response, result.value)
         return {"status": "ok"}
