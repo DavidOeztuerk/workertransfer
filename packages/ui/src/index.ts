@@ -1,4 +1,5 @@
 export { Alert } from "./components/alert";
+export { Badge } from "./components/badge";
 export { Button } from "./components/button";
 export { Card } from "./components/card";
 export { Checkbox } from "./components/checkbox";
@@ -16,6 +17,7 @@ export { Switch } from "./components/switch";
 export { TextArea } from "./components/text-area";
 export { VisuallyHidden } from "./components/visually-hidden";
 export type { AlertProps, AlertVariant } from "./components/alert";
+export type { BadgeProps } from "./components/badge";
 export type { ButtonProps } from "./components/button";
 export type { CardProps } from "./components/card";
 export type { CheckboxProps } from "./components/checkbox";
