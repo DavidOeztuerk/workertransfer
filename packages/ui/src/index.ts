@@ -2,6 +2,7 @@ export { Alert } from "./components/alert";
 export { Button } from "./components/button";
 export { Card } from "./components/card";
 export { Checkbox } from "./components/checkbox";
+export { DescriptionList } from "./components/description-list";
 export { Empty } from "./components/empty";
 export { Field } from "./components/field";
 export { Fieldset, RadioGroup } from "./components/fieldset";
@@ -13,10 +14,15 @@ export { Select } from "./components/select";
 export { Skeleton } from "./components/skeleton";
 export { Switch } from "./components/switch";
 export { TextArea } from "./components/text-area";
+export { VisuallyHidden } from "./components/visually-hidden";
 export type { AlertProps, AlertVariant } from "./components/alert";
 export type { ButtonProps } from "./components/button";
 export type { CardProps } from "./components/card";
 export type { CheckboxProps } from "./components/checkbox";
+export type {
+  DescriptionListItem,
+  DescriptionListProps,
+} from "./components/description-list";
 export type { EmptyProps } from "./components/empty";
 export type { FieldProps } from "./components/field";
 export type { FieldsetProps, RadioGroupProps, RadioOption } from "./components/fieldset";
@@ -28,3 +34,4 @@ export type { SelectProps } from "./components/select";
 export type { SkeletonProps } from "./components/skeleton";
 export type { SwitchProps } from "./components/switch";
 export type { TextAreaProps } from "./components/text-area";
+export type { VisuallyHiddenProps } from "./components/visually-hidden";
