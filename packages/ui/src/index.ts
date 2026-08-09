@@ -1,9 +1,11 @@
+export { Alert } from "./components/alert";
 export { Button } from "./components/button";
 export { Card } from "./components/card";
 export { Field } from "./components/field";
 export { Loading } from "./components/loading";
 export { Switch } from "./components/switch";
 export { TextArea } from "./components/text-area";
+export type { AlertProps, AlertVariant } from "./components/alert";
 export type { ButtonProps } from "./components/button";
 export type { CardProps } from "./components/card";
 export type { FieldProps } from "./components/field";
