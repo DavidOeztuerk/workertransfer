@@ -51,10 +51,21 @@ export interface GemerkteStelle {
 }
 
 function speicher(): Storage | null {
-  // Safari im privaten Modus und abgeschaltete Speicher werfen beim Zugriff.
-  // Eine gemerkte Stelle ist Komfort — sie darf nichts umwerfen.
+  // Zwei verschiedene Arten, kaputt zu sein — und die zweite hat mich erwischt:
+  //
+  // 1. Der Zugriff WIRFT: Safari im privaten Modus, abgeschaltete Speicher.
+  // 2. Das Objekt IST DA, kann aber nichts. Node 25 bringt ein eigenes
+  //    globales `localStorage` mit, das ohne `--localstorage-file` keine
+  //    Methoden hat; jsdom übernimmt es, und `window.localStorage` ist dann
+  //    ein Objekt ohne `getItem`. Der erste Schutz allein reicht dagegen
+  //    nicht — es wirft ja nichts, es kann nur nichts.
+  //
+  // Eine gemerkte Stelle ist Komfort. Sie darf nichts umwerfen, in keinem
+  // der beiden Fälle.
   try {
-    return typeof window === "undefined" ? null : window.localStorage;
+    if (typeof window === "undefined") return null;
+    const s: Storage | undefined = window.localStorage;
+    return typeof s?.getItem === "function" ? s : null;
   } catch {
     return null;
   }
