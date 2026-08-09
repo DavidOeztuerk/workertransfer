@@ -7,7 +7,7 @@ the claim's tenant_id (ADR-0008). Docker-gated; skips wholesale offline.
 
 from __future__ import annotations
 
-import os
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -25,26 +25,43 @@ _SERVICE_DIR = Path(__file__).resolve().parents[2]  # apps/identity-service
 
 
 @pytest.fixture(scope="module")
-def migrated_schema(postgres_url: str) -> None:
+def migrated_schema(postgres_url: str) -> Iterator[None]:
     """Apply alembic upgrade head synchronously before the async tests run.
 
     ``command.upgrade`` drives ``env.py``, which calls ``asyncio.run`` -> it
     cannot run inside the async-test event loop. Running it in a sync
     module-scoped fixture (before pytest-asyncio enters its loop) sidesteps
     that collision and applies the schema once per module/container.
+
+    Die Umgebung wird über ``pytest.MonkeyPatch`` gesetzt und am Modulende
+    zurückgenommen — wie in jedem Nachbarmodul hier. Direkt nach ``os.environ``
+    geschrieben blieb ``WORKER_DATABASE_URL`` für den REST der Sitzung stehen,
+    und weil das Präfix für alle Dienste dasselbe ist, zeigte danach *jede*
+    ``…Settings()`` ohne eigenen Wert auf diesen Container. Sichtbar wurde das
+    an ``tests/test_auth_throttle.py::TestWiredUp``: der Test hält ausdrücklich
+    fest, dass dort KEINE Datenbank läuft, sprach aber mit dieser hier. Er blieb
+    grün — er prüft nur die 429 —, und übrig blieb eine Warnung
+    (``coroutine 'Connection._cancel' was never awaited``) in einem ganz anderen
+    Test, weil der Verbindungspool beim Abräumen mitten in einer Abfrage steckte.
     """
     cfg = Config()
     cfg.set_main_option("script_location", str(_SERVICE_DIR / "migrations"))
-    os.environ["WORKER_DATABASE_URL"] = postgres_url
-    command.upgrade(cfg, "head")
+    patch = pytest.MonkeyPatch()
+    try:
+        patch.setenv("WORKER_DATABASE_URL", postgres_url)
+        # Muss stehen, bevor der Test seine Settings baut — deshalb hier und
+        # nicht im Test.
+        patch.setenv("WORKER_JWT_SECRET", "test-secret-with-at-least-thirty-two-bytes-xx")
+        command.upgrade(cfg, "head")
+        yield
+    finally:
+        patch.undo()
 
 
 async def test_register_login_me_refresh_logout_roundtrip(
     postgres_url: str, migrated_schema: None
 ) -> None:
-    # Re-read settings so the service points at the migrated container DB.
-    os.environ["WORKER_JWT_SECRET"] = "test-secret-with-at-least-thirty-two-bytes-xx"
-
+    # Settings neu lesen, damit der Dienst auf die migrierte Container-DB zeigt.
     from identity_service.configuration import IdentityServiceSettings
     from identity_service.presentation.compose_api import build_app
 
