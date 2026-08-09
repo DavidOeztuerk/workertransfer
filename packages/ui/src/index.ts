@@ -8,6 +8,7 @@ export { Fieldset, RadioGroup } from "./components/fieldset";
 export { LiveRegion, useAnnounce } from "./components/live-region";
 export { Loading } from "./components/loading";
 export { Page } from "./components/page";
+export { Row, RowList } from "./components/row";
 export { Select } from "./components/select";
 export { Skeleton } from "./components/skeleton";
 export { Switch } from "./components/switch";
@@ -22,6 +23,7 @@ export type { FieldsetProps, RadioGroupProps, RadioOption } from "./components/f
 export type { LiveRegionProps } from "./components/live-region";
 export type { LoadingProps } from "./components/loading";
 export type { PageProps } from "./components/page";
+export type { RowListProps, RowProps } from "./components/row";
 export type { SelectProps } from "./components/select";
 export type { SkeletonProps } from "./components/skeleton";
 export type { SwitchProps } from "./components/switch";
