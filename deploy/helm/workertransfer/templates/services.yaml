@@ -1,0 +1,208 @@
+{{/*
+Deployment + Service je Dienst, erzeugt aus der Liste in values.yaml.
+
+Der Name des Service-Objekts ist NICHT frei wählbar: docker/traefik/dynamic.yml
+spricht `http://identity-service:8001` an, und genau diese Datei wird
+unverändert ins Gateway gehängt. Heisst das Objekt hier anders, zeigt die
+Landkarte ins Leere.
+*/}}
+{{- $root := . }}
+{{- range $svc := .Values.services }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $svc.name }}
+  labels:
+    {{- include "workertransfer.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $svc.name }}
+spec:
+  replicas: {{ $root.Values.replicaCount }}
+  {{/*
+  Recreate, nicht RollingUpdate. Zwei Gründe, und beide hängen an replicas=1:
+  ein rollendes Update stellte kurzzeitig eine ZWEITE Instanz daneben — genau
+  das, was die Auth-Bremse und der Outbox-Zusteller nicht vertragen (siehe
+  values.yaml) — und bei portfolio-service könnte das zweite Pod das
+  ReadWriteOnce-Volume gar nicht bekommen und bliebe hängen.
+  */}}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $root.Release.Name }}
+      app.kubernetes.io/component: {{ $svc.name }}
+  template:
+    metadata:
+      labels:
+        {{- include "workertransfer.labels" $root | nindent 8 }}
+        app.kubernetes.io/component: {{ $svc.name }}
+      annotations:
+        {{/*
+        Ohne diese Prüfsumme bliebe ein Pod nach einer Änderung an der
+        gemeinsamen Umgebung mit den ALTEN Werten stehen — `helm upgrade`
+        meldete Erfolg, und nichts hätte sich geändert.
+        */}}
+        checksum/env: {{ include (print $root.Template.BasePath "/configmap-env.yaml") $root | sha256sum }}
+    spec:
+      {{/*
+      Migriert wird HIER und nur hier — nicht im Hauptprozess.
+
+      Warum kein Helm-Hook-Job: ein `pre-install`-Hook läuft, BEVOR das
+      Postgres-StatefulSet aus diesem Chart existiert. Er hätte keine Datenbank,
+      auf die er warten könnte. Postgres selbst zum Hook zu machen, würde ein
+      StatefulSet mit PVC aus Helms Bestandsverwaltung nehmen — ein hoher Preis
+      für die Reihenfolge.
+
+      Der Container benutzt den UNVERÄNDERTEN docker/entrypoint.sh: er migriert
+      und führt danach `true` aus. Es läuft also derselbe Migrationspfad wie in
+      docker compose, nicht eine zweite Beschreibung davon.
+
+      Das Warten steht davor, weil Alembic gegen eine noch schlafende Datenbank
+      mit einem Stapelabzug abbricht — der sieht nach kaputtem Code aus und ist
+      nur eine Reihenfolge.
+
+      ACHTUNG bei replicas > 1: dann läuft das je Pod und ist das Rennen, das
+      hier vermieden werden sollte. Siehe values.yaml — die Zahl steht dort
+      nicht zufällig auf 1.
+      */}}
+      initContainers:
+        - name: migrate
+          image: "{{ $root.Values.image.repository }}:{{ $root.Values.image.tag }}"
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          {{/*
+          `command`, nicht `args`: mit `args` liefe der ENTRYPOINT zuerst und
+          migrierte, BEVOR gewartet wird — genau falsch herum. So wartet die
+          Schleife, und der Entrypoint wird danach ausdrücklich aufgerufen.
+          */}}
+          command:
+            - sh
+            - -c
+            - |
+              until python -c 'import socket; socket.create_connection(("{{ $root.Values.postgres.host }}", {{ $root.Values.postgres.port }}), 2)' 2>/dev/null; do
+                echo "warte auf {{ $root.Values.postgres.host }}:{{ $root.Values.postgres.port }} ..."
+                sleep 2
+              done
+              exec /usr/local/bin/entrypoint.sh true
+          envFrom:
+            - configMapRef:
+                name: {{ $root.Release.Name }}-env
+          env:
+            {{- include "workertransfer.serviceEnv" (dict "root" $root "svc" $svc) | nindent 12 }}
+          resources:
+            {{- toYaml $root.Values.resources | nindent 12 }}
+      containers:
+        - name: service
+          image: "{{ $root.Values.image.repository }}:{{ $root.Values.image.tag }}"
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          {{/*
+          `command` überschreibt den ENTRYPOINT des Images und umgeht ihn damit
+          vollständig. Das ist Absicht: docker/entrypoint.sh migriert vor dem
+          Start, und in Kubernetes gehört das in den Job nebenan. Drei
+          Repliken, die gleichzeitig `alembic upgrade head` fahren, sind ein
+          Rennen — auch wenn heute nur eine läuft.
+
+          Kein --reload: im Cluster gibt es keinen Bind-Mount, der Code kommt
+          aus dem Image.
+          */}}
+          command:
+            - uvicorn
+            - {{ $svc.module }}
+            - --host
+            - "0.0.0.0"
+            - --port
+            - {{ $svc.port | quote }}
+          envFrom:
+            - configMapRef:
+                name: {{ $root.Release.Name }}-env
+          env:
+            {{- include "workertransfer.serviceEnv" (dict "root" $root "svc" $svc) | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ $svc.port }}
+          {{/*
+          live sagt "der Prozess lebt", ready sagt "die Datenbank antwortet
+          auch" (worker_platform.presentation.health). Sie zu vertauschen
+          hiesse: bei einer kurzen Datenbankstörung wird der Dienst NEU
+          GESTARTET statt aus dem Verkehr genommen — und startet in dieselbe
+          Störung hinein.
+          */}}
+          {{/*
+          timeoutSeconds steht ÜBERALL, weil die Voreinstellung 1 Sekunde ist —
+          und die ist hier falsch. Gemessen, nicht vermutet: beim ersten
+          Ausrollen starteten fünfzehn Pods gleichzeitig auf einem Knoten, und
+          jede einzelne Fehlermeldung lautete "timed out after 1s". Drei
+          Dienste wurden deshalb neu gestartet, obwohl sie liefen.
+
+          Eine Bereitschaftsprüfung, die die Datenbank fragt, hat in einer
+          Sekunde nicht sicher geantwortet — nicht weil etwas kaputt ist,
+          sondern weil zehn Python-Prozesse gleichzeitig hochfahren. Wer das
+          über die Zeitgrenze "löst", schreibt einen Fehler als normales
+          Verhalten fest; wer es zu knapp lässt, startet gesunde Dienste neu.
+          */}}
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 40
+          resources:
+            {{- toYaml $root.Values.resources | nindent 12 }}
+          {{- if $svc.persistence }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ $svc.persistence.mountPath }}
+          {{- end }}
+      {{- if $svc.persistence }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ $svc.name }}-data
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svc.name }}
+  labels:
+    {{- include "workertransfer.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $svc.name }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ $root.Release.Name }}
+    app.kubernetes.io/component: {{ $svc.name }}
+  ports:
+    - name: http
+      port: {{ $svc.port }}
+      targetPort: http
+{{- if $svc.persistence }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $svc.name }}-data
+  labels:
+    {{- include "workertransfer.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $svc.name }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ $svc.persistence.size }}
+{{- end }}
+{{- end }}

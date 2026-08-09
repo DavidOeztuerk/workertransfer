@@ -1,0 +1,46 @@
+{{/*
+Das Gateway. Dasselbe Traefik wie in docker compose, und vor allem: DIESELBEN
+Routen.
+
+Die Aufteilung ist nach Beständigkeit gemacht, nicht nach Dateiformat:
+
+  dynamic.yml  — die LANDKARTE. Überall gleich, kommt per --set-file aus
+                 docker/traefik/dynamic.yml. Sie ein zweites Mal zu pflegen
+                 hiesse, sie beim ersten neuen Pfad falsch zu haben. Die Pfade
+                 der Dienste sind nicht disjunkt (/companies/{id}/members ->
+                 identity, /companies/{id}/profile -> companies); die Auflösung
+                 hängt an den priority-Werten IN dieser Datei.
+
+  traefik.yml  — die statische Konfiguration. Umgebungsabhängig und deshalb
+                 hier erzeugt: das Dashboard ist lokal an und in Produktion
+                 aus, TLS kommt später dazu.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-gateway
+  labels:
+    {{- include "workertransfer.labels" . | nindent 4 }}
+data:
+  traefik.yml: |
+    entryPoints:
+      web:
+        address: ":80"
+    providers:
+      file:
+        filename: /etc/traefik/dynamic.yml
+        watch: true
+    api:
+      dashboard: {{ .Values.gateway.dashboard }}
+      insecure: {{ .Values.gateway.dashboard }}
+    log:
+      level: {{ .Values.gateway.logLevel }}
+    # Zugriffsprotokoll ohne Inhalte: Pfad und Status, kein Körper, keine
+    # Cookies. Was hier landete, läge dauerhaft im Protokoll
+    # (docs/product-scope.md).
+    accessLog:
+      fields:
+        headers:
+          defaultMode: drop
+  dynamic.yml: |
+    {{- required "gateway.dynamicConfig fehlt — mit `--set-file gateway.dynamicConfig=docker/traefik/dynamic.yml` installieren (scripts/k8s-up.sh macht das). Ohne die Datei gäbe es keine einzige Route." .Values.gateway.dynamicConfig | nindent 4 }}
