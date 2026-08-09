@@ -9,10 +9,13 @@
 #
 # Python lifecycle goes through `uv` (never pip/poetry); frontend through `pnpm`.
 
-.PHONY: help check check-py check-web validate validate-e2e lint fix type test test-web sync ci clean dev
+.PHONY: help check check-py check-web validate validate-e2e lint fix type test test-web sync ci clean dev k8s-up k8s-down k8s-lint k8s-seed
 
 help:  # Show this help (default target).
-	@awk 'BEGIN {FS = ":.*#"} /^[a-zA-Z_-]+:.*# / {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@# `0-9` im Muster, sonst fehlen k8s-up/-down/-seed/-lint in dieser Liste —
+	@# vorhanden, aber unsichtbar, und damit für niemanden auffindbar.
+	@# Die Breite passt zum längsten Namen (`validate-e2e`).
+	@awk 'BEGIN {FS = ":.*#"} /^[a-zA-Z0-9_-]+:.*# / {printf "  \033[36m%-13s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 check: check-py check-web  # Definition-of-Done gate: all six steps, fail-fast.
 
@@ -56,6 +59,24 @@ ci: check  # Mirror the CI job locally (same steps, same order).
 
 dev:  # Start backend + frontend together locally.
 	./scripts/run-dev.sh
+
+k8s-up:  # Lokale Staging-Umgebung auf kind — bauen, ausrollen, BELEGEN.
+	./scripts/k8s-up.sh
+
+k8s-down:  # Den kind-Cluster samt Daten löschen.
+	./scripts/k8s-down.sh
+
+k8s-seed:  # Testdaten in die laufende Umgebung: Firma, drei Stellen, ein Bewerber-Konto.
+	./scripts/k8s-seed.sh
+
+k8s-lint:  # Chart prüfen, ohne Cluster: helm lint + rendern.
+	helm lint deploy/helm/workertransfer \
+		--set-file gateway.dynamicConfig=docker/traefik/dynamic.yml \
+		--set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql
+	helm template deploy/helm/workertransfer \
+		--set-file gateway.dynamicConfig=docker/traefik/dynamic.yml \
+		--set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql > /dev/null
+	@echo "Chart rendert."
 
 clean:  # Remove caches + bytecode artifacts.
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

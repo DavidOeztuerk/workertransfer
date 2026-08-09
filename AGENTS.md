@@ -107,6 +107,22 @@ pnpm dev      # Vite dev server (turbo parallel)
 - **AI drafts on request, stores nothing** (ADR-0024): `NullDrafter` is the default; `DraftContext` carries no name/email/subject_id; no prompt or answer is ever logged or persisted
 - **`worker-skills` renames, never infers** (ADR-0023): aliases only (`postgres` → `PostgreSQL`). No implications, levels, weights, or likelihood-to-switch. Unknown skills pass through unchanged
 - **Auth edge is throttled per origin, never per email address** (`worker_platform.presentation.throttle`): a per-address limit would both confirm the address exists and let a stranger lock a person out
+- **`replicaCount` stays 1** (ADR-0028): the throttle counts in-process, `OutboxDispatcher.pending()` has no `FOR UPDATE SKIP LOCKED` (two dispatchers ⇒ every mail twice), and migration runs in an initContainer. Raising it means fixing all three, not editing a value
+
+## Kubernetes (local staging)
+
+```bash
+make k8s-up      # kind cluster + both images + helm release + proof
+make k8s-down    # delete cluster and data
+make k8s-lint    # helm lint + render, no cluster
+```
+- Chart in `deploy/helm/workertransfer`, cluster in `deploy/kind/cluster.yaml`; app on **`:8090`** (8080 belongs to the compose gateway — never run both)
+- **One image for ten services**: they differ only in `SERVICE_DIR`, which the pod sets; built once *without* the build arg
+- **Routes and initdb SQL come from the compose files** via `--set-file`, never copied. Both are `required`
+- **`Sec-Fetch-Dest: document` routes to the SPA** (`web-navigation`, priority 200): behind one origin `/jobs` is both an API prefix and a page. Clicking works (client-side router), only deep links and reloads broke — with raw JSON. Do not replace it with a path list
+- **Probes must set `timeoutSeconds`** — the default is 1s and it restarted three healthy services
+- **The web image is built** (`docker/web-prod.Dockerfile`), so URLs come from `window.__WT_CONFIG__` at runtime, not from `VITE_*` at build time
+- CI builds no chart, just as it builds no image
 
 ## Verification order
 
