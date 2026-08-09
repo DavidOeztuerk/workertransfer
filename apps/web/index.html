@@ -9,6 +9,17 @@
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>WorkerTransfer</title>
+    <!--
+      Laufzeitkonfiguration. Bewusst KEIN type="module": ein klassisches Skript
+      läuft sofort und damit garantiert vor dem Bündel darunter, das als Modul
+      ohnehin verzögert ausgeführt wird. src/env.ts liest die Werte beim Import,
+      und dieser Import darf nicht der Erste sein.
+
+      Sie wird nicht gebündelt (sie liegt in public/), bleibt also eine eigene
+      Datei — und genau das erlaubt es dem Helm-Chart, sie im Container zu
+      ersetzen, statt für jede Umgebung ein neues Image zu bauen.
+    -->
+    <script src="/config.js"></script>
   </head>
   <body>
     <div id="root"></div>
