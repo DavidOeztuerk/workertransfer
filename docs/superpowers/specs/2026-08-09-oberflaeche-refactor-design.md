@@ -44,8 +44,8 @@ andere Zahl nennt, steht sie daneben.
 | `<table>` | **0** | 0 ✓ |
 | `window.confirm` | **0** | — |
 | Leerzustands-Sätze | 27 | „kein Leerzustand" ✓ |
-| Testfälle `apps/web` | 386 | — |
-| Testfälle `packages/ui` | 20 | — |
+| Testfälle `apps/web` | 385 | — |
+| Testfälle `packages/ui` | 22 | — |
 
 ### Ein Fund, der nicht im Prompt steht: die Oberfläche hat zwei Paletten
 
@@ -114,7 +114,7 @@ nach einer Verhaltensänderung grün bleibt, hat das Verhalten nicht geprüft.
 
 ## E1 — Das Design-System, vollständig
 
-Berührt **keine** Route. Die 386 Testfälle in `apps/web` bleiben unverändert
+Berührt **keine** Route. Die 385 Testfälle in `apps/web` bleiben unverändert
 grün; ist das nicht so, hat E1 seinen Rahmen verlassen.
 
 ### E1.1 — Eine Palette, ein Token-Satz
@@ -230,9 +230,9 @@ darf **kein** Toast werden.
 ### E1.3 — Beweis für E1
 
 - Jede neue Komponente hat einen Test, der **Verhalten** prüft — Tastatur,
-  Fokus, aria — nicht Klassennamen. Ausgangswert: 20 Testfälle in
+  Fokus, aria — nicht Klassennamen. Ausgangswert: 22 Testfälle in
   `packages/ui`; Ziel etwa 70.
-- Die 386 Testfälle in `apps/web` laufen **unverändert** grün.
+- Die 385 Testfälle in `apps/web` laufen **unverändert** grün.
 - `pnpm check && pnpm test && pnpm build`, alle drei — die CI fährt sie auch.
 - Screenshot-Vergleich der Palettenvereinigung (siehe unten), weil sie sichtbar
   ist.
@@ -490,7 +490,7 @@ ist zu **prüfen**, nicht anzunehmen.
 ## Definition of Done
 
 **E1:** 20 Komponenten mit Verhaltenstests; ein Token-Satz, ein Wächtertest
-gegen undefinierte Tokens; `pnpm check/test/build` grün; die 386 Testfälle in
+gegen undefinierte Tokens; `pnpm check/test/build` grün; die 385 Testfälle in
 `apps/web` unverändert grün; ADR-0029 geschrieben; Screenshot-Vergleich der
 Palette.
 
