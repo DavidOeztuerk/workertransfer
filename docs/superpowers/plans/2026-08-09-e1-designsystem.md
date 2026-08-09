@@ -46,8 +46,11 @@ Diese Regeln gelten für **jede** Aufgabe. Sie werden nicht wiederholt.
   zugängliche Beschreibung, Tastatur, Fokus. `screen.getByRole(...)` statt
   `container.querySelector(".wt-…")`. Wo eine Ausnahme nötig ist, steht der
   Grund als Kommentar im Test.
-- **Keine Route in `apps/web/src/routes/` wird in E1 geändert.** Die **386**
-  Testfälle in `apps/web` müssen am Ende unverändert grün sein. Einzige
+- **Keine Route in `apps/web/src/routes/` wird in E1 geändert.** Die **385**
+  Testfälle in `apps/web` müssen am Ende unverändert grün sein — gemessen mit
+  dem Testläufer, nicht mit `grep`: eine `grep`-Zählung über `it(`/`test(`
+  ergab 386 und lag um eins daneben (im Paket 20 statt der echten 22).
+  Verbindlich ist, was `pnpm test` sagt. Einzige
   erlaubte Ausnahmen: `apps/web/src/styles.css` (Fallbacks entfernen),
   `apps/web/src/styles.test.ts` (neu), `apps/web/package.json` (Skript),
   `apps/web/playwright.shots.config.ts` + `apps/web/e2e-shots/` (neu),
@@ -491,8 +494,9 @@ einzige `styles.css`, und der Wächter liest sie statt des Ordners).
 - [ ] **Step 12: Volles Frontend-Gate**
 
 Run: `pnpm check && pnpm test && pnpm build`
-Expected: alle grün. `pnpm test` muss weiterhin die **386** Testfälle aus
-`apps/web` melden plus 20 + 7 aus dem Paket.
+Expected: alle grün. `pnpm test` meldet **388** Testfälle aus `apps/web`
+(385 bestehende + 3 aus dem neuen Wächter) und **26** aus dem Paket
+(22 bestehende + 4 aus dem neuen Wächter).
 
 - [ ] **Step 13: Commit**
 
@@ -3726,9 +3730,9 @@ Expected: alles grün.
 ```bash
 # Bauteile: müssen 20 sein (5 alt + 15 neu)
 ls -1 packages/ui/src/components/*.tsx | grep -v '\.test\.' | wc -l
-# Testfälle im Paket: Ausgangswert war 20
+# Testfälle im Paket: Ausgangswert war 22 (Testläufer, nicht grep)
 grep -rhc 'it(' packages/ui/src/components/*.test.tsx packages/ui/src/styles.test.ts | awk '{s+=$1} END {print s}'
-# apps/web muss UNVERÄNDERT bei 386 stehen (+3 aus styles.test.ts = 389)
+# apps/web muss UNVERÄNDERT bei 385 stehen (+3 aus styles.test.ts = 388)
 grep -rhc 'it(\|test(' $(find apps/web/src -name '*.test.ts' -o -name '*.test.tsx') | awk '{s+=$1} END {print s}'
 # Tokens: müssen >= 25 sein
 grep -cE '^\s+--wt-[a-z0-9-]+\s*:' packages/ui/src/styles/tokens.css
