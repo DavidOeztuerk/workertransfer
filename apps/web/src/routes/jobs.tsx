@@ -1,10 +1,11 @@
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button, Card, Field, TextArea } from "@workertransfer/ui";
 
 import { apply } from "../applications/client";
 import { getCompanyProfile } from "../companies/client";
 import { getMyProfile } from "../profile/client";
+import { merkeStelle } from "../jobs/intent";
 import type { MeResponse } from "../auth/client";
 
 import {
@@ -12,6 +13,7 @@ import {
   type Job,
   type RemoteMode,
   type SearchResult,
+  getJob,
   searchJobs,
 } from "../jobs/client";
 import { matchSkills } from "../jobs/match";
@@ -38,6 +40,9 @@ interface Filters {
 }
 
 const EMPTY: Filters = { q: "", location: "", remote: "", employment: "" };
+
+/** Geprüft, bevor die ID in eine Anfrage geht — sie kommt aus der Adresszeile. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface JobsRouteProps {
   // Injizierbar, damit der Test ohne laufende Sitzung rendern kann. `null`
@@ -83,7 +88,30 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
 
   const pages = query.data?.pages ?? [];
   const failure = pages.find((page) => !page.ok);
-  const items: Job[] = pages.flatMap((page) => (page.ok ? page.items : []));
+  const gefunden: Job[] = pages.flatMap((page) => (page.ok ? page.items : []));
+
+  // Die Stelle, wegen der jemand sich gerade angemeldet hat (?stelle=<uuid>,
+  // gesetzt von login.tsx). Sie wird EINZELN geholt, statt in der Trefferliste
+  // gesucht zu werden: die Liste ist gefiltert und seitenweise, die gesuchte
+  // Stelle steht also womöglich gar nicht darin — und dann hätte das
+  // Zurückkommen leise nicht funktioniert.
+  const gesuchteStelle = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const roh = new URLSearchParams(window.location.search).get("stelle");
+    return roh !== null && UUID.test(roh) ? roh : null;
+  }, []);
+
+  const einzelne = useQuery({
+    queryKey: ["jobs", "einzeln", gesuchteStelle],
+    queryFn: () => getJob(gesuchteStelle as string),
+    enabled: gesuchteStelle !== null,
+  });
+
+  // Sie steht vorn und kommt in der Liste darunter kein zweites Mal vor.
+  const items: Job[] =
+    einzelne.data != null
+      ? [einzelne.data, ...gefunden.filter((j) => j.id !== einzelne.data?.id)]
+      : gefunden;
 
   return (
     <main className="page">
@@ -155,11 +183,36 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
                 <p>{job.description}</p>
                 <Requirements skills={job.skills} mine={mySkills} />
                 {principal !== null ? (
-                  <ApplyBox jobId={job.id} />
+                  <ApplyBox jobId={job.id} offen={job.id === gesuchteStelle} />
                 ) : (
-                  <p className="candidates__meta">
-                    Zum Bewerben <a href="/login">anmelden</a>.
-                  </p>
+                  <>
+                    {/*
+                      Ein KNOPF, kein Wort in einem Satz. Vorher stand hier
+                      „Zum Bewerben anmelden." und nur das letzte Wort war ein
+                      Link — für ein Programm anklickbar, für einen Menschen
+                      ein Fließtext. Wer bewerben will, sucht einen Knopf, und
+                      er muss dasselbe Gewicht haben wie der für Angemeldete;
+                      sonst sieht die Seite ohne Konto aus, als könne man hier
+                      nichts tun.
+                    */}
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        // Erst merken, dann wechseln. Der Knopf ist die
+                        // EINZIGE Stelle, an der die Absicht entsteht — wer
+                        // über die Kopfzeile zur Anmeldung geht, hat keine
+                        // geäußert, und dann darf ihn auch nichts irgendwohin
+                        // zurückwerfen.
+                        merkeStelle(job.id, job.title);
+                        window.location.href = "/login";
+                      }}
+                    >
+                      Bewerben
+                    </Button>
+                    <p className="candidates__meta">
+                      Dafür brauchst du ein Konto — danach geht es hierher zurück.
+                    </p>
+                  </>
                 )}
               </Card>
             </li>
@@ -257,8 +310,15 @@ function Requirements({ skills, mine }: { skills: string[]; mine: string[] | nul
  * eine Bewerbung ohne jede Angabe zur Person ist keine, und ein Kästchen dafür
  * wäre eine Wahl, die niemand ernsthaft trifft.
  */
-function ApplyBox({ jobId }: { jobId: string }) {
-  const [open, setOpen] = useState(false);
+/**
+ * `offen` startet das Formular aufgeklappt.
+ *
+ * Gesetzt, wenn jemand über `?stelle=` zurückkommt: derjenige hat vor dem
+ * Anmelden schon auf „Bewerben" geklickt. Ihn den Knopf ein zweites Mal
+ * suchen zu lassen, wäre die Frage nochmal zu stellen, die er beantwortet hat.
+ */
+function ApplyBox({ jobId, offen = false }: { jobId: string; offen?: boolean }) {
+  const [open, setOpen] = useState(offen);
   const [message, setMessage] = useState("");
   const [resume, setResume] = useState(true);
   const [portfolio, setPortfolio] = useState(false);

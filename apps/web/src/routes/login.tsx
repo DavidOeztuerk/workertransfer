@@ -4,7 +4,9 @@ import { Button, Field } from "@workertransfer/ui";
 
 import { type LoginInput, login } from "../auth/client";
 import { SESSION_QUERY_KEY } from "../auth/session";
+import { gemerkteStelle, vergissStelle } from "../jobs/intent";
 import { AuthLayout } from "./auth-layout";
+import { ZurueckHinweis } from "../jobs/ZurueckHinweis";
 
 export function LoginRoute() {
   const queryClient = useQueryClient();
@@ -22,9 +24,14 @@ export function LoginRoute() {
     setBusy(false);
     if (result.ok) {
       // The auth cookies are set now; drop the cached anonymous session so the
-      // next read of GET /me reflects the login, then hand over to the app.
+      // next read reflects the login, then hand over to the app.
       await queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
-      window.location.href = "/";
+      // Zurück zu der Stelle, wegen der jemand überhaupt hier gelandet ist.
+      // Kein gespeicherter Pfad, sondern eine ID — wohin navigiert wird,
+      // entscheidet diese Zeile, nicht der Speicher (siehe jobs/intent.ts).
+      const stelle = gemerkteStelle();
+      vergissStelle();
+      window.location.href = stelle === null ? "/" : `/jobs?stelle=${stelle}`;
     } else {
       setError(result.message);
     }
@@ -41,6 +48,7 @@ export function LoginRoute() {
         </>
       }
     >
+      <ZurueckHinweis />
       <form onSubmit={onSubmit}>
         <Field
           label="E-Mail"
