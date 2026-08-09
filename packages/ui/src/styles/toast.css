@@ -1,0 +1,17 @@
+.wt-toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wt-space-4);
+  border: 1px solid var(--wt-border);
+  border-radius: var(--wt-radius-sm);
+  padding: var(--wt-space-3) var(--wt-space-4);
+  background: var(--wt-surface-raised);
+  box-shadow: var(--wt-shadow);
+}
+
+.wt-toast__message {
+  margin: 0;
+  font-size: var(--wt-text-base);
+  line-height: var(--wt-leading-tight);
+}
