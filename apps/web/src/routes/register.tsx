@@ -3,6 +3,7 @@ import { Button, Field } from "@workertransfer/ui";
 
 import { type RegisterInput, registerUser, resendVerification } from "../auth/client";
 import { AuthLayout } from "./auth-layout";
+import { ZurueckHinweis } from "../jobs/ZurueckHinweis";
 
 const CLAIM = "Dein Profil gehört dir.";
 const SUPPORT =
@@ -79,6 +80,7 @@ export function RegisterRoute() {
       {/* Kein Firmen- oder Mandantenfeld: registrieren ist der Akt einer Person
           (ADR-0017). Eine private Adresse ist der Normalfall — der
           Wechselwillige und der Arbeitssuchende brauchen kein Unternehmen. */}
+      <ZurueckHinweis />
       <form onSubmit={onSubmit}>
         <Field
           label="E-Mail"

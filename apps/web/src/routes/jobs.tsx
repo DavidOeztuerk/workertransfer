@@ -183,24 +183,36 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
                 <p>{job.description}</p>
                 <Requirements skills={job.skills} mine={mySkills} />
                 {principal !== null ? (
-                  <ApplyBox jobId={job.id} />
+                  <ApplyBox jobId={job.id} offen={job.id === gesuchteStelle} />
                 ) : (
-                  <p className="candidates__meta">
-                    Zum Bewerben{" "}
-                    <a
-                      href="/login"
+                  <>
+                    {/*
+                      Ein KNOPF, kein Wort in einem Satz. Vorher stand hier
+                      „Zum Bewerben anmelden." und nur das letzte Wort war ein
+                      Link — für ein Programm anklickbar, für einen Menschen
+                      ein Fließtext. Wer bewerben will, sucht einen Knopf, und
+                      er muss dasselbe Gewicht haben wie der für Angemeldete;
+                      sonst sieht die Seite ohne Konto aus, als könne man hier
+                      nichts tun.
+                    */}
+                    <Button
+                      type="button"
                       onClick={() => {
-                        // Die Stelle merken, BEVOR die Seite wechselt. Nach dem
-                        // Anmelden geht es genau hierher zurück — sonst müsste
-                        // man die Suche noch einmal machen, nur weil man kein
-                        // Konto hatte.
-                        merkeStelle(job.id);
+                        // Erst merken, dann wechseln. Der Knopf ist die
+                        // EINZIGE Stelle, an der die Absicht entsteht — wer
+                        // über die Kopfzeile zur Anmeldung geht, hat keine
+                        // geäußert, und dann darf ihn auch nichts irgendwohin
+                        // zurückwerfen.
+                        merkeStelle(job.id, job.title);
+                        window.location.href = "/login";
                       }}
                     >
-                      anmelden
-                    </a>
-                    .
-                  </p>
+                      Bewerben
+                    </Button>
+                    <p className="candidates__meta">
+                      Dafür brauchst du ein Konto — danach geht es hierher zurück.
+                    </p>
+                  </>
                 )}
               </Card>
             </li>
@@ -298,8 +310,15 @@ function Requirements({ skills, mine }: { skills: string[]; mine: string[] | nul
  * eine Bewerbung ohne jede Angabe zur Person ist keine, und ein Kästchen dafür
  * wäre eine Wahl, die niemand ernsthaft trifft.
  */
-function ApplyBox({ jobId }: { jobId: string }) {
-  const [open, setOpen] = useState(false);
+/**
+ * `offen` startet das Formular aufgeklappt.
+ *
+ * Gesetzt, wenn jemand über `?stelle=` zurückkommt: derjenige hat vor dem
+ * Anmelden schon auf „Bewerben" geklickt. Ihn den Knopf ein zweites Mal
+ * suchen zu lassen, wäre die Frage nochmal zu stellen, die er beantwortet hat.
+ */
+function ApplyBox({ jobId, offen = false }: { jobId: string; offen?: boolean }) {
+  const [open, setOpen] = useState(offen);
   const [message, setMessage] = useState("");
   const [resume, setResume] = useState(true);
   const [portfolio, setPortfolio] = useState(false);
