@@ -67,6 +67,17 @@ describe("gemerkte Stelle", () => {
     expect(gemerkteStelle()).toBeNull();
   });
 
+  it("kommt mit einem Speicher klar, der DA ist, aber nichts kann", () => {
+    // Genau dieser Fall hat die CI rot gemacht und lokal nicht: Node 25 stellt
+    // ein globales `localStorage` bereit, das ohne `--localstorage-file` keine
+    // Methoden hat. Es wirft nicht — es kann nur nichts. Ein Schutz, der nur
+    // Ausnahmen abfängt, greift dagegen nicht.
+    vi.spyOn(window, "localStorage", "get").mockReturnValue({} as Storage);
+
+    expect(() => merkeStelle(STELLE)).not.toThrow();
+    expect(gemerkteStelle()).toBeNull();
+  });
+
   it("wirft nicht, wenn der Speicher gesperrt ist", () => {
     // Safari im privaten Modus wirft beim Zugriff. Eine gemerkte Stelle ist
     // Komfort — sie darf die Seite nicht umwerfen.
