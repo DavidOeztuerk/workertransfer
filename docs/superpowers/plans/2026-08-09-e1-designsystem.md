@@ -3489,6 +3489,14 @@ Die Palettenvereinigung aus Task 1 ist sichtbar. Ohne Bilder ist die Aussage
    Knöpfe, Felder und einen `<select>`. Ein angemeldeter Blick käme ohne
    Gewinn mit einer Registrierung samt Mailabruf je Lauf.
 
+**Bekannte Lücke dieses Satzes, aus Aufgabe 8:** die drei Bestandsnutzer von
+`.wt-checkbox` (`jobs.tsx` ApplyBox 2×, `profile.tsx` 1×) liegen alle hinter
+der Anmeldung. Der Wechsel dieser Regel von `display:flex` auf `display:grid`
+ist am gebauten Artefakt belegt, aber **nicht bebildert**. Wer den Satz um eine
+angemeldete Seite erweitern will, nimmt `login()` und `registerAndConfirm()`
+aus `apps/web/e2e/stack.ts` — sonst wird die Lücke mit E3a/E3b geschlossen,
+wenn diese Routen ohnehin umgestellt werden.
+
 - [ ] **Step 1: Die Konfiguration schreiben**
 
 Create `apps/web/playwright.shots.config.ts`:
