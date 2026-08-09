@@ -31,7 +31,23 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface Gemerkt {
   jobId: string;
+  /**
+   * Nur für den Hinweis „Danach geht es zurück zu …".
+   *
+   * Bewusst mitgespeichert statt nachgeladen: sonst bräuchte die Anmeldeseite
+   * eine Abfrage und damit einen QueryClient, nur um einen Satz anzuzeigen.
+   * Dass der Titel veralten kann, ist hier folgenlos — er ist die Notiz einer
+   * Person an sich selbst, sie verfällt nach 24 Stunden, und der richtige
+   * Titel steht danach auf der Stelle selbst. Für die NAVIGATION zählt allein
+   * die ID; der Titel entscheidet nichts.
+   */
+  titel: string;
   gemerktAm: number;
+}
+
+export interface GemerkteStelle {
+  jobId: string;
+  titel: string;
 }
 
 function speicher(): Storage | null {
@@ -44,12 +60,15 @@ function speicher(): Storage | null {
   }
 }
 
-export function merkeStelle(jobId: string): void {
+export function merkeStelle(jobId: string, titel = ""): void {
   if (!UUID.test(jobId)) return;
   const s = speicher();
   if (s === null) return;
   try {
-    s.setItem(SCHLUESSEL, JSON.stringify({ jobId, gemerktAm: Date.now() } satisfies Gemerkt));
+    s.setItem(
+      SCHLUESSEL,
+      JSON.stringify({ jobId, titel: titel.slice(0, 160), gemerktAm: Date.now() } satisfies Gemerkt)
+    );
   } catch {
     // Voller Speicher: dann eben ohne Merken.
   }
@@ -63,6 +82,11 @@ export function merkeStelle(jobId: string): void {
  * dieselbe Annahme, die Open Redirect erst möglich macht.
  */
 export function gemerkteStelle(): string | null {
+  return gemerkteStelleMitTitel()?.jobId ?? null;
+}
+
+/** Wie `gemerkteStelle`, aber mit dem Titel für den Hinweis. */
+export function gemerkteStelleMitTitel(): GemerkteStelle | null {
   const s = speicher();
   if (s === null) return null;
   const roh = s.getItem(SCHLUESSEL);
@@ -77,7 +101,7 @@ export function gemerkteStelle(): string | null {
       vergissStelle();
       return null;
     }
-    return wert.jobId;
+    return { jobId: wert.jobId, titel: typeof wert.titel === "string" ? wert.titel : "" };
   } catch {
     vergissStelle();
     return null;

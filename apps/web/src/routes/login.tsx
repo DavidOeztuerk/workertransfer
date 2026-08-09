@@ -6,6 +6,7 @@ import { type LoginInput, login } from "../auth/client";
 import { SESSION_QUERY_KEY } from "../auth/session";
 import { gemerkteStelle, vergissStelle } from "../jobs/intent";
 import { AuthLayout } from "./auth-layout";
+import { ZurueckHinweis } from "../jobs/ZurueckHinweis";
 
 export function LoginRoute() {
   const queryClient = useQueryClient();
@@ -47,6 +48,7 @@ export function LoginRoute() {
         </>
       }
     >
+      <ZurueckHinweis />
       <form onSubmit={onSubmit}>
         <Field
           label="E-Mail"

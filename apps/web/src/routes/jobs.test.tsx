@@ -170,14 +170,40 @@ describe("JobsRoute", () => {
 });
 
 describe("JobsRoute — bewerben", () => {
-  it("offers applying only to someone who is logged in", async () => {
+  it("bietet Anonymen den Knopf an, aber kein Formular", async () => {
+    // Die Aussage hat sich geändert, die Absicht nicht: bewerben kann nur, wer
+    // angemeldet ist. Vorher stand hier „Zum Bewerben anmelden." mit einem Link
+    // auf dem letzten Wort — für ein Programm anklickbar, für einen Menschen
+    // ein Fließtext. Wer bewerben will, sucht einen Knopf.
     searchJobs.mockResolvedValue({ ok: true, items: [job()], nextCursor: null });
 
     renderWithProviders(<JobsRoute principal={null} />);
 
     await screen.findByText("Backend-Entwicklerin");
-    expect(screen.queryByRole("button", { name: /^Bewerben$/ })).toBeNull();
-    expect(screen.getByText(/anmelden/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Bewerben$/ })).toBeInTheDocument();
+    // Aber eben kein Bewerbungsformular: der Knopf führt zur Anmeldung.
+    expect(screen.queryByLabelText(/Anschreiben/i)).toBeNull();
+    expect(screen.getByText(/danach geht es hierher zurück/i)).toBeInTheDocument();
+  });
+
+  it("merkt sich die Stelle, wenn ein Anonymer auf Bewerben klickt", async () => {
+    // Ohne das müsste man nach dem Anmelden die Suche wiederholen — nur weil
+    // man kein Konto hatte.
+    const user = userEvent.setup();
+    // EINMAL festhalten: `job()` würfelt bei jedem Aufruf eine neue ID.
+    const stelle = job();
+    searchJobs.mockResolvedValue({ ok: true, items: [stelle], nextCursor: null });
+    window.localStorage.clear();
+
+    renderWithProviders(<JobsRoute principal={null} />);
+    await screen.findByText("Backend-Entwicklerin");
+    await user.click(screen.getByRole("button", { name: /^Bewerben$/ }));
+
+    const gemerkt = JSON.parse(window.localStorage.getItem("wt.gemerkte-stelle") ?? "null");
+    expect(gemerkt?.jobId).toBe(stelle.id);
+    // Der Titel reist mit, damit die Anmeldeseite ihn nennen kann, ohne
+    // dafür eine Abfrage zu brauchen.
+    expect(gemerkt?.titel).toBe("Backend-Entwicklerin");
   });
 
   it("does not offer a checkbox for the profile — it is not a choice", async () => {
