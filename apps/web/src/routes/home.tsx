@@ -1,5 +1,7 @@
 import { Button, Card } from "@workertransfer/ui";
 
+import "./home.css";
+
 const foundations = [
   {
     title: "Du entscheidest",
@@ -27,9 +29,19 @@ export function HomeRoute() {
             WorkerTransfer verbindet Bewerbung, direkte Ansprache und faire Wechselprozesse –
             mit nachvollziehbarer KI-Unterstützung statt Black-Box-Entscheidungen.
           </p>
+          {/* Beide führen nach /register. Vorher waren es <Button> ohne onClick
+              und ohne href — die zwei auffälligsten Elemente der Seite, die
+              jeder zuerst sieht, taten beim Klick nichts.
+
+              Die Unterscheidung Arbeitnehmer/Unternehmen trifft die
+              Registrierung selbst; sie kann erst dort entstehen, weil ein
+              Unternehmen eine BESTÄTIGTE Adresse braucht (ADR-0019) und das
+              Konto hier noch PENDING wäre. */}
           <div className="hero__actions">
-            <Button>Als Arbeitnehmer starten</Button>
-            <Button variant="secondary">Als Unternehmen entdecken</Button>
+            <Button href="/register">Als Arbeitnehmer starten</Button>
+            <Button href="/register" variant="secondary">
+              Als Unternehmen entdecken
+            </Button>
           </div>
         </div>
 
