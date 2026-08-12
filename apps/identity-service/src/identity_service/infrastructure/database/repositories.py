@@ -37,6 +37,7 @@ def _to_domain(row: UserModel) -> User:
         display_name=row.display_name,
         roles=tuple(row.roles),
         status=AccountStatus(row.status),
+        pending_company_name=row.pending_company_name,
     )
 
 
@@ -63,6 +64,7 @@ class SqlAlchemyUserRepository:
                 display_name=user.display_name,
                 status=user.status,
                 roles=list(user.roles),
+                pending_company_name=user.pending_company_name,
             )
         )
         await self._session.flush()
@@ -85,6 +87,10 @@ class SqlAlchemyUserRepository:
         row.status = user.status
         row.display_name = user.display_name
         row.roles = list(user.roles)
+        # Muss mit: die Bestätigung LEERT dieses Feld, nachdem sie das
+        # Unternehmen angelegt hat. Fehlte es hier, blieb die Absicht stehen —
+        # und ein zweiter Klick auf denselben Link wäre nicht mehr idempotent.
+        row.pending_company_name = user.pending_company_name
         await self._session.flush()
 
 
