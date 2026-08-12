@@ -80,7 +80,7 @@ test("eine veröffentlichte Stelle findet auch, wer kein Konto hat", async ({ br
     return ((await res.json()) as { slug: string }).slug;
   });
 
-  await anonymous.goto(`/karriere/${slug}`);
+  await anonymous.goto(`/careers/${slug}`);
   await expect(anonymous.getByRole("heading", { name: companyName })).toBeVisible();
   await expect(anonymous.getByText(title)).toBeVisible();
 

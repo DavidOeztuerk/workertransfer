@@ -74,7 +74,7 @@ export function OverviewRoute({ principal }: OverviewRouteProps) {
         openMarket === 1
           ? "1 Unternehmen möchte sehen, ob du ansprechbar bist"
           : `${openMarket} Unternehmen möchten sehen, ob du ansprechbar bist`,
-      href: "/markt",
+      href: "/market",
     });
   }
 
@@ -154,7 +154,7 @@ export function OverviewRoute({ principal }: OverviewRouteProps) {
           <p>Gerade wartet nichts auf dich.</p>
           <p className="requests__meta">
             Du entscheidest, was von dir sichtbar ist — nachsehen kannst du das jederzeit unter{" "}
-            <a href="/freigaben">Meine Freigaben</a>.
+            <a href="/consents">Meine Freigaben</a>.
           </p>
         </Card>
       ) : null}

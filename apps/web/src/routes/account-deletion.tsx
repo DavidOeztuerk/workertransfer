@@ -185,7 +185,7 @@ export function AccountDeletionRoute({ principal = null }: AccountDeletionRouteP
           jeder einzeln bestätigen muss. Du bekommst genau eine E-Mail, wenn alles erledigt ist.
         </p>
         <p className="page__note">
-          Du kannst deine Daten vorher <a href="/meine-daten">unter „Meine Daten"</a>{" "}
+          Du kannst deine Daten vorher <a href="/my-data">unter „Meine Daten"</a>{" "}
           herunterladen. Musst du aber nicht — wer löschen will, darf das ohne Umweg.
         </p>
       </Card>

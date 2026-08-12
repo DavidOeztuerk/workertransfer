@@ -159,7 +159,7 @@ export function MyDataRoute({ principal = null }: MyDataRouteProps) {
           Löschen ist ein eigener Weg und steht bewusst nicht als Knopf neben einem
           Herunterladen-Knopf: hier lässt sich nichts falsch anklicken, was sich nicht rückgängig
           machen ließe. Was dabei passiert, steht vollständig auf{" "}
-          <a href="/konto-loeschen">Konto löschen</a> — vor dem Klick, nicht danach.
+          <a href="/delete-account">Konto löschen</a> — vor dem Klick, nicht danach.
         </p>
         <p className="page__note">
           Du musst hier nichts herunterladen, bevor du löschst. Der Verweis geht in beide

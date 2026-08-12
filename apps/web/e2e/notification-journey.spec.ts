@@ -108,13 +108,13 @@ test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser })
   await expect(candidate.getByRole("switch")).toBeChecked();
 
   // Abbestellen — der Schalter wirkt sofort, es gibt keinen Speichern-Knopf.
-  await candidate.goto("/einstellungen");
+  await candidate.goto("/settings");
   const marketSwitch = candidate.getByRole("switch", { name: /Marktstatus sehen möchte/ });
   await expect(marketSwitch).toBeChecked();
   await marketSwitch.click();
   await expect(marketSwitch).not.toBeChecked();
   // Neu laden: gespeichert ist nur, was den Server erreicht hat.
-  await candidate.goto("/einstellungen");
+  await candidate.goto("/settings");
   await expect(
     candidate.getByRole("switch", { name: /Marktstatus sehen möchte/ })
   ).not.toBeChecked();
