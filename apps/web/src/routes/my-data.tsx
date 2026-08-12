@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card } from "@workertransfer/ui";
+import { Alert, Button, Card, DescriptionList, Loading, Page } from "@workertransfer/ui";
 
 import { type MeResponse, fetchMe } from "../auth/client";
 import { listMyApplications } from "../applications/client";
@@ -92,14 +92,13 @@ export function MyDataRoute({ principal = null }: MyDataRouteProps) {
 
   if (subjectId === null) {
     return (
-      <main className="page page--narrow">
+      <Page title="Meine Daten" narrow>
         <Card>
-          <h1>Meine Daten</h1>
           <p>
             Bitte <a href="/login">anmelden</a>, um deine Daten zu sehen.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
@@ -119,35 +118,33 @@ export function MyDataRoute({ principal = null }: MyDataRouteProps) {
   }
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>Meine Daten</h1>
-        <p className="page__lead">
-          Alles, was diese Plattform über dich gespeichert hat, in einer Datei. Sie entsteht in
-          deinem Browser und wird nirgends abgelegt — es gibt also nichts, das liegen bleibt.
-        </p>
-      </header>
-
+    <Page
+      title="Meine Daten"
+      narrow
+      lead="Alles, was diese Plattform über dich gespeichert hat, in einer Datei. Sie entsteht in deinem Browser und wird nirgends abgelegt — es gibt also nichts, das liegen bleibt."
+    >
       <Card>
-        {query.isPending ? <p role="status">Daten werden gesammelt…</p> : null}
+        {query.isPending ? <Loading label="Daten werden gesammelt…" /> : null}
 
         {missing.length > 0 ? (
           // Vor dem Herunterladen, nicht erst in der Datei.
-          <p className="auth__alert" role="alert">
+          <Alert>
             Diese Teile konnten nicht geladen werden: {missing.join(", ")}. Die Datei sagt das
             ebenfalls — sie ist unvollständig.
-          </p>
+          </Alert>
         ) : null}
 
         {result !== null ? (
           <>
-            <ul className="overview">
-              {Object.entries(result.abschnitte).map(([name, entry]) => (
-                <li key={name}>
-                  {name.replace(/_/g, " ")} — {entry.status === "ok" ? "enthalten" : "fehlt"}
-                </li>
-              ))}
-            </ul>
+            {/* Ein `<dl>`, keine Liste: zu jedem Abschnitt gehört die Auskunft,
+                ob er enthalten ist. Diese Zuordnung ist der ganze Inhalt der
+                Aufstellung und steht damit im Markup statt im Layout. */}
+            <DescriptionList
+              items={Object.entries(result.abschnitte).map(([name, entry]) => ({
+                term: name.replace(/_/g, " "),
+                description: entry.status === "ok" ? "enthalten" : "fehlt",
+              }))}
+            />
             <Button onClick={download}>Als JSON herunterladen</Button>
           </>
         ) : null}
@@ -161,11 +158,11 @@ export function MyDataRoute({ principal = null }: MyDataRouteProps) {
           machen ließe. Was dabei passiert, steht vollständig auf{" "}
           <a href="/delete-account">Konto löschen</a> — vor dem Klick, nicht danach.
         </p>
-        <p className="page__note">
+        <p className="wt-field__hint">
           Du musst hier nichts herunterladen, bevor du löschst. Der Verweis geht in beide
           Richtungen, damit niemand glaubt, es gäbe eine Pflichtreihenfolge.
         </p>
       </Card>
-    </main>
+    </Page>
   );
 }

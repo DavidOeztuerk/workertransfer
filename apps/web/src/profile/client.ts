@@ -267,7 +267,8 @@ export async function listCandidates(
  * Dünne Hülle über den gemeinsamen Ledger-Aufrufen: die Capability gehört
  * hierher, die HTTP-Mechanik nicht.
  */
-export function getVisibility(subjectId: string): Promise<boolean> {
+/** `null` heißt: der Ledger hat nicht geantwortet (siehe `isGranted`). */
+export function getVisibility(subjectId: string): Promise<boolean | null> {
   return isGranted(subjectId, PROFILE_VISIBILITY);
 }
 

@@ -173,12 +173,20 @@ Entschieden; gebaut jeweils in dem E3-PR, der die Herkunftsseite umstellt.
 | ~~`/jobs/$id/apply`~~ **gebaut** | `ApplyBox` in `jobs.tsx:320–420` | E3a ✓ |
 | `/company/jobs/new`, `/company/jobs/$id/edit` | `company-jobs.tsx` (289 Zeilen) | E3d |
 | `/company/team/invite` | `team.tsx` (221 Zeilen) | E3d |
-| `/portfolio/new` (samt Upload) | `portfolio.tsx` (331 Zeilen) | E3b |
-| `/resume/positions/$id` | Fieldsets in `resume.tsx` (290 Zeilen) | E3b |
+| ~~`/portfolio/new`~~ **gebaut**, dazu `/portfolio/$index` | `portfolio.tsx` (331 Zeilen) | E3b ✓ |
+| ~~`/resume/positions/$id`~~ **verworfen** | Fieldsets in `resume.tsx` | E3b — Stationen bleiben EIN Formular |
 
-Beim Lebenslauf mit Vorbehalt: mehrere Stationen gleichzeitig zu bearbeiten
-spricht gegen eine Route je Station. Ob es eine Route je Station oder eine für
-alle wird, entscheidet der Befund von E3b.
+Beim Lebenslauf hat der Vorbehalt gewonnen (Befund E3b, 13.08.2026): die
+Stationen bleiben **ein** Formular. Man bearbeitet sie im Vergleich — „von wann
+bis wann" ergibt nur zusammen Sinn, und die Reihenfolge ist die Aussage. Eine
+Route je Station machte genau das Wichtigste unsichtbar: die Lücke zwischen zwei
+Stationen.
+
+Beim Portfolio umgekehrt: Arbeiten sind voneinander unabhängig, also je Arbeit
+eine Adresse. Die Adresse ist die **Stelle im gespeicherten Feld**, weil
+`PortfolioItem` keine ID hat und der Vertrag nur PUT auf das ganze Feld kennt.
+Zwei Tabs, die gleichzeitig ändern, adressieren dann verschiedene Arbeiten;
+sichtbar bleibt es, weil der Titel der Arbeit in der Überschrift steht.
 
 ### `/company/admin` — angelegt, aber ehrlich beschriftet
 
