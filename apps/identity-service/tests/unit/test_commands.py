@@ -1349,3 +1349,248 @@ async def test_refresh_keeps_the_company_while_the_membership_holds() -> None:
     )
 
     assert tokens.verify_refresh_token(refreshed.value.refresh).tenant_id == tenant_id
+
+
+# --- E2.6: die gemerkte Absicht, ein Unternehmen anzulegen -------------------
+
+
+async def test_register_remembers_the_company_intent() -> None:
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=_FakeMailer())
+
+    res = await _register_via(
+        RegisterUserCommand(
+            email="chef@firma.de",
+            password="strongpassword1",
+            display_name="Chef",
+            company_name="Firma GmbH",
+        ),
+        deps=deps,
+        repos=repos,
+    )
+
+    assert is_success(res)
+    user = await repos["users"].get_by_email("chef@firma.de")
+    assert user is not None
+    # Nur gemerkt, nicht eingelöst: das Unternehmen entsteht erst bei der
+    # Bestätigung, weil eine unbestätigte Adresse keine Domain beweist.
+    assert user.pending_company_name == "Firma GmbH"
+    assert user.status is AccountStatus.PENDING
+    # Und wirklich noch KEIN Unternehmen: das ist der ganze Punkt der Absicht.
+    assert repos["companies"].by_domain == {}
+
+
+async def test_register_without_a_company_stays_a_person() -> None:
+    """Der Rückwärtskompatibilitäts-Test: ohne das neue Feld ändert sich nichts.
+
+    `RegisterUserV1` ist ein versionierter Vertrag. Ein Aufrufer, der
+    `company_name` nicht kennt, muss genau dasselbe Ergebnis bekommen wie vorher.
+    """
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=_FakeMailer())
+
+    res = await _register_via(
+        RegisterUserCommand(
+            email="mensch@example.com", password="strongpassword1", display_name="M"
+        ),
+        deps=deps,
+        repos=repos,
+    )
+
+    assert is_success(res)
+    user = await repos["users"].get_by_email("mensch@example.com")
+    assert user is not None and user.pending_company_name is None
+
+
+async def test_register_rejects_a_public_domain_for_a_company() -> None:
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=_FakeMailer())
+
+    res = await _register_via(
+        RegisterUserCommand(
+            email="max@gmail.com",
+            password="strongpassword1",
+            display_name="Max",
+            company_name="Max GmbH",
+        ),
+        deps=deps,
+        repos=repos,
+    )
+
+    assert not is_success(res)
+    assert fail_err(res).code == "public_email_domain"
+    # Und es entsteht kein halbes Konto: die Absage kommt, bevor etwas angelegt
+    # wird.
+    assert await repos["users"].get_by_email("max@gmail.com") is None
+
+
+async def test_a_public_domain_is_rejected_before_the_address_is_looked_up() -> None:
+    """Die Reihenfolge trägt den Enumerationsschutz, nicht die Höflichkeit.
+
+    `/auth/register` antwortet für eine bekannte Adresse absichtlich genauso wie
+    für eine neue. Würde Freemail NACH der Existenzprüfung geprüft, bekäme eine
+    bekannte Freemail-Adresse das stille „ok" und eine unbekannte das 422 — und
+    der Unterschied wäre genau der Kanal, den dieser Endpunkt schließt.
+
+    Deshalb: zweimal dieselbe Freemail-Adresse mit Firmennamen, zweimal
+    dieselbe Absage.
+    """
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=_FakeMailer())
+    # Erst ein echtes Konto auf genau dieser Adresse anlegen — ohne Firmennamen,
+    # das ist erlaubt und der Normalfall (ADR-0017).
+    await _register_via(
+        RegisterUserCommand(email="max@gmail.com", password="strongpassword1", display_name="Max"),
+        deps=deps,
+        repos=repos,
+    )
+    assert await repos["users"].get_by_email("max@gmail.com") is not None
+
+    # Jetzt derselbe Versuch als Unternehmen: die Adresse ist BEKANNT.
+    res = await _register_via(
+        RegisterUserCommand(
+            email="max@gmail.com",
+            password="strongpassword1",
+            display_name="Max",
+            company_name="Max GmbH",
+        ),
+        deps=deps,
+        repos=repos,
+    )
+
+    assert not is_success(res)
+    assert fail_err(res).code == "public_email_domain"
+
+
+async def test_confirming_redeems_the_company_intent() -> None:
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
+    await _register_via(
+        RegisterUserCommand(
+            email="chef@firma.de",
+            password="strongpassword1",
+            display_name="Chef",
+            company_name="Firma GmbH",
+        ),
+        deps=deps,
+        repos=repos,
+    )
+    raw = _raw_token_from(mailer)
+
+    res = await handle_verify_email(VerifyEmailCommand(token=raw), deps=deps, repos=repos)
+
+    assert is_success(res)
+    assert res.value.company_name == "Firma GmbH"
+    assert res.value.company_error is None
+    # Die Domain stammt aus der bestätigten Adresse und stand nie im Request.
+    company = await repos["companies"].get_by_domain("firma.de")
+    assert company is not None and company.name == "Firma GmbH"
+    user = await repos["users"].get_by_email("chef@firma.de")
+    assert user is not None and user.status is AccountStatus.ACTIVE
+    # Verbraucht: sonst legte ein zweiter Klick ein zweites Unternehmen an.
+    assert user.pending_company_name is None
+    assert (user.id.value, company.id) in repos["memberships"].members
+
+
+async def test_confirming_without_an_intent_creates_no_company() -> None:
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
+    await _register_via(
+        RegisterUserCommand(email="mensch@firma.de", password="strongpassword1", display_name="M"),
+        deps=deps,
+        repos=repos,
+    )
+
+    res = await handle_verify_email(
+        VerifyEmailCommand(token=_raw_token_from(mailer)), deps=deps, repos=repos
+    )
+
+    assert is_success(res)
+    assert res.value.company_name is None and res.value.company_error is None
+    assert repos["companies"].by_domain == {}
+    assert repos["memberships"].members == set()
+
+
+async def test_a_claimed_domain_leaves_the_account_active_and_says_so() -> None:
+    """Die Bestätigung darf nicht scheitern, weil ein Firmenname vergeben war.
+
+    Zwei Menschen bei derselben Firma registrieren beide „als Unternehmen". Der
+    zweite bekommt kein Unternehmen — aber sein Konto ist trotzdem
+    freigeschaltet. Jemanden auszusperren, weil ein Kollege schneller war, wäre
+    die falsche Antwort auf die falsche Frage; der richtige Weg ist dann eine
+    Einladung durch genau diesen Kollegen.
+    """
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
+
+    # Die Erste beansprucht firma.de.
+    await _register_via(
+        RegisterUserCommand(
+            email="erste@firma.de",
+            password="strongpassword1",
+            display_name="Erste",
+            company_name="Firma GmbH",
+        ),
+        deps=deps,
+        repos=repos,
+    )
+    first = await handle_verify_email(
+        VerifyEmailCommand(token=_raw_token_from(mailer)), deps=deps, repos=repos
+    )
+    assert first.value.company_name == "Firma GmbH"
+
+    # Der Zweite versucht dasselbe.
+    await _register_via(
+        RegisterUserCommand(
+            email="zweiter@firma.de",
+            password="strongpassword1",
+            display_name="Zweiter",
+            company_name="Firma GmbH 2",
+        ),
+        deps=deps,
+        repos=repos,
+    )
+
+    res = await handle_verify_email(
+        VerifyEmailCommand(token=_raw_token_from(mailer)), deps=deps, repos=repos
+    )
+
+    assert is_success(res)
+    assert res.value.company_name is None
+    assert res.value.company_error == "domain_already_claimed"
+    # Das Konto ist aktiv, und die Absicht ist verbraucht: es gibt keinen
+    # zweiten Versuch, weil der Token verbraucht ist.
+    user = await repos["users"].get_by_email("zweiter@firma.de")
+    assert user is not None
+    assert user.status is AccountStatus.ACTIVE
+    assert user.pending_company_name is None
+    # Und wirklich nur EIN Unternehmen auf dieser Domain.
+    assert list(repos["companies"].by_domain) == ["firma.de"]
+
+
+async def test_a_second_click_creates_no_second_company() -> None:
+    mailer = _FakeMailer()
+    repos = _confirm_repos()
+    deps = _deps(_Clock(), _FakeTokens(), _Bus(), mailer=mailer)
+    await _register_via(
+        RegisterUserCommand(
+            email="chef@zweite.de",
+            password="strongpassword1",
+            display_name="Chef",
+            company_name="Zweite GmbH",
+        ),
+        deps=deps,
+        repos=repos,
+    )
+    raw = _raw_token_from(mailer)
+    await handle_verify_email(VerifyEmailCommand(token=raw), deps=deps, repos=repos)
+
+    again = await handle_verify_email(VerifyEmailCommand(token=raw), deps=deps, repos=repos)
+
+    # Zweimal klicken ist kein Fehler — es passiert nur nichts mehr.
+    assert is_success(again)
+    assert again.value.company_name is None and again.value.company_error is None
+    assert list(repos["companies"].by_domain) == ["zweite.de"]

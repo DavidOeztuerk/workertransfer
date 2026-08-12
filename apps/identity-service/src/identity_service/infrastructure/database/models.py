@@ -52,6 +52,9 @@ class UserModel(Base, TimestampMixin, VersionMixin):
         default=AccountStatus.ACTIVE,
     )
     roles: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    #: Die gemerkte Absicht aus der Registrierung; NULL heißt „eine Person".
+    #: Wird bei der Bestätigung eingelöst und dann geleert.
+    pending_company_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     __table_args__ = (
         # Globally unique: a person is one account, and they own it before any

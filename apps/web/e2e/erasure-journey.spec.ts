@@ -144,7 +144,7 @@ test("eine Löschung wird verlangt, läuft durch — und der Nachweis bleibt", a
 
   const startedAt = Date.now();
 
-  await page.goto("/konto-loeschen");
+  await page.goto("/delete-account");
 
   // Auf den KNOPF warten, nicht auf die Überschrift: „Konto löschen" steht
   // auch über der Anmeldeaufforderung, die diese Seite zeigt, solange die
@@ -226,7 +226,7 @@ test("nach der Löschung ist die Anmeldung zu — und die Adresse wieder frei", 
 
   const startedAt = Date.now();
 
-  await page.goto("/konto-loeschen");
+  await page.goto("/delete-account");
   await expect(page.getByRole("button", { name: /^Konto löschen$/ })).toBeVisible();
   await page.getByRole("button", { name: /^Konto löschen$/ }).click();
   await page.getByRole("button", { name: /Ja, endgültig löschen/i }).click();

@@ -94,3 +94,74 @@ class TestACrashIsNotSilent:
                 client.get("/health/live")
 
         assert "Hintergrundaufgabe" in caplog.text  # type: ignore[attr-defined]
+
+
+class TestItClosesWhatItOpened:
+    """Der Datenbank-Pool wird beim Herunterfahren geschlossen.
+
+    Vorher tat das **niemand**: es gab keinen einzigen `dispose()` im
+    Produktivcode. Bei jedem SIGTERM — Neustart, `docker compose down`, Rolling
+    Update — rissen die Verbindungen ab, statt sauber zu schliessen. In den
+    Tests erschien dieselbe Lücke als `RuntimeWarning: coroutine
+    'Connection._cancel' was never awaited`.
+    """
+
+    def test_a_closer_runs_when_the_app_stops(self) -> None:
+        geschlossen = asyncio.Event()
+
+        async def close() -> None:
+            geschlossen.set()
+
+        app = create_api_app(_settings(), shutdown=(close,))
+        with TestClient(app) as client:
+            assert client.get("/health/live").status_code == 200
+            # Noch NICHT: solange die App läuft, wird nichts geschlossen.
+            assert not geschlossen.is_set()
+
+        assert geschlossen.is_set()
+
+    def test_the_pool_closes_only_after_the_runner_stopped(self) -> None:
+        """Die Reihenfolge ist die eigentliche Zusage.
+
+        Zuerst den Pool zu schliessen hiesse, ihn dem Outbox-Zusteller mitten in
+        einer Transaktion unter den Füssen wegzuziehen — genau der Abbruch, den
+        das Warten auf die abgebrochene Aufgabe verhindert.
+        """
+        ablauf: list[str] = []
+
+        async def runner() -> None:
+            try:
+                await asyncio.sleep(3600)
+            except asyncio.CancelledError:
+                ablauf.append("runner-fertig")
+                raise
+
+        async def close() -> None:
+            ablauf.append("pool-geschlossen")
+
+        app = create_api_app(_settings(), background=(runner,), shutdown=(close,))
+        with TestClient(app) as client:
+            client.get("/health/live")
+
+        assert ablauf == ["runner-fertig", "pool-geschlossen"]
+
+    def test_a_failing_closer_does_not_stop_the_others(self) -> None:
+        """Beim Beenden zählt jeder Schritt.
+
+        Würde die erste Ausnahme durchschlagen, blieben die übrigen
+        Aufräumschritte aus — und der Prozess geht ohnehin. Geschluckt wird sie
+        nicht, sie wird protokolliert.
+        """
+        zweiter = asyncio.Event()
+
+        async def kaputt() -> None:
+            raise RuntimeError("Pool wollte nicht")
+
+        async def zweite() -> None:
+            zweiter.set()
+
+        app = create_api_app(_settings(), shutdown=(kaputt, zweite))
+        with TestClient(app) as client:
+            client.get("/health/live")
+
+        assert zweiter.is_set()

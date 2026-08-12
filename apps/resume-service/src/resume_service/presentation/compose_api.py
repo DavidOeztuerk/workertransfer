@@ -43,6 +43,11 @@ def build_app(settings: ResumeServiceSettings) -> FastAPI:
         routers=(build_router(deps), build_erasure_router(deps)),
         # Der Outbox-Zusteller läuft im Dienst mit (ADR-0025).
         background=(outbox_runner(deps, settings),),
+        # Der Pool wird beim Herunterfahren geschlossen. Ohne das reissen
+        # die Verbindungen bei jedem SIGTERM ab statt sauber zu schliessen —
+        # und in den Tests erschien dieselbe Lücke als RuntimeWarning
+        # "coroutine 'Connection._cancel' was never awaited".
+        shutdown=(engine.dispose,),
     )
 
 

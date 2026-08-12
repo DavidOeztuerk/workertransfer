@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button, Field } from "@workertransfer/ui";
+import { Alert, Button, Field } from "@workertransfer/ui";
 
 import { type LoginInput, login } from "../auth/client";
 import { SESSION_QUERY_KEY } from "../auth/session";
@@ -68,11 +68,10 @@ export function LoginRoute() {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
-        {error !== null ? (
-          <p className="auth__alert" role="alert">
-            {error}
-          </p>
-        ) : null}
+        {/* Der Fehlertext kommt vom Server und wird nie erfunden — `login()`
+            gibt bei falschen Zugangsdaten eine Meldung zurück und wirft nicht
+            (LoginResult ist eine diskriminierte Union). */}
+        {error !== null ? <Alert>{error}</Alert> : null}
         <Button type="submit" disabled={busy}>
           {busy ? "Anmeldung läuft…" : "Anmelden"}
         </Button>

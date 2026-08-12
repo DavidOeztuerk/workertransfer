@@ -142,7 +142,7 @@ describe("MyDataRoute", () => {
     renderWithProviders(<MyDataRoute principal={principal()} />);
 
     const link = await screen.findByRole("link", { name: /Konto löschen/i });
-    expect(link.getAttribute("href")).toBe("/konto-loeschen");
+    expect(link.getAttribute("href")).toBe("/delete-account");
     expect(screen.queryByRole("button", { name: /löschen/i })).toBeNull();
   });
 });

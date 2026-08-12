@@ -66,8 +66,8 @@ export function CompanyTransfersRoute({ principal = null }: CompanyTransfersRout
         <Card>
           <h1>Transfers</h1>
           <p>
-            Transfers führen nur Unternehmen. Wechsle oben auf ein Unternehmen — oder{" "}
-            <a href="/company/new">lege eines an</a>.
+            Transfers führen nur Unternehmen. Wechsle oben auf ein Unternehmen — oder lass
+            dich von jemandem aus deinem Unternehmen einladen.
           </p>
         </Card>
       </main>

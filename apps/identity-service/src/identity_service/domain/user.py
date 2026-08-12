@@ -125,6 +125,18 @@ class User:
     roles: tuple[str, ...]
     status: AccountStatus
     _events: list[DomainEvent] = field(default_factory=list)
+    #: Der Firmenname, den jemand bei der Registrierung angegeben hat — die
+    #: gemerkte Absicht, ein Unternehmen anzulegen. `None` heißt: eine Person.
+    #:
+    #: Steht hier, nicht im Browser: Bestätigungsmails werden oft auf einem
+    #: anderen Gerät geöffnet, und ein localStorage-Merker wäre dort weg. Aus
+    #: einer Unternehmensregistrierung würde dann stillschweigend eine
+    #: Personenregistrierung.
+    #:
+    #: EINE Spalte, kein zusätzliches `account_type`: das wäre hieraus ableitbar
+    #: und könnte deshalb widersprüchlich werden. Nach der Anlage wird das Feld
+    #: geleert — es heißt „pending".
+    pending_company_name: str | None = None
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, User) and self.id == other.id
@@ -141,6 +153,7 @@ class User:
         display_name: str,
         now: datetime,
         roles: tuple[str, ...] = ("user",),
+        pending_company_name: str | None = None,
     ) -> User:
         # No tenant: registering is an act of a natural person (ADR-0017).
         # Company membership is granted afterwards, in its own aggregate.
@@ -152,6 +165,7 @@ class User:
             roles=roles,
             status=AccountStatus.PENDING,  # bestätigt wird per E-Mail-Token
             _events=[],
+            pending_company_name=pending_company_name,
         )
         user._events.append(
             UserRegistered(
@@ -161,6 +175,21 @@ class User:
             )
         )
         return user
+
+    def company_intent_consumed(self) -> None:
+        """Die gemerkte Absicht ist eingelöst — oder endgültig abgelehnt.
+
+        Wird in BEIDEN Fällen gerufen, und das ist der Punkt: der
+        Bestätigungstoken ist danach verbraucht, es gibt also keinen zweiten
+        Versuch. Bliebe die Absicht stehen, läge sie für immer da und ein
+        zweiter Klick auf denselben Link legte womöglich ein zweites
+        Unternehmen an.
+
+        War die Domain schon beansprucht, ist der richtige Weg ohnehin ein
+        anderer: wer eine bestätigte Adresse auf dieser Domain hat, hat dort
+        Kollegen — und die können einladen.
+        """
+        self.pending_company_name = None
 
     def verify_password(self, plain: str, hasher: PasswordHashing) -> bool:
         return hasher.verify(plain, self.password_hash)

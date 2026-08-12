@@ -8,8 +8,11 @@ gilt.
 
 from __future__ import annotations
 
+import asyncio
 import os
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -35,6 +38,32 @@ def migrated_schema(postgres_url: str) -> None:
     command.upgrade(cfg, "head")
 
 
+#: Jede gebaute App, damit am Modulende ihr Pool geschlossen wird.
+#:
+#: Je Test eine eigene App ist hier TRAGEND und keine Nachlässigkeit: ein
+#: geteilter Aufbau lässt fünf Tests umfallen, weil die Reihenfolge der
+#: Ereignisse an dem hängt, was beim Bauen entsteht. Gemessen, nicht vermutet.
+#:
+#: Ungeschlossen blieben es 15 Verbindungspools, und der Garbage Collector
+#: meldete das später als `RuntimeWarning: coroutine 'Connection._cancel' was
+#: never awaited` — bei einem beliebigen anderen Test in einem anderen Dienst.
+_gebaute_apps: list[Any] = []
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _schliesst_die_pools() -> Iterator[None]:
+    """Schliesst am Modulende, was `_client` geöffnet hat.
+
+    Diese Tests rufen über `ASGITransport` direkt an die App und durchlaufen die
+    Lifespan nie — im laufenden Dienst schliesst sie den Pool von selbst.
+    """
+    yield
+    for app in _gebaute_apps:
+        for close in getattr(app.state, "shutdown", ()):
+            asyncio.run(close())
+    _gebaute_apps.clear()
+
+
 def _client(postgres_url: str) -> tuple[AsyncClient, str, dict[str, str]]:
     os.environ["WORKER_DATABASE_URL"] = postgres_url
     os.environ["WORKER_JWT_SECRET"] = SECRET
@@ -44,6 +73,7 @@ def _client(postgres_url: str) -> tuple[AsyncClient, str, dict[str, str]]:
     from consent_service.presentation.compose_api import build_app
 
     app = build_app(ConsentServiceSettings())
+    _gebaute_apps.append(app)
     subject = uuid4()
     token = TokenManager(SECRET).create_access_token(subject, uuid4(), ["user"], [])
     client = AsyncClient(transport=ASGITransport(app=app), base_url="http://test")

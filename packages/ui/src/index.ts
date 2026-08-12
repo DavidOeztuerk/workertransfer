@@ -20,7 +20,7 @@ export { Toast } from "./components/toast";
 export { VisuallyHidden } from "./components/visually-hidden";
 export type { AlertProps, AlertVariant } from "./components/alert";
 export type { BadgeProps } from "./components/badge";
-export type { ButtonProps } from "./components/button";
+export type { ButtonProps, ButtonVariant } from "./components/button";
 export type { CardProps } from "./components/card";
 export type { CheckboxProps } from "./components/checkbox";
 export type {

@@ -123,7 +123,7 @@ describe("AccountDeletionRoute", () => {
       renderWithProviders(<AccountDeletionRoute principal={principal()} />);
 
       const link = await screen.findByRole("link", { name: /Meine Daten/i });
-      expect(link.getAttribute("href")).toBe("/meine-daten");
+      expect(link.getAttribute("href")).toBe("/my-data");
       // Kein Zwang zum Export vorher: wer ohne Herunterladen löschen will, darf.
       expect(requestErasure).not.toHaveBeenCalled();
     });

@@ -42,6 +42,21 @@ test.describe("Aufnahmen der Oberfläche", () => {
     test.skip(missing !== null, `Stapel steht nicht: ${missing}`);
   });
 
+  // Der Fehlerzustand steht in keiner der vier Seiten, ist aber die einzige
+  // sichtbare Änderung von E2 (.auth__alert -> <Alert>). Ohne dieses Bild wäre
+  // gerade die eine Änderung unbelegt, die es zu belegen gibt.
+  test(`anmelden-fehler (${TAG})`, async ({ page }) => {
+    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.getByLabel("E-Mail").fill("niemand@example.invalid");
+    await page.getByLabel("Passwort").fill("falsches-passwort");
+    await page.getByRole("button", { name: "Anmelden" }).click();
+    // Auf die Meldung warten, nicht auf eine Zeitspanne: sonst zeigt das Bild
+    // je nach Antwortzeit den Zustand davor.
+    await expect(page.getByRole("alert")).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: `.screenshots/${TAG}/anmelden-fehler.png`, fullPage: true });
+  });
+
   for (const seite of SEITEN) {
     test(`${seite.name} (${TAG})`, async ({ page }) => {
       // Der Direktlink, nicht ein Klick: nur das Eintippen der Adresse geht
