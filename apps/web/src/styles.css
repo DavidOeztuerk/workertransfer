@@ -451,7 +451,7 @@ h1 {
 
 .page__note {
   margin: 0;
-  color: var(--wt-accent, #1f6f5c);
+  color: var(--wt-accent);
   font-weight: 600;
   font-size: 0.9rem;
 }
@@ -460,7 +460,7 @@ h1 {
    Seite — sie bekommt einen eigenen Akzent, damit sie nicht wie eine
    Fußnote zum Formular aussieht. */
 .profile__release {
-  border-left: 3px solid var(--wt-accent, #1f6f5c);
+  border-left: 3px solid var(--wt-accent);
 }
 
 .page--narrow form {
@@ -500,7 +500,7 @@ h1 {
 }
 
 .candidates__skills li {
-  border: 1px solid var(--wt-border, #d6d3cd);
+  border: 1px solid var(--wt-border);
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
   font-size: 0.78rem;
@@ -541,7 +541,7 @@ h1 {
   gap: 0.75rem;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid var(--wt-border, #d6d3cd);
+  border: 1px solid var(--wt-border);
   border-radius: 8px;
   padding: 0.85rem 1rem;
 }
@@ -566,7 +566,7 @@ h1 {
 /* Stationen: jede in einem eigenen Rahmen, damit die Felder nicht ineinander
    laufen, wenn es fünf davon sind. */
 .resume__position {
-  border: 1px solid var(--wt-border, #d6d3cd);
+  border: 1px solid var(--wt-border);
   border-radius: 8px;
   padding: 1rem 1.1rem;
   display: grid;
@@ -582,7 +582,7 @@ h1 {
 
 .candidates__asked {
   margin: 0.75rem 0 0;
-  color: var(--wt-accent, #1f6f5c);
+  color: var(--wt-accent);
   font-size: 0.85rem;
   font-weight: 600;
 }
@@ -598,7 +598,7 @@ h1 {
   margin-left: 0.4rem;
   padding: 0 0.35rem;
   border-radius: 999px;
-  background: var(--wt-accent, #1f6f5c);
+  background: var(--wt-accent);
   color: #fff;
   font-size: 0.72rem;
   font-weight: 700;
@@ -618,7 +618,7 @@ h1 {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  border-bottom: 1px solid var(--wt-border, #d6d3cd);
+  border-bottom: 1px solid var(--wt-border);
   padding-bottom: 0.5rem;
 }
 
@@ -647,7 +647,7 @@ h1 {
   display: grid;
   gap: 0.75rem;
   margin-top: 1rem;
-  border-top: 1px solid var(--wt-border, #d6d3cd);
+  border-top: 1px solid var(--wt-border);
   padding-top: 1rem;
 }
 
@@ -661,7 +661,7 @@ h1 {
    Auswahlfeld hätte die Erklärungen verschluckt — und genau hier ist die
    Erklärung die halbe Entscheidung. */
 .market__choices {
-  border: 1px solid var(--wt-border, #d6d3cd);
+  border: 1px solid var(--wt-border);
   border-radius: 8px;
   padding: 0.9rem 1.1rem;
   display: grid;
@@ -698,7 +698,7 @@ h1 {
 .candidates__market {
   margin-top: 0.9rem;
   padding-top: 0.9rem;
-  border-top: 1px solid var(--wt-border, #d6d3cd);
+  border-top: 1px solid var(--wt-border);
   display: grid;
   gap: 0.6rem;
   justify-items: start;
@@ -756,7 +756,7 @@ h1 {
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 0;
-  border-bottom: 1px solid var(--wt-border, #d6d3cd);
+  border-bottom: 1px solid var(--wt-border);
 }
 
 /* „Was liegt an": jede Zeile eine Handlung, kein Fließtext. */
@@ -771,7 +771,7 @@ h1 {
 .overview li a {
   display: block;
   padding: 0.7rem 0.9rem;
-  border: 1px solid var(--wt-border, #d6d3cd);
+  border: 1px solid var(--wt-border);
   border-radius: 8px;
   text-decoration: none;
   color: inherit;
@@ -779,7 +779,7 @@ h1 {
 }
 
 .overview li a:hover {
-  border-color: var(--wt-accent, #1f6f5c);
+  border-color: var(--wt-accent);
 }
 
 /* Aufklappbares Kopfzeilen-Menü. Natives <details>: Tastatur, Escape und
@@ -813,9 +813,9 @@ h1 {
   display: grid;
   gap: 0.1rem;
   padding: 0.4rem;
-  border: 1px solid var(--wt-border, #d6d3cd);
+  border: 1px solid var(--wt-border);
   border-radius: 10px;
-  background: var(--wt-surface, #fdfcfa);
+  background: var(--wt-surface);
   box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
 }
 
@@ -830,7 +830,7 @@ h1 {
 
 .site-header__menu-item:hover,
 .site-header__menu-item:focus-visible {
-  background: var(--wt-border, #ece9e4);
+  background: var(--wt-border);
 }
 
 /* Die Zeile, die in die Gist-Beschreibung gehört — zum Kopieren, nicht zum
@@ -838,9 +838,9 @@ h1 {
 .github__challenge {
   margin: 0.6rem 0;
   padding: 0.7rem 0.9rem;
-  border: 1px solid var(--wt-border, #d6d3cd);
+  border: 1px solid var(--wt-border);
   border-radius: 8px;
-  background: var(--wt-surface-muted, #f4f1ec);
+  background: var(--wt-surface-muted);
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 0.9rem;
   overflow-x: auto;
@@ -852,7 +852,7 @@ h1 {
 .candidates__github {
   margin-top: 0.9rem;
   padding-top: 0.9rem;
-  border-top: 1px solid var(--wt-border, #d6d3cd);
+  border-top: 1px solid var(--wt-border);
 }
 
 .candidates__repos {
@@ -875,9 +875,9 @@ h1 {
 .draft-help {
   margin: 1rem 0;
   padding: 0.8rem 0.9rem;
-  border: 1px dashed var(--wt-border, #d6d3cd);
+  border: 1px dashed var(--wt-border);
   border-radius: 8px;
-  background: var(--wt-surface-muted, #f4f1ec);
+  background: var(--wt-surface-muted);
 }
 
 .draft-help .wt-field {

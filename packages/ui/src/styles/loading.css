@@ -1,0 +1,6 @@
+.wt-loading {
+  margin: 0;
+  color: var(--wt-muted);
+  font-size: var(--wt-text-base);
+  line-height: var(--wt-leading-tight);
+}

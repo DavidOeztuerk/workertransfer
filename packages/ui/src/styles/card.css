@@ -1,0 +1,6 @@
+.wt-card {
+  border: 1px solid var(--wt-line);
+  border-radius: var(--wt-radius-md);
+  background: var(--wt-surface-raised);
+  box-shadow: var(--wt-shadow);
+}
