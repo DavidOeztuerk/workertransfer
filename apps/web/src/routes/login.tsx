@@ -29,9 +29,14 @@ export function LoginRoute() {
       // Zurück zu der Stelle, wegen der jemand überhaupt hier gelandet ist.
       // Kein gespeicherter Pfad, sondern eine ID — wohin navigiert wird,
       // entscheidet diese Zeile, nicht der Speicher (siehe jobs/intent.ts).
+      // Direkt auf die Bewerbungsseite dieser einen Stelle. Vorher ging es auf
+      // `/jobs?stelle=<id>` — eine gefilterte Trefferliste, die eine Box
+      // aufklappte, und dafür brauchte die Liste eine Sonderabfrage für den Fall,
+      // dass die gesuchte Stelle gar nicht darin vorkam. Ein eigener Pfad
+      // braucht das alles nicht.
       const stelle = gemerkteStelle();
       vergissStelle();
-      window.location.href = stelle === null ? "/" : `/jobs?stelle=${stelle}`;
+      window.location.href = stelle === null ? "/" : `/jobs/${stelle}/apply`;
     } else {
       setError(result.message);
     }

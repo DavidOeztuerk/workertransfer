@@ -69,15 +69,22 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
   // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
   await expect(jobCard).toBeVisible();
-  await jobCard.getByRole("button", { name: /^Bewerben$/ }).click();
-  await jobCard.getByRole("button", { name: /Bewerbung abschicken/i }).click();
+  // „Bewerben" ist ein LINK auf eine eigene Adresse, kein Knopf, der in der
+  // Karte etwas aufklappt. Der Klick verlässt die Liste — und dass das durch
+  // Router UND Gateway wirklich funktioniert, prüft nur diese Reise: im
+  // Browsertest ist die Route gemockt, und ein `Sec-Fetch-Dest`-Fehler zeigt
+  // sich ausschließlich am echten Deep-Link.
+  await jobCard.getByRole("link", { name: /^Bewerben$/ }).click();
+  await expect(candidate).toHaveURL(/\/jobs\/[0-9a-f-]{36}\/apply$/);
+  await expect(candidate.getByRole("heading", { level: 1, name: jobTitle })).toBeVisible();
+  await candidate.getByRole("button", { name: /Bewerbung abschicken/i }).click();
   // Auf BEIDE Ausgänge warten — Bestätigung oder Fehlermeldung. Nur auf die
   // Bestätigung zu warten meldet nach 30 Sekunden bloß, dass sie fehlt, und
   // verschweigt, ob die Bewerbung abgelehnt wurde oder ob überhaupt etwas
   // ankam. Dieselbe Lehre wie bei der Anmelde-Hilfe in stack.ts, und dort hat
   // sie einen echten Fehler sichtbar gemacht.
-  const sent = jobCard.getByText(/Bewerbung abgeschickt/i);
-  const rejected = jobCard.getByRole("alert");
+  const sent = candidate.getByText(/Bewerbung abgeschickt/i);
+  const rejected = candidate.getByRole("alert");
   await expect(sent.or(rejected).first()).toBeVisible();
   if (await rejected.isVisible()) {
     throw new Error(`Bewerbung abgelehnt: ${await rejected.innerText()}`);
