@@ -32,6 +32,7 @@ import { CompanyJobsRoute } from "./routes/company-jobs";
 import { CompanyProfileRoute } from "./routes/company-profile";
 import { InvitationRoute } from "./routes/invitation";
 import { JobsRoute } from "./routes/jobs";
+import { JobApplyRoute } from "./routes/job-apply";
 import { MarketRoute } from "./routes/market";
 import { AccountDeletionRoute } from "./routes/account-deletion";
 import { MyDataRoute } from "./routes/my-data";
@@ -300,6 +301,13 @@ function JobsWithSession() {
   return <JobsRoute principal={user} />;
 }
 
+function JobApplyWithSession() {
+  // Auch hier ohne Anmeldezwang: wer die Adresse kalt aufruft, soll die Stelle
+  // sehen und den Weg zur Anmeldung finden, statt vor einer Wand zu stehen.
+  const { user } = useSession();
+  return <JobApplyRoute principal={user} />;
+}
+
 function CompanyProfileWithSession() {
   const { user } = useSession();
   return <CompanyProfileRoute principal={user} />;
@@ -413,6 +421,13 @@ const jobsRoute = createRoute({
   path: "/jobs",
   component: JobsWithSession,
 });
+const jobApplyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  // Unter der Stelle, nicht neben ihr: eine Bewerbung ohne Stelle gibt es
+  // nicht, und der Pfad sagt das.
+  path: "/jobs/$id/apply",
+  component: JobApplyWithSession,
+});
 const applicationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/applications",
@@ -489,6 +504,7 @@ const routeTree = rootRoute.addChildren([
   resumeRoute,
   candidatesRoute,
   jobsRoute,
+  jobApplyRoute,
   careerRoute,
   applicationsRoute,
   consentsRoute,
