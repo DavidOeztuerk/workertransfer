@@ -12,6 +12,7 @@ wirken muss. Hier wird das nachgewiesen statt behauptet.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -141,6 +142,15 @@ def stack(postgres_url: str) -> Iterator[tuple[Any, Any]]:
         transfer_app = build_transfer(TransferServiceSettings())
         yield transfer_app, consent_app
     finally:
+        # Die Pools schliessen, die die Apps geöffnet haben. Diese Tests rufen
+        # über ASGITransport direkt an die App und durchlaufen die Lifespan
+        # nicht — dort würde es von selbst passieren. Ohne das blieb eine
+        # asyncpg-Verbindung offen und der Garbage Collector meldete
+        # `RuntimeWarning: coroutine 'Connection._cancel' was never awaited`,
+        # und zwar bei einem beliebigen späteren Test.
+        for app in (transfer_app, consent_app):
+            for close in getattr(app.state, "shutdown", ()):
+                asyncio.run(close())
         patch.undo()
         _drop_database(admin_url, _CONSENT_DB)
 

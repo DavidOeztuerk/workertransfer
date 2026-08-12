@@ -6,6 +6,7 @@ fremdes Unternehmen und was die Öffentlichkeit sieht.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 @pytest.fixture(scope="module")
 def app(postgres_url: str) -> Iterator[Any]:
     patch = pytest.MonkeyPatch()
+    gebaut: Any = None
     try:
         cfg = Config()
         cfg.set_main_option("script_location", str(_SERVICE_DIR / "migrations"))
@@ -37,8 +39,17 @@ def app(postgres_url: str) -> Iterator[Any]:
         from jobs_service.configuration import JobsServiceSettings
         from jobs_service.presentation.compose_api import build_app
 
-        yield build_app(JobsServiceSettings())
+        gebaut = build_app(JobsServiceSettings())
+        yield gebaut
     finally:
+        # Den Pool schliessen, den die App geöffnet hat. Diese Tests rufen über
+        # ASGITransport direkt an die App und durchlaufen die Lifespan nicht —
+        # dort würde es von selbst passieren. Ohne das bleibt eine
+        # asyncpg-Verbindung offen, und der Garbage Collector meldet später
+        # `RuntimeWarning: coroutine 'Connection._cancel' was never awaited`,
+        # und zwar bei einem beliebigen anderen Test.
+        for close in getattr(getattr(gebaut, "state", None), "shutdown", ()):
+            asyncio.run(close())
         patch.undo()
 
 

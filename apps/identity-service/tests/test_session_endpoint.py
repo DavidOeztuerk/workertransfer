@@ -22,6 +22,10 @@ from identity_service.configuration import IdentityServiceSettings
 from identity_service.main import create_app
 
 
+# Cookies werden am CLIENT gesetzt, nicht je Anfrage: starlette verwirft
+# `cookies=` pro Request (DeprecationWarning), weil dabei unklar ist, ob das
+# Cookie danach im Krug bleibt. Am Client ist die Antwort eindeutig — und jeder
+# Test baut sich hier ohnehin seinen eigenen.
 def _client() -> TestClient:
     return TestClient(create_app(IdentityServiceSettings()))
 
@@ -47,7 +51,8 @@ def test_ein_totes_access_cookie_allein_macht_die_sitzung_nicht_erneuerbar() -> 
     """
     client = _client()
 
-    response = client.get("/auth/session", cookies={"access": "abgelaufen.kaputt.wert"})
+    client.cookies.set("access", "abgelaufen.kaputt.wert")
+    response = client.get("/auth/session")
 
     assert response.status_code == 200
     assert response.json() == {"user": None, "state": "anonymous"}
@@ -62,7 +67,8 @@ def test_mit_refresh_cookie_heisst_es_erneuerbar() -> None:
     """
     client = _client()
 
-    response = client.get("/auth/session", cookies={"refresh": "irgendein.refresh.wert"})
+    client.cookies.set("refresh", "irgendein.refresh.wert")
+    response = client.get("/auth/session")
 
     assert response.status_code == 200
     assert response.json() == {"user": None, "state": "renewable"}
@@ -78,7 +84,10 @@ def test_der_endpunkt_verrät_nichts_ueber_die_person() -> None:
     client = _client()
 
     ohne = client.get("/auth/session").json()
-    mit_muell = client.get("/auth/session", cookies={"access": "aaa.bbb.ccc"}).json()
+    # Erst NACH der ersten Anfrage setzen — die Reihenfolge ist hier die Aussage:
+    # ohne Cookie, dann mit Müll, und beide Antworten müssen gleich sein.
+    client.cookies.set("access", "aaa.bbb.ccc")
+    mit_muell = client.get("/auth/session").json()
 
     assert ohne == mit_muell
 
@@ -126,7 +135,8 @@ def test_ein_abgelehnter_refresh_raeumt_sein_totes_cookie_weg() -> None:
     """
     client = _client()
 
-    antwort = client.post("/auth/refresh", cookies={"refresh": "totes.token.hier"})
+    client.cookies.set("refresh", "totes.token.hier")
+    antwort = client.post("/auth/refresh")
 
     assert antwort.status_code == 401
     gesetzt = antwort.headers.get("set-cookie", "")
@@ -145,6 +155,7 @@ def test_nach_dem_aufraeumen_ist_der_zustand_wieder_anonymous() -> None:
     """
     client = _client()
 
-    antwort = client.get("/auth/session", cookies={"access": "totes.access.token"})
+    client.cookies.set("access", "totes.access.token")
+    antwort = client.get("/auth/session")
 
     assert antwort.json() == {"user": None, "state": "anonymous"}
