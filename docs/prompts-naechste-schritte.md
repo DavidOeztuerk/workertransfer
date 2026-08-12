@@ -64,6 +64,135 @@ bekommt.
 
 ---
 
+## Prompt E — Die Oberfläche vollständig refaktorieren
+
+**In drei Schnitten, in dieser Reihenfolge.** Jeder ist ein eigener PR; erst
+wenn einer grün und gemergt ist, beginnt der nächste. Der Grund steht in der
+Geschichte dieses Repos: 17 Commits auf einem Zweig waren einmal das größte
+Risiko im Projekt, und 26 Routen auf einmal umzustellen wäre schlimmer.
+
+### E1 — Das Design-System, vollständig
+
+```
+Lies zuerst: CLAUDE.md (Abschnitt Frontend), docs/frontend.md, ADR-0022,
+ADR-0027 §6, und packages/ui/src/ komplett.
+
+Der gemessene Ausgangspunkt (08.08.2026):
+- packages/ui bietet FÜNF Komponenten: Button, Card, Field, TextArea, Switch.
+  234 Zeilen CSS, 14 --wt-*-Variablen.
+- apps/web trägt dagegen 26 Routen, 5.224 Zeilen, und 885 Zeilen CSS in EINER
+  Datei (apps/web/src/styles.css).
+- Fast jede Route baut ihre Darstellung selbst. Die Klassenpräfixe verraten es:
+  page (94x), auth (51x), requests (33x), site (25x), candidates (21x).
+
+Was fehlt und deshalb überall neu erfunden wird — nachgezählt, nicht geraten:
+- 18 Routen behandeln `isPending` selbst. Es gibt keine Ladeanzeige.
+- 23 Routen setzen `role="alert"` von Hand. Es gibt keine Fehleranzeige.
+- KEIN aria-live, KEIN <dialog>, KEIN <table>, drei rohe <select>.
+- Kein Leerzustand ("hier ist noch nichts"), kein Toast, kein Badge.
+
+AUFGABE: baue packages/ui zu einem vollständigen System aus, das alles trägt,
+was die 26 Routen brauchen. Kein Tailwind, kein Radix, keine
+Komponentenbibliothek — das ist entschieden (CLAUDE.md) und bleibt so.
+
+Weil du KEINE fremden Primitives nimmst, ist Zugänglichkeit deine Arbeit und
+nicht die einer Bibliothek. Für Dialog heißt das mindestens: Fokusfalle, Esc
+schließt, Fokus kehrt zum auslösenden Element zurück, aria-modal, der
+Hintergrund ist für Screenreader inert. Für Select: Tastaturbedienung und
+aria-activedescendant. Wer das nicht sauber hinbekommt, nimmt lieber das native
+Element — ein hübscher Dialog, den man mit der Tastatur nicht verlassen kann,
+ist schlechter als ein hässlicher.
+
+Drei Dinge, die beim "Aufräumen" leicht kaputtgehen:
+- `Switch` ist ein button[role="switch"], KEINE Checkbox. Eine Checkbox
+  verspricht "gilt nach dem Absenden"; bei einer Einwilligung ist dieser
+  Unterschied nicht kosmetisch.
+- KEINE Komponente, die einen Menschen als Zahl darstellt (ADR-0022): kein
+  Score, kein Prozent, kein Ranking, kein Fortschrittsbalken über Personen.
+  Ein Fortschrittsbalken für einen Upload ist in Ordnung — einer über die
+  "Vollständigkeit" eines Profils ist genau das, was ADR-0022 ausschließt.
+- Die Oberfläche ist deutsch und HARTKODIERT, und die Tests prüfen die
+  deutschen Literale direkt. Ändere Texte nur, wo du es ausdrücklich willst;
+  jede Änderung kostet einen Test. i18n ist NICHT Teil dieses Schnitts.
+
+Die 14 --wt-*-Variablen reichen für 1.119 Zeilen CSS nicht — vieles steht als
+fester Wert drin. Erweitere den Satz (Abstände, Schriftgrößen, Zustände), aber
+erfinde keine Palette für einen Dark Mode, solange niemand ihn anfordert.
+
+BEWEIS: jede neue Komponente hat einen Test, der ihr VERHALTEN prüft, nicht
+ihre Klassen — Tastatur, Fokus, aria. Und die Route-Tests bleiben grün: dieser
+Schnitt ändert noch keine Route.
+```
+
+### E2 — Drei Routen als Referenz: Login, Registrieren, Startseite
+
+```
+Stelle GENAU DIESE DREI auf das neue System um:
+  apps/web/src/routes/login.tsx     (82 Zeilen)
+  apps/web/src/routes/register.tsx  (121 Zeilen)
+  apps/web/src/routes/home.tsx      (65 Zeilen)
+
+Sie sind klein und decken trotzdem alles ab, was die anderen 23 brauchen:
+Formular mit Validierung, Fehlerzustand vom Server, "läuft gerade", eine
+Bestätigungsansicht, Navigation und eine reine Anzeigeseite.
+
+Ziel ist ein MUSTER, das man abschreiben kann — nicht drei hübsche Seiten.
+Schreib am Ende in docs/frontend.md auf, wie eine Route ab jetzt aussieht:
+welche Komponenten, wie Zustände (lädt / leer / Fehler / fertig) behandelt
+werden, und wo CSS hingehört. Ohne diesen Absatz wird E3 zu 23 Einzelfällen.
+
+Was NICHT verloren gehen darf:
+- Die Anmeldeseite zeigt "Danach geht es zurück zu: <Stelle>", wenn eine
+  Absicht gemerkt ist (apps/web/src/jobs/ZurueckHinweis.tsx). Ohne diesen Satz
+  ist die Rückkehr nach dem Anmelden Magie.
+- Nach erfolgreichem Anmelden geht es zu /jobs?stelle=<id>, falls gemerkt.
+- Die Registrierung zeigt für eine bekannte Adresse DIESELBE Antwort wie für
+  eine neue. Ein Unterschied verriete Plattformmitgliedschaft, ohne den
+  Consent-Ledger zu fragen.
+
+BEWEIS: `pnpm check && pnpm test && pnpm build` — alle drei, die CI fährt sie
+auch. Und die E2E-Reisen (apps/web/e2e) gegen den laufenden Stapel: sie sind
+das einzige Netz, das die Oberfläche gegen echte Dienste prüft.
+```
+
+### E3 — Die übrigen 23 Routen
+
+```
+Erst starten, wenn E2 gemergt ist und das Muster in docs/frontend.md steht.
+
+Reihenfolge nach Größe, die größten zuerst — dort steckt der meiste
+Doppelcode:
+  jobs.tsx (457), candidates.tsx (418), portfolio.tsx (331), profile.tsx (297),
+  resume.tsx (290), market.tsx (290), company-jobs.tsx (289), … bis
+  company-new.tsx (101).
+
+Nicht alle in einen PR. Bündle sie zu Gruppen, die zusammengehören (Bewerbung,
+Unternehmen, Konto), je ein PR, jeder für sich grün.
+
+Ziel am Ende: apps/web/src/styles.css ist weitgehend leer, weil das Aussehen in
+packages/ui liegt. Miss es und schreib die Zahl in den PR — heute sind es 885
+Zeilen.
+
+Diese Seiten tragen Zusagen, die kein Refactor anfassen darf:
+- /konto-loeschen (ADR-0027 §6): der Text steht VOR dem Knopf, die Bestätigung
+  hat zwei Schritte mit anders formuliertem zweitem Knopf, danach heißt es
+  "läuft" statt "erledigt" und es gibt KEINEN Fortschrittsbalken. Und: der
+  Erfolgszustand muss Vorrang vor der Anmeldeaufforderung haben, sonst sieht
+  man direkt nach dem Löschen "Bitte anmelden".
+- /jobs: die Passung ist eine Liste mit Haken ("Du hast 2 von 3 genannten
+  Fähigkeiten"), niemals eine Zahl oder ein Balken (ADR-0022). Und für jemanden
+  ohne eingetragene Fähigkeiten schweigt die Seite, statt "0 von 3" zu sagen.
+- Profile: 404 heißt "verborgen ODER nicht vorhanden" und beides muss gleich
+  aussehen; 403 heißt "kein aktives Unternehmen"; 503 heißt "das Ledger
+  schweigt" — und darf NICHT wie "nicht gefunden" aussehen.
+
+BEWEIS je PR: pnpm check/test/build grün, E2E grün, und ein Screenshot-Vergleich
+der umgestellten Seite vorher/nachher im PR. Ein Refactor, der die Oberfläche
+unbemerkt verändert, ist keiner.
+```
+
+---
+
 ## Was der frische Claude wissen muss
 
 - **Zweige:** `feature → develop → main`. `main` und `develop` sind aktuell

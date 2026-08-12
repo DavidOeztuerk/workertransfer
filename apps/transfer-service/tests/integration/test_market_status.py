@@ -12,6 +12,7 @@ wirken muss. Hier wird das nachgewiesen statt behauptet.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -92,7 +93,7 @@ def stack(postgres_url: str) -> Iterator[tuple[Any, Any]]:
     """Beide Dienste einmal je Modul aufbauen.
 
     Je Test neu wäre leichter zu lesen, geht aber nicht: die Apps halten
-    Verbindungspools offen, die `build_app` nicht herausgibt, und ein
+    Verbindungspools offen (herausgegeben über `app.state.shutdown`), und ein
     DROP DATABASE gegen eine belegte Datenbank scheitert. Statt Container zu
     wechseln, räumt `apps` die Tabellen zwischen den Tests aus — dieselbe
     Isolation, ein Bruchteil der Zeit.
@@ -141,6 +142,15 @@ def stack(postgres_url: str) -> Iterator[tuple[Any, Any]]:
         transfer_app = build_transfer(TransferServiceSettings())
         yield transfer_app, consent_app
     finally:
+        # Die Pools schliessen, die die Apps geöffnet haben. Diese Tests rufen
+        # über ASGITransport direkt an die App und durchlaufen die Lifespan
+        # nicht — im laufenden Dienst schliesst sie sie von selbst. Ohne das
+        # bleibt eine asyncpg-Verbindung offen, und der Garbage Collector meldet
+        # sie später bei einem beliebigen ANDEREN Test als
+        # `RuntimeWarning: coroutine 'Connection._cancel' was never awaited`.
+        for app in (transfer_app, consent_app):
+            for close in getattr(app.state, "shutdown", ()):
+                asyncio.run(close())
         patch.undo()
         _drop_database(admin_url, _CONSENT_DB)
 

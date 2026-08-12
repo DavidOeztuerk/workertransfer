@@ -152,7 +152,7 @@ export function GitHubRoute({ principal = null }: GitHubRouteProps) {
               ? `Stand: ${new Date(connection.fetched_at).toLocaleString("de-DE")}`
               : "Noch nichts geholt."}{" "}
             · Sichtbar wird das erst, wenn du es unter{" "}
-            <a href="/freigaben">Meine Freigaben</a> freigibst.
+            <a href="/consents">Meine Freigaben</a> freigibst.
           </p>
           {connection.repositories.length === 0 ? (
             <p>Keine öffentlichen Repositories gefunden. Das ist kein Mangel — nur eine Auskunft.</p>

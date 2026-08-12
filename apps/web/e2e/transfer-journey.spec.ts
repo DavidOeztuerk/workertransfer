@@ -42,7 +42,7 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
 
   // „Ich höre zu" UND „ich arbeite gerade irgendwo" — der Normalfall auf einem
   // Transfermarkt, und der Weg, auf dem eine Freigabe nötig wird.
-  await candidate.goto("/markt");
+  await candidate.goto("/market");
   await candidate.getByRole("radio", { name: /Ich höre zu/ }).check();
   await candidate.getByRole("checkbox", { name: /Ich arbeite gerade irgendwo/ }).check();
   await candidate.getByRole("button", { name: /^Speichern$/ }).click();
@@ -50,12 +50,8 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
 
   const recruiterContext = await browser.newContext();
   const recruiter = await recruiterContext.newPage();
-  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter");
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
-  await recruiter.goto("/company/new");
-  await recruiter.getByLabel(/Name des Unternehmens/i).fill(companyName);
-  await recruiter.getByRole("button", { name: /Unternehmen anlegen/i }).click();
-  await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
   // Warten, bis der Wechsel wirklich gilt: `selectOption` stößt ihn nur an.
@@ -79,7 +75,7 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
   ).toBeVisible();
 
   // Die Person entscheidet.
-  await candidate.goto("/markt");
+  await candidate.goto("/market");
   const row = candidate.locator("li").filter({ hasText: /ob du ansprechbar bist/i });
   // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
   // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
@@ -173,19 +169,15 @@ test("ohne Freigabe des Marktstatus gibt es nichts zu sehen und nichts zu tun", 
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();
 
-  await candidate.goto("/markt");
+  await candidate.goto("/market");
   await candidate.getByRole("radio", { name: /Ich suche aktiv/ }).check();
   await candidate.getByRole("button", { name: /^Speichern$/ }).click();
   await expect(candidate.getByText(/Marktstatus gespeichert/i)).toBeVisible();
 
   const recruiterContext = await browser.newContext();
   const recruiter = await recruiterContext.newPage();
-  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter");
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
-  await recruiter.goto("/company/new");
-  await recruiter.getByLabel(/Name des Unternehmens/i).fill(companyName);
-  await recruiter.getByRole("button", { name: /Unternehmen anlegen/i }).click();
-  await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
   await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
@@ -201,7 +193,7 @@ test("ohne Freigabe des Marktstatus gibt es nichts zu sehen und nichts zu tun", 
 
   // Die Person lehnt ab. „Sucht aktiv" bleibt damit unsichtbar — und dass sie
   // sucht, ist die heikelste Angabe im ganzen System.
-  await candidate.goto("/markt");
+  await candidate.goto("/market");
   const row = candidate.locator("li").filter({ hasText: /ob du ansprechbar bist/i });
   // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
   // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last

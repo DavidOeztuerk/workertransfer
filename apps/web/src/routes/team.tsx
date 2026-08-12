@@ -80,7 +80,8 @@ export function TeamRoute({ principal = null }: TeamRouteProps) {
         <Card>
           <h1>Mannschaft</h1>
           <p>
-            Wähle oben ein Unternehmen — oder <a href="/company/new">lege eines an</a>.
+            Wähle oben ein Unternehmen — oder lass dich von jemandem aus deinem
+            Unternehmen einladen.
           </p>
         </Card>
       </main>

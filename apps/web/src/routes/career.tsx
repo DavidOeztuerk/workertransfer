@@ -16,7 +16,7 @@ const REMOTE_LABEL: Record<string, string> = {
 };
 
 function slugFromPath(): string {
-  // /karriere/<kürzel>
+  // /careers/<kürzel>
   const parts = window.location.pathname.split("/").filter(Boolean);
   return parts[1] ?? "";
 }

@@ -42,12 +42,8 @@ test("eine Anfrage erreicht die Person per Mail — und die Mail verrät nicht, 
 
   const recruiterContext = await browser.newContext();
   const recruiter = await recruiterContext.newPage();
-  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter");
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
-  await recruiter.goto("/company/new");
-  await recruiter.getByLabel(/Name des Unternehmens/i).fill(companyName);
-  await recruiter.getByRole("button", { name: /Unternehmen anlegen/i }).click();
-  await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
   await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
@@ -108,25 +104,21 @@ test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser })
   await expect(candidate.getByRole("switch")).toBeChecked();
 
   // Abbestellen — der Schalter wirkt sofort, es gibt keinen Speichern-Knopf.
-  await candidate.goto("/einstellungen");
+  await candidate.goto("/settings");
   const marketSwitch = candidate.getByRole("switch", { name: /Marktstatus sehen möchte/ });
   await expect(marketSwitch).toBeChecked();
   await marketSwitch.click();
   await expect(marketSwitch).not.toBeChecked();
   // Neu laden: gespeichert ist nur, was den Server erreicht hat.
-  await candidate.goto("/einstellungen");
+  await candidate.goto("/settings");
   await expect(
     candidate.getByRole("switch", { name: /Marktstatus sehen möchte/ })
   ).not.toBeChecked();
 
   const recruiterContext = await browser.newContext();
   const recruiter = await recruiterContext.newPage();
-  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter");
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
-  await recruiter.goto("/company/new");
-  await recruiter.getByLabel(/Name des Unternehmens/i).fill(companyName);
-  await recruiter.getByRole("button", { name: /Unternehmen anlegen/i }).click();
-  await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
   await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();

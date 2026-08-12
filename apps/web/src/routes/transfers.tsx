@@ -69,7 +69,7 @@ export function TransfersRoute({ principal = null }: TransfersRouteProps) {
         <h1>Meine Gespräche</h1>
         <p className="page__lead">
           Ein Unternehmen kann nur zugehen, wenn du ihm deinen{" "}
-          <a href="/markt">Marktstatus freigegeben</a> hast und gerade ansprechbar bist. Ablehnen
+          <a href="/market">Marktstatus freigegeben</a> hast und gerade ansprechbar bist. Ablehnen
           kannst du jederzeit, in jedem Schritt.
         </p>
       </header>

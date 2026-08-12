@@ -15,7 +15,7 @@ import { parseSkills } from "../skills";
 
 export interface ProfileRouteProps {
   // Injizierbar, damit der Test einen Prinzipal rendern kann, ohne eine
-  // laufende Sitzung zu brauchen — wie bei CompanyNewRoute.
+  // laufende Sitzung zu brauchen — dasselbe Muster wie in den anderen Routen.
   principal?: MeResponse | null;
 }
 

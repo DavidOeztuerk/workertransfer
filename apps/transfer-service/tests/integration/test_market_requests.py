@@ -12,6 +12,7 @@ genau das der einzige Weg, und damit war der Transfermarkt praktisch tot.
 
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import Iterator
 from pathlib import Path
@@ -148,6 +149,15 @@ def stack(postgres_url: str) -> Iterator[tuple[Any, Any]]:
         transfer_app = build_transfer(TransferServiceSettings())
         yield transfer_app, consent_app
     finally:
+        # Die Pools schliessen, die die Apps geöffnet haben. Diese Tests rufen
+        # über ASGITransport direkt an die App und durchlaufen die Lifespan
+        # nicht — im laufenden Dienst schliesst sie sie von selbst. Ohne das
+        # bleibt eine asyncpg-Verbindung offen, und der Garbage Collector meldet
+        # sie später bei einem beliebigen ANDEREN Test als
+        # `RuntimeWarning: coroutine 'Connection._cancel' was never awaited`.
+        for app in (transfer_app, consent_app):
+            for close in getattr(app.state, "shutdown", ()):
+                asyncio.run(close())
         patch.undo()
         _drop_database(admin_url, _CONSENT_DB)
 

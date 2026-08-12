@@ -66,3 +66,49 @@ describe("VerifyRoute", () => {
     expect(screen.queryByRole("heading", { name: "E-Mail bestätigt" })).toBeNull();
   });
 });
+
+describe("VerifyRoute — was aus dem Unternehmen wurde", () => {
+  it("names the company when it was created", async () => {
+    verifyEmail.mockResolvedValue({ ok: true, company: "Firma GmbH" });
+
+    renderWithProviders(<VerifyRoute />);
+
+    // Die Überschrift bleibt buchstabengetreu dieselbe — bestätigt ist die
+    // E-MAIL, und darauf prüft auch die E2E-Hilfe (exact: true).
+    expect(
+      await screen.findByRole("heading", { name: "E-Mail bestätigt" })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Firma GmbH ist angelegt/)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  // Der Ausgang, den es vor E2.6 nicht gab: das Konto ist da, das Unternehmen
+  // nicht. Ohne diesen Zweig wäre die Seite grün, während die halbe Absicht
+  // verpufft ist — und niemand wüsste später, warum kein Unternehmen da ist.
+  it("says the account is there and the company is not", async () => {
+    verifyEmail.mockResolvedValue({ ok: true, companyError: "domain_already_claimed" });
+
+    renderWithProviders(<VerifyRoute />);
+
+    expect(
+      await screen.findByRole("heading", { name: "E-Mail bestätigt" })
+    ).toBeInTheDocument();
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("für deine Domain gibt es hier schon eines");
+    // Und der Weg, der wirklich existiert: es gibt keinen Knopf mehr, ein
+    // Unternehmen anzulegen.
+    expect(alert).toHaveTextContent("einzuladen");
+  });
+
+  it("stays silent about companies when none was wanted", async () => {
+    verifyEmail.mockResolvedValue({ ok: true });
+
+    renderWithProviders(<VerifyRoute />);
+
+    expect(
+      await screen.findByRole("heading", { name: "E-Mail bestätigt" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("Dein Konto ist freigeschaltet.")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});

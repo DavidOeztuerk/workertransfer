@@ -32,7 +32,7 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   await login(candidate, candidateEmail);
 
   // Vorher steht dort nichts — und das steht auch so da.
-  await candidate.goto("/freigaben");
+  await candidate.goto("/consents");
   await expect(candidate.getByText(/Niemand sieht etwas von dir/)).toBeVisible();
 
   await candidate.goto("/profile");
@@ -42,18 +42,14 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();
 
-  await candidate.goto("/freigaben");
+  await candidate.goto("/consents");
   await expect(candidate.getByText(/Profil · Alle Unternehmen/)).toBeVisible();
 
   // Ein Unternehmen holt sich eine empfängerbezogene Freigabe.
   const recruiterContext = await browser.newContext();
   const recruiter = await recruiterContext.newPage();
-  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter");
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
-  await recruiter.goto("/company/new");
-  await recruiter.getByLabel(/Name des Unternehmens/i).fill(companyName);
-  await recruiter.getByRole("button", { name: /Unternehmen anlegen/i }).click();
-  await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
   await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
@@ -78,7 +74,7 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   await card.getByRole("button", { name: /Marktstatus anfragen/i }).click();
   await expect(card.getByText(/Marktstatus angefragt/i)).toBeVisible();
 
-  await candidate.goto("/markt");
+  await candidate.goto("/market");
   const row = candidate.locator("li").filter({ hasText: /ob du ansprechbar bist/i });
   // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
   // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
@@ -88,7 +84,7 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   await expect(row.getByText(/Freigegeben/i)).toBeVisible();
 
   // Beide Freigaben stehen auf EINER Seite — mit Firmennamen, nicht mit UUID.
-  await candidate.goto("/freigaben");
+  await candidate.goto("/consents");
   await expect(candidate.getByText(/Profil · Alle Unternehmen/)).toBeVisible();
   await expect(candidate.getByText(new RegExp(`Marktstatus · ${companyName}`))).toBeVisible();
 
@@ -110,7 +106,7 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   await expect(afterCard.getByText(/Marktstatus gerade nicht einsehbar/)).toBeVisible();
 
   // Das Profil steht weiterhin da: zurückgezogen wurde genau eine Freigabe.
-  await candidate.goto("/freigaben");
+  await candidate.goto("/consents");
   await expect(candidate.getByText(/Profil · Alle Unternehmen/)).toBeVisible();
 
   await candidateContext.close();
@@ -157,12 +153,8 @@ test("die Suche findet nur, was freigegeben ist", async ({ browser }) => {
 
   const recruiterContext = await browser.newContext();
   const recruiter = await recruiterContext.newPage();
-  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter");
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
-  await recruiter.goto("/company/new");
-  await recruiter.getByLabel(/Name des Unternehmens/i).fill(companyName);
-  await recruiter.getByRole("button", { name: /Unternehmen anlegen/i }).click();
-  await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
   await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
@@ -203,7 +195,7 @@ test("die Auskunft nennt jeden Abschnitt — auch die leeren", async ({ browser 
   await person.getByRole("switch").click();
   await expect(person.getByRole("switch")).toBeChecked();
 
-  await person.goto("/meine-daten");
+  await person.goto("/my-data");
 
   // Jeder Abschnitt steht da — auch die, zu denen es nichts gibt. „Kein
   // Lebenslauf" ist eine Auskunft und fehlt sonst.
