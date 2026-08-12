@@ -217,11 +217,11 @@ mit eigener Begründung, und der gehört nicht in eine Routenkarte.
 
 ## Soll — noch offen
 
-- **Bleibt `/company/new` erreichbar?** Der Menüeintrag „Unternehmen anlegen"
-  verschwindet (entschieden), aber die Route selbst ist offen: verschwindet sie,
-  hat der spätere legitime Fall — jemand gründet zwei Jahre danach — keinen Weg
-  mehr außer einem zweiten Konto. Bleibt sie erreichbar und nur unverlinkt, ist
-  der Knopf weg und der Weg existiert. Gehört ins Befund-Gate von **E2.6**.
+**Beantwortet (E2.6): `/company/new` verschwindet ganz.** Route, Seite und Tests sind
+gelöscht; `POST /companies` bleibt auf dem Server, weil die Bestätigung dieselbe
+Domänen-Operation braucht. Wer bereits als Person registriert ist, kommt an ein
+Unternehmen nur über eine **Einladung** — und das ist auch die richtige Antwort, wenn
+die eigene Domain schon beansprucht ist: dort sitzen Kollegen.
 
 Die drei Punkte, die hier vorher offen standen — Sprache der Adressen, `/` mit
 zwei Seiten, welche Formulare eigene Routen bekommen — sind oben entschieden.
