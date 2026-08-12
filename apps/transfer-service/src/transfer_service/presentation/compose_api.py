@@ -35,6 +35,11 @@ def build_app(settings: TransferServiceSettings) -> FastAPI:
         # Prozess: ein weiteres Deployment und ein weiterer Gesundheitscheck
         # wären ein hoher Preis für eine Schleife, die eine Tabelle liest.
         background=(outbox_runner(deps, settings),),
+        # Der Pool wird beim Herunterfahren geschlossen. Ohne das reissen
+        # die Verbindungen bei jedem SIGTERM ab statt sauber zu schliessen —
+        # und in den Tests erschien dieselbe Lücke als RuntimeWarning
+        # "coroutine 'Connection._cancel' was never awaited".
+        shutdown=(engine.dispose,),
     )
 
 

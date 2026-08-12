@@ -88,6 +88,29 @@ beforeEach(() => {
   });
 });
 
+// jsdom lässt `window.location` nicht beschreiben und kann keine echte
+// Navigation ausführen. Ohne diesen Ersatz schreibt es
+// „Not implemented: navigation to another Document" auf die Konsole und der
+// Test kann über das Ziel nichts behaupten. Dieselbe Hilfe steht in
+// login.test.tsx, dort mit der langen Begründung.
+function stubLocation(): { readonly href: string } {
+  let href = "";
+  const stub = {
+    get href() {
+      return href;
+    },
+    set href(value: string) {
+      href = value;
+    },
+  };
+  Object.defineProperty(window, "location", { value: stub, writable: true, configurable: true });
+  return {
+    get href() {
+      return href;
+    },
+  };
+}
+
 describe("JobsRoute", () => {
   it("searches without a login — no principal needed at all", async () => {
     searchJobs.mockResolvedValue({ ok: true, items: [job()], nextCursor: null });
@@ -186,10 +209,17 @@ describe("JobsRoute — bewerben", () => {
     expect(screen.getByText(/danach geht es hierher zurück/i)).toBeInTheDocument();
   });
 
-  it("merkt sich die Stelle, wenn ein Anonymer auf Bewerben klickt", async () => {
+  it("merkt sich die Stelle UND wechselt zur Anmeldung", async () => {
     // Ohne das müsste man nach dem Anmelden die Suche wiederholen — nur weil
     // man kein Konto hatte.
+    //
+    // Geprüft werden BEIDE Hälften. Vorher behauptete der Test nur das Merken;
+    // das Wechseln lief gegen jsdom, das echte Navigation nicht kann und sie
+    // mit „Not implemented: navigation to another Document" auf die Konsole
+    // schrieb — eine Meldung im grünen Lauf, und niemand hätte gemerkt, wenn
+    // das Ziel verstellt worden wäre.
     const user = userEvent.setup();
+    const location = stubLocation();
     // EINMAL festhalten: `job()` würfelt bei jedem Aufruf eine neue ID.
     const stelle = job();
     searchJobs.mockResolvedValue({ ok: true, items: [stelle], nextCursor: null });
@@ -204,6 +234,9 @@ describe("JobsRoute — bewerben", () => {
     // Der Titel reist mit, damit die Anmeldeseite ihn nennen kann, ohne
     // dafür eine Abfrage zu brauchen.
     expect(gemerkt?.titel).toBe("Backend-Entwicklerin");
+    // Erst merken, dann wechseln — genau in dieser Reihenfolge, sonst ist die
+    // Absicht beim Ankommen noch nicht da.
+    expect(location.href).toBe("/login");
   });
 
   it("does not offer a checkbox for the profile — it is not a choice", async () => {

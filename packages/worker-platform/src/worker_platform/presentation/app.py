@@ -38,6 +38,7 @@ def create_api_app(
     trust_forwarded_for: bool = False,
     routers: Iterable[APIRouter] = (),
     background: Iterable[Callable[[], Awaitable[None]]] = (),
+    shutdown: Iterable[Callable[[], Awaitable[None]]] = (),
 ) -> FastAPI:
     """Create a secure, observable HTTP entry point with no business endpoints.
 
@@ -57,8 +58,21 @@ def create_api_app(
         docs_url=docs_url,
         redoc_url=None,
         openapi_url=openapi_url,
-        lifespan=_lifespan_for(background),
+        lifespan=_lifespan_for(background, shutdown),
     )
+    # Die Schließer liegen sichtbar an der App, nicht nur in der Lifespan.
+    #
+    # Der Grund ist ein echter Fall: die Integrationstests rufen über
+    # `ASGITransport(app=app)` direkt an die App und durchlaufen die Lifespan
+    # deshalb NIE — Startup und Shutdown laufen dort nicht. Die Vorrichtung in
+    # transfer-service klagte genau darüber („Verbindungspools, die `build_app`
+    # nicht herausgibt"), und die Folge war eine RuntimeWarning über eine
+    # Coroutine, die niemand abgewartet hat.
+    #
+    # Wer die Lifespan nicht fährt, kann jetzt aufräumen, was die App geöffnet
+    # hat. Für den laufenden Dienst ändert das nichts: dort macht es die
+    # Lifespan.
+    app.state.shutdown = tuple(shutdown)
     _instrument_app_if_configured(app, settings)
     register_exception_handlers(app)
     app.include_router(create_health_router(settings.service_name, readiness_checks))
@@ -156,6 +170,7 @@ def _setup_tracing_if_configured(settings: PlatformSettings) -> None:
 
 def _lifespan_for(
     background: Iterable[Callable[[], Awaitable[None]]],
+    shutdown: Iterable[Callable[[], Awaitable[None]]] = (),
 ) -> Callable[[FastAPI], Any]:
     """Dauerläufer, die mit der App leben — und mit ihr enden.
 
@@ -175,6 +190,7 @@ def _lifespan_for(
        Outbox abschaffen soll — deshalb wird er protokolliert.
     """
     runners = tuple(background)
+    closers = tuple(shutdown)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -187,6 +203,19 @@ def _lifespan_for(
             for task in tasks:
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
+            # ERST danach schließen, nie davor: der Outbox-Zusteller kann mitten
+            # in einer Transaktion stecken, und ihm den Pool unter den Füßen
+            # wegzuziehen ist genau der Abbruch, den das `await` oben verhindert.
+            #
+            # Ein Fehler beim Schließen darf das Herunterfahren nicht aufhalten —
+            # der Prozess geht ohnehin, und eine Ausnahme hier würde nur die
+            # übrigen Aufräumschritte überspringen. Er wird protokolliert, nicht
+            # geschluckt.
+            for close in closers:
+                try:
+                    await close()
+                except Exception:
+                    _logger.warning("Aufräumen beim Herunterfahren fehlgeschlagen", exc_info=True)
 
     return lifespan
 

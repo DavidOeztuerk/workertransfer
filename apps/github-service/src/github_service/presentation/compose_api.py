@@ -37,6 +37,11 @@ def build_app(settings: GithubServiceSettings) -> FastAPI:
         auth_middleware=JwtAuthMiddleware,
         auth_middleware_kwargs={"verify": verify_access_token},
         routers=(build_router(deps), build_erasure_router(deps)),
+        # Der Pool wird beim Herunterfahren geschlossen. Ohne das reissen
+        # die Verbindungen bei jedem SIGTERM ab statt sauber zu schliessen —
+        # und in den Tests erschien dieselbe Lücke als RuntimeWarning
+        # "coroutine 'Connection._cancel' was never awaited".
+        shutdown=(engine.dispose,),
     )
 
 
