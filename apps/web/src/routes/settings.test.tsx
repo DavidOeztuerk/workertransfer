@@ -53,6 +53,35 @@ describe("SettingsRoute", () => {
     }
   });
 
+  it("sperrt die Schalter, wenn die Einstellungen nicht abrufbar sind", async () => {
+    // Vorher erfand der Client in diesem Fall `ALL_ON`, die Abfrage GELANG also,
+    // es gab keinen Fehlerzustand, und die Schalter waren bedienbar. Ein Klick
+    // schrieb dann `{...ALL_ON, [key]: next}` — und nahm Abbestellungen zurück,
+    // die niemand zurückgenommen hat.
+    getNotificationPreferences.mockResolvedValue(null);
+
+    renderWithProviders(<SettingsRoute principal={principal()} />);
+
+    expect(await screen.findByText(/nicht abrufbar/i)).toBeInTheDocument();
+    for (const schalter of screen.getAllByRole("switch")) {
+      expect(schalter).toBeDisabled();
+    }
+  });
+
+  it("speichert nichts, was nur die Voreinstellung war", async () => {
+    // Die Gegenprobe zum Test darüber: ein Klick auf einen gesperrten Schalter
+    // darf den Server nicht erreichen.
+    const user = userEvent.setup();
+    getNotificationPreferences.mockResolvedValue(null);
+
+    renderWithProviders(<SettingsRoute principal={principal()} />);
+
+    await screen.findByText(/nicht abrufbar/i);
+    await user.click(screen.getAllByRole("switch")[0] as HTMLElement);
+
+    expect(saveNotificationPreferences).not.toHaveBeenCalled();
+  });
+
   it("applies a toggle at once — there is no save button", async () => {
     // Die Zusage des Bauteils: `Switch` ist bewusst keine Checkbox, weil eine
     // Checkbox verspricht, die Änderung gelte erst beim Absenden.

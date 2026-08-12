@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Card, Switch } from "@workertransfer/ui";
+import { Alert, Card, Loading, Page, Switch } from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
 import {
@@ -75,39 +75,48 @@ export function SettingsRoute({ principal = null }: SettingsRouteProps) {
 
   if (subjectId === null) {
     return (
-      <main className="page page--narrow">
+      <Page title="Einstellungen" narrow>
         <Card>
-          <h1>Einstellungen</h1>
           <p>
             Bitte <a href="/login">anmelden</a>, um deine Einstellungen zu ändern.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
+  // `null` heißt „nicht abrufbar" (siehe `getNotificationPreferences`). Dann
+  // wird NICHTS angezeigt, was aussieht wie eine Wahl: die Schalter sind
+  // gesperrt, und ein Klick kann keine erfundene Voreinstellung schreiben.
+  const unbekannt = query.isPending || query.data === null;
   const values = query.data ?? ALL_ON;
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>Einstellungen</h1>
-        <p className="page__lead">
+    <Page
+      title="Einstellungen"
+      narrow
+      lead={
+        <>
           Was in einer Mail steht, ist bewusst wenig:{" "}
           <strong>„Es gibt etwas Neues für dich."</strong> Kein Firmenname, kein Vorgang, keine
           Anzahl. Eine Mail kann in einem Postfach landen, das nicht nur dir gehört — und dann wäre
           der Satz, der sie nützlicher machte, genau der, der dich den Arbeitsplatz kostet. Was es
           ist, steht hinter der Anmeldung.
-        </p>
-      </header>
+        </>
+      }
+    >
 
       <Card>
         <h2>Benachrichtigungen</h2>
 
-        {error !== null ? (
-          <p className="auth__alert" role="alert">
-            {error}
-          </p>
+        {error !== null ? <Alert>{error}</Alert> : null}
+
+        {query.isPending ? <Loading label="Einstellungen werden geladen…" /> : null}
+        {query.data === null ? (
+          <Alert>
+            Deine Einstellungen sind gerade nicht abrufbar. Solange das so ist, ändern die Schalter
+            nichts — sonst würdest du etwas speichern, das du nie eingestellt hast.
+          </Alert>
         ) : null}
 
         {SWITCHES.map((entry) => (
@@ -116,16 +125,16 @@ export function SettingsRoute({ principal = null }: SettingsRouteProps) {
             label={entry.label}
             hint={entry.hint}
             checked={values[entry.key]}
-            disabled={save.isPending || query.isPending}
+            disabled={save.isPending || unbekannt}
             onChange={(next) => save.mutate({ ...values, [entry.key]: next })}
           />
         ))}
 
-        <p className="page__note">
+        <p className="wt-field__hint">
           Höchstens eine Mail pro Stunde, egal wie viel passiert — auch der Zeitpunkt einer Mail
           verrät etwas.
         </p>
       </Card>
-    </main>
+    </Page>
   );
 }

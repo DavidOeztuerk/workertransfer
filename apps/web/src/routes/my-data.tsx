@@ -63,7 +63,13 @@ export function MyDataRoute({ principal = null }: MyDataRouteProps) {
         // `null` ist eine gültige Auskunft („noch keins") und darum `ok`.
         // Nur wo die Antwort ausblieb, steht „nicht abrufbar".
         konto: section(konto !== null, konto),
-        benachrichtigungen: section(true, benachrichtigungen),
+        // `null` heißt „nicht abrufbar" — vorher stand hier immer `true`, und
+        // der Export behauptete, er enthalte Einstellungen, die niemand gesetzt
+        // hat (der Client erfand in diesem Fall die Voreinstellung).
+        benachrichtigungen: section(
+          benachrichtigungen !== null,
+          benachrichtigungen ?? undefined
+        ),
         profil: section(true, profil),
         lebenslauf: section(true, lebenslauf),
         lebenslauf_anfragen: section(
