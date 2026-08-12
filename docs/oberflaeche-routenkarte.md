@@ -25,7 +25,8 @@ Seiten.
 | `/register` | öffentlich | Konto erstellen | 121 |
 | `/verify` | Token aus der Mail | Adresse bestätigen | 113 |
 | `/invitation` | Token aus der Mail | Einladung annehmen | 127 |
-| `/jobs` | öffentlich (Bewerben nur angemeldet) | Stellenliste **+ eingebettetes Bewerbungsformular** | 457 |
+| `/jobs` | öffentlich (Bewerben nur angemeldet) | Stellenliste; Bewerben führt auf `/jobs/$id/apply` | 457 → 266 |
+| `/jobs/$id/apply` | öffentlich (Absenden nur angemeldet) | Bewerbungsformular samt Passung — **abgespalten 12.08.2026** | 218 (neu) |
 | `/karriere/$slug` | öffentlich | Karriereseite eines Unternehmens | 142 |
 | `/profile` | angemeldet | eigenes Profil | 297 |
 | `/resume` | angemeldet | Lebenslauf **+ Anfragenliste** | 290 |
@@ -92,8 +93,9 @@ Deutsche Seitenadressen (`/stellen`, `/bewerbungen`, `/gespraeche`,
 dann keine Reparatur mehr, sondern ein Netz, das nichts mehr fangen muss.
 
 Der Preis: jede Umbenennung bricht Lesezeichen und geteilte Links, und sie
-berührt die Gateway-Karte, die E2E-Reisen und `jobs/intent.ts` (dort steckt
-`/jobs?stelle=<id>`).
+berührt die Gateway-Karte und die E2E-Reisen. Das Ziel nach dem Anmelden steht
+in `login.tsx` und ist seit dem Abspalten `/jobs/<id>/apply`; `jobs/intent.ts`
+selbst speichert bewusst nur die ID und nie einen Pfad.
 
 ## Soll — die Karte
 
@@ -168,7 +170,7 @@ Entschieden; gebaut jeweils in dem E3-PR, der die Herkunftsseite umstellt.
 
 | neue Route | heute eingebettet in | E3-Gruppe |
 |---|---|---|
-| `/jobs/$id/apply` | `ApplyBox` in `jobs.tsx:320–420` | E3a |
+| ~~`/jobs/$id/apply`~~ **gebaut** | `ApplyBox` in `jobs.tsx:320–420` | E3a ✓ |
 | `/company/jobs/new`, `/company/jobs/$id/edit` | `company-jobs.tsx` (289 Zeilen) | E3d |
 | `/company/team/invite` | `team.tsx` (221 Zeilen) | E3d |
 | `/portfolio/new` (samt Upload) | `portfolio.tsx` (331 Zeilen) | E3b |

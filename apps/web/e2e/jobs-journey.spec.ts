@@ -164,6 +164,16 @@ test("die Passung sieht die Person — und niemand rechnet sie auf dem Server", 
   await expect(candidate.locator('[data-match="missing"]')).toHaveText("Go");
   await expect(candidate.getByText(/%/)).toHaveCount(0);
 
+  // Und dasselbe auf der Bewerbungsseite: dort hilft es beim Formulieren, zu
+  // sehen, welche Fähigkeit fehlt. Zwei Dienste antworten dafür, und der
+  // Abgleich entsteht erst im Browser — nur hier steht beides zugleich zur
+  // Verfügung.
+  await candidate.getByRole("link", { name: /^Bewerben$/ }).click();
+  await expect(candidate).toHaveURL(/\/jobs\/[0-9a-f-]{36}\/apply$/);
+  await expect(candidate.getByText(/2 von 3 genannten Fähigkeiten/)).toBeVisible();
+  await expect(candidate.locator('[data-match="missing"]')).toHaveText("Go");
+  await expect(candidate.getByText(/%/)).toHaveCount(0);
+
   await recruiterContext.close();
   await anonymousContext.close();
   await candidateContext.close();

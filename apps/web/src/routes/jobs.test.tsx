@@ -11,10 +11,6 @@ vi.mock("../companies/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../companies/client")>();
   return { ...actual, getCompanyProfile: vi.fn() };
 });
-vi.mock("../applications/client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../applications/client")>();
-  return { ...actual, apply: vi.fn() };
-});
 vi.mock("../jobs/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../jobs/client")>();
   return { ...actual, searchJobs: vi.fn() };
@@ -40,8 +36,6 @@ function myProfile(skills: string[]) {
     updated_at: "2026-08-02T10:00:00Z",
   };
 }
-const applicationsClient = await import("../applications/client");
-const apply = vi.mocked(applicationsClient.apply);
 const companiesClient = await import("../companies/client");
 const getCompanyProfile = vi.mocked(companiesClient.getCompanyProfile);
 
@@ -71,21 +65,6 @@ beforeEach(() => {
   searchJobs.mockResolvedValue({ ok: true, items: [], nextCursor: null });
   getCompanyProfile.mockResolvedValue(null);
   getMyProfile.mockResolvedValue(null);
-  apply.mockResolvedValue({
-    ok: true,
-    application: {
-      id: "a",
-      job_id: "j1",
-      tenant_id: "t",
-      subject_id: "u",
-      message: "",
-      shares_resume: true,
-      shares_portfolio: false,
-      status: "submitted",
-      created_at: "2026-08-02T10:00:00Z",
-      updated_at: "2026-08-02T10:00:00Z",
-    },
-  });
 });
 
 // jsdom lässt `window.location` nicht beschreiben und kann keine echte
@@ -206,7 +185,25 @@ describe("JobsRoute — bewerben", () => {
     expect(screen.getByRole("button", { name: /^Bewerben$/ })).toBeInTheDocument();
     // Aber eben kein Bewerbungsformular: der Knopf führt zur Anmeldung.
     expect(screen.queryByLabelText(/Anschreiben/i)).toBeNull();
-    expect(screen.getByText(/danach geht es hierher zurück/i)).toBeInTheDocument();
+    expect(screen.getByText(/danach geht es direkt zur Bewerbung/i)).toBeInTheDocument();
+  });
+
+  it("führt Angemeldete auf die Bewerbungsseite dieser Stelle, nicht in ein Formular in der Karte", async () => {
+    // Das Formular hat eine eigene Adresse (`/jobs/<id>/apply`). Vorher klappte
+    // es in der Karte auf: nicht teilbar, nicht neu ladbar, und die gemerkte
+    // Absicht nach dem Anmelden musste auf eine gefilterte Liste zielen, in der
+    // die Stelle womöglich gar nicht vorkam.
+    const stelle = job();
+    searchJobs.mockResolvedValue({ ok: true, items: [stelle], nextCursor: null });
+
+    renderWithProviders(<JobsRoute principal={principal()} />);
+
+    await screen.findByText("Backend-Entwicklerin");
+    expect(screen.getByRole("link", { name: /^Bewerben$/ })).toHaveAttribute(
+      "href",
+      `/jobs/${stelle.id}/apply`
+    );
+    expect(screen.queryByLabelText(/Anschreiben/i)).toBeNull();
   });
 
   it("merkt sich die Stelle UND wechselt zur Anmeldung", async () => {
@@ -239,63 +236,10 @@ describe("JobsRoute — bewerben", () => {
     expect(location.href).toBe("/login");
   });
 
-  it("does not offer a checkbox for the profile — it is not a choice", async () => {
-    const user = userEvent.setup();
-    searchJobs.mockResolvedValue({ ok: true, items: [job()], nextCursor: null });
-
-    renderWithProviders(<JobsRoute principal={principal()} />);
-
-    await user.click(await screen.findByRole("button", { name: /^Bewerben$/ }));
-    expect(screen.getByLabelText(/Lebenslauf/i)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/^Profil$/i)).toBeNull();
-  });
-
-  it("sends what was ticked", async () => {
-    const user = userEvent.setup();
-    searchJobs.mockResolvedValue({ ok: true, items: [job({ id: "j1" })], nextCursor: null });
-    renderWithProviders(<JobsRoute principal={principal()} />);
-
-    await user.click(await screen.findByRole("button", { name: /^Bewerben$/ }));
-    await user.click(screen.getByLabelText(/Meine Arbeiten/i));
-    await user.click(screen.getByRole("button", { name: /Bewerbung abschicken/i }));
-
-    await waitFor(() => expect(apply).toHaveBeenCalled());
-    expect(apply.mock.calls[0]?.[0]).toMatchObject({
-      job_id: "j1",
-      shares_resume: true,
-      shares_portfolio: true,
-    });
-  });
-
-  it("says how to undo it, right where it was done", async () => {
-    // Die Freigabe ist der Punkt; wo man sie zurücknimmt, gehört daneben.
-    const user = userEvent.setup();
-    searchJobs.mockResolvedValue({ ok: true, items: [job()], nextCursor: null });
-    renderWithProviders(<JobsRoute principal={principal()} />);
-
-    await user.click(await screen.findByRole("button", { name: /^Bewerben$/ }));
-    await user.click(screen.getByRole("button", { name: /Bewerbung abschicken/i }));
-
-    expect(await screen.findByText(/Zurückziehen kannst du sie jederzeit/i)).toBeInTheDocument();
-  });
-
-  it("does not call a silent dependency a rejection", async () => {
-    const user = userEvent.setup();
-    searchJobs.mockResolvedValue({ ok: true, items: [job()], nextCursor: null });
-    apply.mockResolvedValue({
-      ok: false,
-      reason: "unavailable",
-      message: "Ein beteiligter Dienst antwortet gerade nicht.",
-    });
-    renderWithProviders(<JobsRoute principal={principal()} />);
-
-    await user.click(await screen.findByRole("button", { name: /^Bewerben$/ }));
-    await user.click(screen.getByRole("button", { name: /Bewerbung abschicken/i }));
-
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("antwortet gerade nicht");
-    expect(alert.textContent).not.toMatch(/abgelehnt/i);
-  });
+  // Das Bewerbungsformular selbst steht in `job-apply.test.tsx` — mitsamt den
+  // Zusagen, die daran hängen: kein Kästchen für das Profil, es wird geschickt
+  // was angehakt war, der Weg zum Zurückziehen, und ein stummer Dienst ist
+  // keine Ablehnung.
 });
 
 describe("JobsRoute — Passung", () => {

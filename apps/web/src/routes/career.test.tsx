@@ -69,11 +69,62 @@ describe("CareerRoute", () => {
     expect(await screen.findByText(/nichts ausgeschrieben/i)).toBeInTheDocument();
   });
 
-  it("points at the one place where applying happens", async () => {
-    // Ein zweiter Bewerbungsweg wäre ein zweiter Ort, an dem die Freigabe
-    // entsteht.
+
+  // Vorher log die Seite hier: `items` wurde bei einem gescheiterten Abruf
+  // GENAUSO leer wie bei einem leeren Ergebnis, und die Seite sagte „Zurzeit ist
+  // nichts ausgeschrieben". Ein Unternehmen, dessen Stellen gerade nicht
+  // abrufbar sind, sah damit aus wie eines, das keine hat — die beruhigendste
+  // falsche Antwort, die es gibt.
+  it("does not pass a failed fetch off as an empty list", async () => {
+    searchJobs.mockResolvedValue({ ok: false, message: "jobs-service antwortet nicht" });
+
     renderWithProviders(<CareerRoute slug="muster" />);
 
-    expect(await screen.findByText(/dort entsteht die Freigabe/i)).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("nicht abrufbar");
+    expect(screen.queryByText(/nichts ausgeschrieben/i)).toBeNull();
+  });
+
+  it("sagt, dass mit dem Bewerben die Freigabe entsteht — und für wen", async () => {
+    // Der Satz stand vorher hier, weil diese Seite auf die Stellensuche
+    // verwies. Der Verweis ist weg, die Aussage bleibt: sie ist der Grund,
+    // warum überhaupt jemand auf den Knopf drückt.
+    renderWithProviders(<CareerRoute slug="muster" />);
+
+    expect(await screen.findByText(/entsteht die Freigabe deiner Daten/i)).toBeInTheDocument();
+    expect(screen.getByText(/nur für dieses eine Unternehmen/i)).toBeInTheDocument();
+  });
+
+  it("führt je Stelle direkt auf die eine Bewerbungsseite", async () => {
+    // „Ein Ort, an dem die Freigabe entsteht" gilt strenger als vorher: früher
+    // verwies diese Seite auf die Stellensuche, und DIE trug ein eigenes
+    // Formular. Jetzt zeigen beide Listen auf dieselbe Adresse — und jemandem,
+    // der die Stelle vor sich hat, wird nicht gesagt, er solle sie noch einmal
+    // suchen.
+    searchJobs.mockResolvedValue({
+      ok: true,
+      items: [
+        {
+          id: "11111111-2222-3333-4444-555555555555",
+          tenant_id: "t1",
+          title: "Backend-Entwicklerin",
+          description: "Was zu tun ist.",
+          location: "Berlin",
+          remote: "hybrid",
+          employment: "full_time",
+          skills: [],
+          status: "published",
+          published_at: "2026-08-02T10:00:00Z",
+          updated_at: "2026-08-02T10:00:00Z",
+        },
+      ],
+      nextCursor: null,
+    });
+
+    renderWithProviders(<CareerRoute slug="muster" />);
+
+    expect(await screen.findByRole("link", { name: /^Bewerben$/ })).toHaveAttribute(
+      "href",
+      "/jobs/11111111-2222-3333-4444-555555555555/apply"
+    );
   });
 });
