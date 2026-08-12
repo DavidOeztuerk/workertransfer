@@ -134,7 +134,20 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
                 # Unterscheidung verrät also nichts.
                 raise HTTPException(status.HTTP_410_GONE, "confirmation link expired")
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid confirmation link")
-        return {"status": "ok"}
+        # Drei Ausgänge, nicht zwei: bestätigt · bestätigt MIT Unternehmen ·
+        # bestätigt OHNE Unternehmen samt Grund. Der dritte entsteht, wenn die
+        # Domain schon beansprucht war — das Konto ist dann trotzdem aktiv.
+        #
+        # Zusätzliche Schlüssel kosten hier keinen Vertragsbruch: die Antwort
+        # war immer ein untypisiertes dict[str, str], und ein Aufrufer, der nur
+        # `status` liest, liest weiter dasselbe.
+        verified = result.value
+        answer = {"status": "ok"}
+        if verified.company_name is not None:
+            answer["company"] = verified.company_name
+        if verified.company_error is not None:
+            answer["company_error"] = verified.company_error
+        return answer
 
     @router.post("/resend-verification", status_code=status.HTTP_202_ACCEPTED)
     async def resend(body: ResendVerificationV1) -> dict[str, str]:
