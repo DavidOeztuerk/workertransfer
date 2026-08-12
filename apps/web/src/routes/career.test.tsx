@@ -69,6 +69,21 @@ describe("CareerRoute", () => {
     expect(await screen.findByText(/nichts ausgeschrieben/i)).toBeInTheDocument();
   });
 
+
+  // Vorher log die Seite hier: `items` wurde bei einem gescheiterten Abruf
+  // GENAUSO leer wie bei einem leeren Ergebnis, und die Seite sagte „Zurzeit ist
+  // nichts ausgeschrieben". Ein Unternehmen, dessen Stellen gerade nicht
+  // abrufbar sind, sah damit aus wie eines, das keine hat — die beruhigendste
+  // falsche Antwort, die es gibt.
+  it("does not pass a failed fetch off as an empty list", async () => {
+    searchJobs.mockResolvedValue({ ok: false, message: "jobs-service antwortet nicht" });
+
+    renderWithProviders(<CareerRoute slug="muster" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("nicht abrufbar");
+    expect(screen.queryByText(/nichts ausgeschrieben/i)).toBeNull();
+  });
+
   it("points at the one place where applying happens", async () => {
     // Ein zweiter Bewerbungsweg wäre ein zweiter Ort, an dem die Freigabe
     // entsteht.

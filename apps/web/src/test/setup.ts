@@ -1,4 +1,25 @@
 import "@testing-library/jest-dom/vitest";
+import { configure } from "@testing-library/react";
+
+/**
+ * Die Wartegrenze von `findBy*` und `waitFor` — 1000 ms wären zu knapp.
+ *
+ * Sie ist NICHT dasselbe wie Vitests `testTimeout` (in vite.config.ts auf 20 s,
+ * mit derselben Begründung): `testTimeout` beendet den ganzen Test,
+ * `asyncUtilTimeout` beendet eine einzelne Wartezeit. Ein Test kann also 3,8
+ * Sekunden laufen und trotzdem an einer 1-Sekunden-Wartezeit scheitern — genau
+ * das war der Befund: ein Volllauf mit 2 roten Tests, der nächste mit 7, jedes
+ * Mal andere Dateien, und alle grün, sobald sie einzeln laufen.
+ *
+ * Verschärft hat es die Umstellung auf `packages/ui`: jede Route zieht seither
+ * mehr Module, und der erste Aufbau dauert unter Volllast länger als eine
+ * Sekunde.
+ *
+ * Eine Testsuite, deren Ergebnis von der Maschinenlast abhängt, ist keine. Die
+ * höhere Grenze verlangsamt keinen grünen Lauf: sie greift nur dort, wo vorher
+ * abgebrochen wurde.
+ */
+configure({ asyncUtilTimeout: 5_000 });
 
 /**
  * Ein eigener, berechenbarer `localStorage` für die Testreihe.
