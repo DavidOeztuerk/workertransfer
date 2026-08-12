@@ -99,8 +99,21 @@ class TestWiredUp:
         # `raise_server_exceptions=False`, weil hier ABSICHTLICH keine Datenbank
         # läuft: die ersten zehn Versuche erreichen den Handler und scheitern
         # dort mit 500. Genau das macht den Test aussagekräftig — siehe unten.
+        #
+        # Die Adresse zeigt deshalb ausdrücklich ins Leere statt auf die
+        # Voreinstellung: auf 127.0.0.1:5432 horcht der Compose-Stack, sobald
+        # jemand ihn laufen lässt, und dann spräche dieser Test mit einer echten
+        # Datenbank, obwohl seine ganze Aussage davon lebt, dass keine da ist.
+        # Er bliebe grün — er zählt nur die 429 —, hinterließe aber einen
+        # Verbindungspool, der beim Abräumen mitten in einer Abfrage steckt.
         return TestClient(
-            create_app(_settings(environment=Environment.LOCAL, auth_throttle_enabled=True)),
+            create_app(
+                _settings(
+                    environment=Environment.LOCAL,
+                    auth_throttle_enabled=True,
+                    database_url="postgresql+asyncpg://niemand@127.0.0.1:1/gibt-es-nicht",
+                )
+            ),
             raise_server_exceptions=False,
         )
 

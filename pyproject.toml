@@ -71,27 +71,6 @@ testpaths = ["tests", "apps", "packages"]
 # Pfad als Identität — Services dürfen ihre Tests gleich benennen, was der
 # Generator ohnehin tut.
 addopts = "--import-mode=importlib"
-# Genau EINE Warnung wird unterdrückt, und nur weil ihre Herkunft bekannt ist.
-#
-# Mit tracemalloc nachgesehen, nicht vermutet: sie entsteht INNERHALB von
-# asyncpg, auf dem Schließpfad selbst —
-#
-#   sqlalchemy/dialects/postgresql/asyncpg.py  await self._connection.close(timeout=2)
-#   asyncpg/connection.py                      await self._protocol.close(timeout)
-#   asyncpg/connection.py                      self._loop.create_task(self._cancel(waiter))
-#
-# `close(timeout=2)` läuft in seinen Zeitablauf, asyncpg legt daraufhin eine
-# Abbruch-Aufgabe an, und die Ereignisschleife des anyio-Portals endet, bevor
-# sie laufen kann. Kein Leck in diesem Code: sie wurde erst SICHTBAR, als das
-# Schließen des Pools überhaupt eingebaut war (create_api_app(shutdown=...)).
-# Vorher wurde nie geschlossen, also gab es auch nichts abzubrechen.
-#
-# Der Filter ist absichtlich eng: er nennt die Coroutine beim Namen. Jede
-# ANDERE nicht abgewartete Coroutine erscheint weiter — und das ist der Punkt,
-# denn genau diese Warnung hat hier einen echten Mangel aufgedeckt.
-filterwarnings = [
-  "ignore:coroutine 'Connection._cancel' was never awaited:RuntimeWarning",
-]
 
 [tool.ruff]
 line-length = 100
