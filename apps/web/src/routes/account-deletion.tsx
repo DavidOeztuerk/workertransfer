@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button, Card } from "@workertransfer/ui";
+import { Alert, Button, Card, Page } from "@workertransfer/ui";
 
 import { requestErasure } from "../account/client";
 import { useCompanies } from "../auth/companies";
@@ -70,50 +70,51 @@ export function AccountDeletionRoute({ principal = null }: AccountDeletionRouteP
   // `principal` als feste Eigenschaft, die sich nie ändert.
   if (accepted) {
     return (
-      <main className="page page--narrow">
-        <header className="page__header">
-          <h1>Konto löschen</h1>
-        </header>
+      <Page title="Konto löschen" narrow>
         <Card>
-          <p role="status">
-            <strong>Deine Löschung ist angenommen und läuft.</strong> Du bist abgemeldet, und
-            unter deinem Namen passiert ab jetzt nichts mehr. Wir schicken dir{" "}
-            <strong>eine einzige E-Mail</strong>, sobald alles gelöscht ist — bis dahin gibt es
-            hier nichts mehr zu sehen.
-          </p>
-          <p className="page__note">
+          {/* `notice` und nicht `error`: `Alert` setzt damit `role="status"`,
+              genau wie vorher. Eine Bestätigung, die den Vorleser unterbricht,
+              wäre Lärm — und dies ist eine Bestätigung, kein Fehler. */}
+          <Alert variant="notice">
+            <strong>Deine Löschung ist angenommen und läuft.</strong> Du bist abgemeldet, und unter
+            deinem Namen passiert ab jetzt nichts mehr. Wir schicken dir{" "}
+            <strong>eine einzige E-Mail</strong>, sobald alles gelöscht ist — bis dahin gibt es hier
+            nichts mehr zu sehen.
+          </Alert>
+          <p className="wt-field__hint">
             Dass es etwas dauert, hat einen einfachen Grund: deine Daten liegen bei mehreren
-            Diensten, und jeder muss den Auftrag bestätigen. Erreicht er einen davon nicht, gilt
-            die Löschung nicht als fertig — und du bekommst keine Nachricht, die nicht stimmt.
+            Diensten, und jeder muss den Auftrag bestätigen. Erreicht er einen davon nicht, gilt die
+            Löschung nicht als fertig — und du bekommst keine Nachricht, die nicht stimmt.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
   if (principal === null) {
     return (
-      <main className="page page--narrow">
+      <Page title="Konto löschen" narrow>
         <Card>
-          <h1>Konto löschen</h1>
           <p>
             Bitte <a href="/login">anmelden</a>, um dein Konto zu löschen.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>Konto löschen</h1>
-        <p className="page__lead">
-          Hier wird dein Konto gelöscht — <strong>unwiderruflich</strong>. Es gibt keinen
-          Papierkorb und keine Frist, in der du es dir noch anders überlegen kannst. Was hier
-          steht, gilt; deshalb steht es hier und nicht im Kleingedruckten.
-        </p>
-      </header>
+    <Page
+      title="Konto löschen"
+      narrow
+      lead={
+        <>
+          Hier wird dein Konto gelöscht — <strong>unwiderruflich</strong>. Es gibt keinen Papierkorb
+          und keine Frist, in der du es dir noch anders überlegen kannst. Was hier steht, gilt;
+          deshalb steht es hier und nicht im Kleingedruckten.
+        </>
+      }
+    >
 
       <Card>
         <h2>Was gelöscht wird</h2>
@@ -127,7 +128,7 @@ export function AccountDeletionRoute({ principal = null }: AccountDeletionRouteP
           <li>Deine GitHub-Verbindung.</li>
           <li>Deine Benachrichtigungs-Einstellungen.</li>
         </ul>
-        <p className="requests__meta">
+        <p className="wt-field__hint">
           <strong>Es bleibt nichts davon stehen.</strong> Auch nicht die Bewerbung, über die du{" "}
           <strong>eingestellt</strong> wurdest — auch die verschwindet aus der Liste des
           Unternehmens. Das ist so gewollt: die Unterlage über ein Arbeitsverhältnis ist dein
@@ -137,7 +138,7 @@ export function AccountDeletionRoute({ principal = null }: AccountDeletionRouteP
 
       <Card>
         <h2>Was bleibt — und warum</h2>
-        <p className="requests__meta">
+        <p className="wt-field__hint">
           Ein Nachweis darüber, <em>dass</em> gelöscht wurde: welche Freigaben unter deiner
           Kennung einmal erteilt und wann sie zurückgenommen wurden. Ohne ihn ließe sich nicht
           mehr belegen, dass wir deiner Löschung nachgekommen sind. Was du selbst
@@ -168,7 +169,7 @@ export function AccountDeletionRoute({ principal = null }: AccountDeletionRouteP
               </li>
             ))}
           </ul>
-          <p className="page__note">
+          <p className="wt-field__hint">
             Das hält deine Löschung <strong>nicht auf</strong>. Du musst niemandem vorher etwas
             übergeben: dein Recht auf Löschung hängt nicht daran, ob sich jemand anderes um ein
             Unternehmen kümmert.
@@ -178,46 +179,48 @@ export function AccountDeletionRoute({ principal = null }: AccountDeletionRouteP
 
       <Card>
         <h2>Wie es abläuft</h2>
-        <p className="requests__meta">
+        <p className="wt-field__hint">
           Mit dem Klick bist du <strong>sofort abgemeldet</strong> und deine Sitzungen sind
           widerrufen. Die Löschung selbst läuft danach weiter — sie geht{" "}
           <strong>nicht sofort</strong> durch, weil deine Daten bei mehreren Diensten liegen und
           jeder einzeln bestätigen muss. Du bekommst genau eine E-Mail, wenn alles erledigt ist.
         </p>
-        <p className="page__note">
+        <p className="wt-field__hint">
           Du kannst deine Daten vorher <a href="/my-data">unter „Meine Daten"</a>{" "}
           herunterladen. Musst du aber nicht — wer löschen will, darf das ohne Umweg.
         </p>
       </Card>
 
       <Card>
-        {error !== null ? (
-          <p className="auth__alert" role="alert">
-            {error}
-          </p>
-        ) : null}
+        {error !== null ? <Alert>{error}</Alert> : null}
 
+        {/* Zwei Schritte INLINE, kein Dialog. Ein Dialog wäre eine andere Zusage:
+            er nimmt die Seite weg, auf der gerade steht, was verschwindet — und
+            genau das soll beim zweiten Klick noch lesbar sein (ADR-0027 §6). */}
         {asking ? (
           <>
-            <p className="auth__alert" role="alert">
-              Letzte Frage: dein Konto und alles oben Genannte werden gelöscht. Das lässt sich
-              nicht rückgängig machen.
-            </p>
-            <div className="form__actions">
-              <Button onClick={() => erase.mutate()} disabled={erase.isPending}>
-                {erase.isPending ? "Wird angenommen…" : "Ja, endgültig löschen"}
-              </Button>
-              <Button
-                variant="quiet"
-                onClick={() => {
-                  setAsking(false);
-                  setError(null);
-                }}
-                disabled={erase.isPending}
-              >
-                Abbrechen
-              </Button>
-            </div>
+            <Alert>
+              Letzte Frage: dein Konto und alles oben Genannte werden gelöscht. Das lässt sich nicht
+              rückgängig machen.
+            </Alert>
+            {/* Hier stand `<div className="form__actions">` — eine Klasse ohne
+                jede Regel in `styles.css`. Die zwei Knöpfe der
+                unwiderruflichsten Handlung des Systems lagen also ohne Layout
+                da. `Card` ordnet sie schon; die Hülle war nie mehr als ein
+                Name. */}
+            <Button onClick={() => erase.mutate()} disabled={erase.isPending}>
+              {erase.isPending ? "Wird angenommen…" : "Ja, endgültig löschen"}
+            </Button>
+            <Button
+              variant="quiet"
+              onClick={() => {
+                setAsking(false);
+                setError(null);
+              }}
+              disabled={erase.isPending}
+            >
+              Abbrechen
+            </Button>
           </>
         ) : (
           <Button variant="secondary" onClick={() => setAsking(true)}>
@@ -225,6 +228,6 @@ export function AccountDeletionRoute({ principal = null }: AccountDeletionRouteP
           </Button>
         )}
       </Card>
-    </main>
+    </Page>
   );
 }

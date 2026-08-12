@@ -28,19 +28,35 @@ function send(path: string, init: RequestInit = {}): Promise<Response> {
 }
 
 /**
- * Bei einem Fehler die Voreinstellung, nicht „alles aus".
+ * Bei einem Fehler `null` — weder „alles aus" noch „alles an".
  *
- * Ein Netzfehler ist keine Abbestellung. Zeigte die Seite hier vier
- * ausgeschaltete Schalter, würde beim nächsten Speichern genau das
- * geschrieben — und die Person hätte sich abgemeldet, ohne es zu wollen.
+ * Hier stand die Voreinstellung, mit dieser Begründung: ein Netzfehler ist keine
+ * Abbestellung; zeigte die Seite vier ausgeschaltete Schalter, würde beim
+ * nächsten Speichern genau das geschrieben, und die Person hätte sich
+ * abgemeldet, ohne es zu wollen. Das ist richtig.
+ *
+ * Es gilt aber **Wort für Wort auch in der anderen Richtung**. Vier
+ * eingeschaltete Schalter werden beim nächsten Speichern ebenso geschrieben: wer
+ * drei Arten abbestellt hatte, sah nach einem Ausfall alle vier an, und ein
+ * Klick auf den vierten schickte `{...ALL_ON, [key]: next}` — drei
+ * Abbestellungen zurückgenommen, die niemand zurückgenommen hat. Schlimmer noch
+ * war der Fehlschlag unsichtbar: die Abfrage GELANG ja, also gab es keinen
+ * Fehlerzustand und die Schalter waren bedienbar.
+ *
+ * `null` heißt „nicht abrufbar". Die Route sagt das und sperrt die Schalter,
+ * womit in keine Richtung etwas Erfundenes geschrieben werden kann.
+ *
+ * Das `ALL_ON` für ein **neues Konto** hängt nicht hieran: `GET
+ * /me/notification-preferences` antwortet immer `200` mit den Voreinstellungen,
+ * auch wenn nie etwas gespeichert wurde. Diese Zusage kommt vom Server.
  */
-export async function getNotificationPreferences(): Promise<NotificationPreferences> {
+export async function getNotificationPreferences(): Promise<NotificationPreferences | null> {
   try {
     const res = await send("/me/notification-preferences");
-    if (!res.ok) return { ...ALL_ON };
+    if (!res.ok) return null;
     return (await res.json()) as NotificationPreferences;
   } catch {
-    return { ...ALL_ON };
+    return null;
   }
 }
 
