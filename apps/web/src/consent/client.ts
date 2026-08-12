@@ -12,14 +12,24 @@ export const PORTFOLIO_VISIBILITY = "portfolio.visibility:public";
 export type ConsentResult = { ok: true; granted: boolean } | { ok: false; message: string };
 
 /**
- * Gilt diese Einwilligung gerade?
+ * Gilt diese Einwilligung gerade? `null` heißt: der Ledger hat nicht geantwortet.
  *
- * Bei einem Fehler `false`. Bewusst asymmetrisch zum Server, der in diesem Fall
- * 503 meldet statt zu verbergen: hier steht nur die Stellung eines Schalters auf
- * dem Spiel, und ein Schalter, der versehentlich „freigegeben" behauptet, wäre
- * die gefährlichere Lüge.
+ * Hier stand `false` für diesen Fall, mit einer Begründung, die weiter gilt: ein
+ * Schalter, der versehentlich „freigegeben" behauptet, ist die gefährlichere
+ * Lüge. Genau deshalb bleibt die ANZEIGE bei Nichtwissen aus.
+ *
+ * Sie schloss aber nur die eine Hälfte. `false` heißt für den Aufrufer „nicht
+ * freigegeben", und ein Schalter in dieser Stellung ist **bedienbar**: der
+ * nächste Klick schickt ein `grant` für eine Einwilligung, deren Zustand
+ * niemand kennt — und wer längst freigegeben hatte, liest „nicht freigegeben"
+ * und hält den Widerruf für erledigt.
+ *
+ * `null` trennt beides: die Anzeige bleibt aus (unverändert), der Schalter wird
+ * gesperrt, und die Seite sagt, was los ist. Damit ist die Oberfläche wieder so
+ * genau wie der Server, der für diese Lage `503` vorhält statt `404` — beides
+ * wären Behauptungen über etwas, das er nicht weiß.
  */
-export async function isGranted(subjectId: string, capability: string): Promise<boolean> {
+export async function isGranted(subjectId: string, capability: string): Promise<boolean | null> {
   try {
     const res = await fetch(`${CONSENT_BASE_URL}/consent/check`, {
       method: "POST",
@@ -27,11 +37,11 @@ export async function isGranted(subjectId: string, capability: string): Promise<
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ subject_id: subjectId, capability }),
     });
-    if (!res.ok) return false;
+    if (!res.ok) return null;
     const body = (await res.json()) as { granted?: unknown; deleted?: unknown };
     return body.granted === true && body.deleted !== true;
   } catch {
-    return false;
+    return null;
   }
 }
 

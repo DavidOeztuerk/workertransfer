@@ -1,6 +1,10 @@
-/* Zwei Spalten: Kästchen, dann Text. Trägt zugleich die drei Bestandsstellen,
-   die diese Klasse noch mit rohem <input> und <span> benutzen (jobs.tsx 2x,
-   profile.tsx 1x) — E1 fasst keine Route an. */
+/* Zwei Spalten: Kästchen, dann Text.
+
+   Hier stand, dass die Klasse zugleich drei Bestandsstellen mit rohem <input>
+   und <span> trägt (jobs.tsx 2x, profile.tsx 1x) — E1 fasste keine Route an.
+   Alle drei sind mit E3a/E3b auf das Bauteil umgestellt; sie bekamen vorher
+   weder die Kästchengröße noch `accent-color`. Es gibt keinen Aufrufer mehr,
+   der nur die Klasse setzt. */
 .wt-checkbox {
   display: grid;
   grid-template-columns: auto 1fr;

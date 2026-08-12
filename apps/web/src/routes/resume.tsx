@@ -1,6 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Button, Card, Field } from "@workertransfer/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  Empty,
+  Field,
+  Fieldset,
+  Loading,
+  Page,
+  Row,
+  RowList,
+} from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
 import {
@@ -98,24 +109,23 @@ export function ResumeRoute({ principal = null }: ResumeRouteProps) {
 
   if (subjectId === null) {
     return (
-      <main className="page page--narrow">
+      <Page title="Mein Lebenslauf" narrow>
         <Card>
-          <h1>Mein Lebenslauf</h1>
           <p>
             Bitte <a href="/login">anmelden</a>, um deinen Lebenslauf zu bearbeiten.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
   if (resumeQuery.isPending) {
     return (
-      <main className="page page--narrow">
+      <Page title="Mein Lebenslauf" narrow>
         <Card>
-          <p role="status">Lebenslauf wird geladen…</p>
+          <Loading label="Lebenslauf wird geladen…" />
         </Card>
-      </main>
+      </Page>
     );
   }
 
@@ -127,39 +137,34 @@ export function ResumeRoute({ principal = null }: ResumeRouteProps) {
   const requests = requestsQuery.data;
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>Mein Lebenslauf</h1>
-        <p className="page__lead">
-          Diesen Lebenslauf sieht niemand, bis du ihn einem Unternehmen freigibst — Unternehmen für
-          Unternehmen, jedes einzeln. Eine Freigabe kannst du jederzeit zurückziehen; sie wirkt
-          sofort.
-        </p>
-      </header>
-
+    <Page
+      title="Mein Lebenslauf"
+      narrow
+      lead="Diesen Lebenslauf sieht niemand, bis du ihn einem Unternehmen freigibst — Unternehmen für Unternehmen, jedes einzeln. Eine Freigabe kannst du jederzeit zurückziehen; sie wirkt sofort."
+    >
       <Card>
         <h2>Anfragen</h2>
-        {requests !== undefined && !requests.ok ? (
-          <p className="auth__alert" role="alert">
-            {requests.message}
-          </p>
-        ) : null}
+        {/* Reihenfolge nach dem Muster: lädt, dann Fehler, dann leer, dann
+            Inhalt. Der LADEZUSTAND fehlte — und er sah aus wie „bislang hat
+            niemand gefragt". Das ist die beruhigendste falsche Antwort, die es
+            hier gibt: wer eine Anfrage erwartet, hätte die Seite zugemacht. */}
+        {requestsQuery.isPending ? <Loading label="Anfragen werden geladen…" /> : null}
+        {requests !== undefined && !requests.ok ? <Alert>{requests.message}</Alert> : null}
         {requests?.ok && requests.requests.length === 0 ? (
-          <p>Bislang hat niemand nach deinem Lebenslauf gefragt.</p>
+          <Empty title="Bislang hat niemand nach deinem Lebenslauf gefragt." />
         ) : null}
         {requests?.ok && requests.requests.length > 0 ? (
-          <ul className="requests">
+          <RowList>
             {requests.requests.map((request) => (
-              <li key={request.id}>
-                <RequestRow
-                  request={request}
-                  busy={answer.isPending || withdraw.isPending}
-                  onAnswer={(grant) => answer.mutate({ id: request.id, grant })}
-                  onWithdraw={() => withdraw.mutate(request.id)}
-                />
-              </li>
+              <RequestRow
+                key={request.id}
+                request={request}
+                busy={answer.isPending || withdraw.isPending}
+                onAnswer={(grant) => answer.mutate({ id: request.id, grant })}
+                onWithdraw={() => withdraw.mutate(request.id)}
+              />
             ))}
-          </ul>
+          </RowList>
         ) : null}
       </Card>
 
@@ -174,8 +179,7 @@ export function ResumeRoute({ principal = null }: ResumeRouteProps) {
           {rows.map((row, index) => (
             // Der Index als Schlüssel ist hier richtig: die Zeilen haben keine
             // eigene Identität, die Reihenfolge macht erst der Server.
-            <fieldset key={index} className="resume__position">
-              <legend>Station {index + 1}</legend>
+            <Fieldset key={index} legend={`Station ${index + 1}`}>
               <Field
                 label="Arbeitgeber"
                 value={row.employer}
@@ -210,7 +214,7 @@ export function ResumeRoute({ principal = null }: ResumeRouteProps) {
               >
                 Station entfernen
               </Button>
-            </fieldset>
+            </Fieldset>
           ))}
 
           <Button
@@ -221,19 +225,17 @@ export function ResumeRoute({ principal = null }: ResumeRouteProps) {
             Station hinzufügen
           </Button>
 
-          {error !== null ? (
-            <p className="auth__alert" role="alert">
-              {error}
-            </p>
-          ) : null}
-          {saved && error === null ? <p className="page__note">Lebenslauf gespeichert.</p> : null}
+          {error !== null ? <Alert>{error}</Alert> : null}
+          {/* `notice` und nicht `error`: eine Bestätigung, die den Vorleser
+              unterbricht, ist Lärm. */}
+          {saved && error === null ? <Alert variant="notice">Lebenslauf gespeichert.</Alert> : null}
 
           <Button type="submit" disabled={save.isPending}>
             {save.isPending ? "Wird gespeichert…" : "Speichern"}
           </Button>
         </form>
       </Card>
-    </main>
+    </Page>
   );
 }
 
@@ -255,36 +257,41 @@ function RequestRow({
   const holdsAccess = request.status === "GRANTED" && request.active === true;
 
   return (
-    <div className="requests__row">
-      <div>
-        <p className="requests__title">Ein Unternehmen fragt nach deinem Lebenslauf</p>
-        <p className="requests__meta">
-          {isPending
-            ? "Noch nicht beantwortet"
-            : request.status === "DECLINED"
-              ? "Abgelehnt — dieses Unternehmen kann nicht erneut fragen"
-              : holdsAccess
-                ? "Freigegeben — das Unternehmen sieht deinen Lebenslauf"
-                : "Freigabe zurückgezogen"}
-        </p>
-      </div>
-      <div className="requests__actions">
-        {isPending ? (
+    <Row
+      title="Ein Unternehmen fragt nach deinem Lebenslauf"
+      meta={
+        isPending
+          ? "Noch nicht beantwortet"
+          : request.status === "DECLINED"
+            ? "Abgelehnt — dieses Unternehmen kann nicht erneut fragen"
+            : holdsAccess
+              ? "Freigegeben — das Unternehmen sieht deinen Lebenslauf"
+              : "Freigabe zurückgezogen"
+      }
+      // Keine Knöpfe, wenn es nichts zu tun gibt: ein Zurückziehen für eine
+      // Freigabe, die es nicht mehr gibt, wäre eine Lüge über den Zustand —
+      // deshalb `undefined` und nicht ein deaktivierter Knopf.
+      actions={
+        isPending || holdsAccess ? (
           <>
-            <Button onClick={() => onAnswer(true)} disabled={busy}>
-              Freigeben
-            </Button>
-            <Button variant="quiet" onClick={() => onAnswer(false)} disabled={busy}>
-              Ablehnen
-            </Button>
+            {isPending ? (
+              <>
+                <Button onClick={() => onAnswer(true)} disabled={busy}>
+                  Freigeben
+                </Button>
+                <Button variant="quiet" onClick={() => onAnswer(false)} disabled={busy}>
+                  Ablehnen
+                </Button>
+              </>
+            ) : null}
+            {holdsAccess ? (
+              <Button variant="quiet" onClick={onWithdraw} disabled={busy}>
+                Zurückziehen
+              </Button>
+            ) : null}
           </>
-        ) : null}
-        {holdsAccess ? (
-          <Button variant="quiet" onClick={onWithdraw} disabled={busy}>
-            Zurückziehen
-          </Button>
-        ) : null}
-      </div>
-    </div>
+        ) : undefined
+      }
+    />
   );
 }
