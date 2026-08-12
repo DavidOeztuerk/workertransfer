@@ -154,8 +154,10 @@ sie benutzen — der Name lügt, die Abhängigkeit nicht.
 - Texte ändern, wo es nicht ausdrücklich gewollt ist: die Tests prüfen die
   deutschen Literale direkt.
 - Eine Zusage verlieren. Beispiele aus diesen drei Routen: „Danach geht es
-  zurück zu: *Stelle*" (`ZurueckHinweis`), das Ziel `/jobs?stelle=<id>` nach dem
+  zurück zu: *Stelle*" (`ZurueckHinweis`), das Ziel `/jobs/<id>/apply` nach dem
   Anmelden, und für eine bekannte Adresse **dieselbe** Antwort wie für eine neue.
+  Das Ziel war bis 12.08.2026 `/jobs?stelle=<id>` — und von **keinem** Test
+  gedeckt, obwohl es der einzige Weg zurück ist.
 - Eine sichtbare Änderung unangekündigt lassen. Jeder PR trägt zwei Listen: was
   sich absichtlich geändert hat, und welche Testzahl sich deswegen bewegt hat.
 

@@ -133,7 +133,60 @@ einen Zustand für „Stelle unbekannt oder zurückgezogen", und den Rückweg
 
 ## Noch offen
 
-- **Verlinkt die Karriereseite direkt auf die Bewerbung je Stelle?** Heute zeigt
-  sie auf `/jobs` (*„the one place where applying happens"*). Entscheidbar, wenn
-  die Bewerbungsroute steht.
+*(keine offenen Punkte mehr — siehe „Ergebnis" darunter)*
 
+
+
+## Ergebnis (12.08.2026)
+
+Die Gruppe ist umgestellt. Gemessen statt geschätzt:
+
+| Datei | vorher | nachher |
+|---|---|---|
+| `routes/applications.tsx` | 146 | 124 |
+| `routes/career.tsx` | 142 | 160 |
+| `routes/jobs.tsx` | 457 | 266 |
+| `routes/job-apply.tsx` | – | 218 (neu) |
+| `routes/candidates.tsx` | 418 | 197 |
+| `candidates/CandidateCard.tsx` | – | 243 (neu) |
+| `jobs/Requirements.tsx` | – | 71 (neu) |
+| `src/styles.css` | 606 | 534 |
+
+`career.tsx` ist **länger** geworden, und das ist der Punkt: der gescheiterte
+Abruf war vorher ein Leerzustand („Zurzeit ist nichts ausgeschrieben") — die
+beruhigendste falsche Antwort, die es gibt.
+
+### Die Karriereseite verlinkt jetzt direkt (offene Frage, entschieden)
+
+Ja. Möglich wurde es erst durch die eigene Adresse: vorher hätte ein Link auf
+`/jobs` bedeutet, dass jemand die Stelle, die er vor sich hat, dort noch einmal
+sucht. Die Zusage „**ein** Ort, an dem die Freigabe entsteht" gilt dadurch
+*strenger* als vorher — früher verwies diese Seite auf die Stellensuche, und DIE
+trug ein eigenes Formular. Jetzt zeigen beide Listen auf dieselbe eine Adresse.
+
+### Die CSS-Messung war zu optimistisch — und fand zwei tote Regeln
+
+Aus „12 von 27 können umziehen" wurden nach dem Schnitt **11 der Gruppe
+gehörende, davon 7 umgezogen** — plus **zwei Regeln ohne jede Verwendung**:
+
+- `.jobs__apply` stylte die aufklappende Box und starb mit ihr.
+- `.settings__row` war **schon vorher** tot; gefunden, weil die Messung diesmal
+  nur echte `className`-Vorkommen zählte statt Textvorkommen (ein Pfad wie
+  `/candidates` sieht in einer `.ts`-Datei aus wie ein Klassenname).
+
+Nicht umgezogen sind `.candidates`, `.candidates__headline`, `.candidates__meta`
+und `.candidates__skills`: sie gehören der Gruppe, aber **drei ihrer Routen
+teilen sie**. Neben eine davon gelegt hieße, dass `jobs.tsx` und `career.tsx`
+von einer Datei abhängen, die sie nicht importieren — unsichtbar und beim
+nächsten Umbau falsch. Sie bleiben zentral, mit einem Kommentar, der auch das
+Zweite benennt: **der Name lügt inzwischen** (eine Stelle trägt
+`.candidates__headline`). Die Umbenennung gehört in den Schnitt, der `/jobs` und
+`/candidates` gemeinsam anfasst.
+
+### Der CSS-Wächter las genau eine Datei
+
+`apps/web/src/styles.test.ts` prüfte `src/styles.css` über einen festen Pfad.
+Regeln zu ihren Bauteilen zu verschieben hätte sie damit **ungeprüft** gemacht —
+und zwar genau in dem Punkt, für den der Wächter existiert (keine zweite
+Palette über `var(--wt-x, #fdfcfa)`). Er sucht jetzt alle `.css` unter `src/`
+und besteht darauf, mehr als eine zu finden.
