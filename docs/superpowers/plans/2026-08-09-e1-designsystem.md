@@ -3489,6 +3489,16 @@ Die Palettenvereinigung aus Task 1 ist sichtbar. Ohne Bilder ist die Aussage
    Knöpfe, Felder und einen `<select>`. Ein angemeldeter Blick käme ohne
    Gewinn mit einer Registrierung samt Mailabruf je Lauf.
 
+**Das Werkzeug muss reproduzierbar sein, sonst beweist der Vergleich nichts.**
+Der erste Anlauf nahm die Bilder direkt nach `page.goto()` auf. Die Kopfzeile
+zeigt ihre Links aber erst, wenn `useSession()` fertig ist (`isLoading ? null :
+…` in `app.tsx`) — unter Last entstand das Bild **vor** der Antwort von
+`GET /me`, und dieselbe Seite sah je nach Maschinenlast anders aus. Ein
+Vergleich zweier solcher Bilder zeigt Wartezeit, nicht Gestaltung. Deshalb
+`waitUntil: "networkidle"` **und** `document.fonts.ready`; belegt ist es damit,
+dass zwei Läufe gegen denselben Code auf allen vier Seiten byte-identische
+Bilder liefern — diese Probe gehört vor jeden Vorher/Nachher-Vergleich.
+
 **Bekannte Lücke dieses Satzes, aus Aufgabe 8:** die drei Bestandsnutzer von
 `.wt-checkbox` (`jobs.tsx` ApplyBox 2×, `profile.tsx` 1×) liegen alle hinter
 der Anmeldung. Der Wechsel dieser Regel von `display:flex` auf `display:grid`

@@ -47,9 +47,17 @@ test.describe("Aufnahmen der Oberfläche", () => {
       // Der Direktlink, nicht ein Klick: nur das Eintippen der Adresse geht
       // wirklich durchs Gateway (docker/traefik/dynamic.yml, Sec-Fetch-Dest).
       // Ein Klick schaltet im Browser um und beweist nichts.
-      await page.goto(seite.pfad);
+      // `networkidle` und nicht die Voreinstellung: die Kopfzeile zeigt ihre
+      // Links erst, wenn `useSession()` fertig ist (`isLoading ? null : …` in
+      // app.tsx). Ohne das Warten entstand das Bild unter Last VOR der Antwort
+      // von `GET /me` — dieselbe Seite sah dann je nach Maschinenlast anders
+      // aus, und ein Vergleich zweier solcher Bilder beweist nichts.
+      await page.goto(seite.pfad, { waitUntil: "networkidle" });
       // Eine <h1> ist der Beleg, dass die Seite kam und nicht rohes JSON.
       await expect(page.locator("h1").first()).toBeVisible();
+      // Schriften: ein Bild vor dem Laden der Schrift zeigt eine andere
+      // Textbreite und damit andere Umbrüche.
+      await page.evaluate(() => document.fonts.ready);
       await page.screenshot({ path: `.screenshots/${TAG}/${seite.name}.png`, fullPage: true });
     });
   }

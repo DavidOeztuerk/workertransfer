@@ -77,6 +77,16 @@ schrumpft, meldet Ordnung über Dateien, die er nicht mehr findet — dieselbe
 Fehlerklasse wie ein E2E-Lauf, der sich vollständig überspringt und trotzdem
 grün berichtet.
 
+**Eine Skala darf zwei gemessene Werte nicht zu einem machen.** Beim ersten
+Tokenisieren waren `0.85rem` (Feld-Label) und `0.8rem` (Hinweis, Fehler) beide
+auf `--wt-text-sm` abgebildet, und `140ms` (Schalter) auf
+`--wt-transition: 160ms`. Der Screenshot-Vergleich zeigte daraufhin **jedes
+Formular um einen Pixel verschoben** — eine vierte sichtbare Änderung, die
+niemand angekündigt hatte. Es gibt deshalb `--wt-text-md: 0.85rem` und
+`--wt-transition-fast: 140ms`. Aufräumen, das die Oberfläche verändert, ist
+kein Aufräumen; und die 20 ms am Schalter wären nie aufgefallen, was sie zur
+verführerischeren Hälfte des Fehlers macht.
+
 Das CSS liegt als eine Datei je Bauteil in `packages/ui/src/styles/`, gehalten
 von einer Einstiegsdatei aus reinen `@import`-Zeilen. Zwanzig Bauteile in eine
 Datei zu legen hätte in `packages/ui` genau den Fehler wiederholt, dessen

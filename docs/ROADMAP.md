@@ -690,6 +690,19 @@ zuerst, dass sie überhaupt etwas *lesen* — ein Wächter, der bei einer
 Umbenennung still auf null Vergleiche schrumpft, meldet Ordnung über Dateien,
 die er nicht mehr findet.
 
+**Der Screenshot-Vergleich fand, was kein Test fand.** Zwei Werte waren beim
+Tokenisieren zu einem geworden — `0.85rem` und `0.8rem` beide auf
+`--wt-text-sm`, `140ms` auf `160ms` — und jedes Formular saß einen Pixel höher.
+Eine vierte, unangekündigte sichtbare Änderung; behoben über `--wt-text-md` und
+`--wt-transition-fast`. Danach das gemessene Ergebnis: von den vier öffentlichen
+Seiten sind **drei byte-identisch**, nur `/jobs` unterscheidet sich, und dort
+mit dem Auge nicht erkennbar — der Unterschied sitzt auf 1px-Kartenrändern.
+
+Dass die Bilder überhaupt vergleichbar sind, ist selbst eine Messung: der erste
+Anlauf fotografierte **vor** der Antwort von `GET /me`, weshalb die Kopfzeile je
+nach Maschinenlast anders aussah. Mit `networkidle` liefern zwei Läufe gegen
+denselben Code byte-identische Bilder — diese Probe gehört vor jeden Vergleich.
+
 **Natives Element vor selbstgebautem**, mit drei konkreten Gründen: `<select>`
 (das APG-Muster verlangt sonst `aria-activedescendant`, und kein Wähler braucht
 Autocomplete), `<dialog>` samt `showModal()` (der Browser liefert
