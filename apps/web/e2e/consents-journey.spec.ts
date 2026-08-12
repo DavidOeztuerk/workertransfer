@@ -48,12 +48,8 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   // Ein Unternehmen holt sich eine empfängerbezogene Freigabe.
   const recruiterContext = await browser.newContext();
   const recruiter = await recruiterContext.newPage();
-  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter");
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
-  await recruiter.goto("/company/new");
-  await recruiter.getByLabel(/Name des Unternehmens/i).fill(companyName);
-  await recruiter.getByRole("button", { name: /Unternehmen anlegen/i }).click();
-  await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
   await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
@@ -157,12 +153,8 @@ test("die Suche findet nur, was freigegeben ist", async ({ browser }) => {
 
   const recruiterContext = await browser.newContext();
   const recruiter = await recruiterContext.newPage();
-  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter");
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
-  await recruiter.goto("/company/new");
-  await recruiter.getByLabel(/Name des Unternehmens/i).fill(companyName);
-  await recruiter.getByRole("button", { name: /Unternehmen anlegen/i }).click();
-  await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
   await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();

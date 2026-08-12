@@ -241,9 +241,17 @@ export const E2E_PASSWORD = "e2e-Passwort-mit-Laenge-1!";
 export async function registerAndConfirm(
   page: Page,
   email: string,
-  displayName: string
+  displayName: string,
+  companyName?: string
 ): Promise<void> {
   await page.goto("/register");
+  // Ein Unternehmen entsteht seit E2.6 NUR hier: die Wahl fällt bei der
+  // Registrierung, angelegt wird es bei der Bestätigung. Es gibt keine Seite
+  // „Unternehmen anlegen" mehr, über die diese Reisen früher gingen.
+  if (companyName !== undefined) {
+    await page.getByRole("radio", { name: "Für ein Unternehmen" }).check();
+    await page.getByLabel("Name des Unternehmens").fill(companyName);
+  }
   await page.getByLabel(/E-Mail/i).fill(email);
   await page.getByLabel(/Passwort/i).first().fill(E2E_PASSWORD);
   // Pflichtfeld. Fehlt es, blockt die native Formularvalidierung das Absenden
@@ -296,6 +304,22 @@ export async function registerAndConfirm(
       .innerText()
       .catch(() => "");
     throw new Error(`Bestätigung für ${email} fehlgeschlagen: ${detail.slice(0, 300)}`);
+  }
+  // Ein Unternehmen kann bestätigt werden UND trotzdem nicht entstehen: ist die
+  // Domain schon beansprucht, bleibt das Konto aktiv und die Seite zeigt einen
+  // Hinweis. Ohne diese Prüfung liefe die Reise weiter und fiele Schritte später
+  // an einer Stelle um, die mit der Ursache nichts zu tun hat — derselbe Fehler,
+  // den der lange Kommentar über der Erfolgsüberschrift beschreibt.
+  if (companyName !== undefined) {
+    const angelegt = page.getByText(`${companyName} ist angelegt`);
+    const abgelehnt = page.getByRole("alert");
+    await expect(angelegt.or(abgelehnt).first()).toBeVisible();
+    if (await abgelehnt.isVisible()) {
+      throw new Error(
+        `Unternehmen "${companyName}" für ${email} wurde NICHT angelegt: ` +
+          (await abgelehnt.innerText().catch(() => "(kein Text)")).slice(0, 300)
+      );
+    }
   }
   await expect(confirmed).toBeVisible();
 }
