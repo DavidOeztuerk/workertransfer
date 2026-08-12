@@ -7,24 +7,23 @@ import type { Portfolio } from "../portfolio/client";
 import { renderWithProviders } from "../test/render";
 import { PortfolioRoute } from "./portfolio";
 
+// Die Formulare liegen auf eigenen Adressen; ihre Zusagen stehen in
+// `portfolio-item.test.tsx` — Anhänge, leerer Link als `null`, leeres Jahr als
+// `null`, der abgelehnte Link und das Entfernen genau einer Arbeit.
 vi.mock("../portfolio/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../portfolio/client")>();
   return {
     ...actual,
     getMyPortfolio: vi.fn(),
-    saveMyPortfolio: vi.fn(),
     getPortfolioVisibility: vi.fn(),
     setPortfolioVisibility: vi.fn(),
-    uploadAttachment: vi.fn(),
   };
 });
 
 const client = await import("../portfolio/client");
 const getMyPortfolio = vi.mocked(client.getMyPortfolio);
-const saveMyPortfolio = vi.mocked(client.saveMyPortfolio);
 const getPortfolioVisibility = vi.mocked(client.getPortfolioVisibility);
 const setPortfolioVisibility = vi.mocked(client.setPortfolioVisibility);
-const uploadAttachment = vi.mocked(client.uploadAttachment);
 
 const SUBJECT = "11111111-1111-1111-1111-111111111111";
 
@@ -53,59 +52,43 @@ beforeEach(() => {
   vi.clearAllMocks();
   getMyPortfolio.mockResolvedValue(null);
   getPortfolioVisibility.mockResolvedValue(false);
-  saveMyPortfolio.mockResolvedValue({ ok: true, portfolio: portfolio() });
   setPortfolioVisibility.mockResolvedValue({ ok: true, granted: true });
 });
 
 describe("PortfolioRoute", () => {
-  it("fills the form with what is already stored", async () => {
+  it("listet die Arbeiten und verlinkt jede auf ihre eigene Adresse", async () => {
     getMyPortfolio.mockResolvedValue(portfolio());
 
     renderWithProviders(<PortfolioRoute principal={principal()} />);
 
-    expect(await screen.findByDisplayValue("Ein Werkzeug")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("https://example.org/werkzeug")).toBeInTheDocument();
+    expect(await screen.findByText("Ein Werkzeug")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Bearbeiten/i })).toHaveAttribute(
+      "href",
+      "/portfolio/0"
+    );
+    expect(screen.getByRole("link", { name: /Arbeit hinzufügen/i })).toHaveAttribute(
+      "href",
+      "/portfolio/new"
+    );
   });
 
-  it("sends an empty link as null, not as an empty string", async () => {
-    // "" würde später als Link gerendert und ins Nichts führen.
-    const user = userEvent.setup();
-    renderWithProviders(<PortfolioRoute principal={principal()} />);
-
-    await user.click(await screen.findByRole("button", { name: /Arbeit hinzufügen/i }));
-    await user.type(screen.getByLabelText(/Titel/i), "Ohne Link");
-    await user.click(screen.getByRole("button", { name: /^Speichern$/ }));
-
-    await waitFor(() => expect(saveMyPortfolio).toHaveBeenCalled());
-    expect(saveMyPortfolio.mock.calls[0]?.[0][0]?.url).toBeNull();
-  });
-
-  it("sends an empty year as null, not as zero", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<PortfolioRoute principal={principal()} />);
-
-    await user.click(await screen.findByRole("button", { name: /Arbeit hinzufügen/i }));
-    await user.type(screen.getByLabelText(/Titel/i), "Ohne Jahr");
-    await user.click(screen.getByRole("button", { name: /^Speichern$/ }));
-
-    await waitFor(() => expect(saveMyPortfolio).toHaveBeenCalled());
-    expect(saveMyPortfolio.mock.calls[0]?.[0][0]?.year).toBeNull();
-  });
-
-  it("keeps a rejected link on screen and does not claim success", async () => {
-    const user = userEvent.setup();
+  it("bietet in der Liste kein Entfernen an", async () => {
+    // Das Entfernen steht auf der Seite der einzelnen Arbeit: dort hat die
+    // Person sie vor sich und sieht, was verschwindet. In einer Liste wäre es
+    // ein Knopf neben einer Zeile, und Zeilen verwechselt man.
     getMyPortfolio.mockResolvedValue(portfolio());
-    saveMyPortfolio.mockResolvedValue({
-      ok: false,
-      reason: "invalid",
-      message: "Only http and https links are allowed",
-    });
+
     renderWithProviders(<PortfolioRoute principal={principal()} />);
 
-    await user.click(await screen.findByRole("button", { name: /^Speichern$/ }));
+    await screen.findByText("Ein Werkzeug");
+    expect(screen.queryByRole("button", { name: /entfernen/i })).toBeNull();
+  });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("http and https");
-    expect(screen.queryByText(/gespeichert/i)).toBeNull();
+  it("sagt bei leerem Portfolio, dass die Voreinstellung kein Fehler ist", async () => {
+    renderWithProviders(<PortfolioRoute principal={principal()} />);
+
+    expect(await screen.findByText(/Noch keine Arbeit eingetragen/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Arbeit hinzufügen/i })).toBeInTheDocument();
   });
 
   it("switches its own release, not the profile's", async () => {
@@ -122,82 +105,34 @@ describe("PortfolioRoute", () => {
   it("does not offer a release before there is something to release", async () => {
     renderWithProviders(<PortfolioRoute principal={principal()} />);
 
-    await screen.findByRole("button", { name: /Arbeit hinzufügen/i });
+    await screen.findByText(/Noch keine Arbeit eingetragen/i);
     expect(screen.getByRole("switch")).toBeDisabled();
+  });
+
+  it("sperrt den Schalter, wenn der Ledger nicht antwortet — und sagt es", async () => {
+    // Dieselbe Korrektur wie auf der Profilseite: `null` heißt „der Ledger hat
+    // nicht geantwortet". Vorher war das von „nicht freigegeben" nicht zu
+    // unterscheiden, und der Schalter war in dieser Lage BEDIENBAR — der
+    // nächste Klick hätte etwas freigegeben, dessen Stand niemand kennt.
+    //
+    // MIT gespeicherter Arbeit, sonst wäre der Schalter ohnehin gesperrt und
+    // dieser Test grün, ohne etwas zu prüfen.
+    getMyPortfolio.mockResolvedValue(portfolio());
+    getPortfolioVisibility.mockResolvedValue(null);
+
+    renderWithProviders(<PortfolioRoute principal={principal()} />);
+
+    const schalter = await screen.findByRole("switch");
+    await waitFor(() => expect(schalter).toBeDisabled());
+    expect(schalter).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText(/nicht abrufbar/i)).toBeInTheDocument();
+    // Und der Grund ist der richtige: nicht „erst eine Arbeit speichern".
+    expect(screen.queryByText(/Erst eine Arbeit speichern/i)).toBeNull();
   });
 
   it("tells an anonymous visitor to log in", () => {
     renderWithProviders(<PortfolioRoute principal={null} />);
 
     expect(screen.getByText(/anmelden/i)).toBeInTheDocument();
-  });
-});
-
-describe("PortfolioRoute — Anhänge", () => {
-  it("uploads immediately and keeps the name for the save", async () => {
-    const user = userEvent.setup();
-    uploadAttachment.mockResolvedValue({
-      ok: true,
-      name: "abc123.png",
-      contentType: "image/png",
-      size: 4,
-    });
-    renderWithProviders(<PortfolioRoute principal={principal()} />);
-
-    await user.click(await screen.findByRole("button", { name: /Arbeit hinzufügen/i }));
-    await user.type(screen.getByLabelText(/Titel/i), "Mit Datei");
-    await user.upload(
-      screen.getByLabelText("Datei"),
-      new File([new Uint8Array([1, 2, 3, 4])], "bild.png", { type: "image/png" })
-    );
-    await screen.findByText(/Datei angehängt/i);
-    await user.click(screen.getByRole("button", { name: /^Speichern$/ }));
-
-    await waitFor(() => expect(saveMyPortfolio).toHaveBeenCalled());
-    expect(saveMyPortfolio.mock.calls[0]?.[0][0]?.attachment).toBe("abc123.png");
-  });
-
-  it("never shows the local file name — it never went to the server", async () => {
-    const user = userEvent.setup();
-    uploadAttachment.mockResolvedValue({
-      ok: true,
-      name: "abc123.png",
-      contentType: "image/png",
-      size: 4,
-    });
-    renderWithProviders(<PortfolioRoute principal={principal()} />);
-
-    await user.click(await screen.findByRole("button", { name: /Arbeit hinzufügen/i }));
-    await user.upload(
-      screen.getByLabelText("Datei"),
-      new File([new Uint8Array([1])], "streng-geheim.png", { type: "image/png" })
-    );
-
-    await screen.findByText(/Datei angehängt/i);
-    expect(screen.queryByText(/streng-geheim/)).toBeNull();
-  });
-
-  it("says why a file was refused instead of failing quietly", async () => {
-    // Die Datei trägt einen erlaubten Typ und heißt .png — nur ihre Bytes sind
-    // HTML. Genau so sieht der Angriff aus, und genau deshalb entscheidet der
-    // SERVER: `accept` im Dialog ist eine Bequemlichkeit, keine Prüfung. (Sie
-    // filtert im Test sogar so gut, dass eine .txt-Datei gar nicht erst
-    // ankäme — der interessante Fall kommt an und wird trotzdem abgelehnt.)
-    const user = userEvent.setup();
-    uploadAttachment.mockResolvedValue({
-      ok: false,
-      message: "Only PNG, JPEG and PDF files are accepted",
-    });
-    renderWithProviders(<PortfolioRoute principal={principal()} />);
-
-    await user.click(await screen.findByRole("button", { name: /Arbeit hinzufügen/i }));
-    await user.upload(
-      screen.getByLabelText("Datei"),
-      new File(["<html><script>alert(1)</script></html>"], "harmlos.png", {
-        type: "image/png",
-      })
-    );
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("PNG");
   });
 });

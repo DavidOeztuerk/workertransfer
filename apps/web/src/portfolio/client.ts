@@ -95,7 +95,8 @@ export async function saveMyPortfolio(items: PortfolioItem[]): Promise<SaveResul
   return { ok: true, portfolio: (await res.json()) as Portfolio };
 }
 
-export function getPortfolioVisibility(subjectId: string): Promise<boolean> {
+/** `null` heißt: der Ledger hat nicht geantwortet (siehe `isGranted`). */
+export function getPortfolioVisibility(subjectId: string): Promise<boolean | null> {
   return isGranted(subjectId, PORTFOLIO_VISIBILITY);
 }
 

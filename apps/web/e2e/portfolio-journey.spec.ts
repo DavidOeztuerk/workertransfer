@@ -36,13 +36,25 @@ test("Profil und Portfolio sind zwei getrennte Freigaben", async ({ browser }) =
   await expect(candidate.getByRole("switch")).toBeChecked();
 
   // Arbeiten anlegen — aber NICHT freigeben.
+  //
+  // Das Formular hat eine eigene Adresse (`/portfolio/new`); „Arbeit
+  // hinzufügen" ist ein LINK. Nach dem Speichern führt es zurück auf die Liste,
+  // und dort steht die Arbeit — das ist die Bestätigung, nicht ein Satz im
+  // Formular.
   await candidate.goto("/portfolio");
-  await candidate.getByRole("button", { name: /Arbeit hinzufügen/i }).click();
+  await candidate.getByRole("link", { name: /Arbeit hinzufügen/i }).click();
+  await expect(candidate).toHaveURL(/\/portfolio\/new$/);
   await candidate.getByLabel("Titel").fill(workTitle);
   await candidate.getByLabel(/Link/i).fill("https://example.org/werkzeug");
   await candidate.getByRole("button", { name: /^Speichern$/ }).click();
-  await expect(candidate.getByText(/Arbeiten gespeichert/i)).toBeVisible();
+  await expect(candidate.getByText(workTitle)).toBeVisible();
   await expect(candidate.getByRole("switch")).not.toBeChecked();
+
+  // Und der Deep-Link auf das Formular trägt: nur ein Neuladen geht wirklich
+  // durchs Gateway, ein Klick schaltet bloß den Router um.
+  await candidate.goto("/portfolio/0");
+  await expect(candidate.getByLabel("Titel")).toHaveValue(workTitle);
+  await candidate.goto("/portfolio");
 
   const recruiterContext = await browser.newContext();
   const recruiter = await recruiterContext.newPage();

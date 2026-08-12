@@ -89,6 +89,20 @@ beforeEach(() => {
   vi.mocked(transfers.listMyTransfers).mockResolvedValue({ ok: true, transfers: [] });
 });
 
+/**
+ * Die Auskunft zu einem Abschnitt — „enthalten" oder „fehlt".
+ *
+ * Die Aufstellung ist ein `<dl>`: der Name steht im `<dt>`, die Auskunft im
+ * `<dd>` daneben. Vorher war beides EIN Textknoten („lebenslauf — enthalten"),
+ * und ein Test darauf konnte nicht scheitern, wenn die Zuordnung verrutscht —
+ * er prüfte eine Zeichenkette, nicht das Paar. Über `nextElementSibling`
+ * bewegt sich diese Hilfe an derselben Beziehung, die auch ein Vorleser nutzt.
+ */
+function auskunft(abschnitt: string): string {
+  const term = screen.getByText(abschnitt);
+  return term.nextElementSibling?.textContent ?? "";
+}
+
 describe("MyDataRoute", () => {
   it("asks for a login rather than collecting data for nobody", async () => {
     renderWithProviders(<MyDataRoute principal={null} />);
@@ -101,9 +115,10 @@ describe("MyDataRoute", () => {
     // „Kein Lebenslauf" ist eine Auskunft. Sie fehlt sonst.
     renderWithProviders(<MyDataRoute principal={principal()} />);
 
-    expect(await screen.findByText(/lebenslauf — enthalten/)).toBeTruthy();
-    expect(screen.getByText(/portfolio — enthalten/)).toBeTruthy();
-    expect(screen.getByText(/freigaben verlauf — enthalten/)).toBeTruthy();
+    await screen.findByText("lebenslauf");
+    expect(auskunft("lebenslauf")).toBe("enthalten");
+    expect(auskunft("portfolio")).toBe("enthalten");
+    expect(auskunft("freigaben verlauf")).toBe("enthalten");
   });
 
   it("warns before the download when a part is missing", async () => {
@@ -114,7 +129,7 @@ describe("MyDataRoute", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("transfers");
-    expect(screen.getByText(/transfers — fehlt/)).toBeTruthy();
+    expect(auskunft("transfers")).toBe("fehlt");
   });
 
   it("keeps the consent history, which the overview page deliberately omits", async () => {
@@ -131,7 +146,8 @@ describe("MyDataRoute", () => {
     });
     renderWithProviders(<MyDataRoute principal={principal()} />);
 
-    expect(await screen.findByText(/freigaben verlauf — enthalten/)).toBeTruthy();
+    await screen.findByText("freigaben verlauf");
+    expect(auskunft("freigaben verlauf")).toBe("enthalten");
   });
 
   it("points to deleting as a different path — a link, never a neighbouring button", async () => {
