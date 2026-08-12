@@ -112,3 +112,89 @@ describe("RegisterRoute", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
+
+describe("RegisterRoute — Person oder Unternehmen", () => {
+  it("registers a person by default, without asking about a company", () => {
+    render(<RegisterRoute />);
+
+    expect(screen.getByRole("radio", { name: "Für mich" })).toBeChecked();
+    expect(screen.queryByLabelText("Name des Unternehmens")).toBeNull();
+  });
+
+  it("asks for the company name only when a company is being registered", async () => {
+    const user = userEvent.setup();
+    render(<RegisterRoute />);
+
+    await user.click(screen.getByRole("radio", { name: "Für ein Unternehmen" }));
+
+    expect(screen.getByLabelText("Name des Unternehmens")).toBeInTheDocument();
+  });
+
+  // Die Hero-Knöpfe der Startseite tragen die Absicht als ?as=company mit.
+  // Ohne diese Vorauswahl landet jemand, der „Als Unternehmen entdecken" klickt,
+  // im Personenformular — und merkt es erst nach der Bestätigungsmail.
+  it("preselects a company when the address says so", () => {
+    window.history.replaceState({}, "", "/register?as=company");
+    try {
+      render(<RegisterRoute />);
+
+      expect(screen.getByRole("radio", { name: "Für ein Unternehmen" })).toBeChecked();
+      expect(screen.getByLabelText("Name des Unternehmens")).toBeInTheDocument();
+    } finally {
+      window.history.replaceState({}, "", "/");
+    }
+  });
+
+  // Sofort, nicht erst nach der Mail: der Server lehnt ohnehin ab (422), aber
+  // wer es erst zwei Schritte später erfährt, hat zwei Schritte verloren.
+  it("says right away that a mass provider cannot become a company", async () => {
+    const user = userEvent.setup();
+    render(<RegisterRoute />);
+
+    await user.click(screen.getByRole("radio", { name: "Für ein Unternehmen" }));
+    await user.type(screen.getByLabelText("E-Mail"), "max@gmail.com");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Ein Unternehmen braucht eine eigene Domain."
+    );
+    expect(screen.getByRole("button", { name: "Registrieren" })).toBeDisabled();
+  });
+
+  it("sends the company name, and never a tenant", async () => {
+    const fetchMock = vi.fn(
+      async (_url: string, _init?: RequestInit) => new Response("{}", { status: 201 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<RegisterRoute />);
+
+    await user.click(screen.getByRole("radio", { name: "Für ein Unternehmen" }));
+    await user.type(screen.getByLabelText("E-Mail"), "chef@firma.de");
+    await user.type(screen.getByLabelText("Name des Unternehmens"), "Firma GmbH");
+    await user.type(screen.getByLabelText("Passwort"), "strongpassword1");
+    await user.type(screen.getByLabelText("Anzeigename"), "Chef");
+    await user.click(screen.getByRole("button", { name: "Registrieren" }));
+
+    const body = String(fetchMock.mock.calls[0]?.[1]?.body ?? "");
+    expect(body).toContain('"company_name":"Firma GmbH"');
+    expect(body).not.toContain('"tenant_id"');
+  });
+
+  it("sends no company_name at all when registering as a person", async () => {
+    const fetchMock = vi.fn(
+      async (_url: string, _init?: RequestInit) => new Response("{}", { status: 201 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<RegisterRoute />);
+
+    await user.type(screen.getByLabelText("E-Mail"), "mensch@example.com");
+    await user.type(screen.getByLabelText("Passwort"), "strongpassword1");
+    await user.type(screen.getByLabelText("Anzeigename"), "M");
+    await user.click(screen.getByRole("button", { name: "Registrieren" }));
+
+    // Kein `"company_name":null` — ein null wäre eine Aussage, die niemand
+    // gemacht hat.
+    expect(String(fetchMock.mock.calls[0]?.[1]?.body ?? "")).not.toContain("company_name");
+  });
+});

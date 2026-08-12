@@ -12,7 +12,11 @@ describe("HomeRoute", () => {
 
   // Die beiden auffälligsten Elemente der Seite, die jeder zuerst sieht, waren
   // tote Knöpfe: <Button> ohne onClick und ohne href. Ein Klick tat nichts.
-  it("offers two ways in, and both actually lead somewhere", () => {
+  //
+  // Und der zweite trägt die ABSICHT mit: ohne `?as=company` landet jemand, der
+  // „Als Unternehmen entdecken" klickt, im Personenformular — und merkt es erst
+  // nach der Bestätigungsmail, wenn kein Unternehmen da ist.
+  it("offers two ways in, and both carry their intent", () => {
     render(<HomeRoute />);
 
     expect(screen.getByRole("link", { name: "Als Arbeitnehmer starten" })).toHaveAttribute(
@@ -21,7 +25,7 @@ describe("HomeRoute", () => {
     );
     expect(screen.getByRole("link", { name: "Als Unternehmen entdecken" })).toHaveAttribute(
       "href",
-      "/register"
+      "/register?as=company"
     );
   });
 

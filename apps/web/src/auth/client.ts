@@ -31,11 +31,26 @@ export interface RegisterInput {
   email: string;
   password: string;
   displayName: string;
+  /**
+   * Gesetzt heißt: hier registriert sich ein Unternehmen.
+   *
+   * Das Unternehmen entsteht erst mit der Bestätigung der Adresse — eine
+   * unbestätigte Adresse beweist keine Domain (ADR-0019). Bis dahin merkt der
+   * SERVER die Absicht, nicht der Browser: Bestätigungsmails werden oft auf
+   * einem anderen Gerät geöffnet.
+   */
+  companyName?: string;
 }
 
 export type RegisterResult = { ok: true } | { ok: false; message: string };
 // `expired` is its own case so the UI can offer "resend" instead of a dead end.
-export type VerifyResult = { ok: true } | { ok: false; expired: boolean; message: string };
+//
+// Der Erfolgsfall hat drei Ausprägungen, nicht eine: bestätigt · bestätigt MIT
+// Unternehmen · bestätigt OHNE Unternehmen samt Grund. Ohne die dritte zeigt die
+// Seite „alles gut", während die halbe Absicht verpufft ist.
+export type VerifyResult =
+  | { ok: true; company?: string; companyError?: string }
+  | { ok: false; expired: boolean; message: string };
 export type CreateCompanyResult =
   | { ok: true; company: Company }
   | { ok: false; message: string };
@@ -232,6 +247,10 @@ export async function registerUser(input: RegisterInput): Promise<RegisterResult
       email: input.email,
       password: input.password,
       display_name: input.displayName,
+      // Nur mitschicken, wenn es eine Absicht gibt: `company_name` ist im
+      // Vertrag optional, und ein `null` im Body wäre eine Aussage, die niemand
+      // gemacht hat.
+      ...(input.companyName !== undefined ? { company_name: input.companyName } : {}),
     }),
   });
   // A known address answers 201 too — the server sends the real owner a warning
@@ -247,7 +266,19 @@ export async function verifyEmail(token: string): Promise<VerifyResult> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ token }),
   });
-  if (res.ok) return { ok: true };
+  if (res.ok) {
+    // Der Ausgang der Unternehmensanlage steht in der Antwort. Ein Körper, der
+    // sich nicht lesen lässt, macht die Bestätigung NICHT ungültig — sie ist
+    // serverseitig längst passiert, und ein 200 auf dem Papier
+    // nachträglich in ein Scheitern zu drehen wäre die falsche Auskunft.
+    const body: unknown = await res.json().catch(() => ({}));
+    const data = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+    return {
+      ok: true,
+      ...(typeof data.company === "string" ? { company: data.company } : {}),
+      ...(typeof data.company_error === "string" ? { companyError: data.company_error } : {}),
+    };
+  }
   const expired = res.status === 410;
   return {
     ok: false,
