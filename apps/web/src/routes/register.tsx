@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Field } from "@workertransfer/ui";
+import { Alert, Button, Field } from "@workertransfer/ui";
 
 import { type RegisterInput, registerUser, resendVerification } from "../auth/client";
 import { AuthLayout } from "./auth-layout";
@@ -17,6 +17,8 @@ export function RegisterRoute() {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [resent, setResent] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendFailed, setResendFailed] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,19 +50,41 @@ export function RegisterRoute() {
           </>
         }
       >
+        {/* Vorher: `await resendVerification(email); setResent(true)` ohne
+            try/catch und ohne „läuft". Bei einem Netzfehler wirft fetch, die
+            Zusage wird nie gesetzt, und der Knopf tut sichtbar NICHTS — ein
+            Erfolgszustand, den niemand erreicht, und ein Fehler, den niemand
+            sieht.
+
+            Der Server bleibt weiterhin stumm (202, egal ob etwas gesendet
+            wurde) und darf es sein: das ist der Schutz gegen Enumeration. Nur
+            der Transportfehler wird gemeldet, und der sagt nichts über
+            Plattformmitgliedschaft. */}
         <Button
           variant="secondary"
+          disabled={resending}
           onClick={async () => {
-            await resendVerification(email);
-            setResent(true);
+            setResending(true);
+            setResendFailed(false);
+            try {
+              await resendVerification(email);
+              setResent(true);
+            } catch {
+              setResendFailed(true);
+            } finally {
+              setResending(false);
+            }
           }}
         >
-          E-Mail erneut senden
+          {resending ? "Wird gesendet…" : "E-Mail erneut senden"}
         </Button>
+        {resendFailed ? (
+          <Alert>
+            Die E-Mail konnte gerade nicht angefordert werden. Versuch es später noch einmal.
+          </Alert>
+        ) : null}
         {resent ? (
-          <p className="auth__note" role="status">
-            Falls nötig, ist die E-Mail erneut unterwegs.
-          </p>
+          <Alert variant="notice">Falls nötig, ist die E-Mail erneut unterwegs.</Alert>
         ) : null}
       </AuthLayout>
     );
@@ -107,11 +131,7 @@ export function RegisterRoute() {
           onChange={(e) => setDisplayName(e.target.value)}
           required
         />
-        {error !== null ? (
-          <p className="auth__alert" role="alert">
-            {error}
-          </p>
-        ) : null}
+        {error !== null ? <Alert>{error}</Alert> : null}
         <Button type="submit" disabled={busy}>
           {busy ? "Wird angelegt…" : "Registrieren"}
         </Button>

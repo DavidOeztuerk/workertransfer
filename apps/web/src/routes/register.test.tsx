@@ -50,6 +50,52 @@ describe("RegisterRoute", () => {
     expect(body).not.toContain('"tenant_id"');
   });
 
+  // Der Knopf tat bei einem Netzfehler sichtbar NICHTS: `await
+  // resendVerification()` wirft, `setResent(true)` läuft nie, und es erschien
+  // weder eine Zusage noch ein Fehler.
+  it("says so when the mail could not even be requested", async () => {
+    let call = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        call += 1;
+        // Erster Aufruf: die Registrierung. Zweiter: das erneute Senden.
+        if (call === 1) return new Response("{}", { status: 201 });
+        throw new TypeError("Failed to fetch");
+      })
+    );
+    render(<RegisterRoute />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText("E-Mail"), "a@b.com");
+    await user.type(screen.getByLabelText("Passwort"), "strongpassword1");
+    await user.type(screen.getByLabelText("Anzeigename"), "A");
+    await user.click(screen.getByRole("button", { name: "Registrieren" }));
+    await user.click(await screen.findByRole("button", { name: "E-Mail erneut senden" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Die E-Mail konnte gerade nicht angefordert werden."
+    );
+    // Und die Zusage darf gerade NICHT dastehen.
+    expect(screen.queryByText(/erneut unterwegs/)).toBeNull();
+  });
+
+  it("confirms the resend when it went out", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 201 })));
+    render(<RegisterRoute />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText("E-Mail"), "a@b.com");
+    await user.type(screen.getByLabelText("Passwort"), "strongpassword1");
+    await user.type(screen.getByLabelText("Anzeigename"), "A");
+    await user.click(screen.getByRole("button", { name: "Registrieren" }));
+    await user.click(await screen.findByRole("button", { name: "E-Mail erneut senden" }));
+
+    // role="status" und nicht "alert": eine Bestätigung unterbricht nicht.
+    expect(await screen.findByRole("status")).toHaveTextContent("erneut unterwegs");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("shows the same hint for a known address as for a new one", async () => {
     // Der Server antwortet auch bei bekannter Adresse 201 — kein
     // Enumerationskanal. Die Oberfläche darf daraus nichts anderes machen.
