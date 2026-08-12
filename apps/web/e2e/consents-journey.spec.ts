@@ -199,10 +199,17 @@ test("die Auskunft nennt jeden Abschnitt — auch die leeren", async ({ browser 
 
   // Jeder Abschnitt steht da — auch die, zu denen es nichts gibt. „Kein
   // Lebenslauf" ist eine Auskunft und fehlt sonst.
-  await expect(person.getByText(/^profil — enthalten$/)).toBeVisible();
-  await expect(person.getByText(/^lebenslauf — enthalten$/)).toBeVisible();
-  await expect(person.getByText(/^portfolio — enthalten$/)).toBeVisible();
-  await expect(person.getByText(/^freigaben verlauf — enthalten$/)).toBeVisible();
+  //
+  // Die Aufstellung ist ein `<dl>`: der Name im `<dt>`, die Auskunft im `<dd>`
+  // daneben. Vorher war beides ein Textknoten („profil — enthalten"), und eine
+  // Prüfung darauf konnte nicht scheitern, wenn die ZUORDNUNG verrutscht. Diese
+  // Hilfe bewegt sich an derselben Beziehung, die auch ein Vorleser nutzt.
+  const auskunft = (abschnitt: string) =>
+    person.getByText(abschnitt, { exact: true }).locator("xpath=following-sibling::dd[1]");
+  await expect(auskunft("profil")).toHaveText("enthalten");
+  await expect(auskunft("lebenslauf")).toHaveText("enthalten");
+  await expect(auskunft("portfolio")).toHaveText("enthalten");
+  await expect(auskunft("freigaben verlauf")).toHaveText("enthalten");
   // Nichts fehlt: bei laufendem Stack gibt es keine Warnung.
   await expect(person.getByRole("alert")).toHaveCount(0);
 
