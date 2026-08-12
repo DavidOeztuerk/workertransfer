@@ -39,12 +39,8 @@ test("eine Einladung lässt genau die eingeladene Person herein", async ({ brows
 
   const adminContext = await browser.newContext();
   const admin = await adminContext.newPage();
-  await registerAndConfirm(admin, adminEmail, "E2E Chefin");
+  await registerAndConfirm(admin, adminEmail, "E2E Chefin", companyName);
   await login(admin, adminEmail);
-  await admin.goto("/company/new");
-  await admin.getByLabel(/Name des Unternehmens/i).fill(companyName);
-  await admin.getByRole("button", { name: /Unternehmen anlegen/i }).click();
-  await expect(admin.getByText(/Administrator/i)).toBeVisible();
   await actAsCompany(admin, companyName);
   await admin.goto("/company/team");
   await expect(admin.getByText("E2E Chefin")).toBeVisible();

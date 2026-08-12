@@ -51,10 +51,6 @@ export type RegisterResult = { ok: true } | { ok: false; message: string };
 export type VerifyResult =
   | { ok: true; company?: string; companyError?: string }
   | { ok: false; expired: boolean; message: string };
-export type CreateCompanyResult =
-  | { ok: true; company: Company }
-  | { ok: false; message: string };
-
 export interface Company {
   id: string;
   name: string;
@@ -298,18 +294,6 @@ export async function resendVerification(email: string): Promise<void> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email }),
   });
-}
-
-export async function createCompany(name: string): Promise<CreateCompanyResult> {
-  // No domain in the body — the server derives it from the confirmed address.
-  const res = await fetch(`${API_BASE_URL}/companies`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name }),
-  });
-  if (res.ok) return { ok: true, company: (await res.json()) as Company };
-  return { ok: false, message: await detail(res, "Unternehmen konnte nicht angelegt werden") };
 }
 
 export async function listCompanies(): Promise<Membership[]> {

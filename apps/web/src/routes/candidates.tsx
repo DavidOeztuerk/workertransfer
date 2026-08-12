@@ -70,8 +70,8 @@ export function CandidatesRoute({ principal = null }: CandidatesRouteProps) {
         <Card>
           <h1>Kandidatinnen und Kandidaten</h1>
           <p>
-            Profile sehen nur Unternehmen. Wechsle oben auf ein Unternehmen — oder{" "}
-            <a href="/company/new">lege eines an</a>.
+            Profile sehen nur Unternehmen. Wechsle oben auf ein Unternehmen — oder lass
+            dich von jemandem aus deinem Unternehmen einladen.
           </p>
         </Card>
       </main>

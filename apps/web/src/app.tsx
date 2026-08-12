@@ -17,7 +17,6 @@ import { useLogout, useSession } from "./auth/session";
 import { CandidatesRoute } from "./routes/candidates";
 import { CompanyTransfersRoute } from "./routes/company-transfers";
 import { ConsentsRoute } from "./routes/consents";
-import { CompanyNewRoute } from "./routes/company-new";
 import { GitHubRoute } from "./routes/github";
 import { HomeRoute } from "./routes/home";
 import { OverviewRoute } from "./routes/overview";
@@ -150,9 +149,6 @@ export function RootLayout() {
                 </Link>
                 <Link className="site-header__menu-item" to="/delete-account">
                   Konto löschen
-                </Link>
-                <Link className="site-header__menu-item" to="/company/new">
-                  Unternehmen anlegen
                 </Link>
               </HeaderMenu>
               {user.tenant_id !== null ? (
@@ -319,13 +315,6 @@ function TeamWithSession() {
   return <TeamRoute principal={user} />;
 }
 
-function CompanyNewWithSession() {
-  // The route needs the principal; the component takes it as a prop so it stays
-  // testable without a live session.
-  const { user } = useSession();
-  return <CompanyNewRoute principal={user} />;
-}
-
 const rootRoute = createRootRoute({ component: RootLayout });
 
 /**
@@ -489,12 +478,6 @@ const invitationRoute = createRoute({
   path: "/invitation",
   component: InvitationRoute,
 });
-const companyNewRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/company/new",
-  component: CompanyNewWithSession,
-});
-
 const routeTree = rootRoute.addChildren([
   homeRoute,
   overviewRoute,
@@ -520,7 +503,6 @@ const routeTree = rootRoute.addChildren([
   companyProfileRoute,
   teamRoute,
   invitationRoute,
-  companyNewRoute,
 ]);
 
 export const router = createRouter({ routeTree });

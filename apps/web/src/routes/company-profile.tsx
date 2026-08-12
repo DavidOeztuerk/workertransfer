@@ -90,7 +90,8 @@ export function CompanyProfileRoute({ principal = null }: CompanyProfileRoutePro
         <Card>
           <h1>Unser Unternehmen</h1>
           <p>
-            Wähle oben ein Unternehmen — oder <a href="/company/new">lege eines an</a>.
+            Wähle oben ein Unternehmen — oder lass dich von jemandem aus deinem
+            Unternehmen einladen.
           </p>
         </Card>
       </main>

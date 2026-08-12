@@ -54,13 +54,8 @@ test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort",
 
   const recruiterContext = await browser.newContext();
   const recruiter = await recruiterContext.newPage();
-  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter");
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
-
-  await recruiter.goto("/company/new");
-  await recruiter.getByLabel(/Name des Unternehmens/i).fill(companyName);
-  await recruiter.getByRole("button", { name: /Unternehmen anlegen/i }).click();
-  await expect(recruiter.getByText(/Administrator/i)).toBeVisible();
 
   // Ohne aktives Unternehmen zeigt die Seite nur einen Hinweis — der Wechsel
   // ist der Punkt, an dem der Server den Tenant ins Token schreibt (ADR-0018).

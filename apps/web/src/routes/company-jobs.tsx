@@ -89,7 +89,8 @@ export function CompanyJobsRoute({ principal = null }: CompanyJobsRouteProps) {
         <Card>
           <h1>Unsere Stellen</h1>
           <p>
-            Wähle oben ein Unternehmen — oder <a href="/company/new">lege eines an</a>.
+            Wähle oben ein Unternehmen — oder lass dich von jemandem aus deinem
+            Unternehmen einladen.
           </p>
         </Card>
       </main>
