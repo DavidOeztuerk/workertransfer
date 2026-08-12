@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Card, Empty, Loading, Page, Row, RowList } from "@workertransfer/ui";
+import { Alert, Button, Card, Empty, Loading, Page, Row, RowList } from "@workertransfer/ui";
 
 import { getCompanyBySlug } from "../companies/client";
 import { searchJobs } from "../jobs/client";
@@ -138,13 +138,20 @@ export function CareerRoute({ slug }: CareerRouteProps) {
                 meta={`${job.location !== "" ? job.location : "Ort nicht angegeben"} · ${
                   REMOTE_LABEL[job.remote] ?? job.remote
                 }`}
+                // Direkt zur Bewerbung dieser Stelle. Vorher schickte diese
+                // Seite auf die Stellensuche zurück — jemandem, der die Stelle
+                // gerade vor sich hat, zu sagen „such sie dort noch einmal".
+                // Möglich wurde es erst, als das Formular eine eigene Adresse
+                // bekam; ohne Konto führt sie zur Anmeldung und merkt sich die
+                // Stelle, also funktioniert auch der weitergegebene Link.
+                actions={<Button href={`/jobs/${job.id}/apply`}>Bewerben</Button>}
               />
             ))}
           </RowList>
         ) : null}
         <p className="wt-field__hint">
-          Bewerben geht über <a href="/jobs">die Stellensuche</a> — dort entsteht die Freigabe
-          deiner Daten, und zwar nur für dieses eine Unternehmen.
+          Mit dem Bewerben entsteht die Freigabe deiner Daten — und zwar nur für dieses eine
+          Unternehmen.
         </p>
       </Card>
     </Page>

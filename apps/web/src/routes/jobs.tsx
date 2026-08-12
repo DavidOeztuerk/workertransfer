@@ -16,6 +16,8 @@ import {
 } from "../jobs/client";
 import { Requirements } from "../jobs/Requirements";
 
+import "./jobs.css";
+
 /** Werte aus dem Vertrag sind keine Sätze für Menschen. */
 const REMOTE_LABEL: Record<RemoteMode, string> = {
   none: "Vor Ort",

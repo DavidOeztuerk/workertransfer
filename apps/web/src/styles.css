@@ -189,8 +189,14 @@ h1 {
   gap: 1.1rem;
 }
 
-/* Kandidatenliste: Karten in einer flexiblen Spaltenzahl, damit die Seite auf
-   dem Laptop nicht zu einer endlosen Kolonne wird. */
+/* Die Kartenliste — geteilt von /candidates, /jobs und /careers/<kürzel>, und
+   deshalb bleibt sie hier, während die karteneigenen Regeln zu ihren Bauteilen
+   gewandert sind.
+
+   Der Name lügt inzwischen: eine Stelle ist keine Kandidatin, trägt aber
+   `.candidates__headline`. Das ist zu benennen und nicht zu vererben — die
+   Umbenennung gehört in den Schnitt, der /jobs und /candidates gemeinsam
+   anfasst, nicht in eine Umstellung nebenbei. */
 .candidates {
   list-style: none;
   margin: 0;
@@ -225,12 +231,6 @@ h1 {
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
   font-size: 0.78rem;
-}
-
-/* Passung: die fehlende Fähigkeit wird blasser, nicht rot. Rot wäre ein
-   Urteil; hier steht nur, was noch nicht dasteht. */
-.jobs__skills [data-match="missing"] {
-  color: var(--wt-muted);
 }
 
 /* Für alles, was gelesen, aber nicht gesehen werden soll — die Wörter hinter
@@ -301,13 +301,6 @@ h1 {
   color: var(--wt-muted);
 }
 
-.candidates__asked {
-  margin: 0.75rem 0 0;
-  color: var(--wt-accent);
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
 /* Zähler an einem Navigationslink. Klein, aber nicht dekorativ: er ist der
    einzige Weg, auf dem eine Anfrage die Person heute erreicht. */
 .badge {
@@ -354,30 +347,6 @@ h1 {
   font-size: 0.8rem;
 }
 
-/* Suchfilter: nebeneinander, solange Platz ist. */
-.jobs__filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 1rem;
-  align-items: end;
-}
-
-/* Bewerbungsformular in einer Stellenkarte: schmal, damit es die Karte nicht
-   sprengt. */
-.jobs__apply {
-  display: grid;
-  gap: 0.75rem;
-  margin-top: 1rem;
-  border-top: 1px solid var(--wt-border);
-  padding-top: 1rem;
-}
-
-/* Wer sucht — direkt unter dem Stellentitel. */
-.jobs__hiring {
-  margin: 0 0 0.35rem;
-  font-size: 0.9rem;
-}
-
 /* Marktstatus: die drei Zustände als Radiogruppe, jeder mit seinem Satz. Ein
    Auswahlfeld hätte die Erklärungen verschluckt — und genau hier ist die
    Erklärung die halbe Entscheidung. */
@@ -411,18 +380,6 @@ h1 {
 .market__hint {
   color: var(--wt-muted);
   font-size: 0.85rem;
-}
-
-/* Der Marktstatus-Teil einer Kandidatenkarte, abgesetzt von der
-   Lebenslauf-Anfrage darüber: es sind zwei Freigaben, und sie sollen auch wie
-   zwei aussehen. */
-.candidates__market {
-  margin-top: 0.9rem;
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--wt-border);
-  display: grid;
-  gap: 0.6rem;
-  justify-items: start;
 }
 
 .transfer {
@@ -466,18 +423,6 @@ h1 {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
-}
-
-/* Einstellungen: die Schalter untereinander, mit Luft dazwischen. Sie wirken
-   sofort — deshalb steht kein Speichern-Knopf darunter. */
-.settings__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--wt-border);
 }
 
 /* „Was liegt an": jede Zeile eine Handlung, kein Fließtext. */
@@ -566,23 +511,6 @@ h1 {
   font-size: 0.9rem;
   overflow-x: auto;
   user-select: all;
-}
-
-/* GitHub-Belege auf einer Kandidatenkarte — abgesetzt, weil es eine eigene
-   Freigabe ist. */
-.candidates__github {
-  margin-top: 0.9rem;
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--wt-border);
-}
-
-.candidates__repos {
-  list-style: none;
-  margin: 0.4rem 0;
-  padding: 0;
-  display: grid;
-  gap: 0.25rem;
-  font-size: 0.9rem;
 }
 
 /* Die Formulierungshilfe — abgesetzt, weil sie etwas anderes ist als der Rest

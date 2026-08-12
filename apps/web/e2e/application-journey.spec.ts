@@ -77,6 +77,14 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   await jobCard.getByRole("link", { name: /^Bewerben$/ }).click();
   await expect(candidate).toHaveURL(/\/jobs\/[0-9a-f-]{36}\/apply$/);
   await expect(candidate.getByRole("heading", { level: 1, name: jobTitle })).toBeVisible();
+  // Und derselbe Zustand nach F5. Der Klick allein beweist nichts über das
+  // Gateway — der Router schaltet im Browser um, ohne zu fragen. Erst das
+  // Neuladen schickt die Adresse wirklich hin, und unter `/jobs/…` liegt
+  // zusätzlich das echte `GET /jobs/{id}` des jobs-service: dass die
+  // Dokumentregel (`Sec-Fetch-Dest: document`, priority 200) darüber gewinnt,
+  // ist zu prüfen und nicht anzunehmen.
+  await candidate.reload();
+  await expect(candidate.getByRole("heading", { level: 1, name: jobTitle })).toBeVisible();
   await candidate.getByRole("button", { name: /Bewerbung abschicken/i }).click();
   // Auf BEIDE Ausgänge warten — Bestätigung oder Fehlermeldung. Nur auf die
   // Bestätigung zu warten meldet nach 30 Sekunden bloß, dass sie fehlt, und

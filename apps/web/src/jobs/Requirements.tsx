@@ -2,6 +2,8 @@ import { VisuallyHidden } from "@workertransfer/ui";
 
 import { matchSkills } from "./match";
 
+import "./requirements.css";
+
 /**
  * Was die Stelle verlangt — und, wenn ein Profil da ist, was davon man hat.
  *
