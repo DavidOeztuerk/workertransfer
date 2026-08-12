@@ -39,7 +39,7 @@ export function HomeRoute() {
               Konto hier noch PENDING wäre. */}
           <div className="hero__actions">
             <Button href="/register">Als Arbeitnehmer starten</Button>
-            <Button href="/register" variant="secondary">
+            <Button href="/register?as=company" variant="secondary">
               Als Unternehmen entdecken
             </Button>
           </div>
