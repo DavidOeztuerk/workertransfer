@@ -1,6 +1,6 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button, Card } from "@workertransfer/ui";
+import { Alert, Button, Card, Empty, Loading, Page, Row, RowList } from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
 import { getCompanyProfile } from "../companies/client";
@@ -71,74 +71,57 @@ export function ConsentsRoute({ principal = null }: ConsentsRouteProps) {
 
   if (subjectId === null) {
     return (
-      <main className="page page--narrow">
+      <Page title="Meine Freigaben" narrow>
         <Card>
-          <h1>Meine Freigaben</h1>
           <p>
             Bitte <a href="/login">anmelden</a>, um deine Freigaben zu sehen.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>Meine Freigaben</h1>
-        <p className="page__lead">
-          Alles, was gerade gilt — an einer Stelle. Zurückziehen wirkt sofort: der nächste Zugriff
-          läuft ins Leere, ohne Umweg über uns. Was hier nicht steht, sieht niemand.
-        </p>
-      </header>
+    <Page
+      title="Meine Freigaben"
+      narrow
+      lead="Alles, was gerade gilt — an einer Stelle. Zurückziehen wirkt sofort: der nächste Zugriff läuft ins Leere, ohne Umweg über uns. Was hier nicht steht, sieht niemand."
+    >
+      {error !== null ? <Alert>{error}</Alert> : null}
 
-      {error !== null ? (
-        <p className="auth__alert" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <Card>
+        {/* Reihenfolge nach dem Muster: lädt, dann Fehler, dann leer, dann
+            Inhalt. */}
+        {query.isPending ? <Loading label="Freigaben werden geladen…" /> : null}
 
-      {query.isPending ? (
-        <Card>
-          <p role="status">Freigaben werden geladen…</p>
-        </Card>
-      ) : null}
+        {/* Kein leerer Zustand bei einem Fehler: „du hast nichts freigegeben"
+            wäre hier die beruhigendste falsche Antwort, die es gibt. */}
+        {query.data !== undefined && !query.data.ok ? <Alert>{query.data.message}</Alert> : null}
 
-      {query.data !== undefined && !query.data.ok ? (
-        <Card>
-          {/* Kein leerer Zustand bei einem Fehler: „du hast nichts freigegeben"
-              wäre hier die beruhigendste falsche Antwort, die es gibt. */}
-          <p className="auth__alert" role="alert">
-            {query.data.message}
-          </p>
-        </Card>
-      ) : null}
+        {query.data?.ok && consents.length === 0 ? (
+          <Empty
+            title="Du hast im Moment nichts freigegeben."
+            hint="Niemand sieht etwas von dir."
+          />
+        ) : null}
 
-      {query.data?.ok && consents.length === 0 ? (
-        <Card>
-          <p>Du hast im Moment nichts freigegeben. Niemand sieht etwas von dir.</p>
-        </Card>
-      ) : null}
-
-      {consents.length > 0 ? (
-        <Card>
-          <ul className="requests">
+        {consents.length > 0 ? (
+          <RowList>
             {consents.map((consent) => (
-              <li key={consent.capability}>
-                <ConsentRow
-                  consent={consent}
-                  companyName={
-                    nameById.get(parseCapability(consent.capability).tenantId ?? "") ?? null
-                  }
-                  busy={withdraw.isPending}
-                  onWithdraw={() => withdraw.mutate(consent.capability)}
-                />
-              </li>
+              <ConsentRow
+                key={consent.capability}
+                consent={consent}
+                companyName={
+                  nameById.get(parseCapability(consent.capability).tenantId ?? "") ?? null
+                }
+                busy={withdraw.isPending}
+                onWithdraw={() => withdraw.mutate(consent.capability)}
+              />
             ))}
-          </ul>
-        </Card>
-      ) : null}
-    </main>
+          </RowList>
+        ) : null}
+      </Card>
+    </Page>
   );
 }
 
@@ -164,20 +147,14 @@ function ConsentRow({
       : "Empfänger unbekannt";
 
   return (
-    <div className="requests__row">
-      <div>
-        <p className="requests__title">
-          {what} · {who}
-        </p>
-        <p className="requests__meta">
-          Freigegeben am {new Date(consent.granted_at).toLocaleDateString("de-DE")}
-        </p>
-      </div>
-      <div className="requests__actions">
+    <Row
+      title={`${what} · ${who}`}
+      meta={`Freigegeben am ${new Date(consent.granted_at).toLocaleDateString("de-DE")}`}
+      actions={
         <Button variant="quiet" onClick={onWithdraw} disabled={busy}>
           Zurückziehen
         </Button>
-      </div>
-    </div>
+      }
+    />
   );
 }
