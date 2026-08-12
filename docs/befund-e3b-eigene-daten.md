@@ -144,3 +144,60 @@ nicht drei Gespräche gleichzeitig führen.
   zweite aussieht. Bleibt handgebaut, mit dem Kommentar, warum.
 - **Der Upload-Fortschritt.** `uploadAttachment` ist ein `fetch`, kein Stream;
   ein Balken wäre erfunden.
+
+
+## Ergebnis (13.08.2026)
+
+| Datei | vorher | nachher |
+|---|---|---|
+| `routes/profile.tsx` | 297 | 248 |
+| `profile/DraftHelp.tsx` | – | 69 (neu) |
+| `routes/resume.tsx` | 290 | 297 |
+| `routes/portfolio.tsx` | 331 | 175 |
+| `routes/portfolio-item.tsx` | – | 345 (neu) |
+| `routes/my-data.tsx` | 171 | 168 |
+| `apps/web/src/styles.css` | 534 | 517 |
+
+Tests: **40 → 59** in dieser Gruppe (Web gesamt 414 → 433, Dateien 46 → 48).
+
+`resume.tsx` ist **länger** geworden — der fehlende Ladezustand und die
+Fallunterscheidung in `RequestRow` kosten Zeilen. Das ist der Preis dafür, dass
+„es lädt" nicht mehr wie „niemand hat gefragt" aussieht.
+
+### Der Ledger-Fund reichte tiefer als gedacht
+
+Der Befund vermutete das Problem in den Routen. Es lag im **Client**: `isGranted`
+gab bei Netzfehler *und* bei Fehlerantwort `false` zurück — die Unterscheidung
+war schon weg, bevor eine Route sie hätte treffen können. Der Kommentar dort
+nannte die Wahl ausdrücklich und begründete sie richtig („ein Schalter, der
+versehentlich ‚freigegeben' behauptet, wäre die gefährlichere Lüge"), schloss
+damit aber nur eine Hälfte.
+
+`isGranted` liefert jetzt `boolean | null`. Die Anzeige bleibt bei Nichtwissen
+unverändert aus; neu ist, dass der Schalter dann **gesperrt** ist und die Seite
+sagt, warum. Vorher war er bedienbar, und der nächste Klick schickte ein `grant`
+für eine Einwilligung, deren Stand niemand kannte.
+
+Zwei Dinge fielen dabei auf:
+
+- **`isGranted` hatte keinen einzigen Test.** Jetzt sechs, darunter die 200er
+  Antwort mit unlesbarem Körper — auch das ist kein „nein".
+- **Ein Test nagelte die alte Form fest** (`profile/client.test.ts`, „treats an
+  unreachable ledger as not visible"). Er nannte im Namen die Zusage („never
+  claims a release"), prüfte aber den Mechanismus. Die Zusage gilt weiter und
+  steht jetzt ausdrücklich als zweite Behauptung darin.
+
+### Eine Falle, in die ich zuerst gelaufen bin
+
+Der erste Test für den gesperrten Schalter war grün, **ohne etwas zu prüfen**:
+`getMyProfile` liefert in `beforeEach` `null`, also ist der Schalter schon wegen
+„erst ein Profil speichern" gesperrt. Erst mit gespeichertem Profil *und* der
+Gegenprobe auf den Hinweistext misst er die Sache. Gegen den ungefixten Code
+laufen gelassen — er fällt.
+
+### Tote Regeln
+
+`.resume__position` hat keinen Aufrufer mehr (resume nutzt `Fieldset`, portfolio
+ist aufgeteilt) und ist entfernt. Der Kompatibilitäts-Kommentar in
+`packages/ui/src/styles/checkbox.css` nannte drei Bestandsstellen mit rohem
+`<input>` — alle drei sind umgestellt, und die Notiz sagt das jetzt.

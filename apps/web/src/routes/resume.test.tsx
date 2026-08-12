@@ -110,6 +110,29 @@ describe("ResumeRoute", () => {
     expect(screen.queryByText(/gespeichert/i)).toBeNull();
   });
 
+  it("sagt beim Laden der Anfragen, dass geladen wird — nicht „hat niemand gefragt“", async () => {
+    // Der Ladezustand FEHLTE, und er sah aus wie der Leerzustand. Von den beiden
+    // Sätzen ist der falsche der beruhigende: wer eine Anfrage erwartet, hätte
+    // die Seite zugemacht.
+    let loesen: (() => void) | undefined;
+    listMyRequests.mockReturnValue(
+      new Promise((resolve) => {
+        loesen = () => resolve({ ok: true, requests: [] });
+      })
+    );
+
+    renderWithProviders(<ResumeRoute principal={principal()} />);
+
+    expect(await screen.findByText(/Anfragen werden geladen/i)).toBeInTheDocument();
+    expect(screen.queryByText(/hat niemand nach deinem Lebenslauf gefragt/i)).toBeNull();
+
+    loesen?.();
+    // Und danach steht die Auskunft da — der Ladezustand hält sie nicht auf.
+    expect(
+      await screen.findByText(/hat niemand nach deinem Lebenslauf gefragt/i)
+    ).toBeInTheDocument();
+  });
+
   it("offers a pending request both answers", async () => {
     listMyRequests.mockResolvedValue({ ok: true, requests: [request()] });
 

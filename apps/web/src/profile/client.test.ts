@@ -117,7 +117,17 @@ describe("visibility", () => {
     });
   });
 
-  it("treats an unreachable ledger as not visible — it never claims a release", async () => {
+  it("sagt bei stummem Ledger „weiß nicht“ — und behauptet damit weiter keine Freigabe", async () => {
+    // Hier stand `false`, mit der Begründung: eine behauptete Freigabe ist die
+    // gefährlichere Lüge. Die Begründung gilt, die Zusage im Namen auch — die
+    // ANZEIGE bleibt aus (`null` ist nicht `true`).
+    //
+    // `false` schloss aber nur die eine Hälfte: es heißt für den Aufrufer
+    // „nicht freigegeben", und ein Schalter in dieser Stellung ist BEDIENBAR.
+    // Der nächste Klick schickte ein `grant` für eine Einwilligung, deren
+    // Zustand niemand kennt — und wer längst freigegeben hatte, las „nicht
+    // freigegeben" und hielt den Widerruf für erledigt. `null` trennt beides:
+    // die Route sperrt den Schalter und sagt, was los ist.
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -125,7 +135,10 @@ describe("visibility", () => {
       })
     );
 
-    await expect(getVisibility(SUBJECT)).resolves.toBe(false);
+    const antwort = await getVisibility(SUBJECT);
+    expect(antwort).toBeNull();
+    // Die eigentliche Zusage, ausdrücklich: niemals „ja".
+    expect(antwort).not.toBe(true);
   });
 
   it("always sends a reason when withdrawing — the ledger demands one", async () => {

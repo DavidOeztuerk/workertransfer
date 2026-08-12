@@ -22,6 +22,7 @@ import { HomeRoute } from "./routes/home";
 import { OverviewRoute } from "./routes/overview";
 import { LoginRoute } from "./routes/login";
 import { PortfolioRoute } from "./routes/portfolio";
+import { PortfolioItemRoute } from "./routes/portfolio-item";
 import { ProfileRoute } from "./routes/profile";
 import { ResumeRoute } from "./routes/resume";
 import { TeamRoute } from "./routes/team";
@@ -308,6 +309,11 @@ function JobApplyWithSession() {
   return <JobApplyRoute principal={user} />;
 }
 
+function PortfolioItemWithSession() {
+  const { user } = useSession();
+  return <PortfolioItemRoute principal={user} />;
+}
+
 function CompanyProfileWithSession() {
   const { user } = useSession();
   return <CompanyProfileRoute principal={user} />;
@@ -400,6 +406,18 @@ const portfolioRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/portfolio",
   component: PortfolioWithSession,
+});
+const portfolioNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/portfolio/new",
+  component: PortfolioItemWithSession,
+});
+const portfolioItemRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  // Die Stelle im gespeicherten Feld — `PortfolioItem` hat keine ID, und der
+  // Vertrag kennt nur PUT auf das ganze Feld (Befund E3b).
+  path: "/portfolio/$index",
+  component: PortfolioItemWithSession,
 });
 const resumeRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -501,6 +519,8 @@ const routeTree = rootRoute.addChildren([
   verifyRoute,
   profileRoute,
   portfolioRoute,
+  portfolioNewRoute,
+  portfolioItemRoute,
   resumeRoute,
   candidatesRoute,
   jobsRoute,

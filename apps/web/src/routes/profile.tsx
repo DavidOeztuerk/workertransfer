@@ -1,16 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Button, Card, Field, Switch, TextArea } from "@workertransfer/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  Field,
+  Loading,
+  Page,
+  Switch,
+  TextArea,
+} from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
 import {
   type Profile,
-  draftProfileText,
   getMyProfile,
   getVisibility,
   saveMyProfile,
   setVisibility,
 } from "../profile/client";
+import { DraftHelp } from "../profile/DraftHelp";
 import { parseSkills } from "../skills";
 
 export interface ProfileRouteProps {
@@ -106,14 +116,13 @@ export function ProfileRoute({ principal = null }: ProfileRouteProps) {
 
   if (subjectId === null) {
     return (
-      <main className="page page--narrow">
+      <Page title="Mein Profil" narrow>
         <Card>
-          <h1>Mein Profil</h1>
           <p>
             Bitte <a href="/login">anmelden</a>, um dein Profil zu bearbeiten.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
@@ -121,16 +130,26 @@ export function ProfileRoute({ principal = null }: ProfileRouteProps) {
     // Kein leeres Formular, das sich nachträglich füllt: wer in der Zwischenzeit
     // zu tippen anfängt, verliert seine Eingabe, sobald die Antwort eintrifft.
     return (
-      <main className="page page--narrow">
+      <Page title="Mein Profil" narrow>
         <Card>
-          <p role="status">Profil wird geladen…</p>
+          <Loading label="Profil wird geladen…" />
         </Card>
-      </main>
+      </Page>
     );
   }
 
   const hasProfile = profileQuery.data != null;
+  // Die ANZEIGE bleibt bei Nichtwissen aus — ein Schalter, der versehentlich
+  // „freigegeben" behauptet, ist die gefährlichere Lüge.
   const released = visibilityQuery.data === true;
+  // ... aber „weiß ich nicht" ist nicht „nein". Solange die Antwort aussteht
+  // oder ausbleibt, darf der Schalter nicht BEDIENBAR sein: sonst schickt der
+  // nächste Klick ein `grant` für eine Einwilligung, deren Zustand niemand
+  // kennt. `null` kommt aus `isGranted` und heißt „der Ledger hat nicht
+  // geantwortet" (vorher war das von „nicht freigegeben" nicht zu
+  // unterscheiden).
+  const ledgerSilent = !visibilityQuery.isPending && visibilityQuery.data === null;
+  const ledgerUnknown = visibilityQuery.isPending || ledgerSilent;
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setSaved(false);
@@ -138,24 +157,25 @@ export function ProfileRoute({ principal = null }: ProfileRouteProps) {
   }
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>Mein Profil</h1>
-        <p className="page__lead">
-          Was hier steht, sieht zunächst niemand. Sichtbar wird es erst, wenn du es freigibst — und
-          unsichtbar in dem Moment, in dem du die Freigabe zurückziehst.
-        </p>
-      </header>
+    <Page
+      title="Mein Profil"
+      narrow
+      lead="Was hier steht, sieht zunächst niemand. Sichtbar wird es erst, wenn du es freigibst — und unsichtbar in dem Moment, in dem du die Freigabe zurückziehst."
+    >
 
       <Card className="profile__release">
         <Switch
           label="Profil für Unternehmen freigeben"
           checked={released}
-          disabled={!hasProfile || toggle.isPending}
+          disabled={!hasProfile || toggle.isPending || ledgerUnknown}
           hint={
-            hasProfile
-              ? "Wirkt sofort. Ein Widerruf entzieht den Zugriff, ohne dass du jemanden darum bitten musst."
-              : "Erst ein Profil speichern — freigeben lässt sich nur, was es gibt."
+            ledgerSilent
+              ? "Ob eine Freigabe gilt, ist gerade nicht abrufbar. Solange das so ist, ändert dieser Schalter nichts — sonst würdest du etwas freigeben, dessen Stand niemand kennt."
+              : visibilityQuery.isPending
+                ? "Freigabe wird geprüft…"
+                : hasProfile
+                  ? "Wirkt sofort. Ein Widerruf entzieht den Zugriff, ohne dass du jemanden darum bitten musst."
+                  : "Erst ein Profil speichern — freigeben lässt sich nur, was es gibt."
           }
           onChange={(next) => toggle.mutate(next)}
         />
@@ -203,95 +223,26 @@ export function ProfileRoute({ principal = null }: ProfileRouteProps) {
             value={form.skills}
             onChange={(e) => update("skills", e.target.value)}
           />
-          <label className="wt-checkbox">
-            <input
-              type="checkbox"
-              checked={form.remote_ok}
-              onChange={(e) => update("remote_ok", e.target.checked)}
-            />
-            <span>Remote-Arbeit kommt für mich in Frage</span>
-          </label>
+          {/* Das Bauteil, nicht nur seine Klasse: handgebaut fehlten
+              `.wt-checkbox__box` und `.wt-checkbox__label`, also bekam das
+              Kästchen weder seine Größe noch `accent-color` und der Text kein
+              `cursor: pointer`. Das war die letzte solche Stelle. */}
+          <Checkbox
+            label="Remote-Arbeit kommt für mich in Frage"
+            checked={form.remote_ok}
+            onChange={(e) => update("remote_ok", e.target.checked)}
+          />
 
-          {error !== null ? (
-            <p className="auth__alert" role="alert">
-              {error}
-            </p>
-          ) : null}
-          {saved && error === null ? <p className="page__note">Profil gespeichert.</p> : null}
+          {error !== null ? <Alert>{error}</Alert> : null}
+          {/* `notice` und nicht `error`: eine Bestätigung, die den Vorleser
+              unterbricht, ist Lärm. */}
+          {saved && error === null ? <Alert variant="notice">Profil gespeichert.</Alert> : null}
 
           <Button type="submit" disabled={save.isPending}>
             {save.isPending ? "Wird gespeichert…" : "Speichern"}
           </Button>
         </form>
       </Card>
-    </main>
-  );
-}
-
-/**
- * Formulierungshilfe — auf Anforderung, und sie sagt, was hinausgeht.
- *
- * Die drei Entscheidungen, die hier sichtbar sind:
- *
- * 1. **Nur auf Knopfdruck.** Kein Vorschlag von selbst, kein Hintergrundlauf.
- *    Dieselbe Regel wie bei GitHub: einmal auf Bitte hinsehen ist etwas anderes
- *    als dauerhaft hinterhersehen.
- * 2. **Der Hinweis steht am Knopf**, nicht in einer Datenschutzerklärung. Wer
- *    drückt, hat gelesen, dass sein Text an einen fremden Anbieter geht.
- * 3. **Der Entwurf ersetzt nur das Formularfeld.** Gespeichert wird er erst,
- *    wenn die Person auf „Speichern" drückt — dann ist es ihr Text.
- *
- * Und ein bewusstes Detail: hat sie schon etwas geschrieben, heißt der Knopf
- * „umformulieren" statt „schreiben". Ein Knopf, der ungefragt vorhandene
- * Arbeit überschreibt, wird einmal gedrückt und danach nie wieder.
- */
-function DraftHelp({
-  onDraft,
-  hasText,
-}: {
-  onDraft: (draft: string) => void;
-  hasText: boolean;
-}) {
-  const [wish, setWish] = useState("");
-  const [problem, setProblem] = useState<string | null>(null);
-
-  const ask = useMutation({
-    mutationFn: () => draftProfileText(wish),
-    onSuccess: (result) => {
-      if (result.ok) {
-        setProblem(null);
-        onDraft(result.draft);
-      } else {
-        setProblem(result.message);
-      }
-    },
-  });
-
-  return (
-    <div className="draft-help">
-      <Field
-        label={hasText ? "Text umformulieren lassen" : "Beim Schreiben helfen lassen"}
-        hint="Optional: was dir wichtig ist („kürzer“, „sachlicher“, „ich bin Pflegefachkraft“). Dein Profiltext und deine Fähigkeiten gehen dafür an Anthropic. Name und Adresse nicht. Gespeichert wird nichts — der Vorschlag landet nur im Feld oben, und du entscheidest."
-        value={wish}
-        onChange={(e) => setWish(e.target.value)}
-        maxLength={200}
-      />
-      {problem !== null ? (
-        <p className="auth__alert" role="alert">
-          {problem}
-        </p>
-      ) : null}
-      {/* type="button" ausgeschrieben, obwohl `Button` es ohnehin so vorgibt:
-          dieser Knopf steht im selben <form> wie „Speichern“, und wer hier
-          liest, soll nicht erst das UI-Paket aufschlagen müssen, um zu wissen,
-          welcher der beiden absendet. */}
-      <Button type="button" variant="quiet" onClick={() => ask.mutate()} disabled={ask.isPending}>
-        {ask.isPending
-          ? "Wird geschrieben…"
-          : hasText
-            ? "Vorschlag holen (ersetzt den Text oben)"
-            : "Vorschlag holen"}
-      </Button>
-    </div>
+    </Page>
   );
 }
