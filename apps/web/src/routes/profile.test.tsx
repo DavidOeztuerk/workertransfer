@@ -129,6 +129,31 @@ describe("ProfileRoute", () => {
     expect(saveMyProfile).not.toHaveBeenCalled();
   });
 
+  it("sperrt den Schalter, wenn der Ledger nicht antwortet — und sagt es", async () => {
+    // Vorher war „der Ledger schweigt" von „nicht freigegeben" nicht zu
+    // unterscheiden: `isGranted` gab in beiden Fällen `false`. Der Schalter
+    // stand also auf „aus" UND war bedienbar — der nächste Klick hätte ein
+    // `grant` für eine Einwilligung geschickt, deren Zustand niemand kennt.
+    // Und wer längst freigegeben hatte, las „nicht freigegeben" und hielt den
+    // Widerruf für erledigt.
+    //
+    // Die Anzeige bleibt aus, das ist unverändert und richtig. Neu ist, dass
+    // sie nichts BEHAUPTET, was sie nicht weiß.
+    // MIT gespeichertem Profil, sonst wäre der Schalter ohnehin gesperrt („erst
+    // ein Profil speichern") und dieser Test grün, ohne etwas zu prüfen.
+    getMyProfile.mockResolvedValue(profile());
+    getVisibility.mockResolvedValue(null);
+
+    renderWithProviders(<ProfileRoute principal={principal()} />);
+
+    const schalter = await screen.findByRole("switch");
+    await waitFor(() => expect(schalter).toBeDisabled());
+    expect(schalter).toHaveAttribute("aria-checked", "false");
+    // Und der Grund ist der richtige: nicht „erst ein Profil speichern".
+    expect(screen.getByText(/nicht abrufbar/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Erst ein Profil speichern/i)).toBeNull();
+  });
+
   it("does not offer a release before there is a profile to release", async () => {
     // Eine Einwilligung, die auf nichts zeigt, wäre eine Zusage ins Leere —
     // und beim Widerruf müsste die Person erklären, was sie nie gezeigt hat.

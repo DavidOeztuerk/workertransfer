@@ -284,23 +284,6 @@ h1 {
   flex-wrap: wrap;
 }
 
-/* Stationen: jede in einem eigenen Rahmen, damit die Felder nicht ineinander
-   laufen, wenn es fünf davon sind. */
-.resume__position {
-  border: 1px solid var(--wt-border);
-  border-radius: 8px;
-  padding: 1rem 1.1rem;
-  display: grid;
-  gap: 0.9rem;
-  margin: 0;
-}
-
-.resume__position legend {
-  padding: 0 0.4rem;
-  font-size: 0.85rem;
-  color: var(--wt-muted);
-}
-
 /* Zähler an einem Navigationslink. Klein, aber nicht dekorativ: er ist der
    einzige Weg, auf dem eine Anfrage die Person heute erreicht. */
 .badge {
