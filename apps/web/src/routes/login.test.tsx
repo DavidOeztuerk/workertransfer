@@ -46,6 +46,34 @@ describe("LoginRoute", () => {
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
   });
 
+  it("führt nach dem Anmelden auf die Bewerbungsseite der gemerkten Stelle", async () => {
+    // Diese Zeile war von keinem Test gedeckt, und das Ziel hat sich geändert:
+    // vorher `/jobs?stelle=<id>` — eine gefilterte Liste, die eine Box
+    // aufklappte —, jetzt die eigene Adresse des Formulars. Ohne diesen Test
+    // hätte man den Weg zurück verstellen können, ohne dass etwas rot wird.
+    const stelle = "11111111-2222-3333-4444-555555555555";
+    window.localStorage.setItem(
+      "wt.gemerkte-stelle",
+      JSON.stringify({ jobId: stelle, titel: "Backend-Entwicklerin", gemerktAm: Date.now() })
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ status: "ok" }), { status: 200 }))
+    );
+    const location = stubLocation();
+
+    renderWithProviders(<LoginRoute />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("E-Mail"), "a@b.com");
+    await user.type(screen.getByLabelText("Passwort"), "strongpassword1");
+    await user.click(screen.getByRole("button", { name: "Anmelden" }));
+
+    expect(location.href).toBe(`/jobs/${stelle}/apply`);
+    // Und die Absicht ist verbraucht: sonst käme sie beim nächsten Anmelden
+    // wieder, und niemand wüsste, warum.
+    expect(window.localStorage.getItem("wt.gemerkte-stelle")).toBeNull();
+  });
+
   it("shows the error message on a failed login and does not redirect", async () => {
     // 401 with an unparseable body: login() keeps its default German message
     // (the detail-passthrough branch is covered by auth/client.test.ts).

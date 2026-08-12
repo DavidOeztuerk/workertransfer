@@ -1,0 +1,10 @@
+/* Die Passung.
+
+   Liegt neben `Requirements.tsx` und nicht bei einer Route, weil sie auf zwei
+   Seiten steht: in der Trefferliste und auf der Bewerbungsseite. */
+
+/* Passung: die fehlende Fähigkeit wird blasser, nicht rot. Rot wäre ein
+   Urteil; hier steht nur, was noch nicht dasteht. */
+.jobs__skills [data-match="missing"] {
+  color: var(--wt-muted);
+}

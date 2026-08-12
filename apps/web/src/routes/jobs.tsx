@@ -1,8 +1,7 @@
-import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { Button, Card, Field, TextArea } from "@workertransfer/ui";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { Alert, Button, Card, Empty, Field, Loading, Page, Select } from "@workertransfer/ui";
 
-import { apply } from "../applications/client";
 import { getCompanyProfile } from "../companies/client";
 import { getMyProfile } from "../profile/client";
 import { merkeStelle } from "../jobs/intent";
@@ -13,10 +12,11 @@ import {
   type Job,
   type RemoteMode,
   type SearchResult,
-  getJob,
   searchJobs,
 } from "../jobs/client";
-import { matchSkills } from "../jobs/match";
+import { Requirements } from "../jobs/Requirements";
+
+import "./jobs.css";
 
 /** Werte aus dem Vertrag sind keine Sätze für Menschen. */
 const REMOTE_LABEL: Record<RemoteMode, string> = {
@@ -41,9 +41,6 @@ interface Filters {
 
 const EMPTY: Filters = { q: "", location: "", remote: "", employment: "" };
 
-/** Geprüft, bevor die ID in eine Anfrage geht — sie kommt aus der Adresszeile. */
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 export interface JobsRouteProps {
   // Injizierbar, damit der Test ohne laufende Sitzung rendern kann. `null`
   // heißt „nicht angemeldet" — und die Seite funktioniert dann trotzdem, sie
@@ -66,7 +63,8 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
   });
 
   // Einmal für die ganze Seite, nicht je Stelle — und derselbe Schlüssel wie
-  // auf der Profilseite, damit beide sich einen Stand teilen.
+  // auf der Profilseite und der Bewerbungsseite, damit alle drei sich einen
+  // Stand teilen.
   const profileQuery = useQuery({
     queryKey: ["profile", "me"],
     queryFn: getMyProfile,
@@ -88,41 +86,13 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
 
   const pages = query.data?.pages ?? [];
   const failure = pages.find((page) => !page.ok);
-  const gefunden: Job[] = pages.flatMap((page) => (page.ok ? page.items : []));
-
-  // Die Stelle, wegen der jemand sich gerade angemeldet hat (?stelle=<uuid>,
-  // gesetzt von login.tsx). Sie wird EINZELN geholt, statt in der Trefferliste
-  // gesucht zu werden: die Liste ist gefiltert und seitenweise, die gesuchte
-  // Stelle steht also womöglich gar nicht darin — und dann hätte das
-  // Zurückkommen leise nicht funktioniert.
-  const gesuchteStelle = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    const roh = new URLSearchParams(window.location.search).get("stelle");
-    return roh !== null && UUID.test(roh) ? roh : null;
-  }, []);
-
-  const einzelne = useQuery({
-    queryKey: ["jobs", "einzeln", gesuchteStelle],
-    queryFn: () => getJob(gesuchteStelle as string),
-    enabled: gesuchteStelle !== null,
-  });
-
-  // Sie steht vorn und kommt in der Liste darunter kein zweites Mal vor.
-  const items: Job[] =
-    einzelne.data != null
-      ? [einzelne.data, ...gefunden.filter((j) => j.id !== einzelne.data?.id)]
-      : gefunden;
+  const items: Job[] = pages.flatMap((page) => (page.ok ? page.items : []));
 
   return (
-    <main className="page">
-      <header className="page__header">
-        <h1>Offene Stellen</h1>
-        <p className="page__lead">
-          Was hier steht, haben Unternehmen selbst veröffentlicht. Zum Lesen brauchst du kein
-          Konto — erst zum Bewerben.
-        </p>
-      </header>
-
+    <Page
+      title="Offene Stellen"
+      lead="Was hier steht, haben Unternehmen selbst veröffentlicht. Zum Lesen brauchst du kein Konto — erst zum Bewerben."
+    >
       <Card>
         <form
           className="jobs__filters"
@@ -142,32 +112,50 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
             value={form.location}
             onChange={(e) => setForm({ ...form, location: e.target.value })}
           />
-          <label className="wt-field">
-            <span className="wt-field__label">Arbeitsform</span>
-            <select
-              className="wt-field__input"
-              value={form.remote}
-              onChange={(e) => setForm({ ...form, remote: e.target.value as RemoteMode | "" })}
-            >
-              <option value="">Egal</option>
-              <option value="none">Vor Ort</option>
-              <option value="hybrid">Hybrid</option>
-              <option value="full">Vollständig remote</option>
-            </select>
-          </label>
+          <Select
+            label="Arbeitsform"
+            value={form.remote}
+            onChange={(e) => setForm({ ...form, remote: e.target.value as RemoteMode | "" })}
+          >
+            <option value="">Egal</option>
+            <option value="none">Vor Ort</option>
+            <option value="hybrid">Hybrid</option>
+            <option value="full">Vollständig remote</option>
+          </Select>
+          {/* Diesen Filter gab es schon: `searchJobs` schickt `employment` seit
+              immer mit, nur konnte niemand ihn setzen — er stand im Zustand und
+              blieb leer. Ein Wähler dafür ist kein neues Versprechen, sondern
+              das Einlösen eines vorhandenen. */}
+          <Select
+            label="Beschäftigungsart"
+            value={form.employment}
+            onChange={(e) =>
+              setForm({ ...form, employment: e.target.value as EmploymentType | "" })
+            }
+          >
+            <option value="">Egal</option>
+            <option value="full_time">Vollzeit</option>
+            <option value="part_time">Teilzeit</option>
+            <option value="contract">Auf Vertragsbasis</option>
+            <option value="internship">Praktikum</option>
+          </Select>
           <Button type="submit">Suchen</Button>
         </form>
       </Card>
 
-      {failure !== undefined && !failure.ok ? (
+      {/* Reihenfolge nach dem Muster: lädt, dann Fehler, dann leer, dann
+          Inhalt. */}
+      {query.isPending ? (
         <Card>
-          <p className="auth__alert" role="alert">
-            {failure.message}
-          </p>
+          <Loading label="Wird gesucht…" />
         </Card>
       ) : null}
 
-      {query.isPending ? <p role="status">Wird gesucht…</p> : null}
+      {failure !== undefined && !failure.ok ? <Alert>{failure.message}</Alert> : null}
+
+      {!query.isPending && failure === undefined && items.length === 0 ? (
+        <Empty title="Dazu wurde nichts gefunden." hint="Andere Begriffe führen vielleicht weiter." />
+      ) : null}
 
       {items.length > 0 ? (
         <ul className="candidates">
@@ -183,7 +171,14 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
                 <p>{job.description}</p>
                 <Requirements skills={job.skills} mine={mySkills} />
                 {principal !== null ? (
-                  <ApplyBox jobId={job.id} offen={job.id === gesuchteStelle} />
+                  /*
+                    Ein LINK auf eine eigene Adresse, kein aufklappendes
+                    Formular in der Karte. Das Formular überlebt damit ein
+                    Neuladen, ist teilbar, und die gemerkte Absicht nach dem
+                    Anmelden hat ein echtes Ziel statt einer Liste, die eine Box
+                    aufklappt.
+                  */
+                  <Button href={`/jobs/${job.id}/apply`}>Bewerben</Button>
                 ) : (
                   <>
                     {/*
@@ -210,7 +205,7 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
                       Bewerben
                     </Button>
                     <p className="candidates__meta">
-                      Dafür brauchst du ein Konto — danach geht es hierher zurück.
+                      Dafür brauchst du ein Konto — danach geht es direkt zur Bewerbung.
                     </p>
                   </>
                 )}
@@ -218,12 +213,6 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
             </li>
           ))}
         </ul>
-      ) : null}
-
-      {!query.isPending && failure === undefined && items.length === 0 ? (
-        <Card>
-          <p>Dazu wurde nichts gefunden. Andere Begriffe führen vielleicht weiter.</p>
-        </Card>
       ) : null}
 
       {query.hasNextPage ? (
@@ -235,189 +224,9 @@ export function JobsRoute({ principal = null }: JobsRouteProps) {
           {query.isFetchingNextPage ? "Wird geladen…" : "Mehr laden"}
         </Button>
       ) : null}
-    </main>
+    </Page>
   );
 }
-
-
-/**
- * Was die Stelle verlangt — und, wenn ein Profil da ist, was davon man hat.
- *
- * Die Passung wird der PERSON gezeigt, nicht dem Unternehmen, und sie ordnet
- * Stellen, keine Menschen. Gerechnet wird hier im Browser: so gibt es sie
- * nirgends als Datensatz, den später jemand auswertet.
- *
- * Kein Prozentwert. Eine Zahl sieht aus wie eine Messung und verschweigt, was
- * zählt — welche Fähigkeit fehlt. Die Liste sagt es, und damit weiß die Person,
- * was sie tun könnte.
- */
-function Requirements({ skills, mine }: { skills: string[]; mine: string[] | null }) {
-  // Dieselbe Aufbereitung wie im Abgleich, damit die angezeigte Liste und die
-  // verglichene dieselbe ist. Liefen sie auseinander, stünde ein Eintrag da,
-  // der nie ein Haken werden kann.
-  const listed = skills.map((skill) => skill.trim()).filter((skill) => skill !== "");
-
-  // Nichts genannt: dann gibt es auch nichts abzugleichen. Ein „0 von 0" wäre
-  // eine Aussage über eine Stelle, die gar keine gemacht hat.
-  if (listed.length === 0) return null;
-
-  const match = mine === null || mine.length === 0 ? null : matchSkills(listed, mine);
-  const have = new Set(match?.have ?? []);
-
-  return (
-    <div className="jobs__skills">
-      {match !== null ? (
-        <p className="candidates__meta">
-          Du hast {match.have.length} von {listed.length} genannten Fähigkeiten:
-        </p>
-      ) : null}
-      {mine !== null && mine.length === 0 ? (
-        // Nicht „0 von 3": die Person hat nichts gesagt, nicht nichts gekonnt.
-        <p className="candidates__meta">
-          Trage Fähigkeiten in deinem <a href="/profile">Profil</a> ein, dann siehst du hier, was
-          davon du mitbringst.
-        </p>
-      ) : null}
-      <ul className="candidates__skills">
-        {listed.map((skill) => {
-          const state = match === null ? "unknown" : have.has(skill) ? "have" : "missing";
-          return (
-            <li key={skill}>
-              {state !== "unknown" ? (
-                <span aria-hidden="true">{state === "have" ? "✓ " : "✗ "}</span>
-              ) : null}
-              <span data-match={state}>{skill}</span>
-              {/* Das Zeichen ist Dekoration; wer vorgelesen bekommt, braucht
-                  das Wort. Sonst hörte man drei Namen und keinen Unterschied. */}
-              {state !== "unknown" ? (
-                <span className="wt-visually-hidden">
-                  {state === "have" ? " (hast du)" : " (fehlt dir)"}
-                </span>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-
-/**
- * Bewerben — und damit die eigenen Daten diesem einen Unternehmen freigeben.
- *
- * Die Kästchen benennen, was mitgeht. Das Profil steht bewusst nicht zur Wahl:
- * eine Bewerbung ohne jede Angabe zur Person ist keine, und ein Kästchen dafür
- * wäre eine Wahl, die niemand ernsthaft trifft.
- */
-/**
- * `offen` startet das Formular aufgeklappt.
- *
- * Gesetzt, wenn jemand über `?stelle=` zurückkommt: derjenige hat vor dem
- * Anmelden schon auf „Bewerben" geklickt. Ihn den Knopf ein zweites Mal
- * suchen zu lassen, wäre die Frage nochmal zu stellen, die er beantwortet hat.
- */
-function ApplyBox({ jobId, offen = false }: { jobId: string; offen?: boolean }) {
-  const [open, setOpen] = useState(offen);
-  const [message, setMessage] = useState("");
-  const [resume, setResume] = useState(true);
-  const [portfolio, setPortfolio] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
-
-  const send = useMutation({
-    mutationFn: () =>
-      apply({
-        job_id: jobId,
-        message,
-        shares_resume: resume,
-        shares_portfolio: portfolio,
-      }),
-    onSuccess: (result) => {
-      if (result.ok) {
-        setError(null);
-        setSent(true);
-        setOpen(false);
-      } else {
-        setError(result.message);
-      }
-    },
-  });
-
-  if (sent && error === null) {
-    return (
-      <p className="page__note">
-        Bewerbung abgeschickt. Zurückziehen kannst du sie jederzeit unter{" "}
-        <a href="/applications">Meine Bewerbungen</a> — dann sieht das Unternehmen deine Daten
-        nicht mehr.
-      </p>
-    );
-  }
-
-  if (!open) {
-    return (
-      <>
-        {error !== null ? (
-          <p className="auth__alert" role="alert">
-            {error}
-          </p>
-        ) : null}
-        <Button variant="quiet" onClick={() => setOpen(true)}>
-          Bewerben
-        </Button>
-      </>
-    );
-  }
-
-  return (
-    <form
-      className="jobs__apply"
-      onSubmit={(e) => {
-        e.preventDefault();
-        send.mutate();
-      }}
-    >
-      <TextArea
-        label="Anschreiben"
-        hint="Optional. Was dich mit dieser Stelle verbindet."
-        rows={4}
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        maxLength={4000}
-      />
-      <p className="wt-field__hint">
-        Dein Profil geht immer mit — ohne es wäre es keine Bewerbung. Was du zusätzlich
-        freigibst, entscheidest du:
-      </p>
-      <label className="wt-checkbox">
-        <input type="checkbox" checked={resume} onChange={(e) => setResume(e.target.checked)} />
-        <span>Lebenslauf</span>
-      </label>
-      <label className="wt-checkbox">
-        <input
-          type="checkbox"
-          checked={portfolio}
-          onChange={(e) => setPortfolio(e.target.checked)}
-        />
-        <span>Meine Arbeiten</span>
-      </label>
-
-      {error !== null ? (
-        <p className="auth__alert" role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      <Button type="submit" disabled={send.isPending}>
-        {send.isPending ? "Wird gesendet…" : "Bewerbung abschicken"}
-      </Button>
-      <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
-        Abbrechen
-      </Button>
-    </form>
-  );
-}
-
 
 /**
  * Wer sucht.
