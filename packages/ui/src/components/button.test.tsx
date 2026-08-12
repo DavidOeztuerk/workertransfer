@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Button } from "./button";
 
 describe("Button", () => {
-  it("renders its label", () => {
+  it("renders its children", () => {
     render(<Button>Anmelden</Button>);
 
     expect(screen.getByRole("button", { name: "Anmelden" })).toBeInTheDocument();
@@ -35,10 +35,47 @@ describe("Button", () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
-  it("defaults to type=button so it never submits a form by accident", () => {
+  it("defaults to the primary variant class", () => {
+    render(<Button>Start</Button>);
+
+    expect(screen.getByRole("button")).toHaveClass("wt-button", "wt-button--primary");
+  });
+
+  it.each(["primary", "secondary", "quiet"] as const)("applies the %s variant", (variant) => {
+    render(<Button variant={variant}>x</Button>);
+
+    expect(screen.getByRole("button")).toHaveClass(`wt-button--${variant}`);
+  });
+
+  it("merges a caller className instead of replacing the base classes", () => {
+    render(<Button className="extra">x</Button>);
+
+    expect(screen.getByRole("button")).toHaveClass("wt-button", "wt-button--primary", "extra");
+  });
+
+  it('defaults to type="button" so it never submits a form by accident', () => {
     render(<Button>Anmelden</Button>);
 
     expect(screen.getByRole("button")).toHaveAttribute("type", "button");
+  });
+
+  it("lets a caller override the type", () => {
+    // Das Anmeldeformular hängt daran: die Props werden NACH dem Standard
+    // gespreizt, deshalb sendet <Button type="submit"> wirklich ab. Die
+    // Reihenfolge zu tauschen würde das Absenden stillschweigend kaputt machen.
+    render(<Button type="submit">x</Button>);
+
+    expect(screen.getByRole("button")).toHaveAttribute("type", "submit");
+  });
+
+  it("forwards arbitrary button attributes", () => {
+    render(
+      <Button disabled aria-label="Speichern">
+        x
+      </Button>
+    );
+
+    expect(screen.getByRole("button", { name: "Speichern" })).toBeDisabled();
   });
 
   // Mit `href` wird ein LINK daraus, kein Knopf. Ein <button> in ein <a> zu
