@@ -176,6 +176,21 @@ class User:
         )
         return user
 
+    def company_intent_consumed(self) -> None:
+        """Die gemerkte Absicht ist eingelöst — oder endgültig abgelehnt.
+
+        Wird in BEIDEN Fällen gerufen, und das ist der Punkt: der
+        Bestätigungstoken ist danach verbraucht, es gibt also keinen zweiten
+        Versuch. Bliebe die Absicht stehen, läge sie für immer da und ein
+        zweiter Klick auf denselben Link legte womöglich ein zweites
+        Unternehmen an.
+
+        War die Domain schon beansprucht, ist der richtige Weg ohnehin ein
+        anderer: wer eine bestätigte Adresse auf dieser Domain hat, hat dort
+        Kollegen — und die können einladen.
+        """
+        self.pending_company_name = None
+
     def verify_password(self, plain: str, hasher: PasswordHashing) -> bool:
         return hasher.verify(plain, self.password_hash)
 

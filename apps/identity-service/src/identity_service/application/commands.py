@@ -247,9 +247,23 @@ class VerifyEmailCommand:
     token: str
 
 
+@dataclass(frozen=True, slots=True)
+class EmailVerified:
+    """Was die Bestätigung ergeben hat.
+
+    Zwei Felder statt eines Wahrheitswerts, weil es drei Ausgänge gibt: nur
+    bestätigt, bestätigt **mit** Unternehmen, und bestätigt **ohne** Unternehmen
+    samt Grund. Der dritte ist der, den eine Oberfläche sonst als „alles gut"
+    anzeigt, während die halbe Absicht verpufft ist.
+    """
+
+    company_name: str | None = None
+    company_error: str | None = None
+
+
 async def handle_verify_email(
     cmd: VerifyEmailCommand, *, deps: dict[str, Any], repos: dict[str, Any]
-) -> Result[None]:
+) -> Result[EmailVerified]:
     clock = deps["clock"]
     now = clock.now()
     try:
@@ -266,7 +280,7 @@ async def handle_verify_email(
             # ist genau so freigeschaltet, wie der Klick es wollte. Wer den
             # Token hat, hatte ohnehin die Mail — hier wird nichts verraten.
             if user.status is AccountStatus.ACTIVE:
-                return Result.ok(None)
+                return Result.ok(EmailVerified())
             # Noch PENDING heißt: der Token wurde durch ein erneutes Senden
             # entwertet. Der alte Link darf dann nicht mehr freischalten.
             raise TokenInvalid()
@@ -288,10 +302,39 @@ async def handle_verify_email(
                 metadata={},
             )
         )
+
+        # Jetzt — und erst jetzt — kann die Absicht aus der Registrierung
+        # eingelöst werden: der Nutzer ist ACTIVE, also akzeptiert
+        # handle_create_company ihn, und die Domain stammt aus einer BEWIESENEN
+        # Adresse (ADR-0019). Gleiche Transaktion, gleiche Repositories, kein
+        # Dienst-zu-Dienst-Aufruf: /companies liegt in diesem Dienst.
+        verified = EmailVerified()
+        wanted = user.pending_company_name
+        if wanted is not None:
+            outcome = await handle_create_company(
+                CreateCompanyCommand(user_id=user.id.value, name=wanted),
+                deps=deps,
+                repos=repos,
+            )
+            # In JEDEM Fall verbraucht — auch bei Ablehnung. Siehe
+            # User.company_intent_consumed.
+            user.company_intent_consumed()
+            await repos["users"].save(user)
+            if outcome.is_success:
+                verified = EmailVerified(company_name=outcome.value.name)
+            else:
+                # Die BESTÄTIGUNG scheitert dadurch nicht. Das Konto ist
+                # freigeschaltet, und das ist richtig und unumkehrbar: jemanden
+                # auszusperren, weil ein Firmenname vergeben war, wäre die
+                # falsche Antwort auf die falsche Frage.
+                err = outcome.error
+                verified = EmailVerified(
+                    company_error=err.code if err is not None else "company_not_created"
+                )
     except DomainError as exc:
         return Result.fail(exc)
     await _publish_user_events(user, deps)
-    return Result.ok(None)
+    return Result.ok(verified)
 
 
 @dataclass(frozen=True, slots=True)
