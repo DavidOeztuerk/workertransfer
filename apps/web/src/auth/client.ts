@@ -191,7 +191,7 @@ export async function fetchSession(): Promise<MeResponse | null> {
 /**
  * Das eigene Profil — geschützt, und hier ist 401 die richtige Antwort.
  *
- * Bleibt für Stellen, die wirklich das Profil brauchen (`/meine-daten`). Für
+ * Bleibt für Stellen, die wirklich das Profil brauchen (`/my-data`). Für
  * die Frage "ist jemand angemeldet?" gibt es `fetchSession`; wer sie hier
  * stellt, bekommt einen 401 auf einen normalen Zustand.
  */

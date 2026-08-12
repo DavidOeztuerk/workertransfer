@@ -4,9 +4,11 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  useNavigate,
   useRouter,
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { useEffect } from "react";
 
 import { Button } from "@workertransfer/ui";
 
@@ -115,7 +117,7 @@ export function RootLayout() {
                   Ebene tiefer. Vorher standen siebzehn Einträge nebeneinander,
                   und siebzehn gleichwertige Einträge sind keine Navigation,
                   sondern eine Liste. */}
-              <Link className="site-header__link" to="/markt">
+              <Link className="site-header__link" to="/market">
                 Marktstatus
               </Link>
               <Link className="site-header__link" to="/transfers">
@@ -137,16 +139,16 @@ export function RootLayout() {
                 <Link className="site-header__menu-item" to="/applications">
                   Bewerbungen
                 </Link>
-                <Link className="site-header__menu-item" to="/freigaben">
+                <Link className="site-header__menu-item" to="/consents">
                   Meine Freigaben
                 </Link>
-                <Link className="site-header__menu-item" to="/meine-daten">
+                <Link className="site-header__menu-item" to="/my-data">
                   Meine Daten
                 </Link>
-                <Link className="site-header__menu-item" to="/einstellungen">
+                <Link className="site-header__menu-item" to="/settings">
                   Einstellungen
                 </Link>
-                <Link className="site-header__menu-item" to="/konto-loeschen">
+                <Link className="site-header__menu-item" to="/delete-account">
                   Konto löschen
                 </Link>
                 <Link className="site-header__menu-item" to="/company/new">
@@ -325,18 +327,56 @@ function CompanyNewWithSession() {
 }
 
 const rootRoute = createRootRoute({ component: RootLayout });
+
+/**
+ * `/` ist die Werbeseite — und leitet Angemeldete auf `/overview`.
+ *
+ * Vorher bediente `/` beide Seiten: abgemeldet die Werbung, angemeldet die
+ * Übersicht. Das hielt die Werbung aus dem Weg, gab der Übersicht aber **keine
+ * eigene Adresse** — man konnte sie nicht verlinken, und ein Screenshot von `/`
+ * zeigte je nach Sitzung etwas anderes.
+ *
+ * Die Weiterleitung erzeugt kein neues Flackern: solange die Sitzung lädt,
+ * rendert diese Route schon vorher `null`.
+ */
 function HomeOrOverview() {
-  // Angemeldet zeigt die Startseite, was ansteht — nicht mehr die Werbung.
-  // Wer schon da ist, muss nicht überzeugt werden.
   const { user, isLoading } = useSession();
-  if (isLoading) return null;
-  return user === null ? <HomeRoute /> : <OverviewRoute principal={user} />;
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isLoading && user !== null) void navigate({ to: "/overview", replace: true });
+  }, [isLoading, user, navigate]);
+
+  if (isLoading || user !== null) return null;
+  return <HomeRoute />;
+}
+
+/**
+ * Die Übersicht braucht eine Sitzung — ohne sie gibt es nichts anzuzeigen, weil
+ * jede ihrer vier Abfragen „meine" Daten holt. Abgemeldet geht es zum Anmelden
+ * statt zu einer leeren Seite mit einer Bitte darauf.
+ */
+function OverviewWithSession() {
+  const { user, isLoading } = useSession();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isLoading && user === null) void navigate({ to: "/login", replace: true });
+  }, [isLoading, user, navigate]);
+
+  if (isLoading || user === null) return null;
+  return <OverviewRoute principal={user} />;
 }
 
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   component: HomeOrOverview,
+});
+const overviewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/overview",
+  component: OverviewWithSession,
 });
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -376,7 +416,7 @@ const candidatesRoute = createRoute({
 });
 const careerRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/karriere/$slug",
+  path: "/careers/$slug",
   component: CareerRoute,
 });
 const jobsRoute = createRoute({
@@ -396,27 +436,27 @@ const githubRoute = createRoute({
 });
 const myDataRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/meine-daten",
+  path: "/my-data",
   component: MyDataWithSession,
 });
 const consentsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/freigaben",
+  path: "/consents",
   component: ConsentsWithSession,
 });
 const accountDeletionRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/konto-loeschen",
+  path: "/delete-account",
   component: AccountDeletionWithSession,
 });
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/einstellungen",
+  path: "/settings",
   component: SettingsWithSession,
 });
 const marketRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/markt",
+  path: "/market",
   component: MarketWithSession,
 });
 const transfersRoute = createRoute({
@@ -457,6 +497,7 @@ const companyNewRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   homeRoute,
+  overviewRoute,
   loginRoute,
   registerRoute,
   verifyRoute,
