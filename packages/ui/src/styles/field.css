@@ -7,7 +7,8 @@
 
 .wt-field__label {
   color: var(--wt-ink);
-  font-size: var(--wt-text-sm);
+  /* 0.85rem, nicht 0.8rem — siehe Kommentar an --wt-text-md in tokens.css. */
+  font-size: var(--wt-text-md);
   font-weight: 700;
   letter-spacing: -0.01em;
 }

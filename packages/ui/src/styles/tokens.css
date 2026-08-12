@@ -40,6 +40,12 @@
   /* Schrift */
   --wt-text-xs: 0.72rem;
   --wt-text-sm: 0.8rem;
+  /* 0.85rem ist ein EIGENER Wert im Bestand (Feld-Label), nicht 0.8rem mit
+     Rundungsfehler. Beim ersten Tokenisieren waren beide auf --wt-text-sm
+     abgebildet — der Screenshot-Vergleich zeigte daraufhin jedes Formular um
+     einen Pixel verschoben. Eine Skala, die zwei gemessene Größen zu einer
+     macht, ändert die Oberfläche, während sie aufzuräumen behauptet. */
+  --wt-text-md: 0.85rem;
   --wt-text-base: 0.92rem;
   --wt-text-lg: 1rem;
   --wt-text-xl: 1.25rem;
@@ -60,6 +66,10 @@
   --wt-focus-outline: 3px solid color-mix(in srgb, var(--wt-mint), white 30%);
   --wt-disabled-opacity: 0.55;
 
-  /* Bewegung */
+  /* Bewegung. Zwei Geschwindigkeiten, weil der Bestand zwei hatte: 160ms für
+     Knöpfe und Felder, 140ms für den Schalter. Beide auf eine zu ziehen wäre
+     unsichtbar gewesen und deshalb die verführerischere Variante — geändert
+     hätte es die Oberfläche trotzdem. */
   --wt-transition: 160ms ease;
+  --wt-transition-fast: 140ms ease;
 }
