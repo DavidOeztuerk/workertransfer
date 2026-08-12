@@ -104,6 +104,30 @@ describe("ApplicationsRoute", () => {
     expect(await screen.findByText(/sieht deine Daten nicht mehr/i)).toBeInTheDocument();
   });
 
+
+  // Vorher sah man hier eine LEERE KARTE: `result` war undefined, also griff
+  // keiner der drei Zweige, und es stand nichts da — kein Ladehinweis, kein
+  // Leerzustand, nichts. Wer eine langsame Verbindung hat, konnte nicht
+  // unterscheiden, ob geladen wird oder ob er keine Bewerbungen hat.
+  it("says it is loading instead of showing an empty card", async () => {
+    let loesen: (wert: { ok: true; applications: [] }) => void = () => {};
+    listMyApplications.mockReturnValue(
+      new Promise((resolve) => {
+        loesen = resolve;
+      })
+    );
+
+    renderWithProviders(<ApplicationsRoute principal={principal()} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Bewerbungen werden geladen…");
+    // Und ausdrücklich NICHT der Leerzustand: „noch keine Bewerbung" wäre
+    // während des Ladens eine Behauptung, die niemand kennt.
+    expect(screen.queryByText(/Noch keine Bewerbung/)).toBeNull();
+
+    loesen({ ok: true, applications: [] });
+    expect(await screen.findByText(/Noch keine Bewerbung/)).toBeInTheDocument();
+  });
+
   it("tells an anonymous visitor to log in", () => {
     renderWithProviders(<ApplicationsRoute principal={null} />);
 

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card } from "@workertransfer/ui";
+import { Alert, Card, Empty, Loading, Page, Row, RowList } from "@workertransfer/ui";
 
 import { getCompanyBySlug } from "../companies/client";
 import { searchJobs } from "../jobs/client";
@@ -52,45 +52,49 @@ export function CareerRoute({ slug }: CareerRouteProps) {
 
   if (company.isPending) {
     return (
-      <main className="page page--narrow">
+      <Page title="Karriere" narrow>
         <Card>
-          <p role="status">Wird geladen…</p>
+          <Loading label="Unternehmen wird geladen…" />
         </Card>
-      </main>
+      </Page>
     );
   }
 
   const profile = company.data;
   if (profile === null || profile === undefined) {
     return (
-      <main className="page page--narrow">
+      <Page title="Diese Seite gibt es nicht" narrow>
         <Card>
-          <h1>Diese Seite gibt es nicht</h1>
           <p>
             Unter dieser Adresse ist kein Unternehmen hinterlegt.{" "}
             <a href="/jobs">Alle offenen Stellen</a>
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
   const result = jobs.data;
   const items = result?.ok ? result.items : [];
+  // Ein GESCHEITERTER Abruf ist kein Leerzustand. Vorher wurde `items` in beiden
+  // Fällen leer, und die Seite sagte „Zurzeit ist nichts ausgeschrieben" —
+  // also die beruhigendste falsche Antwort, die es gibt. Ein Unternehmen, dessen
+  // Stellen gerade nicht abrufbar sind, sieht sonst aus wie eines, das keine
+  // hat.
+  const abrufFehlgeschlagen = result !== undefined && !result.ok;
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>{profile.display_name}</h1>
-        {profile.website !== null ? (
-          <p className="page__lead">
-            <a href={profile.website} target="_blank" rel="noreferrer noopener">
-              {profile.website}
-            </a>
-          </p>
-        ) : null}
-      </header>
-
+    <Page
+      title={profile.display_name}
+      narrow
+      lead={
+        profile.website !== null ? (
+          <a href={profile.website} target="_blank" rel="noreferrer noopener">
+            {profile.website}
+          </a>
+        ) : undefined
+      }
+    >
       {profile.about !== "" ? (
         <Card>
           <h2>Über uns</h2>
@@ -100,9 +104,7 @@ export function CareerRoute({ slug }: CareerRouteProps) {
 
       {profile.locations.length > 0 || profile.benefits.length > 0 ? (
         <Card>
-          {profile.locations.length > 0 ? (
-            <p className="candidates__meta">Standorte: {profile.locations.join(", ")}</p>
-          ) : null}
+          {profile.locations.length > 0 ? <p>Standorte: {profile.locations.join(", ")}</p> : null}
           {profile.benefits.length > 0 ? (
             <ul className="candidates__skills">
               {profile.benefits.map((benefit) => (
@@ -115,28 +117,36 @@ export function CareerRoute({ slug }: CareerRouteProps) {
 
       <Card>
         <h2>Offene Stellen</h2>
-        {jobs.isPending ? <p role="status">Stellen werden geladen…</p> : null}
-        {!jobs.isPending && items.length === 0 ? (
-          <p>Zurzeit ist nichts ausgeschrieben.</p>
+        {/* Reihenfolge nach dem Muster: lädt, dann Fehler, dann leer, dann
+            Inhalt. */}
+        {jobs.isPending ? <Loading label="Stellen werden geladen…" /> : null}
+        {abrufFehlgeschlagen ? (
+          <Alert>
+            Die offenen Stellen sind gerade nicht abrufbar. Das heißt nicht, dass es keine gibt —
+            versuch es später noch einmal.
+          </Alert>
+        ) : null}
+        {!jobs.isPending && !abrufFehlgeschlagen && items.length === 0 ? (
+          <Empty title="Zurzeit ist nichts ausgeschrieben." />
         ) : null}
         {items.length > 0 ? (
-          <ul className="team">
+          <RowList>
             {items.map((job) => (
-              <li key={job.id}>
-                <span>{job.title}</span>
-                <span className="team__role">
-                  {job.location !== "" ? job.location : "Ort nicht angegeben"} ·{" "}
-                  {REMOTE_LABEL[job.remote] ?? job.remote}
-                </span>
-              </li>
+              <Row
+                key={job.id}
+                title={job.title}
+                meta={`${job.location !== "" ? job.location : "Ort nicht angegeben"} · ${
+                  REMOTE_LABEL[job.remote] ?? job.remote
+                }`}
+              />
             ))}
-          </ul>
+          </RowList>
         ) : null}
         <p className="wt-field__hint">
           Bewerben geht über <a href="/jobs">die Stellensuche</a> — dort entsteht die Freigabe
           deiner Daten, und zwar nur für dieses eine Unternehmen.
         </p>
       </Card>
-    </main>
+    </Page>
   );
 }

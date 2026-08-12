@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button, Card } from "@workertransfer/ui";
+import { Alert, Button, Card, Empty, Loading, Page, Row, RowList } from "@workertransfer/ui";
 
 import {
   type Application,
@@ -28,6 +28,14 @@ function isLive(status: ApplicationStatus): boolean {
   return status === "submitted" || status === "reviewing";
 }
 
+/** Das Profil geht immer mit — ohne es wäre es keine Bewerbung. */
+function freigegeben(application: Application): string {
+  const teile = ["Profil"];
+  if (application.shares_resume) teile.push("Lebenslauf");
+  if (application.shares_portfolio) teile.push("Arbeiten");
+  return teile.join(", ");
+}
+
 export function ApplicationsRoute({ principal = null }: ApplicationsRouteProps) {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -48,99 +56,69 @@ export function ApplicationsRoute({ principal = null }: ApplicationsRouteProps) 
 
   if (principal === null) {
     return (
-      <main className="page page--narrow">
+      <Page title="Meine Bewerbungen" narrow>
         <Card>
-          <h1>Meine Bewerbungen</h1>
           <p>
             Bitte <a href="/login">anmelden</a>, um deine Bewerbungen zu sehen.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
   const result = query.data;
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>Meine Bewerbungen</h1>
-        <p className="page__lead">
-          Solange eine Bewerbung läuft, sieht das Unternehmen dein Profil — und was du sonst
-          freigegeben hast. Ziehst du sie zurück, ist der Zugriff sofort zu; der Vorgang bleibt
-          beim Unternehmen als das stehen, was er war.
-        </p>
-      </header>
-
-      {error !== null ? (
-        <Card>
-          <p className="auth__alert" role="alert">
-            {error}
-          </p>
-        </Card>
-      ) : null}
+    <Page
+      title="Meine Bewerbungen"
+      narrow
+      lead="Solange eine Bewerbung läuft, sieht das Unternehmen dein Profil — und was du sonst freigegeben hast. Ziehst du sie zurück, ist der Zugriff sofort zu; der Vorgang bleibt beim Unternehmen als das stehen, was er war."
+    >
+      {error !== null ? <Alert>{error}</Alert> : null}
 
       <Card>
-        {result !== undefined && !result.ok ? (
-          <p className="auth__alert" role="alert">
-            {result.message}
-          </p>
-        ) : null}
+        {/* Reihenfolge nach dem Muster: lädt, dann Fehler, dann leer, dann
+            Inhalt. Der Ladezustand FEHLTE hier — solange die Liste unterwegs
+            war, griff keiner der drei Zweige und man sah eine leere Karte. */}
+        {query.isPending ? <Loading label="Bewerbungen werden geladen…" /> : null}
+        {result !== undefined && !result.ok ? <Alert>{result.message}</Alert> : null}
         {result?.ok && result.applications.length === 0 ? (
-          <p>
-            Noch keine Bewerbung. <a href="/jobs">Offene Stellen ansehen</a>.
-          </p>
+          <Empty
+            title="Noch keine Bewerbung."
+            action={<a href="/jobs">Offene Stellen ansehen</a>}
+          />
         ) : null}
         {result?.ok && result.applications.length > 0 ? (
-          <ul className="requests">
+          <RowList>
             {result.applications.map((application) => (
-              <li key={application.id}>
-                <Row
-                  application={application}
-                  busy={withdraw.isPending}
-                  onWithdraw={() => withdraw.mutate(application.id)}
-                />
-              </li>
+              <Row
+                key={application.id}
+                title={STATUS_LABEL[application.status]}
+                meta={
+                  isLive(application.status)
+                    ? `Freigegeben: ${freigegeben(application)}`
+                    : "Das Unternehmen sieht deine Daten nicht mehr."
+                }
+                // Zurückziehen nur, solange etwas freigegeben IST. Ein Knopf für
+                // eine Bewerbung, die schon zu ist, wäre eine Lüge über den
+                // Zustand — deshalb `undefined` und nicht ein deaktivierter
+                // Knopf.
+                actions={
+                  isLive(application.status) ? (
+                    <Button
+                      variant="quiet"
+                      onClick={() => withdraw.mutate(application.id)}
+                      disabled={withdraw.isPending}
+                    >
+                      Zurückziehen
+                    </Button>
+                  ) : undefined
+                }
+              />
             ))}
-          </ul>
+          </RowList>
         ) : null}
       </Card>
-    </main>
-  );
-}
-
-function Row({
-  application,
-  busy,
-  onWithdraw,
-}: {
-  application: Application;
-  busy: boolean;
-  onWithdraw: () => void;
-}) {
-  const shared = ["Profil"];
-  if (application.shares_resume) shared.push("Lebenslauf");
-  if (application.shares_portfolio) shared.push("Arbeiten");
-
-  return (
-    <div className="requests__row">
-      <div>
-        <p className="requests__title">{STATUS_LABEL[application.status]}</p>
-        <p className="requests__meta">
-          {isLive(application.status)
-            ? `Freigegeben: ${shared.join(", ")}`
-            : "Das Unternehmen sieht deine Daten nicht mehr."}
-        </p>
-      </div>
-      <div className="requests__actions">
-        {/* Zurückziehen nur, solange etwas freigegeben IST. Ein Knopf für eine
-            Bewerbung, die schon zu ist, wäre eine Lüge über den Zustand. */}
-        {isLive(application.status) ? (
-          <Button variant="quiet" onClick={onWithdraw} disabled={busy}>
-            Zurückziehen
-          </Button>
-        ) : null}
-      </div>
-    </div>
+    </Page>
   );
 }
