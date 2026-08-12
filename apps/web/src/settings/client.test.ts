@@ -19,10 +19,17 @@ afterEach(() => {
 });
 
 describe("getNotificationPreferences", () => {
-  it("falls back to all-on, never to all-off", async () => {
-    // Ein Netzfehler ist keine Abbestellung. Vier ausgeschaltete Schalter
-    // würden beim nächsten Speichern geschrieben — und die Person hätte sich
-    // abgemeldet, ohne es zu wollen.
+  it("erfindet bei einem Fehler nichts — weder alles aus noch alles an", async () => {
+    // Hier stand „falls back to all-on, never to all-off", mit dieser
+    // Begründung: ein Netzfehler ist keine Abbestellung; vier ausgeschaltete
+    // Schalter würden beim nächsten Speichern geschrieben, und die Person hätte
+    // sich abgemeldet, ohne es zu wollen. Das stimmt.
+    //
+    // Es stimmt aber Wort für Wort auch umgekehrt: vier EINGESCHALTETE Schalter
+    // werden beim nächsten Speichern ebenso geschrieben. Wer drei Arten
+    // abbestellt hatte, sah nach einem Ausfall alle vier an — und ein Klick auf
+    // den vierten nahm drei Abbestellungen zurück, die niemand zurückgenommen
+    // hat. Deshalb `null`: die Route sperrt dann die Schalter.
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -30,7 +37,21 @@ describe("getNotificationPreferences", () => {
       })
     );
 
-    await expect(getNotificationPreferences()).resolves.toEqual(ALL_ON);
+    const antwort = await getNotificationPreferences();
+    expect(antwort).toBeNull();
+    // Die alte Zusage, ausdrücklich: niemals „alles aus".
+    expect(antwort).not.toEqual({
+      resume_request: false,
+      market_request: false,
+      application_update: false,
+      transfer_update: false,
+    });
+  });
+
+  it("sagt auch bei einer Fehlerantwort „weiß nicht“", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => respond(503, { detail: "kaputt" })));
+
+    await expect(getNotificationPreferences()).resolves.toBeNull();
   });
 
   it("sends the cookie to the identity service", async () => {

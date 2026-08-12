@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button, Card, Field } from "@workertransfer/ui";
+import { Alert, Button, Card, Field, Loading, Page } from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
 import {
@@ -55,14 +55,13 @@ export function GitHubRoute({ principal = null }: GitHubRouteProps) {
 
   if (subjectId === null) {
     return (
-      <main className="page page--narrow">
+      <Page title="GitHub verbinden" narrow>
         <Card>
-          <h1>GitHub verbinden</h1>
           <p>
             Bitte <a href="/login">anmelden</a>, um dein GitHub-Konto zu verbinden.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
@@ -70,34 +69,32 @@ export function GitHubRoute({ principal = null }: GitHubRouteProps) {
   const busy = connect.isPending || verify.isPending || refresh.isPending;
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>GitHub verbinden</h1>
-        <p className="page__lead">
+    <Page
+      title="GitHub verbinden"
+      narrow
+      lead={
+        <>
           Was hier erscheint, sind <strong>Belege, keine Noten</strong>: deine öffentlichen
           Repositories mit Link. Diese Plattform rechnet daraus keine Punktzahl und keine
           Rangfolge — wer wissen will, ob dein Code gut ist, sieht ihn sich an.
-        </p>
-        <p className="requests__meta">
-          Geholt wird nur, wenn du es auslöst. Es läuft kein Abgleich im Hintergrund: eine
-          Plattform, die dir dauerhaft hinterhersieht, tut etwas anderes als eine, die einmal auf
-          deine Bitte hinsieht.
-        </p>
-      </header>
-
-      {error !== null ? (
-        <p className="auth__alert" role="alert">
-          {error}
-        </p>
-      ) : null}
+        </>
+      }
+      note="Geholt wird nur, wenn du es auslöst. Es läuft kein Abgleich im Hintergrund: eine Plattform, die dir dauerhaft hinterhersieht, tut etwas anderes als eine, die einmal auf deine Bitte hinsieht."
+    >
+      {error !== null ? <Alert>{error}</Alert> : null}
 
       {query.isPending ? (
         <Card>
-          <p role="status">Wird geladen…</p>
+          <Loading label="Verbindung wird geladen…" />
         </Card>
       ) : null}
 
-      {connection === null || connection === undefined ? (
+      {/* `!query.isPending` gehört dazu: solange die Abfrage läuft, ist
+          `connection` `undefined`, und vorher stand „Wird geladen…" UND das
+          Formular „Konto nennen" gleichzeitig auf der Seite. Wer schnell tippt,
+          nannte ein Konto, bevor die Seite wusste, ob schon eines verbunden
+          ist. */}
+      {!query.isPending && (connection === null || connection === undefined) ? (
         <Card>
           <h2>Konto nennen</h2>
           <form
@@ -129,10 +126,15 @@ export function GitHubRoute({ principal = null }: GitHubRouteProps) {
             Lege einen <strong>öffentlichen</strong> Gist an, dessen Beschreibung genau so lautet:
           </p>
           <pre className="github__challenge">{connection.challenge_description}</pre>
-          <p className="requests__meta">
+          <p className="wt-field__hint">
             Der Inhalt ist egal. Danach darf der Gist wieder weg — er beweist nur, dass du über
             das Konto <strong>{connection.login}</strong> verfügst.
           </p>
+          {/* `.transfer__actions` ist die geteilte Knopfreihe (transfers,
+              company-transfers, github) und hat eine Regel. Sie hier durch ein
+              Interna von `Row` zu ersetzen wäre dasselbe Ausleihen in neuer
+              Richtung — umbenannt wird sie in E3e, wo ihr Eigentümer umgestellt
+              wird. */}
           <div className="transfer__actions">
             <Button onClick={() => verify.mutate()} disabled={busy}>
               {verify.isPending ? "Wird geprüft…" : "Nachweis prüfen"}
@@ -147,7 +149,7 @@ export function GitHubRoute({ principal = null }: GitHubRouteProps) {
       {connection != null && connection.verified ? (
         <Card>
           <h2>{connection.login}</h2>
-          <p className="requests__meta">
+          <p className="wt-field__hint">
             {connection.fetched_at !== null
               ? `Stand: ${new Date(connection.fetched_at).toLocaleString("de-DE")}`
               : "Noch nichts geholt."}{" "}
@@ -163,7 +165,7 @@ export function GitHubRoute({ principal = null }: GitHubRouteProps) {
                   <a href={repo.url} target="_blank" rel="noreferrer noopener">
                     {repo.name}
                   </a>
-                  <span className="requests__meta">
+                  <span className="wt-field__hint">
                     {repo.language ?? "ohne Sprachangabe"} · {repo.stars} ★
                     {repo.description !== "" ? ` · ${repo.description}` : ""}
                   </span>
@@ -171,6 +173,11 @@ export function GitHubRoute({ principal = null }: GitHubRouteProps) {
               ))}
             </ul>
           )}
+          {/* `.transfer__actions` ist die geteilte Knopfreihe (transfers,
+              company-transfers, github) und hat eine Regel. Sie hier durch ein
+              Interna von `Row` zu ersetzen wäre dasselbe Ausleihen in neuer
+              Richtung — umbenannt wird sie in E3e, wo ihr Eigentümer umgestellt
+              wird. */}
           <div className="transfer__actions">
             <Button variant="quiet" onClick={() => refresh.mutate()} disabled={busy}>
               {refresh.isPending ? "Wird geholt…" : "Aktualisieren"}
@@ -181,6 +188,6 @@ export function GitHubRoute({ principal = null }: GitHubRouteProps) {
           </div>
         </Card>
       ) : null}
-    </main>
+    </Page>
   );
 }

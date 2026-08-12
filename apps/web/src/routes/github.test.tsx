@@ -78,6 +78,28 @@ describe("GitHubRoute", () => {
     expect(await screen.findByText("workertransfer-verify-abc123")).toBeTruthy();
   });
 
+  it("fragt nicht nach einem Konto, solange es noch lädt", async () => {
+    // Vorher schlossen sich die beiden Bedingungen nicht aus: solange die
+    // Abfrage lief, war `connection` `undefined`, also standen „Wird geladen…"
+    // UND das Formular „Konto nennen" gleichzeitig da. Wer schnell tippt, nennt
+    // ein Konto, bevor die Seite weiß, ob schon eines verbunden ist.
+    let loesen: (() => void) | undefined;
+    getMyGitHub.mockReturnValue(
+      new Promise((resolve) => {
+        loesen = () => resolve(null);
+      })
+    );
+
+    renderWithProviders(<GitHubRoute principal={principal()} />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/wird geladen/i);
+    expect(screen.queryByLabelText(/GitHub-Benutzername/i)).toBeNull();
+
+    loesen?.();
+    // Und danach ist es da — der Ladezustand hält es nicht auf.
+    expect(await screen.findByLabelText(/GitHub-Benutzername/i)).toBeInTheDocument();
+  });
+
   it("sends the login when connecting", async () => {
     renderWithProviders(<GitHubRoute principal={principal()} />);
     const user = userEvent.setup();
