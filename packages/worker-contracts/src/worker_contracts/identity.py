@@ -36,6 +36,15 @@ class RegisterUserV1(BaseModel):
     email: str = Field(..., min_length=3, max_length=320)
     password: str = Field(..., min_length=1, max_length=1024)
     display_name: str = Field(..., min_length=1, max_length=255)
+    #: Gesetzt heißt: hier registriert sich ein Unternehmen. Das Unternehmen
+    #: entsteht aber erst bei der Bestätigung der Adresse — eine unbestätigte
+    #: Adresse beweist keine Domain (ADR-0019). Bis dahin ist dies nur eine
+    #: gemerkte Absicht.
+    #:
+    #: OPTIONAL, und das ist Absicht: V1 ist ein versionierter Vertrag, ein
+    #: Pflichtfeld wäre ein Bruch. `None` heißt Person, und das ist ohnehin der
+    #: richtige Standard (ADR-0017).
+    company_name: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class VerifyEmailV1(BaseModel):

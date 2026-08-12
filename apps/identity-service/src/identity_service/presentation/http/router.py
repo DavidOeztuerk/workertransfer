@@ -28,6 +28,7 @@ from identity_service.application.commands import (
     handle_verify_email,
 )
 from identity_service.application.ports import TokenPair
+from identity_service.domain.company import PublicEmailDomain
 from identity_service.domain.membership import NotAMember
 from identity_service.domain.user import (
     AccountDisabled,
@@ -73,7 +74,9 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
 
     @router.post("/register", status_code=status.HTTP_201_CREATED)
     async def register(body: RegisterUserV1) -> dict[str, str]:
-        cmd = RegisterUserCommand(body.email, body.password, body.display_name)
+        cmd = RegisterUserCommand(
+            body.email, body.password, body.display_name, company_name=body.company_name
+        )
         # Mails werden gesammelt und ERST NACH dem Commit versandt: die UoW
         # committet im __aexit__ des request_scope, ein Versand innerhalb würde
         # den Bestätigungslink verschicken, bevor die Token-Zeile existiert.
@@ -82,6 +85,11 @@ def build_auth_router(deps: dict[str, Any]) -> APIRouter:
             result = await handle_register(cmd, deps=deps, repos=repos, outbox=outbox)
         if not result.is_success:
             err = result.error
+            if isinstance(err, PublicEmailDomain):
+                # Derselbe Code wie an POST /companies (422), damit dieselbe
+                # Ablehnung nicht je Endpunkt anders heißt. Verraten wird dabei
+                # nichts: die Adresse hat die Person gerade selbst getippt.
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, err.message)
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST, err.message if err is not None else "invalid"
             )

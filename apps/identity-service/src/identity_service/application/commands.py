@@ -28,6 +28,7 @@ from identity_service.domain.company import (
     Company,
     DomainAlreadyClaimed,
     EmailDomain,
+    PublicEmailDomain,
 )
 from identity_service.domain.invitation import Invitation, InvitationInvalid
 from identity_service.domain.membership import (
@@ -98,6 +99,9 @@ class RegisterUserCommand:
     email: str
     password: str
     display_name: str
+    #: Gesetzt heißt „hier registriert sich ein Unternehmen". Es entsteht erst
+    #: bei der Bestätigung der Adresse (E2.6) — bis dahin ist es eine Absicht.
+    company_name: str | None = None
 
 
 async def handle_register(
@@ -112,6 +116,22 @@ async def handle_register(
     now = deps["clock"].now()
     try:
         policy.validate(cmd.password)
+        # Freemail VOR der Existenzprüfung, und das ist keine Stilfrage: prüfte
+        # man es danach, antwortete der Endpunkt bei einer bekannten Adresse
+        # anders als bei einer unbekannten — und die Zusage „dieselbe Antwort"
+        # (der Enumerationsschutz) wäre gefallen.
+        #
+        # Verraten wird dabei nichts: ob eine Adresse bei einem Massenanbieter
+        # liegt, steckt in der Adresse, die die Person gerade selbst getippt hat.
+        #
+        # Die Domain SELBST wird hier NICHT geprüft. „firma.de ist schon
+        # beansprucht" wäre an dieser Stelle ein Enumerationskanal über
+        # Unternehmen, beantwortbar von jedem, der eine Domain errät. Das prüft
+        # erst die Bestätigung, wenn die Adresse bewiesen ist.
+        if cmd.company_name is not None:
+            domain = EmailDomain.from_email(Email(cmd.email))
+            if domain.is_public():
+                raise PublicEmailDomain(domain.value)
         # Immer hashen, auch wenn die Adresse längst vergeben ist. bcrypt mit 12
         # Runden braucht ~300 ms; ein früher Ausstieg wäre in ~10 ms zurück und
         # würde über die Antwortzeit verraten, was der gleiche Statuscode gerade
@@ -129,6 +149,7 @@ async def handle_register(
             password_hash=password_hash,
             display_name=cmd.display_name,
             now=now,
+            pending_company_name=cmd.company_name,
         )
         await repos["users"].add(user)
         await repos["audit"].append(
