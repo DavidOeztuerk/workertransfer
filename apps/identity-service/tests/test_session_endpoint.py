@@ -22,12 +22,16 @@ from identity_service.configuration import IdentityServiceSettings
 from identity_service.main import create_app
 
 
-# Cookies werden am CLIENT gesetzt, nicht je Anfrage: starlette verwirft
-# `cookies=` pro Request (DeprecationWarning), weil dabei unklar ist, ob das
-# Cookie danach im Krug bleibt. Am Client ist die Antwort eindeutig — und jeder
-# Test baut sich hier ohnehin seinen eigenen.
-def _client() -> TestClient:
-    return TestClient(create_app(IdentityServiceSettings()))
+def _client(**cookies: str) -> TestClient:
+    """Ein Client, der die genannten Cookies von Anfang an mitbringt.
+
+    Die Cookies gehören an den Client und nicht an die einzelne Anfrage: httpx
+    hat den Weg je Anfrage verworfen, weil unklar bleibt, ob so ein Cookie
+    danach im Krug liegt oder nicht. Hier ist die Antwort ohnehin „von Anfang
+    an dabei" — ein Browser bringt sein Cookie mit, er reicht es nicht einer
+    einzelnen Anfrage nach.
+    """
+    return TestClient(create_app(IdentityServiceSettings()), cookies=cookies or None)
 
 
 def test_anonym_antwortet_200_und_nicht_401() -> None:
@@ -49,9 +53,8 @@ def test_ein_totes_access_cookie_allein_macht_die_sitzung_nicht_erneuerbar() -> 
     auf, bekäme 401 — und wir hätten den Fehler, den dieser Endpunkt abschafft,
     nur eine Anfrage später wieder.
     """
-    client = _client()
+    client = _client(access="abgelaufen.kaputt.wert")
 
-    client.cookies.set("access", "abgelaufen.kaputt.wert")
     response = client.get("/auth/session")
 
     assert response.status_code == 200
@@ -65,9 +68,8 @@ def test_mit_refresh_cookie_heisst_es_erneuerbar() -> None:
     zweiter Ort, der Token bewertet, wäre ein zweiter Ort, an dem er falsch
     liegen kann. Dieser Endpunkt sagt nur, ob ein Versuch überhaupt Sinn ergibt.
     """
-    client = _client()
+    client = _client(refresh="irgendein.refresh.wert")
 
-    client.cookies.set("refresh", "irgendein.refresh.wert")
     response = client.get("/auth/session")
 
     assert response.status_code == 200
@@ -81,13 +83,8 @@ def test_der_endpunkt_verrät_nichts_ueber_die_person() -> None:
     mitkommt — es gibt also nichts, woraus jemand auf einen Kontostand,
     eine Adresse oder auch nur deren Existenz schliessen könnte.
     """
-    client = _client()
-
-    ohne = client.get("/auth/session").json()
-    # Erst NACH der ersten Anfrage setzen — die Reihenfolge ist hier die Aussage:
-    # ohne Cookie, dann mit Müll, und beide Antworten müssen gleich sein.
-    client.cookies.set("access", "aaa.bbb.ccc")
-    mit_muell = client.get("/auth/session").json()
+    ohne = _client().get("/auth/session").json()
+    mit_muell = _client(access="aaa.bbb.ccc").get("/auth/session").json()
 
     assert ohne == mit_muell
 
@@ -133,9 +130,8 @@ def test_ein_abgelehnter_refresh_raeumt_sein_totes_cookie_weg() -> None:
     zu löschen bräuchte einen zweiten Set-Cookie-Kopf an einer Ausnahme, die
     nur einen tragen kann.
     """
-    client = _client()
+    client = _client(refresh="totes.token.hier")
 
-    client.cookies.set("refresh", "totes.token.hier")
     antwort = client.post("/auth/refresh")
 
     assert antwort.status_code == 401
@@ -153,9 +149,8 @@ def test_nach_dem_aufraeumen_ist_der_zustand_wieder_anonymous() -> None:
     Ohne Refresh-Cookie meldet die Sitzungsabfrage `anonymous`, und die
     Oberfläche stellt gar keine zweite Anfrage mehr.
     """
-    client = _client()
+    client = _client(access="totes.access.token")
 
-    client.cookies.set("access", "totes.access.token")
     antwort = client.get("/auth/session")
 
     assert antwort.json() == {"user": None, "state": "anonymous"}
