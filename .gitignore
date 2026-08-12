@@ -33,3 +33,8 @@ var/
 # Erzeugt beim Nachsehen im Browser, gehört nicht ins Repository — 18 Dateien
 # waren versehentlich verfolgt.
 .playwright-mcp/
+
+# Screenshot-Aufnahmen für den Vorher/Nachher-Vergleich im PR. Bilder, keine
+# Quellen — und plattformabhängig, deshalb bewusst keine Referenzbilder im
+# Repository (Schriftglättung darwin vs. linux erzeugt Fehlalarme).
+.screenshots/

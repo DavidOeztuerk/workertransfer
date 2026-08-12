@@ -1,0 +1,68 @@
+/* Formularfelder — bis zur Einführung von `Field` gab es im Designsystem
+   keine, weshalb jedes Auth-Formular ungestylt war. */
+.wt-field {
+  display: grid;
+  gap: var(--wt-space-2);
+}
+
+.wt-field__label {
+  color: var(--wt-ink);
+  /* 0.85rem, nicht 0.8rem — siehe Kommentar an --wt-text-md in tokens.css. */
+  font-size: var(--wt-text-md);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.wt-field__input {
+  min-height: 2.9rem;
+  width: 100%;
+  border: 1px solid var(--wt-line);
+  border-radius: var(--wt-radius-sm);
+  padding: var(--wt-space-3) var(--wt-space-4);
+  color: var(--wt-ink);
+  background: var(--wt-surface-raised);
+  transition: border-color var(--wt-transition), box-shadow var(--wt-transition);
+}
+
+.wt-field__input::placeholder {
+  color: color-mix(in srgb, var(--wt-muted), transparent 25%);
+}
+
+.wt-field__input:focus-visible {
+  border-color: var(--wt-green);
+  outline: none;
+  /* Ring statt Outline, damit der Rahmenradius erhalten bleibt. */
+  box-shadow: var(--wt-focus-ring);
+}
+
+.wt-field__input[aria-invalid="true"] {
+  border-color: var(--wt-danger);
+}
+
+.wt-field__input[aria-invalid="true"]:focus-visible {
+  box-shadow: 0 0 0 3px var(--wt-danger-soft);
+}
+
+.wt-field__hint {
+  margin: 0;
+  color: var(--wt-muted);
+  font-size: var(--wt-text-sm);
+  line-height: var(--wt-leading-tight);
+}
+
+.wt-field__error {
+  margin: 0;
+  color: var(--wt-danger);
+  font-size: var(--wt-text-sm);
+  font-weight: 600;
+  line-height: var(--wt-leading-tight);
+}
+
+/* Mehrzeiliges Feld: erbt alles von .wt-field__input, nur die Höhe und das
+   Zeilenverhalten sind anders. */
+.wt-field__input--multiline {
+  min-height: 7rem;
+  resize: vertical;
+  font: inherit;
+  line-height: var(--wt-leading-normal);
+}
