@@ -125,105 +125,11 @@ h1 {
   color: #f4fbf5;
 }
 
-/* ---------------------------------------------------------------------------
-   Auth-Seiten — zweigeteilt: Markenpanel links, Formular rechts.
-   --------------------------------------------------------------------------- */
-.auth {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  min-height: calc(100vh - 4.6rem);
-}
-
-.auth__aside {
-  /* Explizite Rasterposition: das Panel steht im DOM NACH dem Formular
-     (Bedienreihenfolge), erscheint visuell aber links. */
-  grid-column: 1;
-  grid-row: 1;
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 1rem;
-  padding: clamp(2.5rem, 6vw, 5rem);
-  color: #f4fbf5;
-  background: var(--wt-green-deep);
-}
-
-.auth__aside::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
-  background-size: 3.75rem 3.75rem;
-  content: "";
-  mask-image: linear-gradient(to bottom, black, transparent 78%);
-}
-
-.auth__aside::after {
-  position: absolute;
-  z-index: -1;
-  right: -8rem;
-  bottom: -10rem;
-  width: min(60%, 26rem);
-  aspect-ratio: 1;
-  border: 1px solid rgba(185, 245, 207, 0.55);
-  border-radius: 50%;
-  box-shadow: 0 0 0 3rem rgba(185, 245, 207, 0.05);
-  content: "";
-}
-
-.auth__claim {
-  max-width: 22rem;
-  margin: 0;
-  font-size: clamp(1.7rem, 3vw, 2.6rem);
-  font-weight: 850;
-  letter-spacing: -0.05em;
-  line-height: 1.05;
-}
-
-.auth__support {
-  max-width: 26rem;
-  margin: 0;
-  color: rgba(244, 251, 245, 0.78);
-  line-height: 1.6;
-}
-
-.auth__panel {
-  grid-column: 2;
-  grid-row: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(2rem, 5vw, 4rem) clamp(1.25rem, 4vw, 3rem);
-}
-
-.auth__form {
-  width: min(26rem, 100%);
-  display: grid;
-  gap: 1.15rem;
-  padding: clamp(1.5rem, 3vw, 2.25rem);
-}
-
-.auth__form h1 {
-  margin: 0;
-  font-size: clamp(1.9rem, 3vw, 2.4rem);
-  line-height: 1.05;
-}
-
-.auth__form form {
-  display: grid;
-  gap: 1rem;
-}
-
-.auth__lead {
-  margin: 0;
-  color: var(--wt-muted);
-  line-height: 1.55;
-}
-
+/* Bleibt hier, obwohl der Name lügt: acht Routen benutzen diese Klasse für
+   ihre Fehlermeldung (settings, company-transfers, my-data,
+   account-deletion, team, company-new) und keine davon hat mit Auth zu tun.
+   Sie verschwindet, wenn E3 ihren letzten Aufrufer auf <Alert> umgestellt
+   hat. Der Rest der Auth-Hülle liegt in routes/auth-layout.css. */
 .auth__alert {
   margin: 0;
   border: 1px solid rgba(180, 57, 47, 0.35);
@@ -232,48 +138,6 @@ h1 {
   color: #8f2c24;
   background: rgba(180, 57, 47, 0.07);
   font-size: 0.9rem;
-}
-
-.auth__note {
-  margin: 0;
-  color: var(--wt-muted);
-  font-size: 0.9rem;
-}
-
-.auth__note a {
-  color: var(--wt-green);
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-
-@media (max-width: 56rem) {
-  .auth {
-    grid-template-columns: 1fr;
-    min-height: 0;
-  }
-
-  .auth__panel {
-    grid-column: 1;
-    grid-row: 2;
-  }
-
-  .auth__aside {
-    /* Auf schmalen Schirmen nur noch ein Band ÜBER dem Formular — dafür muss
-       die Rasterposition wieder freigegeben werden. */
-    grid-column: 1;
-    grid-row: 1;
-    justify-content: flex-start;
-    padding: 2rem clamp(1.25rem, 5vw, 2.5rem);
-  }
-
-  .auth__aside::after {
-    display: none;
-  }
-
-  .auth__claim {
-    font-size: 1.55rem;
-  }
 }
 
 /* Innenseiten: eine schmale Spalte, weil es hier um ein Formular geht und
