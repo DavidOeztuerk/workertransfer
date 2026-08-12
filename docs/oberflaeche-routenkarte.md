@@ -118,6 +118,19 @@ gleichzeitig Seite und API-Präfix von transfer-service
 (`PathPrefix("/market") || PathPrefix("/transfers")`). Dasselbe galt vorher schon
 für `/jobs`, `/applications`, `/transfers` und `/github`.
 
+**Geprüft am laufenden Gateway (12.08.2026), nicht abgeleitet.** Mit
+`Sec-Fetch-Dest: document` gegen `:8080` liefern alle neun Seitenadressen die
+Oberfläche — `/`, `/overview`, `/market`, `/consents`, `/settings`, `/my-data`,
+`/delete-account`, `/jobs`, `/careers/test`. Ohne den Kopf antwortet die API:
+`/market/status` → 422 `application/problem+json` (transfer-service),
+`/transfers` → 401, `/jobs` → 200 `application/json`. Die Kollision ist damit
+sauber getrennt.
+
+Eine Falle beim Prüfen selbst: ein Bereitschaftstest auf „antwortet überhaupt"
+ist zu wenig. Traefik läuft, bevor es seine `dynamic.yml` gelesen hat, und
+antwortet in diesem Fenster auf **alles** mit `404` — auch auf `/`, das niemand
+angefasst hat. Wer da misst, hält seine eigene Umbenennung für kaputt.
+
 Eine Ausnahme bleibt nötig, falls je eine Adresse entsteht, zu der ein Browser
 **navigieren muss** und die nicht zur Oberfläche gehört. Geprüft, als die Regel
 entstand: kein Dienst antwortet mit einer Weiterleitung, es gibt keinen
