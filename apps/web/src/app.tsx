@@ -10,7 +10,7 @@ import {
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 
-import { Button } from "@workertransfer/ui";
+import { Button, Select } from "@workertransfer/ui";
 
 import { useCompanies, useSwitchCompany } from "./auth/companies";
 import { useLogout, useSession } from "./auth/session";
@@ -206,9 +206,14 @@ function CompanySwitcher({ activeTenantId }: { activeTenantId: string | null }) 
 
   const active = companies.find((c) => c.id === activeTenantId);
   return (
-    <label>
-      Handeln als
-      <select
+    <div className="site-header__switcher">
+      {/* Der letzte rohe `<select>` des Projekts — er hatte gar keine Klasse und
+          erbte damit den Browser-Standard mitten in einer gestylten Kopfzeile.
+          `Select` bringt Beschriftung und Feld in dieselbe Form wie überall
+          sonst; die Hülle daneben macht daraus wieder eine Zeile statt eines
+          Blocks, denn hier steht ein Navigationsbedienelement, kein Formular. */}
+      <Select
+        label="Handeln als"
         value={activeTenantId ?? ""}
         onChange={(e) => switchTo.mutate(e.target.value)}
         disabled={switchTo.isPending}
@@ -226,9 +231,9 @@ function CompanySwitcher({ activeTenantId }: { activeTenantId: string | null }) 
             {company.name}
           </option>
         ))}
-      </select>
+      </Select>
       {active !== undefined ? <span>{active.role}</span> : null}
-    </label>
+    </div>
   );
 }
 

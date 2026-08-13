@@ -53,15 +53,14 @@ export function TeamRoute({ principal = null }: TeamRouteProps) {
 
   if (tenantId === null) {
     return (
-      <main className="page page--narrow">
+      <Page title="Mannschaft" narrow>
         <Card>
-          <h1>Mannschaft</h1>
           <p>
-            Wähle oben ein Unternehmen — oder lass dich von jemandem aus deinem
-            Unternehmen einladen.
+            Wähle oben ein Unternehmen — oder lass dich von jemandem aus deinem Unternehmen
+            einladen.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 

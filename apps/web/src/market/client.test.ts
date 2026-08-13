@@ -34,10 +34,19 @@ afterEach(() => {
 });
 
 describe("getMyMarketStatus", () => {
-  it("falls back to unavailable when the server cannot be reached", async () => {
-    // Nicht `null` und nicht „offen": die Voreinstellung darf nie zugunsten
-    // des Marktes ausfallen. Wer nichts gesagt hat, hat nicht „ich höre zu"
-    // gesagt — und ein Netzfehler ist erst recht keine Zustimmung.
+  it("erfindet gar keinen Status mehr — auch keinen sicheren", async () => {
+    // Hier stand ein Ersatz: `unavailable`, nicht ansprechbar. Die Begründung
+    // war richtig und gilt weiter — die Voreinstellung darf nie zugunsten des
+    // Marktes ausfallen, und ein Netzfehler ist keine Zustimmung. Für die
+    // ANZEIGE war das die sichere Richtung.
+    //
+    // Sie übersah nur, dass dieser Ersatz in ein FORMULAR geschrieben wurde:
+    // nach einem Ausfall stand dort „gerade nicht ansprechbar" mit leerer
+    // Notiz, und wer irgendetwas anfasste und speicherte, hatte seine
+    // Ansprechbarkeit zurückgezogen und seine Notiz gelöscht, ohne es zu
+    // wollen. Auf einem Transfermarkt heißt das: die Person verschwindet.
+    //
+    // `null` erfüllt die alte Zusage STRENGER: es wird nichts mehr erfunden.
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -45,12 +54,18 @@ describe("getMyMarketStatus", () => {
       })
     );
 
-    await expect(getMyMarketStatus()).resolves.toMatchObject({
-      availability: "unavailable",
-      is_approachable: false,
-    });
+    const antwort = await getMyMarketStatus();
+    expect(antwort).toBeNull();
+    // Und ausdrücklich: erst recht nichts, was nach Zustimmung aussieht.
+    expect(antwort).not.toMatchObject({ availability: "open" });
+    expect(antwort).not.toMatchObject({ is_approachable: true });
   });
 
+  it("sagt auch bei einer Fehlerantwort „weiß nicht“", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => respond(503, { detail: "weg" })));
+
+    await expect(getMyMarketStatus()).resolves.toBeNull();
+  });
   it("sends the cookie to the transfer service", async () => {
     const fetchMock = vi.fn(async () => respond(200, status));
     vi.stubGlobal("fetch", fetchMock);

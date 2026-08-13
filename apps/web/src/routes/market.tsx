@@ -1,6 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Button, Card, Field } from "@workertransfer/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  Empty,
+  Field,
+  Loading,
+  Page,
+  RadioGroup,
+} from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
 import {
@@ -61,9 +71,13 @@ export function MarketRoute({ principal = null }: MarketRouteProps) {
 
   // Die Voreinstellung ist der geladene Status, und der ist ohne Angabe
   // `unavailable`. Die Seite denkt sich nichts aus.
+  // Nur ein GELUNGENER Abruf füllt das Formular. `null` heißt „nicht abrufbar":
+  // vorher stand dann ein Ersatzwert darin („nicht ansprechbar", leere Notiz),
+  // und ein Speichern schrieb ihn — die Person hatte ihre Ansprechbarkeit
+  // zurückgezogen und ihre Notiz gelöscht, ohne es zu wollen.
   const loaded = statusQuery.data;
   useEffect(() => {
-    if (loaded !== undefined) {
+    if (loaded !== undefined && loaded !== null) {
       setAvailability(loaded.availability);
       setEmployed(loaded.employed);
       setNote(loaded.note);
@@ -102,49 +116,63 @@ export function MarketRoute({ principal = null }: MarketRouteProps) {
 
   if (subjectId === null) {
     return (
-      <main className="page page--narrow">
+      <Page title="Mein Marktstatus" narrow>
         <Card>
-          <h1>Mein Marktstatus</h1>
           <p>
             Bitte <a href="/login">anmelden</a>, um deinen Marktstatus zu setzen.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
   if (statusQuery.isPending) {
     return (
-      <main className="page page--narrow">
+      <Page title="Mein Marktstatus" narrow>
         <Card>
-          <p role="status">Marktstatus wird geladen…</p>
+          <Loading label="Marktstatus wird geladen…" />
         </Card>
-      </main>
+      </Page>
+    );
+  }
+
+  // Kein Formular, wenn der Abruf scheiterte. Die alte Zusage — „der Ersatz
+  // fällt nie zugunsten des Marktes aus" — gilt damit STRENGER als vorher: es
+  // wird gar nichts mehr erfunden, in keine Richtung.
+  if (statusQuery.data === null) {
+    return (
+      <Page title="Mein Marktstatus" narrow>
+        <Card>
+          <Alert>
+            Dein Marktstatus ist gerade nicht abrufbar. Ändern lässt er sich erst wieder, wenn er
+            lesbar ist — sonst würdest du womöglich zurücknehmen, was du nie zurückgenommen hast.
+          </Alert>
+        </Card>
+      </Page>
     );
   }
 
   const requests = requestsQuery.data;
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>Mein Marktstatus</h1>
-        <p className="page__lead">
+    <Page
+      title="Mein Marktstatus"
+      narrow
+      lead={
+        <>
           Ob du ansprechbar bist, sieht nur, wem du es freigegeben hast — Unternehmen für
           Unternehmen, jedes einzeln. Es gibt hier bewusst kein „für alle": dass jemand wechseln
           will, ist die heikelste Angabe auf dieser Plattform.
-        </p>
-      </header>
+        </>
+      }
+    >
 
       <Card>
         <h2>Anfragen</h2>
-        {requests !== undefined && !requests.ok ? (
-          <p className="auth__alert" role="alert">
-            {requests.message}
-          </p>
-        ) : null}
+        {requestsQuery.isPending ? <Loading label="Anfragen werden geladen…" /> : null}
+        {requests !== undefined && !requests.ok ? <Alert>{requests.message}</Alert> : null}
         {requests?.ok && requests.requests.length === 0 ? (
-          <p>Bislang hat niemand gefragt.</p>
+          <Empty title="Bislang hat niemand gefragt." />
         ) : null}
         {requests?.ok && requests.requests.length > 0 ? (
           <ul className="requests">
@@ -170,46 +198,35 @@ export function MarketRoute({ principal = null }: MarketRouteProps) {
             save.mutate();
           }}
         >
-          <fieldset className="market__choices">
-            <legend>Status</legend>
-            {CHOICES.map((choice) => (
-              <label key={choice.value} className="market__choice">
-                <input
-                  type="radio"
-                  name="availability"
-                  value={choice.value}
-                  checked={availability === choice.value}
-                  onChange={() => {
-                    setSaved(false);
-                    setAvailability(choice.value);
-                  }}
-                />
-                <span>
-                  <strong>{choice.label}</strong>
-                  <span className="market__hint">{choice.hint}</span>
-                </span>
-              </label>
-            ))}
-          </fieldset>
+          {/* Native Radios mit gemeinsamem `name` — erst dadurch bewegen die
+              Pfeiltasten den Fokus innerhalb der Gruppe. Das Bauteil tut genau
+              das, was hier von Hand stand. */}
+          <RadioGroup
+            legend="Status"
+            name="availability"
+            value={availability}
+            onChange={(next) => {
+              setSaved(false);
+              setAvailability(next as Availability);
+            }}
+            options={CHOICES.map((choice) => ({
+              value: choice.value,
+              label: choice.label,
+              hint: choice.hint,
+            }))}
+          />
 
-          <label className="market__choice">
-            <input
-              type="checkbox"
-              checked={employed}
-              onChange={(e) => {
-                setSaved(false);
-                setEmployed(e.target.checked);
-              }}
-            />
-            <span>
-              <strong>Ich arbeite gerade irgendwo</strong>
-              <span className="market__hint">
-                Dann braucht ein Wechsel eine Freigabe deines Arbeitgebers. Diese Plattform fragt
-                ihn nicht — sie weiß nicht, wer er ist, und soll es nicht wissen. Du bestätigst
-                selbst, wenn es soweit ist.
-              </span>
-            </span>
-          </label>
+          {/* Ein Kästchen, kein Schalter: es gilt mit dem Absenden, und darunter
+              steht ein Speichern-Knopf. */}
+          <Checkbox
+            label="Ich arbeite gerade irgendwo"
+            hint="Dann braucht ein Wechsel eine Freigabe deines Arbeitgebers. Diese Plattform fragt ihn nicht — sie weiß nicht, wer er ist, und soll es nicht wissen. Du bestätigst selbst, wenn es soweit ist."
+            checked={employed}
+            onChange={(e) => {
+              setSaved(false);
+              setEmployed(e.target.checked);
+            }}
+          />
 
           <Field
             label="Notiz"
@@ -222,19 +239,17 @@ export function MarketRoute({ principal = null }: MarketRouteProps) {
             maxLength={500}
           />
 
-          {error !== null ? (
-            <p className="auth__alert" role="alert">
-              {error}
-            </p>
+          {error !== null ? <Alert>{error}</Alert> : null}
+          {saved && error === null ? (
+            <Alert variant="notice">Marktstatus gespeichert.</Alert>
           ) : null}
-          {saved && error === null ? <p className="page__note">Marktstatus gespeichert.</p> : null}
 
           <Button type="submit" disabled={save.isPending}>
             {save.isPending ? "Wird gespeichert…" : "Speichern"}
           </Button>
         </form>
       </Card>
-    </main>
+    </Page>
   );
 }
 
