@@ -85,6 +85,13 @@ test("eine Anfrage erreicht die Person per Mail — und die Mail verrät nicht, 
 });
 
 test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser }) => {
+  // Dreifaches Budget, und zwar wegen der FORM dieser Reise, nicht wegen der
+  // Maschine: sie ist die einzige, die ein volles Mail-Fenster (60 s) absichtlich
+  // mit Warten auf nichts verbringt — eine Abwesenheit lässt sich nur durch
+  // Verstreichen beweisen. Dazu kommen zwei Registrierungen mit Mail-Umlauf,
+  // eine Unternehmensanlage und ein Wechsel. 150 s reichen dafür nicht, und das
+  // Fenster zu verkürzen wäre keine Reparatur, sondern eine schwächere Aussage.
+  test.slow();
   const candidateEmail = uniqueEmail("kandidat.example");
   const companyDomain = uniqueCompanyDomain();
   const recruiterEmail = uniqueEmail(companyDomain);
