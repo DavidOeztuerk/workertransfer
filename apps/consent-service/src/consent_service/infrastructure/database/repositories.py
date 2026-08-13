@@ -7,8 +7,9 @@ is a property of the available API, not a rule someone has to remember.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from consent_service.domain.audit import AuditEvent
@@ -93,6 +94,36 @@ class SqlAlchemyConsentEventRepository:
         )
         row = (await self._session.execute(stmt)).scalars().first()
         return _to_domain(row) if row is not None else None
+
+    async def latest_effective_many(
+        self, pairs: Sequence[tuple[SubjectId, Capability]]
+    ) -> dict[tuple[UUID, str], ConsentEvent]:
+        """Der neueste Stand für viele Paare — in EINER Abfrage.
+
+        Dasselbe DISTINCT ON und dieselbe ORDER BY wie `latest_effective`, nur
+        mit einer `IN`-Liste über Wertepaare statt zweier Gleichheiten. Der Index
+        `ix_consent_events_lookup` trägt das genauso: er beginnt mit
+        `(subject_id, capability)`.
+
+        Doppelte Paare in der Eingabe kosten nichts — die Abbildung hat je Paar
+        einen Eintrag, und `IN` interessiert sich nicht für Wiederholungen.
+        """
+        if not pairs:
+            return {}
+        wanted = [(subject.value, capability.value) for subject, capability in pairs]
+        stmt = (
+            select(ConsentEventModel)
+            .where(tuple_(ConsentEventModel.subject_id, ConsentEventModel.capability).in_(wanted))
+            .distinct(ConsentEventModel.subject_id, ConsentEventModel.capability)
+            .order_by(
+                ConsentEventModel.subject_id,
+                ConsentEventModel.capability,
+                ConsentEventModel.recorded_at.desc(),
+                ConsentEventModel.event_id.desc(),
+            )
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return {(row.subject_id, row.capability): _to_domain(row) for row in rows}
 
     async def latest_per_capability(self, subject_id: SubjectId) -> Sequence[ConsentEvent]:
         """Wie `latest_effective`, nur ohne Einschränkung auf eine Fähigkeit.

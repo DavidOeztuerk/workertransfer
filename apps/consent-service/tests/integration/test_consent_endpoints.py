@@ -187,3 +187,115 @@ async def test_audit_metadata_never_contains_pii(postgres_url: str, migrated_sch
     blob = " ".join(row[0] for row in rows).lower()
     for forbidden in ("email", "password", "token", "@"):
         assert forbidden not in blob, f"{forbidden!r} leaked into audit metadata"
+
+
+async def test_check_batch_says_the_same_as_check_over_http(
+    postgres_url: str, migrated_schema: None
+) -> None:
+    """Zwei Endpunkte, dieselbe Auskunft — über HTTP und echtes Postgres.
+
+    ADR-0030. Der Vergleich läuft Paar für Paar: ein zweiter Weg, der sich mit dem
+    ersten uneinig werden kann, ist schlimmer als kein zweiter Weg.
+    """
+    client, subject, token = _client(postgres_url)
+    auth = {"Authorization": f"Bearer {token}"}
+    zweite = "portfolio.visibility:public"
+    fremd = str(uuid4())
+
+    async with client:
+        # Eine Fähigkeit erteilt, eine erteilt und widerrufen, eine nie berührt.
+        await client.post(
+            "/consent/grant", json={"subject_id": subject, "capability": CAPABILITY}, headers=auth
+        )
+        await client.post(
+            "/consent/grant", json={"subject_id": subject, "capability": zweite}, headers=auth
+        )
+        await client.post(
+            "/consent/revoke",
+            json={"subject_id": subject, "capability": zweite, "reason": "doch nicht"},
+            headers=auth,
+        )
+
+        paare = [
+            {"subject_id": subject, "capability": CAPABILITY},
+            {"subject_id": subject, "capability": zweite},
+            {"subject_id": fremd, "capability": CAPABILITY},
+        ]
+
+        gesammelt = await client.post("/consent/check-batch", json={"pairs": paare}, headers=auth)
+        assert gesammelt.status_code == 200, gesammelt.text
+        ergebnisse = gesammelt.json()["results"]
+        assert len(ergebnisse) == len(paare)
+
+        for paar, ergebnis in zip(paare, ergebnisse, strict=True):
+            einzeln = (await client.post("/consent/check", json=paar, headers=auth)).json()
+            assert ergebnis["granted"] == einzeln["granted"], paar
+            assert ergebnis["deleted"] == einzeln["deleted"], paar
+            # Und die Sammelprüfung verrät so wenig wie die einzelne.
+            assert "reason" not in ergebnis
+
+        assert [e["granted"] for e in ergebnisse] == [True, False, False]
+
+
+async def test_check_batch_answers_in_the_order_of_the_questions(
+    postgres_url: str, migrated_schema: None
+) -> None:
+    """Die Reihenfolge ist Vertrag: der Aufrufer ordnet sie seinen Zeilen zu."""
+    client, subject, token = _client(postgres_url)
+    auth = {"Authorization": f"Bearer {token}"}
+    fremd = str(uuid4())
+
+    async with client:
+        await client.post(
+            "/consent/grant", json={"subject_id": subject, "capability": CAPABILITY}, headers=auth
+        )
+        response = await client.post(
+            "/consent/check-batch",
+            json={
+                "pairs": [
+                    {"subject_id": fremd, "capability": CAPABILITY},
+                    {"subject_id": subject, "capability": CAPABILITY},
+                    {"subject_id": fremd, "capability": CAPABILITY},
+                ]
+            },
+            headers=auth,
+        )
+
+    assert [e["granted"] for e in response.json()["results"]] == [False, True, False]
+
+
+async def test_check_batch_refuses_more_than_the_contract_carries(
+    postgres_url: str, migrated_schema: None
+) -> None:
+    """Die Obergrenze steht im Vertrag und wirkt am Endpunkt — nicht als
+    stillschweigend gekürzte Liste, die halb beantwortet zurückkäme."""
+    from worker_contracts import MAX_CHECK_BATCH
+
+    client, subject, token = _client(postgres_url)
+    async with client:
+        response = await client.post(
+            "/consent/check-batch",
+            json={
+                "pairs": [
+                    {"subject_id": subject, "capability": CAPABILITY}
+                    for _ in range(MAX_CHECK_BATCH + 1)
+                ]
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 422
+
+
+async def test_check_batch_needs_a_token_like_check(
+    postgres_url: str, migrated_schema: None
+) -> None:
+    """Der billigere Weg darf nicht der offenere sein."""
+    client, subject, _token = _client(postgres_url)
+    async with client:
+        response = await client.post(
+            "/consent/check-batch",
+            json={"pairs": [{"subject_id": subject, "capability": CAPABILITY}]},
+        )
+
+    assert response.status_code in (401, 403)

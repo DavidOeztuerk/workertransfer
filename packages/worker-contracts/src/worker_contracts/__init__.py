@@ -8,6 +8,9 @@ from worker_contracts.applications import (
 )
 from worker_contracts.companies import CompanyProfileV1, SaveCompanyProfileV1
 from worker_contracts.consent import (
+    MAX_CHECK_BATCH,
+    ConsentCheckBatchResultV1,
+    ConsentCheckBatchV1,
     ConsentCheckResultV1,
     ConsentCheckV1,
     ConsentGrantedV1,
@@ -78,6 +81,7 @@ from worker_contracts.transfer import (
 )
 
 __all__ = [
+    "MAX_CHECK_BATCH",
     "AcceptInvitationV1",
     "AdvanceApplicationV1",
     "ApplicationStatsV1",
@@ -89,6 +93,8 @@ __all__ = [
     "CompanyV1",
     "CompanyWithdrawalV1",
     "ConnectGitHubV1",
+    "ConsentCheckBatchResultV1",
+    "ConsentCheckBatchV1",
     "ConsentCheckResultV1",
     "ConsentCheckV1",
     "ConsentGrantV1",

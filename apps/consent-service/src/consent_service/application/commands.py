@@ -103,6 +103,13 @@ class CheckConsentQuery:
     capability: str
 
 
+@dataclass(frozen=True, slots=True)
+class CheckConsentBatchQuery:
+    """Mehrere Paare, in der Reihenfolge, in der der Aufrufer sie gestellt hat."""
+
+    pairs: tuple[CheckConsentQuery, ...]
+
+
 async def _record(
     *,
     action: ConsentAction,
@@ -219,6 +226,40 @@ async def handle_check(
 
     latest = await repos["consent"].latest_effective(subject, cap)
     return Result.ok(project_state([latest] if latest is not None else []))
+
+
+async def handle_check_many(
+    query: CheckConsentBatchQuery, *, deps: dict[str, Any], repos: dict[str, Any]
+) -> Result[list[ConsentState]]:
+    """Wie `handle_check`, nur für viele Paare — und mit EINER Abfrage.
+
+    Die Antworten kommen in der Reihenfolge der Fragen zurück (Vertrag:
+    `ConsentCheckBatchResultV1`). Ein Paar ohne jedes Ereignis bekommt denselben
+    Zustand wie in der einzelnen Prüfung: nicht erteilt. Abwesenheit ist ein
+    Zustand, kein Fehler.
+
+    Ein einziges ungültiges Paar lässt die GANZE Anfrage scheitern, statt an
+    dieser Stelle ein „nicht erteilt" einzusetzen. Das ist Absicht: eine
+    unlesbare Kennung ist ein Programmierfehler beim Aufrufer, und ihn als
+    fehlende Einwilligung auszugeben würde ihn verstecken — bis jemand eine
+    ganze Seite lang niemanden mehr sieht und den Grund im Ledger sucht.
+    """
+    parsed: list[tuple[SubjectId, Capability]] = []
+    for pair in query.pairs:
+        try:
+            parsed.append((SubjectId(pair.subject_id), Capability(pair.capability)))
+        except DomainError as error:
+            return Result.fail(error)
+
+    newest = await repos["consent"].latest_effective_many(parsed)
+    return Result.ok(
+        [
+            project_state(
+                [event] if (event := newest.get((subject.value, cap.value))) is not None else []
+            )
+            for subject, cap in parsed
+        ]
+    )
 
 
 async def handle_list_mine(

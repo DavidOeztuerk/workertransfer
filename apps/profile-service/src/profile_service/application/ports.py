@@ -6,6 +6,7 @@ sie fragen müssen, nicht WIE. Der HTTP-Adapter liegt in der Infrastruktur.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol
 from uuid import UUID
 
@@ -37,6 +38,21 @@ class ConsentGate(Protocol):
     """
 
     async def may_see(self, subject_id: UUID, *, tenant_id: UUID, bearer: str) -> bool: ...
+
+    async def may_see_many(
+        self, subject_ids: Sequence[UUID], *, tenant_id: UUID, bearer: str
+    ) -> list[bool]:
+        """Dieselbe Frage für viele Personen — eine Antwort je Eingabe, in deren
+        Reihenfolge.
+
+        Getrennte Methode und nicht `may_see` mit einer Liste: die einzelne Frage
+        hat einen anderen Aufrufer (`GET /profiles/{id}`) und darf nicht teurer
+        werden, weil die Liste billiger geworden ist.
+
+        Wirft `ConsentUnavailable` wie `may_see` — ein `False` wäre auch hier
+        eine Aussage über eine Person, die niemand treffen kann.
+        """
+        ...
 
 
 class ProfileRepository(Protocol):
