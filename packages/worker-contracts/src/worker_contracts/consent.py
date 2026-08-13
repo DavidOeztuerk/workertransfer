@@ -17,6 +17,9 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 __all__ = [
+    "MAX_CHECK_BATCH",
+    "ConsentCheckBatchResultV1",
+    "ConsentCheckBatchV1",
     "ConsentCheckResultV1",
     "ConsentCheckV1",
     "ConsentGrantV1",
@@ -90,6 +93,53 @@ class ConsentCheckResultV1(BaseModel):
     capability: str
     granted: bool
     deleted: bool = False
+
+
+MAX_CHECK_BATCH = 100
+"""Wie viele Paare eine Sammelprüfung höchstens tragen darf.
+
+Hergeleitet, nicht geraten: ein Verbraucher fragt höchstens eine Seite, und die
+größte Seite in `profile-service` sind 50 Profile — bei zwei Fähigkeiten je
+Person (öffentlich und unternehmensspezifisch) also 100 Paare.
+
+Die Grenze steht aus einem zweiten Grund da. `/check` ist für jeden
+authentifizierten Aufrufer über jede Person offen, damit der Ledger als Enabler
+taugt; eine Sammelprüfung ändert daran nichts Grundsätzliches, macht das Abfragen
+aber **billiger**. Eine Obergrenze hält den Unterschied klein: aus einer Anfrage
+werden 100 Antworten, nicht 100.000.
+"""
+
+
+class ConsentCheckBatchV1(BaseModel):
+    """Mehrere „darf ich?" in einer Anfrage.
+
+    Der Grund ist gemessen: eine Seite Kandidaten kostete bis zu 40 einzelne
+    Aufrufe an den Ledger, jeder mit eigenem Verbindungsaufbau — 1,7 bis 8,8
+    Sekunden für eine Seite, und unter Last mehr als die Oberfläche abwartet.
+
+    Was sich **nicht** ändert: gelesen wird weiter synchron, es wird nichts
+    zwischengespeichert und nichts vorgehalten (ADR-0013 — ein Widerruf muss beim
+    nächsten Lesen wirken). Eine Sammelprüfung ist eine Frage in einer Runde,
+    keine Vorratsantwort.
+    """
+
+    pairs: list[ConsentCheckV1] = Field(..., min_length=1, max_length=MAX_CHECK_BATCH)
+
+
+class ConsentCheckBatchResultV1(BaseModel):
+    """Die Antworten — **in der Reihenfolge der Fragen**, eine je Paar.
+
+    Die Reihenfolge ist Teil des Vertrags und nicht Bequemlichkeit: der Aufrufer
+    ordnet die Antworten seinen Zeilen zu. Käme sie in beliebiger Folge, müsste
+    er über `(subject_id, capability)` zuordnen — und ein Paar, das doppelt
+    gefragt wurde, wäre dann nicht mehr eindeutig.
+
+    Dieselben Felder wie `ConsentCheckResultV1`, also weiterhin **ohne** Grund
+    eines Widerrufs. Eine Sammelprüfung darf nichts preisgeben, was die einzelne
+    verschweigt.
+    """
+
+    results: list[ConsentCheckResultV1]
 
 
 class ConsentGrantedV1(BaseModel):
