@@ -15,6 +15,8 @@ from typing import Any, Literal, cast
 from fastapi import APIRouter, HTTPException, Request, status
 from worker_auth import get_request_user
 from worker_contracts import (
+    ConsentCheckBatchResultV1,
+    ConsentCheckBatchV1,
     ConsentCheckResultV1,
     ConsentCheckV1,
     ConsentGrantedV1,
@@ -26,11 +28,13 @@ from worker_contracts import (
 from worker_core import DomainError
 
 from consent_service.application.commands import (
+    CheckConsentBatchQuery,
     CheckConsentQuery,
     ConsentSubjectMismatch,
     GrantConsentCommand,
     RevokeConsentCommand,
     handle_check,
+    handle_check_many,
     handle_grant,
     handle_list_mine,
     handle_my_history,
@@ -179,5 +183,39 @@ def build_consent_router(deps: dict[str, Any]) -> APIRouter:
         if not result.is_success:
             raise _to_http(result.error)
         return _check_result_dto(body.subject_id, body.capability, result.value)
+
+    @router.post("/check-batch")
+    async def check_batch(body: ConsentCheckBatchV1, request: Request) -> ConsentCheckBatchResultV1:
+        """Dieselbe Frage wie `/check`, nur *n*-mal in einer Runde.
+
+        Dieselben Regeln, ausdrücklich: jeder authentifizierte Aufrufer darf über
+        jede Person fragen (das macht den Ledger als Enabler brauchbar), und die
+        Antwort trägt **keinen** Widerrufsgrund. Was hier billiger wird, ist die
+        Anzahl der Runden — nicht der Zugang.
+
+        Weiterhin synchron und ohne jeden Zwischenspeicher (ADR-0013): ein
+        Widerruf wirkt beim nächsten Lesen, und das gilt auch, wenn das Lesen
+        hundert Paare umfasst.
+
+        Die Obergrenze steht im Vertrag (`MAX_CHECK_BATCH`), nicht hier — sonst
+        gäbe es zwei Wahrheiten darüber, was eine Anfrage tragen darf.
+        """
+        _actor_id(request)
+        query = CheckConsentBatchQuery(
+            pairs=tuple(
+                CheckConsentQuery(subject_id=pair.subject_id, capability=pair.capability)
+                for pair in body.pairs
+            )
+        )
+        async with request_scope(session_factory) as (_uow, repos):
+            result = await handle_check_many(query, deps=deps, repos=repos)
+        if not result.is_success:
+            raise _to_http(result.error)
+        return ConsentCheckBatchResultV1(
+            results=[
+                _check_result_dto(pair.subject_id, pair.capability, state)
+                for pair, state in zip(body.pairs, result.value, strict=True)
+            ]
+        )
 
     return router

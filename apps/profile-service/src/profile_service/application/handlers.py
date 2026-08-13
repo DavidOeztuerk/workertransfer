@@ -7,7 +7,6 @@ Abruf frisch geholt (ADR-0013, kein Cache).
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -171,13 +170,17 @@ async def handle_list_visible_profiles(
     if not candidates:
         return Result.ok(([], next_cursor))
 
-    # Parallel: eine Seite bedeutet `limit` Abfragen an einen Service im selben
-    # Netz. Nacheinander wären das aufsummierte Latenzen ohne Grund.
-    verdicts = await asyncio.gather(
-        *(
-            deps["consent"].may_see(p.subject_id, tenant_id=query.tenant_id, bearer=query.bearer)
-            for p in candidates
-        )
+    # EINE Anfrage für die ganze Seite. Vorher standen hier `limit` parallele
+    # Aufrufe — bei zwei Fähigkeiten je Person also bis zu 40, jeder mit eigenem
+    # Verbindungsaufbau. Gemessen: 1,7 bis 8,8 Sekunden für eine Seite, und unter
+    # Last mehr als die Oberfläche abwartet; sie zeigte dann endlos „Profile
+    # werden geladen…".
+    #
+    # Parallel war nicht falsch, nur nicht genug: aufsummierte Latenzen wurden
+    # vermieden, der Aufwand je Anfrage blieb. Weiterhin synchron und ohne
+    # Zwischenspeicher (ADR-0013).
+    verdicts = await deps["consent"].may_see_many(
+        [p.subject_id for p in candidates], tenant_id=query.tenant_id, bearer=query.bearer
     )
     visible = [profile for profile, allowed in zip(candidates, verdicts, strict=True) if allowed]
     return Result.ok((visible, next_cursor))
