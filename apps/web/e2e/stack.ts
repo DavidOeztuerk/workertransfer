@@ -67,6 +67,40 @@ const PROBE_ATTEMPTS = 3;
 //: Geschwindigkeit der Maschine.
 const MAIL_TIMEOUT_MS = 60_000;
 
+/**
+ * Zeitlimit für EINE Anfrage an Mailpit — nicht für das Warten insgesamt.
+ *
+ * `fetch` hat von sich aus keines, und in einer Schleife, die auf eine Frist
+ * prüft, macht das die Frist unwirksam: hängt eine einzelne Anfrage, wird
+ * `Date.now()` nie wieder erreicht. Gemessen wurde daraus eine Reise, die bei
+ * 150 s Budget **15 Minuten** lief und am Ende nur „Test timeout" meldete — ohne
+ * Stelle, weil kein Playwright-Kommando offen war und der Bericht deshalb nichts
+ * zu zeigen hatte. Die eigentliche Prüfung (`expect(mail).toBeNull()`) kam nie
+ * dran, die Reise hat also weder bewiesen noch widerlegt, was sie soll.
+ *
+ * Fünf Sekunden sind reichlich: Mailpit antwortet gemessen in 2 ms. Die Zahl ist
+ * ein Limit gegen Hängen, keine Erwartung an die Geschwindigkeit.
+ */
+const MAILPIT_REQUEST_TIMEOUT_MS = 5_000;
+
+/**
+ * Eine Anfrage an Mailpit. `null` heißt „diese eine Anfrage hat nicht
+ * geantwortet" — die aufrufende Schleife versucht es erneut, bis IHRE Frist
+ * abläuft. Ein Fehlschlag hier darf nichts umwerfen: er ist eine Aussage über
+ * einen HTTP-Aufruf, nicht über die Mail.
+ */
+async function mailpit<T>(path: string): Promise<T | null> {
+  try {
+    const res = await fetch(`${MAILPIT_URL}${path}`, {
+      signal: AbortSignal.timeout(MAILPIT_REQUEST_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 async function reachable(url: string): Promise<boolean> {
   for (let attempt = 1; attempt <= PROBE_ATTEMPTS; attempt += 1) {
     try {
@@ -163,20 +197,15 @@ async function tokenFromMail(
   const pattern = new RegExp(`${linkPath}\\?token=([A-Za-z0-9_-]+)`);
   const deadline = Date.now() + MAIL_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const list = (await (await fetch(`${MAILPIT_URL}/api/v1/messages?limit=50`)).json()) as {
-      messages?: MailpitMessage[];
-    };
-    const hit = (list.messages ?? []).find(
+    const list = await mailpit<{ messages?: MailpitMessage[] }>("/api/v1/messages?limit=50");
+    const hit = (list?.messages ?? []).find(
       (message) =>
         message.Subject.includes(subjectPart) &&
         message.To.some((to) => to.Address.toLowerCase() === address.toLowerCase())
     );
     if (hit !== undefined) {
-      const body = (await (await fetch(`${MAILPIT_URL}/api/v1/message/${hit.ID}`)).json()) as {
-        Text?: string;
-        HTML?: string;
-      };
-      const token = pattern.exec(`${body.Text ?? ""}${body.HTML ?? ""}`)?.[1];
+      const body = await mailpit<{ Text?: string; HTML?: string }>(`/api/v1/message/${hit.ID}`);
+      const token = pattern.exec(`${body?.Text ?? ""}${body?.HTML ?? ""}`)?.[1];
       if (token !== undefined) return token;
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -212,19 +241,17 @@ export async function lastMailFor(
 ): Promise<{ subject: string; text: string } | null> {
   const deadline = Date.now() + MAIL_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const list = (await (await fetch(`${MAILPIT_URL}/api/v1/messages?limit=50`)).json()) as {
-      messages?: (MailpitMessage & { Created?: string })[];
-    };
-    const hit = (list.messages ?? []).find(
+    const list = await mailpit<{ messages?: (MailpitMessage & { Created?: string })[] }>(
+      "/api/v1/messages?limit=50"
+    );
+    const hit = (list?.messages ?? []).find(
       (message) =>
         message.To.some((to) => to.Address.toLowerCase() === address.toLowerCase()) &&
         new Date(message.Created ?? 0).getTime() >= after
     );
     if (hit !== undefined) {
-      const body = (await (
-        await fetch(`${MAILPIT_URL}/api/v1/message/${hit.ID}`)
-      ).json()) as MailpitDetail;
-      return { subject: hit.Subject, text: `${body.Text ?? ""}${body.HTML ?? ""}` };
+      const body = await mailpit<MailpitDetail>(`/api/v1/message/${hit.ID}`);
+      return { subject: hit.Subject, text: `${body?.Text ?? ""}${body?.HTML ?? ""}` };
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
