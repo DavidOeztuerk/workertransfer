@@ -174,4 +174,31 @@ describe("MarketRoute", () => {
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(screen.queryByText("Marktstatus gespeichert.")).toBeNull();
   });
+
+  it("zeigt bei einem Ausfall KEIN Formular — und schreibt damit nichts Erfundenes", async () => {
+    // Der teuerste stille Schreibvorgang, den es hier gab: der Client lieferte
+    // bei jedem Fehlschlag einen Ersatz („nicht ansprechbar", leere Notiz), der
+    // Ladezustand war vorbei, und ein Speichern schrieb ihn. Die Person hatte
+    // ihre Ansprechbarkeit zurückgezogen und ihre Notiz gelöscht, ohne es zu
+    // wollen — auf einem Transfermarkt heißt das: sie verschwindet.
+    //
+    // Die alte Zusage („der Ersatz fällt nie zugunsten des Marktes aus") gilt
+    // damit strenger als vorher: es wird gar nichts mehr erfunden.
+    getMyMarketStatus.mockResolvedValue(null);
+
+    renderWithProviders(<MarketRoute principal={principal()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/nicht abrufbar/i);
+    expect(screen.queryByLabelText(/Notiz/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Speichern/i })).toBeNull();
+  });
+
+  it("speichert nichts, solange der Status nicht lesbar ist", async () => {
+    getMyMarketStatus.mockResolvedValue(null);
+
+    renderWithProviders(<MarketRoute principal={principal()} />);
+
+    await screen.findByRole("alert");
+    expect(saveMyMarketStatus).not.toHaveBeenCalled();
+  });
 });
