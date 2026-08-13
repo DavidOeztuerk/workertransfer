@@ -168,3 +168,101 @@ async def test_repository_offers_no_mutation_api() -> None:
     """Append-only is structural, not a convention."""
     assert not hasattr(SqlAlchemyConsentEventRepository, "update")
     assert not hasattr(SqlAlchemyConsentEventRepository, "delete")
+
+
+async def test_sammelabfrage_liefert_dasselbe_wie_die_einzelnen(session: AsyncSession) -> None:
+    """Eine SQL-Abfrage für viele Paare — und Paar für Paar dieselbe Antwort.
+
+    Nur hier prüfbar: die Reduktion auf den neuesten Stand steckt im
+    `DISTINCT ON` samt seiner `ORDER BY`, und die Version mit der `IN`-Liste über
+    Wertepaare ist eine ANDERE Abfrage. Dass sie dieselbe Ordnung anwendet, ist
+    eine Eigenschaft des SQL und keine des Python-Codes darüber.
+    """
+    repo = SqlAlchemyConsentEventRepository(session)
+    erteilt, widerrufen, spaeter_erneut, unberuehrt = (SubjectId(uuid4()) for _ in range(4))
+    zweite = Capability("resume.visibility:tenant:11111111-1111-1111-1111-111111111111")
+
+    await repo.append(
+        ConsentEvent.grant(subject_id=erteilt, capability=CAPABILITY, recorded_at=BASE)
+    )
+    await repo.append(
+        ConsentEvent.grant(subject_id=widerrufen, capability=CAPABILITY, recorded_at=BASE)
+    )
+    await repo.append(
+        ConsentEvent.revoke(
+            subject_id=widerrufen,
+            capability=CAPABILITY,
+            recorded_at=BASE + timedelta(minutes=5),
+            reason=WITHDRAWN,
+        )
+    )
+    # Widerrufen und danach ERNEUT erteilt: hier entscheidet allein die
+    # Reihenfolge, und genau daran scheitert eine Abfrage mit falscher ORDER BY.
+    await repo.append(
+        ConsentEvent.grant(subject_id=spaeter_erneut, capability=CAPABILITY, recorded_at=BASE)
+    )
+    await repo.append(
+        ConsentEvent.revoke(
+            subject_id=spaeter_erneut,
+            capability=CAPABILITY,
+            recorded_at=BASE + timedelta(minutes=5),
+            reason=WITHDRAWN,
+        )
+    )
+    await repo.append(
+        ConsentEvent.grant(
+            subject_id=spaeter_erneut,
+            capability=CAPABILITY,
+            recorded_at=BASE + timedelta(minutes=9),
+        )
+    )
+    # Zweites Paar derselben Person: die Zuordnung muss über BEIDE Schlüsselteile
+    # gehen, nicht nur über die Kennung.
+    await repo.append(ConsentEvent.grant(subject_id=erteilt, capability=zweite, recorded_at=BASE))
+
+    paare = [
+        (erteilt, CAPABILITY),
+        (widerrufen, CAPABILITY),
+        (spaeter_erneut, CAPABILITY),
+        (unberuehrt, CAPABILITY),
+        (erteilt, zweite),
+        (widerrufen, zweite),
+    ]
+
+    gesammelt = await repo.latest_effective_many(paare)
+
+    for subject, capability in paare:
+        einzeln = await repo.latest_effective(subject, capability)
+        aus_sammlung = gesammelt.get((subject.value, capability.value))
+        if einzeln is None:
+            assert aus_sammlung is None, f"Sammlung erfand ein Ereignis für {capability.value}"
+            continue
+        assert aus_sammlung is not None, f"Sammlung übersah {capability.value}"
+        assert aus_sammlung.event_id.value == einzeln.event_id.value
+        # Und dasselbe projizierte Urteil, nicht nur dieselbe Zeile.
+        assert project_state([aus_sammlung]).granted == project_state([einzeln]).granted, (
+            f"uneinig über {capability.value}"
+        )
+
+
+async def test_sammelabfrage_ohne_paare_fragt_nicht(session: AsyncSession) -> None:
+    """Eine leere Liste in `IN ()` ist in SQL kein gültiger Ausdruck — und eine
+    Abfrage, deren Ergebnis feststeht, gehört nicht in die Datenbank."""
+    repo = SqlAlchemyConsentEventRepository(session)
+
+    assert await repo.latest_effective_many([]) == {}
+
+
+async def test_doppelte_paare_kosten_nichts(session: AsyncSession) -> None:
+    """Der Aufrufer soll nicht deduplizieren müssen."""
+    repo = SqlAlchemyConsentEventRepository(session)
+    subject = SubjectId(uuid4())
+    await repo.append(
+        ConsentEvent.grant(subject_id=subject, capability=CAPABILITY, recorded_at=BASE)
+    )
+
+    gefunden = await repo.latest_effective_many(
+        [(subject, CAPABILITY), (subject, CAPABILITY), (subject, CAPABILITY)]
+    )
+
+    assert len(gefunden) == 1

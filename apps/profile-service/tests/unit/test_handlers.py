@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
@@ -74,18 +75,39 @@ class _FakeProfiles:
 
 
 class _FakeGate:
-    """Antwortet nach einer Menge freigegebener Subjekte."""
+    """Antwortet nach einer Menge freigegebener Subjekte.
+
+    Kennt BEIDE Wege — die einzelne Frage und die Sammelprüfung (ADR-0030) —, und
+    zwar aus derselben Menge. Ein Fake, der die Sammelprüfung aus einer zweiten
+    Quelle beantwortet, vergliche im Test zwei Fakes statt zwei Wege.
+
+    `runden` zählt die Aufrufe: der Gewinn der Sammelprüfung ist eine Zahl, die
+    ein Test behaupten kann, im Gegensatz zu einer Laufzeit.
+    """
 
     def __init__(self, visible: set[UUID] | None = None, *, broken: bool = False) -> None:
         self.visible = visible or set()
         self.broken = broken
         self.asked: list[UUID] = []
+        self.runden = 0
 
     async def may_see(self, subject_id: UUID, *, tenant_id: UUID, bearer: str) -> bool:
         if self.broken:
             raise ConsentUnavailable("down")
+        self.runden += 1
         self.asked.append(subject_id)
         return subject_id in self.visible
+
+    async def may_see_many(
+        self, subject_ids: Sequence[UUID], *, tenant_id: UUID, bearer: str
+    ) -> list[bool]:
+        if self.broken:
+            raise ConsentUnavailable("down")
+        if not subject_ids:
+            return []
+        self.runden += 1
+        self.asked.extend(subject_ids)
+        return [subject_id in self.visible for subject_id in subject_ids]
 
 
 def _deps(clock: _Clock, gate: _FakeGate) -> dict[str, Any]:
@@ -317,3 +339,29 @@ class TestListProfiles:
         )
 
         assert res.is_success
+
+    async def test_eine_seite_kostet_eine_runde_im_ledger(self) -> None:
+        """Der Gewinn aus ADR-0030, als Zahl statt als Laufzeit.
+
+        Vorher stand hier ein `asyncio.gather` über `limit` einzelne Aufrufe —
+        bei zwei Fähigkeiten je Person also bis zu 40 Runden für eine Seite.
+        Gemessen kostete das 1,7 bis 8,8 Sekunden, und die Oberfläche zeigte
+        endlos „Profile werden geladen…".
+
+        Eine Zeitmessung gehört nicht in einen Test (sie wäre eine Aussage über
+        die Maschine); die Anzahl der Runden schon.
+        """
+        repos, subjects = await self._many(5)
+        gate = _FakeGate(set(subjects))
+
+        result = await handle_list_visible_profiles(
+            ListProfilesQuery(limit=5, cursor=None, tenant_id=TENANT, bearer=BEARER),
+            deps=_deps(_Clock(), gate),
+            repos=repos,
+        )
+
+        assert result.is_success
+        assert gate.runden == 1
+        # Und gefragt wurde trotzdem nach jeder Person — eine Runde ist keine
+        # Abkürzung um die Prüfung herum.
+        assert set(gate.asked) == set(subjects)
