@@ -35,7 +35,7 @@ function profile(overrides: Partial<CompanyProfile> = {}): CompanyProfile {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getCompanyBySlug.mockResolvedValue(profile());
+  getCompanyBySlug.mockResolvedValue({ ok: true, profile: profile() });
   searchJobs.mockResolvedValue({ ok: true, items: [], nextCursor: null });
 });
 
@@ -55,12 +55,35 @@ describe("CareerRoute", () => {
   });
 
   it("says an unknown address is unknown, rather than showing an empty frame", async () => {
-    getCompanyBySlug.mockResolvedValue(null);
+    getCompanyBySlug.mockResolvedValue({
+      ok: false,
+      reason: "not-found",
+      message: "Unter dieser Adresse ist kein Unternehmen hinterlegt.",
+    });
 
     renderWithProviders(<CareerRoute slug="gibtsnicht" />);
 
     expect(await screen.findByText(/Diese Seite gibt es nicht/i)).toBeInTheDocument();
     expect(searchJobs).not.toHaveBeenCalled();
+  });
+
+
+  it("nennt eine Störung eine Störung — nicht „gibt es nicht“", async () => {
+    // Der Unterschied wird von FREMDEN gesehen: ein Unternehmen gibt diesen Link
+    // an Bewerber weiter. Vorher war ein Ausfall von companies-service von einem
+    // unbekannten Kürzel nicht zu unterscheiden, und die Seite behauptete, es
+    // gebe die Firma nicht.
+    getCompanyBySlug.mockResolvedValue({
+      ok: false,
+      reason: "unavailable",
+      message: "Diese Seite ist gerade nicht abrufbar.",
+    });
+
+    renderWithProviders(<CareerRoute slug="muster" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/nicht abrufbar/i);
+    expect(screen.getByText(/heißt nicht, dass es dieses Unternehmen nicht gibt/i)).toBeVisible();
+    expect(screen.queryByText(/Diese Seite gibt es nicht/i)).toBeNull();
   });
 
   it("says plainly when nothing is advertised", async () => {

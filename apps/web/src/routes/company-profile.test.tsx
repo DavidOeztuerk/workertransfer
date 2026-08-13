@@ -37,7 +37,7 @@ function profile(): CompanyProfile {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getOwnCompanyProfile.mockResolvedValue(null);
+  getOwnCompanyProfile.mockResolvedValue({ ok: true, profile: null });
   saveCompanyProfile.mockResolvedValue({ ok: true, profile: profile() });
 });
 
@@ -49,8 +49,27 @@ describe("CompanyProfileRoute", () => {
     expect(getOwnCompanyProfile).not.toHaveBeenCalled();
   });
 
+
+  it("zeigt bei einem Ausfall KEIN leeres Formular", async () => {
+    // Das war die gefährlichste Stelle dieser Art: der Client gab bei jedem
+    // Fehlschlag `null`, daraus wurde ein leeres Formular, und der Ladezustand
+    // war vorbei — es sah aus wie „noch nichts eingetragen". Wer dann den Namen
+    // tippte und speicherte, überschrieb Über-uns, Website, Standorte und
+    // Benefits mit leer.
+    getOwnCompanyProfile.mockResolvedValue({
+      ok: false,
+      message: "Das Profil ist gerade nicht abrufbar.",
+    });
+
+    renderWithProviders(<CompanyProfileRoute principal={principal(TENANT)} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/nicht abrufbar/i);
+    expect(screen.queryByLabelText(/Anzeigename/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Speichern/i })).toBeNull();
+  });
+
   it("fills the form with what is already stored", async () => {
-    getOwnCompanyProfile.mockResolvedValue(profile());
+    getOwnCompanyProfile.mockResolvedValue({ ok: true, profile: profile() });
 
     renderWithProviders(<CompanyProfileRoute principal={principal(TENANT)} />);
 
@@ -90,7 +109,7 @@ describe("CompanyProfileRoute", () => {
 
   it("keeps a rejected form on screen and does not claim success", async () => {
     const user = userEvent.setup();
-    getOwnCompanyProfile.mockResolvedValue(profile());
+    getOwnCompanyProfile.mockResolvedValue({ ok: true, profile: profile() });
     saveCompanyProfile.mockResolvedValue({
       ok: false,
       reason: "invalid",
