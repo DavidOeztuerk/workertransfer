@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button, Card, Field } from "@workertransfer/ui";
+import { Alert, Button, Card, Empty, Field, Loading, Page } from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
 import {
@@ -62,54 +62,39 @@ export function CompanyTransfersRoute({ principal = null }: CompanyTransfersRout
 
   if (!hasCompany) {
     return (
-      <main className="page page--narrow">
+      <Page title="Transfers" narrow>
         <Card>
-          <h1>Transfers</h1>
           <p>
-            Transfers führen nur Unternehmen. Wechsle oben auf ein Unternehmen — oder lass
-            dich von jemandem aus deinem Unternehmen einladen.
+            Transfers führen nur Unternehmen. Wechsle oben auf ein Unternehmen — oder lass dich von
+            jemandem aus deinem Unternehmen einladen.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
   const data = query.data;
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>Transfers</h1>
-        <p className="page__lead">
-          Die Ablöse wird hier festgehalten, nicht bewegt: diese Plattform führt kein Geld. Sie
-          steht da, damit beide Seiten dieselbe Zahl im Blick haben.
-        </p>
-      </header>
+    <Page
+      title="Transfers"
+      narrow
+      lead="Die Ablöse wird hier festgehalten, nicht bewegt: diese Plattform führt kein Geld. Sie steht da, damit beide Seiten dieselbe Zahl im Blick haben."
+    >
+      {error !== null ? <Alert>{error}</Alert> : null}
 
-      {error !== null ? (
-        <p className="auth__alert" role="alert">
-          {error}
-        </p>
-      ) : null}
-
+      {/* Reihenfolge nach dem Muster: lädt, dann Fehler, dann leer, dann
+          Inhalt. */}
       {query.isPending ? (
         <Card>
-          <p role="status">Transfers werden geladen…</p>
+          <Loading label="Transfers werden geladen…" />
         </Card>
       ) : null}
 
-      {data !== undefined && !data.ok ? (
-        <Card>
-          <p className="auth__alert" role="alert">
-            {data.message}
-          </p>
-        </Card>
-      ) : null}
+      {data !== undefined && !data.ok ? <Alert>{data.message}</Alert> : null}
 
       {data?.ok && data.transfers.length === 0 ? (
-        <Card>
-          <p>Es läuft gerade kein Transfer.</p>
-        </Card>
+        <Empty title="Es läuft gerade kein Transfer." />
       ) : null}
 
       {data?.ok
@@ -126,7 +111,7 @@ export function CompanyTransfersRoute({ principal = null }: CompanyTransfersRout
             </Card>
           ))
         : null}
-    </main>
+    </Page>
   );
 }
 
@@ -155,7 +140,7 @@ function CompanyTransfer({
   return (
     <div className="transfer">
       <h2>{TITLES[transfer.status]}</h2>
-      <p className="requests__meta">
+      <p className="wt-field__hint">
         {transfer.requires_release
           ? "Braucht eine Freigabe des aktuellen Arbeitgebers — die Person bestätigt sie selbst und schließt damit ab"
           : "Keine Freigabe nötig"}

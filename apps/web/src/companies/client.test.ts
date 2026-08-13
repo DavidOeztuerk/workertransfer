@@ -46,9 +46,33 @@ describe("getCompanyProfile", () => {
 
 describe("getOwnCompanyProfile", () => {
   it("keeps 'null' apart from 'not asked' — the server sends null for 'none yet'", async () => {
+    // Die Zusage im Namen gilt weiter, die Form hat sich geändert: `null` steckt
+    // jetzt IN einer gelungenen Antwort. Vorher war ein `null` von der Leitung
+    // von einem `null` des Servers nicht zu unterscheiden — und daraus wurde ein
+    // leeres Formular, dessen Speichern echte Firmendaten überschrieb.
     vi.stubGlobal("fetch", vi.fn(async () => respond(200, null)));
 
-    await expect(getOwnCompanyProfile()).resolves.toBeNull();
+    await expect(getOwnCompanyProfile()).resolves.toEqual({ ok: true, profile: null });
+  });
+
+  it("nennt einen Ausfall einen Ausfall — und nicht „noch keins“", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => respond(503, { detail: "weg" })));
+
+    const antwort = await getOwnCompanyProfile();
+    expect(antwort.ok).toBe(false);
+    // Und vor allem: NICHT als „es gibt noch keins" lesbar.
+    expect(antwort).not.toEqual({ ok: true, profile: null });
+  });
+
+  it("sagt auch bei fehlender Verbindung nicht „noch keins“", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      })
+    );
+
+    expect((await getOwnCompanyProfile()).ok).toBe(false);
   });
 });
 

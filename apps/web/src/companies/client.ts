@@ -71,14 +71,39 @@ export async function getCompanyProfile(tenantId: string): Promise<CompanyProfil
   }
 }
 
-export async function getOwnCompanyProfile(): Promise<CompanyProfile | null> {
+export type OwnProfileResult =
+  | { ok: true; profile: CompanyProfile | null }
+  | { ok: false; message: string };
+
+/**
+ * Das eigene Firmenprofil — mit Unterscheidung zwischen „noch keins" und
+ * „nicht abrufbar".
+ *
+ * Hier stand `null` für beides, und das war die gefährlichste Stelle dieser Art
+ * im Projekt: `toForm(null)` ist ein LEERES Formular, der Ladezustand ist zu
+ * diesem Zeitpunkt vorbei (die Abfrage gelang ja), und die Seite sah aus wie
+ * „noch nichts eingetragen". Wer dann den Anzeigenamen tippte und speicherte,
+ * schickte ein `PUT` mit leerem Über-uns, leerer Website, leeren Standorten und
+ * leeren Benefits — und überschrieb damit, was vorher dastand.
+ *
+ * `{ ok: true, profile: null }` heißt „es gibt noch keins", `{ ok: false }`
+ * heißt „wir wissen es nicht". Nur das Erste darf ein leeres Formular zeigen.
+ */
+export async function getOwnCompanyProfile(): Promise<OwnProfileResult> {
+  let res: Response;
   try {
-    const res = await send("/companies/me/profile");
-    if (!res.ok) return null;
-    const body: unknown = await res.json();
-    return body === null ? null : (body as CompanyProfile);
+    res = await send("/companies/me/profile");
   } catch {
-    return null;
+    return { ok: false, message: "Keine Verbindung zum Server." };
+  }
+  if (!res.ok) {
+    return { ok: false, message: "Das Profil ist gerade nicht abrufbar." };
+  }
+  try {
+    const body: unknown = await res.json();
+    return { ok: true, profile: body === null ? null : (body as CompanyProfile) };
+  } catch {
+    return { ok: false, message: "Das Profil ist gerade nicht abrufbar." };
   }
 }
 
@@ -113,18 +138,49 @@ export async function saveCompanyProfile(input: CompanyProfileInput): Promise<Sa
 }
 
 
+export type BySlugResult =
+  | { ok: true; profile: CompanyProfile }
+  | { ok: false; reason: "not-found" | "unavailable"; message: string }; 
+
 /**
  * Die Karriere-Seite eines Unternehmens, über ihr Kürzel.
  *
- * `null` heißt „diese Adresse gibt es nicht" — die Seite zeigt dann, dass sie
- * nichts gefunden hat, statt eines leeren Rahmens.
+ * Hier stand `null` für „gibt es nicht", für `500`, für `503` und für „kein
+ * Netz". `career.tsx` machte daraus „Diese Seite gibt es nicht. Unter dieser
+ * Adresse ist kein Unternehmen hinterlegt."
+ *
+ * Das ist die einzige Stelle dieser Art, die **Fremde** sehen: ein Unternehmen
+ * gibt seinen Karriere-Link an Bewerber, der Dienst stolpert, und der Empfänger
+ * liest, dass es die Firma nicht gibt. Eine Aussage über ein Unternehmen, die
+ * niemand treffen wollte.
+ *
+ * `not-found` ist eine Auskunft, `unavailable` ist eine Störung. Die Seite sagt
+ * beides verschieden.
  */
-export async function getCompanyBySlug(slug: string): Promise<CompanyProfile | null> {
+export async function getCompanyBySlug(slug: string): Promise<BySlugResult> {
+  let res: Response;
   try {
-    const res = await send(`/companies/by-slug/${encodeURIComponent(slug)}`);
-    if (!res.ok) return null;
-    return (await res.json()) as CompanyProfile;
+    res = await send(`/companies/by-slug/${encodeURIComponent(slug)}`);
   } catch {
-    return null;
+    return { ok: false, reason: "unavailable", message: "Keine Verbindung zum Server." };
+  }
+  if (res.status === 404) {
+    return {
+      ok: false,
+      reason: "not-found",
+      message: "Unter dieser Adresse ist kein Unternehmen hinterlegt.",
+    };
+  }
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason: "unavailable",
+      message: "Diese Seite ist gerade nicht abrufbar.",
+    };
+  }
+  try {
+    return { ok: true, profile: (await res.json()) as CompanyProfile };
+  } catch {
+    return { ok: false, reason: "unavailable", message: "Diese Seite ist gerade nicht abrufbar." };
   }
 }
