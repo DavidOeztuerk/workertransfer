@@ -30,6 +30,7 @@ import { PendingRequestBadge } from "./resume/pending-badge";
 import { ApplicationsRoute } from "./routes/applications";
 import { CareerRoute } from "./routes/career";
 import { CompanyJobsRoute } from "./routes/company-jobs";
+import { CompanyJobNewRoute } from "./routes/company-job-new";
 import { CompanyProfileRoute } from "./routes/company-profile";
 import { InvitationRoute } from "./routes/invitation";
 import { JobsRoute } from "./routes/jobs";
@@ -324,6 +325,11 @@ function CompanyJobsWithSession() {
   return <CompanyJobsRoute principal={user} />;
 }
 
+function CompanyJobNewWithSession() {
+  const { user } = useSession();
+  return <CompanyJobNewRoute principal={user} />;
+}
+
 function TeamWithSession() {
   const { user } = useSession();
   return <TeamRoute principal={user} />;
@@ -501,6 +507,11 @@ const companyProfileRoute = createRoute({
   path: "/company/profile",
   component: CompanyProfileWithSession,
 });
+const companyJobNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/company/jobs/new",
+  component: CompanyJobNewWithSession,
+});
 const teamRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/company/team",
@@ -536,6 +547,7 @@ const routeTree = rootRoute.addChildren([
   transfersRoute,
   companyTransfersRoute,
   companyJobsRoute,
+  companyJobNewRoute,
   companyProfileRoute,
   teamRoute,
   invitationRoute,
