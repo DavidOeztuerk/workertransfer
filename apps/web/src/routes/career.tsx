@@ -40,7 +40,8 @@ export function CareerRoute({ slug }: CareerRouteProps) {
     enabled: wanted !== "",
   });
 
-  const tenantId = company.data?.tenant_id;
+  const gefunden = company.data?.ok === true ? company.data.profile : undefined;
+  const tenantId = gefunden?.tenant_id;
   const jobs = useQuery({
     // Zwei Aufrufe statt eines zusammengesetzten Endpunkts: die Dienste haben
     // getrennte Datenbanken, und einer, der für den anderen antwortet, verwischt
@@ -60,8 +61,25 @@ export function CareerRoute({ slug }: CareerRouteProps) {
     );
   }
 
-  const profile = company.data;
-  if (profile === null || profile === undefined) {
+  // „Gibt es nicht" und „nicht abrufbar" sind zwei verschiedene Sätze. Vorher
+  // war beides `null`, und ein Ausfall von companies-service las sich als
+  // „diese Firma gibt es nicht" — auf einer Seite, die ein Unternehmen selbst
+  // an Bewerber weitergibt.
+  if (company.data?.ok === false && company.data.reason === "unavailable") {
+    return (
+      <Page title="Karriere" narrow>
+        <Card>
+          <Alert>
+            {company.data.message} Das heißt nicht, dass es dieses Unternehmen nicht gibt —
+            versuch es später noch einmal.
+          </Alert>
+        </Card>
+      </Page>
+    );
+  }
+
+  const profile = gefunden;
+  if (profile === undefined) {
     return (
       <Page title="Diese Seite gibt es nicht" narrow>
         <Card>

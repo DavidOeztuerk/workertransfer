@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Button, Card, Field, TextArea } from "@workertransfer/ui";
+import { Alert, Button, Card, Field, Loading, Page, TextArea } from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
 import {
@@ -56,7 +56,11 @@ export function CompanyProfileRoute({ principal = null }: CompanyProfileRoutePro
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const loaded = query.data;
+  // Nur ein GELUNGENER Abruf füllt das Formular. Vorher gab der Client bei
+  // jedem Fehlschlag `null`, `toForm(null)` ist EMPTY, und die Seite sah aus wie
+  // „noch nichts eingetragen" — wer dann den Namen tippte und speicherte,
+  // überschrieb Über-uns, Website, Standorte und Benefits mit leer.
+  const loaded = query.data?.ok === true ? query.data.profile : undefined;
   useEffect(() => {
     if (loaded !== undefined) setForm(toForm(loaded));
   }, [loaded]);
@@ -86,25 +90,40 @@ export function CompanyProfileRoute({ principal = null }: CompanyProfileRoutePro
 
   if (tenantId === null) {
     return (
-      <main className="page page--narrow">
+      <Page title="Unser Unternehmen" narrow>
         <Card>
-          <h1>Unser Unternehmen</h1>
           <p>
-            Wähle oben ein Unternehmen — oder lass dich von jemandem aus deinem
-            Unternehmen einladen.
+            Wähle oben ein Unternehmen — oder lass dich von jemandem aus deinem Unternehmen
+            einladen.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
   if (query.isPending) {
     return (
-      <main className="page page--narrow">
+      <Page title="Unser Unternehmen" narrow>
         <Card>
-          <p role="status">Profil wird geladen…</p>
+          <Loading label="Profil wird geladen…" />
         </Card>
-      </main>
+      </Page>
+    );
+  }
+
+  // Kein Formular, wenn der Abruf scheiterte: man kann nicht bearbeiten, was man
+  // nicht lesen konnte, und ein leeres Formular wäre die Einladung, echte Daten
+  // zu überschreiben.
+  if (query.data?.ok === false) {
+    return (
+      <Page title="Unser Unternehmen" narrow>
+        <Card>
+          <Alert>
+            {query.data.message} Bearbeiten lässt sich das Profil erst wieder, wenn es lesbar
+            ist — sonst würdet ihr überschreiben, was gerade niemand sehen kann.
+          </Alert>
+        </Card>
+      </Page>
     );
   }
 
@@ -114,14 +133,11 @@ export function CompanyProfileRoute({ principal = null }: CompanyProfileRoutePro
   }
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>Unser Unternehmen</h1>
-        <p className="page__lead">
-          Das sehen Bewerber neben jeder eurer Stellen. Solange hier nichts steht, bleibt eine
-          Ausschreibung anonym — Titel und Beschreibung, sonst nichts.
-        </p>
-      </header>
+    <Page
+      title="Unser Unternehmen"
+      narrow
+      lead="Das sehen Bewerber neben jeder eurer Stellen. Solange hier nichts steht, bleibt eine Ausschreibung anonym — Titel und Beschreibung, sonst nichts."
+    >
 
       <Card>
         <form
@@ -167,18 +183,18 @@ export function CompanyProfileRoute({ principal = null }: CompanyProfileRoutePro
             onChange={(e) => update("benefits", e.target.value)}
           />
 
-          {error !== null ? (
-            <p className="auth__alert" role="alert">
-              {error}
-            </p>
+          {error !== null ? <Alert>{error}</Alert> : null}
+          {/* `notice` und nicht `error`: eine Bestätigung, die den Vorleser
+              unterbricht, ist Lärm. */}
+          {saved && error === null ? (
+            <Alert variant="notice">Profil gespeichert.</Alert>
           ) : null}
-          {saved && error === null ? <p className="page__note">Profil gespeichert.</p> : null}
 
           <Button type="submit" disabled={save.isPending}>
             {save.isPending ? "Wird gespeichert…" : "Speichern"}
           </Button>
         </form>
       </Card>
-    </main>
+    </Page>
   );
 }
