@@ -26,6 +26,7 @@ import { PortfolioItemRoute } from "./routes/portfolio-item";
 import { ProfileRoute } from "./routes/profile";
 import { ResumeRoute } from "./routes/resume";
 import { TeamRoute } from "./routes/team";
+import { CompanyTeamInviteRoute } from "./routes/company-team-invite";
 import { PendingRequestBadge } from "./resume/pending-badge";
 import { ApplicationsRoute } from "./routes/applications";
 import { CareerRoute } from "./routes/career";
@@ -325,6 +326,11 @@ function CompanyJobsWithSession() {
   return <CompanyJobsRoute principal={user} />;
 }
 
+function CompanyTeamInviteWithSession() {
+  const { user } = useSession();
+  return <CompanyTeamInviteRoute principal={user} />;
+}
+
 function CompanyJobNewWithSession() {
   const { user } = useSession();
   return <CompanyJobNewRoute principal={user} />;
@@ -512,6 +518,11 @@ const companyJobNewRoute = createRoute({
   path: "/company/jobs/new",
   component: CompanyJobNewWithSession,
 });
+const companyTeamInviteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/company/team/invite",
+  component: CompanyTeamInviteWithSession,
+});
 const teamRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/company/team",
@@ -550,6 +561,7 @@ const routeTree = rootRoute.addChildren([
   companyJobNewRoute,
   companyProfileRoute,
   teamRoute,
+  companyTeamInviteRoute,
   invitationRoute,
 ]);
 

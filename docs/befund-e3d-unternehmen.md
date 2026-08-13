@@ -130,3 +130,44 @@ nur sie weiß, ob sie gehen darf.
   `oberflaeche-erwartete-ansichten.md`), und sie gehört nicht in einen
   Umstellungsschnitt: das ist eine Änderung am Verhalten mehrerer Dienste. Die
   Oberfläche versteckt weiterhin und behauptet nichts anderes.
+
+
+## Ergebnis (13.08.2026)
+
+| Datei | vorher | nachher |
+|---|---|---|
+| `routes/company-jobs.tsx` | 290 | 119 |
+| `routes/company-job-new.tsx` | – | 207 (neu) |
+| `routes/team.tsx` | 222 | 146 |
+| `routes/company-team-invite.tsx` | – | 140 (neu) |
+| `routes/company-transfers.tsx` | 232 | 217 |
+| `routes/company-profile.tsx` | 184 | 200 |
+| `routes/invitation.tsx` | 127 | **unverändert** |
+
+Tests dieser Gruppe: **38 → 65**.
+
+### `/invitation` bleibt stehen, und das ist die Entscheidung
+
+Sie sitzt als einzige der Gruppe in der `AuthLayout`-Hülle und teilt sich die
+`auth__*`-Klassen mit `/login`, `/register` und `/verify`. Eine von vieren
+umzustellen hinterlässt eine Mischung aus zwei Systemen im selben Rahmen — die
+vier gehören zusammen umgestellt, und `verify` samt `auth-layout` steht ohnehin
+in E3e.
+
+### Ein Fund, den ich selbst verursacht habe
+
+`RowList` nahm nur `children` und `className`. Mein `data-testid` fiel damit
+**still** weg, und der Fehler zeigte sich als roter Test an ganz anderer Stelle.
+`RowList` und `Row` reichen übrige Attribute jetzt durch — wie `Field` und
+`Select` es seit E1 tun. Ein Primitiv, das Attribute verschluckt, ist eine Falle
+für den Nächsten.
+
+### `/company/transfers` hat jetzt 14 Tests, geschrieben VOR der Umstellung
+
+Zwölf davon liefen gegen den unveränderten Code grün — sie messen also, was da
+war, und nicht, was ich daraus gemacht habe. Zwei Annahmen von mir waren falsch
+(der Satz ohne Unternehmen lautet anders, und `makeOffer` nimmt ein Objekt statt
+vier Argumente); beides hat der erste Lauf gezeigt.
+
+Damit ist auch die tragendste Regel der Seite endlich festgenagelt: **Abschließen
+erscheint nur, wenn keine Freigabe nötig ist.**
