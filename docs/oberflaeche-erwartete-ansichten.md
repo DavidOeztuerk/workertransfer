@@ -1,7 +1,11 @@
 # Erwartete Ansichten je Route
 
-Stand 13.08.2026, nach E3a–E3c und ADR-0030. **27 Routen.** Gelesen aus
-`apps/web/src/app.tsx` und den Routendateien — nicht aus dem Gedächtnis.
+Stand 13.08.2026, **nach dem vollständigen Prompt E** (E1–E3e) und ADR-0030.
+**29 Routen.** Gelesen aus `apps/web/src/app.tsx` und den Routendateien — nicht
+aus dem Gedächtnis.
+
+Jede Route trägt das Designsystem: **null** rohe Seitenhüllen (`main.page`),
+**null** rohe `<select>` im ganzen Projekt.
 
 Wie zu lesen: je Route steht, **wer** sie sehen darf und **was** dabei erscheint,
 getrennt nach Zustand. Ein Zustand, der hier steht, ist im Code vorhanden; wo
@@ -194,12 +198,33 @@ Der Vorspann sagt, was in einer Mail steht: **„Es gibt etwas Neues für dich."
 **Belege, keine Noten** (ADR-0022). Es läuft **kein** Abgleich im Hintergrund. Sichtbar für Unternehmen wird es erst über `/consents`.
 
 ### `/market` — Mein Marktstatus
-Verfügbarkeit (sucht aktiv / hört zu / gerade nicht), „arbeitet gerade", Notiz, Ansprechbarkeit — plus die Anfragen von Unternehmen.
-*Noch nicht umgestellt (E3e): eigenes Markup, `getMyMarketStatus` erfindet bei Fehlschlag vermutlich eine Voreinstellung — derselbe Verdacht wie bei den zwei Funden aus E3b/E3c.*
+| Zustand | Ansicht |
+|---|---|
+| anonym | „Bitte anmelden, um deinen Marktstatus zu setzen." |
+| lädt | „Marktstatus wird geladen…" |
+| **nicht abrufbar** | **kein Formular** + „Ändern lässt er sich erst wieder, wenn er lesbar ist — sonst würdest du womöglich zurücknehmen, was du nie zurückgenommen hast." |
+| Person | **Anfragen** (lädt / Fehler / „Bislang hat niemand gefragt." / Liste) und **„Bin ich ansprechbar?"** |
+
+Das Formular: drei Radios (**sucht aktiv** / **hört zu** / **gerade nicht**), das Kästchen „Ich arbeite gerade irgendwo", eine Notiz (≤ 500 Zeichen), Speichern.
+
+Es gibt hier bewusst **kein „für alle"** — dass jemand wechseln will, ist die heikelste Angabe der Plattform. Freigegeben wird Unternehmen für Unternehmen.
+
+„Ich arbeite gerade irgendwo" heißt: ein Wechsel braucht eine Freigabe des Arbeitgebers. **Diese Plattform fragt ihn nicht** — sie weiß nicht, wer er ist, und soll es nicht wissen. Die Person bestätigt selbst.
+
+Der „nicht abrufbar"-Zustand ist der Fund aus E3e: vorher stand dort ein Ersatzwert („gerade nicht ansprechbar", leere Notiz), und ein Speichern schrieb ihn — die Person zog ihre Ansprechbarkeit zurück und löschte ihre Notiz, ohne es zu wollen.
 
 ### `/transfers` — Meine Gespräche
-Ein Transfer entsteht nur aus **drei Ja**; der Arbeitgeber wird nie gefragt.
-*Noch nicht umgestellt (E3e).*
+| Zustand | Ansicht |
+|---|---|
+| anonym | „Bitte anmelden, um deine Gespräche zu sehen." |
+| lädt | „Gespräche werden geladen…" |
+| Fehler | Meldung — nie als leere Liste |
+| leer | „Es läuft gerade kein Gespräch." |
+| Inhalt | je Gespräch der Stand und die möglichen Züge |
+
+Ein Unternehmen kann nur zugehen, wenn der **Marktstatus freigegeben** ist und die Person gerade ansprechbar. **Ablehnen geht jederzeit, in jedem Schritt.**
+
+Ein Transfer entsteht nur aus **drei Ja**, und der aktuelle Arbeitgeber wird **nie gefragt** — die Plattform weiß nicht einmal, wer er ist. Braucht ein Wechsel seine Freigabe, **bestätigt die Person sie selbst** und schließt damit ab.
 
 ### `/delete-account` — Konto löschen
 | Zustand | Ansicht |
@@ -232,21 +257,75 @@ Je Karte **drei getrennte Türen**: Lebenslauf anfragen · Marktstatus anfragen 
 Getrennt, weil ein Lebenslauf verrät *wo jemand war*, der Marktstatus *dass er weg will*.
 **Keine Gesamtzahl** — sie würde verraten, wie viele Profile *nicht* freigegeben sind.
 
-### `/company/jobs` — Unsere Stellen
-Eigene Stellen samt Entwurf/Veröffentlicht/Geschlossen, Anlegen und Bearbeiten, KI-Hilfe für die **eigene Anzeige** (`POST /jobs/draft`).
-*Noch nicht umgestellt (E3d), Abspaltung `/company/jobs/new` und `/company/jobs/$id/edit` geplant.*
+### `/company/jobs` — Unsere Stellen *(nur noch Liste seit E3d)*
+| Zustand | Ansicht |
+|---|---|
+| kein Unternehmen | „Wähle oben ein Unternehmen — oder lass dich einladen." |
+| lädt | „Stellen werden geladen…" *(fehlte vor E3d — die Karte blieb vollständig leer)* |
+| Fehler | Meldung |
+| leer | „Noch keine Stelle angelegt." + „Neue Stelle" |
+| gefüllt | Zeilen: Titel, Stand, Knöpfe |
+
+Stand: **„Entwurf — sieht nur ihr"** / „Veröffentlicht" / „Geschlossen".
+Ein Entwurf bietet **Veröffentlichen** und **Schließen**; eine veröffentlichte nur Schließen; eine **geschlossene gar nichts** — es gibt keinen Weg zurück, und ein Knopf würde einen behaupten.
+
+### `/company/jobs/new` — Neue Stelle *(neu in E3d)*
+Titel (Pflicht), Beschreibung (Pflicht), Ort, gesuchte Fähigkeiten (≤ 20, kommagetrennt), Arbeitsform, **KI-Hilfe für die eigene Anzeige**, „Entwurf anlegen". Rückweg „Zurück zu unseren Stellen".
+
+**Angelegt wird immer ein Entwurf** — Veröffentlichen ist ein zweiter, bewusster Schritt auf der Liste. Ein Knopf, der beides täte, hätte die Stelle draußen, bevor jemand sie gelesen hat.
+
+Die KI-Hilfe (ADR-0024) formuliert die **eigene Anzeige** und sagt über keine Person etwas — der einzige Unternehmens-Agent, der ohne eigene Abwägung baubar war. Sie ist ausdrücklich **nicht** der Absende-Knopf des Formulars, in dem sie steht, und über vorhandenem Text warnt sie. Nach dem Speichern geht es zurück auf die Liste.
 
 ### `/company/profile` — Unser Unternehmen
-Anzeigename, Über uns, Website, Standorte, Benefits, Kürzel für `/careers/<slug>`.
-*Noch nicht umgestellt (E3d).*
+| Zustand | Ansicht |
+|---|---|
+| kein Unternehmen | „Wähle oben ein Unternehmen — oder lass dich einladen." |
+| lädt | „Profil wird geladen…" |
+| **nicht abrufbar** | **kein Formular** + „Bearbeiten lässt sich das Profil erst wieder, wenn es lesbar ist — sonst würdet ihr überschreiben, was gerade niemand sehen kann." |
+| Unternehmen | Anzeigename (Pflicht), Über uns, Website, Standorte, Benefits |
 
-### `/company/team` — Mannschaft
-Mitglieder mit Rolle, Einladen per E-Mail.
-*Noch nicht umgestellt (E3d), Abspaltung `/company/team/invite` geplant.*
+„Das sehen Bewerber neben jeder eurer Stellen. Solange hier nichts steht, bleibt eine Ausschreibung **anonym**." Leere Website wird `null`, nicht `""`.
+
+Der „nicht abrufbar"-Zustand ist der Fund aus E3d: vorher stand dort ein **leeres** Formular, das aussah wie „noch nichts eingetragen" — und ein Speichern überschrieb Über-uns, Website, Standorte und Benefits mit leer.
+
+### `/company/team` — Mannschaft *(nur noch Liste seit E3d)*
+| Zustand | Ansicht |
+|---|---|
+| kein Unternehmen | „Wähle oben ein Unternehmen — oder lass dich einladen." |
+| lädt | „Mitglieder werden geladen…" *(fehlte vor E3d)* |
+| Mitglieder | Name, „Administrator"/„Mitglied", für Admins **Verlassen** (bei sich selbst) bzw. **Entfernen** (bei anderen) |
+| offene Einladungen | Adresse, Rolle, für Admins **Zurückziehen** — **nie ein Token** |
+| leer | „Keine offenen Einladungen." |
+
+Für Admins steht darunter **„Einladen"** → `/company/team/invite`. Der letzte Admin **kann nicht gehen**, und die Seite sagt, was zu tun ist.
+
+### `/company/team/invite` — Einladen *(neu in E3d)*
+| Zustand | Ansicht |
+|---|---|
+| kein Unternehmen | „Wähle oben ein Unternehmen — oder lass dich einladen." |
+| lädt | „Mitglieder werden geladen…" |
+| **einfaches Mitglied** | „Einladen dürfen nur Administratoren." — **kein Formular** |
+| Administrator | E-Mail-Adresse, Rolle (Mitglied / Administrator), „Einladen" |
+| verschickt | „Einladung verschickt." |
+
+Die Rollenprüfung ist **mitgewandert**: ein abgespaltenes Formular, das sie zurückließe, wäre eine Tür neben der verschlossenen. Die eigene Rolle kommt aus der Mitgliederliste, nicht aus der Kopfzeile — dort steht, was der Browser glaubt, nicht was der Server weiß.
+
+**Die Antwort ist dieselbe, ob die Adresse ein Konto hat oder nicht** — sonst wäre die Einladung ein Prüfwerkzeug für Mitgliedschaft.
 
 ### `/company/transfers` — Transfers
-Laufende Gespräche aus Unternehmenssicht, Angebot und Start.
-*Noch nicht umgestellt (E3d).*
+| Zustand | Ansicht |
+|---|---|
+| kein Unternehmen | „Transfers führen nur Unternehmen." |
+| lädt | „Transfers werden geladen…" |
+| Fehler | Meldung — nie als leere Liste |
+| leer | „Es läuft gerade kein Transfer." |
+| Inhalt | je Vorgang Stand, Angebot und Züge |
+
+Stand: „Interesse hinterlegt — die Person hat noch nicht geantwortet" / „Im Gespräch" / „Angebot abgegeben" / „Die Person hat angenommen" / „Abgeschlossen" / „Von der Person abgelehnt" / „Von euch zurückgezogen".
+
+Im Gespräch gibt es das Angebotsformular: **Angebot** (Worte), **Start** (Monat), **Ablöse in Euro**. *„Die Ablöse wird hier festgehalten, nicht bewegt: diese Plattform führt kein Geld."*
+
+**Abschließen erscheint nur, wenn KEINE Freigabe nötig ist.** Ist eine nötig, schließt die Person selbst ab — nur sie weiß, ob sie gehen darf. Ein Zustand „freigegeben und noch offen" existiert nicht. Zurückziehen geht, solange der Vorgang läuft; bei einem abgeschlossenen gibt es **gar nichts** mehr.
 
 ---
 
@@ -257,6 +336,8 @@ Laufende Gespräche aus Unternehmenssicht, Angebot und Start.
 | **`admin` vs. `member` wird nirgends durchgesetzt** | Die Kopfzeile *versteckt* Unternehmenseinträge; wer die Adresse kennt, kommt hin, und der Server antwortet `403` erst dort, wo `tenant_id` fehlt. **Die Navigation ist keine Zugriffskontrolle.** |
 | **`/company/admin` gibt es nicht** | Bewusst zurückgestellt: braucht erst serverseitige Rollen. HR-Verwaltung und DNS-Anbindung für eine Subdomain gehören dort hin. |
 | **Kein Client hat ein Zeitlimit** | `fetch` wartet unbegrenzt. Eine Seite, die keine Antwort bekommt, dreht endlos — für eine Person nicht von Langsamkeit zu unterscheiden. Der *Anlass* auf `/candidates` ist mit ADR-0030 weg, der Mangel nicht. |
-| **`/market`, `/transfers`, `/overview`, `/company/*` tragen noch eigenes Markup** | E3d und E3e stehen aus; dort sitzt auch der vierte rohe `<select>` (`CompanySwitcher`) und der Verdacht auf einen dritten „Client erfindet eine Voreinstellung"-Fund. |
+| **Viermal erfand ein Client eine Voreinstellung** | Behoben in E3b–E3e (`isGranted`, `getNotificationPreferences`, `getOwnCompanyProfile`, `getMyMarketStatus`). Drei der vier Begründungen im Code waren **richtig** — und alle vier betrachteten nur die Anzeige, nie das Schreiben. Beim nächsten neuen Client danach suchen. |
+| **`auth__lead role="status"` in `/verify` und `/invitation`** | Bewusst stehen gelassen: das ist die Vorspann-Zeile der `AuthLayout`-Hülle, die dort zugleich den Ladezustand ansagt. Ein `Loading` mitten darin sähe fremd aus. |
+| **Der „Stand"-Bereich der Übersicht fehlt** | Er zeigte „wie viele Unternehmen dich gerade sehen" — eine Zahl über Blicke auf einen Menschen, also genau das, was ADR-0022 fernhält. Braucht eine eigene Abwägung, keine Umstellung. |
 | **„Anmeldung fehlgeschlagen" ist die einzige Meldung** | Eine englische Server-Meldung würde in einer deutschen Oberfläche stehen; deshalb übersetzt der Client sie pauschal — der Preis ist, dass alle Fehlgründe gleich aussehen. |
 | **Kein i18n** | Alle Texte sind hart deutsch, und die Tests prüfen die Literale. |
