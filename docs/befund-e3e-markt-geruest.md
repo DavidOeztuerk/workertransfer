@@ -99,3 +99,35 @@ Anzeige, nie das Schreiben.
   eine Zahl über Blicke auf einen Menschen. Das ist genau die Sorte Zahl, die
   ADR-0022 fernhält, und sie gehört in eine eigene Abwägung, nicht in eine
   Umstellung.
+
+
+## Ergebnis (13.08.2026)
+
+| Datei | vorher | nachher |
+|---|---|---|
+| `routes/market.tsx` | 290 | 279 |
+| `routes/transfers.tsx` | 189 | 190 |
+| `routes/overview.tsx` | 189 | 183 |
+| `app.tsx` (Schale) | 574 | 583 |
+
+**Null** rohe Seitenhüllen (`main.page`) und **null** rohe `<select>` im ganzen
+Projekt — beides jetzt messbar und nicht behauptet.
+
+### Was bewusst stehen bleibt
+
+- **`auth__lead role="status"` in `/verify` und `/invitation`.** Das ist die
+  Vorspann-Zeile der `AuthLayout`-Hülle, die dort zugleich den Ladezustand
+  ansagt. Ein `Loading` mitten in dieser Hülle sähe fremd aus, und die Rolle ist
+  bereits richtig gesetzt. Umgestellt wurde nur, was eine Meldung ist
+  (`Alert` in `/invitation`).
+- **Der „Stand"-Bereich der Übersicht.** Er stünde in der Routenkarte für E3e,
+  zeigte aber „wie viele Unternehmen dich gerade sehen" — eine Zahl über Blicke
+  auf einen Menschen. Genau die Sorte Zahl, die ADR-0022 fernhält. Eigene
+  Abwägung, nicht Umstellung.
+
+### Der Wähler in der Kopfzeile brauchte eine Regel
+
+`Select` ist ein Formularfeld und damit ein Block: Beschriftung über dem Feld. In
+einer Navigationsleiste ist das falsch herum. `.site-header__switcher` legt
+beides wieder nebeneinander — **nur dort**. Ein eigenes Bauteil wäre ein zweites
+Wähler-Muster für einen einzigen Aufrufer.

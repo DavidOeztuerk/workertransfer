@@ -1,6 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, Field, Loading, Page } from "@workertransfer/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  Empty,
+  Field,
+  Loading,
+  Page,
+  RadioGroup,
+} from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
 import {
@@ -106,14 +116,13 @@ export function MarketRoute({ principal = null }: MarketRouteProps) {
 
   if (subjectId === null) {
     return (
-      <main className="page page--narrow">
+      <Page title="Mein Marktstatus" narrow>
         <Card>
-          <h1>Mein Marktstatus</h1>
           <p>
             Bitte <a href="/login">anmelden</a>, um deinen Marktstatus zu setzen.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
@@ -163,7 +172,7 @@ export function MarketRoute({ principal = null }: MarketRouteProps) {
         {requestsQuery.isPending ? <Loading label="Anfragen werden geladen…" /> : null}
         {requests !== undefined && !requests.ok ? <Alert>{requests.message}</Alert> : null}
         {requests?.ok && requests.requests.length === 0 ? (
-          <p>Bislang hat niemand gefragt.</p>
+          <Empty title="Bislang hat niemand gefragt." />
         ) : null}
         {requests?.ok && requests.requests.length > 0 ? (
           <ul className="requests">
@@ -189,46 +198,35 @@ export function MarketRoute({ principal = null }: MarketRouteProps) {
             save.mutate();
           }}
         >
-          <fieldset className="market__choices">
-            <legend>Status</legend>
-            {CHOICES.map((choice) => (
-              <label key={choice.value} className="market__choice">
-                <input
-                  type="radio"
-                  name="availability"
-                  value={choice.value}
-                  checked={availability === choice.value}
-                  onChange={() => {
-                    setSaved(false);
-                    setAvailability(choice.value);
-                  }}
-                />
-                <span>
-                  <strong>{choice.label}</strong>
-                  <span className="market__hint">{choice.hint}</span>
-                </span>
-              </label>
-            ))}
-          </fieldset>
+          {/* Native Radios mit gemeinsamem `name` — erst dadurch bewegen die
+              Pfeiltasten den Fokus innerhalb der Gruppe. Das Bauteil tut genau
+              das, was hier von Hand stand. */}
+          <RadioGroup
+            legend="Status"
+            name="availability"
+            value={availability}
+            onChange={(next) => {
+              setSaved(false);
+              setAvailability(next as Availability);
+            }}
+            options={CHOICES.map((choice) => ({
+              value: choice.value,
+              label: choice.label,
+              hint: choice.hint,
+            }))}
+          />
 
-          <label className="market__choice">
-            <input
-              type="checkbox"
-              checked={employed}
-              onChange={(e) => {
-                setSaved(false);
-                setEmployed(e.target.checked);
-              }}
-            />
-            <span>
-              <strong>Ich arbeite gerade irgendwo</strong>
-              <span className="market__hint">
-                Dann braucht ein Wechsel eine Freigabe deines Arbeitgebers. Diese Plattform fragt
-                ihn nicht — sie weiß nicht, wer er ist, und soll es nicht wissen. Du bestätigst
-                selbst, wenn es soweit ist.
-              </span>
-            </span>
-          </label>
+          {/* Ein Kästchen, kein Schalter: es gilt mit dem Absenden, und darunter
+              steht ein Speichern-Knopf. */}
+          <Checkbox
+            label="Ich arbeite gerade irgendwo"
+            hint="Dann braucht ein Wechsel eine Freigabe deines Arbeitgebers. Diese Plattform fragt ihn nicht — sie weiß nicht, wer er ist, und soll es nicht wissen. Du bestätigst selbst, wenn es soweit ist."
+            checked={employed}
+            onChange={(e) => {
+              setSaved(false);
+              setEmployed(e.target.checked);
+            }}
+          />
 
           <Field
             label="Notiz"
