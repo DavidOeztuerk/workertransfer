@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { type AcceptResult, type Membership, acceptInvitation } from "../auth/team";
+import { Alert } from "@workertransfer/ui";
+
 import { AuthLayout } from "./auth-layout";
 
 type State =
@@ -119,9 +121,7 @@ export function InvitationRoute() {
         )
       }
     >
-      <p className="auth__alert" role="alert">
-        {state.message}
-      </p>
+      <Alert>{state.message}</Alert>
     </AuthLayout>
   );
 }

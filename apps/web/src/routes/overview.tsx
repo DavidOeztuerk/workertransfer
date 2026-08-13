@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card } from "@workertransfer/ui";
+import { Alert, Card, Empty, Page, Row, RowList } from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
 import { listMyMarketRequests } from "../market/client";
@@ -131,59 +131,53 @@ export function OverviewRoute({ principal }: OverviewRouteProps) {
   const nothing = mine.length === 0 && company.length === 0;
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>Was liegt an</h1>
-        <p className="page__lead">
-          Nur Dinge, die auf eine Entscheidung von dir warten. Was von selbst läuft, steht hier
-          nicht — sonst wäre es eine Liste, und Listen übersieht man.
-        </p>
-      </header>
-
+    <Page
+      title="Was liegt an"
+      narrow
+      lead="Nur Dinge, die auf eine Entscheidung von dir warten. Was von selbst läuft, steht hier nicht — sonst wäre es eine Liste, und Listen übersieht man."
+    >
       {failed ? (
-        <Card>
-          <p className="auth__alert" role="alert">
-            Ein Teil konnte nicht geladen werden. Was hier steht, ist deshalb womöglich
-            unvollständig.
-          </p>
-        </Card>
+        <Alert>
+          Ein Teil konnte nicht geladen werden. Was hier steht, ist deshalb womöglich
+          unvollständig.
+        </Alert>
       ) : null}
 
       {nothing && !failed ? (
-        <Card>
-          <p>Gerade wartet nichts auf dich.</p>
-          <p className="requests__meta">
-            Du entscheidest, was von dir sichtbar ist — nachsehen kannst du das jederzeit unter{" "}
-            <a href="/consents">Meine Freigaben</a>.
-          </p>
-        </Card>
+        <Empty
+          title="Gerade wartet nichts auf dich."
+          hint={
+            <>
+              Du entscheidest, was von dir sichtbar ist — nachsehen kannst du das jederzeit unter{" "}
+              <a href="/consents">Meine Freigaben</a>.
+            </>
+          }
+        />
       ) : null}
 
       {mine.length > 0 ? (
         <Card>
           <h2>Für dich</h2>
-          <ul className="overview">
+          {/* Gezählt werden VORGÄNGE, nie Personen (ADR-0022/0026). */}
+          <RowList>
             {mine.map((item) => (
-              <li key={item.href}>
-                <a href={item.href}>{item.label}</a>
-              </li>
+              <Row key={item.href} title={<a href={item.href}>{item.label}</a>} />
             ))}
-          </ul>
+          </RowList>
         </Card>
       ) : null}
 
       {company.length > 0 ? (
         <Card>
           <h2>Für dein Unternehmen</h2>
-          <ul className="overview">
+          {/* Gezählt werden VORGÄNGE, nie Personen (ADR-0022/0026). */}
+          <RowList>
             {company.map((item) => (
-              <li key={item.href}>
-                <a href={item.href}>{item.label}</a>
-              </li>
+              <Row key={item.href} title={<a href={item.href}>{item.label}</a>} />
             ))}
-          </ul>
+          </RowList>
         </Card>
       ) : null}
-    </main>
+    </Page>
   );
 }

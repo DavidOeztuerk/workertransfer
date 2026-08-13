@@ -515,3 +515,26 @@ h1 {
 .draft-help .wt-field {
   margin-top: 0;
 }
+
+/* Der Unternehmenswechsel in der Kopfzeile.
+
+   `Select` ist ein Formularfeld und damit ein Block: Beschriftung über dem
+   Feld. In einer Navigationsleiste ist das falsch herum, deshalb legt diese
+   Regel beides wieder nebeneinander — und nur hier. Ein eigenes Bauteil dafür
+   wäre ein zweites Wähler-Muster für einen einzigen Aufrufer. */
+.site-header__switcher {
+  display: flex;
+  align-items: center;
+  gap: var(--wt-space-2);
+}
+
+.site-header__switcher .wt-field {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--wt-space-2);
+  margin: 0;
+}
+
+.site-header__switcher .wt-field__input {
+  width: auto;
+}

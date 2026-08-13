@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button, Card } from "@workertransfer/ui";
+import { Alert, Button, Card, Empty, Loading, Page } from "@workertransfer/ui";
 
 import type { MeResponse } from "../auth/client";
 import {
@@ -50,53 +50,47 @@ export function TransfersRoute({ principal = null }: TransfersRouteProps) {
 
   if (subjectId === null) {
     return (
-      <main className="page page--narrow">
+      <Page title="Meine Gespräche" narrow>
         <Card>
-          <h1>Meine Gespräche</h1>
           <p>
             Bitte <a href="/login">anmelden</a>, um deine Gespräche zu sehen.
           </p>
         </Card>
-      </main>
+      </Page>
     );
   }
 
   const data = query.data;
 
   return (
-    <main className="page page--narrow">
-      <header className="page__header">
-        <h1>Meine Gespräche</h1>
-        <p className="page__lead">
+    <Page
+      title="Meine Gespräche"
+      narrow
+      lead={
+        <>
           Ein Unternehmen kann nur zugehen, wenn du ihm deinen{" "}
           <a href="/market">Marktstatus freigegeben</a> hast und gerade ansprechbar bist. Ablehnen
           kannst du jederzeit, in jedem Schritt.
-        </p>
-      </header>
-
-      {error !== null ? (
-        <p className="auth__alert" role="alert">
-          {error}
-        </p>
-      ) : null}
+        </>
+      }
+    >
+      {error !== null ? <Alert>{error}</Alert> : null}
 
       {query.isPending ? (
         <Card>
-          <p role="status">Gespräche werden geladen…</p>
+          <Loading label="Gespräche werden geladen…" />
         </Card>
       ) : null}
 
       {data !== undefined && !data.ok ? (
         <Card>
-          <p className="auth__alert" role="alert">
-            {data.message}
-          </p>
+          <Alert>{data.message}</Alert>
         </Card>
       ) : null}
 
       {data?.ok && data.transfers.length === 0 ? (
         <Card>
-          <p>Es läuft gerade kein Gespräch.</p>
+          <Empty title="Es läuft gerade kein Gespräch." />
         </Card>
       ) : null}
 
@@ -111,7 +105,7 @@ export function TransfersRoute({ principal = null }: TransfersRouteProps) {
             </Card>
           ))
         : null}
-    </main>
+    </Page>
   );
 }
 
