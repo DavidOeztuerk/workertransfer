@@ -73,28 +73,38 @@ function send(path: string, init: RequestInit = {}): Promise<Response> {
 }
 
 /**
- * Der Ersatz ist `unavailable`, nie `null` und nie „offen".
+ * Der eigene Marktstatus, oder `null` — „nicht abrufbar".
  *
- * Der Server antwortet auf `GET /market/me` schon nie mit `null`, damit sich
- * die Oberfläche keine Voreinstellung ausdenken muss. Für den Fall, dass er gar
- * nicht antwortet, gilt hier dieselbe Regel: die Voreinstellung darf nie
- * zugunsten des Marktes ausfallen. Ein Netzfehler ist keine Zustimmung.
+ * Hier stand ein Ersatzwert: `unavailable`, leere Notiz. Die Begründung war
+ * richtig und gilt weiter — *die Voreinstellung darf nie zugunsten des Marktes
+ * ausfallen; ein Netzfehler ist keine Zustimmung*. Für die ANZEIGE war das die
+ * sichere Richtung.
+ *
+ * Sie übersah nur, dass dieser Ersatz nicht bloß angezeigt, sondern in ein
+ * **Formular** geschrieben wurde. Nach einem Ausfall stand dort „gerade nicht
+ * ansprechbar" mit leerer Notiz, `isPending` war vorbei (die Abfrage gelang ja),
+ * und es gab keinen Fehlerzustand. Wer dann irgendetwas anfasste und speicherte,
+ * schickte `availability: "unavailable"` und `note: ""` — und hatte seine
+ * Ansprechbarkeit zurückgezogen und seine Notiz gelöscht, ohne es zu wollen.
+ *
+ * Auf einem Transfermarkt ist das der teuerste stille Schreibvorgang: die Person
+ * verschwindet.
+ *
+ * `null` heißt „wir wissen es nicht". Die Seite zeigt dann kein Formular, und
+ * damit wird in KEINE Richtung mehr etwas erfunden — die alte Zusage gilt
+ * strenger als vorher, nicht schwächer.
+ *
+ * Der Server antwortet auf `GET /market/me` übrigens nie mit `null`; ein
+ * fehlender Datensatz kommt dort als `unavailable` zurück. Diese Voreinstellung
+ * ist also weiterhin eine Aussage des Servers und keine der Oberfläche.
  */
-export async function getMyMarketStatus(): Promise<MarketStatus> {
-  const fallbackStatus: MarketStatus = {
-    subject_id: "",
-    availability: "unavailable",
-    employed: false,
-    note: "",
-    is_approachable: false,
-    updated_at: "",
-  };
+export async function getMyMarketStatus(): Promise<MarketStatus | null> {
   try {
     const res = await send("/market/me");
-    if (!res.ok) return fallbackStatus;
+    if (!res.ok) return null;
     return (await res.json()) as MarketStatus;
   } catch {
-    return fallbackStatus;
+    return null;
   }
 }
 
