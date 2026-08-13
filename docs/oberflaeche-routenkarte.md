@@ -171,8 +171,8 @@ Entschieden; gebaut jeweils in dem E3-PR, der die Herkunftsseite umstellt.
 | neue Route | heute eingebettet in | E3-Gruppe |
 |---|---|---|
 | ~~`/jobs/$id/apply`~~ **gebaut** | `ApplyBox` in `jobs.tsx:320–420` | E3a ✓ |
-| `/company/jobs/new`, `/company/jobs/$id/edit` | `company-jobs.tsx` (289 Zeilen) | E3d |
-| `/company/team/invite` | `team.tsx` (221 Zeilen) | E3d |
+| ~~`/company/jobs/new`~~ **gebaut** | `company-jobs.tsx` (290 Zeilen) | E3d ✓ — `$id/edit` verworfen: es gibt kein Bearbeiten-Formular |
+| ~~`/company/team/invite`~~ **gebaut** | `team.tsx` (222 Zeilen) | E3d ✓ — mit der Rollenprüfung, die mitwandern musste |
 | ~~`/portfolio/new`~~ **gebaut**, dazu `/portfolio/$index` | `portfolio.tsx` (331 Zeilen) | E3b ✓ |
 | ~~`/resume/positions/$id`~~ **verworfen** | Fieldsets in `resume.tsx` | E3b — Stationen bleiben EIN Formular |
 

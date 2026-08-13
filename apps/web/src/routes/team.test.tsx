@@ -71,11 +71,6 @@ describe("TeamRoute", () => {
     expect(screen.getByText("Kollege")).toBeInTheDocument();
   });
 
-  it("offers the invite form to an admin", async () => {
-    renderWithProviders(<TeamRoute principal={principal(TENANT)} />);
-
-    expect(await screen.findByLabelText(/E-Mail/i)).toBeInTheDocument();
-  });
 
   it("does not offer it to a plain member", async () => {
     // Sichtbarkeit ist Bequemlichkeit; die Ablehnung spricht immer der Server
@@ -89,31 +84,7 @@ describe("TeamRoute", () => {
     expect(screen.queryByLabelText(/E-Mail/i)).toBeNull();
   });
 
-  it("invites with the address and the chosen role", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<TeamRoute principal={principal(TENANT)} />);
 
-    await user.type(await screen.findByLabelText(/E-Mail/i), "neu@firma.example");
-    await user.selectOptions(screen.getByLabelText(/Rolle/i), "admin");
-    await user.click(screen.getByRole("button", { name: /Einladen/i }));
-
-    await waitFor(() =>
-      expect(inviteMember).toHaveBeenCalledWith(TENANT, "neu@firma.example", "admin")
-    );
-  });
-
-  it("says the same thing whether or not the address already has an account", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<TeamRoute principal={principal(TENANT)} />);
-
-    await user.type(await screen.findByLabelText(/E-Mail/i), "neu@firma.example");
-    await user.click(screen.getByRole("button", { name: /Einladen/i }));
-
-    // Der Server antwortet in beiden Fällen gleich; die Oberfläche darf daraus
-    // keinen Unterschied machen ("Konto gefunden" wäre genau das Leck).
-    const note = await screen.findByText(/Einladung verschickt/i);
-    expect(note.textContent).not.toMatch(/Konto|registriert|bereits/i);
-  });
 
   it("shows an open invitation without ever showing a token", async () => {
     listInvitations.mockResolvedValue({ ok: true, invitations: [invitation()] });
