@@ -119,26 +119,100 @@ zerstört genau diese Stellen, weil sie sie nicht erkennt.
 
 ---
 
+## Die Tokenform entscheidet die Reihenfolge
+
+Bevor irgendetwas migriert wird, musst du das hier wissen — sonst leitest du es
+teuer neu her.
+
+**Girder kann die Token nicht lesen, die der Python-identity-service ausstellt.
+Und Python kann die nicht lesen, die Girder ausstellt.** Beides gemessen, nicht
+vermutet.
+
+Ein Python-Token sieht so aus (`packages/worker-auth/src/worker_auth/jwt.py`):
+
+```json
+{ "sub": "…uuid…", "tenant_id": "…uuid…", "roles": [], "permissions": [],
+  "exp": …, "iat": …, "type": "access", "jti": "…" }
+```
+
+| | Python → Girder | Girder → Python |
+|---|---|---|
+| HS256, gleiches Geheimnis | ✓ | ✓ |
+| `iss` / `aud` | **fehlen** → Girder lehnt ab | Python prüft sie nicht, egal |
+| `type` | Girder prüft ihn nicht → **ein Refresh-Token gilt als Access-Token** | **fehlt** → Python lehnt ab |
+| Mandant | `tenant_id` gegen Girders `tenant` | dasselbe umgekehrt |
+
+Der Mandanten-Punkt ist der gefährliche, weil er **lautlos** scheitert. Schaltet
+man Aussteller- und Zielgruppenprüfung ab, damit der Token durchgeht, passiert
+das hier:
+
+```
+wie Girder konfiguriert ist        ABGELEHNT: SecurityTokenInvalidAudienceException
+mit abgeschalteter iss/aud-Prüfung angenommen als "as self"
+                                                   ↑
+im Token steht tenant_id = 2222…, Girder liest "tenant" — den gibt es dort nicht
+```
+
+Ein Firmen-Akteur wird zur Privatperson. Kein Fehler, kein Protokolleintrag,
+andere Daten sichtbar. **Baue diesen Flicken nicht.**
+
+### Was daraus folgt
+
+Jeder Dienst außer identity-service prüft nur Token. Migrierst du einen davon
+zuerst, muss er die Token des *Python*-Dienstes annehmen — und der einzige Weg
+dahin ist genau der Flicken oben, zehnmal wiederholt.
+
+**Also identity-service zuerst**, mit einem Übergangstoken, den beide Welten
+annehmen. Python ignoriert zusätzliche Ansprüche (gemessen), also genügt:
+
+```csharp
+new UserClaims
+{
+    UserId = subject.ToString(),           // sub     — beide
+    Email  = email,
+    Acting = new Capacity.ForCompany(t),   // tenant  — Girder
+    SessionId = signIn.Session.ToString(),
+    CustomClaims = new()
+    {
+        ["tenant_id"]   = t.ToString(),    // ─── was Python zusätzlich braucht
+        ["type"]        = "access",
+        ["roles"]       = string.Join(",", roles),
+        ["permissions"] = string.Join(",", permissions)
+    }
+}
+```
+
+`iss` und `aud` setzt Girder ohnehin aus `JwtSettings`. Prüfe die Form gegen
+Pythons `TokenManager.verify_token` **und** gegen einen .NET-Dienst, bevor du
+weitergehst — das ist der Beweis, an dem alles Weitere hängt.
+
+Wenn der Übergang abgeschlossen ist, fallen die vier `CustomClaims` weg. Setz
+dafür ein Ticket, sonst bleiben sie für immer.
+
+---
+
 ## Vorgeschlagene Reihenfolge
 
-**Nicht mit identity-service anfangen**, obwohl es die Referenz ist. Es ist mit
-5.562 Zeilen das größte und hat die meisten Sonderfälle. Ein Fehler im
-Vorgehen kostet dort am meisten.
-
-| # | Dienst | Warum diese Stelle |
+| # | Schritt | Warum diese Stelle |
 |---|---|---|
-| 0 | **Gerüst + ein Dienst als Muster** | `companies-service` (1.036 Zeilen), einfachste Domäne, benutzt aber Mandantenfähigkeit — beweist das Girder-Fundament |
-| 1 | `consent-service` | Alles andere hängt daran. Muss vor Profil/Lebenslauf/Portfolio stehen |
-| 2 | `profile-service` | Erster Konsument des Ledgers, klärt das 404/403/503-Muster |
-| 3 | `jobs-service` | Caching-Regeln (ADR-0031), Skill-Vokabular |
-| 4 | `resume-service`, `portfolio-service` | Dasselbe Muster, strenger |
-| 5 | `applications-service` | |
-| 6 | `transfer-service` | Outbox, ADR-0025 |
-| 7 | **`identity-service`** | Zuletzt, mit allen gelernten Mustern |
-| 8 | `github-service` | ADR-0022 beachten: es bewertete Menschen |
+| 0 | **Solution-Gerüst** | Struktur, zentrale Paketverwaltung, Quellzuordnung. Beweist nichts, kostet nichts |
+| 1 | **identity-service, dünne Scheibe** | Nur Anmelden, Erneuern, Abmelden und die Tokenform. Der Beweis: ein Token daraus wird von den Python-Diensten *und* von einem .NET-Dienst angenommen |
+| 2 | **identity-service, Rest** | Registrierung, Bestätigung, Unternehmen, Einladungen, Rollen, Löschkaskade |
+| 3 | `consent-service` | Alles andere hängt daran. Muss vor Profil/Lebenslauf/Portfolio stehen |
+| 4 | `profile-service` | Erster Konsument des Ledgers, klärt das 404/403/503-Muster |
+| 5 | `companies-service` | Einfachste Domäne, prüft die Mandantenfähigkeit gegen echte Token |
+| 6 | `jobs-service` | Caching-Regeln (ADR-0031), Skill-Vokabular |
+| 7 | `resume-service`, `portfolio-service` | Dasselbe Muster, strenger |
+| 8 | `applications-service` | |
+| 9 | `transfer-service` | Outbox, ADR-0025 — die Girder nicht hat |
+| 10 | `github-service` | ADR-0022 beachten: es bewertete Menschen |
 
-**Nach jedem Dienst:** die React-App muss unverändert gegen ihn laufen. Wenn
-sie es nicht tut, hat sich ein Vertrag geändert, und das ist ein Fehler, kein
+**Der Grund gegen identity-service gilt weiter**: 5.562 Zeilen, die meisten
+Sonderfälle. Deshalb Schritt 1 als *Scheibe* — nur so viel, wie die Tokenform
+beweist — und der Rest erst danach.
+
+**Nach jedem Schritt:** die React-App muss unverändert dagegen laufen. Wenn sie
+es nicht tut, hat sich ein Vertrag geändert, und das ist ein Fehler, kein
 Fortschritt.
 
 ---
@@ -162,20 +236,33 @@ Bevor irgendein Dienst übersetzt wird:
      <packageSource key="nuget.org"><package pattern="*" /></packageSource>
    </packageSourceMapping>
    ```
-3. **Einen Dienst vollständig bauen**, mit Tests, Migrationen und laufender
-   React-App dagegen. Erst wenn das steht, ist das Muster bewiesen.
+3. **Die Tokenform beweisen** (Schritt 1), bevor ein zweiter Dienst anfängt.
 
-**Die Pro-Dienst-Struktur** (aus Girders README und dem workertransfer-ADR-0003
-— Composition Root pro Dienst, kein fluent PlatformBuilder):
+**Die Pro-Dienst-Struktur — ein Projekt je Schicht, nicht Ordner in einem:**
 
 ```
-src/WorkerTransfer.Companies/
-  Domain/          Entitäten, Wertobjekte, Domänenereignisse
-  Application/     Commands, Queries, Handler, Ports
-  Infrastructure/  DbContext, Repositories, Migrationen
-  Api/             Endpunkte, Composition Root
-tests/WorkerTransfer.Companies.Tests/
+dotnet/src/identity-service/
+  WorkerTransfer.Identity.Domain/           Girder.Core
+  WorkerTransfer.Identity.Contracts/        Girder.Contracts
+  WorkerTransfer.Identity.Application/      Girder.Abstractions, Girder.Application
+  WorkerTransfer.Identity.Infrastructure/   Girder.Infrastructure, Girder.Data.EntityFrameworkCore
+  WorkerTransfer.Identity.Api/              Girder.Infrastructure
+dotnet/tests/WorkerTransfer.Identity.Tests/
 ```
+
+Getrennte Projekte, weil dann der **Übersetzer** die Richtung erzwingt: die
+Domänenschicht kann die Infrastruktur nicht aufrufen, weil sie keinen Verweis
+darauf hat. Ordner in einem Projekt verlassen sich auf Disziplin, und Disziplin
+hält so lange, bis es eilig wird. Es ist auch der Zuschnitt, in dem Girder
+selbst gebaut ist.
+
+Die Anwendungsschicht nennt kein Signaturverfahren und keine Hashfunktion. Sie
+erklärt Ports; die Infrastruktur beantwortet sie mit Girder.
+
+**Warum `dotnet/` und nicht die Wurzel:** Python liegt in `apps/` und
+`packages/`, das Frontend in `apps/web`. Ein eigener Zweig hält die drei
+Ökosysteme auseinander, solange sie nebeneinander laufen. Wenn Python geht,
+kann der Ordner flach gezogen werden.
 
 ---
 
@@ -439,9 +526,15 @@ Mal echte Fehler gefunden:
 > Lies `CLAUDE.md` und Girders `README.md`. Mehr Vorlauf brauchst du nicht —
 > die Muster stehen in diesem Dokument.
 >
-> Miss dann den Ist-Zustand von `apps/companies-service` — Endpunkte, Modelle,
-> Migrationen, Tests — und leg mir einen Plan für Schritt 0 vor: Solution-Gerüst
-> plus `companies-service` als .NET-Dienst auf Girder 2.3.0.
+> Das Gerüst steht bereits unter `dotnet/`. Fang mit **Schritt 1** an: die
+> dünne Scheibe von identity-service — Anmelden, Erneuern, Abmelden und die
+> Tokenform aus dem Abschnitt „Die Tokenform entscheidet die Reihenfolge".
+>
+> Miss zuerst, was `apps/identity-service` an diesen drei Stellen heute tut,
+> und leg mir einen Plan vor. Der Abnahmetest steht fest: ein Token aus deinem
+> .NET-Dienst wird von `TokenManager.verify_token` **und** von einem
+> Girder-Dienst angenommen, und ein Python-Token wird von deinem Dienst
+> angenommen. Zeig mir das laufend, nicht als Behauptung.
 >
 > Beantworte darin ausdrücklich die Change-Tracking-Frage. Der Vorschlag aus
 > der Girder-Sitzung war: `AsNoTracking()` beim Lesen und ein ausdrückliches

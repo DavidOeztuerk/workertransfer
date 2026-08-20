@@ -38,3 +38,7 @@ var/
 # Quellen — und plattformabhängig, deshalb bewusst keine Referenzbilder im
 # Repository (Schriftglättung darwin vs. linux erzeugt Fehlalarme).
 .screenshots/
+
+# .NET
+dotnet/**/bin/
+dotnet/**/obj/
