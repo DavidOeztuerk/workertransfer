@@ -119,3 +119,29 @@ Anmeldung, nicht je Erneuerung.
 später wieder Privatperson — lautlos, mitten in der Arbeit. Genau die
 Herabstufung, vor der `docs/MIGRATION-PROMPT.md` warnt, nur durch eine andere
 Tür.
+
+---
+
+## Ü-6 · bcrypt bleibt das schreibende Verfahren
+
+**Wo:** Composition Root von `WorkerTransfer.Identity.Api`
+
+**Jetzt:** `AddBCryptPasswords()` — bcrypt liest **und** schreibt, nicht nur
+`AddBCryptPasswordReader()`.
+
+**Warum:** Girders Kette schreibt einen Eintrag beim nächsten Anmelden neu,
+sobald sie `SuccessRehashNeeded` meldet. Schriebe der .NET-Dienst dabei auf
+PBKDF2 oder Argon2id um, könnte `worker_auth.BcryptPasswordHasher` diesen
+Eintrag nicht mehr lesen — und die Person käme in den Python-Dienst nicht mehr
+hinein. Das trifft genau den Fall, in dem man ihn braucht: einen Rückweg nach
+dem Umstieg.
+
+**Was daraus wird:** eine freie Entscheidung. Argon2id ist OWASPs erste Wahl,
+und `AddArgon2Passwords()` plus `AddBCryptPasswordReader()` holt jede Person bei
+ihrer nächsten Anmeldung herüber, ohne dass jemand etwas zurücksetzen muss.
+
+**Woran man merkt, dass es Zeit ist:** der Rückweg auf den Python-identity-
+service ist aufgegeben — also wenn `apps/identity-service` gelöscht wird.
+
+**Kosten des Vergessens:** keine akuten. bcrypt mit 12 Runden ist in Ordnung;
+es ist nur nicht mehr die beste verfügbare Wahl.
