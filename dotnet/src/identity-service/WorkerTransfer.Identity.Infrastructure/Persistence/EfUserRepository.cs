@@ -25,6 +25,17 @@ public sealed class EfUserRepository(IdentityDbContext context) : IUserRepositor
         return row is null ? null : ZumAggregat(row);
     }
 
+    /// <inheritdoc />
+    public async Task<User?> FindByIdAsync(
+        SubjectId id,
+        CancellationToken cancellationToken = default)
+    {
+        var row = await context.Users
+            .FirstOrDefaultAsync(candidate => candidate.Id == id.Value, cancellationToken);
+
+        return row is null ? null : ZumAggregat(row);
+    }
+
     private static User ZumAggregat(UserRow row) => new()
     {
         Id = new SubjectId(row.Id),

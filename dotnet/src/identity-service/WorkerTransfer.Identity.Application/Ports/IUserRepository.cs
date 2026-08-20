@@ -1,3 +1,4 @@
+using Girder.Core.Identity;
 using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Application.Ports;
@@ -15,4 +16,9 @@ public interface IUserRepository
     /// <param name="cancellationToken">Cancels the lookup.</param>
     /// <returns>The account, or <c>null</c> when there is none.</returns>
     Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default);
+
+    /// <param name="id">Who to look up.</param>
+    /// <param name="cancellationToken">Cancels the lookup.</param>
+    /// <returns>The account, or <c>null</c> when there is none.</returns>
+    Task<User?> FindByIdAsync(SubjectId id, CancellationToken cancellationToken = default);
 }
