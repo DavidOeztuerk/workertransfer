@@ -19,6 +19,13 @@ Zwei Repositorien auf derselben Maschine:
 Girder liegt auf `github.com/DavidOeztuerk/girder`, wird nach GitHub Packages
 veröffentlicht und ist die Grundlage der Migration.
 
+**Der Zweig ist `dotnet-migration`**, von `develop` abgezweigt, nicht gepusht.
+Er ist ausgecheckt — arbeite darauf. Nicht auf `develop`, nicht auf `main`, und
+lege keinen neuen an: die Migration ist ein Vorhaben, nicht eines pro Dienst.
+Wenn du dich doch auf einem anderen Zweig wiederfindest, wechsle zurück, bevor
+du committest. (Genau das ist in der Girder-Sitzung schiefgegangen, zweimal
+hintereinander, obwohl es aufgefallen war.)
+
 **Lies zuerst:**
 
 1. `/Users/davidozturk/Projects/workertransfer/CLAUDE.md` — die Projektregeln.
