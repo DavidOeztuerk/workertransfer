@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/identity-service/">
+    <Project Path="src/identity-service/WorkerTransfer.Identity.Api/WorkerTransfer.Identity.Api.csproj" />
+    <Project Path="src/identity-service/WorkerTransfer.Identity.Application/WorkerTransfer.Identity.Application.csproj" />
+    <Project Path="src/identity-service/WorkerTransfer.Identity.Contracts/WorkerTransfer.Identity.Contracts.csproj" />
+    <Project Path="src/identity-service/WorkerTransfer.Identity.Domain/WorkerTransfer.Identity.Domain.csproj" />
+    <Project Path="src/identity-service/WorkerTransfer.Identity.Infrastructure/WorkerTransfer.Identity.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WorkerTransfer.Identity.Tests/WorkerTransfer.Identity.Tests.csproj" />
+  </Folder>
+</Solution>

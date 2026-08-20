@@ -1,0 +1,40 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+
+    <!--
+      Also pins what our dependencies drag in. A transitive package with a
+      known vulnerability is then raised here rather than waited on.
+    -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+
+    <GirderVersion>2.3.0</GirderVersion>
+  </PropertyGroup>
+
+  <ItemGroup Label="Girder">
+    <PackageVersion Include="Girder.Abstractions" Version="$(GirderVersion)" />
+    <PackageVersion Include="Girder.Application" Version="$(GirderVersion)" />
+    <PackageVersion Include="Girder.Contracts" Version="$(GirderVersion)" />
+    <PackageVersion Include="Girder.Core" Version="$(GirderVersion)" />
+    <PackageVersion Include="Girder.Data.EntityFrameworkCore" Version="$(GirderVersion)" />
+    <PackageVersion Include="Girder.InMemory" Version="$(GirderVersion)" />
+    <PackageVersion Include="Girder.Infrastructure" Version="$(GirderVersion)" />
+    <PackageVersion Include="Girder.Passwords.BCrypt" Version="$(GirderVersion)" />
+  </ItemGroup>
+
+  <ItemGroup Label="Persistenz">
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup Label="Tests">
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="FluentAssertions" Version="7.2.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="NSubstitute" Version="5.3.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+</Project>

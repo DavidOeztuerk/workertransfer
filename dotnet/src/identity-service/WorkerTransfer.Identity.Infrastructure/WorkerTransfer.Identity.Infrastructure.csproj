@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\WorkerTransfer.Identity.Application\WorkerTransfer.Identity.Application.csproj" />
+    <ProjectReference Include="..\WorkerTransfer.Identity.Domain\WorkerTransfer.Identity.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Girder.Data.EntityFrameworkCore" />
+    <PackageReference Include="Girder.Infrastructure" />
+    <PackageReference Include="Girder.Passwords.BCrypt" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
