@@ -145,9 +145,11 @@ Ein Python-Token sieht so aus (`packages/worker-auth/src/worker_auth/jwt.py`):
 | | Python → Girder | Girder → Python |
 |---|---|---|
 | HS256, gleiches Geheimnis | ✓ | ✓ |
-| `iss` / `aud` | **fehlen** → Girder lehnt ab | Python prüft sie nicht, egal |
+| `iss` | fehlt → Girder lehnt ab | Python prüft ihn nicht, harmlos |
+| `aud` | fehlt → Girder lehnt ab | **steht immer drin → Python lehnt ab** |
 | `type` | Girder prüft ihn nicht → **ein Refresh-Token gilt als Access-Token** | **fehlt** → Python lehnt ab |
 | Mandant | `tenant_id` gegen Girders `tenant` | dasselbe umgekehrt |
+| `roles` / `permissions` | Girder liest sie nicht, harmlos | **nur als Zeichenkette darstellbar → Python lehnt ab** |
 
 Der Mandanten-Punkt ist der gefährliche, weil er **lautlos** scheitert. Schaltet
 man Aussteller- und Zielgruppenprüfung ab, damit der Token durchgeht, passiert
@@ -163,6 +165,24 @@ im Token steht tenant_id = 2222…, Girder liest "tenant" — den gibt es dort n
 Ein Firmen-Akteur wird zur Privatperson. Kein Fehler, kein Protokolleintrag,
 andere Daten sichtbar. **Baue diesen Flicken nicht.**
 
+Der identity-service muss die alten Token trotzdem annehmen — beim Umstieg hält
+jeder Browser ein gültiges Zugriffs-Cookie. Das Gefährliche ist nicht, `iss` und
+`aud` zu lockern, sondern es **pauschal** zu tun und die Herabstufung
+danebenstehen zu lassen. Der Weg, der beides trennt:
+
+- `AudienceValidator` und `IssuerValidator` als Delegat statt der Flaggen:
+  *fehlt* der Anspruch, ist es der alte Aussteller und wird angenommen; *steht*
+  er drin, muss er unserer sein. Eine Regel, die man hinschreiben und prüfen
+  kann — nicht eine Prüfung, die man ausschaltet. Steht als **Ü-2** in
+  `docs/uebergang-python-dotnet.md`.
+- Ein **eigener `IPrincipalFactory`** (Girder registriert seinen mit schlichtem
+  `AddSingleton`, unserer danach gewinnt), der `tenant` und `tenant_id` liest,
+  bei `type != "access"` ablehnt, und bei einem Mandanten-Anspruch, der dasteht
+  und nicht lesbar ist, **401 antwortet statt herabzustufen**.
+
+Damit wird aus dem lautlosen Fehler ein lauter — und das ist der ganze
+Unterschied zum Flicken.
+
 ### Was daraus folgt
 
 Jeder Dienst außer identity-service prüft nur Token. Migrierst du einen davon
@@ -170,7 +190,7 @@ zuerst, muss er die Token des *Python*-Dienstes annehmen — und der einzige Weg
 dahin ist genau der Flicken oben, zehnmal wiederholt.
 
 **Also identity-service zuerst**, mit einem Übergangstoken, den beide Welten
-annehmen. Python ignoriert zusätzliche Ansprüche (gemessen), also genügt:
+annehmen. Python ignoriert *unbekannte* Ansprüche (gemessen), also genügt:
 
 ```csharp
 new UserClaims
@@ -181,20 +201,46 @@ new UserClaims
     SessionId = signIn.Session.ToString(),
     CustomClaims = new()
     {
-        ["tenant_id"]   = t.ToString(),    // ─── was Python zusätzlich braucht
-        ["type"]        = "access",
-        ["roles"]       = string.Join(",", roles),
-        ["permissions"] = string.Join(",", permissions)
+        ["tenant_id"] = t.ToString(),      // ─── was Python zusätzlich braucht
+        ["type"]      = "access"
     }
 }
 ```
 
-`iss` und `aud` setzt Girder ohnehin aus `JwtSettings`. Prüfe die Form gegen
-Pythons `TokenManager.verify_token` **und** gegen einen .NET-Dienst, bevor du
-weitergehst — das ist der Beweis, an dem alles Weitere hängt.
+**Zwei Ansprüche, nicht vier**, und beide Auslassungen sind gemessen:
 
-Wenn der Übergang abgeschlossen ist, fallen die vier `CustomClaims` weg. Setz
-dafür ein Ticket, sonst bleiben sie für immer.
+- **`roles` und `permissions` bleiben draußen.** `CustomClaims` ist ein
+  `Dictionary<string, string>`, kann also keine Liste ausdrücken; eine
+  zusammengefügte Zeichenkette lehnt Pythons `TokenPayload` ab. Weglassen geht:
+  Python setzt dann `[]`. Es kostet auch nichts, und der Grund dafür ist
+  stärker als die Messung — die Rollenprüfungen lesen aus
+  `user_tenant_memberships`, nie aus dem Token (`CLAUDE.md`: der Token sagt,
+  für *welches* Unternehmen jemand handelt, nie mit welchem Recht). Der Anspruch
+  war nie maßgeblich. `/me` und `/auth/session` beantworten die Rollen aus
+  `users.roles`, wo sie stehen. Ticket:
+  `bugs/customclaims-kann-keine-liste-ausdruecken.md`.
+- **`aud` ist der Grund, warum Python angefasst werden muss.** Girder setzt es
+  bei jedem Token und kann es nicht lassen — eine leere Zielgruppe lehnt
+  `JwtService` schon im Konstruktor ab. PyJWT weist einen Token mit `aud` ab,
+  wenn keine Zielgruppe erwartet wird (`InvalidAudienceError`). Deshalb
+  entschlüsselt `worker_auth` mit `options={"verify_aud": False}`; das ist eine
+  Zeile, keine Verschlechterung (Python hatte nie eine Zielgruppen-Erwartung)
+  und eine Schuld, die als **Ü-1** in `docs/uebergang-python-dotnet.md` steht
+  und später zu `audience=…` wird. Ticket:
+  `bugs/jwtservice-kann-nicht-ohne-aud-ausstellen.md`.
+
+`iss` setzt Girder ebenfalls aus `JwtSettings`, und der ist harmlos — PyJWT
+prüft ihn nur, wenn man ihn danach fragt.
+
+Prüfe die Form gegen Pythons `TokenManager.verify_token` **und** gegen einen
+.NET-Dienst, bevor du weitergehst — das ist der Beweis, an dem alles Weitere
+hängt. Und fahr die Gegenproben mit: falsche Signatur, abgelaufen, ein
+Refresh-Token als Zugriffstoken, ein Mandanten-Anspruch, der dasteht und nicht
+lesbar ist. Ohne sie beweist der grüne Durchlauf nur, dass etwas durchkommt.
+
+Wenn der Übergang abgeschlossen ist, fallen die zwei `CustomClaims` weg. Sie
+stehen als **Ü-3** in `docs/uebergang-python-dotnet.md`, damit sie nicht für
+immer bleiben.
 
 ---
 
@@ -221,6 +267,33 @@ beweist — und der Rest erst danach.
 **Nach jedem Schritt:** die React-App muss unverändert dagegen laufen. Wenn sie
 es nicht tut, hat sich ein Vertrag geändert, und das ist ein Fehler, kein
 Fortschritt.
+
+### Zwei Dinge, die die Scheibe nicht kann
+
+Beide sind gemessen und ändern nichts am Schnitt — aber wer sie erst beim
+Umstieg bemerkt, sucht den Fehler an der falschen Stelle.
+
+**Die Scheibe ersetzt den Python-Dienst nicht.** identity-service beantwortet
+neunzehn Routen, nicht drei: dazu `POST /auth/{register,verify-email,
+resend-verification,company/{id}}`, `GET /auth/session`, `GET /me`, acht unter
+`/companies` und `/invitations`, `POST /account/erasure` und drei für
+Benachrichtigungen. Traefik leitet `/auth`, `/me`, `/companies` und
+`/notifications` dorthin, und die React-App ruft `GET /auth/session` bei
+**jedem** Seitenaufruf. Ein Dienst mit drei Endpunkten bricht die App auf der
+ersten Seite. Schritt 1 läuft also **daneben** — eigener Port, eigenes Schema —,
+und „die React-App läuft unverändert dagegen" heißt hier: der Vertrag wird auf
+Token-Ebene bewiesen. Der Umstieg ist Schritt 2.
+
+**Der Erneuerungstoken wandert nicht mit.** Girders Erneuerungstoken ist ein
+undurchsichtiger Zufallswert in `girder_refresh_tokens`, Pythons ein JWT in
+`sessions` — andere Form, anderer Speicher. „Ein Python-Token wird angenommen"
+gilt für den **Zugriffs**token; beim Umstieg meldet sich jeder einmal neu an
+(**Ü-4**). Und weil `GirderRefreshToken` keine Mandantenspalte hat, Pythons
+`sessions` aber schon, überlebt die Firma eine Erneuerung nicht von selbst. Für
+die Scheibe egal — Anmelden gibt immer ein Personen-Token (ADR-0017) —, für
+Schritt 2 nicht: dann braucht es eine eigene Tabelle `SessionId → TenantId`, und
+weil `SessionId` über die ganze Rotationskette stabil bleibt, ist das eine Zeile
+je Anmeldung (**Ü-5**).
 
 ---
 
@@ -491,13 +564,53 @@ Aus `CLAUDE.md` und den 31 ADRs. Jede hat Geld oder Vertrauen gekostet:
 - **Die Löschung hat kein Begründungsfeld.** Von jemandem, der gehen will, eine
   Rechtfertigung zu verlangen, ist ein Hebel gegen ihn.
 - **Aggregate kommen losgelöst aus den Repositories.** Eine Änderung erreicht
-  die Datenbank nur über ein ausdrückliches `save()`. In .NET mit EF Core ist
-  das anders (Change Tracking) — **das ist eine echte Verhaltensänderung und
-  muss bewusst entschieden werden.**
+  die Datenbank nur über ein ausdrückliches `save()`. Entschieden, siehe
+  „Change Tracking" unten — und das Tragende ist nicht `AsNoTracking()`.
 - **Skill-Vokabular benennt um, es folgert nie.** ADR-0023. `"Postgres" ==
   "PostgreSQL"` ist erlaubt, `"React impliziert JavaScript"` nicht.
 - **Passung wird im Browser berechnet und existiert sonst nirgends.**
   Kein serverseitiges Matching, kein Score, keine Rangliste von Menschen.
+
+---
+
+## Change Tracking
+
+Entschieden. Der Vorschlag aus der Girder-Sitzung war `AsNoTracking()` beim
+Lesen und ein ausdrückliches `SaveAsync` beim Schreiben. Die Richtung stimmt,
+die Begründung greift zu kurz.
+
+**Was Python zusichert, ist nicht „kein Tracking", sondern: das Aggregat ist ein
+anderes Objekt als die Zeile.** `_to_domain` baut ein neues; nichts am Aggregat
+erreicht die Datenbank außer über `save()`, das Feld für Feld kopiert. Gäbe ein
+.NET-Repository EF-Entitäten mit `AsNoTracking()` heraus, müsste `save()` einen
+losgelösten Graphen `Update()`n — und das schreibt *alle* Spalten und holt genau
+die Fehlerklasse zurück, vor der die Python-Repositories warnen.
+
+Also, in dieser Reihenfolge:
+
+1. **Die Abbildung bleibt** (Zeile → Domänenobjekt). Sie ist es, die die
+   Semantik erhält, gegen die 20.000 Zeilen Python geschrieben sind.
+2. **`NoTracking` als Voreinstellung des DbContext**, nicht als Aufruf je
+   Abfrage. Ein Aufruf je Abfrage ist Disziplin, und die nächste hinzugefügte
+   Abfrage vergisst ihn.
+3. **Ausdrückliches `SaveAsync` am Repository**, damit der Schreibvorgang an der
+   Aufrufstelle steht. Das eine `SaveChangesAsync` gehört in eine UnitOfWork je
+   Anfrage — die ist **unsere**: Girder liefert `Audit`, `CacheInvalidation`,
+   `Caching`, `Logging`, `Performance`, `Validation`, aber kein
+   Transaktions-Behavior.
+4. `users.version` wird EF-Nebenläufigkeitsmarke. Das geht mit der Abbildung
+   ebenso.
+
+**Die Normalisierungsfalle** — der Grund, warum Punkt 2 hier kein
+Vorsichtsmaßnahme, sondern eine Notwendigkeit ist: `_to_domain` schickt die
+gelesenen Werte durch den Domänenkonstruktor, und der normalisiert. Er trimmt,
+entdoppelt nach `casefold`, wirft Leeres weg, weist eine feindliche URL ab.
+`companies-service` tut das ausdrücklich, „damit eine von Hand veränderte Zeile
+nicht unbemerkt durchrutscht". Mit eingeschaltetem Tracking wäre das Ergebnis
+dieser Normalisierung eine *Änderung* an einer verfolgten Entität — und ein
+reiner Lesevorgang schriebe beim nächsten `SaveChanges` Zeilen um, die niemand
+anfassen wollte. Das ist in diesem Code kein Gedankenspiel, sondern der
+Normalfall auf jedem Lesepfad.
 
 ---
 
@@ -543,25 +656,27 @@ Mal echte Fehler gefunden:
 > Girder-Dienst angenommen, und ein Python-Token wird von deinem Dienst
 > angenommen. Zeig mir das laufend, nicht als Behauptung.
 >
-> Beantworte darin ausdrücklich die Change-Tracking-Frage. Der Vorschlag aus
-> der Girder-Sitzung war: `AsNoTracking()` beim Lesen und ein ausdrückliches
-> `SaveAsync` beim Schreiben, weil das die Semantik erhält, gegen die 20.000
-> Zeilen Python geschrieben wurden, und weil der Schreibvorgang dann an der
-> Aufrufstelle steht. Prüf das und widersprich, wenn du es anders siehst.
->
 > Wenn dabei ein Fehler auftaucht: erst klären, ob er aus WorkerTransfer oder
 > aus Girder kommt. Aus Girder heißt anhalten, Ticket nach `bugs/`, melden.
 >
 > Erst nach meiner Zustimmung anfangen.
 
+**Beantwortet, damit es niemand zweimal herleitet:** die Change-Tracking-Frage
+steht im Abschnitt „Change Tracking"; die Tokenform ist gemessen und trägt zwei
+`CustomClaims`, nicht vier; die zwei Grenzen der Scheibe stehen unter
+„Vorgeschlagene Reihenfolge". Was nur wegen des Übergangs existiert, führt
+`docs/uebergang-python-dotnet.md`.
+
 ---
 
 ## Zum Schluss: was Girder noch fehlt
 
-Damit du es nicht suchst. Nichts davon blockiert `companies-service`.
+Damit du es nicht suchst. Nichts davon blockiert Schritt 1.
 
 | | |
 |---|---|
+| **Ausstellen ohne `aud`** | Geht nicht, und deshalb muss `worker_auth` es ignorieren. `bugs/jwtservice-kann-nicht-ohne-aud-ausstellen.md` |
+| **Listenwertige `CustomClaims`** | Geht nicht — ein `Dictionary<string, string>` kann keine Liste. `bugs/customclaims-kann-keine-liste-ausdruecken.md` |
 | **Outbox** | Gibt es nicht. Wird spätestens bei `transfer-service` gebraucht |
 | **`ILogSanitizer` ohne Konsumenten** | Bleibt als Werkzeug; Girder benutzt es seit dem Umstieg auf Formen nicht mehr |
 | **`DataProtectionSecretProvider` ohne Konsumenten** | ASP.NETs Schlüsselring wird angelegt und von nichts benutzt |
