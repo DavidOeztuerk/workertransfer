@@ -77,7 +77,14 @@ class TokenManager:
 
     def verify_token(self, token: str, *, expected_type: str) -> TokenPayload:
         try:
-            claims: dict[str, Any] = pyjwt.decode(token, self.secret, algorithms=[self.algorithm])
+            # `verify_aud=False` für Ü-1 in docs/uebergang-python-dotnet.md —
+            # zu `audience=…` machen, sobald kein Token ohne `aud` mehr umläuft.
+            claims: dict[str, Any] = pyjwt.decode(
+                token,
+                self.secret,
+                algorithms=[self.algorithm],
+                options={"verify_aud": False},
+            )
         except pyjwt.ExpiredSignatureError as exc:
             raise ExpiredToken("Token expired") from exc
         except pyjwt.InvalidTokenError as exc:
