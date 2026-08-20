@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
@@ -25,6 +26,7 @@
     <ProjectReference Include="..\..\src\identity-service\WorkerTransfer.Identity.Api\WorkerTransfer.Identity.Api.csproj" />
     <ProjectReference Include="..\..\src\identity-service\WorkerTransfer.Identity.Application\WorkerTransfer.Identity.Application.csproj" />
     <ProjectReference Include="..\..\src\identity-service\WorkerTransfer.Identity.Domain\WorkerTransfer.Identity.Domain.csproj" />
+    <ProjectReference Include="..\..\src\identity-service\WorkerTransfer.Identity.Infrastructure\WorkerTransfer.Identity.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
