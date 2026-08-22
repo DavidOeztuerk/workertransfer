@@ -1,6 +1,7 @@
 using Girder.Data.EntityFrameworkCore.Sessions;
 using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.Identity.Domain.Audit;
+using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Infrastructure.Persistence;
 
@@ -20,11 +21,18 @@ public sealed class UserRow
 
     public string DisplayName { get; set; } = string.Empty;
 
-    /// <summary>The <c>account_status</c> enum column, as its stored name.</summary>
-    public string Status { get; set; } = string.Empty;
+    /// <summary>The <c>account_status</c> enum column.</summary>
+    public AccountStatus Status { get; set; }
 
     /// <summary>The <c>roles</c> jsonb column, unparsed.</summary>
     public string Roles { get; set; } = "[]";
+
+    /// <summary>The company meant at registration. <c>null</c> means a person.</summary>
+    public string? PendingCompanyName { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
 
     public int Version { get; set; }
 }
@@ -43,6 +51,10 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<UserRow> Users => Set<UserRow>();
 
     public DbSet<AuditEventRow> AuditEvents => Set<AuditEventRow>();
+
+    public DbSet<TenantRow> Tenants => Set<TenantRow>();
+
+    public DbSet<VerificationTokenRow> VerificationTokens => Set<VerificationTokenRow>();
 
     public DbSet<MembershipRow> Memberships => Set<MembershipRow>();
 
@@ -66,6 +78,9 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(row => row.DisplayName).HasColumnName("display_name");
             entity.Property(row => row.Status).HasColumnName("status");
             entity.Property(row => row.Roles).HasColumnName("roles").HasColumnType("jsonb");
+            entity.Property(row => row.PendingCompanyName).HasColumnName("pending_company_name");
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at");
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at");
             entity.Property(row => row.Version).HasColumnName("version").IsConcurrencyToken();
         });
 
@@ -94,6 +109,41 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(row => row.TenantId).HasColumnName("tenant_id");
             entity.Property(row => row.Role).HasColumnName("role");
             entity.Property(row => row.GrantedAt).HasColumnName("granted_at");
+
+            // Same reason: a membership is written in the same transaction as
+            // the company it points at.
+            entity.HasOne<UserRow>().WithMany().HasForeignKey(row => row.UserId);
+            entity.HasOne<TenantRow>().WithMany().HasForeignKey(row => row.TenantId);
+        });
+
+        modelBuilder.Entity<TenantRow>(entity =>
+        {
+            entity.ToTable("tenants", t => t.ExcludeFromMigrations());
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id");
+            entity.Property(row => row.Name).HasColumnName("name");
+            entity.Property(row => row.Domain).HasColumnName("domain").HasColumnType("citext");
+            entity.Property(row => row.Status).HasColumnName("status");
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at");
+        });
+
+        modelBuilder.Entity<VerificationTokenRow>(entity =>
+        {
+            entity.ToTable("email_verification_tokens", t => t.ExcludeFromMigrations());
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id");
+            entity.Property(row => row.UserId).HasColumnName("user_id");
+            entity.Property(row => row.TokenHash).HasColumnName("token_hash");
+            entity.Property(row => row.Purpose).HasColumnName("purpose");
+            entity.Property(row => row.ExpiresAt).HasColumnName("expires_at");
+            entity.Property(row => row.ConsumedAt).HasColumnName("consumed_at");
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at");
+
+            // Not for the schema — Alembic owns that — but for the order. EF
+            // does not know a foreign key it was not told about, so without
+            // this it may insert the token before the account it belongs to,
+            // which is exactly what registering does in one transaction.
+            entity.HasOne<UserRow>().WithMany().HasForeignKey(row => row.UserId);
         });
 
         modelBuilder.Entity<SessionCapacityRow>(entity =>
@@ -166,4 +216,38 @@ public sealed class SessionCapacityRow
     public Guid SessionId { get; set; }
 
     public Guid TenantId { get; set; }
+}
+
+/// <summary>One row of <c>tenants</c>.</summary>
+public sealed class TenantRow
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>citext, so the uniqueness of a domain is case-insensitive.</summary>
+    public string Domain { get; set; } = string.Empty;
+
+    public string Status { get; set; } = "active";
+
+    public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>One row of <c>email_verification_tokens</c>.</summary>
+/// <remarks>Only the hash. A leaked row must not be an account takeover.</remarks>
+public sealed class VerificationTokenRow
+{
+    public Guid Id { get; set; }
+
+    public Guid UserId { get; set; }
+
+    public string TokenHash { get; set; } = string.Empty;
+
+    public string Purpose { get; set; } = string.Empty;
+
+    public DateTime ExpiresAt { get; set; }
+
+    public DateTime? ConsumedAt { get; set; }
+
+    public DateTime CreatedAt { get; set; }
 }

@@ -34,15 +34,7 @@ public class AnmeldenTests
 
     private void EsGibt(AccountStatus status = AccountStatus.Active) =>
         _benutzer.FindByEmailAsync("anna@example.com", Arg.Any<CancellationToken>())
-            .Returns(new User
-            {
-                Id = Anna,
-                Email = "anna@example.com",
-                PasswordHash = Eintrag,
-                DisplayName = "Anna",
-                Status = status,
-                Roles = ["user"]
-            });
+            .Returns(Konten.Bestehend(Anna, "anna@example.com", Eintrag, status));
 
     private void DasPasswortStimmt(
         PasswordVerification ergebnis = PasswordVerification.Success) =>

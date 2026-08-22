@@ -22,15 +22,7 @@ public class SitzungsstandTests
 
     private void EsGibtDasKonto() =>
         _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>())
-            .Returns(new User
-            {
-                Id = Anna,
-                Email = "anna@example.com",
-                PasswordHash = "$2b$12$x",
-                DisplayName = "Anna",
-                Status = AccountStatus.Active,
-                Roles = ["user"]
-            });
+            .Returns(Konten.Bestehend(Anna, "anna@example.com", "$2b$12$x", AccountStatus.Active));
 
     [Fact]
     public async Task Angemeldet_heisst_active_und_das_Konto_liegt_bei()
@@ -129,15 +121,7 @@ public class SitzungsstandTests
             var anna = SubjectId.New();
             _akteur.Current.Returns(Principal.Person(anna));
             _benutzer.FindByIdAsync(anna, Arg.Any<CancellationToken>())
-                .Returns(new User
-                {
-                    Id = anna,
-                    Email = "anna@example.com",
-                    PasswordHash = "$2b$12$x",
-                    DisplayName = "Anna",
-                    Status = AccountStatus.Active,
-                    Roles = ["user"]
-                });
+                .Returns(Konten.Bestehend(anna, "anna@example.com", "$2b$12$x", AccountStatus.Active));
 
             (await Konto())!.Email.Should().Be("anna@example.com");
         }

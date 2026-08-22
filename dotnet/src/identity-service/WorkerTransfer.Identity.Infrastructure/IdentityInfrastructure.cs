@@ -4,16 +4,20 @@ using Girder.Infrastructure.Security.Identity;
 using Girder.Passwords.BCrypt;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using WorkerTransfer.Identity.Application.Anmelden;
 using WorkerTransfer.Identity.Application.Behaviors;
 using WorkerTransfer.Identity.Application.Ports;
+using WorkerTransfer.Identity.Application.Registrierung;
 using WorkerTransfer.Identity.Domain.Audit;
 using WorkerTransfer.Identity.Domain.Companies;
 using WorkerTransfer.Identity.Domain.Sessions;
+using WorkerTransfer.Identity.Domain.Verification;
 using WorkerTransfer.Identity.Domain.Users;
 using WorkerTransfer.Identity.Infrastructure.Persistence;
+using WorkerTransfer.Identity.Infrastructure.Post;
 using WorkerTransfer.Identity.Infrastructure.Security;
 
 namespace WorkerTransfer.Identity.Infrastructure;
@@ -28,11 +32,18 @@ public static class IdentityInfrastructure
 {
     /// <param name="services">The container.</param>
     /// <param name="connectionString">Where the identity database lives.</param>
+    /// <param name="services">The container.</param>
+    /// <param name="configuration">Where the mail settings come from.</param>
+    /// <param name="connectionString">Where the identity database lives.</param>
     public static IServiceCollection AddIdentityInfrastructure(
         this IServiceCollection services,
+        IConfiguration configuration,
         string connectionString)
     {
         ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services.Configure<Postsettings>(configuration.GetSection(Postsettings.Abschnitt));
 
         // bcrypt reads *and* writes while the Python service can still sign
         // people in — Ü-6 in docs/uebergang-python-dotnet.md.
@@ -57,6 +68,18 @@ public static class IdentityInfrastructure
         services.AddEntityFrameworkRefreshTokens<IdentityDbContext>();
         services.AddScoped<IUserRepository, EfUserRepository>();
         services.AddScoped<IMembershipRepository, EfMembershipRepository>();
+        services.AddScoped<ICompanyRepository, EfCompanyRepository>();
+        services.AddScoped<IVerificationTokenRepository, EfVerificationTokenRepository>();
+        services.AddScoped<UnternehmenAnlegen>();
+        services.AddSingleton<IEinmaltoken, Sha256Einmaltoken>();
+        services.AddSingleton<IVersender, SmtpVersender>();
+
+        // One tray per request, and both ports on it. Queueing and sending are
+        // two interfaces so a handler can only ever put something in.
+        services.AddScoped<Postkorb>();
+        services.AddScoped<IPostkorb>(anbieter => anbieter.GetRequiredService<Postkorb>());
+        services.AddScoped<IPostkorbVersand>(
+            anbieter => anbieter.GetRequiredService<Postkorb>());
         services.AddScoped<IAuditTrail, EfAuditTrail>();
         services.AddScoped<ISessionCapacity, EfSessionCapacity>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
@@ -69,8 +92,11 @@ public static class IdentityInfrastructure
         // Girder's logging and validation run before anything is written, which
         // is where a rejected command costs nothing.
         services.AddCQRS(typeof(AnmeldenBefehl).Assembly);
-        services.AddScoped(
-            typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
+
+        // Order is the point. Sending wraps the transaction, so a confirmation
+        // link never reaches an inbox before the row it points at exists.
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(VersandBehavior<,>));
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
         return services;
     }

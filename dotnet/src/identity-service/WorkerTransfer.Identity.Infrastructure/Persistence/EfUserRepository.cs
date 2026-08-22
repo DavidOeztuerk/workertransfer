@@ -1,13 +1,12 @@
 using System.Text.Json;
 using Girder.Core.Identity;
 using Microsoft.EntityFrameworkCore;
-using WorkerTransfer.Identity.Application.Ports;
 using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Infrastructure.Persistence;
 
-/// <summary>Reads accounts out of the <c>users</c> table.</summary>
-public sealed class EfUserRepository(IdentityDbContext context) : IUserRepository
+/// <summary>Reads and writes the <c>users</c> table.</summary>
+public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr) : IUserRepository
 {
     /// <inheritdoc />
     /// <remarks>
@@ -36,13 +35,66 @@ public sealed class EfUserRepository(IdentityDbContext context) : IUserRepositor
         return row is null ? null : ZumAggregat(row);
     }
 
-    private static User ZumAggregat(UserRow row) => new()
+    /// <inheritdoc />
+    public Task AddAsync(User user, CancellationToken cancellationToken = default)
     {
-        Id = new SubjectId(row.Id),
-        Email = row.Email,
-        PasswordHash = row.PasswordHash,
-        DisplayName = row.DisplayName,
-        Status = AccountStatusNames.FromDatabase(row.Status),
-        Roles = JsonSerializer.Deserialize<List<string>>(row.Roles) ?? []
-    };
+        ArgumentNullException.ThrowIfNull(user);
+
+        var jetzt = uhr.GetUtcNow().UtcDateTime;
+
+        context.Users.Add(new UserRow
+        {
+            Id = user.Id.Value,
+            Email = user.Email,
+            PasswordHash = user.PasswordHash,
+            DisplayName = user.DisplayName,
+            Status = user.Status,
+            Roles = JsonSerializer.Serialize(user.Roles),
+            PendingCompanyName = user.PendingCompanyName,
+            CreatedAt = jetzt,
+            UpdatedAt = jetzt,
+            Version = 1
+        });
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Reads the row tracked, which the context does not do by default. The
+    /// default is right for every read path — the aggregate normalises, and a
+    /// tracked read would mark rows modified that nobody touched — and it is
+    /// wrong here, where the point <em>is</em> to modify. Reading it inside the
+    /// caller's transaction also gives the concurrency token an original to
+    /// compare against.
+    /// <para>
+    /// Only what an aggregate can change is written: neither the address nor
+    /// the password entry has a way to change on it, so writing them back would
+    /// only be an opportunity to write them back wrong.
+    /// </para>
+    /// </remarks>
+    public async Task SaveAsync(User user, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        var row = await context.Users
+            .AsTracking()
+            .FirstOrDefaultAsync(candidate => candidate.Id == user.Id.Value, cancellationToken)
+            ?? throw new InvalidOperationException(
+                $"No account {user.Id} to save. Was it added in this transaction?");
+
+        row.Status = user.Status;
+        row.PendingCompanyName = user.PendingCompanyName;
+        row.UpdatedAt = uhr.GetUtcNow().UtcDateTime;
+        row.Version += 1;
+    }
+
+    private static User ZumAggregat(UserRow row) => User.Restore(
+        new SubjectId(row.Id),
+        row.Email,
+        row.PasswordHash,
+        row.DisplayName,
+        row.Status,
+        JsonSerializer.Deserialize<List<string>>(row.Roles) ?? [],
+        row.PendingCompanyName);
 }

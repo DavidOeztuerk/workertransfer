@@ -14,15 +14,8 @@ namespace WorkerTransfer.Identity.Tests;
 /// </remarks>
 public class AnmeldeRegelnTests
 {
-    private static User Konto(AccountStatus status) => new()
-    {
-        Id = SubjectId.New(),
-        Email = "anna@example.com",
-        PasswordHash = "$2b$12$abcdefghijklmnopqrstuv",
-        DisplayName = "Anna",
-        Status = status,
-        Roles = ["user"]
-    };
+    private static User Konto(AccountStatus status) =>
+        Konten.Bestehend(SubjectId.New(), status: status);
 
     [Fact]
     public void Ein_aktives_Konto_darf_sich_anmelden()
@@ -48,28 +41,5 @@ public class AnmeldeRegelnTests
         var darf = () => Konto(status).AssertCanSignIn();
 
         darf.Should().Throw<AccountDisabledException>();
-    }
-
-    /// <summary>
-    /// The values are the ones already in the <c>account_status</c> column, so
-    /// the two systems read the same rows.
-    /// </summary>
-    [Theory]
-    [InlineData(AccountStatus.Pending, "pending")]
-    [InlineData(AccountStatus.Active, "active")]
-    [InlineData(AccountStatus.Suspended, "suspended")]
-    [InlineData(AccountStatus.Disabled, "disabled")]
-    public void Die_Zustaende_heissen_wie_in_der_Datenbank(AccountStatus status, string gespeichert)
-    {
-        AccountStatusNames.ToDatabase(status).Should().Be(gespeichert);
-        AccountStatusNames.FromDatabase(gespeichert).Should().Be(status);
-    }
-
-    [Fact]
-    public void Ein_unbekannter_Zustand_wird_nicht_geraten()
-    {
-        var lesen = () => AccountStatusNames.FromDatabase("halbwegs-aktiv");
-
-        lesen.Should().Throw<ArgumentOutOfRangeException>();
     }
 }

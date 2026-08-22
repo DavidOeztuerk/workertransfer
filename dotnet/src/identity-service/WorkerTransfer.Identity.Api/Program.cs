@@ -17,6 +17,7 @@ builder.Services.AddSharedInfrastructure(
         .AddObservability());
 
 builder.Services.AddIdentityInfrastructure(
+    builder.Configuration,
     builder.Configuration.GetConnectionString("identity")
     ?? throw new InvalidOperationException("ConnectionStrings:identity is not configured."));
 
@@ -35,6 +36,7 @@ app.UseSharedInfrastructure(builder.Environment, serviceName, pipeline => pipeli
 app.UseMiddleware<ProblemDetailsMiddleware>();
 
 app.MapAuthEndpoints();
+app.MapRegistrierungsEndpoints();
 
 await app.RunAsync();
 
