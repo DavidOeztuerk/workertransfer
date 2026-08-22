@@ -23,6 +23,7 @@ using WorkerTransfer.Identity.Infrastructure.Persistence;
 using WorkerTransfer.Identity.Infrastructure.Loeschung;
 using WorkerTransfer.Identity.Infrastructure.Post;
 using WorkerTransfer.Identity.Infrastructure.Security;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Identity.Infrastructure;
 

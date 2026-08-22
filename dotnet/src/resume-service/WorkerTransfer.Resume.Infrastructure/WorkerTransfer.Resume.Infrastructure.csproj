@@ -11,6 +11,7 @@
     <ProjectReference Include="..\WorkerTransfer.Resume.Domain\WorkerTransfer.Resume.Domain.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Consent\WorkerTransfer.Contracts.Consent.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.Outbox\WorkerTransfer.Outbox.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>

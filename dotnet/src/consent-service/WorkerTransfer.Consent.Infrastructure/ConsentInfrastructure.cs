@@ -13,6 +13,7 @@ using WorkerTransfer.Consent.Domain.Ledger;
 using WorkerTransfer.Consent.Infrastructure.Loeschung;
 using WorkerTransfer.Consent.Infrastructure.Persistence;
 using WorkerTransfer.Consent.Infrastructure.Security;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Consent.Infrastructure;
 
