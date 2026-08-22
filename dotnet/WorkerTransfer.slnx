@@ -1,5 +1,8 @@
 <Solution>
   <Folder Name="/src/" />
+  <Folder Name="/src/shared/">
+    <Project Path="src/shared/WorkerTransfer.Outbox/WorkerTransfer.Outbox.csproj" />
+  </Folder>
   <Folder Name="/src/identity-service/">
     <Project Path="src/identity-service/WorkerTransfer.Identity.Api/WorkerTransfer.Identity.Api.csproj" />
     <Project Path="src/identity-service/WorkerTransfer.Identity.Application/WorkerTransfer.Identity.Application.csproj" />
@@ -9,5 +12,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/WorkerTransfer.Identity.Tests/WorkerTransfer.Identity.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Outbox.Tests/WorkerTransfer.Outbox.Tests.csproj" />
   </Folder>
 </Solution>
