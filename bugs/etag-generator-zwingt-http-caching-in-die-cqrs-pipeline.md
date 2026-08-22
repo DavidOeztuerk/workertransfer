@@ -147,8 +147,26 @@ Schwesterticket. Ob es dort auch zuschlägt, hängt davon ab, ob
 `AddHttpResponseCaching` einen Cache mitregistriert — das ist nicht nachgesehen
 worden. Prüfen, wenn die Sitzung ohnehin in der Datei steht.
 
-## Stand
+## Stand — erledigt
 
-- [ ] gemeldet
-- [ ] in Girder behoben, Fassung: <…>
-- [ ] Schwesterticket entsprechend gekürzt (nur noch Cache, kein ETag)
+- [x] gemeldet
+- [x] in Girder behoben, Fassung: **3.0.0**
+- [x] Schwesterticket erledigt sich mit: die Anforderung nennt nur noch den Cache
+
+`CacheInvalidationBehavior` verwirft ETags direkt über `IDistributedCacheService`;
+`CacheKeys.ETagPrefix` liegt in `Girder.Abstractions.Caching`. `IETagGenerator`
+ist nach `Girder.Infrastructure.Caching.Http` gezogen, neben ihre Umsetzung —
+`Girder.Application` *kann* sie nicht mehr erreichen.
+
+**Der Nebenbefund war echt und ist mit behoben.** `ETagGenerator` nimmt
+`IDistributedCacheService` jetzt verpflichtend, die vier unerreichbaren
+Degradationszweige sind weg, und beide `AddHttpResponseCaching`-Überladungen
+melden die Anforderung an.
+
+**Ein zweiter Fehler fiel dabei auf, weil der Test gegen den Cache lief statt
+gegen einen Mock:** `Girder.InMemory.RemoveByPatternAsync` verglich das rohe
+Muster mit Schlüsseln, die das Präfix des Speichers tragen. `AddInMemoryCache`
+setzt immer eines — also traf **jedes** `InvalidationPatterns` und jedes
+`ETagInvalidationPatterns` in einer In-Memory-Installation nichts und löschte
+lautlos nichts. Redis hat sein Muster immer präfigiert; die beiden waren sich
+über denselben Vertrag uneinig. Ein Mock-Test wäre dafür blind gewesen.

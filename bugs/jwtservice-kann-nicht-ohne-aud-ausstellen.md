@@ -107,8 +107,16 @@ alten Token mehr umlaufen.
 Ein `Audience`, das leer bleiben darf und dann keinen Anspruch schreibt, würde
 die Schuld überflüssig machen.
 
-## Stand
+## Stand — kein Auftrag
 
-- [ ] gemeldet
-- [ ] in Girder behoben, Fassung: <…>
-- [ ] Umweg hier entfernt
+- [x] gemeldet
+- [ ] ~~in Girder behoben~~ — **wird nicht behoben, und das ist richtig so**
+- [ ] erledigt sich mit Ü-1, wenn Python geht (Schritt 12)
+
+Dass Girder bei jedem Token `aud` setzt, ist kein Mangel, sondern korrektes
+Verhalten. Es stört einzig an der Naht zu PyJWT, das einen Token mit `aud`
+ablehnt, wenn keine Zielgruppe erwartet wird. Die Gegenseite trägt es mit
+`options={"verify_aud": False}` in `worker_auth` — das ist Ü-1 in
+`docs/uebergang-python-dotnet.md`, also Gerüst mit Verfallsdatum.
+
+Hier ist nichts zu beheben, nur etwas zu löschen, und das passiert in Schritt 12.
