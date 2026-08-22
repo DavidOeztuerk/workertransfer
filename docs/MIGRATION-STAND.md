@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-23, nach dem Abbruch von Welle 1.
+**Zuletzt fortgeschrieben:** 2026-08-23, nach `consent`.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -18,12 +18,12 @@ was davon getan ist.
 | | |
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
-| **Phase B — die neun Dienste** | **Welle 1 abgebrochen**, Arbeit gesichert in `02d80a4` |
+| **Phase B — die neun Dienste** | **1 von 9 fertig** (`consent`). profile und resume angefangen |
 | **Phase C — Zusammenbau** | nicht begonnen |
 | **Prüfer** | nicht begonnen |
-| **Tests** | 211 grün, 0 rot, 0 übersprungen |
+| **Tests** | 261 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
-| **Nicht in der Solution** | consent, profile, resume — sie übersetzen noch nicht |
+| **Nicht in der Solution** | profile, resume — sie übersetzen noch nicht |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
 
@@ -89,15 +89,14 @@ nicht übersetzen, würde das den Gesamtbau roten, und dann sagt `dotnet build`
 | Domain | steht | steht | steht |
 | Application | steht | steht | steht |
 | Infrastructure | steht | steht | steht |
-| Contracts | fehlt | leeres Projekt | steht |
-| **Api** | **fehlt ganz** | nur `Program.cs`, **keine Endpunkte** | nur `.csproj`, **kein `Program.cs`** |
-| **EF-Migrationen** | **fehlen** | **fehlen** | **fehlen** |
-| Tests | 1 Datei | 4 Dateien | **keine** |
-| Übersetzt | ungeprüft | ungeprüft | ungeprüft |
+| Contracts | steht | leeres Projekt | steht |
+| **Api** | steht | nur `Program.cs`, **keine Endpunkte** | nur `.csproj`, **kein `Program.cs`** |
+| **EF-Migrationen** | steht | **fehlen** | **fehlen** |
+| Tests | 50 | 4 Dateien, keine Integrationstests | **keine** |
+| Übersetzt | ja, grün | ungeprüft | ungeprüft |
 
-**Allen dreien fehlt dasselbe:** die Api-Schicht mit den Routen, die
-EF-Migrationen, und der Nachweis, dass es übersetzt und grün ist. Keinem fehlt
-nur eine Kleinigkeit.
+**profile und resume fehlt dasselbe:** die Api-Schicht mit den Routen, die
+EF-Migrationen, und der Nachweis, dass es übersetzt und grün ist.
 
 ### So wird Welle 1 fortgesetzt
 
@@ -134,8 +133,13 @@ Keiner der drei kam bis zu seinem Bericht. Was beim Fortsetzen zu klären ist:
   gebaut (`Domain/Faehigkeiten/Wortschatz.cs`); `jobs` braucht dieselbe in
   Welle 2. Spätestens dann nach `dotnet/src/shared/WorkerTransfer.Skills`
   ziehen — nicht vorher, sonst schreiben zwei Agenten dieselbe Datei.
-- **Ob die drei überhaupt übersetzen, ist ungeprüft.** Sie standen nie in der
+- **Ob profile und resume übersetzen, ist ungeprüft.** Sie stehen nicht in der
   Solution und wurden nie gebaut.
+- **Zwei Testerwartungen an consent waren falsch, nicht der Code** — beide
+  Korrekturen stehen in `b06d2bd` und sind der Sache nach interessant: das
+  Fähigkeitsmuster prüft die Form und nicht das Vokabular, und `retained = 0`
+  bei bleibender Kette ist kein Widerspruch, weil `retained` Zeilen zählt, die
+  ein Aufbewahrungsschalter gerettet hat, und nicht anonymisierten Beweis.
 
 ### Eine Lehre, die bleibt
 
