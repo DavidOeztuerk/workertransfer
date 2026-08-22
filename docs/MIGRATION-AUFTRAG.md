@@ -5,6 +5,11 @@ Nachschlagewerk — Schichten, Girder je Paket, Fallen, Zweigstrategie. Lies bei
 dann fang an. **Ohne Rückfragen.** Alle Entscheidungen, die getroffen werden
 mussten, stehen hier.
 
+**Wo die Arbeit gerade steht, sagt `docs/MIGRATION-STAND.md`.** Diese Datei hier
+sagt, was zu tun ist; jene sagt, was davon getan ist. Lies sie zuerst, wenn du
+eine laufende Migration aufnimmst — sonst analysierst du dir wieder zusammen,
+was schon jemand aufgeschrieben hat.
+
 Am Ende läuft alles auf .NET mit Girder, Python ist restlos weg, und die Vision
 steht.
 
@@ -106,18 +111,30 @@ zehn Agenten sie parallel raten, bekommst du zehn Varianten.
 
 Committe Phase A, bevor du Agenten startest.
 
-### Phase B — die Dienste, parallel, ein Agent je Dienst
+### Phase B — die Dienste, in drei Wellen zu dritt
 
-Neun Agenten, gleichzeitig. Sie berühren einander nicht: eigener Ordner, eigenes
-Schema, eigene Tests.
+Neun Dienste, ein Agent je Dienst. Sie berühren einander nicht: eigener Ordner,
+eigenes Schema, eigene Tests, und sie reden nur über die Verträge aus Phase A
+miteinander — die stehen. Kein Agent wartet fachlich auf einen anderen.
 
-```
-consent · profile · resume · portfolio · jobs
-companies · applications · transfer · notification
-```
+**Trotzdem laufen sie nicht alle neun gleichzeitig, sondern in drei Wellen zu
+dritt.** Der erste Versuch mit neun parallelen Agenten ist am Ausgabelimit
+gestorben, bevor einer eine Datei angelegt hatte — neun Agenten, die alle
+gleichzeitig `CLAUDE.md`, die ADRs, den Python-Dienst und die Vorlage lesen,
+verbrauchen das Fenster mit Lesen und kommen nicht zum Schreiben.
 
-**Warum das parallel geht:** die Dienste reden nur über die Verträge aus Phase A
-miteinander, und die stehen. Kein Agent wartet auf einen anderen.
+| Welle | Dienste | Warum diese drei |
+|---|---|---|
+| **1** | `consent` · `profile` · `resume` | An ihnen hängen die Einwilligungsregeln. Sie prüfen die Vorlage am härtesten, und was dabei über sie herauskommt, hilft den folgenden sechs |
+| **2** | `portfolio` · `jobs` · `applications` | Ablage, Anzeigen, Bewerbungen — die drei mit eigenem Zuschnitt und je einer Aufbewahrungskonstante bzw. Speicherfrage |
+| **3** | `companies` · `transfer` · `notification` | Die Abgrenzung zu identity, die Outbox im zweiten Dienst, und der neue Dienst |
+
+**Zwischen den Wellen wird `docs/MIGRATION-STAND.md` fortgeschrieben** — was
+fertig ist, was gerade läuft, was als Nächstes kommt. Wer die Arbeit aufnimmt,
+liest diese eine Datei und nicht den halben Verlauf.
+
+**Erst wenn eine Welle vollständig zurückgemeldet hat**, startet die nächste.
+Fällt ein Agent aus, wird nur er neu gestartet, nicht die Welle.
 
 Jeder Agent bekommt den Auftrag unten, mit seinem Dienstnamen eingesetzt.
 
