@@ -495,19 +495,76 @@ Anwendungsschicht, und die Handler bekommen `IRequest`/`IRequestHandler`.
 Was Girder **nicht** liefert, ist ein Transaktions-Behavior. Das eine
 `SaveChangesAsync` gehört in eine UnitOfWork je Anfrage, und die ist unsere.
 
-**Wohin gehören Domänenereignisse und ausgehende Ereignisse?** Die Löschkaskade
-(ADR-0027) verschickt an sieben Empfänger und gilt erst als fertig, wenn keine
-Outbox-Zeile mehr ohne `delivered_at` steht. **Girder hat keine Outbox.** Der
-Schnitt, wenn du sie baust: Tabelle und „Absicht in derselben Transaktion
-aufschreiben" gehören nach Girder, der Versand-Dienst ist eine
-Hintergrundschleife und gehört der Anwendung — dieselbe Trennung wie bei
-`IRefreshTokenStore.PurgeAsync`. Kläre das, **bevor** du die Löschung baust.
+**Wohin gehören Domänenereignisse und ausgehende Ereignisse?** Domänenereignisse
+bleiben im Aggregat und werden beim Speichern eingesammelt, nicht als
+Mediator-Notification verschickt: ein Ereignis, das den Handler verlässt, bevor
+die Transaktion committet, ist genau der Fehler, den die Outbox abschafft.
 
-Drei Eigenschaften der Outbox sind tragend und leicht wegzuräumen: sie hält
-**keinen Inhalt**, nur `user_id` und `kind` (sie landet in jedem Backup); Aufgeben
-heißt **die Zeile stehen lassen**, nie löschen; und die Zustellung der Löschung
-**muss scheitern können** — ein toter Empfänger blockiert die Fertigmeldung, und
-das ist der Sinn.
+Die Löschkaskade (ADR-0027) verschickt an sieben Empfänger und gilt erst als
+fertig, wenn keine Outbox-Zeile mehr ohne `delivered_at` steht. **Girder hat
+keine Outbox.**
+
+### Wo sie liegt
+
+Der Mechanismus wird geteilt: `dotnet/src/shared/WorkerTransfer.Outbox`. **Die
+Tabelle liegt in der Datenbank des schreibenden Dienstes** — identitys
+Löschabsichten in identitys Schema, in identitys Transaktion. Das ist der ganze
+Punkt des Musters: die Zeile committet gemeinsam mit der Domänenänderung. Läge
+sie bei einem zentralen Dienst, wäre es eine verteilte Transaktion, also genau
+das, was die Outbox vermeiden soll — und der Vollständigkeitsbeweis aus ADR-0027
+wäre keiner mehr.
+
+Ein notification-service kommt später und ist der **Empfänger**, nicht der Ort
+der Outbox. Zur Kontrolle: die Löschkaskade ist überhaupt keine Benachrichtigung
+— sieben Löschabsichten an sieben Dienste hätten dort nichts zu suchen.
+
+Der Schnitt innerhalb der Bibliothek ist derselbe wie bei
+`IRefreshTokenStore.PurgeAsync`: Tabelle und „Absicht in derselben Transaktion
+aufschreiben" gehören in die Bibliothek, der Zusteller ist eine
+Hintergrundschleife und gehört dem Dienst.
+
+### Selbst gebaut, nicht MassTransit — entschieden
+
+`Girder.Messaging.MassTransit` liegt bereit und bringt eine erprobte
+Transactional Outbox mit. Sie wird hier trotzdem nicht benutzt, aus drei Gründen
+in dieser Gewichtung:
+
+1. **Es gibt keinen Broker, und es soll keinen geben.** MassTransits Outbox ist
+   eine Brücke zu einem Bus. ADR-0025 hat `worker-messaging` samt
+   `RabbitMQHealthCheck` gelöscht, weil dieses System nie einen Broker betrieben
+   hat. Einen einzuführen, damit sieben HTTP-Aufrufe zuverlässig werden, ist ein
+   großer Betriebsaufwand für nichts — in Compose, in k8s, in CI.
+2. **Die Löschsemantik kämpft gegen das Rahmenwerk.** Kein Versuchslimit, ein
+   toter Empfänger *blockiert* die Fertigmeldung, die Reihenfolge ist erzwungen
+   (sieben Bestätigungen → Schlussmail → dann fällt `users`), und `Deferred`
+   heißt „noch nicht", ohne einen Versuch zu verbrauchen. Ein Bus will
+   dead-lettern und weitergehen. Das ist Orchestrierung, kein Pub/Sub.
+3. **Die `payload`-Spalte.** MassTransit speichert den Nachrichtenrumpf. ADR-0025
+   hält bewusst **keinen Inhalt**, nur `user_id` und `kind` — eine Outbox landet
+   in jedem Backup. Jede Nachricht ist ein *Verweis*, kein Dokument; der
+   Empfänger liest den aktuellen Stand selbst nach. Das ist der schwächste der
+   drei Gründe und trotzdem einer: das Argument des ADR ist die Einladung, und
+   die Einladung ist die Spalte.
+
+**Was wir dafür selbst leisten müssen, und zwar von Anfang an:** `FOR UPDATE SKIP
+LOCKED` beim Holen der offenen Zeilen. Die Python-Fassung hat es nicht, und
+deshalb steht `replicaCount: 1` im Helm-Chart — zwei Zusteller greifen dieselben
+Zeilen und jede Mail geht doppelt raus. Das ist einer von drei Gründen für die
+eine Replik; hier fällt er weg, wenn es gleich richtig gebaut wird.
+
+**Das ist kein Urteil über MassTransit.** Wenn notification-service kommt und
+echtes Fan-out über einen Bus braucht, ist es dort das richtige Werkzeug — mit
+seiner eigenen Outbox. Beide vertragen sich; was hier entschieden ist, betrifft
+die Löschkaskade und die Benachrichtigungen von identity und transfer.
+
+### Die drei tragenden Eigenschaften
+
+Sie sind leicht wegzuräumen: die Outbox hält **keinen Inhalt**, nur `user_id` und
+`kind`; Aufgeben heißt **die Zeile stehen lassen**, nie löschen; und die
+Zustellung der Löschung **muss scheitern können** — ein toter Empfänger blockiert
+die Fertigmeldung, und das ist der Sinn.
+
+Kläre die Form, **bevor** du die Löschung baust.
 
 ---
 
