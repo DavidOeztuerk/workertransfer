@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\WorkerTransfer.Consent.Application\WorkerTransfer.Consent.Application.csproj" />
     <ProjectReference Include="..\WorkerTransfer.Consent.Domain\WorkerTransfer.Consent.Domain.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>

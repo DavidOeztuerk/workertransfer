@@ -1,28 +1,26 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
-namespace WorkerTransfer.Consent.Infrastructure.Security;
+namespace WorkerTransfer.ServiceDefaults;
 
 /// <summary>
 /// Lets the access token arrive as a cookie as well as a header.
 /// </summary>
 /// <remarks>
-/// Both carriers are needed and neither is optional. Consuming services and CLI
+/// Both carriers are needed and neither is optional. Service-to-service and CLI
 /// callers send <c>Authorization: Bearer</c>; a browser never sees the token at
 /// all — it is <c>httpOnly</c>, and the only thing the page can do is let the
-/// cookie ride along. Without this, the consent page is anonymous to this
-/// service while the sign-in looks like it worked, and every switch on it comes
-/// back <c>401</c>.
+/// cookie ride along. Without this, every request from the app is anonymous
+/// while the sign-in looks like it worked.
 /// <para>
-/// Copied from identity-service rather than shared: thirty lines lifted into a
-/// common package would be a coupling point across a service boundary, and its
-/// price is higher than the copy's (ADR-0004). What must not be copied is the
-/// <em>meaning</em> — which cookie a service reads is its own decision, and
-/// this one only ever reads, never sets.
+/// Shared rather than repeated per service: the third copy is where the rule
+/// starts to differ by service, and a service that reads the cookie one way
+/// while its neighbour reads it another is a bug nobody can see from either
+/// side.
 /// </para>
 /// </remarks>
-public static class Zugriffscookie
+public static class ZugriffsCookie
 {
-    /// <summary>The cookie identity-service sets on sign-in.</summary>
+    /// <summary>The cookie the sign-in endpoints set.</summary>
     public const string Name = "access";
 
     /// <summary>Reads the token out of the cookie when no header carried one.</summary>
