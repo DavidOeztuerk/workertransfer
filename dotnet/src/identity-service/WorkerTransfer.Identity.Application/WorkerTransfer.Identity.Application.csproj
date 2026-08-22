@@ -2,7 +2,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WorkerTransfer.Identity.Domain\WorkerTransfer.Identity.Domain.csproj" />
-    <ProjectReference Include="..\WorkerTransfer.Identity.Contracts\WorkerTransfer.Identity.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

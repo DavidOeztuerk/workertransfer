@@ -19,7 +19,7 @@ const saveCompanyProfile = vi.mocked(client.saveCompanyProfile);
 const TENANT = "11111111-1111-1111-1111-111111111111";
 
 function principal(tenantId: string | null): MeResponse {
-  return { user_id: "u", email: "chef@firma.example", tenant_id: tenantId, roles: ["user"] };
+  return { user_id: "u", email: "chef@firma.example", tenant_id: tenantId };
 }
 
 function profile(): CompanyProfile {

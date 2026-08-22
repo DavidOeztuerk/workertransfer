@@ -40,7 +40,7 @@ const TENANT = "22222222-2222-2222-2222-222222222222";
 const TRANSFER = "33333333-3333-3333-3333-333333333333";
 
 function principal(tenantId: string | null): MeResponse {
-  return { user_id: "u", email: "chef@firma.example", tenant_id: tenantId, roles: ["user"] };
+  return { user_id: "u", email: "chef@firma.example", tenant_id: tenantId };
 }
 
 function transfer(overrides: Partial<Transfer> = {}): Transfer {

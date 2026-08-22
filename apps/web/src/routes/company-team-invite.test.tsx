@@ -30,7 +30,7 @@ const TENANT = "11111111-1111-1111-1111-111111111111";
 const ME = "33333333-3333-3333-3333-333333333333";
 
 function principal(tenantId: string | null): MeResponse {
-  return { user_id: ME, email: "chef@firma.example", tenant_id: tenantId, roles: ["user"] };
+  return { user_id: ME, email: "chef@firma.example", tenant_id: tenantId };
 }
 
 function member(role: "admin" | "member", id = ME, name = "Chefin"): CompanyMember {

@@ -21,6 +21,11 @@ public sealed record RenewedSession(
     string RefreshToken,
     DateTimeOffset ExpiresAt);
 
+/// <summary>A sign-in that was ended.</summary>
+/// <param name="Session">Which sign-in it was.</param>
+/// <param name="Subject">Whose it was, from the stored record.</param>
+public sealed record BeendeteSitzung(SessionId Session, SubjectId Subject);
+
 /// <summary>Beginning, carrying forward and ending a sign-in.</summary>
 /// <remarks>
 /// Names no storage and no token format. The refresh token is opaque by
@@ -48,9 +53,16 @@ public interface ISessionService
     /// <summary>
     /// Ends the sign-in a refresh token belongs to, and retires the token.
     /// </summary>
+    /// <returns>
+    /// Which sign-in was ended, or <c>null</c> when the token belonged to none.
+    /// The caller needs both parts: the sign-in, to forget what it was acting
+    /// as, and the person, to record who signed out.
+    /// </returns>
     /// <remarks>
     /// Idempotent: a token that was never issued, already used or expired has
     /// no sign-in to end, and that is not an error.
     /// </remarks>
-    Task EndByRefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default);
+    Task<BeendeteSitzung?> EndByRefreshTokenAsync(
+        string refreshToken,
+        CancellationToken cancellationToken = default);
 }

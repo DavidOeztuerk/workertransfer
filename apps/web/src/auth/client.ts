@@ -24,7 +24,9 @@ export interface MeResponse {
   // null while acting as a person. A tenant is a company (ADR-0017) and only
   // becomes active after switching into one the user is a member of.
   tenant_id: string | null;
-  roles: readonly string[];
+  // Keine Rollen. Nichts hier hat sie je gelesen, und jede
+  // Berechtigungsprüfung im System liest `user_tenant_memberships` je
+  // Vorgang — ein Feld, das niemand liest, veraltet und wird dann geglaubt.
 }
 
 export interface RegisterInput {

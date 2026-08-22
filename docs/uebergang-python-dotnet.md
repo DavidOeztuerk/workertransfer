@@ -105,20 +105,31 @@ sondern eine einmalige Folge, die notiert ist, damit sie beim Umstieg niemanden
 
 ## Ü-5 · Der Mandant überlebt eine Erneuerung nicht von selbst
 
-**Wo:** noch nicht gebaut — fällig in Schritt 2, mit `POST /auth/company/{id}`.
+**Wo:** `session_capacities`, Migration `HandlungsformDerSitzung`, dazu
+`ISessionCapacity` (Domäne) und `EfSessionCapacity` (Infrastruktur).
 
-**Jetzt:** Pythons `sessions` trägt eine `tenant_id`, und `handle_refresh` stellt
-die Firma nach erneuter Mitgliedsprüfung wieder her. `GirderRefreshToken` hat
-keine solche Spalte.
+**Jetzt:** Pythons `sessions` trägt eine `tenant_id`, und `handle_refresh`
+stellt die Firma nach erneuter Mitgliedsprüfung wieder her.
+`GirderRefreshToken` hat keine solche Spalte.
 
 **Was daraus wird:** eine eigene kleine Tabelle `SessionId → TenantId`. Weil
 `SessionId` über die ganze Rotationskette stabil bleibt, ist das eine Zeile je
-Anmeldung, nicht je Erneuerung.
+Anmeldung, nicht je Erneuerung. Eine fehlende Zeile heißt „handelt für sich
+selbst" — die Anmeldung einer Privatperson schreibt hier gar nichts.
+
+**Woran man merkt, dass es Zeit ist:** wenn `GirderRefreshToken` eine
+Mandantenspalte bekommt. Solange nicht, bleibt die Tabelle — sie ist dann keine
+Übergangsschuld mehr, sondern der Ort, an dem diese Frage beantwortet wird.
 
 **Kosten des Vergessens:** wer für eine Firma handelt, ist eine Viertelstunde
 später wieder Privatperson — lautlos, mitten in der Arbeit. Genau die
 Herabstufung, vor der `docs/MIGRATION-PROMPT.md` warnt, nur durch eine andere
 Tür.
+
+**Nicht wegzukürzen:** die Mitgliedschaft wird bei **jeder** Erneuerung neu
+geprüft und nie aus der Zeile geglaubt. Einmal geprüft ist der Nachweis genau
+einmal gut; wer hineingelassen wurde, bliebe drin, solange er weiter erneuert —
+lange nachdem das Unternehmen ihn entfernt hat.
 
 ---
 
