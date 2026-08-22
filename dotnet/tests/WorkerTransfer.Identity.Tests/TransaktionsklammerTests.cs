@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Girder.Abstractions.Security.Sessions;
 using Girder.Core.Identity;
 using Girder.Data.EntityFrameworkCore;
 using Girder.Data.EntityFrameworkCore.Sessions;
@@ -96,11 +97,17 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// A refresh does not: <c>TryConsumeAsync</c> opens a transaction of its
-    /// own, and the connection already has one.
+    /// Und eine Erneuerung ebenso: sie tritt der offenen Klammer bei, statt eine
+    /// zweite zu öffnen, und die Rotation wird mit der Arbeit des Aufrufers
+    /// dauerhaft.
     /// </summary>
+    /// <remarks>
+    /// Bis Girder 3.0.1 warf diese Stelle
+    /// <c>"The connection is already in a transaction"</c> — der Grund, warum
+    /// <c>POST /auth/refresh</c> und <c>/auth/logout</c> eine Weile rot standen.
+    /// </remarks>
     [Fact]
-    public async Task Eine_Erneuerung_laeuft_nicht_in_einer_offenen_Transaktion()
+    public async Task Eine_Erneuerung_laeuft_in_einer_offenen_Transaktion()
     {
         using var bereich = _anbieter.CreateScope();
         var kontext = bereich.ServiceProvider.GetRequiredService<NurGirderKontext>();
@@ -109,10 +116,19 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
         var angemeldet = await sitzungen.SignInAsync(SubjectId.New());
 
         await using var klammer = await kontext.Database.BeginTransactionAsync();
+        var erneuert = await sitzungen.RefreshAsync(angemeldet.RefreshToken);
+        await klammer.CommitAsync();
 
-        var erneuern = async () => await sitzungen.RefreshAsync(angemeldet.RefreshToken);
+        erneuert.Succeeded.Should().BeTrue();
+        erneuert.RefreshToken.Should().NotBeNullOrEmpty()
+            .And.NotBe(angemeldet.RefreshToken, "eine Erneuerung rotiert den Token");
 
-        (await erneuern.Should().ThrowAsync<InvalidOperationException>())
-            .WithMessage("*already in a transaction*");
+        // Nach dem Commit des Aufrufers: der alte Token ist wirklich verbraucht.
+        // Ihn erneut vorzulegen nimmt jetzt den Zweig für eine bereits gedrehte
+        // Zeile — innerhalb des Kulanzfensters also ein Geschwister, kein
+        // Diebstahl. Das beweist, dass die Rotation an der Klammer des Aufrufers
+        // hing und dessen Commit überlebt hat; ohne sie stünde hier Rotated.
+        var nochmal = await sitzungen.RefreshAsync(angemeldet.RefreshToken);
+        nochmal.Outcome.Should().Be(ConsumeOutcome.RotatedWithinGrace);
     }
 }
