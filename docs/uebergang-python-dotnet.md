@@ -156,3 +156,56 @@ service ist aufgegeben — also wenn `apps/identity-service` gelöscht wird.
 
 **Kosten des Vergessens:** keine akuten. bcrypt mit 12 Runden ist in Ordnung;
 es ist nur nicht mehr die beste verfügbare Wahl.
+
+---
+
+## Ü-7 · Der `CREATE TYPE`-Guard in den EF-Migrationen
+
+**Wo:** `HandlungsformDerSitzung` in `apps`-Schreibweise
+`dotnet/src/identity-service/…/Persistence/Migrations/`. Wortgleich in jedem
+weiteren Dienst, dessen Alembic-Schema einen Postgres-Enum besitzt.
+
+**Gemessen, damit niemand raten muss:** es sind **drei Typen in zwei Diensten**,
+nicht vier. `identity-service` hat `account_status` und `audit_action`,
+`consent-service` hat `consent_audit_action`. Die übrigen acht Dienste haben
+keinen; was dort nach einem Enum aussieht, sind Unique-Constraints und ein
+Check-Constraint (`ck_consent_events_action`).
+
+**Jetzt:** EF braucht den Enum im Modell, sonst schickt es die Spalte als
+`integer` und Postgres weist sie ab. Steht er im Modell, will die erzeugte
+Migration ihn bedingungslos anlegen — auf einer Datenbank, die Alembic schon
+angelegt hat. Also steht statt `AlterDatabase()` ein Guard im `Up`:
+
+```sql
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'audit_action') THEN
+        CREATE TYPE audit_action AS ENUM (…);
+    END IF;
+END $$;
+```
+
+**Warum ein Guard und nicht „nach Schritt 12 einmal anlegen":** der Guard ist in
+beiden Welten richtig und braucht kein Gedächtnis. Eine Migration, die erst
+später etwas tun soll, verlangt von jemandem, sich zum richtigen Zeitpunkt daran
+zu erinnern — und genau das passiert nicht.
+
+**Was daraus wird:** ein schlichtes `CREATE TYPE`. Nach Schritt 12 gibt es kein
+Alembic mehr, das ihn vorher angelegt haben könnte, und dann ist die Bedingung
+eine Bedingung über einen Fall, den es nicht mehr gibt.
+
+**Woran man merkt, dass es Zeit ist:** `apps/identity-service` und
+`apps/consent-service` sind gelöscht.
+
+**Die Falle, und deshalb der Test:** `IF NOT EXISTS` fragt nach dem **Namen**,
+nicht nach den **Werten**. Eine Datenbank, deren Etiketten von dem abweichen,
+was der Dienst schreibt, läuft durch den Guard und scheitert erst bei der ersten
+Einfügung — was bei `invitation_withdrawn` die erste je zurückgenommene
+Einladung sein kann, Monate später. `PruefspurEtikettenTests` nagelt die Menge
+deshalb dreifach fest: ausgeschrieben, gegen `pg_enum` der echten Spalte, und
+gegen die SQL des Guards selbst. Gegenprobe gefahren: ein geändertes Etikett
+lässt zwei der drei Tests fallen.
+
+**Kosten des Vergessens:** ein `DO $$`-Block, der eine Bedingung prüft, die
+niemand mehr verstehen muss — und, ohne den Test, ein Guard, der grün durchläuft
+und den Fehler auf die erste frische Datenbank verschiebt.
