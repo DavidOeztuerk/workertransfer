@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-22, beim Start von Welle 1.
+**Zuletzt fortgeschrieben:** 2026-08-23, nach dem Abbruch von Welle 1.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -18,11 +18,12 @@ was davon getan ist.
 | | |
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
-| **Phase B — die neun Dienste** | **Welle 1 läuft** (consent · profile · resume) |
+| **Phase B — die neun Dienste** | **Welle 1 abgebrochen**, Arbeit gesichert in `02d80a4` |
 | **Phase C — Zusammenbau** | nicht begonnen |
 | **Prüfer** | nicht begonnen |
 | **Tests** | 211 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
+| **Nicht in der Solution** | consent, profile, resume — sie übersetzen noch nicht |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
 
@@ -71,27 +72,49 @@ gehen an `notification-service`.
 ## Phase B — die neun Dienste
 
 Ein erster Versuch mit neun gleichzeitigen Agenten ist am Ausgabelimit
-gestorben, bevor einer eine Datei angelegt hatte; im Repository ist davon nichts
-zurückgeblieben. Deshalb drei Wellen zu dritt.
+gestorben, bevor einer eine Datei angelegt hatte. Der zweite Versuch — Welle 1
+mit dreien — ist **ebenfalls am Ausgabelimit gestorben**, aber deutlich später:
+alle drei hatten Domäne, Anwendung und Infrastruktur weitgehend geschrieben.
 
-**Welle 1 läuft seit dem Stand dieser Zeile.** Solange sie läuft, ist der
-Arbeitsbaum nicht sauber und die Solution kennt die neuen Projekte noch nicht —
-das ist erwartet, nicht kaputt.
+**Diese Arbeit ist in `02d80a4` gesichert.** Der Commit baut nicht und soll es
+nicht; er verhindert nur, dass ein unachtsames Kommando sie kostet. Die
+Projekte stehen **absichtlich nicht** in `WorkerTransfer.slnx`: solange sie
+nicht übersetzen, würde das den Gesamtbau roten, und dann sagt `dotnet build`
+über identity und die geteilten Pakete nichts mehr aus.
 
-| Welle | Dienst | Port | Stand | Commit |
-|---|---|---|---|---|
-| 1 | `consent` | 8002 | **läuft** | — |
-| 1 | `profile` | 8003 | **läuft** | — |
-| 1 | `resume` | 8004 | **läuft** | — |
-| 2 | `portfolio` | 8005 | offen | — |
-| 2 | `jobs` | 8006 | offen | — |
-| 2 | `applications` | 8007 | offen | — |
-| 3 | `companies` | 8008 | offen | — |
-| 3 | `transfer` | 8009 | offen | — |
-| 3 | `notification` | 8010 | offen | — |
+### Wo die drei genau stehen
 
-`github-service` fällt ersatzlos weg (ADR-0022) und steht deshalb nicht in
-dieser Liste.
+| | consent | profile | resume |
+|---|---|---|---|
+| Domain | steht | steht | steht |
+| Application | steht | steht | steht |
+| Infrastructure | steht | steht | steht |
+| Contracts | fehlt | leeres Projekt | steht |
+| **Api** | **fehlt ganz** | nur `Program.cs`, **keine Endpunkte** | nur `.csproj`, **kein `Program.cs`** |
+| **EF-Migrationen** | **fehlen** | **fehlen** | **fehlen** |
+| Tests | 1 Datei | 4 Dateien | **keine** |
+| Übersetzt | ungeprüft | ungeprüft | ungeprüft |
+
+**Allen dreien fehlt dasselbe:** die Api-Schicht mit den Routen, die
+EF-Migrationen, und der Nachweis, dass es übersetzt und grün ist. Keinem fehlt
+nur eine Kleinigkeit.
+
+### So wird Welle 1 fortgesetzt
+
+Je Dienst ein Agent, mit demselben Auftrag wie beim Start — **plus dem Hinweis,
+dass Domäne, Anwendung und Infrastruktur schon liegen und er dort weitermacht,
+statt neu anzufangen.** Reihenfolge der verbleibenden Arbeit:
+
+1. Api-Projekt anlegen bzw. vervollständigen: `Program.cs` auf
+   `AddWorkerTransferDefaults` / `UseWorkerTransferDefaults`, dann die Routen.
+2. EF-Migration erzeugen (`dotnet ef migrations add …`).
+3. Tests schreiben — Einheitentests **und** Integrationstests gegen
+   Testcontainers, mit `Database.MigrateAsync()`.
+4. Gegenproben fahren.
+5. Bauen und testen, **in getrennten Aufrufen**, nur auf den eigenen Projekten.
+6. Committen; damit ist die WIP-Bedingung für diesen Dienst aufgehoben.
+
+Erst wenn ein Dienst übersetzt und grün ist, kommt er in die Solution.
 
 ### Was nach jeder Welle zu tun ist
 
@@ -105,7 +128,22 @@ dieser Liste.
 
 ### Offene Punkte, die ein Agent gemeldet hat
 
-Noch keine.
+Keiner der drei kam bis zu seinem Bericht. Was beim Fortsetzen zu klären ist:
+
+- **Die Fähigkeitentabelle gehört geteilt.** `profile` hat sie dienstintern
+  gebaut (`Domain/Faehigkeiten/Wortschatz.cs`); `jobs` braucht dieselbe in
+  Welle 2. Spätestens dann nach `dotnet/src/shared/WorkerTransfer.Skills`
+  ziehen — nicht vorher, sonst schreiben zwei Agenten dieselbe Datei.
+- **Ob die drei überhaupt übersetzen, ist ungeprüft.** Sie standen nie in der
+  Solution und wurden nie gebaut.
+
+### Eine Lehre, die bleibt
+
+Zwei Anläufe sind am Ausgabelimit gescheitert, nicht an der Sache. Drei Agenten
+gleichzeitig reichen aus, um es zu erschöpfen, wenn jeder einen Dienst von der
+Domäne bis zur Api baut. Beim nächsten Anlauf bekommt **ein Agent einen Dienst
+und einen abgeschlossenen Abschnitt** — erst Api und Migration, dann in einem
+zweiten Lauf die Tests —, statt alles in einem Zug.
 
 ---
 
