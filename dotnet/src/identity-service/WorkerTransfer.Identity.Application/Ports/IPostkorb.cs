@@ -57,4 +57,17 @@ public interface IPostkorb
     /// <param name="firma">Which company, so the recipient can recognise it.</param>
     /// <param name="klartextToken">The token, in the clear. Only ever here and in the mail.</param>
     void Einladung(string an, SubjectId einladender, string firma, string klartextToken);
+
+    /// <summary>"Your account is gone."</summary>
+    /// <remarks>
+    /// Says only <em>that</em> it is done. Listing what was deleted would copy
+    /// the data into an inbox that may not be the person's alone (ADR-0027 §6)
+    /// — and it would be the one place where a deletion produced a new record.
+    /// </remarks>
+    /// <param name="an">
+    /// The address, read at delivery time from the row that is about to fall.
+    /// Never from the outbox: that is durable storage.
+    /// </param>
+    /// <param name="wer">Whose account it was. For the log.</param>
+    void Loeschbestaetigung(string an, SubjectId wer);
 }

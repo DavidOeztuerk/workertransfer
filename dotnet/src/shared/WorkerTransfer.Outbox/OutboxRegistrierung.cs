@@ -34,7 +34,7 @@ public static class OutboxRegistrierung
 
         services.AddSingleton(einstellungen);
         services.AddScoped<IOutbox, EfOutbox<TKontext>>();
-        services.AddSingleton<OutboxZusteller<TKontext>>();
+        services.AddScoped<OutboxZusteller<TKontext>>();
         services.AddHostedService<OutboxSchleife<TKontext>>();
 
         return services;

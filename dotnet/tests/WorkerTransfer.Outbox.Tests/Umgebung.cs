@@ -17,7 +17,13 @@ public sealed class ProbeKontext(DbContextOptions<ProbeKontext> options) : DbCon
 public sealed class Kontextfabrik(string verbindung) : IDbContextFactory<ProbeKontext>
 {
     public ProbeKontext CreateDbContext() =>
-        new(new DbContextOptionsBuilder<ProbeKontext>().UseNpgsql(verbindung).Options);
+        new(new DbContextOptionsBuilder<ProbeKontext>()
+            .UseNpgsql(verbindung)
+            // As the services configure it. With tracking on by default
+            // this suite could not see a dispatcher that writes onto an
+            // untracked copy — which is exactly the bug it missed once.
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
+            .Options);
 }
 
 /// <summary>A real Postgres. <c>FOR UPDATE SKIP LOCKED</c> has no fake.</summary>

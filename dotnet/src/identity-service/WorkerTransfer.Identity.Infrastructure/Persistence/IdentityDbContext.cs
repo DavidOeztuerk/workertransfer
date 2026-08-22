@@ -1,4 +1,5 @@
 using Girder.Data.EntityFrameworkCore.Sessions;
+using WorkerTransfer.Outbox;
 using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.Identity.Domain.Audit;
 using WorkerTransfer.Identity.Domain.Users;
@@ -174,6 +175,11 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(row => row.SessionId).HasColumnName("session_id");
             entity.Property(row => row.TenantId).HasColumnName("tenant_id");
         });
+
+        // Ours, and in OUR database: the intent commits together with the
+        // change that caused it. At a central service it would be a
+        // distributed transaction — exactly what the pattern avoids.
+        modelBuilder.ConfigureOutbox();
 
         modelBuilder.ConfigureGirderRefreshTokens();
 

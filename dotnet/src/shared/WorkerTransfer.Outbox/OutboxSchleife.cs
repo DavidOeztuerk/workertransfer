@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -17,7 +18,7 @@ namespace WorkerTransfer.Outbox;
 /// </remarks>
 /// <typeparam name="TKontext">The service's own context.</typeparam>
 public sealed class OutboxSchleife<TKontext>(
-    OutboxZusteller<TKontext> zusteller,
+    IServiceScopeFactory bereiche,
     OutboxEinstellungen einstellungen,
     TimeProvider uhr,
     ILogger<OutboxSchleife<TKontext>> protokoll) : BackgroundService
@@ -35,7 +36,14 @@ public sealed class OutboxSchleife<TKontext>(
 
             try
             {
-                (faellig, zugestellt) = await zusteller.DurchlaufAsync(stoppingToken);
+                // A scope per pass: the dispatcher and its delivery reach into
+                // a database, and a background loop that holds one context for
+                // its whole life holds it for days.
+                using var bereich = bereiche.CreateScope();
+
+                (faellig, zugestellt) = await bereich.ServiceProvider
+                    .GetRequiredService<OutboxZusteller<TKontext>>()
+                    .DurchlaufAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

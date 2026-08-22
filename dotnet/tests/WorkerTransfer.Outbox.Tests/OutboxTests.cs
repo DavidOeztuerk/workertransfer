@@ -29,10 +29,23 @@ public class OutboxTests(Postgres postgres)
 {
     private Kontextfabrik Fabrik() => new(postgres.ConnectionString);
 
+    /// <summary>
+    /// A dispatcher with a context of its own — the way the loop builds one per
+    /// pass, from a scope of its own.
+    /// </summary>
     private OutboxZusteller<ProbeKontext> Zusteller(
-        IZustellung zustellung, OutboxEinstellungen? einstellungen = null) =>
-        new(Fabrik(), zustellung, TimeProvider.System,
+        ProbeKontext kontext,
+        IZustellung zustellung,
+        OutboxEinstellungen? einstellungen = null) =>
+        new(kontext, zustellung, TimeProvider.System,
             NullLogger<OutboxZusteller<ProbeKontext>>.Instance, einstellungen);
+
+    private async Task<(int Faellig, int Zugestellt)> Durchlauf(
+        IZustellung zustellung, OutboxEinstellungen? einstellungen = null)
+    {
+        await using var kontext = Fabrik().CreateDbContext();
+        return await Zusteller(kontext, zustellung, einstellungen).DurchlaufAsync();
+    }
 
     private async Task<SubjectId> Vermerke(string art, int wie_viele = 1)
     {
@@ -86,7 +99,7 @@ public class OutboxTests(Postgres postgres)
         var wer = await Vermerke("transfer.accepted");
         var zustellung = new Probezustellung();
 
-        var (faellig, zugestellt) = await Zusteller(zustellung).DurchlaufAsync();
+        var (faellig, zugestellt) = await Durchlauf(zustellung);
 
         faellig.Should().BeGreaterThan(0);
         zugestellt.Should().BeGreaterThan(0);
@@ -106,7 +119,7 @@ public class OutboxTests(Postgres postgres)
         var zustellung = new Probezustellung((_, _) =>
             throw new HttpRequestException("Anna Müller, geboren 1984, wohnhaft ..."));
 
-        await Zusteller(zustellung).DurchlaufAsync();
+        await Durchlauf(zustellung);
 
         var zeile = await Zeile(wer);
         zeile.Attempts.Should().Be(1);
@@ -126,7 +139,7 @@ public class OutboxTests(Postgres postgres)
         var zustellung = new Probezustellung(
             (_, _) => throw new NochNichtException("erst quittieren lassen"));
 
-        var (faellig, zugestellt) = await Zusteller(zustellung).DurchlaufAsync();
+        var (faellig, zugestellt) = await Durchlauf(zustellung);
 
         faellig.Should().BeGreaterThan(0);
         zugestellt.Should().Be(0);
@@ -150,7 +163,7 @@ public class OutboxTests(Postgres postgres)
 
         for (var i = 0; i < 5; i++)
         {
-            await Zusteller(zustellung, einstellungen).DurchlaufAsync();
+            await Durchlauf(zustellung, einstellungen);
         }
 
         var zeile = await Zeile(wer);
@@ -171,7 +184,7 @@ public class OutboxTests(Postgres postgres)
 
         for (var i = 0; i < 12; i++)
         {
-            await Zusteller(zustellung, einstellungen).DurchlaufAsync();
+            await Durchlauf(zustellung, einstellungen);
         }
 
         var zeile = await Zeile(wer);
@@ -206,7 +219,7 @@ public class OutboxTests(Postgres postgres)
         gesperrt.Should().NotBeEmpty("sonst prüft der Test nichts");
 
         var zustellung = new Probezustellung();
-        var (faellig, zugestellt) = await Zusteller(zustellung).DurchlaufAsync();
+        var (faellig, zugestellt) = await Durchlauf(zustellung);
 
         faellig.Should().Be(0, "die gesperrten Zeilen gehören dem anderen Durchlauf");
         zugestellt.Should().Be(0);
