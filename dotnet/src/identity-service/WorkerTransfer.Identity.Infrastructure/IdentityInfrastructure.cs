@@ -11,6 +11,7 @@ using WorkerTransfer.Identity.Application.Anmelden;
 using WorkerTransfer.Identity.Application.Behaviors;
 using WorkerTransfer.Identity.Application.Ports;
 using WorkerTransfer.Identity.Application.Registrierung;
+using WorkerTransfer.Identity.Application.Unternehmen;
 using WorkerTransfer.Identity.Domain.Audit;
 using WorkerTransfer.Identity.Domain.Companies;
 using WorkerTransfer.Identity.Domain.Sessions;
@@ -71,6 +72,8 @@ public static class IdentityInfrastructure
         services.AddScoped<ICompanyRepository, EfCompanyRepository>();
         services.AddScoped<IVerificationTokenRepository, EfVerificationTokenRepository>();
         services.AddScoped<UnternehmenAnlegen>();
+        services.AddScoped<IInvitationRepository, EfInvitationRepository>();
+        services.AddScoped<Firmenzugriff>();
         services.AddSingleton<IEinmaltoken, Sha256Einmaltoken>();
         services.AddSingleton<IVersender, SmtpVersender>();
 

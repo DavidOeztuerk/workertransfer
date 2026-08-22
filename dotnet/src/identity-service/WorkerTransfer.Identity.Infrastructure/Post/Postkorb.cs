@@ -55,6 +55,22 @@ public sealed class Postkorb(
             empfaenger));
 
     /// <inheritdoc />
+    public void Einladung(string an, SubjectId einladender, string firma, string klartextToken)
+    {
+        var basis = _einstellungen.WebAdresse.TrimEnd('/');
+        var wen = string.IsNullOrWhiteSpace(firma) ? "ein Unternehmen" : firma;
+
+        _wartend.Add(new AusgehendePost(
+            an,
+            "Du wurdest zu einem Unternehmen eingeladen",
+            $"Du wurdest eingeladen, für {wen} bei WorkerTransfer zu handeln. "
+            + "Über folgenden Link nimmst du die Einladung an:\n\n"
+            + $"{basis}/invitation?token={klartextToken}\n\n"
+            + "Wenn du damit nichts anfangen kannst, ignoriere diese Nachricht.\n",
+            einladender));
+    }
+
+    /// <inheritdoc />
     public async Task VersendeGesammeltesAsync(CancellationToken cancellationToken = default)
     {
         // Taken out first: a send that throws must not leave the tray full for
