@@ -28,7 +28,7 @@ public static class Zustellgrenzen
 /// </remarks>
 /// <typeparam name="TKontext">The service's own context.</typeparam>
 public sealed class OutboxZusteller<TKontext>(
-    IDbContextFactory<TKontext> kontexte,
+    TKontext kontext,
     IZustellung zustellung,
     TimeProvider uhr,
     ILogger<OutboxZusteller<TKontext>> protokoll,
@@ -48,20 +48,18 @@ public sealed class OutboxZusteller<TKontext>(
     public async Task<(int Faellig, int Zugestellt)> DurchlaufAsync(
         CancellationToken cancellationToken = default)
     {
-        await using var kontext = await kontexte.CreateDbContextAsync(cancellationToken);
-
         // The rows are locked for the length of this transaction, so a second
         // dispatcher skips them instead of delivering the same intent twice.
         // Python has no such lock, which is one of three reasons its Helm chart
         // is pinned to one replica.
         await using var klammer = await kontext.Database.BeginTransactionAsync(cancellationToken);
 
-        var faellige = await FaelligeAsync(kontext, cancellationToken);
+        var faellige = await FaelligeAsync(cancellationToken);
         var zugestellt = 0;
 
-        foreach (var eintrag in faellige)
+        foreach (var zeile in faellige)
         {
-            if (await ZustelleAsync(kontext, eintrag, cancellationToken))
+            if (await ZustelleAsync(zeile, cancellationToken))
             {
                 zugestellt++;
             }
@@ -82,8 +80,7 @@ public sealed class OutboxZusteller<TKontext>(
     /// deliberately: every service here runs Postgres, and a portable version
     /// would have to give up the guarantee.
     /// </remarks>
-    private async Task<IReadOnlyList<OutboxEintrag>> FaelligeAsync(
-        TKontext kontext,
+    private async Task<IReadOnlyList<OutboxZeile>> FaelligeAsync(
         CancellationToken cancellationToken)
     {
         // The table name is a setting, not caller input, and it is quoted — but
@@ -102,26 +99,25 @@ public sealed class OutboxZusteller<TKontext>(
 
         object grenze = _einstellungen.HoechsteVersuche is { } wert ? wert : DBNull.Value;
 
-        var zeilen = await kontext.Set<OutboxZeile>()
+        // Tracked, and the rows are handed on as they are. Reading them a
+        // second time would hand back untracked copies wherever the service
+        // configured NoTracking — and then every "delivered" would be written
+        // onto an object nobody saves. That is not hypothetical: it is how this
+        // method used to work.
+        return await kontext.Set<OutboxZeile>()
             .FromSqlRaw(sql, grenze, _einstellungen.Stapelgroesse)
             .AsTracking()
             .ToListAsync(cancellationToken);
-
-        return [.. zeilen.Select(zeile =>
-            new OutboxEintrag(zeile.Id, new SubjectId(zeile.UserId), zeile.Kind, zeile.Attempts))];
     }
 
     private async Task<bool> ZustelleAsync(
-        TKontext kontext,
-        OutboxEintrag eintrag,
+        OutboxZeile zeile,
         CancellationToken cancellationToken)
     {
-        var zeile = await kontext.Set<OutboxZeile>()
-            .FirstAsync(kandidat => kandidat.Id == eintrag.Id, cancellationToken);
-
         try
         {
-            await zustellung.ZustelleAsync(eintrag.Empfaenger, eintrag.Art, cancellationToken);
+            await zustellung.ZustelleAsync(
+                new SubjectId(zeile.UserId), zeile.Kind, cancellationToken);
         }
         catch (NochNichtException)
         {

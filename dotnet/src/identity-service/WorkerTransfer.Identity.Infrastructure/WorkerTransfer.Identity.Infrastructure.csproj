@@ -3,6 +3,8 @@
   <ItemGroup>
     <ProjectReference Include="..\WorkerTransfer.Identity.Application\WorkerTransfer.Identity.Application.csproj" />
     <ProjectReference Include="..\WorkerTransfer.Identity.Domain\WorkerTransfer.Identity.Domain.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Erasure\WorkerTransfer.Contracts.Erasure.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Outbox\WorkerTransfer.Outbox.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -60,12 +60,18 @@ public static class Loeschempfaenger
     /// over would have kept exactly what the ADR condemns.
     /// </para>
     /// <para>
+    /// <c>notification</c> took its place, and not by symmetry: it holds the
+    /// notification preferences, and those are keyed by the person. A service
+    /// that holds a row per person is a recipient — that is the whole rule, and
+    /// it is why this list is checked against the schemas rather than agreed on.
+    /// </para>
+    /// <para>
     /// A test goes red the moment any service grows a table with
     /// <c>subject_id</c> or <c>user_id</c> and is not on this list.
     /// </para>
     /// </remarks>
     public static IReadOnlyList<string> Fremde { get; } =
-        ["consent", "profile", "resume", "portfolio", "applications", "transfer"];
+        ["consent", "profile", "resume", "portfolio", "applications", "transfer", "notification"];
 
     /// <summary>The final notice to the person. Itself an outbox row.</summary>
     public const string Schlussnachricht = Praefix + "final";

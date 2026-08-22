@@ -7,10 +7,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using WorkerTransfer.Outbox;
 using WorkerTransfer.Identity.Application.Anmelden;
 using WorkerTransfer.Identity.Application.Behaviors;
 using WorkerTransfer.Identity.Application.Ports;
 using WorkerTransfer.Identity.Application.Registrierung;
+using WorkerTransfer.Identity.Application.Loeschung;
 using WorkerTransfer.Identity.Application.Unternehmen;
 using WorkerTransfer.Identity.Domain.Audit;
 using WorkerTransfer.Identity.Domain.Companies;
@@ -18,6 +20,7 @@ using WorkerTransfer.Identity.Domain.Sessions;
 using WorkerTransfer.Identity.Domain.Verification;
 using WorkerTransfer.Identity.Domain.Users;
 using WorkerTransfer.Identity.Infrastructure.Persistence;
+using WorkerTransfer.Identity.Infrastructure.Loeschung;
 using WorkerTransfer.Identity.Infrastructure.Post;
 using WorkerTransfer.Identity.Infrastructure.Security;
 
@@ -74,6 +77,18 @@ public static class IdentityInfrastructure
         services.AddScoped<UnternehmenAnlegen>();
         services.AddScoped<IInvitationRepository, EfInvitationRepository>();
         services.AddScoped<Firmenzugriff>();
+        services.AddScoped<ILoeschbestand, EfLoeschbestand>();
+
+        services.Configure<Loescheinstellungen>(
+            configuration.GetSection(Loescheinstellungen.Abschnitt));
+        services.AddHttpClient(nameof(HttpLoeschzustellung));
+        services.AddScoped<IZustellung, HttpLoeschzustellung>();
+
+        // No attempt ceiling. For a notification "leave it after ten" is right;
+        // for an erasure it is exactly the silent failure ADR-0027 exists
+        // against — a promise nobody redeems, and nobody sees it.
+        services.AddOutbox<IdentityDbContext>(
+            configuration, einstellungen => einstellungen.HoechsteVersuche = null);
         services.AddSingleton<IEinmaltoken, Sha256Einmaltoken>();
         services.AddSingleton<IVersender, SmtpVersender>();
 

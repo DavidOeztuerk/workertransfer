@@ -71,6 +71,16 @@ public sealed class Postkorb(
     }
 
     /// <inheritdoc />
+    public void Loeschbestaetigung(string an, SubjectId wer) =>
+        _wartend.Add(new AusgehendePost(
+            an,
+            "Dein Konto bei WorkerTransfer ist gelöscht",
+            "Dein Konto und die Daten, die andere Dienste über dich hielten, sind "
+            + "gelöscht. Es gibt nichts mehr, das dich hier zuordnet.\n\n"
+            + "Diese Nachricht ist die letzte, die du von uns bekommst.\n",
+            wer));
+
+    /// <inheritdoc />
     public async Task VersendeGesammeltesAsync(CancellationToken cancellationToken = default)
     {
         // Taken out first: a send that throws must not leave the tray full for

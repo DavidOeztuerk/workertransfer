@@ -25,6 +25,7 @@ app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 app.MapAuthEndpoints();
 app.MapRegistrierungsEndpoints();
 app.MapUnternehmensEndpoints();
+app.MapLoeschEndpoints();
 
 await app.RunAsync();
 
