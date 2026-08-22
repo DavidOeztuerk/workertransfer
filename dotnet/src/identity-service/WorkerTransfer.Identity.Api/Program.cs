@@ -1,20 +1,17 @@
 using Girder.Infrastructure.Builder.Modules;
-using Girder.Infrastructure.Extensions;
 using WorkerTransfer.Identity.Api;
 using WorkerTransfer.Identity.Infrastructure;
+using WorkerTransfer.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
 const string serviceName = "identity-service";
 
-builder.Services.AddSharedInfrastructure(
-    builder.Configuration, builder.Environment, serviceName, infrastructure => infrastructure
-        .AddJwtAuthentication()
-        .AddPrincipal()
-        .AddPasswordHashing()
-        .AddTokenSessions()
-        .AddSecurityHeaders()
-        .AddHealthChecks()
-        .AddObservability());
+// The only service that calls AlsAussteller(): it holds the private half of the
+// key. A second issuer would be a second place that can mint a principal, and
+// nothing downstream could tell the two apart.
+builder.Services.AddWorkerTransferDefaults(
+    builder.Configuration, builder.Environment, serviceName,
+    infrastruktur => infrastruktur.AlsAussteller());
 
 builder.Services.AddIdentityInfrastructure(
     builder.Configuration,
@@ -23,17 +20,7 @@ builder.Services.AddIdentityInfrastructure(
 
 var app = builder.Build();
 
-app.UseSharedInfrastructure(builder.Environment, serviceName, pipeline => pipeline
-    .UseCorrelationId()
-    .UseSecurityHeaders()
-    .UseAuth()
-    .UsePrincipal()
-    .UseHealthCheckEndpoints());
-
-// Ahead of the endpoints and instead of Girder's UseExceptionHandling(): the
-// React app reads `detail` out of an RFC 9457 body, and Girder's handler writes
-// an envelope of a different shape.
-app.UseMiddleware<ProblemDetailsMiddleware>();
+app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
 app.MapAuthEndpoints();
 app.MapRegistrierungsEndpoints();
