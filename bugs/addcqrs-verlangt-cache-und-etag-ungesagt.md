@@ -216,8 +216,17 @@ veröffentlichen, und in WorkerTransfer `GirderVersion` in
 **Bauen und Testen in getrennten Aufrufen** — verkettet scheitern die
 Testcontainers-Reihen und sehen dabei aus wie echte Testfehler.
 
-## Stand
+## Stand — erledigt
 
-- [ ] gemeldet
-- [ ] in Girder behoben, Fassung: <…>
-- [ ] Umweg hier entfernt
+- [x] gemeldet
+- [x] in Girder behoben, Fassung: **3.0.0**
+- [x] kein Umweg entstanden: der Fix kam, bevor identity-service ihn brauchte
+
+`AddCQRS` registriert die beiden Cache-Behaviors nur noch, wo die übergebenen
+Assemblies wirklich ein `ICacheableQuery` oder `ICacheInvalidatingCommand`
+enthalten; sonst wird die Anforderung beim Start gemeldet und nennt den Typ. Die
+Parameter der Behaviors sind verpflichtend, die toten Null-Zweige weg.
+
+`ProviderRequirement`/`ProviderRequirements` sind nach `Girder.Abstractions.Hosting`
+gewandert, damit `Girder.Application` sie erreicht — das ist der Bruch, der die
+Hauptversion begründet.

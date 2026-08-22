@@ -67,8 +67,15 @@ Sollte später ein listenwertiger Anspruch wirklich gebraucht werden, bliebe nur
 den Zugriffstoken an `IJwtService` vorbei selbst zu bauen — und damit auf das
 Stück zu verzichten, dessentwegen wir Girder nehmen.
 
-## Stand
+## Stand — Meldung, kein Auftrag
 
-- [ ] gemeldet
-- [ ] in Girder behoben, Fassung: <…>
-- [ ] Umweg hier entfernt
+- [x] gemeldet
+- [ ] in Girder behoben, Fassung: <…> — **niemand hier wartet darauf**
+
+Eine echte Grenze von Girders API: ein `Dictionary<string, string>` kann keinen
+listenwertigen Anspruch ausdrücken. Für WorkerTransfer folgenlos, und zwar aus
+einem Grund, der bleibt: Rollen kommen aus `user_tenant_memberships`, nie aus
+dem Token. Der Anspruch war nie maßgeblich.
+
+Das Ticket ist als Meldung an Girder wertvoll — ein anderer Konsument wird
+darüber stolpern —, aber es ist Fahrplan, kein Arbeitsposten.
