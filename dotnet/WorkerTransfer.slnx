@@ -7,6 +7,13 @@
     <Project Path="src/shared/WorkerTransfer.Outbox/WorkerTransfer.Outbox.csproj" />
     <Project Path="src/shared/WorkerTransfer.ServiceDefaults/WorkerTransfer.ServiceDefaults.csproj" />
   </Folder>
+  <Folder Name="/src/consent-service/">
+    <Project Path="src/consent-service/WorkerTransfer.Consent.Api/WorkerTransfer.Consent.Api.csproj" />
+    <Project Path="src/consent-service/WorkerTransfer.Consent.Application/WorkerTransfer.Consent.Application.csproj" />
+    <Project Path="src/consent-service/WorkerTransfer.Consent.Contracts/WorkerTransfer.Consent.Contracts.csproj" />
+    <Project Path="src/consent-service/WorkerTransfer.Consent.Domain/WorkerTransfer.Consent.Domain.csproj" />
+    <Project Path="src/consent-service/WorkerTransfer.Consent.Infrastructure/WorkerTransfer.Consent.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/identity-service/">
     <Project Path="src/identity-service/WorkerTransfer.Identity.Api/WorkerTransfer.Identity.Api.csproj" />
     <Project Path="src/identity-service/WorkerTransfer.Identity.Application/WorkerTransfer.Identity.Application.csproj" />
@@ -15,6 +22,7 @@
     <Project Path="src/identity-service/WorkerTransfer.Identity.Infrastructure/WorkerTransfer.Identity.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/WorkerTransfer.Consent.Tests/WorkerTransfer.Consent.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Identity.Tests/WorkerTransfer.Identity.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Outbox.Tests/WorkerTransfer.Outbox.Tests.csproj" />
   </Folder>
