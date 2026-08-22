@@ -17,7 +17,7 @@ const listMyApplications = vi.mocked(client.listMyApplications);
 const withdrawApplication = vi.mocked(client.withdrawApplication);
 
 function principal(): MeResponse {
-  return { user_id: "u", email: "anna@example.com", tenant_id: null, roles: ["user"] };
+  return { user_id: "u", email: "anna@example.com", tenant_id: null };
 }
 
 function application(overrides: Partial<Application> = {}): Application {

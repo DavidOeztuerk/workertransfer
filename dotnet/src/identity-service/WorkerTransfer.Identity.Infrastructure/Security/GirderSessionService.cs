@@ -46,15 +46,19 @@ public sealed class GirderSessionService(ITokenSessionService sitzungen) : ISess
     /// caller holds a token. Consuming the token first retires it and names the
     /// session; ending that session then closes every token in the chain.
     /// </remarks>
-    public async Task EndByRefreshTokenAsync(
+    public async Task<BeendeteSitzung?> EndByRefreshTokenAsync(
         string refreshToken,
         CancellationToken cancellationToken = default)
     {
         var ergebnis = await sitzungen.RefreshAsync(refreshToken, cancellationToken);
 
-        if (ergebnis.Session is { } sitzung)
+        if (ergebnis is not { Session: { } sitzung, Subject: { } subjekt })
         {
-            await sitzungen.SignOutAsync(sitzung, cancellationToken);
+            return null;
         }
+
+        await sitzungen.SignOutAsync(sitzung, cancellationToken);
+
+        return new BeendeteSitzung(sitzung, subjekt);
     }
 }

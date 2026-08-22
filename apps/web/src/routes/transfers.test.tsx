@@ -32,11 +32,11 @@ const TENANT = "33333333-3333-3333-3333-333333333333";
 const TRANSFER = "44444444-4444-4444-4444-444444444444";
 
 function person(): MeResponse {
-  return { user_id: SUBJECT, email: "anna@example.com", tenant_id: null, roles: ["user"] };
+  return { user_id: SUBJECT, email: "anna@example.com", tenant_id: null };
 }
 
 function company(): MeResponse {
-  return { user_id: "55555555-5555-5555-5555-555555555555", email: "hr@acme.de", tenant_id: TENANT, roles: ["user"] };
+  return { user_id: "55555555-5555-5555-5555-555555555555", email: "hr@acme.de", tenant_id: TENANT };
 }
 
 function transfer(overrides: Partial<Transfer> = {}): Transfer {

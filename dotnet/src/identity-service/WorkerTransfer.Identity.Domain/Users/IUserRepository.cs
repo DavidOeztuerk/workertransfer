@@ -1,7 +1,6 @@
 using Girder.Core.Identity;
-using WorkerTransfer.Identity.Domain.Users;
 
-namespace WorkerTransfer.Identity.Application.Ports;
+namespace WorkerTransfer.Identity.Domain.Users;
 
 /// <summary>Finds accounts.</summary>
 /// <remarks>

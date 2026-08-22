@@ -56,7 +56,7 @@ describe("fetchMe", () => {
   it("returns the principal on 200", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => ok({ user_id: "u", email: "a@b.com", tenant_id: "t", roles: ["user"] }))
+      vi.fn(async () => ok({ user_id: "u", email: "a@b.com", tenant_id: "t" }))
     );
     const me = await fetchMe();
     expect(me?.tenant_id).toBe("t");
@@ -77,7 +77,7 @@ describe("fetchMe", () => {
         // Erst nach dem Erneuern antwortet /me.
         const schonErneuert = wege.some((w) => w.endsWith("/auth/refresh"));
         return schonErneuert
-          ? ok({ user_id: "u", email: "a@b.com", tenant_id: null, roles: ["user"] })
+          ? ok({ user_id: "u", email: "a@b.com", tenant_id: null })
           : ok({ detail: "not authenticated" }, 401);
       })
     );
@@ -111,7 +111,7 @@ describe("fetchMe", () => {
         }
         const schonErneuert = wege.some((w) => w.endsWith("/auth/refresh"));
         return schonErneuert
-          ? ok({ user_id: "u", email: "a@b.com", tenant_id: null, roles: ["user"] })
+          ? ok({ user_id: "u", email: "a@b.com", tenant_id: null })
           : ok({ detail: "not authenticated" }, 401);
       })
     );
@@ -141,7 +141,7 @@ describe("fetchMe", () => {
 });
 
 describe("fetchSession", () => {
-  const principal = { user_id: "u", email: "a@b.com", tenant_id: null, roles: ["user"] };
+  const principal = { user_id: "u", email: "a@b.com", tenant_id: null };
 
   it("stellt für einen anonymen Besucher GENAU EINE Anfrage", async () => {
     // Der ganze Zweck dieses Endpunkts. Vorher: /me -> 401, und mit dem

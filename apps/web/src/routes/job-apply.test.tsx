@@ -59,7 +59,7 @@ function myProfile(skills: string[]) {
 }
 
 function principal(): MeResponse {
-  return { user_id: "u", email: "anna@example.com", tenant_id: null, roles: ["user"] };
+  return { user_id: "u", email: "anna@example.com", tenant_id: null };
 }
 
 beforeEach(() => {

@@ -73,7 +73,7 @@ function marketStatus(
 const TENANT = "22222222-2222-2222-2222-222222222222";
 
 function principal(tenantId: string | null): MeResponse {
-  return { user_id: "u", email: "anna@firma.de", tenant_id: tenantId, roles: ["user"] };
+  return { user_id: "u", email: "anna@firma.de", tenant_id: tenantId };
 }
 
 function candidate(id: string, headline: string, extra: Partial<Profile> = {}): Profile {

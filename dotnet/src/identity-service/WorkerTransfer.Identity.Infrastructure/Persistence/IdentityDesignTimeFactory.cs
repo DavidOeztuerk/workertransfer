@@ -16,7 +16,9 @@ public sealed class IdentityDesignTimeFactory : IDesignTimeDbContextFactory<Iden
 {
     /// <inheritdoc />
     public IdentityDbContext CreateDbContext(string[] args) =>
-        new(new DbContextOptionsBuilder<IdentityDbContext>()
-            .UseNpgsql("Host=entwurfszeit;Database=identity")
+        new((DbContextOptions<IdentityDbContext>)IdentityDbContextFactory
+            .ZurEntwurfszeit(
+                new DbContextOptionsBuilder<IdentityDbContext>(),
+                "Host=entwurfszeit;Database=identity")
             .Options);
 }

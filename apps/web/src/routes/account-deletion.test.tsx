@@ -41,7 +41,6 @@ function principal(): MeResponse {
     user_id: "11111111-1111-1111-1111-111111111111",
     email: "anna@example.com",
     tenant_id: null,
-    roles: ["user"],
   };
 }
 

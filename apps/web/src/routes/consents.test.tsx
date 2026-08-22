@@ -25,7 +25,7 @@ const SUBJECT = "11111111-1111-1111-1111-111111111111";
 const TENANT = "22222222-2222-2222-2222-222222222222";
 
 function principal(): MeResponse {
-  return { user_id: SUBJECT, email: "anna@example.com", tenant_id: null, roles: ["user"] };
+  return { user_id: SUBJECT, email: "anna@example.com", tenant_id: null };
 }
 
 function granted(capability: string) {

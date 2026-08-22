@@ -24,7 +24,7 @@ const TENANT = "22222222-2222-2222-2222-222222222222";
 const JOB = "11111111-1111-1111-1111-111111111111";
 
 function principal(tenantId: string | null): MeResponse {
-  return { user_id: "u", email: "chef@firma.example", tenant_id: tenantId, roles: ["user"] };
+  return { user_id: "u", email: "chef@firma.example", tenant_id: tenantId };
 }
 
 function job(overrides: Partial<Job> = {}): Job {

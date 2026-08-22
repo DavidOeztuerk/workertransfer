@@ -1,7 +1,6 @@
 using Girder.Infrastructure.Builder.Modules;
 using Girder.Infrastructure.Extensions;
 using WorkerTransfer.Identity.Api;
-using WorkerTransfer.Identity.Application.Anmelden;
 using WorkerTransfer.Identity.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,9 +19,6 @@ builder.Services.AddSharedInfrastructure(
 builder.Services.AddIdentityInfrastructure(
     builder.Configuration.GetConnectionString("identity")
     ?? throw new InvalidOperationException("ConnectionStrings:identity is not configured."));
-builder.Services.AddScoped<AnmeldenHandler>();
-builder.Services.AddScoped<ErneuernHandler>();
-builder.Services.AddScoped<AbmeldenHandler>();
 
 var app = builder.Build();
 

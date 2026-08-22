@@ -31,7 +31,7 @@ const SUBJECT = "11111111-1111-1111-1111-111111111111";
 const TENANT = "22222222-2222-2222-2222-222222222222";
 
 function person(tenantId: string | null = null): MeResponse {
-  return { user_id: SUBJECT, email: "anna@example.com", tenant_id: tenantId, roles: ["user"] };
+  return { user_id: SUBJECT, email: "anna@example.com", tenant_id: tenantId };
 }
 
 function transfer(overrides: Partial<Transfer> = {}): Transfer {
