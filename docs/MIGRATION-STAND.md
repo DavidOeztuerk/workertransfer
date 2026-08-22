@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-23, nach `consent`.
+**Zuletzt fortgeschrieben:** 2026-08-23, nach `resume`.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -18,12 +18,12 @@ was davon getan ist.
 | | |
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
-| **Phase B — die neun Dienste** | **1 von 9 fertig** (`consent`). profile und resume angefangen |
+| **Phase B — die neun Dienste** | **2 von 9 fertig** (`consent`, `resume`). profile angefangen |
 | **Phase C — Zusammenbau** | nicht begonnen |
 | **Prüfer** | nicht begonnen |
-| **Tests** | 261 grün, 0 rot, 0 übersprungen |
+| **Tests** | 273 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
-| **Nicht in der Solution** | profile, resume — sie übersetzen noch nicht |
+| **Nicht in der Solution** | profile — übersetzt noch nicht |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
 
@@ -90,13 +90,13 @@ nicht übersetzen, würde das den Gesamtbau roten, und dann sagt `dotnet build`
 | Application | steht | steht | steht |
 | Infrastructure | steht | steht | steht |
 | Contracts | steht | leeres Projekt | steht |
-| **Api** | steht | nur `Program.cs`, **keine Endpunkte** | nur `.csproj`, **kein `Program.cs`** |
-| **EF-Migrationen** | steht | **fehlen** | **fehlen** |
-| Tests | 50 | 4 Dateien, keine Integrationstests | **keine** |
-| Übersetzt | ja, grün | ungeprüft | ungeprüft |
+| **Api** | steht | nur `Program.cs`, **keine Endpunkte** | steht |
+| **EF-Migrationen** | steht | **fehlen** | steht |
+| Tests | 50 | 4 Dateien, keine Integrationstests | 12 |
+| Übersetzt | ja, grün | ungeprüft | ja, grün |
 
-**profile und resume fehlt dasselbe:** die Api-Schicht mit den Routen, die
-EF-Migrationen, und der Nachweis, dass es übersetzt und grün ist.
+**profile fehlt:** die Routen in der Api, die EF-Migration, Integrationstests
+und der Nachweis, dass es übersetzt.
 
 ### So wird Welle 1 fortgesetzt
 
