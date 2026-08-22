@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 using Npgsql;
 using WorkerTransfer.Identity.Domain.Audit;
+using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Infrastructure.Persistence;
 
@@ -13,22 +14,22 @@ public static class IdentityDbContextFactory
     /// <summary>The Postgres enum behind <c>audit_events.action</c>.</summary>
     private const string AuditActionTyp = "audit_action";
 
-    /// <summary>
-    /// A data source that reads <c>account_status</c> as the name it stores and
-    /// knows the <c>audit_action</c> enum.
-    /// </summary>
+    /// <summary>The Postgres enum behind <c>users.status</c>.</summary>
+    private const string AccountStatusTyp = "account_status";
+
+    /// <summary>A data source that knows both Postgres enums.</summary>
     /// <remarks>
-    /// <c>account_status</c> is left unmapped: the translation already exists in
-    /// <c>AccountStatusNames</c>, is pinned by a test, and is the same one the
-    /// domain uses — a second one configured here would be a second place for
-    /// the four names to drift. <c>audit_action</c> is mapped because it is
-    /// written, and Postgres accepts no text in an enum column.
+    /// Both are written, not only read, and Postgres accepts no text in an enum
+    /// column — a parameter has to carry the type. <c>EnableUnmappedTypes</c>
+    /// stays for everything else the Alembic schema holds that this service
+    /// only reads.
     /// </remarks>
     public static NpgsqlDataSource DataSource(string connectionString)
     {
         var builder = new NpgsqlDataSourceBuilder(connectionString);
         builder.EnableUnmappedTypes();
         builder.MapEnum<AuditAction>(AuditActionTyp);
+        builder.MapEnum<AccountStatus>(AccountStatusTyp);
         return builder.Build();
     }
 
@@ -76,10 +77,13 @@ public static class IdentityDbContextFactory
     }
 
     /// <summary>
-    /// Both halves of the enum are needed. The data source teaches Npgsql the
+    /// Both halves of an enum are needed. The data source teaches Npgsql the
     /// type; this teaches EF that the column is it — without it the parameter
     /// goes out as an integer and Postgres refuses it.
     /// </summary>
-    private static void Gemeinsam(NpgsqlDbContextOptionsBuilder npgsql) =>
+    private static void Gemeinsam(NpgsqlDbContextOptionsBuilder npgsql)
+    {
         npgsql.MapEnum<AuditAction>(AuditActionTyp);
+        npgsql.MapEnum<AccountStatus>(AccountStatusTyp);
+    }
 }

@@ -34,15 +34,7 @@ public class FirmaWechselnTests
 
     private void EsGibtDasKonto(AccountStatus status = AccountStatus.Active) =>
         _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>())
-            .Returns(new User
-            {
-                Id = Anna,
-                Email = "anna@example.com",
-                PasswordHash = "$2b$12$x",
-                DisplayName = "Anna",
-                Status = status,
-                Roles = ["user"]
-            });
+            .Returns(Konten.Bestehend(Anna, "anna@example.com", "$2b$12$x", status));
 
     private void EineSitzungEntsteht()
     {

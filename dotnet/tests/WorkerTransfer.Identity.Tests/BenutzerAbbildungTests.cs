@@ -51,7 +51,7 @@ public class BenutzerAbbildungTests(Postgres postgres)
     {
         var id = await SchreibeBenutzer("anna@example.com");
 
-        var benutzer = await new EfUserRepository(Kontext()).FindByEmailAsync("anna@example.com");
+        var benutzer = await new EfUserRepository(Kontext(), TimeProvider.System).FindByEmailAsync("anna@example.com");
 
         benutzer.Should().NotBeNull();
         benutzer!.Id.Should().Be(new SubjectId(id));
@@ -72,7 +72,7 @@ public class BenutzerAbbildungTests(Postgres postgres)
     {
         await SchreibeBenutzer("Berta@Example.COM");
 
-        var benutzer = await new EfUserRepository(Kontext()).FindByEmailAsync("berta@example.com");
+        var benutzer = await new EfUserRepository(Kontext(), TimeProvider.System).FindByEmailAsync("berta@example.com");
 
         benutzer.Should().NotBeNull();
     }
@@ -83,7 +83,7 @@ public class BenutzerAbbildungTests(Postgres postgres)
         await SchreibeBenutzer("clara@example.com", status: "pending");
         await SchreibeBenutzer("dora@example.com", status: "suspended");
 
-        var repository = new EfUserRepository(Kontext());
+        var repository = new EfUserRepository(Kontext(), TimeProvider.System);
 
         (await repository.FindByEmailAsync("clara@example.com"))!.Status
             .Should().Be(AccountStatus.Pending);
@@ -94,7 +94,7 @@ public class BenutzerAbbildungTests(Postgres postgres)
     [Fact]
     public async Task Eine_unbekannte_Adresse_ergibt_null()
     {
-        var benutzer = await new EfUserRepository(Kontext())
+        var benutzer = await new EfUserRepository(Kontext(), TimeProvider.System)
             .FindByEmailAsync("niemand@example.com");
 
         benutzer.Should().BeNull();
@@ -110,7 +110,7 @@ public class BenutzerAbbildungTests(Postgres postgres)
         await SchreibeBenutzer("emil@example.com");
         var kontext = Kontext();
 
-        await new EfUserRepository(kontext).FindByEmailAsync("emil@example.com");
+        await new EfUserRepository(kontext, TimeProvider.System).FindByEmailAsync("emil@example.com");
 
         kontext.ChangeTracker.Entries().Should().BeEmpty();
     }

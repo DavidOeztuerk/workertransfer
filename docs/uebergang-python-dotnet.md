@@ -161,7 +161,8 @@ es ist nur nicht mehr die beste verfügbare Wahl.
 
 ## Ü-7 · Der `CREATE TYPE`-Guard in den EF-Migrationen
 
-**Wo:** `HandlungsformDerSitzung` in `apps`-Schreibweise
+**Wo:** `HandlungsformDerSitzung` (`audit_action`) und
+`KontostandAlsAufzaehlung` (`account_status`) in
 `dotnet/src/identity-service/…/Persistence/Migrations/`. Wortgleich in jedem
 weiteren Dienst, dessen Alembic-Schema einen Postgres-Enum besitzt.
 
@@ -197,11 +198,17 @@ eine Bedingung über einen Fall, den es nicht mehr gibt.
 **Woran man merkt, dass es Zeit ist:** `apps/identity-service` und
 `apps/consent-service` sind gelöscht.
 
+**Nachgetragen:** `account_status` brauchte denselben Guard, sobald die
+Registrierung die Spalte *schreibt* statt sie nur zu lesen. Lesen ging als
+Text, Schreiben nicht — Postgres nimmt in einer Enum-Spalte keinen Text an.
+Damit ist `AccountStatusNames` weg: die Übersetzung macht Npgsql, und der
+Test hält sie fest.
+
 **Die Falle, und deshalb der Test:** `IF NOT EXISTS` fragt nach dem **Namen**,
 nicht nach den **Werten**. Eine Datenbank, deren Etiketten von dem abweichen,
 was der Dienst schreibt, läuft durch den Guard und scheitert erst bei der ersten
 Einfügung — was bei `invitation_withdrawn` die erste je zurückgenommene
-Einladung sein kann, Monate später. `PruefspurEtikettenTests` nagelt die Menge
+Einladung sein kann, Monate später. `SpaltenetikettenTests` nagelt jede Menge
 deshalb dreifach fest: ausgeschrieben, gegen `pg_enum` der echten Spalte, und
 gegen die SQL des Guards selbst. Gegenprobe gefahren: ein geändertes Etikett
 lässt zwei der drei Tests fallen.

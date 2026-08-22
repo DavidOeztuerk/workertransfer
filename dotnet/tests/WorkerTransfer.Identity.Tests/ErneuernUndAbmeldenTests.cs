@@ -44,15 +44,7 @@ public class ErneuernUndAbmeldenTests
 
     private void EsGibtDasKonto() =>
         _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>())
-            .Returns(new User
-            {
-                Id = Anna,
-                Email = "anna@example.com",
-                PasswordHash = "$2b$12$x",
-                DisplayName = "Anna",
-                Status = AccountStatus.Active,
-                Roles = ["user"]
-            });
+            .Returns(Konten.Bestehend(Anna, "anna@example.com", "$2b$12$x", AccountStatus.Active));
 
     [Fact]
     public async Task Ein_gueltiger_Erneuerungstoken_ergibt_ein_frisches_Paar()
@@ -212,15 +204,7 @@ public class ErneuernUndAbmeldenTests
         DieSitzungTraegtNoch();
         HandeltAlsPrivatperson();
         _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>())
-            .Returns(new User
-            {
-                Id = Anna,
-                Email = "anna@example.com",
-                PasswordHash = "$2b$12$x",
-                DisplayName = "Anna",
-                Status = status,
-                Roles = ["user"]
-            });
+            .Returns(Konten.Bestehend(Anna, "anna@example.com", "$2b$12$x", status));
 
         var ergebnis = await Erneuern("alt");
 
