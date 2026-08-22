@@ -38,6 +38,16 @@ public static class MembershipRoleNames
     };
 }
 
+/// <summary>One company a person may act for, as a picker needs it.</summary>
+/// <param name="Tenant">Which company.</param>
+/// <param name="Name">What it is called.</param>
+/// <param name="Domain">The domain it was proven on.</param>
+/// <param name="Role">With what rights, read from the relation.</param>
+public sealed record Mitgliedschaft(TenantId Tenant, string Name, string Domain, MembershipRole Role);
+
+/// <summary>One member of a company, as a list needs them.</summary>
+public sealed record Firmenmitglied(SubjectId Subject, string DisplayName, MembershipRole Role);
+
 /// <summary>Which companies a person may act for.</summary>
 /// <remarks>
 /// A relation, never a column on the account: one person may act for several
@@ -65,5 +75,41 @@ public interface IMembershipRepository
         SubjectId subject,
         TenantId tenant,
         MembershipRole role,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// What this person may do inside this company, or <c>null</c> if nothing.
+    /// </summary>
+    /// <remarks>
+    /// Read here and never from a claim. A token says which company somebody
+    /// acts for, never with what rights — so withdrawing a role takes effect on
+    /// the next operation rather than on the next sign-in.
+    /// </remarks>
+    Task<MembershipRole?> RoleOfAsync(
+        SubjectId subject,
+        TenantId tenant,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Every company this person may act for.</summary>
+    Task<IReadOnlyList<Mitgliedschaft>> ListForSubjectAsync(
+        SubjectId subject,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Everybody who may act for this company.</summary>
+    Task<IReadOnlyList<Firmenmitglied>> ListMembersAsync(
+        TenantId tenant,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>How many administrators this company has.</summary>
+    /// <remarks>
+    /// Asked before anybody leaves. One is the floor, not a preference: a
+    /// company without an administrator cannot let anyone in again.
+    /// </remarks>
+    Task<int> CountAdminsAsync(TenantId tenant, CancellationToken cancellationToken = default);
+
+    /// <summary>Ends one membership.</summary>
+    Task RemoveAsync(
+        SubjectId subject,
+        TenantId tenant,
         CancellationToken cancellationToken = default);
 }

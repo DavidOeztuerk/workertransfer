@@ -41,4 +41,20 @@ public interface IPostkorb
     /// endpoint can answer identically in both cases.
     /// </remarks>
     void Doppelanmeldung(string an, SubjectId empfaenger);
+
+    /// <summary>
+    /// "You have been invited into a company", with the link.
+    /// </summary>
+    /// <remarks>
+    /// Goes to an address, which may or may not have an account here — and the
+    /// mail must not differ between the two cases, or it becomes a way to ask
+    /// about platform membership without asking the consent ledger.
+    /// </remarks>
+    /// <param name="an">The invited address.</param>
+    /// <param name="einladender">
+    /// Who invited. For the log; the mail names the company, not the person.
+    /// </param>
+    /// <param name="firma">Which company, so the recipient can recognise it.</param>
+    /// <param name="klartextToken">The token, in the clear. Only ever here and in the mail.</param>
+    void Einladung(string an, SubjectId einladender, string firma, string klartextToken);
 }

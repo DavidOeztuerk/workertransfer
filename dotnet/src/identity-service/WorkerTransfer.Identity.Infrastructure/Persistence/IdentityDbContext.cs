@@ -54,6 +54,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
     public DbSet<TenantRow> Tenants => Set<TenantRow>();
 
+    public DbSet<InvitationRow> Invitations => Set<InvitationRow>();
+
     public DbSet<VerificationTokenRow> VerificationTokens => Set<VerificationTokenRow>();
 
     public DbSet<MembershipRow> Memberships => Set<MembershipRow>();
@@ -144,6 +146,24 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             // this it may insert the token before the account it belongs to,
             // which is exactly what registering does in one transaction.
             entity.HasOne<UserRow>().WithMany().HasForeignKey(row => row.UserId);
+        });
+
+        modelBuilder.Entity<InvitationRow>(entity =>
+        {
+            entity.ToTable("company_invitations", t => t.ExcludeFromMigrations());
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id");
+            entity.Property(row => row.TenantId).HasColumnName("tenant_id");
+            entity.Property(row => row.Email).HasColumnName("email").HasColumnType("citext");
+            entity.Property(row => row.Role).HasColumnName("role");
+            entity.Property(row => row.InvitedBy).HasColumnName("invited_by");
+            entity.Property(row => row.Status).HasColumnName("status");
+            entity.Property(row => row.TokenHash).HasColumnName("token_hash");
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at");
+            entity.Property(row => row.ExpiresAt).HasColumnName("expires_at");
+            entity.Property(row => row.AcceptedAt).HasColumnName("accepted_at");
+
+            entity.HasOne<TenantRow>().WithMany().HasForeignKey(row => row.TenantId);
         });
 
         modelBuilder.Entity<SessionCapacityRow>(entity =>
@@ -250,4 +270,36 @@ public sealed class VerificationTokenRow
     public DateTime? ConsumedAt { get; set; }
 
     public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>One row of <c>company_invitations</c>.</summary>
+/// <remarks>
+/// <c>invited_by</c> is nullable and its foreign key is <c>SET NULL</c>, not
+/// <c>CASCADE</c> — and the difference is not a nicety (ADR-0027 §2). With
+/// cascade, a company's open invitations vanished the moment a recruiter
+/// deleted their <em>private</em> account. The invitation belongs to the
+/// company; what falls away is the name on it.
+/// </remarks>
+public sealed class InvitationRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public string Email { get; set; } = string.Empty;
+
+    public string Role { get; set; } = "member";
+
+    public Guid? InvitedBy { get; set; }
+
+    public string Status { get; set; } = "pending";
+
+    /// <summary>Only the hash. The plaintext goes out by mail and stands nowhere here.</summary>
+    public string TokenHash { get; set; } = string.Empty;
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime ExpiresAt { get; set; }
+
+    public DateTime? AcceptedAt { get; set; }
 }
