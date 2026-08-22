@@ -4,6 +4,7 @@
     <ProjectReference Include="..\WorkerTransfer.Identity.Application\WorkerTransfer.Identity.Application.csproj" />
     <ProjectReference Include="..\WorkerTransfer.Identity.Contracts\WorkerTransfer.Identity.Contracts.csproj" />
     <ProjectReference Include="..\WorkerTransfer.Identity.Infrastructure\WorkerTransfer.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>

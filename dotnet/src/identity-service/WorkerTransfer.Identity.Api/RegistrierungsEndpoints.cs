@@ -1,6 +1,8 @@
 using MediatR;
 using WorkerTransfer.Identity.Application.Registrierung;
 
+using WorkerTransfer.ServiceDefaults;
+
 namespace WorkerTransfer.Identity.Api;
 
 /// <summary>What a caller sends to register.</summary>

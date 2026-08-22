@@ -1,24 +1,27 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 
-namespace WorkerTransfer.Identity.Api;
+namespace WorkerTransfer.ServiceDefaults;
 
 /// <summary>
 /// Turns an unhandled failure into an RFC 9457 problem document.
 /// </summary>
 /// <remarks>
 /// Stands in for Girder's <c>UseExceptionHandling()</c>, which writes an
-/// envelope of a different shape. The field names here are the contract the
-/// React app reads — it takes the message out of <c>detail</c> — and a
-/// migration that changes them changes a contract.
+/// envelope of a different shape. One shape across every service, because a
+/// caller that has to know which service answered in order to read the error is
+/// a caller that will read the wrong field.
 /// <para>
-/// Carries the correlation id and nothing else: a body is a place a value ends
-/// up in a log or a screenshot.
+/// Carries the correlation id and nothing else. A body is a place a value ends
+/// up in a log or a screenshot, so what a person typed never reaches it.
 /// </para>
 /// </remarks>
 public sealed class ProblemDetailsMiddleware(
     RequestDelegate next,
     ILogger<ProblemDetailsMiddleware> logger)
 {
+    /// <summary>Runs the rest of the pipeline and catches what falls out.</summary>
     public async Task InvokeAsync(HttpContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -29,6 +32,9 @@ public sealed class ProblemDetailsMiddleware(
         }
         catch (Exception exception)
         {
+            // The exception, not the request body: a failure is exactly when
+            // somebody wants the payload and exactly when writing it out is
+            // worst.
             logger.LogError(exception, "Unhandled request exception");
 
             if (context.Response.HasStarted)
@@ -45,7 +51,7 @@ public sealed class ProblemDetailsMiddleware(
     /// <param name="context">The request being answered.</param>
     /// <param name="status">The status code.</param>
     /// <param name="title">The kind of failure.</param>
-    /// <param name="detail">What the caller is told.</param>
+    /// <param name="detail">What the caller is told. Never what they sent.</param>
     public static async Task Schreibe(
         HttpContext context,
         int status,

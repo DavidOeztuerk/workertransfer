@@ -2,6 +2,8 @@ using Girder.Core.Identity;
 using MediatR;
 using WorkerTransfer.Identity.Application.Anmelden;
 
+using WorkerTransfer.ServiceDefaults;
+
 namespace WorkerTransfer.Identity.Api;
 
 /// <summary>What a caller sends to sign in.</summary>

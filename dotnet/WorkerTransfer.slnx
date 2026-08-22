@@ -1,7 +1,11 @@
 <Solution>
   <Folder Name="/src/" />
   <Folder Name="/src/shared/">
+    <Project Path="src/shared/WorkerTransfer.Contracts.Consent/WorkerTransfer.Contracts.Consent.csproj" />
+    <Project Path="src/shared/WorkerTransfer.Contracts.Erasure/WorkerTransfer.Contracts.Erasure.csproj" />
+    <Project Path="src/shared/WorkerTransfer.Contracts.Identity/WorkerTransfer.Contracts.Identity.csproj" />
     <Project Path="src/shared/WorkerTransfer.Outbox/WorkerTransfer.Outbox.csproj" />
+    <Project Path="src/shared/WorkerTransfer.ServiceDefaults/WorkerTransfer.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/src/identity-service/">
     <Project Path="src/identity-service/WorkerTransfer.Identity.Api/WorkerTransfer.Identity.Api.csproj" />
