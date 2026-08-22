@@ -69,7 +69,8 @@ public sealed class Postgres : IAsyncLifetime
         }
     }
 
-    private static string Repowurzel()
+    /// <summary>Where this repository starts, found by walking up.</summary>
+    public static string Repowurzel()
     {
         var verzeichnis = new DirectoryInfo(AppContext.BaseDirectory);
 
