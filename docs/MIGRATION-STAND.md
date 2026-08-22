@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-22, nach dem Abschluss von Phase A.
+**Zuletzt fortgeschrieben:** 2026-08-22, beim Start von Welle 1.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -18,7 +18,7 @@ was davon getan ist.
 | | |
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
-| **Phase B — die neun Dienste** | **nicht begonnen.** Welle 1 startbereit |
+| **Phase B — die neun Dienste** | **Welle 1 läuft** (consent · profile · resume) |
 | **Phase C — Zusammenbau** | nicht begonnen |
 | **Prüfer** | nicht begonnen |
 | **Tests** | 211 grün, 0 rot, 0 übersprungen |
@@ -70,15 +70,19 @@ gehen an `notification-service`.
 
 ## Phase B — die neun Dienste
 
-**Noch nicht begonnen.** Ein erster Versuch mit neun gleichzeitigen Agenten ist
-am Ausgabelimit gestorben, bevor einer eine Datei angelegt hatte; im Repository
-ist davon nichts zurückgeblieben. Deshalb jetzt drei Wellen zu dritt.
+Ein erster Versuch mit neun gleichzeitigen Agenten ist am Ausgabelimit
+gestorben, bevor einer eine Datei angelegt hatte; im Repository ist davon nichts
+zurückgeblieben. Deshalb drei Wellen zu dritt.
+
+**Welle 1 läuft seit dem Stand dieser Zeile.** Solange sie läuft, ist der
+Arbeitsbaum nicht sauber und die Solution kennt die neuen Projekte noch nicht —
+das ist erwartet, nicht kaputt.
 
 | Welle | Dienst | Port | Stand | Commit |
 |---|---|---|---|---|
-| 1 | `consent` | 8002 | offen | — |
-| 1 | `profile` | 8003 | offen | — |
-| 1 | `resume` | 8004 | offen | — |
+| 1 | `consent` | 8002 | **läuft** | — |
+| 1 | `profile` | 8003 | **läuft** | — |
+| 1 | `resume` | 8004 | **läuft** | — |
 | 2 | `portfolio` | 8005 | offen | — |
 | 2 | `jobs` | 8006 | offen | — |
 | 2 | `applications` | 8007 | offen | — |
