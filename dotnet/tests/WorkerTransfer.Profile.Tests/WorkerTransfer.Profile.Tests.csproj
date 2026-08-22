@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\profile-service\WorkerTransfer.Profile.Api\WorkerTransfer.Profile.Api.csproj" />
+    <ProjectReference Include="..\..\src\profile-service\WorkerTransfer.Profile.Application\WorkerTransfer.Profile.Application.csproj" />
+    <ProjectReference Include="..\..\src\profile-service\WorkerTransfer.Profile.Contracts\WorkerTransfer.Profile.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\profile-service\WorkerTransfer.Profile.Domain\WorkerTransfer.Profile.Domain.csproj" />
+    <ProjectReference Include="..\..\src\profile-service\WorkerTransfer.Profile.Infrastructure\WorkerTransfer.Profile.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
