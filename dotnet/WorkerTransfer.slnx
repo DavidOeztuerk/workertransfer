@@ -21,6 +21,13 @@
     <Project Path="src/identity-service/WorkerTransfer.Identity.Domain/WorkerTransfer.Identity.Domain.csproj" />
     <Project Path="src/identity-service/WorkerTransfer.Identity.Infrastructure/WorkerTransfer.Identity.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/portfolio-service/">
+    <Project Path="src/portfolio-service/WorkerTransfer.Portfolio.Api/WorkerTransfer.Portfolio.Api.csproj" />
+    <Project Path="src/portfolio-service/WorkerTransfer.Portfolio.Application/WorkerTransfer.Portfolio.Application.csproj" />
+    <Project Path="src/portfolio-service/WorkerTransfer.Portfolio.Contracts/WorkerTransfer.Portfolio.Contracts.csproj" />
+    <Project Path="src/portfolio-service/WorkerTransfer.Portfolio.Domain/WorkerTransfer.Portfolio.Domain.csproj" />
+    <Project Path="src/portfolio-service/WorkerTransfer.Portfolio.Infrastructure/WorkerTransfer.Portfolio.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/profile-service/">
     <Project Path="src/profile-service/WorkerTransfer.Profile.Api/WorkerTransfer.Profile.Api.csproj" />
     <Project Path="src/profile-service/WorkerTransfer.Profile.Application/WorkerTransfer.Profile.Application.csproj" />
@@ -39,6 +46,7 @@
     <Project Path="tests/WorkerTransfer.Consent.Tests/WorkerTransfer.Consent.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Identity.Tests/WorkerTransfer.Identity.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Outbox.Tests/WorkerTransfer.Outbox.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Portfolio.Tests/WorkerTransfer.Portfolio.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Profile.Tests/WorkerTransfer.Profile.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Resume.Tests/WorkerTransfer.Resume.Tests.csproj" />
   </Folder>
