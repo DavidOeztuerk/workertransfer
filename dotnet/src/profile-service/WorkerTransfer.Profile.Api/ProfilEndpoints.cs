@@ -1,0 +1,266 @@
+using Girder.Core.Identity;
+using MediatR;
+using WorkerTransfer.Profile.Application.Entwurf;
+using WorkerTransfer.Profile.Application.Loeschung;
+using WorkerTransfer.Profile.Application.Ports;
+using WorkerTransfer.Profile.Application.Profile;
+using WorkerTransfer.Profile.Domain;
+using WorkerTransfer.Profile.Domain.Profile;
+using WorkerTransfer.ServiceDefaults;
+
+namespace WorkerTransfer.Profile.Api;
+
+/// <summary>Was jemand schickt, um sein Profil zu schreiben.</summary>
+/// <remarks>
+/// Ohne <c>subject_id</c>: wessen Profil das ist, steht im geprüften Token.
+/// Und <b>ohne jedes Sichtbarkeitsfeld</b> — ob ein Profil gezeigt werden darf,
+/// steht ausschließlich im Consent-Ledger (ADR-0020). Ein Feld hier wäre eine
+/// zweite Wahrheit, und die beiden wären beim ersten Widerruf uneins.
+/// </remarks>
+public sealed record ProfilKoerper(
+    string Headline, string Bio, string Location, bool RemoteOk, IReadOnlyList<string> Skills);
+
+/// <summary>Was jemand schickt, um sich beim Formulieren helfen zu lassen.</summary>
+public sealed record EntwurfKoerper(string Wish);
+
+/// <summary><c>/profiles</c> und <c>/candidates</c>.</summary>
+public static class ProfilEndpoints
+{
+    /// <summary>Bindet die Profilrouten ein.</summary>
+    public static IEndpointRouteBuilder MapProfilEndpoints(this IEndpointRouteBuilder app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
+        // Ein schweigender Ledger ist weder ein Ja noch ein Nein. 404 sagte,
+        // die Person sei nicht da; das Profil auszugeben hieße, etwas
+        // herzugeben, das niemand freigegeben hat. 503 sagt das einzig Wahre:
+        // dieser Dienst kann gerade nicht antworten.
+        //
+        // Hier als ein Filter statt als Fang in jeder Route, weil die Route,
+        // die ihn vergisst, wie eine funktionierende aussieht, bis der Ledger
+        // ausfällt.
+        var profile = app.MapGroup("/profiles").AddEndpointFilter(SchweigenAbfangen);
+        var kandidaten = app.MapGroup("/candidates").AddEndpointFilter(SchweigenAbfangen);
+
+        profile.MapPut("/me", async (
+            ProfilKoerper koerper,
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await NichtAngemeldet(context);
+                return;
+            }
+
+            try
+            {
+                var profil = await mediator.Send(
+                    new ProfilSpeichernBefehl(
+                        handelnder.Subject, koerper.Headline, koerper.Bio,
+                        koerper.Location, koerper.RemoteOk, koerper.Skills ?? []),
+                    cancellationToken);
+
+                await context.Response.WriteAsJsonAsync(Antwort(profil), cancellationToken);
+            }
+            catch (Eingabefehler fehler)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", fehler.Message);
+            }
+        });
+
+        profile.MapGet("/me", async (
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await NichtAngemeldet(context);
+                return;
+            }
+
+            // Das eigene Profil ohne Ledgerfrage: die Freigabe regelt, wer es
+            // von aussen sieht, nicht ob jemand sein eigenes lesen darf.
+            var profil = await mediator.Send(
+                new MeinProfilAbfrage(handelnder.Subject), cancellationToken);
+
+            if (profil is null)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status404NotFound,
+                    "Request failed", "no profile yet");
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(Antwort(profil), cancellationToken);
+        });
+
+        profile.MapPost("/me/draft", async (
+            EntwurfKoerper koerper,
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await NichtAngemeldet(context);
+                return;
+            }
+
+            try
+            {
+                // Der Entwurf lebt im Formular, bis die Person ihn speichert —
+                // und dann ist es ihr Text. Nichts davon wird hier abgelegt.
+                var text = await mediator.Send(
+                    new EntwurfAbfrage(handelnder.Subject, koerper.Wish ?? string.Empty),
+                    cancellationToken);
+
+                await context.Response.WriteAsJsonAsync(
+                    new Dictionary<string, string> { ["draft"] = text }, cancellationToken);
+            }
+            catch (EntwurfNichtVerfuegbar fehler)
+            {
+                // Die Art des Fehlschlags, nie sein Inhalt — und ausdrücklich
+                // keine Vorlage, die wie ein Vorschlag aussähe.
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status503ServiceUnavailable,
+                    "Request failed", fehler.Message);
+            }
+        });
+
+        profile.MapGet("/{subjectId:guid}", async (
+            Guid subjectId,
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await NichtAngemeldet(context);
+                return;
+            }
+
+            if (handelnder.Acting is not Capacity.ForCompany firma)
+            {
+                // 403 ist eine Aussage über den Aufrufer und verrät nichts über
+                // die Person, nach der er fragt.
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status403Forbidden,
+                    "Request failed", "no active company");
+                return;
+            }
+
+            var profil = await mediator.Send(
+                new FremdesProfilAbfrage(new SubjectId(subjectId), firma.Tenant),
+                cancellationToken);
+
+            if (profil is null)
+            {
+                // Verborgen und nicht vorhanden antworten gleich, und das muss
+                // so bleiben: ein Unterschied sagte, ob dieser Mensch hier ist.
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status404NotFound, "Request failed", "no such profile");
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(Antwort(profil), cancellationToken);
+        });
+
+        kandidaten.MapGet("/", async (
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await NichtAngemeldet(context);
+                return;
+            }
+
+            if (handelnder.Acting is not Capacity.ForCompany firma)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status403Forbidden,
+                    "Request failed", "no active company");
+                return;
+            }
+
+            var anfrage = context.Request.Query;
+
+            var seite = await mediator.Send(
+                new KandidatenAbfrage(
+                    Anzahl(anfrage["limit"]),
+                    anfrage["cursor"],
+                    firma.Tenant,
+                    anfrage["skill"].Count > 0 ? [.. anfrage["skill"]!] : null,
+                    anfrage["location"].ToString(),
+                    anfrage["remote"] == "true"),
+                cancellationToken);
+
+            // Keine Gesamtzahl. Sie verriete über die Differenz zur Seitenlänge,
+            // wie viele Profile NICHT freigegeben sind — genau die Auskunft, die
+            // der Ledger schützt.
+            await context.Response.WriteAsJsonAsync(
+                new Dictionary<string, object?>
+                {
+                    ["items"] = seite.Eintraege.Select(Antwort).ToArray(),
+                    ["next"] = seite.Weiter?.ToString()
+                },
+                cancellationToken);
+        });
+
+        return app;
+    }
+
+    private static async ValueTask<object?> SchweigenAbfangen(
+        EndpointFilterInvocationContext aufruf, EndpointFilterDelegate weiter)
+    {
+        try
+        {
+            return await weiter(aufruf);
+        }
+        catch (EinwilligungSchweigt)
+        {
+            await ProblemDetailsMiddleware.Schreibe(
+                aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                "Request failed", "the consent ledger did not answer");
+
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Wie viele Zeilen eine Seite trägt — mit derselben Obergrenze, aus der
+    /// die Sammelgrenze des Ledgers hergeleitet ist.
+    /// </summary>
+    private static int Anzahl(string? roh) =>
+        int.TryParse(roh, out var wert) && wert is > 0 and <= 50 ? wert : 20;
+
+    /// <remarks>
+    /// Trägt kein Sichtbarkeitsfeld, keinen Punktwert, keinen Rang und keinen
+    /// Prozentwert — und es gehört keines darauf (ADR-0022).
+    /// </remarks>
+    private static Dictionary<string, object?> Antwort(Profil profil) => new()
+    {
+        ["subject_id"] = profil.Wer.Value,
+        ["headline"] = profil.Ueberschrift,
+        ["bio"] = profil.Text,
+        ["location"] = profil.Ort,
+        ["remote_ok"] = profil.RemoteMoeglich,
+        ["skills"] = profil.Faehigkeiten.Werte,
+        ["updated_at"] = profil.GeaendertAm
+    };
+
+    private static Task NichtAngemeldet(HttpContext context) =>
+        ProblemDetailsMiddleware.Schreibe(
+            context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
+}
