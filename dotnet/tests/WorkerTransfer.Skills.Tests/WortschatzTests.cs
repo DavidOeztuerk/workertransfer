@@ -1,8 +1,9 @@
 using System.Reflection;
 using FluentAssertions;
-using WorkerTransfer.Profile.Domain.Faehigkeiten;
 
-namespace WorkerTransfer.Profile.Tests;
+using WorkerTransfer.Skills;
+
+namespace WorkerTransfer.Skills.Tests;
 
 /// <summary>Der Wortschatz benennt um und schließt nie etwas.</summary>
 public class WortschatzTests

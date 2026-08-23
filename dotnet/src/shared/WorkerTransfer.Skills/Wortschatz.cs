@@ -1,6 +1,6 @@
 using System.Collections.Frozen;
 
-namespace WorkerTransfer.Profile.Domain.Faehigkeiten;
+namespace WorkerTransfer.Skills;
 
 /// <summary>Welche Wörter dasselbe meinen — und sonst nichts (ADR-0023).</summary>
 /// <remarks>
@@ -23,12 +23,18 @@ namespace WorkerTransfer.Profile.Domain.Faehigkeiten;
 /// bei jeder neuen Technologie und bei jedem Beruf außerhalb der IT falsch.
 /// </para>
 /// <para>
-/// <b>Dienstintern, und das ist vorläufig.</b> jobs-service braucht dieselbe
-/// Tabelle: der Abgleich im Browser hält die Fähigkeiten einer Stelle gegen die
-/// eines Profils, und zwei Tabellen, die auseinanderlaufen, erzeugen genau die
-/// Lücke, gegen die diese hier existiert. Sobald jobs-service steht, gehört sie
-/// nach <c>WorkerTransfer.Contracts.Skills</c> — vorher wäre es ein geteiltes
-/// Paket mit einem Konsumenten.
+/// <b>Geteilt zwischen profile-service und jobs-service</b>, und nur die
+/// Tabelle. Der Abgleich findet im Browser statt: die Fähigkeiten einer Stelle
+/// werden gegen die eines Profils gehalten, und zwei Tabellen, die
+/// auseinanderlaufen, erzeugen genau die Lücke, gegen die diese hier existiert
+/// — <c>„Postgres"</c> im Profil und <c>„PostgreSQL"</c> in der Stelle wären
+/// dann kein Haken.
+/// </para>
+/// <para>
+/// Was <em>nicht</em> geteilt ist: die <c>Faehigkeitenliste</c> selbst. Die
+/// führt jeder Dienst für sich, denn wie viele Fähigkeiten ein Profil oder eine
+/// Stelle trägt, ist eine Entscheidung des Dienstes, dem sie gehört — ein
+/// geteiltes Domänenmodell gibt es hier nicht (ADR-0004).
 /// </para>
 /// </remarks>
 public static class Wortschatz

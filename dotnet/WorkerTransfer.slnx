@@ -6,6 +6,7 @@
     <Project Path="src/shared/WorkerTransfer.Contracts.Identity/WorkerTransfer.Contracts.Identity.csproj" />
     <Project Path="src/shared/WorkerTransfer.Outbox/WorkerTransfer.Outbox.csproj" />
     <Project Path="src/shared/WorkerTransfer.ServiceDefaults/WorkerTransfer.ServiceDefaults.csproj" />
+    <Project Path="src/shared/WorkerTransfer.Skills/WorkerTransfer.Skills.csproj" />
   </Folder>
   <Folder Name="/src/consent-service/">
     <Project Path="src/consent-service/WorkerTransfer.Consent.Api/WorkerTransfer.Consent.Api.csproj" />
@@ -20,6 +21,13 @@
     <Project Path="src/identity-service/WorkerTransfer.Identity.Contracts/WorkerTransfer.Identity.Contracts.csproj" />
     <Project Path="src/identity-service/WorkerTransfer.Identity.Domain/WorkerTransfer.Identity.Domain.csproj" />
     <Project Path="src/identity-service/WorkerTransfer.Identity.Infrastructure/WorkerTransfer.Identity.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/jobs-service/">
+    <Project Path="src/jobs-service/WorkerTransfer.Jobs.Api/WorkerTransfer.Jobs.Api.csproj" />
+    <Project Path="src/jobs-service/WorkerTransfer.Jobs.Application/WorkerTransfer.Jobs.Application.csproj" />
+    <Project Path="src/jobs-service/WorkerTransfer.Jobs.Contracts/WorkerTransfer.Jobs.Contracts.csproj" />
+    <Project Path="src/jobs-service/WorkerTransfer.Jobs.Domain/WorkerTransfer.Jobs.Domain.csproj" />
+    <Project Path="src/jobs-service/WorkerTransfer.Jobs.Infrastructure/WorkerTransfer.Jobs.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/src/portfolio-service/">
     <Project Path="src/portfolio-service/WorkerTransfer.Portfolio.Api/WorkerTransfer.Portfolio.Api.csproj" />
@@ -45,9 +53,11 @@
   <Folder Name="/tests/">
     <Project Path="tests/WorkerTransfer.Consent.Tests/WorkerTransfer.Consent.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Identity.Tests/WorkerTransfer.Identity.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Jobs.Tests/WorkerTransfer.Jobs.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Outbox.Tests/WorkerTransfer.Outbox.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Portfolio.Tests/WorkerTransfer.Portfolio.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Profile.Tests/WorkerTransfer.Profile.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Resume.Tests/WorkerTransfer.Resume.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Skills.Tests/WorkerTransfer.Skills.Tests.csproj" />
   </Folder>
 </Solution>
