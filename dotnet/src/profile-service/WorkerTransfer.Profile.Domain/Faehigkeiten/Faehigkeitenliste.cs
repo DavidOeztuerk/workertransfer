@@ -1,3 +1,5 @@
+using WorkerTransfer.Skills;
+
 namespace WorkerTransfer.Profile.Domain.Faehigkeiten;
 
 /// <summary>Zu viele Fähigkeiten, oder eine zu lange.</summary>
@@ -26,7 +28,8 @@ public sealed class Faehigkeitenliste
     public const int Hoechstzahl = 30;
 
     /// <summary>Wie lang eine einzelne Fähigkeit sein darf.</summary>
-    public const int Hoechstlaenge = 50;
+    /// <inheritdoc cref="Faehigkeitsgrenzen.Hoechstlaenge" />
+    public const int Hoechstlaenge = Faehigkeitsgrenzen.Hoechstlaenge;
 
     /// <summary>Die leere Liste — jemand, der nichts eingetragen hat.</summary>
     /// <remarks>

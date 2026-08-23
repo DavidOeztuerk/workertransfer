@@ -6,12 +6,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Girder.Core" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\shared\WorkerTransfer.Skills\WorkerTransfer.Skills.csproj" />
-  </ItemGroup>
+  <!--
+    Keine einzige Abhängigkeit, und das ist der Punkt. Eine Tabelle und eine
+    Funktion — was hier hineinkäme, könnte später etwas über Menschen
+    behaupten.
+  -->
 
 </Project>

@@ -1,6 +1,7 @@
 using Girder.Core.Identity;
 using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.Profile.Domain.Faehigkeiten;
+using WorkerTransfer.Skills;
 using WorkerTransfer.Profile.Domain.Profile;
 
 namespace WorkerTransfer.Profile.Infrastructure.Persistence;
