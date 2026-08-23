@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-23, nach `resume`.
+**Zuletzt fortgeschrieben:** 2026-08-23, nach dem Abschluss von Welle 1.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -18,12 +18,11 @@ was davon getan ist.
 | | |
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
-| **Phase B — die neun Dienste** | **2 von 9 fertig** (`consent`, `resume`). profile angefangen |
+| **Phase B — die neun Dienste** | **Welle 1 fertig** — 3 von 9. Welle 2 startbereit |
 | **Phase C — Zusammenbau** | nicht begonnen |
 | **Prüfer** | nicht begonnen |
-| **Tests** | 273 grün, 0 rot, 0 übersprungen |
+| **Tests** | 338 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
-| **Nicht in der Solution** | profile — übersetzt noch nicht |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
 
@@ -82,48 +81,29 @@ Projekte stehen **absichtlich nicht** in `WorkerTransfer.slnx`: solange sie
 nicht übersetzen, würde das den Gesamtbau roten, und dann sagt `dotnet build`
 über identity und die geteilten Pakete nichts mehr aus.
 
-### Wo die drei genau stehen
+### Wie Welle 1 zu Ende ging
 
-| | consent | profile | resume |
-|---|---|---|---|
-| Domain | steht | steht | steht |
-| Application | steht | steht | steht |
-| Infrastructure | steht | steht | steht |
-| Contracts | steht | leeres Projekt | steht |
-| **Api** | steht | nur `Program.cs`, **keine Endpunkte** | steht |
-| **EF-Migrationen** | steht | **fehlen** | steht |
-| Tests | 50 | 4 Dateien, keine Integrationstests | 12 |
-| Übersetzt | ja, grün | ungeprüft | ja, grün |
+Die Agenten hatten Domäne, Anwendung und Infrastruktur weitgehend geschrieben,
+als sie am Ausgabelimit abbrachen. Die fehlende Hälfte — Api-Schicht, Routen,
+EF-Migration, Integrationstests, Gegenproben — ist von Hand nachgezogen worden,
+ein Dienst nach dem anderen.
 
-**profile fehlt:** die Routen in der Api, die EF-Migration, Integrationstests
-und der Nachweis, dass es übersetzt.
+**Das Muster ist wiederholbar** und steht so für Welle 2 und 3 bereit:
 
-### So wird Welle 1 fortgesetzt
+1. Fehlendes in Infrastructure ergänzen (DI-Registrierung, Zustellungen,
+   Sicherheitsadapter).
+2. Api-Projekt: `Program.cs` auf `AddWorkerTransferDefaults` /
+   `UseWorkerTransferDefaults`, dann die Routen.
+3. `dotnet ef migrations add …`.
+4. Integrationstests gegen Testcontainers mit `Database.MigrateAsync()`.
+5. Gegenproben — jede tragende Regel brechen, prüfen dass genau die zugehörigen
+   Tests fallen, und dass der Bruch **übersetzt**.
+6. In `WorkerTransfer.slnx` eintragen, Gesamtlauf, committen.
 
-Je Dienst ein Agent, mit demselben Auftrag wie beim Start — **plus dem Hinweis,
-dass Domäne, Anwendung und Infrastruktur schon liegen und er dort weitermacht,
-statt neu anzufangen.** Reihenfolge der verbleibenden Arbeit:
-
-1. Api-Projekt anlegen bzw. vervollständigen: `Program.cs` auf
-   `AddWorkerTransferDefaults` / `UseWorkerTransferDefaults`, dann die Routen.
-2. EF-Migration erzeugen (`dotnet ef migrations add …`).
-3. Tests schreiben — Einheitentests **und** Integrationstests gegen
-   Testcontainers, mit `Database.MigrateAsync()`.
-4. Gegenproben fahren.
-5. Bauen und testen, **in getrennten Aufrufen**, nur auf den eigenen Projekten.
-6. Committen; damit ist die WIP-Bedingung für diesen Dienst aufgehoben.
-
-Erst wenn ein Dienst übersetzt und grün ist, kommt er in die Solution.
-
-### Was nach jeder Welle zu tun ist
-
-1. Die neuen Projekte in `dotnet/WorkerTransfer.slnx` eintragen — **die Agenten
-   fassen die Datei nicht an**, damit sie sich nicht gegenseitig überschreiben.
-2. Von den Agenten gemeldete Paketversionen in `dotnet/Directory.Packages.props`
-   nachtragen — aus demselben Grund.
-3. `dotnet build` und `dotnet test` über die ganze Solution, **in getrennten
-   Aufrufen**.
-4. Diese Datei fortschreiben: Stand je Dienst, Commit, offene Befunde.
+**Vier Testerwartungen waren falsch und nicht der Code** — das ist der
+wertvollste Befund aus Welle 1. Die von den Agenten geschriebene Domäne war
+jedes Mal besser durchdacht als die Erwartung an sie. Wer Welle 2 fortsetzt,
+sollte bei einem roten Test zuerst fragen, ob der Test recht hat.
 
 ### Offene Punkte, die ein Agent gemeldet hat
 
@@ -133,13 +113,12 @@ Keiner der drei kam bis zu seinem Bericht. Was beim Fortsetzen zu klären ist:
   gebaut (`Domain/Faehigkeiten/Wortschatz.cs`); `jobs` braucht dieselbe in
   Welle 2. Spätestens dann nach `dotnet/src/shared/WorkerTransfer.Skills`
   ziehen — nicht vorher, sonst schreiben zwei Agenten dieselbe Datei.
-- **Ob profile und resume übersetzen, ist ungeprüft.** Sie stehen nicht in der
-  Solution und wurden nie gebaut.
-- **Zwei Testerwartungen an consent waren falsch, nicht der Code** — beide
-  Korrekturen stehen in `b06d2bd` und sind der Sache nach interessant: das
-  Fähigkeitsmuster prüft die Form und nicht das Vokabular, und `retained = 0`
-  bei bleibender Kette ist kein Widerspruch, weil `retained` Zeilen zählt, die
-  ein Aufbewahrungsschalter gerettet hat, und nicht anonymisierten Beweis.
+- **Die Fähigkeitentabelle gehört geteilt.** `profile` hat sie dienstintern
+  (`Domain/Faehigkeiten/Wortschatz.cs`); `jobs` braucht dieselbe in Welle 2.
+  Dann nach `dotnet/src/shared/WorkerTransfer.Skills` ziehen — nicht vorher.
+- **`ZugriffsCookie` ist nach `ServiceDefaults` gewandert.** Es stand in drei
+  Diensten; die dritte Kopie ist die, ab der eine Regel je Dienst zu driften
+  beginnt.
 
 ### Eine Lehre, die bleibt
 
