@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-23, nach `portfolio`.
+**Zuletzt fortgeschrieben:** 2026-08-23, nach `jobs`.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -18,10 +18,10 @@ was davon getan ist.
 | | |
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
-| **Phase B — die neun Dienste** | **4 von 9 fertig.** Welle 2 läuft: `jobs` und `applications` fehlen |
+| **Phase B — die neun Dienste** | **5 von 9 fertig.** Welle 2: nur noch `applications` |
 | **Phase C — Zusammenbau** | nicht begonnen |
 | **Prüfer** | nicht begonnen |
-| **Tests** | 356 grün, 0 rot, 0 übersprungen |
+| **Tests** | 373 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
@@ -113,9 +113,10 @@ Keiner der drei kam bis zu seinem Bericht. Was beim Fortsetzen zu klären ist:
   gebaut (`Domain/Faehigkeiten/Wortschatz.cs`); `jobs` braucht dieselbe in
   Welle 2. Spätestens dann nach `dotnet/src/shared/WorkerTransfer.Skills`
   ziehen — nicht vorher, sonst schreiben zwei Agenten dieselbe Datei.
-- **Die Fähigkeitentabelle gehört geteilt.** `profile` hat sie dienstintern
-  (`Domain/Faehigkeiten/Wortschatz.cs`); `jobs` braucht dieselbe in Welle 2.
-  Dann nach `dotnet/src/shared/WorkerTransfer.Skills` ziehen — nicht vorher.
+- **Erledigt:** die Fähigkeitentabelle liegt jetzt in
+  `dotnet/src/shared/WorkerTransfer.Skills`, ohne eine einzige Abhängigkeit.
+  Geteilt ist nur die Tabelle und die Höchstlänge; die Fähigkeitenliste selbst
+  führt jeder Dienst für sich.
 - **`ZugriffsCookie` ist nach `ServiceDefaults` gewandert.** Es stand in drei
   Diensten; die dritte Kopie ist die, ab der eine Regel je Dienst zu driften
   beginnt.
