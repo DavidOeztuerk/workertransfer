@@ -4,6 +4,7 @@
     <ProjectReference Include="..\WorkerTransfer.Profile.Application\WorkerTransfer.Profile.Application.csproj" />
     <ProjectReference Include="..\WorkerTransfer.Profile.Domain\WorkerTransfer.Profile.Domain.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Consent\WorkerTransfer.Contracts.Consent.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>

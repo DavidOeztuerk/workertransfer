@@ -22,7 +22,6 @@ var app = builder.Build();
 app.UseWorkerTransferDefaults(builder.Environment, dienstname);
 
 app.MapProfilEndpoints();
-app.MapEntwurfsEndpunkt();
 app.MapLoeschEndpunkt();
 
 await app.RunAsync();

@@ -143,7 +143,7 @@ public sealed class HttpEinwilligungstor(
         {
             protokoll.LogWarning("Der Consent-Ledger hat nicht rechtzeitig geantwortet.");
 
-            throw new EinwilligungSchweigt("consent-service timed out", fehler.Message.Length);
+            throw new EinwilligungSchweigt($"consent-service timed out ({fehler.GetType().Name})");
         }
 
         using (antwort)
