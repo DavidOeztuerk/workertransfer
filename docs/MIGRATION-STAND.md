@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-23, nach dem Abschluss von Welle 1.
+**Zuletzt fortgeschrieben:** 2026-08-23, nach `portfolio`.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -18,10 +18,10 @@ was davon getan ist.
 | | |
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
-| **Phase B — die neun Dienste** | **Welle 1 fertig** — 3 von 9. Welle 2 startbereit |
+| **Phase B — die neun Dienste** | **4 von 9 fertig.** Welle 2 läuft: `jobs` und `applications` fehlen |
 | **Phase C — Zusammenbau** | nicht begonnen |
 | **Prüfer** | nicht begonnen |
-| **Tests** | 338 grün, 0 rot, 0 übersprungen |
+| **Tests** | 356 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
