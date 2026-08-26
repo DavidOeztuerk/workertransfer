@@ -108,6 +108,58 @@ Einwilligungstor. GitHub liefert die **Belege** dazu, nicht die Treffer.
 
 ---
 
+## Die KI-Naht: was es gibt, und was bewusst fehlt
+
+**Was es gibt, und was bereits migriert ist:** genau zwei Entwerfer.
+`POST /profiles/me/draft` hilft einer *Person*, zu sagen, was sie sagen will.
+`POST /jobs/draft` hilft einem *Unternehmen*, seine **eigene** Anzeige zu
+formulieren. Beide sagen nie etwas *über* jemanden, beide speichern nichts —
+weder Eingabe noch Antwort (ADR-0024). Ohne API-Schlüssel ist der `NullDrafter`
+aktiv und die Oberfläche sagt es.
+
+Entschieden, damit niemand es neu aufrollt:
+
+| | |
+|---|---|
+| **Sprache** | **C#.** Der ganze Zweck dieser Migration ist *ein* Stapel. Ein Python-Dienst dafür brächte das zweite Ökosystem zurück, das gerade abgeschafft wird — zweite CI-Strecke, zweites Abhängigkeits-Audit, zweite Betriebsform. `worker-ai` sind 288 Zeilen mit einer Abhängigkeit (`httpx`); das Gegenstück heißt `HttpClient` |
+| **Eigener Dienst?** | **Nein, für die Entwerfer nicht.** Sie speichern nichts und müssen ohnehin zu „kein Entwerfer" degradieren können; ein Netzsprung fügt eine Fehlerquelle hinzu und gewinnt nichts. Sie bleiben je Dienst eingebettet, so wie jetzt |
+| **Getrennte Kontexte** | Bleiben getrennt. `DraftContext` (kein Name, keine Adresse, kein Arbeitgeber) und `JobDraftContext` (keine `tenant_id`, kein Firmenname) tragen je eigene Regeln über das `Draftable`-Protokoll. **Kein gemeinsamer Prompt mit einem `if`** — das ist die Stelle, an der eines Tages „erfinde nichts über die Person" für eine Anzeige gälte, oder schlimmer, umgekehrt |
+
+### Scout, Candidate-Ranking, Salary-Recommendation, Team-Analyzer
+
+**Die gibt es nicht, und das ist kein Versehen.**
+
+ULTRAPLAN Phase 6 beschreibt sie ausführlich — und beschreibt sie *so*:
+
+> „Mehrdimensionale Scores statt einer Zahl … AI Developer Scout:
+> natural-language Query → Candidate → CV/GitHub/Skills →
+> **Wechselwahrscheinlichkeit** → **Match-Score** → Vorschlag"
+
+Das ist wörtlich das, was ADR-0022 verboten hat und was `worker-github` das Leben
+gekostet hat. `worker-skills` lässt heute einen Test rotlaufen, sobald ein Name
+`level`, `weight`, `score`, `rank` oder `implies` enthält.
+
+**ULTRAPLAN Phase 6 und die ADRs widersprechen sich, und die ADRs haben
+gewonnen.** Genau deshalb steht in `CLAUDE.md`, die Visionsdokumente seien
+*Absicht, nicht Beschreibung*. Von zehn Unternehmens-Agenten der Vision ist
+`POST /jobs/draft` der einzige, der ohne eigene Abwägung baubar war — die
+anderen zielen auf Menschen.
+
+**Für diese Migration heißt das: nichts davon wird gebaut.** Kein Agent
+improvisiert hier einen Scout, weil er in einem Plandokument steht. Wenn so
+etwas kommen soll, braucht es vorher einen eigenen ADR, der die eine Frage
+beantwortet, an der alles hängt: *rangiert es Stellen für Menschen oder Menschen
+für Unternehmen?* Das Erste gibt es schon — `apps/web/src/jobs/match.ts` zeigt
+einer Person „du hast 2 von 3 genannten Fähigkeiten", im Browser, ohne Prozent
+und ohne Endpunkt. Das Zweite ist die Punktzahl über Menschen.
+
+Ein Scout, der Menschen über **selbstgenannte** Fähigkeiten findet und die
+GitHub-Belege dazu zeigt, wäre baubar — und wäre dann auch der eine Fall, in dem
+ein **eigener Dienst** richtig ist, weil er quer über Dienste fragt. Aber erst
+der ADR, dann der Code.
+
+---
+
 ## Der Ablauf: drei Phasen
 
 ### Phase A — das Fundament, seriell, machst du selbst
@@ -168,8 +220,24 @@ Jeder Agent bekommt den Auftrag unten, mit seinem Dienstnamen eingesetzt.
 2. **Compose und Helm** auf die .NET-Dienste umstellen.
 3. **Python restlos entfernen** — `apps/` außer `web`, `packages/` außer `ui`,
    `pyproject.toml`, `uv.lock`, `Makefile`, `tests/`, `scripts/`, `docker/`,
-   `Kon2.txt`, `var/`, `login-before.png`. Danach `dotnet/` flach in die Wurzel
-   ziehen, als eigener Commit.
+   `Kon2.txt`, `var/`, `login-before.png`. Danach `dotnet/src` → `src` und
+   `dotnet/tests` → `tests`, als eigener Commit, damit die Umbenennungen im
+   Verlauf lesbar bleiben.
+
+   **Der Endstand der Wurzel, damit niemand rät:**
+
+   ```
+   src/            die .NET-Dienste und shared/
+   tests/          die .NET-Tests
+   apps/web/       die React-App — bleibt, wo sie ist
+   packages/ui/    ihre Komponentenbibliothek — bleibt, wo sie ist
+   docs/  bugs/  deploy/  .github/
+   package.json  pnpm-lock.yaml  pnpm-workspace.yaml  turbo.json  tsconfig.base.json
+   ```
+
+   `apps/web` und `packages/ui` werden **nicht** verschoben. Sie sind Frontend,
+   nicht Python, ihr `pnpm`-Werkzeug zeigt auf diese Pfade, und eine Verschiebung
+   kostet Diff ohne Gewinn.
 4. **Das Übergangsgerüst löschen**: Ü-1 bis Ü-7 in
    `docs/uebergang-python-dotnet.md`, ersatzlos. Der `verify_aud`-Eingriff, die
    doppelten Ansprüche, der `type`-Anspruch, die nachsichtigen Validatoren, die
