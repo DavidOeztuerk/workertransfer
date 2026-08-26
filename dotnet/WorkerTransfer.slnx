@@ -43,6 +43,13 @@
     <Project Path="src/jobs-service/WorkerTransfer.Jobs.Domain/WorkerTransfer.Jobs.Domain.csproj" />
     <Project Path="src/jobs-service/WorkerTransfer.Jobs.Infrastructure/WorkerTransfer.Jobs.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/notification-service/">
+    <Project Path="src/notification-service/WorkerTransfer.Notification.Api/WorkerTransfer.Notification.Api.csproj" />
+    <Project Path="src/notification-service/WorkerTransfer.Notification.Application/WorkerTransfer.Notification.Application.csproj" />
+    <Project Path="src/notification-service/WorkerTransfer.Notification.Contracts/WorkerTransfer.Notification.Contracts.csproj" />
+    <Project Path="src/notification-service/WorkerTransfer.Notification.Domain/WorkerTransfer.Notification.Domain.csproj" />
+    <Project Path="src/notification-service/WorkerTransfer.Notification.Infrastructure/WorkerTransfer.Notification.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/portfolio-service/">
     <Project Path="src/portfolio-service/WorkerTransfer.Portfolio.Api/WorkerTransfer.Portfolio.Api.csproj" />
     <Project Path="src/portfolio-service/WorkerTransfer.Portfolio.Application/WorkerTransfer.Portfolio.Application.csproj" />
@@ -77,6 +84,7 @@
     <Project Path="tests/WorkerTransfer.Consent.Tests/WorkerTransfer.Consent.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Identity.Tests/WorkerTransfer.Identity.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Jobs.Tests/WorkerTransfer.Jobs.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Notification.Tests/WorkerTransfer.Notification.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Outbox.Tests/WorkerTransfer.Outbox.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Portfolio.Tests/WorkerTransfer.Portfolio.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Profile.Tests/WorkerTransfer.Profile.Tests.csproj" />

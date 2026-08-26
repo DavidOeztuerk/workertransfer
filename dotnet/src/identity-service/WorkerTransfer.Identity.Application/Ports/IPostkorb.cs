@@ -70,4 +70,24 @@ public interface IPostkorb
     /// </param>
     /// <param name="wer">Whose account it was. For the log.</param>
     void Loeschbestaetigung(string an, SubjectId wer);
+
+    /// <summary>"There is something new for you." Nothing more.</summary>
+    /// <remarks>
+    /// The same sentence for every kind, and the kind is not a parameter — it
+    /// is precisely the secret. A mail lands in a mailbox, and that mailbox may
+    /// be the one at the current employer: on their servers, in their backups,
+    /// in the view of their administrators. A line like "Acme GmbH would like to
+    /// see your market status" is exactly the disclosure this platform is built
+    /// against, sent voluntarily and in the clear.
+    /// <para>
+    /// notification-service decides <em>whether</em> this goes out — it owns the
+    /// four switches and the throttle. It cannot decide <em>what</em> it says,
+    /// because it cannot pass anything but a subject id. That is the guarantee
+    /// the Python service had inside one process, kept across a service
+    /// boundary.
+    /// </para>
+    /// </remarks>
+    /// <param name="an">Where to send it.</param>
+    /// <param name="wer">Whose account it is. For the log.</param>
+    void Neuigkeit(string an, SubjectId wer);
 }

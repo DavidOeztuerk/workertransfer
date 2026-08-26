@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-26, nach `transfer`.
+**Zuletzt fortgeschrieben:** 2026-08-27, nach `notification` — Phase B ist durch.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -18,10 +18,10 @@ was davon getan ist.
 | | |
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
-| **Phase B — die neun Dienste** | **8 von 9 fertig.** Offen: nur noch `notification` |
+| **Phase B — die neun Dienste** | **fertig**, 9 von 9 |
 | **Phase C — Zusammenbau** | nicht begonnen |
 | **Prüfer** | nicht begonnen |
-| **Tests** | 469 grün, 0 rot, 0 übersprungen |
+| **Tests** | 495 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
@@ -40,7 +40,7 @@ aussieht und keiner ist. Die Reihen einzeln fahren:
 ```bash
 cd dotnet
 for p in Outbox Skills Identity Consent Profile Resume Portfolio Jobs Applications \
-         Companies Transfer; do
+         Companies Transfer Notification; do
   dotnet test tests/WorkerTransfer.$p.Tests/WorkerTransfer.$p.Tests.csproj --no-build \
     | grep -E "^(Bestanden!|Fehler!)"
 done
@@ -198,7 +198,7 @@ der es festnagelt.
 
 ---
 
-## Welle 3 — `companies` und `transfer` stehen
+## Welle 3 — `companies`, `transfer` und `notification` stehen
 
 ### `companies-service` (Port 8008)
 
@@ -300,11 +300,51 @@ schwächer und sicherer.
    das EF-Modell, und der Dienst startet gar nicht mehr, bis eine Wanderung
    folgt — die Gegenprobe machte die *ganze* Reihe rot, in 23 ms.
 
+### `notification-service` (Port 8010) — der einzige neue Dienst
+
+Fünf Routen plus die Löschung: `POST /notifications` (der Diensteingang),
+`GET /notifications/me`, `POST /notifications/me/read`,
+`GET|PUT /me/notification-preferences`, `POST /erasure`.
+
+**Der Einwand des Python-Dienstes stimmte, und er wird nicht ignoriert.** Dort
+lagen die Benachrichtigungen bewusst in identity-service, mit der Begründung:
+*„ein `notifications-service` bräuchte die E-Mail-Adresse; sie dorthin zu
+kopieren oder über einen Lookup `subject_id → E-Mail` herauszureichen hieße, das
+empfindlichste Datum des Systems zu vervielfachen — für eine Textmail."*
+
+Beantwortet wird das, indem **die andere Hälfte umzieht**:
+
+| | wo | was |
+|---|---|---|
+| **ob** etwas hinausgeht | notification-service | vier Schalter, Drossel, Postfach |
+| **an wen** | identity-service | die Adresse, die dort ohnehin liegt |
+
+Über die Grenze geht nur eine `userId` — die überall sonst auch schon geht.
+Dazu kam **eine** neue Route in identity: `POST /internal/notify`, mit eigenem
+Geheimnis (`Notify:Geheimnis`, ausdrücklich nicht das der Löschung), immer 202,
+und ihr Rumpf trägt **weder Art noch Text**. Der Satz entsteht in identity,
+für jede Art derselbe. Die Regel des Python-Dienstes — *der Aufrufer hat auf den
+Text keinen Zugriff* — gilt damit über eine Dienstgrenze hinweg und ist stärker
+geworden, nicht schwächer: notification-service **kann** nichts beisteuern.
+
+Drei weitere Entscheidungen tragen:
+
+- **Der Eintrag im Postfach entsteht immer, die Mail wird gedrosselt.** Das
+  Postfach liegt hinter der Anmeldung, wo geprüft wird, wer liest; es zu
+  drosseln hieße, jemandem zu verschweigen, dass etwas passiert ist. Die Mail
+  landet in einem Postfach, das nicht nur der Person gehören muss.
+- **Immer 202**, ob zugestellt oder nicht. Abbestellt, gedrosselt, Person
+  unbekannt: der Aufrufer erfährt nichts — sonst wäre der Endpunkt ein Orakel
+  über die Mitgliedschaft. Die einzige Ausnahme ist eine Art, die es nicht gibt:
+  das ist ein Fehler des Aufrufers und keine Aussage über die Person.
+- **Keine Outbox und keine Inhaltsspalte.** Er ist der Empfänger von Absichten,
+  nicht ihr Absender; und was hier steht, landet in jeder Sicherung.
+
 ---
 
 ## Phase C — Zusammenbau
 
-Nicht begonnen. In dieser Reihenfolge:
+**Jetzt an der Reihe.** In dieser Reihenfolge:
 
 1. Gateway mit Ocelot, eine Route je Dienst, `Sec-Fetch-Dest: document` trennt
    Seite von Ressource.

@@ -81,6 +81,22 @@ public sealed class Postkorb(
             wer));
 
     /// <inheritdoc />
+    public void Neuigkeit(string an, SubjectId wer)
+    {
+        var basis = _einstellungen.WebAdresse.TrimEnd('/');
+
+        _wartend.Add(new AusgehendePost(
+            an,
+            // Für jede Art derselbe Betreff — die Art ist genau das Geheimnis.
+            "Neuigkeiten auf WorkerTransfer",
+            "Es gibt etwas Neues für dich.\n\n"
+            + $"Melde dich an, um nachzusehen: {basis}\n\n"
+            + "Was es ist, steht bewusst nicht in dieser Mail — sie könnte in "
+            + "einem Postfach liegen, das nicht nur dir gehört.\n",
+            wer));
+    }
+
+    /// <inheritdoc />
     public async Task VersendeGesammeltesAsync(CancellationToken cancellationToken = default)
     {
         // Taken out first: a send that throws must not leave the tray full for

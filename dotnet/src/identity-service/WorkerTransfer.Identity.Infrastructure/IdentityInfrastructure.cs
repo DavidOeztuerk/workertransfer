@@ -48,6 +48,8 @@ public static class IdentityInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
+        services.Configure<Meldeeinstellungen>(
+            configuration.GetSection(Meldeeinstellungen.Abschnitt));
         services.Configure<Postsettings>(configuration.GetSection(Postsettings.Abschnitt));
 
         // bcrypt reads *and* writes while the Python service can still sign
