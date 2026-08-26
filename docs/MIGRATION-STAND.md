@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-26, nach `applications`.
+**Zuletzt fortgeschrieben:** 2026-08-26, nach `companies`.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -18,10 +18,10 @@ was davon getan ist.
 | | |
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
-| **Phase B — die neun Dienste** | **6 von 9 fertig.** Welle 2 ist durch; offen ist Welle 3: `companies`, `transfer`, `notification` |
+| **Phase B — die neun Dienste** | **7 von 9 fertig.** Offen: `transfer`, `notification` |
 | **Phase C — Zusammenbau** | nicht begonnen |
 | **Prüfer** | nicht begonnen |
-| **Tests** | 398 grün, 0 rot, 0 übersprungen |
+| **Tests** | 426 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
@@ -39,7 +39,7 @@ aussieht und keiner ist. Die Reihen einzeln fahren:
 
 ```bash
 cd dotnet
-for p in Outbox Skills Identity Consent Profile Resume Portfolio Jobs Applications; do
+for p in Outbox Skills Identity Consent Profile Resume Portfolio Jobs Applications Companies; do
   dotnet test tests/WorkerTransfer.$p.Tests/WorkerTransfer.$p.Tests.csproj --no-build \
     | grep -E "^(Bestanden!|Fehler!)"
 done
@@ -194,6 +194,57 @@ Deshalb war es in `resume`, `profile` und `portfolio` unsichtbar: deren
 Alle vier Dienste geben jetzt `Results.Empty` zurück, mit dem Grund an der
 Stelle. `Ein_schweigender_Ledger_laesst_keine_Bewerbung_zurueck` ist der Test,
 der es festnagelt.
+
+---
+
+## Welle 3 — `companies` steht
+
+### `companies-service` (Port 8008)
+
+Vier Routen, eine Tabelle, **keine Löschung**: `PUT /companies/me/profile`,
+`GET /companies/me/profile`, `GET /companies/by-slug/{kuerzel}`,
+`GET /companies/{tenantId}/profile`.
+
+Der kürzeste Kompositionswurzel-Aufruf im System, und das ist die Aussage: kein
+Consent-Tor, keine Outbox, keine Zustellung, kein Löschbestand. Ein
+Arbeitgeberprofil ist eine Aussage des Unternehmens über sich selbst — es gibt
+niemanden, der einwilligen könnte, niemanden zu benachrichtigen und nichts über
+einen natürlichen Menschen zu löschen. Der Dienst steht deshalb **nicht** in
+`Loeschempfaenger.Fremde`; ein `POST /erasure` hier wäre ein Endpunkt, der
+„erledigt" sagt, ohne je etwas getan zu haben.
+
+Drei Entscheidungen tragen:
+
+- **Das Kürzel ist ein Versprechen.** Abgeleitet aus dem Anzeigenamen, einmal
+  beim ersten Speichern vergeben, danach unveränderlich — es gibt keinen Setzer
+  dafür, und ein Test prüft genau das. Ein Kürzel, das dem Namen folgt, bricht
+  jeden geteilten Link auf die Karriere-Seite. Die Mandanten-Kennung hängt nicht
+  daran: sie stünde sonst in einer Adresse, die weitergegeben wird.
+- **Drei der vier Routen brauchen keine Anmeldung.** Das ist ihr Zweck, nicht
+  eine Lücke.
+- **Erst entdoppeln, dann zählen.** Sonst würde jemand mit einundzwanzigmal
+  „Homeoffice" abgewiesen, obwohl daraus ein Eintrag wird.
+
+### Zwei Gegenproben, die nichts umgeworfen haben — und was daraus folgte
+
+Beide Male war die *Prüfung* zu schwach, nicht der Code:
+
+1. **Die Schemaprüfung des Links war ungedeckt.** Ohne sie blieb die Reihe grün:
+   `javascript:alert(1)` hat gar keinen Wirt und fällt schon an der
+   Wirtsprüfung. Der Test trägt jetzt zusätzlich `ftp://muster.example`.
+2. **„Erst vollständig prüfen, dann schreiben" ließ sich über HTTP nicht
+   widerlegen.** Der Speicher gibt gelesene Zeilen als *neues* Aggregat zurück
+   und schreibt nur über `SichereAsync`, das nach einer Ausnahme nie erreicht
+   wird — die halb geänderte Instanz wird verworfen. Die Regel schützt den, der
+   das Aggregat über den Fehlschlag hinaus in der Hand behält, und wird jetzt
+   dort geprüft: `ProfilregelnTests` fasst die Regeln am Aggregat statt an einer
+   Route.
+
+Und ein **falsch mitkopierter Satz**: der Python-Dienst muss `by-slug` vor die
+`{tenant_id}`-Route ziehen, weil FastAPI nach Deklarationsreihenfolge trifft. In
+ASP.NET trägt `{tenantId:guid}` eine Einschränkung, an der `by-slug` nie
+vorbeikommt — getauscht gemessen, die Reihe blieb grün. Die Begründung steht
+jetzt richtig an der Route.
 
 ---
 
