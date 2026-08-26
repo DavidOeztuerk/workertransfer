@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-23, nach `jobs`.
+**Zuletzt fortgeschrieben:** 2026-08-26, nach `applications`.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -18,10 +18,10 @@ was davon getan ist.
 | | |
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
-| **Phase B — die neun Dienste** | **5 von 9 fertig.** Welle 2: nur noch `applications` |
+| **Phase B — die neun Dienste** | **6 von 9 fertig.** Welle 2 ist durch; offen ist Welle 3: `companies`, `transfer`, `notification` |
 | **Phase C — Zusammenbau** | nicht begonnen |
 | **Prüfer** | nicht begonnen |
-| **Tests** | 373 grün, 0 rot, 0 übersprungen |
+| **Tests** | 398 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
@@ -29,6 +29,20 @@ Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
 ```bash
 dotnet build dotnet/WorkerTransfer.slnx
 dotnet test  dotnet/WorkerTransfer.slnx --blame-hang-timeout 300s
+```
+
+**Der zweite Aufruf reicht auf dieser Maschine nicht mehr.** Neun Testreihen
+gleichzeitig starten neun Container, und der `ResourceReaper` von Testcontainers
+läuft dabei in eine Zeitüberschreitung — *alle* Reihen fallen dann binnen einer
+Millisekunde mit `TypeInitializationException`, was wie ein kaputter Bau
+aussieht und keiner ist. Die Reihen einzeln fahren:
+
+```bash
+cd dotnet
+for p in Outbox Skills Identity Consent Profile Resume Portfolio Jobs Applications; do
+  dotnet test tests/WorkerTransfer.$p.Tests/WorkerTransfer.$p.Tests.csproj --no-build \
+    | grep -E "^(Bestanden!|Fehler!)"
+done
 ```
 
 ---
@@ -131,6 +145,58 @@ zweiten Lauf die Tests —, statt alles in einem Zug.
 
 ---
 
+## Welle 2 ist durch — `portfolio`, `jobs`, `applications`
+
+Alle drei nach dem Muster oben von Hand gebaut, jeder mit eigener EF-Wanderung,
+Testcontainers-Reihe und Gegenproben.
+
+### `applications-service` (Port 8007)
+
+Sechs Routen plus die Löschung: `POST /applications`, `GET /applications/me`,
+`POST /applications/{id}/withdraw`, `POST /applications/{id}/status`,
+`GET /jobs/{id}/applications`, `GET /companies/me/application-stats`,
+`POST /erasure`.
+
+Vier Entscheidungen tragen und lassen sich durch „Aufräumen" leicht umkehren:
+
+- **Der Aufbewahrungsschalter steht auf aus und ist keine Einstellung.**
+  `Aufbewahrung.EingestellteBehalten` ist `false` und deckt **genau eine
+  Zeilenklasse** ab: `status = 'hired'`. Er reist als *Parameter* in
+  `ILoeschbestand.LoescheAsync`, statt dort gelesen zu werden — sonst ließe sich
+  nur prüfen, dass er aus steht, nicht was der umgelegte Schalter abdeckt, und
+  genau das ist die Aussage, auf die es ankommt.
+  Er ist **`static readonly` und nicht `const`**, aus gemessenem Grund: ein
+  `const` wird in jede lesende Assembly hineinkopiert, und bei einer Gegenprobe
+  fiel ein Test über unverändertem Code, weil die Testassembly noch den alten
+  Wert trug.
+- **Erst der Ledger, dann der Vorgang, dann der Commit.** Schweigt der Ledger,
+  fliegt `EinwilligungSchweigt` durch die Transaktion und es entsteht keine
+  Bewerbung. Der Rückzug widerruft dafür **bedingungslos alle drei** Freigaben,
+  auch die nie erteilten.
+- **Die Outbox statt fire-and-forget.** Nur der Zug des Unternehmens wird
+  vermerkt (`application_update`), in derselben Transaktion; der Rückzug durch
+  die Person nicht — sie weiß, was sie getan hat.
+- **Zahlen nur über die eigenen Vorgänge.** Kein Consent-Aufruf, weil gezählt
+  wird, was das Unternehmen ohnehin einzeln sieht. Die Grenze verläuft bei der
+  *Zusammenführung*, nicht bei der Aggregation (ADR-0022/0026).
+
+### Ein Fehler, der drei fertige Dienste betraf
+
+Ein Endpunktfilter, der die Antwort selbst schreibt und danach **`null`**
+zurückgibt, lässt das Rahmenwerk ein zweites Mal schreiben — JSON-`null` samt
+Kopfzeilen, die zu diesem Zeitpunkt schon stehen. Bei einer Anfrage **ohne
+Rumpf** sieht der Aufrufer trotzdem sein 503, und nur das Protokoll trägt eine
+unbehandelte Ausnahme; bei einer **mit Rumpf** reißt die Verbindung, und er
+bekommt `Error while copying content to a stream` statt eines Statuscodes.
+
+Deshalb war es in `resume`, `profile` und `portfolio` unsichtbar: deren
+503-Tests sind GET-Aufrufe. Aufgefallen ist es erst an `POST /applications`.
+Alle vier Dienste geben jetzt `Results.Empty` zurück, mit dem Grund an der
+Stelle. `Ein_schweigender_Ledger_laesst_keine_Bewerbung_zurueck` ist der Test,
+der es festnagelt.
+
+---
+
 ## Phase C — Zusammenbau
 
 Nicht begonnen. In dieser Reihenfolge:
@@ -159,3 +225,7 @@ Nicht begonnen. In dieser Reihenfolge:
   weitermachen.
 - **Gegenproben fahren**, und darauf achten, dass der Bruch **übersetzt**: ein
   Build-Fehler sieht in der Ausgabe aus wie ein bestandener Test.
+- **Nach einer Gegenprobe `--no-incremental` bauen.** Der inkrementelle Bau hat
+  die zurückgenommene Änderung zweimal nicht bemerkt; der Test fiel dann über
+  Code, der längst wieder richtig war — und der nächste Schluss daraus wäre
+  falsch gewesen.

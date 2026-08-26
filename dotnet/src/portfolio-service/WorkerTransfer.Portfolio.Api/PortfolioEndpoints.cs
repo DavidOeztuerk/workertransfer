@@ -35,7 +35,7 @@ public static class PortfolioEndpoints
                         aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
                         "Request failed", "the consent ledger did not answer");
 
-                    return null;
+                    return Geschrieben;
                 }
             });
 
@@ -226,6 +226,20 @@ public static class PortfolioEndpoints
 
         return app;
     }
+
+    /// <summary>
+    /// Was ein Filter zurückgibt, der die Antwort selbst geschrieben hat.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Nicht <c>null</c>.</strong> Ein Filter, der <c>null</c>
+    /// zurückgibt, lässt das Rahmenwerk noch einmal schreiben — JSON-<c>null</c>
+    /// samt Kopfzeilen, und die stehen zu diesem Zeitpunkt schon. Bei einer
+    /// Anfrage ohne Rumpf sieht der Aufrufer trotzdem sein 503 und nur das
+    /// Protokoll trägt eine unbehandelte Ausnahme; bei einer mit Rumpf reißt
+    /// die Verbindung, und er bekommt „Error while copying content to a
+    /// stream". Gemessen an <c>POST /applications</c>.
+    /// </remarks>
+    private static readonly IResult Geschrieben = Results.Empty;
 
     private static IReadOnlyList<Eintrag> Eintraege(
         PortfolioSchreibenV1 koerper, TimeProvider uhr)
