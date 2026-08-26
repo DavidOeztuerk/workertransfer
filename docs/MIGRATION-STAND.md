@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-26, nach `companies`.
+**Zuletzt fortgeschrieben:** 2026-08-26, nach `transfer`.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -18,10 +18,10 @@ was davon getan ist.
 | | |
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
-| **Phase B — die neun Dienste** | **7 von 9 fertig.** Offen: `transfer`, `notification` |
+| **Phase B — die neun Dienste** | **8 von 9 fertig.** Offen: nur noch `notification` |
 | **Phase C — Zusammenbau** | nicht begonnen |
 | **Prüfer** | nicht begonnen |
-| **Tests** | 426 grün, 0 rot, 0 übersprungen |
+| **Tests** | 469 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
@@ -39,7 +39,8 @@ aussieht und keiner ist. Die Reihen einzeln fahren:
 
 ```bash
 cd dotnet
-for p in Outbox Skills Identity Consent Profile Resume Portfolio Jobs Applications Companies; do
+for p in Outbox Skills Identity Consent Profile Resume Portfolio Jobs Applications \
+         Companies Transfer; do
   dotnet test tests/WorkerTransfer.$p.Tests/WorkerTransfer.$p.Tests.csproj --no-build \
     | grep -E "^(Bestanden!|Fehler!)"
 done
@@ -197,7 +198,7 @@ der es festnagelt.
 
 ---
 
-## Welle 3 — `companies` steht
+## Welle 3 — `companies` und `transfer` stehen
 
 ### `companies-service` (Port 8008)
 
@@ -245,6 +246,59 @@ Und ein **falsch mitkopierter Satz**: der Python-Dienst muss `by-slug` vor die
 ASP.NET trägt `{tenantId:guid}` eine Einschränkung, an der `by-slug` nie
 vorbeikommt — getauscht gemessen, die Reihe blieb grün. Die Begründung steht
 jetzt richtig an der Route.
+
+### `transfer-service` (Port 8009)
+
+Der größte Dienst der Migration: achtzehn Routen über drei Aggregate
+(Marktstatus, Anfrage, Vorgang), plus die Löschung.
+
+Der Marktstatus ist **die gefährlichste Angabe im ganzen System**. Ein
+Lebenslauf verrät, wo jemand war; der Marktstatus verrät, dass er weg will — und
+schon die *Existenz* der Aussage kann jemanden den Arbeitsplatz kosten. Alles
+Folgende hängt daran:
+
+- **Es gibt kein `:public`.** Die Freigabe nennt immer einen Empfänger. Beim
+  Profil ist „für alle Unternehmen" eine sinnvolle Wahl; hier wäre sie ein
+  Schalter, dessen Folgen niemand überblickt — darunter der eigene Arbeitgeber,
+  der auf derselben Plattform ist.
+- **Die Freigabe erlaubt zu sehen, nicht zu stören.** `unavailable` heißt nein,
+  auch mit Freigabe. Kein Status, keine Freigabe und „gerade nicht" antworten
+  buchstabengleich, sonst wäre der Endpunkt ein Orakel darüber, wer zuhört.
+- **Die Anfrage setzt die *Profil*freigabe voraus, nicht die Existenz eines
+  Marktstatus.** Beides zu prüfen wäre ein Orakel: „hat schon einen Marktstatus
+  gepflegt" ist eine Information über die Person.
+- **Der Widerruf wirkt im Ledger, nicht im Vorgang.** `GRANTED` bleibt stehen,
+  `active` fällt auf falsch. Ein laufender Transfer bleibt bestehen: er hat
+  seine eigene Tür und seine eigene Absage.
+- **Der Aufbewahrungsschalter** `Aufbewahrung.BezahlteBehalten` steht auf
+  `false` und deckt genau eine Zeilenklasse ab: ein abgeschlossener Handel
+  *mit* Vergütung. Nicht `offered` — ein Gespräch ist kein Vertrag — und nicht
+  `declined`/`withdrawn`.
+
+Und die Regel, die der ULTRAPLAN so nicht zulässt: „beschäftigt → Firma muss
+mitwirken" lässt sich nicht bauen, weil **die Plattform nicht weiß, wo jemand
+arbeitet**. Ein Datensatz dafür wäre die Verbindung zwischen „arbeitet bei X"
+und „hört zu" in einer einzigen Tabelle. Stattdessen trägt der Vorgang, dass
+eine Freigabe *nötig* ist, und die Person bestätigt selbst, dass sie vorliegt —
+schwächer und sicherer.
+
+### Vier Gegenproben, die etwas über die Prüfungen gesagt haben
+
+1. **Ein Widerruf, der 500 antwortet, wäre durchgegangen.** Der Test las danach
+   den Stand und fand ihn unverändert — die Zurückrollung ließ ihn richtig
+   aussehen. Jetzt wird der Statuscode mitgeprüft.
+2. **„Die Freigabepflicht ist eingefroren" ließ sich über HTTP nicht
+   widerlegen**, weil die Eigenschaft keinen Setzer hat. Wie beim Kürzel in
+   companies wird jetzt genau das geprüft: *kann* nicht, nicht „wird nicht".
+3. **Zwei Regeln sind strukturell, nicht geprüft — und das ist besser.**
+   `Anfragebefehle` hat keinen `IMarktspeicher`, kann also gar nicht nach der
+   Existenz eines Marktstatus fragen; der Widerruf-Pfad kann den Vorgang nicht
+   umschreiben, weil das Aggregat nur aus `PENDING` heraus antwortet.
+4. **Die Menge der laufenden Stände lässt sich nicht ändern.** Sie steht an
+   *einer* Stelle (`Transferstaende.Laufende`) und speist sowohl das Aggregat
+   als auch den Teilindex `uq_running_transfer`. Wird sie erweitert, ändert sich
+   das EF-Modell, und der Dienst startet gar nicht mehr, bis eine Wanderung
+   folgt — die Gegenprobe machte die *ganze* Reihe rot, in 23 ms.
 
 ---
 
