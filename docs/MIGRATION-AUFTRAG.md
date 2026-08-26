@@ -70,8 +70,8 @@ Bericht am Ende, ändert aber nichts.
 
 | | Entschieden |
 |---|---|
-| **Dienstzahl** | Die zehn bleiben, **außer `github-service` — der fällt weg** |
-| **`github-service`** | Gelöscht. ADR-0022 hat `worker-github` gelöscht, weil es Menschen bewertete; den Dienst mitzunehmen hieße, genau das zu behalten, was der ADR verurteilt. Er fällt auch aus der Löschkaskade — dann sind es sechs Empfänger, nicht sieben |
+| **Dienstzahl** | Die zehn bleiben, alle |
+| **`github-service`** | **Bleibt, und ist wichtig.** Er ist *das* Portfolio aus belegter Arbeit: Login beanspruchen, Besitz per Challenge **beweisen**, Repos nachladen, fremde Ansicht über die Einwilligung. Er wurde **unter** ADR-0022 gebaut, nicht von ihm verurteilt — das gelöschte Paket `worker-github` bewertete Menschen, der Dienst tut ausdrücklich das Gegenteil. Die Grenze steht unten |
 | **`notification-service`** | **Neu.** Er ist der Empfänger der Benachrichtigungen und der Ort für Messaging. Er ist **nicht** der Ort der Outbox |
 | **Outbox** | `dotnet/src/shared/WorkerTransfer.Outbox`, selbst gebaut, **nicht** MassTransit. **Die Tabelle liegt in der Datenbank des schreibenden Dienstes.** `FOR UPDATE SKIP LOCKED` von Anfang an |
 | **Mediator** | Ja, `Girder.Application`, in jedem Dienst mit mehr als fünf Handlern |
@@ -82,6 +82,29 @@ Bericht am Ende, ändert aber nichts.
 | **Bestätigungsmail** | Keine Outbox. Postkorb im Speicher, Versand nach dem Commit, `/auth/resend-verification` ist der Rückweg |
 | **Gateway** | Ocelot, routet und prüft nichts |
 | **Frontend** | `apps/web` bleibt. Verträge dürfen sich ändern; dann wird die App angepasst |
+
+### Die Grenze bei `github-service`, weil genau hier gerutscht wird
+
+Ein Repository ist **ein Beleg mit einem Link**. Der Dienst darf zeigen, was
+GitHub über ein Repository sagt — Name, Beschreibung, Sprache, Sterne, das
+Datum. Er darf daraus **nichts über den Menschen ableiten**.
+
+| Erlaubt | Verboten |
+|---|---|
+| „Dieses Repository ist laut GitHub zu 80 % Go" | „Diese Person kann Go" |
+| Die Person sieht das und trägt Go **selbst** ins Profil ein | Der Dienst trägt es für sie ein |
+| Ein Scout sucht Menschen über die Fähigkeiten, die sie **selbst genannt** haben, und sieht dann die Belege | Ein Scout sortiert Menschen nach Repository-Zahl, Sternen, Commit-Frequenz oder Sprachanteil |
+| „Verbindung bewiesen" oder „nicht bewiesen" | „Verbindung zu 73 % vertrauenswürdig" |
+
+Der Unterschied ist nicht Feinheit, sondern die ganze Vision: eine Aussage über
+ein *Repository* ist eine Tatsache, eine Aussage über einen *Menschen* ist ein
+Urteil, das er nicht kommentieren kann. Und ein Sortierschlüssel über Menschen
+ist die ADR-0022-Punktzahl durch die Hintertür — auch dann, wenn er „Aktivität"
+heißt.
+
+Die Suche, die der Scout wirklich braucht, gibt es schon: `/candidates` findet
+Menschen über die Fähigkeiten, die sie selbst genannt haben, hinter dem
+Einwilligungstor. GitHub liefert die **Belege** dazu, nicht die Treffer.
 
 ---
 
@@ -235,9 +258,11 @@ Produktivcode.
 >    Einwilligungsprüfung steckt.
 > 2. Ein verborgenes Profil und ein nicht existierendes antworten **byte-gleich**
 >    bis auf die Korrelations-ID.
-> 3. Es gibt **keinen Score, keine Rangliste, keinen Prozentwert** über Menschen.
->    Grep nach `score`, `rank`, `weight`, `level`, `implies`, `match` — jeder
->    Treffer muss sich erklären.
+> 3. Es gibt **keinen Score, keine Rangliste, keinen Prozentwert** über
+>    Menschen. Grep nach `score`, `rank`, `weight`, `level`, `implies`, `match`
+>    — jeder Treffer muss sich erklären. Bei `github-service` besonders: eine
+>    Aussage über ein Repository ist erlaubt, eine über den Menschen nicht, und
+>    kein Sortierschlüssel über Menschen — auch keiner, der „Aktivität" heißt.
 > 4. Die Löschung löscht **vollständig**, hat **kein Begründungsfeld**, ihre
 >    Ausnahme ist eine **Konstante** und steht auf `false`, und die Zustellung
 >    **kann scheitern**.
