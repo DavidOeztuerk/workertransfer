@@ -42,3 +42,6 @@ var/
 # .NET
 dotnet/**/bin/
 dotnet/**/obj/
+# `dotnet ef` legt auf macOS ein Verzeichnis an, dessen Name einen echten
+# Rückstrich enthält — `bin\Debug`. Das trifft die Regel darüber nicht.
+dotnet/**/bin\\Debug/

@@ -8,6 +8,13 @@
     <Project Path="src/shared/WorkerTransfer.ServiceDefaults/WorkerTransfer.ServiceDefaults.csproj" />
     <Project Path="src/shared/WorkerTransfer.Skills/WorkerTransfer.Skills.csproj" />
   </Folder>
+  <Folder Name="/src/applications-service/">
+    <Project Path="src/applications-service/WorkerTransfer.Applications.Api/WorkerTransfer.Applications.Api.csproj" />
+    <Project Path="src/applications-service/WorkerTransfer.Applications.Application/WorkerTransfer.Applications.Application.csproj" />
+    <Project Path="src/applications-service/WorkerTransfer.Applications.Contracts/WorkerTransfer.Applications.Contracts.csproj" />
+    <Project Path="src/applications-service/WorkerTransfer.Applications.Domain/WorkerTransfer.Applications.Domain.csproj" />
+    <Project Path="src/applications-service/WorkerTransfer.Applications.Infrastructure/WorkerTransfer.Applications.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/consent-service/">
     <Project Path="src/consent-service/WorkerTransfer.Consent.Api/WorkerTransfer.Consent.Api.csproj" />
     <Project Path="src/consent-service/WorkerTransfer.Consent.Application/WorkerTransfer.Consent.Application.csproj" />
@@ -51,6 +58,7 @@
     <Project Path="src/resume-service/WorkerTransfer.Resume.Infrastructure/WorkerTransfer.Resume.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/WorkerTransfer.Applications.Tests/WorkerTransfer.Applications.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Consent.Tests/WorkerTransfer.Consent.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Identity.Tests/WorkerTransfer.Identity.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Jobs.Tests/WorkerTransfer.Jobs.Tests.csproj" />
