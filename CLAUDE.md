@@ -121,7 +121,7 @@ It sits **outside authentication** in the strongest sense available: no token ha
 
 **The counter runs in-process**, so the gateway is pinned to one replica. The way out is a registration change, not a rewrite: `RedisDistributedRateLimitStore` satisfies the same interface.
 
-Girder's own `DistributedRateLimitingMiddleware` is deliberately **not** used — in 3.0.1 it lets every request through, even far past its own limits, while the store beneath it counts correctly. Measured, with a reproduction free of WorkerTransfer code, in `bugs/distributed-ratelimiting-middleware-bremst-nicht.md`.
+**None of Girder's three rate limiters is used, and that is measured rather than assumed.** `DistributedRateLimitingMiddleware` and `RateLimitMiddleware` are wired but do not brake; `RateLimitingMiddleware` brakes but has no caller anywhere in Girder. The reason that would survive a fix: **all three trust `X-Forwarded-For` and `X-Real-IP` unconditionally**, and no trusted-proxy list exists anywhere in the library — eight requests against a limit of three all passed, simply by rotating a header the caller sets. Girder's *counter* (`IDistributedRateLimitStore`) is sound and is exactly what we do use. Full write-up in `bugs/ratenbegrenzung-drei-wege-zwei-bremsen-nicht.md`.
 
 ### CI
 

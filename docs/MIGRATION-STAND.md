@@ -823,7 +823,7 @@ selbst voreinstellt: acht Anfragen gegen eine Grenze von fünf ergaben achtmal
 korrekt (nachgesehen), und der Zähler darunter arbeitet korrekt (nachgesehen) —
 der Fehler sitzt dazwischen.
 
-Ticket: `bugs/distributed-ratelimiting-middleware-bremst-nicht.md`, mit einer
+Ticket: `bugs/ratenbegrenzung-drei-wege-zwei-bremsen-nicht.md`, mit einer
 Reproduktion ohne eine Zeile WorkerTransfer. Nebenbefund darin:
 `AddInMemoryRateLimiting()` registriert **nicht**, was `UseDistributedRateLimiting()`
 braucht — zwei Untersysteme mit fast gleichen Namen, die nicht zusammenpassen.

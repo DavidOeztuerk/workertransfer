@@ -129,7 +129,7 @@ Five paths, per origin, per minute, configured in `ocelot.json` beside the route
 - **`X-Forwarded-For` is deliberately not read.** The caller sets it, so trusting it hands the attacker the counter's key. A test pins that a forged one changes nothing.
 - **After the health probes, before authentication.** A braked liveness probe would be the outage; a brake behind bcrypt would cost a hash per attempt.
 - **The counter is in-process** → the gateway stays at one replica. The way out is a registration change to `RedisDistributedRateLimitStore`, same interface.
-- Girder's own `DistributedRateLimitingMiddleware` is **not** used: in 3.0.1 it lets everything through (`bugs/distributed-ratelimiting-middleware-bremst-nicht.md`). Its store beneath counts correctly, and that is what we use.
+- **None of Girder's three rate limiters is used.** Measured, all three (bugs/ratenbegrenzung-drei-wege-zwei-bremsen-nicht.md): two do not brake, the third does but has no wiring anywhere in Girder — and all three trust `X-Forwarded-For` unconditionally, with no trusted-proxy list in the library at all. Girder's *counter* is sound and is what we use.
 
 ## Branches
 

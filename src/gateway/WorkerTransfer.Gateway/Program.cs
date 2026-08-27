@@ -12,10 +12,11 @@ builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange
 
 builder.Services.AddOcelot(builder.Configuration);
 
-// Die Bremse. Der Zähler kommt von Girder und ist nachgemessen richtig; seine
-// Zwischenschicht nicht — die lässt in 3.0.1 alles durch
-// (bugs/distributed-ratelimiting-middleware-bremst-nicht.md). Also der Speicher
-// von dort, die Kette von hier.
+// Die Bremse. Der Zähler kommt von Girder und ist nachgemessen richtig; keine
+// seiner DREI Zwischenschichten taugt hier — zwei bremsen nicht, die dritte ist
+// nirgends verdrahtet, und alle drei glauben X-Forwarded-For bedingungslos
+// (bugs/ratenbegrenzung-drei-wege-zwei-bremsen-nicht.md). Also der Speicher von
+// dort, die Kette von hier.
 //
 // `InMemoryRateLimitStore` zählt IM PROZESS. Das bindet das Gateway an
 // replicaCount: 1 — der Ausweg ist ein Registrierungswechsel auf

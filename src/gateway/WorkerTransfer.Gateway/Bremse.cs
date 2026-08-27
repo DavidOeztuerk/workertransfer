@@ -99,11 +99,25 @@ public sealed class Bremseinstellungen
 /// Ausweg ist ein Registrierungswechsel, kein Umbau:
 /// <c>RedisDistributedRateLimitStore</c> erfüllt dieselbe Schnittstelle.</para>
 ///
-/// <para>Girders eigene <c>DistributedRateLimitingMiddleware</c> wird
-/// <em>nicht</em> benutzt: sie lässt in 3.0.1 jede Anfrage durch, auch weit über
-/// ihrer eigenen Grenze — siehe
-/// <c>bugs/distributed-ratelimiting-middleware-bremst-nicht.md</c>. Der Zähler
-/// darunter ist nachgemessen richtig, und den benutzen wir.</para>
+/// <para><strong>Warum keine von Girders drei Ratenbegrenzungen.</strong>
+/// Girder hat drei, und sie verhalten sich verschieden — der erste Befund sah
+/// nur eine an und war deshalb unvollständig. Alle drei gemessen
+/// (<c>bugs/ratenbegrenzung-drei-wege-zwei-bremsen-nicht.md</c>):
+/// <c>DistributedRateLimitingMiddleware</c> und <c>RateLimitMiddleware</c>
+/// bremsen nicht, <c>RateLimitingMiddleware</c> bremst — hat aber in ganz
+/// Girder keinen Aufrufer.</para>
+///
+/// <para>Und der Grund, der auch nach einer Behebung bliebe: <strong>alle drei
+/// glauben <c>X-Forwarded-For</c> und <c>X-Real-IP</c> bedingungslos</strong>,
+/// und eine Vertrauensliste gibt es in Girder nirgends. Am funktionierenden Weg
+/// gemessen: acht Anfragen gegen eine Grenze von drei, alle durch, nur weil ein
+/// Kopf mitgeschickt wird, den der Aufrufer selbst setzt. Dazu kommt bei
+/// <c>RateLimitMiddleware</c>, dass <c>ClientIdStrategy</c> nirgends gelesen
+/// wird — wer „je Herkunft" einstellt, zählt je Benutzer.</para>
+///
+/// <para>Der <em>Zähler</em> von Girder ist dagegen nachgemessen richtig, und
+/// den benutzen wir: <c>IDistributedRateLimitStore</c>. Eigen ist hier nur die
+/// Kette darüber.</para>
 /// </remarks>
 public static class Bremse
 {
