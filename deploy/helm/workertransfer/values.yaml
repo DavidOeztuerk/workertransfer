@@ -43,19 +43,16 @@ webImage:
 #      Wanderung in einem initContainer und war damit ebenfalls je Pod; besser
 #      wurde es dadurch nicht, nur unsichtbarer.
 #
-#   3. IST KEIN SKALIERUNGSHINDERNIS MEHR, SONDERN EINE LÜCKE. Der Python-
-#      Dienst bremste fünf Endpunkte (/auth/login, /refresh, /register,
-#      /verify-email, /resend-verification) mit einem gleitenden Fenster im
-#      Prozess, bewusst WEITER AUSSEN als die Authentifizierung — sonst würde
-#      bcrypt gerechnet, bevor gebremst wird, und die Bremse wäre selbst der
-#      teuerste Teil des Angriffs (ROADMAP 10.1). Diese Bremse ist bei der
-#      Migration NICHT mitgekommen: in src/ gibt es weder einen RateLimiter
-#      noch einen Zähler für Fehlversuche. Es bremst also gar nichts, und zwar
-#      bei einer Replik genauso wie bei dreien.
+#   3. WIEDER DA — aber am GATEWAY, nicht hier. Die Auth-Bremse fehlte nach
+#      der Migration ganz. Sie steht seit D1 wieder, und zwar im Gateway,
+#      weil nur dort die Herkunft des Aufrufers sichtbar ist: hinter dem
+#      Gateway sieht jeder Dienst nur das Gateway, und eine Bremse dort hätte
+#      alle Menschen in einen Topf geworfen. Ihr Zähler läuft im Prozess, also
+#      hängt die 1 des GATEWAYS daran — siehe templates/gateway.yaml. Diese
+#      Zahl hier gilt für die elf Dienste und wird davon nicht berührt.
 #
-# Wer diese Zahl erhöht, muss Punkt 2 vorher lösen — die Wanderung aus dem
-# Start heraus. Punkt 3 ist davon unabhängig und dringender: er wird nicht
-# dadurch besser, dass es bei eins bleibt.
+# Wer diese Zahl erhöht, muss Punkt 2 vorher lösen: die Wanderung aus dem
+# Start heraus. Punkt 1 ist erledigt, Punkt 3 gilt für ein anderes Deployment.
 replicaCount: 1
 
 # --- Gemeinsame Umgebung ----------------------------------------------------

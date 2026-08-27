@@ -8,6 +8,13 @@
 
   <ItemGroup>
     <PackageReference Include="Ocelot" />
+    <!--
+      Nur fuer den Zaehler der Bremse: `IDistributedRateLimitStore` samt seiner
+      In-Memory-Umsetzung. Girders eigene Zwischenschicht wird NICHT benutzt,
+      siehe bugs/distributed-ratelimiting-middleware-bremst-nicht.md.
+    -->
+    <PackageReference Include="Girder.Abstractions" />
+    <PackageReference Include="Girder.InMemory" />
   </ItemGroup>
 
   <ItemGroup>

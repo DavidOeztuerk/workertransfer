@@ -108,14 +108,19 @@ Restore needs a NuGet login for `Girder.*` (GitHub Packages); `NuGet.Config` pin
 - **Routes and initdb SQL come from the compose files** via `--set-file`, never copied. Both are `required`.
 - **Probes must set `timeoutSeconds`** — the default is 1 s and it once restarted three healthy services.
 - **The web image is a built artifact**, so URLs come from `window.__WT_CONFIG__` at runtime, not from `VITE_*` at build time.
-- **`replicaCount` stays 1**, but for one reason now, not three: every service migrates its schema at startup, so two pods race on one schema. The dispatcher's missing `SKIP LOCKED` is fixed. The auth throttle is not a scaling caveat any more — see below.
+- **`replicaCount` stays 1** for the eleven services, and for one reason now: every service migrates its schema at startup, so two pods race on one schema. (The dispatcher's missing `SKIP LOCKED` is fixed.) The **gateway** is pinned separately — the auth brake counts in-process.
 - **`make k8s-up` has never been run.** The chart lints and renders; only a run proves it.
 
-## Known gap: nothing throttles the auth endpoints
+## The auth brake
 
-The predecessor braked `/auth/login`, `/auth/refresh`, `/auth/register`, `/auth/verify-email` and `/auth/resend-verification` with an in-process sliding window, placed **outside** authentication so bcrypt is not computed before the brake applies. **None of it came across in the migration**; there is no rate limiter anywhere in `src/`.
+Five paths, per origin, per minute, configured in `ocelot.json` beside the routes: `/auth/login` 20, `/auth/register` 5, `/auth/resend-verification` 3, `/auth/verify-email` 20, `/auth/refresh` 60. Implementation in `src/gateway/WorkerTransfer.Gateway/Bremse.cs`.
 
-When it is rebuilt, one rule from the original must survive: **throttle per origin, never per email address.** A per-address limit would both confirm the address exists and let a stranger lock a person out.
+- **Per origin, never per email address.** A per-address limit would confirm the address exists — the enumeration channel `/auth/register` closes — and let a stranger lock a person out. The key is path plus origin; the body is never read.
+- **In the gateway, because only there is the origin visible.** Behind it every service sees the gateway's address, so a brake in identity-service would put all people in one bucket and let the first mistyped password lock out everyone.
+- **`X-Forwarded-For` is deliberately not read.** The caller sets it, so trusting it hands the attacker the counter's key. A test pins that a forged one changes nothing.
+- **After the health probes, before authentication.** A braked liveness probe would be the outage; a brake behind bcrypt would cost a hash per attempt.
+- **The counter is in-process** → the gateway stays at one replica. The way out is a registration change to `RedisDistributedRateLimitStore`, same interface.
+- Girder's own `DistributedRateLimitingMiddleware` is **not** used: in 3.0.1 it lets everything through (`bugs/distributed-ratelimiting-middleware-bremst-nicht.md`). Its store beneath counts correctly, and that is what we use.
 
 ## Branches
 

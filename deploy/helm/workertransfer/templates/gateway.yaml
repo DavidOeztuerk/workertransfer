@@ -14,6 +14,17 @@ metadata:
     {{- include "workertransfer.labels" . | nindent 4 }}
     app.kubernetes.io/component: gateway
 spec:
+  # EINS, und seit der Bremse ist das kein Beiwerk mehr.
+  #
+  # Der Zaehler der Auth-Bremse (Bremse.cs) laeuft IM PROZESS. Bei zwei
+  # Gateways hat jedes sein eigenes Fenster, die wirksame Grenze verdoppelt
+  # sich, und niemand sieht es — jede Instanz rechnet fuer sich korrekt.
+  #
+  # Wer hier hochzaehlt, muss vorher den Zaehler teilen: der Speicher haengt
+  # hinter IDistributedRateLimitStore, und RedisDistributedRateLimitStore
+  # erfuellt dieselbe Schnittstelle. Das ist ein Registrierungswechsel in
+  # Program.cs, kein Umbau — aber er muss passiert sein, bevor diese Zahl
+  # steigt.
   replicas: 1
   selector:
     matchLabels:

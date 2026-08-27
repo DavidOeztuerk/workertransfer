@@ -766,6 +766,142 @@ derselben Hand geprüft, die sie geschrieben hat.
 
 ---
 
+## Phase D1: die Bremse steht — im Gateway
+
+Fünf Pfade, je Herkunft, je Minute: `/auth/login` 20 · `/auth/register` 5 ·
+`/auth/resend-verification` 3 · `/auth/verify-email` 20 · `/auth/refresh` 60.
+Die Regeln stehen in `ocelot.json`, im Abschnitt `Bremse`, unter den Routen,
+aus denen sie auswählen; die Zwischenschicht ist
+`src/gateway/WorkerTransfer.Gateway/Bremse.cs`.
+
+### Wo sie sitzt, und warum das gemessen und nicht gewählt wurde
+
+Die Frage war Gateway, `ServiceDefaults` oder identity-service. Entschieden hat
+sie eine Messung an Girders Zwischenschicht: sie liest die Herkunft aus
+`Connection.RemoteIpAddress` und kennt **keinen** weitergereichten Kopf — und
+das Gateway setzt auch keinen.
+
+Daraus folgt alles Weitere. Hinter dem Gateway ist `RemoteIpAddress` die Adresse
+**des Gateways**, für jeden Aufrufer dieselbe. Eine Bremse in identity-service
+hätte alle Menschen in einen Topf geworfen: wer als Erster fünfmal danebentippt,
+sperrt die Welt aus. Das ist keine Bremse, das ist ein Selbstangriff.
+
+Der übliche Ausweg wäre `X-Forwarded-For` — und der wäre hier **schlimmer als
+das Problem**. Diesen Kopf setzt jeder Aufrufer selbst; ihm zu glauben hieße,
+dem Angreifer den Schlüssel des Zählers zu geben: er dreht ihn bei jeder Anfrage
+und ist nie gebremst. Vertrauen ließe er sich erst hinter einer
+*vertrauenswürdigen* Kette, und die gibt es nicht — in Compose sind die Dienste
+unter 8001–8011 direkt erreichbar. Also wird er nicht gelesen, und ein Test
+nagelt fest, dass ein erfundener nichts verschiebt.
+
+In `ServiceDefaults` gehört sie erst recht nicht: dort steht, was für alle elf
+Dienste gleich sein *muss*. Eine Bremse ist eine Entscheidung über bestimmte
+Endpunkte, und genau ein Dienst hat sie.
+
+**Die Reihenfolge in der Kette** trägt zwei eigene Entscheidungen:
+Gesundheit → Korrelation → **Bremse** → Navigation → Ocelot. Die Probe steht
+davor, weil eine gebremste Liveness-Probe den Behälter aus dem Lastverteiler
+nähme — die Bremse wäre dann selbst der Ausfall, und zwar genau unter Last. Die
+Korrelation steht davor, damit auch ein 429 eine Kennung trägt. Und die Bremse
+steht **vor** Navigation, weil Navigation den Pfad auf `/__ui/…` umschreibt;
+danach träfe keine Regel mehr zu.
+
+### Die Zahlen sind großzügig, und das ist Absicht
+
+Hinter einer Herkunft steht oft ein ganzes Büro mit einer Adresse. Eine Bremse,
+die dort greift, wäre selbst der Ausfall. Sie soll **schnelles** Raten unmöglich
+machen — langsames verhindert sie nicht, und sie ist auch nicht das Einzige, was
+das verhindern muss. Das steht so in `ocelot.json`, damit die nächste Person die
+Zahlen nicht für Zufall hält.
+
+### Ein Girder-Fehler, gefunden und nicht umgangen
+
+`DistributedRateLimitingMiddleware` aus Girder 3.0.1 **bremst nichts**. Weder
+die globale Grenze noch eine pfadgenaue noch die sieben Grenzen, die Girder
+selbst voreinstellt: acht Anfragen gegen eine Grenze von fünf ergaben achtmal
+`200`, ohne eine einzige `X-RateLimit-*`-Kopfzeile. Die Einstellungen binden
+korrekt (nachgesehen), und der Zähler darunter arbeitet korrekt (nachgesehen) —
+der Fehler sitzt dazwischen.
+
+Ticket: `bugs/distributed-ratelimiting-middleware-bremst-nicht.md`, mit einer
+Reproduktion ohne eine Zeile WorkerTransfer. Nebenbefund darin:
+`AddInMemoryRateLimiting()` registriert **nicht**, was `UseDistributedRateLimiting()`
+braucht — zwei Untersysteme mit fast gleichen Namen, die nicht zusammenpassen.
+
+Wir benutzen deshalb Girders **Speicher** (`IDistributedRateLimitStore`,
+`SlidingWindowIncrementAsync`) und eine eigene, sehr kleine Zwischenschicht.
+Das ist **kein Umweg um den Fehler**: nichts wird zurückgebaut, nichts versteckt,
+keine Prüfung abgeschwächt — es ist eine andere, funktionierende Schnittstelle
+derselben Bibliothek. Der Gewinn bleibt: `RedisDistributedRateLimitStore`
+erfüllt dieselbe Schnittstelle, der Sprung auf einen geteilten Zähler ist ein
+Registrierungswechsel.
+
+**Eine Falle beim Messen**, die fast ein falsches Ticket erzeugt hätte: ein noch
+laufender Vorgänger auf demselben Hafen beantwortete die Aufrufe weiter. Drei
+Messreihen waren dadurch wertlos, und sie sahen völlig plausibel aus. Erst
+`lsof -ti :<hafen> | xargs kill -9`, dann neu starten, dann messen.
+
+### Am laufenden Stapel gemessen, nicht nur im Testwirt
+
+Bild neu gebaut, `postgres` + `gateway` + `identity-service` hochgefahren, dann
+durch das echte Gateway gefragt:
+
+```
+POST /auth/login   -> 401, X-RateLimit-Limit: 800, X-RateLimit-Remaining: 799
+GET  /jobs         -> keine einzige RateLimit-Kopfzeile
+
+125 x POST /auth/resend-verification  ->  120 x 202,  5 x 429
+```
+
+**120 durch, 5 abgewiesen** — genau die eingestellte Grenze (3 × Faktor 40).
+Die Abweisung trägt `Retry-After: 60`, die Kopfzeilen, ein RFC-9457-Dokument mit
+Korrelationskennung — und die Adresse aus dem Rumpf steht nirgends darin.
+
+### Der Prüfstand hätte die Bremse sonst umgeworfen
+
+Beim Nachrechnen, nicht beim Ausprobieren, aufgefallen: die Playwright-Reisen
+legen **34 Konten** an, alle von einer Herkunft, binnen weniger Minuten. Gegen
+`/auth/register: 5` fällt `make validate-e2e` um — und zwar zu Recht, denn kein
+Mensch legt vierunddreißig Konten an.
+
+Gelöst mit `Bremse__Faktor`, gesetzt **nur in `docker-compose.yml`** (auf 40).
+Ein Faktor und kein Schalter: die Bremse läuft weiter, zählt weiter, schlüsselt
+weiter je Herkunft — nur die Decke liegt höher. Eine ausgeschaltete Bremse wäre
+in der einzigen laufenden Umgebung gar nicht mehr zu sehen, und was man nie
+sieht, merkt man auch nicht, wenn es kaputtgeht. Die Voreinstellung ist 1, die
+ausgelieferte Karte enthält ihn nicht, und zwei Tests nageln beides fest.
+
+Ins Chart gehört er **nicht**: dort läuft kein Prüfstand, und ein Faktor in
+einer Staging-Umgebung wäre eine Bremse, die nur so aussieht.
+
+### `replicaCount` — die Begründung hat sich schon wieder verschoben
+
+Der Zähler läuft im Prozess. Damit hängt jetzt die **1 des Gateways** daran
+(`templates/gateway.yaml`), nicht die der elf Dienste. Bei den Diensten bleibt
+genau ein Grund übrig: jeder wandert sein Schema beim Start. Beide Stellen sagen
+das jetzt so.
+
+### Gegenproben
+
+Drei tragende Regeln gebrochen, jede fiel **genau einen** Test, keinen zweiten:
+
+| Bruch | fiel |
+|---|---|
+| Rumpf in den Schlüssel (also je E-Mail-Adresse bremsen) | `Fuenf_verschiedene_Adressen_aus_einer_Herkunft_teilen_einen_Topf` |
+| `X-Forwarded-For` glauben | `Ein_mitgebrachter_Weiterleitungskopf_aendert_den_Topf_nicht` |
+| Gesundheitsprobe hinter die Bremse | `Die_Gesundheitsprobe_bleibt_ungebremst_selbst_wenn_sie_gelistet_ist` |
+
+Danach zurückgenommen und `--no-incremental` gebaut.
+
+**Zwei der Tests konnten anfangs gar nicht fallen** und wurden deshalb ersetzt:
+„die Gesundheitsprobe wird nicht gebremst" war trivial wahr, solange
+`/health/live` gar nicht in der Bremskarte steht — jetzt setzt der Test sie
+absichtlich hinein und prüft damit wirklich die Reihenfolge. Und der Beleg gegen
+`X-Forwarded-For` fehlte ganz; ohne ihn wäre die Bremse eine Attrappe gewesen,
+die von außen genauso aussieht.
+
+---
+
 ## Was beim Weiterarbeiten immer gilt
 
 - **Bauen und Testen in getrennten Aufrufen.** Verkettet scheitern die

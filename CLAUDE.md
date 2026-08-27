@@ -103,16 +103,24 @@ The app answers on **`http://localhost:8090`** — not 8080, which belongs to th
 Load-bearing, and easy to undo by tidying up (ADR-0028):
 
 - **The route map stays one file.** The k8s `Service` objects are named exactly like the compose services, so `ocelot.json` travels in the image and the same map serves both. Re-expressing those non-disjoint paths and their priorities as Ingress rules would duplicate the map, and the copy would be wrong at the first new path.
-- **`replicaCount: 1` is a decision, not a starting value** — but only one of its three original reasons survives. The outbox dispatcher now takes its rows with `FOR UPDATE SKIP LOCKED`, so two dispatchers no longer send every mail twice; that one is solved. What still holds: **every service migrates its schema at startup**, so two pods are two pilgrims on one schema. The third reason turned into something else — see the gap below.
+- **`replicaCount: 1` is a decision, not a starting value.** For the eleven services one reason remains: **every service migrates its schema at startup**, so two pods are two pilgrims on one schema. (The outbox dispatcher's missing `SKIP LOCKED` is fixed.) The **gateway** is pinned separately, and for its own reason: the auth brake counts in-process — see below.
 - **The web image is a built artifact, and that forces a runtime config.** `vite build` bakes `import.meta.env.VITE_*` into the bundle, so an image with baked URLs cannot be the same in two environments. `apps/web/src/env.ts` resolves in three steps — `window.__WT_CONFIG__` → `VITE_*` → port fallback — and `apps/web/public/config.js` is an empty object that changes nothing locally. Only the chart lays a real one over it. Do not "simplify" that back to a build arg.
 
 **`make k8s-up` has never been run on this machine.** The chart lints and renders; only a run proves it works.
 
-### A known gap: nothing throttles the auth endpoints
+### The brake on the auth endpoints, and why it lives in the gateway
 
-The predecessor braked five endpoints — `/auth/login`, `/auth/refresh`, `/auth/register`, `/auth/verify-email`, `/auth/resend-verification` — with an in-process sliding window, placed deliberately **outside** authentication, so that bcrypt is not computed before the brake applies; otherwise the brake is itself the most expensive part of the attack.
+Five paths are braked — `/auth/login` (20/min), `/auth/register` (5), `/auth/resend-verification` (3), `/auth/verify-email` (20), `/auth/refresh` (60) — per origin, per minute. The rules live in `ocelot.json` next to the routes they select from, and `Bremse.cs` is the middleware.
 
-**That did not come across in the migration.** There is no rate limiter, no failed-attempt counter and no sliding window anywhere in `src/`. It is not a scaling caveat — it is missing at one replica exactly as much as at three. Written down here rather than in a comment nobody reads, because a login endpoint with no brake is the kind of gap that is only noticed from outside.
+**Per origin, never per email address.** Keying on the address would build exactly the enumeration channel `/auth/register` closes: a braked answer would confirm the address exists. It would also let a stranger lock out anyone whose address they know. The key is path plus origin, and the brake never reads the body — a test sends five *different* addresses from one origin and requires them to share one bucket.
+
+**In the gateway, and that was measured rather than chosen.** A brake needs the caller's origin, which lives in `Connection.RemoteIpAddress`. Behind the gateway that is the *gateway's* address, identical for everyone — a brake inside identity-service would have thrown all people into one bucket, so the first person to mistype their password locks out the world. The usual escape, `X-Forwarded-For`, is worse than the problem here: any caller sets that header themselves, so trusting it hands the attacker the key to the counter. It is therefore not read, and a test pins that a forged one changes nothing.
+
+It sits **outside authentication** in the strongest sense available: no token has been verified and no password hashed when it runs. And it sits **after** the health probes — a braked liveness probe would take the container out of the load balancer, making the brake itself the outage.
+
+**The counter runs in-process**, so the gateway is pinned to one replica. The way out is a registration change, not a rewrite: `RedisDistributedRateLimitStore` satisfies the same interface.
+
+Girder's own `DistributedRateLimitingMiddleware` is deliberately **not** used — in 3.0.1 it lets every request through, even far past its own limits, while the store beneath it counts correctly. Measured, with a reproduction free of WorkerTransfer code, in `bugs/distributed-ratelimiting-middleware-bremst-nicht.md`.
 
 ### CI
 

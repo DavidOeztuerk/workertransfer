@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Girder.Abstractions.Caching;
+using Girder.InMemory.Caching;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -132,12 +134,20 @@ public class Landschaft : IAsyncLifetime
             Landkarte(haefen, umgedreht), optional: false, reloadOnChange: false);
         bau.Services.AddOcelot(bau.Configuration);
 
+        // Wie in `Program.cs`: Girders Zaehler, nicht seine Zwischenschicht.
+        bau.Services.AddMemoryCache();
+        bau.Services.AddSingleton<IDistributedRateLimitStore, InMemoryRateLimitStore>();
+        bau.Services.AddSingleton(
+            bau.Configuration.GetSection(Bremseinstellungen.Abschnitt)
+                .Get<Bremseinstellungen>() ?? new Bremseinstellungen());
+
         var gateway = bau.Build();
 
         // Dieselbe Reihenfolge wie in `Program.cs`. Sie ist Teil dessen, was
         // hier geprueft wird: Ocelot beendet die Kette.
         gateway.UseGesundheit();
         gateway.UseKorrelation();
+        gateway.UseBremse();
         gateway.UseNavigation();
         gateway.UseOcelot().GetAwaiter().GetResult();
 
@@ -181,6 +191,10 @@ public class Landschaft : IAsyncLifetime
         var neu = new Dictionary<string, object>(StringComparer.Ordinal)
         {
             ["Routes"] = routen,
+            // Die Bremse reist mit: die umgedrehte Landschaft soll sich NUR in
+            // der Zeilenreihenfolge unterscheiden, sonst prueft sie nebenbei
+            // etwas anderes.
+            ["Bremse"] = gelesen.RootElement.GetProperty("Bremse"),
             ["GlobalConfiguration"] = gelesen.RootElement.GetProperty("GlobalConfiguration"),
         };
 
@@ -208,4 +222,22 @@ public sealed class UmgedreheteLandschaft : Landschaft
 public sealed class UmgedrehteSammlung : ICollectionFixture<UmgedreheteLandschaft>
 {
     public const string Name = "landschaft-umgedreht";
+}
+
+
+/// <summary>
+/// Dieselbe Landschaft, aber mit eigenen Zählern.
+/// </summary>
+/// <remarks>
+/// Die Bremstests schöpfen Grenzen absichtlich aus. Täten sie das in der
+/// gemeinsamen Landschaft, hinge das Ergebnis von <c>LandkarteTests</c> davon
+/// ab, wer zuerst lief — und ein Test, dessen Ausgang von der Reihenfolge
+/// abhängt, ist schlimmer als keiner.
+/// </remarks>
+public sealed class GebremsteLandschaft : Landschaft;
+
+[CollectionDefinition(Name)]
+public sealed class BremsSammlung : ICollectionFixture<GebremsteLandschaft>
+{
+    public const string Name = "landschaft-bremse";
 }

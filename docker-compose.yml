@@ -292,6 +292,23 @@ services:
       SERVICE_DIR: gateway
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: "http://0.0.0.0:8090"
+      # NUR HIER, und nur wegen des Pruefstands.
+      #
+      # Die Auth-Bremse steht in ocelot.json und gilt unveraendert, wo nichts
+      # anderes gesagt wird. Die Playwright-Reisen legen aber VIERUNDDREISSIG
+      # Konten an, alle von einer Herkunft, binnen weniger Minuten — gegen
+      # `/auth/register: 5` faellt das um, und zwar voellig zu Recht: kein
+      # Mensch legt vierunddreissig Konten an. Ein Pruefstand ist nicht die
+      # Bedrohung, gegen die die Bremse gebaut ist.
+      #
+      # Ein Faktor, kein Schalter: die Bremse laeuft weiter, zaehlt weiter und
+      # schluesselt weiter je Herkunft — nur die Decke liegt hoeher. Eine
+      # ausgeschaltete Bremse waere in der einzigen laufenden Umgebung gar
+      # nicht mehr zu sehen.
+      #
+      # NICHT ins Helm-Chart uebernehmen. Dort laeuft kein Pruefstand, und ein
+      # Faktor in einer Staging-Umgebung waere eine Bremse, die nur so aussieht.
+      Bremse__Faktor: "40"
     depends_on:
       # Nur auf die Datenbank, nicht auf die elf: das Gateway beantwortet
       # /health/live selbst, und ein einzelner kranker Dienst darf es nicht
