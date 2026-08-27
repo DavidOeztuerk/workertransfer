@@ -92,6 +92,7 @@
     <Project Path="tests/WorkerTransfer.Applications.Tests/WorkerTransfer.Applications.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Companies.Tests/WorkerTransfer.Companies.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Consent.Tests/WorkerTransfer.Consent.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Ganzes.Tests/WorkerTransfer.Ganzes.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Gateway.Tests/WorkerTransfer.Gateway.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.GitHub.Tests/WorkerTransfer.GitHub.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Identity.Tests/WorkerTransfer.Identity.Tests.csproj" />

@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-27, nach **Helm** — Phase C, 2 von 6.
+**Zuletzt fortgeschrieben:** 2026-08-27, nach **Python raus** — Phase C, 3 von 6.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -19,9 +19,9 @@ was davon getan ist.
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
 | **Phase B — die Dienste** | **fertig**, 10 von 10 |
-| **Phase C — Zusammenbau** | **2 von 6**: Gateway, Compose und Helm stehen |
+| **Phase C — Zusammenbau** | **3 von 6**: Gateway, Compose, Helm, Python ist raus |
 | **Prüfer** | nicht begonnen |
-| **Tests** | 606 grün, 0 rot, 0 übersprungen |
+| **Tests** | 617 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
@@ -38,13 +38,16 @@ Millisekunde mit `TypeInitializationException`, was wie ein kaputter Bau
 aussieht und keiner ist. Die Reihen einzeln fahren:
 
 ```bash
-cd dotnet
-for p in Outbox Skills Identity Consent Profile Resume Portfolio Jobs Applications \
-         Companies Transfer GitHub Notification Gateway; do
-  dotnet test tests/WorkerTransfer.$p.Tests/WorkerTransfer.$p.Tests.csproj --no-build \
-    | grep -E "^(Bestanden!|Fehler!)"
-done
+make build   # dotnet build
+make test    # scripts/test-dotnet.sh — die Reihen EINZELN
 ```
+
+`scripts/test-dotnet.sh` ist der Grund, warum `make test` nicht `dotnet test`
+über die Projektmappe ruft: fünfzehn Reihen starten dann fünfzehn Behälter
+gleichzeitig, der `ResourceReaper` von Testcontainers läuft in eine
+Zeitüberschreitung, und **alle** Reihen fallen binnen einer Millisekunde mit
+`TypeInitializationException`. Das sieht aus wie ein kaputter Bau und ist
+keiner. Das Skript läuft durch, nennt jede rote Reihe und am Schluss die Zahl.
 
 ---
 
@@ -406,8 +409,8 @@ In dieser Reihenfolge:
 
 1. ~~Gateway mit Ocelot~~ — **fertig**, siehe unten.
 2. ~~Compose und Helm~~ — **fertig**. Compose gemessen, Chart gerendert.
-3. Python restlos entfernen, danach `dotnet/` flach in die Wurzel — als eigener
-   Commit, damit die Umbenennungen lesbar bleiben.
+3. ~~Python restlos entfernen~~ — **fertig**. Die Umbenennung `dotnet/src → src`
+   folgt als eigener Commit.
 4. Übergangsgerüst löschen: Ü-1 bis Ü-7 in
    [`uebergang-python-dotnet.md`](uebergang-python-dotnet.md), ersatzlos. Die
    Enum-Guards werden schlichte `CREATE TYPE`.

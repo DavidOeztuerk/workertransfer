@@ -42,11 +42,11 @@ step() {
   fi
 }
 
-# --- Python ------------------------------------------------------------------
-step "ruff format" uv run ruff format --check .
-step "ruff lint" uv run ruff check .
-step "mypy" uv run mypy packages apps
-step "pytest" uv run pytest -q
+# --- .NET --------------------------------------------------------------------
+# Bauen und Testen in GETRENNTEN Schritten. Verkettet scheitern die
+# Testcontainers-Reihen und sehen dabei aus wie echte Testfehler.
+step "dotnet build" dotnet build dotnet/WorkerTransfer.slnx
+step "dotnet test" ./scripts/test-dotnet.sh
 
 # --- Frontend ----------------------------------------------------------------
 step "tsc" pnpm -r run check
@@ -59,11 +59,11 @@ fi
 
 # --- Was blieb ungeprüft? ----------------------------------------------------
 # Skips sind keine Erfolge. Diese Zahl ist die ehrlichste Kennzahl im Bericht.
-pytest_log="$log_dir/pytest.log"
+dotnet_log="$log_dir/dotnet-test.log"
 playwright_log="$log_dir/playwright.log"
 skipped=0
-if [[ -f "$pytest_log" ]]; then
-  skipped=$(grep -oE '[0-9]+ skipped' "$pytest_log" | tail -1 | grep -oE '[0-9]+' || true)
+if [[ -f "$dotnet_log" ]]; then
+  skipped=$(grep -oE '[0-9]+ uebersprungen' "$dotnet_log" | tail -1 | grep -oE '[0-9]+' || true)
   skipped=${skipped:-0}
 fi
 
@@ -100,7 +100,7 @@ count_from() {
 }
 
 vitest_log="$log_dir/vitest.log"
-pytest_passed=$(count_from "$pytest_log" '[0-9]+ passed')
+dotnet_passed=$(count_from "$dotnet_log" '[0-9]+ Tests gruen')
 vitest_passed=$(count_from "$vitest_log" 'Tests +[0-9]+ passed' sum)
 e2e_ran=$(count_from "$playwright_log" '[0-9]+ passed')
 
@@ -108,7 +108,7 @@ printf '\n%s── Stand ──────────────────�
 for entry in "${RESULTS[@]}"; do
   IFS='|' read -r status name log <<<"$entry"
   case "$name" in
-    pytest) tally="${pytest_passed:-?} bestanden" ;;
+    "dotnet test") tally="${dotnet_passed:-?} bestanden" ;;
     vitest) tally="${vitest_passed:-?} bestanden" ;;
     playwright) tally="${e2e_ran:-?} Reisen" ;;
     *) tally="" ;;
@@ -134,7 +134,7 @@ if [[ "$flaky" -gt 0 ]]; then
 fi
 
 if [[ "$skipped" -gt 0 ]]; then
-  printf '\n  %s!%s %s Python-Tests übersprungen.' "$YELLOW" "$OFF" "$skipped"
+  printf '\n  %s!%s %s .NET-Tests übersprungen.' "$YELLOW" "$OFF" "$skipped"
   if [[ $docker_up -eq 0 ]]; then
     printf ' Der Stack läuft nicht — mit "docker compose up -d"\n    laufen die Integrationstests wirklich statt sich zu überspringen.\n'
   else

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
@@ -11,14 +10,26 @@ using WorkerTransfer.Identity.Infrastructure.Persistence;
 namespace WorkerTransfer.Identity.Tests;
 
 /// <summary>
-/// The proof the whole step rests on: a token this service issues is accepted
-/// by <c>worker_auth.TokenManager.verify_token</c>, and the three endpoints
-/// behave the way the React app expects.
+/// Die drei Endpunkte verhalten sich so, wie die React-App es erwartet.
 /// </summary>
 /// <remarks>
-/// Runs against the real service over HTTP, against a real Postgres carrying
-/// the real Alembic schema, and hands the token to a real Python interpreter.
-/// Every part of it could be faked, and then it would prove nothing.
+/// <strong>Die Haelfte, die Python fragte, ist weg</strong> — mit dem
+/// Python-Dienst. Zwei Tests reichten einen frisch ausgestellten Token an einen
+/// echten Interpreter und liessen ihn von <c>worker_auth.TokenManager</c>
+/// pruefen; ohne Gegenueber beweisen sie nichts mehr.
+/// <para>
+/// Was bleibt, ist die andere Richtung und sie bleibt wichtig: die
+/// Cookie-Namen und -Pfade, das RFC-9457-Dokument, 403 statt 401 fuer ein
+/// unbestaetigtes Konto — und ein Passwort, das der Python-Hasher geschrieben
+/// hat und das hier ohne Zuruecksetzen hereinlaesst. Diese Zeilen liegen in
+/// echten Datenbanken, und sie muessen weiter tragen.
+/// </para>
+/// <para>
+/// Dass .NET Token annimmt, die Python WIRKLICH ausgestellt hat, prueft
+/// <c>KreuzbeweisPythonNachDotnetTests</c> — aus aufgezeichneten Zeichenketten,
+/// also ohne Interpreter. Das ist die Richtung, die nach dem Umzug noch zaehlt:
+/// eine Sitzung von vorgestern muss weiter gelten (Ue-2).
+/// </para>
 /// </remarks>
 [Collection(PostgresCollection.Name)]
 public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
@@ -90,18 +101,6 @@ public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
             .First(zeile => zeile.StartsWith($"{name}=", StringComparison.Ordinal))
             .Split(';')[0][(name.Length + 1)..];
 
-    [Fact]
-    public async Task Der_Zugriffstoken_wird_von_Pythons_TokenManager_angenommen()
-    {
-        var antwort = await Anmelden(Browser(), _email, Passwort);
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var urteil = PythonPrueft(CookieAus(antwort, "access"));
-
-        urteil.Should().StartWith("OK", "Python muss den Token dieses Dienstes lesen koennen");
-        urteil.Should().Contain("type=access");
-    }
-
     /// <summary>
     /// The entry was written by the Python hasher and is read here without
     /// anyone being asked to reset anything.
@@ -172,8 +171,6 @@ public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
         var erneuert = await browser.PostAsync("/auth/refresh", null);
         erneuert.StatusCode.Should().Be(HttpStatusCode.OK);
         CookieAus(erneuert, "refresh").Should().NotBe(erster, "jede Erneuerung rotiert");
-
-        PythonPrueft(CookieAus(erneuert, "access")).Should().StartWith("OK");
     }
 
     [Fact]
@@ -208,42 +205,4 @@ public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
     /// <summary>
     /// Hands the token to the real Python verifier and returns what it said.
     /// </summary>
-    private static string PythonPrueft(string token)
-    {
-        var wurzel = new DirectoryInfo(AppContext.BaseDirectory);
-        while (wurzel is not null && !File.Exists(Path.Combine(wurzel.FullName, "CLAUDE.md")))
-        {
-            wurzel = wurzel.Parent;
-        }
-
-        var start = new ProcessStartInfo("uv")
-        {
-            WorkingDirectory = wurzel!.FullName,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-        start.ArgumentList.Add("run");
-        start.ArgumentList.Add("python");
-        start.ArgumentList.Add("-c");
-        start.ArgumentList.Add("""
-            import sys
-            from worker_auth import TokenManager
-            try:
-                p = TokenManager(secret=sys.argv[2]).verify_token(sys.argv[1], expected_type="access")
-                print(f"OK sub={p.sub} tenant={p.tenant_id} type={p.type} roles={p.roles}")
-            except Exception as e:
-                print(f"ABGELEHNT {type(e).__name__}: {e}")
-            """);
-        start.ArgumentList.Add(token);
-        start.ArgumentList.Add(Geheimnis);
-
-        using var prozess = Process.Start(start)!;
-        var ausgabe = prozess.StandardOutput.ReadToEnd().Trim();
-        var fehler = prozess.StandardError.ReadToEnd();
-        prozess.WaitForExit();
-
-        return prozess.ExitCode == 0
-            ? ausgabe
-            : throw new InvalidOperationException($"python endete mit {prozess.ExitCode}: {fehler}");
-    }
 }
