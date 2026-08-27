@@ -71,10 +71,8 @@ k8s-seed:  # Testdaten in die laufende Umgebung: Firma, drei Stellen, ein Bewerb
 
 k8s-lint:  # Chart prüfen, ohne Cluster: helm lint + rendern.
 	helm lint deploy/helm/workertransfer \
-		--set-file gateway.dynamicConfig=docker/traefik/dynamic.yml \
 		--set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql
 	helm template deploy/helm/workertransfer \
-		--set-file gateway.dynamicConfig=docker/traefik/dynamic.yml \
 		--set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql > /dev/null
 	@echo "Chart rendert."
 

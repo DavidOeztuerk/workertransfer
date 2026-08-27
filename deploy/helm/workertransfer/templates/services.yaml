@@ -1,10 +1,11 @@
 {{/*
 Deployment + Service je Dienst, erzeugt aus der Liste in values.yaml.
 
-Der Name des Service-Objekts ist NICHT frei wählbar: docker/traefik/dynamic.yml
-spricht `http://identity-service:8001` an, und genau diese Datei wird
-unverändert ins Gateway gehängt. Heisst das Objekt hier anders, zeigt die
-Landkarte ins Leere.
+Der Name des Service-Objekts ist NICHT frei wählbar: die Landkarte des
+Gateways spricht `http://identity-service:8001` an, und sie reist im Bild mit.
+Heisst das Objekt hier anders, zeigt die Landkarte ins Leere — und zwar
+lautlos, denn Ocelot meldet einen unerreichbaren Nachbarn erst beim ersten
+Aufruf.
 */}}
 {{- $root := . }}
 {{- range $svc := .Values.services }}
@@ -45,72 +46,34 @@ spec:
         checksum/env: {{ include (print $root.Template.BasePath "/configmap-env.yaml") $root | sha256sum }}
     spec:
       {{/*
-      Migriert wird HIER und nur hier — nicht im Hauptprozess.
+      KEIN initContainer mehr, und das ist der sichtbare Unterschied zur
+      Python-Zeit: dort wanderte ein eigener Behälter das Schema und rief dafür
+      `docker/entrypoint.sh` mit `true` auf.
 
-      Warum kein Helm-Hook-Job: ein `pre-install`-Hook läuft, BEVOR das
-      Postgres-StatefulSet aus diesem Chart existiert. Er hätte keine Datenbank,
-      auf die er warten könnte. Postgres selbst zum Hook zu machen, würde ein
-      StatefulSet mit PVC aus Helms Bestandsverwaltung nehmen — ein hoher Preis
-      für die Reihenfolge.
+      Jetzt wandert der Dienst beim Start selbst (ServiceDefaults.Wanderung).
+      Der Grund ist kein Geschmack: `dotnet ef` braucht das SDK, und ein
+      Laufzeitbild hat keins. Ein Migrationsbündel wäre der andere Weg gewesen
+      und hätte ein zweites Artefakt eingeführt, das mit dem Bild altert.
 
-      Der Container benutzt den UNVERÄNDERTEN docker/entrypoint.sh: er migriert
-      und führt danach `true` aus. Es läuft also derselbe Migrationspfad wie in
-      docker compose, nicht eine zweite Beschreibung davon.
+      Das Warten steht damit ebenfalls im Dienst — was ohnehin richtig ist:
+      hier gibt es kein `depends_on`, der Behälter startet, wann er will. Der
+      alte initContainer wartete mit einer Schleife auf Postgres; dieselbe
+      Geduld liegt nun in `Wanderung.Geduld`.
 
-      Das Warten steht davor, weil Alembic gegen eine noch schlafende Datenbank
-      mit einem Stapelabzug abbricht — der sieht nach kaputtem Code aus und ist
-      nur eine Reihenfolge.
-
-      ACHTUNG bei replicas > 1: dann läuft das je Pod und ist das Rennen, das
-      hier vermieden werden sollte. Siehe values.yaml — die Zahl steht dort
-      nicht zufällig auf 1.
+      ACHTUNG bei replicas > 1: dann wandern zwei Pods dasselbe Schema. Siehe
+      values.yaml — die Zahl steht dort nicht zufällig auf 1.
       */}}
-      initContainers:
-        - name: migrate
-          image: "{{ $root.Values.image.repository }}:{{ $root.Values.image.tag }}"
-          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
-          {{/*
-          `command`, nicht `args`: mit `args` liefe der ENTRYPOINT zuerst und
-          migrierte, BEVOR gewartet wird — genau falsch herum. So wartet die
-          Schleife, und der Entrypoint wird danach ausdrücklich aufgerufen.
-          */}}
-          command:
-            - sh
-            - -c
-            - |
-              until python -c 'import socket; socket.create_connection(("{{ $root.Values.postgres.host }}", {{ $root.Values.postgres.port }}), 2)' 2>/dev/null; do
-                echo "warte auf {{ $root.Values.postgres.host }}:{{ $root.Values.postgres.port }} ..."
-                sleep 2
-              done
-              exec /usr/local/bin/entrypoint.sh true
-          envFrom:
-            - configMapRef:
-                name: {{ $root.Release.Name }}-env
-          env:
-            {{- include "workertransfer.serviceEnv" (dict "root" $root "svc" $svc) | nindent 12 }}
-          resources:
-            {{- toYaml $root.Values.resources | nindent 12 }}
       containers:
         - name: service
           image: "{{ $root.Values.image.repository }}:{{ $root.Values.image.tag }}"
           imagePullPolicy: {{ $root.Values.image.pullPolicy }}
           {{/*
-          `command` überschreibt den ENTRYPOINT des Images und umgeht ihn damit
-          vollständig. Das ist Absicht: docker/entrypoint.sh migriert vor dem
-          Start, und in Kubernetes gehört das in den Job nebenan. Drei
-          Repliken, die gleichzeitig `alembic upgrade head` fahren, sind ein
-          Rennen — auch wenn heute nur eine läuft.
-
-          Kein --reload: im Cluster gibt es keinen Bind-Mount, der Code kommt
-          aus dem Image.
+          KEIN `command`: der ENTRYPOINT des Bildes bleibt stehen und liest
+          `SERVICE_DIR` aus der Umgebung. Zur Python-Zeit stand hier ein
+          uvicorn-Aufruf, der den Entrypoint umging — weil der sonst ein
+          zweites Mal gewandert wäre. Beides ist weg, und damit auch die Frage,
+          ob die beiden Beschreibungen desselben Starts noch übereinstimmen.
           */}}
-          command:
-            - uvicorn
-            - {{ $svc.module }}
-            - --host
-            - "0.0.0.0"
-            - --port
-            - {{ $svc.port | quote }}
           envFrom:
             - configMapRef:
                 name: {{ $root.Release.Name }}-env
@@ -121,7 +84,7 @@ spec:
               containerPort: {{ $svc.port }}
           {{/*
           live sagt "der Prozess lebt", ready sagt "die Datenbank antwortet
-          auch" (worker_platform.presentation.health). Sie zu vertauschen
+          auch". Sie zu vertauschen
           hiesse: bei einer kurzen Datenbankstörung wird der Dienst NEU
           GESTARTET statt aus dem Verkehr genommen — und startet in dieselbe
           Störung hinein.
@@ -135,7 +98,7 @@ spec:
 
           Eine Bereitschaftsprüfung, die die Datenbank fragt, hat in einer
           Sekunde nicht sicher geantwortet — nicht weil etwas kaputt ist,
-          sondern weil zehn Python-Prozesse gleichzeitig hochfahren. Wer das
+          sondern weil elf Prozesse gleichzeitig hochfahren. Wer das
           über die Zeitgrenze "löst", schreibt einen Fehler als normales
           Verhalten fest; wer es zu knapp lässt, startet gesunde Dienste neu.
           */}}
