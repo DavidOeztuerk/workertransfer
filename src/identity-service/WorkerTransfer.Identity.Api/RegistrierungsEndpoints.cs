@@ -80,6 +80,16 @@ public static class RegistrierungsEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
+            // Ein fehlender Token ist eine kaputte Anfrage, kein ungueltiger
+            // Token. Ohne diese Zeilen kam `{}` als 500 zurueck (D2).
+            if (string.IsNullOrWhiteSpace(body.Token))
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", "token is required");
+                return;
+            }
+
             var ergebnis = await mediator.Send(
                 new AdresseBestaetigenBefehl(body.Token), cancellationToken);
 

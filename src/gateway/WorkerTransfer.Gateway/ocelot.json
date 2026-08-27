@@ -5,11 +5,19 @@
 // tut jeder Dienst fuer sich, und ein Gateway, das es ebenfalls taete, waere
 // eine zweite Wahrheit ueber dieselbe Frage.
 //
-// Was hier NICHT steht, ist ebenso wichtig: `/erasure` und `/internal/notify`.
-// Beide sind Dienst-zu-Dienst-Eingaenge hinter einem gemeinsamen Geheimnis.
-// Sie ueber den oeffentlichen Ursprung erreichbar zu machen hiesse, "loesche
-// alles ueber diesen Menschen" ins Netz zu stellen, bewacht von einem Kopf.
-// Ohne Route fallen sie auf die Oberflaeche, und die kennt sie nicht.
+// Was hier NICHT steht, ist ebenso wichtig: `/erasure`, `/internal/notify`
+// und `/companies/withdrawal`. Alle drei sind Dienst-zu-Dienst-Eingaenge
+// hinter einem gemeinsamen Geheimnis. Sie ueber den oeffentlichen Ursprung
+// erreichbar zu machen hiesse, "loesche alles ueber diesen Menschen" ins Netz
+// zu stellen, bewacht von einem Kopf. Ohne Route fallen sie auf die
+// Oberflaeche, und die kennt sie nicht.
+//
+// `/companies/withdrawal` STAND hier bis D2, mit Prioritaet 100. Aufgefallen
+// ist es erst, als jede Route einzeln mit ihrer erwarteten Antwort geprueft
+// wurde: der Endpunkt antwortete oeffentlich mit 401 und bestaetigte damit,
+// dass es ihn gibt. Gebraucht wurde die Route nie — identity-service ruft
+// jobs-service direkt an (`Erasure__Adressen__jobs`), nicht ueber dieses
+// Gateway, und die Oberflaeche kennt den Pfad nicht.
 //
 // Kommentare sind erlaubt: der JSON-Konfigurationsanbieter von .NET ueberliest
 // sie. Gemessen, bevor diese Datei so geschrieben wurde - denn eine Landkarte
@@ -140,19 +148,6 @@
       ],
       "Priority": 100
     },
-    {
-      "UpstreamPathTemplate": "/companies/withdrawal",
-      "DownstreamPathTemplate": "/companies/withdrawal",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [
-        {
-          "Host": "jobs-service",
-          "Port": 8006
-        }
-      ],
-      "Priority": 100
-    },
-
     // Neu gegenueber der Traefik-Landkarte: `/me` gehoert identity, aber
     // `/me/notification-preferences` gehoert notification-service. In Python
     // lagen die Benachrichtigungen noch in identity; seit dem Umzug sind auch

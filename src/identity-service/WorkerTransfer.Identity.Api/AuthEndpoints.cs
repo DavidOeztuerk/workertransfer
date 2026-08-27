@@ -36,6 +36,24 @@ public static class AuthEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
+            // Fehlt eines der beiden Felder, ist das eine kaputte Anfrage und
+            // keine falsche Anmeldung. Ohne diese Zeilen lief `null` bis in den
+            // Passwortpruefer und kam als 500 zurueck — gemessen an D2, mit
+            // `{}` als Rumpf.
+            //
+            // 422 und nicht 401: 401 hiesse "die Zugangsdaten stimmen nicht",
+            // und das waere eine Aussage ueber ein Konto, die hier niemand
+            // geprueft hat. Ueber die Existenz einer Adresse sagt beides
+            // nichts — genau darum bleibt die Meldung bei "field missing".
+            if (string.IsNullOrWhiteSpace(body.Email)
+                || string.IsNullOrWhiteSpace(body.Password))
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", "email and password are required");
+                return;
+            }
+
             var ergebnis = await mediator.Send(
                 new AnmeldenBefehl(body.Email, body.Password), cancellationToken);
 

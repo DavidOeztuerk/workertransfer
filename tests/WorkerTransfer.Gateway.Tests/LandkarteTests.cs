@@ -55,7 +55,6 @@ public class LandkarteTests(Landschaft landschaft)
     [InlineData("/companies/me/application-stats", "applications")]
     [InlineData("/companies/me/profile", "companies")]
     [InlineData("/companies/by-slug/muster-gmbh", "companies")]
-    [InlineData("/companies/withdrawal", "jobs")]
     [InlineData("/companies/7f000001-0000-0000-0000-000000000000/profile", "companies")]
     [InlineData("/me/notification-preferences", "notification")]
     public async Task Die_genauere_Regel_gewinnt(string pfad, string erwartet)
@@ -124,25 +123,46 @@ public class LandkarteTests(Landschaft landschaft)
     }
 
     /// <summary>
-    /// <c>/erasure</c> und <c>/internal/notify</c> haben keine Route.
+    /// Ein Dienst-zu-Dienst-Eingang erreicht von außen nie den Dienst, der ihn
+    /// umsetzt.
     /// </summary>
     /// <remarks>
-    /// Beide sind Dienst-zu-Dienst-Eingänge hinter einem gemeinsamen
-    /// Geheimnis. Über den öffentlichen Ursprung erreichbar wären sie „lösche
-    /// alles über diesen Menschen", bewacht von einem Kopf. Sie fallen auf die
-    /// Oberfläche, und die kennt sie nicht — was hier heißt: sie erreichen
-    /// keinen der zehn Dienste.
+    /// Alle drei liegen hinter einem gemeinsamen Geheimnis. Über den
+    /// öffentlichen Ursprung erreichbar wären sie „lösche alles über diesen
+    /// Menschen", bewacht von einem Kopf.
+    /// <para>
+    /// Geprüft wird deshalb nicht „keine Route", sondern das, was wirklich
+    /// zugesagt ist: <strong>der Besitzer sieht die Anfrage nicht.</strong> Der
+    /// Unterschied ist bei <c>/companies/withdrawal</c> zu sehen — ohne eigene
+    /// Route fällt der Pfad auf <c>/companies/{rest}</c> und landet bei
+    /// identity-service, das ihn nicht kennt und mit 404 antwortet. Das ist
+    /// genau richtig: kein Handler läuft, und die Antwort bestätigt nichts. Es
+    /// „keine Route" zu nennen wäre eine Zusage, die die Landkarte nicht gibt.
+    /// </para>
     /// </remarks>
     [Theory]
-    [InlineData("/erasure")]
-    [InlineData("/internal/notify")]
-    public async Task Die_Diensteingaenge_sind_von_aussen_nicht_erreichbar(string pfad)
+    // `/erasure` setzen acht Dienste um — keiner darf es sehen.
+    [InlineData("/erasure", "consent")]
+    [InlineData("/erasure", "profile")]
+    [InlineData("/erasure", "resume")]
+    [InlineData("/erasure", "portfolio")]
+    [InlineData("/erasure", "applications")]
+    [InlineData("/erasure", "transfer")]
+    [InlineData("/erasure", "github")]
+    [InlineData("/erasure", "notification")]
+    [InlineData("/internal/notify", "identity")]
+    // Stand bis D2 mit Priorität 100 in der Landkarte und antwortete öffentlich
+    // mit 401 — womit es bestätigte, dass es den Endpunkt gibt. Gebraucht wurde
+    // die Route nie: identity-service ruft jobs-service direkt an.
+    [InlineData("/companies/withdrawal", "jobs")]
+    public async Task Ein_Diensteingang_erreicht_seinen_Besitzer_nicht(
+        string pfad, string besitzer)
     {
         var (ohneKopf, _) = await landschaft.Frage(pfad);
         var (mitKopf, _) = await landschaft.Frage(pfad, ("Sec-Fetch-Dest", "document"));
 
-        ohneKopf.Should().BeOneOf("<keine Route>", "web");
-        mitKopf.Should().Be("web");
+        ohneKopf.Should().NotBe(besitzer);
+        mitKopf.Should().Be("web", "eine Navigation gehört immer der Oberfläche");
     }
 
     /// <summary>Die Gesundheitsproben beantwortet das Gateway selbst.</summary>

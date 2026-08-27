@@ -902,6 +902,107 @@ die von außen genauso aussieht.
 
 ---
 
+## Phase D2: die Routenkarte als Test
+
+`docs/routenkarte.yml` hält für **jeden** Endpunkt hinter dem Gateway fest, was
+er in den drei Handlungsformen aus ADR-0017 antwortet — 105 Einträge in 16
+Gruppen, jede Gruppe mit ihrer Begründung. Gefahren wird sie von zwei Seiten,
+und die beiden beantworten verschiedene Fragen:
+
+| | fragt | braucht den Stapel |
+|---|---|---|
+| `RoutenkarteTests` (Gateway-Reihe) | ist die Karte **vollständig**? | nein |
+| `scripts/routenkarte.sh` (`make routenkarte`) | stimmen die **Antworten**? | ja |
+
+Der erste ist der, der eine **neue Route rotlaufen lässt** — gegengeprobt mit
+einer erfundenen `/gehaltsempfehlung/{rest}`: fällt sofort. Ohne ihn wäre die
+Karte genau so lange vollständig, bis jemand einen Endpunkt hinzufügt.
+
+Der zweite ist ein **Skript und keine Testreihe**, und das ist Absicht: eine
+Reihe, die einen laufenden Stapel braucht, überspringt sich ohne ihn — und ein
+übersprungener Test sieht aus wie ein bestandener. Er läuft im CI-Job `images`
+mit, wo der Stapel ohnehin steht. Gegengeprobt mit genau dem Fehler, der das
+Ganze ausgelöst hat: `/jobs` ohne Token als 200 eingetragen → eine Abweichung,
+Abbruchcode 1.
+
+### Die mittlere Spalte ist die, die man vergisst
+
+Sie war der Grund für drei Spalten statt zwei, und sie trägt: in **über zwanzig
+Zeilen** unterscheidet sich „Person ohne Firma" von „handelt für eine Firma".
+`GET /profiles/{id}` ist die schönste davon — **403 für die Person, 404 für die
+Firma**. 403 heißt „du handelst für keine Firma", eine Aussage über den
+*Aufrufer*. 404 heißt „verborgen oder nicht vorhanden", und die beiden müssen
+bis aufs Byte gleich aussehen (ADR-0020). Ein Test nagelt fest, dass die Spalten
+nicht zweimal dasselbe beschreiben.
+
+### Drei Funde, die eine Abhakliste gesegnet hätte
+
+**1. Fünf Endpunkte antworteten auf einen kaputten Rumpf mit 500** — darunter
+`/auth/login`, wo ein fehlendes Passwort bis in den Passwortprüfer lief
+(`ArgumentNullException: inputKey`). Ebenso `/auth/verify-email`,
+`/invitations/accept`, `PUT /resumes/me` und `POST /transfers`. Alle fünf
+antworten jetzt **422**.
+
+Bemerkenswert dabei: **es gibt in `src/` keinen einzigen Validator.** Es gab
+also nichts, was einen Rumpf vor dem Handler prüft. Das ist eine Frage für D3
+(„Validierung vor dem Handler") — hier wurde an der Grenze geprüft, wo der
+Vertrag steht, nach dem Muster, das `consent-service` schon benutzt.
+
+Bei `PUT /resumes/me` war die Entscheidung nicht die offensichtliche: ein
+fehlendes Feld wird **nicht** als leere Liste gelesen. Sonst hieße eine Anfrage,
+in der jemand ein Feld vergessen hat, „lösche meinen ganzen Lebenslauf". Wer
+leeren will, schickt ausdrücklich `[]`.
+
+**2. `/companies/withdrawal` stand mit Priorität 100 in der Landkarte** und
+antwortete öffentlich mit **401** — womit es bestätigte, dass es diesen
+Diensteingang gibt. Gebraucht wurde die Route nie: identity-service ruft
+jobs-service direkt an (`Erasure__Adressen__jobs`), und die Oberfläche kennt den
+Pfad nicht. Route entfernt; jetzt fällt der Pfad auf `/companies/{rest}` und
+bekommt von identity-service ein nichtssagendes 404.
+
+Der zugehörige Test wurde dabei **präziser statt schwächer**: er hieß „die
+Diensteingänge sind von außen nicht erreichbar" und prüfte „keine Route". Das
+stimmt für `/companies/withdrawal` nicht mehr — der Pfad *wird* geroutet, nur
+eben zu jemandem, der ihn nicht kennt. Zugesagt ist etwas anderes und
+Schärferes: **der Besitzer sieht die Anfrage nicht.** Genau das steht jetzt da,
+für alle acht `/erasure`-Dienste einzeln.
+
+**3. `GET /notifications` antwortet 405.** notification-service beantwortet
+`POST /notifications` ohne das gemeinsame Geheimnis bewusst mit 404 und nicht
+mit 401, weil ein 401 bestätigte, dass es den Endpunkt gibt — ein GET auf
+denselben Pfad bestätigt es dann doch: 405 heißt „diesen Pfad gibt es, nur nicht
+mit dieser Methode". Die Verschleierung wird vom Rahmenwerk unterlaufen.
+**Aufgeschrieben, nicht behoben** — es steht in der Karte, damit es niemand für
+Absicht hält.
+
+### Zwei Fallen beim Messen, beide hätten falsche Zahlen ergeben
+
+**Die Firma verschwand lautlos.** Der zweite Messlauf legte die Firma unter
+derselben Domäne an wie der erste. Eine Domäne lässt sich nur einmal
+beanspruchen (ADR-0019), die Firma wurde bei der Bestätigung abgelehnt — das
+Konto war trotzdem bestätigt. Die Messung lief mit einem **Personen-Token in der
+Firmenspalte** weiter, und nichts wurde rot: 25 Zeilen wurden dabei falsch. Das
+Skript legt deshalb je Lauf eine eigene Domäne an, mit dem Grund daneben.
+
+**`#HttpOnly_` ist kein Kommentar.** Der erste Lauf des Skripts meldete jede
+angemeldete Zeile als 401. Ursache: die Keksdatei von curl schreibt httpOnly-
+Kekse mit `#HttpOnly_`-Präfix, und der Leser warf alles mit `#` weg — also genau
+den Zugriffstoken, den es nur als httpOnly-Keks gibt (ADR-0006/0007). Wer das
+nicht findet, hält danach die halbe Karte für falsch und schreibt sie um.
+
+### Was übersprungen wird, und sichtbar
+
+`POST /account/erasure` **löscht den Aufrufer**. Ein Durchlauf, der stumpf jeden
+Endpunkt anfasst, nimmt sich dabei selbst das Konto weg und misst danach lauter
+401, die keine Zusage sind, sondern eine Folge. Das Skript überspringt genau
+diese Zeile und **sagt es in der Ausgabe**. Ihre Werte stehen trotzdem in der
+Karte — gemessen mit zwei Wegwerfkonten, einem privaten und einem mit Firma:
+beide **202**, weil die Löschung nicht sofort fertig ist.
+
+315 Antworten geprüft, alle wie aufgeschrieben, 1 benannter Übersprung.
+
+---
+
 ## Was beim Weiterarbeiten immer gilt
 
 - **Bauen und Testen in getrennten Aufrufen.** Verkettet scheitern die

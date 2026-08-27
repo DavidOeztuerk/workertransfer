@@ -63,6 +63,21 @@ public static class LebenslaufEndpoints
                 return;
             }
 
+            // Ein fehlendes Feld ist NICHT dasselbe wie eine leere Liste.
+            //
+            // `{}` liess frueher `null.Select(...)` laufen und kam als 500
+            // zurueck (D2). Es einfach als leer zu lesen waere schlimmer: dann
+            // hiesse eine Anfrage, in der jemand ein Feld vergessen hat,
+            // „loesche meinen ganzen Lebenslauf". Wer leeren will, schickt
+            // ausdruecklich `[]`.
+            if (body.Positions is null || body.Education is null)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", "positions and education are required");
+                return;
+            }
+
             try
             {
                 // Whose résumé this is comes from the verified token, never

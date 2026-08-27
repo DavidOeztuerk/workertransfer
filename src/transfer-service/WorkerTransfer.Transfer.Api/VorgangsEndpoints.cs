@@ -1,6 +1,7 @@
 using Girder.Core.Identity;
 using MediatR;
 using WorkerTransfer.Transfer.Application.Vorgaenge;
+using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.Transfer.Contracts;
 
 namespace WorkerTransfer.Transfer.Api;
@@ -37,6 +38,18 @@ public static class VorgangsEndpoints
             }
 
             ArgumentNullException.ThrowIfNull(body);
+
+            // Ohne `subjectId` gibt es niemanden, an dem Interesse bestuende.
+            // Der leere Guid lief frueher bis in `new SubjectId(...)` und kam
+            // als 500 zurueck (D2) — eine kaputte Anfrage, keine kaputte
+            // Anwendung.
+            if (body.SubjectId == Guid.Empty)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", "subjectId is required");
+                return;
+            }
 
             var ergebnis = await mediator.Send(
                 new InteresseZeigenBefehl(new SubjectId(body.SubjectId), firma, body.Message),

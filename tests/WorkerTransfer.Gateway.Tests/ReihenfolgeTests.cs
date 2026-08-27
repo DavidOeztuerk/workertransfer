@@ -25,7 +25,6 @@ public class ReihenfolgeTests(UmgedreheteLandschaft landschaft)
     [InlineData("/companies/me/application-stats", "applications")]
     [InlineData("/companies/me/profile", "companies")]
     [InlineData("/companies/by-slug/muster-gmbh", "companies")]
-    [InlineData("/companies/withdrawal", "jobs")]
     [InlineData("/companies/7f000001-0000-0000-0000-000000000000/profile", "companies")]
     [InlineData("/me/notification-preferences", "notification")]
     public async Task Die_Ausnahmen_gewinnen_auch_rueckwaerts(string pfad, string erwartet)
