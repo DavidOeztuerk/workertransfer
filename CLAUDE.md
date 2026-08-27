@@ -202,7 +202,52 @@ EF Core, one `DbContext` per service, one database per service — **no shared d
 
 The table deliberately holds **no content**, only a user id and a kind. An outbox is durable storage and ends up in every backup, so a payload column would be an invitation to write message text into it. **Never carry an email address into it.** Giving up means leaving the row, never deleting it. Delivery is **at-least-once**. There is no broker, and none is planned.
 
-### The route map is a test, not a checklist
+### The Girder modules, all eighteen
+
+Girder exposes **18** module entry points on `InfrastructureBuilder`. We call **7**. This table is the standing answer to "why not that one?", and the rule behind it is inverted from what it used to be: **a module is called unless there is a measured reason against it.**
+
+Two rules that produced most of the corrections here:
+
+- **Search for the purpose, not the part.** Twice a conclusion was drawn from one implementation when Girder had several. `grep -ril <purpose>` over Girder's `src/` first, look at *every* hit, then decide. A broken path proves nothing about the others.
+- **Read the source, not the name.** Three of the lines below say something different from what the method is called.
+
+| Modul | Stand | gemessen |
+|---|---|---|
+| `AddJwtAuthentication` | **gerufen** | Prüft Token in jedem Dienst. Identity stellt aus (`AlsAussteller`), alle anderen prüfen nur. |
+| `AddPrincipal` | **gerufen** | Baut `ICurrentPrincipal` aus dem geprüften Token — die Grundlage von `Capacity` (ADR-0017). |
+| `AddSecurityHeaders` | **gerufen** | Setzt die Sicherheitsköpfe vor allem, was einen Rumpf schreibt. |
+| `AddHealthChecks` | **gerufen** | `/health/live` und `/health/ready` in jedem Dienst. Das Gateway hat eigene — siehe unten. |
+| `AddObservability` | **gerufen** | Ablaufverfolgung und Kennzahlen; Jaeger hängt daran. |
+| `AddPasswordHashing` | **gerufen** | Nur identity-service, über `AlsAussteller()`. BCrypt (ADR-0006). |
+| `AddTokenSessions` | **gerufen** | Nur identity-service. Sitzungen, die ein Widerruf erreichen kann. |
+| `AddAuthorization` | **fehlt, kommt rein** | Bringt den `PermissionPolicyProvider`. Ohne ihn benennt `[RequirePermission]` eine `Permission:`-Richtlinie, die niemand beantwortet, und das Gerüst lehnt **jede** Anfrage an genau die Endpunkte ab, die das Attribut schützen soll. Fällt heute nicht auf, weil wir das Attribut nicht benutzen und Rollen von Hand prüfen — **wir haben ein Berechtigungssystem und benutzen es nicht.** |
+| `AddInputSanitization` | **offen — und der Auftrag irrte** | Registriert `IInputSanitizer`, `IInputValidator`, `IInjectionDetector`: XSS- und Injektionsabwehr am HTTP-Rand. Es hat **nichts** mit der fehlenden Eingabeprüfung in der CQRS-Pipeline zu tun (nächste Zeile). Seine Middleware muss zusätzlich von Hand eingehängt werden; `AddInputSanitizationMiddleware()` ist eine leere Methode. |
+| *(Validierung, kein Modul)* | **läuft schon, hat aber nichts zu tun** | `AddCQRS` hängt `ValidationBehavior` **bereits** in jede Pipeline und ruft **bereits** `AddValidatorsFromAssemblies`. Das Verhalten steigt sofort aus, wenn es keine Validatoren findet — und wir haben **null** `AbstractValidator` geschrieben. Es fehlt also keine Verdrahtung, sondern der Inhalt. Achtung beim Schreiben: `ValidationBehavior` **protokolliert die Fehlermeldungen**, eine Meldung muss deshalb die Regel nennen und nie den Wert. |
+| `AddResilience` | **fehlt, aber nicht allein wirksam** | Registriert nur `ICircuitBreakerFactory` und `IRetryPolicyFactory` — es umhüllt **keinen** HttpClient. Wirksam wird es erst über `AddResilientHttpClient<T>(name, …)` oder über den `ServiceCommunicationManager`, der beide Fabriken optional annimmt. Unsere dreizehn Dienst-zu-Dienst-Aufrufe laufen heute ohne Wiederholung und ohne Zeitlimit. |
+| `AddCommunication` | **fehlt; das Modul nicht, aber sein Kern** | `ServiceCommunicationManager` reicht die Korrelationskennung an jeden ausgehenden Aufruf weiter (Zeile 386), dazu M2M-Token und `X-Request-ID` — und nimmt Wiederholung und Sicherung mit. **Gemessen: `AddServiceCommunication(configuration)` verlangt weder `IEventBus` noch `IDistributedCache`** — die beiden Forderungen stehen nur im Modul `AddCommunication()`. Übrig bleibt ein nicht-nullbarer `IEventBus` im Konstruktor, der an **einer** Stelle benutzt wird (`PublishEventAsync`); kein HTTP-Weg fasst ihn an. `EnableResponseCaching` steht auf `true` und zieht den Cache nach — eine Konfigurationszeile, keine Codeänderung. |
+| `AddDistributedRateLimiting` | **bewusst nicht** | Eine von **drei** Ratenbegrenzungen, und die gemessen kaputte. Alle drei glauben `X-Forwarded-For` bedingungslos, eine Vertrauensliste gibt es in Girder nirgends. Siehe `bugs/ratenbegrenzung-drei-wege-zwei-bremsen-nicht.md`. |
+| `AddCaching` | **bewusst nicht** | HTTP-Antwort-Caching plus `CacheInvalidationService`, und es verlangt einen `IDistributedCacheService`. Eine Einwilligung muss sofort wirken (das gilt, weil es richtig ist, nicht weil ein ADR es sagt) — was zwischengespeichert wird, muss deshalb einzeln entschieden werden, nicht global eingeschaltet. |
+| `AddAuditLogging` | **bewusst nicht** | Registriert `ISecurityAuditLogger`, der ins **Protokoll** schreibt; `AuditBehavior` in der Pipeline wirkt auf `IAuditableCommand`, das wir nicht umsetzen. Unsere Prüfspur ist eine **Tabelle** (`EfPruefspur`) in derselben Transaktion wie die Änderung: sie ist Beleg, Girders ist Telemetrie. Beides kann nebeneinander stehen — nur ersetzt keins das andere. |
+| `AddEncryption` | **bewusst nicht** | Verlangt `IDataEncryptionService` **und** `IMasterKeyProvider` — beide kommen aus `Girder.Redis` oder einem Geheimnisspeicher. Wir verschlüsseln heute auf Feldebene nichts; wer damit anfängt, entscheidet zuerst, wo der Hauptschlüssel liegt, und das ist H2. |
+| `AddSecretManagement` | **offen, gehört zu H2** | Geheimnisverwaltung samt Rotation. Genau die Frage, die H2 stellt — erst `.env` und die Rangfolge, dann entscheiden, ob dieses Modul den Platz von Infisical einnimmt oder daneben steht. |
+| `AddSecurityMonitoring` | **bewusst nicht** | Alarme und Bedrohungssignale, verlangt einen `IDistributedCache`. Ein Alarmweg ohne Empfänger ist ein Protokolleintrag mehr; das lohnt erst, wenn jemand ihn liest. |
+| `AddResourceAuthorization` | **offen, hängt an `AddAuthorization`** | Ressourcen- und Eigentümerprüfungen. Sinnvoll erst, wenn die Richtlinien stehen — sonst prüft es gegen Regeln, die es nicht gibt. |
+
+**Nicht in dieser Tabelle, weil kein Modul:** `AddCQRS` (aus `Girder.Application`) ruft jeder Dienst selbst, und `worker`-eigene Pipeline-Glieder (`TransaktionsBehavior`, identity zusätzlich `VersandBehavior`) hängen daneben.
+
+### Und dieselbe Frage an unseren Eigenbau
+
+| Eigenbau | bleibt? | gemessen |
+|---|---|---|
+| `Bremse.cs` | **ja** | Keine von Girders drei Ratenbegrenzungen kann *je Herkunft statt je Benutzer* und *den Kopf des Aufrufers nicht glauben*. Girders **Zähler** ist gut und wird benutzt. |
+| `Korrelation.cs` (Gateway) | **zu prüfen** | Girders `UseCorrelationId()` tut dasselbe für Dienste. Das Gateway hat keine `ServiceDefaults` — deshalb steht dort eigenes. Ob das Gateway `AddWorkerTransferDefaults` bekommen sollte, ist offen. |
+| `Gesundheit.cs` (Gateway) | **ja** | Ocelot beendet die Kette, ein `MapGet` dahinter läuft nie — gemessen. Girders `AddHealthChecks()` registriert Endpunkte, keine Middleware. |
+| `Navigation.cs` | **ja** | Die `Sec-Fetch-Dest`-Regel hat in Girder keine Entsprechung. |
+| `ProblemDetailsMiddleware` | **zu prüfen** | Girder hat `GlobalExceptionHandlingMiddleware` mit eigener Fehlergestalt. Eine Gestalt über alle Dienste ist der Grund für unsere — zu belegen, dass Girders nicht dasselbe kann. |
+| `Outbox` | **ja** | Girder hat keine. |
+| `Wanderung`, `ZugriffsCookie`, `Skills`, `Contracts.*` | **ja** | Fachlichkeit, kein Nachbau. |
+
+## The route map is a test, not a checklist
 
 [`docs/routenkarte.yml`](docs/routenkarte.yml) records, for every endpoint reachable through the gateway, what it answers in the **three** principals ADR-0017 distinguishes: no token, a person with no company (`tenant_id` null), and someone acting for a company. The middle one is the one people forget — on a transfer market a person without a company is the *normal* case, and the rows where the middle and right columns differ are exactly where ADR-0017 is doing work.
 

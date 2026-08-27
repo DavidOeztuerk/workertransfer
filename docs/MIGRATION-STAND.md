@@ -1003,6 +1003,97 @@ beide **202**, weil die Löschung nicht sofort fertig ist.
 
 ---
 
+## Härtung H1: der Modulabgleich — Messstand
+
+Girders Quelltext liegt unter `~/Projects/Girder` (`v3.0.0-1-gcc147e9`,
+`VersionPrefix 3.0.1` — dieselbe Fassung, die wir konsumieren). Damit ist die
+neue Regel überhaupt erst ausführbar: **nach dem Zweck suchen, nicht nach dem
+Bauteil.**
+
+**Genau gezählt sind es 18 Einstiegspunkte, nicht 17, und wir rufen 7.** Die
+Zahl 7 betrifft *Module*, nicht Dienste: alle elf Dienste rufen
+`AddWorkerTransferDefaults` und bekommen dieselben sieben. Nur das **Gateway**
+ruft es nicht — es hat Ocelot plus vier eigene Zwischenschichten, und genau
+deshalb steht dort `Korrelation.cs` und `Gesundheit.cs` von Hand.
+
+Die Tabelle mit allen achtzehn steht in `CLAUDE.md`.
+
+### Was die Regel sofort eingebracht hat
+
+**Korrelation.** `grep -ril correlation` über Girders `src/` findet **zehn**
+Quelldateien. Die Suche nach einem `DelegatingHandler` hatte **eine** gefunden.
+Girder löst es im `ServiceCommunicationManager`, Zeile 386 — samt M2M-Token und
+`X-Request-ID`.
+
+Zur Frage aus dem Auftrag: **ja, ohne Broker registrierbar.**
+`AddServiceCommunication(configuration)` verlangt weder `IEventBus` noch
+`IDistributedCache` — die beiden `RequiresProvider`-Forderungen stehen nur im
+Modul `AddCommunication()`, nicht in der Erweiterung. Übrig bleibt ein
+nicht-nullbarer `IEventBus` im Konstruktor, benutzt an **einer** Stelle
+(`PublishEventAsync`); kein HTTP-Weg fasst ihn an. `EnableResponseCaching` steht
+auf `true` und zieht den Cache nach — eine Konfigurationszeile.
+
+**Ratenbegrenzung.** Drei Middlewares, nicht eine. Zwei bremsen nicht, die
+dritte bremst und ist nirgends verdrahtet; alle drei glauben `X-Forwarded-For`
+bedingungslos, und eine Vertrauensliste gibt es in Girder nirgends. Acht
+Anfragen gegen eine Grenze von drei kamen durch, nur weil ein Kopf mitgeschickt
+wurde. Ticket neu geschrieben:
+`bugs/ratenbegrenzung-drei-wege-zwei-bremsen-nicht.md`.
+
+**`AddResilience` allein wirkt nicht.** Es registriert nur
+`ICircuitBreakerFactory` und `IRetryPolicyFactory` — es umhüllt keinen
+HttpClient. Wirksam wird es über `AddResilientHttpClient<T>(name, …)` oder über
+den `ServiceCommunicationManager`. Das heißt: **Korrelationsweitergabe und
+Widerstandsfähigkeit sind dieselbe Änderung** — Dienst-zu-Dienst-Aufrufe über
+`IServiceCommunicationManager` führen statt über rohe `HttpClient`.
+
+**`AddInputSanitization` löst das Validierungsproblem nicht.** Es registriert
+`IInputSanitizer`, `IInputValidator`, `IInjectionDetector` — XSS- und
+Injektionsabwehr am HTTP-Rand. Mit der CQRS-Pipeline hat es nichts zu tun. Die
+Annahme im Auftrag stimmt hier nicht, und der Grund ist genau der, den der
+Auftrag selbst nennt: vom Namen geschlossen statt den Quelltext gelesen.
+
+### Die Validierung: die Stufe war nie tot, nur leer
+
+`AddCQRS` hängt `ValidationBehavior` **bereits** in jede Pipeline und ruft
+**bereits** `AddValidatorsFromAssemblies` über unsere Application-Assembly. Das
+Verhalten steigt sofort wieder aus, solange es keinen Validator findet — und wir
+hatten null. Es fehlte also **keine Verdrahtung, sondern der Inhalt.**
+
+Dabei fiel ein latenter Fehler auf: `ValidationBehavior` wirft
+`FluentValidation.ValidationException`, und unser `ProblemDetailsMiddleware`
+fing `Exception` → **500**. Wer den ersten Validator geschrieben hätte, hätte für
+eine falsche Eingabe eine 500 bekommen. Jetzt **422**, und die Antwort nennt
+**nur Feldnamen**: `ErrorMessage` wird bewusst nicht durchgereicht, weil
+FluentValidations Vorgabemeldungen Platzhalter wie `{PropertyValue}` einsetzen —
+das wäre der Wert einer Person in einem Fehlerdokument.
+
+Der erste echte Validator ist `AnmeldenPruefung`. Die Handprüfung aus D2 ist aus
+dem Endpunkt dorthin **gewandert**, nicht dazugekommen: sie gilt jetzt am Befehl
+und damit auch für einen zweiten Aufrufer. Am laufenden Stapel belegt —
+`POST /auth/login` mit `{}` gibt `422` mit `"invalid: Email, Passwort"`, und das
+Protokoll zeigt, dass es aus dem Behavior kommt.
+
+## Härtung H3: zwei von drei zu
+
+**Kaputter JSON-Rumpf gibt jetzt 400 statt 500**, an jedem Endpunkt jedes
+Dienstes. `BadHttpRequestException` trägt den richtigen Abbruchcode selbst; er
+wird übernommen statt hier erfunden. Die Meldung wird **nicht** durchgereicht —
+sie nennt Parameter und Byteposition, und das ist schon eine Aussage über das,
+was jemand geschickt hat. Gemessen an drei Diensten: `400` mit
+`"malformed request body"`.
+
+**Validatoren** — siehe oben, erledigt.
+
+**`GET /notifications` gibt weiter 405.** Offen.
+
+Fünf Tests in `WorkerTransfer.Ganzes.Tests/FehlergestaltTests.cs`, beide Zweige
+gegengeprobt: Meldungen doch durchgereicht → zwei Tests fallen;
+400-Zweig entfernt → einer fällt. Danach zurückgenommen und
+`--no-incremental` gebaut.
+
+---
+
 ## Was beim Weiterarbeiten immer gilt
 
 - **Bauen und Testen in getrennten Aufrufen.** Verkettet scheitern die
