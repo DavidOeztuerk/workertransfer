@@ -19,6 +19,16 @@ public sealed class Entwurfseinstellungen
     /// <summary>Die Adresse des Anbieters.</summary>
     public string Adresse { get; set; } = "https://api.anthropic.com/v1/messages";
 
+    /// <summary>Wie lange auf eine Antwort gewartet wird.</summary>
+    /// <remarks>
+    /// Dreissig und nicht fuenf Sekunden: am anderen Ende steht ein
+    /// Sprachmodell, und ein Entwurf braucht laenger als eine Abfrage. Aber
+    /// eben nicht unbegrenzt — ohne diese Zeile gilt die Vorgabe von
+    /// <c>HttpClient</c> mit HUNDERT Sekunden, und so lange soll niemand
+    /// vor einem Formular sitzen.
+    /// </remarks>
+    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(30);
+
     /// <summary>Welches Modell.</summary>
     public string Modell { get; set; } = "claude-haiku-4-5-20251001";
 }
@@ -54,6 +64,8 @@ public sealed class HttpEntwerfer(
         }
 
         using var client = fabrik.CreateClient(nameof(HttpEntwerfer));
+
+        client.Timeout = _einstellungen.Zeitueberschreitung;
 
         using var anfrage = new HttpRequestMessage(HttpMethod.Post, _einstellungen.Adresse)
         {

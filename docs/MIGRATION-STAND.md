@@ -1074,6 +1074,64 @@ und damit auch für einen zweiten Aufrufer. Am laufenden Stapel belegt —
 `POST /auth/login` mit `{}` gibt `422` mit `"invalid: Email, Passwort"`, und das
 Protokoll zeigt, dass es aus dem Behavior kommt.
 
+## Härtung H1: der Umstieg auf `IServiceCommunicationManager` fällt aus — gemessen
+
+Der Plan war, die dreizehn Dienst-zu-Dienst-Aufrufe darüber zu führen und damit
+**Korrelationsweitergabe und Widerstandsfähigkeit in einem Zug** zu erledigen.
+Registrierbar ist er auch ohne Broker — das war die Frage aus dem Auftrag, und
+die Antwort ist ja. **Benutzbar ist er trotzdem nicht.**
+
+`GetAsync` und `SendRequestAsync` machen aus **jedem** Nicht-2xx ein `null`:
+
+```csharp
+var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+_logger.LogWarning("Request to {ServiceName} failed with status {StatusCode}: {Error}", ...);
+return default;
+```
+
+Das trifft zwei tragende Stellen:
+
+- **Die Löschkaskade.** Ein Empfänger, der mit `500` antwortet, käme als `null`
+  zurück — nicht unterscheidbar von einer erfolgreichen leeren Antwort.
+  `delivered_at` wäre eine Lüge und der Vollständigkeitsbeweis falsch. Genau
+  dafür gibt es die Regel in ADR-0027.
+- **Das Einwilligungstor.** `404` (kein Zugriff) und `503` (der Ledger
+  schweigt) kämen beide als `null` an. Das eine ist eine Antwort, das andere
+  ausdrücklich keine.
+
+Derselbe Denkfehler steckt in `ResilientHttpPolicyHandler`: er macht aus jedem
+Nicht-2xx eine **Ausnahme** und wiederholt sie dreimal. Ein `404` würde also
+dreimal nachgefragt und käme als `HttpRequestException` an.
+
+Ticket: `bugs/statuscodes-werden-als-stoerung-behandelt.md`. Der Kern in einem
+Satz: **ein Statuscode ist hier eine Aussage, keine Störung.**
+
+### Und wieder eine Annahme des Auftrags, die die Messung korrigiert
+
+„Dreizehn Aufrufe ohne Wiederholung **und Zeitlimit**" — das Zeitlimit stimmte
+nicht. Gemessen sind es **fünfzehn** Aufrufstellen, und **acht** setzten schon
+eines. Die anderen **sieben** liefen in die Vorgabe von `HttpClient`:
+**hundert Sekunden**. Das liest sich wie ein Zeitlimit und ist in einem
+Dienst-zu-Dienst-Aufruf keins.
+
+Die auffälligste davon war das **Einwilligungstor von portfolio-service** —
+während *alle anderen* Einwilligungstore eines hatten. Kein Entwurf, ein
+Vergessen.
+
+Alle sieben sind nachgezogen, und nicht mit einer Zahl für alle: fünf Sekunden
+für Dienst-zu-Dienst, **dreißig** für die zwei Entwürfe über die KI-Naht (am
+anderen Ende steht ein Sprachmodell), fünf für die Löschzustellung — dort kostet
+Kürze nichts, weil eine Zeitüberschreitung ein Fehlschlag ist und die
+Outbox-Zeile stehen lässt.
+
+`ZeitlimitTests` hält beides fest: jede Aufrufstelle setzt eines, und keines
+liegt über einer Minute. Gegengeprobt am portfolio-Tor — Zeile entfernt, Test
+fällt.
+
+**Wiederholung wird bewusst nicht pauschal eingebaut.** Sie gehört zur
+Aufrufstelle: was idempotent ist, darf wiederholt werden, und `4xx` wird durch
+Wiederholen nie besser.
+
 ## Härtung H1: `AddAuthorization` ist verdrahtet
 
 `identity-service` ruft es jetzt, und die zwei handgeprüften Verwaltungsrechte

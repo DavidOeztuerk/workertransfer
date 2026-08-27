@@ -14,6 +14,15 @@ public sealed class Benachrichtigungseinstellungen
     /// <summary>Die Basisadresse des notification-service.</summary>
     public string Adresse { get; set; } = string.Empty;
 
+    /// <summary>Wie lange auf eine Antwort gewartet wird.</summary>
+    /// <remarks>
+    /// Fuenf Sekunden, wie bei jedem anderen Dienst-zu-Dienst-Aufruf hier.
+    /// OHNE diese Zeile gilt die Vorgabe von <c>HttpClient</c>: HUNDERT
+    /// Sekunden. Das ist kein Zeitlimit, das ist ein haengender Aufruf mit
+    /// einem Ende irgendwann — und er haengt den Aufrufer mit.
+    /// </remarks>
+    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
+
     /// <summary>Das gemeinsame Geheimnis. Ausdrücklich nicht das der Löschung.</summary>
     /// <remarks>
     /// Leer heißt: es wird nichts zugestellt — und zwar als <em>Fehlschlag</em>,
@@ -51,6 +60,8 @@ public sealed class HttpBenachrichtigung(
         }
 
         using var client = fabrik.CreateClient(nameof(HttpBenachrichtigung));
+
+        client.Timeout = _einstellungen.Zeitueberschreitung;
         using var anfrage = new HttpRequestMessage(
             HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), "/notifications"))
         {

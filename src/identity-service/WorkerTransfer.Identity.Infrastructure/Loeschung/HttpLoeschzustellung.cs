@@ -143,6 +143,8 @@ public sealed class HttpLoeschzustellung(
         }
 
         using var client = fabrik.CreateClient(nameof(HttpLoeschzustellung));
+
+        client.Timeout = _einstellungen.Zeitueberschreitung;
         using var anfrage = new HttpRequestMessage(
             HttpMethod.Post, new Uri(new Uri(basis), pfad))
         {
