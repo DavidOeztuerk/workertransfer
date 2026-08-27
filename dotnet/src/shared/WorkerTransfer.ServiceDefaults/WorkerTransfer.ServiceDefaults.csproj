@@ -12,6 +12,12 @@
 
   <ItemGroup>
     <PackageReference Include="Girder.Infrastructure" />
+    <!--
+      Nur fuer `Wanderung`: jeder der zehn Dienste besitzt ein eigenes Schema
+      und wandert es selbst. Relational, nicht Npgsql — welche Datenbank es
+      ist, entscheidet der Dienst.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
   </ItemGroup>
 
   <ItemGroup>

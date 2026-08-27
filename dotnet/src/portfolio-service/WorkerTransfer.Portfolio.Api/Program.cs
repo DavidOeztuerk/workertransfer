@@ -1,5 +1,6 @@
 using WorkerTransfer.Portfolio.Api;
 using WorkerTransfer.Portfolio.Infrastructure;
+using WorkerTransfer.Portfolio.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,9 @@ builder.Services.AddPortfolioInfrastructure(
     ?? throw new InvalidOperationException("ConnectionStrings:portfolio ist nicht gesetzt."));
 
 var app = builder.Build();
+
+// Erst wandern, dann bedienen (ADR-0010).
+await app.WandereAsync<PortfolioDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, dienstname);
 

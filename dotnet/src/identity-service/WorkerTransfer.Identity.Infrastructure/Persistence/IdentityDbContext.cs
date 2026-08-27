@@ -71,9 +71,11 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
         modelBuilder.Entity<UserRow>(entity =>
         {
-            // Alembic owns this table until the Python service is gone; a
-            // migration generated here would try to create it.
-            entity.ToTable("users", t => t.ExcludeFromMigrations());
+            // Bis zur Migration besass Alembic diese Tabelle; die Abbildung trug
+            // dafuer `ExcludeFromMigrations()`. Mit dem Python-Dienst faellt die
+            // Ausnahme weg: dieser Dienst legt sein Schema jetzt selbst an, wie
+            // die anderen zehn auch.
+            entity.ToTable("users");
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id");
             entity.Property(row => row.Email).HasColumnName("email").HasColumnType("citext");
@@ -89,7 +91,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
         modelBuilder.Entity<AuditEventRow>(entity =>
         {
-            entity.ToTable("audit_events", t => t.ExcludeFromMigrations());
+            entity.ToTable("audit_events");
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id");
             entity.Property(row => row.ActorId).HasColumnName("actor_id");
@@ -105,7 +107,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
         modelBuilder.Entity<MembershipRow>(entity =>
         {
-            entity.ToTable("user_tenant_memberships", t => t.ExcludeFromMigrations());
+            entity.ToTable("user_tenant_memberships");
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id");
             entity.Property(row => row.UserId).HasColumnName("user_id");
@@ -121,7 +123,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
         modelBuilder.Entity<TenantRow>(entity =>
         {
-            entity.ToTable("tenants", t => t.ExcludeFromMigrations());
+            entity.ToTable("tenants");
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id");
             entity.Property(row => row.Name).HasColumnName("name");
@@ -132,7 +134,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
         modelBuilder.Entity<VerificationTokenRow>(entity =>
         {
-            entity.ToTable("email_verification_tokens", t => t.ExcludeFromMigrations());
+            entity.ToTable("email_verification_tokens");
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id");
             entity.Property(row => row.UserId).HasColumnName("user_id");
@@ -151,7 +153,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
         modelBuilder.Entity<InvitationRow>(entity =>
         {
-            entity.ToTable("company_invitations", t => t.ExcludeFromMigrations());
+            entity.ToTable("company_invitations");
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id");
             entity.Property(row => row.TenantId).HasColumnName("tenant_id");

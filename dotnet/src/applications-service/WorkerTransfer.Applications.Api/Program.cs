@@ -1,5 +1,6 @@
 using WorkerTransfer.Applications.Api;
 using WorkerTransfer.Applications.Infrastructure;
+using WorkerTransfer.Applications.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,9 @@ builder.Services.AddApplicationsInfrastructure(
     ?? throw new InvalidOperationException("ConnectionStrings:applications is not configured."));
 
 var app = builder.Build();
+
+// Erst wandern, dann bedienen (ADR-0010).
+await app.WandereAsync<ApplicationsDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 

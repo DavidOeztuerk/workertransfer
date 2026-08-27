@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-27, nach dem **Gateway** — Phase C, Schritt 1 von 6.
+**Zuletzt fortgeschrieben:** 2026-08-27, nach **Compose** — Phase C, Schritt 2 halb.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -19,7 +19,7 @@ was davon getan ist.
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
 | **Phase B — die Dienste** | **fertig**, 10 von 10 |
-| **Phase C — Zusammenbau** | **1 von 6**: Gateway steht |
+| **Phase C — Zusammenbau** | Gateway steht, **Compose läuft**; offen: Helm |
 | **Prüfer** | nicht begonnen |
 | **Tests** | 603 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
@@ -405,7 +405,7 @@ Vier weitere Entscheidungen tragen:
 In dieser Reihenfolge:
 
 1. ~~Gateway mit Ocelot~~ — **fertig**, siehe unten.
-2. Compose und Helm auf die .NET-Dienste.
+2. ~~Compose~~ — **fertig, gemessen**. Offen: Helm.
 3. Python restlos entfernen, danach `dotnet/` flach in die Wurzel — als eigener
    Commit, damit die Umbenennungen lesbar bleiben.
 4. Übergangsgerüst löschen: Ü-1 bis Ü-7 in
@@ -458,6 +458,52 @@ gemeinsame Kennung erfindet jeder Dienst seine eigene.
 
 **Die Ports:** identity 8001 … transfer 8009, notification **8010**, github
 **8011**, Oberfläche 5173, Gateway 8090.
+
+---
+
+## Phase C, Schritt 2: Compose läuft
+
+`docker compose up` bringt Postgres, Mailpit, **elf Dienste**, das Gateway und
+die Oberfläche hoch. Belegt, nicht behauptet: alle zwölf Häfen antworten mit
+200, und eine echte Reise trägt durch das Gateway —
+`register → Mail → verify → login → /me → /profiles/me → /market/me →
+/notifications/me`, sieben Dienste in einer Kette über **einen** Ursprung.
+
+**Ein Bild für alle elf** (`docker/dotnet-service.Dockerfile`): der
+Einstiegspunkt liest `SERVICE_DIR` aus der Umgebung, `dotnet publish` legt jeden
+Einstieg in sein eigenes Verzeichnis. Welche DLL zu starten ist, findet der
+Einstiegspunkt über die einzige `*.runtimeconfig.json` im Verzeichnis — das
+erspart eine Tabelle, die beim nächsten Dienst zu pflegen wäre.
+
+**Der Bau braucht ein Geheimnis.** Girder liegt in GitHub Packages; die
+NuGet-Konfiguration des Nutzers kommt als BuildKit-Geheimnis herein und wird nie
+eine Schicht.
+
+### Vier Dinge, die erst beim Laufen sichtbar wurden
+
+1. **`identity-service` konnte sein Schema nicht anlegen.** Sein Grundschema —
+   neun Tabellen, zwei Aufzählungen, `citext` — lag in acht Alembic-Wanderungen
+   im Python-Baum; die .NET-Abbildung trug `ExcludeFromMigrations()` auf sechs
+   Tabellen. Mit dem Umzug fällt die Ausnahme: eine EF-Wanderung `Grundschema`
+   legt jetzt alles an, wie bei den zehn anderen. Die Testvorrichtung fährt
+   nicht mehr `uv run alembic`, und `SpaltenetikettenTests` prüft die
+   Etikettenmenge jetzt gegen die EF-Anmerkung statt gegen den Guard.
+2. **Der Einstiegspunkt ließ jeden Dienst aus `/app` laufen** — damit las
+   *keiner* seine eigene `appsettings.json`, und das Gateway starb an seiner
+   fehlenden `ocelot.json`. Die Inhaltswurzel von ASP.NET ist das
+   Arbeitsverzeichnis; der Einstiegspunkt wechselt jetzt hinein.
+3. **`pg_isready` lügt.** Während initdb läuft, hört Postgres nur lokal, die
+   Probe meldet trotzdem bereit, und die Dienste bekamen „connection refused".
+   Die Probe fragt jetzt über TCP — *und* `Wanderung` wartet zusätzlich, weil es
+   in Kubernetes gar kein `depends_on` gibt.
+4. **Meine erste Wiederholung fing jede Ausnahme.** Damit wurde ein
+   Schemafehler zu einer Minute Warten mit einer irreführenden letzten Meldung
+   („Typ existiert bereits" — angelegt vom ersten Versuch, dessen Ursache
+   niemand mehr sah). Sie wiederholt jetzt nur bei `DbException.IsTransient`
+   oder einem `SocketException` in der Kette.
+
+Dazu: Vite weist seit 6.x fremde Hosts ab, und Ocelot schickt den Host des
+Ziels — `allowedHosts: ["web"]`, nur dieser eine Name.
 
 ---
 

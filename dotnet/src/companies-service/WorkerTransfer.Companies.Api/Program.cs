@@ -1,5 +1,6 @@
 using WorkerTransfer.Companies.Api;
 using WorkerTransfer.Companies.Infrastructure;
+using WorkerTransfer.Companies.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,9 @@ builder.Services.AddCompaniesInfrastructure(
     ?? throw new InvalidOperationException("ConnectionStrings:companies is not configured."));
 
 var app = builder.Build();
+
+// Erst wandern, dann bedienen (ADR-0010).
+await app.WandereAsync<CompaniesDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 

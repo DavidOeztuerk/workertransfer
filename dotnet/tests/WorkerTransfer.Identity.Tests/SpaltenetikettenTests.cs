@@ -7,20 +7,27 @@ using WorkerTransfer.Identity.Domain.Users;
 namespace WorkerTransfer.Identity.Tests;
 
 /// <summary>
-/// The exact set of labels behind each Postgres enum this service writes.
+/// Die genaue Etikettenmenge hinter jeder Postgres-Aufzaehlung, die dieser
+/// Dienst schreibt.
 /// </summary>
 /// <remarks>
-/// The migration creates a type only when no type of that name is there. That
-/// guard is right — it holds in both worlds and needs no memory of which one it
-/// is in — but it asks about the name and not about the contents. A database
-/// whose labels differ from what this service writes passes the guard and fails
-/// on the first insert, which for <c>invitation_withdrawn</c> may be the first
-/// invitation ever withdrawn, months later.
+/// Solange Alembic das Schema besass, legte eine handgeschriebene Wanderung den
+/// Typ unter einem Guard an, und dieser Test las dessen SQL. Seit dem Umzug
+/// erzeugt EF die Typen selbst — aus der Anmerkung <c>Npgsql:Enum:&lt;typ&gt;</c>
+/// in der Wanderung. Geprueft wird dasselbe wie vorher: <em>welche</em>
+/// Etiketten entstehen.
 /// <para>
-/// So each set is pinned three ways: written out, against the real column, and
-/// against the guard's own SQL. The labels are also a contract with rows Python
-/// already wrote — a rule that derives them today derives something else the
-/// day a member is renamed, silently and only for new rows.
+/// Jede Menge wird dreifach festgenagelt: ausgeschrieben, gegen die echte
+/// Spalte und gegen die Wanderung. Ein Etikett, das dieser Dienst kennt und die
+/// Spalte nicht, ist ein Einfuegen, das scheitert — bei
+/// <c>invitation_withdrawn</c> vielleicht erst bei der ersten je
+/// zurueckgenommenen Einladung, Monate spaeter.
+/// </para>
+/// <para>
+/// Die REIHENFOLGE in der Aufzaehlung ist jetzt EFs (alphabetisch) statt der
+/// des Python-Dienstes. Das ist harmlos, und zwar nachgesehen: keine Abfrage
+/// sortiert nach <c>status</c> oder <c>action</c>. Wer je eine schreibt, muss
+/// hierhin zurueck.
 /// </para>
 /// </remarks>
 [Collection(PostgresCollection.Name)]
@@ -96,13 +103,16 @@ public class SpaltenetikettenTests(Postgres postgres)
     }
 
     /// <summary>
-    /// And against the guard, which is what creates the type once the Python
-    /// service is gone. A guard that creates a different set than the one this
-    /// suite pins would simply move the failure to the first fresh database.
+    /// Und gegen die Wanderung, die den Typ auf einer frischen Datenbank
+    /// anlegt.
     /// </summary>
+    /// <remarks>
+    /// Eine Wanderung, die eine andere Menge anlegt als die hier festgenagelte,
+    /// verschoebe den Fehlschlag nur auf die erste frische Datenbank.
+    /// </remarks>
     [Theory]
     [MemberData(nameof(Aufzaehlungen))]
-    public void Ein_Guard_in_den_Migrationen_legt_genau_diese_Etiketten_an(
+    public void Die_Wanderung_legt_genau_diese_Etiketten_an(
         string typ, string[] etiketten, int mitglieder)
     {
         mitglieder.Should().BePositive();
@@ -112,21 +122,17 @@ public class SpaltenetikettenTests(Postgres postgres)
             "dotnet", "src", "identity-service",
             "WorkerTransfer.Identity.Infrastructure", "Persistence", "Migrations");
 
-        var block = Directory.EnumerateFiles(ordner, "*.cs")
+        var anmerkung = Directory.EnumerateFiles(ordner, "*.cs")
+            .Where(pfad => !pfad.EndsWith("ModelSnapshot.cs", StringComparison.Ordinal))
             .Select(File.ReadAllText)
             .Select(text => Regex.Match(
-                text, $@"CREATE TYPE {typ} AS ENUM \((?<werte>[^)]*)\)",
+                text, $@"""Npgsql:Enum:{typ}"", ""(?<werte>[^""]*)""",
                 RegexOptions.None, TimeSpan.FromSeconds(5)))
             .SingleOrDefault(treffer => treffer.Success);
 
-        block.Should().NotBeNull($"genau eine Migration muss {typ} noch anlegen können");
+        anmerkung.Should().NotBeNull($"genau eine Wanderung muss {typ} anlegen");
 
-        var gefunden = Regex.Matches(
-                block!.Groups["werte"].Value, "'(?<name>[a-z_]+)'",
-                RegexOptions.None, TimeSpan.FromSeconds(5))
-            .Select(treffer => treffer.Groups["name"].Value)
-            .ToArray();
-
-        gefunden.Should().Equal(etiketten);
+        anmerkung!.Groups["werte"].Value.Split(',')
+            .Should().BeEquivalentTo(etiketten);
     }
 }

@@ -1,6 +1,7 @@
 using Girder.Infrastructure.Builder.Modules;
 using WorkerTransfer.Identity.Api;
 using WorkerTransfer.Identity.Infrastructure;
+using WorkerTransfer.Identity.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +20,9 @@ builder.Services.AddIdentityInfrastructure(
     ?? throw new InvalidOperationException("ConnectionStrings:identity is not configured."));
 
 var app = builder.Build();
+
+// Erst wandern, dann bedienen (ADR-0010).
+await app.WandereAsync<IdentityDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 

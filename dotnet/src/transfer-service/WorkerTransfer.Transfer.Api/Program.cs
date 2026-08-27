@@ -1,6 +1,7 @@
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.Transfer.Api;
 using WorkerTransfer.Transfer.Infrastructure;
+using WorkerTransfer.Transfer.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 const string serviceName = "transfer-service";
@@ -15,6 +16,9 @@ builder.Services.AddTransferInfrastructure(
     ?? throw new InvalidOperationException("ConnectionStrings:transfer is not configured."));
 
 var app = builder.Build();
+
+// Erst wandern, dann bedienen (ADR-0010).
+await app.WandereAsync<TransferDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 

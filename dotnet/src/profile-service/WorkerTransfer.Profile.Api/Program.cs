@@ -1,5 +1,6 @@
 using WorkerTransfer.Profile.Api;
 using WorkerTransfer.Profile.Infrastructure;
+using WorkerTransfer.Profile.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +19,9 @@ builder.Services.AddProfileInfrastructure(
     ?? throw new InvalidOperationException("ConnectionStrings:profile ist nicht gesetzt."));
 
 var app = builder.Build();
+
+// Erst wandern, dann bedienen (ADR-0010).
+await app.WandereAsync<ProfileDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, dienstname);
 

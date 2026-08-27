@@ -1,5 +1,6 @@
 using WorkerTransfer.Notification.Api;
 using WorkerTransfer.Notification.Infrastructure;
+using WorkerTransfer.Notification.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,9 @@ builder.Services.AddNotificationInfrastructure(
     ?? throw new InvalidOperationException("ConnectionStrings:notification is not configured."));
 
 var app = builder.Build();
+
+// Erst wandern, dann bedienen (ADR-0010).
+await app.WandereAsync<NotificationDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 

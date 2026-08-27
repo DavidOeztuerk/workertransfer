@@ -1,5 +1,6 @@
 using WorkerTransfer.GitHub.Api;
 using WorkerTransfer.GitHub.Infrastructure;
+using WorkerTransfer.GitHub.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,9 @@ builder.Services.AddGitHubInfrastructure(
     ?? throw new InvalidOperationException("ConnectionStrings:github is not configured."));
 
 var app = builder.Build();
+
+// Erst wandern, dann bedienen (ADR-0010).
+await app.WandereAsync<GitHubDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
