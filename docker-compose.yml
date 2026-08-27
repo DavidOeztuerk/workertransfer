@@ -46,6 +46,28 @@ x-dienst: &dienst
   depends_on:
     postgres:
       condition: service_healthy
+  # EINE Probe fuer alle zwoelf, und sie fragt das, was zaehlt: /health/live,
+  # dieselbe Adresse, die auch Kubernetes abfragt.
+  #
+  # Der Hafen kommt aus ASPNETCORE_URLS, damit er nicht ein zweites Mal
+  # dasteht — eine zweite Liste von Haefen geht beim ersten neuen Dienst
+  # auseinander. `$$` schuetzt die Ersetzung vor Compose, `##*:` schneidet in
+  # dash alles bis zum letzten Doppelpunkt ab.
+  #
+  # Hier stand `dotnet --version`. Das kann auf einem LAUFZEITBILD nie
+  # gelingen (kein SDK, Abbruchcode 155) — jeder Dienst meldete `unhealthy`,
+  # waehrend er tadellos antwortete. Eine Probe, die immer rot ist, ist
+  # schlimmer als keine: nach der zweiten Woche liest sie niemand mehr.
+  healthcheck:
+    test:
+      - CMD-SHELL
+      - curl -fsS "http://127.0.0.1:$${ASPNETCORE_URLS##*:}/health/live" > /dev/null || exit 1
+    interval: 10s
+    timeout: 5s
+    retries: 12
+    # Wandern kostet Zeit, und der erste Start wartet zusaetzlich auf eine
+    # erreichbare Datenbank.
+    start_period: 60s
 
 x-umgebung: &umgebung
   ASPNETCORE_ENVIRONMENT: Development
@@ -132,15 +154,6 @@ services:
         condition: service_healthy
     ports:
       - "8001:8001"
-    healthcheck:
-      test:
-        - CMD
-        - dotnet
-        - --version
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
 
   consent-service:
     <<: *dienst
@@ -152,15 +165,6 @@ services:
       ConnectionStrings__consent: Host=postgres;Port=5432;Database=consent;Username=worker;Password=worker
     ports:
       - "8002:8002"
-    healthcheck:
-      test:
-        - CMD
-        - dotnet
-        - --version
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
 
   profile-service:
     <<: *dienst
@@ -173,15 +177,6 @@ services:
       Consent__Adresse: http://consent-service:8002
     ports:
       - "8003:8003"
-    healthcheck:
-      test:
-        - CMD
-        - dotnet
-        - --version
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
 
   resume-service:
     <<: *dienst
@@ -196,15 +191,6 @@ services:
       Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:-local-notify-secret}
     ports:
       - "8004:8004"
-    healthcheck:
-      test:
-        - CMD
-        - dotnet
-        - --version
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
 
   portfolio-service:
     <<: *dienst
@@ -220,15 +206,6 @@ services:
       - portfolio-data:/var/lib/workertransfer/portfolio
     ports:
       - "8005:8005"
-    healthcheck:
-      test:
-        - CMD
-        - dotnet
-        - --version
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
 
   jobs-service:
     <<: *dienst
@@ -240,15 +217,6 @@ services:
       ConnectionStrings__jobs: Host=postgres;Port=5432;Database=jobs;Username=worker;Password=worker
     ports:
       - "8006:8006"
-    healthcheck:
-      test:
-        - CMD
-        - dotnet
-        - --version
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
 
   applications-service:
     <<: *dienst
@@ -264,15 +232,6 @@ services:
       Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:-local-notify-secret}
     ports:
       - "8007:8007"
-    healthcheck:
-      test:
-        - CMD
-        - dotnet
-        - --version
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
 
   companies-service:
     <<: *dienst
@@ -286,15 +245,6 @@ services:
       ConnectionStrings__companies: Host=postgres;Port=5432;Database=companies;Username=worker;Password=worker
     ports:
       - "8008:8008"
-    healthcheck:
-      test:
-        - CMD
-        - dotnet
-        - --version
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
 
   transfer-service:
     <<: *dienst
@@ -309,15 +259,6 @@ services:
       Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:-local-notify-secret}
     ports:
       - "8009:8009"
-    healthcheck:
-      test:
-        - CMD
-        - dotnet
-        - --version
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
 
   notification-service:
     <<: *dienst
@@ -331,15 +272,6 @@ services:
       Identity__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:-local-notify-secret}
     ports:
       - "8010:8010"
-    healthcheck:
-      test:
-        - CMD
-        - dotnet
-        - --version
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
 
   github-service:
     <<: *dienst
@@ -353,15 +285,6 @@ services:
       GitHub__Token: ${WORKERTRANSFER_GITHUB_TOKEN:-}
     ports:
       - "8011:8011"
-    healthcheck:
-      test:
-        - CMD
-        - dotnet
-        - --version
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
   gateway:
     <<: *dienst
     container_name: workertransfer-gateway

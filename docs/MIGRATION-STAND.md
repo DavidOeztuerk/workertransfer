@@ -596,6 +596,96 @@ Ein gelöschter Test hätte die Rückkehr von `tenant_id` niemand mehr gemeldet.
 
 ---
 
+## Phase C, Schritt 5: eine CI, die Bilder baut
+
+`.github/workflows/ci.yml` ist neu geschrieben. Vier Jobs statt drei:
+
+| Job | fragt |
+|---|---|
+| `backend-quality` | `dotnet restore` → `build` → `./scripts/test-dotnet.sh` (bauen und testen in **getrennten** Schritten, Reihen einzeln) |
+| `frontend-quality` | `pnpm check` · `test` · **`build`** |
+| `images` | **baut beide ausgelieferten Bilder und fährt den ganzen Stapel hoch** |
+| `dependency-audit` | `dotnet list package --vulnerable` und `pnpm audit --prod` |
+
+Der dritte ist der neue. Bis hierher hat die CI nie einen Behälter gebaut —
+genau so kam der Dependabot-Sprung auf node 25 durch und zerlegte das
+Oberflächenbild. Er baut das Dienstbild (eins für alle zwölf, ADR-0028) und das
+Oberflächenbild, fährt dann `docker compose up --wait` über alles außer `web`
+und fragt zweimal durch das Gateway: lesend `/jobs`, schreibend
+`POST /auth/register`. Erst das Schreiben belegt, dass die Wanderungen liefen —
+der Lesepfad antwortet auch auf einer leeren Datenbank.
+
+### Drei Dinge kamen beim Messen heraus, nicht beim Nachdenken
+
+**1. Jeder Dienst meldete `unhealthy`, seit es die Compose-Datei gibt.**
+Die Probe stand als `dotnet --version` in elf Blöcken — und das kann auf einem
+**Laufzeitbild** nie gelingen: kein SDK, Abbruchcode 155, „No .NET SDKs were
+found". Die Dienste antworteten die ganze Zeit tadellos (`/health/live` → 200),
+aber `docker compose ps` zeigte eine Wand aus `unhealthy`. Eine Probe, die immer
+rot ist, ist schlimmer als keine: nach der zweiten Woche liest sie niemand mehr.
+
+Jetzt fragt **eine** Probe im Anker `x-dienst` — für alle elf **und** das
+Gateway — nach `/health/live`, derselben Adresse, die auch Kubernetes abfragt.
+Der Hafen kommt aus `ASPNETCORE_URLS` (`$${ASPNETCORE_URLS##*:}`), damit keine
+zweite Liste von Häfen entsteht, die beim ersten neuen Dienst auseinandergeht.
+Dafür liegt jetzt **curl im Laufzeitbild**: Docker fragt von *innen*, und das
+Bild hatte weder curl noch wget noch nc, `sh` ist dash und kann kein
+`/dev/tcp`. Kubernetes braucht das nicht — dort fragt das Kubelet selbst über
+HTTP; die zwei Megabyte zahlt nur Compose.
+
+**2. Das Gateway hatte gar keine Probe.** Es erbt sie jetzt aus demselben
+Anker. Der Eingang war der einzige Behälter ohne Gesundheitsfrage.
+
+**3. `GET /jobs` ist 401, nicht 200 — und `scripts/k8s-up.sh` behauptete 200.**
+Eine Stellenliste steht hinter der Anmeldung, so ist der Dienst gebaut
+(`StellenEndpoints`: `akteur.Current is null` → `NichtAngemeldet`). Das Skript
+wäre bei seinem ersten Lauf an dieser Zeile gescheitert — es ist nie gelaufen
+(siehe unten). Beide Stellen prüfen jetzt dasselbe: **401 und ein
+RFC-9457-Dokument mit `correlationId`**. Der Beleg fürs Routen ist die Antwort,
+nicht ihr Erfolg — so ein Dokument kann nur jobs-service geschrieben haben, eine
+fehlende Route wäre ein leerer 404 vom Gateway und ein toter Dienst ein 502.
+
+### Ein Entwurf, der verworfen wurde, weil die Gegenprobe ihn widerlegt hat
+
+Der erste Entwurf des Bildjobs startete jeden der zwölf Dienste und fragte nach
+drei Sekunden `docker inspect .State.Running`. Die Gegenprobe: dem Gateway seine
+`ocelot.json` wegnehmen (`-v /dev/null:/app/gateway/ocelot.json`). Ergebnis —
+der Dienst wirft eine unbehandelte Ausnahme direkt in `Program.Main`, **und der
+Behälter läuft trotzdem weiter**, mit 99 % auf einem Kern, nach 45 Sekunden noch
+`Running=true`. Die Prüfung war also grün über einem Dienst, der nichts als
+einen Stacktrace produziert hat.
+
+Deshalb steht dort jetzt `docker compose up --wait`: das wartet auf die
+*Gesundheitsprobe* jedes Behälters statt auf seine bloße Anwesenheit.
+Gegengeprobt: jobs-service eine unerreichbare Datenbank gegeben, `--wait` fällt
+mit Abbruchcode 1 und „application not healthy after 45s".
+
+### Was gemessen ist und was nicht
+
+Lokal gefahren und grün: `make images` (beide Bilder), `docker compose up -d
+--wait` über alle vierzehn Behälter (**alle healthy**, Abbruchcode 0),
+`GET /jobs` → 401 mit `correlationId`, `POST /auth/register` → 201,
+`docker compose config --quiet`, `make k8s-lint`, `pnpm audit --prod` (keine
+Funde), `dotnet list package --vulnerable` (77 Projekte, keine Funde).
+
+Die Auswertung des Paketscans ist gegen vier Fälle geprobt — echte Ausgabe
+(grün), eingeschmuggelter Fund (rot), abgeschnittene Ausgabe (rot), *deutsche*
+Ausgabe (rot). Der letzte Fall ist der Grund für `DOTNET_CLI_UI_LANGUAGE: en`:
+lokal antwortet dasselbe Kommando deutsch, auf dem Läufer englisch, und ein
+grep auf einen der beiden Sätze wäre in der jeweils anderen Umgebung still
+immer wahr.
+
+**Nicht gemessen: der Arbeitsablauf selbst.** Er ist nie auf GitHub gelaufen —
+geprüft sind seine einzelnen Kommandos hier auf dieser Maschine, die YAML-Datei
+parst, mehr nicht. Ob `azure/setup-helm`, die Versionen der Actions und der
+GHA-Cache greifen, sagt erst der erste Lauf.
+
+**Ebenfalls weiterhin nicht gemessen: `make k8s-up`.** Das Chart lintet und
+rendert; ausgerollt wurde es nie. Diese Maschine verträgt fünfzehn Pods nicht
+neben einer Testreihe.
+
+---
+
 ## Was beim Weiterarbeiten immer gilt
 
 - **Bauen und Testen in getrennten Aufrufen.** Verkettet scheitern die

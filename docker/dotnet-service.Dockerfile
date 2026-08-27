@@ -54,6 +54,24 @@ RUN set -eu; \
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS laufzeit
 
+# curl gehoert ins Laufzeitbild, und zwar aus EINEM Grund: der Behaelter muss
+# seine eigene Gesundheitsprobe beantworten koennen.
+#
+# Docker fragt von INNEN — `healthcheck:` in docker-compose.yml laeuft im
+# Behaelter. Das Laufzeitbild bringt aber weder curl noch wget noch nc mit, und
+# `sh` ist dash, kann also auch kein /dev/tcp. Ohne dieses Paket hat die Probe
+# nichts, womit sie fragen koennte; dort stand deshalb `dotnet --version` — und
+# das SCHEITERT auf einem Laufzeitbild immer (Abbruchcode 155, "No .NET SDKs
+# were found"). Jeder Dienst meldete daraufhin `unhealthy`, waehrend er
+# tadellos antwortete, und niemand hat den Meldungen mehr geglaubt.
+#
+# Kubernetes braucht das NICHT — dort fragt das Kubelet selbst ueber HTTP und
+# steht ausserhalb. Die zwei Megabyte zahlt also nur Compose.
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Nicht als root. Das Bild bedient HTTP und schreibt nichts ausser Protokoll.
 RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin dienst
 USER 10001

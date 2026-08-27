@@ -8,7 +8,7 @@
 DOTNET_SLN := WorkerTransfer.slnx
 
 .PHONY: help check check-dotnet check-web build test test-web validate validate-e2e \
-        fix dev up down k8s-up k8s-down k8s-lint k8s-seed clean
+        fix dev up down images k8s-up k8s-down k8s-lint k8s-seed clean
 
 help:  # Diese Liste.
 	@# `0-9` im Muster, sonst fehlen k8s-up/-down/-seed/-lint — vorhanden, aber
@@ -30,9 +30,13 @@ test:  # Die Testreihen, EINZELN.
 	@# kaputter Bau und ist keiner.
 	@./scripts/test-dotnet.sh
 
-check-web:  # Frontend: TypeScript + Vitest.
+check-web:  # Frontend: TypeScript + Vitest + Buendeln.
+	@# `pnpm build` gehoert dazu. tsc und Vitest laufen beide NICHT ueber den
+	@# Bauweg; ein Fehler, der erst beim Buendeln auftritt, faellt sonst erst im
+	@# Bild auf — und das baut hier niemand nebenbei.
 	pnpm check
 	pnpm test
+	pnpm build
 
 test-web:  # Nur die Frontend-Reihe.
 	pnpm test
@@ -62,6 +66,15 @@ k8s-down:  # Den kind-Cluster samt Daten loeschen.
 
 k8s-seed:  # Testdaten in die laufende Umgebung: Firma, drei Stellen, ein Bewerber-Konto.
 	./scripts/k8s-seed.sh
+
+images:  # Beide ausgelieferten Bilder bauen. Der lokale Zwilling des CI-Jobs.
+	@# Eine gruene Pruefung, die kein Bild baut, sagt nichts ueber das, was
+	@# ausgeliefert wird: der Sprung auf node 25 kam so durch und zerlegte das
+	@# Oberflaechenbild (node 25 bringt kein corepack mehr mit).
+	docker build -f docker/dotnet-service.Dockerfile \
+		--secret "id=nuget_config,src=$(HOME)/.nuget/NuGet/NuGet.Config" \
+		-t workertransfer-dotnet:local .
+	docker build -f docker/web-prod.Dockerfile -t workertransfer/web:local .
 
 k8s-lint:  # Chart pruefen, ohne Cluster: helm lint + rendern.
 	helm lint deploy/helm/workertransfer \

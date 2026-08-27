@@ -99,11 +99,18 @@ gruen "Alle Pods bereit."
 schritt "Beweis 2 — lesend durch das Gateway"
 # /jobs gehört jobs-service, / gehört der Oberfläche. Zwei verschiedene Ziele,
 # also wird wirklich geroutet und nicht bloß irgendwas beantwortet.
+#
+# 401 und nicht 200: eine Stellenliste steht hinter der Anmeldung, so ist der
+# Dienst gebaut (`StellenEndpoints`, `akteur.Current is null` -> NichtAngemeldet).
+# Der Beleg fürs Routen ist die ANTWORT, nicht ihr Erfolg — ein
+# RFC-9457-Dokument mit correlationId kann nur jobs-service geschrieben haben;
+# eine fehlende Route wäre ein leerer 404 von Traefik.
 jobs_status=$(curl -s -o /tmp/wt-jobs.json -w '%{http_code}' "${BASE}/jobs" || true)
 web_status=$(curl -s -o /tmp/wt-web.html -w '%{http_code}' "${BASE}/" || true)
 echo "GET /jobs -> ${jobs_status}"
 echo "GET /     -> ${web_status}"
-[ "$jobs_status" = "200" ] || { rot "GET /jobs lieferte ${jobs_status}, erwartet 200."; cat /tmp/wt-jobs.json; exit 1; }
+[ "$jobs_status" = "401" ] || { rot "GET /jobs lieferte ${jobs_status}, erwartet 401."; cat /tmp/wt-jobs.json; exit 1; }
+grep -q '"correlationId"' /tmp/wt-jobs.json || { rot "GET /jobs kam nicht von jobs-service."; cat /tmp/wt-jobs.json; exit 1; }
 [ "$web_status"  = "200" ] || { rot "GET / lieferte ${web_status}, erwartet 200."; exit 1; }
 grep -q "<div id=\"root\">" /tmp/wt-web.html || { rot "GET / lieferte kein ausgeliefertes index.html."; exit 1; }
 # Ohne diese Zeile wäre nicht belegt, dass die Laufzeitkonfiguration wirklich
