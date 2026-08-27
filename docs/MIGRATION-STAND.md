@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-27, nach `github` — Phase B ist durch, **zehn Dienste**.
+**Zuletzt fortgeschrieben:** 2026-08-27, nach dem **Gateway** — Phase C, Schritt 1 von 6.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -19,9 +19,9 @@ was davon getan ist.
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
 | **Phase B — die Dienste** | **fertig**, 10 von 10 |
-| **Phase C — Zusammenbau** | nicht begonnen |
+| **Phase C — Zusammenbau** | **1 von 6**: Gateway steht |
 | **Prüfer** | nicht begonnen |
-| **Tests** | 541 grün, 0 rot, 0 übersprungen |
+| **Tests** | 603 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
@@ -40,7 +40,7 @@ aussieht und keiner ist. Die Reihen einzeln fahren:
 ```bash
 cd dotnet
 for p in Outbox Skills Identity Consent Profile Resume Portfolio Jobs Applications \
-         Companies Transfer GitHub Notification; do
+         Companies Transfer GitHub Notification Gateway; do
   dotnet test tests/WorkerTransfer.$p.Tests/WorkerTransfer.$p.Tests.csproj --no-build \
     | grep -E "^(Bestanden!|Fehler!)"
 done
@@ -402,10 +402,9 @@ Vier weitere Entscheidungen tragen:
 
 ## Phase C — Zusammenbau
 
-**Jetzt an der Reihe.** In dieser Reihenfolge:
+In dieser Reihenfolge:
 
-1. Gateway mit Ocelot, eine Route je Dienst, `Sec-Fetch-Dest: document` trennt
-   Seite von Ressource.
+1. ~~Gateway mit Ocelot~~ — **fertig**, siehe unten.
 2. Compose und Helm auf die .NET-Dienste.
 3. Python restlos entfernen, danach `dotnet/` flach in die Wurzel — als eigener
    Commit, damit die Umbenennungen lesbar bleiben.
@@ -414,6 +413,51 @@ Vier weitere Entscheidungen tragen:
    Enum-Guards werden schlichte `CREATE TYPE`.
 5. CI neu — und sie baut diesmal die Images.
 6. Der Prüfer, gegen die Vision statt gegen Python, mit `CLAUDE.md`-Neufassung.
+
+---
+
+## Phase C, Schritt 1: das Gateway (`dotnet/src/gateway`)
+
+Ocelot 25, elf Ziele, 41 Routen, und **es prüft nichts**: kein Token wird
+gelesen, keine Einwilligung geprüft, keine Rolle erzwungen. Das tut jeder
+Dienst für sich, und ein Gateway, das es ebenfalls täte, wäre eine zweite
+Wahrheit über dieselbe Frage.
+
+Was hier **nicht** steht, ist ebenso wichtig: `/erasure` und
+`/internal/notify` haben keine Route. Beide sind Dienst-zu-Dienst-Eingänge
+hinter einem gemeinsamen Geheimnis; über den öffentlichen Ursprung erreichbar
+wären sie „lösche alles über diesen Menschen", bewacht von einem Kopf.
+
+### Drei Dinge, die gemessen wurden und nicht zu erraten waren
+
+1. **Die `Sec-Fetch-Dest`-Regel passt nicht in die Ocelot-Landkarte.** Eine
+   *wörtliche* Route gewinnt bei Ocelot **immer** gegen einen Platzhalter —
+   `Priority` hin oder her. Eine Auffangregel `/{alles}` mit Kopfbedingung wird
+   von `/jobs` also nie erreicht. Die Regel je kollidierendem Pfad zu
+   wiederholen wäre möglich und wäre genau das, was sie vermeiden soll: zwei
+   Pfadlisten, die auseinanderlaufen. Also setzt `Navigation.cs` **ein** Präfix
+   (`/__ui`), und die Landkarte hat dafür **eine** Zeile. Der letzte
+   Platzhalter ist gierig, deshalb trägt sie auch `/careers/muster` und
+   `/assets/x/y.js`.
+2. **`Priority` macht die Landkarte reihenfolgeunabhängig** — das ist ihr
+   ganzer Zweck hier. Mit den ausgelieferten Werten ändert das Umdrehen aller
+   Zeilen nichts; ohne sie entscheidet die Dateireihenfolge und acht Routen
+   fallen um. Alle auf denselben Wert zu setzen sah zunächst harmlos aus: die
+   Reihe blieb grün, weil die Zeilen zufällig richtig standen. Erst das
+   Umdrehen hat es gezeigt — und `ReihenfolgeTests` hält es seither fest.
+3. **`MapGet` läuft hinter Ocelot nie.** Ocelot beendet die Kette; die
+   Gesundheitsproben mussten in eine Zwischenschicht **vor** ihr. Sie werden
+   auch nicht weitergereicht: sonst kippte ein einzelner kranker Dienst das
+   Gateway aus dem Lastverteiler und nähme die anderen zehn mit.
+
+Zwei kleinere Befunde: Kommentare in `ocelot.json` sind erlaubt (der
+JSON-Konfigurationsanbieter überliest sie) — deshalb trägt die Landkarte ihre
+Begründung mit, wie die Traefik-Datei es tat. Und `X-Correlation-ID` wird hier
+gesetzt, falls sie fehlt: ein Klick wird hinten zu drei Aufrufen, und ohne
+gemeinsame Kennung erfindet jeder Dienst seine eigene.
+
+**Die Ports:** identity 8001 … transfer 8009, notification **8010**, github
+**8011**, Oberfläche 5173, Gateway 8090.
 
 ---
 
