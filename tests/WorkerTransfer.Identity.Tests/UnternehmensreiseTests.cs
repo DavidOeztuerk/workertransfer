@@ -354,4 +354,113 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
         ich.TryGetProperty("tenant_id", out var mandant).Should().BeTrue();
         mandant.ValueKind.Should().Be(JsonValueKind.Null);
     }
+
+    /// <summary>
+    /// Wer entfernt wird, ist bei der NÄCHSTEN Anfrage draußen — mit demselben
+    /// Token.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Der Test, der die ganze Bauart begründet.</strong> Die Rechte
+    /// stehen absichtlich nicht im Token: `Mitgliedschaftsrecht` liest die
+    /// Mitgliedschaft je Anfrage aus der Tabelle. Lägen sie im Token, wirkte
+    /// eine Entfernung erst, wenn es abläuft — und bei genau dieser Handlung
+    /// ist sofort das Einzige, was zählt.
+    /// <para>
+    /// Der Browser der entfernten Person wird hier NICHT neu angemeldet. Genau
+    /// das ist der Punkt: dasselbe Token, das eben noch reichte, reicht jetzt
+    /// nicht mehr.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Ein_entfernter_Administrator_darf_sofort_nichts_mehr()
+    {
+        var domain = NeueDomain();
+        var chefin = await Person(Adresse("chefin", domain), firma: "Beispiel GmbH");
+        var firma = await ErsteFirma(chefin);
+
+        // Eine zweite Person als ADMIN hereinholen.
+        var zweite = Adresse("zweite", "andere.example");
+        await chefin.PostAsJsonAsync(
+            $"/companies/{firma}/invitations", new { email = zweite, role = "admin" });
+
+        var browser = await Person(zweite);
+        await browser.PostAsJsonAsync(
+            "/invitations/accept", new { token = LetzterLink("eingeladen") });
+
+        // Sie darf jetzt einladen — der Beleg, dass die Richtlinie ueberhaupt
+        // etwas durchlaesst und nicht bloss alles ablehnt.
+        var vorher = await browser.PostAsJsonAsync(
+            $"/companies/{firma}/invitations",
+            new { email = Adresse("dritte", "andere.example"), role = "member" });
+        vorher.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        // Die Chefin entfernt sie.
+        var wer = await Subjekt(browser);
+        var entfernt = await chefin.DeleteAsync($"/companies/{firma}/members/{wer}");
+        entfernt.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // DASSELBE Token, kein neues Anmelden.
+        var nachher = await browser.PostAsJsonAsync(
+            $"/companies/{firma}/invitations",
+            new { email = Adresse("vierte", "andere.example"), role = "member" });
+
+        nachher.StatusCode.Should().Be(
+            HttpStatusCode.Forbidden,
+            "die Rolle wird je Anfrage gelesen, nicht aus dem Token — sonst wirkte "
+            + "das Entfernen erst beim Ablauf");
+    }
+
+    /// <summary>
+    /// Eine Ablehnung durch die Richtlinie trägt dasselbe Fehlerdokument wie
+    /// alles andere.
+    /// </summary>
+    /// <remarks>
+    /// Eine Autorisierung wirft nicht, sie schließt die Antwort kurz — ohne
+    /// <c>Ablehnungsgestalt</c> fiele hier ein nackter 403 mit leerem Rumpf
+    /// heraus, und der Bericht eines Menschen hätte keine
+    /// Korrelationskennung.
+    /// </remarks>
+    [Fact]
+    public async Task Die_Ablehnung_traegt_das_uebliche_Fehlerdokument()
+    {
+        var domain = NeueDomain();
+        var chefin = await Person(Adresse("chefin", domain), firma: "Beispiel GmbH");
+        var firma = await ErsteFirma(chefin);
+
+        var kollege = Adresse("kollege", "andere.example");
+        await chefin.PostAsJsonAsync(
+            $"/companies/{firma}/invitations", new { email = kollege, role = "member" });
+
+        var browser = await Person(kollege);
+        await browser.PostAsJsonAsync(
+            "/invitations/accept", new { token = LetzterLink("eingeladen") });
+
+        var versuch = await browser.PostAsJsonAsync(
+            $"/companies/{firma}/invitations",
+            new { email = Adresse("noch-einer", "andere.example"), role = "member" });
+
+        versuch.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        versuch.Content.Headers.ContentType!.MediaType
+            .Should().Be("application/problem+json");
+
+        var rumpf = JsonDocument.Parse(
+            await versuch.Content.ReadAsStringAsync()).RootElement;
+
+        rumpf.GetProperty("status").GetInt32().Should().Be(403);
+        rumpf.GetProperty("detail").GetString().Should().Be("not permitted");
+        rumpf.GetProperty("correlationId").GetString().Should().NotBeNullOrWhiteSpace();
+
+        // WELCHE Richtlinie fehlte, steht nicht darin — das waere eine
+        // Landkarte der Rechte fuer jeden, der sie abfragt.
+        rumpf.ToString().Should().NotContain("company.invite");
+    }
+
+    /// <summary>Die eigene Subjektkennung, wie sie /me nennt.</summary>
+    private static async Task<string> Subjekt(HttpClient browser)
+    {
+        var antwort = await browser.GetFromJsonAsync<JsonElement>("/me");
+
+        return antwort.GetProperty("user_id").GetString()!;
+    }
+
 }

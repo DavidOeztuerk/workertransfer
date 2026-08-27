@@ -29,6 +29,24 @@ public sealed class Firmenzugriff(IMembershipRepository mitgliedschaften)
         await mitgliedschaften.RoleOfAsync(wer, firma, cancellationToken)
         ?? throw new NotAMemberException();
 
+    /// <summary>
+    /// Die Rolle, oder <c>null</c> — ohne zu werfen.
+    /// </summary>
+    /// <remarks>
+    /// Für den Berechtigungshandler: eine Autorisierungsprüfung entscheidet
+    /// „ja oder nein" und darf dafür keine Ausnahme brauchen. Wer eine
+    /// Begründung will (einladen? entfernen?), nimmt weiterhin
+    /// <see cref="AlsAdminAsync"/>.
+    /// </remarks>
+    /// <param name="wer">Wer fragt.</param>
+    /// <param name="firma">Welche Firma.</param>
+    /// <param name="cancellationToken">Bricht die Abfrage ab.</param>
+    public Task<MembershipRole?> RolleOderNichtsAsync(
+        SubjectId wer,
+        TenantId firma,
+        CancellationToken cancellationToken = default) =>
+        mitgliedschaften.RoleOfAsync(wer, firma, cancellationToken);
+
     /// <summary>The caller's role, refusing anybody who is not an administrator.</summary>
     /// <param name="wer">Who is asking.</param>
     /// <param name="firma">Which company.</param>
