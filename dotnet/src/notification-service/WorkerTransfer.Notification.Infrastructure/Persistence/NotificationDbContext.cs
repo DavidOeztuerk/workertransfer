@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Notification.Infrastructure.Persistence;
 
@@ -63,6 +64,13 @@ public sealed class NotificationDbContext(DbContextOptions<NotificationDbContext
         modelBuilder.Entity<WunschZeile>(entity =>
         {
             entity.ToTable("notification_preferences");
+            // Der Schluessel IST der Mensch: diese Zeile heisst ihre
+            // `subject_id` schlicht `id`. Ausgesprochen, weil der
+            // Loeschwaechter (`LoeschempfaengerTests`) sonst nur nach den
+            // Spaltennamen `subject_id`/`user_id` sucht und diese Tabelle
+            // uebersaehe — und damit die Zusage aus ADR-0027 fuer einen ganzen
+            // Dienst.
+            entity.HasAnnotation(Personenzeile.Anmerkung, true);
             entity.HasKey(zeile => zeile.Id);
             entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
             entity.Property(zeile => zeile.Kinds)

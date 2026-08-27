@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <!--
+      Alle elf Infrastrukturen. Das ist der Punkt: diese Reihe prueft, was
+      ueber die Dienstgrenzen hinweg gilt, und kann das nur, wenn sie alle
+      sieht. Jeder neue Dienst gehoert hier hinein — und faellt sonst genau
+      durch die Luecke, die der Loeschwaechter schliesst.
+    -->
+    <ProjectReference Include="..\..\src\identity-service\WorkerTransfer.Identity.Infrastructure\WorkerTransfer.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\consent-service\WorkerTransfer.Consent.Infrastructure\WorkerTransfer.Consent.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\profile-service\WorkerTransfer.Profile.Infrastructure\WorkerTransfer.Profile.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\resume-service\WorkerTransfer.Resume.Infrastructure\WorkerTransfer.Resume.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\portfolio-service\WorkerTransfer.Portfolio.Infrastructure\WorkerTransfer.Portfolio.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\jobs-service\WorkerTransfer.Jobs.Infrastructure\WorkerTransfer.Jobs.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\applications-service\WorkerTransfer.Applications.Infrastructure\WorkerTransfer.Applications.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\companies-service\WorkerTransfer.Companies.Infrastructure\WorkerTransfer.Companies.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\transfer-service\WorkerTransfer.Transfer.Infrastructure\WorkerTransfer.Transfer.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\github-service\WorkerTransfer.GitHub.Infrastructure\WorkerTransfer.GitHub.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\notification-service\WorkerTransfer.Notification.Infrastructure\WorkerTransfer.Notification.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\shared\WorkerTransfer.Contracts.Erasure\WorkerTransfer.Contracts.Erasure.csproj" />
+  </ItemGroup>
+</Project>

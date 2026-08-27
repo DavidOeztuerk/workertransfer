@@ -34,7 +34,7 @@ schritt "Cluster"
 if kind get clusters 2>/dev/null | grep -qx "$CLUSTER"; then
   echo "kind-Cluster '$CLUSTER' existiert bereits."
   # `kind get clusters` listet den Cluster auch, wenn sein Knoten ANGEHALTEN
-  # ist — und das ist der Normalfall, weil man ihn vor `uv run pytest` anhält
+  # ist — und das ist der Normalfall, weil man ihn vor `make test` anhält
   # (Testcontainers und der Cluster vertragen sich nicht). Ohne diese Zeilen
   # meldet das Skript "existiert bereits", baut zehn Minuten lang Images und
   # scheitert dann an einem `kind load` gegen einen Knoten, der nicht läuft.
