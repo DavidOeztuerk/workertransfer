@@ -155,9 +155,10 @@ public class AnmeldenTests
     }
 
     /// <summary>
-    /// The entry is still bcrypt from the Python service. It verifies, and the
-    /// sign-in proceeds — see Ü-6 in <c>docs/uebergang-python-dotnet.md</c> for
-    /// why nothing is rewritten.
+    /// Der Eintrag stammt noch vom bcrypt-Hasher des Python-Dienstes. Er
+    /// verifiziert, die Anmeldung geht durch, und niemand wird gebeten, etwas
+    /// zurueckzusetzen — genau das ist der Sinn, mit dem bcrypt hier weiter
+    /// SCHREIBT (`AddBCryptPasswords`, nicht nur der Leser).
     /// </summary>
     [Fact]
     public async Task Ein_Eintrag_der_neu_geschrieben_werden_duerfte_laesst_trotzdem_herein()

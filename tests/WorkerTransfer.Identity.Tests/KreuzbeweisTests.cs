@@ -25,10 +25,10 @@ namespace WorkerTransfer.Identity.Tests;
 /// echten Datenbanken, und sie muessen weiter tragen.
 /// </para>
 /// <para>
-/// Dass .NET Token annimmt, die Python WIRKLICH ausgestellt hat, prueft
-/// <c>KreuzbeweisPythonNachDotnetTests</c> — aus aufgezeichneten Zeichenketten,
-/// also ohne Interpreter. Das ist die Richtung, die nach dem Umzug noch zaehlt:
-/// eine Sitzung von vorgestern muss weiter gelten (Ue-2).
+/// Die Gegenrichtung — .NET nimmt Token an, die Python wirklich ausgestellt
+/// hat — gibt es nicht mehr. Sie hing an nachsichtigen Validatoren fuer Token
+/// ohne <c>iss</c>/<c>aud</c>; die sind mit dem Uebergang gefallen, und damit
+/// pruefen Aussteller und Zielgruppe wieder voll.
 /// </para>
 /// </remarks>
 [Collection(PostgresCollection.Name)]

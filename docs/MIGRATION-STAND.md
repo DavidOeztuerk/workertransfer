@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-27, nach der **Umbenennung** — Phase C, 3 von 6.
+**Zuletzt fortgeschrieben:** 2026-08-27, nach dem **Übergangsgerüst** — Phase C, 4 von 6.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -19,7 +19,7 @@ was davon getan ist.
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
 | **Phase B — die Dienste** | **fertig**, 10 von 10 |
-| **Phase C — Zusammenbau** | **3 von 6**: Gateway, Compose, Helm, Python ist raus |
+| **Phase C — Zusammenbau** | **4 von 6**: Gateway, Compose, Helm, Python raus, Gerüst weg |
 | **Prüfer** | nicht begonnen |
 | **Tests** | 617 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
@@ -416,9 +416,7 @@ In dieser Reihenfolge:
    `packages/worker-*`. Sie gehören in Schritt 6, wo der Prüfer die
    Dokumentation ohnehin neu fasst — sie hier nachzuziehen hieße, dieselbe
    Datei zweimal anzufassen.
-4. Übergangsgerüst löschen: Ü-1 bis Ü-7 in
-   [`uebergang-python-dotnet.md`](uebergang-python-dotnet.md), ersatzlos. Die
-   Enum-Guards werden schlichte `CREATE TYPE`.
+4. ~~Übergangsgerüst löschen~~ — **fertig**, siehe unten.
 5. CI neu — und sie baut diesmal die Images.
 6. Der Prüfer, gegen die Vision statt gegen Python, mit `CLAUDE.md`-Neufassung.
 
@@ -545,6 +543,56 @@ auskommentierten Zeile, eine fehlende Datenbank blieb also grün.
 **Noch offen (Schritt 3):** `make k8s-up` ist nicht gefahren. Das Chart lintet
 und rendert, aber nur ein Lauf beweist, dass es läuft — und diese Maschine
 verträgt fünfzehn Pods nicht neben einer Testreihe.
+
+---
+
+## Phase C, Schritt 4: das Übergangsgerüst ist weg
+
+`docs/uebergang-python-dotnet.md` ist gelöscht. Was aus jedem Eintrag wurde:
+
+| | wurde |
+|---|---|
+| **Ü-1** `verify_aud: False` | entfällt mit `worker_auth` |
+| **Ü-2** nachsichtige Validatoren | **weg.** Aussteller und Zielgruppe werden wieder voll geprüft; `UebergangsTokenValidation` und `UebergangsPrincipalFactory` sind gelöscht, Girders eigene Fabrik liest wieder `tenant` |
+| **Ü-3** `tenant_id` und `type` im Token | **weg.** Übrig ist Girders `tenant` |
+| **Ü-4** der Python-Erneuerungstoken | war nie eine Schuld — eine einmalige Folge, die eingetreten ist |
+| **Ü-5** `session_capacities` | **bleibt, und ist keine Schuld.** Die Begründung ist an `ISessionCapacity` gewandert, wo sie hingehört |
+| **Ü-6** bcrypt schreibt | **bleibt vorerst** — jetzt als freie Entscheidung, nicht als Zwang |
+| **Ü-7** die `CREATE TYPE`-Guards | **weg.** Kein `DO $$`-Block ist übrig |
+
+Drei Dinge daran sind erwähnenswert:
+
+- **Ü-7 hatte sich schon selbst erledigt.** Identitys Guard fiel mit der neuen
+  Grundschema-Wanderung; consent-service hatte nie einen, weil sein .NET-Modell
+  `varchar` mit Check-Constraint nimmt statt einer Postgres-Aufzählung — die
+  Notiz beschrieb das *Alembic*-Schema.
+- **Ü-5 wäre beim wörtlichen Löschen kaputtgegangen.** Der Eintrag sagt selbst:
+  „solange nicht, bleibt die Tabelle". Ohne sie wäre, wer für eine Firma
+  handelt, eine Viertelstunde später wieder Privatperson — lautlos, mitten in
+  der Arbeit.
+- **Ü-6 ist nicht erledigt, sondern entschieden-werden-dürfend.** bcrypt auf
+  Argon2id umzustellen ist eine sicherheitsrelevante Änderung mit eigenem
+  Commit, kein Nebenprodukt des Aufräumens. Der Grund steht jetzt im
+  Kompositionswurzel-Aufruf.
+
+`KreuzbeweisPythonNachDotnetTests` und `EchtePythonToken` sind gefallen: sie
+belegten, dass .NET Token annimmt, die Python wirklich ausgestellt hat — und das
+tut es jetzt bewusst nicht mehr.
+
+**Zwei Tests hingen an Ü-3 und wurden dabei zuerst übersehen.**
+`TokenformTests` nagelte fest, dass `tenant_id` und `type` im Token *stehen*;
+nach dem Löschen fielen sie, und zwar zu Recht — der Lauf meldete 2 rot von 188.
+Sie sind nicht gelöscht, sondern **umgedreht**: eine Theorie prüft jetzt, dass
+beide Ansprüche **weg sind und wegbleiben**, in *beiden* Handlungsformen
+(`tenant_id` entstand nur bei einer Firma, `type` immer — nur eine Form zu prüfen
+ließe genau die andere Rückkehr durch). Gegenprobe gefahren: beide Ansprüche
+wieder eingebaut, genau diese zwei Theoriefälle fielen, kein dritter. Danach
+`--no-incremental` zurückgebaut, Reihe **189 grün, 0 übersprungen**.
+
+Das ist der Regelfall bei so einem Löschen, nicht die Ausnahme: ein Test, der
+eine Übergangsform *festhält*, wird beim Aufräumen zum Kandidaten — und die
+richtige Antwort ist meistens, ihn ins Verbot zu drehen, nicht ihn wegzuwerfen.
+Ein gelöschter Test hätte die Rückkehr von `tenant_id` niemand mehr gemeldet.
 
 ---
 

@@ -8,7 +8,7 @@ namespace WorkerTransfer.Transfer.Infrastructure.Persistence;
 /// <remarks>
 /// Ohne <c>MapEnum</c>: die drei Stände stehen als Worte in
 /// <c>varchar</c>-Spalten, genau so, wie sie im Vertrag und in der Oberfläche
-/// stehen. Der Guard aus Ü-7 betrifft diesen Dienst deshalb nicht.
+/// stehen.
 /// </remarks>
 public static class TransferDbContextFactory
 {
