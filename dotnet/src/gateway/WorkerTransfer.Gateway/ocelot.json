@@ -1,0 +1,583 @@
+// Die Landkarte des Systems an EINER Stelle.
+//
+// Sie ist der ganze Dienst: das Gateway routet und prueft nichts. Kein Token
+// wird hier gelesen, keine Einwilligung geprueft, keine Rolle erzwungen - das
+// tut jeder Dienst fuer sich, und ein Gateway, das es ebenfalls taete, waere
+// eine zweite Wahrheit ueber dieselbe Frage.
+//
+// Was hier NICHT steht, ist ebenso wichtig: `/erasure` und `/internal/notify`.
+// Beide sind Dienst-zu-Dienst-Eingaenge hinter einem gemeinsamen Geheimnis.
+// Sie ueber den oeffentlichen Ursprung erreichbar zu machen hiesse, "loesche
+// alles ueber diesen Menschen" ins Netz zu stellen, bewacht von einem Kopf.
+// Ohne Route fallen sie auf die Oberflaeche, und die kennt sie nicht.
+//
+// Kommentare sind erlaubt: der JSON-Konfigurationsanbieter von .NET ueberliest
+// sie. Gemessen, bevor diese Datei so geschrieben wurde - denn eine Landkarte
+// ohne Begruendung ist die Landkarte, aus der jemand die Sec-Fetch-Dest-Regel
+// entfernt, weil sie seltsam aussieht.
+{
+  "Routes": [
+    // --- 200: der Browser NAVIGIERT, er ruft keine API auf ------------------
+    //
+    // `/jobs` heisst zwei verschiedene Dinge: die API-Ressource UND die Seite
+    // der Oberflaeche. Dasselbe gilt fuer `/applications`, `/transfers` und
+    // `/github`. Nach Pfad allein ist das nicht zu unterscheiden.
+    //
+    // Auffaellig wird es erst hinter EINEM Ursprung. Ein Klick IM Programm
+    // funktioniert, weil der Router im Browser umschaltet und gar keine
+    // Anfrage stellt - die Haelfte, die durchfaellt, ist der Direktlink und
+    // das Neuladen. Also genau das, was man teilt und was nach einem Absturz
+    // passiert.
+    //
+    // `Sec-Fetch-Dest: document` schickt der Browser AUSSCHLIESSLICH bei einer
+    // Navigation der obersten Ebene; `fetch`/XHR schicken `empty`, und curl,
+    // CLI und Dienst-zu-Dienst schicken den Kopf gar nicht. Die Regel trennt
+    // "ein Mensch geht auf eine Seite" von "ein Programm holt Daten" - und
+    // nicht zwei Pfadlisten, die auseinanderlaufen koennten.
+    //
+    // Geprueft, bevor diese Regel entstand: kein Dienst antwortet je mit einer
+    // Weiterleitung, es gibt keinen OAuth-Ruecksprung, und der Datenexport
+    // laedt ueber einen Blob statt ueber eine Navigation. Es gibt also keine
+    // Adresse, zu der ein Browser navigieren MUSS und die kein Teil der
+    // Oberflaeche ist. Entsteht eine, gehoert sie hier ausgenommen.
+    //
+    // DIE PRUEFUNG SELBST STEHT IN `Navigation.cs`, NICHT HIER. Gemessen an
+    // Ocelot 25: eine woertliche Route gewinnt immer gegen einen Platzhalter,
+    // `Priority` hin oder her - eine Auffangregel `/{alles}` mit
+    // Kopfbedingung wird von `/jobs` also nie erreicht. Die Regel je
+    // kollidierendem Pfad zu wiederholen waere moeglich und waere genau das,
+    // was sie vermeiden soll: zwei Pfadlisten, die auseinanderlaufen. Also
+    // setzt eine Zwischenschicht EIN Praefix, und hier steht EINE Zeile dafuer.
+    // Der `DownstreamPathTemplate` streift es wieder ab; die Oberflaeche sieht
+    // den Pfad, den der Mensch getippt hat.
+    //
+    // Der letzte Platzhalter ist gierig - `/__ui/{alles}` trifft auch
+    // `/careers/muster` und `/assets/x/y.js`. Ebenfalls gemessen.
+    {
+      "UpstreamPathTemplate": "/__ui/{alles}",
+      "DownstreamPathTemplate": "/{alles}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "web",
+          "Port": 5173
+        }
+      ],
+      "Priority": 200
+    },
+
+    // --- 100/90: die Ausnahmen ----------------------------------------------
+    //
+    // Die Pfade der Dienste sind NICHT disjunkt: `/companies/{id}/members`
+    // gehoert identity, `/companies/{id}/profile` gehoert companies - sie
+    // unterscheiden sich erst im letzten Segment. Praefix-Routing allein
+    // reicht also nicht.
+    //
+    // WAS `Priority` HIER WIRKLICH TUT, gemessen: sie macht die Landkarte
+    // REIHENFOLGEUNABHAENGIG. Mit diesen Werten aendert das Umdrehen aller
+    // Zeilen nichts; ohne sie entscheidet die Dateireihenfolge, und acht
+    // Routen fallen um. Alle auf denselben Wert zu setzen sah zunaechst
+    // harmlos aus - die Reihe blieb gruen, weil die Zeilen zufaellig richtig
+    // standen. Wer hier unten eine Route anhaengt, soll sich darauf nicht
+    // verlassen muessen; `ReihenfolgeTests` haelt es fest.
+    {
+      "UpstreamPathTemplate": "/jobs/{stelle}/applications",
+      "DownstreamPathTemplate": "/jobs/{stelle}/applications",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "applications-service",
+          "Port": 8007
+        }
+      ],
+      "Priority": 100
+    },
+    {
+      "UpstreamPathTemplate": "/companies/me/jobs",
+      "DownstreamPathTemplate": "/companies/me/jobs",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "jobs-service",
+          "Port": 8006
+        }
+      ],
+      "Priority": 100
+    },
+    {
+      "UpstreamPathTemplate": "/companies/me/application-stats",
+      "DownstreamPathTemplate": "/companies/me/application-stats",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "applications-service",
+          "Port": 8007
+        }
+      ],
+      "Priority": 100
+    },
+    {
+      "UpstreamPathTemplate": "/companies/me/profile",
+      "DownstreamPathTemplate": "/companies/me/profile",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "companies-service",
+          "Port": 8008
+        }
+      ],
+      "Priority": 100
+    },
+    {
+      "UpstreamPathTemplate": "/companies/by-slug/{kuerzel}",
+      "DownstreamPathTemplate": "/companies/by-slug/{kuerzel}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "companies-service",
+          "Port": 8008
+        }
+      ],
+      "Priority": 100
+    },
+    {
+      "UpstreamPathTemplate": "/companies/withdrawal",
+      "DownstreamPathTemplate": "/companies/withdrawal",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "jobs-service",
+          "Port": 8006
+        }
+      ],
+      "Priority": 100
+    },
+
+    // Neu gegenueber der Traefik-Landkarte: `/me` gehoert identity, aber
+    // `/me/notification-preferences` gehoert notification-service. In Python
+    // lagen die Benachrichtigungen noch in identity; seit dem Umzug sind auch
+    // diese beiden Pfade nicht mehr disjunkt.
+    {
+      "UpstreamPathTemplate": "/me/notification-preferences",
+      "DownstreamPathTemplate": "/me/notification-preferences",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "notification-service",
+          "Port": 8010
+        }
+      ],
+      "Priority": 100
+    },
+    {
+      "UpstreamPathTemplate": "/companies/{firma}/profile",
+      "DownstreamPathTemplate": "/companies/{firma}/profile",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "companies-service",
+          "Port": 8008
+        }
+      ],
+      "Priority": 90
+    },
+
+    // --- 10: die Regelfaelle -------------------------------------------------
+    //
+    // Zwei Zeilen je Praefix, weil Ocelot `/auth` und `/auth/login` nicht mit
+    // einem Muster trifft: `{rest}` verlangt ein Segment. Das ist der
+    // sichtbare Preis gegenueber Traefiks `PathPrefix` - dafuer steht hier
+    // jede Adresse, die es gibt, statt eines Musters, das auch Adressen
+    // traefe, die es nicht gibt.
+    {
+      "UpstreamPathTemplate": "/auth",
+      "DownstreamPathTemplate": "/auth",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-service",
+          "Port": 8001
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/auth/{rest}",
+      "DownstreamPathTemplate": "/auth/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-service",
+          "Port": 8001
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/me",
+      "DownstreamPathTemplate": "/me",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-service",
+          "Port": 8001
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/me/{rest}",
+      "DownstreamPathTemplate": "/me/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-service",
+          "Port": 8001
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/companies",
+      "DownstreamPathTemplate": "/companies",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-service",
+          "Port": 8001
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/companies/{rest}",
+      "DownstreamPathTemplate": "/companies/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-service",
+          "Port": 8001
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/invitations",
+      "DownstreamPathTemplate": "/invitations",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-service",
+          "Port": 8001
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/invitations/{rest}",
+      "DownstreamPathTemplate": "/invitations/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-service",
+          "Port": 8001
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/account",
+      "DownstreamPathTemplate": "/account",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-service",
+          "Port": 8001
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/account/{rest}",
+      "DownstreamPathTemplate": "/account/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-service",
+          "Port": 8001
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/consent",
+      "DownstreamPathTemplate": "/consent",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "consent-service",
+          "Port": 8002
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/consent/{rest}",
+      "DownstreamPathTemplate": "/consent/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "consent-service",
+          "Port": 8002
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/profiles",
+      "DownstreamPathTemplate": "/profiles",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "profile-service",
+          "Port": 8003
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/profiles/{rest}",
+      "DownstreamPathTemplate": "/profiles/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "profile-service",
+          "Port": 8003
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/candidates",
+      "DownstreamPathTemplate": "/candidates",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "profile-service",
+          "Port": 8003
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/candidates/{rest}",
+      "DownstreamPathTemplate": "/candidates/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "profile-service",
+          "Port": 8003
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/resumes",
+      "DownstreamPathTemplate": "/resumes",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "resume-service",
+          "Port": 8004
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/resumes/{rest}",
+      "DownstreamPathTemplate": "/resumes/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "resume-service",
+          "Port": 8004
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/portfolios",
+      "DownstreamPathTemplate": "/portfolios",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "portfolio-service",
+          "Port": 8005
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/portfolios/{rest}",
+      "DownstreamPathTemplate": "/portfolios/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "portfolio-service",
+          "Port": 8005
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/jobs",
+      "DownstreamPathTemplate": "/jobs",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "jobs-service",
+          "Port": 8006
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/jobs/{rest}",
+      "DownstreamPathTemplate": "/jobs/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "jobs-service",
+          "Port": 8006
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/applications",
+      "DownstreamPathTemplate": "/applications",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "applications-service",
+          "Port": 8007
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/applications/{rest}",
+      "DownstreamPathTemplate": "/applications/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "applications-service",
+          "Port": 8007
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/market",
+      "DownstreamPathTemplate": "/market",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "transfer-service",
+          "Port": 8009
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/market/{rest}",
+      "DownstreamPathTemplate": "/market/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "transfer-service",
+          "Port": 8009
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/transfers",
+      "DownstreamPathTemplate": "/transfers",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "transfer-service",
+          "Port": 8009
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/transfers/{rest}",
+      "DownstreamPathTemplate": "/transfers/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "transfer-service",
+          "Port": 8009
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/github",
+      "DownstreamPathTemplate": "/github",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "github-service",
+          "Port": 8011
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/github/{rest}",
+      "DownstreamPathTemplate": "/github/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "github-service",
+          "Port": 8011
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/notifications",
+      "DownstreamPathTemplate": "/notifications",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "notification-service",
+          "Port": 8010
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/notifications/{rest}",
+      "DownstreamPathTemplate": "/notifications/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "notification-service",
+          "Port": 8010
+        }
+      ],
+      "Priority": 10
+    }
+  ],
+
+  "GlobalConfiguration": {
+    // Nur fuer die Adressen, die Ocelot selbst baut. Der Hoerer steht in
+    // ASPNETCORE_URLS und wird vom Behaelter gesetzt.
+    "BaseUrl": "http://localhost:8090"
+  }
+}
