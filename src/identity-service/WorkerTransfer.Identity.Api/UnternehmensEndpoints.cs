@@ -2,6 +2,7 @@ using Girder.Core.Identity;
 using MediatR;
 using WorkerTransfer.Identity.Application.Registrierung;
 using WorkerTransfer.Identity.Application.Unternehmen;
+using WorkerTransfer.Identity.Api.Berechtigung;
 using WorkerTransfer.Identity.Domain.Companies;
 using WorkerTransfer.ServiceDefaults;
 
@@ -126,7 +127,12 @@ public static class UnternehmensEndpoints
                 // platform membership without asking the consent ledger.
                 await context.Response.WriteAsJsonAsync(Einladung(einladung), cancellationToken);
             });
-        });
+        })
+        // Die Rechtepruefung steht jetzt HIER statt im Befehl. Aufgeloest wird
+        // sie von `Mitgliedschaftsrecht` aus der Mitgliedschaftstabelle, nicht
+        // aus dem Token — wer entfernt wird, ist bei der naechsten Anfrage
+        // draussen.
+        .RequireAuthorization(Firmenrechte.Richtlinie(Firmenrechte.Einladen));
 
         firma.MapGet("/invitations", async (
             Guid tenantId,
@@ -230,7 +236,8 @@ public static class UnternehmensEndpoints
 
                 context.Response.StatusCode = StatusCodes.Status204NoContent;
             });
-        });
+        })
+        .RequireAuthorization(Firmenrechte.Richtlinie(Firmenrechte.Entfernen));
 
         app.MapPost("/invitations/accept", async (
             AcceptInvitationBody body,

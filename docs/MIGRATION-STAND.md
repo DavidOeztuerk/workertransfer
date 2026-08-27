@@ -1074,6 +1074,47 @@ und damit auch für einen zweiten Aufrufer. Am laufenden Stapel belegt —
 `POST /auth/login` mit `{}` gibt `422` mit `"invalid: Email, Passwort"`, und das
 Protokoll zeigt, dass es aus dem Behavior kommt.
 
+## Härtung H1: `AddAuthorization` ist verdrahtet
+
+`identity-service` ruft es jetzt, und die zwei handgeprüften Verwaltungsrechte
+(einladen, Mitglied entfernen) hängen an Richtlinien statt an einer Prüfung im
+Endpunkt.
+
+**Die Messung entschied die Bauart.** Girders Berechtigungsrichtlinien lesen aus
+**Ansprüchen** (`RequireClaim("permission", …)`), und
+`PermissionAuthorizationHandler` kennt keinen anderen Weg. Unser Token trägt
+keine Rollen — mit gutem Grund: eine Entfernung wirkte sonst erst beim Ablauf
+des Tokens.
+
+Der Ausweg ist nicht „Rechte ins Token", sondern ein **zweiter Handler**:
+ASP.NET führt alle Handler zu einer Anforderung aus, und ein `Succeed` genügt.
+`Mitgliedschaftsrecht` liest die Rolle je Anfrage aus der
+Mitgliedschaftstabelle; Girders Handler bleibt daneben stehen und findet keine
+Ansprüche. So bekommen wir die Richtlinienmaschinerie **und** die sofortige
+Wirkung.
+
+Drei Dinge, die beim Bauen erst die Messung zeigte:
+
+- **`ICurrentPrincipal` ist während der Autorisierung noch leer.** Girders
+  `UseAuth()` ist Authentifizierung *und* Autorisierung, und unser
+  `UsePrincipal()` läuft danach. Der erste Entwurf gab an jeder geschützten
+  Anfrage 403. Ein Autorisierungshandler nimmt den `ClaimsPrincipal`, den er
+  bekommt.
+- **Der Mandant kommt aus dem Pfad, nicht aus dem Token.** Der zweite Entwurf
+  verlangte den Mandanten im Token — strenger, aber falsch: die bestehenden
+  Reisen rufen `POST /auth/company/{id}` nicht. Der Pfad benennt nur, *welche*
+  Firma gemeint ist; geprüft wird die Mitgliedschaft *des Aufrufers in genau
+  dieser*. So las es `Firmenzugriff.AlsAdminAsync` schon vorher.
+- **Eine Richtlinie wirft nicht, sie schließt kurz.** Ohne
+  `Ablehnungsgestalt` (ein `IAuthorizationMiddlewareResultHandler`) fiel die
+  Ablehnung als **nackter 403 mit leerem Rumpf** heraus —
+  `ProblemDetailsMiddleware` sieht sie nie. Jetzt trägt sie dasselbe
+  RFC-9457-Dokument samt Korrelationskennung. *Welche* Richtlinie fehlte, steht
+  bewusst nicht darin: das wäre eine Landkarte der Rechte.
+
+Zwei neue Tests, beide gegengeprobt: Rolle nicht mehr je Anfrage gelesen →
+zwei fallen; Ergebnis-Handler entfernt → einer fällt.
+
 ## Härtung H3: zwei von drei zu
 
 **Kaputter JSON-Rumpf gibt jetzt 400 statt 500**, an jedem Endpunkt jedes
