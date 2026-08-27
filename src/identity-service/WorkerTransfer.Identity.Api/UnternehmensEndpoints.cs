@@ -245,6 +245,17 @@ public static class UnternehmensEndpoints
                 return;
             }
 
+            // Erst Anmeldung, DANN Eingabe: umgekehrt lernte ein Fremder aus
+            // dem Unterschied 422/401, dass es diesen Endpunkt gibt. Ohne die
+            // Pruefung kam `{}` als 500 zurueck (D2).
+            if (string.IsNullOrWhiteSpace(body.Token))
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", "token is required");
+                return;
+            }
+
             await Beantworte(context, cancellationToken, async () =>
             {
                 var mitgliedschaft = await mediator.Send(

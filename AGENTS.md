@@ -53,6 +53,7 @@ make validate       # runs through, reports every red step, prints the counts
 make fix            # dotnet format
 make up / down      # docker compose — the whole stack
 make images         # both shipped images, the local twin of the CI job
+make routenkarte    # every endpoint x three principals, needs the running stack
 make k8s-up / k8s-down / k8s-lint
 ```
 
@@ -92,6 +93,14 @@ Restore needs a NuGet login for `Girder.*` (GitHub Packages); `NuGet.Config` pin
 - **`WorkerTransfer.Skills` renames, never infers** (ADR-0023): aliases only. No levels, weights, implications or likelihood-to-switch. Unknown skills pass through unchanged.
 - **Aggregates come back detached.** A mutation reaches the database only via an explicit save — forgetting it costs nothing in tests and loses the write in production.
 - New cross-cutting decisions get an ADR in `docs/adr/`.
+
+## The route map
+
+`docs/routenkarte.yml` — every endpoint through the gateway with its expected answer in the three principals of ADR-0017 (no token / person without company / acting for a company).
+
+- `RoutenkarteTests` (gateway suite, no stack) pins that the map is **complete**: a new route without an entry goes red.
+- `scripts/routenkarte.sh` (`make routenkarte`, needs `make up`) drives the answers. A script and not a suite: a suite without a stack skips itself, and a skipped test looks like a passing one.
+- **A deviation is not a reason to edit the map.** The map holds the intent; check which side is wrong first.
 
 ## Gateway
 

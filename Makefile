@@ -8,7 +8,7 @@
 DOTNET_SLN := WorkerTransfer.slnx
 
 .PHONY: help check check-dotnet check-web build test test-web validate validate-e2e \
-        fix dev up down images k8s-up k8s-down k8s-lint k8s-seed clean
+        fix dev up down images routenkarte k8s-up k8s-down k8s-lint k8s-seed clean
 
 help:  # Diese Liste.
 	@# `0-9` im Muster, sonst fehlen k8s-up/-down/-seed/-lint — vorhanden, aber
@@ -43,6 +43,12 @@ test-web:  # Nur die Frontend-Reihe.
 
 validate:  # Wie check, aber laeuft durch und berichtet jeden roten Schritt.
 	./scripts/validate.sh
+
+routenkarte:  # docs/routenkarte.yml gegen den laufenden Stapel fahren.
+	@# Die VOLLSTAENDIGKEIT der Karte prueft RoutenkarteTests und laeuft in
+	@# jeder Reihe mit. Hier werden die ANTWORTEN geprueft, und dafuer braucht
+	@# es den Stapel: `make up` zuerst.
+	./scripts/routenkarte.sh
 
 validate-e2e:  # Zusaetzlich die Browser-Reise; braucht den laufenden Stapel.
 	./scripts/validate.sh --e2e

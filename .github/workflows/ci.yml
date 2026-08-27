@@ -201,6 +201,14 @@ jobs:
           echo "POST /auth/register -> ${status}"
           [ "$status" = "201" ] || { echo "::error::Registrierung lieferte ${status}."; cat antwort.json; exit 1; }
 
+      # Die ganze Routenkarte: jeder Endpunkt, drei Handlungsformen.
+      #
+      # Sie steht hier und nicht in der Testreihe, weil sie den laufenden
+      # Stapel braucht — und eine Reihe, die sich ohne ihn ueberspringt, sieht
+      # aus wie eine bestandene. Hier laeuft der Stapel ohnehin schon.
+      - name: Die Routenkarte stimmt noch
+        run: ./scripts/routenkarte.sh
+
       # Bei einem roten Schritt sind die Protokolle das Einzige, was hilft —
       # der Stapel ist eine Zeile spaeter weg.
       - name: Protokolle, wenn etwas rot war

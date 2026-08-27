@@ -57,6 +57,7 @@ make fix            # dotnet format
 make validate       # like check, but runs through and reports every red step
 make up / make down # the whole stack in docker compose
 make images         # both shipped images — the local twin of the CI job
+make routenkarte    # every endpoint × three principals, against the running stack
 make k8s-up / k8s-down / k8s-lint
 ```
 
@@ -200,6 +201,19 @@ EF Core, one `DbContext` per service, one database per service — **no shared d
 `WorkerTransfer.Outbox` records an *intent* in the **same transaction** as the domain change; a dispatcher delivers it with retries (ADR-0025). The promise it keeps is the old one — a failed mail must never topple the transaction — kept differently.
 
 The table deliberately holds **no content**, only a user id and a kind. An outbox is durable storage and ends up in every backup, so a payload column would be an invitation to write message text into it. **Never carry an email address into it.** Giving up means leaving the row, never deleting it. Delivery is **at-least-once**. There is no broker, and none is planned.
+
+### The route map is a test, not a checklist
+
+[`docs/routenkarte.yml`](docs/routenkarte.yml) records, for every endpoint reachable through the gateway, what it answers in the **three** principals ADR-0017 distinguishes: no token, a person with no company (`tenant_id` null), and someone acting for a company. The middle one is the one people forget — on a transfer market a person without a company is the *normal* case, and the rows where the middle and right columns differ are exactly where ADR-0017 is doing work.
+
+Two things drive it, and they answer different questions:
+
+- **`RoutenkarteTests`** (in the gateway suite, no stack needed) asserts the map is **complete**: every route in `ocelot.json` has at least one entry. Add a route without an entry and it goes red. Without this, the map would be correct exactly until the next endpoint.
+- **`scripts/routenkarte.sh`** (`make routenkarte`, needs `make up`) drives all 315 answers against the running stack. It is a script rather than a test suite on purpose: a suite that needs a stack skips itself without one, and a skipped test looks exactly like a passing one.
+
+The reason it is a test at all: `scripts/k8s-up.sh` claimed `GET /jobs` answers 200. It answers **401** — a job list sits behind login — and the script had never run, so nobody found out. A list nobody drives is wrong the day after it is written.
+
+Building the map found three things a checklist would have blessed: five endpoints answered **500** on a malformed body (one of them `/auth/login`, where a missing password reached the password hasher); `/companies/withdrawal` was routed publicly and answered 401, confirming an internal door exists; and `GET /notifications` answers **405**, which reveals a path the service deliberately hides behind a 404. The first two are fixed. The third is written down in the map, not fixed.
 
 ### The gateway
 
