@@ -30,7 +30,7 @@
 #   2. docker/dotnet-service.Dockerfile: seinen Einstiegspunkt in die Liste.
 #   3. Einen Block unten kopieren und drei Dinge aendern: den Namen,
 #      SERVICE_DIR und den Hafen. Und die Route in
-#      dotnet/src/gateway/WorkerTransfer.Gateway/ocelot.json.
+#      src/gateway/WorkerTransfer.Gateway/ocelot.json.
 # ---------------------------------------------------------------------------
 
 x-dienst: &dienst

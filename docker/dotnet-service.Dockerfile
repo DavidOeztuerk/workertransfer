@@ -16,10 +16,10 @@ WORKDIR /quelle
 
 # Erst die Manifeste, dann der Rest: so bleibt die Wiederherstellung in der
 # Schichtzwischenablage, solange sich keine Abhaengigkeit aendert.
-COPY dotnet/Directory.Build.props dotnet/Directory.Packages.props dotnet/NuGet.Config \
-     dotnet/WorkerTransfer.slnx ./
-COPY dotnet/src ./src
-COPY dotnet/tests ./tests
+COPY Directory.Build.props Directory.Packages.props NuGet.Config \
+     WorkerTransfer.slnx ./
+COPY src ./src
+COPY tests ./tests
 
 # Girder liegt in GitHub Packages und verlangt eine Anmeldung. Sie kommt als
 # BuildKit-Geheimnis herein und wird NIE eine Schicht: ein Zugriff in einem Bild
