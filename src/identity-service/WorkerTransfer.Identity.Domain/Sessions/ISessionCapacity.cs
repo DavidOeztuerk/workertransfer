@@ -11,8 +11,22 @@ namespace WorkerTransfer.Identity.Domain.Sessions;
 /// <para>
 /// Keyed by the sign-in rather than by the token: a <see cref="SessionId"/> is
 /// stable across the whole rotation chain, so this is one row per sign-in and
-/// not one per refresh. Transition debt Ü-5 in
-/// <c>docs/uebergang-python-dotnet.md</c> records why it is a table of its own.
+/// not one per refresh. A missing row means "acting as a person" — a private
+/// person's sign-in writes nothing here at all.
+/// </para>
+/// <para>
+/// <strong>Eine eigene Tabelle, weil Girders Erneuerungstoken keine
+/// Mandantenspalte hat.</strong> Sie stand einmal als Übergangsschuld notiert;
+/// sie ist keine. Solange <c>GirderRefreshToken</c> die Spalte nicht bekommt,
+/// ist dies der Ort, an dem diese Frage beantwortet wird — und bekäme er sie,
+/// wäre das eine Entscheidung mit eigenem Commit, kein Aufräumen.
+/// </para>
+/// <para>
+/// <strong>Nicht wegzukürzen:</strong> die Mitgliedschaft wird bei
+/// <em>jeder</em> Erneuerung neu geprüft und nie aus dieser Zeile geglaubt.
+/// Einmal geprüft ist ein Nachweis genau einmal gut; wer hineingelassen wurde,
+/// bliebe sonst drin, solange er weiter erneuert — lange nachdem das
+/// Unternehmen ihn entfernt hat.
 /// </para>
 /// </remarks>
 public interface ISessionCapacity

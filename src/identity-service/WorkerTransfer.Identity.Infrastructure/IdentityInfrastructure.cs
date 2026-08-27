@@ -52,20 +52,21 @@ public static class IdentityInfrastructure
             configuration.GetSection(Meldeeinstellungen.Abschnitt));
         services.Configure<Postsettings>(configuration.GetSection(Postsettings.Abschnitt));
 
-        // bcrypt reads *and* writes while the Python service can still sign
-        // people in — Ü-6 in docs/uebergang-python-dotnet.md.
+        // bcrypt liest UND schreibt. Zur Uebergangszeit musste es das, damit
+        // der Python-Dienst dieselben Eintraege noch lesen konnte; jetzt ist es
+        // eine freie Entscheidung. Argon2id waere OWASPs erste Wahl und holte
+        // jede Person bei ihrer naechsten Anmeldung herueber
+        // (`AddArgon2Passwords()` plus `AddBCryptPasswordReader()`) — das ist
+        // eine eigene Entscheidung mit eigenem Commit, kein Nebenprodukt des
+        // Aufraeumens.
         services.AddBCryptPasswords();
 
-        // After AddSharedInfrastructure, which registers Girder's factory with
-        // a plain AddSingleton, so this is the one resolved — Ü-2.
-        services.AddSingleton<IPrincipalFactory, UebergangsPrincipalFactory>();
+        // Aussteller und Zielgruppe werden wieder VOLL geprueft: die
+        // nachsichtigen Delegaten gab es nur fuer Token ohne `iss`/`aud`, und
+        // die stellte allein der Python-Dienst aus.
         services.PostConfigure<JwtBearerOptions>(
             JwtBearerDefaults.AuthenticationScheme,
-            options =>
-            {
-                options.TokenValidationParameters.FuerBeideAussteller();
-                options.AuchAusDemCookie();
-            });
+            options => options.AuchAusDemCookie());
 
         services.AddSingleton(_ => IdentityDbContextFactory.DataSource(connectionString));
         services.AddDbContext<IdentityDbContext>((provider, options) =>

@@ -4,12 +4,20 @@ using Girder.Core.Identity;
 namespace WorkerTransfer.Identity.Tests;
 
 /// <summary>
-/// The shape of the transitional access token: what both worlds read out of it.
+/// Die Form des Zugriffstokens: was ein Leser darin findet — und was nicht.
 /// </summary>
 /// <remarks>
-/// Every claim here is load-bearing for one side or the other, and the two
-/// omissions are as deliberate as the entries. See
-/// <c>docs/MIGRATION-PROMPT.md</c>, "Die Tokenform entscheidet die Reihenfolge".
+/// Bis Phase C trug dieses Token zwei Auspraegungen zugleich, weil noch ein
+/// zweiter Dienst mitlas: <c>tenant_id</c> neben <c>tenant</c> und ein
+/// <c>type</c> mit dem Wert <c>access</c>. Beide sind mit Ue-2 gefallen. Sie
+/// stehen hier weiter — als Abwesenheit, siehe
+/// <see cref="Die_uebergangsansprueche_sind_weg_und_bleiben_weg"/>: wer sie
+/// versehentlich zurueckbringt, baut einen zweiten Ort fuer den Mandanten, und
+/// zwei Orte fuer dieselbe Aussage gehen irgendwann auseinander.
+/// <para>
+/// Jeder verbleibende Anspruch traegt etwas, und die Auslassungen sind so
+/// gewollt wie die Eintraege.
+/// </para>
 /// </remarks>
 public class TokenformTests
 {
@@ -22,7 +30,7 @@ public class TokenformTests
             await Tokenform.Issuer_().IssueAsync(Anna, "anna@example.com", acting, Sitzung));
 
     [Fact]
-    public async Task Beide_Welten_finden_das_Subjekt_unter_sub()
+    public async Task Das_Subjekt_steht_unter_sub()
     {
         var payload = await IssueAsync(Capacity.AsSelf.Instance);
 
@@ -30,36 +38,53 @@ public class TokenformTests
     }
 
     [Fact]
-    public async Task Python_findet_den_Mandanten_unter_tenant_id_und_Girder_unter_tenant()
+    public async Task Wer_fuer_eine_Firma_handelt_traegt_sie_unter_tenant()
     {
         var payload = await IssueAsync(new Capacity.ForCompany(Firma));
 
         payload.Claim("tenant").Should().Be(Firma.ToString());
-        payload.Claim("tenant_id").Should().Be(Firma.ToString());
     }
 
     [Fact]
-    public async Task Wer_als_Person_handelt_traegt_keinen_der_beiden_Mandantenansprueche()
+    public async Task Wer_als_Person_handelt_traegt_gar_keinen_Mandanten()
     {
         var payload = await IssueAsync(Capacity.AsSelf.Instance);
 
-        payload.Has("tenant").Should().BeFalse();
-        payload.Has("tenant_id").Should().BeFalse("ein leerer Mandant ist kein Mandant");
-    }
-
-    [Fact]
-    public async Task Python_verlangt_type_und_bekommt_access()
-    {
-        var payload = await IssueAsync(Capacity.AsSelf.Instance);
-
-        payload.Claim("type").Should().Be("access");
+        payload.Has("tenant").Should().BeFalse("ein leerer Mandant ist kein Mandant");
     }
 
     /// <summary>
-    /// Not an oversight: the role checks read from <c>user_tenant_memberships</c>,
-    /// never from the token, so the claim was never authoritative. It also cannot
-    /// be written as a list — see
-    /// <c>bugs/customclaims-kann-keine-liste-ausdruecken.md</c>.
+    /// Die beiden Ansprueche aus der Uebergangszeit, jetzt als Verbot.
+    /// </summary>
+    /// <remarks>
+    /// <c>tenant_id</c> war die Schreibweise des Vorgaengerdienstes und stand
+    /// neben <c>tenant</c> — zwei Namen fuer dieselbe Firma. <c>type</c> sagte
+    /// <c>access</c>, weil der Vorgaenger sonst nicht validierte; hier
+    /// unterscheidet die Lebensdauer die beiden Tokenarten, und ein Anspruch,
+    /// den niemand liest, ist bloss eine Aussage mehr, die falsch werden kann.
+    /// <para>
+    /// Geprueft wird in BEIDEN Handlungsformen: <c>tenant_id</c> entstand nur
+    /// bei einer Firma, <c>type</c> immer. Nur eine Form zu pruefen liesse
+    /// genau die andere Rueckkehr durch.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("tenant_id")]
+    [InlineData("type")]
+    public async Task Die_uebergangsansprueche_sind_weg_und_bleiben_weg(string anspruch)
+    {
+        var alsPerson = await IssueAsync(Capacity.AsSelf.Instance);
+        var fuerFirma = await IssueAsync(new Capacity.ForCompany(Firma));
+
+        alsPerson.Has(anspruch).Should().BeFalse();
+        fuerFirma.Has(anspruch).Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Kein Versehen: die Rollenpruefungen lesen aus
+    /// <c>user_tenant_memberships</c>, nie aus dem Token, der Anspruch war also
+    /// nie massgeblich. Er liesse sich auch gar nicht als Liste schreiben —
+    /// siehe <c>bugs/customclaims-kann-keine-liste-ausdruecken.md</c>.
     /// </summary>
     [Theory]
     [InlineData("roles")]

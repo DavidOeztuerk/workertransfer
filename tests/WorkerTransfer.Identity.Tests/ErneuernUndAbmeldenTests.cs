@@ -106,8 +106,7 @@ public class ErneuernUndAbmeldenTests
 
     /// <summary>
     /// Signing in gives a person token; so does refreshing. Acting for a
-    /// company is a step of its own — see Ü-5 in
-    /// <c>docs/uebergang-python-dotnet.md</c>.
+    /// company is a step of its own — see <c>ISessionCapacity</c>.
     /// </summary>
     [Fact]
     public async Task Eine_Erneuerung_macht_niemanden_zum_Unternehmen()

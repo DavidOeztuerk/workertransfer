@@ -6,7 +6,7 @@ using WorkerTransfer.Identity.Infrastructure.Persistence;
 namespace WorkerTransfer.Identity.Tests;
 
 /// <summary>
-/// What a sign-in acts as, across the table that remembers it (Ü-5).
+/// What a sign-in acts as, across the table that remembers it.
 /// </summary>
 [Collection(PostgresCollection.Name)]
 public class HandlungsformTests(Postgres postgres) : IAsyncLifetime

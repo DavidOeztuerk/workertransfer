@@ -6,8 +6,7 @@ namespace WorkerTransfer.Companies.Infrastructure.Persistence;
 
 /// <summary>Baut Datenquelle und Kontext über dem Schema dieses Dienstes.</summary>
 /// <remarks>
-/// Ohne <c>MapEnum</c>: dieser Dienst legt keinen Postgres-Enumtyp an, und
-/// deshalb betrifft ihn der Guard aus Ü-7 nicht.
+/// Ohne <c>MapEnum</c>: dieser Dienst legt keinen Postgres-Enumtyp an.
 /// </remarks>
 public static class CompaniesDbContextFactory
 {

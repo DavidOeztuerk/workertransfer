@@ -10,9 +10,14 @@ namespace WorkerTransfer.Identity.Infrastructure.Security;
 /// <remarks>
 /// Girder writes <c>sub</c>, <c>email</c>, <c>jti</c>, <c>iat</c>, <c>exp</c>,
 /// <c>iss</c>, <c>aud</c>, <c>session_id</c> and — while acting for a company —
-/// <c>tenant</c>. Two more are added for the Python services that are still
-/// live: <c>tenant_id</c> and <c>type</c>. Both leave with the transition and
-/// are listed as Ü-3 in <c>docs/uebergang-python-dotnet.md</c>.
+/// <c>tenant</c>. Mehr steht nicht drin.
+/// <para>
+/// Zur Uebergangszeit standen hier zwei weitere: <c>tenant_id</c> neben Girders
+/// <c>tenant</c>, und <c>type: "access"</c>. Pythons <c>TokenPayload</c>
+/// verlangte beides. Sie sind weg — <c>tenant_id</c> neben <c>tenant</c> war
+/// genau die Doppelung, bei der eines Tages eines von beiden gepflegt wird und
+/// das andere nicht.
+/// </para>
 /// <para>
 /// Roles and permissions are not written. They are read from
 /// <c>user_tenant_memberships</c> per operation, never from a token, and
@@ -22,8 +27,6 @@ namespace WorkerTransfer.Identity.Infrastructure.Security;
 /// </remarks>
 public sealed class GirderAccessTokenIssuer(IJwtService jwt) : IAccessTokenIssuer
 {
-    private const string AccessTokenType = "access";
-
     /// <inheritdoc />
     public async Task<string> IssueAsync(
         SubjectId subject,
@@ -34,20 +37,12 @@ public sealed class GirderAccessTokenIssuer(IJwtService jwt) : IAccessTokenIssue
     {
         ArgumentNullException.ThrowIfNull(acting);
 
-        var custom = new Dictionary<string, string> { ["type"] = AccessTokenType };
-
-        if (acting is Capacity.ForCompany company)
-        {
-            custom["tenant_id"] = company.Tenant.ToString();
-        }
-
         var issued = await jwt.GenerateTokenAsync(new UserClaims
         {
             UserId = subject.ToString(),
             Email = email,
             Acting = acting,
-            SessionId = session.ToString(),
-            CustomClaims = custom
+            SessionId = session.ToString()
         });
 
         return issued.AccessToken;
