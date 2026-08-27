@@ -45,7 +45,7 @@ step() {
 # --- .NET --------------------------------------------------------------------
 # Bauen und Testen in GETRENNTEN Schritten. Verkettet scheitern die
 # Testcontainers-Reihen und sehen dabei aus wie echte Testfehler.
-step "dotnet build" dotnet build dotnet/WorkerTransfer.slnx
+step "dotnet build" dotnet build WorkerTransfer.slnx
 step "dotnet test" ./scripts/test-dotnet.sh
 
 # --- Frontend ----------------------------------------------------------------

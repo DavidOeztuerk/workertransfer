@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-27, nach **Python raus** — Phase C, 3 von 6.
+**Zuletzt fortgeschrieben:** 2026-08-27, nach der **Umbenennung** — Phase C, 3 von 6.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -27,8 +27,8 @@ was davon getan ist.
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
 
 ```bash
-dotnet build dotnet/WorkerTransfer.slnx
-dotnet test  dotnet/WorkerTransfer.slnx --blame-hang-timeout 300s
+dotnet build WorkerTransfer.slnx
+dotnet test  WorkerTransfer.slnx --blame-hang-timeout 300s
 ```
 
 **Der zweite Aufruf reicht auf dieser Maschine nicht mehr.** Neun Testreihen
@@ -55,14 +55,14 @@ keiner. Das Skript läuft durch, nennt jede rote Reihe und am Schluss die Zahl.
 
 Vier Stücke, alle committet und grün.
 
-**1. `dotnet/src/shared/WorkerTransfer.Outbox`** — Tabelle je Dienst in dessen
+**1. `src/shared/WorkerTransfer.Outbox`** — Tabelle je Dienst in dessen
 eigener Datenbank (`ConfigureOutbox()`), Absicht in derselben Transaktion
 (`IOutbox.VermerkeAsync`), `FOR UPDATE SKIP LOCKED` beim Holen,
 `NochNichtException` für „noch nicht" ohne Versuchsverbrauch,
 `HoechsteVersuche = null` heißt nie aufgeben, kein Inhalt außer `user_id` und
 `kind`. Die Schleife gehört dem Dienst und öffnet je Durchlauf einen Bereich.
 
-**2. `dotnet/src/shared/WorkerTransfer.ServiceDefaults`** —
+**2. `src/shared/WorkerTransfer.ServiceDefaults`** —
 `AddWorkerTransferDefaults(...)` und `UseWorkerTransferDefaults(...)`.
 `AlsAussteller()` ruft **nur identity**. Die RFC-9457-Problemdetails liegen hier.
 
@@ -129,10 +129,10 @@ Keiner der drei kam bis zu seinem Bericht. Was beim Fortsetzen zu klären ist:
 
 - **Die Fähigkeitentabelle gehört geteilt.** `profile` hat sie dienstintern
   gebaut (`Domain/Faehigkeiten/Wortschatz.cs`); `jobs` braucht dieselbe in
-  Welle 2. Spätestens dann nach `dotnet/src/shared/WorkerTransfer.Skills`
+  Welle 2. Spätestens dann nach `src/shared/WorkerTransfer.Skills`
   ziehen — nicht vorher, sonst schreiben zwei Agenten dieselbe Datei.
 - **Erledigt:** die Fähigkeitentabelle liegt jetzt in
-  `dotnet/src/shared/WorkerTransfer.Skills`, ohne eine einzige Abhängigkeit.
+  `src/shared/WorkerTransfer.Skills`, ohne eine einzige Abhängigkeit.
   Geteilt ist nur die Tabelle und die Höchstlänge; die Fähigkeitenliste selbst
   führt jeder Dienst für sich.
 - **`ZugriffsCookie` ist nach `ServiceDefaults` gewandert.** Es stand in drei
@@ -409,8 +409,13 @@ In dieser Reihenfolge:
 
 1. ~~Gateway mit Ocelot~~ — **fertig**, siehe unten.
 2. ~~Compose und Helm~~ — **fertig**. Compose gemessen, Chart gerendert.
-3. ~~Python restlos entfernen~~ — **fertig**. Die Umbenennung `dotnet/src → src`
-   folgt als eigener Commit.
+3. ~~Python restlos entfernen, `dotnet/src → src`~~ — **fertig**.
+
+   **Offen und bewusst verschoben:** die Pfadangaben in `docs/`, `AGENTS.md`,
+   `CONTRIBUTING.md` und `README.md` zeigen noch auf `apps/<dienst>` und
+   `packages/worker-*`. Sie gehören in Schritt 6, wo der Prüfer die
+   Dokumentation ohnehin neu fasst — sie hier nachzuziehen hieße, dieselbe
+   Datei zweimal anzufassen.
 4. Übergangsgerüst löschen: Ü-1 bis Ü-7 in
    [`uebergang-python-dotnet.md`](uebergang-python-dotnet.md), ersatzlos. Die
    Enum-Guards werden schlichte `CREATE TYPE`.
@@ -419,7 +424,7 @@ In dieser Reihenfolge:
 
 ---
 
-## Phase C, Schritt 1: das Gateway (`dotnet/src/gateway`)
+## Phase C, Schritt 1: das Gateway (`src/gateway`)
 
 Ocelot 25, elf Ziele, 41 Routen, und **es prüft nichts**: kein Token wird
 gelesen, keine Einwilligung geprüft, keine Rolle erzwungen. Das tut jeder

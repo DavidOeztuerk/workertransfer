@@ -5,7 +5,7 @@
 # wie echte Testfehler.
 
 .DEFAULT_GOAL := help
-DOTNET_SLN := dotnet/WorkerTransfer.slnx
+DOTNET_SLN := WorkerTransfer.slnx
 
 .PHONY: help check check-dotnet check-web build test test-web validate validate-e2e \
         fix dev up down k8s-up k8s-down k8s-lint k8s-seed clean
@@ -71,4 +71,4 @@ k8s-lint:  # Chart pruefen, ohne Cluster: helm lint + rendern.
 	@echo "Chart rendert."
 
 clean:  # Bau- und Testreste.
-	find dotnet -type d \( -name bin -o -name obj -o -name TestResults \) -prune -exec rm -rf {} +
+	find src tests -type d \( -name bin -o -name obj -o -name TestResults \) -prune -exec rm -rf {} +

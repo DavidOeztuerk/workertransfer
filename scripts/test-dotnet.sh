@@ -23,7 +23,7 @@ gesamt=0
 uebersprungen=0
 
 for reihe in "${reihen[@]}"; do
-  projekt="dotnet/tests/WorkerTransfer.${reihe}.Tests/WorkerTransfer.${reihe}.Tests.csproj"
+  projekt="tests/WorkerTransfer.${reihe}.Tests/WorkerTransfer.${reihe}.Tests.csproj"
   [ -f "$projekt" ] || continue
 
   zeile=$(dotnet test "$projekt" --no-build 2>&1 | grep -E "^(Bestanden!|Fehler!)" | tail -1)

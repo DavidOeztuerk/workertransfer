@@ -119,7 +119,7 @@ public class SpaltenetikettenTests(Postgres postgres)
 
         var ordner = Path.Combine(
             Postgres.Repowurzel(),
-            "dotnet", "src", "identity-service",
+            "src", "identity-service",
             "WorkerTransfer.Identity.Infrastructure", "Persistence", "Migrations");
 
         var anmerkung = Directory.EnumerateFiles(ordner, "*.cs")
