@@ -30,6 +30,43 @@ public sealed class ProblemDetailsMiddleware(
         {
             await next(context);
         }
+        catch (FluentValidation.ValidationException ungueltig)
+        {
+            // DIE STUFE IST SCHARF, NUR LEER.
+            //
+            // `AddCQRS` haengt Girders `ValidationBehavior` bereits in jede
+            // Pipeline und ruft bereits `AddValidatorsFromAssemblies`. Es steigt
+            // sofort aus, solange es keinen Validator findet — und wir hatten
+            // keinen. Wer den ersten schreibt, bekaeme ohne diesen Zweig eine
+            // 500 fuer eine Eingabe, die der Aufrufer falsch gemacht hat.
+            //
+            // 422 und nicht 400: der Rumpf war lesbar, sein Inhalt ist es nicht.
+            // Genau die Unterscheidung, die die handgeschriebenen Pruefungen an
+            // den Endpunkten schon treffen.
+            //
+            // GENANNT WERDEN NUR DIE FELDNAMEN, nie die Werte. `ErrorMessage`
+            // wird bewusst nicht durchgereicht: FluentValidation setzt in seine
+            // Vorgabemeldungen Platzhalter ein, und `{PropertyValue}` waere der
+            // Wert einer Person in einem Fehlerdokument — das landet in
+            // Bildschirmfotos und Fehlerberichten. Ein Feldname ist Form, kein
+            // Inhalt.
+            var felder = string.Join(
+                ", ",
+                ungueltig.Errors.Select(fehler => fehler.PropertyName)
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Distinct(StringComparer.Ordinal));
+
+            logger.LogWarning("Validation failed for {Fields}", felder);
+
+            if (context.Response.HasStarted)
+            {
+                throw;
+            }
+
+            await Schreibe(context, StatusCodes.Status422UnprocessableEntity,
+                "Request failed",
+                felder.Length > 0 ? $"invalid: {felder}" : "validation failed");
+        }
         catch (BadHttpRequestException kaputt)
         {
             // EIN KAPUTTER RUMPF IST KEIN SERVERFEHLER.
