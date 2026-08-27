@@ -370,3 +370,106 @@ Fertig ist es, wenn all das zugleich gilt:
 **Wenn danach die offenen Girder-Fehler behoben sind, muss alles grün werden,
 ohne dass jemand Code zurückbaut.** Das ist der Sinn der Regel oben, und daran
 misst sich, ob dieser Auftrag ausgeführt wurde.
+
+---
+
+## Phase D — bis es sitzt
+
+Phase C hat die Migration abgeschlossen. Phase D beweist, dass sie trägt. Nichts
+an der Oberfläche, bevor D durch ist.
+
+### D0 — Die Wurzel: gemessen, und sie ist sauber
+
+Der Verdacht war, dort läge Python-Erbe. Liegt es nicht:
+
+| | Befund |
+|---|---|
+| `node_modules` (210 M) auf der Wurzel | **Richtig so.** pnpm-Workspaces hängen die geteilten Pakete an die Wurzel und verlinken von dort nach `apps/web/node_modules` und `packages/ui/node_modules`. Kein Erbe, sondern die Bauform. **0 Dateien in git verfolgt** |
+| `package.json`, `pnpm-*`, `turbo.json`, `tsconfig.base.json` auf der Wurzel | **Müssen dort liegen.** Das *ist* die Workspace-Wurzel; sie definiert die Mitglieder (`apps/web`, `packages/ui`) und hält `turbo` |
+| `Makefile` | **Schon .NET.** 14 Treffer auf `dotnet`/`pnpm`, **null** auf `uv`, `pytest`, `ruff`, `mypy`, `alembic` |
+| `scripts/`, `docker/`, `deploy/` | Alle .NET, k8s oder Frontend |
+| `.turbo`, `.pnpm-store`, `.playwright-mcp`, `.claude` | Arbeitsspuren, **0 Dateien verfolgt**, alle ignoriert |
+
+**Nichts davon kann weg.** Die einzigen offenen Posten sind `.opencode` (10
+verfolgte Dateien) und `.superpowers` (1) — Werkzeug fremder Agenten im Repo.
+Schadet nichts, gehört aber vermutlich nicht dorthin. Entscheidung liegt beim
+Menschen.
+
+### D1 — Die Bremse, zuerst
+
+**Sie fehlt.** Der Python-Dienst bremste fünf Endpunkte (`/auth/login`,
+`/refresh`, `/register`, `/verify-email`, `/resend-verification`); in `src/`
+bremst nichts. Das ist keine Politur, das ist ein Loch, und es steht vor allem
+anderen in dieser Phase.
+
+Die Regel, die überleben muss: **je Herkunft bremsen, nie je E-Mail-Adresse.**
+Wer je Adresse bremst, baut einen Aufzählungskanal — eine gebremste Antwort
+verrät, dass die Adresse existiert. Und die Bremse sitzt **weiter außen als die
+Authentifizierung**, sonst kostet jeder Versuch schon einen Hash.
+
+Girder bringt Ratenbegrenzung mit. Sitzt sie am Gateway, in `ServiceDefaults`
+oder in identity-service? Sie muss dort sitzen, wo sie den Prozess kennt: der
+Zähler läuft **im Prozess** (ROADMAP 10.1), was `replicaCount: 1` mitbedingt —
+wer sie über mehrere Repliken tragen will, braucht einen geteilten Zähler. Das
+gehört entschieden und aufgeschrieben, nicht nebenbei gebaut.
+
+### D2 — Die Routenkarte, als Test statt als Abhaken
+
+Jede Route jedes Dienstes, **durch das Gateway**, mit ihrer **erwarteten**
+Antwort. Nicht „gibt sie 200" — `GET /jobs` gibt korrekt `401`, und genau daran
+wäre `scripts/k8s-up.sh` bei seinem ersten Lauf gescheitert, weil dort `200`
+stand.
+
+Die Karte ist kein Skript, das einmal läuft, sondern eine Datei mit erwarteten
+Antworten und ein Test, der sie fährt. Eine neue Route ohne Eintrag lässt ihn
+rotlaufen — sonst ist die Karte am Tag nach ihrer Erstellung veraltet.
+
+Je Route festhalten: Antwort ohne Token · Antwort mit Personen-Token · Antwort
+mit Firmen-Token. Drei Spalten, weil ADR-0017 drei Fälle kennt und der mittlere
+der ist, den man vergisst.
+
+### D3 — Die Querschnitte im Betrieb, nicht im Test
+
+Gegen den laufenden Stapel, mit echtem Verkehr durchs Gateway. Ein Unit-Test
+beweist hier nichts, weil genau die Verkettung Gateway → Dienst → Antwort die
+Frage ist.
+
+- **Korrelations-ID.** Eine Anfrage mit `X-Correlation-ID: probe-1` durchs
+  Gateway: taucht `probe-1` im Log des Dienstes auf, und steht sie in der
+  Antwort? Und ohne Kopf: wird eine erzeugt, und ist es **eine** über die ganze
+  Kette statt einer je Sprung?
+- **ETag.** Wo `AddHttpResponseCaching` sitzt: kommt ein `ETag`, und antwortet
+  ein `If-None-Match` mit `304`? Und der Punkt, der zählt: **entwertet ein
+  Schreibvorgang ihn wirklich?** Genau daran ist Girder 3.0.1 schon einmal
+  lautlos gescheitert — In-Memory verglich rohe Muster mit präfigierten
+  Schlüsseln und löschte nichts.
+- **CQRS.** Läuft die Pipeline wirklich, und in der gedachten Reihenfolge?
+  Validierung vor dem Handler, Prüfspur in derselben Transaktion, und das
+  Entscheidende: **keine Werte im Log.** Schick ein Kommando mit
+  `"Termin bei Dr. Weber"` durch und grep das Log danach. Findet sich der Text,
+  ist eine tragende Regel gebrochen.
+- **Die Prüfspur.** Ein fehlgeschlagener Login schreibt seine Zeile, und sie
+  überlebt den Abbruch des Befehls.
+
+### D4 — Girder-Tickets aus dem, was dabei auffällt
+
+Wie in Phase B: **der Code bleibt richtig, der Test bleibt rot, das Ticket wird
+geschrieben, die Arbeit geht weiter.** Kein Umweg. Und vorher die Zuordnung
+klären — Girders Pipeline steht in jedem Stapelabzug und beweist nichts.
+
+### D5 — Der Prüfer, diesmal unabhängig
+
+In Phase C ist er an einer Nutzungsgrenze abgebrochen, und die Bestandsaufnahme
+kam danach von derselben Hand, die die Neufassung geschrieben hat. Das zählt
+nicht — der Sinn eines Prüfers ist die zweite Hand.
+
+Ein **frischer Agent**, der nichts davon geschrieben hat, fährt den Auftrag aus
+dem Abschnitt „Der Prüfer" noch einmal: zu jeder Zusage der Vision die
+Fundstelle **und der Test**. Eine Zusage ohne Test ist eine Absichtserklärung.
+
+### Erst danach die Oberfläche
+
+`docs/SCOUT-UND-BERATER.md` beschreibt, wie sie aussehen soll — die
+Herkunftsangabe an jedem Beleg, „nicht genannt" statt eines Kreuzes, der nicht
+wegklickbare Hinweis auf Selbstnennung *und* Sortierung, der neutrale Satz statt
+eines leeren Kastens. Das ist der Auftrag für Phase E, nicht für D.
