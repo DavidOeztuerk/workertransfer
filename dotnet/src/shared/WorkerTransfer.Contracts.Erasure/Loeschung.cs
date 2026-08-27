@@ -55,15 +55,20 @@ public static class Loeschempfaenger
     /// (ADR-0027 §2), and a deletion order to a service with nothing to delete
     /// would be an endpoint that says "done" without ever doing anything.
     /// <para>
-    /// <c>github</c> is gone with its service: ADR-0022 deleted
-    /// <c>worker-github</c> because it scored people, and carrying the service
-    /// over would have kept exactly what the ADR condemns.
+    /// <c>github</c> is on this list, and the reason it was once left off is
+    /// worth keeping: ADR-0022 deleted the <em>package</em>
+    /// <c>worker-github</c>, which scored people. The <em>service</em> was
+    /// built under that same ADR and does the opposite — it shows what GitHub
+    /// says about a repository and derives nothing about a person. Confusing
+    /// the two costs a service; the domain module says so in its first
+    /// paragraph.
     /// </para>
     /// <para>
-    /// <c>notification</c> took its place, and not by symmetry: it holds the
-    /// notification preferences, and those are keyed by the person. A service
-    /// that holds a row per person is a recipient — that is the whole rule, and
-    /// it is why this list is checked against the schemas rather than agreed on.
+    /// <c>notification</c> is here for the same reason as everyone else: it
+    /// holds the notification preferences, and those are keyed by the person. A
+    /// service that holds a row per person is a recipient — that is the whole
+    /// rule, and it is why this list is checked against the schemas rather than
+    /// agreed on.
     /// </para>
     /// <para>
     /// A test goes red the moment any service grows a table with
@@ -71,7 +76,10 @@ public static class Loeschempfaenger
     /// </para>
     /// </remarks>
     public static IReadOnlyList<string> Fremde { get; } =
-        ["consent", "profile", "resume", "portfolio", "applications", "transfer", "notification"];
+    [
+        "consent", "profile", "resume", "portfolio",
+        "applications", "transfer", "github", "notification"
+    ];
 
     /// <summary>The final notice to the person. Itself an outbox row.</summary>
     public const string Schlussnachricht = Praefix + "final";
