@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-27, nach **Compose** — Phase C, Schritt 2 halb.
+**Zuletzt fortgeschrieben:** 2026-08-27, nach **Helm** — Phase C, 2 von 6.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -19,9 +19,9 @@ was davon getan ist.
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
 | **Phase B — die Dienste** | **fertig**, 10 von 10 |
-| **Phase C — Zusammenbau** | Gateway steht, **Compose läuft**; offen: Helm |
+| **Phase C — Zusammenbau** | **2 von 6**: Gateway, Compose und Helm stehen |
 | **Prüfer** | nicht begonnen |
-| **Tests** | 603 grün, 0 rot, 0 übersprungen |
+| **Tests** | 606 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
@@ -405,7 +405,7 @@ Vier weitere Entscheidungen tragen:
 In dieser Reihenfolge:
 
 1. ~~Gateway mit Ocelot~~ — **fertig**, siehe unten.
-2. ~~Compose~~ — **fertig, gemessen**. Offen: Helm.
+2. ~~Compose und Helm~~ — **fertig**. Compose gemessen, Chart gerendert.
 3. Python restlos entfernen, danach `dotnet/` flach in die Wurzel — als eigener
    Commit, damit die Umbenennungen lesbar bleiben.
 4. Übergangsgerüst löschen: Ü-1 bis Ü-7 in
@@ -461,7 +461,7 @@ gemeinsame Kennung erfindet jeder Dienst seine eigene.
 
 ---
 
-## Phase C, Schritt 2: Compose läuft
+## Phase C, Schritt 2: Compose läuft, Helm rendert
 
 `docker compose up` bringt Postgres, Mailpit, **elf Dienste**, das Gateway und
 die Oberfläche hoch. Belegt, nicht behauptet: alle zwölf Häfen antworten mit
@@ -504,6 +504,39 @@ eine Schicht.
 
 Dazu: Vite weist seit 6.x fremde Hosts ab, und Ocelot schickt den Host des
 Ziels — `allowedHosts: ["web"]`, nur dieser eine Name.
+
+### Helm: was wegfiel
+
+Drei Dinge verschwinden mit Python, und jedes war eine Fehlerquelle:
+
+- **Der `migrate`-initContainer.** Er fuhr `docker/entrypoint.sh true` und
+  wartete davor mit einer Schleife auf Postgres. Jetzt wandert der Dienst beim
+  Start selbst — `dotnet ef` braucht das SDK, und ein Laufzeitbild hat keins.
+  Das Warten liegt damit ebenfalls im Dienst, was ohnehin richtig ist: in
+  Kubernetes gibt es kein `depends_on`.
+- **Der `uvicorn`-Aufruf im `command`.** Er umging den ENTRYPOINT, damit dieser
+  nicht ein zweites Mal wanderte. Beides ist weg — und mit ihm die Frage, ob
+  die zwei Beschreibungen desselben Starts noch übereinstimmen.
+- **Traefik samt ConfigMap.** Das Gateway ist jetzt ein Dienst aus demselben
+  Bild (`SERVICE_DIR=gateway`), und seine Landkarte reist *im Bild*. Damit
+  fährt im Cluster, was Compose fährt; eine Kopie, die beim ersten neuen Pfad
+  falsch wird, gibt es nicht mehr.
+
+`replicaCount: 1` hat jetzt einen **vierten** Grund: zwei Pods sind zwei Pilger
+auf demselben Schema.
+
+### Der Wächter, der mit umgezogen ist
+
+`tests/test_k8s_matches_compose.py` fiel — zu Recht, es prüfte gegen den
+Python-Baum. Seine *Absicht* ist zu wertvoll zum Wegwerfen und lebt jetzt als
+`TopologieTests` im Gateway-Projekt: Landkarte, Compose und Chart müssen
+dieselbe Landschaft beschreiben. Vier Gegenproben, und eine davon hat eine
+Lücke im Wächter selbst gezeigt — `CREATE DATABASE` traf auch in einer
+auskommentierten Zeile, eine fehlende Datenbank blieb also grün.
+
+**Noch offen (Schritt 3):** `make k8s-up` ist nicht gefahren. Das Chart lintet
+und rendert, aber nur ein Lauf beweist, dass es läuft — und diese Maschine
+verträgt fünfzehn Pods nicht neben einer Testreihe.
 
 ---
 

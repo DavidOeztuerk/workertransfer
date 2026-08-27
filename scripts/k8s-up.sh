@@ -60,7 +60,11 @@ kubectl get nodes >/dev/null 2>&1 || { rot "Der Cluster antwortet nicht."; exit 
 schritt "Images bauen"
 # EIN Image für alle zehn Dienste: sie unterscheiden sich nur in SERVICE_DIR,
 # und das setzt der Pod. Der Build-Arg bleibt deshalb hier ungesetzt.
-docker build -f docker/service.Dockerfile -t workertransfer/service:dev .
+# EIN Bild fuer alle elf Dienste UND das Gateway. Das Geheimnis traegt die
+# NuGet-Anmeldung fuer GitHub Packages herein und wird nie eine Schicht.
+docker build -f docker/dotnet-service.Dockerfile \
+  --secret "id=nuget_config,src=${HOME}/.nuget/NuGet/NuGet.Config" \
+  -t workertransfer/service:dev .
 docker build -f docker/web-prod.Dockerfile -t workertransfer/web:dev .
 
 schritt "Images in den Cluster laden"
@@ -71,11 +75,10 @@ kind load docker-image workertransfer/web:dev --name "$CLUSTER"
 
 # ---------------------------------------------------------------------------
 schritt "Helm-Release"
-# Die beiden --set-file sind der Grund, warum es keine zweite Landkarte gibt:
-# Routen und Datenbankanlage kommen aus DENSELBEN Dateien, die docker compose
-# benutzt.
+# Nur noch EIN --set-file: die Datenbankanlage kommt aus derselben Datei, die
+# docker compose benutzt. Die Routen brauchen keins mehr — die Landkarte reist
+# im Bild, und damit faehrt hier, was Compose faehrt.
 helm upgrade --install "$RELEASE" "$CHART" \
-  --set-file gateway.dynamicConfig=docker/traefik/dynamic.yml \
   --set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql \
   --set anthropicApiKey="${ANTHROPIC_API_KEY:-}" \
   --wait --timeout 12m
@@ -123,7 +126,7 @@ for pfad in /jobs /applications /transfers /github; do
   grep -q '<div id="root">' /tmp/wt-navi.html || {
     rot "${pfad} als Direktlink lieferte nicht die Oberfläche (Status ${navi}):"
     head -c 200 /tmp/wt-navi.html; echo
-    rot "Fehlt die Regel `web-navigation` in docker/traefik/dynamic.yml?"
+    rot "Fehlt Navigation.UseNavigation() im Gateway (Sec-Fetch-Dest)?"
     exit 1
   }
   # Und dieselbe Adresse als Datenabruf muss weiterhin die API treffen.
@@ -143,7 +146,7 @@ mail="k8s-beweis-$(date +%s)@example.org"
 reg_status=$(curl -s -o /tmp/wt-reg.json -w '%{http_code}' \
   -X POST "${BASE}/auth/register" \
   -H 'Content-Type: application/json' \
-  -d "{\"email\":\"${mail}\",\"password\":\"ein-ausreichend-langes-passwort\",\"display_name\":\"K8s Beweis\"}" || true)
+  -d "{\"email\":\"${mail}\",\"password\":\"ein-ausreichend-langes-passwort\",\"displayName\":\"K8s Beweis\"}" || true)
 echo "POST /auth/register -> ${reg_status}"
 [ "$reg_status" = "201" ] || { rot "Registrierung lieferte ${reg_status}, erwartet 201."; cat /tmp/wt-reg.json; exit 1; }
 

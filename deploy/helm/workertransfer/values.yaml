@@ -8,10 +8,10 @@
 # Datei; was sich unterscheidet, ist ein Wert.
 
 # --- Das eine Image ---------------------------------------------------------
-# Alle zehn Dienste laufen aus DEMSELBEN Image. Sie unterscheiden sich nur in
-# SERVICE_DIR und im uvicorn-Modul, und beides steht unten in der Dienstliste.
-# Zehn Images, die sich in einer Umgebungsvariablen unterscheiden, wären kein
-# Zehnfaches an Software — nur zehnfacher Platz und zehnfache Ladezeit.
+# Alle elf Dienste UND das Gateway laufen aus DEMSELBEN Image. Sie
+# unterscheiden sich in genau einer Umgebungsvariablen, SERVICE_DIR, und die
+# steht unten in der Dienstliste. Zwölf Images, die sich in einer Variablen
+# unterscheiden, wären kein Zwölffaches an Software — nur zwölffacher Platz.
 image:
   repository: workertransfer/service
   tag: dev
@@ -38,21 +38,27 @@ webImage:
 #      (ADR-0027 §4 verlangt Idempotenz), für Benachrichtigungen heisst es:
 #      jede Mail zweimal.
 #
-# Wer diese Zahl erhöht, muss vorher BEIDES lösen — geteilter Zähler (Redis)
-# oder Bremse ins Gateway, und SKIP LOCKED im Zusteller. Die Zahl allein zu
-# ändern verändert Verhalten, das niemand angefordert hat.
+#   3. Jeder Dienst WANDERT SEIN SCHEMA BEIM START (ServiceDefaults.Wanderung).
+#      Zwei Pods sind zwei Pilger auf demselben Schema — ein Rennen, das
+#      niemand gewinnt. Zur Python-Zeit stand die Wanderung in einem
+#      initContainer und war damit ebenfalls je Pod; besser wurde es dadurch
+#      nicht, nur unsichtbarer.
+#
+# Wer diese Zahl erhöht, muss vorher ALLE DREI lösen — geteilter Zähler (Redis)
+# oder Bremse ins Gateway, SKIP LOCKED im Zusteller, und die Wanderung aus dem
+# Start heraus. Die Zahl allein zu ändern verändert Verhalten, das niemand
+# angefordert hat.
 replicaCount: 1
 
 # --- Gemeinsame Umgebung ----------------------------------------------------
 # Entspricht dem x-service-env-Anker in docker-compose.yml.
 env:
-  WORKER_ENVIRONMENT: staging
-  # 0.0.0.0, nicht die Voreinstellung 127.0.0.1: im Container beantwortete der
-  # veröffentlichte Port sonst nichts.
-  WORKER_HOST: "0.0.0.0"
-  WORKER_MAIL_FROM: noreply@workertransfer.local
+  ASPNETCORE_ENVIRONMENT: Staging
+  JwtSettings__Issuer: workertransfer
+  JwtSettings__Audience: workertransfer
+  Mail__Absender: noreply@workertransfer.local
   # Traces nach Jaeger. LEER hiesse AUS.
-  WORKER_OTLP_ENDPOINT: http://jaeger:4317
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
 
 # Der Ursprung, unter dem der BROWSER die Anwendung erreicht. Im kind-Cluster
 # ist das der Host-Port aus deploy/kind/cluster.yaml. In Staging und Produktion
@@ -141,20 +147,15 @@ jaeger:
   image: jaegertracing/all-in-one:1.60.0
 
 # --- Gateway ----------------------------------------------------------------
+# Kein Traefik mehr: das Gateway ist ein eigener Dienst aus demselben Image
+# (SERVICE_DIR=gateway), und seine Landkarte reist MIT dem Bild.
+#
+# Damit fällt die ConfigMap weg, die die Traefik-Datei ins Cluster trug — und
+# mit ihr die Frage, ob die Kopie noch stimmt. Was Compose fährt, fährt hier.
 gateway:
-  image: traefik:v3.3
   # Der NodePort, den deploy/kind/cluster.yaml auf den Host-Port 8090 legt.
   nodePort: 30080
-  # Lokal an, damit man sieht, welche Regel gewonnen hat — und das tut man hier
-  # brauchen, weil die Pfade nicht disjunkt sind. In Produktion AUS: ein
-  # offenes Dashboard verrät die ganze Landkarte.
-  dashboard: true
-  logLevel: INFO
-  # Die Routen. Kommt NICHT aus dieser Datei, sondern per
-  #   --set-file gateway.dynamicConfig=docker/traefik/dynamic.yml
-  # aus der Datei, die auch Compose benutzt. Eine Landkarte, nicht zwei —
-  # sonst wäre die Kopie beim ersten neuen Pfad falsch.
-  dynamicConfig: ""
+  port: 8090
 
 # --- Oberfläche -------------------------------------------------------------
 web:
@@ -166,75 +167,65 @@ web:
   apiOrigin: ""
 
 # --- Die Dienste ------------------------------------------------------------
-# Eine Liste, über die vier Templates laufen (Deployment, Service,
-# Migrations-Job, ConfigMap) — dasselbe Prinzip wie der x-service-Anker in
-# docker-compose.yml. Einen Dienst hinzuzufügen ist ein Eintrag, keine Kopie.
-#
-# tests/test_k8s_matches_compose.py fällt rot, sobald diese Liste und
-# docker-compose.yml auseinanderlaufen.
+# Eine Liste, über die zwei Templates laufen (Deployment, Service) — dasselbe
+# Prinzip wie der x-dienst-Anker in docker-compose.yml. Einen Dienst
+# hinzuzufügen ist ein Eintrag, keine Kopie.
 #
 #   name      — Name des K8s-Service. MUSS dem Compose-Dienstnamen entsprechen,
-#               weil docker/traefik/dynamic.yml genau diese Namen anspricht.
-#   dir       — apps/<dir>, wird als SERVICE_DIR gesetzt (Alembic-Historie)
-#   module    — das uvicorn-Ziel
+#               weil ocelot.json genau diese Namen anspricht.
+#   dir       — der Schlüssel im Bild, wird als SERVICE_DIR gesetzt
 #   port      — Port, auf dem der Dienst lauscht
 #   database  — seine eigene Datenbank (ADR-0004: keine gemeinsame)
 #   env       — was nur dieser Dienst braucht
 services:
   - name: identity-service
-    dir: identity-service
-    module: identity_service.main:app
+    dir: identity
     port: 8001
     database: identity
     env:
       # Wohin die Löschbefehle gehen (ADR-0027 §4). jobs-service steht dabei,
       # ist aber KEIN Empfänger der Kaskade — er bekommt nur die Absicht aus
       # §7, wenn ein Unternehmen ohne Administrator zurückbleibt.
-      WORKER_CONSENT_BASE_URL: http://consent-service:8002
-      WORKER_PROFILE_BASE_URL: http://profile-service:8003
-      WORKER_RESUME_BASE_URL: http://resume-service:8004
-      WORKER_PORTFOLIO_BASE_URL: http://portfolio-service:8005
-      WORKER_JOBS_BASE_URL: http://jobs-service:8006
-      WORKER_APPLICATIONS_BASE_URL: http://applications-service:8007
-      WORKER_TRANSFER_BASE_URL: http://transfer-service:8009
-      WORKER_GITHUB_BASE_URL: http://github-service:8010
+      Erasure__Adressen__consent: http://consent-service:8002
+      Erasure__Adressen__profile: http://profile-service:8003
+      Erasure__Adressen__resume: http://resume-service:8004
+      Erasure__Adressen__portfolio: http://portfolio-service:8005
+      Erasure__Adressen__jobs: http://jobs-service:8006
+      Erasure__Adressen__applications: http://applications-service:8007
+      Erasure__Adressen__transfer: http://transfer-service:8009
+      Erasure__Adressen__notification: http://notification-service:8010
+      Erasure__Adressen__github: http://github-service:8011
 
   - name: consent-service
-    dir: consent-service
-    module: consent_service.main:app
+    dir: consent
     port: 8002
     database: consent
 
   - name: profile-service
-    dir: profile-service
-    module: profile_service.main:app
+    dir: profile
     port: 8003
     database: profile
     env:
-      # Der Profile-Service fragt den Ledger, bevor er ein fremdes Profil zeigt
-      # (ADR-0013, synchron und ohne Cache).
-      WORKER_CONSENT_BASE_URL: http://consent-service:8002
+      # Fragt den Ledger, bevor er ein fremdes Profil zeigt (ADR-0013,
+      # synchron und ohne Zwischenspeicher).
+      Consent__Adresse: http://consent-service:8002
     drafting: true
 
   - name: resume-service
-    dir: resume-service
-    module: resume_service.main:app
+    dir: resume
     port: 8004
     database: resume
     env:
-      # Der Lebenslauf wird je Unternehmen einzeln freigegeben; die Berechtigung
-      # steht im Ledger (Capability resume.visibility:tenant:<id>).
-      WORKER_CONSENT_BASE_URL: http://consent-service:8002
-      WORKER_IDENTITY_BASE_URL: http://identity-service:8001
+      Consent__Adresse: http://consent-service:8002
+      Notifications__Adresse: http://notification-service:8010
 
   - name: portfolio-service
-    dir: portfolio-service
-    module: portfolio_service.main:app
+    dir: portfolio
     port: 8005
     database: portfolio
     env:
-      WORKER_CONSENT_BASE_URL: http://consent-service:8002
-      WORKER_STORAGE_ROOT: /var/lib/workertransfer/portfolio-attachments
+      Consent__Adresse: http://consent-service:8002
+      Storage__Wurzel: /var/lib/workertransfer/portfolio-attachments
     # Anhänge überleben den Pod. Ein Pfad im Image wäre beim nächsten Deploy
     # weg — dieselbe Überlegung wie das Volume in docker-compose.yml.
     persistence:
@@ -242,53 +233,54 @@ services:
       mountPath: /var/lib/workertransfer/portfolio-attachments
 
   - name: jobs-service
-    dir: jobs-service
-    module: jobs_service.main:app
+    dir: jobs
     port: 8006
     database: jobs
     drafting: true
 
   - name: applications-service
-    dir: applications-service
-    module: applications_service.main:app
+    dir: applications
     port: 8007
     database: applications
     env:
-      WORKER_CONSENT_BASE_URL: http://consent-service:8002
-      WORKER_IDENTITY_BASE_URL: http://identity-service:8001
-      WORKER_JOBS_BASE_URL: http://jobs-service:8006
+      Consent__Adresse: http://consent-service:8002
+      Jobs__Adresse: http://jobs-service:8006
+      Notifications__Adresse: http://notification-service:8010
 
   - name: companies-service
-    dir: companies-service
-    module: companies_service.main:app
+    dir: companies
     port: 8008
     database: companies
 
   - name: transfer-service
-    dir: transfer-service
-    module: transfer_service.main:app
+    dir: transfer
     port: 8009
     database: transfer
     env:
-      WORKER_CONSENT_BASE_URL: http://consent-service:8002
-      WORKER_IDENTITY_BASE_URL: http://identity-service:8001
+      Consent__Adresse: http://consent-service:8002
+      Notifications__Adresse: http://notification-service:8010
+
+  - name: notification-service
+    dir: notification
+    port: 8010
+    database: notification
+    env:
+      # Dieser Dienst entscheidet, OB etwas hinausgeht; AN WEN weiss allein
+      # identity-service. Ueber die Grenze geht nur eine userId.
+      Identity__Adresse: http://identity-service:8001
 
   - name: github-service
-    dir: github-service
-    module: github_service.main:app
-    port: 8010
-    # Nicht `github`: so heisst die Datenbank in scripts/initdb, und sie ist
-    # dort bewusst anders benannt als der Dienst.
-    database: github_service
+    dir: github
+    port: 8011
+    database: github
     env:
-      WORKER_CONSENT_BASE_URL: http://consent-service:8002
-      WORKER_IDENTITY_BASE_URL: http://identity-service:8001
+      Consent__Adresse: http://consent-service:8002
 
 resources:
   requests:
     cpu: 25m
     memory: 128Mi
-  # Kein CPU-Limit: gedrosselte Python-Prozesse antworten langsamer, statt zu
+  # Kein CPU-Limit: ein gedrosselter Prozess antwortet langsamer, statt zu
   # scheitern, und das sieht in einer Bereitschaftsprüfung wie ein kaputter
   # Dienst aus. Speicher wird begrenzt, weil ein Leck sonst den Knoten mitnimmt.
   limits:
