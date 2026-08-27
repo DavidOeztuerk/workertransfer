@@ -179,7 +179,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Das_Verlangen_sperrt_sofort_und_schreibt_acht_Absichten()
+    public async Task Das_Verlangen_sperrt_sofort_und_schreibt_zehn_Absichten()
     {
         var (browser, wer, _) = await Person();
 
@@ -189,7 +189,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
         (await Kontostand(wer)).Should().Be("disabled", "ab jetzt passiert nichts mehr unter diesem Namen");
 
         var zeilen = await Zeilen(wer);
-        zeilen.Should().HaveCount(9, "sieben Empfaenger, die Schlussnachricht und identity selbst");
+        zeilen.Should().HaveCount(10, "acht Empfaenger, die Schlussnachricht und identity selbst");
         zeilen.Select(z => z.Kind).Should().Contain(LoeschungVerlangenHandler.Absichten);
     }
 
@@ -205,10 +205,15 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
         Loeschempfaenger.Fremde.Should().BeEquivalentTo(
         [
             "consent", "profile", "resume", "portfolio",
-            "applications", "transfer", "notification"
+            "applications", "transfer", "github", "notification"
         ]);
 
-        Loeschempfaenger.Fremde.Should().NotContain("github", "der Dienst faellt weg");
+        // `github` gehoert dazu: der Dienst haelt eine Zeile je Mensch — die
+        // Verknuepfung „dieser Plattform-Mensch ist jener GitHub-Name". Er
+        // stand einmal nicht auf dieser Liste, weil das geloeschte PAKET
+        // `worker-github` (das Menschen bewertete) mit dem DIENST verwechselt
+        // wurde, der unter ADR-0022 gebaut ist und das Gegenteil tut.
+        Loeschempfaenger.Fremde.Should().Contain("github");
         Loeschempfaenger.Fremde.Should().NotContain("jobs", "haelt nichts Personenbezogenes");
         Loeschempfaenger.Fremde.Should().NotContain("companies");
     }
@@ -240,7 +245,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
         var zweite = await browser.PostAsync("/account/erasure", null);
 
         zweite.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        (await Zeilen(wer)).Should().HaveCount(9);
+        (await Zeilen(wer)).Should().HaveCount(10);
     }
 
     /// <summary>
@@ -306,7 +311,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
         await Durchlauf(3);
 
         var zeilen = await Zeilen(wer);
-        zeilen.Should().OnlyContain(z => z.Delivered != null, "alle neun sind durch");
+        zeilen.Should().OnlyContain(z => z.Delivered != null, "alle zehn sind durch");
 
         (await Kontostand(wer)).Should().BeNull("die Zeile ist weg");
 
@@ -329,7 +334,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
         using var bereich = _dienst.Services.CreateScope();
         var bestand = bereich.ServiceProvider.GetRequiredService<ILoeschbestand>();
 
-        (await bestand.OffeneAbsichtenAsync(new SubjectId(wer))).Should().HaveCount(9);
+        (await bestand.OffeneAbsichtenAsync(new SubjectId(wer))).Should().HaveCount(10);
 
         await Durchlauf(3);
 

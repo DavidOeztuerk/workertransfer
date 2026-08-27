@@ -29,6 +29,13 @@
     <Project Path="src/consent-service/WorkerTransfer.Consent.Domain/WorkerTransfer.Consent.Domain.csproj" />
     <Project Path="src/consent-service/WorkerTransfer.Consent.Infrastructure/WorkerTransfer.Consent.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/github-service/">
+    <Project Path="src/github-service/WorkerTransfer.GitHub.Api/WorkerTransfer.GitHub.Api.csproj" />
+    <Project Path="src/github-service/WorkerTransfer.GitHub.Application/WorkerTransfer.GitHub.Application.csproj" />
+    <Project Path="src/github-service/WorkerTransfer.GitHub.Contracts/WorkerTransfer.GitHub.Contracts.csproj" />
+    <Project Path="src/github-service/WorkerTransfer.GitHub.Domain/WorkerTransfer.GitHub.Domain.csproj" />
+    <Project Path="src/github-service/WorkerTransfer.GitHub.Infrastructure/WorkerTransfer.GitHub.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/identity-service/">
     <Project Path="src/identity-service/WorkerTransfer.Identity.Api/WorkerTransfer.Identity.Api.csproj" />
     <Project Path="src/identity-service/WorkerTransfer.Identity.Application/WorkerTransfer.Identity.Application.csproj" />
@@ -82,6 +89,7 @@
     <Project Path="tests/WorkerTransfer.Applications.Tests/WorkerTransfer.Applications.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Companies.Tests/WorkerTransfer.Companies.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Consent.Tests/WorkerTransfer.Consent.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.GitHub.Tests/WorkerTransfer.GitHub.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Identity.Tests/WorkerTransfer.Identity.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Jobs.Tests/WorkerTransfer.Jobs.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Notification.Tests/WorkerTransfer.Notification.Tests.csproj" />

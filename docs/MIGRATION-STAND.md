@@ -8,7 +8,7 @@ Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
 Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
 was davon getan ist.
 
-**Zuletzt fortgeschrieben:** 2026-08-27, nach `notification` — Phase B ist durch.
+**Zuletzt fortgeschrieben:** 2026-08-27, nach `github` — Phase B ist durch, **zehn Dienste**.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.
 
 ---
@@ -18,10 +18,10 @@ was davon getan ist.
 | | |
 |---|---|
 | **Phase A — Fundament** | **fertig**, committet |
-| **Phase B — die neun Dienste** | **fertig**, 9 von 9 |
+| **Phase B — die Dienste** | **fertig**, 10 von 10 |
 | **Phase C — Zusammenbau** | nicht begonnen |
 | **Prüfer** | nicht begonnen |
-| **Tests** | 495 grün, 0 rot, 0 übersprungen |
+| **Tests** | 541 grün, 0 rot, 0 übersprungen |
 | **Offene Girder-Schulden** | keine |
 
 Prüfen lässt sich das mit zwei Aufrufen, **getrennt**:
@@ -40,7 +40,7 @@ aussieht und keiner ist. Die Reihen einzeln fahren:
 ```bash
 cd dotnet
 for p in Outbox Skills Identity Consent Profile Resume Portfolio Jobs Applications \
-         Companies Transfer Notification; do
+         Companies Transfer GitHub Notification; do
   dotnet test tests/WorkerTransfer.$p.Tests/WorkerTransfer.$p.Tests.csproj --no-build \
     | grep -E "^(Bestanden!|Fehler!)"
 done
@@ -342,6 +342,64 @@ Drei weitere Entscheidungen tragen:
 
 ---
 
+## Nachtrag: `github-service` (Port 8011)
+
+**Er war gestrichen, und die Streichung war ein Irrtum.** Verwechselt worden
+waren das gelöschte *Paket* `worker-github` — das Menschen bewertete — und der
+*Dienst*, der **unter** ADR-0022 gebaut wurde und ausdrücklich das Gegenteil
+tut. Sein Domänenmodul sagt das im ersten Absatz.
+
+Sechs Routen plus die Löschung: `POST /github/me` (Konto nennen),
+`POST /github/me/{verify,refresh}`, `GET /github/me`, `DELETE /github/me`,
+`GET /github/{subjectId}`, `POST /erasure`. Damit sind es **zehn Dienste**, und
+die Löschkaskade hat wieder **acht** fremde Empfänger — `github` ist wieder
+dabei, weil er eine Zeile je Mensch hält.
+
+Die Grenze, an der genau hier gerutscht wird, steht jetzt nicht nur im Auftrag,
+sondern als Test (`Adr0022Tests`):
+
+| Erlaubt | Verboten |
+|---|---|
+| „Dieses Repository ist laut GitHub zu 80 % Go" | „Diese Person kann Go" |
+| Die Person trägt Go **selbst** ins Profil ein | Der Dienst trägt es für sie ein |
+| „Verbindung bewiesen" / „nicht bewiesen" | „zu 73 % vertrauenswürdig" |
+
+Der Test greift Domäne und Vertrag ab und fällt, sobald irgendeine öffentliche
+Fläche ein Wort wie `score`, `rank`, `level`, `bewert` oder `activity` trägt.
+Dazu zwei Formprüfungen: ein `Repository` trägt genau sechs abgeschriebene
+Felder, eine `Verbindung` keine Zusammenfassung.
+
+Vier weitere Entscheidungen tragen:
+
+- **Beim Nennen wird GitHub nicht gefragt.** Solange nichts bewiesen ist, gibt
+  es nichts zu holen — und ein Abruf verriete nur, dass jemand nach diesem Konto
+  gefragt hat.
+- **Ein Kontowechsel setzt den Nachweis zurück** *und* würfelt die
+  Einmalzeichenfolge neu. Sonst könnte jemand ein Konto nachweisen und danach
+  den Namen auf ein fremdes drehen.
+- **Sortiert wird nach Datum, nie nach Sternen.** Sterne messen Sichtbarkeit,
+  nicht Arbeit, und eine Sortierung ist bereits eine Wertung.
+- **Kein Hintergrundabgleich**, kein Nachtlauf, kein Webhook (ADR-0004): eine
+  Plattform, die einem Menschen dauerhaft hinterhersieht, tut etwas anderes als
+  eine, die einmal auf seine Bitte hinsieht.
+
+### Drei Gegenproben, die über die Prüfungen etwas gesagt haben
+
+1. **„Nur eine nachgewiesene Verbindung nimmt einen Abzug an" war ungedeckt.**
+   Der Handler erreicht `Lege_ab` heute nur nach geglücktem Nachweis — die
+   Prüfung ist eine zweite Verteidigungslinie, und genau die fällt lautlos,
+   wenn jemand später einen Knopf „jetzt laden" baut. Jetzt am Aggregat geprüft
+   (`VerbindungsregelnTests`).
+2. **Der Fork-Filter war ungedeckt**, weil die Reisetests `IGitHub` ersetzen.
+   Alles *im* Klienten war damit ungeprüft. Jetzt gibt es `HttpGitHubTests`
+   gegen ein GitHub aus Papier — Forks, Feldabbildung, 404, Ratenlimit,
+   Abfrageform.
+3. **Ein Test von mir war falsch, nicht der Code:** `CanWrite` meldet auch
+   einen *privaten* Setzer als schreibbar. Die Aussage, auf die es ankommt, ist
+   „kein **öffentlicher** Setzer" — `GetSetMethod(nonPublic: false)`.
+
+---
+
 ## Phase C — Zusammenbau
 
 **Jetzt an der Reihe.** In dieser Reihenfolge:
@@ -370,7 +428,9 @@ Drei weitere Entscheidungen tragen:
   weitermachen.
 - **Gegenproben fahren**, und darauf achten, dass der Bruch **übersetzt**: ein
   Build-Fehler sieht in der Ausgabe aus wie ein bestandener Test.
-- **Nach einer Gegenprobe `--no-incremental` bauen.** Der inkrementelle Bau hat
-  die zurückgenommene Änderung zweimal nicht bemerkt; der Test fiel dann über
-  Code, der längst wieder richtig war — und der nächste Schluss daraus wäre
-  falsch gewesen.
+- **Nach einer Gegenprobe `--no-incremental` bauen** — und zwar nach dem
+  *Zurücknehmen*, nicht nur nach dem Patchen. Der inkrementelle Bau hat die
+  Rücknahme inzwischen dreimal nicht bemerkt. Zweimal fiel ein Test über Code,
+  der längst wieder richtig war; einmal *bestand* eine Gegenprobe, obwohl die
+  Regel wirklich fehlte — der zweite Fall ist der gefährlichere, weil er wie ein
+  Freibrief aussieht.
