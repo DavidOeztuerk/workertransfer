@@ -1,5 +1,6 @@
 using WorkerTransfer.Consent.Api;
 using WorkerTransfer.Consent.Infrastructure;
+using WorkerTransfer.Consent.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,6 +17,9 @@ builder.Services.AddConsentInfrastructure(
     ?? throw new InvalidOperationException("ConnectionStrings:consent is not configured."));
 
 var app = builder.Build();
+
+// Erst wandern, dann bedienen (ADR-0010).
+await app.WandereAsync<ConsentDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 

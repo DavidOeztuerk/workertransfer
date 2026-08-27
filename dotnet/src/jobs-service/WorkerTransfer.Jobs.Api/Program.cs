@@ -1,5 +1,6 @@
 using WorkerTransfer.Jobs.Api;
 using WorkerTransfer.Jobs.Infrastructure;
+using WorkerTransfer.Jobs.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +15,9 @@ builder.Services.AddJobsInfrastructure(
     ?? throw new InvalidOperationException("ConnectionStrings:jobs ist nicht gesetzt."));
 
 var app = builder.Build();
+
+// Erst wandern, dann bedienen (ADR-0010).
+await app.WandereAsync<JobsDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, dienstname);
 

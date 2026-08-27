@@ -1,5 +1,6 @@
 using WorkerTransfer.Resume.Api;
 using WorkerTransfer.Resume.Infrastructure;
+using WorkerTransfer.Resume.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,9 @@ builder.Services.AddResumeInfrastructure(
     ?? throw new InvalidOperationException("ConnectionStrings:resume is not configured."));
 
 var app = builder.Build();
+
+// Erst wandern, dann bedienen (ADR-0010).
+await app.WandereAsync<ResumeDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 

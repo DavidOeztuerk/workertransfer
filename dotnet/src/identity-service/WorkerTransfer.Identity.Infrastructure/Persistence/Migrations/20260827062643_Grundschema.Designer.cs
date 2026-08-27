@@ -14,8 +14,8 @@ using WorkerTransfer.Identity.Infrastructure.Persistence;
 namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(IdentityDbContext))]
-    [Migration("20260822143648_Loeschabsichten")]
-    partial class Loeschabsichten
+    [Migration("20260827062643_Grundschema")]
+    partial class Grundschema
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -126,10 +126,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("audit_events", null, t =>
-                        {
-                            t.ExcludeFromMigrations();
-                        });
+                    b.ToTable("audit_events", (string)null);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.InvitationRow", b =>
@@ -183,10 +180,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("company_invitations", null, t =>
-                        {
-                            t.ExcludeFromMigrations();
-                        });
+                    b.ToTable("company_invitations", (string)null);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.MembershipRow", b =>
@@ -219,10 +213,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("user_tenant_memberships", null, t =>
-                        {
-                            t.ExcludeFromMigrations();
-                        });
+                    b.ToTable("user_tenant_memberships", (string)null);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.SessionCapacityRow", b =>
@@ -269,10 +260,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("tenants", null, t =>
-                        {
-                            t.ExcludeFromMigrations();
-                        });
+                    b.ToTable("tenants", (string)null);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.UserRow", b =>
@@ -325,10 +313,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("users", null, t =>
-                        {
-                            t.ExcludeFromMigrations();
-                        });
+                    b.ToTable("users", (string)null);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.VerificationTokenRow", b =>
@@ -368,10 +353,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("email_verification_tokens", null, t =>
-                        {
-                            t.ExcludeFromMigrations();
-                        });
+                    b.ToTable("email_verification_tokens", (string)null);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Outbox.OutboxZeile", b =>
