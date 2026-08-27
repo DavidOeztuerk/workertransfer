@@ -32,6 +32,55 @@ Zahl verbirgt genau das.
 
 ---
 
+## Was ADR-0022 wirklich verbietet
+
+Er wird als Verbot des Ganzen gelesen. Er ist es nicht — er hat einen eigenen
+Abschnitt „Was in Phase 6 wiederkommen darf", und darin steht dieser Entwurf
+fast wörtlich:
+
+> **Darf wiederkommen:** Belege mit Herkunft — „Hat an *diesem* Projekt *diese*
+> Commits gemacht", nachprüfbar, mit Link, **ohne Zwischenrechnung**.
+> Einwilligung zuerst. Sichtbarkeit über den Ledger, jederzeit widerrufbar.
+
+Verboten sind **genau drei Dinge**, und sie greifen alle noch:
+
+**1. Eine Zahl, die einen Menschen zusammenfasst — und jede Rangfolge daraus.**
+Das gelöschte Paket rechnete zehn Dimensionen mit festen Gewichten auf 0–100.
+Der ADR nennt den Grund, der bleibt: *„Die Gewichte hat niemand begründet. Sie
+sind eine Meinung im Gewand einer Formel."* Und eine Nachkommastelle sieht aus
+wie eine Messung.
+
+**2. Abgeleitete Eigenschaften ohne Grundlage.** „leadership", „community",
+„architecture" aus Repository-Metadaten. Dazu gehört auch der alte
+`SkillAnalyzer`: `base_score = bytes_count / total_bytes` — *„Bytes sind kein
+Können. Eine eingecheckte Abhängigkeit schlägt jede sorgfältige Bibliothek. Wer
+wenig und gut schreibt, verliert."*
+
+**3. Stillschweigende Vollständigkeit.** *„Wer nichts auf GitHub hat, ist nicht
+schlechter, sondern woanders. Eine Ansicht, die das nicht sagt, lügt durch
+Auslassung."*
+
+### Der dritte Punkt trifft diesen Entwurf, und das ist der wichtigste Fund
+
+Eine Trefferliste, die „Go ✓ · Kubernetes ✓ · Rust ✗" zeigt, behauptet
+stillschweigend, die Liste sei über den Menschen **vollständig**. Ist sie nicht:
+das ✗ heißt „hat es nicht **genannt**", nicht „kann es nicht". Wer Rust kann und
+es nicht getippt hat, steht dort mit einem Kreuz, das über ihn lügt.
+
+Genauso trifft es die Belege: wer kein GitHub verknüpft hat, darf nicht wie ein
+leerer Eintrag aussehen. Ein Nebentätigkeitsverbot, Sorgearbeit oder ein
+Zweitjob sind keine Aussage über Können — der ADR nennt das ausdrücklich als den
+Weg, auf dem eine Rangliste *systematisch benachteiligt*.
+
+**Deshalb steht das nicht im Kleingedruckten, sondern in der Ausgabe selbst.**
+Wie, steht unten unter „In der Oberfläche".
+
+**Was aus alldem folgt:** ADR-0022 wird nicht ersetzt und nicht abgeschwächt. Es
+kommt ein Folge-ADR, der seinen eigenen „darf wiederkommen"-Abschnitt einlöst
+und die drei Verbote als Tests festnagelt.
+
+---
+
 ## Wer hat es gesagt? Die eine Frage, die alles ordnet
 
 Jede Fähigkeit, die im System steht, trägt ihre Herkunft. Es gibt genau drei
@@ -190,6 +239,69 @@ Prüfung mit Note:**
 
 ---
 
+## In der Oberfläche
+
+Die drei Verbote sind keine Prüfungen im Hintergrund, sie sind sichtbare
+Gestaltung. Wo sie nur im Code stünden, wären sie in einem Redesign weg.
+
+**Das Kreuz sagt, worüber es spricht.** Nicht „✗ Rust", sondern:
+
+```
+Go            ✓  genannt
+Kubernetes    ✓  genannt · Belege: 3 Repos
+Rust             nicht genannt
+```
+
+Kein rotes Kreuz, kein Durchstreichen. Eine leere Stelle ist eine leere Stelle.
+
+**Jede Trefferliste trägt einen Satz, der nicht wegklickbar ist:**
+
+> Diese Liste zeigt, was Menschen **selbst genannt** haben. Wer etwas nicht
+> genannt hat, kann es trotzdem können. Die Reihenfolge ist *zuletzt
+> aktualisiert*, nicht *beste Passung*.
+
+Der zweite Halbsatz ist ebenso wichtig wie der erste: eine unsortierte Liste
+sieht aus wie eine sortierte, wenn niemand dazuschreibt, wonach sie geordnet ist.
+
+**Belege tragen ihre Herkunft im Text**, nicht in einem Tooltip:
+
+```
+C# 52,4 %          in diesem Repository, laut GitHub gemessen
+docker             vom Besitzer als Thema des Repositorys gesetzt
+Terraform          aus dem Lebenslauf, von der Person bestätigt
+```
+
+Nie „C# 52 %" neben einem Namen. Der Anteil gehört zum Repository, und das steht
+daneben.
+
+**Wer keine Belege verknüpft hat, sieht neutral aus:**
+
+> Keine Belege verknüpft. Das sagt nichts über Können — nicht alle Arbeit ist
+> öffentlich.
+
+Kein leerer Kasten, kein ausgegrauter Bereich, kein „0 Repos". Ein leerer Kasten
+ist ein Urteil ohne Worte.
+
+**In der Ansicht der Person** steht dieselbe Wahrheit von der anderen Seite:
+
+```
+Dein Profil nennt 7 Fähigkeiten.
+Unternehmen suchen nach dem, was hier steht — nicht nach dem, was du kannst.
+[ Fähigkeit hinzufügen ]
+```
+
+Das ist der ehrlichste Satz der ganzen Plattform: er sagt der Person, wovon ihre
+Auffindbarkeit wirklich abhängt, statt sie raten zu lassen.
+
+**Und die Gegenrichtung, die es schon gibt:** `apps/web/src/jobs/match.ts` zeigt
+einer Person „Du hast 2 von 3 genannten Fähigkeiten: Python ✓ · Kubernetes ✓ ·
+Go ✗". Das darf eine Zählung tragen, weil es **Stellen für einen Menschen**
+ordnet und nicht Menschen für ein Unternehmen. Die Scout-Ansicht darf es nicht.
+Dieselbe Gestaltung, andere Richtung, andere Regel — und genau deshalb steht der
+Unterschied hier und nicht in einem Kommentar.
+
+---
+
 ## Die Reisen
 
 Playwright-Journeys, aus vier Blickwinkeln. Sie sind zugleich die Abnahme.
@@ -218,9 +330,13 @@ Playwright-Journeys, aus vier Blickwinkeln. Sie sind zugleich die Abnahme.
 ```
 1  Anmelden, Firmenkontext wählen
 2  Suche anlegen: "Go, Kubernetes, verteilte Systeme, Remote"
-3  Treffer: je Person "Go ✓ · Kubernetes ✓ · verteilte Systeme ✗", Belege verlinkt
+3  Treffer: je Person "Go ✓ genannt · Kubernetes ✓ genannt · verteilte Systeme
+   nicht genannt", Belege verlinkt
    → Prüfen: KEINE Prozentzahl, KEINE Sortierung nach Trefferzahl
    → Prüfen: zweimaliges Laden gibt dieselbe Reihenfolge
+   → Prüfen: der Hinweis "zeigt, was Menschen selbst genannt haben" steht da
+     und ist nicht wegklickbar
+   → Prüfen: eine Person OHNE GitHub sieht neutral aus, nicht leer
 4  Ansprache: Entwurf erscheint, wird geändert, Mensch klickt Senden
    → Prüfen: ohne Klick ist nichts rausgegangen
 5  Gespräch Stufe 1: Profil sichtbar, Lebenslauf NICHT
@@ -270,6 +386,10 @@ Als Tests, die rot werden, wenn jemand „aufräumt":
 - Keine Nachricht, die ohne Klick eines Menschen rausgeht
 - Kein Zugriff eines Unternehmens auf die eigene Belegschaft über Scout
 - Keine Bewertung, die den Vorgang überlebt
+- Kein „✗" oder Durchstreichen an einer nicht genannten Fähigkeit — nur „nicht
+  genannt"
+- Keine Trefferliste ohne den Hinweis auf Selbstnennung und Sortierung
+- Kein leerer oder ausgegrauter Bereich für jemanden ohne Belege
 
 ---
 
@@ -277,9 +397,10 @@ Als Tests, die rot werden, wenn jemand „aufräumt":
 
 Vor dem ADR zu klären:
 
-1. **Ergänzt oder ersetzt das ADR-0022?** Er liest sich heute als Verbot des
-   Ganzen. Er sollte sagen: verboten ist die *Zahl über den Menschen*, nicht die
-   *Suche nach einer Anforderung*.
+1. ~~Ergänzt oder ersetzt das ADR-0022?~~ **Beantwortet: keins von beidem.** Er
+   verbietet drei Dinge und erlaubt diesen Entwurf in seinem eigenen Abschnitt
+   „darf wiederkommen". Es kommt ein Folge-ADR, der ihn einlöst und die drei
+   Verbote als Tests festnagelt — siehe oben.
 2. **Wie verhält sich `scout-service` zum bestehenden `/candidates`?** Vermutlich
    löst er es ab — dieselbe Frage, bessere Antwort.
 3. **Trägt der Berater eine KI?** Er darf entwerfen (Nachrichten, Zusammen-
