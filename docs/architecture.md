@@ -11,29 +11,34 @@ does not make employment, ranking, or legal decisions autonomously.
 
 ```text
 workertransfer/
-├── apps/                     deployable entry points
-│   ├── identity-service/     auth vertical slice (the reference shape)
-│   ├── consent-service/      consent ledger (Phase 3, in progress)
-│   └── web/                  React app (pnpm workspace member)
-├── packages/                 technical platform packages only
-│   ├── worker-core/          framework-free domain primitives
-│   ├── worker-platform/      the kernel: HTTP + application cross-cutting concerns
-│   ├── worker-shared/        domain-neutral primitives (clock, pagination, money)
-│   ├── worker-*/             composable infrastructure libraries
-│   └── ui/                   shared React components (pnpm)
+├── src/                      eleven services, the gateway, and what they share
+│   ├── identity-service/     accounts, sessions, companies (the reference shape)
+│   ├── consent-service/      the ledger everything else leans on
+│   ├── <nine more services>/ profile, resume, portfolio, jobs, applications,
+│   │                         companies, transfer, notification, github
+│   ├── gateway/              Ocelot — the single entrance
+│   └── shared/               ServiceDefaults, Outbox, Skills, Contracts.*
+├── tests/                    one suite per service, plus Gateway, Outbox,
+│                             Skills and Ganzes (cross-service guards)
+├── apps/web/                 React app (pnpm workspace member)
+├── packages/ui/              shared React components (pnpm)
 ├── docs/                     ADRs, architecture, product constraints, vision
-├── docker/                   shared service Dockerfile, web Dockerfile, entrypoint
-├── scripts/                  database bootstrap (initdb)
-├── tests/                    repo-level architectural guards
-└── .github/workflows/        repeatable CI (backend + frontend jobs)
+├── bugs/                     open Girder debts, each with a reproduction
+├── deploy/                   Helm chart and kind cluster
+├── docker/                   one service Dockerfile, two web ones, one entrypoint
+├── scripts/                  database bootstrap, test runner, k8s scripts
+└── .github/workflows/        CI: .NET, frontend, images, dependency audit
 ```
 
-Most `worker-*` packages are libraries with no consumer yet. The two services import
-seven or eight of them; the observability, messaging, cache and storage packages exist
-but nothing wires them into a running process.
+The platform is **.NET 10 on Girder 3.0.1**, a shared foundation library from
+GitHub Packages. It replaced a Python (`uv`) monorepo in August 2026; the
+translation was done by hand, service by service, and `docs/MIGRATION-STAND.md`
+records what was measured along the way.
 
-An `uv` workspace gives all Python packages one lockfile. Packages have their own
-`pyproject.toml` files and use explicit workspace dependencies.
+`src/shared/` holds six things and nothing else: `ServiceDefaults` (the one call
+every service makes), `Outbox`, `Skills`, and three `Contracts.*` packages. There
+is no kernel of unused libraries — a package here has a consumer or it does not
+exist.
 
 ## Service shape
 
@@ -45,11 +50,14 @@ Presentation  ->  Application  ->  Domain
      └-------- Infrastructure -------┘
 ```
 
-- **Presentation** holds HTTP, message-consumer, worker, and future gRPC adapters.
+- **Presentation** (the `Api` project) holds HTTP endpoints and their filters.
+  All dependency wiring sits behind one `Add<Service>Infrastructure()` per
+  service — its composition root, not a fluent builder (ADR-0003).
 - **Application** holds commands, queries, handlers, orchestration, ports, and
   authorization requirements.
 - **Domain** holds aggregates, entities, value objects, domain policies, and domain
-  events. It has no FastAPI, database, or transport dependency.
+  events. It has no ASP.NET, EF Core, or transport dependency. Repository
+  *interfaces* live here; their implementations live in Infrastructure.
 - **Infrastructure** implements application ports: database repositories, message
   transport, storage, provider clients, and cache adapters.
 
@@ -58,7 +66,7 @@ They are introduced per integration and must not become a shared domain model.
 
 ## Sharing rule
 
-Only technical, domain-neutral code may move into `packages/`:
+Only technical, domain-neutral code may move into `src/shared/`:
 
 - context propagation, observability, configuration, error mapping, resilience
 - CQRS dispatch abstractions and test tooling
