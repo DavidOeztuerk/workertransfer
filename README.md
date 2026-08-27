@@ -95,11 +95,11 @@ The technical design and delivery sequence live in [docs/architecture.md](docs/a
 
 ## Current boundary
 
-This is a working system, not a pretend-complete recruiting product. Some things are deliberately absent and one is missing by accident:
+This is a working system, not a pretend-complete recruiting product. Some things are deliberately absent:
 
 - There is **no S3 backend** for stored files, no orphan collection, and no upload UI (ADR-0021).
 - The consent ledger has **no admin surface**; a person manages their own releases.
 - `make k8s-up` has **never been run** — the chart lints and renders, but only a run proves it.
-- **Nothing throttles the auth endpoints.** The predecessor braked five of them; that did not survive the migration. See CLAUDE.md, "A known gap".
+- The **auth brake** is back (gateway, per origin, five paths) but its counter is in-process, which pins the gateway to one replica.
 
 [`docs/SCOUT-UND-BERATER.md`](docs/SCOUT-UND-BERATER.md) and [`docs/vision/`](docs/vision/) describe what is intended next. They are intent, not description, and each new service needs its own ADR first.

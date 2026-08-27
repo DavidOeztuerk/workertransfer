@@ -575,6 +575,48 @@
     }
   ],
 
+  // --- Die Bremse ----------------------------------------------------------
+  //
+  // Sie steht in DIESER Datei und nicht in einer zweiten: die gebremsten Pfade
+  // sind eine Auswahl AUS der Landkarte darueber, und zwei Dateien ueber
+  // dieselben Pfade gehen beim ersten neuen Endpunkt auseinander.
+  // `BremsenkarteTests` laesst rot laufen, was hier steht und dort keine Route
+  // hat.
+  //
+  // GEZAEHLT WIRD JE HERKUNFT, NIE JE E-MAIL-ADRESSE. Wer je Adresse braemste,
+  // baute genau den Aufzaehlungskanal, den /auth/register schliesst: eine
+  // gebremste Antwort verriete, dass die Adresse existiert. Und er liesse einen
+  // Fremden jeden aussperren, dessen Adresse er kennt.
+  //
+  // DIE ZAHLEN SIND GROSSZUEGIG, und das ist Absicht. Hinter einer Herkunft
+  // steht oft ein ganzes Buero mit einer Adresse. Eine Bremse, die dort greift,
+  // waere selbst der Ausfall. Sie soll SCHNELLES Raten unmoeglich machen — nicht
+  // langsames, denn dagegen hilft sie ohnehin nicht, und sie ist auch nicht das
+  // Einzige, was dagegen helfen muss.
+  "Bremse": {
+    "Fenster": "00:01:00",
+    "Pfade": {
+      // Der eigentliche Grund fuer das Ganze: Passwortraten.
+      "/auth/login": 20,
+
+      // Eine Anmeldung kostet nichts und laesst sich beliebig oft versuchen.
+      // Enger, weil hier Konten entstehen.
+      "/auth/register": 5,
+
+      // Verschickt eine MAIL. Ohne Bremse ist das ein Verstaerker: ein Fremder
+      // laesst eine Adresse hundertmal anschreiben, die ihm nicht gehoert.
+      "/auth/resend-verification": 3,
+
+      // Ein Bestaetigungslink wird auch mal zweimal geklickt. Weit genug, dass
+      // das nie stoert, eng genug, dass Token nicht durchprobiert werden.
+      "/auth/verify-email": 20,
+
+      // WEIT, mit Absicht: jeder offene Tab erneuert. Zu eng, und ein Mensch
+      // mit sechs Tabs meldet sich staendig selbst ab.
+      "/auth/refresh": 60
+    }
+  },
+
   "GlobalConfiguration": {
     // Nur fuer die Adressen, die Ocelot selbst baut. Der Hoerer steht in
     // ASPNETCORE_URLS und wird vom Behaelter gesetzt.
