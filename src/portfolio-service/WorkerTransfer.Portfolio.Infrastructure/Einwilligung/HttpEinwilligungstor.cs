@@ -16,6 +16,15 @@ public sealed class Einwilligungseinstellungen
 
     /// <summary>Die Basisadresse von consent-service.</summary>
     public string Adresse { get; set; } = string.Empty;
+
+    /// <summary>Wie lange auf eine Antwort gewartet wird.</summary>
+    /// <remarks>
+    /// Fuenf Sekunden, wie bei jedem anderen Dienst-zu-Dienst-Aufruf hier.
+    /// OHNE diese Zeile gilt die Vorgabe von <c>HttpClient</c>: HUNDERT
+    /// Sekunden. Das ist kein Zeitlimit, das ist ein haengender Aufruf mit
+    /// einem Ende irgendwann — und er haengt den Aufrufer mit.
+    /// </remarks>
+    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>Fragt den Ledger — synchron, jedes Mal, ohne Zwischenspeicher.</summary>
@@ -47,6 +56,8 @@ public sealed class HttpEinwilligungstor(
         }
 
         using var client = fabrik.CreateClient(nameof(HttpEinwilligungstor));
+
+        client.Timeout = _einstellungen.Zeitueberschreitung;
         using var anfrage = new HttpRequestMessage(
             HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), "/consent/check"))
         {
