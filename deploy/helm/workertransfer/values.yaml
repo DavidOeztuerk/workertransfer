@@ -27,27 +27,35 @@ webImage:
 
 # --- Repliken: eins, und das ist eine ENTSCHEIDUNG --------------------------
 # Nicht "noch nicht skaliert", sondern "darf noch nicht skaliert werden".
-# Zwei belegte Gründe (ADR-0028, ROADMAP 10.1):
 #
-#   1. Die Auth-Bremse (worker_platform.presentation.throttle) zählt IM
-#      PROZESS. Bei drei Instanzen verdreifacht sich das effektive Limit —
-#      und niemand sieht es, weil jede einzelne Instanz korrekt rechnet.
-#   2. Der Outbox-Zusteller hat KEINE Sperre: OutboxDispatcher.pending() ist
-#      ein SELECT ... ORDER BY created_at LIMIT n ohne FOR UPDATE SKIP LOCKED.
-#      Zwei Zusteller greifen dieselben Zeilen. Für die Löschkaskade folgenlos
-#      (ADR-0027 §4 verlangt Idempotenz), für Benachrichtigungen heisst es:
-#      jede Mail zweimal.
+# Hier standen drei Gründe. Beim Prüfen nach der Migration blieb EINER übrig,
+# einer ist gelöst, und einer hat sich als etwas anderes herausgestellt als
+# ein Skalierungshindernis. Der Reihe nach, weil die Unterschiede zählen:
 #
-#   3. Jeder Dienst WANDERT SEIN SCHEMA BEIM START (ServiceDefaults.Wanderung).
-#      Zwei Pods sind zwei Pilger auf demselben Schema — ein Rennen, das
-#      niemand gewinnt. Zur Python-Zeit stand die Wanderung in einem
-#      initContainer und war damit ebenfalls je Pod; besser wurde es dadurch
-#      nicht, nur unsichtbarer.
+#   1. GELÖST. Der Outbox-Zusteller nimmt seine Zeilen mit
+#      "FOR UPDATE SKIP LOCKED" (OutboxZusteller.cs, rohes SQL — LINQ kann es
+#      nicht ausdrücken). Zwei Zusteller greifen NICHT mehr dieselben Zeilen.
+#      Zur Python-Zeit war das der Grund, warum jede Mail zweimal rausging.
 #
-# Wer diese Zahl erhöht, muss vorher ALLE DREI lösen — geteilter Zähler (Redis)
-# oder Bremse ins Gateway, SKIP LOCKED im Zusteller, und die Wanderung aus dem
-# Start heraus. Die Zahl allein zu ändern verändert Verhalten, das niemand
-# angefordert hat.
+#   2. GILT WEITER. Jeder Dienst WANDERT SEIN SCHEMA BEIM START
+#      (ServiceDefaults.Wanderung). Zwei Pods sind zwei Pilger auf demselben
+#      Schema — ein Rennen, das niemand gewinnt. Zur Python-Zeit stand die
+#      Wanderung in einem initContainer und war damit ebenfalls je Pod; besser
+#      wurde es dadurch nicht, nur unsichtbarer.
+#
+#   3. IST KEIN SKALIERUNGSHINDERNIS MEHR, SONDERN EINE LÜCKE. Der Python-
+#      Dienst bremste fünf Endpunkte (/auth/login, /refresh, /register,
+#      /verify-email, /resend-verification) mit einem gleitenden Fenster im
+#      Prozess, bewusst WEITER AUSSEN als die Authentifizierung — sonst würde
+#      bcrypt gerechnet, bevor gebremst wird, und die Bremse wäre selbst der
+#      teuerste Teil des Angriffs (ROADMAP 10.1). Diese Bremse ist bei der
+#      Migration NICHT mitgekommen: in src/ gibt es weder einen RateLimiter
+#      noch einen Zähler für Fehlversuche. Es bremst also gar nichts, und zwar
+#      bei einer Replik genauso wie bei dreien.
+#
+# Wer diese Zahl erhöht, muss Punkt 2 vorher lösen — die Wanderung aus dem
+# Start heraus. Punkt 3 ist davon unabhängig und dringender: er wird nicht
+# dadurch besser, dass es bei eins bleibt.
 replicaCount: 1
 
 # --- Gemeinsame Umgebung ----------------------------------------------------

@@ -686,6 +686,86 @@ neben einer Testreihe.
 
 ---
 
+## Phase C, Schritt 6: der Prüfer und die Neufassung
+
+`CLAUDE.md` ist **neu geschrieben**, nicht fortgeschrieben. Sie beschreibt jetzt
+ein .NET-System auf Girder: die elf Dienste mit Häfen und Zuständigkeit, die
+Befehle, die Schichten, das Gateway, den Stapel — und, das ist der eigentliche
+Zweck, die Regeln, die die Gestalt tragen, jede mit ihrem Grund. Was den Grund
+für eine Entscheidung nennt, ist geblieben; was Python beschrieb, ist weg. **Die
+ADR-Verweise stehen alle noch** — sie sind das Wertvollste am alten System, und
+ein Grund wechselt nicht die Sprache.
+
+Mitgezogen: `AGENTS.md` (dieselben Regeln, eine Zeile je Regel), `README.md`,
+`CONTRIBUTING.md`, `docs/architecture.md`. **Nicht angefasst:** die ADRs, die
+Pläne und Spezifikationen unter `docs/superpowers/`, `docs/vision/`. Das sind
+Aufzeichnungen eines vergangenen Standes; sie umzuschreiben hieße, die Geschichte
+zu fälschen. Wo dort ein Python-Pfad steht, benennt er die Entscheidung, nicht
+die Datei.
+
+### Die zwei Abschnitte, die ausdrücklich verlangt waren
+
+**ADR-0022 steht jetzt genau da.** Der Abschnitt sagt zuerst, was der ADR
+*wirklich* verbietet — drei Dinge, nicht das Ganze: eine Zahl, die einen
+Menschen zusammenfasst (samt jeder Rangfolge daraus); abgeleitete Eigenschaften
+ohne Grundlage; stillschweigende Vollständigkeit. Und dann, was er in seinem
+eigenen Abschnitt „darf wiederkommen" ausdrücklich erlaubt: Belege mit Herkunft
+ohne Zwischenrechnung, Einwilligung zuerst, Sichtbarkeit über den Ledger. Die
+Trennlinie ist die **Richtung der Frage** — Anforderung rein, Belege raus, nie
+Mensch rein, Zahl raus. Dazu der Satz, der den nächsten Leser vor demselben
+Fehler bewahren soll: `github-service` wurde **unter** diesem ADR gebaut, nicht
+von ihm verurteilt.
+
+**`docs/SCOUT-UND-BERATER.md` ist als GEPLANT aufgenommen**, in derselben
+Kategorie wie die Visionsdokumente: Absicht, keine Beschreibung. Genannt sind die
+drei Dienste (`scout-service`, `advisor-service`, `assessment-service`), ihre
+Auflagen, die Oberflächenregeln und die vier Playwright-Reisen — mit dem Satz,
+dass jeder vorher einen eigenen ADR braucht und **kein Agent etwas davon baut**.
+
+### Der Prüfer fand drei Dinge, und eines ist keine Doku-Frage
+
+**1. `replicaCount: 1` stand mit drei Gründen da, von denen nur einer noch gilt.**
+Der Zusteller hat inzwischen `FOR UPDATE SKIP LOCKED` (rohes SQL in
+`OutboxZusteller.cs`, LINQ kann es nicht ausdrücken) — der Grund „jede Mail
+zweimal" ist **gelöst**. Geblieben ist, dass jeder Dienst sein Schema beim Start
+wandert, also zwei Pods auf demselben Schema ein Rennen fahren. `values.yaml`
+sagte beides falsch und sagt es jetzt richtig.
+
+**2. Die Auth-Bremse ist bei der Migration verlorengegangen.** Kein Doku-Fehler,
+sondern eine Lücke: Der Python-Dienst bremste **fünf** Endpunkte (`/auth/login`,
+`/refresh`, `/register`, `/verify-email`, `/resend-verification`) mit einem
+gleitenden Fenster im Prozess, bewusst **weiter außen als die
+Authentifizierung** — sonst würde bcrypt gerechnet, bevor gebremst wird, und die
+Bremse wäre selbst der teuerste Teil des Angriffs (ROADMAP 10.1). In `src/` gibt
+es **weder einen RateLimiter noch einen Fehlversuchszähler**. Es bremst also
+nichts, und zwar bei einer Replik genauso wie bei dreien.
+
+Das ist **nicht gebaut worden** — eine Bremse ist eine sicherheitsrelevante
+Entscheidung mit eigenen Fragen (Fenster, Grenzen, Schlüssel, Verhalten hinter
+einem Gateway) und gehört in einen eigenen Commit, nicht in ein Aufräumen. Sie
+steht jetzt an drei Stellen ausgeschrieben: `CLAUDE.md`, `AGENTS.md`, `README.md`.
+
+Eine Regel aus dem Original muss beim Wiederaufbau überleben, und sie ist der
+Grund, warum sie hier steht statt in einem Kommentar: **je Herkunft bremsen, nie
+je E-Mail-Adresse.** Eine Grenze je Adresse würde zugleich bestätigen, dass die
+Adresse existiert, und einem Fremden erlauben, einen Menschen auszusperren.
+
+**3. `docs/uebergang-python-dotnet.md` war nicht die letzte Python-Spur.** Die
+lebenden Dokumente beschrieben durchweg noch das Vorgängersystem — `AGENTS.md`
+nannte die sechs `uv`/`ruff`/`mypy`/`pytest`-Schritte als *bindende* Reihenfolge,
+`README.md` empfahl `uv sync`, `CONTRIBUTING.md` verlangte Python 3.14 als
+Voraussetzung. Alle drei sind ersetzt.
+
+### Was der Prüfer NICHT geleistet hat
+
+Der erste Anlauf lief als eigener Agent und ist unterwegs an einer
+Nutzungsgrenze abgebrochen. Die Bestandsaufnahme wurde danach hier gemacht, mit
+denselben Fragen, aber **ohne den unabhängigen Blick**, der der eigentliche Wert
+eines Prüfers ist. Wer die Neufassung gegenliest, sollte das wissen: sie ist von
+derselben Hand geprüft, die sie geschrieben hat.
+
+---
+
 ## Was beim Weiterarbeiten immer gilt
 
 - **Bauen und Testen in getrennten Aufrufen.** Verkettet scheitern die
