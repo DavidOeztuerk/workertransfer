@@ -30,6 +30,33 @@ public sealed class ProblemDetailsMiddleware(
         {
             await next(context);
         }
+        catch (BadHttpRequestException kaputt)
+        {
+            // EIN KAPUTTER RUMPF IST KEIN SERVERFEHLER.
+            //
+            // Unlesbares JSON — eine offene Klammer, ein falscher Typ — laesst
+            // die Modellbindung von ASP.NET werfen, und ohne diesen Zweig kam
+            // das als 500 zurueck: an JEDEM Endpunkt, mit Stapelabzug im
+            // Protokoll. Gemessen an D3, gefunden mit einem abgeschnittenen
+            // JSON-Rumpf.
+            //
+            // Der Abbruchcode kommt aus der Ausnahme selbst (400) und wird
+            // nicht hier erfunden — sie weiss besser, was sie meint.
+            //
+            // Die Meldung wird NICHT durchgereicht. Sie nennt den Parameter und
+            // die Byteposition, und das ist schon eine Aussage ueber das, was
+            // jemand geschickt hat. `detail` sagt die Form, nie den Inhalt.
+            logger.LogWarning(
+                "Malformed request body ({Status})", kaputt.StatusCode);
+
+            if (context.Response.HasStarted)
+            {
+                throw;
+            }
+
+            await Schreibe(context, kaputt.StatusCode,
+                "Request failed", "malformed request body");
+        }
         catch (Exception exception)
         {
             // The exception, not the request body: a failure is exactly when
