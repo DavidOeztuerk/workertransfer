@@ -69,19 +69,27 @@ x-dienst: &dienst
     # erreichbare Datenbank.
     start_period: 60s
 
+# KEIN GEHEIMNIS HAT HIER EINE VORGABE.
+#
+# Frueher stand `${WORKERTRANSFER_JWT_SECRET:-dev-only-secret-...}` da. Das ist
+# bequem und falsch: ein eingebauter Vorgabewert IST das Geheimnis, und es liegt
+# damit in git. `:?` bricht stattdessen ab und nennt den fehlenden Schluessel.
+#
+# Wer neu ist: `make env` schreibt eine .env aus .env.example und wuerfelt die
+# drei Geheimnisse frisch. Compose liest sie von selbst.
 x-umgebung: &umgebung
   ASPNETCORE_ENVIRONMENT: Development
   # Ein gemeinsames Geheimnis: identity unterschreibt, alle anderen pruefen
   # (ADR-0007/0015). Die Dienste weisen diese Voreinstellung in
   # Produktion/Staging zurueck.
-  JwtSettings__Secret: ${WORKERTRANSFER_JWT_SECRET:-dev-only-secret-change-me-in-production-32bytes}
+  JwtSettings__Secret: ${WORKERTRANSFER_JWT_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
   JwtSettings__Issuer: workertransfer
   JwtSettings__Audience: workertransfer
   # Gemeinsames Geheimnis der Loeschkaskade (ADR-0027 4.4). AUSDRUECKLICH EIN
   # ANDERES als das der Benachrichtigung: "darf eine Mail anstossen" und "darf
   # alles ueber einen Menschen loeschen" duerfen nicht dasselbe Papier sein.
   # LEER hiesse: der Endpunkt ist zu.
-  Erasure__Geheimnis: ${WORKERTRANSFER_ERASURE_SECRET:-local-erasure-secret}
+  Erasure__Geheimnis: ${WORKERTRANSFER_ERASURE_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
 
 services:
   postgres:
@@ -137,7 +145,7 @@ services:
       Mail__Port: "1025"
       Mail__Absender: noreply@workertransfer.local
       Mail__WebAdresse: ${WORKERTRANSFER_WEB_URL:-http://localhost:8090}
-      Notify__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:-local-notify-secret}
+      Notify__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
       Erasure__Adressen__consent: http://consent-service:8002
       Erasure__Adressen__profile: http://profile-service:8003
       Erasure__Adressen__resume: http://resume-service:8004
@@ -188,7 +196,7 @@ services:
       ConnectionStrings__resume: Host=postgres;Port=5432;Database=resume;Username=worker;Password=worker
       Consent__Adresse: http://consent-service:8002
       Notifications__Adresse: http://notification-service:8010
-      Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:-local-notify-secret}
+      Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
     ports:
       - "8004:8004"
 
@@ -229,7 +237,7 @@ services:
       Consent__Adresse: http://consent-service:8002
       Jobs__Adresse: http://jobs-service:8006
       Notifications__Adresse: http://notification-service:8010
-      Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:-local-notify-secret}
+      Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
     ports:
       - "8007:8007"
 
@@ -256,7 +264,7 @@ services:
       ConnectionStrings__transfer: Host=postgres;Port=5432;Database=transfer;Username=worker;Password=worker
       Consent__Adresse: http://consent-service:8002
       Notifications__Adresse: http://notification-service:8010
-      Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:-local-notify-secret}
+      Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
     ports:
       - "8009:8009"
 
@@ -269,7 +277,7 @@ services:
       ASPNETCORE_URLS: "http://0.0.0.0:8010"
       ConnectionStrings__notification: Host=postgres;Port=5432;Database=notification;Username=worker;Password=worker
       Identity__Adresse: http://identity-service:8001
-      Identity__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:-local-notify-secret}
+      Identity__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
     ports:
       - "8010:8010"
 
@@ -308,7 +316,7 @@ services:
       #
       # NICHT ins Helm-Chart uebernehmen. Dort laeuft kein Pruefstand, und ein
       # Faktor in einer Staging-Umgebung waere eine Bremse, die nur so aussieht.
-      Bremse__Faktor: "40"
+      Bremse__Faktor: "${WORKERTRANSFER_BREMSE_FAKTOR:-1}"
     depends_on:
       # Nur auf die Datenbank, nicht auf die elf: das Gateway beantwortet
       # /health/live selbst, und ein einzelner kranker Dienst darf es nicht

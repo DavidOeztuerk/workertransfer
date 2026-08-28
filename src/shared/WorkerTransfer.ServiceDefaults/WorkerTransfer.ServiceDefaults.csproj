@@ -11,6 +11,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Nur fuer `Umgebung.Laden()`: eine .env-Datei in die Prozessumgebung. -->
+    <PackageReference Include="DotNetEnv" />
     <PackageReference Include="Girder.Infrastructure" />
     <!--
       Nur fuer `Wanderung`: jeder der zehn Dienste besitzt ein eigenes Schema

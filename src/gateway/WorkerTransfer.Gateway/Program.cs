@@ -4,6 +4,11 @@ using Ocelot.DependencyInjection;
 using Ocelot.Middleware;
 using WorkerTransfer.Gateway;
 
+// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
+// Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
+// geladen hiesse geladen und von niemandem gelesen.
+WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Die Landkarte reist als eigene Datei, nicht in appsettings: sie ist der

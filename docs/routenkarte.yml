@@ -75,25 +75,60 @@ gruppen:
       403 statt 404: „du bist dort nicht Mitglied" ist eine Aussage ueber den
       Aufrufer und verraet nichts ueber die Firma.
 
-      `POST /companies` antwortet 409, weil die Domaene schon beansprucht ist —
-      eine Domaene gehoert genau einer Firma (ADR-0019).
+      `POST /companies` ist die interessanteste Zeile der Gruppe, weil sie in den
+      zwei Spalten aus ZWEI GRUENDEN verschieden ausfaellt — beide mit `{}` als
+      Rumpf:
+
+      Die PERSON hat eine eigene, unbeanspruchte Domaene. Dort faellt die
+      Namenspruefung zuerst: 400.
+
+      Die FIRMA hat ihre Domaene mit der Gruendung schon beansprucht, und die
+      Domaenenpruefung laeuft VOR der Namenspruefung: 409. Eine Domaene gehoert
+      genau einer Firma (ADR-0019), und das gilt auch fuer die eigene.
+
+      HIER STAND ZWEIMAL 409, und das war falsch gemessen: `example.org`, die
+      Domaene beider Prinzipale, war von einem frueheren Lauf auf DERSELBEN
+      Datenbank beansprucht. Nach `docker compose down -v` kippte die Zeile auf
+      400, nach einem einzigen Probeaufruf wieder auf 409.
+
+      Eine Zeile, die von Resten eines frueheren Laufs abhaengt, ist genau die
+      Abhakliste, gegen die diese Karte gebaut ist — nur diesmal in ihr selbst.
+      Behoben wurde deshalb nicht die Zahl, sondern der PRUEFSTAND:
+      `scripts/routenkarte.sh` gibt jetzt auch der Person eine eigene Domaene je
+      Lauf. Seitdem stehen beide Werte durch Konstruktion fest.
     eintraege:
       - { methode: GET, pfad: '/me', ohne: 401, person: 200, firma: 200 }
       - { methode: GET, pfad: '/me/companies', ohne: 401, person: 200, firma: 200 }
-      - { methode: POST, pfad: '/companies', ohne: 401, person: 409, firma: 409 }
+      - { methode: POST, pfad: '/companies', ohne: 401, person: 400, firma: 409 }
 
   - name: 'Firmenverwaltung — 404 fuer eine fremde Firma'
     warum: |
-      Wer kein Mitglied ist, bekommt 404 und nicht 403: ein 403 bestaetigte, dass
-      es die Firma gibt. Die Firma, deren Kennung hier steht, existiert nicht —
-      und genau deshalb ist die Antwort dieselbe wie fuer eine, die es gibt und
-      zu der man nicht gehoert. Das ist die Zusage.
+      Zwei Antworten, und der Unterschied ist seit H1 neu:
+
+      LESEN gibt 404. Wer kein Mitglied ist, soll nicht erfahren, ob es die
+      Firma gibt; die Kennung hier existiert nicht, und die Antwort ist
+      dieselbe wie fuer eine, die es gibt und zu der man nicht gehoert.
+
+      SCHREIBEN gibt 403 — `POST /invitations` und `DELETE /members/{id}`
+      haengen an einer Richtlinie (`Permission:company.*`), und die entscheidet,
+      BEVOR der Rumpf ueberhaupt angesehen wird. Zuvor gaben sie 400 (Rumpf
+      kaputt) beziehungsweise 404 (kein Mitglied).
+
+      Der Wechsel war eine FOLGE, keine Absicht — er fiel beim Fahren dieser
+      Karte auf. Nachgeprueft traegt er trotzdem: die Richtlinie antwortet 403
+      unabhaengig davon, ob die Firma existiert, verraet also nichts. Und 403
+      heisst hier dasselbe wie ueberall sonst: eine Aussage ueber den AUFRUFER
+      („du darfst das nicht"), keine ueber die Sache. Dass die Autorisierung vor
+      der Eingabepruefung steht, ist ausserdem die Reihenfolge, die dieses
+      System schon bei `/invitations/accept` ausdruecklich gewaehlt hat — sonst
+      lernte ein Fremder aus dem Unterschied 400/403, dass sein Rumpf in Ordnung
+      war.
     eintraege:
-      - { methode: POST, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations', ohne: 401, person: 400, firma: 400 }
+      - { methode: POST, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations', ohne: 401, person: 403, firma: 403 }
       - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations', ohne: 401, person: 404, firma: 404 }
       - { methode: DELETE, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations/00000000-0000-0000-0000-000000000002', ohne: 401, person: 404, firma: 404 }
       - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/members', ohne: 401, person: 404, firma: 404 }
-      - { methode: DELETE, pfad: '/companies/00000000-0000-0000-0000-000000000001/members/00000000-0000-0000-0000-000000000002', ohne: 401, person: 404, firma: 404 }
+      - { methode: DELETE, pfad: '/companies/00000000-0000-0000-0000-000000000001/members/00000000-0000-0000-0000-000000000002', ohne: 401, person: 403, firma: 403 }
       - { methode: POST, pfad: '/invitations/accept', ohne: 401, person: 422, firma: 422 }
 
   - name: 'Einwilligung — der Ledger'

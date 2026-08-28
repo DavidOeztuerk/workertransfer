@@ -8,7 +8,7 @@
 DOTNET_SLN := WorkerTransfer.slnx
 
 .PHONY: help check check-dotnet check-web build test test-web validate validate-e2e \
-        fix dev up down images routenkarte k8s-up k8s-down k8s-lint k8s-seed clean
+        fix dev env up down images routenkarte k8s-up k8s-down k8s-lint k8s-seed clean
 
 help:  # Diese Liste.
 	@# `0-9` im Muster, sonst fehlen k8s-up/-down/-seed/-lint — vorhanden, aber
@@ -55,6 +55,26 @@ validate-e2e:  # Zusaetzlich die Browser-Reise; braucht den laufenden Stapel.
 
 fix:  # Formatieren.
 	dotnet format $(DOTNET_SLN)
+
+env:  # .env aus der Vorlage anlegen und die drei Geheimnisse wuerfeln.
+	@# Der erste Befehl in einem frischen Klon. Danach laeuft `make up`.
+	@#
+	@# Die Geheimnisse stehen in .env.example LEER — ein eingebauter Vorgabewert
+	@# waere das Geheimnis selbst, und es laege in git. Hier entstehen sie neu,
+	@# je Klon andere.
+	@if [ -f .env ]; then \
+		echo ".env gibt es schon — nichts geaendert."; \
+		echo "Zum Neuwuerfeln: rm .env && make env"; \
+	else \
+		cp .env.example .env; \
+		for s in WORKERTRANSFER_JWT_SECRET WORKERTRANSFER_NOTIFY_SECRET WORKERTRANSFER_ERASURE_SECRET; do \
+			wert=$$(openssl rand -base64 32); \
+			tmp=$$(mktemp); \
+			awk -v k="$$s" -v v="$$wert" '$$0 == k "=" { print k "=" v; next } { print }' .env > "$$tmp" && mv "$$tmp" .env; \
+		done; \
+		echo ".env angelegt, drei Geheimnisse frisch gewuerfelt."; \
+		echo "Sie ist ignoriert und gehoert nicht in git."; \
+	fi
 
 up:  # Der ganze Stapel lokal: Postgres, Mailpit, elf Dienste, Gateway, Oberflaeche.
 	docker compose up -d --build
