@@ -52,8 +52,18 @@ curl -sf -o /dev/null "${BASE}/health/live" || {
 # dass irgendetwas rot wird. Genau so ist dieses Skript beim Bauen einmal in
 # die Irre gelaufen.
 stempel="$(date +%s)-$$"
-PERSON="rk-person-${stempel}@example.org"
-FIRMA="chef@rk-${stempel}.example"
+# EIGENE DOMAENE AUCH FUER DIE PERSON, nicht nur fuer die Firma.
+#
+# `POST /companies` antwortet je nach Zustand VERSCHIEDEN: ist die Domaene der
+# Person noch frei, faellt zuerst die Namenspruefung (400); ist sie schon
+# beansprucht, faellt zuerst die Domaenenpruefung (409). Mit einer geteilten
+# Domaene wie example.org haengt die Antwort also davon ab, ob irgendein
+# frueherer Lauf dort eine Firma angelegt hat — und die Karte kippte zwischen
+# zwei Werten, ohne dass sich etwas am Code geaendert haette.
+#
+# Mit einer eigenen Domaene je Lauf ist sie eindeutig: 400.
+PERSON="mensch@rk-p-${stempel}.example"
+FIRMA="chef@rk-f-${stempel}.example"
 
 token_aus_mail() {
   for _ in $(seq 1 40); do

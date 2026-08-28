@@ -49,6 +49,7 @@ The vision documents in [`docs/vision/`](docs/vision/) describe a much larger fu
 Everything has a `make` target, and the target is the twin of what CI runs. `make help` lists them.
 
 ```bash
+make env            # FIRST, in a fresh clone: writes .env and rolls three secrets
 make check          # the gate: build, then test, then the frontend — fail-fast
 make build          # dotnet build. Warnings are errors (Directory.Build.props)
 make test           # the suites, ONE AT A TIME (see below)
@@ -80,6 +81,16 @@ dotnet nuget add source https://nuget.pkg.github.com/DavidOeztuerk/index.json \
 ```
 
 `NuGet.Config` also pins package source mapping: only `Girder.*` may come from GitHub, everything else from nuget.org. Without that, a public package of the same name could answer first.
+
+### Configuration comes from the environment
+
+`make env` is the first command in a fresh clone. It copies `.env.example` — which is complete, one comment per key — and **rolls the three secrets** with `openssl rand -base64 32`. `.env` is git-ignored; `.env.example` ships with the secrets **empty**.
+
+That emptiness is the point. A built-in default *is* the secret, and it then lives in git. `docker-compose.yml` therefore uses `${WORKERTRANSFER_JWT_SECRET:?…}`, not `${…:-dev-only-secret}`: without a value, compose aborts and **names the missing variable**. Girder does the same at its own most important place — `JWT_SECRET` beats `JwtSettings:Secret`, and if both are absent it throws a `ConfigurationException` naming the key.
+
+`Umgebung.Laden()` (`ServiceDefaults`) is the **first line of every one of the twelve `Program.cs`**, before `CreateBuilder` — the configuration builder reads environment variables exactly once, when it builds, so loading afterwards means loading and nobody reading. A test pins that order in all twelve. It never overwrites an already-set variable: in compose and in the cluster the environment comes from there, and a file left in the image must never override it.
+
+Infisical will later fill the environment. It feeds `.env`; it does not replace the mechanism, so no code changes for it.
 
 ### The stack
 

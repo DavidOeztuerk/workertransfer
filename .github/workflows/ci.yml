@@ -154,6 +154,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Ohne .env faehrt nichts hoch, und das ist Absicht: kein Geheimnis hat
+      # eine eingebaute Vorgabe mehr. `make env` legt sie an und wuerfelt die
+      # drei frisch — je Lauf andere, was hier genau richtig ist.
+      - name: Umgebung anlegen
+        run: make env
+
       # DER EIGENTLICHE BELEG.
       #
       # Nicht "der Behaelter lief noch nach drei Sekunden" — das ist gemessen

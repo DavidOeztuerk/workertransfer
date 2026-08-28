@@ -3,6 +3,11 @@ using WorkerTransfer.Jobs.Infrastructure;
 using WorkerTransfer.Jobs.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
+// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
+// Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
+// geladen hiesse geladen und von niemandem gelesen.
+WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+
 var builder = WebApplication.CreateBuilder(args);
 const string dienstname = "jobs-service";
 

@@ -1074,6 +1074,83 @@ und damit auch für einen zweiten Aufrufer. Am laufenden Stapel belegt —
 `POST /auth/login` mit `{}` gibt `422` mit `"invalid: Email, Passwort"`, und das
 Protokoll zeigt, dass es aus dem Behavior kommt.
 
+## Härtung H2: Konfiguration über die Umgebung
+
+| Stück | wo |
+|---|---|
+| `DotNetEnv` 3.1.1 | `Directory.Packages.props`, referenziert von `ServiceDefaults` |
+| `Umgebung.Laden()` | `src/shared/WorkerTransfer.ServiceDefaults/Umgebung.cs` |
+| Aufruf | erste Zeile in **allen zwölf** `Program.cs`, vor `CreateBuilder` |
+| Vorlage | `.env.example`, vollständig, ein Kommentar je Schlüssel |
+| Anlegen | `make env` |
+| Wächter | `tests/WorkerTransfer.Ganzes.Tests/UmgebungTests.cs` |
+
+**Vor `CreateBuilder`, und das ist keine Kosmetik:** der Konfigurationsaufbau
+liest die Umgebungsvariablen genau einmal, beim Bauen. Wer die Datei danach
+lädt, hat sie geladen und niemand liest sie. Ein Test nagelt die Reihenfolge in
+allen zwölf Einstiegspunkten fest.
+
+**Eine gesetzte Variable wird nicht überschrieben** (`clobberExistingVars:
+false`). In Compose und im Cluster kommt die Umgebung von dort; eine Datei, die
+im Bild liegen bliebe, dürfte das nie übersteuern — sonst entschiede der Inhalt
+des Bildes über die Geheimnisse der Installation.
+
+### Kein Geheimnis mehr in git
+
+Drei standen mit eingebauter Vorgabe in `docker-compose.yml`:
+
+```
+${WORKERTRANSFER_JWT_SECRET:-dev-only-secret-change-me-in-production-32bytes}
+${WORKERTRANSFER_NOTIFY_SECRET:-local-notify-secret}
+${WORKERTRANSFER_ERASURE_SECRET:-local-erasure-secret}
+```
+
+Ein eingebauter Vorgabewert **ist** das Geheimnis, und er liegt damit in git.
+Jetzt steht dort `${…:?…}`. **Gemessen:** ohne `.env` bricht
+`docker compose config` mit **Abbruchcode 1** ab und nennt jede fehlende
+Variable beim Namen. `make env` legt die Datei an und würfelt die drei mit
+`openssl rand -base64 32` — je Klon andere. In `.env.example` stehen sie
+**leer**, mit dem Befehl daneben; zwei Tests halten das fest, in beide
+Richtungen (Vorlage leer, compose ohne Vorgabe).
+
+Girders Rangfolge ist nachgesehen und stimmt mit der Vorgabe überein
+(`ServiceCollectionExtensions.cs:246`): `JWT_SECRET` schlägt
+`JwtSettings:Secret`, und fehlt beides, wirft es eine `ConfigurationException`,
+die den Schlüssel **benennt**.
+
+CI zieht mit: der `images`-Job ruft `make env`, bevor er den Stapel hochfährt —
+dort gibt es keine `.env`, weil sie ignoriert ist.
+
+### Am laufenden Stapel belegt
+
+`docker compose down -v`, dann neu hoch mit frisch gewürfelten Geheimnissen:
+**alle vierzehn Behälter gesund**, Routenkarte **315 Antworten grün**.
+
+### Und dabei fiel ein Fehler in der Routenkarte selbst auf
+
+Beim Fahren gegen die frische Datenbank fielen fünf Zeilen. Vier davon waren
+**Folgen der Autorisierung aus H1** und tragen nach Prüfung:
+`POST /companies/{id}/invitations` und `DELETE …/members/{id}` geben jetzt
+**403** statt 400 beziehungsweise 404, weil die Richtlinie entscheidet, *bevor*
+der Rumpf angesehen wird. Das ist dieselbe Reihenfolge, die dieses System bei
+`/invitations/accept` schon ausdrücklich gewählt hat, und die Richtlinie
+antwortet unabhängig davon, ob die Firma existiert — sie verrät also nichts.
+Lesen bleibt bei 404, Schreiben gibt 403; der Unterschied steht jetzt in der
+Karte.
+
+Die fünfte war **ein Fehler der Karte**: `POST /companies` stand mit 409, und
+das galt nur, weil ein früherer Lauf auf derselben Datenbank schon eine Firma
+auf `example.org` angelegt hatte. Nach `down -v` kippte die Zeile auf 400, nach
+einem einzigen Probeaufruf zurück auf 409 — eine Zeile, die von Resten abhängt,
+also genau die Abhakliste, gegen die diese Karte gebaut ist.
+
+Behoben wurde nicht die Zahl, sondern der **Prüfstand**: `routenkarte.sh` gibt
+jetzt auch der Person eine eigene Domäne je Lauf. Seitdem stehen beide Werte
+durch Konstruktion fest — **400** für die Person (freie Domäne, die
+Namensprüfung fällt zuerst) und **409** für die Firma (ihre Domäne ist mit der
+Gründung beansprucht, und die Domänenprüfung läuft vor der Namensprüfung).
+Zweimal hintereinander gefahren, beide Male grün.
+
 ## Härtung H1: der Umstieg auf `IServiceCommunicationManager` fällt aus — gemessen
 
 Der Plan war, die dreizehn Dienst-zu-Dienst-Aufrufe darüber zu führen und damit

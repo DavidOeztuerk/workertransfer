@@ -13,6 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup Label="Girder">
+    <PackageVersion Include="DotNetEnv" Version="3.1.1" />
     <PackageVersion Include="Girder.Abstractions" Version="$(GirderVersion)" />
     <PackageVersion Include="Girder.Application" Version="$(GirderVersion)" />
     <PackageVersion Include="Girder.Contracts" Version="$(GirderVersion)" />

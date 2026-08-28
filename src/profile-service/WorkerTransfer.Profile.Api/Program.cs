@@ -3,6 +3,11 @@ using WorkerTransfer.Profile.Infrastructure;
 using WorkerTransfer.Profile.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
+// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
+// Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
+// geladen hiesse geladen und von niemandem gelesen.
+WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+
 var builder = WebApplication.CreateBuilder(args);
 const string dienstname = "profile-service";
 

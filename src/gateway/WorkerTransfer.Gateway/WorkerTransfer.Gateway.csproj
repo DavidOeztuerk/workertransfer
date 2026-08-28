@@ -19,6 +19,17 @@
 
   <ItemGroup>
     <!--
+      Nur fuer `Umgebung.Laden()`. Das Gateway ruft bewusst NICHT
+      `AddWorkerTransferDefaults` — es hat keine Datenbank, keine CQRS-Pipeline
+      und keine Endpunkte, die ein Token pruefen. Aber die Konfiguration soll
+      es genauso lesen wie die elf anderen: ein zweiter Weg dafuer waere ein
+      zweiter Ort, an dem ein Schluessel fehlen kann.
+    -->
+    <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
       Die Landkarte reist mit dem Bild. Sie ist kein Anhängsel der
       Konfiguration, sondern das Einzige, was dieser Dienst tut.
     -->
