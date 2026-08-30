@@ -152,11 +152,38 @@ Wege könnte die zwei Zusagen halten, an denen für uns alles hängt —
 Vertrauensliste wäre schlanker als unserer. Der Wechsel darf nur nicht die
 Zusagen kosten.
 
-## Stand
+## Stand — in Girder behoben, hier zu messen
 
-- [ ] gemeldet
-- [ ] Weg 1 bremst
-- [ ] Weg 2 bremst, `ConfigureRateLimitRules` stürzt nicht mehr ab, `ClientIdStrategy` wird gelesen
-- [ ] Weg 3 hat eine Verdrahtung und zählt genau
-- [ ] weitergereichte Köpfe nur hinter einer Vertrauensliste
-- [ ] eigene Bremse hier entfernt
+- [x] gemeldet
+- [x] von drei Wegen bleibt einer, Fassung: **4.0.0**
+- [x] `ConfigureRateLimitRules` gibt es nicht mehr
+- [x] die Einstellung, wen gezählt wird, wird gelesen
+- [x] weitergereichte Köpfe nur hinter einer erklärten Vertrauensliste
+- [ ] eigene Bremse hier gemessen und entfernt — H2 in `docs/AUFTRAG-GIRDER-4.md`
+
+Die Behebung war nicht „alle drei bremsen", sondern **einer bleibt**.
+
+`RateLimitMiddleware` fragte `IRateLimitService`, dessen `CheckRateLimitAsync`
+über eine Regelsammlung läuft — leer, solange niemand Regeln einträgt, und dann
+kommt `IsAllowed = true` heraus. Der einzige Weg, Regeln einzutragen, war
+`ConfigureRateLimitRules`, und das registriert eine Singleton-Fabrik für
+`IRateLimitService`, die im Rumpf `IRateLimitService` auflöst: sich selbst. Wer
+sie je auflöste, verlor den Prozess ohne Protokoll. Dass es nie auffiel, steht in
+seinem eigenen Test — er prüft, dass eine Registrierung *hinzugefügt* wurde, und
+löst sie nie auf. `RateLimitingMiddleware` zählte in einem `IMemoryCache`, also je
+Prozess, und war nirgends verdrahtet.
+
+Entfernt: `IRateLimitService` samt beiden Anbieterfassungen, `AddRateLimit`,
+`AddRateLimitMiddleware`, `ConfigureRateLimitRules`, beide überzähligen
+Middlewares und ihr Regelmodell.
+
+`ClientIdStrategy` und `CustomClientIdExtractor` standen auf einer Optionsklasse
+und wurden nirgends gelesen — wer „je Herkunft" einstellte, zählte je Benutzer.
+An ihrer Stelle steht `RateLimitSubject`, auf jeder Anfrage gelesen, mit
+`SubjectExtractor` für Mandant oder Schlüssel.
+
+**Der schärfste Fall stand nicht im Ticket:** `IsWhitelisted` las die
+Ausnahmeliste über denselben gefälschten Kopf, und die Liste trägt per Vorgabe
+`127.0.0.1`. Ein `X-Forwarded-For: 127.0.0.1` hob die Bremse damit ohne jede
+Konfiguration ganz auf. Dieselbe Blindheit lag an sechs weiteren Stellen —
+Prüfprotokoll, Telemetrie, Eingabesäuberung.
