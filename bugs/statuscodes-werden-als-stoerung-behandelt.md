@@ -112,10 +112,36 @@ den Statuscode durchreichen (etwa als Ergebnistyp statt `TResponse?`), und der
 Wiederholungshandler dürfte nur auf `5xx`, Zeitüberschreitungen und
 Verbindungsfehler wiederholen, nicht auf `4xx`.
 
-## Stand
+## Stand — zwei von drei in Girder behoben
 
-- [ ] gemeldet
-- [ ] `SendRequestAsync`/`GetAsync` reichen den Statuscode durch
-- [ ] `ResilientHttpPolicyHandler` wiederholt nur, was sich durch Wiederholen bessern kann
-- [ ] fremde Antwortrümpfe landen nicht mehr im Protokoll
-- [ ] Umstieg auf `IServiceCommunicationManager` vollzogen, eigene Aufrufe entfernt
+- [x] gemeldet
+- [x] `SendRequestAsync`/`GetAsync` reichen den Statuscode durch, Fassung: **4.0.0**
+- [x] `ResilientHttpPolicyHandler` wiederholt nur, was sich durch Wiederholen bessern kann
+- [ ] **fremde Antwortrümpfe landen weiter im Protokoll** — nicht behoben, siehe unten
+- [ ] Umstieg auf `IServiceCommunicationManager` vollzogen — H2 in `docs/AUFTRAG-GIRDER-4.md`
+
+`GetAsync` und `SendRequestAsync` geben `ServiceResponse<T>` zurück: `Status`,
+`Value`, und `Body` mit dem Rumpf, in dem der ferne Dienst meist sagt, was
+fehlte. Nur ein Aufruf, der überhaupt keine Antwort bekam, wirft noch. Ein leerer
+Erfolg und ein `404` sind damit unterscheidbar, was sie vorher nicht waren.
+
+Wiederholt wird nur noch, was ein zweiter Versuch anders beantworten könnte: 408,
+429 und 5xx ohne 501 — eine Route, die es nicht gibt, gibt es zwischen zwei
+Versuchen auch nicht. Die Antwort wird dabei getragen statt beschrieben, so dass
+der letzte Versuch dem Aufrufer immer noch gibt, was der ferne Dienst gesagt hat.
+
+Zwischengespeichert wird nur noch, was gelungen ist: ein gemerkter `404` würde
+weiter antworten, nachdem die Sache da ist.
+
+**Der dritte Punkt ist offen.** Der Manager protokolliert den fremden Rumpf
+weiterhin auf `Warning`:
+
+```
+_logger.LogWarning("GET to {ServiceName} answered {StatusCode}: {Body}",
+    serviceName, response.StatusCode, content);
+```
+
+Vorher war es dieselbe Zeile mit `errorContent`, also unverändert schlecht. Seit
+der Rumpf ohnehin in `ServiceResponse.Body` beim Aufrufer ankommt, ist er im
+Protokoll nicht nur riskant, sondern überflüssig. Gehört nach Girder als eigene
+kleine Meldung.

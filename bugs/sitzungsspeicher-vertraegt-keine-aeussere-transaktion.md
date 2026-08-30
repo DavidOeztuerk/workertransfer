@@ -176,9 +176,25 @@ umdrehen.
 
 **Bauen und Testen in getrennten Aufrufen.**
 
-## Stand
+## Stand — in Girder behoben, hier offen
 
 - [x] gemeldet
-- [ ] in Girder behoben, Fassung: <…>
-- [ ] Umweg hier entfernt — es ist keiner entstanden, die Klammer fehlt
-      einstweilen auf zwei Routen
+- [x] in Girder behoben, Fassung: **3.0.1**
+- [ ] Klammer auf `/auth/refresh` und `/auth/logout` nachgezogen
+
+`TryConsumeAsync` öffnet nur noch dann eine eigene Transaktion, wenn keine offen
+ist. Kein Savepoint: zwischen dem Beginn und dem Null-Zeilen-Zweig steht allein
+das bedingte `ExecuteUpdateAsync`, das nichts traf — es gibt nichts
+zurückzurollen, und ein Rollback griffe über den Speicher hinaus in die Arbeit
+des Aufrufers.
+
+**Die eigentliche Arbeit war der Verlierer-Pfad.** `AlreadyRotatedAsync`
+antwortet schreibend — ein Geschwister-Token im Kulanzfenster, oder
+`CloseSessionAsync` bei erkanntem Diebstahl. Bisher überlebten diese
+Schreibvorgänge nur, weil das Rollback die Transaktion vorher beendete. Er liegt
+jetzt außerhalb des Transaktionsbereichs. Die naive Behebung — Bedingung rein,
+Rollback raus, Rest stehen lassen — übersetzt sauber und meldet einen Diebstahl,
+während die Sitzung offen bleibt.
+
+Hier ist kein Umweg entstanden. Die Klammer fehlt weiterhin auf den zwei Routen;
+sie ist jetzt nur nicht mehr blockiert.

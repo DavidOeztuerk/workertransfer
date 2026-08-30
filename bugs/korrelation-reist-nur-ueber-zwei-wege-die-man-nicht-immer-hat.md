@@ -119,9 +119,27 @@ arbeitete unter einer eigenen.
 Wir bauen den Handler deshalb bei uns — als dritten Schreiber desselben Musters,
 nicht als Erfindung. Er fällt weg, sobald Girder ihn mitbringt.
 
-## Stand
+## Stand — in Girder behoben, hier zu messen
 
-- [ ] gemeldet
-- [ ] Girder reicht die Kennung an jedem `HttpClient` weiter
-- [ ] `CorrelationIdMiddleware` setzt und liest Baggage
-- [ ] eigener Handler hier entfernt
+- [x] gemeldet
+- [x] Girder reicht die Kennung an jedem `HttpClient` weiter, Fassung: **4.0.0**
+- [x] `CorrelationIdMiddleware` schreibt Baggage, und `LoggingBehavior` liest es
+- [ ] eigener Handler hier gemessen und entfernt — H2 in `docs/AUFTRAG-GIRDER-4.md`
+
+`LoggingBehavior` las `Activity.Current?.GetBaggageItem("CorrelationId")`, und
+`AddBaggage` kam in ganz Girder nicht vor — ein Leser ohne Schreiber. Geschrieben
+wurde `SetTag`, und ein Etikett bleibt an dem Span, an den es geschrieben wurde.
+
+Die Middleware schreibt jetzt beides. Gepäck braucht eine `Activity`, und ohne
+eingerichtete Ablaufverfolgung gibt es keine; die Middleware beginnt in dem Fall
+eine. Die Kennung zu verlieren, weil niemand OpenTelemetry eingerichtet hat, wäre
+die falsche Richtung.
+
+`CorrelationIdHandler` hängt über `ConfigureHttpClientDefaults` an jedem Client,
+den die Fabrik baut — das ist das Modul `CorrelationPropagation`, und es steht in
+`UseDefaults()`. Eine selbst gesetzte Kennung überschreibt er nicht, und außerhalb
+einer Anfrage erfindet er keine.
+
+Kopfname und Gepäckschlüssel liegen jetzt in `Girder.Abstractions.Observability`
+an einer Stelle. Vier Dateien hielten sie vorher jede für sich — genau die
+Streuung, aus der ein Leser und ein Schreiber entstehen, die sich verfehlen.
