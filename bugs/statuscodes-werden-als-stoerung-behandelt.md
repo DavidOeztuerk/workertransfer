@@ -112,12 +112,12 @@ den Statuscode durchreichen (etwa als Ergebnistyp statt `TResponse?`), und der
 Wiederholungshandler dürfte nur auf `5xx`, Zeitüberschreitungen und
 Verbindungsfehler wiederholen, nicht auf `4xx`.
 
-## Stand — zwei von drei in Girder behoben
+## Stand — in Girder behoben, hier zu messen
 
 - [x] gemeldet
 - [x] `SendRequestAsync`/`GetAsync` reichen den Statuscode durch, Fassung: **4.0.0**
 - [x] `ResilientHttpPolicyHandler` wiederholt nur, was sich durch Wiederholen bessern kann
-- [ ] **fremde Antwortrümpfe landen weiter im Protokoll** — nicht behoben, siehe unten
+- [x] fremde Antwortrümpfe landen nicht mehr im Protokoll, Fassung: **4.0.1**
 - [ ] Umstieg auf `IServiceCommunicationManager` vollzogen — H2 in `docs/AUFTRAG-GIRDER-4.md`
 
 `GetAsync` und `SendRequestAsync` geben `ServiceResponse<T>` zurück: `Status`,
@@ -133,15 +133,17 @@ der letzte Versuch dem Aufrufer immer noch gibt, was der ferne Dienst gesagt hat
 Zwischengespeichert wird nur noch, was gelungen ist: ein gemerkter `404` würde
 weiter antworten, nachdem die Sache da ist.
 
-**Der dritte Punkt ist offen.** Der Manager protokolliert den fremden Rumpf
-weiterhin auf `Warning`:
+**Der dritte Punkt ist mit 4.0.1 erledigt.** Der Manager protokollierte den
+fremden Rumpf auf `Warning`, und zwar an drei Stellen: beim GET, beim POST, und
+die Fehlerliste aus einem `success:false`-Umschlag — die letzte auf einem `200`,
+also auf dem Pfad, den man am ehesten übersieht.
 
 ```
-_logger.LogWarning("GET to {ServiceName} answered {StatusCode}: {Body}",
-    serviceName, response.StatusCode, content);
+vorher   GET to UserService answered NotFound: {"error":"anna@example.com hat kein Konto"}
+jetzt    GET to UserService answered NotFound (48 bytes)
 ```
 
-Vorher war es dieselbe Zeile mit `errorContent`, also unverändert schlecht. Seit
-der Rumpf ohnehin in `ServiceResponse.Body` beim Aufrufer ankommt, ist er im
-Protokoll nicht nur riskant, sondern überflüssig. Gehört nach Girder als eigene
-kleine Meldung.
+Protokolliert wird die Form: welcher Dienst, welcher Status, wie viele Bytes
+beziehungsweise wie viele Fehler. Die Werte kommen ohnehin in
+`ServiceResponse.Body` beim Aufrufer an, wo entschieden werden kann, ob sie
+behalten werden dürfen.
