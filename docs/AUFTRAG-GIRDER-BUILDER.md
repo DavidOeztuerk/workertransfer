@@ -162,8 +162,13 @@ wird:
   ausdrücklichen Warnung, dass das alte Lambda die Vorgabe *ersetzt* hat.
 - **Ein Abschnitt zu Souveränität:** was Girder nach außen ruft, wie
   `EgressPolicy` das begrenzt, und wie man den `SovereigntyReport` liest.
-- **Jede öffentliche Methode mit XML-Doku**, die sagt, was passiert, wenn man
-  sie *nicht* ruft. Das ist die Frage, die man beim Lesen wirklich hat.
+- ~~Jede öffentliche Methode mit XML-Doku~~ — **zurückgenommen.** Girder hat dazu
+  längst eine Position, und sie steht in `Directory.Build.props`: CS1591 ist
+  unterdrückt, weil *„requiring one on every member produces noise, not
+  documentation"*. Die Anforderung wurde geschrieben, ohne das nachzusehen. Was
+  bleibt: **die Erweiterungsmethoden und Baumeister** dokumentieren, was passiert,
+  wenn man sie *nicht* ruft — das ist die Frage, die man beim Verdrahten wirklich
+  hat, und sie stellt sich nicht bei einer Fehlercode-Konstante.
 
 ## Abnahme
 
