@@ -1074,6 +1074,75 @@ und damit auch für einen zweiten Aufrufer. Am laufenden Stapel belegt —
 `POST /auth/login` mit `{}` gibt `422` mit `"invalid: Email, Passwort"`, und das
 Protokoll zeigt, dass es aus dem Behavior kommt.
 
+## Umstieg auf Girder 4: H4 — die Reste
+
+### Die Validatoren: die Stufe lief längst, es fehlte der Inhalt
+
+Sieben Validatoren geschrieben, jeder am **Befehl** statt am Endpunkt — dort
+gelten sie auch für einen zweiten Aufrufer:
+
+| Dienst | Befehl |
+|---|---|
+| identity | `AnmeldenBefehl`, `AdresseBestaetigenBefehl`, `BestaetigungErneutSendenBefehl`, `EinladungAnnehmenBefehl`, `UnternehmenGruendenBefehl` |
+| github | `VerbindenBefehl` |
+| applications | `BewerbungBewegenBefehl` |
+
+**Die Feldnamen sind die des Aufrufers.** `ProblemDetailsMiddleware` antwortet
+`invalid: <Felder>`, und diese Namen kommen aus dem Validator — also wird
+umbenannt, wo unser Befehl anders heißt als das, was auf der Leitung stand.
+Vorher sagte `/auth/login` `invalid: Email, Passwort` zu jemandem, der
+`password` geschickt hatte.
+
+**Drei Fälle bleiben bewusst am Endpunkt**: resume (`Positions`/`Education`),
+portfolio (`Eintraege`) und transfer (`SubjectId`). Dort wird der Rumpf in
+Wertobjekte umgewandelt, *bevor* es einen Befehl gibt — ein Validator am Befehl
+käme zu spät. Bei resume trägt der Endpunkt zusätzlich eine Unterscheidung, die
+ein Validator nicht ausdrücken kann: ein **fehlendes** Feld ist nicht dasselbe
+wie `[]`, sonst hieße eine vergessene Zeile „lösche meinen ganzen Lebenslauf".
+
+Drei Kartenzeilen haben sich dadurch verschoben, jede geprüft statt
+übernommen:
+
+- `POST /applications/{id}/status` gibt der Firma **422 statt 404**. Richtig so:
+  422 spricht über den Rumpf des Aufrufers, 404 über unsere Daten. Mit gültigem
+  Stand und unbekannter Kennung kommt weiterhin 404, und die Autorisierung steht
+  davor — die Person bekommt 403, ohne dass ihr Rumpf angesehen wird.
+- `POST /auth/resend-verification` gibt bei leerem Rumpf **422 statt 202**.
+  **Die Aufzählungssperre bleibt und ist nachgemessen:** mit einer Adresse
+  antwortet der Endpunkt für eine bekannte und eine unbekannte gleich mit 202.
+- `POST /companies` gibt beiden **422**. Der lehrreiche Unterschied 400/409 ist
+  aus einem leeren Rumpf nicht mehr ablesbar; die Eigenschaft selbst ist es —
+  mit gültigem Namen antwortet die Firma weiterhin 409 (nachgemessen).
+
+### `GET /notifications` verrät den Pfad nicht mehr
+
+Der Fund war präzise: `/notifications` **hat** eine Gateway-Route (wegen
+`/notifications/me`), also erreichte jede Methode den Dienst, und ASP.NET
+antwortete auf GET, PUT, DELETE mit **405** — „diesen Pfad gibt es". Genau die
+Verschleierung, die der Dienst mit seinem 404-statt-401 aufbaut, nahm ihm das
+Rahmenwerk wieder ab.
+
+Behoben **nicht durch eine Sonderregel**, sondern durch einen Umzug: der
+Diensteingang liegt jetzt unter `/internal/notifications`, wo es keine
+Gateway-Route gibt — wie bei `/erasure` und `/internal/notify`. Damit verhalten
+sich alle drei Dienst-zu-Dienst-Türen gleich.
+
+Gemessen nach dem Umzug:
+
+```
+/notifications   GET 404 · POST 404 · PUT 404 · DELETE 404 · PATCH 404
+/gibtesnicht     GET 404 · POST 404 · PUT 404
+```
+
+Nicht unterscheidbar. `LandkarteTests` führt jetzt alle drei Türen.
+
+### Die Zeitlimits waren schon zu
+
+Beide Punkte stammten aus der Härtung davor und sind dort erledigt: das
+Einwilligungstor von portfolio-service hat sein Zeitlimit, und alle **fünfzehn**
+ausgehenden Aufrufstellen setzen eines. `ZeitlimitTests` hält beides fest —
+jede Stelle setzt eins, und keines liegt über einer Minute.
+
 ## Umstieg auf Girder 4: H1 — der neue Composition Root
 
 `Dienstgrundlage.cs` steht auf `AddGirder(...)` mit `UseDefaults()`. Der Anlass

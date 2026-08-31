@@ -63,7 +63,7 @@ public sealed class HttpBenachrichtigung(
 
         client.Timeout = _einstellungen.Zeitueberschreitung;
         using var anfrage = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), "/notifications"))
+            HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), "/internal/notifications"))
         {
             // Der ganze Inhalt: über wen und welcher Art. Kein Text, kein
             // Grund, kein Firmenname — der Empfänger liest den aktuellen Stand

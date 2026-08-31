@@ -142,6 +142,7 @@ public class LandkarteTests(Landschaft landschaft)
     /// </remarks>
     [Theory]
     // `/erasure` setzen acht Dienste um — keiner darf es sehen.
+    [InlineData("/internal/notifications", "notification")]
     [InlineData("/erasure", "consent")]
     [InlineData("/erasure", "profile")]
     [InlineData("/erasure", "resume")]
