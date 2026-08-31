@@ -79,6 +79,17 @@ x-dienst: &dienst
 # drei Geheimnisse frisch. Compose liest sie von selbst.
 x-umgebung: &umgebung
   ASPNETCORE_ENVIRONMENT: Development
+  # WER IM BROWSER RUFEN DARF.
+  #
+  # Ohne diesen Schluessel faellt Girder in Development auf `localhost:3000`
+  # zurueck — also auf einen Ursprung, den es hier nicht gibt, waehrend die
+  # Oberflaeche auf 5173 liegt und durch das Gateway auf 8090. Gemessen: eine
+  # Vorpruefung kam mit 204 zurueck und ohne einen einzigen
+  # `Access-Control-Allow-*`-Kopf. CORS war eingehaengt und liess niemanden
+  # durch.
+  #
+  # Kein Geheimnis, deshalb darf hier eine Vorgabe stehen.
+  CORS_ORIGINS: ${WORKERTRANSFER_CORS_ORIGINS:-http://localhost:5173,http://localhost:8090}
   # Ein gemeinsames Geheimnis: identity unterschreibt, alle anderen pruefen
   # (ADR-0007/0015). Die Dienste weisen diese Voreinstellung in
   # Produktion/Staging zurueck.
