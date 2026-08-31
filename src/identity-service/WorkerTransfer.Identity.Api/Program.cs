@@ -1,4 +1,3 @@
-using Girder.Infrastructure.Builder.Modules;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
 using WorkerTransfer.Identity.Api;
@@ -20,13 +19,14 @@ const string serviceName = "identity-service";
 // nothing downstream could tell the two apart.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
-    // AddAuthorization() bringt den PermissionPolicyProvider. OHNE IHN
-    // beantwortet niemand die `Permission:`-Namen, und das Geruest lehnt JEDE
-    // Anfrage an einen so geschuetzten Endpunkt ab — fail-closed, aber an genau
-    // der Stelle, die das Attribut schuetzen sollte. Das faellt erst dem auf,
-    // der es zum ersten Mal benutzt, und sieht dann aus wie ein kaputter
-    // Endpunkt.
-    infrastruktur => infrastruktur.AlsAussteller().AddAuthorization());
+    girder => girder.AlsAussteller());
+
+// Die Richtlinienmaschinerie kommt seit Girder 4.0.2 aus der Vorgabe:
+// `GirderModule.Authorization` ruft `AddAuthorization()` und bringt damit den
+// PermissionPolicyProvider mit — den, der `Permission:*`-Namen zur Laufzeit
+// aufloest. Bis 4.0.1 rief dasselbe Modul `AddResourceAuthorization()`, und die
+// Maschinerie fehlte still; sie stand hier von Hand. Jetzt nicht mehr noetig —
+// UnternehmensreiseTests belegt, dass sie trotzdem greift.
 
 // Wer ein Firmenrecht hat, entscheidet die MITGLIEDSCHAFTSTABELLE, nicht das
 // Token. Girders eigener Handler bleibt daneben stehen und liest Ansprueche —

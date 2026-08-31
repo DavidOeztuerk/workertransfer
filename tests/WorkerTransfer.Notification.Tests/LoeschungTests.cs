@@ -152,12 +152,26 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         return browser.PostAsJsonAsync("/erasure", new { userId = wer });
     }
 
-    private Task<HttpResponseMessage> Melde(Guid wer)
+    /// <summary>Legt einen Eingang an — und besteht darauf, dass es klappt.</summary>
+    /// <remarks>
+    /// Die Antwort wird GEPRUEFT. Vorher wurde sie weggeworfen, und ein
+    /// fehlgeschlagenes Befuellen meldete sich erst drei Zeilen spaeter als
+    /// „kein Eintrag" — eine Ursache, die wie eine Wirkung aussieht.
+    /// </remarks>
+    private async Task<HttpResponseMessage> Melde(Guid wer)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Notify-Secret", Meldegeheimnis);
-        return browser.PostAsJsonAsync(
+
+        var antwort = await browser.PostAsJsonAsync(
             "/notifications", new { userId = wer, kind = "market_request" });
+
+        antwort.IsSuccessStatusCode.Should().BeTrue(
+            "das Befuellen muss gelingen, sonst prueft der Test etwas anderes — "
+            + $"bekam {(int)antwort.StatusCode}: "
+            + await antwort.Content.ReadAsStringAsync());
+
+        return antwort;
     }
 
     private Task<HttpResponseMessage> Wuensche(Guid wer)

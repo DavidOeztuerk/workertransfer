@@ -1074,6 +1074,88 @@ und damit auch für einen zweiten Aufrufer. Am laufenden Stapel belegt —
 `POST /auth/login` mit `{}` gibt `422` mit `"invalid: Email, Passwort"`, und das
 Protokoll zeigt, dass es aus dem Behavior kommt.
 
+## Umstieg auf Girder 4: H1 — der neue Composition Root
+
+`Dienstgrundlage.cs` steht auf `AddGirder(...)` mit `UseDefaults()`. Der Anlass
+war ein Befund und kein Wunsch: **der Sprung von 3.0.1 auf 4.0.1 kostete null
+Quelltextänderungen** — wer nichts benutzt, merkt auch nichts.
+
+Die Ursache war die Form des alten Aufrufs: `AddSharedInfrastructure(…, lambda)`
+ließ das Lambda die Vorgabe **ersetzen** statt sie zu ergänzen. Wir nannten fünf
+Module und bekamen fünf.
+
+### Drei Fehler auf dem Weg, alle beim Bauen gefunden
+
+**`GirderModule.Authorization` bildete in 4.0.1 auf `AddResourceAuthorization()`
+ab**, nicht auf `AddAuthorization()`. Der naive Umstieg hätte damit den
+`PermissionPolicyProvider` verloren — genau die Maschinerie, an der die
+Firmenrechte hängen, und zwar lautlos: jeder geschützte Endpunkt hätte 403
+gegeben. Mit **4.0.2** ruft das Modul `AddAuthorization()` und steht in der
+Vorgabe; `ResourceAuthorization` ist ein eigenes Modul.
+
+**Der `KeyRing` fehlte im Container** (`bugs/jwt-modul-registriert-den-verbraucher-ohne-seinen-schluesselbund.md`).
+Der Katalog registrierte `IJwtService` bedingungslos, das einzige
+`AddSingleton(keys)` stand auf dem alten Modulweg. Reproduziert mit null
+Fremdcode. Behoben in **4.0.2**, und der Fix sitzt an der Stelle, an der sich
+Verbraucher und Abhängigkeit nicht mehr trennen lassen.
+
+**Die Kette kennt die Modulauswahl nicht.** `GirderComposition` kommt in
+`Girder.Infrastructure` nicht vor: die Dienstseite hat `Without(...)`, die
+Middleware-Seite hat nichts Entsprechendes. Jede Abwahl braucht deshalb eine
+zweite, von Hand gepflegte Auslassung in der Kette — sonst bricht der Start
+(`UseRateLimiting() needs IDistributedRateLimitStore`). Unsere Kette ist eine
+**wortgleiche Kopie** der Vorgabe minus drei Zeilen.
+
+### Die vierte Auslassung ist eine eigene Entscheidung
+
+`UsePermissions()` steht **nicht** in unserer Kette. `PermissionMiddleware`
+verlangt für **jede** Anfrage Authentifizierung, außer der Endpunkt trägt
+`[AllowAnonymous]` oder eine eigene `IEndpointAccessPolicy` erklärt ihn für
+öffentlich. Als Vorgabe ist das richtig — für ein System ohne öffentliche
+Fläche. Wir haben eine.
+
+Gemessen, was es kostet: mit der Zeile antwortete `POST /notifications` mit
+**401 in Girders Umschlag**, obwohl der Geheimniskopf stimmte — die Ablehnung
+fällt vor unserem Fehlerdokument und vor dem Endpunkt. Sie einzuschalten hieße,
+unsere öffentliche Fläche ein zweites Mal zu erklären, neben den Endpunkten und
+neben `docs/routenkarte.yml`.
+
+### Was zurückkam — und zwei Korrekturen an der Liste
+
+| | Stand |
+|---|---|
+| **Serilog** | ✅ schreibt (`[00:59:49 INF] …`, vorher ASP.NETs zweizeiliges `info:`) |
+| **Swagger** | ✅ `/swagger/v1/swagger.json` → 200, Oberfläche unter **`/api-docs`** → 200 |
+| **CORS** | ⚠️ war eingehängt und ließ **niemanden** durch |
+| **JSON** | ✅ camelCase, in Development eingerückt — auch für den MVC-Pfad |
+| **HttpContextAccessor** | ❗ **fehlte nie** |
+
+**CORS war der eigentliche Fund.** Ohne konfigurierte Ursprünge fällt Girder in
+Development auf `http://localhost:3000` zurück — einen Ursprung, den es hier
+nicht gibt. Eine Vorprüfung kam mit `204` und **ohne einen einzigen**
+`Access-Control-Allow-*`-Kopf zurück. Jetzt setzt `CORS_ORIGINS` in
+`docker-compose.yml` und `.env.example` die richtigen; gemessen: `5173` bekommt
+`Access-Control-Allow-Origin`, `boese.example` bekommt keinen.
+
+**Der `HttpContextAccessor` fehlte nie** — `AddCQRS` registriert ihn seit jeher
+(`Girder.Application/Extensions/ServiceCollectionExtensions.cs:42`), und acht
+unserer elf Dienste registrierten ihn zusätzlich selbst. Die Lücke war
+unsichtbar, weil sie achtmal lokal geflickt war. Das ist die ehrlichere Fassung
+der Zeile im Auftrag.
+
+### Die Bremse blockiert H1 nicht mehr, sondern steht mit Grund im Quelltext
+
+`RateLimiting` ist in der Vorgabe und verlangt einen `IDistributedRateLimitStore`.
+Den Anbieter einfach dazuzumelden hieße, **zwei Bremsen** zu fahren, und niemand
+wüsste, welche greift. Stattdessen `Without(GirderModule.RateLimiting, …)` mit
+dem Grund im Quelltext — H2 nimmt ihn später weg oder bestätigt ihn.
+
+Insgesamt drei `Without(...)`: `RateLimiting`, `HttpResponseCaching`
+(ETag ist ein Zwischenspeicher beim Aufrufer, und fast alles hier steht hinter
+dem Einwilligungstor) und `ResourceAuthorization`. `Caching` bleibt **an**.
+
+**647 Tests grün, 0 rot, 0 übersprungen. Routenkarte 315 Antworten grün.**
+
 ## Härtung H2: Konfiguration über die Umgebung
 
 | Stück | wo |
