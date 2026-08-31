@@ -58,13 +58,20 @@ gruppen:
       "state":"anonymous"}`. Das ist die Frage der Oberflaeche „bin ich
       angemeldet?", und ein 401 waere darauf keine Antwort, sondern ein Fehler.
 
+      `/auth/resend-verification` steht hier mit 422, weil der Rumpf `{}` GAR
+      KEINE Adresse enthaelt — eine Aussage ueber die Anfrage, nicht ueber ein
+      Konto. Die Zusage bleibt und ist nachgemessen: mit einer Adresse antwortet
+      der Endpunkt fuer eine bekannte und eine unbekannte GLEICH mit 202. Vorher
+      stand hier 202 auch fuer den leeren Rumpf; das war nicht falsch, aber es
+      nahm Muell an und nannte es angenommen.
+
       422 statt 500 bei kaputtem Rumpf: bis D2 lief ein fehlendes Passwort bis in
       den Passwortpruefer und kam als 500 zurueck.
     eintraege:
       - { methode: POST, pfad: '/auth/register', ohne: 400, person: 400, firma: 400 }
       - { methode: POST, pfad: '/auth/login', ohne: 422, person: 422, firma: 422 }
       - { methode: POST, pfad: '/auth/verify-email', ohne: 422, person: 422, firma: 422 }
-      - { methode: POST, pfad: '/auth/resend-verification', ohne: 202, person: 202, firma: 202 }
+      - { methode: POST, pfad: '/auth/resend-verification', ohne: 422, person: 422, firma: 422 }
       - { methode: POST, pfad: '/auth/refresh', ohne: 401, person: 200, firma: 200 }
       - { methode: POST, pfad: '/auth/company/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 403 }
       - { methode: GET, pfad: '/auth/session', ohne: 200, person: 200, firma: 200 }
@@ -75,16 +82,19 @@ gruppen:
       403 statt 404: „du bist dort nicht Mitglied" ist eine Aussage ueber den
       Aufrufer und verraet nichts ueber die Firma.
 
-      `POST /companies` ist die interessanteste Zeile der Gruppe, weil sie in den
-      zwei Spalten aus ZWEI GRUENDEN verschieden ausfaellt — beide mit `{}` als
-      Rumpf:
+      `POST /companies` gibt beiden 422: mit `{}` fehlt der Name, und das
+      entscheidet seit H4 ein Validator in der Pipeline — vor jeder Frage
+      danach, wem welche Domaene gehoert.
 
-      Die PERSON hat eine eigene, unbeanspruchte Domaene. Dort faellt die
-      Namenspruefung zuerst: 400.
+      HIER STANDEN 400 und 409, und der Unterschied war lehrreich: die Firma
+      bekam 409, weil die Domaenenpruefung VOR der Namenspruefung lief, die
+      Person 400, weil ihre Domaene frei war. Mit dem Validator ist das aus
+      einem leeren Rumpf nicht mehr abzulesen.
 
-      Die FIRMA hat ihre Domaene mit der Gruendung schon beansprucht, und die
-      Domaenenpruefung laeuft VOR der Namenspruefung: 409. Eine Domaene gehoert
-      genau einer Firma (ADR-0019), und das gilt auch fuer die eigene.
+      Verloren ist die Eigenschaft nicht, nur diese Beobachtung: mit einem
+      GUELTIGEN Namen antwortet die Firma weiterhin 409 (nachgemessen). Eine
+      Domaene gehoert genau einer Firma (ADR-0019), und das gilt auch fuer die
+      eigene.
 
       HIER STAND ZWEIMAL 409, und das war falsch gemessen: `example.org`, die
       Domaene beider Prinzipale, war von einem frueheren Lauf auf DERSELBEN
@@ -99,7 +109,7 @@ gruppen:
     eintraege:
       - { methode: GET, pfad: '/me', ohne: 401, person: 200, firma: 200 }
       - { methode: GET, pfad: '/me/companies', ohne: 401, person: 200, firma: 200 }
-      - { methode: POST, pfad: '/companies', ohne: 401, person: 400, firma: 409 }
+      - { methode: POST, pfad: '/companies', ohne: 401, person: 422, firma: 422 }
 
   - name: 'Firmenverwaltung — 404 fuer eine fremde Firma'
     warum: |
@@ -225,6 +235,16 @@ gruppen:
 
   - name: 'Bewerbungen'
     warum: |
+      `POST /{id}/status` gibt der Firma 422 und nicht 404: mit `{}` als Rumpf
+      fehlt der Stand, und das ist eine kaputte ANFRAGE. Seit H4 entscheidet das
+      ein Validator in der Pipeline, bevor der Handler nach der Bewerbung sucht.
+
+      Die Reihenfolge ist Absicht und verraet nichts: 422 spricht ueber den
+      Rumpf des Aufrufers, 404 ueber unsere Daten. Mit einem gueltigen Stand und
+      einer Kennung, die es nicht gibt, kommt weiterhin 404. Und die
+      Autorisierung steht davor — die Person bekommt 403, ohne dass ihr Rumpf
+      ueberhaupt angesehen wird.
+
       `POST /applications` gibt 503: applications-service fragt jobs-service nach
       der Stelle, und ueber eine, die es nicht gibt, kann er nichts sagen.
       `GET /jobs/{id}/applications` und `/companies/me/application-stats` sehen
@@ -233,7 +253,7 @@ gruppen:
       - { methode: POST, pfad: '/applications', ohne: 401, person: 503, firma: 503 }
       - { methode: GET, pfad: '/applications/me', ohne: 401, person: 200, firma: 200 }
       - { methode: POST, pfad: '/applications/00000000-0000-0000-0000-000000000001/withdraw', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/applications/00000000-0000-0000-0000-000000000001/status', ohne: 401, person: 403, firma: 404 }
+      - { methode: POST, pfad: '/applications/00000000-0000-0000-0000-000000000001/status', ohne: 401, person: 403, firma: 422 }
       - { methode: GET, pfad: '/jobs/00000000-0000-0000-0000-000000000001/applications', ohne: 401, person: 403, firma: 200 }
       - { methode: GET, pfad: '/companies/me/application-stats', ohne: 401, person: 403, firma: 200 }
 
@@ -289,9 +309,12 @@ gruppen:
 
   - name: 'Benachrichtigungen'
     warum: |
-      `POST /notifications` ist der Diensteingang und antwortet ohne das
-      gemeinsame Geheimnis mit **404, nicht 401**: ein 401 bestaetigte, dass es
-      den Endpunkt gibt.
+      `POST /notifications` ist seit H4 KEIN Endpunkt mehr — der Diensteingang
+      liegt unter `/internal/notifications` und hat dort keine Gateway-Route.
+      Beide antworten von aussen 404.
+
+      Er antwortet auch INNEN mit 404 statt 401, wenn das gemeinsame Geheimnis
+      fehlt: ein 401 bestaetigte, dass es den Endpunkt gibt.
     eintraege:
       - { methode: POST, pfad: '/notifications', ohne: 404, person: 404, firma: 404 }
       - { methode: GET, pfad: '/notifications/me', ohne: 401, person: 200, firma: 200 }
@@ -313,6 +336,7 @@ gruppen:
     eintraege:
       - { methode: POST, pfad: '/erasure', ohne: 404, person: 404, firma: 404 }
       - { methode: POST, pfad: '/internal/notify', ohne: 404, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/internal/notifications', ohne: 404, person: 404, firma: 404 }
       - { methode: POST, pfad: '/companies/withdrawal', ohne: 404, person: 404, firma: 404 }
 
   - name: 'Die nackten Praefixe — was ein Prefix ohne Rest antwortet'
@@ -326,17 +350,23 @@ gruppen:
 
       404 — dort liegt kein Endpunkt. Der Regelfall.
 
-      405 bei `/companies`, `/applications`, `/notifications` — dort liegt ein
-      POST, und GET ist nicht erlaubt. Bei den ersten beiden ist das
-      harmlos.
+      405 bei `/companies` und `/applications` — dort liegt ein POST, und GET
+      ist nicht erlaubt. Hier ist das harmlos: dass es diese Ressourcen gibt,
+      ist keine Auskunft.
 
-      Bei `/notifications` ist es das NICHT, und das ist beim Durchmessen
-      aufgefallen: der Dienst antwortet auf POST ohne das gemeinsame Geheimnis
+      `/notifications` STAND hier mit 405 und war der Fund dieser Gruppe: der
+      Dienst antwortet auf den Diensteingang ohne das gemeinsame Geheimnis
       bewusst mit 404 und nicht mit 401, weil ein 401 bestaetigte, dass es den
-      Endpunkt gibt. Ein GET auf denselben Pfad bestaetigt es dann doch — 405
-      heisst „diesen Pfad gibt es, nur nicht mit dieser Methode". Die
-      Verschleierung des Dienstes wird also vom Rahmenwerk unterlaufen.
-      Aufgeschrieben statt stillschweigend gesegnet; behoben ist es nicht.
+      Endpunkt gibt — und ein GET auf denselben Pfad bestaetigte es dann doch.
+      405 heisst „diesen Pfad gibt es, nur nicht mit dieser Methode"; die
+      Verschleierung wurde also vom Rahmenwerk unterlaufen.
+
+      Behoben in H4, und nicht durch eine Sonderregel: der Diensteingang ist
+      nach `/internal/notifications` umgezogen. Dort gibt es keine
+      Gateway-Route, wie bei `/erasure` und `/internal/notify` — womit sich
+      alle drei Dienst-zu-Dienst-Tueren gleich verhalten. `/notifications`
+      antwortet jetzt auf JEDE Methode 404, nicht unterscheidbar von einem
+      Pfad, den es nicht gibt (gemessen ueber GET, POST, PUT, DELETE, PATCH).
     eintraege:
       - { methode: GET, pfad: '/auth', ohne: 404, person: 404, firma: 404 }
       - { methode: GET, pfad: '/invitations', ohne: 404, person: 404, firma: 404 }
@@ -349,7 +379,7 @@ gruppen:
       - { methode: GET, pfad: '/github', ohne: 404, person: 404, firma: 404 }
       - { methode: GET, pfad: '/companies', ohne: 405, person: 405, firma: 405 }
       - { methode: GET, pfad: '/applications', ohne: 405, person: 405, firma: 405 }
-      - { methode: GET, pfad: '/notifications', ohne: 405, person: 405, firma: 405 }
+      - { methode: GET, pfad: '/notifications', ohne: 404, person: 404, firma: 404 }
 
   - name: 'Kontoloeschung und die Kandidatensuche im Einzelnen'
     warum: |

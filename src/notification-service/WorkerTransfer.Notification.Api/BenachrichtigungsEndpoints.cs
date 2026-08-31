@@ -30,7 +30,21 @@ public static class BenachrichtigungsEndpoints
         // Person unbekannt: der Aufrufer erfährt nichts darüber, ob und warum.
         // Sonst wäre der Endpunkt ein Orakel darüber, ob es diese Person gibt
         // und ob sie Post will.
-        app.MapPost("/notifications", async (
+        // `/internal/notifications` und nicht `/notifications`.
+        //
+        // Der Dienst antwortet ohne das gemeinsame Geheimnis bewusst mit 404
+        // und nicht 401: ein 401 bestaetigte, dass es den Endpunkt gibt. Solange
+        // er unter `/notifications` lag, nahm ihm das Rahmenwerk genau diese
+        // Verschleierung wieder ab — der Pfad hat eine Gateway-Route (wegen
+        // `/notifications/me`), also erreichte JEDE Methode den Dienst, und auf
+        // GET, PUT, DELETE antwortete ASP.NET mit 405. Und 405 heisst: diesen
+        // Pfad gibt es.
+        //
+        // Unter `/internal/` gibt es keine Gateway-Route, wie bei `/erasure`
+        // und `/internal/notify`. Damit verhalten sich alle drei
+        // Dienst-zu-Dienst-Tueren gleich, und keine verraet sich ueber eine
+        // Methode, die niemand benutzt.
+        app.MapPost("/internal/notifications", async (
             BenachrichtigenV1 body,
             IMediator mediator,
             IPostbote postbote,

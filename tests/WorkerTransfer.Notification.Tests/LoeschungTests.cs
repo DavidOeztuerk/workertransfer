@@ -164,7 +164,7 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         browser.DefaultRequestHeaders.Add("X-Notify-Secret", Meldegeheimnis);
 
         var antwort = await browser.PostAsJsonAsync(
-            "/notifications", new { userId = wer, kind = "market_request" });
+            "/internal/notifications", new { userId = wer, kind = "market_request" });
 
         antwort.IsSuccessStatusCode.Should().BeTrue(
             "das Befuellen muss gelingen, sonst prueft der Test etwas anderes — "

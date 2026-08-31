@@ -25,6 +25,12 @@ namespace WorkerTransfer.Identity.Application.Anmelden;
 /// Antwort nach draußen nennt ohnehin nur Feldnamen
 /// (<c>ProblemDetailsMiddleware</c>).</para>
 ///
+/// <para><strong>Die Feldnamen sind die des Aufrufers.</strong>
+/// <c>ProblemDetailsMiddleware</c> antwortet mit <c>invalid: &lt;Felder&gt;</c>,
+/// und diese Namen kommen aus dem Validator. Wo unser Befehl anders heißt als
+/// das, was auf der Leitung stand, wird umbenannt — sonst nennt die Antwort ein
+/// Feld, das der Aufrufer nie geschickt hat.</para>
+///
 /// <para>Keine Prüfung auf E-Mail-<em>Form</em>: ob die Adresse existiert,
 /// entscheidet der Versand, und eine Formprüfung, die 422 statt 401 gibt,
 /// verriete, dass die Anmeldung überhaupt so weit gekommen ist.</para>
@@ -37,7 +43,11 @@ public sealed class AnmeldenPruefung : AbstractValidator<AnmeldenBefehl>
         RuleFor(befehl => befehl.Email)
             .NotEmpty().WithMessage("email is required");
 
+        // Der Name, den der AUFRUFER geschickt hat, nicht unserer. Die Antwort
+        // sagt `invalid: password`, und ein `invalid: Passwort` waere fuer
+        // jemanden, der `password` gesendet hat, ein Feld, das es nicht gibt.
         RuleFor(befehl => befehl.Passwort)
-            .NotEmpty().WithMessage("password is required");
+            .NotEmpty().WithMessage("password is required")
+            .OverridePropertyName("password");
     }
 }
