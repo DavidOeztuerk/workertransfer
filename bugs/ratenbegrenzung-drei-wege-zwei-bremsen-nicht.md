@@ -159,7 +159,40 @@ Zusagen kosten.
 - [x] `ConfigureRateLimitRules` gibt es nicht mehr
 - [x] die Einstellung, wen gezählt wird, wird gelesen
 - [x] weitergereichte Köpfe nur hinter einer erklärten Vertrauensliste
-- [ ] eigene Bremse hier gemessen und entfernt — H2 in `docs/AUFTRAG-GIRDER-4.md`
+- [x] eigene Bremse hier **gemessen** — H2, Messung 1
+- [ ] eigene Bremse entfernt — haengt an
+  `abweisung-der-bremse-ist-kein-problemdokument.md`, nicht mehr an diesem Ticket
+
+**Gemessen an Girder 4.0.2, ohne Fremdcode.** Alles, was hier stand, ist zu:
+
+```
+Grenze 3/min, je Herkunft
+  1) echte Herkunft 10.0.0.1                          200 200 200 429 429
+  2) dieselbe, mit gefaelschtem X-Forwarded-For        200 200 200 429 429
+  3) X-Forwarded-For: 127.0.0.1 (die Falle)            200 200 200 429 429
+  4) echte Loopback-Herkunft (Ausnahmeliste)           200 200 200 200 200
+  4b) dieselbe, Ausnahmeliste geleert                  200 200 429 429 429
+```
+
+Zeile 2 und 3 sind der Punkt: der Kopf aendert nichts mehr, auch nicht der, der
+frueher die Bremse ganz aufhob. `ClientAddress.Of` liest allein
+`Connection.RemoteIpAddress`; weitergereichte Koepfe wirken nur ueber eine
+benannte Vertrauensliste (`TrustForwardedHeadersFrom`), und ohne sie gar nicht.
+Zeile 4 gegen 4b zeigt, dass die Loopback-Ausnahme noch da ist — sie ist aber
+nicht mehr erreichbar, ausser man kommt wirklich von dort.
+
+Auch die uebrigen Zusagen halten: je Herkunft (drei Adressen, drei Toepfe),
+Je-Pfad-Grenzen (`/auth/login` auf 2 gebremst, `/jobs` bei 100 nicht),
+`X-RateLimit-Limit/-Remaining/-Reset` auf jeder Antwort, `Retry-After` auf der
+Abweisung, und `UseRateLimiting()` steht in der Vorgabekette vor `UseAuth()`.
+
+Die eigene Bremse bleibt trotzdem — aus einem neuen und viel kleineren Grund,
+der nichts mit diesem Ticket zu tun hat: die Abweisung ist
+`application/json` mit einem `traceId` und damit weder Problemdokument noch mit
+Korrelationskennung. Das steht jetzt in einem eigenen Ticket.
+
+In den elf Diensten bleibt das Modul draussen, und dort ist der Grund
+endgueltig: ein Dienst hinter dem Gateway sieht als Herkunft nur das Gateway.
 
 Die Behebung war nicht „alle drei bremsen", sondern **einer bleibt**.
 

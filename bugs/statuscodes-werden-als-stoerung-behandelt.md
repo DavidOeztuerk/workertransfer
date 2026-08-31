@@ -118,7 +118,80 @@ Verbindungsfehler wiederholen, nicht auf `4xx`.
 - [x] `SendRequestAsync`/`GetAsync` reichen den Statuscode durch, Fassung: **4.0.0**
 - [x] `ResilientHttpPolicyHandler` wiederholt nur, was sich durch Wiederholen bessern kann
 - [x] fremde Antwortrümpfe landen nicht mehr im Protokoll, Fassung: **4.0.1**
-- [ ] Umstieg auf `IServiceCommunicationManager` vollzogen — H2 in `docs/AUFTRAG-GIRDER-4.md`
+- [x] hier **gemessen** — H2, Messung 3
+- [ ] Umstieg auf `IServiceCommunicationManager` — **abgesagt**, Begruendung unten
+
+**Gemessen an Girder 4.0.2, ohne Fremdcode.** Ein Ziel, das mitzaehlt, wie oft es
+gefragt wurde; der Aufrufer geht ueber `IServiceCommunicationManager`:
+
+```
+  Pfad                 Status kommt an           Aufrufe am Ziel
+  --------------------------------------------------------------
+  /leer-aber-ok        200 OK                    1
+  /vierhundertvier     404 NotFound              1
+  /vierhundertdrei     403 Forbidden             1
+  /fuenfhundertdrei    503 ServiceUnavailable    1
+  /fuenfhundert        500 InternalServerError   1
+```
+
+Beide Fragen sind damit beantwortet: **jeder Status kommt als er selbst an**, und
+**nichts wird dreimal gefragt**. Der Kern dieses Tickets ist wirklich weg.
+
+Wiederholt wird ueberhaupt kein Statuscode mehr, auch kein 5xx: der Manager
+haengt `ResilientHttpPolicyHandler` gar nicht an seinen Client, sondern nutzt
+`IRetryPolicy` unter dem Namen `ServiceCommunication`, und deren `ShouldRetry`
+prueft **Ausnahmen**. Seit ein Nicht-2xx keine Ausnahme mehr ist, loest nur noch
+ein Transportfehler oder eine Zeitueberschreitung eine Wiederholung aus. Fuer uns
+ist das die richtige Richtung: ein `503` heisst *„der Ledger schweigt"* und darf
+nicht still nachgefragt werden, bis irgendwann etwas anderes herauskommt.
+
+## Warum der Umstieg trotzdem nicht kommt
+
+Nicht mehr wegen der Statuscodes — die sind in Ordnung. Drei andere Gruende,
+alle beim Messen gefunden:
+
+**1. `Communication` verlangt einen Broker.** `CommunicationModule` deklariert
+`RequiresProvider<IEventBus>`, und `IEventBus` registriert in ganz Girder genau
+eine Stelle: `Girder.Messaging.MassTransit`. Ohne Anbieter stirbt der Container
+beim Aufloesen des Managers:
+
+```
+Unable to resolve service for type 'Girder.Abstractions.Messaging.IEventBus'
+while attempting to activate 'ServiceCommunicationManager'.
+```
+
+Wir betreiben bewusst keinen Broker. Den Manager zu nehmen hiesse, MassTransit
+und RabbitMQ mitzunehmen, damit `PublishEventAsync` existiert — eine Methode, die
+wir nicht rufen.
+
+*(Der Wortlaut oben ist der rohe DI-Fehler, weil meine Probe den Manager von Hand
+aufloeste. Girders eigener Waechter ist ein `IStartupFilter` und meldet sich mit
+Namen des fehlenden Anbieters und dem Aufruf, der ihn liefert, sobald der Wirt
+wirklich startet. Das ist gut gebaut — es hat mich nur nicht erwischt.)*
+
+**2. `UseGateway` steht per Vorgabe auf `true`.** Dann geht **jeder** Aufruf an
+den Dienst namens `gateway`; der `serviceName`, den man uebergibt, wird fuer die
+Adresse nicht gelesen. Bei uns liefe Dienst-zu-Dienst-Verkehr damit durch Ocelot
+und durch unsere eigene Bremse. Gemessen: mit der Vorgabe kam
+`Service ziel not configured`, obwohl `ServiceEndpoints:ziel` gesetzt war.
+
+**3. `EnableResponseCaching` steht per Vorgabe auf `true`**, und die Vorgabepolitik
+ist „jede GET-Antwort, fuenf Minuten". Unsere Einwilligungspruefung ist ein POST
+(`/consent/check-batch`) und entkaeme dem — aber nur durch ihre **Form**, nicht
+durch eine Entscheidung. Ein Ledger-Ergebnis, das fuenf Minuten liegen bleibt,
+waere ADR-0013 ins Gesicht: eine Ruecknahme muss beim naechsten Lesen wirken.
+Siehe Messung 4.
+
+**Und der Grund, der den Umstieg ueberhaupt attraktiv machte, ist weg:** die
+Korrelationsweitergabe. Die haengt seit 4.0.0 an jedem `HttpClient` der Fabrik
+(Messung 2, nachgewiesen ueber einen echten Sprung). Wir bekommen die Kette also,
+ohne die Antwort aufzugeben — genau das, was hier als „die eigentliche Luecke"
+stand.
+
+Ein Nebenbefund: der Manager liest die Dienstadressen aus dem **obersten**
+Abschnitt `ServiceEndpoints`, waehrend `ServiceCommunicationOptions` eine eigene
+Eigenschaft `ServiceEndpoints` unter `ServiceCommunication` hat, die dabei
+niemand liest. Zwei Orte fuer dieselbe Sache, einer davon tot.
 
 `GetAsync` und `SendRequestAsync` geben `ServiceResponse<T>` zurück: `Status`,
 `Value`, und `Body` mit dem Rumpf, in dem der ferne Dienst meist sagt, was
