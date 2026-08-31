@@ -124,7 +124,35 @@ nicht als Erfindung. Er fällt weg, sobald Girder ihn mitbringt.
 - [x] gemeldet
 - [x] Girder reicht die Kennung an jedem `HttpClient` weiter, Fassung: **4.0.0**
 - [x] `CorrelationIdMiddleware` schreibt Baggage, und `LoggingBehavior` liest es
-- [ ] eigener Handler hier gemessen und entfernt — H2 in `docs/AUFTRAG-GIRDER-4.md`
+- [x] hier **gemessen** — H2, Messung 2
+- [x] eigener Handler entfernt (er war ohnehin zurueckgenommen worden)
+
+**Gemessen an einem echten Sprung**, nicht an einem Test, der nur prueft, dass
+ein Kopf gesetzt wird: `GET /profiles/{id}` an profile-service mit blankem curl,
+profile-service fragt darauf consent-service (`POST /consent/check-batch`).
+Gesucht wurde in **beiden** Protokollen.
+
+```
+mit mitgeschickter Kennung
+  profile-service  Starting request FremdesProfilAbfrage  with correlation kette-h2-1788173800
+  consent-service  Starting request SammelpruefungAbfrage with correlation kette-h2-1788173800
+
+ohne mitgeschickte Kennung (der Alltagsfall aus dem Browser)
+  profile-service erzeugte: 0HNO79NTM5E1K:00000001
+  consent-service sah:      0HNO79NTM5E1K:00000001
+```
+
+In D3 war das noch der Bruch: dieselbe Anfrage, und consent-service arbeitete
+unter einer eigenen Kennung.
+
+**Gegenprobe, damit die Messung nicht das Falsche beweist:** der Kopf koennte ja
+von unserem eigenen Code kommen. `HttpEinwilligungstor` setzt an der ausgehenden
+Anfrage genau eine Kopfzeile, `Authorization` — sonst keine. Die Kennung kann
+also nur ueber `CorrelationIdHandler` gekommen sein, den Girder ueber
+`ConfigureHttpClientDefaults` an jeden Client der Fabrik haengt. Dass das reicht,
+haengt an einer Bedingung, die hier erfuellt ist: `new HttpClient(` kommt in
+`src/` **nirgends** vor, alle neun Dienste registrieren `AddHttpClient()`. Ein
+selbst gebauter Client bekaeme nichts.
 
 `LoggingBehavior` las `Activity.Current?.GetBaggageItem("CorrelationId")`, und
 `AddBaggage` kam in ganz Girder nicht vor — ein Leser ohne Schreiber. Geschrieben

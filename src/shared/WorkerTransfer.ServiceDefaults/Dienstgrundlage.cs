@@ -84,14 +84,23 @@ public static class Dienstgrundlage
                 // braucht eine Schluesselverteilung, keine Codeaenderung hier.
                 .UseJwt(jwt => jwt.FromSharedSecret())
 
-                // Girders Bremse steht in der Vorgabe. Sie hier zu lassen hiesse,
-                // ZWEI Bremsen zu fahren — und dann weiss niemand, welche greift.
+                // Girders Bremse steht in der Vorgabe, und sie ist in 4.0.2
+                // nachgemessen in Ordnung (H2, Messung 1): sie bremst, sie zaehlt
+                // je Herkunft, sie liest X-Forwarded-For nicht mehr, und ein
+                // gefaelschtes "X-Forwarded-For: 127.0.0.1" hebt sie nicht auf.
+                // Der Grund, sie hier trotzdem nicht zu fahren, hat mit Girder
+                // nichts zu tun und aendert sich auch nicht mehr:
+                //
+                // Ein Dienst hinter dem Gateway sieht als Herkunft die Adresse
+                // DES GATEWAYS — fuer jeden Aufrufer dieselbe. Eine Bremse hier
+                // wuerfe alle Menschen in einen Topf: wer als Erster fuenfmal
+                // danebentippt, sperrt die ganze Welt aus. Die Bremse gehoert an
+                // den Eingang, und dort steht sie (src/gateway/.../Bremse.cs).
                 .Without(
                     GirderModule.RateLimiting,
-                    "Bremse.cs im Gateway bremst je Herkunft und liest "
-                    + "X-Forwarded-For nicht; ob Girders Fassung das seit 4.0.0 "
-                    + "auch tut, ist Messung H2 — bis dahin waere eine zweite "
-                    + "Bremse eine, von der niemand weiss, welche greift")
+                    "ein Dienst hinter dem Gateway sieht als Herkunft nur das "
+                    + "Gateway, also alle Aufrufer als einen — gebremst wird am "
+                    + "Eingang, in Bremse.cs")
 
                 // Steht ohnehin nicht in der Vorgabe. Hier genannt, damit die
                 // Entscheidung im Quelltext steht und nicht im Gedaechtnis.

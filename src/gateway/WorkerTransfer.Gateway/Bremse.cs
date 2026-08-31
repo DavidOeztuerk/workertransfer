@@ -99,23 +99,35 @@ public sealed class Bremseinstellungen
 /// Ausweg ist ein Registrierungswechsel, kein Umbau:
 /// <c>RedisDistributedRateLimitStore</c> erfüllt dieselbe Schnittstelle.</para>
 ///
-/// <para><strong>Warum keine von Girders drei Ratenbegrenzungen.</strong>
-/// Girder hat drei, und sie verhalten sich verschieden — der erste Befund sah
-/// nur eine an und war deshalb unvollständig. Alle drei gemessen
-/// (<c>bugs/ratenbegrenzung-drei-wege-zwei-bremsen-nicht.md</c>):
-/// <c>DistributedRateLimitingMiddleware</c> und <c>RateLimitMiddleware</c>
-/// bremsen nicht, <c>RateLimitingMiddleware</c> bremst — hat aber in ganz
-/// Girder keinen Aufrufer.</para>
+/// <para><strong>Warum nicht Girders Bremse.</strong> Der alte Grund ist weg:
+/// Girder hatte drei Ratenbegrenzungen, zwei bremsten nicht, die dritte war
+/// nirgends verdrahtet, und alle drei glaubten <c>X-Forwarded-For</c> ohne jede
+/// Vertrauensliste. Das ist seit 4.0.0 behoben und in H2 nachgemessen: es bleibt
+/// eine, sie bremst, sie zählt je Herkunft, sie liest den Kopf nicht mehr, und
+/// ein gefälschtes <c>X-Forwarded-For: 127.0.0.1</c> hebt sie nicht auf — obwohl
+/// die Ausnahmeliste weiterhin Loopback trägt, denn die Herkunft kommt jetzt
+/// allein aus <c>Connection.RemoteIpAddress</c>. Je-Pfad-Grenzen kann sie auch.</para>
 ///
-/// <para>Und der Grund, der auch nach einer Behebung bliebe: <strong>alle drei
-/// glauben <c>X-Forwarded-For</c> und <c>X-Real-IP</c> bedingungslos</strong>,
-/// und eine Vertrauensliste gibt es in Girder nirgends. Am funktionierenden Weg
-/// gemessen: acht Anfragen gegen eine Grenze von drei, alle durch, nur weil ein
-/// Kopf mitgeschickt wird, den der Aufrufer selbst setzt. Dazu kommt bei
-/// <c>RateLimitMiddleware</c>, dass <c>ClientIdStrategy</c> nirgends gelesen
-/// wird — wer „je Herkunft" einstellt, zählt je Benutzer.</para>
+/// <para>Was sie <em>nicht</em> kann, ist der Grund, warum diese Kette bleibt:
+/// <strong>ihre Abweisung ist kein Problemdokument und trägt keine
+/// Korrelationskennung.</strong> Sie schreibt <c>application/json</c> mit einem
+/// <c>traceId</c> aus <c>HttpContext.TraceIdentifier</c>, fest verdrahtet, ohne
+/// Haken zum Anpassen. Genau das ist hier zugesagt: wer sich beschwert,
+/// ausgesperrt worden zu sein, soll eine Kennung nennen können — und der Browser
+/// soll keine zweite Fehlergestalt lernen müssen.
+/// <c>Die_Abweisung_nennt_kein_Konto</c> nagelt beides fest. Gemeldet als
+/// <c>bugs/abweisung-der-bremse-ist-kein-problemdokument.md</c>; kommt es, fällt
+/// diese Kette weg.</para>
 ///
-/// <para>Der <em>Zähler</em> von Girder ist dagegen nachgemessen richtig, und
+/// <para>Zwei kleinere Unterschiede stehen daneben, keiner davon trägt allein:
+/// die Grenzen lägen in einer zweiten Datei statt neben den Routen (heute nagelt
+/// <c>BremsenkarteTests</c> fest, dass jeder gebremste Pfad eine Route hat), und
+/// Girders Optionsklasse bringt fremde Je-Pfad-Vorgaben mit (<c>/api/auth/login</c>
+/// und sechs weitere aus Skillswap), die beim Binden nicht ersetzt, sondern
+/// ergänzt werden — gemessen: <c>/api/auth/register</c> wurde bei 3 gebremst,
+/// obwohl es diese Route hier nicht gibt.</para>
+///
+/// <para>Der <em>Zähler</em> von Girder war schon immer nachgemessen richtig, und
 /// den benutzen wir: <c>IDistributedRateLimitStore</c>. Eigen ist hier nur die
 /// Kette darüber.</para>
 /// </remarks>

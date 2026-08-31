@@ -28,9 +28,13 @@ public interface IBefehl<out TAntwort> : IRequest<TAntwort>, IBefehl;
 /// <para>
 /// And no cache either, ever, for the ones that carry a check: a withdrawal has
 /// to take effect on the very next read (ADR-0013). That is why nothing in this
-/// service implements Girder's <c>ICacheableQuery</c> — a test pins the
-/// absence, and <c>AddCQRS</c> then leaves both cache behaviours out of the
-/// pipeline entirely.
+/// service implements Girder's <c>ICacheableQuery</c>, and <c>AddCQRS</c> then
+/// leaves both cache behaviours out of the pipeline entirely.
+/// </para>
+/// <para>
+/// <c>ZwischenspeicherTests</c> pins that absence — for all eleven services, not
+/// only this one. It did not exist when this sentence first claimed it did
+/// (found in H2, measurement 4); the promise held, but nothing held it.
 /// </para>
 /// </remarks>
 /// <typeparam name="TAntwort">What the handler answers.</typeparam>

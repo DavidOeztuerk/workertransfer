@@ -67,8 +67,17 @@ gruppen:
 
       422 statt 500 bei kaputtem Rumpf: bis D2 lief ein fehlendes Passwort bis in
       den Passwortpruefer und kam als 500 zurueck.
+
+      `/auth/register` stand hier als einziger der vier mit **400** — die
+      Fachschicht wies das leere Passwort ab, bevor irgendetwas den Rumpf ansah.
+      Ein Rumpf ohne `displayName` kam dagegen als **500** zurueck, denn ihn wies
+      niemand ab: er lief bis in die Datenbank
+      (`null value in column "display_name"`). Beides ist seit H2 dieselbe
+      Antwort wie ueberall sonst, 422 mit `invalid: <felder>`, weil ein kaputter
+      Rumpf ueberall dieselbe Sache ist. Der Prueferklasse fehlte genau diese
+      eine Tuer.
     eintraege:
-      - { methode: POST, pfad: '/auth/register', ohne: 400, person: 400, firma: 400 }
+      - { methode: POST, pfad: '/auth/register', ohne: 422, person: 422, firma: 422 }
       - { methode: POST, pfad: '/auth/login', ohne: 422, person: 422, firma: 422 }
       - { methode: POST, pfad: '/auth/verify-email', ohne: 422, person: 422, firma: 422 }
       - { methode: POST, pfad: '/auth/resend-verification', ohne: 422, person: 422, firma: 422 }
