@@ -27,7 +27,8 @@ public static class MeldeEndpoints
     private const string Geheimniskopf = "X-Notify-Secret";
 
     /// <summary>Was hereinkommt: eine Kennung, sonst nichts.</summary>
-    private sealed record MeldungV1(Guid UserId);
+    private sealed record MeldungV1(
+        [property: System.Text.Json.Serialization.JsonPropertyName("user_id")] Guid UserId);
 
     /// <summary>Bildet den einen Endpunkt ab.</summary>
     public static IEndpointRouteBuilder MapMeldeEndpoints(this IEndpointRouteBuilder app)

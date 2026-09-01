@@ -285,6 +285,91 @@ kein Test einen kaputten Registrierungsrumpf schickte.
 
 ---
 
+## H5 — was der Prüfer fand, und was daraus wurde
+
+Ein frischer Agent hat die Migration geprüft: Modultabelle (25 Zeilen, nicht 24
+— `ResourceAuthorization` kam mit 4.0.2 dazu), Zusagen mit Fundstelle und Test,
+Abnahmekriterien einzeln. Sein Urteil zur Migration selbst: sie trägt. Die vier
+H2-Messungen hielten seiner unabhängigen Nachmessung stand.
+
+Sein schwerster Fund war einer, den kein Gate hatte: **die Oberfläche kam nicht
+hinein.**
+
+### Ein Draht, zwei Dialekte
+
+Der Draht dieser Plattform ist snake_case — neun Dienste setzen ihn ausdrücklich
+mit `[JsonPropertyName]`, und `apps/web` liest und schreibt danach. Wo die
+Angabe fehlt, fällt .NET auf camelCase aus `GirderModule.JsonOptions` zurück.
+Dann heißt dasselbe Feld auf beiden Seiten anders.
+
+**Warum das jahrelang unsichtbar bleibt:** bei einwortigen Feldern sind
+camelCase und snake_case *dasselbe Wort* — `token`, `email`, `capability`,
+`reason`. Erst ein zusammengesetzter Name geht auseinander. Und zusammengesetzte
+Namen sind selten.
+
+Vier Stellen, drei verschiedene Schadensbilder, alle gemessen:
+
+| Feld | was passierte |
+|---|---|
+| `RegisterBody.DisplayName` | Spalte ist `NOT NULL` → **500** (seit H4: 422). **Niemand konnte sich über die Oberfläche registrieren.** |
+| `ProfilKoerper.RemoteOk` | `bool` fällt still auf `false`. Wer „Remote möglich" ankreuzte, bekam **200** — und das Häkchen war weg. |
+| `GrantBody/RevokeBody/CheckBody.SubjectId` | kam als `Guid.Empty` an → **403 „a consent belongs to its subject"**. **Der Einwilligungs-Ledger war über die Oberfläche unbedienbar** — der Dienst, auf den sich alle anderen stützen. |
+| `EinwilligungsfrageV1.SubjectId` | reist *zwischen* zwei Diensten, war auf beiden Seiten camelCase und damit in sich stimmig — bis ich den Empfänger richtigstellte und den Absender nicht. Gemessen: `A SubjectId must not be empty`, profile-service meldete 503, die Kandidatenliste war leer. |
+
+Dazu ein fünfter, anderer Art: **der Client fragte `GET /profiles`**, während die
+Kandidatenliste auf `GET /candidates` liegt. `/profiles` ist ein absichtlich
+toter Präfix — und die Routenkarte hatte ihn sogar als `404/404/404` notiert,
+ohne zu merken, dass die Oberfläche daran hängt.
+
+### Warum 660 grüne Tests nichts merkten
+
+Weil sie **selbst camelCase schickten.** Zehn Testdateien, quer durch acht
+Reihen. Wer gegen den Server prüft statt gegen den Vertrag, bestätigt jeden
+Dialekt, den der Server gerade spricht — auch einen, den sonst niemand spricht.
+Der einzige Test, der recht hatte, war `apps/web/src/routes/register.test.tsx`;
+der Prüfbericht hat ihn zunächst getadelt, er „zementiere den falschen Vertrag".
+Er zementierte den richtigen.
+
+Playwright hätte es sofort gezeigt und läuft weder in `make check` noch in CI.
+**Das ist die eigentliche Lücke hinter allen fünf Fehlern.**
+
+### Und eine Begründung, die ein Symptom rechtfertigte
+
+`docs/routenkarte.yml` hielt für zwei Endpunkte **503** fest, mit dieser
+Erklärung: *„der Ledger kann über ein nicht existierendes Subjekt nichts sagen.
+503 ist dann die einzig wahre Antwort."*
+
+Das ist falsch. Der Ledger *kann* etwas sagen: keine Freigabe, also nein. `503`
+heißt nicht „unbekannt", sondern „hat nicht geantwortet" — und das traf zu, weil
+der interne Aufruf am Draht scheiterte. Nach der Behebung antworten beide `404`,
+wie überall sonst.
+
+Die Karte hielt also ein Symptom fest **und hatte sich einen Grund dafür
+geschrieben.** Das ist die unangenehmste Art, falsch zu liegen: mit Begründung.
+Der Prüfstand hat es gefunden, weil er die Absicht gegen die Wirklichkeit fährt
+— aber nur, weil sich die Wirklichkeit änderte.
+
+### Was jetzt hält
+
+`tests/WorkerTransfer.Ganzes.Tests/DrahtvertragTests.cs`, über **21** Assemblies
+— elf Api-Schichten, acht Vertragsschichten der Dienste, zwei gemeinsame. Jeder
+zusammengesetzte Feldname braucht ein `[JsonPropertyName]`, **und dessen Wert
+darf keinen Großbuchstaben tragen.**
+
+Beide Hälften sind teuer erkauft:
+
+- Ein Filter auf `IsPublic` übersah `MeldungV1` — ein `private sealed record`
+  innerhalb der Endpunktklasse, auf dem Draht ganz normal gebunden.
+- Ein Wächter, der nur *Anwesenheit* prüft, hätte `BenachrichtigenV1` durchgehen
+  lassen: die trug die Angabe — mit dem Wert `"userId"`. Er hätte den zweiten
+  Dialekt festgeschrieben statt ihn zu beenden.
+- Und wer nur die Api-Schichten scannt, sieht die Vertragsschichten nicht: sie
+  liegen in eigenen Assemblies. Genau dort saß der Fehler zuletzt.
+
+Gegengeprobt: Angabe entfernen → genau eine Zeile fällt und nennt das Feld.
+
+---
+
 ## Offen
 
 Zwei Dinge, beide bei Girder:

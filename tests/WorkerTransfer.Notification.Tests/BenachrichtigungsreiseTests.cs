@@ -64,7 +64,7 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Notify-Secret", geheimnis);
-        return browser.PostAsJsonAsync("/internal/notifications", new { userId = wer, kind = art });
+        return browser.PostAsJsonAsync("/internal/notifications", new { user_id = wer, kind = art });
     }
 
     private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>

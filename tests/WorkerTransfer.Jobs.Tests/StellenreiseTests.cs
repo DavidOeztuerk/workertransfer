@@ -290,7 +290,7 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var anfrage = new HttpRequestMessage(HttpMethod.Post, "/erasure")
         {
-            Content = JsonContent.Create(new { userId = Guid.CreateVersion7() })
+            Content = JsonContent.Create(new { user_id = Guid.CreateVersion7() })
         };
         anfrage.Headers.Add("X-Erasure-Secret", Rueckzugsgeheimnis);
 
@@ -315,7 +315,7 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
 
         var anfrage = new HttpRequestMessage(HttpMethod.Post, "/companies/withdrawal")
         {
-            Content = JsonContent.Create(new { tenantId = firma })
+            Content = JsonContent.Create(new { tenant_id = firma })
         };
         anfrage.Headers.Add("X-Erasure-Secret", Rueckzugsgeheimnis);
 
@@ -338,7 +338,7 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
 
         var anfrage = new HttpRequestMessage(HttpMethod.Post, "/companies/withdrawal")
         {
-            Content = JsonContent.Create(new { tenantId = firma })
+            Content = JsonContent.Create(new { tenant_id = firma })
         };
         anfrage.Headers.Add("X-Erasure-Secret", "falsch");
 

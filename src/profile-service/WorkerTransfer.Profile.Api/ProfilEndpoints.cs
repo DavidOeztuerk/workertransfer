@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Girder.Core.Identity;
 using MediatR;
 using WorkerTransfer.Profile.Application.Entwurf;
@@ -17,8 +18,24 @@ namespace WorkerTransfer.Profile.Api;
 /// steht ausschließlich im Consent-Ledger (ADR-0020). Ein Feld hier wäre eine
 /// zweite Wahrheit, und die beiden wären beim ersten Widerruf uneins.
 /// </remarks>
+/// <remarks>
+/// <para><strong><c>remote_ok</c> steht ausdrücklich da, und hier war der Schaden
+/// still.</strong> Ohne <c>[JsonPropertyName]</c> band <c>RemoteOk</c> auf
+/// <c>remoteOk</c>, während die Oberfläche <c>remote_ok</c> schickt
+/// (<c>apps/web/src/profile/client.ts:98</c>). Ein <c>bool</c> hat keine
+/// Not-Null-Sperre und keinen Wächter: er fiel einfach auf <c>false</c>
+/// zurück.</para>
+///
+/// <para>Wer „Remote möglich" ankreuzte und speicherte, bekam <c>200</c> — und
+/// das Häkchen war weg. Das ist die unangenehmere Hälfte desselben Fehlers:
+/// die Registrierung schlug wenigstens laut fehl.</para>
+/// </remarks>
 public sealed record ProfilKoerper(
-    string Headline, string Bio, string Location, bool RemoteOk, IReadOnlyList<string> Skills);
+    [property: JsonPropertyName("headline")] string Headline,
+    [property: JsonPropertyName("bio")] string Bio,
+    [property: JsonPropertyName("location")] string Location,
+    [property: JsonPropertyName("remote_ok")] bool RemoteOk,
+    [property: JsonPropertyName("skills")] IReadOnlyList<string> Skills);
 
 /// <summary>Was jemand schickt, um sich beim Formulieren helfen zu lassen.</summary>
 public sealed record EntwurfKoerper(string Wish);

@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Girder.Core.Identity;
 using MediatR;
 using WorkerTransfer.Consent.Application.Einwilligung;
@@ -8,15 +9,37 @@ using WorkerTransfer.ServiceDefaults;
 namespace WorkerTransfer.Consent.Api;
 
 /// <summary>What a caller sends to give a permission.</summary>
+/// <remarks>
+/// <para><strong>Die Drahtnamen stehen ausdrücklich da.</strong> Der Draht dieser
+/// Plattform ist snake_case; ohne <c>[JsonPropertyName]</c> fiele
+/// <c>SubjectId</c> auf <c>subjectId</c> zurück, während die Oberfläche
+/// <c>subject_id</c> schickt (<c>apps/web/src/consent/client.ts:38,63</c>).</para>
+///
+/// <para>Was das kostete, war gemessen kein stiller Schaden, sondern ein
+/// vollständiger Ausfall: der Wert kam als <c>Guid.Empty</c> an, der Wächter
+/// verglich ihn mit dem Aufrufer und antwortete <c>403 „a consent belongs to its
+/// subject"</c>. <strong>Über die Oberfläche konnte niemand etwas freigeben oder
+/// zurücknehmen</strong> — bei dem Dienst, auf den sich alle anderen stützen.
+/// Dass nichts Falsches ins Buch geriet, ist das Verdienst des Wächters, nicht
+/// dieser Zeile.</para>
+/// </remarks>
 /// <param name="Reason">Optional: giving a permission needs no justification.</param>
-public sealed record GrantBody(Guid SubjectId, string Capability, string? Reason = null);
+public sealed record GrantBody(
+    [property: JsonPropertyName("subject_id")] Guid SubjectId,
+    [property: JsonPropertyName("capability")] string Capability,
+    [property: JsonPropertyName("reason")] string? Reason = null);
 
 /// <summary>What a caller sends to take one back.</summary>
 /// <param name="Reason">Mandatory: withdrawing must always be explainable.</param>
-public sealed record RevokeBody(Guid SubjectId, string Capability, string Reason);
+public sealed record RevokeBody(
+    [property: JsonPropertyName("subject_id")] Guid SubjectId,
+    [property: JsonPropertyName("capability")] string Capability,
+    [property: JsonPropertyName("reason")] string Reason);
 
 /// <summary>What a caller sends to ask about one pair.</summary>
-public sealed record CheckBody(Guid SubjectId, string Capability);
+public sealed record CheckBody(
+    [property: JsonPropertyName("subject_id")] Guid SubjectId,
+    [property: JsonPropertyName("capability")] string Capability);
 
 /// <summary>What a caller sends to ask about many pairs at once.</summary>
 public sealed record CheckBatchBody(IReadOnlyList<CheckBody> Pairs);

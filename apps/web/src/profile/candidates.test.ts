@@ -24,7 +24,7 @@ describe("listCandidates", () => {
     await listCandidates();
 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe(`${PROFILE_BASE_URL}/profiles`);
+    expect(url).toBe(`${PROFILE_BASE_URL}/candidates`);
     expect(init.credentials).toBe("include");
   });
 
@@ -35,7 +35,7 @@ describe("listCandidates", () => {
     await listCandidates("abc123");
 
     const [url] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe(`${PROFILE_BASE_URL}/profiles?cursor=abc123`);
+    expect(url).toBe(`${PROFILE_BASE_URL}/candidates?cursor=abc123`);
   });
 
   it("reports a missing company distinguishably — that is a fixable state", async () => {

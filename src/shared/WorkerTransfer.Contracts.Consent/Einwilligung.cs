@@ -1,7 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace WorkerTransfer.Contracts.Consent;
 
 /// <summary>One question: may this capability be exercised for this person?</summary>
-public sealed record EinwilligungsfrageV1(Guid SubjectId, string Capability);
+public sealed record EinwilligungsfrageV1(
+    [property: JsonPropertyName("subject_id")] Guid SubjectId,
+    [property: JsonPropertyName("capability")] string Capability);
 
 /// <summary>
 /// The answer to "may I?" — deliberately without the reason.
@@ -18,7 +22,10 @@ public sealed record EinwilligungsfrageV1(Guid SubjectId, string Capability);
 /// refactor.
 /// </para>
 /// </remarks>
-public sealed record EinwilligungsantwortV1(Guid SubjectId, string Capability, bool Granted)
+public sealed record EinwilligungsantwortV1(
+    [property: JsonPropertyName("subject_id")] Guid SubjectId,
+    [property: JsonPropertyName("capability")] string Capability,
+    [property: JsonPropertyName("granted")] bool Granted)
 {
     /// <summary>Whether the capability was erased rather than withdrawn.</summary>
     public bool Deleted { get; init; }
