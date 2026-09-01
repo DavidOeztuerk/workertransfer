@@ -7,7 +7,6 @@ import Container from "@mui/material/Container";
 import Divider from "@mui/material/Divider";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
-import Stack from "@mui/material/Stack";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -73,7 +72,7 @@ export function SiteHeader() {
             worker<Box component="span" sx={{ color: "primary.main" }}>transfer</Box>
           </Typography>
 
-          <Stack direction="row" spacing={0.5} sx={{ display: { xs: "none", md: "flex" } }}>
+          <Box sx={{ display: { xs: "none", md: "flex" }, gap: 0.5 }}>
             <NavLink to="/jobs" current={pathname}>
               Stellen
             </NavLink>
@@ -90,7 +89,7 @@ export function SiteHeader() {
                 </NavLink>
               </>
             ) : null}
-          </Stack>
+          </Box>
 
           <Box sx={{ flexGrow: 1 }} />
 
