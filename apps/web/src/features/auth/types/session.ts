@@ -1,0 +1,29 @@
+/**
+ * Wer gerade handelt.
+ *
+ * `tenantId === null` heisst "handelt als Person", NICHT "fehlt" (ADR-0017).
+ * Auf einem Transfermarkt ist die Person ohne Firma der Normalfall, und die
+ * beiden Zustände zu vermischen wäre genau der Fehler, der später eine
+ * Firmenansicht für jemanden zeigt, der keine hat.
+ */
+export interface Session {
+  userId: string;
+  email: string;
+  tenantId: string | null;
+}
+
+/** Eine Firma, für die jemand handeln darf. */
+export interface Membership {
+  id: string;
+  name: string;
+  role: string;
+}
+
+/**
+ * Der Sitzungszustand kennt DREI Fälle, nicht zwei.
+ *
+ * `unknown` ist der Zustand vor der ersten Antwort und darf nicht als
+ * "abgemeldet" gezeichnet werden: sonst blitzt beim Laden jeder Seite kurz die
+ * Anmeldeaufforderung auf, obwohl die Person angemeldet ist.
+ */
+export type SessionStatus = "unknown" | "authenticated" | "anonymous";
