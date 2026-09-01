@@ -57,7 +57,7 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
     {
         var anfrage = new HttpRequestMessage(HttpMethod.Post, "/erasure")
         {
-            Content = JsonContent.Create(new { userId = wer })
+            Content = JsonContent.Create(new { user_id = wer })
         };
 
         if (geheimnis is not null)
@@ -75,15 +75,15 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
 
         await browser.PostAsJsonAsync("/consent/grant", new
         {
-            subjectId = anna, capability = "profile.visibility:public"
+            subject_id = anna, capability = "profile.visibility:public"
         });
         await browser.PostAsJsonAsync("/consent/grant", new
         {
-            subjectId = anna, capability = "portfolio.visibility:public"
+            subject_id = anna, capability = "portfolio.visibility:public"
         });
         await browser.PostAsJsonAsync("/consent/revoke", new
         {
-            subjectId = anna,
+            subject_id = anna,
             capability = "portfolio.visibility:public",
             reason = "mein Arbeitgeber soll das nicht sehen"
         });
@@ -171,7 +171,7 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
         await _dienst.CreateClient().SendAsync(Loeschbefehl(anna, Geheimnis));
 
         var geprueft = await Als(Guid.CreateVersion7()).PostAsJsonAsync(
-            "/consent/check", new { subjectId = anna, capability = "profile.visibility:public" });
+            "/consent/check", new { subject_id = anna, capability = "profile.visibility:public" });
 
         var stand = JsonDocument.Parse(await geprueft.Content.ReadAsStringAsync()).RootElement;
 

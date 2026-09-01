@@ -51,17 +51,17 @@ public class LedgerreiseTests(Postgres postgres) : IAsyncLifetime
     private static Task<HttpResponseMessage> Erteile(
         HttpClient browser, Guid wer, string faehigkeit) =>
         browser.PostAsJsonAsync(
-            "/consent/grant", new { subjectId = wer, capability = faehigkeit });
+            "/consent/grant", new { subject_id = wer, capability = faehigkeit });
 
     private static Task<HttpResponseMessage> Widerrufe(
         HttpClient browser, Guid wer, string faehigkeit, string grund) =>
         browser.PostAsJsonAsync(
-            "/consent/revoke", new { subjectId = wer, capability = faehigkeit, reason = grund });
+            "/consent/revoke", new { subject_id = wer, capability = faehigkeit, reason = grund });
 
     private static Task<HttpResponseMessage> Pruefe(
         HttpClient browser, Guid wer, string faehigkeit) =>
         browser.PostAsJsonAsync(
-            "/consent/check", new { subjectId = wer, capability = faehigkeit });
+            "/consent/check", new { subject_id = wer, capability = faehigkeit });
 
     [Fact]
     public async Task Erteilen_widerrufen_und_wieder_erteilen()
@@ -138,7 +138,7 @@ public class LedgerreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var antwort = await _dienst.CreateClient().PostAsJsonAsync(
             "/consent/check",
-            new { subjectId = Guid.CreateVersion7(), capability = "profile.visibility:public" });
+            new { subject_id = Guid.CreateVersion7(), capability = "profile.visibility:public" });
 
         antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -233,9 +233,9 @@ public class LedgerreiseTests(Postgres postgres) : IAsyncLifetime
         {
             pairs = new[]
             {
-                new { subjectId = berta, capability = "profile.visibility:public" },
-                new { subjectId = anna, capability = "profile.visibility:public" },
-                new { subjectId = berta, capability = "portfolio.visibility:public" }
+                new { subject_id = berta, capability = "profile.visibility:public" },
+                new { subject_id = anna, capability = "profile.visibility:public" },
+                new { subject_id = berta, capability = "portfolio.visibility:public" }
             }
         });
 
@@ -263,7 +263,7 @@ public class LedgerreiseTests(Postgres postgres) : IAsyncLifetime
 
         var antwort = await Als(Guid.CreateVersion7()).PostAsJsonAsync("/consent/check-batch", new
         {
-            pairs = new[] { new { subjectId = anna, capability = "profile.visibility:public" } }
+            pairs = new[] { new { subject_id = anna, capability = "profile.visibility:public" } }
         });
 
         (await antwort.Content.ReadAsStringAsync()).Should().NotContain("Arbeitgeber");
@@ -279,7 +279,7 @@ public class LedgerreiseTests(Postgres postgres) : IAsyncLifetime
         var paare = Enumerable.Range(0, Einwilligungsgrenzen.HoechsteSammelgroesse + 1)
             .Select(_ => new
             {
-                subjectId = Guid.CreateVersion7(),
+                subject_id = Guid.CreateVersion7(),
                 capability = "profile.visibility:public"
             })
             .ToArray();
@@ -296,7 +296,7 @@ public class LedgerreiseTests(Postgres postgres) : IAsyncLifetime
         var paare = Enumerable.Range(0, Einwilligungsgrenzen.HoechsteSammelgroesse)
             .Select(_ => new
             {
-                subjectId = Guid.CreateVersion7(),
+                subject_id = Guid.CreateVersion7(),
                 capability = "profile.visibility:public"
             })
             .ToArray();
@@ -362,7 +362,7 @@ public class LedgerreiseTests(Postgres postgres) : IAsyncLifetime
 
         var versuch = await Als(anna).PostAsJsonAsync(
             "/consent/delete",
-            new { subjectId = anna, capability = "profile.visibility:public" });
+            new { subject_id = anna, capability = "profile.visibility:public" });
 
         versuch.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

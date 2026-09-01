@@ -95,8 +95,8 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
         {
             email,
             password = passwort,
-            displayName = "Anna",
-            companyName = firma
+            display_name = "Anna",
+            company_name = firma
         });
 
     private Task<HttpResponseMessage> Bestaetige(string token) =>

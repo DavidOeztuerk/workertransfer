@@ -10,7 +10,7 @@ namespace WorkerTransfer.Notification.Contracts;
 /// Zeile, in der irgendwann „Acme GmbH möchte deinen Marktstatus sehen" steht.
 /// </remarks>
 public sealed record BenachrichtigenV1(
-    [property: JsonPropertyName("userId")] Guid UserId,
+    [property: JsonPropertyName("user_id")] Guid UserId,
     [property: JsonPropertyName("kind")] string Kind);
 
 /// <summary>Ein Eintrag im Postfach.</summary>

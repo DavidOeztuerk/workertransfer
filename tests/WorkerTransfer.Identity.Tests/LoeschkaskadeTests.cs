@@ -112,7 +112,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
 
         await browser.PostAsJsonAsync("/auth/register", new
         {
-            email, password = Passwort, displayName = "Anna"
+            email, password = Passwort, display_name = "Anna"
         });
 
         var token = System.Text.RegularExpressions.Regex.Match(
@@ -356,7 +356,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
 
         await browser.PostAsJsonAsync("/auth/register", new
         {
-            email, password = Passwort, displayName = "Chefin", companyName = "Beispiel GmbH"
+            email, password = Passwort, display_name = "Chefin", company_name = "Beispiel GmbH"
         });
         var token = System.Text.RegularExpressions.Regex.Match(
             _versand.Post.Last().Text, @"token=(?<t>[A-Za-z0-9_-]+)",

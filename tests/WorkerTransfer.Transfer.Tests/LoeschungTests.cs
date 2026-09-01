@@ -221,7 +221,7 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", "geraten");
 
-        var antwort = await browser.PostAsJsonAsync("/erasure", new { userId = anna });
+        var antwort = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
 
         antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
@@ -248,7 +248,7 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", Loeschgeheimnis);
-        return browser.PostAsJsonAsync("/erasure", new { userId = wer });
+        return browser.PostAsJsonAsync("/erasure", new { user_id = wer });
     }
 
     private async Task Status(Guid wer)

@@ -344,7 +344,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
 
         var anfrage = new HttpRequestMessage(HttpMethod.Post, "/erasure")
         {
-            Content = JsonContent.Create(new { userId = anna })
+            Content = JsonContent.Create(new { user_id = anna })
         };
         anfrage.Headers.Add("X-Erasure-Secret", Loeschgeheimnis);
 
@@ -373,7 +373,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
 
         var anfrage = new HttpRequestMessage(HttpMethod.Post, "/erasure")
         {
-            Content = JsonContent.Create(new { userId = Guid.CreateVersion7() })
+            Content = JsonContent.Create(new { user_id = Guid.CreateVersion7() })
         };
         anfrage.Headers.Add("X-Erasure-Secret", "irgendwas");
 

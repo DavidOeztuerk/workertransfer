@@ -84,9 +84,9 @@ d=json.load(sys.stdin); print((d.get('Text') or '')+(d.get('HTML') or ''))" \
 
 anlegen() {
   if [ -n "${2:-}" ]; then
-    rumpf="{\"email\":\"$1\",\"password\":\"$PW\",\"displayName\":\"Routenkarte\",\"companyName\":\"$2\"}"
+    rumpf="{\"email\":\"$1\",\"password\":\"$PW\",\"display_name\":\"Routenkarte\",\"company_name\":\"$2\"}"
   else
-    rumpf="{\"email\":\"$1\",\"password\":\"$PW\",\"displayName\":\"Routenkarte\"}"
+    rumpf="{\"email\":\"$1\",\"password\":\"$PW\",\"display_name\":\"Routenkarte\"}"
   fi
   curl -sf -o /dev/null -X POST "${BASE}/auth/register" \
     -H 'Content-Type: application/json' -d "$rumpf"

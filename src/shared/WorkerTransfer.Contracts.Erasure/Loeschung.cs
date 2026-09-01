@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace WorkerTransfer.Contracts.Erasure;
 
 /// <summary>"Delete everything you hold about this person."</summary>
@@ -17,7 +19,7 @@ namespace WorkerTransfer.Contracts.Erasure;
 /// have to know which tables stand elsewhere (ADR-0004).
 /// </para>
 /// </remarks>
-public sealed record LoeschungV1(Guid UserId);
+public sealed record LoeschungV1([property: JsonPropertyName("user_id")] Guid UserId);
 
 /// <summary>The receipt.</summary>
 /// <param name="Retained">
@@ -39,7 +41,7 @@ public sealed record LoeschungsquittungV1(int Retained = 0);
 /// toward the completeness proof of an erasure: otherwise a silent jobs-service
 /// would hold a person's erasure open.
 /// </remarks>
-public sealed record UnternehmensrueckzugV1(Guid TenantId);
+public sealed record UnternehmensrueckzugV1([property: JsonPropertyName("tenant_id")] Guid TenantId);
 
 /// <summary>Who has to acknowledge before an erasure is finished.</summary>
 public static class Loeschempfaenger

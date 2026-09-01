@@ -35,5 +35,16 @@
     <ProjectReference Include="..\..\src\github-service\WorkerTransfer.GitHub.Infrastructure\WorkerTransfer.GitHub.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\notification-service\WorkerTransfer.Notification.Infrastructure\WorkerTransfer.Notification.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\shared\WorkerTransfer.Contracts.Erasure\WorkerTransfer.Contracts.Erasure.csproj" />
+    <ProjectReference Include="..\..\src\identity-service\WorkerTransfer.Identity.Api\WorkerTransfer.Identity.Api.csproj" />
+    <ProjectReference Include="..\..\src\consent-service\WorkerTransfer.Consent.Api\WorkerTransfer.Consent.Api.csproj" />
+    <ProjectReference Include="..\..\src\profile-service\WorkerTransfer.Profile.Api\WorkerTransfer.Profile.Api.csproj" />
+    <ProjectReference Include="..\..\src\resume-service\WorkerTransfer.Resume.Api\WorkerTransfer.Resume.Api.csproj" />
+    <ProjectReference Include="..\..\src\portfolio-service\WorkerTransfer.Portfolio.Api\WorkerTransfer.Portfolio.Api.csproj" />
+    <ProjectReference Include="..\..\src\jobs-service\WorkerTransfer.Jobs.Api\WorkerTransfer.Jobs.Api.csproj" />
+    <ProjectReference Include="..\..\src\applications-service\WorkerTransfer.Applications.Api\WorkerTransfer.Applications.Api.csproj" />
+    <ProjectReference Include="..\..\src\companies-service\WorkerTransfer.Companies.Api\WorkerTransfer.Companies.Api.csproj" />
+    <ProjectReference Include="..\..\src\transfer-service\WorkerTransfer.Transfer.Api\WorkerTransfer.Transfer.Api.csproj" />
+    <ProjectReference Include="..\..\src\github-service\WorkerTransfer.GitHub.Api\WorkerTransfer.GitHub.Api.csproj" />
+    <ProjectReference Include="..\..\src\notification-service\WorkerTransfer.Notification.Api\WorkerTransfer.Notification.Api.csproj" />
   </ItemGroup>
 </Project>

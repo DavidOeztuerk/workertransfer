@@ -5,7 +5,7 @@ namespace WorkerTransfer.Identity.Application.Registrierung;
 /// <summary>Was dastehen muss, damit ein Konto überhaupt angelegt werden kann.</summary>
 /// <remarks>
 /// <para><strong>Gefunden, weil es fehlte.</strong> Ein Rumpf ohne
-/// <c>displayName</c> lief bis in die Datenbank und kam als <c>500</c> zurück
+/// <c>display_name</c> lief bis in die Datenbank und kam als <c>500</c> zurück
 /// (<c>null value in column "display_name" violates not-null constraint</c>).
 /// Genau die Klasse, die die Prüfstufe schließen soll — die Registrierung war
 /// als einzige der vier Türen ohne Prüfer geblieben.</para>
@@ -46,7 +46,7 @@ public sealed class RegistrierungPruefung : AbstractValidator<RegistrierenBefehl
             .OverridePropertyName("password");
 
         RuleFor(befehl => befehl.Anzeigename)
-            .NotEmpty().WithMessage("displayName is required")
-            .OverridePropertyName("displayName");
+            .NotEmpty().WithMessage("display_name is required")
+            .OverridePropertyName("display_name");
     }
 }

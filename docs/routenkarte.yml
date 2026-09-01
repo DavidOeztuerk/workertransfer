@@ -197,10 +197,19 @@ gruppen:
       deshalb keinen oeffentlichen Schalter: eine Firma FRAGT, die Person
       antwortet, und die Freigabe gilt fuer diese eine Firma.
 
-      `POST /resumes/{id}/requests` gibt 503 fuer die Firma: gefragt werden darf
-      nur, wer die PROFIL-Freigabe hat, und der Ledger kann ueber ein nicht
-      existierendes Subjekt nichts sagen. 503 ist dann die einzig wahre Antwort —
-      weder ein Ja noch ein Nein.
+      `POST /resumes/{id}/requests` gibt 404 fuer die Firma: gefragt werden darf
+      nur, wer die PROFIL-Freigabe hat, und ein nicht existierendes Subjekt hat
+      keine. 404 heisst hier wie ueberall "verborgen oder nicht vorhanden", und
+      die beiden muessen ununterscheidbar bleiben.
+
+      **Hier stand bis zum Drahtnamen-Fund 503, mit einer Begruendung, die
+      falsch war** — "der Ledger kann ueber ein nicht existierendes Subjekt
+      nichts sagen". Er kann: keine Freigabe, also nein. 503 heisst nicht
+      "unbekannt", sondern "hat nicht geantwortet", und das traf zu, weil
+      resume-service den Ledger mit `subjectId` fragte, waehrend der auf
+      `subject_id` hoerte. Die Karte hielt also ein Symptom fest und hatte sich
+      einen Grund dafuer geschrieben. Das ist die unangenehmste Art, falsch zu
+      liegen: mit Begruendung.
     eintraege:
       - { methode: PUT, pfad: '/resumes/me', ohne: 401, person: 422, firma: 422 }
       - { methode: GET, pfad: '/resumes/me', ohne: 401, person: 404, firma: 404 }
@@ -208,7 +217,7 @@ gruppen:
       - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/grant', ohne: 401, person: 404, firma: 404 }
       - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, firma: 404 }
       - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/revoke', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/resumes/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, firma: 503 }
+      - { methode: POST, pfad: '/resumes/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, firma: 404 }
       - { methode: GET, pfad: '/resumes/requests', ohne: 401, person: 403, firma: 200 }
       - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 404 }
 
@@ -290,7 +299,7 @@ gruppen:
       - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/grant', ohne: 401, person: 404, firma: 404 }
       - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, firma: 404 }
       - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/revoke', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/market/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, firma: 503 }
+      - { methode: POST, pfad: '/market/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, firma: 404 }
       - { methode: GET, pfad: '/market/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 404 }
       - { methode: POST, pfad: '/transfers', ohne: 401, person: 403, firma: 422 }
       - { methode: GET, pfad: '/transfers/me', ohne: 401, person: 200, firma: 200 }

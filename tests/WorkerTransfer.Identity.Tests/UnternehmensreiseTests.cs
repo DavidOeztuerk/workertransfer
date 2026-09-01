@@ -77,8 +77,8 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
         {
             email,
             password = Passwort,
-            displayName = email.Split('@')[0],
-            companyName = firma
+            display_name = email.Split('@')[0],
+            company_name = firma
         });
         angelegt.StatusCode.Should().Be(HttpStatusCode.Created);
 

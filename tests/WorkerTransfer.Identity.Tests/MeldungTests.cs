@@ -77,7 +77,7 @@ public class MeldungTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = Browser();
         browser.DefaultRequestHeaders.Add("X-Notify-Secret", geheimnis);
-        return browser.PostAsJsonAsync("/internal/notify", new { userId = wer });
+        return browser.PostAsJsonAsync("/internal/notify", new { user_id = wer });
     }
 
     /// <summary>Legt ein bestätigtes Konto an und gibt seine Kennung zurück.</summary>
@@ -87,7 +87,7 @@ public class MeldungTests(Postgres postgres) : IAsyncLifetime
 
         await Browser().PostAsJsonAsync("/auth/register", new
         {
-            email = adresse, password = Passwort, displayName = "Anna"
+            email = adresse, password = Passwort, display_name = "Anna"
         });
 
         var token = Regex.Match(
@@ -105,7 +105,7 @@ public class MeldungTests(Postgres postgres) : IAsyncLifetime
 
         await Browser().PostAsJsonAsync("/auth/register", new
         {
-            email = adresse, password = Passwort, displayName = "Bea"
+            email = adresse, password = Passwort, display_name = "Bea"
         });
 
         return _post.Post[^1].Empfaenger.Value;

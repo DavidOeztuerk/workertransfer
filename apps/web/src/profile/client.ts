@@ -218,7 +218,12 @@ export async function listCandidates(
   cursor?: string,
   filters: CandidateFilters = NO_FILTERS
 ): Promise<CandidatePage> {
-  const url = `${PROFILE_BASE_URL}/profiles${candidateQuery(cursor, filters)}`;
+  // `/candidates` und NICHT `/profiles`: der blanke Praefix ist eine
+  // absichtlich tote Tuer (404 in allen drei Handlungsformen, so steht es auch
+  // in docs/routenkarte.yml). Die Liste hing dadurch immer im Fehlerfall —
+  // "Die Liste konnte nicht geladen werden." — und niemand sah es, weil kein
+  // Gate die Oberflaeche gegen den Server fuhr.
+  const url = `${PROFILE_BASE_URL}/candidates${candidateQuery(cursor, filters)}`;
   let res: Response;
   try {
     res = await fetch(url, { credentials: "include" });

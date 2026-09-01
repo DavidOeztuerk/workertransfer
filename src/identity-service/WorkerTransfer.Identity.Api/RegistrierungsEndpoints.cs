@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using MediatR;
 using WorkerTransfer.Identity.Application.Registrierung;
 
@@ -6,12 +7,33 @@ using WorkerTransfer.ServiceDefaults;
 namespace WorkerTransfer.Identity.Api;
 
 /// <summary>What a caller sends to register.</summary>
+/// <remarks>
+/// <para><strong>Die Namen stehen ausdrücklich da, und das ist keine Zierde.</strong>
+/// Der Draht dieser Plattform ist snake_case — neun Dienste setzen ihn mit
+/// <c>[JsonPropertyName]</c> auf ihren <c>Contracts</c>-Typen, und die
+/// Oberfläche schickt danach. Dieser Rumpf hatte als einziger keine, fiel damit
+/// auf camelCase aus <c>GirderModule.JsonOptions</c> zurück und band
+/// <c>display_name</c> an nichts.</para>
+///
+/// <para><strong>Warum es niemandem auffiel:</strong> jeder andere Rumpf in
+/// identity hat nur einwortige Felder (<c>token</c>, <c>email</c>, <c>name</c>,
+/// <c>role</c>) — da sind camelCase und snake_case dasselbe Wort. Erst ein
+/// zusammengesetzter Name macht den Unterschied sichtbar, und
+/// <c>display_name</c> ist der einzige auf einem Pflichtfeld.</para>
+///
+/// <para>Es kam als <c>500</c> zurück (die Spalte ist <c>NOT NULL</c>), seit H4
+/// als <c>422</c>. Beides heisst: über die Oberfläche konnte sich niemand
+/// registrieren. <c>DrahtnamenTests</c> nagelt die vier Namen jetzt fest.</para>
+/// </remarks>
 /// <param name="CompanyName">
 /// Set means "a company is registering here". Optional, because the ordinary
 /// user of a transfer market is a person with no company at all.
 /// </param>
 public sealed record RegisterBody(
-    string Email, string Password, string DisplayName, string? CompanyName = null);
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("display_name")] string DisplayName,
+    [property: JsonPropertyName("company_name")] string? CompanyName = null);
 
 /// <summary>What a caller sends to confirm.</summary>
 public sealed record VerifyEmailBody(string Token);

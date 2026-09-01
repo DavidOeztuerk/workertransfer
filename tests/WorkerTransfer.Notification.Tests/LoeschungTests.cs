@@ -103,7 +103,7 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", "geraten");
 
-        var antwort = await browser.PostAsJsonAsync("/erasure", new { userId = anna });
+        var antwort = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
 
         antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
@@ -127,7 +127,7 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", Meldegeheimnis);
 
-        var antwort = await browser.PostAsJsonAsync("/erasure", new { userId = anna });
+        var antwort = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
 
         antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
@@ -149,7 +149,7 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", Loeschgeheimnis);
-        return browser.PostAsJsonAsync("/erasure", new { userId = wer });
+        return browser.PostAsJsonAsync("/erasure", new { user_id = wer });
     }
 
     /// <summary>Legt einen Eingang an — und besteht darauf, dass es klappt.</summary>
@@ -164,7 +164,7 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         browser.DefaultRequestHeaders.Add("X-Notify-Secret", Meldegeheimnis);
 
         var antwort = await browser.PostAsJsonAsync(
-            "/internal/notifications", new { userId = wer, kind = "market_request" });
+            "/internal/notifications", new { user_id = wer, kind = "market_request" });
 
         antwort.IsSuccessStatusCode.Should().BeTrue(
             "das Befuellen muss gelingen, sonst prueft der Test etwas anderes — "
