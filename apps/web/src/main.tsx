@@ -1,12 +1,11 @@
-import { QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { Provider } from "react-redux";
 
-import { router } from "./app";
-import { queryClient } from "./auth/query-client";
-import "@workertransfer/ui/styles.css";
-import "./styles.css";
+import "@fontsource-variable/inter";
+
+import { AppRoot } from "./AppRoot";
+import { store } from "./core/store/store";
 
 const container = document.getElementById("root");
 
@@ -16,8 +15,8 @@ if (container === null) {
 
 createRoot(container).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <Provider store={store}>
+      <AppRoot />
+    </Provider>
   </StrictMode>
 );
