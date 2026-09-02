@@ -1,12 +1,13 @@
 import type { RouteObject } from "react-router-dom";
 
+import { CandidatesPage } from "./pages/CandidatesPage";
 import { CareerPage } from "./pages/CareerPage";
 
 /**
  * Die Routen dessen, was ein Unternehmen tut.
  *
  * <strong>Fast leer.</strong> Nur `/careers/<slug>` steht; es fehlen noch:
- * `/candidates`, `/company/jobs`, `/company/jobs/new`, `/company/team`
+ * `/company/jobs`, `/company/jobs/new`, `/company/team`
  * (+ `/invite`), `/company/profile`, `/company/transfers`.
  *
  * Die Reihenfolge und die Vorlagen stehen in
@@ -17,4 +18,5 @@ import { CareerPage } from "./pages/CareerPage";
  */
 export const companyRoutes: RouteObject[] = [
   { path: "/careers/:slug", element: <CareerPage /> },
+  { path: "/candidates", element: <CandidatesPage /> },
 ];
