@@ -1,13 +1,7 @@
 import type { RouteObject } from "react-router-dom";
 
-import { CandidatesPage } from "./pages/CandidatesPage";
-import { CompanyJobNewPage } from "./pages/CompanyJobNewPage";
-import { CompanyJobsPage } from "./pages/CompanyJobsPage";
-import { CompanyTeamInvitePage } from "./pages/CompanyTeamInvitePage";
-import { CompanyProfilePage } from "./pages/CompanyProfilePage";
-import { CompanyTeamPage } from "./pages/CompanyTeamPage";
-import { CompanyTransfersPage } from "./pages/CompanyTransfersPage";
-import { CareerPage } from "./pages/CareerPage";
+import { lazyRoute } from "../../shared/components/routing/lazyRoute";
+
 
 /**
  * Die Routen dessen, was ein Unternehmen tut.
@@ -24,12 +18,12 @@ import { CareerPage } from "./pages/CareerPage";
  * heute noch auf der Liste.
  */
 export const companyRoutes: RouteObject[] = [
-  { path: "/careers/:slug", element: <CareerPage /> },
-  { path: "/candidates", element: <CandidatesPage /> },
-  { path: "/company/jobs", element: <CompanyJobsPage /> },
-  { path: "/company/jobs/new", element: <CompanyJobNewPage /> },
-  { path: "/company/team", element: <CompanyTeamPage /> },
-  { path: "/company/team/invite", element: <CompanyTeamInvitePage /> },
-  { path: "/company/profile", element: <CompanyProfilePage /> },
-  { path: "/company/transfers", element: <CompanyTransfersPage /> },
+  { path: "/careers/:slug", element: lazyRoute(() => import("./pages/CareerPage"), "CareerPage") },
+  { path: "/candidates", element: lazyRoute(() => import("./pages/CandidatesPage"), "CandidatesPage") },
+  { path: "/company/jobs", element: lazyRoute(() => import("./pages/CompanyJobsPage"), "CompanyJobsPage") },
+  { path: "/company/jobs/new", element: lazyRoute(() => import("./pages/CompanyJobNewPage"), "CompanyJobNewPage") },
+  { path: "/company/team", element: lazyRoute(() => import("./pages/CompanyTeamPage"), "CompanyTeamPage") },
+  { path: "/company/team/invite", element: lazyRoute(() => import("./pages/CompanyTeamInvitePage"), "CompanyTeamInvitePage") },
+  { path: "/company/profile", element: lazyRoute(() => import("./pages/CompanyProfilePage"), "CompanyProfilePage") },
+  { path: "/company/transfers", element: lazyRoute(() => import("./pages/CompanyTransfersPage"), "CompanyTransfersPage") },
 ];
