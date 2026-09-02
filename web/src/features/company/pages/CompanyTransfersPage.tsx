@@ -7,7 +7,11 @@ import CardContent from "@mui/material/CardContent";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
-import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  EmptyBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import { useHandelnder } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -50,7 +54,7 @@ export function CompanyTransfersPage() {
   const transfers = useAsync(
     (signal) => listCompanyTransfers(signal),
     [tenantId],
-    fuerFirma
+    fuerFirma,
   );
 
   if (!fuerFirma) {
@@ -59,8 +63,8 @@ export function CompanyTransfersPage() {
         <Card>
           <CardContent>
             <Typography>
-              Transfers sieht nur, wer für ein Unternehmen handelt. Wechsle oben auf ein
-              Unternehmen.
+              Transfers sieht nur, wer für ein Unternehmen handelt. Wechsle oben
+              auf ein Unternehmen.
             </Typography>
           </CardContent>
         </Card>
@@ -76,14 +80,20 @@ export function CompanyTransfersPage() {
     transfers.reload();
   }
 
-  async function anbieten(id: string, text: string, start: string, abloese: string) {
+  async function anbieten(
+    id: string,
+    text: string,
+    start: string,
+    abloese: string,
+  ) {
     setLaeuft(true);
     const ergebnis = await makeOffer(id, {
       note: text,
       start_on: start.trim() === "" ? null : start.trim(),
       // Euro im Feld, Cent auf dem Draht — gerundet, damit "1,005" nicht als
       // Bruchteil eines Cents ankommt.
-      fee_cents: abloese.trim() === "" ? null : Math.round(Number(abloese) * 100),
+      fee_cents:
+        abloese.trim() === "" ? null : Math.round(Number(abloese) * 100),
     });
     setLaeuft(false);
     setFehler(ergebnis.ok ? null : ergebnis.error.detail);
@@ -98,8 +108,8 @@ export function CompanyTransfersPage() {
       title="Transfers"
       narrow
       lead={
-        "Die Ablöse wird hier festgehalten, nicht bewegt: diese Plattform führt kein Geld. Sie "
-        + "steht da, damit beide Seiten dieselbe Zahl im Blick haben."
+        "Die Ablöse wird hier festgehalten, nicht bewegt: diese Plattform führt kein Geld. Sie " +
+        "steht da, damit beide Seiten dieselbe Zahl im Blick haben."
       }
     >
       {fehler !== null ? (
@@ -125,7 +135,17 @@ export function CompanyTransfersPage() {
         <EmptyBlock title="Es läuft gerade kein Transfer." />
       ) : null}
 
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <Box
+        component="ul"
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          listStyle: "none",
+          p: 0,
+          m: 0,
+        }}
+      >
         {liste.map((transfer: Transfer) => (
           <Transferkarte
             key={transfer.id}
@@ -158,11 +178,13 @@ function Transferkarte({
   const [abloese, setAbloese] = useState("");
 
   const laeuftNoch = RUNNING.includes(transfer.status);
-  const darfAbschliessen = transfer.status === "accepted" && !transfer.requires_release;
-  const zeigtAngebot = transfer.status === "offered" || transfer.status === "accepted";
+  const darfAbschliessen =
+    transfer.status === "accepted" && !transfer.requires_release;
+  const zeigtAngebot =
+    transfer.status === "offered" || transfer.status === "accepted";
 
   return (
-    <Card>
+    <Card component="li">
       <CardContent>
         <Typography variant="h2" sx={{ mb: 1 }}>
           {TITEL[transfer.status]}
@@ -241,12 +263,20 @@ function Transferkarte({
 
         <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
           {darfAbschliessen ? (
-            <Button variant="contained" onClick={() => onZug("complete")} disabled={gesperrt}>
+            <Button
+              variant="contained"
+              onClick={() => onZug("complete")}
+              disabled={gesperrt}
+            >
               Abschließen
             </Button>
           ) : null}
           {laeuftNoch ? (
-            <Button variant="text" onClick={() => onZug("withdraw")} disabled={gesperrt}>
+            <Button
+              variant="text"
+              onClick={() => onZug("withdraw")}
+              disabled={gesperrt}
+            >
               Zurückziehen
             </Button>
           ) : null}

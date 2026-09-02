@@ -9,13 +9,21 @@ import Radio from "@mui/material/Radio";
 import RadioGroup from "@mui/material/RadioGroup";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { Link as RouterLink, Navigate, useSearchParams } from "react-router-dom";
+import {
+  Link as RouterLink,
+  Navigate,
+  useSearchParams,
+} from "react-router-dom";
 import Link from "@mui/material/Link";
 
 import { useAppSelector } from "../../../core/store/hooks";
 import { AuthCard } from "../components/AuthCard";
 import { AuthModeTabs } from "../components/AuthModeTabs";
-import { isPublicEmailDomain, registriere, sendeBestaetigungErneut } from "../api/registrierung";
+import {
+  isPublicEmailDomain,
+  registriere,
+  sendeBestaetigungErneut,
+} from "../api/registrierung";
 
 const LEAD =
   "Dein Profil gehört dir. Registrieren kostet nichts und verpflichtet zu nichts. Sichtbar wirst du erst, wenn du es willst.";
@@ -41,7 +49,7 @@ export function RegisterPage() {
   // landet jemand, der „Als Unternehmen entdecken" klickt, im Personenformular
   // und merkt es erst nach der Bestätigungsmail.
   const [art, setArt] = useState<Art>(
-    suchparameter.get("as") === "company" ? "company" : "person"
+    suchparameter.get("as") === "company" ? "company" : "person",
   );
 
   const [unternehmensname, setUnternehmensname] = useState("");
@@ -59,8 +67,9 @@ export function RegisterPage() {
   // Nur wenn überhaupt eine Adresse dasteht: `isPublicEmailDomain("")` urteilte
   // über einen leeren Domainteil und blitzte beim ersten getippten Zeichen auf.
   const freemail = useMemo(
-    () => art === "company" && email.includes("@") && isPublicEmailDomain(email),
-    [art, email]
+    () =>
+      art === "company" && email.includes("@") && isPublicEmailDomain(email),
+    [art, email],
   );
 
   if (status === "authenticated") return <Navigate to="/overview" replace />;
@@ -86,7 +95,12 @@ export function RegisterPage() {
     <AuthCard title="Konto erstellen" lead={LEAD}>
       <AuthModeTabs current="register" />
 
-      <Box component="form" onSubmit={absenden} noValidate sx={{ display: "grid", gap: 2.5 }}>
+      <Box
+        component="form"
+        onSubmit={absenden}
+        noValidate
+        sx={{ display: "grid", gap: 2.5 }}
+      >
         <FormControl component="fieldset" sx={{ display: "grid", gap: 1 }}>
           <FormLabel component="legend" sx={{ mb: 0.5 }}>
             Wofür registrierst du dich?
@@ -105,21 +119,41 @@ export function RegisterPage() {
             <Box>
               <FormControlLabel
                 value="person"
-                control={<Radio slotProps={{ input: { "aria-describedby": personHinweis } }} />}
+                control={
+                  <Radio
+                    slotProps={{ input: { "aria-describedby": personHinweis } }}
+                  />
+                }
                 label="Für mich"
               />
-              <Typography id={personHinweis} variant="body2" color="text.secondary" sx={{ ml: 4 }}>
-                Du suchst oder bist wechselwillig. Sichtbar wirst du erst, wenn du es willst.
+              <Typography
+                id={personHinweis}
+                variant="body2"
+                color="text.secondary"
+                sx={{ ml: 4 }}
+              >
+                Du suchst oder bist wechselwillig. Sichtbar wirst du erst, wenn
+                du es willst.
               </Typography>
             </Box>
             <Box sx={{ mt: 1 }}>
               <FormControlLabel
                 value="company"
-                control={<Radio slotProps={{ input: { "aria-describedby": firmaHinweis } }} />}
+                control={
+                  <Radio
+                    slotProps={{ input: { "aria-describedby": firmaHinweis } }}
+                  />
+                }
                 label="Für ein Unternehmen"
               />
-              <Typography id={firmaHinweis} variant="body2" color="text.secondary" sx={{ ml: 4 }}>
-                Braucht deine Arbeitsadresse — daraus entsteht die Domain des Unternehmens.
+              <Typography
+                id={firmaHinweis}
+                variant="body2"
+                color="text.secondary"
+                sx={{ ml: 4 }}
+              >
+                Braucht deine Arbeitsadresse — daraus entsteht die Domain des
+                Unternehmens.
               </Typography>
             </Box>
           </RadioGroup>
@@ -156,9 +190,9 @@ export function RegisterPage() {
             gemacht, was ohnehin gilt. */}
         {freemail ? (
           <Alert severity="warning">
-            Ein Unternehmen braucht eine eigene Domain. Mit einer Adresse bei einem
-            Massenanbieter geht das nicht — nimm deine Arbeitsadresse, oder registriere dich
-            für dich selbst.
+            Ein Unternehmen braucht eine eigene Domain. Mit einer Adresse bei
+            einem Massenanbieter geht das nicht — nimm deine Arbeitsadresse,
+            oder registriere dich für dich selbst.
           </Alert>
         ) : null}
 
@@ -181,7 +215,12 @@ export function RegisterPage() {
 
         {fehler !== null ? <Alert severity="error">{fehler}</Alert> : null}
 
-        <Button type="submit" variant="contained" size="large" disabled={laeuft || freemail}>
+        <Button
+          type="submit"
+          variant="contained"
+          size="large"
+          disabled={laeuft || freemail}
+        >
           {laeuft ? "Wird angelegt…" : "Registrieren"}
         </Button>
       </Box>
@@ -228,7 +267,8 @@ function FastGeschafft({ email }: { email: string }) {
 
         {gescheitert ? (
           <Alert severity="error">
-            Die E-Mail konnte gerade nicht angefordert werden. Versuch es später noch einmal.
+            Die E-Mail konnte gerade nicht angefordert werden. Versuch es später
+            noch einmal.
           </Alert>
         ) : null}
 

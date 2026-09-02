@@ -20,7 +20,13 @@ interface Entwurf {
   benefits: string;
 }
 
-const LEER: Entwurf = { display_name: "", about: "", website: "", locations: "", benefits: "" };
+const LEER: Entwurf = {
+  display_name: "",
+  about: "",
+  website: "",
+  locations: "",
+  benefits: "",
+};
 
 /** Mit Komma getrennt, Leeres fällt weg — „nichts angegeben" ist keine leere Zeile. */
 const liste = (roh: string): string[] =>
@@ -48,7 +54,11 @@ export function CompanyProfilePage() {
   const [gespeichert, setGespeichert] = useState(false);
   const [laeuft, setLaeuft] = useState(false);
 
-  const profil = useAsync((signal) => getOwnCompanyProfile(signal), [tenantId], fuerFirma);
+  const profil = useAsync(
+    (signal) => getOwnCompanyProfile(signal),
+    [tenantId],
+    fuerFirma,
+  );
 
   useEffect(() => {
     if (uebernommen || !profil.data?.ok) return;
@@ -71,8 +81,8 @@ export function CompanyProfilePage() {
         <Card>
           <CardContent>
             <Typography>
-              Das Unternehmensprofil bearbeitet nur, wer für ein Unternehmen handelt. Wechsle oben
-              auf ein Unternehmen.
+              Das Unternehmensprofil bearbeitet nur, wer für ein Unternehmen
+              handelt. Wechsle oben auf ein Unternehmen.
             </Typography>
           </CardContent>
         </Card>
@@ -105,13 +115,15 @@ export function CompanyProfilePage() {
       title="Unser Unternehmen"
       narrow
       lead={
-        "Das sehen Bewerber neben jeder eurer Stellen. Solange hier nichts steht, bleibt eine "
-        + "Ausschreibung anonym — Titel und Beschreibung, sonst nichts."
+        "Das sehen Bewerber neben jeder eurer Stellen. Solange hier nichts steht, bleibt eine " +
+        "Ausschreibung anonym — Titel und Beschreibung, sonst nichts."
       }
     >
       <Card>
         <CardContent>
-          {profil.pending ? <LoadingBlock label="Profil wird geladen…" /> : null}
+          {profil.pending ? (
+            <LoadingBlock label="Profil wird geladen…" />
+          ) : null}
 
           {fehler !== null ? (
             <Alert severity="error" sx={{ mb: 2 }}>

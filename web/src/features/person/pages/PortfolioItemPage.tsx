@@ -9,11 +9,20 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 
-import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  EmptyBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 import { useAsync } from "../lib/useAsync";
-import { type Arbeit, haengeAn, ladeMeines, speichereMeines } from "../api/portfolio";
+import {
+  type Arbeit,
+  haengeAn,
+  ladeMeines,
+  speichereMeines,
+} from "../api/portfolio";
 
 interface Entwurf {
   title: string;
@@ -24,7 +33,14 @@ interface Entwurf {
   attachment: string | null;
 }
 
-const LEER: Entwurf = { title: "", summary: "", url: "", role: "", year: "", attachment: null };
+const LEER: Entwurf = {
+  title: "",
+  summary: "",
+  url: "",
+  role: "",
+  year: "",
+  attachment: null,
+};
 
 const zuEntwurf = (arbeit: Arbeit): Entwurf => ({
   title: arbeit.title,
@@ -72,7 +88,7 @@ export function PortfolioItemPage() {
   const schaufenster = useAsync(
     (signal) => ladeMeines(signal),
     [sitzung?.userId],
-    sitzung !== null
+    sitzung !== null,
   );
 
   const [entwurf, setEntwurf] = useState<Entwurf>(LEER);
@@ -80,9 +96,15 @@ export function PortfolioItemPage() {
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
 
-  const arbeiten = schaufenster.wert?.ok ? (schaufenster.wert.wert?.items ?? []) : [];
+  const arbeiten = schaufenster.wert?.ok
+    ? (schaufenster.wert.wert?.items ?? [])
+    : [];
   const position = neu ? arbeiten.length : Number(stelle);
-  const vorhanden = !neu && Number.isInteger(position) && position >= 0 && position < arbeiten.length;
+  const vorhanden =
+    !neu &&
+    Number.isInteger(position) &&
+    position >= 0 &&
+    position < arbeiten.length;
 
   useEffect(() => {
     if (geladen || !schaufenster.wert?.ok) return;
@@ -91,7 +113,12 @@ export function PortfolioItemPage() {
   }, [geladen, schaufenster.wert, vorhanden, arbeiten, position]);
 
   if (status === "anonymous") {
-    return <AnmeldungNoetig titel="Arbeit bearbeiten" zweck="deine Arbeiten zu bearbeiten" />;
+    return (
+      <AnmeldungNoetig
+        titel="Arbeit bearbeiten"
+        zweck="deine Arbeiten zu bearbeiten"
+      />
+    );
   }
 
   if (schaufenster.laedt) {
@@ -140,7 +167,9 @@ export function PortfolioItemPage() {
 
   async function entfernen() {
     setLaeuft(true);
-    const ergebnis = await speichereMeines(arbeiten.filter((_, i) => i !== position));
+    const ergebnis = await speichereMeines(
+      arbeiten.filter((_, i) => i !== position),
+    );
     setLaeuft(false);
 
     if (ergebnis.ok) void navigate("/portfolio");
@@ -158,7 +187,13 @@ export function PortfolioItemPage() {
 
   return (
     <PageShell
-      title={neu ? "Neue Arbeit" : entwurf.title !== "" ? entwurf.title : "Arbeit bearbeiten"}
+      title={
+        neu
+          ? "Neue Arbeit"
+          : entwurf.title !== ""
+            ? entwurf.title
+            : "Arbeit bearbeiten"
+      }
       narrow
     >
       <Box sx={{ mb: 2 }}>
@@ -222,9 +257,16 @@ export function PortfolioItemPage() {
                   Server, und die Oberfläche soll nur sagen, was wahr ist — dass
                   eine Datei hängt. */}
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {entwurf.attachment !== null ? "Eine Datei hängt an dieser Arbeit." : "Keine Datei."}
+                {entwurf.attachment !== null
+                  ? "Eine Datei hängt an dieser Arbeit."
+                  : "Keine Datei."}
               </Typography>
-              <Button component="label" variant="outlined" size="small" disabled={laeuft}>
+              <Button
+                component="label"
+                variant="outlined"
+                size="small"
+                disabled={laeuft}
+              >
                 Datei wählen
                 <input
                   type="file"

@@ -7,7 +7,12 @@ import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import Typography from "@mui/material/Typography";
 
-import { EmptyBlock, ErrorBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  EmptyBlock,
+  ErrorBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import {
   type GrantedConsent,
@@ -38,11 +43,12 @@ export function ConsentsPage() {
   const freigaben = useAsync(
     (signal) => listMyConsents(signal),
     [subjectId],
-    subjectId !== null
+    subjectId !== null,
   );
 
   const ergebnis = freigaben.wert;
-  const consents: GrantedConsent[] = ergebnis?.ok === true ? ergebnis.consents : [];
+  const consents: GrantedConsent[] =
+    ergebnis?.ok === true ? ergebnis.consents : [];
 
   // Die Namen kommen frisch vom companies-service. Sie im Ledger zu führen
   // hiesse, eine Kopie zu halten, die veraltet, sobald ein Unternehmen sich
@@ -51,19 +57,23 @@ export function ConsentsPage() {
     ...new Set(
       consents
         .map((consent) => parseCapability(consent.capability).tenantId)
-        .filter((id): id is string => id !== null)
+        .filter((id): id is string => id !== null),
     ),
   ].sort();
 
   const namen = useAsync(
     async (signal) => {
       const paare = await Promise.all(
-        tenantIds.map(async (id) => [id, await getCompanyName(id, signal)] as const)
+        tenantIds.map(
+          async (id) => [id, await getCompanyName(id, signal)] as const,
+        ),
       );
-      return new Map(paare.filter((paar): paar is [string, string] => paar[1] !== null));
+      return new Map(
+        paare.filter((paar): paar is [string, string] => paar[1] !== null),
+      );
     },
     [tenantIds.join(",")],
-    tenantIds.length > 0
+    tenantIds.length > 0,
   );
   const nameFuer = namen.wert ?? new Map<string, string>();
 
@@ -71,12 +81,17 @@ export function ConsentsPage() {
     async (capability: string) => {
       if (subjectId === null) return;
       setzeBeschaeftigt(true);
-      const ergebnis = await setGranted(subjectId, capability, false, WITHDRAWAL_REASON);
+      const ergebnis = await setGranted(
+        subjectId,
+        capability,
+        false,
+        WITHDRAWAL_REASON,
+      );
       setzeBeschaeftigt(false);
       setzeFehler(ergebnis.ok ? null : ergebnis.error);
       freigaben.erneut();
     },
-    [subjectId, freigaben]
+    [subjectId, freigaben],
   );
 
   if (unbekannt) {
@@ -88,7 +103,12 @@ export function ConsentsPage() {
   }
 
   if (subjectId === null) {
-    return <AnmeldungNoetig titel="Meine Freigaben" zweck="deine Freigaben zu sehen" />;
+    return (
+      <AnmeldungNoetig
+        titel="Meine Freigaben"
+        zweck="deine Freigaben zu sehen"
+      />
+    );
   }
 
   return (
@@ -103,11 +123,15 @@ export function ConsentsPage() {
         <CardContent>
           {/* Reihenfolge nach dem Muster: lädt, dann Fehler, dann leer, dann
               Inhalt. */}
-          {freigaben.laedt ? <LoadingBlock label="Freigaben werden geladen…" /> : null}
+          {freigaben.laedt ? (
+            <LoadingBlock label="Freigaben werden geladen…" />
+          ) : null}
 
           {/* Kein leerer Zustand bei einem Fehler: „du hast nichts freigegeben"
               wäre hier die beruhigendste falsche Antwort, die es gibt. */}
-          {ergebnis !== undefined && !ergebnis.ok ? <ErrorBlock error={ergebnis.error} /> : null}
+          {ergebnis !== undefined && !ergebnis.ok ? (
+            <ErrorBlock error={ergebnis.error} />
+          ) : null}
 
           {ergebnis?.ok && consents.length === 0 ? (
             <EmptyBlock
@@ -123,7 +147,9 @@ export function ConsentsPage() {
                   key={consent.capability}
                   consent={consent}
                   firmenname={
-                    nameFuer.get(parseCapability(consent.capability).tenantId ?? "") ?? null
+                    nameFuer.get(
+                      parseCapability(consent.capability).tenantId ?? "",
+                    ) ?? null
                   }
                   beschaeftigt={beschaeftigt}
                   onWithdraw={() => void zuruecknehmen(consent.capability)}
@@ -175,7 +201,8 @@ function ConsentZeile({
           {was} · {wer}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Freigegeben am {new Date(consent.granted_at).toLocaleDateString("de-DE")}
+          Freigegeben am{" "}
+          {new Date(consent.granted_at).toLocaleDateString("de-DE")}
         </Typography>
       </Box>
       <Button variant="text" onClick={onWithdraw} disabled={beschaeftigt}>

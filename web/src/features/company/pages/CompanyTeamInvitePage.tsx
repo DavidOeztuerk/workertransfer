@@ -13,7 +13,12 @@ import { Link as RouterLink } from "react-router-dom";
 import { LoadingBlock, PageShell } from "../../../shared/components/ui";
 import { useHandelnder } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
-import { type CompanyMember, type Role, inviteMember, listMembers } from "../api/team";
+import {
+  type CompanyMember,
+  type Role,
+  inviteMember,
+  listMembers,
+} from "../api/team";
 
 /**
  * <c>/company/team/invite</c> — jemanden einladen.
@@ -39,7 +44,7 @@ export function CompanyTeamInvitePage() {
   const mitglieder = useAsync(
     (signal) => listMembers(tenantId as string, signal),
     [tenantId],
-    fuerFirma
+    fuerFirma,
   );
 
   const zurueck = (
@@ -60,8 +65,9 @@ export function CompanyTeamInvitePage() {
   if (!fuerFirma) {
     return rahmen(
       <Typography>
-        Wähle oben ein Unternehmen — oder lass dich von jemandem aus deinem Unternehmen einladen.
-      </Typography>
+        Wähle oben ein Unternehmen — oder lass dich von jemandem aus deinem
+        Unternehmen einladen.
+      </Typography>,
     );
   }
 
@@ -71,14 +77,15 @@ export function CompanyTeamInvitePage() {
 
   const liste = mitglieder.data?.ok ? mitglieder.data.members : [];
   const istAdmin =
-    liste.find((eintrag: CompanyMember) => eintrag.user_id === subjectId)?.role === "admin";
+    liste.find((eintrag: CompanyMember) => eintrag.user_id === subjectId)
+      ?.role === "admin";
 
   if (!istAdmin) {
     return rahmen(
       <Typography>
-        Einladen dürfen nur Administratoren. Wende dich an jemanden aus deinem Unternehmen, der
-        das ist.
-      </Typography>
+        Einladen dürfen nur Administratoren. Wende dich an jemanden aus deinem
+        Unternehmen, der das ist.
+      </Typography>,
     );
   }
 
@@ -104,7 +111,12 @@ export function CompanyTeamInvitePage() {
         ereignis.preventDefault();
         void einladen();
       }}
-      sx={{ display: "flex", flexDirection: "column", gap: 2.5, alignItems: "flex-start" }}
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 2.5,
+        alignItems: "flex-start",
+      }}
     >
       <TextField
         label="E-Mail-Adresse"
@@ -145,6 +157,6 @@ export function CompanyTeamInvitePage() {
       <Button type="submit" variant="contained" disabled={laeuft}>
         {laeuft ? "Wird verschickt…" : "Einladen"}
       </Button>
-    </Box>
+    </Box>,
   );
 }

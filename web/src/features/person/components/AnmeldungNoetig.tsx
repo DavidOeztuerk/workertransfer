@@ -17,7 +17,13 @@ import { PageShell } from "../../../shared/components/ui";
  * Der Verweis ist ein Router-Link, kein `<a href>`: ein voller Neuladevorgang
  * mitten in der Anwendung verwirft die geladene Sitzung und fragt sie neu.
  */
-export function AnmeldungNoetig({ titel, zweck }: { titel: string; zweck: string }) {
+export function AnmeldungNoetig({
+  titel,
+  zweck,
+}: {
+  titel: string;
+  zweck: string;
+}) {
   return (
     <PageShell title={titel} narrow>
       <Card>

@@ -9,12 +9,24 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
-import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  EmptyBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import { CandidateCard } from "../components/CandidateCard";
 import { useHandelnder } from "../lib/session";
 import { useAsync, useSeiten } from "../lib/useAsync";
-import { type CandidateFilters, NO_FILTERS, type Profile, listCandidates } from "../api/candidates";
-import { type MarketRequest, listCompanyMarketRequests } from "../../work/api/market";
+import {
+  type CandidateFilters,
+  NO_FILTERS,
+  type Profile,
+  listCandidates,
+} from "../api/candidates";
+import {
+  type MarketRequest,
+  listCompanyMarketRequests,
+} from "../../work/api/market";
 
 /**
  * <c>/candidates</c> — wer sein Profil freigegeben hat.
@@ -35,7 +47,11 @@ import { type MarketRequest, listCompanyMarketRequests } from "../../work/api/ma
 export function CandidatesPage() {
   const { fuerFirma } = useHandelnder();
 
-  const [entwurf, setEntwurf] = useState({ skills: "", location: "", remoteOnly: false });
+  const [entwurf, setEntwurf] = useState({
+    skills: "",
+    location: "",
+    remoteOnly: false,
+  });
   const [filter, setFilter] = useState<CandidateFilters>(NO_FILTERS);
 
   const hatFilter =
@@ -45,23 +61,30 @@ export function CandidatesPage() {
     (cursor, signal) =>
       listCandidates(cursor, filter, signal).then((ergebnis) =>
         ergebnis.ok
-          ? { ok: true as const, items: ergebnis.items, nextCursor: ergebnis.nextCursor }
-          : { ok: false as const, fehler: ergebnis.error.detail }
+          ? {
+              ok: true as const,
+              items: ergebnis.items,
+              nextCursor: ergebnis.nextCursor,
+            }
+          : { ok: false as const, fehler: ergebnis.error.detail },
       ),
     JSON.stringify(filter),
-    fuerFirma
+    fuerFirma,
   );
 
   const anfragen = useAsync(
     (signal) => listCompanyMarketRequests(signal),
     [fuerFirma],
-    fuerFirma
+    fuerFirma,
   );
 
   const marktanfragen = new Map<string, MarketRequest>(
     anfragen.data?.ok === true
-      ? anfragen.data.requests.map((anfrage: MarketRequest) => [anfrage.subject_id, anfrage])
-      : []
+      ? anfragen.data.requests.map((anfrage: MarketRequest) => [
+          anfrage.subject_id,
+          anfrage,
+        ])
+      : [],
   );
 
   // Ohne aktives Unternehmen wird gar nicht erst gefragt. Der Server antwortete
@@ -73,8 +96,8 @@ export function CandidatesPage() {
         <Card>
           <CardContent>
             <Typography>
-              Profile sehen nur Unternehmen. Wechsle oben auf ein Unternehmen — oder lass dich von
-              jemandem aus deinem Unternehmen einladen.
+              Profile sehen nur Unternehmen. Wechsle oben auf ein Unternehmen —
+              oder lass dich von jemandem aus deinem Unternehmen einladen.
             </Typography>
           </CardContent>
         </Card>
@@ -86,8 +109,8 @@ export function CandidatesPage() {
     <PageShell
       title="Kandidatinnen und Kandidaten"
       lead={
-        "Hier steht ausschließlich, wer sein Profil freigegeben hat. Wer die Freigabe zurückzieht, "
-        + "verschwindet beim nächsten Laden — ohne Umweg über uns."
+        "Hier steht ausschließlich, wer sein Profil freigegeben hat. Wer die Freigabe zurückzieht, " +
+        "verschwindet beim nächsten Laden — ohne Umweg über uns."
       }
     >
       {seiten.fehler !== null ? (
@@ -111,21 +134,30 @@ export function CandidatesPage() {
                 remoteOnly: entwurf.remoteOnly,
               });
             }}
-            sx={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start" }}
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              alignItems: "flex-start",
+            }}
           >
             <TextField
               label="Fähigkeiten"
               helperText="Mit Komma trennen. Es zählt, wer ALLE davon kann."
               placeholder="Python, Kubernetes"
               value={entwurf.skills}
-              onChange={(e) => setEntwurf((jetzt) => ({ ...jetzt, skills: e.target.value }))}
+              onChange={(e) =>
+                setEntwurf((jetzt) => ({ ...jetzt, skills: e.target.value }))
+              }
             />
             <TextField
               label="Ort"
               helperText="Ein Teil genügt."
               placeholder="Berlin"
               value={entwurf.location}
-              onChange={(e) => setEntwurf((jetzt) => ({ ...jetzt, location: e.target.value }))}
+              onChange={(e) =>
+                setEntwurf((jetzt) => ({ ...jetzt, location: e.target.value }))
+              }
             />
 
             {/* Ein Kästchen, kein Schalter: der Filter gilt mit dem Absenden,
@@ -136,15 +168,19 @@ export function CandidatesPage() {
                   <Checkbox
                     checked={entwurf.remoteOnly}
                     onChange={(e) =>
-                      setEntwurf((jetzt) => ({ ...jetzt, remoteOnly: e.target.checked }))
+                      setEntwurf((jetzt) => ({
+                        ...jetzt,
+                        remoteOnly: e.target.checked,
+                      }))
                     }
                   />
                 }
                 label="Nur wer Remote angegeben hat"
               />
               <Typography variant="body2" color="text.secondary">
-                Ohne Haken erscheinen alle. Es gibt keinen Filter für „nur vor Ort" — ein
-                fehlender Haken heißt „nicht ja gesagt", nicht „lehnt ab".
+                Ohne Haken erscheinen alle. Es gibt keinen Filter für „nur vor
+                Ort" — ein fehlender Haken heißt „nicht ja gesagt", nicht „lehnt
+                ab".
               </Typography>
             </Box>
 
@@ -177,7 +213,17 @@ export function CandidatesPage() {
       ) : null}
 
       {seiten.items.length > 0 ? (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <Box
+          component="ul"
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            listStyle: "none",
+            p: 0,
+            m: 0,
+          }}
+        >
           {seiten.items.map((profil: Profile) => (
             <CandidateCard
               key={profil.subject_id}
@@ -189,7 +235,9 @@ export function CandidatesPage() {
         </Box>
       ) : null}
 
-      {!seiten.pending && seiten.fehler === null && seiten.items.length === 0 ? (
+      {!seiten.pending &&
+      seiten.fehler === null &&
+      seiten.items.length === 0 ? (
         hatFilter ? (
           <EmptyBlock title="Auf diese Suche passt gerade niemand, der sein Profil freigegeben hat." />
         ) : (
@@ -203,7 +251,11 @@ export function CandidatesPage() {
       {/* Bewusst keine Gesamtzahl. */}
       {seiten.mehr ? (
         <Box sx={{ mt: 3 }}>
-          <Button variant="outlined" onClick={seiten.weiter} disabled={seiten.pending}>
+          <Button
+            variant="outlined"
+            onClick={seiten.weiter}
+            disabled={seiten.pending}
+          >
             {seiten.pending ? "Wird geladen…" : "Mehr laden"}
           </Button>
         </Box>

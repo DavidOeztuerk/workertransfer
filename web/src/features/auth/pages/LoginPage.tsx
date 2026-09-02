@@ -41,7 +41,9 @@ export function LoginPage() {
    * Knopf tut sichtbar nichts. Ohne diesen Zustand wäre die Anmeldung an genau
    * der Stelle stumm, an der jemand nicht weiterkommt.
    */
-  const [stummerFehlschlag, setStummerFehlschlag] = useState<string | null>(null);
+  const [stummerFehlschlag, setStummerFehlschlag] = useState<string | null>(
+    null,
+  );
 
   // Wer schon angemeldet ist, hat auf dem Anmeldeformular nichts verloren.
   // Greift auch nach einer erfolgreichen Anmeldung, weil der Status dann
@@ -71,7 +73,7 @@ export function LoginPage() {
       // Angemeldet, aber die Sitzung kam leer zurück. Das ist kein Erfolg, und
       // stillschweigend auf der Seite stehen zu bleiben erklärt es niemandem.
       setStummerFehlschlag(
-        "Die Anmeldung ging durch, die Sitzung liess sich aber nicht lesen. Bitte versuch es noch einmal."
+        "Die Anmeldung ging durch, die Sitzung liess sich aber nicht lesen. Bitte versuch es noch einmal.",
       );
       return;
     }
@@ -79,7 +81,9 @@ export function LoginPage() {
     // `payload` gesetzt heisst: der Slice zeigt den Fehler des Servers. Nur der
     // andere Fall braucht hier einen eigenen Satz.
     if (ergebnis.payload === undefined) {
-      setStummerFehlschlag("Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.");
+      setStummerFehlschlag(
+        "Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.",
+      );
     }
   }
 
@@ -90,7 +94,12 @@ export function LoginPage() {
     >
       <AuthModeTabs current="login" />
 
-      <Box component="form" onSubmit={absenden} noValidate sx={{ display: "grid", gap: 2 }}>
+      <Box
+        component="form"
+        onSubmit={absenden}
+        noValidate
+        sx={{ display: "grid", gap: 2 }}
+      >
         <TextField
           label="E-Mail"
           type="email"
@@ -112,9 +121,16 @@ export function LoginPage() {
 
         {/* Der Fehlertext kommt vom Server und wird nie erfunden. */}
         {fehler !== null ? <ErrorBlock error={fehler} /> : null}
-        {stummerFehlschlag !== null ? <Alert severity="error">{stummerFehlschlag}</Alert> : null}
+        {stummerFehlschlag !== null ? (
+          <Alert severity="error">{stummerFehlschlag}</Alert>
+        ) : null}
 
-        <Button type="submit" variant="contained" size="large" disabled={pending}>
+        <Button
+          type="submit"
+          variant="contained"
+          size="large"
+          disabled={pending}
+        >
           {pending ? "Anmeldung läuft…" : "Anmelden"}
         </Button>
       </Box>

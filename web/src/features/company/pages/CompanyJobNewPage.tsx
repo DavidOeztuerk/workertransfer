@@ -73,8 +73,8 @@ export function CompanyJobNewPage() {
         <Card>
           <CardContent>
             <Typography>
-              Stellen legt nur an, wer für ein Unternehmen handelt. Wechsle oben auf ein
-              Unternehmen.
+              Stellen legt nur an, wer für ein Unternehmen handelt. Wechsle oben
+              auf ein Unternehmen.
             </Typography>
           </CardContent>
         </Card>
@@ -121,13 +121,17 @@ export function CompanyJobNewPage() {
             <TextField
               label="Titel"
               value={entwurf.title}
-              onChange={(e) => setEntwurf({ ...entwurf, title: e.target.value })}
+              onChange={(e) =>
+                setEntwurf({ ...entwurf, title: e.target.value })
+              }
               required
             />
             <TextField
               label="Beschreibung"
               value={entwurf.description}
-              onChange={(e) => setEntwurf({ ...entwurf, description: e.target.value })}
+              onChange={(e) =>
+                setEntwurf({ ...entwurf, description: e.target.value })
+              }
               multiline
               minRows={5}
             />
@@ -135,13 +139,17 @@ export function CompanyJobNewPage() {
               label="Ort"
               helperText="Leer lassen, wenn es keinen festen gibt."
               value={entwurf.location}
-              onChange={(e) => setEntwurf({ ...entwurf, location: e.target.value })}
+              onChange={(e) =>
+                setEntwurf({ ...entwurf, location: e.target.value })
+              }
             />
             <TextField
               select
               label="Arbeitsform"
               value={entwurf.remote}
-              onChange={(e) => setEntwurf({ ...entwurf, remote: e.target.value as RemoteMode })}
+              onChange={(e) =>
+                setEntwurf({ ...entwurf, remote: e.target.value as RemoteMode })
+              }
             >
               {Object.entries(REMOTE_LABEL).map(([wert, label]) => (
                 <MenuItem key={wert} value={wert}>
@@ -154,7 +162,10 @@ export function CompanyJobNewPage() {
               label="Beschäftigung"
               value={entwurf.employment}
               onChange={(e) =>
-                setEntwurf({ ...entwurf, employment: e.target.value as EmploymentType })
+                setEntwurf({
+                  ...entwurf,
+                  employment: e.target.value as EmploymentType,
+                })
               }
             >
               {Object.entries(EMPLOYMENT_LABEL).map(([wert, label]) => (
@@ -167,12 +178,16 @@ export function CompanyJobNewPage() {
               label="Gesuchte Fähigkeiten"
               helperText="Mit Komma trennen."
               value={entwurf.skills}
-              onChange={(e) => setEntwurf({ ...entwurf, skills: e.target.value })}
+              onChange={(e) =>
+                setEntwurf({ ...entwurf, skills: e.target.value })
+              }
             />
 
             <Formulierungshilfe
               entwurf={entwurf}
-              onVorschlag={(text) => setEntwurf({ ...entwurf, description: text })}
+              onVorschlag={(text) =>
+                setEntwurf({ ...entwurf, description: text })
+              }
             />
 
             <Box>
@@ -216,12 +231,16 @@ function Formulierungshilfe({
   return (
     <Box sx={{ p: 2, borderRadius: 2, bgcolor: "action.hover" }}>
       <TextField
-        label={hatText ? "Anzeige umformulieren lassen" : "Beim Schreiben helfen lassen"}
+        label={
+          hatText
+            ? "Anzeige umformulieren lassen"
+            : "Beim Schreiben helfen lassen"
+        }
         helperText={
-          "Optional: was euch wichtig ist („kürzer“, „weniger Floskeln“). Titel, Beschreibung, "
-          + "Ort und die gesuchten Fähigkeiten gehen dafür an Anthropic — nichts über Bewerbende. "
-          + "Anforderungen erfindet der Vorschlag keine dazu, und gespeichert wird er erst, wenn "
-          + "ihr den Entwurf anlegt."
+          "Optional: was euch wichtig ist („kürzer“, „weniger Floskeln“). Titel, Beschreibung, " +
+          "Ort und die gesuchten Fähigkeiten gehen dafür an Anthropic — nichts über Bewerbende. " +
+          "Anforderungen erfindet der Vorschlag keine dazu, und gespeichert wird er erst, wenn " +
+          "ihr den Entwurf anlegt."
         }
         value={wunsch}
         onChange={(e) => setWunsch(e.target.value)}

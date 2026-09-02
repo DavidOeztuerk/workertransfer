@@ -14,7 +14,12 @@ interface VorgangZeile {
 }
 
 function vorgang(werte: Partial<VorgangZeile> = {}): VorgangZeile {
-  return { status: "interested", requires_release: false, release_confirmed: false, ...werte };
+  return {
+    status: "interested",
+    requires_release: false,
+    release_confirmed: false,
+    ...werte,
+  };
 }
 
 /**
@@ -32,7 +37,9 @@ function antworten(karte: Record<string, Antwort>) {
     const pfad = new URL(url).pathname;
     gefragt.push(pfad);
     const antwort = karte[pfad] ?? { body: [] };
-    return new Response(JSON.stringify(antwort.body ?? []), { status: antwort.status ?? 200 });
+    return new Response(JSON.stringify(antwort.body ?? []), {
+      status: antwort.status ?? 200,
+    });
   });
   vi.stubGlobal("fetch", stub);
   return gefragt;
@@ -60,7 +67,9 @@ describe("OverviewPage", () => {
   it("sagt klar, wenn gerade nichts wartet", async () => {
     renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
 
-    expect(await screen.findByText("Gerade wartet nichts auf dich.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Gerade wartet nichts auf dich."),
+    ).toBeInTheDocument();
   });
 
   it("zählt nur, was auf eine Entscheidung wartet, nicht was von selbst läuft", async () => {
@@ -78,7 +87,9 @@ describe("OverviewPage", () => {
 
     renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
 
-    expect(await screen.findByText("1 Gespräch wartet auf dich")).toBeInTheDocument();
+    expect(
+      await screen.findByText("1 Gespräch wartet auf dich"),
+    ).toBeInTheDocument();
   });
 
   it("zählt eine ausstehende Freigabe, eine bestätigte nicht", async () => {
@@ -86,28 +97,40 @@ describe("OverviewPage", () => {
       "/transfers/me": {
         body: [
           vorgang({ status: "accepted", requires_release: true }),
-          vorgang({ status: "accepted", requires_release: true, release_confirmed: true }),
+          vorgang({
+            status: "accepted",
+            requires_release: true,
+            release_confirmed: true,
+          }),
         ],
       },
     });
 
     renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
 
-    expect(await screen.findByText("1 Gespräch wartet auf dich")).toBeInTheDocument();
+    expect(
+      await screen.findByText("1 Gespräch wartet auf dich"),
+    ).toBeInTheDocument();
   });
 
   it("zählt offene Anfragen beider Arten getrennt", async () => {
     antworten({
-      "/market/me/requests": { body: [{ status: "PENDING" }, { status: "GRANTED" }] },
+      "/market/me/requests": {
+        body: [{ status: "PENDING" }, { status: "GRANTED" }],
+      },
       "/resumes/me/requests": { body: [{ status: "PENDING" }] },
     });
 
     renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
 
     expect(
-      await screen.findByText("1 Unternehmen möchte sehen, ob du ansprechbar bist")
+      await screen.findByText(
+        "1 Unternehmen möchte sehen, ob du ansprechbar bist",
+      ),
     ).toBeInTheDocument();
-    expect(screen.getByText("1 Anfrage nach deinem Lebenslauf")).toBeInTheDocument();
+    expect(
+      screen.getByText("1 Anfrage nach deinem Lebenslauf"),
+    ).toBeInTheDocument();
   });
 
   it("fragt ohne aktives Unternehmen nicht nach Firmenvorgängen", async () => {
@@ -127,7 +150,9 @@ describe("OverviewPage", () => {
 
     renderMitStore(<OverviewPage />, { auth: MIT_FIRMA });
 
-    expect(await screen.findByText("1 Transfer wartet auf euch")).toBeInTheDocument();
+    expect(
+      await screen.findByText("1 Transfer wartet auf euch"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Für dein Unternehmen")).toBeInTheDocument();
     expect(screen.queryByText("Für dich")).toBeNull();
   });
@@ -135,7 +160,12 @@ describe("OverviewPage", () => {
   it("gibt ein unvollständiges Bild zu, statt zu behaupten, nichts warte", async () => {
     // „Nichts liegt an" ist die eine Aussage, die nach einer fehlgeschlagenen
     // Abfrage falsch sein kann — und sie wiegt in Sicherheit.
-    antworten({ "/market/me/requests": { status: 503, body: { detail: "Ledger schweigt" } } });
+    antworten({
+      "/market/me/requests": {
+        status: 503,
+        body: { detail: "Ledger schweigt" },
+      },
+    });
 
     renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
 
@@ -146,13 +176,18 @@ describe("OverviewPage", () => {
   it("benutzt Singular und Plural, weil ein '1 Gespräche' nach kaputt aussieht", async () => {
     antworten({
       "/transfers/me": {
-        body: [vorgang({ status: "interested" }), vorgang({ status: "offered" })],
+        body: [
+          vorgang({ status: "interested" }),
+          vorgang({ status: "offered" }),
+        ],
       },
     });
 
     renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
 
-    expect(await screen.findByText("2 Gespräche warten auf dich")).toBeInTheDocument();
+    expect(
+      await screen.findByText("2 Gespräche warten auf dich"),
+    ).toBeInTheDocument();
   });
 
   /**

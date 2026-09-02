@@ -50,8 +50,16 @@ export function JobApplyPage() {
 
   const gueltig = typeof jobId === "string" && jobId !== "";
 
-  const stelle = useAsync((signal) => getJob(jobId as string, signal), [jobId], gueltig);
-  const profil = useAsync((signal) => getMyProfile(signal), [subjectId], angemeldet);
+  const stelle = useAsync(
+    (signal) => getJob(jobId as string, signal),
+    [jobId],
+    gueltig,
+  );
+  const profil = useAsync(
+    (signal) => getMyProfile(signal),
+    [subjectId],
+    angemeldet,
+  );
 
   const zurueck = (
     <Link component={RouterLink} to="/jobs" variant="body2">
@@ -93,7 +101,9 @@ export function JobApplyPage() {
         <Box sx={{ mb: 2 }}>{zurueck}</Box>
         <Card>
           <CardContent>
-            <Typography>Sie wurde zurückgezogen, oder es gab sie nie.</Typography>
+            <Typography>
+              Sie wurde zurückgezogen, oder es gab sie nie.
+            </Typography>
           </CardContent>
         </Card>
       </PageShell>
@@ -128,7 +138,8 @@ export function JobApplyPage() {
         <Card>
           <CardContent>
             <Typography sx={{ mb: 2 }}>
-              Zum Bewerben brauchst du ein Konto — danach geht es hierher zurück.
+              Zum Bewerben brauchst du ein Konto — danach geht es hierher
+              zurück.
             </Typography>
             {/* Erst merken, dann wechseln. Wer über die Kopfzeile zur Anmeldung
                 geht, hat keine Absicht geäußert und wird auch nicht
@@ -208,8 +219,8 @@ export function JobApplyPage() {
 
             {/* Das Profil steht bewusst NICHT zur Wahl. */}
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Dein Profil geht immer mit — ohne es wäre es keine Bewerbung. Was du zusätzlich
-              freigibst, entscheidest du:
+              Dein Profil geht immer mit — ohne es wäre es keine Bewerbung. Was
+              du zusätzlich freigibst, entscheidest du:
             </Typography>
 
             <Box sx={{ display: "flex", flexDirection: "column", mb: 2 }}>
@@ -224,7 +235,10 @@ export function JobApplyPage() {
               />
               <FormControlLabel
                 control={
-                  <Checkbox checked={arbeiten} onChange={(e) => setArbeiten(e.target.checked)} />
+                  <Checkbox
+                    checked={arbeiten}
+                    onChange={(e) => setArbeiten(e.target.checked)}
+                  />
                 }
                 label="Meine Arbeiten"
               />

@@ -15,16 +15,23 @@ import { JobsPage } from "./JobsPage";
  */
 type Antwort = { status?: number; body?: unknown };
 
-function stubFetch(routen: (url: string, init: RequestInit | undefined) => Antwort) {
-  const spion = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input.toString();
-    const antwort = routen(url, init);
-    const status = antwort.status ?? 200;
-    return new Response(status === 204 ? null : JSON.stringify(antwort.body ?? null), {
-      status,
-      headers: { "content-type": "application/json" },
-    });
-  });
+function stubFetch(
+  routen: (url: string, init: RequestInit | undefined) => Antwort,
+) {
+  const spion = vi.fn(
+    async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const antwort = routen(url, init);
+      const status = antwort.status ?? 200;
+      return new Response(
+        status === 204 ? null : JSON.stringify(antwort.body ?? null),
+        {
+          status,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    },
+  );
   vi.stubGlobal("fetch", spion);
   return spion;
 }
@@ -45,7 +52,11 @@ const STELLE = {
 
 const SITZUNG = {
   status: "authenticated" as const,
-  session: { userId: "33333333-3333-4333-8333-333333333333", email: "a@b.de", tenantId: null },
+  session: {
+    userId: "33333333-3333-4333-8333-333333333333",
+    email: "a@b.de",
+    tenantId: null,
+  },
 };
 
 beforeEach(() => {
@@ -60,7 +71,8 @@ afterEach(() => {
 describe("JobsPage", () => {
   it("fragt /jobs und zeigt, was das Unternehmen geschrieben hat", async () => {
     const spion = stubFetch((url) => {
-      if (url.includes("/jobs")) return { body: { items: [STELLE], next_cursor: null } };
+      if (url.includes("/jobs"))
+        return { body: { items: [STELLE], next_cursor: null } };
       if (url.includes("/companies/")) {
         return {
           body: {
@@ -82,7 +94,9 @@ describe("JobsPage", () => {
 
     expect(await screen.findByText("Backend-Entwicklung")).toBeInTheDocument();
     expect(await screen.findByText("Acme GmbH")).toBeInTheDocument();
-    expect(spion.mock.calls.some(([url]) => String(url).endsWith("/jobs"))).toBe(true);
+    expect(
+      spion.mock.calls.some(([url]) => String(url).endsWith("/jobs")),
+    ).toBe(true);
   });
 
   it("schickt leere Filter gar nicht erst mit — ein `remote=` fände nichts", async () => {
@@ -98,7 +112,9 @@ describe("JobsPage", () => {
       const urls = spion.mock.calls.map(([url]) => String(url));
       expect(urls.some((url) => url.includes("q=Python"))).toBe(true);
     });
-    expect(spion.mock.calls.every(([url]) => !String(url).includes("remote="))).toBe(true);
+    expect(
+      spion.mock.calls.every(([url]) => !String(url).includes("remote=")),
+    ).toBe(true);
   });
 
   it("nennt beim leeren Ergebnis, dass nichts gefunden wurde", async () => {
@@ -109,13 +125,17 @@ describe("JobsPage", () => {
 
   it("zeigt ohne Anmeldung keine Passung — und behauptet damit keine Lücke", async () => {
     stubFetch((url) =>
-      url.includes("/jobs") ? { body: { items: [STELLE], next_cursor: null } } : { status: 404 }
+      url.includes("/jobs")
+        ? { body: { items: [STELLE], next_cursor: null } }
+        : { status: 404 },
     );
 
     renderMitStore(<JobsPage />);
     await screen.findByText("Backend-Entwicklung");
 
-    expect(screen.queryByText(/von 3 genannten Fähigkeiten/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/von 3 genannten Fähigkeiten/),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/0 von 3/)).not.toBeInTheDocument();
     // Die Fähigkeiten selbst stehen trotzdem da — sie gehören der Anzeige.
     expect(screen.getByText("Python")).toBeInTheDocument();
@@ -136,16 +156,22 @@ describe("JobsPage", () => {
           },
         };
       }
-      if (url.includes("/jobs")) return { body: { items: [STELLE], next_cursor: null } };
+      if (url.includes("/jobs"))
+        return { body: { items: [STELLE], next_cursor: null } };
       return { status: 404 };
     });
 
     renderMitStore(<JobsPage />, { auth: SITZUNG });
 
-    expect(await screen.findByText("Du hast 2 von 3 genannten Fähigkeiten:")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Du hast 2 von 3 genannten Fähigkeiten:"),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/%/)).not.toBeInTheDocument();
     // Gleichheit, nicht Enthaltensein: "Go" bleibt eine Lücke.
-    expect(screen.getByText("Go").closest("li")).toHaveAttribute("data-match", "missing");
+    expect(screen.getByText("Go").closest("li")).toHaveAttribute(
+      "data-match",
+      "missing",
+    );
   });
 
   it("sagt „trage Fähigkeiten ein“ statt „0 von 3“, wenn nichts eingetragen ist", async () => {
@@ -163,35 +189,43 @@ describe("JobsPage", () => {
           },
         };
       }
-      if (url.includes("/jobs")) return { body: { items: [STELLE], next_cursor: null } };
+      if (url.includes("/jobs"))
+        return { body: { items: [STELLE], next_cursor: null } };
       return { status: 404 };
     });
 
     renderMitStore(<JobsPage />, { auth: SITZUNG });
 
-    expect(await screen.findByText(/Trage Fähigkeiten in deinem/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Trage Fähigkeiten in deinem/),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/0 von 3/)).not.toBeInTheDocument();
   });
 
   it("merkt sich beim Bewerben ohne Konto nur die UUID, nie einen Pfad", async () => {
     stubFetch((url) =>
-      url.includes("/jobs") ? { body: { items: [STELLE], next_cursor: null } } : { status: 404 }
+      url.includes("/jobs")
+        ? { body: { items: [STELLE], next_cursor: null } }
+        : { status: 404 },
     );
 
     renderMitStore(<JobsPage />);
     await screen.findByText("Backend-Entwicklung");
     await userEvent.click(screen.getByRole("button", { name: "Bewerben" }));
 
-    const gemerkt = JSON.parse(window.localStorage.getItem("wt.gemerkte-stelle") ?? "{}") as Record<
-      string,
-      unknown
-    >;
+    const gemerkt = JSON.parse(
+      window.localStorage.getItem("wt.gemerkte-stelle") ?? "{}",
+    ) as Record<string, unknown>;
     expect(gemerkt.jobId).toBe(STELLE.id);
     expect(JSON.stringify(gemerkt)).not.toContain("/");
   });
 
   it("blättert weiter und behält die vorige Seite", async () => {
-    const zweite = { ...STELLE, id: "44444444-4444-4444-8444-444444444444", title: "Zweite Stelle" };
+    const zweite = {
+      ...STELLE,
+      id: "44444444-4444-4444-8444-444444444444",
+      title: "Zweite Stelle",
+    };
     stubFetch((url) => {
       if (!url.includes("/jobs")) return { status: 404 };
       return url.includes("cursor=n2")
@@ -210,13 +244,19 @@ describe("JobsPage", () => {
   it("zeigt einen gescheiterten Abruf als Fehler, nicht als leere Liste", async () => {
     stubFetch(() => ({
       status: 500,
-      body: { title: "Kaputt", detail: "Es ging schief.", correlationId: "abc-123" },
+      body: {
+        title: "Kaputt",
+        detail: "Es ging schief.",
+        correlationId: "abc-123",
+      },
     }));
 
     renderMitStore(<JobsPage />);
 
     expect(await screen.findByText("Es ging schief.")).toBeInTheDocument();
-    expect(screen.queryByText("Dazu wurde nichts gefunden.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Dazu wurde nichts gefunden."),
+    ).not.toBeInTheDocument();
     // Die Korrelationskennung ist der einzige Faden zurück durch alle Dienste.
     expect(screen.getByText(/abc-123/)).toBeInTheDocument();
   });

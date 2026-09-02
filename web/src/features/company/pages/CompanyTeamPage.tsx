@@ -7,7 +7,11 @@ import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
-import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  EmptyBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import { useHandelnder } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -40,13 +44,13 @@ export function CompanyTeamPage() {
   const mitglieder = useAsync(
     (signal) => listMembers(tenantId as string, signal),
     [tenantId],
-    fuerFirma
+    fuerFirma,
   );
 
   const einladungen = useAsync(
     (signal) => listInvitations(tenantId as string, signal),
     [tenantId],
-    fuerFirma
+    fuerFirma,
   );
 
   if (!fuerFirma) {
@@ -55,8 +59,8 @@ export function CompanyTeamPage() {
         <Card>
           <CardContent>
             <Typography>
-              Die Mannschaft sieht nur, wer für ein Unternehmen handelt. Wechsle oben auf ein
-              Unternehmen.
+              Die Mannschaft sieht nur, wer für ein Unternehmen handelt. Wechsle
+              oben auf ein Unternehmen.
             </Typography>
           </CardContent>
         </Card>
@@ -65,7 +69,9 @@ export function CompanyTeamPage() {
   }
 
   const liste = mitglieder.data?.ok ? mitglieder.data.members : [];
-  const meineRolle = liste.find((eintrag: CompanyMember) => eintrag.user_id === subjectId)?.role;
+  const meineRolle = liste.find(
+    (eintrag: CompanyMember) => eintrag.user_id === subjectId,
+  )?.role;
   const istAdmin = meineRolle === "admin";
 
   const offene = einladungen.data?.ok ? einladungen.data.invitations : [];
@@ -91,12 +97,16 @@ export function CompanyTeamPage() {
       title="Mannschaft"
       narrow
       lead={
-        "Wer hier steht, kann für das Unternehmen handeln — Profile sehen, Lebensläufe anfragen. "
-        + "Administratoren dürfen außerdem einladen."
+        "Wer hier steht, kann für das Unternehmen handeln — Profile sehen, Lebensläufe anfragen. " +
+        "Administratoren dürfen außerdem einladen."
       }
       actions={
         istAdmin ? (
-          <Button component={RouterLink} to="/company/team/invite" variant="contained">
+          <Button
+            component={RouterLink}
+            to="/company/team/invite"
+            variant="contained"
+          >
             Einladen
           </Button>
         ) : undefined
@@ -116,14 +126,26 @@ export function CompanyTeamPage() {
 
           {/* Der LADEZUSTAND fehlte im alten Code, und die Karte blieb
               währenddessen leer. */}
-          {mitglieder.pending ? <LoadingBlock label="Mitglieder werden geladen…" /> : null}
+          {mitglieder.pending ? (
+            <LoadingBlock label="Mitglieder werden geladen…" />
+          ) : null}
 
           {mitglieder.data !== null && !mitglieder.data.ok ? (
             <Alert severity="error">{mitglieder.data.error.detail}</Alert>
           ) : null}
 
           {liste.length > 0 ? (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <Box
+              component="ul"
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 1.5,
+                listStyle: "none",
+                p: 0,
+                m: 0,
+              }}
+            >
               {liste.map((eintrag: CompanyMember) => (
                 <Zeile
                   key={eintrag.user_id}
@@ -137,7 +159,9 @@ export function CompanyTeamPage() {
                         onClick={() => void entfernen(eintrag.user_id)}
                         disabled={laeuft}
                       >
-                        {eintrag.user_id === subjectId ? "Verlassen" : "Entfernen"}
+                        {eintrag.user_id === subjectId
+                          ? "Verlassen"
+                          : "Entfernen"}
                       </Button>
                     ) : undefined
                   }
@@ -154,7 +178,9 @@ export function CompanyTeamPage() {
             Offene Einladungen
           </Typography>
 
-          {einladungen.pending ? <LoadingBlock label="Einladungen werden geladen…" /> : null}
+          {einladungen.pending ? (
+            <LoadingBlock label="Einladungen werden geladen…" />
+          ) : null}
 
           {einladungen.data !== null && !einladungen.data.ok ? (
             <Alert severity="error">{einladungen.data.error.detail}</Alert>
@@ -206,7 +232,7 @@ function Zeile({
   aktion?: React.ReactNode;
 }) {
   return (
-    <Card variant="outlined">
+    <Card component="li" variant="outlined">
       <CardContent
         sx={{
           display: "flex",
@@ -222,7 +248,9 @@ function Zeile({
             {meta}
           </Typography>
         </Box>
-        {aktion !== undefined ? <Box sx={{ flexShrink: 0 }}>{aktion}</Box> : null}
+        {aktion !== undefined ? (
+          <Box sx={{ flexShrink: 0 }}>{aktion}</Box>
+        ) : null}
       </CardContent>
     </Card>
   );

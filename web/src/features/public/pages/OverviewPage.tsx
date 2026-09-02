@@ -8,7 +8,11 @@ import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink, Navigate } from "react-router-dom";
 
-import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  EmptyBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
 import { type Aufgabenstand, ladeAufgaben } from "../api/aufgaben";
 
@@ -75,7 +79,10 @@ function Liste({ titel, eintraege }: { titel: string; eintraege: Eintrag[] }) {
           {titel}
         </Typography>
         {/* Gezählt werden VORGÄNGE, nie Personen (ADR-0022/0026). */}
-        <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0, display: "grid", gap: 1 }}>
+        <Box
+          component="ul"
+          sx={{ listStyle: "none", m: 0, p: 0, display: "grid", gap: 1 }}
+        >
           {eintraege.map((eintrag) => (
             <Box component="li" key={eintrag.ziel}>
               <Link component={RouterLink} to={eintrag.ziel}>
@@ -153,8 +160,8 @@ export function OverviewPage() {
 
       {stand?.unvollstaendig === true ? (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          Ein Teil konnte nicht geladen werden. Was hier steht, ist deshalb womöglich
-          unvollständig.
+          Ein Teil konnte nicht geladen werden. Was hier steht, ist deshalb
+          womöglich unvollständig.
         </Alert>
       ) : null}
 
@@ -171,7 +178,9 @@ export function OverviewPage() {
       ) : null}
 
       {meine.length > 0 ? <Liste titel="Für dich" eintraege={meine} /> : null}
-      {firmen.length > 0 ? <Liste titel="Für dein Unternehmen" eintraege={firmen} /> : null}
+      {firmen.length > 0 ? (
+        <Liste titel="Für dein Unternehmen" eintraege={firmen} />
+      ) : null}
     </PageShell>
   );
 }

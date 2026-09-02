@@ -8,7 +8,12 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
-import { EmptyBlock, ErrorBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  EmptyBlock,
+  ErrorBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import type { CompanyProfile } from "../../company/api/companies";
 import {
   EMPLOYMENT_LABEL,
@@ -52,16 +57,20 @@ export function JobsPage() {
   const laden = useCallback(
     (cursor: string | undefined, signal: AbortSignal) =>
       searchJobs(applied, cursor, signal).then((ergebnis) =>
-        ergebnis.ok ? ergebnis : ({ ok: false, fehler: ergebnis } as const)
+        ergebnis.ok ? ergebnis : ({ ok: false, fehler: ergebnis } as const),
       ),
-    [applied]
+    [applied],
   );
   const liste = useSeiten<Job, SucheFehlschlag>(laden, JSON.stringify(applied));
 
   // Einmal für die ganze Seite, nicht je Stelle. Solange die Sitzung unbekannt
   // ist, wird NICHT gefragt — sonst liefe beim Kaltstart ein Abruf, dessen
   // Antwort feststeht (401), und die Passung flackerte kurz auf.
-  const profil = useAsync((signal) => getMyProfile(signal), [angemeldet], angemeldet);
+  const profil = useAsync(
+    (signal) => getMyProfile(signal),
+    [angemeldet],
+    angemeldet,
+  );
 
   /*
    * Drei Zustände, und die Unterscheidung trägt:
@@ -106,7 +115,9 @@ export function JobsPage() {
           <TextField
             label="Ort"
             value={form.location}
-            onChange={(event) => setForm({ ...form, location: event.target.value })}
+            onChange={(event) =>
+              setForm({ ...form, location: event.target.value })
+            }
           />
           {/* Native Auswahlfelder: MUIs Voreinstellung ist ein Listenfeld aus
               `div`s, das weder `selectOption` noch ein Screenreader als
@@ -115,8 +126,16 @@ export function JobsPage() {
             select
             label="Arbeitsform"
             value={form.remote}
-            slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
-            onChange={(event) => setForm({ ...form, remote: event.target.value as RemoteMode | "" })}
+            slotProps={{
+              select: { native: true },
+              inputLabel: { shrink: true },
+            }}
+            onChange={(event) =>
+              setForm({
+                ...form,
+                remote: event.target.value as RemoteMode | "",
+              })
+            }
           >
             <option value="">Egal</option>
             <option value="none">Vor Ort</option>
@@ -130,9 +149,15 @@ export function JobsPage() {
             select
             label="Beschäftigungsart"
             value={form.employment}
-            slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
+            slotProps={{
+              select: { native: true },
+              inputLabel: { shrink: true },
+            }}
             onChange={(event) =>
-              setForm({ ...form, employment: event.target.value as EmploymentType | "" })
+              setForm({
+                ...form,
+                employment: event.target.value as EmploymentType | "",
+              })
             }
           >
             <option value="">Egal</option>
@@ -148,7 +173,9 @@ export function JobsPage() {
       </Card>
 
       {/* Reihenfolge auf jeder Liste: lädt, dann Fehler, dann leer, dann Inhalt. */}
-      {liste.pending && liste.items.length === 0 ? <LoadingBlock label="Wird gesucht …" /> : null}
+      {liste.pending && liste.items.length === 0 ? (
+        <LoadingBlock label="Wird gesucht …" />
+      ) : null}
 
       {liste.fehler !== null ? <ErrorBlock error={liste.fehler.error} /> : null}
 
@@ -160,7 +187,10 @@ export function JobsPage() {
       ) : null}
 
       {liste.items.length > 0 ? (
-        <Box component="ul" sx={{ listStyle: "none", p: 0, m: 0, display: "grid", gap: 2 }}>
+        <Box
+          component="ul"
+          sx={{ listStyle: "none", p: 0, m: 0, display: "grid", gap: 2 }}
+        >
           {liste.items.map((job) => (
             <Box component="li" key={job.id}>
               <Card>
@@ -169,11 +199,18 @@ export function JobsPage() {
                     {job.title}
                   </Typography>
                   <Hiring profil={firmen[job.tenant_id]} />
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                    {job.location !== "" ? job.location : "Ort nicht angegeben"} ·{" "}
-                    {REMOTE_LABEL[job.remote]} · {EMPLOYMENT_LABEL[job.employment]}
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 1.5 }}
+                  >
+                    {job.location !== "" ? job.location : "Ort nicht angegeben"}{" "}
+                    · {REMOTE_LABEL[job.remote]} ·{" "}
+                    {EMPLOYMENT_LABEL[job.employment]}
                   </Typography>
-                  <Typography sx={{ whiteSpace: "pre-line" }}>{job.description}</Typography>
+                  <Typography sx={{ whiteSpace: "pre-line" }}>
+                    {job.description}
+                  </Typography>
                   <Requirements skills={job.skills} mine={meineSkills} />
 
                   {laedt ? null : angemeldet ? (
@@ -216,8 +253,13 @@ export function JobsPage() {
                       >
                         Bewerben
                       </Button>
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        Dafür brauchst du ein Konto — danach geht es direkt zur Bewerbung.
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mt: 1 }}
+                      >
+                        Dafür brauchst du ein Konto — danach geht es direkt zur
+                        Bewerbung.
                       </Typography>
                     </Box>
                   )}

@@ -20,22 +20,26 @@ describe("HomePage", () => {
   it("bietet zwei Wege hinein, und beide tragen ihre Absicht", () => {
     renderMitStore(<HomePage />);
 
-    expect(screen.getByRole("link", { name: "Als Arbeitnehmer starten" })).toHaveAttribute(
-      "href",
-      "/register"
-    );
-    expect(screen.getByRole("link", { name: "Als Unternehmen entdecken" })).toHaveAttribute(
-      "href",
-      "/register?as=company"
-    );
+    expect(
+      screen.getByRole("link", { name: "Als Arbeitnehmer starten" }),
+    ).toHaveAttribute("href", "/register");
+    expect(
+      screen.getByRole("link", { name: "Als Unternehmen entdecken" }),
+    ).toHaveAttribute("href", "/register?as=company");
   });
 
   it("nennt seine drei Grundlagen", () => {
     renderMitStore(<HomePage />);
 
-    expect(screen.getByRole("heading", { name: "Du entscheidest" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Echte Nachweise" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Human in control" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Du entscheidest" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Echte Nachweise" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Human in control" }),
+    ).toBeInTheDocument();
   });
 
   // Die Abschnitte tragen Namen, damit ein Screenreader sie in der
@@ -71,6 +75,8 @@ describe("HomePage", () => {
     renderMitStore(<HomePage />, { auth: { status: "unknown" } });
 
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
-    expect(screen.queryByRole("link", { name: "Als Arbeitnehmer starten" })).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: "Als Arbeitnehmer starten" }),
+    ).toBeNull();
   });
 });
