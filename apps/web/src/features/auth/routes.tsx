@@ -2,6 +2,7 @@ import type { RouteObject } from "react-router-dom";
 
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { LogoutPage } from "./pages/LogoutPage";
 import { VerifyPage } from "./pages/VerifyPage";
 
 /**
@@ -12,11 +13,12 @@ import { VerifyPage } from "./pages/VerifyPage";
  * dazwischen steht als Reiter AUF der Seite — nicht in der Kopfzeile, wo er
  * vorher je nach Seite verschwand.
  *
- * NOCH NICHT migriert: `/invitation` und `/logout`. Sie stehen in
- * `docs/uebergabe/frontend-public-auth.md` als offene Punkte.
+ * NOCH NICHT migriert: `/invitation`. Steht in
+ * `docs/uebergabe/frontend-public-auth.md` als offener Punkt.
  */
 export const authRoutes: RouteObject[] = [
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
   { path: "/verify", element: <VerifyPage /> },
+  { path: "/logout", element: <LogoutPage /> },
 ];
