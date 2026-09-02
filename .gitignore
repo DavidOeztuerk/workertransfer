@@ -35,9 +35,6 @@ var/
 .screenshots/
 
 # .NET
-**/bin/
-**/obj/
+**/bin*
+**/obj*
 **/TestResults/
-# `dotnet ef` legt auf macOS ein Verzeichnis an, dessen Name einen echten
-# Rückstrich enthält — `bin\Debug`. Das trifft die Regel darüber nicht.
-**/bin\\Debug/

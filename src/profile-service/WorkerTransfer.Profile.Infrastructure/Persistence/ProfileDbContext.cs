@@ -104,12 +104,38 @@ public sealed class ProfileDbContext(DbContextOptions<ProfileDbContext> options)
     /// <summary>Die Prüfspur.</summary>
     public DbSet<Pruefzeile> Pruefeintraege => Set<Pruefzeile>();
 
+    /// <summary>Die Namen der Postgres-Aufzählungen dieses Dienstes.</summary>
+    /// <remarks>
+    /// Als Konstante und nicht als Zeichenkette an der Aufrufstelle: der Name
+    /// steht in der Datenbank und in der Wanderung, und zwei Schreibweisen
+    /// desselben Namens fallen erst beim ersten Einfügen auf.
+    /// </remarks>
+    public static class Enumnamen
+    {
+        /// <summary>Hinter <c>audit_events.action</c>.</summary>
+        public const string Pruefhandlung = "pruef_handlung";
+    }
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
-        modelBuilder.HasPostgresEnum<Pruefhandlung>("pruef_handlung");
+        // `name:` ausgeschrieben, und das ist keine Zierde: die generische
+        // Überladung nimmt ihr ERSTES Argument als SCHEMA, nicht als Typnamen.
+        // Positionell geschrieben legte diese Zeile ein Schema `pruef_handlung`
+        // an und darin einen Typ `pruefhandlung` — eine Waise, die niemand
+        // benutzt, denn die Wanderung hatte den echten Typ längst als
+        // `public.pruef_handlung` angelegt. Gemessen an der laufenden Datenbank:
+        //
+        //   nspname        | typname
+        //   public         | pruef_handlung     <- die benutzte
+        //   pruef_handlung | pruefhandlung      <- die Waise
+        //
+        // Folgenlos im Betrieb, aber sie entsteht bei JEDER Wanderung in JEDER
+        // Umgebung neu. resume-service schreibt es seit jeher benannt; nur
+        // dieser Dienst tat es nicht.
+        modelBuilder.HasPostgresEnum<Pruefhandlung>(name: Enumnamen.Pruefhandlung);
 
         modelBuilder.Entity<ProfilZeile>(zeile =>
         {
