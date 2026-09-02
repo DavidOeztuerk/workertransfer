@@ -15,9 +15,12 @@ namespace WorkerTransfer.Profile.Domain.Pruefspur;
 /// im selben Augenblick erlaubt hat.
 /// </para>
 /// <para>
-/// Jedes Mitglied wird als <c>snake_case</c> seines Namens gespeichert; ein
-/// Test hält alle drei gegen die echte Spalte, weil diese Regel Npgsqls ist und
-/// nicht unsere.
+/// Jedes Mitglied wird als <c>snake_case</c> seines Namens gespeichert — das
+/// ist Npgsqls Regel und nicht unsere. <b>Ein Test dafür gibt es hier nicht</b>,
+/// anders als in identity-service (<c>SpaltenetikettenTests</c>); dieser
+/// Kommentar behauptete lange einen, den niemand geschrieben hatte. Wer ein
+/// viertes Mitglied ergänzt, ohne eine Wanderung dafür anzulegen, merkt es
+/// deshalb erst beim ersten Einfügen.
 /// </para>
 /// </remarks>
 public enum Pruefhandlung
