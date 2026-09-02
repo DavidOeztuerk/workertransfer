@@ -46,7 +46,7 @@ test("eine Anfrage erreicht die Person per Mail — und die Mail verrät nicht, 
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
-  await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
+  await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   // Ab hier zählt nur, was nach diesem Zeitpunkt zugestellt wird — die
   // Bestätigungsmail von vorhin ginge sonst als Treffer durch.
@@ -128,7 +128,7 @@ test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser })
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
-  await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
+  await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   const since = Date.now();
   await recruiter.goto("/candidates");

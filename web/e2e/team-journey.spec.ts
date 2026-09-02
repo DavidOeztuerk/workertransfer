@@ -28,7 +28,7 @@ skipWithoutStack();
 async function actAsCompany(page: import("@playwright/test").Page, name: string) {
   await page.goto("/");
   await page.getByLabel(/Handeln als/i).selectOption({ label: name });
-  await expect(page.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 }
 
 test("eine Einladung lässt genau die eingeladene Person herein", async ({ browser }) => {
