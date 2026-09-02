@@ -112,6 +112,39 @@ public static class Dienstgrundlage
                     + "Modul stellt Speicher nur bereit, und keine "
                     + "Einwilligungsabfrage ist ein ICacheableQuery")
 
+                // Communication und Encryption stehen ohnehin nicht in der
+                // Vorgabe — hier genannt, weil ein Grund, der nur in einem
+                // Commit-Text steht, beim naechsten Leser nicht existiert.
+                // Girders eigener Kommentar sagt es: "Silence is not a
+                // decision."
+                //
+                // Communication: gemessen in H2. Die Statuscodes sind heil (ein
+                // 404 kommt als 404 an, EIN Aufruf am Ziel, keine drei). Es
+                // verlangt aber `IEventBus`, und den liefert allein
+                // Girder.Messaging.MassTransit — also einen Broker, den wir
+                // bewusst nicht betreiben. Dazu schickt `UseGateway = true` per
+                // Vorgabe JEDEN Aufruf an den Dienst "gateway", und
+                // `EnableResponseCaching = true` speichert jede GET-Antwort
+                // fuenf Minuten. Und der Grund, der den Umstieg attraktiv
+                // machte, ist erledigt: die Korrelationskette haengt seit 4.0.0
+                // an jedem HttpClient der Fabrik.
+                .Without(
+                    GirderModule.Communication,
+                    "verlangt IEventBus und damit einen Broker, den wir nicht "
+                    + "betreiben; die Korrelationskette bekommen wir seit 4.0.0 "
+                    + "ohne ihn")
+
+                // Encryption: verlangt `IDataEncryptionService` UND
+                // `IMasterKeyProvider`, beide aus Girder.Redis oder einem
+                // Geheimnisspeicher. Wir verschluesseln heute auf Feldebene
+                // nichts. Wer damit anfaengt, entscheidet zuerst, WO der
+                // Hauptschluessel liegt — und das ist dieselbe Frage wie bei
+                // SecretManagement, nicht eine Zeile hier.
+                .Without(
+                    GirderModule.Encryption,
+                    "verschluesselt wird heute auf Feldebene nichts; wer damit "
+                    + "anfaengt, entscheidet zuerst, wo der Hauptschluessel liegt")
+
                 // ResourceAuthorization bleibt draussen (seit 4.0.2 ein eigenes
                 // Modul): Ressourcenrichtlinien ruft kein Endpunkt hier, und es
                 // verlangt einen Speicher. `Authorization` selbst ist IN der
