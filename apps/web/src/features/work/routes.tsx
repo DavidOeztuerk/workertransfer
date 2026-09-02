@@ -2,6 +2,7 @@ import type { RouteObject } from "react-router-dom";
 
 import { ApplicationsPage } from "./pages/ApplicationsPage";
 import { JobsPage } from "./pages/JobsPage";
+import { MarketPage } from "./pages/MarketPage";
 
 /**
  * Die Routen dessen, was eine Person tut.
@@ -14,4 +15,5 @@ import { JobsPage } from "./pages/JobsPage";
 export const workRoutes: RouteObject[] = [
   { path: "/jobs", element: <JobsPage /> },
   { path: "/applications", element: <ApplicationsPage /> },
+  { path: "/market", element: <MarketPage /> },
 ];
