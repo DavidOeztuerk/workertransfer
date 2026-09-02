@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 
 import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
@@ -31,6 +30,14 @@ export function CompanySwitcher() {
   return (
     <TextField
       select
+      // NATIV, und das ist keine Nebensache: MUIs Vorgabe rendert ein `div`
+      // mit `role="button"`, das ein verstecktes Feld fuellt. Ein natives
+      // `<select>` ist das, was ein Screenreader als Auswahlliste ansagt, was
+      // die Tastatur ohne Zusatzcode bedient, und was `selectOption` in den
+      // E2E-Reisen findet. Die MUI-Fassung sieht nur so aus.
+      // `inputLabel.shrink`: ein natives Feld zeigt seinen Wert sofort, die
+      // schwebende Beschriftung laege sonst darueber.
+      slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
       size="small"
       label="Handeln als"
       value={tenantId ?? ""}
@@ -40,13 +47,13 @@ export function CompanySwitcher() {
       }}
       sx={{ minWidth: 200, display: { xs: "none", md: "block" } }}
     >
-      <MenuItem value="" disabled>
+      <option value="" disabled>
         Ich selbst (Abmelden nötig)
-      </MenuItem>
+      </option>
       {memberships.map((firma) => (
-        <MenuItem key={firma.id} value={firma.id}>
+        <option key={firma.id} value={firma.id}>
           {firma.name}
-        </MenuItem>
+        </option>
       ))}
     </TextField>
   );

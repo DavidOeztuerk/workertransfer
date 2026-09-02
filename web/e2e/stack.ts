@@ -8,7 +8,7 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-export const WEB_URL = process.env.E2E_WEB_URL ?? "http://localhost:5173";
+export const WEB_URL = process.env.E2E_WEB_URL ?? "http://localhost:8090";
 export const IDENTITY_URL = process.env.E2E_IDENTITY_URL ?? "http://localhost:8001";
 export const CONSENT_URL = process.env.E2E_CONSENT_URL ?? "http://localhost:8002";
 export const PROFILE_URL = process.env.E2E_PROFILE_URL ?? "http://localhost:8003";
@@ -18,10 +18,26 @@ export const JOBS_URL = process.env.E2E_JOBS_URL ?? "http://localhost:8006";
 export const APPLICATIONS_URL = process.env.E2E_APPLICATIONS_URL ?? "http://localhost:8007";
 export const COMPANIES_URL = process.env.E2E_COMPANIES_URL ?? "http://localhost:8008";
 export const TRANSFER_URL = process.env.E2E_TRANSFER_URL ?? "http://localhost:8009";
-export const GITHUB_URL = process.env.E2E_GITHUB_URL ?? "http://localhost:8010";
+// 8011, nicht 8010: dort hoert notification-service. Die Verwechslung stand
+// hier monatelang — die Probe fuer "github-service" fragte damit einen anderen
+// Dienst, und eine tote github-service sah gesund aus. Umgekehrt wurde
+// notification-service ueberhaupt nie geprueft.
+export const GITHUB_URL = process.env.E2E_GITHUB_URL ?? "http://localhost:8011";
+export const NOTIFICATION_URL = process.env.E2E_NOTIFICATION_URL ?? "http://localhost:8010";
+
+/**
+ * Das Gateway — der einzige Weg, den die Auslieferung anbietet.
+ *
+ * Die Reisen fuhren frueher gegen den Vite-Server auf 5173, also am Gateway
+ * vorbei. Genau deshalb fiel monatelang niemandem auf, dass die Oberflaeche
+ * DURCH das Gateway gar nicht laedt: es reichte das HTML durch, aber keinen
+ * ihrer Bestandteile. Wer den Weg nicht faehrt, den er ausliefert, prueft eine
+ * Anwendung, die es so nicht gibt.
+ */
+export const GATEWAY_URL = process.env.E2E_GATEWAY_URL ?? "http://localhost:8090";
 export const MAILPIT_URL = process.env.E2E_MAILPIT_URL ?? "http://localhost:8025";
 
-const REQUIRED: ReadonlyArray<readonly [string, string]> = [
+const REQUIRED: ReadonlyArray<readonly [string, string, Record<string, string>?]> = [
   ["web", WEB_URL],
   ["identity-service", `${IDENTITY_URL}/health/live`],
   ["consent-service", `${CONSENT_URL}/health/live`],
@@ -101,12 +117,12 @@ async function mailpit<T>(path: string): Promise<T | null> {
   }
 }
 
-async function reachable(url: string): Promise<boolean> {
+async function reachable(url: string, koepfe?: Record<string, string>): Promise<boolean> {
   for (let attempt = 1; attempt <= PROBE_ATTEMPTS; attempt += 1) {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-      const res = await fetch(url, { signal: controller.signal });
+      const res = await fetch(url, { signal: controller.signal, headers: koepfe });
       clearTimeout(timer);
       if (res.ok) return true;
     } catch {
@@ -129,8 +145,8 @@ async function reachable(url: string): Promise<boolean> {
  */
 export async function missingService(): Promise<string | null> {
   if (stackIsUp) return null;
-  for (const [name, url] of REQUIRED) {
-    if (!(await reachable(url))) {
+  for (const [name, url, koepfe] of REQUIRED) {
+    if (!(await reachable(url, koepfe))) {
       return name;
     }
   }

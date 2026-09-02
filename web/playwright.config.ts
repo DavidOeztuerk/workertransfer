@@ -50,7 +50,10 @@ export default defineConfig({
     // sagen wo. Genau so hat sich ein Navigationsfehler in dieser Reise sieben
     // Minuten lang versteckt.
     actionTimeout: 15_000,
-    baseURL: process.env.E2E_WEB_URL ?? "http://localhost:5173",
+    // Das GATEWAY, nicht der Vite-Server. Es ist der einzige Weg, den die
+    // Auslieferung anbietet — und der, auf dem die Oberflaeche monatelang gar
+    // nicht lud, weil niemand ihn fuhr.
+    baseURL: process.env.E2E_WEB_URL ?? "http://localhost:8090",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
