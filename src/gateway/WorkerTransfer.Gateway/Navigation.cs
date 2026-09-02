@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
 namespace WorkerTransfer.Gateway;
 
 /// <summary>Trennt „ein Mensch geht auf eine Seite" von „ein Programm holt Daten".</summary>
@@ -32,6 +35,78 @@ public static class Navigation
     public const string Dokument = "document";
 
     /// <summary>
+    /// Wofür der Browser sonst noch fragt, wenn er eine Seite zusammensetzt.
+    /// </summary>
+    /// <remarks>
+    /// <para>Ohne diese Liste kam die Seite an und blieb <strong>leer</strong>:
+    /// das Gateway lieferte das HTML, aber jedes <c>&lt;script src="/src/main.tsx"&gt;</c>
+    /// darin lief ins Leere. Gemessen im Browser — vier 404 für
+    /// <c>/@vite/client</c>, <c>/@react-refresh</c>, <c>/config.js</c> und
+    /// <c>/src/main.tsx</c>.</para>
+    ///
+    /// <para><strong>Warum eine Liste von Zwecken und keine von Pfaden.</strong>
+    /// Die naheliegende Antwort wären Routen für <c>/@vite/*</c>, <c>/src/*</c>,
+    /// <c>/node_modules/*</c>, <c>/assets/*</c> — also eine Aufzählung dessen,
+    /// was ein Bündler heute erzeugt. Die ist beim nächsten Werkzeugwechsel
+    /// falsch, und sie unterscheidet sich zwischen Entwicklungsserver und
+    /// gebautem Bündel. Der Kopf hier sagt stattdessen, <em>wofür</em> gefragt
+    /// wird, und das ändert sich nicht.</para>
+    ///
+    /// <para><strong>Und es trennt sauber von der API.</strong> Ein
+    /// <c>fetch()</c> schickt <c>empty</c>, steht also nicht auf dieser Liste
+    /// und bleibt bei den Diensten. Nur was der Browser <em>zum Zusammenbauen
+    /// einer Seite</em> holt, geht an die Oberfläche.</para>
+    ///
+    /// <para>Ein Fremder kann den Kopf fälschen und damit statische Dateien der
+    /// Oberfläche erreichen. Das ist kein Verlust: sie sind öffentlich, und wer
+    /// sie will, bekommt sie ohnehin.</para>
+    ///
+    /// <para><strong>Aber nur, wo kein Dienst den Pfad beansprucht.</strong> Ein
+    /// erster Anlauf schrieb jeden Bestandteil um — und schickte damit auch
+    /// <c>/jobs</c> an die Oberfläche, sobald jemand <c>Sec-Fetch-Dest: script</c>
+    /// mitgab. <c>Alles_andere_als_document_geht_an_den_Dienst</c> fiel darüber,
+    /// zu Recht: was ein Dienst beansprucht, gehört dem Dienst, egal wofür
+    /// gefragt wird. Nur ein Dokument gehört immer der Oberfläche, denn eine
+    /// Adresse wie <c>/jobs</c> ist auch eine Seite.</para>
+    /// </remarks>
+    public static readonly string[] Bestandteile =
+        ["script", "style", "image", "font", "worker"];
+
+    /// <summary>
+    /// Die ersten Wegabschnitte, die eine Route in <c>ocelot.json</c> beansprucht.
+    /// </summary>
+    /// <remarks>
+    /// Aus der Landkarte gelesen und nicht danebengeschrieben: eine zweite
+    /// Liste über dieselben Pfade geht beim ersten neuen Endpunkt auseinander.
+    /// </remarks>
+    public static HashSet<string> BeanspruchteAbschnitte(IConfiguration konfiguration)
+    {
+        ArgumentNullException.ThrowIfNull(konfiguration);
+
+        var abschnitte = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var route in konfiguration.GetSection("Routes").GetChildren())
+        {
+            var vorlage = route["UpstreamPathTemplate"];
+
+            if (string.IsNullOrEmpty(vorlage))
+            {
+                continue;
+            }
+
+            var erster = vorlage.Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+
+            // Ein Platzhalter beansprucht nichts Bestimmtes.
+            if (erster is not null && !erster.StartsWith('{'))
+            {
+                abschnitte.Add(erster);
+            }
+        }
+
+        return abschnitte;
+    }
+
+    /// <summary>
     /// Das Präfix, unter dem die Landkarte die Oberfläche führt.
     /// </summary>
     /// <remarks>
@@ -45,6 +120,9 @@ public static class Navigation
     {
         ArgumentNullException.ThrowIfNull(app);
 
+        var beansprucht = BeanspruchteAbschnitte(
+            app.ApplicationServices.GetRequiredService<IConfiguration>());
+
         return app.Use(async (context, weiter) =>
         {
             // Von außen mitgebracht darf das Präfix nicht sein: es ist eine
@@ -56,10 +134,18 @@ public static class Navigation
                 return;
             }
 
-            if (string.Equals(
-                    context.Request.Headers[Kopf].ToString(),
-                    Dokument,
-                    StringComparison.Ordinal))
+            var zweck = context.Request.Headers[Kopf].ToString();
+
+            var erster = context.Request.Path.Value?
+                .Split('/', StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault();
+
+            var derOberflaeche =
+                string.Equals(zweck, Dokument, StringComparison.Ordinal)
+                || (Bestandteile.Contains(zweck, StringComparer.Ordinal)
+                    && (erster is null || !beansprucht.Contains(erster)));
+
+            if (derOberflaeche)
             {
                 context.Request.Path = Praefix + context.Request.Path;
             }

@@ -108,6 +108,38 @@ public class LandkarteTests(Landschaft landschaft)
         dienst.Should().Be("jobs");
     }
 
+    /// <summary>
+    /// Auch die Bestandteile einer Seite finden die Oberfläche — sonst kommt
+    /// die Seite an und bleibt leer.
+    /// </summary>
+    /// <remarks>
+    /// <para><strong>Gemessen im Browser, nicht ausgedacht.</strong> Das Gateway
+    /// lieferte das HTML von <c>/verify</c>, aber jedes <c>&lt;script src&gt;</c>
+    /// darin lief ins Leere: vier 404 für <c>/@vite/client</c>,
+    /// <c>/@react-refresh</c>, <c>/config.js</c> und <c>/src/main.tsx</c>. Die
+    /// Navigationsstufe schrieb nur <em>Dokumente</em> auf das UI-Präfix um,
+    /// und ein Skript schickt <c>Sec-Fetch-Dest: script</c>.</para>
+    ///
+    /// <para><strong>Warum es niemand bemerkt hat:</strong> Playwright fährt
+    /// gegen <c>:5173</c>, also am Gateway vorbei. Über das Gateway hatte die
+    /// Oberfläche nie geladen — nur fällt das erst auf, wenn jemand
+    /// <c>:8090</c> im Browser öffnet. Und genau das ist der Weg, den das
+    /// Helm-Chart als einzigen anbietet.</para>
+    /// </remarks>
+    [Theory]
+    [InlineData("/@vite/client", "script")]
+    [InlineData("/@react-refresh", "script")]
+    [InlineData("/src/main.tsx", "script")]
+    [InlineData("/config.js", "script")]
+    [InlineData("/favicon.svg", "image")]
+    [InlineData("/assets/index-abc123.css", "style")]
+    public async Task Bestandteile_einer_Seite_finden_die_Oberflaeche(string pfad, string zweck)
+    {
+        var (dienst, _) = await landschaft.Frage(pfad, ("Sec-Fetch-Dest", zweck));
+
+        dienst.Should().Be("web");
+    }
+
     /// <summary>Die Oberfläche bekommt, was kein Dienst beansprucht.</summary>
     [Theory]
     [InlineData("/")]
