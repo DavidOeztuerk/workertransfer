@@ -62,7 +62,7 @@ test("Profil und Portfolio sind zwei getrennte Freigaben", async ({ browser }) =
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
-  await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
+  await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   // Das Profil ist da — die Arbeiten nicht. Genau das ist der Punkt: die
   // Profilfreigabe öffnet das Portfolio nicht.

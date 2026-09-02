@@ -38,7 +38,13 @@ export const GATEWAY_URL = process.env.E2E_GATEWAY_URL ?? "http://localhost:8090
 export const MAILPIT_URL = process.env.E2E_MAILPIT_URL ?? "http://localhost:8025";
 
 const REQUIRED: ReadonlyArray<readonly [string, string, Record<string, string>?]> = [
-  ["web", WEB_URL],
+  // Die Oberflaeche wird geprueft, WIE EIN BROWSER SIE HOLT: mit
+  // `Sec-Fetch-Dest: document`. Ohne den Kopf schreibt das Gateway den Pfad
+  // nicht auf die Oberflaeche um, Ocelot findet keine Route, und die Probe
+  // meldet die ganze Landschaft als unten — worauf sich alle zwanzig Reisen
+  // ueberspringen und der Lauf mit `exit 0` endet. Genau so ist er zweimal
+  // gruen gewesen, ohne eine einzige Reise gefahren zu sein.
+  ["web", WEB_URL, { "Sec-Fetch-Dest": "document" }],
   ["identity-service", `${IDENTITY_URL}/health/live`],
   ["consent-service", `${CONSENT_URL}/health/live`],
   ["profile-service", `${PROFILE_URL}/health/live`],
@@ -49,6 +55,8 @@ const REQUIRED: ReadonlyArray<readonly [string, string, Record<string, string>?]
   ["companies-service", `${COMPANIES_URL}/health/live`],
   ["transfer-service", `${TRANSFER_URL}/health/live`],
   ["github-service", `${GITHUB_URL}/health/live`],
+  ["notification-service", `${NOTIFICATION_URL}/health/live`],
+  ["gateway", `${GATEWAY_URL}/health/live`],
   ["mailpit", `${MAILPIT_URL}/api/v1/messages?limit=1`],
 ];
 
@@ -391,7 +399,7 @@ export async function login(page: Page, email: string): Promise<void> {
   // jetzt IM Menü und ist zugeklappt nicht sichtbar. Die Zusammenfassung gibt
   // es nur angemeldet und sie ist immer sichtbar — ein besseres Signal als ein
   // Eintrag, der hinter einem Aufklapper liegt.
-  const signedIn = page.locator("summary", { hasText: "Mein Konto" });
+  const signedIn = page.getByRole("button", { name: "Mein Konto" });
   const failure = page.getByRole("alert");
   try {
     await expect(signedIn.or(failure).first()).toBeVisible();
@@ -424,5 +432,5 @@ export async function login(page: Page, email: string): Promise<void> {
 export async function switchToCompany(page: Page, companyName: string): Promise<void> {
   await page.goto("/");
   await page.getByLabel(/Handeln als/i).selectOption({ label: companyName });
-  await expect(page.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 }

@@ -98,7 +98,8 @@ export function SiteHeader() {
           {angemeldet ? (
             <>
               <CompanySwitcher />
-              <AccountMenu alsFirma={alsFirma} />
+              {alsFirma ? <FirmenMenu /> : null}
+              <AccountMenu />
             </>
           ) : (
             // EIN Zugang, immer sichtbar — auch auf /login und /register.
@@ -143,8 +144,17 @@ function NavLink({
   );
 }
 
-/** Das eigene Konto — und, falls für eine Firma gehandelt wird, deren Bereiche. */
-function AccountMenu({ alsFirma }: { alsFirma: boolean }) {
+/**
+ * Das eigene Konto.
+ *
+ * <strong>Getrennt vom Firmenmenü, und das ist keine Ordnungsliebe.</strong>
+ * Hier stand beides zusammen, durch einen Trennstrich geschieden — kompakter,
+ * aber es verwischt genau die Grenze, um die sich diese Anwendung dreht: was
+ * jemand als PERSON tut, und was er FÜR EIN UNTERNEHMEN tut. Wer sein Profil
+ * freigibt, tut etwas anderes als wer Kandidatinnen ansieht, und die beiden
+ * gehören nicht in dieselbe Liste.
+ */
+function AccountMenu() {
   const [anker, setAnker] = useState<null | HTMLElement>(null);
 
   return (
@@ -176,16 +186,50 @@ function AccountMenu({ alsFirma }: { alsFirma: boolean }) {
         <Eintrag to="/my-data">Meine Daten</Eintrag>
         <Eintrag to="/settings">Einstellungen</Eintrag>
 
-        {alsFirma ? <Divider /> : null}
-        {alsFirma ? <Eintrag to="/candidates">Kandidatinnen</Eintrag> : null}
-        {alsFirma ? <Eintrag to="/company/jobs">Unsere Stellen</Eintrag> : null}
-        {alsFirma ? <Eintrag to="/company/transfers">Unsere Gespräche</Eintrag> : null}
-        {alsFirma ? <Eintrag to="/company/profile">Unternehmensprofil</Eintrag> : null}
-        {alsFirma ? <Eintrag to="/company/team">Team</Eintrag> : null}
-
         <Divider />
         <Eintrag to="/delete-account">Konto löschen</Eintrag>
         <Eintrag to="/logout">Abmelden</Eintrag>
+      </Menu>
+    </>
+  );
+}
+
+/**
+ * Was für ein Unternehmen getan wird — nur sichtbar, während dafür gehandelt
+ * wird.
+ *
+ * <strong>Es verbirgt, es schützt nicht.</strong> Ob jemand Kandidatinnen sehen
+ * oder eine Stelle veröffentlichen darf, entscheidet der Server je Anfrage. Wer
+ * die Adresse direkt tippt, bekommt dieselbe Antwort wie über dieses Menü.
+ */
+function FirmenMenu() {
+  const [anker, setAnker] = useState<null | HTMLElement>(null);
+
+  return (
+    <>
+      <Button
+        size="small"
+        endIcon={<ExpandMoreIcon />}
+        onClick={(event) => setAnker(event.currentTarget)}
+        aria-haspopup="menu"
+        aria-expanded={anker !== null}
+        sx={{ color: "text.secondary" }}
+      >
+        Unternehmen
+      </Button>
+      <Menu
+        anchorEl={anker}
+        open={anker !== null}
+        onClose={() => setAnker(null)}
+        onClick={() => setAnker(null)}
+        slotProps={{ paper: { sx: { minWidth: 232, mt: 1 } } }}
+      >
+        <Eintrag to="/candidates">Kandidatinnen</Eintrag>
+        <Eintrag to="/company/jobs">Unsere Stellen</Eintrag>
+        <Eintrag to="/company/transfers">Unsere Gespräche</Eintrag>
+        <Divider />
+        <Eintrag to="/company/profile">Unternehmensprofil</Eintrag>
+        <Eintrag to="/company/team">Team</Eintrag>
       </Menu>
     </>
   );

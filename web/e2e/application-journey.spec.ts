@@ -32,7 +32,7 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
   await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
-  await expect(recruiter.locator("summary", { hasText: "Unternehmen" })).toBeVisible();
+  await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
   await recruiter.goto("/company/jobs");
   await recruiter.getByLabel("Titel").fill(jobTitle);
   await recruiter.getByLabel(/Beschreibung/i).fill("Was zu tun ist.");
