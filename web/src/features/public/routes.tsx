@@ -1,7 +1,8 @@
 import type { RouteObject } from "react-router-dom";
 
+import { lazyRoute } from "../../shared/components/routing/lazyRoute";
+
 import { HomePage } from "./pages/HomePage";
-import { OverviewPage } from "./pages/OverviewPage";
 
 /**
  * Die Routen dieses Bereichs — angemeldet HIER, nicht in `core/router`.
@@ -17,5 +18,5 @@ import { OverviewPage } from "./pages/OverviewPage";
  */
 export const publicRoutes: RouteObject[] = [
   { index: true, element: <HomePage /> },
-  { path: "/overview", element: <OverviewPage /> },
+  { path: "/overview", element: lazyRoute(() => import("./pages/OverviewPage"), "OverviewPage") },
 ];

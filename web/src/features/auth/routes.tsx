@@ -1,10 +1,7 @@
 import type { RouteObject } from "react-router-dom";
 
-import { InvitationPage } from "./pages/InvitationPage";
-import { LoginPage } from "./pages/LoginPage";
-import { RegisterPage } from "./pages/RegisterPage";
-import { LogoutPage } from "./pages/LogoutPage";
-import { VerifyPage } from "./pages/VerifyPage";
+import { lazyRoute } from "../../shared/components/routing/lazyRoute";
+
 
 /**
  * Die Routen des Anmeldebereichs.
@@ -19,9 +16,9 @@ import { VerifyPage } from "./pages/VerifyPage";
  * das gerade gelungen ist.
  */
 export const authRoutes: RouteObject[] = [
-  { path: "/login", element: <LoginPage /> },
-  { path: "/register", element: <RegisterPage /> },
-  { path: "/verify", element: <VerifyPage /> },
-  { path: "/logout", element: <LogoutPage /> },
-  { path: "/invitation", element: <InvitationPage /> },
+  { path: "/login", element: lazyRoute(() => import("./pages/LoginPage"), "LoginPage") },
+  { path: "/register", element: lazyRoute(() => import("./pages/RegisterPage"), "RegisterPage") },
+  { path: "/verify", element: lazyRoute(() => import("./pages/VerifyPage"), "VerifyPage") },
+  { path: "/logout", element: lazyRoute(() => import("./pages/LogoutPage"), "LogoutPage") },
+  { path: "/invitation", element: lazyRoute(() => import("./pages/InvitationPage"), "InvitationPage") },
 ];

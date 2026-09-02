@@ -1,10 +1,7 @@
 import type { RouteObject } from "react-router-dom";
 
-import { ApplicationsPage } from "./pages/ApplicationsPage";
-import { JobApplyPage } from "./pages/JobApplyPage";
-import { JobsPage } from "./pages/JobsPage";
-import { MarketPage } from "./pages/MarketPage";
-import { TransfersPage } from "./pages/TransfersPage";
+import { lazyRoute } from "../../shared/components/routing/lazyRoute";
+
 
 /**
  * Die Routen dessen, was eine Person tut.
@@ -13,9 +10,9 @@ import { TransfersPage } from "./pages/TransfersPage";
  * Unternehmensprofil samt seiner Stellen und gehoert sachlich dorthin.
  */
 export const workRoutes: RouteObject[] = [
-  { path: "/jobs", element: <JobsPage /> },
-  { path: "/applications", element: <ApplicationsPage /> },
-  { path: "/market", element: <MarketPage /> },
-  { path: "/transfers", element: <TransfersPage /> },
-  { path: "/jobs/:jobId/apply", element: <JobApplyPage /> },
+  { path: "/jobs", element: lazyRoute(() => import("./pages/JobsPage"), "JobsPage") },
+  { path: "/applications", element: lazyRoute(() => import("./pages/ApplicationsPage"), "ApplicationsPage") },
+  { path: "/market", element: lazyRoute(() => import("./pages/MarketPage"), "MarketPage") },
+  { path: "/transfers", element: lazyRoute(() => import("./pages/TransfersPage"), "TransfersPage") },
+  { path: "/jobs/:jobId/apply", element: lazyRoute(() => import("./pages/JobApplyPage"), "JobApplyPage") },
 ];
