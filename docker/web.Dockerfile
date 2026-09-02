@@ -32,7 +32,6 @@ WORKDIR /app
 # not on every source edit.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/
-COPY packages/ui/package.json packages/ui/
 
 RUN pnpm install --frozen-lockfile
 
