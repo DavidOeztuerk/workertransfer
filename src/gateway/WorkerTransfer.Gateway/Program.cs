@@ -1,9 +1,5 @@
 using Girder.Abstractions.Caching;
-using Girder.Abstractions.Hosting;
 using Girder.InMemory.Caching;
-using Girder.Infrastructure.Builder;
-using Girder.Infrastructure.Extensions;
-using Girder.Infrastructure.Security.Headers;
 using Ocelot.DependencyInjection;
 using Ocelot.Middleware;
 using WorkerTransfer.Gateway;
@@ -30,24 +26,6 @@ builder.Services.AddOcelot(builder.Configuration);
 // `InMemoryRateLimitStore` zählt IM PROZESS. Das bindet das Gateway an
 // replicaCount: 1 — der Ausweg ist ein Registrierungswechsel auf
 // `RedisDistributedRateLimitStore`, kein Umbau.
-// Girder, aber nur EIN Modul.
-//
-// Das Gateway ruft `AddWorkerTransferDefaults` bewusst nicht: es ist kein
-// Dienst, es hat keine Datenbank, keine CQRS-Kette und prueft kein Token. Was
-// ihm bisher trotzdem fehlte, waren die Sicherheitskoepfe — gemessen: `GET
-// /health/live` direkt am Gateway kam ohne `X-Content-Type-Options`, ohne
-// `X-Frame-Options`, ohne CSP zurueck. Dieselbe Anfrage DURCHGEREICHT an einen
-// Dienst brachte alle mit, denn sie stammten vom Dienst und nie vom Gateway.
-//
-// Betroffen war alles, was das Gateway SELBST beantwortet: die Gesundheits-
-// proben und jede 429 der Bremse. Also ausgerechnet die Antworten, die ein
-// Aufrufer am ehesten zu sehen bekommt, ohne je einen Dienst erreicht zu haben.
-builder.Services.AddGirder(
-    builder.Configuration,
-    builder.Environment,
-    "gateway",
-    girder => girder.Use(GirderModule.SecurityHeaders));
-
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<IDistributedRateLimitStore, InMemoryRateLimitStore>();
 builder.Services.AddSingleton(
@@ -66,11 +44,6 @@ var app = builder.Build();
 //               können.
 //   Bremse      vor Navigation, weil Navigation den Pfad auf `/__ui/...`
 //               umschreibt. Danach träfe keine Regel mehr zu.
-// GANZ vorn, vor der Gesundheitsprobe: die Koepfe sollen auf JEDER Antwort
-// stehen, auch auf denen, die hier gleich enden. Eine Stufe, die eine Antwort
-// schreibt, kommt fuer sie zu spaet.
-app.UseSecurityHeaders();
-
 app.UseGesundheit();
 app.UseKorrelation();
 app.UseBremse();
