@@ -1,9 +1,11 @@
 import type { RouteObject } from "react-router-dom";
 
+import { CareerPage } from "./pages/CareerPage";
+
 /**
  * Die Routen dessen, was ein Unternehmen tut.
  *
- * <strong>Noch leer.</strong> Keine Seite dieses Bereichs ist migriert:
+ * <strong>Fast leer.</strong> Nur `/careers/<slug>` steht; es fehlen noch:
  * `/candidates`, `/company/jobs`, `/company/jobs/new`, `/company/team`
  * (+ `/invite`), `/company/profile`, `/company/transfers`.
  *
@@ -13,4 +15,6 @@ import type { RouteObject } from "react-router-dom";
  * nicht `/profiles` (ein absichtlich toter Präfix), und die alte Vorlage für
  * `/company/team` heisst `routes/team.tsx`, nicht `company-team.tsx`.
  */
-export const companyRoutes: RouteObject[] = [];
+export const companyRoutes: RouteObject[] = [
+  { path: "/careers/:slug", element: <CareerPage /> },
+];
