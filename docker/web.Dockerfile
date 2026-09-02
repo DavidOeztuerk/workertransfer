@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# The Vite dev server for apps/web. Debian-based rather than Alpine on purpose:
+# The Vite dev server for web/. Debian-based rather than Alpine on purpose:
 # esbuild and rollup ship platform-specific binaries, and the musl variants are
 # a recurring source of "works on my machine" in this exact spot.
 
@@ -30,15 +30,21 @@ WORKDIR /app
 
 # Manifests first: this layer only rebuilds when a dependency actually changes,
 # not on every source edit.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/web/package.json apps/web/
+# Nur das Manifest: diese Schicht baut neu, wenn sich eine Abhaengigkeit
+# aendert, nicht bei jeder Quelltextaenderung.
+#
+# Frueher standen hier drei Dateien, weil ein pnpm-Workspace zwei Pakete
+# koordinierte. Es gibt nur noch dieses eine — der Workspace ist damit weg, und
+# mit ihm turbo, die Wurzel-package.json und ein 400 MB grosses node_modules an
+# der Wurzel.
+COPY web/package.json web/pnpm-lock.yaml ./
 
 RUN pnpm install --frozen-lockfile
 
-COPY . /app
+COPY web/ /app
 
 EXPOSE 5173
 
 # --host 0.0.0.0: Vite binds to localhost by default, which inside a container
 # means "unreachable from the host" — the published port would answer nothing.
-CMD ["pnpm", "--filter", "@workertransfer/web", "dev", "--host", "0.0.0.0"]
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]

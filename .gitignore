@@ -14,7 +14,7 @@ node_modules/
 # Playwright-Artefakte: Traces und Screenshots eines Laufs, keine Quellen.
 test-results/
 playwright-report/
-.turbo/
+
 dist/
 build/
 *.egg-info/

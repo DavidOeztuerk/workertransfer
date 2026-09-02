@@ -351,8 +351,8 @@ services:
       # mehr; das Gateway trennt Seite von Ressource ueber Sec-Fetch-Dest.
       VITE_API_BASE_URL: http://localhost:8090
     volumes:
-      - ./apps/web:/app/apps/web
-      - ./packages/ui:/app/packages/ui
+      - ./web/src:/app/src
+      - ./web/public:/app/public
       - /app/node_modules
     ports:
       - "5173:5173"
