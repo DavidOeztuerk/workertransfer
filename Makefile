@@ -34,12 +34,12 @@ check-web:  # Frontend: TypeScript + Vitest + Buendeln.
 	@# `pnpm build` gehoert dazu. tsc und Vitest laufen beide NICHT ueber den
 	@# Bauweg; ein Fehler, der erst beim Buendeln auftritt, faellt sonst erst im
 	@# Bild auf — und das baut hier niemand nebenbei.
-	pnpm check
-	pnpm test
-	pnpm build
+	cd web && pnpm check
+	cd web && pnpm test
+	cd web && pnpm build
 
 test-web:  # Nur die Frontend-Reihe.
-	pnpm test
+	cd web && pnpm test
 
 validate:  # Wie check, aber laeuft durch und berichtet jeden roten Schritt.
 	./scripts/validate.sh

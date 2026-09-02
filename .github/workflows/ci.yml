@@ -74,15 +74,20 @@ jobs:
         with:
           node-version: ${{ env.NODE_MAJOR }}
           cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
+        working-directory: web
       - run: pnpm check
+        working-directory: web
       - run: pnpm test
+        working-directory: web
 
       # `pnpm build` gehoert dazu und ist nicht nur Kosmetik: tsc und Vitest
       # laufen beide nicht ueber den Bauweg, und ein Fehler, der erst beim
       # Buendeln auftritt, faellt sonst erst im Bild auf.
       - run: pnpm build
+        working-directory: web
 
   # --------------------------------------------------------------------------
   # DER JOB, DEN ES VORHER NICHT GAB.
@@ -227,7 +232,7 @@ jobs:
 
       # Das Oberflaechenbild getrennt: nginx braucht nichts von alledem. Es muss
       # sein index.html ausliefern UND config.js daneben — `vite build` backt
-      # VITE_* in das Buendel, deshalb loest apps/web/src/env.ts zur Laufzeit
+      # VITE_* in das Buendel, deshalb loest web/src/env.ts zur Laufzeit
       # ueber window.__WT_CONFIG__ auf. Fehlt die Datei, faellt das erst im
       # Cluster auf.
       - name: Die Oberflaeche liefert aus
@@ -328,16 +333,22 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_MAJOR }}
-          cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm check
-      - run: pnpm test
-
-      # `pnpm build` gehoert dazu und ist nicht nur Kosmetik: tsc und Vitest
-      # laufen beide nicht ueber den Bauweg, und ein Fehler, der erst beim
-      # Buendeln auftritt, faellt sonst erst im Bild auf.
-      - run: pnpm build
+      # HIER stand eine Kopie der Frontend-Folge (install, check, test, build) —
+      # also genau das, was `frontend-quality` ohnehin tut, und KEINE Pruefung.
+      #
+      # Sie ist ein Ueberbleibsel des Entdoppelns: die Datei definierte
+      # `dependency-audit` zweimal, und die beiden Fassungen waren nicht gleich.
+      # Die eine hatte DOTNET_CLI_UI_LANGUAGE, die andere diesen Schritt. Beim
+      # Aufloesen blieb die erste stehen — und damit fiel der pnpm-Teil des
+      # Jobs still aus, waehrend CLAUDE.md ihn weiter als seine Haelfte
+      # beschrieb. Ein Audit, das niemand ausfuehrt, ist schlechter als keines:
+      # es steht im Dokument und beruhigt.
+      - name: Frontend-Pakete pruefen
+        # `--prod`: was nur beim Bauen laeuft, erreicht keinen Browser.
+        # `moderate` als Schwelle, damit „low" nicht jede Woche blockiert.
+        run: pnpm audit --prod --audit-level moderate
+        working-directory: web
 
   # --------------------------------------------------------------------------
   # DER JOB, DEN ES VORHER NICHT GAB.

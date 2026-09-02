@@ -8,8 +8,6 @@ node_modules
 **/bin*
 **/obj*
 **/TestResults
-.turbo
-**/.turbo
 **/dist
 **/build
 **/*.egg-info
