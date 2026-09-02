@@ -3,14 +3,15 @@ import type { RouteObject } from "react-router-dom";
 import { CandidatesPage } from "./pages/CandidatesPage";
 import { CompanyJobNewPage } from "./pages/CompanyJobNewPage";
 import { CompanyJobsPage } from "./pages/CompanyJobsPage";
+import { CompanyTeamInvitePage } from "./pages/CompanyTeamInvitePage";
+import { CompanyTeamPage } from "./pages/CompanyTeamPage";
 import { CareerPage } from "./pages/CareerPage";
 
 /**
  * Die Routen dessen, was ein Unternehmen tut.
  *
  * <strong>Fast leer.</strong> Nur `/careers/<slug>` steht; es fehlen noch:
- * `/company/team`
- * (+ `/invite`), `/company/profile`, `/company/transfers`.
+ * `/company/profile`, `/company/transfers`.
  *
  * Die Reihenfolge und die Vorlagen stehen in
  * `docs/uebergabe/frontend-work-company.md`. Zwei Dinge daraus, die man beim
@@ -23,4 +24,6 @@ export const companyRoutes: RouteObject[] = [
   { path: "/candidates", element: <CandidatesPage /> },
   { path: "/company/jobs", element: <CompanyJobsPage /> },
   { path: "/company/jobs/new", element: <CompanyJobNewPage /> },
+  { path: "/company/team", element: <CompanyTeamPage /> },
+  { path: "/company/team/invite", element: <CompanyTeamInvitePage /> },
 ];
