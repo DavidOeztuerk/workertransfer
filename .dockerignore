@@ -5,8 +5,8 @@
 .github
 node_modules
 **/node_modules
-**/bin
-**/obj
+**/bin*
+**/obj*
 **/TestResults
 .turbo
 **/.turbo
