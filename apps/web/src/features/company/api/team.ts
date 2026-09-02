@@ -1,0 +1,170 @@
+// Mannschaft eines Unternehmens: Mitglieder und Einladungen.
+//
+// Der Einladungs-Token taucht hier nirgends auf. Er steht weder in der Antwort
+// aufs Einladen noch in der Liste der offenen Einladungen — angenommen wird
+// eine Einladung in `features/auth`, und dort kommt er aus der URL, in die ihn
+// die Mail geschrieben hat.
+
+import { request } from "../../../core/api/client";
+import { API_BASE_URL } from "../../../env";
+import { type Fehlschlag, deuten } from "./fehler";
+
+export type Role = "admin" | "member";
+
+export interface CompanyMember {
+  user_id: string;
+  display_name: string;
+  role: Role;
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: Role;
+  status: string;
+  created_at: string;
+  expires_at: string;
+}
+
+export type MitgliederErgebnis =
+  | { ok: true; members: CompanyMember[] }
+  | Fehlschlag<"fehlgeschlagen">;
+export type EinladungenErgebnis =
+  | { ok: true; invitations: Invitation[] }
+  | Fehlschlag<"fehlgeschlagen">;
+export type EinladenErgebnis =
+  | { ok: true; invitation: Invitation }
+  | Fehlschlag<"not-admin" | "not-yours" | "invalid" | "offline">;
+export type EntfernenErgebnis =
+  | { ok: true }
+  | Fehlschlag<"last-admin" | "not-admin" | "offline">;
+
+/**
+ * Die Mannschaft. Ein `404` heißt „nicht deins", nicht „kaputt".
+ *
+ * Der Server antwortet absichtlich `404` statt `403`, damit niemand erfragen
+ * kann, welche Unternehmen es gibt. Die Oberfläche macht daraus einen ruhigen
+ * leeren Zustand statt einer Fehlermeldung, die nichts erklärt.
+ */
+export async function listMembers(
+  tenantId: string,
+  signal?: AbortSignal
+): Promise<MitgliederErgebnis> {
+  const antwort = await request<CompanyMember[]>(
+    API_BASE_URL,
+    `/companies/${tenantId}/members`,
+    { signal },
+    "Die Mannschaft ließ sich nicht laden."
+  );
+  if (antwort.ok) return { ok: true, members: antwort.value ?? [] };
+  if (antwort.error.status === 404) return { ok: true, members: [] };
+  return deuten<"fehlgeschlagen">(
+    antwort.error,
+    { 0: { reason: "fehlgeschlagen", title: "Keine Verbindung zum Server." } },
+    "fehlgeschlagen"
+  );
+}
+
+export async function listInvitations(
+  tenantId: string,
+  signal?: AbortSignal
+): Promise<EinladungenErgebnis> {
+  const antwort = await request<Invitation[]>(
+    API_BASE_URL,
+    `/companies/${tenantId}/invitations`,
+    { signal },
+    "Die Einladungen ließen sich nicht laden."
+  );
+  if (antwort.ok) return { ok: true, invitations: antwort.value ?? [] };
+  if (antwort.error.status === 404) return { ok: true, invitations: [] };
+  return deuten<"fehlgeschlagen">(
+    antwort.error,
+    { 0: { reason: "fehlgeschlagen", title: "Keine Verbindung zum Server." } },
+    "fehlgeschlagen"
+  );
+}
+
+export async function inviteMember(
+  tenantId: string,
+  email: string,
+  role: Role
+): Promise<EinladenErgebnis> {
+  const antwort = await request<Invitation>(
+    API_BASE_URL,
+    `/companies/${tenantId}/invitations`,
+    // Kein Unternehmen im Rumpf: es steht im Pfad und wird gegen die
+    // Mitgliedschaft des Aufrufers geprüft.
+    { method: "POST", body: { email, role } },
+    "Die Einladung ließ sich nicht anlegen."
+  );
+  if (antwort.ok) return { ok: true, invitation: antwort.value };
+  return deuten<"not-admin" | "not-yours" | "invalid" | "offline">(
+    antwort.error,
+    {
+      0: { reason: "offline", title: "Keine Verbindung zum Server." },
+      403: {
+        reason: "not-admin",
+        title: "Einladen darf nur, wer Administrator dieses Unternehmens ist.",
+      },
+      404: { reason: "not-yours", title: "Für dieses Unternehmen kannst du nicht einladen." },
+    },
+    "invalid"
+  );
+}
+
+export async function withdrawInvitation(
+  tenantId: string,
+  invitationId: string
+): Promise<{ ok: true } | Fehlschlag<"fehlgeschlagen">> {
+  // `204` ohne Rumpf — `request()` gibt dafür `undefined` zurück, statt den
+  // Parser in einen Fehler laufen zu lassen, der wie ein Serverfehler aussähe.
+  const antwort = await request<void>(
+    API_BASE_URL,
+    `/companies/${tenantId}/invitations/${invitationId}`,
+    { method: "DELETE" },
+    "Die Einladung ließ sich nicht zurückziehen."
+  );
+  if (antwort.ok) return { ok: true };
+  return deuten<"fehlgeschlagen">(
+    antwort.error,
+    { 0: { reason: "fehlgeschlagen", title: "Keine Verbindung zum Server." } },
+    "fehlgeschlagen"
+  );
+}
+
+/**
+ * Ein Mitglied entfernen — oder sich selbst.
+ *
+ * `409` heißt nicht „du darfst nicht", sondern „nicht dieses Mitglied, nicht
+ * jetzt": der letzte Administrator kann nicht gehen. Das getrennt zu halten ist
+ * der Unterschied zwischen „such dir jemanden mit mehr Rechten" und „mach
+ * vorher jemanden zum Administrator".
+ */
+export async function removeMember(
+  tenantId: string,
+  memberId: string
+): Promise<EntfernenErgebnis> {
+  const antwort = await request<void>(
+    API_BASE_URL,
+    `/companies/${tenantId}/members/${memberId}`,
+    { method: "DELETE" },
+    "Das Mitglied ließ sich nicht entfernen."
+  );
+  if (antwort.ok) return { ok: true };
+  return deuten<"last-admin" | "not-admin" | "offline">(
+    antwort.error,
+    {
+      0: { reason: "offline", title: "Keine Verbindung zum Server." },
+      409: {
+        reason: "last-admin",
+        title: "Ein Unternehmen braucht mindestens einen Administrator.",
+        detail: "Mache zuerst jemanden zum Administrator.",
+      },
+      403: {
+        reason: "not-admin",
+        title: "Entfernen darf nur, wer Administrator dieses Unternehmens ist.",
+      },
+    },
+    "offline"
+  );
+}
