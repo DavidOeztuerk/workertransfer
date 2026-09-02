@@ -4,20 +4,24 @@ import { CandidatesPage } from "./pages/CandidatesPage";
 import { CompanyJobNewPage } from "./pages/CompanyJobNewPage";
 import { CompanyJobsPage } from "./pages/CompanyJobsPage";
 import { CompanyTeamInvitePage } from "./pages/CompanyTeamInvitePage";
+import { CompanyProfilePage } from "./pages/CompanyProfilePage";
 import { CompanyTeamPage } from "./pages/CompanyTeamPage";
+import { CompanyTransfersPage } from "./pages/CompanyTransfersPage";
 import { CareerPage } from "./pages/CareerPage";
 
 /**
  * Die Routen dessen, was ein Unternehmen tut.
  *
- * <strong>Fast leer.</strong> Nur `/careers/<slug>` steht; es fehlen noch:
- * `/company/profile`, `/company/transfers`.
+ * <strong>Alle Seiten dieses Bereichs sind migriert.</strong>
  *
- * Die Reihenfolge und die Vorlagen stehen in
- * `docs/uebergabe/frontend-work-company.md`. Zwei Dinge daraus, die man beim
- * Bauen sonst falsch macht: die Kandidatenliste liegt auf `GET /candidates` und
- * nicht `/profiles` (ein absichtlich toter Präfix), und die alte Vorlage für
- * `/company/team` heisst `routes/team.tsx`, nicht `company-team.tsx`.
+ * `/careers/<slug>` liegt hier und nicht in `work`: sie zeigt ein
+ * Unternehmensprofil samt seiner Stellen und gehoert sachlich hierher.
+ *
+ * Zwei Dinge, die man beim Bauen sonst falsch macht und die deshalb
+ * stehenbleiben: die Kandidatenliste liegt auf `GET /candidates` und nicht
+ * `/profiles` (ein absichtlich toter Praefix), und `/company/jobs` und
+ * `/company/jobs/new` sind zwei Seiten — eine E2E-Reise sucht das Formular
+ * heute noch auf der Liste.
  */
 export const companyRoutes: RouteObject[] = [
   { path: "/careers/:slug", element: <CareerPage /> },
@@ -26,4 +30,6 @@ export const companyRoutes: RouteObject[] = [
   { path: "/company/jobs/new", element: <CompanyJobNewPage /> },
   { path: "/company/team", element: <CompanyTeamPage /> },
   { path: "/company/team/invite", element: <CompanyTeamInvitePage /> },
+  { path: "/company/profile", element: <CompanyProfilePage /> },
+  { path: "/company/transfers", element: <CompanyTransfersPage /> },
 ];
