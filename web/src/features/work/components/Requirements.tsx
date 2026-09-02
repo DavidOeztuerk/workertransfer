@@ -56,17 +56,26 @@ function NurVorgelesen({ children }: { children: React.ReactNode }) {
  *   gekonnt.
  * - sonst — abgleichen.
  */
-export function Requirements({ skills, mine }: { skills: string[]; mine: string[] | null }) {
+export function Requirements({
+  skills,
+  mine,
+}: {
+  skills: string[];
+  mine: string[] | null;
+}) {
   // Dieselbe Aufbereitung wie im Abgleich, damit die angezeigte Liste und die
   // verglichene dieselbe ist. Liefen sie auseinander, stünde ein Eintrag da,
   // der nie ein Haken werden kann.
-  const listed = skills.map((skill) => skill.trim()).filter((skill) => skill !== "");
+  const listed = skills
+    .map((skill) => skill.trim())
+    .filter((skill) => skill !== "");
 
   // Nichts genannt: dann gibt es auch nichts abzugleichen. Ein „0 von 0" wäre
   // eine Aussage über eine Stelle, die gar keine gemacht hat.
   if (listed.length === 0) return null;
 
-  const match = mine === null || mine.length === 0 ? null : matchSkills(listed, mine);
+  const match =
+    mine === null || mine.length === 0 ? null : matchSkills(listed, mine);
   const have = new Set(match?.have ?? []);
 
   return (
@@ -78,8 +87,9 @@ export function Requirements({ skills, mine }: { skills: string[]; mine: string[
       ) : null}
       {mine !== null && mine.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
-          Trage Fähigkeiten in deinem <RouterLink to="/profile">Profil</RouterLink> ein, dann siehst
-          du hier, was davon du mitbringst.
+          Trage Fähigkeiten in deinem{" "}
+          <RouterLink to="/profile">Profil</RouterLink> ein, dann siehst du
+          hier, was davon du mitbringst.
         </Typography>
       ) : null}
       <Box
@@ -94,7 +104,8 @@ export function Requirements({ skills, mine }: { skills: string[]; mine: string[
         }}
       >
         {listed.map((skill) => {
-          const state = match === null ? "unknown" : have.has(skill) ? "have" : "missing";
+          const state =
+            match === null ? "unknown" : have.has(skill) ? "have" : "missing";
           return (
             <Box
               component="li"
@@ -123,7 +134,9 @@ export function Requirements({ skills, mine }: { skills: string[]; mine: string[
               {/* Das Zeichen ist Dekoration; wer vorgelesen bekommt, braucht
                   das Wort. Sonst hörte man drei Namen und keinen Unterschied. */}
               {state !== "unknown" ? (
-                <NurVorgelesen>{state === "have" ? " (hast du)" : " (fehlt dir)"}</NurVorgelesen>
+                <NurVorgelesen>
+                  {state === "have" ? " (hast du)" : " (fehlt dir)"}
+                </NurVorgelesen>
               ) : null}
             </Box>
           );

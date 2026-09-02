@@ -34,7 +34,7 @@ test("eine veröffentlichte Stelle findet auch, wer kein Konto hat", async ({ br
   await recruiter.getByRole("button", { name: /Speichern/i }).click();
   await expect(recruiter.getByText(/Profil gespeichert/i)).toBeVisible();
 
-  await recruiter.goto("/company/jobs");
+  await recruiter.goto("/company/jobs/new");
   await recruiter.getByLabel("Titel").fill(title);
   await recruiter.getByLabel(/Beschreibung/i).fill("Was zu tun ist.");
   await recruiter.getByLabel("Ort", { exact: true }).fill("Hamburg");
@@ -114,7 +114,7 @@ test("die Passung sieht die Person — und niemand rechnet sie auf dem Server", 
   await login(recruiter, recruiterEmail);
   await switchToCompany(recruiter, companyName);
 
-  await recruiter.goto("/company/jobs");
+  await recruiter.goto("/company/jobs/new");
   await recruiter.getByLabel("Titel").fill(title);
   await recruiter.getByLabel(/Beschreibung/i).fill("Was zu tun ist.");
   // „PostgreSQL" hier, „postgres" gleich im Profil: das Vokabular (ADR-0023)
@@ -201,7 +201,7 @@ test("ohne Anbieter sagt die Formulierungshilfe es — statt still nichts zu tun
   await login(recruiter, recruiterEmail);
   await switchToCompany(recruiter, companyName);
 
-  await recruiter.goto("/company/jobs");
+  await recruiter.goto("/company/jobs/new");
   await recruiter.getByLabel(/Beschreibung/i).fill(eigenerText);
 
   // Der Hinweis steht AM KNOPF und nennt, was hinausginge — nicht in einer

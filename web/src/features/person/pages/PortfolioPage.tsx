@@ -51,20 +51,27 @@ export function PortfolioPage() {
   const schaufenster = useAsync(
     (signal) => ladeMeines(signal),
     [subjectId],
-    subjectId !== null
+    subjectId !== null,
   );
 
   const freigabe = useAsync(
     () => isGranted(subjectId as string, PORTFOLIO_VISIBILITY),
     [subjectId],
-    subjectId !== null
+    subjectId !== null,
   );
 
   if (status === "anonymous" || subjectId === null) {
-    return <AnmeldungNoetig titel="Meine Arbeiten" zweck="deine Arbeiten zu bearbeiten" />;
+    return (
+      <AnmeldungNoetig
+        titel="Meine Arbeiten"
+        zweck="deine Arbeiten zu bearbeiten"
+      />
+    );
   }
 
-  const arbeiten = schaufenster.wert?.ok ? (schaufenster.wert.wert?.items ?? []) : [];
+  const arbeiten = schaufenster.wert?.ok
+    ? (schaufenster.wert.wert?.items ?? [])
+    : [];
   const hatArbeiten = arbeiten.length > 0;
 
   // `undefined` heisst „wird noch geladen", `null` heisst „der Ledger schweigt".
@@ -77,7 +84,7 @@ export function PortfolioPage() {
       subjectId as string,
       PORTFOLIO_VISIBILITY,
       neu,
-      "Über die Portfolio-Einstellungen zurückgezogen"
+      "Über die Portfolio-Einstellungen zurückgezogen",
     );
     setSchaltet(false);
 
@@ -91,13 +98,13 @@ export function PortfolioPage() {
   }
 
   const hinweis = ledgerSchweigt
-    ? "Ob eine Freigabe gilt, ist gerade nicht abrufbar. Solange das so ist, ändert dieser "
-      + "Schalter nichts — sonst würdest du etwas freigeben, dessen Stand niemand kennt."
+    ? "Ob eine Freigabe gilt, ist gerade nicht abrufbar. Solange das so ist, ändert dieser " +
+      "Schalter nichts — sonst würdest du etwas freigeben, dessen Stand niemand kennt."
     : freigabe.laedt
       ? "Freigabe wird geprüft…"
       : hatArbeiten
-        ? "Eigene Freigabe, getrennt vom Profil: du kannst ansprechbar sein, ohne deine "
-          + "Arbeiten zu zeigen. Wirkt sofort."
+        ? "Eigene Freigabe, getrennt vom Profil: du kannst ansprechbar sein, ohne deine " +
+          "Arbeiten zu zeigen. Wirkt sofort."
         : "Erst eine Arbeit speichern — freigeben lässt sich nur, was es gibt.";
 
   return (
@@ -105,8 +112,8 @@ export function PortfolioPage() {
       title="Meine Arbeiten"
       narrow
       lead={
-        "Ein Schaufenster: hier steht, was du zeigen willst. Was du nicht zeigen darfst, gehört "
-        + "nicht hierher — dafür gibt es keine halbe Sichtbarkeit."
+        "Ein Schaufenster: hier steht, was du zeigen willst. Was du nicht zeigen darfst, gehört " +
+        "nicht hierher — dafür gibt es keine halbe Sichtbarkeit."
       }
     >
       {fehler !== null ? (
@@ -130,7 +137,9 @@ export function PortfolioPage() {
 
       <Card>
         <CardContent>
-          {schaufenster.laedt ? <LoadingBlock label="Portfolio wird geladen…" /> : null}
+          {schaufenster.laedt ? (
+            <LoadingBlock label="Portfolio wird geladen…" />
+          ) : null}
 
           {schaufenster.wert && !schaufenster.wert.ok ? (
             <ErrorBlock error={schaufenster.wert.error} />
@@ -141,7 +150,11 @@ export function PortfolioPage() {
               title="Noch keine Arbeit eingetragen."
               hint="Was hier steht, entscheidest du — und wer es sieht, auch."
               action={
-                <Button component={RouterLink} to="/portfolio/new" variant="contained">
+                <Button
+                  component={RouterLink}
+                  to="/portfolio/new"
+                  variant="contained"
+                >
                   Arbeit hinzufügen
                 </Button>
               }
@@ -150,7 +163,14 @@ export function PortfolioPage() {
 
           {hatArbeiten ? (
             <>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mb: 3 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1.5,
+                  mb: 3,
+                }}
+              >
                 {/* Die Reihenfolge ist die des gespeicherten Feldes, und die
                     Adresse einer Arbeit ist ihre Stelle darin: eine Arbeit hat
                     keine eigene Kennung. */}
@@ -171,7 +191,14 @@ export function PortfolioPage() {
                           {einordnung(arbeit)}
                         </Typography>
                       </Box>
-                      <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexShrink: 0 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          gap: 1.5,
+                          alignItems: "center",
+                          flexShrink: 0,
+                        }}
+                      >
                         <Button
                           component={RouterLink}
                           to={`/portfolio/${index}`}
@@ -195,7 +222,11 @@ export function PortfolioPage() {
                   </Card>
                 ))}
               </Box>
-              <Button component={RouterLink} to="/portfolio/new" variant="contained">
+              <Button
+                component={RouterLink}
+                to="/portfolio/new"
+                variant="contained"
+              >
                 Arbeit hinzufügen
               </Button>
             </>

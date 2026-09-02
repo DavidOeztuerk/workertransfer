@@ -62,7 +62,10 @@ describe("ConsentsPage", () => {
   it("zeigt einen Fehler nie als leere Liste", async () => {
     // „Du hast nichts freigegeben" wäre hier die beruhigendste falsche Antwort,
     // die dieses System geben kann.
-    draht.setze("GET /consent/me", { status: 503, body: { title: "Ledger schweigt" } });
+    draht.setze("GET /consent/me", {
+      status: 503,
+      body: { title: "Ledger schweigt" },
+    });
     renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
 
     expect(await screen.findByRole("alert")).toBeTruthy();
@@ -70,7 +73,9 @@ describe("ConsentsPage", () => {
   });
 
   it("benennt den Bereich und sagt, dass eine öffentliche Freigabe allen gilt", async () => {
-    draht.setze("GET /consent/me", { body: [granted("profile.visibility:public")] });
+    draht.setze("GET /consent/me", {
+      body: [granted("profile.visibility:public")],
+    });
     renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
 
     expect(await screen.findByText(/Profil · Alle Unternehmen/)).toBeTruthy();
@@ -95,13 +100,17 @@ describe("ConsentsPage", () => {
     });
     renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
 
-    expect(await screen.findByText(/Marktstatus · Ein Unternehmen/)).toBeTruthy();
+    expect(
+      await screen.findByText(/Marktstatus · Ein Unternehmen/),
+    ).toBeTruthy();
   });
 
   it("zeigt eine unbekannte Capability, statt sie zu verschlucken", async () => {
     // Eine Freigabe zu verbergen, weil die Oberfläche ihr Format nicht kennt,
     // wäre auf genau dieser Seite der schlimmste denkbare Fehler.
-    draht.setze("GET /consent/me", { body: [granted("something.entirely:new")] });
+    draht.setze("GET /consent/me", {
+      body: [granted("something.entirely:new")],
+    });
     renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
 
     expect(await screen.findByText(/something.entirely:new/)).toBeTruthy();
@@ -109,13 +118,19 @@ describe("ConsentsPage", () => {
   });
 
   it("zieht mit einer Begründung zurück, weil ein Widerruf erklärbar sein muss", async () => {
-    draht.setze("GET /consent/me", { body: [granted("profile.visibility:public")] });
+    draht.setze("GET /consent/me", {
+      body: [granted("profile.visibility:public")],
+    });
     renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Zurückziehen" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Zurückziehen" }),
+    );
 
-    await waitFor(() => expect(draht.letzter("POST /consent/revoke")).toBeDefined());
+    await waitFor(() =>
+      expect(draht.letzter("POST /consent/revoke")).toBeDefined(),
+    );
     expect(draht.letzter("POST /consent/revoke")?.body).toEqual({
       subject_id: PERSON.userId,
       capability: "profile.visibility:public",
@@ -124,7 +139,9 @@ describe("ConsentsPage", () => {
   });
 
   it("meldet einen gescheiterten Widerruf, statt Erfolg vorzutäuschen", async () => {
-    draht.setze("GET /consent/me", { body: [granted("profile.visibility:public")] });
+    draht.setze("GET /consent/me", {
+      body: [granted("profile.visibility:public")],
+    });
     draht.setze("POST /consent/revoke", {
       status: 503,
       body: { title: "Keine Verbindung zum Consent-Ledger." },
@@ -132,7 +149,9 @@ describe("ConsentsPage", () => {
     renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Zurückziehen" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Zurückziehen" }),
+    );
 
     expect(await screen.findByRole("alert")).toBeTruthy();
   });

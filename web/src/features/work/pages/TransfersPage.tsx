@@ -8,7 +8,11 @@ import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
-import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  EmptyBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import { useHandelnder } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -47,7 +51,11 @@ export function TransfersPage() {
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
 
-  const gespraeche = useAsync((signal) => listMyTransfers(signal), [subjectId], angemeldet);
+  const gespraeche = useAsync(
+    (signal) => listMyTransfers(signal),
+    [subjectId],
+    angemeldet,
+  );
 
   if (!angemeldet) {
     return (
@@ -56,7 +64,12 @@ export function TransfersPage() {
           <CardContent>
             <Typography>
               Bitte{" "}
-              <Button component={RouterLink} to="/login" variant="text" size="small">
+              <Button
+                component={RouterLink}
+                to="/login"
+                variant="text"
+                size="small"
+              >
                 anmelden
               </Button>
               , um deine Gespräche zu sehen.
@@ -79,17 +92,14 @@ export function TransfersPage() {
   const liste = gespraeche.data?.ok ? gespraeche.data.transfers : [];
 
   return (
-    <PageShell
-      title="Meine Gespräche"
-      narrow
-      lead=""
-    >
+    <PageShell title="Meine Gespräche" narrow lead="">
       <Typography color="text.secondary" sx={{ mb: 3, maxWidth: "62ch" }}>
         Ein Unternehmen kann nur zugehen, wenn du ihm deinen{" "}
         <Link component={RouterLink} to="/market">
           Marktstatus freigegeben
         </Link>{" "}
-        hast und gerade ansprechbar bist. Ablehnen kannst du jederzeit, in jedem Schritt.
+        hast und gerade ansprechbar bist. Ablehnen kannst du jederzeit, in jedem
+        Schritt.
       </Typography>
 
       {fehler !== null ? (
@@ -114,7 +124,17 @@ export function TransfersPage() {
         <EmptyBlock title="Es läuft gerade kein Gespräch." />
       ) : null}
 
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <Box
+        component="ul"
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          listStyle: "none",
+          p: 0,
+          m: 0,
+        }}
+      >
         {liste.map((gespraech: Transfer) => (
           <Gespraechskarte
             key={gespraech.id}
@@ -138,11 +158,13 @@ function Gespraechskarte({
   onZug: (zug: PersonAction) => void;
 }) {
   const laeuftNoch = RUNNING.includes(gespraech.status);
-  const brauchtFreigabe = gespraech.requires_release && !gespraech.release_confirmed;
-  const zeigtAngebot = gespraech.status === "offered" || gespraech.status === "accepted";
+  const brauchtFreigabe =
+    gespraech.requires_release && !gespraech.release_confirmed;
+  const zeigtAngebot =
+    gespraech.status === "offered" || gespraech.status === "accepted";
 
   return (
-    <Card>
+    <Card component="li">
       <CardContent>
         <Typography variant="h2" sx={{ mb: 1 }}>
           {TITEL[gespraech.status]}
@@ -186,21 +208,30 @@ function Gespraechskarte({
 
         {gespraech.status === "accepted" && brauchtFreigabe ? (
           <Alert severity="info" sx={{ mb: 2 }}>
-            Es fehlt noch, dass dein Arbeitgeber dich gehen lässt. Diese Plattform fragt ihn nicht
-            — sie weiß nicht, wer er ist und soll es nicht wissen. Bestätige selbst, sobald es
-            geklärt ist: <strong>damit ist der Transfer abgeschlossen.</strong> Der letzte Schritt
-            gehört dir, weil nur du weißt, ob du gehen darfst.
+            Es fehlt noch, dass dein Arbeitgeber dich gehen lässt. Diese
+            Plattform fragt ihn nicht — sie weiß nicht, wer er ist und soll es
+            nicht wissen. Bestätige selbst, sobald es geklärt ist:{" "}
+            <strong>damit ist der Transfer abgeschlossen.</strong> Der letzte
+            Schritt gehört dir, weil nur du weißt, ob du gehen darfst.
           </Alert>
         ) : null}
 
         <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
           {gespraech.status === "interested" ? (
-            <Button variant="contained" onClick={() => onZug("accept-talk")} disabled={gesperrt}>
+            <Button
+              variant="contained"
+              onClick={() => onZug("accept-talk")}
+              disabled={gesperrt}
+            >
               Gespräch annehmen
             </Button>
           ) : null}
           {gespraech.status === "offered" ? (
-            <Button variant="contained" onClick={() => onZug("accept-offer")} disabled={gesperrt}>
+            <Button
+              variant="contained"
+              onClick={() => onZug("accept-offer")}
+              disabled={gesperrt}
+            >
               Angebot annehmen
             </Button>
           ) : null}
@@ -214,7 +245,11 @@ function Gespraechskarte({
             </Button>
           ) : null}
           {laeuftNoch ? (
-            <Button variant="text" onClick={() => onZug("decline")} disabled={gesperrt}>
+            <Button
+              variant="text"
+              onClick={() => onZug("decline")}
+              disabled={gesperrt}
+            >
               Ablehnen
             </Button>
           ) : null}

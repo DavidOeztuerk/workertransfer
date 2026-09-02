@@ -22,7 +22,12 @@ export function AuthModeTabs({ current }: { current: "login" | "register" }) {
       aria-label="Anmelden oder neues Konto anlegen"
     >
       <Tab component={RouterLink} to="/login" value="login" label="Anmelden" />
-      <Tab component={RouterLink} to="/register" value="register" label="Konto anlegen" />
+      <Tab
+        component={RouterLink}
+        to="/register"
+        value="register"
+        label="Konto anlegen"
+      />
     </Tabs>
   );
 }

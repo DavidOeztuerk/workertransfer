@@ -17,8 +17,10 @@ function antworten(karte: Record<string, Antwort>) {
       const pfad = new URL(url).pathname;
       gefragt.push({ pfad, rumpf: String(init?.body ?? "") });
       const antwort = karte[pfad] ?? { body: {} };
-      return new Response(JSON.stringify(antwort.body ?? {}), { status: antwort.status ?? 200 });
-    })
+      return new Response(JSON.stringify(antwort.body ?? {}), {
+        status: antwort.status ?? 200,
+      });
+    }),
   );
   return gefragt;
 }
@@ -49,7 +51,9 @@ describe("LoginPage", () => {
   it("trägt die deutsche Überschrift", () => {
     renderMitStore(seite(), { route: "/login" });
 
-    expect(screen.getByRole("heading", { name: "Anmelden" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Anmelden" }),
+    ).toBeInTheDocument();
   });
 
   it("fragt nicht nach einem Unternehmen", () => {
@@ -95,7 +99,10 @@ describe("LoginPage", () => {
 
   it("zeigt den Fehlschlag als Meldung und leitet nicht weiter", async () => {
     antworten({
-      "/auth/login": { status: 401, body: { detail: "E-Mail oder Passwort stimmen nicht." } },
+      "/auth/login": {
+        status: 401,
+        body: { detail: "E-Mail oder Passwort stimmen nicht." },
+      },
     });
     const user = userEvent.setup();
     renderMitStore(seite(), { route: "/login" });
@@ -106,7 +113,7 @@ describe("LoginPage", () => {
 
     // E2E wartet auf genau diese Rolle.
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "E-Mail oder Passwort stimmen nicht."
+      "E-Mail oder Passwort stimmen nicht.",
     );
     expect(screen.queryByText("Übersicht")).toBeNull();
   });
@@ -119,7 +126,10 @@ describe("LoginPage", () => {
    * stumm, an der jemand nicht weiterkommt.
    */
   it("bleibt nicht stumm, wenn die Sitzung nach dem Anmelden nicht zu lesen ist", async () => {
-    antworten({ "/auth/login": {}, "/auth/session": { status: 500, body: {} } });
+    antworten({
+      "/auth/login": {},
+      "/auth/session": { status: 500, body: {} },
+    });
     const user = userEvent.setup();
     renderMitStore(seite(), { route: "/login" });
 
@@ -127,7 +137,9 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText(/Passwort/i), "strongpassword1");
     await user.click(screen.getByRole("button", { name: /Anmelden/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Anmeldung fehlgeschlagen");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Anmeldung fehlgeschlagen",
+    );
     expect(screen.queryByText("Übersicht")).toBeNull();
   });
 
@@ -151,7 +163,7 @@ describe("LoginPage", () => {
 
     expect(screen.getByRole("tab", { name: "Konto anlegen" })).toHaveAttribute(
       "href",
-      "/register"
+      "/register",
     );
   });
 });

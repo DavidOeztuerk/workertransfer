@@ -8,7 +8,12 @@ import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import TextField from "@mui/material/TextField";
 
-import { ConsentSwitch, ErrorBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  ConsentSwitch,
+  ErrorBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import {
   type Profile,
@@ -31,7 +36,13 @@ interface FormState {
   skills: string;
 }
 
-const LEER: FormState = { headline: "", bio: "", location: "", remote_ok: false, skills: "" };
+const LEER: FormState = {
+  headline: "",
+  bio: "",
+  location: "",
+  remote_ok: false,
+  skills: "",
+};
 
 function zuFormular(profil: Profile | null): FormState {
   if (profil === null) return LEER;
@@ -55,11 +66,15 @@ function zuFormular(profil: Profile | null): FormState {
 export function ProfilePage() {
   const { subjectId, unbekannt } = usePerson();
 
-  const profil = useAsync((signal) => getMyProfile(signal), [subjectId], subjectId !== null);
+  const profil = useAsync(
+    (signal) => getMyProfile(signal),
+    [subjectId],
+    subjectId !== null,
+  );
   const freigabe = useAsync(
     (signal) => getVisibility(subjectId ?? "", signal),
     [subjectId],
-    subjectId !== null
+    subjectId !== null,
   );
 
   const [formular, setzeFormular] = useState<FormState>(LEER);
@@ -76,7 +91,10 @@ export function ProfilePage() {
     if (geladen?.ok === true) setzeFormular(zuFormular(geladen.profile));
   }, [geladen]);
 
-  function aendere<K extends keyof FormState>(schluessel: K, wert: FormState[K]) {
+  function aendere<K extends keyof FormState>(
+    schluessel: K,
+    wert: FormState[K],
+  ) {
     setzeGespeichert(false);
     setzeFormular((jetzt) => ({ ...jetzt, [schluessel]: wert }));
   }
@@ -127,7 +145,9 @@ export function ProfilePage() {
   }
 
   if (subjectId === null) {
-    return <AnmeldungNoetig titel="Mein Profil" zweck="dein Profil zu bearbeiten" />;
+    return (
+      <AnmeldungNoetig titel="Mein Profil" zweck="dein Profil zu bearbeiten" />
+    );
   }
 
   if (profil.laedt || geladen === undefined) {
@@ -203,7 +223,9 @@ export function ProfilePage() {
               label="Überschrift"
               helperText="Eine Zeile, die sagt, worum es dir geht."
               value={formular.headline}
-              onChange={(ereignis) => aendere("headline", ereignis.target.value)}
+              onChange={(ereignis) =>
+                aendere("headline", ereignis.target.value)
+              }
               slotProps={{ htmlInput: { maxLength: 120 } }}
               required
               fullWidth
@@ -225,7 +247,9 @@ export function ProfilePage() {
             <TextField
               label="Ort"
               value={formular.location}
-              onChange={(ereignis) => aendere("location", ereignis.target.value)}
+              onChange={(ereignis) =>
+                aendere("location", ereignis.target.value)
+              }
               slotProps={{ htmlInput: { maxLength: 120 } }}
               fullWidth
             />
@@ -246,7 +270,9 @@ export function ProfilePage() {
               control={
                 <Checkbox
                   checked={formular.remote_ok}
-                  onChange={(ereignis) => aendere("remote_ok", ereignis.target.checked)}
+                  onChange={(ereignis) =>
+                    aendere("remote_ok", ereignis.target.checked)
+                  }
                 />
               }
               label="Remote-Arbeit kommt für mich in Frage"

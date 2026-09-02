@@ -7,7 +7,11 @@ import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink, useParams } from "react-router-dom";
 
-import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  EmptyBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import { useAsync } from "../lib/useAsync";
 import { getCompanyBySlug } from "../api/companies";
 import { REMOTE_LABEL, searchJobs } from "../../work/api/jobs";
@@ -30,16 +34,17 @@ export function CareerPage() {
   const unternehmen = useAsync(
     (signal) => getCompanyBySlug(gesucht, signal),
     [gesucht],
-    gesucht !== ""
+    gesucht !== "",
   );
 
   const profil = unternehmen.data?.ok ? unternehmen.data.profile : undefined;
   const tenantId = profil?.tenant_id;
 
   const stellen = useAsync(
-    (signal) => searchJobs({ company: tenantId as string, limit: 50 }, undefined, signal),
+    (signal) =>
+      searchJobs({ company: tenantId as string, limit: 50 }, undefined, signal),
     [tenantId],
-    tenantId !== undefined
+    tenantId !== undefined,
   );
 
   if (unternehmen.pending) {
@@ -54,12 +59,15 @@ export function CareerPage() {
     );
   }
 
-  if (unternehmen.data?.ok === false && unternehmen.data.reason === "unavailable") {
+  if (
+    unternehmen.data?.ok === false &&
+    unternehmen.data.reason === "unavailable"
+  ) {
     return (
       <PageShell title="Karriere" narrow>
         <Alert severity="warning">
-          {unternehmen.data.error.detail} Das heißt nicht, dass es dieses Unternehmen nicht gibt —
-          versuch es später noch einmal.
+          {unternehmen.data.error.detail} Das heißt nicht, dass es dieses
+          Unternehmen nicht gibt — versuch es später noch einmal.
         </Alert>
       </PageShell>
     );
@@ -84,7 +92,8 @@ export function CareerPage() {
 
   const ergebnis = stellen.data;
   const liste = ergebnis?.ok ? ergebnis.items : [];
-  const abrufGescheitert = ergebnis !== null && ergebnis !== undefined && !ergebnis.ok;
+  const abrufGescheitert =
+    ergebnis !== null && ergebnis !== undefined && !ergebnis.ok;
 
   return (
     <PageShell title={profil.display_name} narrow>
@@ -135,12 +144,14 @@ export function CareerPage() {
           </Typography>
 
           {/* Reihenfolge: lädt, dann Fehler, dann leer, dann Inhalt. */}
-          {stellen.pending ? <LoadingBlock label="Stellen werden geladen…" /> : null}
+          {stellen.pending ? (
+            <LoadingBlock label="Stellen werden geladen…" />
+          ) : null}
 
           {abrufGescheitert ? (
             <Alert severity="warning">
-              Die offenen Stellen sind gerade nicht abrufbar. Das heißt nicht, dass es keine gibt
-              — versuch es später noch einmal.
+              Die offenen Stellen sind gerade nicht abrufbar. Das heißt nicht,
+              dass es keine gibt — versuch es später noch einmal.
             </Alert>
           ) : null}
 
@@ -149,9 +160,19 @@ export function CareerPage() {
           ) : null}
 
           {liste.length > 0 ? (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <Box
+              component="ul"
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 1.5,
+                listStyle: "none",
+                p: 0,
+                m: 0,
+              }}
+            >
               {liste.map((stelle) => (
-                <Card key={stelle.id} variant="outlined">
+                <Card key={stelle.id} component="li" variant="outlined">
                   <CardContent
                     sx={{
                       display: "flex",
@@ -164,8 +185,10 @@ export function CareerPage() {
                     <Box>
                       <Typography variant="h4">{stelle.title}</Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {stelle.location !== "" ? stelle.location : "Ort nicht angegeben"} ·{" "}
-                        {REMOTE_LABEL[stelle.remote] ?? stelle.remote}
+                        {stelle.location !== ""
+                          ? stelle.location
+                          : "Ort nicht angegeben"}{" "}
+                        · {REMOTE_LABEL[stelle.remote] ?? stelle.remote}
                       </Typography>
                     </Box>
                     <Button

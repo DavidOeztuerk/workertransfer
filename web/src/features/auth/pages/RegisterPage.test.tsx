@@ -13,17 +13,26 @@ function antworten(...folge: Antwort[]) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
-      gefragt.push({ pfad: new URL(url).pathname, rumpf: String(init?.body ?? "") });
-      const antwort = folge[nummer] ?? folge[folge.length - 1] ?? { status: 201 };
+      gefragt.push({
+        pfad: new URL(url).pathname,
+        rumpf: String(init?.body ?? ""),
+      });
+      const antwort = folge[nummer] ??
+        folge[folge.length - 1] ?? { status: 201 };
       nummer += 1;
       if (antwort.wirft === true) throw new TypeError("Failed to fetch");
-      return new Response(JSON.stringify(antwort.body ?? {}), { status: antwort.status ?? 201 });
-    })
+      return new Response(JSON.stringify(antwort.body ?? {}), {
+        status: antwort.status ?? 201,
+      });
+    }),
   );
   return gefragt;
 }
 
-async function fuelleUndSende(user: ReturnType<typeof userEvent.setup>, email: string) {
+async function fuelleUndSende(
+  user: ReturnType<typeof userEvent.setup>,
+  email: string,
+) {
   await user.type(screen.getByLabelText(/E-Mail/i), email);
   await user.type(screen.getByLabelText(/Passwort/i), "strongpassword1");
   await user.type(screen.getByLabelText(/Anzeigename/i), "Max");
@@ -95,7 +104,9 @@ describe("RegisterPage — Person oder Unternehmen", () => {
     const user = userEvent.setup();
     renderMitStore(<RegisterPage />, { route: "/register" });
 
-    await user.click(screen.getByRole("radio", { name: "Für ein Unternehmen" }));
+    await user.click(
+      screen.getByRole("radio", { name: "Für ein Unternehmen" }),
+    );
 
     expect(screen.getByLabelText(/Name des Unternehmens/i)).toBeInTheDocument();
   });
@@ -104,7 +115,9 @@ describe("RegisterPage — Person oder Unternehmen", () => {
     // Die Hero-Knöpfe der Startseite tragen die Absicht als ?as=company mit.
     renderMitStore(<RegisterPage />, { route: "/register?as=company" });
 
-    expect(screen.getByRole("radio", { name: "Für ein Unternehmen" })).toBeChecked();
+    expect(
+      screen.getByRole("radio", { name: "Für ein Unternehmen" }),
+    ).toBeChecked();
     expect(screen.getByLabelText(/Name des Unternehmens/i)).toBeInTheDocument();
   });
 
@@ -114,13 +127,17 @@ describe("RegisterPage — Person oder Unternehmen", () => {
     const user = userEvent.setup();
     renderMitStore(<RegisterPage />, { route: "/register" });
 
-    await user.click(screen.getByRole("radio", { name: "Für ein Unternehmen" }));
+    await user.click(
+      screen.getByRole("radio", { name: "Für ein Unternehmen" }),
+    );
     await user.type(screen.getByLabelText(/E-Mail/i), "max@gmail.com");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Ein Unternehmen braucht eine eigene Domain."
+      "Ein Unternehmen braucht eine eigene Domain.",
     );
-    expect(screen.getByRole("button", { name: /Registrieren/i })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /Registrieren/i }),
+    ).toBeDisabled();
   });
 
   it("urteilt nicht über eine Adresse, die noch kein @ hat", async () => {
@@ -147,9 +164,14 @@ describe("RegisterPage — Person oder Unternehmen", () => {
     const user = userEvent.setup();
     renderMitStore(<RegisterPage />, { route: "/register" });
 
-    await user.click(screen.getByRole("radio", { name: "Für ein Unternehmen" }));
+    await user.click(
+      screen.getByRole("radio", { name: "Für ein Unternehmen" }),
+    );
     await user.type(screen.getByLabelText(/E-Mail/i), "chef@firma.de");
-    await user.type(screen.getByLabelText(/Name des Unternehmens/i), "Firma GmbH");
+    await user.type(
+      screen.getByLabelText(/Name des Unternehmens/i),
+      "Firma GmbH",
+    );
     await user.type(screen.getByLabelText(/Passwort/i), "strongpassword1");
     await user.type(screen.getByLabelText(/Anzeigename/i), "Chef");
     await user.click(screen.getByRole("button", { name: /Registrieren/i }));
@@ -179,10 +201,12 @@ describe("RegisterPage — die E-Mail erneut anfordern", () => {
     renderMitStore(<RegisterPage />, { route: "/register" });
 
     await fuelleUndSende(user, "a@b.com");
-    await user.click(await screen.findByRole("button", { name: "E-Mail erneut senden" }));
+    await user.click(
+      await screen.findByRole("button", { name: "E-Mail erneut senden" }),
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Die E-Mail konnte gerade nicht angefordert werden."
+      "Die E-Mail konnte gerade nicht angefordert werden.",
     );
     expect(screen.queryByText(/erneut unterwegs/)).toBeNull();
   });
@@ -194,15 +218,20 @@ describe("RegisterPage — die E-Mail erneut anfordern", () => {
    * nichts unterwegs war.
    */
   it("meldet auch einen Nicht-2xx als Fehlschlag, statt Versand zu behaupten", async () => {
-    antworten({ status: 201 }, { status: 429, body: { detail: "Zu viele Anfragen" } });
+    antworten(
+      { status: 201 },
+      { status: 429, body: { detail: "Zu viele Anfragen" } },
+    );
     const user = userEvent.setup();
     renderMitStore(<RegisterPage />, { route: "/register" });
 
     await fuelleUndSende(user, "a@b.com");
-    await user.click(await screen.findByRole("button", { name: "E-Mail erneut senden" }));
+    await user.click(
+      await screen.findByRole("button", { name: "E-Mail erneut senden" }),
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Die E-Mail konnte gerade nicht angefordert werden."
+      "Die E-Mail konnte gerade nicht angefordert werden.",
     );
     expect(screen.queryByText(/erneut unterwegs/)).toBeNull();
   });
@@ -213,10 +242,14 @@ describe("RegisterPage — die E-Mail erneut anfordern", () => {
     renderMitStore(<RegisterPage />, { route: "/register" });
 
     await fuelleUndSende(user, "a@b.com");
-    await user.click(await screen.findByRole("button", { name: "E-Mail erneut senden" }));
+    await user.click(
+      await screen.findByRole("button", { name: "E-Mail erneut senden" }),
+    );
 
     // role="status" und nicht "alert": eine Bestätigung unterbricht nicht.
-    expect(await screen.findByRole("status")).toHaveTextContent("erneut unterwegs");
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "erneut unterwegs",
+    );
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });

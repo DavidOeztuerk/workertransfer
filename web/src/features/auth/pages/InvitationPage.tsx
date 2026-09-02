@@ -10,8 +10,8 @@ import { AuthCard } from "../components/AuthCard";
 import { type Einladungsergebnis, nimmAn } from "../api/einladung";
 
 const ZUSAGE =
-  "Die Einladung gilt genau für die Adresse, an die sie ging — ein weitergeleiteter Link "
-  + "öffnet nichts.";
+  "Die Einladung gilt genau für die Adresse, an die sie ging — ein weitergeleiteter Link " +
+  "öffnet nichts.";
 
 type Lage =
   | { art: "laeuft" }
@@ -44,7 +44,11 @@ export function InvitationPage() {
     const token = suche.get("token") ?? "";
 
     if (token === "") {
-      setLage({ art: "abgelehnt", brauchtKonto: false, meldung: "Es fehlt ein Einladungslink." });
+      setLage({
+        art: "abgelehnt",
+        brauchtKonto: false,
+        meldung: "Es fehlt ein Einladungslink.",
+      });
       return;
     }
 
@@ -56,7 +60,11 @@ export function InvitationPage() {
               name: ergebnis.mitgliedschaft.name,
               rolle: ergebnis.mitgliedschaft.role,
             }
-          : { art: "abgelehnt", brauchtKonto: ergebnis.brauchtKonto, meldung: ergebnis.meldung }
+          : {
+              art: "abgelehnt",
+              brauchtKonto: ergebnis.brauchtKonto,
+              meldung: ergebnis.meldung,
+            },
       );
     });
   }, [suche]);
@@ -78,8 +86,9 @@ export function InvitationPage() {
             : "Du bist Mitglied dieses Unternehmens."}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Um dafür zu handeln, wähle das Unternehmen oben aus. Wir wechseln nicht von selbst —
-          sonst würdest du ungefragt aus dem Unternehmen herausgeholt, in dem du gerade arbeitest.{" "}
+          Um dafür zu handeln, wähle das Unternehmen oben aus. Wir wechseln
+          nicht von selbst — sonst würdest du ungefragt aus dem Unternehmen
+          herausgeholt, in dem du gerade arbeitest.{" "}
           <Link component={RouterLink} to="/">
             Zur Startseite
           </Link>

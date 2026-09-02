@@ -14,7 +14,8 @@ import {
   sendeBestaetigungErneut,
 } from "../api/registrierung";
 
-const LEAD = "Die Bestätigung stellt sicher, dass niemand deine Adresse für sich benutzt.";
+const LEAD =
+  "Die Bestätigung stellt sicher, dass niemand deine Adresse für sich benutzt.";
 
 type Zustand =
   | { phase: "laeuft" }
@@ -65,7 +66,11 @@ export function VerifyPage() {
       setZustand(
         ergebnis.ok
           ? { phase: "fertig", ...ergebnis }
-          : { phase: "gescheitert", abgelaufen: ergebnis.abgelaufen, meldung: ergebnis.meldung }
+          : {
+              phase: "gescheitert",
+              abgelaufen: ergebnis.abgelaufen,
+              meldung: ergebnis.meldung,
+            },
       );
     });
   }, [token]);
@@ -110,14 +115,14 @@ export function VerifyPage() {
               hat, hat dort Kollegen. */}
           {zustand.unternehmenFehler === "domain_already_claimed" ? (
             <Alert severity="warning">
-              Dein Konto ist da, das Unternehmen nicht: für deine Domain gibt es hier schon
-              eines. Bitte jemanden aus deinem Unternehmen, dich einzuladen — dann handelst du
-              unter demselben Dach.
+              Dein Konto ist da, das Unternehmen nicht: für deine Domain gibt es
+              hier schon eines. Bitte jemanden aus deinem Unternehmen, dich
+              einzuladen — dann handelst du unter demselben Dach.
             </Alert>
           ) : zustand.unternehmenFehler !== undefined ? (
             <Alert severity="warning">
-              Dein Konto ist da, das Unternehmen konnte nicht angelegt werden. Bitte jemanden
-              aus deinem Unternehmen, dich einzuladen.
+              Dein Konto ist da, das Unternehmen konnte nicht angelegt werden.
+              Bitte jemanden aus deinem Unternehmen, dich einzuladen.
             </Alert>
           ) : null}
 
@@ -131,7 +136,9 @@ export function VerifyPage() {
     );
   }
 
-  return <Gescheitert abgelaufen={zustand.abgelaufen} meldung={zustand.meldung} />;
+  return (
+    <Gescheitert abgelaufen={zustand.abgelaufen} meldung={zustand.meldung} />
+  );
 }
 
 /**
@@ -140,7 +147,13 @@ export function VerifyPage() {
  * Ein ungültiger Link wird auch beim zweiten Versuch nicht gültig; dort gäbe es
  * nichts anzubieten ausser einer Sackgasse mit Knopf.
  */
-function Gescheitert({ abgelaufen, meldung }: { abgelaufen: boolean; meldung: string }) {
+function Gescheitert({
+  abgelaufen,
+  meldung,
+}: {
+  abgelaufen: boolean;
+  meldung: string;
+}) {
   const [email, setEmail] = useState("");
   const [laeuft, setLaeuft] = useState(false);
   const [gesendet, setGesendet] = useState(false);
@@ -162,7 +175,12 @@ function Gescheitert({ abgelaufen, meldung }: { abgelaufen: boolean; meldung: st
         <Alert severity="error">{meldung}</Alert>
 
         {abgelaufen ? (
-          <Box component="form" onSubmit={absenden} noValidate sx={{ display: "grid", gap: 2 }}>
+          <Box
+            component="form"
+            onSubmit={absenden}
+            noValidate
+            sx={{ display: "grid", gap: 2 }}
+          >
             <TextField
               label="E-Mail"
               type="email"
@@ -178,8 +196,8 @@ function Gescheitert({ abgelaufen, meldung }: { abgelaufen: boolean; meldung: st
 
             {gescheitert ? (
               <Alert severity="error">
-                Die E-Mail konnte gerade nicht angefordert werden. Versuch es später noch
-                einmal.
+                Die E-Mail konnte gerade nicht angefordert werden. Versuch es
+                später noch einmal.
               </Alert>
             ) : null}
             {/* Eine Bestätigung unterbricht nicht — deshalb `role="status"`. */}

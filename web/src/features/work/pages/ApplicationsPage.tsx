@@ -7,7 +7,11 @@ import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
-import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  EmptyBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import { useHandelnder } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -26,7 +30,8 @@ const STAND: Record<ApplicationStatus, string> = {
 };
 
 /** Läuft die Bewerbung noch — also sieht das Unternehmen gerade etwas? */
-const laeuft = (stand: ApplicationStatus) => stand === "submitted" || stand === "reviewing";
+const laeuft = (stand: ApplicationStatus) =>
+  stand === "submitted" || stand === "reviewing";
 
 /**
  * Was mit dieser Bewerbung geöffnet wurde.
@@ -61,7 +66,7 @@ export function ApplicationsPage() {
   const bewerbungen = useAsync(
     (signal) => listMyApplications(signal),
     [subjectId],
-    angemeldet
+    angemeldet,
   );
 
   if (!angemeldet) {
@@ -71,7 +76,12 @@ export function ApplicationsPage() {
           <CardContent>
             <Typography>
               Bitte{" "}
-              <Button component={RouterLink} to="/login" variant="text" size="small">
+              <Button
+                component={RouterLink}
+                to="/login"
+                variant="text"
+                size="small"
+              >
                 anmelden
               </Button>
               , um deine Bewerbungen zu sehen.
@@ -99,9 +109,9 @@ export function ApplicationsPage() {
       title="Meine Bewerbungen"
       narrow
       lead={
-        "Solange eine Bewerbung läuft, sieht das Unternehmen dein Profil — und was du sonst "
-        + "freigegeben hast. Ziehst du sie zurück, ist der Zugriff sofort zu; der Vorgang bleibt "
-        + "beim Unternehmen als das stehen, was er war."
+        "Solange eine Bewerbung läuft, sieht das Unternehmen dein Profil — und was du sonst " +
+        "freigegeben hast. Ziehst du sie zurück, ist der Zugriff sofort zu; der Vorgang bleibt " +
+        "beim Unternehmen als das stehen, was er war."
       }
     >
       {fehler !== null ? (
@@ -115,7 +125,9 @@ export function ApplicationsPage() {
           {/* Reihenfolge: lädt, dann Fehler, dann leer, dann Inhalt. Der
               Ladezustand FEHLTE im alten Code — solange die Liste unterwegs
               war, griff keiner der Zweige und man sah eine leere Karte. */}
-          {bewerbungen.pending ? <LoadingBlock label="Bewerbungen werden geladen…" /> : null}
+          {bewerbungen.pending ? (
+            <LoadingBlock label="Bewerbungen werden geladen…" />
+          ) : null}
 
           {ergebnis !== null && !ergebnis.ok ? (
             <Alert severity="error">{ergebnis.error.detail}</Alert>
@@ -133,9 +145,19 @@ export function ApplicationsPage() {
           ) : null}
 
           {liste.length > 0 ? (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <Box
+              component="ul"
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 1.5,
+                listStyle: "none",
+                p: 0,
+                m: 0,
+              }}
+            >
               {liste.map((bewerbung: Application) => (
-                <Card key={bewerbung.id} variant="outlined">
+                <Card key={bewerbung.id} component="li" variant="outlined">
                   <CardContent
                     sx={{
                       display: "flex",
@@ -146,7 +168,9 @@ export function ApplicationsPage() {
                     }}
                   >
                     <Box>
-                      <Typography variant="h4">{STAND[bewerbung.status]}</Typography>
+                      <Typography variant="h4">
+                        {STAND[bewerbung.status]}
+                      </Typography>
                       <Typography variant="body2" color="text.secondary">
                         {laeuft(bewerbung.status)
                           ? `Freigegeben: ${freigegeben(bewerbung)}`

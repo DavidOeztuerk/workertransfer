@@ -7,10 +7,19 @@ import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
-import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  EmptyBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import { useHandelnder } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
-import { type Job, closeJob, listOwnJobs, publishJob } from "../../work/api/jobs";
+import {
+  type Job,
+  closeJob,
+  listOwnJobs,
+  publishJob,
+} from "../../work/api/jobs";
 
 const STAND: Record<string, string> = {
   draft: "Entwurf — sieht nur ihr",
@@ -36,7 +45,11 @@ export function CompanyJobsPage() {
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
 
-  const stellen = useAsync((signal) => listOwnJobs(signal), [fuerFirma], fuerFirma);
+  const stellen = useAsync(
+    (signal) => listOwnJobs(signal),
+    [fuerFirma],
+    fuerFirma,
+  );
 
   if (!fuerFirma) {
     return (
@@ -44,8 +57,8 @@ export function CompanyJobsPage() {
         <Card>
           <CardContent>
             <Typography>
-              Stellen verwaltet nur, wer für ein Unternehmen handelt. Wechsle oben auf ein
-              Unternehmen.
+              Stellen verwaltet nur, wer für ein Unternehmen handelt. Wechsle
+              oben auf ein Unternehmen.
             </Typography>
           </CardContent>
         </Card>
@@ -55,7 +68,9 @@ export function CompanyJobsPage() {
 
   async function schalten(id: string, veroeffentlichen: boolean) {
     setLaeuft(true);
-    const ergebnis = veroeffentlichen ? await publishJob(id) : await closeJob(id);
+    const ergebnis = veroeffentlichen
+      ? await publishJob(id)
+      : await closeJob(id);
     setLaeuft(false);
     setFehler(ergebnis.ok ? null : ergebnis.error.detail);
     stellen.reload();
@@ -69,11 +84,15 @@ export function CompanyJobsPage() {
       title="Unsere Stellen"
       narrow
       lead={
-        "Ein Entwurf sieht niemand außer euch. Veröffentlicht ist er für alle sichtbar, auch ohne "
-        + "Konto — und geschlossen bleibt geschlossen."
+        "Ein Entwurf sieht niemand außer euch. Veröffentlicht ist er für alle sichtbar, auch ohne " +
+        "Konto — und geschlossen bleibt geschlossen."
       }
       actions={
-        <Button component={RouterLink} to="/company/jobs/new" variant="contained">
+        <Button
+          component={RouterLink}
+          to="/company/jobs/new"
+          variant="contained"
+        >
           Neue Stelle
         </Button>
       }
@@ -90,7 +109,9 @@ export function CompanyJobsPage() {
               LADEZUSTAND fehlte im alten Code — und weil auch der Leersatz eine
               geglückte Antwort verlangte, blieb die Karte währenddessen
               vollständig leer. */}
-          {stellen.pending ? <LoadingBlock label="Stellen werden geladen…" /> : null}
+          {stellen.pending ? (
+            <LoadingBlock label="Stellen werden geladen…" />
+          ) : null}
 
           {ergebnis !== null && !ergebnis.ok ? (
             <Alert severity="error">{ergebnis.error.detail}</Alert>
@@ -100,7 +121,11 @@ export function CompanyJobsPage() {
             <EmptyBlock
               title="Noch keine Stelle angelegt."
               action={
-                <Button component={RouterLink} to="/company/jobs/new" variant="contained">
+                <Button
+                  component={RouterLink}
+                  to="/company/jobs/new"
+                  variant="contained"
+                >
                   Neue Stelle
                 </Button>
               }
@@ -108,9 +133,19 @@ export function CompanyJobsPage() {
           ) : null}
 
           {liste.length > 0 ? (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <Box
+              component="ul"
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 1.5,
+                listStyle: "none",
+                p: 0,
+                m: 0,
+              }}
+            >
               {liste.map((stelle: Job) => (
-                <Card key={stelle.id} variant="outlined">
+                <Card key={stelle.id} component="li" variant="outlined">
                   <CardContent
                     sx={{
                       display: "flex",

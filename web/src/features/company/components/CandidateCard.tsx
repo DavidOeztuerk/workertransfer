@@ -12,7 +12,11 @@ import { useAsync } from "../lib/useAsync";
 import type { Profile } from "../api/candidates";
 import { getGitHub } from "../api/github";
 import { requestResume } from "../api/resumeRequests";
-import { type MarketRequest, getMarketStatus, requestMarketStatus } from "../../work/api/market";
+import {
+  type MarketRequest,
+  getMarketStatus,
+  requestMarketStatus,
+} from "../../work/api/market";
 import { expressInterest } from "../../work/api/transfers";
 
 const ANSPRECHBARKEIT: Record<string, string> = {
@@ -43,7 +47,7 @@ export function CandidateCard({
   onGeaendert: () => void;
 }) {
   return (
-    <Card>
+    <Card component="li">
       <CardContent>
         <Typography variant="h3" sx={{ mb: 0.5 }}>
           {profile.headline}
@@ -53,7 +57,9 @@ export function CandidateCard({
           {profile.remote_ok ? " · Remote möglich" : null}
         </Typography>
 
-        {profile.bio !== "" ? <Typography sx={{ mb: 1.5 }}>{profile.bio}</Typography> : null}
+        {profile.bio !== "" ? (
+          <Typography sx={{ mb: 1.5 }}>{profile.bio}</Typography>
+        ) : null}
 
         {profile.skills.length > 0 ? (
           <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap", mb: 2 }}>
@@ -147,7 +153,11 @@ function Marktzugang({
   const [laeuft, setLaeuft] = useState(false);
 
   const erteilt = anfrage?.status === "GRANTED";
-  const stand = useAsync((signal) => getMarketStatus(subjectId, signal), [subjectId], erteilt);
+  const stand = useAsync(
+    (signal) => getMarketStatus(subjectId, signal),
+    [subjectId],
+    erteilt,
+  );
 
   const status = stand.data?.ok === true ? stand.data.status : null;
 
@@ -201,7 +211,9 @@ function Marktzugang({
             {ANSPRECHBARKEIT[status.availability]}
             {status.employed ? " · arbeitet gerade" : null}
           </Typography>
-          {status.note !== "" ? <Typography sx={{ mt: 0.5 }}>{status.note}</Typography> : null}
+          {status.note !== "" ? (
+            <Typography sx={{ mt: 0.5 }}>{status.note}</Typography>
+          ) : null}
           {status.is_approachable ? (
             <Button
               variant="contained"
@@ -210,15 +222,18 @@ function Marktzugang({
               disabled={laeuft}
               onClick={() => {
                 setLaeuft(true);
-                void expressInterest(subjectId, "Wir würden gern mit dir sprechen.").then(
+                void expressInterest(
+                  subjectId,
+                  "Wir würden gern mit dir sprechen.",
+                ).then(
                   (ergebnis: Awaited<ReturnType<typeof expressInterest>>) => {
                     setLaeuft(false);
                     setMeldung(
                       ergebnis.ok
                         ? "Interesse hinterlegt. Die Person entscheidet."
-                        : ergebnis.error.detail
+                        : ergebnis.error.detail,
                     );
-                  }
+                  },
                 );
               }}
             >
@@ -239,8 +254,12 @@ function Marktzugang({
  * Wertung. Keine Repositories sind kein Mangel, sondern eine Auskunft.
  */
 function GitHubBelege({ subjectId }: { subjectId: string }) {
-  const verbindung = useAsync((signal) => getGitHub(subjectId, signal), [subjectId]);
-  const stand = verbindung.data?.ok === true ? verbindung.data.connection : null;
+  const verbindung = useAsync(
+    (signal) => getGitHub(subjectId, signal),
+    [subjectId],
+  );
+  const stand =
+    verbindung.data?.ok === true ? verbindung.data.connection : null;
 
   if (stand === null) return null;
 

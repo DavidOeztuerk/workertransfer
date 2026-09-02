@@ -9,11 +9,22 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
-import { ErrorBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  ErrorBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 import { useAsync } from "../lib/useAsync";
-import { type Verbindung, holeNeu, ladeMeine, nenneKonto, pruefeNachweis, trenne } from "../api/github";
+import {
+  type Verbindung,
+  holeNeu,
+  ladeMeine,
+  nenneKonto,
+  pruefeNachweis,
+  trenne,
+} from "../api/github";
 
 /**
  * <c>/github</c> — die eigene, nachgewiesene Verbindung.
@@ -41,14 +52,21 @@ export function GitHubPage() {
   const verbindung = useAsync(
     (signal) => ladeMeine(signal),
     [sitzung?.userId],
-    sitzung !== null
+    sitzung !== null,
   );
 
   if (status === "anonymous") {
-    return <AnmeldungNoetig titel="GitHub verbinden" zweck="dein GitHub-Konto zu verbinden" />;
+    return (
+      <AnmeldungNoetig
+        titel="GitHub verbinden"
+        zweck="dein GitHub-Konto zu verbinden"
+      />
+    );
   }
 
-  async function fuehreAus(was: () => Promise<{ ok: boolean; error?: { detail: string } }>) {
+  async function fuehreAus(
+    was: () => Promise<{ ok: boolean; error?: { detail: string } }>,
+  ) {
     setLaeuft(true);
     const ergebnis = await was();
     setLaeuft(false);
@@ -60,22 +78,24 @@ export function GitHubPage() {
   }
 
   const geladen = !verbindung.laedt && verbindung.wert?.ok === true;
-  const stand: Verbindung | null = verbindung.wert?.ok ? verbindung.wert.wert : null;
+  const stand: Verbindung | null = verbindung.wert?.ok
+    ? verbindung.wert.wert
+    : null;
 
   return (
     <PageShell
       title="GitHub verbinden"
       narrow
       lead={
-        "Was hier erscheint, sind Belege, keine Noten: deine öffentlichen Repositories mit Link. "
-        + "Diese Plattform rechnet daraus keine Punktzahl und keine Rangfolge — wer wissen will, "
-        + "ob dein Code gut ist, sieht ihn sich an."
+        "Was hier erscheint, sind Belege, keine Noten: deine öffentlichen Repositories mit Link. " +
+        "Diese Plattform rechnet daraus keine Punktzahl und keine Rangfolge — wer wissen will, " +
+        "ob dein Code gut ist, sieht ihn sich an."
       }
     >
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Geholt wird nur, wenn du es auslöst. Es läuft kein Abgleich im Hintergrund: eine
-        Plattform, die dir dauerhaft hinterhersieht, tut etwas anderes als eine, die einmal auf
-        deine Bitte hinsieht.
+        Geholt wird nur, wenn du es auslöst. Es läuft kein Abgleich im
+        Hintergrund: eine Plattform, die dir dauerhaft hinterhersieht, tut etwas
+        anderes als eine, die einmal auf deine Bitte hinsieht.
       </Typography>
 
       {fehler !== null ? (
@@ -92,7 +112,9 @@ export function GitHubPage() {
         </Card>
       ) : null}
 
-      {verbindung.wert && !verbindung.wert.ok ? <ErrorBlock error={verbindung.wert.error} /> : null}
+      {verbindung.wert && !verbindung.wert.ok ? (
+        <ErrorBlock error={verbindung.wert.error} />
+      ) : null}
 
       {/* `geladen` gehört dazu: solange geladen wird, ist der Stand unbekannt,
           und vorher stand „Wird geladen…" UND das Formular gleichzeitig da. Wer
@@ -110,7 +132,12 @@ export function GitHubPage() {
                 ereignis.preventDefault();
                 void fuehreAus(() => nenneKonto(login));
               }}
-              sx={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start" }}
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                alignItems: "flex-start",
+              }}
             >
               <TextField
                 label="GitHub-Benutzername"
@@ -136,8 +163,8 @@ export function GitHubPage() {
               Nachweis
             </Typography>
             <Typography sx={{ mb: 1.5 }}>
-              Lege einen <strong>öffentlichen</strong> Gist an, dessen Beschreibung genau so
-              lautet:
+              Lege einen <strong>öffentlichen</strong> Gist an, dessen
+              Beschreibung genau so lautet:
             </Typography>
             <Box
               component="pre"
@@ -154,8 +181,9 @@ export function GitHubPage() {
               {stand.challenge_description}
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Der Inhalt ist egal. Danach darf der Gist wieder weg — er beweist nur, dass du über
-              das Konto <strong>{stand.login}</strong> verfügst.
+              Der Inhalt ist egal. Danach darf der Gist wieder weg — er beweist
+              nur, dass du über das Konto <strong>{stand.login}</strong>{" "}
+              verfügst.
             </Typography>
             <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
               <Button
@@ -167,7 +195,9 @@ export function GitHubPage() {
               </Button>
               <Button
                 variant="text"
-                onClick={() => void fuehreAus(async () => ({ ok: await trenne() }))}
+                onClick={() =>
+                  void fuehreAus(async () => ({ ok: await trenne() }))
+                }
                 disabled={laeuft}
               >
                 Anderes Konto
@@ -196,13 +226,18 @@ export function GitHubPage() {
 
             {stand.repositories.length === 0 ? (
               <Typography sx={{ mb: 2 }}>
-                Keine öffentlichen Repositories gefunden. Das ist kein Mangel — nur eine Auskunft.
+                Keine öffentlichen Repositories gefunden. Das ist kein Mangel —
+                nur eine Auskunft.
               </Typography>
             ) : (
               <Box component="ul" sx={{ pl: 2.5, mb: 2 }}>
                 {stand.repositories.map((repo) => (
                   <Box component="li" key={repo.name} sx={{ mb: 1 }}>
-                    <Link href={repo.url} target="_blank" rel="noreferrer noopener">
+                    <Link
+                      href={repo.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
                       {repo.name}
                     </Link>
                     <Typography variant="body2" color="text.secondary">
@@ -224,7 +259,9 @@ export function GitHubPage() {
               </Button>
               <Button
                 variant="text"
-                onClick={() => void fuehreAus(async () => ({ ok: await trenne() }))}
+                onClick={() =>
+                  void fuehreAus(async () => ({ ok: await trenne() }))
+                }
                 disabled={laeuft}
               >
                 Verbindung trennen

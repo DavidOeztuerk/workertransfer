@@ -5,7 +5,11 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
 
-import { ConsentSwitch, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  ConsentSwitch,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 import { useAsync } from "../lib/useAsync";
@@ -23,16 +27,22 @@ import {
  * der Schalter tut. Wer „Marktstatus-Anfragen" abschaltet, soll wissen, dass er
  * von der Anfrage dann nur erfährt, wenn er zufällig vorbeischaut.
  */
-const SCHALTER: { schluessel: keyof Benachrichtigungswahl; label: string; hinweis: string }[] = [
+const SCHALTER: {
+  schluessel: keyof Benachrichtigungswahl;
+  label: string;
+  hinweis: string;
+}[] = [
   {
     schluessel: "market_request",
     label: "Wenn ein Unternehmen deinen Marktstatus sehen möchte",
-    hinweis: "Ohne diese Nachricht erfährst du davon nur, wenn du zufällig vorbeischaust.",
+    hinweis:
+      "Ohne diese Nachricht erfährst du davon nur, wenn du zufällig vorbeischaust.",
   },
   {
     schluessel: "resume_request",
     label: "Wenn ein Unternehmen nach deinem Lebenslauf fragt",
-    hinweis: "Auch hier entscheidest du — aber nur, wenn du von der Frage weißt.",
+    hinweis:
+      "Auch hier entscheidest du — aber nur, wenn du von der Frage weißt.",
   },
   {
     schluessel: "transfer_update",
@@ -70,17 +80,25 @@ export function SettingsPage() {
   const wahl = useAsync(
     (signal) => ladeWahl(signal),
     [sitzung?.userId],
-    sitzung !== null
+    sitzung !== null,
   );
 
   if (status === "anonymous") {
-    return <AnmeldungNoetig titel="Einstellungen" zweck="deine Einstellungen zu ändern" />;
+    return (
+      <AnmeldungNoetig
+        titel="Einstellungen"
+        zweck="deine Einstellungen zu ändern"
+      />
+    );
   }
 
   const unbekannt = wahl.laedt || wahl.wert === null;
   const werte = wahl.wert ?? ALLES_AN;
 
-  async function umschalten(schluessel: keyof Benachrichtigungswahl, neu: boolean) {
+  async function umschalten(
+    schluessel: keyof Benachrichtigungswahl,
+    neu: boolean,
+  ) {
     const naechste = { ...werte, [schluessel]: neu };
     setSpeichert(true);
     wahl.setze(naechste);
@@ -104,11 +122,11 @@ export function SettingsPage() {
       title="Einstellungen"
       narrow
       lead={
-        "Was in einer Mail steht, ist bewusst wenig: „Es gibt etwas Neues für dich.“ "
-        + "Kein Firmenname, kein Vorgang, keine Anzahl. Eine Mail kann in einem Postfach "
-        + "landen, das nicht nur dir gehört — und dann wäre der Satz, der sie nützlicher "
-        + "machte, genau der, der dich den Arbeitsplatz kostet. Was es ist, steht hinter "
-        + "der Anmeldung."
+        "Was in einer Mail steht, ist bewusst wenig: „Es gibt etwas Neues für dich.“ " +
+        "Kein Firmenname, kein Vorgang, keine Anzahl. Eine Mail kann in einem Postfach " +
+        "landen, das nicht nur dir gehört — und dann wäre der Satz, der sie nützlicher " +
+        "machte, genau der, der dich den Arbeitsplatz kostet. Was es ist, steht hinter " +
+        "der Anmeldung."
       }
     >
       <Card>
@@ -117,14 +135,21 @@ export function SettingsPage() {
             Benachrichtigungen
           </Typography>
 
-          {fehler !== null ? <Alert severity="error" sx={{ mb: 2 }}>{fehler}</Alert> : null}
+          {fehler !== null ? (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {fehler}
+            </Alert>
+          ) : null}
 
-          {wahl.laedt ? <LoadingBlock label="Einstellungen werden geladen…" /> : null}
+          {wahl.laedt ? (
+            <LoadingBlock label="Einstellungen werden geladen…" />
+          ) : null}
 
           {wahl.wert === null && !wahl.laedt ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              Deine Einstellungen sind gerade nicht abrufbar. Solange das so ist, ändern die
-              Schalter nichts — sonst würdest du etwas speichern, das du nie eingestellt hast.
+              Deine Einstellungen sind gerade nicht abrufbar. Solange das so
+              ist, ändern die Schalter nichts — sonst würdest du etwas
+              speichern, das du nie eingestellt hast.
             </Alert>
           ) : null}
 
@@ -142,8 +167,8 @@ export function SettingsPage() {
           </Box>
 
           <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
-            Höchstens eine Mail pro Stunde, egal wie viel passiert — auch der Zeitpunkt einer
-            Mail verrät etwas.
+            Höchstens eine Mail pro Stunde, egal wie viel passiert — auch der
+            Zeitpunkt einer Mail verrät etwas.
           </Typography>
         </CardContent>
       </Card>

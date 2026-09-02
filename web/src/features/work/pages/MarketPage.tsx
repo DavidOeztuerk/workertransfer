@@ -14,7 +14,11 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
-import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  EmptyBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import { useHandelnder } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -28,7 +32,11 @@ import {
 } from "../api/market";
 
 const WAHLEN: { wert: Availability; label: string; hinweis: string }[] = [
-  { wert: "open", label: "Ich suche aktiv", hinweis: "Unternehmen mit Freigabe dürfen zugehen." },
+  {
+    wert: "open",
+    label: "Ich suche aktiv",
+    hinweis: "Unternehmen mit Freigabe dürfen zugehen.",
+  },
   {
     wert: "listening",
     label: "Ich höre zu",
@@ -55,10 +63,19 @@ const WAHLEN: { wert: Availability; label: string; hinweis: string }[] = [
 export function MarketPage() {
   const { angemeldet, subjectId } = useHandelnder();
 
-  const stand = useAsync((signal) => getMyMarketStatus(signal), [subjectId], angemeldet);
-  const anfragen = useAsync((signal) => listMyMarketRequests(signal), [subjectId], angemeldet);
+  const stand = useAsync(
+    (signal) => getMyMarketStatus(signal),
+    [subjectId],
+    angemeldet,
+  );
+  const anfragen = useAsync(
+    (signal) => listMyMarketRequests(signal),
+    [subjectId],
+    angemeldet,
+  );
 
-  const [verfuegbarkeit, setVerfuegbarkeit] = useState<Availability>("unavailable");
+  const [verfuegbarkeit, setVerfuegbarkeit] =
+    useState<Availability>("unavailable");
   const [beschaeftigt, setBeschaeftigt] = useState(false);
   const [notiz, setNotiz] = useState("");
   const [gespeichert, setGespeichert] = useState(false);
@@ -84,7 +101,12 @@ export function MarketPage() {
           <CardContent>
             <Typography>
               Bitte{" "}
-              <Button component={RouterLink} to="/login" variant="text" size="small">
+              <Button
+                component={RouterLink}
+                to="/login"
+                variant="text"
+                size="small"
+              >
                 anmelden
               </Button>
               , um deinen Marktstatus zu setzen.
@@ -137,9 +159,9 @@ export function MarketPage() {
       title="Mein Marktstatus"
       narrow
       lead={
-        "Ob du ansprechbar bist, sieht nur, wem du es freigegeben hast — Unternehmen für "
-        + "Unternehmen, jedes einzeln. Es gibt hier bewusst kein „für alle“: dass jemand wechseln "
-        + "will, ist die heikelste Angabe auf dieser Plattform."
+        "Ob du ansprechbar bist, sieht nur, wem du es freigegeben hast — Unternehmen für " +
+        "Unternehmen, jedes einzeln. Es gibt hier bewusst kein „für alle“: dass jemand wechseln " +
+        "will, ist die heikelste Angabe auf dieser Plattform."
       }
     >
       {fehler !== null ? (
@@ -154,7 +176,9 @@ export function MarketPage() {
             Anfragen
           </Typography>
 
-          {anfragen.pending ? <LoadingBlock label="Anfragen werden geladen…" /> : null}
+          {anfragen.pending ? (
+            <LoadingBlock label="Anfragen werden geladen…" />
+          ) : null}
 
           {anfragen.data !== null && !anfragen.data.ok ? (
             <Alert severity="error">{anfragen.data.error.detail}</Alert>
@@ -165,13 +189,25 @@ export function MarketPage() {
           ) : null}
 
           {liste.length > 0 ? (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <Box
+              component="ul"
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 1.5,
+                listStyle: "none",
+                p: 0,
+                m: 0,
+              }}
+            >
               {liste.map((anfrage: MarketRequest) => (
                 <Anfragezeile
                   key={anfrage.id}
                   anfrage={anfrage}
                   gesperrt={laeuft}
-                  onAntwort={(erteilen) => void beantworten(anfrage.id, erteilen)}
+                  onAntwort={(erteilen) =>
+                    void beantworten(anfrage.id, erteilen)
+                  }
                   onZurueck={() => void zurueckziehen(anfrage.id)}
                 />
               ))}
@@ -186,7 +222,9 @@ export function MarketPage() {
             Bin ich ansprechbar?
           </Typography>
 
-          {stand.pending ? <LoadingBlock label="Marktstatus wird geladen…" /> : null}
+          {stand.pending ? (
+            <LoadingBlock label="Marktstatus wird geladen…" />
+          ) : null}
 
           {gespeichert ? (
             <Alert severity="success" sx={{ mb: 2 }} role="status">
@@ -216,8 +254,16 @@ export function MarketPage() {
               >
                 {WAHLEN.map((wahl) => (
                   <Box key={wahl.wert} sx={{ mb: 0.5 }}>
-                    <FormControlLabel value={wahl.wert} control={<Radio />} label={wahl.label} />
-                    <Typography variant="body2" color="text.secondary" sx={{ ml: 4 }}>
+                    <FormControlLabel
+                      value={wahl.wert}
+                      control={<Radio />}
+                      label={wahl.label}
+                    />
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ ml: 4 }}
+                    >
                       {wahl.hinweis}
                     </Typography>
                   </Box>
@@ -292,7 +338,7 @@ function Anfragezeile({
         : "Freigabe zurückgezogen";
 
   return (
-    <Card variant="outlined">
+    <Card component="li" variant="outlined">
       <CardContent
         sx={{
           display: "flex",
@@ -314,16 +360,31 @@ function Anfragezeile({
         <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
           {offen ? (
             <>
-              <Button variant="contained" size="small" onClick={() => onAntwort(true)} disabled={gesperrt}>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => onAntwort(true)}
+                disabled={gesperrt}
+              >
                 Freigeben
               </Button>
-              <Button variant="text" size="small" onClick={() => onAntwort(false)} disabled={gesperrt}>
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => onAntwort(false)}
+                disabled={gesperrt}
+              >
                 Ablehnen
               </Button>
             </>
           ) : null}
           {haeltZugriff ? (
-            <Button variant="text" size="small" onClick={onZurueck} disabled={gesperrt}>
+            <Button
+              variant="text"
+              size="small"
+              onClick={onZurueck}
+              disabled={gesperrt}
+            >
               Zurückziehen
             </Button>
           ) : null}

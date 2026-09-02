@@ -70,10 +70,10 @@ export function HomePage() {
           background: (theme) =>
             `radial-gradient(1200px 480px at 12% -10%, ${alpha(
               theme.palette.primary.main,
-              theme.palette.mode === "light" ? 0.14 : 0.22
+              theme.palette.mode === "light" ? 0.14 : 0.22,
             )}, transparent 62%), radial-gradient(900px 420px at 88% 4%, ${alpha(
               theme.palette.secondary.main,
-              theme.palette.mode === "light" ? 0.1 : 0.16
+              theme.palette.mode === "light" ? 0.1 : 0.16,
             )}, transparent 58%)`,
         }}
       >
@@ -96,15 +96,25 @@ export function HomePage() {
               variant="h1"
               sx={{
                 ...scale.display,
-                fontSize: { xs: "2.15rem", sm: "2.6rem", md: scale.display.fontSize },
+                fontSize: {
+                  xs: "2.15rem",
+                  sm: "2.6rem",
+                  md: scale.display.fontSize,
+                },
                 mb: 3,
               }}
             >
-              Neue Arbeit soll sich wie eine selbstbestimmte Entscheidung anfühlen.
+              Neue Arbeit soll sich wie eine selbstbestimmte Entscheidung
+              anfühlen.
             </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ fontSize: "1.0625rem", mb: 4 }}>
-              WorkerTransfer verbindet Bewerbung, direkte Ansprache und faire Wechselprozesse –
-              mit nachvollziehbarer KI-Unterstützung statt Black-Box-Entscheidungen.
+            <Typography
+              variant="body1"
+              color="text.secondary"
+              sx={{ fontSize: "1.0625rem", mb: 4 }}
+            >
+              WorkerTransfer verbindet Bewerbung, direkte Ansprache und faire
+              Wechselprozesse – mit nachvollziehbarer KI-Unterstützung statt
+              Black-Box-Entscheidungen.
             </Typography>
             {/* Beide Wege führen nach /register, und der zweite trägt seine
                 ABSICHT mit: ohne `?as=company` landet jemand, der „Als
@@ -115,7 +125,12 @@ export function HomePage() {
                 Seite: ein Unternehmen braucht eine BESTÄTIGTE Adresse
                 (ADR-0019), und das Konto wäre hier noch pending. */}
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
-              <Button component={RouterLink} to="/register" variant="contained" size="large">
+              <Button
+                component={RouterLink}
+                to="/register"
+                variant="contained"
+                size="large"
+              >
                 Als Arbeitnehmer starten
               </Button>
               <Button
@@ -145,7 +160,11 @@ export function HomePage() {
           >
             Unser Ausgangspunkt
           </Typography>
-          <Typography id={grundlagenId} variant="h2" sx={{ maxWidth: "26ch", mb: { xs: 4, md: 6 } }}>
+          <Typography
+            id={grundlagenId}
+            variant="h2"
+            sx={{ maxWidth: "26ch", mb: { xs: 4, md: 6 } }}
+          >
             Vertrauen ist kein Feature. Es ist die Architektur.
           </Typography>
 
@@ -174,7 +193,9 @@ export function HomePage() {
                   <Typography variant="h3" sx={{ mb: 1 }}>
                     {grundlage.titel}
                   </Typography>
-                  <Typography color="text.secondary">{grundlage.text}</Typography>
+                  <Typography color="text.secondary">
+                    {grundlage.text}
+                  </Typography>
                 </CardContent>
               </Card>
             ))}
@@ -212,9 +233,9 @@ export function HomePage() {
               </Typography>
             </Box>
             <Typography color="text.secondary" sx={{ maxWidth: "58ch" }}>
-              Zuerst entstehen sichere Identitäten, Profile und Einwilligungen. Danach folgen Jobs,
-              Bewerbungen, nachvollziehbare GitHub-Nachweise und ein einvernehmlicher
-              Transfer-Flow.
+              Zuerst entstehen sichere Identitäten, Profile und Einwilligungen.
+              Danach folgen Jobs, Bewerbungen, nachvollziehbare GitHub-Nachweise
+              und ein einvernehmlicher Transfer-Flow.
             </Typography>
           </Box>
         </Container>

@@ -8,7 +8,12 @@ import Divider from "@mui/material/Divider";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
-import { EmptyBlock, ErrorBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import {
+  EmptyBlock,
+  ErrorBlock,
+  LoadingBlock,
+  PageShell,
+} from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 import { useAsync } from "../lib/useAsync";
@@ -51,11 +56,15 @@ export function ResumePage() {
   const status = useAppSelector((state) => state.auth.status);
   const sitzung = useAppSelector((state) => state.auth.session);
 
-  const lebenslauf = useAsync((signal) => ladeMeinen(signal), [sitzung?.userId], sitzung !== null);
+  const lebenslauf = useAsync(
+    (signal) => ladeMeinen(signal),
+    [sitzung?.userId],
+    sitzung !== null,
+  );
   const anfragen = useAsync(
     (signal) => ladeMeineAnfragen(signal),
     [sitzung?.userId],
-    sitzung !== null
+    sitzung !== null,
   );
 
   const [zeilen, setZeilen] = useState<Station[]>([]);
@@ -68,22 +77,34 @@ export function ResumePage() {
   // stilles leeres Formular waere die Einladung, den Lebenslauf zu ueberschreiben.
   useEffect(() => {
     if (lebenslauf.wert?.ok && lebenslauf.wert.wert !== null) {
-      setZeilen(lebenslauf.wert.wert.positions.map((station) => ({ ...station })));
+      setZeilen(
+        lebenslauf.wert.wert.positions.map((station) => ({ ...station })),
+      );
     }
   }, [lebenslauf.wert]);
 
   if (status === "anonymous") {
-    return <AnmeldungNoetig titel="Mein Lebenslauf" zweck="deinen Lebenslauf zu bearbeiten" />;
+    return (
+      <AnmeldungNoetig
+        titel="Mein Lebenslauf"
+        zweck="deinen Lebenslauf zu bearbeiten"
+      />
+    );
   }
 
   function aendere(index: number, teil: Partial<Station>) {
-    setZeilen((vorher) => vorher.map((zeile, i) => (i === index ? { ...zeile, ...teil } : zeile)));
+    setZeilen((vorher) =>
+      vorher.map((zeile, i) => (i === index ? { ...zeile, ...teil } : zeile)),
+    );
     setGespeichert(false);
   }
 
   async function speichern() {
     setLaeuft(true);
-    const ergebnis = await speichereMeinen({ positions: zeilen, education: [] });
+    const ergebnis = await speichereMeinen({
+      positions: zeilen,
+      education: [],
+    });
     setLaeuft(false);
 
     if (ergebnis.ok) {
@@ -117,9 +138,9 @@ export function ResumePage() {
       title="Mein Lebenslauf"
       narrow
       lead={
-        "Diesen Lebenslauf sieht niemand, bis du ihn einem Unternehmen freigibst — Unternehmen "
-        + "für Unternehmen, jedes einzeln. Eine Freigabe kannst du jederzeit zurückziehen; sie "
-        + "wirkt sofort."
+        "Diesen Lebenslauf sieht niemand, bis du ihn einem Unternehmen freigibst — Unternehmen " +
+        "für Unternehmen, jedes einzeln. Eine Freigabe kannst du jederzeit zurückziehen; sie " +
+        "wirkt sofort."
       }
     >
       <Card sx={{ mb: 3 }}>
@@ -128,22 +149,38 @@ export function ResumePage() {
             Anfragen
           </Typography>
 
-          {anfragen.laedt ? <LoadingBlock label="Anfragen werden geladen…" /> : null}
+          {anfragen.laedt ? (
+            <LoadingBlock label="Anfragen werden geladen…" />
+          ) : null}
 
-          {anfragen.wert && !anfragen.wert.ok ? <ErrorBlock error={anfragen.wert.error} /> : null}
+          {anfragen.wert && !anfragen.wert.ok ? (
+            <ErrorBlock error={anfragen.wert.error} />
+          ) : null}
 
           {anfragen.wert?.ok && anfragen.wert.wert.length === 0 ? (
             <EmptyBlock title="Bislang hat niemand nach deinem Lebenslauf gefragt." />
           ) : null}
 
           {anfragen.wert?.ok && anfragen.wert.wert.length > 0 ? (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <Box
+              component="ul"
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 1.5,
+                listStyle: "none",
+                p: 0,
+                m: 0,
+              }}
+            >
               {anfragen.wert.wert.map((anfrage) => (
                 <Anfragezeile
                   key={anfrage.id}
                   anfrage={anfrage}
                   gesperrt={laeuft}
-                  onAntwort={(erteilen) => void beantworteAnfrage(anfrage.id, erteilen)}
+                  onAntwort={(erteilen) =>
+                    void beantworteAnfrage(anfrage.id, erteilen)
+                  }
                   onZurueck={() => void nimmZurueck(anfrage.id)}
                 />
               ))}
@@ -158,7 +195,9 @@ export function ResumePage() {
             Stationen
           </Typography>
 
-          {lebenslauf.laedt ? <LoadingBlock label="Lebenslauf wird geladen…" /> : null}
+          {lebenslauf.laedt ? (
+            <LoadingBlock label="Lebenslauf wird geladen…" />
+          ) : null}
 
           {lebenslauf.wert && !lebenslauf.wert.ok ? (
             <ErrorBlock error={lebenslauf.wert.error} />
@@ -192,7 +231,9 @@ export function ResumePage() {
                   <TextField
                     label="Arbeitgeber"
                     value={zeile.employer}
-                    onChange={(e) => aendere(index, { employer: e.target.value })}
+                    onChange={(e) =>
+                      aendere(index, { employer: e.target.value })
+                    }
                     required
                   />
                   <TextField
@@ -204,14 +245,20 @@ export function ResumePage() {
                   <TextField
                     label="Von"
                     value={zeile.started_on}
-                    onChange={(e) => aendere(index, { started_on: e.target.value })}
+                    onChange={(e) =>
+                      aendere(index, { started_on: e.target.value })
+                    }
                     helperText="Monat, zum Beispiel 2020-01"
                     required
                   />
                   <TextField
                     label="Bis"
                     value={zeile.ended_on ?? ""}
-                    onChange={(e) => aendere(index, { ended_on: endeNormalisieren(e.target.value) })}
+                    onChange={(e) =>
+                      aendere(index, {
+                        ended_on: endeNormalisieren(e.target.value),
+                      })
+                    }
                     helperText="Leer lassen, wenn du noch dort bist."
                   />
                 </Box>
@@ -222,7 +269,9 @@ export function ResumePage() {
             <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
               <Button
                 variant="outlined"
-                onClick={() => setZeilen((vorher) => [...vorher, { ...LEERE_STATION }])}
+                onClick={() =>
+                  setZeilen((vorher) => [...vorher, { ...LEERE_STATION }])
+                }
               >
                 Station hinzufügen
               </Button>
@@ -268,7 +317,7 @@ function Anfragezeile({
         : "Freigabe zurückgezogen";
 
   return (
-    <Card variant="outlined">
+    <Card component="li" variant="outlined">
       <CardContent
         sx={{
           display: "flex",
@@ -279,7 +328,9 @@ function Anfragezeile({
         }}
       >
         <Box>
-          <Typography variant="h4">Ein Unternehmen fragt nach deinem Lebenslauf</Typography>
+          <Typography variant="h4">
+            Ein Unternehmen fragt nach deinem Lebenslauf
+          </Typography>
           <Typography variant="body2" color="text.secondary">
             {stand}
           </Typography>
@@ -288,16 +339,31 @@ function Anfragezeile({
         <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
           {offen ? (
             <>
-              <Button variant="contained" size="small" onClick={() => onAntwort(true)} disabled={gesperrt}>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => onAntwort(true)}
+                disabled={gesperrt}
+              >
                 Freigeben
               </Button>
-              <Button variant="text" size="small" onClick={() => onAntwort(false)} disabled={gesperrt}>
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => onAntwort(false)}
+                disabled={gesperrt}
+              >
                 Ablehnen
               </Button>
             </>
           ) : null}
           {haeltZugriff ? (
-            <Button variant="text" size="small" onClick={onZurueck} disabled={gesperrt}>
+            <Button
+              variant="text"
+              size="small"
+              onClick={onZurueck}
+              disabled={gesperrt}
+            >
               Zurückziehen
             </Button>
           ) : null}

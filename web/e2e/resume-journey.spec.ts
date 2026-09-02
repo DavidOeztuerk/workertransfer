@@ -74,8 +74,11 @@ test("ein Lebenslauf erreicht nur das Unternehmen, dem er freigegeben wurde", as
 
   // Die Anfrage muss die Person erreichen, ohne dass sie danach sucht.
   await candidate.goto("/");
+  // Die Uebersicht sagt seit dem Umbau, WORUM es geht, statt nur "1 offene
+  // Anfrage" an einem Abzeichen. Die Zusage dieser Reise ist unveraendert: die
+  // Anfrage muss die Person erreichen, ohne dass sie danach sucht.
   await expect(
-    candidate.getByLabel(/1 offene Anfrage/i)
+    candidate.getByText("1 Anfrage nach deinem Lebenslauf")
   ).toBeVisible();
 
   // Die Person entscheidet — vorher gibt es nichts zu sehen.
