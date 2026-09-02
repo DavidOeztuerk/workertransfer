@@ -132,7 +132,22 @@ It sits **outside authentication** in the strongest sense available: no token ha
 
 **The counter runs in-process**, so the gateway is pinned to one replica. The way out is a registration change, not a rewrite: `RedisDistributedRateLimitStore` satisfies the same interface.
 
-**None of Girder's three rate limiters is used, and that is measured rather than assumed.** `DistributedRateLimitingMiddleware` and `RateLimitMiddleware` are wired but do not brake; `RateLimitingMiddleware` brakes but has no caller anywhere in Girder. The reason that would survive a fix: **all three trust `X-Forwarded-For` and `X-Real-IP` unconditionally**, and no trusted-proxy list exists anywhere in the library — eight requests against a limit of three all passed, simply by rotating a header the caller sets. Girder's *counter* (`IDistributedRateLimitStore`) is sound and is exactly what we do use. Full write-up in `bugs/ratenbegrenzung-drei-wege-zwei-bremsen-nicht.md`.
+**Girder's own rate limiter works, and the brake stays anyway — for a smaller reason than before.** Under 3.0.1 there were *three* limiters: two did not brake, the third had no caller, and all three trusted `X-Forwarded-For` unconditionally with no trusted-proxy list anywhere. All of that is fixed. Measured against 4.0.2, same probes the brake is held to:
+
+```
+limit 3/min, per origin
+  real origin 10.0.0.1                      200 200 200 429 429
+  same, with a forged X-Forwarded-For       200 200 200 429 429
+  X-Forwarded-For: 127.0.0.1 (the trap)     200 200 200 429 429
+  real loopback origin (exempt list)        200 200 200 200 200
+  same, exempt list emptied                 200 200 429 429 429
+```
+
+The third line is the one that mattered: the header that used to lift the brake without any configuration now changes nothing. `ClientAddress.Of` reads only `Connection.RemoteIpAddress`; a forwarded header works solely behind a named trust list (`TrustForwardedHeadersFrom`). `WhitelistedIps` still defaults to loopback, but that is no longer reachable by forging — only by genuinely coming from there.
+
+**`Bremse.cs` stays for one measured reason: Girder's rejection is `application/json` with a `traceId`** — not a problem document, no correlation id, hard-wired with no hook. That is exactly what is promised here: whoever complains about being locked out should be able to name an id. Filed as `bugs/abweisung-der-bremse-ist-kein-problemdokument.md`; when it lands, the chain goes.
+
+**In the eleven services the module stays out for a reason that has nothing to do with Girder and will not change:** a service behind the gateway sees the gateway as the origin — every caller as one. The brake belongs at the entrance, and there it is.
 
 ### CI
 
@@ -215,7 +230,11 @@ The table deliberately holds **no content**, only a user id and a kind. An outbo
 
 ### The Girder modules, all eighteen
 
-Girder exposes **18** module entry points on `InfrastructureBuilder`. We call **7**. This table is the standing answer to "why not that one?", and the rule behind it is inverted from what it used to be: **a module is called unless there is a measured reason against it.**
+Girder 4.0.2 names **25** modules in `GirderModule` (`Girder.Abstractions/Hosting/GirderModule.cs`). `UseDefaults()` asks for **18**; the remaining seven are opt-in because they need a decision Girder may not make. Our composition root takes the defaults, adds `Principal` (plus `PasswordHashing` and `TokenSessions` for identity only), and declares **four** exclusions with a reason each. Every one of the 25 is accounted for.
+
+The rule behind the table is inverted from what it used to be: **a module is called unless there is a measured reason against it**, and the reason lives in `.Without(module, reason)` in the code — `GirderBuilder` refuses an empty one.
+
+*(The table below is from the 3.0.1 era and names `InfrastructureBuilder` methods, not the module enum. It still records why each area was rejected, but the wiring it describes is gone: the migration to `AddGirder(...)` with `UseDefaults()` is H1 in `docs/AUFTRAG-UMSTIEG-4.md`, and the four measurements that revisited those decisions are H2 — written up in `docs/erkenntnisse-girder.md`. Where the two disagree, the measurements win.)*
 
 Two rules that produced most of the corrections here:
 
@@ -283,7 +302,11 @@ Route order in `ocelot.json` is pinned by `ReihenfolgeTests` against a *reversed
 
 ### Frontend
 
-`apps/web` (Vite + React 19 + TanStack Query + TanStack Router) consumes `@workertransfer/ui` (`packages/ui` — hand-written CSS with `--wt-*` custom properties; no Tailwind, no Radix, no component library). `Switch` is a `button[role="switch"]`, not a checkbox: a checkbox promises the change applies on submit, and for a consent toggle that difference is not cosmetic.
+`apps/web` is **being rebuilt** (in progress, see `docs/uebergabe/`): MUI 7+ with Emotion, Redux Toolkit, `react-router-dom` with `createBrowserRouter`, laid out per feature — `core/{api,router,store}`, `features/<name>/{components,pages,store,types}`, `shared/`. Colours, spacing and type live in `src/styles/tokens/` as the single source; `src/styles/theme.ts` builds the MUI theme from them, light and dark. A colour literal in a component is a defect, not a shortcut.
+
+**The palette deliberately drops green.** On a platform that decides about consent, green *is* a signal ("granted") and must not also be the house colour — mixing the two takes the signal's meaning away. Indigo carries, amber accents sparingly, and green/red/amber stay free for granted, revoked, in progress.
+
+The former stack (TanStack Query + TanStack Router, `packages/ui` with hand-written CSS) is still in the tree while pages migrate, and goes when they are through. One rule survives the rebuild verbatim: **a consent toggle is a switch, never a checkbox** — a checkbox promises the change applies on submit, and for a consent toggle that difference is not cosmetic. `shared/components/ui/ConsentSwitch` is the one place that renders it.
 
 **Every route path is English — no German, no mix**: `/`, `/overview`, `/login`, `/register`, `/verify`, `/invitation`, `/profile`, `/portfolio`, `/resume`, `/consents`, `/settings`, `/delete-account`, `/market`, `/transfers`, `/candidates`, `/jobs`, `/careers/<slug>`, `/applications`, `/my-data`, `/github`, `/company/team`, `/company/jobs`, `/company/profile`, `/company/transfers`. `/` is the marketing page and redirects a signed-in visitor to `/overview`; before that split one address served both, which left the overview unlinkable and made a screenshot of `/` depend on the session.
 
