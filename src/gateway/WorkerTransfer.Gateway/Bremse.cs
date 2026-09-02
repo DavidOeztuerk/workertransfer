@@ -142,6 +142,12 @@ public static class Bremse
     /// <summary>Wann es wieder geht, in Sekunden.</summary>
     public const string KopfSpaeter = "Retry-After";
 
+    /// <summary>Der Browser darf den Inhaltstyp nicht raten.</summary>
+    public const string KopfKeinRaten = "X-Content-Type-Options";
+
+    /// <summary>Diese Antwort gehört in keinen fremden Rahmen.</summary>
+    public const string KopfKeinRahmen = "X-Frame-Options";
+
     /// <summary>
     /// Wenn keine Herkunft feststellbar ist. Alle namenlosen Aufrufer teilen
     /// sich dann einen Topf — enger, nie weiter: eine unbekannte Herkunft darf
@@ -227,6 +233,21 @@ public static class Bremse
         context.Response.Headers[KopfSpaeter] =
             ((int)fenster.TotalSeconds).ToString(CultureInfo.InvariantCulture);
         context.Response.ContentType = "application/problem+json";
+
+        // Die Sicherheitsköpfe HIER und nicht als Stufe über der ganzen Kette.
+        //
+        // Das Gateway beantwortet fast nichts selbst — es reicht durch. Eine
+        // Stufe davor legte ihre Köpfe deshalb auch über die Oberfläche, und
+        // Girders Fassung bringt eine CSP mit `script-src 'self'` und
+        // `upgrade-insecure-requests` mit. Gemessen: die Oberfläche blieb weiss.
+        // Vites Modul-Einstieg ist inline, seine Worker sind `blob:` — beides
+        // von der CSP verboten —, und `upgrade-insecure-requests` schrieb
+        // `http://localhost:8090/…` auf `https://` um, wo niemand hört.
+        //
+        // Eine CSP ist für einen JSON-Rumpf ohnehin bedeutungslos. Was hier
+        // zählt, sind diese zwei Zeilen, und sie gehören zu DIESER Antwort.
+        context.Response.Headers[KopfKeinRaten] = "nosniff";
+        context.Response.Headers[KopfKeinRahmen] = "DENY";
 
         // Dieselbe Form wie in den Diensten (RFC 9457), damit der Browser eine
         // Antwort bekommt und keine zweite Fehlergestalt lernen muss.
