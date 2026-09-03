@@ -49,6 +49,13 @@ const de = {
     unsereGespraeche: "Unsere Gespräche",
     firmenprofil: "Unternehmensprofil",
     team: "Team",
+    einstellungenMenue: "Darstellung und Sprache",
+    navigation: "Navigation",
+    menueOeffnen: "Menü öffnen",
+    stellen: "Stellen",
+    uebersicht: "Übersicht",
+    marktstatus: "Marktstatus",
+    gespraeche: "Gespräche",
   },
 
   nichtGefunden: {

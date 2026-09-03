@@ -61,6 +61,8 @@ describe("die Kataloge", () => {
       "en:mannschaft.rolleAdmin",
       "en:kopf.github",
       "en:kopf.team",
+      "en:kopf.navigation",
+      "fr:kopf.navigation",
       "fr:freigaben.bereichProfile",
       "fr:freigaben.bereichGithub",
       "fr:bewerbungen.teilProfil",

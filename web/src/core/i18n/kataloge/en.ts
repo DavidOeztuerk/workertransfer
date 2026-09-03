@@ -46,6 +46,13 @@ const en: Katalog = {
     unsereGespraeche: "Our conversations",
     firmenprofil: "Company profile",
     team: "Team",
+    einstellungenMenue: "Appearance and language",
+    navigation: "Navigation",
+    menueOeffnen: "Open menu",
+    stellen: "Positions",
+    uebersicht: "Overview",
+    marktstatus: "Market status",
+    gespraeche: "Conversations",
   },
 
   nichtGefunden: {

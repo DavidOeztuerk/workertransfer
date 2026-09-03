@@ -7,17 +7,14 @@ import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 
 import { useAppSelector } from "../../../core/store/hooks";
-import { ColorModeToggle } from "./ColorModeToggle";
-import { LanguagePicker } from "./LanguagePicker";
 
 /**
- * Die Fusszeile — und der Ort, an dem die Darstellung eingestellt wird.
+ * Die Fusszeile.
  *
- * <strong>Sprache und Helligkeit stehen hier und nicht oben.</strong> Die
- * Kopfzeile gehört der Navigation und der einen Handlung, die auf einer Seite
- * zählt; ein Auswahlfeld dazwischen nimmt beiden den Platz und der Seite die
- * Ruhe. Beides sind zudem Dinge, die man einmal einstellt und dann Monate nicht
- * anfasst — solche Bedienelemente gehören nach unten, nicht in die Blickachse.
+ * <strong>Darstellung und Sprache standen hier und stehen jetzt oben</strong>,
+ * im Zahnrad. Der Gedanke „das stellt man einmal ein, also gehört es nach
+ * unten" war logisch und praktisch falsch: wer die Sprache wechselt, weil er
+ * die Oberfläche nicht lesen kann, scrollt nicht erst an das Ende der Seite.
  *
  * <strong>Die rechtlichen Seiten sind echt und nicht nur verlinkt.</strong> Ein
  * Verweis auf ein Impressum, das es nicht gibt, ist schlechter als kein
@@ -45,7 +42,7 @@ export function SiteFooter() {
             gridTemplateColumns: {
               xs: "1fr",
               sm: "repeat(2, 1fr)",
-              md: "1.6fr repeat(3, 1fr)",
+              md: "2fr repeat(2, 1fr)",
             },
           }}
         >
@@ -76,15 +73,6 @@ export function SiteFooter() {
             <Verweis to="/accessibility">{t("fuss.barrierefreiheit")}</Verweis>
           </Spalte>
 
-          <Spalte titel={t("fuss.darstellung")}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <LanguagePicker />
-              <ColorModeToggle />
-            </Box>
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-              {t("fuss.darstellungHinweis")}
-            </Typography>
-          </Spalte>
         </Box>
 
         <Divider sx={{ my: { xs: 4, md: 5 } }} />

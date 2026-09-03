@@ -46,6 +46,13 @@ const fr: Katalog = {
     unsereGespraeche: "Nos échanges",
     firmenprofil: "Profil de l’entreprise",
     team: "Équipe",
+    einstellungenMenue: "Affichage et langue",
+    navigation: "Navigation",
+    menueOeffnen: "Ouvrir le menu",
+    stellen: "Postes",
+    uebersicht: "Aperçu",
+    marktstatus: "Statut sur le marché",
+    gespraeche: "Échanges",
   },
 
   nichtGefunden: {
