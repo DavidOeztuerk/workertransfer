@@ -23,7 +23,7 @@ export async function nimmAn(token: string, signal?: AbortSignal): Promise<Einla
     API_BASE_URL,
     "/invitations/accept",
     { method: "POST", body: { token }, signal },
-    "Die Einladung konnte nicht angenommen werden."
+    "fehler.einladungNichtAngenommen"
   );
 
   if (antwort.ok) {
@@ -34,7 +34,7 @@ export async function nimmAn(token: string, signal?: AbortSignal): Promise<Einla
     return {
       ok: false,
       brauchtKonto: true,
-      meldung: "Bitte melde dich mit der eingeladenen Adresse an und öffne den Link erneut.",
+      meldung: "fehler.eingeladeneAdresse",
     };
   }
 
@@ -45,6 +45,6 @@ export async function nimmAn(token: string, signal?: AbortSignal): Promise<Einla
   return {
     ok: false,
     brauchtKonto: false,
-    meldung: "Diese Einladung ist nicht (mehr) gültig. Bitte lass dir eine neue schicken.",
+    meldung: "fehler.einladungUngueltig",
   };
 }

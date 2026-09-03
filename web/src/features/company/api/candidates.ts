@@ -8,7 +8,7 @@
 
 import { request } from "../../../core/api/client";
 import { PROFILE_BASE_URL } from "../../../env";
-import { type Fehlschlag, deuten } from "./fehler";
+import { type Fehlschlag, deuten } from "../../../shared/api/fehler";
 
 export interface Profile {
   subject_id: string;
@@ -75,7 +75,7 @@ export async function listCandidates(
     PROFILE_BASE_URL,
     `/candidates${candidateQuery(cursor, filters)}`,
     { signal },
-    "Die Liste konnte nicht geladen werden."
+    "fehler.listeNichtGeladen2"
   );
   if (antwort.ok) {
     return {
@@ -87,23 +87,23 @@ export async function listCandidates(
   return deuten<KandidatenFehler>(
     antwort.error,
     {
-      0: { reason: "offline", title: "Keine Verbindung zum Server." },
+      0: { reason: "offline", titel: "fehler.keineVerbindung" },
       401: {
         reason: "unauthenticated",
-        title: "Deine Sitzung ist abgelaufen.",
-        detail: "Bitte melde dich erneut an.",
+        titel: "fehler.sitzungAbgelaufen",
+        text: "fehler.erneutAnmelden",
       },
       403: {
         reason: "no-company",
-        title: "Profile sehen nur Unternehmen.",
-        detail: "Wechsle oben auf ein Unternehmen.",
+        titel: "fehler.nurFirmenProfile",
+        text: "fehler.firmaWaehlen",
       },
       // NICHT als leere Liste zeigen: das wäre die Behauptung, niemand habe
       // freigegeben — und genau das weiß in diesem Moment niemand.
       503: {
         reason: "consent-unavailable",
-        title: "Der Consent-Ledger antwortet gerade nicht.",
-        detail: "Wir zeigen lieber nichts als das Falsche.",
+        titel: "fehler.ledgerSchweigt",
+        text: "fehler.lieberNichts",
       },
     },
     "offline"

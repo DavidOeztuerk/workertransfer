@@ -7,7 +7,11 @@
 
 import { request } from "../../../core/api/client";
 import { APPLICATIONS_BASE_URL } from "../../../env";
-import { type Fehlschlag, deuten } from "./fehler";
+import {
+  type Deutung,
+  type Fehlschlag,
+  deuten,
+} from "../../../shared/api/fehler";
 
 export type ApplicationStatus = "submitted" | "reviewing" | "rejected" | "withdrawn" | "hired";
 
@@ -47,21 +51,21 @@ export type BewerbungErgebnis =
 export type ListenErgebnis = { ok: true; applications: Application[] } | Fehlschlag<"fehlgeschlagen" | "offline">;
 
 const SCHREIBFEHLER: Partial<
-  Record<number, { reason: BewerbungFehler; title: string; detail?: string }>
+  Record<number, Deutung<BewerbungFehler>>
 > = {
-  0: { reason: "offline", title: "Keine Verbindung zum Server." },
+  0: { reason: "offline", titel: "fehler.keineVerbindung" },
   401: {
     reason: "unauthenticated",
-    title: "Zum Bewerben brauchst du ein Konto.",
-    detail: "Bitte melde dich an.",
+    titel: "fehler.kontoZumBewerben",
+    text: "fehler.anmelden",
   },
-  404: { reason: "gone", title: "Diese Stelle ist nicht mehr offen." },
+  404: { reason: "gone", titel: "fehler.stelleGeschlossen" },
   // Weder abgelehnt noch angenommen: wir wissen es gerade nicht, und eine
   // Absage, die niemand ausgesprochen hat, wäre die schlimmere Antwort.
   503: {
     reason: "unavailable",
-    title: "Ein beteiligter Dienst antwortet gerade nicht.",
-    detail: "Bitte später erneut versuchen.",
+    titel: "fehler.dienstSchweigt",
+    text: "fehler.spaeterErneut",
   },
 };
 
@@ -70,7 +74,7 @@ async function schreiben(path: string, body?: unknown): Promise<BewerbungErgebni
     APPLICATIONS_BASE_URL,
     path,
     { method: "POST", body },
-    "Die Bewerbung konnte nicht abgeschickt werden."
+    "fehler.bewerbungNichtGesendet"
   );
   if (antwort.ok) return { ok: true, application: antwort.value };
   // `409` behält den Satz des Servers: der Zustand passt nicht, und die Person
@@ -101,7 +105,7 @@ async function liste(path: string, signal?: AbortSignal): Promise<ListenErgebnis
     APPLICATIONS_BASE_URL,
     path,
     { signal },
-    "Die Liste ließ sich nicht laden."
+    "fehler.listeNichtGeladen"
   );
   if (antwort.ok) return { ok: true, applications: antwort.value ?? [] };
   // Kein Konto bzw. kein aktives Unternehmen: ein behebbarer Zustand, kein
@@ -111,7 +115,7 @@ async function liste(path: string, signal?: AbortSignal): Promise<ListenErgebnis
   }
   return deuten<"fehlgeschlagen" | "offline">(
     antwort.error,
-    { 0: { reason: "offline", title: "Keine Verbindung zum Server." } },
+    { 0: { reason: "offline", titel: "fehler.keineVerbindung" } },
     "fehlgeschlagen"
   );
 }

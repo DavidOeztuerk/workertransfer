@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -19,10 +20,11 @@ import {
 } from "../../work/api/market";
 import { expressInterest } from "../../work/api/transfers";
 
+/** Als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
 const ANSPRECHBARKEIT: Record<string, string> = {
-  open: "Sucht aktiv",
-  listening: "Hört zu",
-  unavailable: "Gerade nicht ansprechbar",
+  open: "kandidaten.ansprechbarOpen",
+  listening: "kandidaten.ansprechbarListening",
+  unavailable: "kandidaten.ansprechbarUnavailable",
 };
 
 /**
@@ -46,6 +48,8 @@ export function CandidateCard({
   marketRequest: MarketRequest | undefined;
   onGeaendert: () => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Card component="li">
       <CardContent>
@@ -53,8 +57,10 @@ export function CandidateCard({
           {profile.headline}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          {profile.location !== "" ? profile.location : "Ort nicht angegeben"}
-          {profile.remote_ok ? " · Remote möglich" : null}
+          {profile.location !== ""
+            ? profile.location
+            : t("kandidaten.ortFehlt")}
+          {profile.remote_ok ? t("kandidaten.remoteMoeglich") : null}
         </Typography>
 
         {profile.bio !== "" ? (
@@ -90,6 +96,7 @@ export function CandidateCard({
  * können soll.
  */
 function Lebenslaufanfrage({ subjectId }: { subjectId: string }) {
+  const { t } = useTranslation();
   const [meldung, setMeldung] = useState<string | null>(null);
   const [gefragt, setGefragt] = useState(false);
   const [laeuft, setLaeuft] = useState(false);
@@ -97,7 +104,7 @@ function Lebenslaufanfrage({ subjectId }: { subjectId: string }) {
   if (gefragt) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Anfrage gestellt. Die Person entscheidet.
+        {t("kandidaten.lebenslaufGefragt")}
       </Typography>
     );
   }
@@ -126,7 +133,7 @@ function Lebenslaufanfrage({ subjectId }: { subjectId: string }) {
           });
         }}
       >
-        {laeuft ? "Wird gefragt…" : "Lebenslauf anfragen"}
+        {laeuft ? t("kandidaten.wirdGefragt") : t("kandidaten.lebenslaufAnfragen")}
       </Button>
     </Box>
   );
@@ -149,6 +156,7 @@ function Marktzugang({
   anfrage: MarketRequest | undefined;
   onGeaendert: () => void;
 }) {
+  const { t } = useTranslation();
   const [meldung, setMeldung] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
 
@@ -183,33 +191,33 @@ function Marktzugang({
             });
           }}
         >
-          {laeuft ? "Wird gefragt…" : "Marktstatus anfragen"}
+          {laeuft ? t("kandidaten.wirdGefragt") : t("kandidaten.marktAnfragen")}
         </Button>
       ) : null}
 
       {anfrage?.status === "PENDING" ? (
         <Typography variant="body2" color="text.secondary">
-          Marktstatus angefragt. Die Person entscheidet.
+          {t("kandidaten.marktAngefragt")}
         </Typography>
       ) : null}
 
       {anfrage?.status === "DECLINED" ? (
         <Typography variant="body2" color="text.secondary">
-          Marktstatus abgelehnt.
+          {t("kandidaten.marktAbgelehnt")}
         </Typography>
       ) : null}
 
       {erteilt && status === null && !stand.pending ? (
         <Typography variant="body2" color="text.secondary">
-          Marktstatus gerade nicht einsehbar.
+          {t("kandidaten.marktNichtEinsehbar")}
         </Typography>
       ) : null}
 
       {status !== null ? (
         <>
           <Typography variant="body2" color="text.secondary">
-            {ANSPRECHBARKEIT[status.availability]}
-            {status.employed ? " · arbeitet gerade" : null}
+            {t(ANSPRECHBARKEIT[status.availability] ?? status.availability)}
+            {status.employed ? t("kandidaten.arbeitetGerade") : null}
           </Typography>
           {status.note !== "" ? (
             <Typography sx={{ mt: 0.5 }}>{status.note}</Typography>
@@ -224,20 +232,22 @@ function Marktzugang({
                 setLaeuft(true);
                 void expressInterest(
                   subjectId,
-                  "Wir würden gern mit dir sprechen.",
+                  t("kandidaten.interesseText"),
                 ).then(
                   (ergebnis: Awaited<ReturnType<typeof expressInterest>>) => {
                     setLaeuft(false);
                     setMeldung(
                       ergebnis.ok
-                        ? "Interesse hinterlegt. Die Person entscheidet."
+                        ? t("kandidaten.interesseHinterlegt")
                         : ergebnis.error.detail,
                     );
                   },
                 );
               }}
             >
-              {laeuft ? "Wird hinterlegt…" : "Interesse zeigen"}
+              {laeuft
+                ? t("kandidaten.interesseLaeuft")
+                : t("kandidaten.interesseZeigen")}
             </Button>
           ) : null}
         </>
@@ -254,6 +264,7 @@ function Marktzugang({
  * Wertung. Keine Repositories sind kein Mangel, sondern eine Auskunft.
  */
 function GitHubBelege({ subjectId }: { subjectId: string }) {
+  const { t, i18n } = useTranslation();
   const verbindung = useAsync(
     (signal) => getGitHub(subjectId, signal),
     [subjectId],
@@ -276,7 +287,7 @@ function GitHubBelege({ subjectId }: { subjectId: string }) {
 
       {stand.repositories.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          Keine öffentlichen Repositories.
+          {t("kandidaten.keineRepos")}
         </Typography>
       ) : (
         <Box component="ul" sx={{ pl: 2.5, my: 1 }}>
@@ -293,7 +304,11 @@ function GitHubBelege({ subjectId }: { subjectId: string }) {
 
       {stand.fetched_at !== null ? (
         <Typography variant="caption" color="text.secondary">
-          Stand: {new Date(stand.fetched_at).toLocaleDateString("de-DE")}
+          {t("kandidaten.standVom", {
+            zeitpunkt: new Date(stand.fetched_at).toLocaleDateString(
+              i18n.language,
+            ),
+          })}
         </Typography>
       ) : null}
     </Box>

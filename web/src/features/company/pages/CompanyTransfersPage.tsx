@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -173,6 +174,7 @@ function Transferkarte({
   onZug: (zug: CompanyAction) => void;
   onAngebot: (text: string, start: string, abloese: string) => void;
 }) {
+  const { t } = useTranslation();
   const [text, setText] = useState("");
   const [start, setStart] = useState("");
   const [abloese, setAbloese] = useState("");
@@ -203,11 +205,9 @@ function Transferkarte({
         */}
         {transfer.requires_release && !transfer.release_confirmed ? (
           <Alert severity="info" sx={{ mb: 2 }}>
-            <strong>Braucht eine Freigabe.</strong> Die Person arbeitet gerade
-            woanders. Den Abschluss macht deshalb sie, sobald sie bestätigt hat,
-            dass ihr Arbeitgeber sie gehen lässt — ihr könnt ihn nicht für sie
-            machen. <strong>Diese Plattform fragt ihn nicht</strong>: sie weiß
-            nicht, wer er ist, und will es nicht wissen.
+            <strong>{t("transfer.brauchtFreigabeTitel")}</strong>{" "}
+            {t("transfer.brauchtFreigabeText")}{" "}
+            <strong>{t("transfer.brauchtFreigabeZusage")}</strong>
           </Alert>
         ) : null}
 

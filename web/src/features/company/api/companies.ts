@@ -6,7 +6,8 @@
 
 import { request } from "../../../core/api/client";
 import { COMPANIES_BASE_URL } from "../../../env";
-import { type Fehlschlag, deuten } from "./fehler";
+import { type Fehlschlag, deuten } from "../../../shared/api/fehler";
+import { i18n } from "../../../core/i18n/i18n";
 
 export interface CompanyProfile {
   tenant_id: string;
@@ -82,13 +83,13 @@ export async function getOwnCompanyProfile(
     COMPANIES_BASE_URL,
     "/companies/me/profile",
     { signal },
-    "Das Profil ist gerade nicht abrufbar."
+    "fehler.profilNichtAbrufbar"
   );
   if (antwort.ok) return { ok: true, profile: antwort.value ?? null };
   return deuten<"unavailable">(
     antwort.error,
     {
-      0: { reason: "unavailable", title: "Das Profil ist gerade nicht abrufbar." },
+      0: { reason: "unavailable", titel: "fehler.profilNichtAbrufbar" },
     },
     "unavailable"
   );
@@ -103,14 +104,14 @@ export async function saveCompanyProfile(
     // Kein `tenant_id`: das Unternehmen steht im Token und wird gegen die
     // Mitgliedschaft geprüft.
     { method: "PUT", body: input },
-    "Das Profil konnte nicht gespeichert werden."
+    "fehler.profilNichtGespeichert"
   );
   if (antwort.ok) return { ok: true, profile: antwort.value };
   return deuten<"no-company" | "invalid" | "offline">(
     antwort.error,
     {
-      0: { reason: "offline", title: "Keine Verbindung zum Server." },
-      403: { reason: "no-company", title: "Wähle oben ein Unternehmen, für das du handelst." },
+      0: { reason: "offline", titel: "fehler.keineVerbindung" },
+      403: { reason: "no-company", titel: "fehler.firmaWaehlenHandelnd" },
     },
     "invalid"
   );
@@ -138,7 +139,7 @@ export async function getCompanyBySlug(
     COMPANIES_BASE_URL,
     `/companies/by-slug/${encodeURIComponent(slug)}`,
     { signal },
-    "Diese Seite ist gerade nicht abrufbar."
+    "fehler.seiteNichtAbrufbar"
   );
   if (antwort.ok && antwort.value !== undefined && antwort.value !== null) {
     return { ok: true, profile: antwort.value };
@@ -149,18 +150,18 @@ export async function getCompanyBySlug(
       reason: "unavailable",
       error: {
         status: 0,
-        title: "Diese Seite ist gerade nicht abrufbar.",
-        detail: "Diese Seite ist gerade nicht abrufbar.",
+        title: i18n.t("fehler.seiteNichtAbrufbar"),
+        detail: i18n.t("fehler.seiteNichtAbrufbar"),
       },
     };
   }
   return deuten<"not-found" | "unavailable">(
     antwort.error,
     {
-      0: { reason: "unavailable", title: "Keine Verbindung zum Server." },
+      0: { reason: "unavailable", titel: "fehler.keineVerbindung" },
       404: {
         reason: "not-found",
-        title: "Unter dieser Adresse ist kein Unternehmen hinterlegt.",
+        titel: "fehler.keineFirmaUnterAdresse",
       },
     },
     "unavailable"

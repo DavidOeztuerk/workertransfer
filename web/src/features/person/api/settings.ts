@@ -41,7 +41,7 @@ export async function ladeWahl(signal?: AbortSignal): Promise<Benachrichtigungsw
     API_BASE_URL,
     PFAD,
     { signal },
-    "Die Einstellungen sind gerade nicht abrufbar."
+    "fehler.einstellungenNichtAbrufbar"
   );
 
   return antwort.ok ? (antwort.value ?? null) : null;
@@ -60,7 +60,7 @@ export async function speichereWahl(
     API_BASE_URL,
     PFAD,
     { method: "PUT", body: wahl, signal },
-    "Die Einstellungen konnten nicht gespeichert werden."
+    "fehler.einstellungenNichtGespeichert"
   );
 
   return antwort.ok ? { ok: true, wahl: antwort.value ?? wahl } : { ok: false, error: antwort.error };

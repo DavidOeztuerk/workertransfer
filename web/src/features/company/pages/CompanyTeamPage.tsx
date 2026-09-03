@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -37,6 +38,7 @@ import {
  * behandelt werden könnte.
  */
 export function CompanyTeamPage() {
+  const { t } = useTranslation();
   const { fuerFirma, tenantId, subjectId } = useHandelnder();
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
@@ -55,12 +57,11 @@ export function CompanyTeamPage() {
 
   if (!fuerFirma) {
     return (
-      <PageShell title="Mannschaft" narrow>
+      <PageShell title={t("mannschaft.titel")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              Die Mannschaft sieht nur, wer für ein Unternehmen handelt. Wechsle
-              oben auf ein Unternehmen.
+              {t("mannschaft.nurFirma")}
             </Typography>
           </CardContent>
         </Card>
@@ -94,12 +95,9 @@ export function CompanyTeamPage() {
 
   return (
     <PageShell
-      title="Mannschaft"
+      title={t("mannschaft.titel")}
       narrow
-      lead={
-        "Wer hier steht, kann für das Unternehmen handeln — Profile sehen, Lebensläufe anfragen. " +
-        "Administratoren dürfen außerdem einladen."
-      }
+      lead={t("mannschaft.lead")}
       actions={
         istAdmin ? (
           <Button
@@ -107,7 +105,7 @@ export function CompanyTeamPage() {
             to="/company/team/invite"
             variant="contained"
           >
-            Einladen
+            {t("mannschaft.einladen")}
           </Button>
         ) : undefined
       }
@@ -121,13 +119,13 @@ export function CompanyTeamPage() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            Mitglieder
+            {t("mannschaft.mitglieder")}
           </Typography>
 
           {/* Der LADEZUSTAND fehlte im alten Code, und die Karte blieb
               währenddessen leer. */}
           {mitglieder.pending ? (
-            <LoadingBlock label="Mitglieder werden geladen…" />
+            <LoadingBlock label={t("mannschaft.mitgliederLaden")} />
           ) : null}
 
           {mitglieder.data !== null && !mitglieder.data.ok ? (
@@ -150,7 +148,11 @@ export function CompanyTeamPage() {
                 <Zeile
                   key={eintrag.user_id}
                   titel={eintrag.display_name}
-                  meta={eintrag.role === "admin" ? "Administrator" : "Mitglied"}
+                  meta={t(
+                    eintrag.role === "admin"
+                      ? "mannschaft.rolleAdmin"
+                      : "mannschaft.rolleMitglied",
+                  )}
                   aktion={
                     istAdmin ? (
                       <Button
@@ -159,9 +161,11 @@ export function CompanyTeamPage() {
                         onClick={() => void entfernen(eintrag.user_id)}
                         disabled={laeuft}
                       >
-                        {eintrag.user_id === subjectId
-                          ? "Verlassen"
-                          : "Entfernen"}
+                        {t(
+                          eintrag.user_id === subjectId
+                            ? "mannschaft.verlassen"
+                            : "mannschaft.entfernen",
+                        )}
                       </Button>
                     ) : undefined
                   }
@@ -175,11 +179,11 @@ export function CompanyTeamPage() {
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            Offene Einladungen
+            {t("mannschaft.einladungen")}
           </Typography>
 
           {einladungen.pending ? (
-            <LoadingBlock label="Einladungen werden geladen…" />
+            <LoadingBlock label={t("mannschaft.einladungenLaden")} />
           ) : null}
 
           {einladungen.data !== null && !einladungen.data.ok ? (
@@ -187,7 +191,7 @@ export function CompanyTeamPage() {
           ) : null}
 
           {einladungen.data?.ok && offene.length === 0 ? (
-            <EmptyBlock title="Keine offenen Einladungen." />
+            <EmptyBlock title={t("mannschaft.einladungenLeer")} />
           ) : null}
 
           {offene.length > 0 ? (
@@ -199,7 +203,11 @@ export function CompanyTeamPage() {
                 <Zeile
                   key={eintrag.id}
                   titel={eintrag.email}
-                  meta={eintrag.role === "admin" ? "Administrator" : "Mitglied"}
+                  meta={t(
+                    eintrag.role === "admin"
+                      ? "mannschaft.rolleAdmin"
+                      : "mannschaft.rolleMitglied",
+                  )}
                   aktion={
                     istAdmin ? (
                       <Button
@@ -208,7 +216,7 @@ export function CompanyTeamPage() {
                         onClick={() => void zurueckziehen(eintrag.id)}
                         disabled={laeuft}
                       >
-                        Zurückziehen
+                        {t("allgemein.zurueckziehen")}
                       </Button>
                     ) : undefined
                   }

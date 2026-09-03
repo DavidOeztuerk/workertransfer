@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -79,6 +80,7 @@ function zuArbeit(entwurf: Entwurf): Arbeit {
  * eine Zeile unter vielen.
  */
 export function PortfolioItemPage() {
+  const { t } = useTranslation();
   const { stelle } = useParams();
   const navigate = useNavigate();
   const status = useAppSelector((state) => state.auth.status);
@@ -115,16 +117,16 @@ export function PortfolioItemPage() {
   if (status === "anonymous") {
     return (
       <AnmeldungNoetig
-        titel="Arbeit bearbeiten"
-        zweck="deine Arbeiten zu bearbeiten"
+        titel={t("arbeiten.einzelTitel")}
+        satz="arbeiten.anmelden"
       />
     );
   }
 
   if (schaufenster.laedt) {
     return (
-      <PageShell title="Arbeit bearbeiten" narrow>
-        <LoadingBlock label="Arbeiten werden geladen…" />
+      <PageShell title={t("arbeiten.einzelTitel")} narrow>
+        <LoadingBlock label={t("arbeiten.einzelLaden")} />
       </PageShell>
     );
   }
@@ -133,13 +135,13 @@ export function PortfolioItemPage() {
   // zweiten Tab, oder wenn jemand die Zahl von Hand ändert.
   if (!neu && !vorhanden) {
     return (
-      <PageShell title="Diese Arbeit gibt es nicht" narrow>
+      <PageShell title={t("arbeiten.einzelFehltTitel")} narrow>
         <EmptyBlock
-          title="Diese Arbeit gibt es nicht"
-          hint="Vielleicht wurde sie entfernt."
+          title={t("arbeiten.einzelFehltTitel")}
+          hint={t("arbeiten.einzelFehltHinweis")}
           action={
             <Button component={RouterLink} to="/portfolio" variant="contained">
-              Zurück zu meinen Arbeiten
+              {t("arbeiten.zurueck")}
             </Button>
           }
         />
@@ -189,16 +191,16 @@ export function PortfolioItemPage() {
     <PageShell
       title={
         neu
-          ? "Neue Arbeit"
+          ? t("arbeiten.einzelNeu")
           : entwurf.title !== ""
             ? entwurf.title
-            : "Arbeit bearbeiten"
+            : t("arbeiten.einzelTitel")
       }
       narrow
     >
       <Box sx={{ mb: 2 }}>
         <Link component={RouterLink} to="/portfolio" variant="body2">
-          Zurück zu meinen Arbeiten
+          {t("arbeiten.zurueck")}
         </Link>
       </Box>
 
@@ -219,47 +221,49 @@ export function PortfolioItemPage() {
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
             <TextField
-              label="Titel"
+              label={t("arbeiten.feldTitel")}
               value={entwurf.title}
               onChange={(e) => aendere({ title: e.target.value })}
               required
             />
             <TextField
-              label="Worum es geht"
+              label={t("arbeiten.feldWorum")}
               value={entwurf.summary}
               onChange={(e) => aendere({ summary: e.target.value })}
-              helperText="Was es ist und was du daran gemacht hast."
+              helperText={t("arbeiten.feldWorumHinweis")}
               multiline
               minRows={3}
             />
             <TextField
-              label="Link"
+              label={t("arbeiten.feldLink")}
               value={entwurf.url}
               onChange={(e) => aendere({ url: e.target.value })}
-              helperText="Optional, und nur http oder https."
+              helperText={t("arbeiten.feldLinkHinweis")}
             />
             <TextField
-              label="Deine Rolle"
+              label={t("arbeiten.feldRolle")}
               value={entwurf.role}
               onChange={(e) => aendere({ role: e.target.value })}
             />
             <TextField
-              label="Jahr"
+              label={t("arbeiten.feldJahr")}
               value={entwurf.year}
               onChange={(e) => aendere({ year: e.target.value })}
             />
 
             <Box>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                Datei
+                {t("arbeiten.datei")}
               </Typography>
               {/* Der lokale Dateiname wird NICHT angezeigt: er wandert nicht zum
                   Server, und die Oberfläche soll nur sagen, was wahr ist — dass
                   eine Datei hängt. */}
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {entwurf.attachment !== null
-                  ? "Eine Datei hängt an dieser Arbeit."
-                  : "Keine Datei."}
+                {t(
+                  entwurf.attachment !== null
+                    ? "arbeiten.dateiHaengtAn"
+                    : "arbeiten.keineDatei",
+                )}
               </Typography>
               <Button
                 component="label"
@@ -267,7 +271,7 @@ export function PortfolioItemPage() {
                 size="small"
                 disabled={laeuft}
               >
-                Datei wählen
+                {t("arbeiten.dateiWaehlen")}
                 <input
                   type="file"
                   hidden
@@ -285,7 +289,9 @@ export function PortfolioItemPage() {
 
             <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
               <Button type="submit" variant="contained" disabled={laeuft}>
-                {laeuft ? "Wird gespeichert…" : "Speichern"}
+                {laeuft
+                  ? t("allgemein.speichernLaeuft")
+                  : t("allgemein.speichern")}
               </Button>
               {!neu ? (
                 <Button
@@ -294,7 +300,9 @@ export function PortfolioItemPage() {
                   onClick={() => void entfernen()}
                   disabled={laeuft}
                 >
-                  {laeuft ? "Wird entfernt…" : "Diese Arbeit entfernen"}
+                  {laeuft
+                    ? t("arbeiten.entfernenLaeuft")
+                    : t("arbeiten.entfernen")}
                 </Button>
               ) : null}
             </Box>

@@ -1,4 +1,5 @@
 import Box from "@mui/material/Box";
+import { Trans, useTranslation } from "react-i18next";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
@@ -63,6 +64,7 @@ export function Requirements({
   skills: string[];
   mine: string[] | null;
 }) {
+  const { t } = useTranslation();
   // Dieselbe Aufbereitung wie im Abgleich, damit die angezeigte Liste und die
   // verglichene dieselbe ist. Liefen sie auseinander, stünde ein Eintrag da,
   // der nie ein Haken werden kann.
@@ -82,14 +84,18 @@ export function Requirements({
     <Box sx={{ mt: 1.5 }}>
       {match !== null ? (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
-          Du hast {match.have.length} von {listed.length} genannten Fähigkeiten:
+          {t("stellen.duHast", {
+            treffer: match.have.length,
+            gesamt: listed.length,
+          })}
         </Typography>
       ) : null}
       {mine !== null && mine.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
-          Trage Fähigkeiten in deinem{" "}
-          <RouterLink to="/profile">Profil</RouterLink> ein, dann siehst du
-          hier, was davon du mitbringst.
+          <Trans
+            i18nKey="stellen.keineFaehigkeiten"
+            components={{ 1: <RouterLink to="/profile" /> }}
+          />
         </Typography>
       ) : null}
       <Box
@@ -135,7 +141,7 @@ export function Requirements({
                   das Wort. Sonst hörte man drei Namen und keinen Unterschied. */}
               {state !== "unknown" ? (
                 <NurVorgelesen>
-                  {state === "have" ? " (hast du)" : " (fehlt dir)"}
+                  {t(state === "have" ? "stellen.hastDu" : "stellen.fehltDir")}
                 </NurVorgelesen>
               ) : null}
             </Box>

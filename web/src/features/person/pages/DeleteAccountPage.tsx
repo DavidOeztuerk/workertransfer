@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -14,16 +15,8 @@ import { sitzungBeendet } from "../../auth/store/authSlice";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 import { loeschungVerlangen } from "../api/erasure";
 
-const WAS_VERSCHWINDET = [
-  "Dein Konto: E-Mail-Adresse, Passwort, Anzeigename.",
-  "Dein Profil mit Überschrift, Text, Ort und Fähigkeiten.",
-  "Dein Lebenslauf mit allen Stationen und Ausbildungen.",
-  "Deine Arbeiten samt hochgeladener Dateien.",
-  "Dein Marktstatus und alle Gespräche über einen Wechsel.",
-  "Deine Bewerbungen samt der Anschreiben, die du geschrieben hast.",
-  "Deine GitHub-Verbindung.",
-  "Deine Benachrichtigungs-Einstellungen.",
-];
+/** Nur die Nummern — der Wortlaut liegt in den Katalogen. */
+const WAS_VERSCHWINDET = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 function Abschnitt({
   titel,
@@ -67,6 +60,7 @@ function Abschnitt({
  * sonst liest die Person direkt nach dem Löschen „Bitte anmelden“.
  */
 export function DeleteAccountPage() {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const status = useAppSelector((state) => state.auth.status);
   const firmen = useAppSelector((state) => state.auth.memberships);
@@ -79,22 +73,20 @@ export function DeleteAccountPage() {
   // ZUERST. Siehe oben — nach dem Löschen gibt es keinen Prinzipal mehr.
   if (angenommen) {
     return (
-      <PageShell title="Konto löschen" narrow>
+      <PageShell title={t("loeschung.titel")} narrow>
         <Card>
           <CardContent>
             {/* `info` und nicht `error`: das ist eine Bestätigung. Ein roter
                 Kasten hier läse sich, als sei etwas schiefgegangen. */}
             <Alert severity="info" sx={{ mb: 2 }} role="status">
-              <strong>Deine Löschung ist angenommen und läuft.</strong> Du bist
-              abgemeldet, und unter deinem Namen passiert ab jetzt nichts mehr.
-              Wir schicken dir <strong>eine einzige E-Mail</strong>, sobald
-              alles gelöscht ist — bis dahin gibt es hier nichts mehr zu sehen.
+              <strong>{t("loeschung.angenommenTitel")}</strong>{" "}
+              <Trans
+                i18nKey="loeschung.angenommenText"
+                components={{ 1: <strong /> }}
+              />
             </Alert>
             <Typography variant="body2" color="text.secondary">
-              Dass es etwas dauert, hat einen einfachen Grund: deine Daten
-              liegen bei mehreren Diensten, und jeder muss den Auftrag
-              bestätigen. Erreicht er einen davon nicht, gilt die Löschung nicht
-              als fertig — und du bekommst keine Nachricht, die nicht stimmt.
+              {t("loeschung.angenommenWarum")}
             </Typography>
           </CardContent>
         </Card>
@@ -104,7 +96,10 @@ export function DeleteAccountPage() {
 
   if (status !== "authenticated") {
     return (
-      <AnmeldungNoetig titel="Konto löschen" zweck="dein Konto zu löschen" />
+      <AnmeldungNoetig
+        titel={t("loeschung.titel")}
+        satz="loeschung.anmelden"
+      />
     );
   }
 
@@ -132,89 +127,70 @@ export function DeleteAccountPage() {
 
   return (
     <PageShell
-      title="Konto löschen"
+      title={t("loeschung.titel")}
       narrow
-      lead={
-        "Hier wird dein Konto gelöscht — unwiderruflich. Es gibt keinen Papierkorb und keine " +
-        "Frist, in der du es dir noch anders überlegen kannst. Was hier steht, gilt; deshalb " +
-        "steht es hier und nicht im Kleingedruckten."
-      }
+      lead={t("loeschung.lead")}
     >
-      <Abschnitt titel="Was gelöscht wird">
+      <Abschnitt titel={t("loeschung.wasTitel")}>
         <Box component="ul" sx={{ pl: 2.5, m: 0, mb: 2 }}>
-          {WAS_VERSCHWINDET.map((zeile) => (
-            <Typography component="li" key={zeile} sx={{ mb: 0.5 }}>
-              {zeile}
+          {WAS_VERSCHWINDET.map((nummer) => (
+            <Typography component="li" key={nummer} sx={{ mb: 0.5 }}>
+              {t(`loeschung.was${nummer}`)}
             </Typography>
           ))}
         </Box>
         <Typography variant="body2" color="text.secondary">
-          <strong>Es bleibt nichts davon stehen.</strong> Auch nicht die
-          Bewerbung, über die du <strong>eingestellt</strong> wurdest — auch die
-          verschwindet aus der Liste des Unternehmens. Das ist so gewollt: die
-          Unterlage über ein Arbeitsverhältnis ist dein Vertrag beim
-          Arbeitgeber, nicht eine Zeile bei einer Vermittlungsplattform.
+          <Trans
+            i18nKey="loeschung.nichtsBleibt"
+            components={[<strong key="a" />, <strong key="b" />]}
+          />
         </Typography>
       </Abschnitt>
 
-      <Abschnitt titel="Was bleibt — und warum">
+      <Abschnitt titel={t("loeschung.bleibtTitel")}>
         <Typography variant="body2" color="text.secondary">
-          Ein Nachweis darüber, <em>dass</em> gelöscht wurde: welche Freigaben
-          unter deiner Kennung einmal erteilt und wann sie zurückgenommen
-          wurden. Ohne ihn ließe sich nicht mehr belegen, dass wir deiner
-          Löschung nachgekommen sind. Was du selbst hineingeschrieben hast —
-          etwa der Grund für eine zurückgenommene Freigabe — wird dabei
-          entfernt. Übrig bleiben Kennungen und Zeitpunkte, die auf keinen
-          Menschen mehr zeigen.
+          <Trans i18nKey="loeschung.bleibtText" components={{ 1: <em /> }} />
         </Typography>
       </Abschnitt>
 
       {firmen.length > 0 ? (
-        <Abschnitt titel="Und deine Unternehmen">
+        <Abschnitt titel={t("loeschung.firmenTitel")}>
           <Box component="ul" sx={{ pl: 2.5, m: 0, mb: 2 }}>
             {firmen.map((firma) => (
               <Typography component="li" key={firma.id} sx={{ mb: 0.5 }}>
                 <strong>{firma.name}</strong>{" "}
                 {firma.role === "admin" ? (
-                  <>
-                    — bist du die <em>letzte</em> Person mit Verwaltungsrechten,
-                    wird das Unternehmen <strong>stillgelegt</strong> und seine
-                    Stellenanzeigen werden zurückgezogen. Eine Anzeige, hinter
-                    der niemand mehr steht, ist schlechter als keine:
-                    Bewerbungen liefen an niemanden.
-                  </>
+                  <Trans
+                    i18nKey="loeschung.firmaAdmin"
+                    components={{ 1: <em />, 3: <strong /> }}
+                  />
                 ) : (
-                  <>
-                    — deine Mitgliedschaft endet. Das Unternehmen selbst bleibt,
-                    wie es ist.
-                  </>
+                  t("loeschung.firmaMitglied")
                 )}
               </Typography>
             ))}
           </Box>
           <Typography variant="body2" color="text.secondary">
-            Das hält deine Löschung <strong>nicht auf</strong>. Du musst
-            niemandem vorher etwas übergeben: dein Recht auf Löschung hängt
-            nicht daran, ob sich jemand anderes um ein Unternehmen kümmert.
+            <Trans
+              i18nKey="loeschung.firmenHaeltNichtAuf"
+              components={{ 1: <strong /> }}
+            />
           </Typography>
         </Abschnitt>
       ) : null}
 
-      <Abschnitt titel="Wie es abläuft">
+      <Abschnitt titel={t("loeschung.ablaufTitel")}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Mit dem Klick bist du <strong>sofort abgemeldet</strong> und deine
-          Sitzungen sind widerrufen. Die Löschung selbst läuft danach weiter —
-          sie geht <strong>nicht sofort</strong> durch, weil deine Daten bei
-          mehreren Diensten liegen und jeder einzeln bestätigen muss. Du
-          bekommst genau eine E-Mail, wenn alles erledigt ist.
+          <Trans
+            i18nKey="loeschung.ablaufText"
+            components={{ 1: <strong />, 3: <strong /> }}
+          />
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Du kannst deine Daten vorher{" "}
-          <Link component={RouterLink} to="/my-data">
-            unter „Meine Daten“
-          </Link>{" "}
-          herunterladen. Musst du aber nicht — wer löschen will, darf das ohne
-          Umweg.
+          <Trans
+            i18nKey="loeschung.ablaufExport"
+            components={{ 1: <Link component={RouterLink} to="/my-data" /> }}
+          />
         </Typography>
       </Abschnitt>
 
@@ -229,8 +205,7 @@ export function DeleteAccountPage() {
           {fragt ? (
             <>
               <Alert severity="warning" sx={{ mb: 2 }}>
-                Letzte Frage: dein Konto und alles oben Genannte werden
-                gelöscht. Das lässt sich nicht rückgängig machen.
+                {t("loeschung.letzteFrage")}
               </Alert>
               <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
                 <Button
@@ -239,7 +214,7 @@ export function DeleteAccountPage() {
                   onClick={() => void loeschen()}
                   disabled={laeuft}
                 >
-                  {laeuft ? "Wird angenommen…" : "Ja, endgültig löschen"}
+                  {laeuft ? t("loeschung.laeuft") : t("loeschung.bestaetigen")}
                 </Button>
                 <Button
                   variant="text"
@@ -249,7 +224,7 @@ export function DeleteAccountPage() {
                   }}
                   disabled={laeuft}
                 >
-                  Abbrechen
+                  {t("allgemein.abbrechen")}
                 </Button>
               </Box>
             </>
@@ -259,7 +234,7 @@ export function DeleteAccountPage() {
               color="error"
               onClick={() => setFragt(true)}
             >
-              Konto löschen
+              {t("loeschung.knopf")}
             </Button>
           )}
         </CardContent>

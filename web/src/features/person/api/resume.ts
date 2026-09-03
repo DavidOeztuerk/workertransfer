@@ -1,6 +1,7 @@
 import { request } from "../../../core/api/client";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import { RESUME_BASE_URL } from "../../../env";
+import { i18n } from "../../../core/i18n/i18n";
 
 /**
  * Der Lebenslauf — strenger als das Profil, und das ist der ganze Entwurf.
@@ -76,7 +77,7 @@ export async function ladeMeinen(signal?: AbortSignal): Promise<Antwort<Lebensla
     RESUME_BASE_URL,
     "/resumes/me",
     { signal },
-    "Der Lebenslauf ist gerade nicht abrufbar."
+    "fehler.lebenslaufNichtAbrufbar"
   );
 
   if (antwort.ok) return { ok: true, wert: antwort.value ?? null };
@@ -92,7 +93,7 @@ export async function speichereMeinen(
     RESUME_BASE_URL,
     "/resumes/me",
     { method: "PUT", body: eingabe, signal },
-    "Der Lebenslauf konnte nicht gespeichert werden."
+    "fehler.lebenslaufNichtGespeichert"
   );
 
   return antwort.ok
@@ -108,7 +109,7 @@ export async function ladeMeineAnfragen(
     RESUME_BASE_URL,
     "/resumes/me/requests",
     { signal },
-    "Die Anfragen sind gerade nicht abrufbar."
+    "fehler.anfragenNichtAbrufbar"
   );
 
   return antwort.ok
@@ -129,7 +130,7 @@ async function handeln(pfad: string, signal?: AbortSignal): Promise<Antwort<Lebe
     RESUME_BASE_URL,
     pfad,
     { method: "POST", signal },
-    "Die Anfrage konnte nicht beantwortet werden."
+    "fehler.anfrageNichtBeantwortet"
   );
 
   if (!antwort.ok && antwort.error.status === 503) {
@@ -137,7 +138,7 @@ async function handeln(pfad: string, signal?: AbortSignal): Promise<Antwort<Lebe
       ok: false,
       error: {
         ...antwort.error,
-        detail: "Der Consent-Ledger antwortet gerade nicht — es wurde nichts geändert.",
+        detail: i18n.t("fehler.ledgerSchweigtOhneAenderung"),
       },
     };
   }

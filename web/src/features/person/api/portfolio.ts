@@ -1,6 +1,7 @@
 import { request } from "../../../core/api/client";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import { PORTFOLIO_BASE_URL } from "../../../env";
+import { i18n } from "../../../core/i18n/i18n";
 
 /**
  * Die Arbeitsproben — ein Schaufenster mit eigener Freigabe.
@@ -41,7 +42,7 @@ export async function ladeMeines(signal?: AbortSignal): Promise<Antwort<Schaufen
     PORTFOLIO_BASE_URL,
     "/portfolios/me",
     { signal },
-    "Die Arbeiten sind gerade nicht abrufbar."
+    "fehler.arbeitenNichtAbrufbar"
   );
 
   if (antwort.ok) return { ok: true, wert: antwort.value ?? null };
@@ -63,7 +64,7 @@ export async function speichereMeines(
     PORTFOLIO_BASE_URL,
     "/portfolios/me",
     { method: "PUT", body: { items: arbeiten }, signal },
-    "Die Arbeiten konnten nicht gespeichert werden."
+    "fehler.arbeitenNichtGespeichert"
   );
 
   return antwort.ok
@@ -103,7 +104,11 @@ export async function haengeAn(datei: File, signal?: AbortSignal): Promise<Antwo
   } catch {
     return {
       ok: false,
-      error: { status: 0, title: "Keine Verbindung", detail: "Keine Verbindung zum Server." },
+      error: {
+        status: 0,
+        title: i18n.t("fehler.keineVerbindungKurz"),
+        detail: i18n.t("fehler.keineVerbindung"),
+      },
     };
   }
 
@@ -112,8 +117,8 @@ export async function haengeAn(datei: File, signal?: AbortSignal): Promise<Antwo
       ok: false,
       error: {
         status: antwort.status,
-        title: "Datei abgelehnt",
-        detail: "Die Datei wurde nicht angenommen. Erlaubt sind PNG, JPEG und PDF.",
+        title: i18n.t("fehler.dateiAbgelehnt"),
+        detail: i18n.t("fehler.dateiNichtAngenommen"),
       },
     };
   }

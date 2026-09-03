@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -24,14 +25,15 @@ import {
   personMove,
 } from "../api/transfers";
 
+/** Der Stand als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
 const TITEL: Record<Transfer["status"], string> = {
-  interested: "Ein Unternehmen hat Interesse",
-  talking: "Ihr seid im Gespräch",
-  offered: "Es liegt ein Angebot vor",
-  accepted: "Du hast angenommen",
-  completed: "Abgeschlossen",
-  declined: "Von dir abgelehnt",
-  withdrawn: "Vom Unternehmen zurückgezogen",
+  interested: "gespraeche.standInterested",
+  talking: "gespraeche.standTalking",
+  offered: "gespraeche.standOffered",
+  accepted: "gespraeche.standAccepted",
+  completed: "gespraeche.standCompleted",
+  declined: "gespraeche.standDeclined",
+  withdrawn: "gespraeche.standWithdrawn",
 };
 
 /**
@@ -47,6 +49,7 @@ const TITEL: Record<Transfer["status"], string> = {
  * wissen. Ob jemand gehen darf, bestätigt er selbst.
  */
 export function TransfersPage() {
+  const { t } = useTranslation();
   const { angemeldet, subjectId } = useHandelnder();
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
@@ -59,20 +62,14 @@ export function TransfersPage() {
 
   if (!angemeldet) {
     return (
-      <PageShell title="Meine Gespräche" narrow>
+      <PageShell title={t("gespraeche.titel")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              Bitte{" "}
-              <Button
-                component={RouterLink}
-                to="/login"
-                variant="text"
-                size="small"
-              >
-                anmelden
-              </Button>
-              , um deine Gespräche zu sehen.
+              <Trans
+                i18nKey="gespraeche.anmelden"
+                components={{ 1: <Link component={RouterLink} to="/login" /> }}
+              />
             </Typography>
           </CardContent>
         </Card>
@@ -92,14 +89,12 @@ export function TransfersPage() {
   const liste = gespraeche.data?.ok ? gespraeche.data.transfers : [];
 
   return (
-    <PageShell title="Meine Gespräche" narrow lead="">
+    <PageShell title={t("gespraeche.titel")} narrow lead="">
       <Typography color="text.secondary" sx={{ mb: 3, maxWidth: "62ch" }}>
-        Ein Unternehmen kann nur zugehen, wenn du ihm deinen{" "}
-        <Link component={RouterLink} to="/market">
-          Marktstatus freigegeben
-        </Link>{" "}
-        hast und gerade ansprechbar bist. Ablehnen kannst du jederzeit, in jedem
-        Schritt.
+        <Trans
+          i18nKey="gespraeche.einleitung"
+          components={{ 1: <Link component={RouterLink} to="/market" /> }}
+        />
       </Typography>
 
       {fehler !== null ? (
@@ -111,7 +106,7 @@ export function TransfersPage() {
       {gespraeche.pending ? (
         <Card>
           <CardContent>
-            <LoadingBlock label="Gespräche werden geladen…" />
+            <LoadingBlock label={t("gespraeche.laden")} />
           </CardContent>
         </Card>
       ) : null}
@@ -121,7 +116,7 @@ export function TransfersPage() {
       ) : null}
 
       {gespraeche.data?.ok && liste.length === 0 ? (
-        <EmptyBlock title="Es läuft gerade kein Gespräch." />
+        <EmptyBlock title={t("gespraeche.leer")} />
       ) : null}
 
       <Box
@@ -157,6 +152,7 @@ function Gespraechskarte({
   gesperrt: boolean;
   onZug: (zug: PersonAction) => void;
 }) {
+  const { t } = useTranslation();
   const laeuftNoch = RUNNING.includes(gespraech.status);
   const brauchtFreigabe =
     gespraech.requires_release && !gespraech.release_confirmed;
@@ -167,7 +163,7 @@ function Gespraechskarte({
     <Card component="li">
       <CardContent>
         <Typography variant="h2" sx={{ mb: 1 }}>
-          {TITEL[gespraech.status]}
+          {t(TITEL[gespraech.status])}
         </Typography>
 
         {gespraech.message !== "" ? (
@@ -186,19 +182,19 @@ function Gespraechskarte({
             }}
           >
             <Typography component="dt" variant="body2" color="text.secondary">
-              Angebot
+              {t("gespraeche.angebot")}
             </Typography>
             <Typography component="dd" sx={{ m: 0 }}>
               {gespraech.offer_note === "" ? "—" : gespraech.offer_note}
             </Typography>
             <Typography component="dt" variant="body2" color="text.secondary">
-              Start
+              {t("gespraeche.start")}
             </Typography>
             <Typography component="dd" sx={{ m: 0 }}>
               {gespraech.offer_start_on ?? "—"}
             </Typography>
             <Typography component="dt" variant="body2" color="text.secondary">
-              Ablöse
+              {t("gespraeche.abloese")}
             </Typography>
             <Typography component="dd" sx={{ m: 0 }}>
               {euro(gespraech.offer_fee_cents)}
@@ -208,11 +204,10 @@ function Gespraechskarte({
 
         {gespraech.status === "accepted" && brauchtFreigabe ? (
           <Alert severity="info" sx={{ mb: 2 }}>
-            Es fehlt noch, dass dein Arbeitgeber dich gehen lässt. Diese
-            Plattform fragt ihn nicht — sie weiß nicht, wer er ist und soll es
-            nicht wissen. Bestätige selbst, sobald es geklärt ist:{" "}
-            <strong>damit ist der Transfer abgeschlossen.</strong> Der letzte
-            Schritt gehört dir, weil nur du weißt, ob du gehen darfst.
+            <Trans
+              i18nKey="gespraeche.freigabeFehlt"
+              components={{ 1: <strong /> }}
+            />
           </Alert>
         ) : null}
 
@@ -223,7 +218,7 @@ function Gespraechskarte({
               onClick={() => onZug("accept-talk")}
               disabled={gesperrt}
             >
-              Gespräch annehmen
+              {t("gespraeche.gespraechAnnehmen")}
             </Button>
           ) : null}
           {gespraech.status === "offered" ? (
@@ -232,7 +227,7 @@ function Gespraechskarte({
               onClick={() => onZug("accept-offer")}
               disabled={gesperrt}
             >
-              Angebot annehmen
+              {t("gespraeche.angebotAnnehmen")}
             </Button>
           ) : null}
           {gespraech.status === "accepted" && brauchtFreigabe ? (
@@ -241,7 +236,7 @@ function Gespraechskarte({
               onClick={() => onZug("confirm-release")}
               disabled={gesperrt}
             >
-              Freigabe bestätigen und abschließen
+              {t("gespraeche.freigabeBestaetigen")}
             </Button>
           ) : null}
           {laeuftNoch ? (
@@ -250,7 +245,7 @@ function Gespraechskarte({
               onClick={() => onZug("decline")}
               disabled={gesperrt}
             >
-              Ablehnen
+              {t("allgemein.ablehnen")}
             </Button>
           ) : null}
         </Box>

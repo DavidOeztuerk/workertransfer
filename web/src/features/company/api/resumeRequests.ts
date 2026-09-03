@@ -12,7 +12,7 @@
 
 import { request } from "../../../core/api/client";
 import { RESUME_BASE_URL } from "../../../env";
-import { type Fehlschlag, deuten } from "./fehler";
+import { type Fehlschlag, deuten } from "../../../shared/api/fehler";
 
 export interface ResumeRequest {
   id: string;
@@ -37,27 +37,27 @@ export async function requestResume(subjectId: string): Promise<AnfrageErgebnis>
     RESUME_BASE_URL,
     `/resumes/${subjectId}/requests`,
     { method: "POST" },
-    "Die Anfrage konnte nicht gestellt werden."
+    "fehler.anfrageNichtGestellt"
   );
   if (antwort.ok) return { ok: true, request: antwort.value };
   return deuten<AnfrageFehler>(
     antwort.error,
     {
-      0: { reason: "offline", title: "Keine Verbindung zum Server." },
-      409: { reason: "already-asked", title: "Ihr habt diese Person bereits gefragt." },
+      0: { reason: "offline", titel: "fehler.keineVerbindung" },
+      409: { reason: "already-asked", titel: "fehler.bereitsGefragt" },
       403: {
         reason: "no-company",
-        title: "Lebensläufe fragen nur Unternehmen an.",
-        detail: "Wechsle oben auf ein Unternehmen.",
+        titel: "fehler.nurFirmenLebenslauf",
+        text: "fehler.firmaWaehlen",
       },
       // Fragen setzt die PROFIL-Freigabe voraus, nie die Existenz eines
       // Lebenslaufs: „hat schon einen geschrieben" ist eine Tatsache über die
       // Person, nach der niemand tasten können soll.
-      404: { reason: "not-available", title: "Diese Person ist gerade nicht anfragbar." },
+      404: { reason: "not-available", titel: "fehler.personNichtAnfragbar" },
       503: {
         reason: "unavailable",
-        title: "Der Consent-Ledger antwortet gerade nicht.",
-        detail: "Bitte später erneut versuchen.",
+        titel: "fehler.ledgerSchweigt",
+        text: "fehler.spaeterErneut",
       },
     },
     "offline"

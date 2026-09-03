@@ -2,6 +2,7 @@ import { request } from "../../../core/api/client";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import { PROFILE_BASE_URL } from "../../../env";
 import { PROFILE_VISIBILITY, type ConsentResult, isGranted, setGranted } from "./consent";
+import { i18n } from "../../../core/i18n/i18n";
 
 /**
  * profile-service und der Consent-Ledger — zwei Dienste, weil es zwei
@@ -48,7 +49,7 @@ export async function getMyProfile(signal?: AbortSignal): Promise<ProfileLoad> {
     PROFILE_BASE_URL,
     "/profiles/me",
     { signal },
-    "Dein Profil liess sich nicht laden."
+    "fehler.eigenesProfilNichtGeladen"
   );
   // 404 heisst hier „noch keins" — bei der EIGENEN Ressource gibt es die
   // Doppeldeutigkeit „versteckt oder nicht vorhanden" nicht, die ADR-0020 für
@@ -77,7 +78,7 @@ export async function saveMyProfile(input: ProfileInput): Promise<SaveResult> {
         skills: input.skills,
       },
     },
-    "Das Profil konnte nicht gespeichert werden."
+    "fehler.profilNichtGespeichert"
   );
   if (!antwort.ok) return { ok: false, error: antwort.error };
   return { ok: true, profile: antwort.value };
@@ -103,11 +104,11 @@ export async function draftProfileText(wish: string): Promise<DraftResult> {
     PROFILE_BASE_URL,
     "/profiles/me/draft",
     { method: "POST", body: { wish } },
-    "Die Formulierungshilfe ist gerade nicht verfügbar."
+    "fehler.entwurfNichtVerfuegbar"
   );
   if (!antwort.ok) {
     if (antwort.error.status === 401) {
-      return { ok: false, message: "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an." };
+      return { ok: false, message: "fehler.sitzungAbgelaufenLang" };
     }
     // 503 heisst „nicht eingerichtet ODER Anbieter still" — von aussen dasselbe,
     // und beides heisst „später noch einmal", nicht „falsch gemacht". Gemeldet
@@ -115,7 +116,7 @@ export async function draftProfileText(wish: string): Promise<DraftResult> {
     return {
       ok: false,
       message:
-        "Die Formulierungshilfe ist gerade nicht verfügbar. Dein Text bleibt unverändert.",
+        "fehler.entwurfNichtVerfuegbarLang",
     };
   }
   return { ok: true, draft: antwort.value?.draft ?? "" };
@@ -131,6 +132,6 @@ export function setVisibility(subjectId: string, granted: boolean): Promise<Cons
     subjectId,
     PROFILE_VISIBILITY,
     granted,
-    "Über die Profil-Einstellungen zurückgezogen"
+    i18n.t("fehler.widerrufProfilEinstellungen")
   );
 }

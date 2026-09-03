@@ -1,4 +1,6 @@
-import type { ApiError } from "../../../core/store/thunkHelpers";
+import type { ApiError } from "../../core/store/thunkHelpers";
+import { i18n } from "../../core/i18n/i18n";
+import type { Katalog } from "../../core/i18n/kataloge/de";
 
 /**
  * Aus einem Statuscode einen Grund und einen Satz machen — an EINER Stelle.
@@ -19,16 +21,26 @@ import type { ApiError } from "../../../core/store/thunkHelpers";
  * Steht kein Eintrag in der Tabelle, bleibt der Satz des Servers stehen: sein
  * Problemdokument weiß bei `409` und `422` mehr über den Vorgang als wir hier.
  *
- * Diese Datei ist die Zwillingsschwester von `features/work/api/fehler.ts`.
- * Sie gehörte nach `src/shared/` — das ist in diesem Durchgang fremdes
- * Territorium. Beim Zusammenlegen der Ströme: dorthin ziehen, beide Kopien
- * löschen.
+ * <strong>Diese Datei lag zweimal vor</strong> — je einmal unter `work/api` und
+ * `company/api`, wortgleich, und der Kommentar dort sagte selbst, sie gehöre
+ * nach `shared/`. Hier ist sie.
  */
+
+/**
+ * Ein Schlüssel aus dem Fehlerbereich des Katalogs — kein Satz.
+ *
+ * Der Typ ist das eigentliche Werkzeug: i18next gibt einen unbekannten
+ * Schlüssel unverändert zurück, ein liegengebliebener deutscher Satz sähe in
+ * der Oberfläche also RICHTIG aus und wäre in keiner anderen Sprache
+ * übersetzt. So ist er ein Übersetzungsfehler.
+ */
+export type Fehlerschluessel = `fehler.${keyof Katalog["fehler"] & string}`;
+
 export interface Deutung<R extends string> {
   reason: R;
-  title: string;
+  titel: Fehlerschluessel;
   /** Fehlt er, trägt der Titel allein. */
-  detail?: string;
+  text?: Fehlerschluessel;
 }
 
 export interface Fehlschlag<R extends string> {
@@ -44,10 +56,19 @@ export function deuten<R extends string>(
 ): Fehlschlag<R> {
   const deutung = tabelle[error.status];
   if (deutung === undefined) return { ok: false, reason: ersatzgrund, error };
+
+  // Übersetzt wird HIER und nicht beim Aufbau der Tabelle: die Tabellen stehen
+  // auf Modulebene, ihre Werte entstünden also beim Laden — lange bevor jemand
+  // eine Sprache wählen konnte.
+  const titel = i18n.t(deutung.titel);
   return {
     ok: false,
     reason: deutung.reason,
-    error: { ...error, title: deutung.title, detail: deutung.detail ?? deutung.title },
+    error: {
+      ...error,
+      title: titel,
+      detail: deutung.text === undefined ? titel : i18n.t(deutung.text),
+    },
   };
 }
 

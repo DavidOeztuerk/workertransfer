@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link as RouterLink, useLocation } from "react-router-dom";
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
@@ -12,6 +13,7 @@ import Typography from "@mui/material/Typography";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 import { ColorModeToggle } from "./ColorModeToggle";
+import { LanguagePicker } from "./LanguagePicker";
 import { CompanySwitcher } from "./CompanySwitcher";
 import { useAppSelector } from "../../../core/store/hooks";
 
@@ -35,6 +37,7 @@ import { useAppSelector } from "../../../core/store/hooks";
  * Bequemlichkeit, keine Zugriffskontrolle.
  */
 export function SiteHeader() {
+  const { t } = useTranslation();
   const { pathname } = useLocation();
   const status = useAppSelector((state) => state.auth.status);
   const session = useAppSelector((state) => state.auth.session);
@@ -93,6 +96,7 @@ export function SiteHeader() {
 
           <Box sx={{ flexGrow: 1 }} />
 
+          <LanguagePicker />
           <ColorModeToggle />
 
           {angemeldet ? (
@@ -104,7 +108,7 @@ export function SiteHeader() {
           ) : (
             // EIN Zugang, immer sichtbar — auch auf /login und /register.
             <Button component={RouterLink} to="/login" variant="contained" size="small">
-              Anmelden
+              {t("kopf.anmelden")}
             </Button>
           )}
         </Toolbar>

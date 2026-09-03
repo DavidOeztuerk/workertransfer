@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -33,6 +34,7 @@ import {
  * jemand einladen darf, entscheidet der Server je Anfrage.
  */
 export function CompanyTeamInvitePage() {
+  const { t } = useTranslation();
   const { fuerFirma, tenantId, subjectId } = useHandelnder();
 
   const [email, setEmail] = useState("");
@@ -49,12 +51,12 @@ export function CompanyTeamInvitePage() {
 
   const zurueck = (
     <Link component={RouterLink} to="/company/team" variant="body2">
-      Zurück zur Mannschaft
+      {t("mannschaft.zurueck")}
     </Link>
   );
 
   const rahmen = (inhalt: React.ReactNode) => (
-    <PageShell title="Einladen" narrow>
+    <PageShell title={t("mannschaft.einladen")} narrow>
       <Box sx={{ mb: 2 }}>{zurueck}</Box>
       <Card>
         <CardContent>{inhalt}</CardContent>
@@ -65,14 +67,13 @@ export function CompanyTeamInvitePage() {
   if (!fuerFirma) {
     return rahmen(
       <Typography>
-        Wähle oben ein Unternehmen — oder lass dich von jemandem aus deinem
-        Unternehmen einladen.
+        {t("mannschaft.einladenOhneFirma")}
       </Typography>,
     );
   }
 
   if (mitglieder.pending) {
-    return rahmen(<LoadingBlock label="Mitglieder werden geladen…" />);
+    return rahmen(<LoadingBlock label={t("mannschaft.mitgliederLaden")} />);
   }
 
   const liste = mitglieder.data?.ok ? mitglieder.data.members : [];
@@ -83,8 +84,7 @@ export function CompanyTeamInvitePage() {
   if (!istAdmin) {
     return rahmen(
       <Typography>
-        Einladen dürfen nur Administratoren. Wende dich an jemanden aus deinem
-        Unternehmen, der das ist.
+        {t("mannschaft.einladenNurAdmin")}
       </Typography>,
     );
   }
@@ -119,9 +119,9 @@ export function CompanyTeamInvitePage() {
       }}
     >
       <TextField
-        label="E-Mail-Adresse"
+        label={t("mannschaft.email")}
         type="email"
-        helperText="Die Person braucht ein Konto mit genau dieser Adresse — sie kann es auch nach der Einladung anlegen."
+        helperText={t("mannschaft.emailHinweis")}
         value={email}
         onChange={(e) => {
           setEmail(e.target.value);
@@ -133,13 +133,13 @@ export function CompanyTeamInvitePage() {
 
       <TextField
         select
-        label="Rolle"
+        label={t("mannschaft.rolle")}
         value={rolle}
         onChange={(e) => setRolle(e.target.value as Role)}
         fullWidth
       >
-        <MenuItem value="member">Mitglied</MenuItem>
-        <MenuItem value="admin">Administrator</MenuItem>
+        <MenuItem value="member">{t("mannschaft.rolleMitglied")}</MenuItem>
+        <MenuItem value="admin">{t("mannschaft.rolleAdmin")}</MenuItem>
       </TextField>
 
       {fehler !== null ? (
@@ -150,12 +150,12 @@ export function CompanyTeamInvitePage() {
 
       {verschickt ? (
         <Alert severity="success" role="status" sx={{ alignSelf: "stretch" }}>
-          Einladung verschickt.
+          {t("mannschaft.verschickt")}
         </Alert>
       ) : null}
 
       <Button type="submit" variant="contained" disabled={laeuft}>
-        {laeuft ? "Wird verschickt…" : "Einladen"}
+        {laeuft ? t("mannschaft.verschicktLaeuft") : t("mannschaft.einladen")}
       </Button>
     </Box>,
   );

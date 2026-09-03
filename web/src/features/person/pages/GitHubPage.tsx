@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -42,6 +43,7 @@ import {
  * <strong>Geholt wird nur auf Auslösung.</strong> Kein Abgleich im Hintergrund.
  */
 export function GitHubPage() {
+  const { t, i18n } = useTranslation();
   const status = useAppSelector((state) => state.auth.status);
   const sitzung = useAppSelector((state) => state.auth.session);
 
@@ -57,10 +59,7 @@ export function GitHubPage() {
 
   if (status === "anonymous") {
     return (
-      <AnmeldungNoetig
-        titel="GitHub verbinden"
-        zweck="dein GitHub-Konto zu verbinden"
-      />
+      <AnmeldungNoetig titel={t("github.titel")} satz="github.anmelden" />
     );
   }
 
@@ -84,18 +83,12 @@ export function GitHubPage() {
 
   return (
     <PageShell
-      title="GitHub verbinden"
+      title={t("github.titel")}
       narrow
-      lead={
-        "Was hier erscheint, sind Belege, keine Noten: deine öffentlichen Repositories mit Link. " +
-        "Diese Plattform rechnet daraus keine Punktzahl und keine Rangfolge — wer wissen will, " +
-        "ob dein Code gut ist, sieht ihn sich an."
-      }
+      lead={t("github.lead")}
     >
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Geholt wird nur, wenn du es auslöst. Es läuft kein Abgleich im
-        Hintergrund: eine Plattform, die dir dauerhaft hinterhersieht, tut etwas
-        anderes als eine, die einmal auf deine Bitte hinsieht.
+        {t("github.nurAufBitte")}
       </Typography>
 
       {fehler !== null ? (
@@ -107,7 +100,7 @@ export function GitHubPage() {
       {verbindung.laedt ? (
         <Card>
           <CardContent>
-            <LoadingBlock label="Verbindung wird geladen…" />
+            <LoadingBlock label={t("github.laden")} />
           </CardContent>
         </Card>
       ) : null}
@@ -124,7 +117,7 @@ export function GitHubPage() {
         <Card>
           <CardContent>
             <Typography variant="h2" sx={{ mb: 2 }}>
-              Konto nennen
+              {t("github.kontoNennen")}
             </Typography>
             <Box
               component="form"
@@ -140,8 +133,8 @@ export function GitHubPage() {
               }}
             >
               <TextField
-                label="GitHub-Benutzername"
-                helperText="Nur der Name, ohne Adresse."
+                label={t("github.benutzername")}
+                helperText={t("github.benutzernameHinweis")}
                 placeholder="anna"
                 value={login}
                 onChange={(e) => setLogin(e.target.value)}
@@ -149,7 +142,7 @@ export function GitHubPage() {
                 required
               />
               <Button type="submit" variant="contained" disabled={laeuft}>
-                Weiter
+                {t("github.weiter")}
               </Button>
             </Box>
           </CardContent>
@@ -160,11 +153,13 @@ export function GitHubPage() {
         <Card>
           <CardContent>
             <Typography variant="h2" sx={{ mb: 1.5 }}>
-              Nachweis
+              {t("github.nachweis")}
             </Typography>
             <Typography sx={{ mb: 1.5 }}>
-              Lege einen <strong>öffentlichen</strong> Gist an, dessen
-              Beschreibung genau so lautet:
+              <Trans
+                i18nKey="github.nachweisAnleitung"
+                components={{ 1: <strong /> }}
+              />
             </Typography>
             <Box
               component="pre"
@@ -181,9 +176,11 @@ export function GitHubPage() {
               {stand.challenge_description}
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Der Inhalt ist egal. Danach darf der Gist wieder weg — er beweist
-              nur, dass du über das Konto <strong>{stand.login}</strong>{" "}
-              verfügst.
+              <Trans
+                i18nKey="github.nachweisErklaerung"
+                values={{ login: stand.login }}
+                components={{ 1: <strong /> }}
+              />
             </Typography>
             <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
               <Button
@@ -191,7 +188,7 @@ export function GitHubPage() {
                 onClick={() => void fuehreAus(() => pruefeNachweis())}
                 disabled={laeuft}
               >
-                {laeuft ? "Wird geprüft…" : "Nachweis prüfen"}
+                {laeuft ? t("github.nachweisLaeuft") : t("github.nachweisPruefen")}
               </Button>
               <Button
                 variant="text"
@@ -200,7 +197,7 @@ export function GitHubPage() {
                 }
                 disabled={laeuft}
               >
-                Anderes Konto
+                {t("github.anderesKonto")}
               </Button>
             </Box>
           </CardContent>
@@ -215,19 +212,23 @@ export function GitHubPage() {
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               {stand.fetched_at !== null
-                ? `Stand: ${new Date(stand.fetched_at).toLocaleString("de-DE")}`
-                : "Noch nichts geholt."}{" "}
-              · Sichtbar wird das erst, wenn du es unter{" "}
-              <Link component={RouterLink} to="/consents">
-                Meine Freigaben
-              </Link>{" "}
-              freigibst.
+                ? t("github.standVom", {
+                    zeitpunkt: new Date(stand.fetched_at).toLocaleString(
+                      i18n.language,
+                    ),
+                  })
+                : t("github.nochNichtsGeholt")}{" "}
+              <Trans
+                i18nKey="github.sichtbarkeit"
+                components={{
+                  1: <Link component={RouterLink} to="/consents" />,
+                }}
+              />
             </Typography>
 
             {stand.repositories.length === 0 ? (
               <Typography sx={{ mb: 2 }}>
-                Keine öffentlichen Repositories gefunden. Das ist kein Mangel —
-                nur eine Auskunft.
+                {t("github.keineRepos")}
               </Typography>
             ) : (
               <Box component="ul" sx={{ pl: 2.5, mb: 2 }}>
@@ -241,7 +242,8 @@ export function GitHubPage() {
                       {repo.name}
                     </Link>
                     <Typography variant="body2" color="text.secondary">
-                      {repo.language ?? "ohne Sprachangabe"} · {repo.stars} ★
+                      {repo.language ?? t("github.ohneSprache")} · {repo.stars}{" "}
+                      ★
                       {repo.description !== "" ? ` · ${repo.description}` : ""}
                     </Typography>
                   </Box>
@@ -255,7 +257,9 @@ export function GitHubPage() {
                 onClick={() => void fuehreAus(() => holeNeu())}
                 disabled={laeuft}
               >
-                {laeuft ? "Wird geholt…" : "Aktualisieren"}
+                {laeuft
+                  ? t("github.aktualisierenLaeuft")
+                  : t("github.aktualisieren")}
               </Button>
               <Button
                 variant="text"
@@ -264,7 +268,7 @@ export function GitHubPage() {
                 }
                 disabled={laeuft}
               >
-                Verbindung trennen
+                {t("github.trennen")}
               </Button>
             </Box>
           </CardContent>

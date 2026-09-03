@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
@@ -12,23 +13,10 @@ import { useAppSelector } from "../../../core/store/hooks";
 import { scale } from "../../../styles/tokens/typography";
 
 /**
- * Die drei Sätze, auf denen die Plattform steht. Wörtlich aus der alten
- * Startseite übernommen — sie sind das Versprechen, nicht Füllung.
+ * Die drei Sätze, auf denen die Plattform steht — hier stehen nur ihre
+ * Schlüssel, der Wortlaut liegt in den Katalogen.
  */
-const grundlagen = [
-  {
-    titel: "Du entscheidest",
-    text: "Sichtbarkeit, Kontakte, Dokumente und jedes Angebot bleiben unter deiner Kontrolle.",
-  },
-  {
-    titel: "Echte Nachweise",
-    text: "Projekterfahrung und verknüpfte Quellen werden transparent gezeigt – nur nach Freigabe.",
-  },
-  {
-    titel: "Human in control",
-    text: "KI erstellt Entwürfe und Orientierung; Bewerbungen, Nachrichten und Verträge werden geprüft.",
-  },
-];
+const grundlagen = [1, 2, 3] as const;
 
 /**
  * Die Marketingseite auf `/` — und die Weiterleitung Angemeldeter auf
@@ -44,6 +32,7 @@ const grundlagen = [
  * Übersicht, der nach einem Fehler aussieht.
  */
 export function HomePage() {
+  const { t } = useTranslation();
   const status = useAppSelector((zustand) => zustand.auth.status);
 
   const heldId = useId();
@@ -89,7 +78,7 @@ export function HomePage() {
                 mb: 2,
               }}
             >
-              Talent mobility, menschenzentriert
+              {t("start.auge")}
             </Typography>
             <Typography
               id={heldId}
@@ -104,17 +93,14 @@ export function HomePage() {
                 mb: 3,
               }}
             >
-              Neue Arbeit soll sich wie eine selbstbestimmte Entscheidung
-              anfühlen.
+              {t("start.titel")}
             </Typography>
             <Typography
               variant="body1"
               color="text.secondary"
               sx={{ fontSize: "1.0625rem", mb: 4 }}
             >
-              WorkerTransfer verbindet Bewerbung, direkte Ansprache und faire
-              Wechselprozesse – mit nachvollziehbarer KI-Unterstützung statt
-              Black-Box-Entscheidungen.
+              {t("start.text")}
             </Typography>
             {/* Beide Wege führen nach /register, und der zweite trägt seine
                 ABSICHT mit: ohne `?as=company` landet jemand, der „Als
@@ -131,7 +117,7 @@ export function HomePage() {
                 variant="contained"
                 size="large"
               >
-                Als Arbeitnehmer starten
+                {t("start.alsPerson")}
               </Button>
               <Button
                 component={RouterLink}
@@ -139,7 +125,7 @@ export function HomePage() {
                 variant="outlined"
                 size="large"
               >
-                Als Unternehmen entdecken
+                {t("start.alsUnternehmen")}
               </Button>
             </Box>
           </Box>
@@ -158,14 +144,14 @@ export function HomePage() {
               mb: 1.5,
             }}
           >
-            Unser Ausgangspunkt
+            {t("start.grundlagenAuge")}
           </Typography>
           <Typography
             id={grundlagenId}
             variant="h2"
             sx={{ maxWidth: "26ch", mb: { xs: 4, md: 6 } }}
           >
-            Vertrauen ist kein Feature. Es ist die Architektur.
+            {t("start.grundlagenTitel")}
           </Typography>
 
           <Box
@@ -175,8 +161,8 @@ export function HomePage() {
               gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
             }}
           >
-            {grundlagen.map((grundlage, index) => (
-              <Card key={grundlage.titel} sx={{ height: "100%" }}>
+            {grundlagen.map((nummer) => (
+              <Card key={nummer} sx={{ height: "100%" }}>
                 <CardContent sx={{ p: { xs: 2.5, md: 3.5 } }}>
                   <Typography
                     component="span"
@@ -188,13 +174,13 @@ export function HomePage() {
                       mb: 1.5,
                     }}
                   >
-                    0{index + 1}
+                    0{nummer}
                   </Typography>
                   <Typography variant="h3" sx={{ mb: 1 }}>
-                    {grundlage.titel}
+                    {t(`start.grundlage${nummer}Titel`)}
                   </Typography>
                   <Typography color="text.secondary">
-                    {grundlage.text}
+                    {t(`start.grundlage${nummer}Text`)}
                   </Typography>
                 </CardContent>
               </Card>
@@ -226,16 +212,14 @@ export function HomePage() {
                   mb: 1.5,
                 }}
               >
-                In Entwicklung
+                {t("start.wegAuge")}
               </Typography>
               <Typography id={wegId} variant="h2">
-                Eine Plattform, die mit einer klaren ersten Grundlage wächst.
+                {t("start.wegTitel")}
               </Typography>
             </Box>
             <Typography color="text.secondary" sx={{ maxWidth: "58ch" }}>
-              Zuerst entstehen sichere Identitäten, Profile und Einwilligungen.
-              Danach folgen Jobs, Bewerbungen, nachvollziehbare GitHub-Nachweise
-              und ein einvernehmlicher Transfer-Flow.
+              {t("start.wegText")}
             </Typography>
           </Box>
         </Container>

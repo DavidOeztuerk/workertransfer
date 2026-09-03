@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
@@ -21,11 +22,11 @@ import { PORTFOLIO_VISIBILITY, isGranted, setGranted } from "../api/consent";
 import { type Arbeit, anhangUrl, ladeMeines } from "../api/portfolio";
 
 /** Rolle und Jahr, soweit angegeben — und ob eine Datei hängt. */
-function einordnung(arbeit: Arbeit): string {
+function einordnung(arbeit: Arbeit, mitDatei: string): string {
   const teile: string[] = [];
   if (arbeit.role !== "") teile.push(arbeit.role);
   if (arbeit.year !== null) teile.push(String(arbeit.year));
-  if (arbeit.attachment !== null) teile.push("mit Datei");
+  if (arbeit.attachment !== null) teile.push(mitDatei);
   return teile.join(" · ");
 }
 
@@ -41,6 +42,7 @@ function einordnung(arbeit: Arbeit): string {
  * Arbeit lässt sich nichts freigeben: was es nicht gibt, kann man nicht zeigen.
  */
 export function PortfolioPage() {
+  const { t } = useTranslation();
   const status = useAppSelector((state) => state.auth.status);
   const sitzung = useAppSelector((state) => state.auth.session);
   const subjectId = sitzung?.userId ?? null;
@@ -63,8 +65,8 @@ export function PortfolioPage() {
   if (status === "anonymous" || subjectId === null) {
     return (
       <AnmeldungNoetig
-        titel="Meine Arbeiten"
-        zweck="deine Arbeiten zu bearbeiten"
+        titel={t("arbeiten.titel")}
+        satz="arbeiten.anmelden"
       />
     );
   }
@@ -84,7 +86,7 @@ export function PortfolioPage() {
       subjectId as string,
       PORTFOLIO_VISIBILITY,
       neu,
-      "Über die Portfolio-Einstellungen zurückgezogen",
+      t("arbeiten.widerrufsgrund"),
     );
     setSchaltet(false);
 
@@ -98,35 +100,36 @@ export function PortfolioPage() {
   }
 
   const hinweis = ledgerSchweigt
-    ? "Ob eine Freigabe gilt, ist gerade nicht abrufbar. Solange das so ist, ändert dieser " +
-      "Schalter nichts — sonst würdest du etwas freigeben, dessen Stand niemand kennt."
+    ? t("arbeiten.freigabeSchweigt")
     : freigabe.laedt
-      ? "Freigabe wird geprüft…"
-      : hatArbeiten
-        ? "Eigene Freigabe, getrennt vom Profil: du kannst ansprechbar sein, ohne deine " +
-          "Arbeiten zu zeigen. Wirkt sofort."
-        : "Erst eine Arbeit speichern — freigeben lässt sich nur, was es gibt.";
+      ? t("arbeiten.freigabePruefung")
+      : t(
+          hatArbeiten
+            ? "arbeiten.freigabeWirkt"
+            : "arbeiten.freigabeOhneArbeit",
+        );
 
   return (
     <PageShell
-      title="Meine Arbeiten"
+      title={t("arbeiten.titel")}
       narrow
-      lead={
-        "Ein Schaufenster: hier steht, was du zeigen willst. Was du nicht zeigen darfst, gehört " +
-        "nicht hierher — dafür gibt es keine halbe Sichtbarkeit."
-      }
+      lead={t("arbeiten.lead")}
     >
       {fehler !== null ? (
         <ErrorBlock
-          error={{ status: 0, title: "Fehler", detail: fehler }}
-          title="Die Freigabe konnte nicht geändert werden"
+          error={{
+            status: 0,
+            title: t("arbeiten.freigabeFehlschlag"),
+            detail: fehler,
+          }}
+          title={t("arbeiten.freigabeFehlschlag")}
         />
       ) : null}
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <ConsentSwitch
-            label="Arbeiten für Unternehmen freigeben"
+            label={t("arbeiten.freigabeLabel")}
             hint={hinweis}
             checked={freigabe.wert === true}
             disabled={!hatArbeiten || schaltet || ledgerUnbekannt}
@@ -138,7 +141,7 @@ export function PortfolioPage() {
       <Card>
         <CardContent>
           {schaufenster.laedt ? (
-            <LoadingBlock label="Portfolio wird geladen…" />
+            <LoadingBlock label={t("arbeiten.laden")} />
           ) : null}
 
           {schaufenster.wert && !schaufenster.wert.ok ? (
@@ -147,15 +150,15 @@ export function PortfolioPage() {
 
           {!schaufenster.laedt && schaufenster.wert?.ok && !hatArbeiten ? (
             <EmptyBlock
-              title="Noch keine Arbeit eingetragen."
-              hint="Was hier steht, entscheidest du — und wer es sieht, auch."
+              title={t("arbeiten.leerTitel")}
+              hint={t("arbeiten.leerHinweis")}
               action={
                 <Button
                   component={RouterLink}
                   to="/portfolio/new"
                   variant="contained"
                 >
-                  Arbeit hinzufügen
+                  {t("arbeiten.hinzufuegen")}
                 </Button>
               }
             />
@@ -188,7 +191,7 @@ export function PortfolioPage() {
                       <Box>
                         <Typography variant="h4">{arbeit.title}</Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {einordnung(arbeit)}
+                          {einordnung(arbeit, t("arbeiten.mitDatei"))}
                         </Typography>
                       </Box>
                       <Box
@@ -205,7 +208,7 @@ export function PortfolioPage() {
                           size="small"
                           variant="text"
                         >
-                          Bearbeiten
+                          {t("arbeiten.bearbeiten")}
                         </Button>
                         {arbeit.attachment !== null ? (
                           <Link
@@ -214,7 +217,7 @@ export function PortfolioPage() {
                             rel="noreferrer noopener"
                             variant="body2"
                           >
-                            Datei ansehen
+                            {t("arbeiten.dateiAnsehen")}
                           </Link>
                         ) : null}
                       </Box>
@@ -227,7 +230,7 @@ export function PortfolioPage() {
                 to="/portfolio/new"
                 variant="contained"
               >
-                Arbeit hinzufügen
+                {t("arbeiten.hinzufuegen")}
               </Button>
             </>
           ) : null}

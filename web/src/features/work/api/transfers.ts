@@ -5,7 +5,13 @@
 
 import { request } from "../../../core/api/client";
 import { TRANSFER_BASE_URL } from "../../../env";
-import { type Fehlschlag, deuten } from "./fehler";
+import { i18n } from "../../../core/i18n/i18n";
+import {
+  type Deutung,
+  type Fehlerschluessel,
+  type Fehlschlag,
+  deuten,
+} from "../../../shared/api/fehler";
 
 export type TransferStatus =
   | "interested"
@@ -52,37 +58,48 @@ export type TransferListe = { ok: true; transfers: Transfer[] } | Fehlschlag<"fe
 export const RUNNING: TransferStatus[] = ["interested", "talking", "offered", "accepted"];
 
 /**
- * Die Ablöse in Worten, wie sie in Deutschland gelesen wird.
+ * Die Ablöse in Worten, in der GEWÄHLTEN Sprache.
  *
- * `Intl.NumberFormat("de-DE", …)` und nicht von Hand: `5.000,00 €` steht so in
- * der E2E-Reise, und eine handgeschriebene Formatierung trifft entweder das
- * schmale Leerzeichen vor dem Euro nicht oder die Tausenderpunkte.
+ * `Intl.NumberFormat` und nicht von Hand: `5.000,00 €` steht so in der
+ * E2E-Reise, und eine handgeschriebene Formatierung trifft entweder das schmale
+ * Leerzeichen vor dem Euro nicht oder die Tausenderpunkte.
+ *
+ * Die Sprache kommt aus i18next und nicht aus dem Gerät: sonst stünde ein
+ * deutscher Satz neben einer amerikanisch gesetzten Zahl. Die WÄHRUNG bleibt
+ * Euro — sie ist eine Tatsache über den Betrag, keine Anzeigefrage.
  */
 export function euro(cents: number | null): string {
   if (cents === null) return "—";
-  return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
+  return new Intl.NumberFormat(i18n.language, {
+    style: "currency",
+    currency: "EUR",
+  }).format(cents / 100);
 }
 
 const UEBERGANGSFEHLER: Partial<
-  Record<number, { reason: TransferFehler; title: string; detail?: string }>
+  Record<number, Deutung<TransferFehler>>
 > = {
-  0: { reason: "offline", title: "Keine Verbindung zum Server." },
+  0: { reason: "offline", titel: "fehler.keineVerbindung" },
   // Kein Status, keine Freigabe, „gerade nicht", fremder Vorgang — vom Server
   // bewusst nicht unterschieden. Die Oberfläche unterscheidet sie auch nicht.
-  404: { reason: "not-available", title: "Das ist gerade nicht möglich." },
+  404: { reason: "not-available", titel: "fehler.geradeNichtMoeglich" },
   403: {
     reason: "no-company",
-    title: "Dafür braucht es ein aktives Unternehmen.",
-    detail: "Wechsle oben auf eines.",
+    titel: "fehler.aktivesUnternehmenNoetig",
+    text: "fehler.firmaWaehlenKurz",
   },
   503: {
     reason: "unavailable",
-    title: "Der Consent-Ledger antwortet gerade nicht.",
-    detail: "Bitte später erneut versuchen.",
+    titel: "fehler.ledgerSchweigt",
+    text: "fehler.spaeterErneut",
   },
 };
 
-async function zug(path: string, body?: unknown, fallback = "Der Schritt konnte nicht ausgeführt werden."): Promise<TransferErgebnis> {
+async function zug(
+  path: string,
+  body?: unknown,
+  fallback: Fehlerschluessel = "fehler.schrittFehlgeschlagen"
+): Promise<TransferErgebnis> {
   const antwort = await request<Transfer>(TRANSFER_BASE_URL, path, { method: "POST", body }, fallback);
   if (antwort.ok) return { ok: true, transfer: antwort.value };
   if (antwort.error.status === 409) {
@@ -95,7 +112,7 @@ export function expressInterest(subjectId: string, message: string): Promise<Tra
   return zug(
     "/transfers",
     { subject_id: subjectId, message },
-    "Das Interesse konnte nicht hinterlegt werden."
+    "fehler.interesseNichtHinterlegt"
   );
 }
 
@@ -113,7 +130,7 @@ export function makeOffer(transferId: string, input: OfferInput): Promise<Transf
   return zug(
     `/transfers/${transferId}/offer`,
     { note: input.note, start_on: input.start_on, fee_cents: input.fee_cents },
-    "Das Angebot konnte nicht gemacht werden."
+    "fehler.angebotNichtGemacht"
   );
 }
 
@@ -122,14 +139,14 @@ async function listTransfers(path: string, signal?: AbortSignal): Promise<Transf
     TRANSFER_BASE_URL,
     path,
     { signal },
-    "Die Liste ließ sich nicht laden."
+    "fehler.listeNichtGeladen"
   );
   if (antwort.ok) return { ok: true, transfers: antwort.value ?? [] };
   // Nicht als leere Liste zeigen: „keine Vorgänge" ist eine Aussage, und sie
   // wäre falsch.
   return deuten<"fehlgeschlagen">(
     antwort.error,
-    { 0: { reason: "fehlgeschlagen", title: "Keine Verbindung zum Server." } },
+    { 0: { reason: "fehlgeschlagen", titel: "fehler.keineVerbindung" } },
     "fehlgeschlagen"
   );
 }

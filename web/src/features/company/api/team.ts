@@ -7,7 +7,7 @@
 
 import { request } from "../../../core/api/client";
 import { API_BASE_URL } from "../../../env";
-import { type Fehlschlag, deuten } from "./fehler";
+import { type Fehlschlag, deuten } from "../../../shared/api/fehler";
 
 export type Role = "admin" | "member";
 
@@ -54,13 +54,13 @@ export async function listMembers(
     API_BASE_URL,
     `/companies/${tenantId}/members`,
     { signal },
-    "Die Mannschaft ließ sich nicht laden."
+    "fehler.mannschaftNichtGeladen"
   );
   if (antwort.ok) return { ok: true, members: antwort.value ?? [] };
   if (antwort.error.status === 404) return { ok: true, members: [] };
   return deuten<"fehlgeschlagen">(
     antwort.error,
-    { 0: { reason: "fehlgeschlagen", title: "Keine Verbindung zum Server." } },
+    { 0: { reason: "fehlgeschlagen", titel: "fehler.keineVerbindung" } },
     "fehlgeschlagen"
   );
 }
@@ -73,13 +73,13 @@ export async function listInvitations(
     API_BASE_URL,
     `/companies/${tenantId}/invitations`,
     { signal },
-    "Die Einladungen ließen sich nicht laden."
+    "fehler.einladungenNichtGeladen"
   );
   if (antwort.ok) return { ok: true, invitations: antwort.value ?? [] };
   if (antwort.error.status === 404) return { ok: true, invitations: [] };
   return deuten<"fehlgeschlagen">(
     antwort.error,
-    { 0: { reason: "fehlgeschlagen", title: "Keine Verbindung zum Server." } },
+    { 0: { reason: "fehlgeschlagen", titel: "fehler.keineVerbindung" } },
     "fehlgeschlagen"
   );
 }
@@ -95,18 +95,18 @@ export async function inviteMember(
     // Kein Unternehmen im Rumpf: es steht im Pfad und wird gegen die
     // Mitgliedschaft des Aufrufers geprüft.
     { method: "POST", body: { email, role } },
-    "Die Einladung ließ sich nicht anlegen."
+    "fehler.einladungNichtAngelegt"
   );
   if (antwort.ok) return { ok: true, invitation: antwort.value };
   return deuten<"not-admin" | "not-yours" | "invalid" | "offline">(
     antwort.error,
     {
-      0: { reason: "offline", title: "Keine Verbindung zum Server." },
+      0: { reason: "offline", titel: "fehler.keineVerbindung" },
       403: {
         reason: "not-admin",
-        title: "Einladen darf nur, wer Administrator dieses Unternehmens ist.",
+        titel: "fehler.nurAdminEinladen",
       },
-      404: { reason: "not-yours", title: "Für dieses Unternehmen kannst du nicht einladen." },
+      404: { reason: "not-yours", titel: "fehler.fuerDieseFirmaNichtEinladen" },
     },
     "invalid"
   );
@@ -122,12 +122,12 @@ export async function withdrawInvitation(
     API_BASE_URL,
     `/companies/${tenantId}/invitations/${invitationId}`,
     { method: "DELETE" },
-    "Die Einladung ließ sich nicht zurückziehen."
+    "fehler.einladungNichtZurueckgezogen"
   );
   if (antwort.ok) return { ok: true };
   return deuten<"fehlgeschlagen">(
     antwort.error,
-    { 0: { reason: "fehlgeschlagen", title: "Keine Verbindung zum Server." } },
+    { 0: { reason: "fehlgeschlagen", titel: "fehler.keineVerbindung" } },
     "fehlgeschlagen"
   );
 }
@@ -148,21 +148,21 @@ export async function removeMember(
     API_BASE_URL,
     `/companies/${tenantId}/members/${memberId}`,
     { method: "DELETE" },
-    "Das Mitglied ließ sich nicht entfernen."
+    "fehler.mitgliedNichtEntfernt"
   );
   if (antwort.ok) return { ok: true };
   return deuten<"last-admin" | "not-admin" | "offline">(
     antwort.error,
     {
-      0: { reason: "offline", title: "Keine Verbindung zum Server." },
+      0: { reason: "offline", titel: "fehler.keineVerbindung" },
       409: {
         reason: "last-admin",
-        title: "Ein Unternehmen braucht mindestens einen Administrator.",
-        detail: "Mache zuerst jemanden zum Administrator.",
+        titel: "fehler.mindestensEinAdmin",
+        text: "fehler.zuerstAdminMachen",
       },
       403: {
         reason: "not-admin",
-        title: "Entfernen darf nur, wer Administrator dieses Unternehmens ist.",
+        titel: "fehler.nurAdminEntfernen",
       },
     },
     "offline"

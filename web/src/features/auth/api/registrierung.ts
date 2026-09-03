@@ -103,7 +103,7 @@ export async function registriere(eingabe: RegistrierEingabe): Promise<Registrie
           : {}),
       },
     },
-    "Registrierung fehlgeschlagen"
+    "fehler.registrierungFehlgeschlagen"
   );
 
   return antwort.ok ? { ok: true } : { ok: false, meldung: antwort.error.detail };
@@ -127,7 +127,7 @@ export async function bestaetigeEmail(token: string): Promise<BestaetigungsErgeb
     API_BASE_URL,
     "/auth/verify-email",
     { method: "POST", body: { token } },
-    "Dieser Bestätigungslink ist ungültig."
+    "fehler.bestaetigungslinkUngueltig"
   );
 
   if (antwort.ok) {
@@ -149,8 +149,8 @@ export async function bestaetigeEmail(token: string): Promise<BestaetigungsErgeb
     ok: false,
     abgelaufen,
     meldung: abgelaufen
-      ? "Dieser Bestätigungslink ist abgelaufen."
-      : "Dieser Bestätigungslink ist ungültig.",
+      ? "fehler.bestaetigungslinkAbgelaufen"
+      : "fehler.bestaetigungslinkUngueltig",
   };
 }
 
@@ -171,7 +171,7 @@ export async function sendeBestaetigungErneut(email: string): Promise<VersandErg
     API_BASE_URL,
     "/auth/resend-verification",
     { method: "POST", body: { email } },
-    "Die E-Mail konnte gerade nicht angefordert werden."
+    "fehler.mailNichtAngefordert"
   );
   return antwort.ok ? { ok: true } : { ok: false };
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
 
 import { LoadingBlock } from "../../../shared/components/ui";
@@ -21,6 +22,7 @@ import { logout } from "../store/authThunks";
  * nicht mehr gelesen.
  */
 export function LogoutPage() {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const status = useAppSelector((state) => state.auth.status);
   const gestartet = useRef(false);
@@ -37,5 +39,5 @@ export function LogoutPage() {
     return <Navigate to="/" replace />;
   }
 
-  return <LoadingBlock label="Du wirst abgemeldet …" />;
+  return <LoadingBlock label={t("abmeldung.laeuft")} />;
 }

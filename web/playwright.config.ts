@@ -50,6 +50,18 @@ export default defineConfig({
     // sagen wo. Genau so hat sich ein Navigationsfehler in dieser Reise sieben
     // Minuten lang versteckt.
     actionTimeout: 15_000,
+
+    // Die Sprache ist festgenagelt, und das ist keine Bequemlichkeit.
+    //
+    // Ohne diese Zeile fährt Chromium mit `en-US`, die Oberfläche folgt dem
+    // Gerät (ADR-0031) und JEDE Reise, die einen deutschen Text sucht, fällt —
+    // auf diesem Rechner. Auf dem der nächsten Person mit deutschem System wäre
+    // sie grün. Ein Test, dessen Ergebnis von der Umgebung abhängt, sagt nichts.
+    //
+    // Dass die Umschaltung wirklich wirkt, prüft GENAU EINE Reise, und die
+    // schaltet selbst um: `language-journey.spec.ts`. Die anderen prüfen ihre
+    // eigene Sache und sollen sich an der Sprache nicht stören.
+    locale: "de-DE",
     // Das GATEWAY, nicht der Vite-Server. Es ist der einzige Weg, den die
     // Auslieferung anbietet — und der, auf dem die Oberflaeche monatelang gar
     // nicht lud, weil niemand ihn fuhr.

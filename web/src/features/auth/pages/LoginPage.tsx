@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -23,6 +24,7 @@ import { login } from "../store/authThunks";
  * lassen war beides: falsch und unbenutzbar.
  */
 export function LoginPage() {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
@@ -72,25 +74,21 @@ export function LoginPage() {
       }
       // Angemeldet, aber die Sitzung kam leer zurück. Das ist kein Erfolg, und
       // stillschweigend auf der Seite stehen zu bleiben erklärt es niemandem.
-      setStummerFehlschlag(
-        "Die Anmeldung ging durch, die Sitzung liess sich aber nicht lesen. Bitte versuch es noch einmal.",
-      );
+      setStummerFehlschlag(t("anmeldung.sitzungUnlesbar"));
       return;
     }
 
     // `payload` gesetzt heisst: der Slice zeigt den Fehler des Servers. Nur der
     // andere Fall braucht hier einen eigenen Satz.
     if (ergebnis.payload === undefined) {
-      setStummerFehlschlag(
-        "Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.",
-      );
+      setStummerFehlschlag(t("anmeldung.fehlgeschlagen"));
     }
   }
 
   return (
     <AuthCard
-      title="Anmelden"
-      lead="Wechseln ist eine Entscheidung, kein Zufall. Du bestimmst, wer dich sieht, wer dich anspricht und was du teilst."
+      title={t("anmeldung.titel")}
+      lead={t("anmeldung.lead")}
     >
       <AuthModeTabs current="login" />
 
@@ -101,7 +99,7 @@ export function LoginPage() {
         sx={{ display: "grid", gap: 2 }}
       >
         <TextField
-          label="E-Mail"
+          label={t("anmeldung.email")}
           type="email"
           // Ohne `autoComplete` kann kein Passwortmanager füllen — der Browser
           // mahnt es in der Konsole selbst an.
@@ -111,7 +109,7 @@ export function LoginPage() {
           required
         />
         <TextField
-          label="Passwort"
+          label={t("anmeldung.passwort")}
           type="password"
           autoComplete="current-password"
           value={passwort}
@@ -131,7 +129,7 @@ export function LoginPage() {
           size="large"
           disabled={pending}
         >
-          {pending ? "Anmeldung läuft…" : "Anmelden"}
+          {pending ? t("anmeldung.laeuft") : t("anmeldung.knopf")}
         </Button>
       </Box>
     </AuthCard>
