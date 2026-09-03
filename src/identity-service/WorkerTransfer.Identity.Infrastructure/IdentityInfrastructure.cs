@@ -61,12 +61,6 @@ public static class IdentityInfrastructure
         // Aufraeumens.
         services.AddBCryptPasswords();
 
-        // Aussteller und Zielgruppe werden wieder VOLL geprueft: die
-        // nachsichtigen Delegaten gab es nur fuer Token ohne `iss`/`aud`, und
-        // die stellte allein der Python-Dienst aus.
-        services.PostConfigure<JwtBearerOptions>(
-            JwtBearerDefaults.AuthenticationScheme,
-            options => options.AuchAusDemCookie());
 
         services.AddSingleton(_ => IdentityDbContextFactory.DataSource(connectionString));
         services.AddDbContext<IdentityDbContext>((provider, options) =>

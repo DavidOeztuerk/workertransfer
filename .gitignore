@@ -36,3 +36,7 @@ var/
 **/bin*
 **/obj*
 **/TestResults/
+
+# Das Gespraechsprotokoll, das beim Umstieg auf Girder 4 als Vorlage diente.
+# Gehoert nicht ins Projekt.
+kon.txt

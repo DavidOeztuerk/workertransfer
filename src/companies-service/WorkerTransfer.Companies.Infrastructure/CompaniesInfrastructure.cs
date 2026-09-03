@@ -35,11 +35,6 @@ public static class CompaniesInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        // Ein Browser hält das Token als httpOnly-Cookie und kann sonst nichts
-        // damit anfangen.
-        services.PostConfigure<JwtBearerOptions>(
-            JwtBearerDefaults.AuthenticationScheme,
-            options => options.AuchAusDemCookie());
 
         services.AddSingleton(_ => CompaniesDbContextFactory.Datenquelle(connectionString));
         services.AddDbContext<CompaniesDbContext>((provider, options) =>

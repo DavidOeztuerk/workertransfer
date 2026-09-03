@@ -1,3 +1,4 @@
+using Girder.Abstractions.Observability;
 using FluentAssertions;
 
 namespace WorkerTransfer.Gateway.Tests;
@@ -218,7 +219,7 @@ public class LandkarteTests(Landschaft landschaft)
     {
         using var antwort = await landschaft.Browser.GetAsync("/jobs");
 
-        antwort.Headers.GetValues(Korrelation.Kopf).Single().Should().NotBeEmpty();
+        antwort.Headers.GetValues(CorrelationId.HeaderName).Single().Should().NotBeEmpty();
     }
 
     /// <summary>Eine mitgebrachte Kennung wird durchgereicht, nicht überschrieben.</summary>
@@ -229,10 +230,10 @@ public class LandkarteTests(Landschaft landschaft)
     public async Task Eine_mitgebrachte_Kennung_bleibt()
     {
         using var anfrage = new HttpRequestMessage(HttpMethod.Get, "/jobs");
-        anfrage.Headers.TryAddWithoutValidation(Korrelation.Kopf, "meine-kette");
+        anfrage.Headers.TryAddWithoutValidation(CorrelationId.HeaderName, "meine-kette");
 
         using var antwort = await landschaft.Browser.SendAsync(anfrage);
 
-        antwort.Headers.GetValues(Korrelation.Kopf).Single().Should().Be("meine-kette");
+        antwort.Headers.GetValues(CorrelationId.HeaderName).Single().Should().Be("meine-kette");
     }
 }

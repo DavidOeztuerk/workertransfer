@@ -1,7 +1,9 @@
 using System.Net;
 using FluentAssertions;
 using Girder.Abstractions.Caching;
-using Girder.InMemory.Caching;
+using Girder.Infrastructure.Middleware;
+using Girder.Infrastructure.Models;
+using Girder.Infrastructure.RateLimiting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,11 +55,20 @@ public sealed class SicherheitskoepfeTests
         bau.WebHost.UseUrls("http://127.0.0.1:0");
         bau.Logging.ClearProviders();
         bau.Services.AddMemoryCache();
-        bau.Services.AddSingleton<IDistributedRateLimitStore, InMemoryRateLimitStore>();
-        bau.Services.AddSingleton(new Bremseinstellungen
+        bau.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
+        bau.Services.Configure<DistributedRateLimitingOptions>(einstellungen =>
         {
-            Fenster = TimeSpan.FromMinutes(1),
-            Pfade = new Dictionary<string, int>(StringComparer.Ordinal) { ["/auth/login"] = 1 }
+            einstellungen.RequestsPerMinute = 0;
+            einstellungen.RequestsPerHour = 0;
+            einstellungen.RequestsPerDay = 0;
+            einstellungen.Subject = RateLimitSubject.Origin;
+            einstellungen.WhitelistedIps = [];
+            einstellungen.WhitelistedEndpoints = [];
+            einstellungen.EndpointSpecificLimits = new Dictionary<string, EndpointRateLimit>(
+                StringComparer.Ordinal)
+            {
+                ["/auth/login"] = new EndpointRateLimit { RequestsPerMinute = 1 }
+            };
         });
 
         var wirt = bau.Build();
@@ -72,7 +83,7 @@ public sealed class SicherheitskoepfeTests
             await weiter();
         });
 
-        wirt.UseBremse();
+        wirt.UseMiddleware<DistributedRateLimitingMiddleware>();
 
         // Steht für das, was Ocelot sonst durchreicht: eine fremde Seite, die
         // ihre eigenen Köpfe mitbringt (oder eben keine).

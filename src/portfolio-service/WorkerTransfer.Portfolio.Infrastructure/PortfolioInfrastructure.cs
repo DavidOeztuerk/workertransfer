@@ -45,16 +45,12 @@ public static class PortfolioInfrastructure
         services.Configure<Loescheinstellungen>(
             configuration.GetSection(Loescheinstellungen.Abschnitt));
 
-        services.PostConfigure<JwtBearerOptions>(
-            JwtBearerDefaults.AuthenticationScheme,
-            options => options.AuchAusDemCookie());
 
         services.AddSingleton(_ => PortfolioDbContextFactory.Datenquelle(connectionString));
         services.AddDbContext<PortfolioDbContext>((anbieter, optionen) =>
             PortfolioDbContextFactory.Konfiguriere(
                 optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
 
-        services.AddHttpContextAccessor();
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 

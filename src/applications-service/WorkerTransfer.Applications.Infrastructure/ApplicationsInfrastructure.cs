@@ -51,18 +51,12 @@ public static class ApplicationsInfrastructure
         services.Configure<Loescheinstellungen>(
             configuration.GetSection(Loescheinstellungen.Abschnitt));
 
-        // Ein Browser hält das Token als httpOnly-Cookie und kann sonst nichts
-        // damit anfangen.
-        services.PostConfigure<JwtBearerOptions>(
-            JwtBearerDefaults.AuthenticationScheme,
-            options => options.AuchAusDemCookie());
 
         services.AddSingleton(_ => ApplicationsDbContextFactory.Datenquelle(connectionString));
         services.AddDbContext<ApplicationsDbContext>((provider, options) =>
             ApplicationsDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
 
-        services.AddHttpContextAccessor();
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 

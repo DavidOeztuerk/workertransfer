@@ -2,7 +2,9 @@ using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Girder.Abstractions.Caching;
-using Girder.InMemory.Caching;
+using Girder.Infrastructure.Middleware;
+using Girder.Infrastructure.Models;
+using Girder.Infrastructure.RateLimiting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -134,20 +136,19 @@ public class Landschaft : IAsyncLifetime
             Landkarte(haefen, umgedreht), optional: false, reloadOnChange: false);
         bau.Services.AddOcelot(bau.Configuration);
 
-        // Wie in `Program.cs`: Girders Zaehler, nicht seine Zwischenschicht.
+        // Wortgleich zu `Program.cs` — Girders Zaehler UND seine Zwischenschicht.
         bau.Services.AddMemoryCache();
-        bau.Services.AddSingleton<IDistributedRateLimitStore, InMemoryRateLimitStore>();
-        bau.Services.AddSingleton(
-            bau.Configuration.GetSection(Bremseinstellungen.Abschnitt)
-                .Get<Bremseinstellungen>() ?? new Bremseinstellungen());
+        bau.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
+        bau.Services.Configure<DistributedRateLimitingOptions>(
+            bau.Configuration.GetSection(DistributedRateLimitingOptions.SectionName));
 
         var gateway = bau.Build();
 
         // Dieselbe Reihenfolge wie in `Program.cs`. Sie ist Teil dessen, was
         // hier geprueft wird: Ocelot beendet die Kette.
         gateway.UseGesundheit();
-        gateway.UseKorrelation();
-        gateway.UseBremse();
+        gateway.UseMiddleware<CorrelationIdMiddleware>();
+        gateway.UseMiddleware<DistributedRateLimitingMiddleware>();
         gateway.UseNavigation();
         gateway.UseOcelot().GetAwaiter().GetResult();
 
@@ -194,7 +195,8 @@ public class Landschaft : IAsyncLifetime
             // Die Bremse reist mit: die umgedrehte Landschaft soll sich NUR in
             // der Zeilenreihenfolge unterscheiden, sonst prueft sie nebenbei
             // etwas anderes.
-            ["Bremse"] = gelesen.RootElement.GetProperty("Bremse"),
+            ["DistributedRateLimiting"] =
+                gelesen.RootElement.GetProperty("DistributedRateLimiting"),
             ["GlobalConfiguration"] = gelesen.RootElement.GetProperty("GlobalConfiguration"),
         };
 

@@ -40,16 +40,12 @@ public static class JobsInfrastructure
         services.Configure<Rueckzugseinstellungen>(
             configuration.GetSection(Rueckzugseinstellungen.Abschnitt));
 
-        services.PostConfigure<JwtBearerOptions>(
-            JwtBearerDefaults.AuthenticationScheme,
-            options => options.AuchAusDemCookie());
 
         services.AddSingleton(_ => JobsDbContextFactory.Datenquelle(connectionString));
         services.AddDbContext<JobsDbContext>((anbieter, optionen) =>
             JobsDbContextFactory.Konfiguriere(
                 optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
 
-        services.AddHttpContextAccessor();
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 

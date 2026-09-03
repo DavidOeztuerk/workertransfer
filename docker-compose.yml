@@ -337,7 +337,7 @@ services:
       #
       # NICHT ins Helm-Chart uebernehmen. Dort laeuft kein Pruefstand, und ein
       # Faktor in einer Staging-Umgebung waere eine Bremse, die nur so aussieht.
-      Bremse__Faktor: "${WORKERTRANSFER_BREMSE_FAKTOR:-1}"
+      DistributedRateLimiting__LimitMultiplier: "${WORKERTRANSFER_BREMSE_FAKTOR:-1}"
     depends_on:
       # Nur auf die Datenbank, nicht auf die elf: das Gateway beantwortet
       # /health/live selbst, und ein einzelner kranker Dienst darf es nicht

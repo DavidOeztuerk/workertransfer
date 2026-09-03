@@ -9,7 +9,7 @@
     -->
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
 
-    <GirderVersion>4.1.0</GirderVersion>
+    <GirderVersion>4.2.2</GirderVersion>
   </PropertyGroup>
 
   <ItemGroup Label="Girder">
@@ -19,6 +19,7 @@
     <PackageVersion Include="Girder.Contracts" Version="$(GirderVersion)" />
     <PackageVersion Include="Girder.Core" Version="$(GirderVersion)" />
     <PackageVersion Include="Girder.Data.EntityFrameworkCore" Version="$(GirderVersion)" />
+    <PackageVersion Include="Girder.Http" Version="$(GirderVersion)" />
     <PackageVersion Include="Girder.InMemory" Version="$(GirderVersion)" />
     <PackageVersion Include="Girder.Infrastructure" Version="$(GirderVersion)" />
     <PackageVersion Include="Girder.Passwords.BCrypt" Version="$(GirderVersion)" />

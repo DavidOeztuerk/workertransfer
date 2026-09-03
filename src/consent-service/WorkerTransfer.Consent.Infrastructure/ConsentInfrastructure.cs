@@ -44,19 +44,12 @@ public static class ConsentInfrastructure
         services.Configure<Loescheinstellungen>(
             configuration.GetSection(Loescheinstellungen.Abschnitt));
 
-        // A browser holds the token as an httpOnly cookie and can do nothing
-        // else with it. Without this every switch on the consent page comes
-        // back 401 while the sign-in looks like it worked.
-        services.PostConfigure<JwtBearerOptions>(
-            JwtBearerDefaults.AuthenticationScheme,
-            options => options.AuchAusDemCookie());
 
         services.AddSingleton(_ => ConsentDbContextFactory.DataSource(connectionString));
         services.AddDbContext<ConsentDbContext>((provider, options) =>
             ConsentDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
 
-        services.AddHttpContextAccessor();
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<IConsentLedger, EfConsentLedger>();
