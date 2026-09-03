@@ -34,7 +34,7 @@ export interface AuthVorgabe {
 export const PERSON: Session = {
   userId: "11111111-1111-1111-1111-111111111111",
   email: "anna@example.com",
-  tenantId: null,
+  tenantId: null, language: "de",
 };
 
 export function testStore(vorgabe: AuthVorgabe = {}) {

@@ -51,6 +51,7 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
             Status = user.Status,
             Roles = JsonSerializer.Serialize(user.Roles),
             PendingCompanyName = user.PendingCompanyName,
+            Language = Sprachwahl.Etikett(user.Kontosprache),
             CreatedAt = jetzt,
             UpdatedAt = jetzt,
             Version = 1
@@ -85,6 +86,7 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
 
         row.Status = user.Status;
         row.PendingCompanyName = user.PendingCompanyName;
+        row.Language = Sprachwahl.Etikett(user.Kontosprache);
         row.UpdatedAt = uhr.GetUtcNow().UtcDateTime;
         row.Version += 1;
     }
@@ -96,5 +98,6 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
         row.DisplayName,
         row.Status,
         JsonSerializer.Deserialize<List<string>>(row.Roles) ?? [],
-        row.PendingCompanyName);
+        row.PendingCompanyName,
+        Sprachwahl.Aus(row.Language));
 }

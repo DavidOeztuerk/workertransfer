@@ -55,7 +55,7 @@ const SITZUNG = {
   session: {
     userId: "33333333-3333-4333-8333-333333333333",
     email: "a@b.de",
-    tenantId: null,
+    tenantId: null, language: "de",
   },
 };
 

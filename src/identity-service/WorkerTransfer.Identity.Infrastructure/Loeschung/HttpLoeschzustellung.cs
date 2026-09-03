@@ -79,14 +79,14 @@ public sealed class HttpLoeschzustellung(
             throw new NochNichtException("noch nicht alle Empfänger haben quittiert");
         }
 
-        // Read now, not carried along: the address lives in the row that is
-        // about to be deleted, and putting it in the outbox would write it into
-        // every backup (ADR-0025 §5).
-        var adresse = await bestand.AdresseAsync(wer, cancellationToken);
+        // Read now, not carried along: the address and the language live in the
+        // row that is about to be deleted, and putting either in the outbox
+        // would write it into every backup (ADR-0025 §5).
+        var anschrift = await bestand.AdresseAsync(wer, cancellationToken);
 
-        if (adresse is not null)
+        if (anschrift is not null)
         {
-            postkorb.Loeschbestaetigung(adresse, wer);
+            postkorb.Loeschbestaetigung(anschrift.Adresse, wer, anschrift.Sprache);
             await versand.VersendeGesammeltesAsync(cancellationToken);
         }
     }

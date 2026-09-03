@@ -47,12 +47,17 @@ function antworten(karte: Record<string, Antwort>) {
 
 const ANGEMELDET = {
   status: "authenticated" as const,
-  session: { userId: SUBJECT, email: "anna@example.com", tenantId: null },
+  session: { userId: SUBJECT, email: "anna@example.com", tenantId: null, language: "de" },
 };
 
 const MIT_FIRMA = {
   status: "authenticated" as const,
-  session: { userId: SUBJECT, email: "anna@example.com", tenantId: TENANT },
+  session: {
+    userId: SUBJECT,
+    email: "anna@example.com",
+    tenantId: TENANT,
+    language: "de",
+  },
 };
 
 beforeEach(() => {

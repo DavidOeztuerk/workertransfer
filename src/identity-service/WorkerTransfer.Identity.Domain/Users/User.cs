@@ -45,7 +45,8 @@ public sealed class User
         string displayName,
         AccountStatus status,
         IReadOnlyList<string> roles,
-        string? pendingCompanyName)
+        string? pendingCompanyName,
+        Kontosprache sprache)
     {
         Id = id;
         Email = email;
@@ -54,6 +55,7 @@ public sealed class User
         Status = status;
         Roles = roles;
         PendingCompanyName = pendingCompanyName;
+        Kontosprache = sprache;
     }
 
     /// <summary>Who this is.</summary>
@@ -85,6 +87,13 @@ public sealed class User
     /// </remarks>
     public string? PendingCompanyName { get; private set; }
 
+    /// <summary>The language this person is written to in.</summary>
+    /// <remarks>
+    /// On the account and not on the request, because the mails that matter
+    /// most go out without one — see <see cref="Users.Sprache"/>.
+    /// </remarks>
+    public Kontosprache Kontosprache { get; private set; }
+
     /// <summary>A new account, unconfirmed.</summary>
     /// <remarks>
     /// Registering is an act of a natural person (ADR-0017); membership in a
@@ -96,13 +105,19 @@ public sealed class User
     /// <param name="pendingCompanyName">
     /// A company to create once the address is confirmed, or <c>null</c>.
     /// </param>
+    /// <param name="sprache">
+    /// What to write to them in. Taken from the browser at registration, and
+    /// changeable afterwards — the confirmation mail is the first thing this
+    /// account ever receives, so guessing here is better than defaulting.
+    /// </param>
     public static User Register(
         string email,
         string passwordHash,
         string displayName,
-        string? pendingCompanyName = null) =>
+        string? pendingCompanyName = null,
+        Kontosprache sprache = Sprachwahl.Vorgabe) =>
         new(SubjectId.New(), email, passwordHash, displayName,
-            AccountStatus.Pending, ["user"], pendingCompanyName);
+            AccountStatus.Pending, ["user"], pendingCompanyName, sprache);
 
     /// <summary>The account as a row holds it.</summary>
     /// <remarks>For repositories. Everything here is already true.</remarks>
@@ -113,8 +128,10 @@ public sealed class User
         string displayName,
         AccountStatus status,
         IReadOnlyList<string> roles,
-        string? pendingCompanyName) =>
-        new(id, email, passwordHash, displayName, status, roles, pendingCompanyName);
+        string? pendingCompanyName,
+        Kontosprache sprache = Sprachwahl.Vorgabe) =>
+        new(id, email, passwordHash, displayName, status, roles,
+            pendingCompanyName, sprache);
 
     /// <summary>The address was confirmed.</summary>
     /// <remarks>
@@ -143,6 +160,16 @@ public sealed class User
     /// </para>
     /// </remarks>
     public void CompanyIntentSpent() => PendingCompanyName = null;
+
+    /// <summary>The person chose a language.</summary>
+    /// <remarks>
+    /// An explicit choice, which is why it is a method and not a setter fed by
+    /// every request: the browser's header is a guess and must never quietly
+    /// overwrite what somebody picked. Somebody who reads German while
+    /// travelling in France should not find their mails in French afterwards.
+    /// </remarks>
+    /// <param name="sprache">What they picked.</param>
+    public void SpracheWaehlen(Kontosprache sprache) => Kontosprache = sprache;
 
     /// <summary>
     /// Refuses a sign-in the account is not in a state for.

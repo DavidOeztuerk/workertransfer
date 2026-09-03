@@ -1,4 +1,5 @@
 using Girder.Core.Identity;
+using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Application.Ports;
 
@@ -20,6 +21,14 @@ namespace WorkerTransfer.Identity.Application.Ports;
 /// service sends are two things one can find, not three call sites assembling
 /// strings.
 /// </para>
+/// <para>
+/// <strong>Every intent carries the recipient's language</strong>, and it comes
+/// from the account rather than the request. Two of these mails are written
+/// without a request at all — the deletion confirmation when the last of eight
+/// services acknowledges, the news mail from a dispatcher — so an
+/// <c>Accept-Language</c> would be absent exactly where it is needed
+/// (<see cref="Kontosprache"/>).
+/// </para>
 /// </remarks>
 public interface IPostkorb
 {
@@ -30,7 +39,9 @@ public interface IPostkorb
     /// address into it.
     /// </param>
     /// <param name="klartextToken">The token, in the clear. Only ever here and in the mail.</param>
-    void Bestaetigungslink(string an, SubjectId empfaenger, string klartextToken);
+    /// <param name="sprache">What to write in.</param>
+    void Bestaetigungslink(
+        string an, SubjectId empfaenger, string klartextToken, Kontosprache sprache);
 
     /// <summary>
     /// "Somebody tried to register with your address."
@@ -40,7 +51,10 @@ public interface IPostkorb
     /// only thing that happens on a duplicate registration, and it is why the
     /// endpoint can answer identically in both cases.
     /// </remarks>
-    void Doppelanmeldung(string an, SubjectId empfaenger);
+    /// <param name="an">Where to send it.</param>
+    /// <param name="empfaenger">Whose account it is.</param>
+    /// <param name="sprache">What to write in.</param>
+    void Doppelanmeldung(string an, SubjectId empfaenger, Kontosprache sprache);
 
     /// <summary>
     /// "You have been invited into a company", with the link.
@@ -56,7 +70,14 @@ public interface IPostkorb
     /// </param>
     /// <param name="firma">Which company, so the recipient can recognise it.</param>
     /// <param name="klartextToken">The token, in the clear. Only ever here and in the mail.</param>
-    void Einladung(string an, SubjectId einladender, string firma, string klartextToken);
+    /// <param name="sprache">
+    /// What to write in. Taken from the <em>inviting</em> account when the
+    /// address is unknown here — an invitation goes to somebody who may have no
+    /// account, so there is no row of theirs to read.
+    /// </param>
+    void Einladung(
+        string an, SubjectId einladender, string firma, string klartextToken,
+        Kontosprache sprache);
 
     /// <summary>"Your account is gone."</summary>
     /// <remarks>
@@ -69,7 +90,12 @@ public interface IPostkorb
     /// Never from the outbox: that is durable storage.
     /// </param>
     /// <param name="wer">Whose account it was. For the log.</param>
-    void Loeschbestaetigung(string an, SubjectId wer);
+    /// <param name="sprache">
+    /// What to write in — read from the row before it falls. This mail is the
+    /// last thing that account ever receives, and it is written long after the
+    /// request that asked for the deletion.
+    /// </param>
+    void Loeschbestaetigung(string an, SubjectId wer, Kontosprache sprache);
 
     /// <summary>"There is something new for you." Nothing more.</summary>
     /// <remarks>
@@ -89,5 +115,6 @@ public interface IPostkorb
     /// </remarks>
     /// <param name="an">Where to send it.</param>
     /// <param name="wer">Whose account it is. For the log.</param>
-    void Neuigkeit(string an, SubjectId wer);
+    /// <param name="sprache">What to write in.</param>
+    void Neuigkeit(string an, SubjectId wer, Kontosprache sprache);
 }

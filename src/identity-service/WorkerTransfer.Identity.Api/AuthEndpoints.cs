@@ -3,11 +3,16 @@ using MediatR;
 using WorkerTransfer.Identity.Application.Anmelden;
 
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Api;
 
 /// <summary>What a caller sends to sign in.</summary>
 public sealed record LoginBody(string Email, string Password);
+
+/// <summary>What a caller sends to change their language.</summary>
+/// <param name="Language">A tag this platform has texts for: de, en or fr.</param>
+public sealed record SprachwahlBody(string Language);
 
 /// <summary><c>/auth/*</c> and <c>/me</c>.</summary>
 /// <remarks>
@@ -186,6 +191,53 @@ public static class AuthEndpoints
             context.Response.StatusCode = StatusCodes.Status204NoContent;
         });
 
+        // Die Sprache ist eine Entscheidung über das eigene Konto und liegt
+        // deshalb unter `/account`, nicht unter `/auth`: sie hat mit dem
+        // Anmelden nichts zu tun, und die fünf Auth-Pfade tragen eine Bremse,
+        // die hier nur im Weg stünde.
+        app.MapPut("/account/language", async (
+            SprachwahlBody body,
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status401Unauthorized,
+                    "Request failed", "not authenticated");
+                return;
+            }
+
+            // `Sprachwahl.Aus` beantwortet Unbekanntes mit der Vorgabe statt mit
+            // einem Fehler. Hier ist das falsch: wer „is" schickt, bekäme
+            // stillschweigend Deutsch gespeichert und wüsste nicht, warum seine
+            // Wahl nicht hielt. Eine Wahl, die nicht wirkt, muss das sagen.
+            if (!Sprachwahl.Kennen(body.Language))
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", "unsupported language");
+                return;
+            }
+
+            var erledigt = await mediator.Send(
+                new SpracheWaehlenBefehl(
+                    handelnder.Subject, Sprachwahl.Aus(body.Language)),
+                cancellationToken);
+
+            if (!erledigt)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status404NotFound,
+                    "Request failed", "no such account");
+                return;
+            }
+
+            await SchreibeOk(context, cancellationToken);
+        });
+
         app.MapGet("/me", async (
             IMediator mediator,
             HttpContext context,
@@ -215,7 +267,12 @@ public static class AuthEndpoints
         ["email"] = konto.Email,
         // null while acting as a person; a company is only active after
         // POST /auth/company/{id} (ADR-0017).
-        ["tenant_id"] = konto.Firma?.ToString()
+        ["tenant_id"] = konto.Firma?.ToString(),
+        // Damit die Oberfläche der GEWÄHLTEN Sprache folgt und nicht dem Gerät.
+        // Wer auf einem englischen Rechner Deutsch gewählt hat, soll nach dem
+        // Anmelden Deutsch sehen — sonst wäre die Wahl nur so lange gültig, wie
+        // derselbe Browser sie sich merkt.
+        ["language"] = Sprachwahl.Etikett(konto.Sprache)
     };
 
     private static Task SchreibeOk(HttpContext context, CancellationToken cancellationToken) =>

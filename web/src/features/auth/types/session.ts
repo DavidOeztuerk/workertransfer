@@ -10,6 +10,14 @@ export interface Session {
   userId: string;
   email: string;
   tenantId: string | null;
+  /**
+   * Die Sprache, die am KONTO steht.
+   *
+   * Sie kommt mit, damit die Wahl den Browser überlebt: wer auf einem
+   * englischen Rechner Deutsch gewählt hat, sieht nach dem Anmelden auf einem
+   * anderen Gerät wieder Deutsch. Der lokale Speicher weiss davon nichts.
+   */
+  language: string;
 }
 
 /** Eine Firma, für die jemand handeln darf. */

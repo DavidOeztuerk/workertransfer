@@ -2,6 +2,7 @@ using Girder.Core.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Identity.Application.Ports;
+using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Infrastructure.Post;
 
@@ -31,69 +32,52 @@ public sealed class Postkorb(
     private readonly Postsettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public void Bestaetigungslink(string an, SubjectId empfaenger, string klartextToken)
+    public void Bestaetigungslink(
+        string an, SubjectId empfaenger, string klartextToken, Kontosprache sprache)
     {
         var basis = _einstellungen.WebAdresse.TrimEnd('/');
+        var text = Mailtexte.Bestaetigung(
+            sprache, $"{basis}/verify?token={klartextToken}");
 
-        _wartend.Add(new AusgehendePost(
-            an,
-            "Bitte bestätige deine E-Mail-Adresse",
-            "Willkommen bei WorkerTransfer! Bitte bestätige deine E-Mail-Adresse "
-            + $"über folgenden Link:\n\n{basis}/verify?token={klartextToken}\n",
-            empfaenger));
+        _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, empfaenger));
     }
 
     /// <inheritdoc />
-    public void Doppelanmeldung(string an, SubjectId empfaenger) =>
-        _wartend.Add(new AusgehendePost(
-            an,
-            "Registrierungsversuch mit deiner E-Mail-Adresse",
-            "Jemand hat versucht, mit deiner E-Mail-Adresse ein neues Konto bei "
-            + "WorkerTransfer anzulegen. Du hast bereits ein Konto — falls du das "
-            + "warst, melde dich einfach an. War es nicht du, kannst du diese "
-            + "Nachricht ignorieren.\n",
-            empfaenger));
-
-    /// <inheritdoc />
-    public void Einladung(string an, SubjectId einladender, string firma, string klartextToken)
+    public void Doppelanmeldung(string an, SubjectId empfaenger, Kontosprache sprache)
     {
-        var basis = _einstellungen.WebAdresse.TrimEnd('/');
-        var wen = string.IsNullOrWhiteSpace(firma) ? "ein Unternehmen" : firma;
-
-        _wartend.Add(new AusgehendePost(
-            an,
-            "Du wurdest zu einem Unternehmen eingeladen",
-            $"Du wurdest eingeladen, für {wen} bei WorkerTransfer zu handeln. "
-            + "Über folgenden Link nimmst du die Einladung an:\n\n"
-            + $"{basis}/invitation?token={klartextToken}\n\n"
-            + "Wenn du damit nichts anfangen kannst, ignoriere diese Nachricht.\n",
-            einladender));
+        var text = Mailtexte.Doppelanmeldung(sprache);
+        _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, empfaenger));
     }
 
     /// <inheritdoc />
-    public void Loeschbestaetigung(string an, SubjectId wer) =>
-        _wartend.Add(new AusgehendePost(
-            an,
-            "Dein Konto bei WorkerTransfer ist gelöscht",
-            "Dein Konto und die Daten, die andere Dienste über dich hielten, sind "
-            + "gelöscht. Es gibt nichts mehr, das dich hier zuordnet.\n\n"
-            + "Diese Nachricht ist die letzte, die du von uns bekommst.\n",
-            wer));
-
-    /// <inheritdoc />
-    public void Neuigkeit(string an, SubjectId wer)
+    public void Einladung(
+        string an, SubjectId einladender, string firma, string klartextToken,
+        Kontosprache sprache)
     {
         var basis = _einstellungen.WebAdresse.TrimEnd('/');
+        var wen = string.IsNullOrWhiteSpace(firma)
+            ? Mailtexte.EinUnternehmen(sprache)
+            : firma;
+        var text = Mailtexte.Einladung(
+            sprache, wen, $"{basis}/invitation?token={klartextToken}");
 
-        _wartend.Add(new AusgehendePost(
-            an,
-            // Für jede Art derselbe Betreff — die Art ist genau das Geheimnis.
-            "Neuigkeiten auf WorkerTransfer",
-            "Es gibt etwas Neues für dich.\n\n"
-            + $"Melde dich an, um nachzusehen: {basis}\n\n"
-            + "Was es ist, steht bewusst nicht in dieser Mail — sie könnte in "
-            + "einem Postfach liegen, das nicht nur dir gehört.\n",
-            wer));
+        _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, einladender));
+    }
+
+    /// <inheritdoc />
+    public void Loeschbestaetigung(string an, SubjectId wer, Kontosprache sprache)
+    {
+        var text = Mailtexte.Loeschbestaetigung(sprache);
+        _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, wer));
+    }
+
+    /// <inheritdoc />
+    public void Neuigkeit(string an, SubjectId wer, Kontosprache sprache)
+    {
+        var basis = _einstellungen.WebAdresse.TrimEnd('/');
+        var text = Mailtexte.Neuigkeit(sprache, basis);
+
+        _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, wer));
     }
 
     /// <inheritdoc />

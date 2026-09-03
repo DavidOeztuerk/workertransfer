@@ -47,26 +47,65 @@ Anfrage existiert dann längst nicht mehr. Dasselbe gilt für jede
 Benachrichtigung, die aus einem fremden Vorgang entsteht: eine
 Lebenslauf-Anfrage schreibt an einen Menschen, der gerade gar nichts tut.
 
-Also: **die Sprache ist eine Spalte am Konto**, gesetzt bei der Registrierung
-aus `Accept-Language`, änderbar in den Einstellungen, gelesen beim Zustellen.
+Also: **die Sprache ist eine Spalte am Konto** (`users.language`), gesetzt bei der
+Registrierung aus `Accept-Language`, änderbar über `PUT /account/language`,
+gelesen beim Zustellen.
+
+Der Kopf wird **genau einmal** gelesen: bei der Registrierung. Danach nie wieder.
+Er ist eine Angabe des Geräts, und ein Gerät darf eine Entscheidung nicht
+überschreiben — wer auf einem englischen Rechner Deutsch gewählt hat, soll nicht
+beim nächsten Anmelden wieder Englisch bekommen.
+
+`PUT /account/language` weist eine Sprache ohne Texte mit **422** ab, statt
+stillschweigend Deutsch zu speichern. Eine Wahl, die nicht wirkt und nichts sagt,
+sieht für den Menschen aus wie ein Fehler der Oberfläche.
+
+Der Typ heisst `Kontosprache` und nicht `Sprache`: `Sprache` ist ein
+Parser-Kombinator-Paket, das transitiv hereinkommt und den gleichnamigen
+Namensraum besetzt. Der längere Name sagt ohnehin das Richtige — es ist die
+Sprache des **Kontos**, nicht die der Anfrage.
 
 **Die Outbox trägt sie nicht.** ADR-0025 gilt unverändert: die Zeile hält eine
 Kennung und eine Art, keinen Inhalt. Die Sprache wird beim Zustellen aus dem
 Konto gelesen — sonst stünde in jeder Sicherung eine weitere Aussage über einen
 Menschen, und eine, die beim Ändern der Vorliebe sofort falsch wäre.
 
-## Was synchron antwortet, folgt dem Kopf
+## Was synchron antwortet: Englisch auf dem Draht, übersetzt in der Oberfläche
 
-Problemdokumente und alles, was direkt auf eine Anfrage antwortet, lesen
-`Accept-Language`. Das ist richtig, weil der Aufrufer in diesem Moment da ist —
-und es deckt auch den Fall ab, den die Kontospalte nicht kennt: eine Anfrage
-ohne Anmeldung.
+**Nachtrag vom 03.09.2026, nach dem Bauen.** Der ursprüngliche Absatz sagte, ein
+Problemdokument solle `Accept-Language` lesen. Gebaut ist etwas anderes, und der
+Grund gehört hierher, weil das Versprechen sonst neben dem Code stünde und ihm
+widerspräche.
 
-**Girders Vorgabe wird neutral englisch.** `ErrorMessageService` verdrahtet
-heute rund zwanzig deutsche Meldungen fest und ist die einzige Datei in ganz
-Girder mit deutschem Text; Girders eigene README führt das seit Langem als
-Mangel. Eine Bibliothek, die die Sprache ihres ersten Anwenders festschreibt, ist
-für jeden zweiten kaputt.
+**Ein Problemdokument ist auf dem Draht englisch und beschreibt eine FORM.**
+`"malformed request body"`, `"invalid: email, password"`, `"not authenticated"` —
+das sind Aussagen über die Anfrage, keine Sätze für einen Menschen. Sie stehen so
+schon da, weil `detail` nie den Inhalt nennen darf (nur die Gestalt), und dieselbe
+Regel macht sie zu etwas, das man nicht übersetzt, sondern DEUTET.
+
+**Die Oberfläche deutet sie.** `shared/api/fehler.ts` bildet Statuscode auf einen
+Grund und einen Katalogschlüssel ab, je Aufrufstelle. Der Mensch liest also
+ohnehin nie den Serversatz, sondern den Katalogtext seiner Sprache — und zwar in
+jeder Sprache, die die Oberfläche kennt, auch in einer, von der das Backend nie
+gehört hat.
+
+**Der Preis der anderen Lösung war der Ausschlag.** `Accept-Language` durch zwölf
+Dienste zu ziehen hiesse, den Katalog zwölfmal zu halten. Genau das ist die
+Abweichung, gegen die diese Codebasis sonst überall verteidigt wird: zwölf
+Antworten auf eine Frage sind zwölf Gelegenheiten, sie verschieden zu
+beantworten. Ein Statuscode ist eine, und er ist maschinenlesbar.
+
+**Gemessen, nicht angenommen** (03.09.2026, gegen den laufenden Stapel): jede
+Antwort auf dem Draht ist englisch — die eigenen (`"not authenticated"`,
+`"Password rejected: must be at least 12 characters"`) und auch Girders eigene
+(`"Potentially malicious input detected"`, `title: "Bad request"`). Der befürchtete
+deutsche `ErrorMessageService` erreicht hier niemanden: unser
+`ProblemDetailsMiddleware` schreibt die Gestalt, und Girder 4.2 antwortet an den
+Stellen, die durchkommen, selbst englisch.
+
+**Girders `ErrorMessageService` bleibt trotzdem eine Schuld** — nur keine unsere.
+Eine Bibliothek, die die Sprache ihres ersten Anwenders festschreibt, ist für
+jeden zweiten kaputt. Sie steht auf Girders Zettel, nicht auf diesem.
 
 ## Was mit den Tests passiert
 

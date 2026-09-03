@@ -62,7 +62,8 @@ public sealed class BestaetigungErneutSendenHandler(
                 ConsumedAt: null),
             cancellationToken);
 
-        postkorb.Bestaetigungslink(konto.Email, konto.Id, klartext);
+        postkorb.Bestaetigungslink(
+            konto.Email, konto.Id, klartext, konto.Kontosprache);
 
         return Unit.Value;
     }

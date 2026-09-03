@@ -1,4 +1,5 @@
 using Girder.Core.Identity;
+using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Application.Loeschung;
 
@@ -8,6 +9,18 @@ namespace WorkerTransfer.Identity.Application.Loeschung;
 /// this carries the service's own rows. Both run in one transaction, and
 /// neither knows what the other holds.
 /// </remarks>
+/// <summary>Where the last mail goes, and in which language.</summary>
+/// <remarks>
+/// Both read from the row that is about to be deleted, in one go and at the
+/// moment of sending. Neither travels in the outbox: that is durable storage
+/// and ends up in every backup (ADR-0025 §5). The language is here rather than
+/// on the request because there is no request — this runs from the dispatcher,
+/// possibly days after somebody asked to be deleted.
+/// </remarks>
+/// <param name="Adresse">The address the notice goes to.</param>
+/// <param name="Sprache">What to write it in.</param>
+public sealed record Schlussanschrift(string Adresse, Kontosprache Sprache);
+
 public interface ILoeschbestand
 {
     /// <summary>Whether a cascade for this person is already under way.</summary>
@@ -44,7 +57,8 @@ public interface ILoeschbestand
     /// forbidden: an outbox is durable storage and lands in every backup
     /// (ADR-0025 §5).
     /// </remarks>
-    Task<string?> AdresseAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task<Schlussanschrift?> AdresseAsync(
+        SubjectId wer, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// The last step: <c>users</c> falls, and what hangs on it.

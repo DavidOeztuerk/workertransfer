@@ -31,6 +31,15 @@ public sealed class UserRow
     /// <summary>The company meant at registration. <c>null</c> means a person.</summary>
     public string? PendingCompanyName { get; set; }
 
+    /// <summary>The <c>language</c> column: two letters, never null.</summary>
+    /// <remarks>
+    /// A plain string and not the enum: a mail written by a dispatcher days
+    /// later reads this row, and a value the database refuses to widen would
+    /// make adding a fourth language a migration of the column type rather than
+    /// of the catalogue. The domain still narrows it on the way in.
+    /// </remarks>
+    public string Language { get; set; } = "de";
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
@@ -84,6 +93,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(row => row.Status).HasColumnName("status");
             entity.Property(row => row.Roles).HasColumnName("roles").HasColumnType("jsonb");
             entity.Property(row => row.PendingCompanyName).HasColumnName("pending_company_name");
+            entity.Property(row => row.Language).HasColumnName("language");
             entity.Property(row => row.CreatedAt).HasColumnName("created_at");
             entity.Property(row => row.UpdatedAt).HasColumnName("updated_at");
             entity.Property(row => row.Version).HasColumnName("version").IsConcurrencyToken();
