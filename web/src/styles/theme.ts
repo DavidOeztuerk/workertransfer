@@ -83,10 +83,23 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
           // navigiert, muss jederzeit sehen, wo er steht. MUIs Vorgabe ist an
           // mehreren Stellen unsichtbar auf farbigem Grund. Zwei Lagen, damit er
           // auf hellem wie auf dunklem Grund trägt.
-          "*:focus-visible": {
+          //
+          // NICHT auf Formularfelder. Ein `input`, `select` oder `textarea`
+          // steckt in einem `OutlinedInput`, und der zeichnet im Fokus schon
+          // einen 2px-Rahmen um sich. Beides zusammen ergab zwei Rahmen
+          // ineinander — einen am Feld, einen am Kasten darum —, und weil der
+          // äussere rund und der innere eckig ist, sah es schief aus. Gemessen
+          // an der Sprachwahl und den Filtern.
+          "*:focus-visible:not(input):not(select):not(textarea)": {
             outline: "none",
             boxShadow: light ? focusRing.light : focusRing.dark,
             borderRadius: radius.sm,
+          },
+
+          // Das Feld selbst bekommt gar keinen eigenen Ring: der Kasten um es
+          // herum ist der Fokus, und er ist gross genug, um gesehen zu werden.
+          "input:focus-visible, select:focus-visible, textarea:focus-visible": {
+            outline: "none",
           },
 
           body: {
@@ -187,6 +200,16 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
       },
 
       MuiTextField: { defaultProps: { size: "small", fullWidth: true } },
+
+      MuiSelect: {
+        styleOverrides: {
+          // Platz für den Pfeil. Ohne das schiebt sich der längste Eintrag
+          // („Wie mein Gerät") unter das Symbol und wird abgeschnitten —
+          // MUI setzt das Padding nur für die eigene Listenvariante, nicht für
+          // ein natives `select`.
+          select: { paddingRight: "34px !important" },
+        },
+      },
 
       MuiOutlinedInput: {
         styleOverrides: {

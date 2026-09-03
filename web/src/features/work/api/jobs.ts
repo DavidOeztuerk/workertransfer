@@ -40,6 +40,53 @@ export interface Job {
   updated_at: string;
 }
 
+/**
+ * Wie eine Anzeige auf dem DRAHT aussieht.
+ *
+ * <strong>Nicht dasselbe wie <c>Job</c>, und genau daran ist es einmal
+ * gescheitert.</strong> Der Dienst schreibt <c>remote_mode</c> und
+ * <c>employment_type</c>; der Typ oben heisst <c>remote</c> und
+ * <c>employment</c>. Solange die Antwort direkt auf <c>Job</c> gecastet wurde,
+ * waren beide Felder still <c>undefined</c> — TypeScript sieht in eine
+ * JSON-Antwort nicht hinein, und ein Cast ist eine Behauptung, keine Prüfung.
+ *
+ * Sichtbar wurde es erst, als aus der Nachschlagetabelle eine Funktion wurde:
+ * `REMOTE_LABEL[undefined]` ergibt `undefined` und zeichnet nichts,
+ * `remoteLabel(undefined)` ergibt `stelle.remoteundefined` und steht in der
+ * Karte. Dieselbe Klasse Fehler wie bei den vier Benachrichtigungssprüngen —
+ * ein Name, der auf beiden Seiten anders heisst, und niemand merkt es.
+ */
+interface JobDraht {
+  id: string;
+  tenant_id: string;
+  title: string;
+  description: string;
+  location: string;
+  remote_mode: RemoteMode;
+  employment_type: EmploymentType;
+  skills: string[];
+  status: JobStatus;
+  published_at: string | null;
+  updated_at: string;
+}
+
+/** Vom Draht in die Gestalt, mit der die Oberfläche arbeitet. */
+function zurAnzeige(draht: JobDraht): Job {
+  return {
+    id: draht.id,
+    tenant_id: draht.tenant_id,
+    title: draht.title,
+    description: draht.description,
+    location: draht.location,
+    remote: draht.remote_mode,
+    employment: draht.employment_type,
+    skills: draht.skills ?? [],
+    status: draht.status,
+    published_at: draht.published_at,
+    updated_at: draht.updated_at,
+  };
+}
+
 export interface JobInput {
   title: string;
   description: string;
@@ -142,7 +189,7 @@ export async function searchJobs(
   signal?: AbortSignal
 ): Promise<SucheErgebnis> {
   const answer = await request<{
-    items?: Job[];
+    items?: JobDraht[];
     page?: number;
     page_size?: number;
     total_items?: number;
@@ -162,7 +209,7 @@ export async function searchJobs(
   }
   return {
     ok: true,
-    items: answer.value?.items ?? [],
+    items: (answer.value?.items ?? []).map(zurAnzeige),
     // Die Werte des SERVERS und nicht die der Anfrage: bei `page_size=100000`
     // deckelt er, und die Leiste muss zeichnen, was wirklich geliefert wurde.
     page: answer.value?.page ?? page,
@@ -180,18 +227,18 @@ export async function searchJobs(
  * uns erwarten kann.
  */
 export async function getJob(jobId: string, signal?: AbortSignal): Promise<Job | null> {
-  const answer = await request<Job>(JOBS_BASE_URL, `/jobs/${jobId}`, { signal });
-  return answer.ok ? (answer.value ?? null) : null;
+  const answer = await request<JobDraht>(JOBS_BASE_URL, `/jobs/${jobId}`, { signal });
+  return answer.ok && answer.value !== undefined ? zurAnzeige(answer.value) : null;
 }
 
 export async function listOwnJobs(signal?: AbortSignal): Promise<EigeneJobsErgebnis> {
-  const answer = await request<Job[]>(
+  const answer = await request<JobDraht[]>(
     JOBS_BASE_URL,
     "/companies/me/jobs",
     { signal },
     "fehler.listeNichtGeladen"
   );
-  if (answer.ok) return { ok: true, jobs: answer.value ?? [] };
+  if (answer.ok) return { ok: true, jobs: (answer.value ?? []).map(zurAnzeige) };
   // Kein aktives Unternehmen ist ein behebbarer Zustand, kein Fehler. Die Seite
   // fragt ohne Unternehmen ohnehin nicht, aber die Antwort bleibt dieselbe wie
   // zuvor: eine leere Liste, keine Meldung.
@@ -219,13 +266,13 @@ async function schreiben(
   method: "POST" | "PUT",
   body?: unknown
 ): Promise<JobErgebnis> {
-  const answer = await request<Job>(
+  const answer = await request<JobDraht>(
     JOBS_BASE_URL,
     path,
     { method, body },
     "fehler.ausschreibungNichtGespeichert"
   );
-  if (answer.ok) return { ok: true, job: answer.value };
+  if (answer.ok) return { ok: true, job: zurAnzeige(answer.value) };
   // `409` bleibt beim Satz des Servers: die Eingabe ist in Ordnung, der Zustand
   // passt nicht — das ist etwas anderes als ein Formularfehler, und der Dienst
   // weiß besser, was gerade nicht geht.

@@ -36,14 +36,31 @@ function stubFetch(
   return spion;
 }
 
+/**
+ * Eine Stelle, WIE DER DIENST SIE SCHICKT — nicht, wie die Oberfläche sie hält.
+ *
+ * <strong>Hier stand einmal `remote` und `employment`.</strong> Der Dienst
+ * schreibt aber `remote_mode` und `employment_type`. Die ganze Reihe war grün,
+ * während die Karte in der laufenden Anlage
+ * `stelle.remoteundefined · stelle.employmentundefined` zeigte — weil der Test
+ * eine Gestalt erfand, die es auf dem Draht nie gab, und `searchJobs` die
+ * Antwort ungeprüft auf `Job` castete.
+ *
+ * Die Regel dahinter steht in CLAUDE.md beim Benachrichtigungsdraht: einen
+ * Namen auf beiden Seiten selbst zu schreiben ist eine Zeichenkette, die man
+ * zweimal prüft. Ein Fixture muss den DRAHT nachbilden.
+ *
+ * Und vollständig gefüllt, jedes Feld: ein Fixture mit leeren Feldern lässt
+ * genau die Zweige ungeprüft, die etwas anzeigen.
+ */
 const STELLE = {
   id: "11111111-1111-4111-8111-111111111111",
   tenant_id: "22222222-2222-4222-8222-222222222222",
   title: "Backend-Entwicklung",
   description: "Wir bauen Dienste.",
   location: "Berlin",
-  remote: "hybrid",
-  employment: "full_time",
+  remote_mode: "hybrid",
+  employment_type: "full_time",
   skills: ["Python", "Kubernetes", "Go"],
   status: "published",
   published_at: "2026-08-01T00:00:00Z",
@@ -264,6 +281,30 @@ describe("JobsPage", () => {
 
     expect(await screen.findByText("Zweite Stelle")).toBeInTheDocument();
     expect(screen.queryByText("Backend-Entwicklung")).not.toBeInTheDocument();
+  });
+
+  /**
+   * Die Karte zeigt Ort, Arbeitsform und Beschäftigung als WORTE.
+   *
+   * Der Test, der gefehlt hat. Er prüft nicht, dass irgendetwas dasteht,
+   * sondern dass die drei Angaben AUS DEM DRAHT übersetzt ankommen — und dass
+   * kein Katalogschlüssel durchschlägt. `stelle.remoteundefined` wäre für
+   * `getByText` sonst genauso ein Treffer wie „Hybrid".
+   */
+  it("zeigt Ort, Arbeitsform und Beschäftigung übersetzt", async () => {
+    stubFetch((url) =>
+      url.includes("/jobs") ? { body: seite([STELLE]) } : { status: 404 },
+    );
+
+    renderMitStore(<JobsPage />);
+
+    const zeile = await screen.findByText(/Berlin/);
+    expect(zeile).toHaveTextContent("Berlin");
+    expect(zeile).toHaveTextContent("Hybrid");
+    expect(zeile).toHaveTextContent("Vollzeit");
+    // Kein roher Schlüssel — weder als „undefined" noch als Punktpfad.
+    expect(zeile.textContent ?? "").not.toContain("stelle.");
+    expect(zeile.textContent ?? "").not.toContain("undefined");
   });
 
   /** Die Leiste sagt, wo man ist — und die Zahl kommt vom Server. */

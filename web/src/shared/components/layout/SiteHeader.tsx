@@ -14,6 +14,15 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 import { CompanySwitcher } from "./CompanySwitcher";
 import { useAppSelector } from "../../../core/store/hooks";
+import LoginIcon from "@mui/icons-material/LoginOutlined";
+import MenuIcon from "@mui/icons-material/MenuOutlined";
+import Drawer from "@mui/material/Drawer";
+import IconButton from "@mui/material/IconButton";
+import List from "@mui/material/List";
+import ListItemButton from "@mui/material/ListItemButton";
+import ListItemText from "@mui/material/ListItemText";
+import Tooltip from "@mui/material/Tooltip";
+import { SettingsMenu } from "./SettingsMenu";
 
 /**
  * Die Kopfzeile.
@@ -34,9 +43,24 @@ import { useAppSelector } from "../../../core/store/hooks";
  * versteckt, hat nichts gesichert. Die Firmeneinträge sind deshalb eine
  * Bequemlichkeit, keine Zugriffskontrolle.
  */
+/**
+ * Die Wege der Kopfzeile — EINMAL beschrieben.
+ *
+ * Kopfleiste und Schublade zeigen dieselben Einträge; zweimal geschrieben gehen
+ * sie beim nächsten neuen Weg auseinander, und zwar an der Stelle, die niemand
+ * ansieht (die schmale).
+ */
+const WEGE: { pfad: string; schluessel: string; immer: boolean }[] = [
+  { pfad: "/jobs", schluessel: "kopf.stellen", immer: true },
+  { pfad: "/overview", schluessel: "kopf.uebersicht", immer: false },
+  { pfad: "/market", schluessel: "kopf.marktstatus", immer: false },
+  { pfad: "/transfers", schluessel: "kopf.gespraeche", immer: false },
+];
+
 export function SiteHeader() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
+  const [schublade, setSchublade] = useState(false);
   const status = useAppSelector((state) => state.auth.status);
   const session = useAppSelector((state) => state.auth.session);
 
@@ -62,6 +86,21 @@ export function SiteHeader() {
           jeder Seite steht. */}
       <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
         <Toolbar disableGutters sx={{ gap: 2, minHeight: { xs: 60, md: 66 } }}>
+          {/* DIE NAVIGATION VERSCHWAND ERSATZLOS.
+              Bei 420px stand oben nur noch „workertransfer" und „Anmelden" —
+              `Stellen` lag hinter `display: { xs: "none", md: "flex" }` und war
+              von einem Telefon aus gar nicht erreichbar. Verstecken ohne Ersatz
+              ist kein responsives Verhalten, sondern eine fehlende Seite. */}
+          <IconButton
+            onClick={() => setSchublade(true)}
+            aria-label={t("kopf.menueOeffnen")}
+            size="small"
+            edge="start"
+            sx={{ display: { xs: "inline-flex", md: "none" }, mr: 0.5 }}
+          >
+            <MenuIcon fontSize="small" />
+          </IconButton>
+
           <Typography
             component={RouterLink}
             to="/"
@@ -78,25 +117,16 @@ export function SiteHeader() {
           </Typography>
 
           <Box sx={{ display: { xs: "none", md: "flex" }, gap: 0.5 }}>
-            <NavLink to="/jobs" current={pathname}>
-              Stellen
-            </NavLink>
-            {signedIn ? (
-              <>
-                <NavLink to="/overview" current={pathname}>
-                  Übersicht
-                </NavLink>
-                <NavLink to="/market" current={pathname}>
-                  Marktstatus
-                </NavLink>
-                <NavLink to="/transfers" current={pathname}>
-                  Gespräche
-                </NavLink>
-              </>
-            ) : null}
+            {WEGE.filter((weg) => weg.immer || signedIn).map((weg) => (
+              <NavLink key={weg.pfad} to={weg.pfad} current={pathname}>
+                {t(weg.schluessel)}
+              </NavLink>
+            ))}
           </Box>
 
           <Box sx={{ flexGrow: 1 }} />
+
+          <SettingsMenu />
 
           {signedIn ? (
             <>
@@ -106,17 +136,65 @@ export function SiteHeader() {
             </>
           ) : (
             // EIN Zugang, immer sichtbar — auch auf /login und /register.
-            <Button
-              component={RouterLink}
-              to="/login"
-              variant="contained"
-              sx={{ ml: 1, px: 2.5, flexShrink: 0 }}
-            >
-              {t("kopf.anmelden")}
-            </Button>
+            <>
+              {/* Auf schmalen Bildschirmen ein Symbol, sonst der Knopf. Ein
+                  Knopf mit Text kostet hier 91px — genau die, die der
+                  Navigation fehlten. Das Symbol trägt dasselbe `aria-label`,
+                  ein Vorleser hört also in beiden Fällen „Anmelden". */}
+              <Tooltip title={t("kopf.anmelden")}>
+                <IconButton
+                  component={RouterLink}
+                  to="/login"
+                  aria-label={t("kopf.anmelden")}
+                  size="small"
+                  color="primary"
+                  sx={{ display: { xs: "inline-flex", sm: "none" } }}
+                >
+                  <LoginIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Button
+                component={RouterLink}
+                to="/login"
+                variant="contained"
+                sx={{ ml: 1, px: 2.5, flexShrink: 0, display: { xs: "none", sm: "inline-flex" } }}
+              >
+                {t("kopf.anmelden")}
+              </Button>
+            </>
           )}
         </Toolbar>
       </Container>
+
+      <Drawer
+        anchor="left"
+        open={schublade}
+        onClose={() => setSchublade(false)}
+        slotProps={{ paper: { sx: { width: 268 } } }}
+      >
+        <Box sx={{ px: 2, pt: 2.5, pb: 1 }}>
+          <Typography
+            variant="caption"
+            sx={{ fontWeight: 660, letterSpacing: "0.06em", textTransform: "uppercase" }}
+            color="text.secondary"
+          >
+            {t("kopf.navigation")}
+          </Typography>
+        </Box>
+        <List sx={{ px: 1 }}>
+          {WEGE.filter((weg) => weg.immer || signedIn).map((weg) => (
+            <ListItemButton
+              key={weg.pfad}
+              component={RouterLink}
+              to={weg.pfad}
+              selected={pathname === weg.pfad}
+              onClick={() => setSchublade(false)}
+            >
+              <ListItemText primary={t(weg.schluessel)} />
+            </ListItemButton>
+          ))}
+        </List>
+      </Drawer>
     </AppBar>
   );
 }
