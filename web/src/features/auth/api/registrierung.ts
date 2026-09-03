@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "../../../env";
 import { request } from "../../../core/api/client";
+import { i18n } from "../../../core/i18n/i18n";
 
 /**
  * Registrieren, bestätigen, erneut senden — die drei Wege in ein Konto.
@@ -149,8 +150,8 @@ export async function bestaetigeEmail(token: string): Promise<BestaetigungsErgeb
     ok: false,
     abgelaufen,
     meldung: abgelaufen
-      ? "fehler.bestaetigungslinkAbgelaufen"
-      : "fehler.bestaetigungslinkUngueltig",
+      ? i18n.t("fehler.bestaetigungslinkAbgelaufen")
+      : i18n.t("fehler.bestaetigungslinkUngueltig"),
   };
 }
 

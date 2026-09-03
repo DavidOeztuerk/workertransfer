@@ -1,6 +1,7 @@
 import { request } from "../../../core/api/client";
 import { API_BASE_URL } from "../../../env";
 import type { Membership } from "../types/session";
+import { i18n } from "../../../core/i18n/i18n";
 
 export type Einladungsergebnis =
   | { ok: true; mitgliedschaft: Membership }
@@ -18,6 +19,10 @@ export type Einladungsergebnis =
  * nächsten Schritten führen: anmelden, eine neue Einladung erbitten, oder
  * nichts.
  */
+// `meldung` ist ein FERTIGER SATZ, kein Katalogschlüssel: die Seite zeigt ihn
+// unverändert an, und ein Schlüssel stünde dort wörtlich — i18next gibt einen
+// zurück, den niemand nachschlägt. Genau das ist einmal passiert, an der
+// Formulierungshilfe, und die E2E-Reise hat es gefunden.
 export async function nimmAn(token: string, signal?: AbortSignal): Promise<Einladungsergebnis> {
   const antwort = await request<Membership>(
     API_BASE_URL,
@@ -34,7 +39,7 @@ export async function nimmAn(token: string, signal?: AbortSignal): Promise<Einla
     return {
       ok: false,
       brauchtKonto: true,
-      meldung: "fehler.eingeladeneAdresse",
+      meldung: i18n.t("fehler.eingeladeneAdresse"),
     };
   }
 
@@ -45,6 +50,6 @@ export async function nimmAn(token: string, signal?: AbortSignal): Promise<Einla
   return {
     ok: false,
     brauchtKonto: false,
-    meldung: "fehler.einladungUngueltig",
+    meldung: i18n.t("fehler.einladungUngueltig"),
   };
 }

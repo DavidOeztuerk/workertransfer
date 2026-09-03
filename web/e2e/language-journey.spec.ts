@@ -54,25 +54,29 @@ test("die Sprachwahl wechselt die Oberfläche und erreicht die Mail", async ({ p
     page.getByRole("heading", { name: "Mon statut sur le marché" })
   ).toBeVisible();
 
-  // Jetzt der Teil, den nur der Server kann. `resend-verification` schickt eine
-  // Bestätigungsmail an ein bereits bestätigtes Konto — der Endpunkt antwortet
-  // absichtlich gleich, ob die Adresse bekannt ist oder nicht, und schickt der
-  // bekannten eine Mail. Das ist der kürzeste Weg zu einer echten Zustellung.
+  // Jetzt der Teil, den nur der Server kann — und die Doppelanmeldung ist dafür
+  // der schärfste Beleg, den es hier gibt.
   //
-  // Der Browser sagt weiterhin `de-DE`. Wenn hier Französisch ankommt, ist es
-  // die Spalte gewesen und nicht der Kopf.
-  // Der Zeitpunkt VOR der Anfrage: sonst fände `lastMailFor` die deutsche
-  // Bestätigungsmail von vorhin und der Test wäre grün, ohne etwas zu belegen.
+  // `POST /auth/register` auf eine bereits vergebene Adresse antwortet
+  // absichtlich wie auf eine freie und schickt dem ECHTEN INHABER eine
+  // Warnung. Diese Anfrage hat keine Sitzung, und ihr Kopf sagt `de-DE` —
+  // Playwright setzt ihn aus `locale`. Kommt die Mail trotzdem französisch an,
+  // kann sie das nur aus der Spalte haben.
+  //
+  // (`resend-verification` wäre der naheliegendere Weg und ist der falsche: an
+  // ein bestätigtes Konto schickt der Endpunkt bewusst gar nichts.)
   const seit = Date.now();
 
-  const antwort = await page.request.post("/auth/resend-verification", {
-    data: { email },
+  const antwort = await page.request.post("/auth/register", {
+    data: { email, password: "geheim-und-lang-genug", display_name: "Doppelt" },
   });
-  expect(antwort.ok()).toBeTruthy();
+  expect(antwort.status()).toBe(201);
 
+  // `after` ist nicht kosmetisch: ohne ihn fände die Suche die deutsche
+  // Bestätigungsmail von vorhin, und der Test wäre grün, ohne etwas zu belegen.
   const mail = await lastMailFor(email, { after: seit });
   expect(mail).not.toBeNull();
-  expect(mail!.subject).toContain("Merci de confirmer");
+  expect(mail!.subject).toContain("Tentative d’inscription");
 
   // Zurück auf Deutsch, damit dieselbe Anlage für die nächste Reise nicht in
   // einem Zustand steht, den niemand erwartet. Die Sprache heisst jetzt
