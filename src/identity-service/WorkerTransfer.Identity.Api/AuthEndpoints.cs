@@ -379,7 +379,12 @@ public static class AuthEndpoints
         // Wer auf einem englischen Rechner Deutsch gewählt hat, soll nach dem
         // Anmelden Deutsch sehen — sonst wäre die Wahl nur so lange gültig, wie
         // derselbe Browser sie sich merkt.
-        ["language"] = Sprachwahl.Etikett(konto.Sprache)
+        ["language"] = Sprachwahl.Etikett(konto.Sprache),
+        // Fuer das Bild im Kopf: aus dem Namen werden die Initialen, und die
+        // Farbe daneben folgt ihm. Aus einer Adresse liesse sich beides auch
+        // ableiten — es waere nur falsch, denn `max.werber@…` ergibt „M" und
+        // nicht „MW".
+        ["display_name"] = konto.Anzeigename
     };
 
     /// <summary>Die Einstellungen auf dem Draht — snake_case, wie überall.</summary>

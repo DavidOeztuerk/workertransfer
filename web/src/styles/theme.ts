@@ -199,7 +199,50 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
         },
       },
 
+      // DIE BESCHRIFTUNG STEHT ÜBER DEM FELD, IMMER.
+      //
+      // MUIs Vorgabe ist ein schwebendes Label: es sitzt IM leeren Feld und
+      // wandert beim Tippen auf die Rahmenlinie. Das trägt, solange alle Felder
+      // gleich sind — und Auswahlfelder sind es nie: ein `select` zeigt immer
+      // einen Wert, sein Label steht also von Anfang an oben.
+      //
+      // Gemessen an der Filterleiste: drei Textfelder mit Beschriftung IM Feld
+      // neben zwei Auswahlfeldern mit Beschriftung auf der Rahmenlinie, und
+      // weil das Feld einen gefüllten Grund hat, lag die Schrift dort nicht in
+      // einer Lücke, sondern auf der Linie. Zwei Muster in einer Spalte, und
+      // keines sah nach Absicht aus.
       MuiTextField: { defaultProps: { size: "small", fullWidth: true } },
+
+      MuiInputLabel: {
+        // `shrink` als VORGABE. Ohne das hängt die Stellung daran, ob ein Feld
+        // gerade gefüllt ist, und das ist genau der Unterschied, der die zwei
+        // Muster erzeugt hat.
+        defaultProps: { shrink: true },
+        styleOverrides: {
+          root: {
+            maxWidth: "100%",
+            fontSize: "0.8125rem",
+            fontWeight: 580,
+            lineHeight: 1.4,
+            color: light ? neutral[700] : neutral[300],
+            // Der Fokus färbt den RAHMEN, nicht die Beschriftung. Ein Label,
+            // das die Farbe wechselt, zieht den Blick von dem Feld ab, in dem
+            // gerade geschrieben wird.
+            "&.Mui-focused": { color: light ? neutral[700] : neutral[300] },
+          },
+          // DIESE Regel ist die wirksame. `root` allein reicht nicht: MUIs
+          // Variante `outlined` setzt `position: absolute` und einen
+          // `transform` mit höherer Spezifität, und eine Überschreibung nur an
+          // `root` sieht im Quelltext richtig aus und wirkt nicht — an genau
+          // dieser Leiste gemessen.
+          outlined: {
+            position: "static",
+            transform: "none",
+            marginBottom: 6,
+            "&.MuiInputLabel-shrink": { position: "static", transform: "none" },
+          },
+        },
+      },
 
       MuiSelect: {
         styleOverrides: {
@@ -213,6 +256,15 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
 
       MuiOutlinedInput: {
         styleOverrides: {
+          // Kein Ausschnitt im Rahmen: die Beschriftung steht darüber, also
+          // gibt es nichts freizulassen. Ohne `top: 0` bliebe der Rahmen um
+          // die halbe Zeilenhöhe nach unten versetzt — er ist dafür gebaut, ein
+          // Label in sich zu tragen.
+          // Kein Ausschnitt im Rahmen: die Beschriftung steht darüber, also
+          // gibt es nichts freizulassen. `top: 0` ist Pflicht — der Rahmen ist
+          // dafür gebaut, ein Label in sich zu tragen, und säße sonst um die
+          // halbe Zeilenhöhe zu tief.
+          notchedOutline: { top: 0, "& legend": { display: "none" } },
           root: {
             borderRadius: radius.sm,
             backgroundColor: flaeche.sunken,
@@ -232,7 +284,6 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
         styleOverrides: { root: { marginLeft: 2, lineHeight: 1.5 } },
       },
 
-      MuiInputLabel: { styleOverrides: { root: { fontWeight: 540 } } },
 
       // Ein Hinweis ohne Rand verschwimmt mit der Seite; gerade Fehler müssen
       // als eigener Block lesbar sein. Die Fläche kommt aus den Bedeutungs-

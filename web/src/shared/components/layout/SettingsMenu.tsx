@@ -1,6 +1,6 @@
-import DarkModeIcon from "@mui/icons-material/DarkModeOutlined";
-import LightModeIcon from "@mui/icons-material/LightModeOutlined";
-import SettingsIcon from "@mui/icons-material/SettingsOutlined";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
+import LightModeIcon from "@mui/icons-material/LightMode";
+import SettingsIcon from "@mui/icons-material/Settings";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
@@ -70,8 +70,11 @@ export function SettingsMenu() {
           aria-haspopup="menu"
           aria-expanded={anker !== null}
           size="small"
+          // Die gefüllte Fassung, nicht die umrissene: als 20px-Symbol ist der
+          // Umriss eine Haarlinie und verschwindet neben dem Text daneben.
+          sx={{ color: "text.secondary" }}
         >
-          <SettingsIcon fontSize="small" />
+          <SettingsIcon />
         </IconButton>
       </Tooltip>
 

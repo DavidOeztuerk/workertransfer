@@ -8,6 +8,7 @@ interface SessionBody {
   email: string;
   tenant_id: string | null;
   language: string;
+  display_name: string;
 }
 
 interface MembershipBody {
@@ -21,6 +22,7 @@ const toSession = (body: SessionBody): Session => ({
   email: body.email,
   tenantId: body.tenant_id,
   language: body.language,
+  displayName: body.display_name ?? "",
 });
 
 /**

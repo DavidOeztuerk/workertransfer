@@ -18,6 +18,13 @@ export interface Session {
    * anderen Gerät wieder Deutsch. Der lokale Speicher weiss davon nichts.
    */
   language: string;
+  /**
+   * Der Name, unter dem die Person auftritt.
+   *
+   * Für die Initialen im Kopf. Aus der Adresse liesse er sich nicht ableiten:
+   * `max.werber@…` ergäbe „M" und nicht „MW".
+   */
+  displayName: string;
 }
 
 /** Eine Firma, für die jemand handeln darf. */

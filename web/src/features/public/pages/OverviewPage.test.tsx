@@ -47,7 +47,7 @@ function antworten(karte: Record<string, Antwort>) {
 
 const ANGEMELDET = {
   status: "authenticated" as const,
-  session: { userId: SUBJECT, email: "anna@example.com", tenantId: null, language: "de" },
+  session: { userId: SUBJECT, email: "anna@example.com", tenantId: null, language: "de", displayName: "Anna Beispiel" },
 };
 
 const MIT_FIRMA = {
@@ -56,7 +56,7 @@ const MIT_FIRMA = {
     userId: SUBJECT,
     email: "anna@example.com",
     tenantId: TENANT,
-    language: "de",
+    language: "de", displayName: "Anna Beispiel",
   },
 };
 
