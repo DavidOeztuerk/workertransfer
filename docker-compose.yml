@@ -101,6 +101,9 @@ x-umgebung: &umgebung
   # alles ueber einen Menschen loeschen" duerfen nicht dasselbe Papier sein.
   # LEER hiesse: der Endpunkt ist zu.
   Erasure__Geheimnis: ${WORKERTRANSFER_ERASURE_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+  # Der Hauptschluessel fuer hinterlegte Geheimnisse (heute: der KI-Schluessel
+  # einer Person). ROLLEN HEISST VERLIEREN — es gibt keine Versionierung.
+  WORKERTRANSFER_SECRETS_KEY: ${WORKERTRANSFER_SECRETS_KEY:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
 
 services:
   postgres:
