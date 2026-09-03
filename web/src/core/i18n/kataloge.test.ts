@@ -59,9 +59,16 @@ describe("die Kataloge", () => {
       "en:firmentransfers.start",
       "en:firmentransfers.titel",
       "en:mannschaft.rolleAdmin",
+      "en:kopf.github",
+      "en:kopf.team",
       "fr:freigaben.bereichProfile",
       "fr:freigaben.bereichGithub",
       "fr:bewerbungen.teilProfil",
+      "fr:kopf.profil",
+      "fr:kopf.github",
+      // Produktnamen, in jeder Sprache dieselben.
+      "en:kandidaten.faehigkeitenBeispiel",
+      "fr:kandidaten.faehigkeitenBeispiel",
     ]);
 
     for (const sprache of ["en", "fr"] as const) {

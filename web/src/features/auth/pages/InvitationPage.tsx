@@ -8,10 +8,7 @@ import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import { LoadingBlock } from "../../../shared/components/ui";
 import { AuthCard } from "../components/AuthCard";
 import { type Einladungsergebnis, nimmAn } from "../api/einladung";
-
-const ZUSAGE =
-  "Die Einladung gilt genau für die Adresse, an die sie ging — ein weitergeleiteter Link " +
-  "öffnet nichts.";
+import { Trans, useTranslation } from "react-i18next";
 
 type Lage =
   | { art: "laeuft" }
@@ -33,6 +30,7 @@ type Lage =
  * herauszuholen, in dem er gerade arbeitet.
  */
 export function InvitationPage() {
+  const { t } = useTranslation();
   const [suche] = useSearchParams();
   const [lage, setLage] = useState<Lage>({ art: "laeuft" });
   const gestartet = useRef(false);
@@ -47,7 +45,7 @@ export function InvitationPage() {
       setLage({
         art: "abgelehnt",
         brauchtKonto: false,
-        meldung: "Es fehlt ein Einladungslink.",
+        meldung: t("einladung.fehltLink"),
       });
       return;
     }
@@ -67,56 +65,64 @@ export function InvitationPage() {
             },
       );
     });
-  }, [suche]);
+  }, [suche, t]);
 
   if (lage.art === "laeuft") {
     return (
-      <AuthCard title="Einladung wird geprüft…" lead={ZUSAGE}>
-        <LoadingBlock label="Einen Moment bitte." />
+      <AuthCard
+        title={t("einladung.laeuftTitel")}
+        lead={t("einladung.zusage")}
+      >
+        <LoadingBlock label={t("einladung.laeuftText")} />
       </AuthCard>
     );
   }
 
   if (lage.art === "dabei") {
     return (
-      <AuthCard title={`Willkommen bei ${lage.name}`} lead={ZUSAGE}>
+      <AuthCard
+        title={t("einladung.willkommen", { name: lage.name })}
+        lead={t("einladung.zusage")}
+      >
         <Typography sx={{ mb: 2 }}>
-          {lage.rolle === "admin"
-            ? "Du bist Administrator dieses Unternehmens."
-            : "Du bist Mitglied dieses Unternehmens."}
+          {t(
+            lage.rolle === "admin"
+              ? "einladung.alsAdmin"
+              : "einladung.alsMitglied",
+          )}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Um dafür zu handeln, wähle das Unternehmen oben aus. Wir wechseln
-          nicht von selbst — sonst würdest du ungefragt aus dem Unternehmen
-          herausgeholt, in dem du gerade arbeitest.{" "}
-          <Link component={RouterLink} to="/">
-            Zur Startseite
-          </Link>
+          <Trans
+            i18nKey="einladung.wechselHinweis"
+            components={{ 1: <Link component={RouterLink} to="/" /> }}
+          />
         </Typography>
       </AuthCard>
     );
   }
 
   return (
-    <AuthCard title="Einladung nicht angenommen" lead={ZUSAGE}>
+    <AuthCard
+      title={t("einladung.abgelehntTitel")}
+      lead={t("einladung.zusage")}
+    >
       <Alert severity="error" sx={{ mb: 2 }}>
         {lage.meldung}
       </Alert>
       <Box>
         {lage.brauchtKonto ? (
           <Typography variant="body2">
-            <Link component={RouterLink} to="/login">
-              Anmelden
-            </Link>{" "}
-            — oder zuerst{" "}
-            <Link component={RouterLink} to="/register">
-              Registrieren
-            </Link>{" "}
-            und den Link danach erneut öffnen.
+            <Trans
+              i18nKey="einladung.brauchtKonto"
+              components={{
+                1: <Link component={RouterLink} to="/login" />,
+                3: <Link component={RouterLink} to="/register" />,
+              }}
+            />
           </Typography>
         ) : (
           <Link component={RouterLink} to="/" variant="body2">
-            Zur Startseite
+            {t("einladung.zurStartseite")}
           </Link>
         )}
       </Box>

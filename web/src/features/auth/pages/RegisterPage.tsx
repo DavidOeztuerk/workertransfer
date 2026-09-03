@@ -15,6 +15,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import Link from "@mui/material/Link";
+import { Trans, useTranslation } from "react-i18next";
 
 import { useAppSelector } from "../../../core/store/hooks";
 import { AuthCard } from "../components/AuthCard";
@@ -24,9 +25,6 @@ import {
   registriere,
   sendeBestaetigungErneut,
 } from "../api/registrierung";
-
-const LEAD =
-  "Dein Profil gehört dir. Registrieren kostet nichts und verpflichtet zu nichts. Sichtbar wirst du erst, wenn du es willst.";
 
 type Art = "person" | "company";
 
@@ -39,6 +37,7 @@ type Art = "person" | "company";
  * fälschen (ADR-0017/0018/0019).
  */
 export function RegisterPage() {
+  const { t } = useTranslation();
   const status = useAppSelector((zustand) => zustand.auth.status);
   const [suchparameter] = useSearchParams();
 
@@ -92,7 +91,7 @@ export function RegisterPage() {
   if (abgeschickt) return <FastGeschafft email={email} />;
 
   return (
-    <AuthCard title="Konto erstellen" lead={LEAD}>
+    <AuthCard title={t("registrierung.titel")} lead={t("registrierung.lead")}>
       <AuthModeTabs current="register" />
 
       <Box
@@ -103,7 +102,7 @@ export function RegisterPage() {
       >
         <FormControl component="fieldset" sx={{ display: "grid", gap: 1 }}>
           <FormLabel component="legend" sx={{ mb: 0.5 }}>
-            Wofür registrierst du dich?
+            {t("registrierung.wofuer")}
           </FormLabel>
           {/* Der Hinweis steht NEBEN der Beschriftung, nicht darin: sonst hiesse
               die Auswahl für einen Screenreader „Für ein Unternehmen Braucht
@@ -124,7 +123,7 @@ export function RegisterPage() {
                     slotProps={{ input: { "aria-describedby": personHinweis } }}
                   />
                 }
-                label="Für mich"
+                label={t("registrierung.fuerMich")}
               />
               <Typography
                 id={personHinweis}
@@ -132,8 +131,7 @@ export function RegisterPage() {
                 color="text.secondary"
                 sx={{ ml: 4 }}
               >
-                Du suchst oder bist wechselwillig. Sichtbar wirst du erst, wenn
-                du es willst.
+                {t("registrierung.fuerMichHinweis")}
               </Typography>
             </Box>
             <Box sx={{ mt: 1 }}>
@@ -144,7 +142,7 @@ export function RegisterPage() {
                     slotProps={{ input: { "aria-describedby": firmaHinweis } }}
                   />
                 }
-                label="Für ein Unternehmen"
+                label={t("registrierung.fuerFirma")}
               />
               <Typography
                 id={firmaHinweis}
@@ -152,21 +150,20 @@ export function RegisterPage() {
                 color="text.secondary"
                 sx={{ ml: 4 }}
               >
-                Braucht deine Arbeitsadresse — daraus entsteht die Domain des
-                Unternehmens.
+                {t("registrierung.fuerFirmaHinweis")}
               </Typography>
             </Box>
           </RadioGroup>
         </FormControl>
 
         <TextField
-          label="E-Mail"
+          label={t("registrierung.email")}
           type="email"
           autoComplete="username"
           helperText={
             art === "company"
-              ? "Deine Arbeitsadresse. Aus ihrer Domain entsteht das Unternehmen."
-              : "Privat oder geschäftlich — beides ist in Ordnung."
+              ? t("registrierung.emailHinweisFirma")
+              : t("registrierung.emailHinweisPerson")
           }
           value={email}
           onChange={(ereignis) => setEmail(ereignis.target.value)}
@@ -175,9 +172,9 @@ export function RegisterPage() {
 
         {art === "company" ? (
           <TextField
-            label="Name des Unternehmens"
+            label={t("registrierung.firmenname")}
             autoComplete="organization"
-            helperText="Entsteht mit der Bestätigung deiner Adresse, nicht sofort."
+            helperText={t("registrierung.firmennameHinweis")}
             value={unternehmensname}
             onChange={(ereignis) => setUnternehmensname(ereignis.target.value)}
             required
@@ -190,23 +187,21 @@ export function RegisterPage() {
             gemacht, was ohnehin gilt. */}
         {freemail ? (
           <Alert severity="warning">
-            Ein Unternehmen braucht eine eigene Domain. Mit einer Adresse bei
-            einem Massenanbieter geht das nicht — nimm deine Arbeitsadresse,
-            oder registriere dich für dich selbst.
+            {t("registrierung.freemail")}
           </Alert>
         ) : null}
 
         <TextField
-          label="Passwort"
+          label={t("registrierung.passwort")}
           type="password"
           autoComplete="new-password"
-          helperText="Mindestens 12 Zeichen."
+          helperText={t("registrierung.passwortHinweis")}
           value={passwort}
           onChange={(ereignis) => setPasswort(ereignis.target.value)}
           required
         />
         <TextField
-          label="Anzeigename"
+          label={t("registrierung.anzeigename")}
           autoComplete="name"
           value={anzeigename}
           onChange={(ereignis) => setAnzeigename(ereignis.target.value)}
@@ -221,7 +216,7 @@ export function RegisterPage() {
           size="large"
           disabled={laeuft || freemail}
         >
-          {laeuft ? "Wird angelegt…" : "Registrieren"}
+          {laeuft ? t("registrierung.laeuft") : t("registrierung.knopf")}
         </Button>
       </Box>
     </AuthCard>
@@ -238,6 +233,7 @@ export function RegisterPage() {
  * den `/auth/register` gerade schliesst.
  */
 function FastGeschafft({ email }: { email: string }) {
+  const { t } = useTranslation();
   const [laeuft, setLaeuft] = useState(false);
   const [gesendet, setGesendet] = useState(false);
   const [gescheitert, setGescheitert] = useState(false);
@@ -253,8 +249,8 @@ function FastGeschafft({ email }: { email: string }) {
 
   return (
     <AuthCard
-      title="Fast geschafft"
-      lead="Wir haben dir eine E-Mail geschickt. Bestätige darüber deine Adresse, dann kannst du dich anmelden."
+      title={t("registrierung.fastGeschafft")}
+      lead={t("registrierung.fastGeschafftLead")}
     >
       <Box sx={{ display: "grid", gap: 2 }}>
         {/* Ohne den Fehlerzweig tat dieser Knopf bei einem Netzfehler sichtbar
@@ -262,13 +258,12 @@ function FastGeschafft({ email }: { email: string }) {
             von der Bremse (3/min) erzeugte die Zusage „ist unterwegs", obwohl
             nichts unterwegs war. */}
         <Button variant="outlined" onClick={erneutSenden} disabled={laeuft}>
-          {laeuft ? "Wird gesendet…" : "E-Mail erneut senden"}
+          {laeuft ? t("registrierung.erneutLaeuft") : t("registrierung.erneut")}
         </Button>
 
         {gescheitert ? (
           <Alert severity="error">
-            Die E-Mail konnte gerade nicht angefordert werden. Versuch es später
-            noch einmal.
+            {t("registrierung.erneutGescheitert")}
           </Alert>
         ) : null}
 
@@ -276,15 +271,15 @@ function FastGeschafft({ email }: { email: string }) {
             nicht. MUIs `Alert` trägt sonst immer `role="alert"`. */}
         {gesendet ? (
           <Alert role="status" severity="success">
-            Falls nötig, ist die E-Mail erneut unterwegs.
+            {t("registrierung.erneutGesendet")}
           </Alert>
         ) : null}
 
         <Typography variant="body2" color="text.secondary">
-          Adresse schon bestätigt?{" "}
-          <Link component={RouterLink} to="/login">
-            Zur Anmeldung
-          </Link>
+          <Trans
+            i18nKey="registrierung.schonBestaetigt"
+            components={{ 1: <Link component={RouterLink} to="/login" /> }}
+          />
         </Typography>
       </Box>
     </AuthCard>

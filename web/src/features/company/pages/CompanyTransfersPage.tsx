@@ -25,14 +25,15 @@ import {
   makeOffer,
 } from "../../work/api/transfers";
 
+/** Der Stand als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
 const TITEL: Record<Transfer["status"], string> = {
-  interested: "Interesse hinterlegt — die Person hat noch nicht geantwortet",
-  talking: "Im Gespräch",
-  offered: "Angebot abgegeben",
-  accepted: "Die Person hat angenommen",
-  completed: "Abgeschlossen",
-  declined: "Von der Person abgelehnt",
-  withdrawn: "Von euch zurückgezogen",
+  interested: "firmentransfers.standInterested",
+  talking: "firmentransfers.standTalking",
+  offered: "firmentransfers.standOffered",
+  accepted: "firmentransfers.standAccepted",
+  completed: "firmentransfers.standCompleted",
+  declined: "firmentransfers.standDeclined",
+  withdrawn: "firmentransfers.standWithdrawn",
 };
 
 /**
@@ -48,6 +49,7 @@ const TITEL: Record<Transfer["status"], string> = {
  * tun.
  */
 export function CompanyTransfersPage() {
+  const { t } = useTranslation();
   const { fuerFirma, tenantId } = useHandelnder();
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
@@ -60,12 +62,11 @@ export function CompanyTransfersPage() {
 
   if (!fuerFirma) {
     return (
-      <PageShell title="Transfers" narrow>
+      <PageShell title={t("firmentransfers.titel")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              Transfers sieht nur, wer für ein Unternehmen handelt. Wechsle oben
-              auf ein Unternehmen.
+              {t("firmentransfers.nurFirma")}
             </Typography>
           </CardContent>
         </Card>
@@ -106,12 +107,9 @@ export function CompanyTransfersPage() {
 
   return (
     <PageShell
-      title="Transfers"
+      title={t("firmentransfers.titel")}
       narrow
-      lead={
-        "Die Ablöse wird hier festgehalten, nicht bewegt: diese Plattform führt kein Geld. Sie " +
-        "steht da, damit beide Seiten dieselbe Zahl im Blick haben."
-      }
+      lead={t("firmentransfers.lead")}
     >
       {fehler !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -123,7 +121,7 @@ export function CompanyTransfersPage() {
       {transfers.pending ? (
         <Card>
           <CardContent>
-            <LoadingBlock label="Transfers werden geladen…" />
+            <LoadingBlock label={t("firmentransfers.laden")} />
           </CardContent>
         </Card>
       ) : null}
@@ -133,7 +131,7 @@ export function CompanyTransfersPage() {
       ) : null}
 
       {ergebnis?.ok && liste.length === 0 ? (
-        <EmptyBlock title="Es läuft gerade kein Transfer." />
+        <EmptyBlock title={t("firmentransfers.leer")} />
       ) : null}
 
       <Box
@@ -189,7 +187,7 @@ function Transferkarte({
     <Card component="li">
       <CardContent>
         <Typography variant="h2" sx={{ mb: 1 }}>
-          {TITEL[transfer.status]}
+          {t(TITEL[transfer.status])}
         </Typography>
 
         {/*
@@ -223,19 +221,19 @@ function Transferkarte({
             }}
           >
             <Typography component="dt" variant="body2" color="text.secondary">
-              Angebot
+              {t("firmentransfers.angebot")}
             </Typography>
             <Typography component="dd" sx={{ m: 0 }}>
               {transfer.offer_note === "" ? "—" : transfer.offer_note}
             </Typography>
             <Typography component="dt" variant="body2" color="text.secondary">
-              Start
+              {t("firmentransfers.start")}
             </Typography>
             <Typography component="dd" sx={{ m: 0 }}>
               {transfer.offer_start_on ?? "—"}
             </Typography>
             <Typography component="dt" variant="body2" color="text.secondary">
-              Ablöse
+              {t("firmentransfers.abloese")}
             </Typography>
             <Typography component="dd" sx={{ m: 0 }}>
               {euro(transfer.offer_fee_cents)}
@@ -253,8 +251,8 @@ function Transferkarte({
             sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}
           >
             <TextField
-              label="Angebot"
-              helperText="Was ihr anbietet, in Worten."
+              label={t("firmentransfers.angebot")}
+              helperText={t("firmentransfers.angebotHinweis")}
               value={text}
               onChange={(e) => setText(e.target.value)}
               slotProps={{ htmlInput: { maxLength: 2000 } }}
@@ -262,21 +260,21 @@ function Transferkarte({
               minRows={3}
             />
             <TextField
-              label="Start"
-              helperText="Monat, zum Beispiel 2026-11."
+              label={t("firmentransfers.start")}
+              helperText={t("firmentransfers.startHinweis")}
               placeholder="2026-11"
               value={start}
               onChange={(e) => setStart(e.target.value)}
             />
             <TextField
-              label="Ablöse in Euro"
-              helperText="Wird festgehalten, nicht überwiesen."
+              label={t("firmentransfers.abloese")}
+              helperText={t("firmentransfers.abloeseHinweis")}
               value={abloese}
               onChange={(e) => setAbloese(e.target.value)}
             />
             <Box>
               <Button type="submit" variant="contained" disabled={gesperrt}>
-                Angebot machen
+                {t("firmentransfers.angebotMachen")}
               </Button>
             </Box>
           </Box>
@@ -289,7 +287,7 @@ function Transferkarte({
               onClick={() => onZug("complete")}
               disabled={gesperrt}
             >
-              Abschließen
+              {t("firmentransfers.abschliessen")}
             </Button>
           ) : null}
           {laeuftNoch ? (
@@ -298,7 +296,7 @@ function Transferkarte({
               onClick={() => onZug("withdraw")}
               disabled={gesperrt}
             >
-              Zurückziehen
+              {t("allgemein.zurueckziehen")}
             </Button>
           ) : null}
         </Box>

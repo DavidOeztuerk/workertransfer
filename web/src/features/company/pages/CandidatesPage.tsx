@@ -142,7 +142,7 @@ export function CandidatesPage() {
             <TextField
               label={t("kandidaten.faehigkeiten")}
               helperText={t("kandidaten.faehigkeitenHinweis")}
-              placeholder="Python, Kubernetes"
+              placeholder={t("kandidaten.faehigkeitenBeispiel")}
               value={entwurf.skills}
               onChange={(e) =>
                 setEntwurf((jetzt) => ({ ...jetzt, skills: e.target.value }))
@@ -151,7 +151,7 @@ export function CandidatesPage() {
             <TextField
               label={t("kandidaten.ort")}
               helperText={t("kandidaten.ortHinweis")}
-              placeholder="Berlin"
+              placeholder={t("kandidaten.ortBeispiel")}
               value={entwurf.location}
               onChange={(e) =>
                 setEntwurf((jetzt) => ({ ...jetzt, location: e.target.value }))

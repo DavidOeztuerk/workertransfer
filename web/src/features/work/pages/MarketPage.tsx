@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -8,6 +8,7 @@ import CardContent from "@mui/material/CardContent";
 import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import FormLabel from "@mui/material/FormLabel";
+import Link from "@mui/material/Link";
 import Radio from "@mui/material/Radio";
 import RadioGroup from "@mui/material/RadioGroup";
 import Checkbox from "@mui/material/Checkbox";
@@ -32,22 +33,11 @@ import {
   saveMyMarketStatus,
 } from "../api/market";
 
-const WAHLEN: { wert: Availability; label: string; hinweis: string }[] = [
-  {
-    wert: "open",
-    label: "Ich suche aktiv",
-    hinweis: "Unternehmen mit Freigabe dürfen zugehen.",
-  },
-  {
-    wert: "listening",
-    label: "Ich höre zu",
-    hinweis: "Ich suche nicht, bin aber für ein gutes Angebot ansprechbar.",
-  },
-  {
-    wert: "unavailable",
-    label: "Gerade nicht",
-    hinweis: "Auch mit Freigabe darf mich niemand ansprechen.",
-  },
+/** Nur die Werte — Beschriftung und Hinweis stehen in den Katalogen. */
+const WAHLEN: { wert: Availability; name: string }[] = [
+  { wert: "open", name: "Open" },
+  { wert: "listening", name: "Listening" },
+  { wert: "unavailable", name: "Unavailable" },
 ];
 
 /**
@@ -98,20 +88,16 @@ export function MarketPage() {
 
   if (!angemeldet) {
     return (
-      <PageShell title="Mein Marktstatus" narrow>
+      <PageShell title={t("markt.titel")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              Bitte{" "}
-              <Button
-                component={RouterLink}
-                to="/login"
-                variant="text"
-                size="small"
-              >
-                anmelden
-              </Button>
-              , um deinen Marktstatus zu setzen.
+              <Trans
+                i18nKey="markt.anmelden"
+                components={{
+                  1: <Link component={RouterLink} to="/login" />,
+                }}
+              />
             </Typography>
           </CardContent>
         </Card>
@@ -158,13 +144,9 @@ export function MarketPage() {
 
   return (
     <PageShell
-      title="Mein Marktstatus"
+      title={t("markt.titel")}
       narrow
-      lead={
-        "Ob du ansprechbar bist, sieht nur, wem du es freigegeben hast — Unternehmen für " +
-        "Unternehmen, jedes einzeln. Es gibt hier bewusst kein „für alle“: dass jemand wechseln " +
-        "will, ist die heikelste Angabe auf dieser Plattform."
-      }
+      lead={t("markt.lead")}
     >
       {fehler !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -175,11 +157,11 @@ export function MarketPage() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            Anfragen
+            {t("markt.anfragen")}
           </Typography>
 
           {anfragen.pending ? (
-            <LoadingBlock label="Anfragen werden geladen…" />
+            <LoadingBlock label={t("markt.anfragenLaden")} />
           ) : null}
 
           {anfragen.data !== null && !anfragen.data.ok ? (
@@ -187,7 +169,7 @@ export function MarketPage() {
           ) : null}
 
           {anfragen.data?.ok && liste.length === 0 ? (
-            <EmptyBlock title="Bislang hat niemand gefragt." />
+            <EmptyBlock title={t("markt.anfragenLeer")} />
           ) : null}
 
           {liste.length > 0 ? (
@@ -221,11 +203,11 @@ export function MarketPage() {
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            Bin ich ansprechbar?
+            {t("markt.ansprechbar")}
           </Typography>
 
           {stand.pending ? (
-            <LoadingBlock label="Marktstatus wird geladen…" />
+            <LoadingBlock label={t("markt.standLaden")} />
           ) : null}
 
           {gespeichert ? (
@@ -242,7 +224,7 @@ export function MarketPage() {
             }}
           >
             <FormControl sx={{ mb: 2 }}>
-              <FormLabel id="markt-status">Status</FormLabel>
+              <FormLabel id="markt-status">{t("markt.status")}</FormLabel>
               {/* Ein RadioGroup mit gemeinsamem `name`: erst dadurch bewegen die
                   Pfeiltasten den Fokus innerhalb der Gruppe. */}
               <RadioGroup
@@ -259,14 +241,14 @@ export function MarketPage() {
                     <FormControlLabel
                       value={wahl.wert}
                       control={<Radio />}
-                      label={wahl.label}
+                      label={t(`markt.wahl${wahl.name}`)}
                     />
                     <Typography
                       variant="body2"
                       color="text.secondary"
                       sx={{ ml: 4 }}
                     >
-                      {wahl.hinweis}
+                      {t(`markt.wahl${wahl.name}Hinweis`)}
                     </Typography>
                   </Box>
                 ))}
@@ -338,16 +320,19 @@ function Anfragezeile({
   onAntwort: (erteilen: boolean) => void;
   onZurueck: () => void;
 }) {
+  const { t } = useTranslation();
   const offen = anfrage.status === "PENDING";
   const haeltZugriff = anfrage.status === "GRANTED" && anfrage.active === true;
 
   const stand = offen
-    ? "Noch nicht beantwortet"
+    ? t("markt.standOffen")
     : anfrage.status === "DECLINED"
-      ? "Abgelehnt — dieses Unternehmen kann nicht erneut fragen"
-      : haeltZugriff
-        ? "Freigegeben — das Unternehmen sieht deinen Marktstatus"
-        : "Freigabe zurückgezogen";
+      ? t("markt.standAbgelehnt")
+      : t(
+          haeltZugriff
+            ? "markt.standFreigegeben"
+            : "markt.standZurueckgezogen",
+        );
 
   return (
     <Card component="li" variant="outlined">
@@ -362,7 +347,7 @@ function Anfragezeile({
       >
         <Box>
           <Typography variant="h4">
-            Ein Unternehmen möchte sehen, ob du ansprechbar bist
+            {t("markt.anfrageTitel")}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {stand}
@@ -378,7 +363,7 @@ function Anfragezeile({
                 onClick={() => onAntwort(true)}
                 disabled={gesperrt}
               >
-                Freigeben
+                {t("allgemein.freigeben")}
               </Button>
               <Button
                 variant="text"
@@ -386,7 +371,7 @@ function Anfragezeile({
                 onClick={() => onAntwort(false)}
                 disabled={gesperrt}
               >
-                Ablehnen
+                {t("allgemein.ablehnen")}
               </Button>
             </>
           ) : null}
@@ -397,7 +382,7 @@ function Anfragezeile({
               onClick={onZurueck}
               disabled={gesperrt}
             >
-              Zurückziehen
+              {t("allgemein.zurueckziehen")}
             </Button>
           ) : null}
         </Box>
