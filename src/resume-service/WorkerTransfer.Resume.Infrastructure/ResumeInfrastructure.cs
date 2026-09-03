@@ -50,18 +50,12 @@ public static class ResumeInfrastructure
         services.Configure<Loescheinstellungen>(
             configuration.GetSection(Loescheinstellungen.Abschnitt));
 
-        // A browser holds the token as an httpOnly cookie and can do nothing
-        // else with it.
-        services.PostConfigure<JwtBearerOptions>(
-            JwtBearerDefaults.AuthenticationScheme,
-            options => options.AuchAusDemCookie());
 
         services.AddSingleton(_ => ResumeDbContextFactory.DataSource(connectionString));
         services.AddDbContext<ResumeDbContext>((provider, options) =>
             ResumeDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
 
-        services.AddHttpContextAccessor();
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 

@@ -1,5 +1,7 @@
 using Girder.Abstractions.Caching;
-using Girder.InMemory.Caching;
+using Girder.Infrastructure.Middleware;
+using Girder.Infrastructure.Models;
+using Girder.Infrastructure.RateLimiting;
 using Ocelot.DependencyInjection;
 using Ocelot.Middleware;
 using WorkerTransfer.Gateway;
@@ -17,25 +19,24 @@ builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange
 
 builder.Services.AddOcelot(builder.Configuration);
 
-// Die Bremse. Der Zähler kommt von Girder, die Kette von hier.
+// Die Bremse — Girders, ganz. Hier standen bis Girder 4.2.0 rund hundertdreißig
+// eigene Zeilen, und der Grund dafür war nie eine fehlende Fähigkeit:
 //
-// Girders eigene Zwischenschicht ist seit 4.0.0 nachgemessen in Ordnung — sie
-// liest die Herkunft allein aus Connection.RemoteIpAddress, ein gefälschtes
-// X-Forwarded-For hebt sie nicht mehr auf, sie zählt je Herkunft und kann
-// Je-Pfad-Grenzen. Sie steht hier trotzdem nicht, und der Grund ist klein und
-// genau benannt: ihre Abweisung ist application/json mit einem traceId — also
-// weder Problemdokument noch Korrelationskennung, fest verdrahtet ohne Haken
-// (bugs/abweisung-der-bremse-ist-kein-problemdokument.md). Wer sich ausgesperrt
-// meldet, soll eine Kennung nennen können. Landet das, fällt diese Kette weg.
+//   * Selektiv bremsen (fünf benannte Pfade, sonst nichts) kann Girder, seit es
+//     Grenzen gibt — eine Vorgabe von 0 legt keinen Zähler an. Es stand nur
+//     nirgends, und kein Test hielt es fest.
+//   * Die Abweisung war kein Problemdokument. Behoben in 4.1.0.
+//   * Und sie zu holen kostete `Girder.Infrastructure` mit vierundvierzig
+//     transitiven Paketen — Swagger, Telemetrie, neun Logging-Pakete — für ein
+//     Gateway, das nur routet. `Girder.Http` bringt NULL mit.
 //
-// `InMemoryRateLimitStore` zählt IM PROZESS. Das bindet das Gateway an
-// replicaCount: 1 — der Ausweg ist ein Registrierungswechsel auf
-// `RedisDistributedRateLimitStore`, kein Umbau.
+// Die fünf Grenzen stehen weiter in `ocelot.json`, neben den Routen, aus denen
+// sie ausgewählt sind. `BremsenkarteTests` hält weiterhin fest, dass jeder
+// gebremste Pfad wirklich eine Route hat — die Zusage überlebt die Datei.
 builder.Services.AddMemoryCache();
-builder.Services.AddSingleton<IDistributedRateLimitStore, InMemoryRateLimitStore>();
-builder.Services.AddSingleton(
-    builder.Configuration.GetSection(Bremseinstellungen.Abschnitt)
-        .Get<Bremseinstellungen>() ?? new Bremseinstellungen());
+builder.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
+builder.Services.Configure<DistributedRateLimitingOptions>(
+    builder.Configuration.GetSection(DistributedRateLimitingOptions.SectionName));
 
 var app = builder.Build();
 
@@ -50,8 +51,8 @@ var app = builder.Build();
 //   Bremse      vor Navigation, weil Navigation den Pfad auf `/__ui/...`
 //               umschreibt. Danach träfe keine Regel mehr zu.
 app.UseGesundheit();
-app.UseKorrelation();
-app.UseBremse();
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<DistributedRateLimitingMiddleware>();
 app.UseNavigation();
 
 await app.UseOcelot();

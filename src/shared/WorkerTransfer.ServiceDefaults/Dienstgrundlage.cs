@@ -4,6 +4,7 @@ using Girder.Infrastructure.Builder.Modules;
 using Girder.Infrastructure.Extensions;
 using Girder.Infrastructure.Security.Identity;
 using Girder.Infrastructure.Security.InputSanitization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -90,6 +91,21 @@ public static class Dienstgrundlage
         // Flaeche, auf der ein Wert ohne Fachpruefer ankommt.
         services.Configure<InputSanitizationOptions>(
             optionen => optionen.InspectJsonBodies = false);
+
+        // Das Token kommt aus dem `Authorization`-Kopf ODER aus dem
+        // `access`-Cookie, und beide Traeger werden gebraucht: Dienst-zu-Dienst
+        // und CLI schicken den Kopf, der Browser sieht das httpOnly-Token nie und
+        // kann es nur als Cookie zuruecksenden.
+        //
+        // Das stand elfmal, in jedem Dienst wortgleich. Es ist aber keine
+        // Entscheidung eines Dienstes, sondern eine der Plattform — und elf
+        // Stellen fuer dieselbe Aussage sind elf Gelegenheiten, sie beim
+        // zwoelften Dienst zu vergessen. Dann kaeme jeder Schalter im Browser
+        // mit 401 zurueck, obwohl die Anmeldung aussieht, als haette sie
+        // funktioniert.
+        services.PostConfigure<JwtBearerOptions>(
+            JwtBearerDefaults.AuthenticationScheme,
+            optionen => optionen.AuchAusDemCookie());
 
         return services.AddGirder(configuration, environment, dienstname, girder =>
         {

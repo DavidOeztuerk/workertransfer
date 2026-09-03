@@ -4,7 +4,7 @@ The short reference. `CLAUDE.md` carries the reasons; this file carries the comm
 
 ## What this is
 
-WorkerTransfer is a consent-first talent-mobility platform, written in **.NET 10 on Girder 4.1.0** (a shared foundation library from GitHub Packages) with a React frontend.
+WorkerTransfer is a consent-first talent-mobility platform, written in **.NET 10 on Girder 4.2.2** (a shared foundation library from GitHub Packages) with a React frontend.
 
 It was a Python (`uv`) monorepo until August 2026 and was translated by hand. **No Python remains** — no `uv`, `ruff`, `mypy`, `pytest`, `alembic`, no `apps/<service>`, no `packages/worker-*`. A document that names those is describing the predecessor. `docs/MIGRATION-STAND.md` says what changed and what was measured.
 
@@ -132,7 +132,7 @@ Restore needs a NuGet login for `Girder.*` (GitHub Packages); `NuGet.Config` pin
 
 ## The auth brake
 
-Five paths, per origin, per minute, configured in `ocelot.json` beside the routes: `/auth/login` 20, `/auth/register` 5, `/auth/resend-verification` 3, `/auth/verify-email` 20, `/auth/refresh` 60. Implementation in `src/gateway/WorkerTransfer.Gateway/Bremse.cs`.
+Five paths, per origin, per minute, configured in `ocelot.json` beside the routes as Girder's `DistributedRateLimiting` section: `/auth/login` 20, `/auth/register` 5, `/auth/resend-verification` 3, `/auth/verify-email` 20, `/auth/refresh` 60. **The three defaults are `0`** — a limit of zero writes no counter, so only the named paths count. The middleware is Girder's; there is no hand-written brake any more.
 
 - **Per origin, never per email address.** A per-address limit would confirm the address exists — the enumeration channel `/auth/register` closes — and let a stranger lock a person out. The key is path plus origin; the body is never read.
 - **In the gateway, because only there is the origin visible.** Behind it every service sees the gateway's address, so a brake in identity-service would put all people in one bucket and let the first mistyped password lock out everyone.
@@ -140,7 +140,7 @@ Five paths, per origin, per minute, configured in `ocelot.json` beside the route
 - **After the health probes, before authentication.** A braked liveness probe would be the outage; a brake behind bcrypt would cost a hash per attempt.
 - **The counter is in-process** → the gateway stays at one replica. The way out is a registration change to `RedisDistributedRateLimitStore`, same interface.
 - **Girder's input sanitization middleware runs, since 4.1.0 — but not over JSON bodies.** Until 4.0.2 it matched a *bare* SQL keyword on a word boundary (a hyphen is one), so `/jobs?q=Union-Investment` answered **400**, and because every request from the deletion page carried `Referer: …/delete-account` that whole page was dead down to its `/auth/session`. Fixed: it matches injection *syntax*, the `Referer` is not input, and JSON string values are inspected. We set `InspectJsonBodies = false` anyway (reason in `Dienstgrundlage.cs`): the filter runs first and cannot name a field, so a 422 saying *which* field is wrong becomes a blunt 400 — measured on five cases across three services. They are still refused; the person filling in the form is just told less. Query string and the two address headers stay inspected.
-- **Girder's rate limiter is sound since 4.0.0, and is still left out of the eleven services — for topology, not distrust.** Measured without foreign code: `ClientAddress.Of` reads only `Connection.RemoteIpAddress`, a forged `X-Forwarded-For: 127.0.0.1` no longer lifts the brake, it counts per origin, does per-path limits and sets `X-RateLimit-*` and `Retry-After`. But **a service behind the gateway sees only the gateway as the origin**, so every caller would share one bucket. Braking happens at the entrance. `Bremse.cs` stays there for a reason of *kind*, not of defect (its 429 has been a problem document with a correlation id since 4.1.0): Girder's middleware is a **global** brake with per-path refinement, and the whole UI travels through this gateway. Ours brakes five named paths and touches nothing else.
+- **Girder's rate limiter is what runs, and `Bremse.cs` is gone (4.2.0).** It survived three rounds of justification, each measured and each wrong differently — last of them "Girder's is global, ours is selective", which was simply false: a limit of `0` writes no counter. What actually kept it was price: `Girder.Infrastructure` drags 44 transitive packages and this gateway only routes. `Girder.Http` carries none. **In the eleven services the limiter stays out for topology** — a service behind the gateway sees only the gateway as the origin, so every caller would share one bucket.
 
 ## Branches
 

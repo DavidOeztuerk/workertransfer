@@ -41,11 +41,6 @@ public static class NotificationInfrastructure
         services.Configure<Loescheinstellungen>(
             configuration.GetSection(Loescheinstellungen.Abschnitt));
 
-        // Ein Browser hält das Token als httpOnly-Cookie und kann sonst nichts
-        // damit anfangen.
-        services.PostConfigure<JwtBearerOptions>(
-            JwtBearerDefaults.AuthenticationScheme,
-            options => options.AuchAusDemCookie());
 
         services.AddSingleton(_ => NotificationDbContextFactory.Datenquelle(connectionString));
         services.AddDbContext<NotificationDbContext>((provider, options) =>

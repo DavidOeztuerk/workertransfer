@@ -9,12 +9,13 @@
   <ItemGroup>
     <PackageReference Include="Ocelot" />
     <!--
-      Nur fuer den Zaehler der Bremse: `IDistributedRateLimitStore` samt seiner
-      In-Memory-Umsetzung. Girders eigene Zwischenschicht wird NICHT benutzt,
-      siehe bugs/distributed-ratelimiting-middleware-bremst-nicht.md.
+      Girders Zwischenschichten fuer Bremse und Korrelation — und seit 4.2.0
+      kosten sie nichts weiter: `Girder.Http` bringt NULL Fremdpakete mit,
+      waehrend `Girder.Infrastructure` vierundvierzig zoege. Genau dieser Preis
+      war der Grund, warum hier vorher beides von Hand stand.
     -->
     <PackageReference Include="Girder.Abstractions" />
-    <PackageReference Include="Girder.InMemory" />
+    <PackageReference Include="Girder.Http" />
   </ItemGroup>
 
   <ItemGroup>

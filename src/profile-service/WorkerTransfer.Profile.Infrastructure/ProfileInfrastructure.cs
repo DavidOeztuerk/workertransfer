@@ -52,18 +52,12 @@ public static class ProfileInfrastructure
         services.Configure<Loescheinstellungen>(
             configuration.GetSection(Loescheinstellungen.Abschnitt));
 
-        // Ein Browser hält den Token als httpOnly-Cookie und kann sonst nichts
-        // damit anfangen.
-        services.PostConfigure<JwtBearerOptions>(
-            JwtBearerDefaults.AuthenticationScheme,
-            options => options.AuchAusDemCookie());
 
         services.AddSingleton(_ => ProfileDbContextFactory.Datenquelle(connectionString));
         services.AddDbContext<ProfileDbContext>((anbieter, optionen) =>
             ProfileDbContextFactory.Konfiguriere(
                 optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
 
-        services.AddHttpContextAccessor();
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 

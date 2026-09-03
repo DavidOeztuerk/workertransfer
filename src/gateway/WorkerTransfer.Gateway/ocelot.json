@@ -588,27 +588,46 @@
   // waere selbst der Ausfall. Sie soll SCHNELLES Raten unmoeglich machen — nicht
   // langsames, denn dagegen hilft sie ohnehin nicht, und sie ist auch nicht das
   // Einzige, was dagegen helfen muss.
-  "Bremse": {
-    "Fenster": "00:01:00",
-    "Pfade": {
+  // Der Abschnitt ist Girders eigener (`DistributedRateLimitingOptions`) — seit
+  // 4.2.0 gibt es hier nichts mehr selbst zu bauen.
+  //
+  // DIE DREI VORGABEN STEHEN AUF 0, UND DAS IST DER GANZE TRICK: eine Grenze von
+  // 0 legt keinen Zaehler an, also zaehlen ausschliesslich die fuenf Pfade
+  // darunter. Ohne das braeche eine Vorgabe ueber allem — durch dieses Gateway
+  // laeuft auch die ganze Oberflaeche, und jeder Bildabruf zaehlte mit.
+  //
+  // `Subject: Origin` haelt die zweite Zusage: je Herkunft, nie je Benutzer.
+  "DistributedRateLimiting": {
+    "RequestsPerMinute": 0,
+    "RequestsPerHour": 0,
+    "RequestsPerDay": 0,
+    "Subject": "Origin",
+    "EnableEndpointSpecificLimiting": true,
+
+    // Leer, nicht ausgelassen: Loopback steht sonst per Vorgabe darauf, und
+    // dann bremst hier lokal gar nichts — man sieht es nur nicht.
+    "WhitelistedIps": [],
+    "WhitelistedEndpoints": [],
+
+    "EndpointSpecificLimits": {
       // Der eigentliche Grund fuer das Ganze: Passwortraten.
-      "/auth/login": 20,
+      "/auth/login": { "RequestsPerMinute": 20 },
 
       // Eine Anmeldung kostet nichts und laesst sich beliebig oft versuchen.
       // Enger, weil hier Konten entstehen.
-      "/auth/register": 5,
+      "/auth/register": { "RequestsPerMinute": 5 },
 
       // Verschickt eine MAIL. Ohne Bremse ist das ein Verstaerker: ein Fremder
       // laesst eine Adresse hundertmal anschreiben, die ihm nicht gehoert.
-      "/auth/resend-verification": 3,
+      "/auth/resend-verification": { "RequestsPerMinute": 3 },
 
       // Ein Bestaetigungslink wird auch mal zweimal geklickt. Weit genug, dass
       // das nie stoert, eng genug, dass Token nicht durchprobiert werden.
-      "/auth/verify-email": 20,
+      "/auth/verify-email": { "RequestsPerMinute": 20 },
 
       // WEIT, mit Absicht: jeder offene Tab erneuert. Zu eng, und ein Mensch
       // mit sechs Tabs meldet sich staendig selbst ab.
-      "/auth/refresh": 60
+      "/auth/refresh": { "RequestsPerMinute": 60 }
     }
   },
 

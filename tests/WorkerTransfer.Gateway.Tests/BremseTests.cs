@@ -4,7 +4,9 @@ using System.Text;
 using System.Text.Json;
 using FluentAssertions;
 using Girder.Abstractions.Caching;
-using Girder.InMemory.Caching;
+using Girder.Infrastructure.Middleware;
+using Girder.Infrastructure.Models;
+using Girder.Infrastructure.RateLimiting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,29 +30,39 @@ public sealed class BremseTests
 {
     private const string HerkunftsKopf = "X-Test-Herkunft";
 
-    private static WebApplication Wirt(
-        int grenze, TimeSpan? fenster = null, bool auchDieProbe = false)
+    private static WebApplication Wirt(int grenze, bool auchDieProbe = false)
     {
         var bau = WebApplication.CreateBuilder();
         bau.WebHost.UseUrls("http://127.0.0.1:0");
         bau.Logging.ClearProviders();
         bau.Services.AddMemoryCache();
-        bau.Services.AddSingleton<IDistributedRateLimitStore, InMemoryRateLimitStore>();
+        bau.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
 
-        var pfade = new Dictionary<string, int>(StringComparer.Ordinal)
+        var grenzen = new Dictionary<string, EndpointRateLimit>(StringComparer.Ordinal)
         {
-            ["/auth/login"] = grenze
+            ["/auth/login"] = new EndpointRateLimit { RequestsPerMinute = grenze }
         };
 
         if (auchDieProbe)
         {
-            pfade["/health/live"] = grenze;
+            grenzen["/health/live"] = new EndpointRateLimit { RequestsPerMinute = grenze };
         }
 
-        bau.Services.AddSingleton(new Bremseinstellungen
+        bau.Services.Configure<DistributedRateLimitingOptions>(einstellungen =>
         {
-            Fenster = fenster ?? TimeSpan.FromMinutes(1),
-            Pfade = pfade
+            // Wie in der ausgelieferten Karte: keine Vorgabe ueber allem, damit
+            // NUR die genannten Pfade zaehlen.
+            einstellungen.RequestsPerMinute = 0;
+            einstellungen.RequestsPerHour = 0;
+            einstellungen.RequestsPerDay = 0;
+            einstellungen.Subject = RateLimitSubject.Origin;
+
+            // Loopback steht per Vorgabe auf der Ausnahmeliste, und im Test kommt
+            // alles von dort — ohne diese Zeile misst die Probe eine Bremse, die
+            // gar nicht zaehlt.
+            einstellungen.WhitelistedIps = [];
+            einstellungen.WhitelistedEndpoints = [];
+            einstellungen.EndpointSpecificLimits = grenzen;
         });
 
         var wirt = bau.Build();
@@ -72,8 +84,8 @@ public sealed class BremseTests
 
         // Dieselbe Reihenfolge wie in `Program.cs`: die Probe zuerst.
         wirt.UseGesundheit();
-        wirt.UseKorrelation();
-        wirt.UseBremse();
+        wirt.UseMiddleware<CorrelationIdMiddleware>();
+        wirt.UseMiddleware<DistributedRateLimitingMiddleware>();
         wirt.Map("/{**alles}", () => Results.Ok(new { durch = true }));
 
         return wirt;
@@ -210,7 +222,10 @@ public sealed class BremseTests
 
         var gelesen = JsonDocument.Parse(rumpf).RootElement;
         gelesen.GetProperty("status").GetInt32().Should().Be(429);
-        gelesen.GetProperty("detail").GetString().Should().Be("too many requests");
+        // Der Wortlaut ist Girders. Was hier zaehlt, ist die Zusage darueber:
+        // er nennt kein Konto — und kann es nicht, weil die Bremse den Rumpf
+        // nie liest.
+        gelesen.GetProperty("detail").GetString().Should().NotBeNullOrWhiteSpace();
         gelesen.GetProperty("correlationId").GetString().Should().NotBeNullOrWhiteSpace();
         abgewiesen.Content.Headers.ContentType!.MediaType
             .Should().Be("application/problem+json");
@@ -219,35 +234,29 @@ public sealed class BremseTests
     [Fact]
     public async Task Die_Abweisung_sagt_wann_es_wieder_geht()
     {
-        await using var wirt = Wirt(grenze: 1, fenster: TimeSpan.FromSeconds(30));
+        await using var wirt = Wirt(grenze: 1);
         await wirt.StartAsync();
         using var browser = Browser(wirt);
 
         (await Anmelden(browser, "10.0.0.1")).Dispose();
         using var abgewiesen = await Anmelden(browser, "10.0.0.1");
 
-        abgewiesen.Headers.GetValues(Bremse.KopfSpaeter).Single().Should().Be("30");
-        abgewiesen.Headers.GetValues(Bremse.KopfGrenze).Single().Should().Be("1");
-        abgewiesen.Headers.GetValues(Bremse.KopfRest).Single().Should().Be("0");
+        // Eine Minute, und die ist nicht mehr verstellbar: Girder zaehlt in
+        // festen Fenstern (Minute, Stunde, Tag). Die ausgelieferte Karte stand
+        // ohnehin auf einer Minute, also aendert sich im Betrieb nichts.
+        abgewiesen.Headers.GetValues("Retry-After").Single().Should().Be("60");
+        abgewiesen.Headers.GetValues("X-RateLimit-Limit").Single().Should().Be("1");
+        abgewiesen.Headers.GetValues("X-RateLimit-Remaining").Single().Should().Be("0");
     }
 
-    [Fact]
-    public async Task Das_Fenster_laeuft_ab_und_gibt_wieder_frei()
-    {
-        await using var wirt = Wirt(grenze: 1, fenster: TimeSpan.FromSeconds(1));
-        await wirt.StartAsync();
-        using var browser = Browser(wirt);
-
-        (await Anmelden(browser, "10.0.0.1")).Dispose();
-        (await Anmelden(browser, "10.0.0.1")).StatusCode
-            .Should().Be(HttpStatusCode.TooManyRequests);
-
-        await Task.Delay(TimeSpan.FromSeconds(1.5));
-
-        using var danach = await Anmelden(browser, "10.0.0.1");
-        danach.StatusCode.Should().Be(
-            HttpStatusCode.OK, "eine Bremse ist keine Sperre — sie muss wieder loslassen");
-    }
+    // `Das_Fenster_laeuft_ab_und_gibt_wieder_frei` stand hier und ist gegangen.
+    // Es fuhr ein Ein-Sekunden-Fenster und wartete 1,5 Sekunden; Girder zaehlt in
+    // festen Fenstern, also hiesse derselbe Test jetzt eine Minute warten.
+    //
+    // Die Zusage — eine Bremse ist keine Sperre, sie muss wieder loslassen —
+    // haelt Girders `RateLimitStoreConformance`, an einem kurzen Fenster und
+    // gegen JEDEN Speicher, auch den von Redis. Dort gehoert sie hin: sie ist
+    // eine Eigenschaft des Zaehlers, nicht unserer Verdrahtung.
 
     /// <summary>
     /// Ein mitgebrachter <c>X-Forwarded-For</c> verschiebt den Topf nicht.
@@ -314,88 +323,60 @@ public sealed class BremseTests
         }
     }
 
-    /// <summary>Der Schlüssel besteht aus Pfad und Herkunft, sonst nichts.</summary>
-    [Theory]
-    [InlineData("/auth/login", "10.0.0.1", "bremse:/auth/login:10.0.0.1")]
-    [InlineData("/auth/register", "::1", "bremse:/auth/register:::1")]
-    public void Der_Schluessel_besteht_nur_aus_Pfad_und_Herkunft(
-        string pfad, string herkunft, string erwartet) =>
-        Bremse.Schluessel(pfad, herkunft).Should().Be(erwartet);
-
-    /// <summary>
-    /// Ein Rechner, zwei Schreibweisen, ein Topf.
-    /// </summary>
-    /// <remarks>
-    /// Kestrel liefert eine IPv4-Adresse über einen Dual-Stack-Hörer als
-    /// <c>::ffff:10.0.0.1</c>. Ohne diese Zusammenführung hätte derselbe
-    /// Rechner zwei Töpfe und damit die doppelte Grenze — je nachdem, wie der
-    /// Hörer konfiguriert ist.
-    /// </remarks>
-    [Fact]
-    public void Dieselbe_Maschine_bekommt_nicht_zwei_Toepfe()
-    {
-        var schlicht = new DefaultHttpContext();
-        schlicht.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("10.0.0.1");
-
-        var verkleidet = new DefaultHttpContext();
-        verkleidet.Connection.RemoteIpAddress =
-            System.Net.IPAddress.Parse("10.0.0.1").MapToIPv6();
-
-        Bremse.Herkunft(verkleidet).Should().Be(Bremse.Herkunft(schlicht));
-    }
-
-    /// <summary>
-    /// Ohne feststellbare Herkunft wird nicht durchgewinkt.
-    /// </summary>
-    /// <remarks>
-    /// Der Zweifelsfall muss <em>enger</em> ausfallen, nie weiter: wäre „keine
-    /// Herkunft" der Freifahrtschein, wäre das Erzeugen dieses Zustands der
-    /// erste Schritt jedes Angriffs.
-    /// </remarks>
-    [Fact]
-    public void Ohne_Herkunft_gilt_ein_gemeinsamer_Name()
-    {
-        var ohne = new DefaultHttpContext();
-        ohne.Connection.RemoteIpAddress = null;
-
-        Bremse.Herkunft(ohne).Should().Be(Bremse.Namenlos);
-    }
+    // Drei Tests standen hier und sind mit `Bremse.cs` gegangen: die Gestalt des
+    // Zählerschlüssels, die Zusammenführung von `::ffff:10.0.0.1`, und der
+    // gemeinsame Topf ohne feststellbare Herkunft. Alle drei prüften eine
+    // Umsetzung, die es hier nicht mehr gibt — sie gehören jetzt zu
+    // `ClientAddress` in Girder und werden dort geprüft.
+    //
+    // Die ZUSAGE, die sie trugen, steht weiter oben und stärker: „verschiedene
+    // Adressen aus einer Herkunft teilen einen Topf" fährt fünf echte Anmeldungen
+    // durch das echte Gateway. Ein Schlüssel, der die Adresse enthielte, fiele
+    // dort — ohne dass der Test seine Gestalt kennen müsste.
 
     /// <summary>Die Zahlen aus der ausgelieferten Karte, nicht aus einer Kopie.</summary>
     [Fact]
     public void Die_ausgelieferte_Karte_bremst_genau_die_fuenf_Auth_Pfade()
     {
-        var karte = Bremskarte.Lesen();
+        var pfade = Bremskarte.Pfade();
 
-        karte.Pfade.Keys.Should().BeEquivalentTo(
+        pfade.Keys.Should().BeEquivalentTo(
             "/auth/login",
             "/auth/register",
             "/auth/resend-verification",
             "/auth/verify-email",
             "/auth/refresh");
 
-        karte.Fenster.Should().Be(TimeSpan.FromMinutes(1));
-        karte.Pfade.Values.Should().OnlyContain(
+        pfade.Values.Should().OnlyContain(
             grenze => grenze > 0, "eine Grenze von null wäre eine Sperre, keine Bremse");
     }
+
+    /// <summary>
+    /// Die drei Vorgaben stehen auf 0 — und daran hängt alles.
+    /// </summary>
+    /// <remarks>
+    /// Eine Vorgabe legt einen Zähler für JEDEN Pfad an. Durch dieses Gateway
+    /// läuft auch die ganze Oberfläche, also zählte dann jeder Bildabruf mit,
+    /// und die fünf Auth-Grenzen wären nur noch die zusätzliche Verschärfung
+    /// darüber. Genau diese Form war der Grund, warum hier jahrelang eine eigene
+    /// Bremse stand — bis jemand nachgemessen hat, dass 0 sie abschaltet.
+    /// </remarks>
+    [Fact]
+    public void Die_ausgelieferte_Karte_hat_keine_Vorgabe_ueber_allem() =>
+        Bremskarte.Vorgaben().Should().AllSatisfy(vorgabe => vorgabe.Should().Be(0));
 
     /// <summary>
     /// Die ausgelieferte Karte multipliziert nichts.
     /// </summary>
     /// <remarks>
-    /// <c>Faktor</c> ist Luft für den Prüfstand und wird in
+    /// <c>LimitMultiplier</c> ist Luft für den Prüfstand und wird in
     /// <c>docker-compose.yml</c> gesetzt, nirgends sonst. Stünde er in der
     /// Karte, gälten die Zahlen daneben nicht mehr — und niemand würde es
     /// merken, weil die Bremse weiter antwortet, nur später.
     /// </remarks>
     [Fact]
     public void Die_ausgelieferte_Karte_multipliziert_nichts() =>
-        Bremskarte.Lesen().Faktor.Should().Be(1);
-
-    /// <summary>Ohne Angabe wird nicht multipliziert.</summary>
-    [Fact]
-    public void Der_Faktor_ist_ohne_Angabe_eins() =>
-        new Bremseinstellungen().Faktor.Should().Be(1);
+        Bremskarte.Multiplikator().Should().Be(1);
 
     /// <summary>
     /// Jeder gebremste Pfad ist auch eine Route.
@@ -409,10 +390,10 @@ public sealed class BremseTests
     [Fact]
     public void Jeder_gebremste_Pfad_hat_eine_Route()
     {
-        var karte = Bremskarte.Lesen();
+        var pfade = Bremskarte.Pfade();
         var routen = Bremskarte.Routen();
 
-        foreach (var pfad in karte.Pfade.Keys)
+        foreach (var pfad in pfade.Keys)
         {
             routen.Should().Contain(
                 route => Passt(route, pfad),
@@ -448,18 +429,45 @@ internal static class Bremskarte
             new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip }).RootElement;
     }
 
-    public static Bremseinstellungen Lesen()
+    /// <summary>
+    /// Die gebremsten Pfade und ihre Grenzen, aus Girders Abschnitt.
+    /// </summary>
+    /// <remarks>
+    /// Gelesen statt gebaut: was hier steht, ist genau das, was der Behälter
+    /// bindet. Ein Test gegen eine eigene Kopie prüfte seine eigene Kopie.
+    /// </remarks>
+    public static IReadOnlyDictionary<string, int> Pfade()
     {
-        var abschnitt = Wurzel().GetProperty(Bremseinstellungen.Abschnitt);
+        var abschnitt = Wurzel().GetProperty(DistributedRateLimitingOptions.SectionName);
 
-        return new Bremseinstellungen
-        {
-            Fenster = TimeSpan.Parse(
-                abschnitt.GetProperty("Fenster").GetString()!, CultureInfo.InvariantCulture),
-            Faktor = abschnitt.TryGetProperty("Faktor", out var faktor) ? faktor.GetInt32() : 1,
-            Pfade = abschnitt.GetProperty("Pfade").EnumerateObject()
-                .ToDictionary(e => e.Name, e => e.Value.GetInt32(), StringComparer.Ordinal)
-        };
+        return abschnitt.GetProperty("EndpointSpecificLimits").EnumerateObject()
+            .ToDictionary(
+                eintrag => eintrag.Name,
+                eintrag => eintrag.Value.GetProperty("RequestsPerMinute").GetInt32(),
+                StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Die drei Vorgaben. Sie MÜSSEN 0 sein — sonst zählt jeder Pfad mit.
+    /// </summary>
+    public static IReadOnlyList<int> Vorgaben()
+    {
+        var abschnitt = Wurzel().GetProperty(DistributedRateLimitingOptions.SectionName);
+
+        return
+        [
+            abschnitt.GetProperty("RequestsPerMinute").GetInt32(),
+            abschnitt.GetProperty("RequestsPerHour").GetInt32(),
+            abschnitt.GetProperty("RequestsPerDay").GetInt32()
+        ];
+    }
+
+    /// <summary>Der Multiplikator, sofern die Karte einen nennt.</summary>
+    public static int Multiplikator()
+    {
+        var abschnitt = Wurzel().GetProperty(DistributedRateLimitingOptions.SectionName);
+
+        return abschnitt.TryGetProperty("LimitMultiplier", out var wert) ? wert.GetInt32() : 1;
     }
 
     public static IReadOnlyList<string> Routen() =>
