@@ -28,6 +28,6 @@ export interface Profile {
  * „0 von 3": die Person hat nichts gesagt, nicht nichts gekonnt.
  */
 export async function getMyProfile(signal?: AbortSignal): Promise<Profile | null> {
-  const antwort = await request<Profile | null>(PROFILE_BASE_URL, "/profiles/me", { signal });
-  return antwort.ok ? (antwort.value ?? null) : null;
+  const answer = await request<Profile | null>(PROFILE_BASE_URL, "/profiles/me", { signal });
+  return answer.ok ? (answer.value ?? null) : null;
 }

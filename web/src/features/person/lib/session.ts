@@ -15,8 +15,8 @@ export function usePerson(): {
   /** Die Sitzung ist noch nicht geprüft. Weder angemeldet noch abgemeldet. */
   unbekannt: boolean;
 } {
-  const status = useAppSelector((zustand) => zustand.auth.status);
-  const session = useAppSelector((zustand) => zustand.auth.session);
+  const status = useAppSelector((state) => state.auth.status);
+  const session = useAppSelector((state) => state.auth.session);
 
   return {
     subjectId: session?.userId ?? null,

@@ -48,13 +48,13 @@ import { listMyApplications } from "../../work/api/applications";
 export function MyDataPage() {
   const { t } = useTranslation();
   const status = useAppSelector((state) => state.auth.status);
-  const sitzung = useAppSelector((state) => state.auth.session);
+  const session = useAppSelector((state) => state.auth.session);
 
   const auskunft = useAsync(
     async (signal): Promise<Record<string, Abschnitt>> => {
       const [
         benachrichtigungen,
-        profil,
+        profile,
         lebenslauf,
         lebenslaufAnfragen,
         portfolio,
@@ -81,25 +81,28 @@ export function MyDataPage() {
       ]);
 
       return {
-        konto: abschnitt(sitzung !== null, sitzung),
+        konto: abschnitt(session !== null, session),
         benachrichtigungen: abschnitt(
           benachrichtigungen !== null,
           benachrichtigungen ?? undefined,
         ),
-        profil: abschnitt(profil.ok, profil.ok ? profil.profile : undefined),
+        // Die Schlüssel dieses Objekts sind die ABSCHNITTSNAMEN der Datei, die
+        // ein Mensch herunterlädt — Datenvertrag, kein beiläufiger Name. Sie
+        // heissen deutsch, weil sie es beim ersten Export taten.
+        profil: abschnitt(profile.ok, profile.ok ? profile.profile : undefined),
         lebenslauf: abschnitt(
           lebenslauf.ok,
-          lebenslauf.ok ? lebenslauf.wert : undefined,
+          lebenslauf.ok ? lebenslauf.value : undefined,
         ),
         lebenslauf_anfragen: abschnitt(
           lebenslaufAnfragen.ok,
-          lebenslaufAnfragen.ok ? lebenslaufAnfragen.wert : undefined,
+          lebenslaufAnfragen.ok ? lebenslaufAnfragen.value : undefined,
         ),
         portfolio: abschnitt(
           portfolio.ok,
-          portfolio.ok ? portfolio.wert : undefined,
+          portfolio.ok ? portfolio.value : undefined,
         ),
-        github: abschnitt(github.ok, github.ok ? github.wert : undefined),
+        github: abschnitt(github.ok, github.ok ? github.value : undefined),
         marktstatus: abschnitt(
           marktstatus.ok,
           marktstatus.ok ? marktstatus.status : undefined,
@@ -126,8 +129,8 @@ export function MyDataPage() {
         ),
       };
     },
-    [sitzung?.userId],
-    sitzung !== null,
+    [session?.userId],
+    session !== null,
   );
 
   if (status === "anonymous") {
@@ -139,17 +142,17 @@ export function MyDataPage() {
     );
   }
 
-  const ergebnis =
-    auskunft.wert === undefined ? null : baueAuskunft(auskunft.wert);
-  const fehlend = ergebnis?.unvollständig ?? [];
+  const result =
+    auskunft.value === undefined ? null : baueAuskunft(auskunft.value);
+  const missing = result?.unvollständig ?? [];
 
   function herunterladen() {
-    if (ergebnis === null) return;
+    if (result === null) return;
 
-    const inhalt = new Blob([JSON.stringify(ergebnis, null, 2)], {
+    const content = new Blob([JSON.stringify(result, null, 2)], {
       type: "application/json",
     });
-    const url = URL.createObjectURL(inhalt);
+    const url = URL.createObjectURL(content);
     const verweis = document.createElement("a");
     verweis.href = url;
     verweis.download = dateiname();
@@ -171,13 +174,13 @@ export function MyDataPage() {
             <LoadingBlock label={t("meineDaten.laden")} />
           ) : null}
 
-          {fehlend.length > 0 ? (
+          {missing.length > 0 ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              {t("meineDaten.unvollstaendig", { teile: fehlend.join(", ") })}
+              {t("meineDaten.unvollstaendig", { parts: missing.join(", ") })}
             </Alert>
           ) : null}
 
-          {ergebnis !== null ? (
+          {result !== null ? (
             <>
               {/* Ein `<dl>`, keine Liste: zu jedem Abschnitt gehört die
                   Auskunft, ob er enthalten ist. Diese Zuordnung IST der Inhalt
@@ -192,7 +195,7 @@ export function MyDataPage() {
                   mb: 3,
                 }}
               >
-                {Object.entries(ergebnis.abschnitte).map(([name, eintrag]) => (
+                {Object.entries(result.abschnitte).map(([name, entry]) => (
                   <Box key={name} sx={{ display: "contents" }}>
                     <Typography component="dt" variant="body2">
                       {name.replace(/_/g, " ")}
@@ -202,13 +205,13 @@ export function MyDataPage() {
                       variant="body2"
                       sx={{ m: 0 }}
                       color={
-                        eintrag.status === "ok"
+                        entry.status === "ok"
                           ? "text.secondary"
                           : "warning.main"
                       }
                     >
                       {t(
-                        eintrag.status === "ok"
+                        entry.status === "ok"
                           ? "meineDaten.enthalten"
                           : "meineDaten.fehlt",
                       )}

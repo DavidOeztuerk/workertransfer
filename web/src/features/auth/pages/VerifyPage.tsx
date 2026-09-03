@@ -40,17 +40,17 @@ const versuche = new Map<string, Promise<BestaetigungsErgebnis>>();
 function bestaetigeEinmal(token: string): Promise<BestaetigungsErgebnis> {
   const laufend = versuche.get(token);
   if (laufend !== undefined) return laufend;
-  const gestartet = bestaetigeEmail(token);
-  versuche.set(token, gestartet);
-  return gestartet;
+  const started = bestaetigeEmail(token);
+  versuche.set(token, started);
+  return started;
 }
 
 export function VerifyPage() {
   const { t } = useTranslation();
-  const [suchparameter] = useSearchParams();
-  const token = suchparameter.get("token") ?? "";
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") ?? "";
 
-  const [zustand, setZustand] = useState<Zustand>({ phase: "laeuft" });
+  const [state, setZustand] = useState<Zustand>({ phase: "laeuft" });
 
   useEffect(() => {
     if (token === "") {
@@ -61,20 +61,20 @@ export function VerifyPage() {
       });
       return;
     }
-    void bestaetigeEinmal(token).then((ergebnis) => {
+    void bestaetigeEinmal(token).then((result) => {
       setZustand(
-        ergebnis.ok
-          ? { phase: "fertig", ...ergebnis }
+        result.ok
+          ? { phase: "fertig", ...result }
           : {
               phase: "gescheitert",
-              abgelaufen: ergebnis.abgelaufen,
-              meldung: ergebnis.meldung,
+              abgelaufen: result.abgelaufen,
+              meldung: result.meldung,
             },
       );
     });
   }, [token, t]);
 
-  if (zustand.phase === "laeuft") {
+  if (state.phase === "laeuft") {
     return (
       <AuthCard
         title={t("bestaetigung.laeuftTitel")}
@@ -87,7 +87,7 @@ export function VerifyPage() {
     );
   }
 
-  if (zustand.phase === "fertig") {
+  if (state.phase === "fertig") {
     return (
       // Die Überschrift ist für ALLE drei Erfolge dieselbe, und sie ist in allen
       // dreien wahr: bestätigt ist die E-MAIL. Was aus dem Unternehmen wurde,
@@ -100,8 +100,8 @@ export function VerifyPage() {
       <AuthCard
         title={t("bestaetigung.fertigTitel")}
         lead={
-          zustand.unternehmen !== undefined
-            ? t("bestaetigung.fertigMitFirma", { name: zustand.unternehmen })
+          state.unternehmen !== undefined
+            ? t("bestaetigung.fertigMitFirma", { name: state.unternehmen })
             : t("bestaetigung.fertigOhneFirma")
         }
       >
@@ -115,11 +115,11 @@ export function VerifyPage() {
               einen Knopf „Unternehmen anlegen" gibt es nicht mehr. Der richtige
               Weg ist ohnehin ein anderer — wer eine Adresse auf dieser Domain
               hat, hat dort Kollegen. */}
-          {zustand.unternehmenFehler === "domain_already_claimed" ? (
+          {state.unternehmenFehler === "domain_already_claimed" ? (
             <Alert severity="warning">
               {t("bestaetigung.domainVergeben")}
             </Alert>
-          ) : zustand.unternehmenFehler !== undefined ? (
+          ) : state.unternehmenFehler !== undefined ? (
             <Alert severity="warning">
               {t("bestaetigung.firmaGescheitert")}
             </Alert>
@@ -136,7 +136,7 @@ export function VerifyPage() {
   }
 
   return (
-    <Gescheitert abgelaufen={zustand.abgelaufen} meldung={zustand.meldung} />
+    <Gescheitert abgelaufen={state.abgelaufen} meldung={state.meldung} />
   );
 }
 
@@ -155,17 +155,17 @@ function Gescheitert({
 }) {
   const { t } = useTranslation();
   const [email, setEmail] = useState("");
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
   const [gesendet, setGesendet] = useState(false);
   const [gescheitert, setGescheitert] = useState(false);
 
-  async function absenden(ereignis: React.FormEvent) {
-    ereignis.preventDefault();
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
     setLaeuft(true);
     setGescheitert(false);
-    const ergebnis = await sendeBestaetigungErneut(email);
+    const result = await sendeBestaetigungErneut(email);
     setLaeuft(false);
-    if (ergebnis.ok) setGesendet(true);
+    if (result.ok) setGesendet(true);
     else setGescheitert(true);
   }
 
@@ -180,7 +180,7 @@ function Gescheitert({
         {abgelaufen ? (
           <Box
             component="form"
-            onSubmit={absenden}
+            onSubmit={submit}
             noValidate
             sx={{ display: "grid", gap: 2 }}
           >
@@ -190,11 +190,11 @@ function Gescheitert({
               autoComplete="username"
               helperText={t("bestaetigung.emailHinweis")}
               value={email}
-              onChange={(ereignis) => setEmail(ereignis.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               required
             />
-            <Button type="submit" variant="contained" disabled={laeuft}>
-              {laeuft
+            <Button type="submit" variant="contained" disabled={running}>
+              {running
                 ? t("bestaetigung.neuerLinkLaeuft")
                 : t("bestaetigung.neuerLink")}
             </Button>

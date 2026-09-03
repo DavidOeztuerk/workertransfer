@@ -95,21 +95,21 @@ const UEBERGANGSFEHLER: Partial<
   },
 };
 
-async function zug(
+async function move(
   path: string,
   body?: unknown,
   fallback: Fehlerschluessel = "fehler.schrittFehlgeschlagen"
 ): Promise<TransferErgebnis> {
-  const antwort = await request<Transfer>(TRANSFER_BASE_URL, path, { method: "POST", body }, fallback);
-  if (antwort.ok) return { ok: true, transfer: antwort.value };
-  if (antwort.error.status === 409) {
-    return { ok: false, reason: "conflict", error: antwort.error };
+  const answer = await request<Transfer>(TRANSFER_BASE_URL, path, { method: "POST", body }, fallback);
+  if (answer.ok) return { ok: true, transfer: answer.value };
+  if (answer.error.status === 409) {
+    return { ok: false, reason: "conflict", error: answer.error };
   }
-  return deuten<TransferFehler>(antwort.error, UEBERGANGSFEHLER, "offline");
+  return deuten<TransferFehler>(answer.error, UEBERGANGSFEHLER, "offline");
 }
 
 export function expressInterest(subjectId: string, message: string): Promise<TransferErgebnis> {
-  return zug(
+  return move(
     "/transfers",
     { subject_id: subjectId, message },
     "fehler.interesseNichtHinterlegt"
@@ -117,17 +117,17 @@ export function expressInterest(subjectId: string, message: string): Promise<Tra
 }
 
 export function personMove(transferId: string, action: PersonAction): Promise<TransferErgebnis> {
-  return zug(`/transfers/${transferId}/${action}`);
+  return move(`/transfers/${transferId}/${action}`);
 }
 
 export function companyMove(transferId: string, action: CompanyAction): Promise<TransferErgebnis> {
-  return zug(`/transfers/${transferId}/${action}`);
+  return move(`/transfers/${transferId}/${action}`);
 }
 
 export function makeOffer(transferId: string, input: OfferInput): Promise<TransferErgebnis> {
   // `null` statt "" für den Monat: "" ist kein Monat und scheiterte am Muster
   // des Vertrags — mit einer Meldung, die nach einem Serverproblem aussieht.
-  return zug(
+  return move(
     `/transfers/${transferId}/offer`,
     { note: input.note, start_on: input.start_on, fee_cents: input.fee_cents },
     "fehler.angebotNichtGemacht"
@@ -135,17 +135,17 @@ export function makeOffer(transferId: string, input: OfferInput): Promise<Transf
 }
 
 async function listTransfers(path: string, signal?: AbortSignal): Promise<TransferListe> {
-  const antwort = await request<Transfer[]>(
+  const answer = await request<Transfer[]>(
     TRANSFER_BASE_URL,
     path,
     { signal },
     "fehler.listeNichtGeladen"
   );
-  if (antwort.ok) return { ok: true, transfers: antwort.value ?? [] };
+  if (answer.ok) return { ok: true, transfers: answer.value ?? [] };
   // Nicht als leere Liste zeigen: „keine Vorgänge" ist eine Aussage, und sie
   // wäre falsch.
   return deuten<"fehlgeschlagen">(
-    antwort.error,
+    answer.error,
     { 0: { reason: "fehlgeschlagen", titel: "fehler.keineVerbindung" } },
     "fehlgeschlagen"
   );

@@ -32,17 +32,17 @@ function vorgang(werte: Partial<VorgangZeile> = {}): VorgangZeile {
 type Antwort = { status?: number; body?: unknown };
 
 function antworten(karte: Record<string, Antwort>) {
-  const gefragt: string[] = [];
+  const asked: string[] = [];
   const stub = vi.fn(async (url: string) => {
-    const pfad = new URL(url).pathname;
-    gefragt.push(pfad);
-    const antwort = karte[pfad] ?? { body: [] };
-    return new Response(JSON.stringify(antwort.body ?? []), {
-      status: antwort.status ?? 200,
+    const path = new URL(url).pathname;
+    asked.push(path);
+    const answer = karte[path] ?? { body: [] };
+    return new Response(JSON.stringify(answer.body ?? []), {
+      status: answer.status ?? 200,
     });
   });
   vi.stubGlobal("fetch", stub);
-  return gefragt;
+  return asked;
 }
 
 const ANGEMELDET = {
@@ -141,13 +141,13 @@ describe("OverviewPage", () => {
   it("fragt ohne aktives Unternehmen nicht nach Firmenvorgängen", async () => {
     // Ohne Firma antwortet der Dienst 403 — und ein Fehler, den die Anfrage
     // selbst erzeugt hat, dürfte die Übersicht als unvollständig markieren.
-    const gefragt = antworten({});
+    const asked = antworten({});
 
     renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
 
     await screen.findByText("Gerade wartet nichts auf dich.");
-    expect(gefragt).not.toContain("/transfers");
-    expect(gefragt).toContain("/transfers/me");
+    expect(asked).not.toContain("/transfers");
+    expect(asked).toContain("/transfers/me");
   });
 
   it("hält die Sache des Unternehmens von der der Person getrennt", async () => {
@@ -201,12 +201,12 @@ describe("OverviewPage", () => {
    * fehlende Token.
    */
   it("zeigt einer abgemeldeten Besucherin keine leere Übersicht", async () => {
-    const gefragt = antworten({});
+    const asked = antworten({});
 
     renderMitStore(<OverviewPage />, { auth: { status: "anonymous" } });
 
     expect(screen.queryByText("Gerade wartet nichts auf dich.")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Was liegt an" })).toBeNull();
-    expect(gefragt).toHaveLength(0);
+    expect(asked).toHaveLength(0);
   });
 });

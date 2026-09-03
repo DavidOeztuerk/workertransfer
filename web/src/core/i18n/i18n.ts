@@ -39,16 +39,16 @@ void i18n.use(initReactI18next).init({
 
 /** Setzt die Sprache aus der Vorliebe. `system` folgt dem Gerät (ADR-0031). */
 export function spracheAnwenden(vorliebe: Sprachvorliebe): void {
-  const sprache = aufgeloest(vorliebe);
+  const language = aufgeloest(vorliebe);
 
-  if (i18n.language !== sprache) {
-    void i18n.changeLanguage(sprache);
+  if (i18n.language !== language) {
+    void i18n.changeLanguage(language);
   }
 
   if (typeof document !== "undefined") {
     // Ohne das bleibt `<html lang>` auf Deutsch stehen: Vorleseprogramme
     // sprechen den Text dann mit der falschen Aussprache, und die Silbentrennung
     // des Browsers trennt nach den falschen Regeln.
-    document.documentElement.lang = sprache;
+    document.documentElement.lang = language;
   }
 }

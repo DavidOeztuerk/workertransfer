@@ -27,16 +27,16 @@ import { spracheSpeichern } from "../../../features/auth/store/authThunks";
 export function LanguagePicker() {
   const dispatch = useAppDispatch();
   const vorliebe = useAppSelector((state) => state.preferences.language);
-  const angemeldet = useAppSelector((state) => state.auth.status === "authenticated");
+  const signedIn = useAppSelector((state) => state.auth.status === "authenticated");
   const { t } = useTranslation();
 
-  function waehle(gewaehlt: Sprachvorliebe) {
-    dispatch(languageSet(gewaehlt));
+  function choose(chosen: Sprachvorliebe) {
+    dispatch(languageSet(chosen));
 
     // Ans Konto geht die AUFGELÖSTE Sprache, nicht „system": der Server hat
     // kein Gerät, dem er folgen könnte, und eine Mail muss eine Sprache haben.
-    if (angemeldet) {
-      void dispatch(spracheSpeichern(aufgeloest(gewaehlt)));
+    if (signedIn) {
+      void dispatch(spracheSpeichern(aufgeloest(chosen)));
     }
   }
 
@@ -53,15 +53,15 @@ export function LanguagePicker() {
       size="small"
       label={t("sprache.label")}
       value={vorliebe}
-      onChange={(ereignis) => waehle(ereignis.target.value as Sprachvorliebe)}
+      onChange={(event) => choose(event.target.value as Sprachvorliebe)}
       sx={{ minWidth: 150 }}
     >
       <option value="system">{t("sprache.system")}</option>
-      {SPRACHEN.map((sprache) => (
+      {SPRACHEN.map((language) => (
         // Der Name der Sprache steht IN dieser Sprache: wer die Oberfläche
         // gerade nicht lesen kann, sucht „Deutsch", nicht „German".
-        <option key={sprache} value={sprache}>
-          {t(`sprache.${sprache}`)}
+        <option key={language} value={language}>
+          {t(`sprache.${language}`)}
         </option>
       ))}
     </TextField>

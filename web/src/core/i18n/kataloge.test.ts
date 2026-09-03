@@ -6,13 +6,13 @@ import en from "./kataloge/en";
 import fr from "./kataloge/fr";
 
 /** Jeden Schlüssel als flachen Pfad, damit ein Vergleich etwas sagt. */
-function pfade(wert: unknown, praefix = ""): string[] {
-  if (typeof wert !== "object" || wert === null) {
+function pfade(value: unknown, praefix = ""): string[] {
+  if (typeof value !== "object" || value === null) {
     return [praefix];
   }
 
-  return Object.entries(wert).flatMap(([schluessel, unten]) =>
-    pfade(unten, praefix === "" ? schluessel : `${praefix}.${schluessel}`)
+  return Object.entries(value).flatMap(([key, unten]) =>
+    pfade(unten, praefix === "" ? key : `${praefix}.${key}`)
   );
 }
 
@@ -25,8 +25,8 @@ describe("die Kataloge", () => {
   it("haben in jeder Sprache dieselben Schlüssel", () => {
     const quelle = pfade(de).sort();
 
-    for (const sprache of SPRACHEN) {
-      expect(pfade(kataloge[sprache]).sort(), `Katalog ${sprache}`).toEqual(quelle);
+    for (const language of SPRACHEN) {
+      expect(pfade(kataloge[language]).sort(), `Katalog ${language}`).toEqual(quelle);
     }
   });
 
@@ -71,29 +71,29 @@ describe("die Kataloge", () => {
       "fr:kandidaten.faehigkeitenBeispiel",
     ]);
 
-    for (const sprache of ["en", "fr"] as const) {
+    for (const language of ["en", "fr"] as const) {
       const gleich = pfade(de).filter(
-        (pfad) =>
-          !erlaubt.has(`${sprache}:${pfad}`) &&
-          lies(de, pfad) === lies(kataloge[sprache], pfad)
+        (path) =>
+          !erlaubt.has(`${language}:${path}`) &&
+          lies(de, path) === lies(kataloge[language], path)
       );
 
-      expect(gleich, `unübersetzt in ${sprache}`).toEqual([]);
+      expect(gleich, `unübersetzt in ${language}`).toEqual([]);
     }
   });
 
   it("lassen keinen Text leer", () => {
-    for (const sprache of SPRACHEN) {
-      for (const pfad of pfade(kataloge[sprache])) {
-        expect(lies(kataloge[sprache], pfad).trim(), `${sprache}: ${pfad}`).not.toBe("");
+    for (const language of SPRACHEN) {
+      for (const path of pfade(kataloge[language])) {
+        expect(lies(kataloge[language], path).trim(), `${language}: ${path}`).not.toBe("");
       }
     }
   });
 });
 
-function lies(katalog: unknown, pfad: string): string {
-  return pfad.split(".").reduce<unknown>(
-    (wert, teil) => (wert as Record<string, unknown>)[teil],
+function lies(katalog: unknown, path: string): string {
+  return path.split(".").reduce<unknown>(
+    (value, teil) => (value as Record<string, unknown>)[teil],
     katalog
   ) as string;
 }

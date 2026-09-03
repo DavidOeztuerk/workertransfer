@@ -25,11 +25,11 @@ export function LogoutPage() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const status = useAppSelector((state) => state.auth.status);
-  const gestartet = useRef(false);
+  const started = useRef(false);
 
   useEffect(() => {
-    if (gestartet.current) return;
-    gestartet.current = true;
+    if (started.current) return;
+    started.current = true;
     void dispatch(logout());
   }, [dispatch]);
 

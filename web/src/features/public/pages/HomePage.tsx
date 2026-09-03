@@ -33,7 +33,7 @@ const grundlagen = [1, 2, 3] as const;
  */
 export function HomePage() {
   const { t } = useTranslation();
-  const status = useAppSelector((zustand) => zustand.auth.status);
+  const status = useAppSelector((state) => state.auth.status);
 
   const heldId = useId();
   const grundlagenId = useId();
@@ -161,8 +161,8 @@ export function HomePage() {
               gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
             }}
           >
-            {grundlagen.map((nummer) => (
-              <Card key={nummer} sx={{ height: "100%" }}>
+            {grundlagen.map((number) => (
+              <Card key={number} sx={{ height: "100%" }}>
                 <CardContent sx={{ p: { xs: 2.5, md: 3.5 } }}>
                   <Typography
                     component="span"
@@ -174,13 +174,13 @@ export function HomePage() {
                       mb: 1.5,
                     }}
                   >
-                    0{nummer}
+                    0{number}
                   </Typography>
                   <Typography variant="h3" sx={{ mb: 1 }}>
-                    {t(`start.grundlage${nummer}Titel`)}
+                    {t(`start.grundlage${number}Titel`)}
                   </Typography>
                   <Typography color="text.secondary">
-                    {t(`start.grundlage${nummer}Text`)}
+                    {t(`start.grundlage${number}Text`)}
                   </Typography>
                 </CardContent>
               </Card>

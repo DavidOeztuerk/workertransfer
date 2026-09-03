@@ -30,11 +30,11 @@ const LEER: Entwurf = {
 };
 
 /** Mit Komma getrennt, Leeres fällt weg — „nichts angegeben" ist keine leere Zeile. */
-const liste = (roh: string): string[] =>
-  roh
+const list = (raw: string): string[] =>
+  raw
     .split(",")
-    .map((eintrag) => eintrag.trim())
-    .filter((eintrag) => eintrag !== "");
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
 
 /**
  * <c>/company/profile</c> — wie ein Unternehmen auftritt.
@@ -50,32 +50,32 @@ export function CompanyProfilePage() {
   const { t } = useTranslation();
   const { fuerFirma, tenantId } = useHandelnder();
 
-  const [entwurf, setEntwurf] = useState<Entwurf>(LEER);
-  const [uebernommen, setUebernommen] = useState(false);
+  const [draft, setEntwurf] = useState<Entwurf>(LEER);
+  const [adopted, setUebernommen] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [gespeichert, setGespeichert] = useState(false);
-  const [laeuft, setLaeuft] = useState(false);
+  const [saved, setGespeichert] = useState(false);
+  const [running, setLaeuft] = useState(false);
 
-  const profil = useAsync(
+  const profile = useAsync(
     (signal) => getOwnCompanyProfile(signal),
     [tenantId],
     fuerFirma,
   );
 
   useEffect(() => {
-    if (uebernommen || !profil.data?.ok) return;
-    const stand = profil.data.profile;
-    if (stand !== null) {
+    if (adopted || !profile.data?.ok) return;
+    const current = profile.data.profile;
+    if (current !== null) {
       setEntwurf({
-        display_name: stand.display_name,
-        about: stand.about,
-        website: stand.website ?? "",
-        locations: stand.locations.join(", "),
-        benefits: stand.benefits.join(", "),
+        display_name: current.display_name,
+        about: current.about,
+        website: current.website ?? "",
+        locations: current.locations.join(", "),
+        benefits: current.benefits.join(", "),
       });
     }
     setUebernommen(true);
-  }, [uebernommen, profil.data]);
+  }, [adopted, profile.data]);
 
   if (!fuerFirma) {
     return (
@@ -93,20 +93,20 @@ export function CompanyProfilePage() {
 
   async function speichern() {
     setLaeuft(true);
-    const ergebnis = await saveCompanyProfile({
-      display_name: entwurf.display_name,
-      about: entwurf.about,
-      website: entwurf.website.trim() === "" ? null : entwurf.website.trim(),
-      locations: liste(entwurf.locations),
-      benefits: liste(entwurf.benefits),
+    const result = await saveCompanyProfile({
+      display_name: draft.display_name,
+      about: draft.about,
+      website: draft.website.trim() === "" ? null : draft.website.trim(),
+      locations: list(draft.locations),
+      benefits: list(draft.benefits),
     });
     setLaeuft(false);
 
-    if (ergebnis.ok) {
+    if (result.ok) {
       setFehler(null);
       setGespeichert(true);
     } else {
-      setFehler(ergebnis.error.detail);
+      setFehler(result.error.detail);
       setGespeichert(false);
     }
   }
@@ -119,7 +119,7 @@ export function CompanyProfilePage() {
     >
       <Card>
         <CardContent>
-          {profil.pending ? (
+          {profile.pending ? (
             <LoadingBlock label={t("firmenprofil.laden")} />
           ) : null}
 
@@ -129,7 +129,7 @@ export function CompanyProfilePage() {
             </Alert>
           ) : null}
 
-          {gespeichert ? (
+          {saved ? (
             <Alert severity="success" role="status" sx={{ mb: 2 }}>
               {t("firmenprofil.gespeichert")}
             </Alert>
@@ -137,8 +137,8 @@ export function CompanyProfilePage() {
 
           <Box
             component="form"
-            onSubmit={(ereignis) => {
-              ereignis.preventDefault();
+            onSubmit={(event) => {
+              event.preventDefault();
               void speichern();
             }}
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
@@ -146,9 +146,9 @@ export function CompanyProfilePage() {
             <TextField
               label={t("firmenprofil.anzeigename")}
               helperText={t("firmenprofil.anzeigenameHinweis")}
-              value={entwurf.display_name}
+              value={draft.display_name}
               onChange={(e) => {
-                setEntwurf({ ...entwurf, display_name: e.target.value });
+                setEntwurf({ ...draft, display_name: e.target.value });
                 setGespeichert(false);
               }}
               required
@@ -156,9 +156,9 @@ export function CompanyProfilePage() {
             <TextField
               label={t("firmenprofil.ueberUns")}
               helperText={t("firmenprofil.ueberUnsHinweis")}
-              value={entwurf.about}
+              value={draft.about}
               onChange={(e) => {
-                setEntwurf({ ...entwurf, about: e.target.value });
+                setEntwurf({ ...draft, about: e.target.value });
                 setGespeichert(false);
               }}
               multiline
@@ -167,34 +167,34 @@ export function CompanyProfilePage() {
             <TextField
               label={t("firmenprofil.website")}
               helperText={t("firmenprofil.websiteHinweis")}
-              value={entwurf.website}
+              value={draft.website}
               onChange={(e) => {
-                setEntwurf({ ...entwurf, website: e.target.value });
+                setEntwurf({ ...draft, website: e.target.value });
                 setGespeichert(false);
               }}
             />
             <TextField
               label={t("firmenprofil.standorte")}
               helperText={t("firmenprofil.standorteHinweis")}
-              value={entwurf.locations}
+              value={draft.locations}
               onChange={(e) => {
-                setEntwurf({ ...entwurf, locations: e.target.value });
+                setEntwurf({ ...draft, locations: e.target.value });
                 setGespeichert(false);
               }}
             />
             <TextField
               label={t("firmenprofil.leistungen")}
               helperText={t("firmenprofil.leistungenHinweis")}
-              value={entwurf.benefits}
+              value={draft.benefits}
               onChange={(e) => {
-                setEntwurf({ ...entwurf, benefits: e.target.value });
+                setEntwurf({ ...draft, benefits: e.target.value });
                 setGespeichert(false);
               }}
             />
 
             <Box>
-              <Button type="submit" variant="contained" disabled={laeuft}>
-                {laeuft
+              <Button type="submit" variant="contained" disabled={running}>
+                {running
                   ? t("allgemein.speichernLaeuft")
                   : t("allgemein.speichern")}
               </Button>

@@ -8,25 +8,25 @@ import { RegisterPage } from "./RegisterPage";
 type Antwort = { status?: number; body?: unknown; wirft?: boolean };
 
 function antworten(...folge: Antwort[]) {
-  const gefragt: { pfad: string; rumpf: string }[] = [];
-  let nummer = 0;
+  const asked: { path: string; body: string }[] = [];
+  let number = 0;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
-      gefragt.push({
-        pfad: new URL(url).pathname,
-        rumpf: String(init?.body ?? ""),
+      asked.push({
+        path: new URL(url).pathname,
+        body: String(init?.body ?? ""),
       });
-      const antwort = folge[nummer] ??
+      const answer = folge[number] ??
         folge[folge.length - 1] ?? { status: 201 };
-      nummer += 1;
-      if (antwort.wirft === true) throw new TypeError("Failed to fetch");
-      return new Response(JSON.stringify(antwort.body ?? {}), {
-        status: antwort.status ?? 201,
+      number += 1;
+      if (answer.wirft === true) throw new TypeError("Failed to fetch");
+      return new Response(JSON.stringify(answer.body ?? {}), {
+        status: answer.status ?? 201,
       });
     }),
   );
-  return gefragt;
+  return asked;
 }
 
 async function fuelleUndSende(
@@ -67,7 +67,7 @@ describe("RegisterPage", () => {
   });
 
   it("schickt display_name in snake_case und nie einen Mandanten", async () => {
-    const gefragt = antworten({ status: 201 });
+    const asked = antworten({ status: 201 });
     const user = userEvent.setup();
     renderMitStore(<RegisterPage />, { route: "/register" });
 
@@ -75,8 +75,8 @@ describe("RegisterPage", () => {
 
     // Der Draht bindet `display_name`. Mit `displayName` kommt die Eingabe
     // nicht herein — gemessen, und der Fehler sah aus wie ein leeres Formular.
-    expect(gefragt[0]?.rumpf).toContain('"display_name"');
-    expect(gefragt[0]?.rumpf).not.toContain("tenant_id");
+    expect(asked[0]?.body).toContain('"display_name"');
+    expect(asked[0]?.body).not.toContain("tenant_id");
   });
 
   it("sagt bei einer bekannten Adresse dasselbe wie bei einer neuen", async () => {
@@ -160,7 +160,7 @@ describe("RegisterPage — Person oder Unternehmen", () => {
   });
 
   it("schickt den Firmennamen, und nie einen Mandanten", async () => {
-    const gefragt = antworten({ status: 201 });
+    const asked = antworten({ status: 201 });
     const user = userEvent.setup();
     renderMitStore(<RegisterPage />, { route: "/register" });
 
@@ -176,12 +176,12 @@ describe("RegisterPage — Person oder Unternehmen", () => {
     await user.type(screen.getByLabelText(/Anzeigename/i), "Chef");
     await user.click(screen.getByRole("button", { name: /Registrieren/i }));
 
-    expect(gefragt[0]?.rumpf).toContain('"company_name":"Firma GmbH"');
-    expect(gefragt[0]?.rumpf).not.toContain("tenant_id");
+    expect(asked[0]?.body).toContain('"company_name":"Firma GmbH"');
+    expect(asked[0]?.body).not.toContain("tenant_id");
   });
 
   it("schickt als Person gar kein company_name", async () => {
-    const gefragt = antworten({ status: 201 });
+    const asked = antworten({ status: 201 });
     const user = userEvent.setup();
     renderMitStore(<RegisterPage />, { route: "/register" });
 
@@ -189,7 +189,7 @@ describe("RegisterPage — Person oder Unternehmen", () => {
 
     // Kein `"company_name":null` — ein null wäre eine Aussage, die niemand
     // gemacht hat.
-    expect(gefragt[0]?.rumpf).not.toContain("company_name");
+    expect(asked[0]?.body).not.toContain("company_name");
   });
 });
 

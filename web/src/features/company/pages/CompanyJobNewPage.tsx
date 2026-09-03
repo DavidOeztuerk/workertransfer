@@ -42,11 +42,11 @@ const LEER: Entwurf = {
   skills: "",
 };
 
-const faehigkeiten = (roh: string): string[] =>
-  roh
+const faehigkeiten = (raw: string): string[] =>
+  raw
     .split(",")
-    .map((eintrag) => eintrag.trim())
-    .filter((eintrag) => eintrag !== "");
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
 
 /**
  * <c>/company/jobs/new</c> — eine Anzeige anlegen.
@@ -60,11 +60,11 @@ export function CompanyJobNewPage() {
   const navigate = useNavigate();
   const { fuerFirma } = useHandelnder();
 
-  const [entwurf, setEntwurf] = useState<Entwurf>(LEER);
+  const [draft, setEntwurf] = useState<Entwurf>(LEER);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
 
-  const zurueck = (
+  const back = (
     <Link component={RouterLink} to="/company/jobs" variant="body2">
       {t("firmenstellen.zurueck")}
     </Link>
@@ -73,7 +73,7 @@ export function CompanyJobNewPage() {
   if (!fuerFirma) {
     return (
       <PageShell title={t("firmenstellen.neu")} narrow>
-        <Box sx={{ mb: 2 }}>{zurueck}</Box>
+        <Box sx={{ mb: 2 }}>{back}</Box>
         <Card>
           <CardContent>
             <Typography>
@@ -87,23 +87,23 @@ export function CompanyJobNewPage() {
 
   async function anlegen() {
     setLaeuft(true);
-    const ergebnis = await createJob({
-      title: entwurf.title,
-      description: entwurf.description,
-      location: entwurf.location,
-      remote: entwurf.remote,
-      employment: entwurf.employment,
-      skills: faehigkeiten(entwurf.skills),
+    const result = await createJob({
+      title: draft.title,
+      description: draft.description,
+      location: draft.location,
+      remote: draft.remote,
+      employment: draft.employment,
+      skills: faehigkeiten(draft.skills),
     });
     setLaeuft(false);
 
-    if (ergebnis.ok) void navigate("/company/jobs");
-    else setFehler(ergebnis.error.detail);
+    if (result.ok) void navigate("/company/jobs");
+    else setFehler(result.error.detail);
   }
 
   return (
     <PageShell title={t("firmenstellen.neu")} narrow>
-      <Box sx={{ mb: 2 }}>{zurueck}</Box>
+      <Box sx={{ mb: 2 }}>{back}</Box>
 
       <Card>
         <CardContent>
@@ -115,25 +115,25 @@ export function CompanyJobNewPage() {
 
           <Box
             component="form"
-            onSubmit={(ereignis) => {
-              ereignis.preventDefault();
+            onSubmit={(event) => {
+              event.preventDefault();
               void anlegen();
             }}
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
             <TextField
               label={t("firmenstellen.feldTitel")}
-              value={entwurf.title}
+              value={draft.title}
               onChange={(e) =>
-                setEntwurf({ ...entwurf, title: e.target.value })
+                setEntwurf({ ...draft, title: e.target.value })
               }
               required
             />
             <TextField
               label={t("firmenstellen.beschreibung")}
-              value={entwurf.description}
+              value={draft.description}
               onChange={(e) =>
-                setEntwurf({ ...entwurf, description: e.target.value })
+                setEntwurf({ ...draft, description: e.target.value })
               }
               multiline
               minRows={5}
@@ -141,61 +141,61 @@ export function CompanyJobNewPage() {
             <TextField
               label={t("firmenstellen.ort")}
               helperText={t("firmenstellen.ortHinweis")}
-              value={entwurf.location}
+              value={draft.location}
               onChange={(e) =>
-                setEntwurf({ ...entwurf, location: e.target.value })
+                setEntwurf({ ...draft, location: e.target.value })
               }
             />
             <TextField
               select
               label={t("firmenstellen.arbeitsform")}
-              value={entwurf.remote}
+              value={draft.remote}
               onChange={(e) =>
-                setEntwurf({ ...entwurf, remote: e.target.value as RemoteMode })
+                setEntwurf({ ...draft, remote: e.target.value as RemoteMode })
               }
             >
-              {REMOTE_MODES.map((wert) => (
-                <MenuItem key={wert} value={wert}>
-                  {remoteLabel(wert)}
+              {REMOTE_MODES.map((value) => (
+                <MenuItem key={value} value={value}>
+                  {remoteLabel(value)}
                 </MenuItem>
               ))}
             </TextField>
             <TextField
               select
               label={t("firmenstellen.beschaeftigung")}
-              value={entwurf.employment}
+              value={draft.employment}
               onChange={(e) =>
                 setEntwurf({
-                  ...entwurf,
+                  ...draft,
                   employment: e.target.value as EmploymentType,
                 })
               }
             >
-              {EMPLOYMENT_TYPES.map((wert) => (
-                <MenuItem key={wert} value={wert}>
-                  {employmentLabel(wert)}
+              {EMPLOYMENT_TYPES.map((value) => (
+                <MenuItem key={value} value={value}>
+                  {employmentLabel(value)}
                 </MenuItem>
               ))}
             </TextField>
             <TextField
               label={t("firmenstellen.faehigkeiten")}
               helperText={t("firmenstellen.faehigkeitenHinweis")}
-              value={entwurf.skills}
+              value={draft.skills}
               onChange={(e) =>
-                setEntwurf({ ...entwurf, skills: e.target.value })
+                setEntwurf({ ...draft, skills: e.target.value })
               }
             />
 
             <Formulierungshilfe
-              entwurf={entwurf}
+              draft={draft}
               onVorschlag={(text) =>
-                setEntwurf({ ...entwurf, description: text })
+                setEntwurf({ ...draft, description: text })
               }
             />
 
             <Box>
-              <Button type="submit" variant="contained" disabled={laeuft}>
-                {laeuft
+              <Button type="submit" variant="contained" disabled={running}>
+                {running
                   ? t("firmenstellen.anlegenLaeuft")
                   : t("firmenstellen.anlegen")}
               </Button>
@@ -221,18 +221,18 @@ export function CompanyJobNewPage() {
  * sonst die Stelle an.
  */
 function Formulierungshilfe({
-  entwurf,
+  draft,
   onVorschlag,
 }: {
-  entwurf: Entwurf;
+  draft: Entwurf;
   onVorschlag: (text: string) => void;
 }) {
   const { t } = useTranslation();
-  const [wunsch, setWunsch] = useState("");
+  const [wish, setWunsch] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
 
-  const hatText = entwurf.description.trim() !== "";
+  const hatText = draft.description.trim() !== "";
 
   return (
     <Box sx={{ p: 2, borderRadius: 2, bgcolor: "action.hover" }}>
@@ -241,7 +241,7 @@ function Formulierungshilfe({
           hatText ? "firmenstellen.hilfeUmformulieren" : "firmenstellen.hilfeNeu",
         )}
         helperText={t("firmenstellen.hilfeHinweis")}
-        value={wunsch}
+        value={wish}
         onChange={(e) => setWunsch(e.target.value)}
         slotProps={{ htmlInput: { maxLength: 200 } }}
         sx={{ mb: 1.5 }}
@@ -257,27 +257,27 @@ function Formulierungshilfe({
         type="button"
         variant="outlined"
         size="small"
-        disabled={laeuft}
+        disabled={running}
         onClick={() => {
           setLaeuft(true);
           void draftJobText({
-            title: entwurf.title,
-            description: entwurf.description,
-            location: entwurf.location,
-            skills: faehigkeiten(entwurf.skills),
-            wish: wunsch,
-          }).then((ergebnis) => {
+            title: draft.title,
+            description: draft.description,
+            location: draft.location,
+            skills: faehigkeiten(draft.skills),
+            wish: wish,
+          }).then((result) => {
             setLaeuft(false);
-            if (ergebnis.ok) {
+            if (result.ok) {
               setProblem(null);
-              onVorschlag(ergebnis.draft);
+              onVorschlag(result.draft);
             } else {
-              setProblem(ergebnis.error.detail);
+              setProblem(result.error.detail);
             }
           });
         }}
       >
-        {laeuft
+        {running
           ? t("firmenstellen.hilfeLaeuft")
           : t(
               hatText

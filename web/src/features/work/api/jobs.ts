@@ -89,19 +89,19 @@ export const EMPLOYMENT_TYPES: EmploymentType[] = [
   "internship",
 ];
 
-export function remoteLabel(wert: RemoteMode): string {
-  const schluessel = { none: "None", hybrid: "Hybrid", full: "Full" } as const;
-  return i18n.t(`stelle.remote${schluessel[wert]}`);
+export function remoteLabel(value: RemoteMode): string {
+  const key = { none: "None", hybrid: "Hybrid", full: "Full" } as const;
+  return i18n.t(`stelle.remote${key[value]}`);
 }
 
-export function employmentLabel(wert: EmploymentType): string {
-  const schluessel = {
+export function employmentLabel(value: EmploymentType): string {
+  const key = {
     full_time: "FullTime",
     part_time: "PartTime",
     contract: "Contract",
     internship: "Internship",
   } as const;
-  return i18n.t(`stelle.employment${schluessel[wert]}`);
+  return i18n.t(`stelle.employment${key[value]}`);
 }
 
 export function suchAnfrage(filters: SearchFilters, cursor?: string): string {
@@ -127,23 +127,23 @@ export async function searchJobs(
   cursor?: string,
   signal?: AbortSignal
 ): Promise<SucheErgebnis> {
-  const antwort = await request<{ items?: Job[]; next_cursor?: string | null }>(
+  const answer = await request<{ items?: Job[]; next_cursor?: string | null }>(
     JOBS_BASE_URL,
     `/jobs${suchAnfrage(filters, cursor)}`,
     { signal },
     "fehler.sucheFehlgeschlagen"
   );
-  if (!antwort.ok) {
+  if (!answer.ok) {
     return deuten<SucheFehler>(
-      antwort.error,
+      answer.error,
       { 0: { reason: "offline", titel: "fehler.keineVerbindung" } },
       "fehlgeschlagen"
     );
   }
   return {
     ok: true,
-    items: antwort.value?.items ?? [],
-    nextCursor: antwort.value?.next_cursor ?? null,
+    items: answer.value?.items ?? [],
+    nextCursor: answer.value?.next_cursor ?? null,
   };
 }
 
@@ -155,24 +155,24 @@ export async function searchJobs(
  * uns erwarten kann.
  */
 export async function getJob(jobId: string, signal?: AbortSignal): Promise<Job | null> {
-  const antwort = await request<Job>(JOBS_BASE_URL, `/jobs/${jobId}`, { signal });
-  return antwort.ok ? (antwort.value ?? null) : null;
+  const answer = await request<Job>(JOBS_BASE_URL, `/jobs/${jobId}`, { signal });
+  return answer.ok ? (answer.value ?? null) : null;
 }
 
 export async function listOwnJobs(signal?: AbortSignal): Promise<EigeneJobsErgebnis> {
-  const antwort = await request<Job[]>(
+  const answer = await request<Job[]>(
     JOBS_BASE_URL,
     "/companies/me/jobs",
     { signal },
     "fehler.listeNichtGeladen"
   );
-  if (antwort.ok) return { ok: true, jobs: antwort.value ?? [] };
+  if (answer.ok) return { ok: true, jobs: answer.value ?? [] };
   // Kein aktives Unternehmen ist ein behebbarer Zustand, kein Fehler. Die Seite
   // fragt ohne Unternehmen ohnehin nicht, aber die Antwort bleibt dieselbe wie
   // zuvor: eine leere Liste, keine Meldung.
-  if (antwort.error.status === 403) return { ok: true, jobs: [] };
+  if (answer.error.status === 403) return { ok: true, jobs: [] };
   return deuten<SucheFehler>(
-    antwort.error,
+    answer.error,
     { 0: { reason: "offline", titel: "fehler.keineVerbindung" } },
     "fehlgeschlagen"
   );
@@ -194,20 +194,20 @@ async function schreiben(
   method: "POST" | "PUT",
   body?: unknown
 ): Promise<JobErgebnis> {
-  const antwort = await request<Job>(
+  const answer = await request<Job>(
     JOBS_BASE_URL,
     path,
     { method, body },
     "fehler.ausschreibungNichtGespeichert"
   );
-  if (antwort.ok) return { ok: true, job: antwort.value };
+  if (answer.ok) return { ok: true, job: answer.value };
   // `409` bleibt beim Satz des Servers: die Eingabe ist in Ordnung, der Zustand
   // passt nicht — das ist etwas anderes als ein Formularfehler, und der Dienst
   // weiß besser, was gerade nicht geht.
-  if (antwort.error.status === 409) {
-    return { ok: false, reason: "conflict", error: antwort.error };
+  if (answer.error.status === 409) {
+    return { ok: false, reason: "conflict", error: answer.error };
   }
-  return deuten<JobFehler>(antwort.error, SCHREIBFEHLER, "invalid");
+  return deuten<JobFehler>(answer.error, SCHREIBFEHLER, "invalid");
 }
 
 // Kein `tenant_id` im Rumpf: das Unternehmen steht im Token und wird gegen die
@@ -245,15 +245,15 @@ export async function draftJobText(input: {
   skills: string[];
   wish: string;
 }): Promise<EntwurfErgebnis> {
-  const antwort = await request<{ draft: string }>(
+  const answer = await request<{ draft: string }>(
     JOBS_BASE_URL,
     "/jobs/draft",
     { method: "POST", body: input },
     "fehler.entwurfNichtVerfuegbarLang"
   );
-  if (antwort.ok) return { ok: true, draft: antwort.value?.draft ?? "" };
+  if (answer.ok) return { ok: true, draft: answer.value?.draft ?? "" };
   return deuten<"no-company" | "unavailable">(
-    antwort.error,
+    answer.error,
     {
       403: { reason: "no-company", titel: "fehler.fuerFirmaHandelnNoetig" },
     },

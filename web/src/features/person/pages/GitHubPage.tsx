@@ -45,16 +45,16 @@ import {
 export function GitHubPage() {
   const { t, i18n } = useTranslation();
   const status = useAppSelector((state) => state.auth.status);
-  const sitzung = useAppSelector((state) => state.auth.session);
+  const session = useAppSelector((state) => state.auth.session);
 
   const [login, setLogin] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
 
-  const verbindung = useAsync(
+  const connection = useAsync(
     (signal) => ladeMeine(signal),
-    [sitzung?.userId],
-    sitzung !== null,
+    [session?.userId],
+    session !== null,
   );
 
   if (status === "anonymous") {
@@ -63,22 +63,22 @@ export function GitHubPage() {
     );
   }
 
-  async function fuehreAus(
+  async function run(
     was: () => Promise<{ ok: boolean; error?: { detail: string } }>,
   ) {
     setLaeuft(true);
-    const ergebnis = await was();
+    const result = await was();
     setLaeuft(false);
 
-    if (!ergebnis.ok && ergebnis.error) setFehler(ergebnis.error.detail);
+    if (!result.ok && result.error) setFehler(result.error.detail);
     else setFehler(null);
 
-    verbindung.erneut();
+    connection.again();
   }
 
-  const geladen = !verbindung.laedt && verbindung.wert?.ok === true;
-  const stand: Verbindung | null = verbindung.wert?.ok
-    ? verbindung.wert.wert
+  const loaded = !connection.laedt && connection.value?.ok === true;
+  const current: Verbindung | null = connection.value?.ok
+    ? connection.value.value
     : null;
 
   return (
@@ -97,7 +97,7 @@ export function GitHubPage() {
         </Alert>
       ) : null}
 
-      {verbindung.laedt ? (
+      {connection.laedt ? (
         <Card>
           <CardContent>
             <LoadingBlock label={t("github.laden")} />
@@ -105,15 +105,15 @@ export function GitHubPage() {
         </Card>
       ) : null}
 
-      {verbindung.wert && !verbindung.wert.ok ? (
-        <ErrorBlock error={verbindung.wert.error} />
+      {connection.value && !connection.value.ok ? (
+        <ErrorBlock error={connection.value.error} />
       ) : null}
 
       {/* `geladen` gehört dazu: solange geladen wird, ist der Stand unbekannt,
           und vorher stand „Wird geladen…" UND das Formular gleichzeitig da. Wer
           schnell tippt, nannte ein Konto, bevor die Seite wusste, ob schon eines
           verbunden ist. */}
-      {geladen && stand === null ? (
+      {loaded && current === null ? (
         <Card>
           <CardContent>
             <Typography variant="h2" sx={{ mb: 2 }}>
@@ -121,9 +121,9 @@ export function GitHubPage() {
             </Typography>
             <Box
               component="form"
-              onSubmit={(ereignis) => {
-                ereignis.preventDefault();
-                void fuehreAus(() => nenneKonto(login));
+              onSubmit={(event) => {
+                event.preventDefault();
+                void run(() => nenneKonto(login));
               }}
               sx={{
                 display: "flex",
@@ -141,7 +141,7 @@ export function GitHubPage() {
                 slotProps={{ htmlInput: { maxLength: 39 } }}
                 required
               />
-              <Button type="submit" variant="contained" disabled={laeuft}>
+              <Button type="submit" variant="contained" disabled={running}>
                 {t("github.weiter")}
               </Button>
             </Box>
@@ -149,7 +149,7 @@ export function GitHubPage() {
         </Card>
       ) : null}
 
-      {stand !== null && !stand.verified ? (
+      {current !== null && !current.verified ? (
         <Card>
           <CardContent>
             <Typography variant="h2" sx={{ mb: 1.5 }}>
@@ -173,29 +173,29 @@ export function GitHubPage() {
                 overflowX: "auto",
               }}
             >
-              {stand.challenge_description}
+              {current.challenge_description}
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               <Trans
                 i18nKey="github.nachweisErklaerung"
-                values={{ login: stand.login }}
+                values={{ login: current.login }}
                 components={{ 1: <strong /> }}
               />
             </Typography>
             <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
               <Button
                 variant="contained"
-                onClick={() => void fuehreAus(() => pruefeNachweis())}
-                disabled={laeuft}
+                onClick={() => void run(() => pruefeNachweis())}
+                disabled={running}
               >
-                {laeuft ? t("github.nachweisLaeuft") : t("github.nachweisPruefen")}
+                {running ? t("github.nachweisLaeuft") : t("github.nachweisPruefen")}
               </Button>
               <Button
                 variant="text"
                 onClick={() =>
-                  void fuehreAus(async () => ({ ok: await trenne() }))
+                  void run(async () => ({ ok: await trenne() }))
                 }
-                disabled={laeuft}
+                disabled={running}
               >
                 {t("github.anderesKonto")}
               </Button>
@@ -204,16 +204,16 @@ export function GitHubPage() {
         </Card>
       ) : null}
 
-      {stand !== null && stand.verified ? (
+      {current !== null && current.verified ? (
         <Card>
           <CardContent>
             <Typography variant="h2" sx={{ mb: 1 }}>
-              {stand.login}
+              {current.login}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {stand.fetched_at !== null
+              {current.fetched_at !== null
                 ? t("github.standVom", {
-                    zeitpunkt: new Date(stand.fetched_at).toLocaleString(
+                    zeitpunkt: new Date(current.fetched_at).toLocaleString(
                       i18n.language,
                     ),
                   })
@@ -226,13 +226,13 @@ export function GitHubPage() {
               />
             </Typography>
 
-            {stand.repositories.length === 0 ? (
+            {current.repositories.length === 0 ? (
               <Typography sx={{ mb: 2 }}>
                 {t("github.keineRepos")}
               </Typography>
             ) : (
               <Box component="ul" sx={{ pl: 2.5, mb: 2 }}>
-                {stand.repositories.map((repo) => (
+                {current.repositories.map((repo) => (
                   <Box component="li" key={repo.name} sx={{ mb: 1 }}>
                     <Link
                       href={repo.url}
@@ -254,19 +254,19 @@ export function GitHubPage() {
             <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
               <Button
                 variant="outlined"
-                onClick={() => void fuehreAus(() => holeNeu())}
-                disabled={laeuft}
+                onClick={() => void run(() => holeNeu())}
+                disabled={running}
               >
-                {laeuft
+                {running
                   ? t("github.aktualisierenLaeuft")
                   : t("github.aktualisieren")}
               </Button>
               <Button
                 variant="text"
                 onClick={() =>
-                  void fuehreAus(async () => ({ ok: await trenne() }))
+                  void run(async () => ({ ok: await trenne() }))
                 }
-                disabled={laeuft}
+                disabled={running}
               >
                 {t("github.trennen")}
               </Button>

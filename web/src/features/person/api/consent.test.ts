@@ -28,9 +28,9 @@ const ALLE_BEREICHE = [
 ] as const;
 
 describe("parseCapability", () => {
-  it.each(ALLE_BEREICHE)("nennt für %s einen Katalogschlüssel", (roh, name) => {
-    const schluessel = `freigaben.${name}`;
-    expect(parseCapability(`${roh}.visibility:public`).area).toBe(schluessel);
+  it.each(ALLE_BEREICHE)("nennt für %s einen Katalogschlüssel", (raw, name) => {
+    const key = `freigaben.${name}`;
+    expect(parseCapability(`${raw}.visibility:public`).area).toBe(key);
     expect(de.freigaben).toHaveProperty(name);
   });
 

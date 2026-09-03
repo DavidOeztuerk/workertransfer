@@ -31,32 +31,32 @@ export interface Verbindung {
   repositories: Repository[];
 }
 
-export type Antwort<T> = { ok: true; wert: T } | { ok: false; error: ApiError };
+export type Antwort<T> = { ok: true; value: T } | { ok: false; error: ApiError };
 
 /** Die eigene Verbindung. `null` heisst: noch keine genannt. */
 export async function ladeMeine(signal?: AbortSignal): Promise<Antwort<Verbindung | null>> {
-  const antwort = await request<Verbindung>(
+  const answer = await request<Verbindung>(
     GITHUB_BASE_URL,
     "/github/me",
     { signal },
     "fehler.verbindungNichtAbrufbar"
   );
 
-  if (antwort.ok) return { ok: true, wert: antwort.value ?? null };
-  if (antwort.error.status === 404) return { ok: true, wert: null };
-  return { ok: false, error: antwort.error };
+  if (answer.ok) return { ok: true, value: answer.value ?? null };
+  if (answer.error.status === 404) return { ok: true, value: null };
+  return { ok: false, error: answer.error };
 }
 
 async function handeln(
-  pfad: string,
+  path: string,
   optionen: Parameters<typeof request>[2],
   fallback: Fehlerschluessel
 ): Promise<Antwort<Verbindung>> {
-  const antwort = await request<Verbindung>(GITHUB_BASE_URL, pfad, optionen, fallback);
+  const answer = await request<Verbindung>(GITHUB_BASE_URL, path, optionen, fallback);
 
-  return antwort.ok
-    ? { ok: true, wert: antwort.value as Verbindung }
-    : { ok: false, error: antwort.error };
+  return answer.ok
+    ? { ok: true, value: answer.value as Verbindung }
+    : { ok: false, error: answer.error };
 }
 
 /** Ein Konto NENNEN — verbunden ist es damit noch nicht. */
@@ -93,12 +93,12 @@ export const holeNeu = (signal?: AbortSignal) =>
 
 /** Die Verbindung trennen. */
 export async function trenne(signal?: AbortSignal): Promise<boolean> {
-  const antwort = await request<void>(
+  const answer = await request<void>(
     GITHUB_BASE_URL,
     "/github/me",
     { method: "DELETE", signal },
     "fehler.verbindungNichtGetrennt"
   );
 
-  return antwort.ok;
+  return answer.ok;
 }

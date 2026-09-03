@@ -45,14 +45,14 @@ const LEER: FormState = {
   skills: "",
 };
 
-function zuFormular(profil: Profile | null): FormState {
-  if (profil === null) return LEER;
+function zuFormular(profile: Profile | null): FormState {
+  if (profile === null) return LEER;
   return {
-    headline: profil.headline,
-    bio: profil.bio,
-    location: profil.location,
-    remote_ok: profil.remote_ok,
-    skills: profil.skills.join(", "),
+    headline: profile.headline,
+    bio: profile.bio,
+    location: profile.location,
+    remote_ok: profile.remote_ok,
+    skills: profile.skills.join(", "),
   };
 }
 
@@ -68,7 +68,7 @@ export function ProfilePage() {
   const { t } = useTranslation();
   const { subjectId, unbekannt } = usePerson();
 
-  const profil = useAsync(
+  const profile = useAsync(
     (signal) => getMyProfile(signal),
     [subjectId],
     subjectId !== null,
@@ -79,59 +79,59 @@ export function ProfilePage() {
     subjectId !== null,
   );
 
-  const [formular, setzeFormular] = useState<FormState>(LEER);
+  const [form, setzeFormular] = useState<FormState>(LEER);
   const [fehler, setzeFehler] = useState<ApiError | null>(null);
-  const [gespeichert, setzeGespeichert] = useState(false);
-  const [speichert, setzeSpeichert] = useState(false);
-  const [schaltet, setzeSchaltet] = useState(false);
+  const [saved, setzeGespeichert] = useState(false);
+  const [saving, setzeSpeichert] = useState(false);
+  const [toggling, setzeSchaltet] = useState(false);
 
   // Das Formular folgt dem Server, solange niemand tippt. Danach gehört der
   // Zustand der Person — sonst verliert sie ihre Eingabe, sobald die Antwort
   // eintrifft.
-  const geladen = profil.wert;
+  const loaded = profile.value;
   useEffect(() => {
-    if (geladen?.ok === true) setzeFormular(zuFormular(geladen.profile));
-  }, [geladen]);
+    if (loaded?.ok === true) setzeFormular(zuFormular(loaded.profile));
+  }, [loaded]);
 
-  function aendere<K extends keyof FormState>(
-    schluessel: K,
-    wert: FormState[K],
+  function change<K extends keyof FormState>(
+    key: K,
+    value: FormState[K],
   ) {
     setzeGespeichert(false);
-    setzeFormular((jetzt) => ({ ...jetzt, [schluessel]: wert }));
+    setzeFormular((now) => ({ ...now, [key]: value }));
   }
 
-  async function speichere() {
+  async function save() {
     setzeSpeichert(true);
-    const ergebnis = await saveMyProfile({
-      headline: formular.headline,
-      bio: formular.bio,
-      location: formular.location,
-      remote_ok: formular.remote_ok,
-      skills: parseSkills(formular.skills),
+    const result = await saveMyProfile({
+      headline: form.headline,
+      bio: form.bio,
+      location: form.location,
+      remote_ok: form.remote_ok,
+      skills: parseSkills(form.skills),
     });
     setzeSpeichert(false);
-    if (ergebnis.ok) {
+    if (result.ok) {
       setzeFehler(null);
       setzeGespeichert(true);
-      profil.setze({ ok: true, profile: ergebnis.profile });
+      profile.setze({ ok: true, profile: result.profile });
     } else {
       setzeGespeichert(false);
-      setzeFehler(ergebnis.error);
+      setzeFehler(result.error);
     }
   }
 
-  async function schalte(naechster: boolean) {
+  async function toggle(naechster: boolean) {
     if (subjectId === null) return;
     setzeSchaltet(true);
-    const ergebnis = await setVisibility(subjectId, naechster);
+    const result = await setVisibility(subjectId, naechster);
     setzeSchaltet(false);
-    if (ergebnis.ok) {
+    if (result.ok) {
       setzeFehler(null);
       // Der Ledger sagt, was gilt — nicht der Wunsch des Klicks.
-      freigabe.setze(ergebnis.granted);
+      freigabe.setze(result.granted);
     } else {
-      setzeFehler(ergebnis.error);
+      setzeFehler(result.error);
       // Zurückstellen: ein Schalter, der „sichtbar" zeigt, obwohl nichts
       // freigegeben wurde, wäre die gefährlichere Lüge.
       freigabe.setze(!naechster);
@@ -152,7 +152,7 @@ export function ProfilePage() {
     );
   }
 
-  if (profil.laedt || geladen === undefined) {
+  if (profile.laedt || loaded === undefined) {
     // Kein leeres Formular, das sich nachträglich füllt: wer in der Zwischenzeit
     // zu tippen anfängt, verliert seine Eingabe, sobald die Antwort eintrifft.
     return (
@@ -162,27 +162,27 @@ export function ProfilePage() {
     );
   }
 
-  if (!geladen.ok) {
+  if (!loaded.ok) {
     // Und schon gar kein leeres Formular über einer gescheiterten Abfrage: wer
     // darin etwas tippt und speichert, überschreibt alles, was dastand, mit
     // leer. Der Ladezustand ist dann vorbei, die Seite sähe aus wie „noch
     // nichts eingetragen".
     return (
       <PageShell title={t("profil.titel")} narrow>
-        <ErrorBlock error={geladen.error} />
+        <ErrorBlock error={loaded.error} />
       </PageShell>
     );
   }
 
-  const hatProfil = geladen.profile !== null;
+  const hatProfil = loaded.profile !== null;
   // Die ANZEIGE bleibt bei Nichtwissen aus — ein Schalter, der versehentlich
   // „freigegeben" behauptet, ist die gefährlichere Lüge.
-  const freigegeben = freigabe.wert === true;
+  const freigegeben = freigabe.value === true;
   // ... aber „weiss ich nicht" ist nicht „nein". Solange die Antwort aussteht
   // oder ausbleibt, darf der Schalter nicht BEDIENBAR sein: sonst schickt der
   // nächste Klick ein `grant` für eine Einwilligung, deren Zustand niemand
   // kennt.
-  const ledgerSchweigt = !freigabe.laedt && freigabe.wert === null;
+  const ledgerSchweigt = !freigabe.laedt && freigabe.value === null;
   const ledgerUnbekannt = freigabe.laedt || ledgerSchweigt;
 
   return (
@@ -196,7 +196,7 @@ export function ProfilePage() {
           <ConsentSwitch
             label={t("profil.freigabeLabel")}
             checked={freigegeben}
-            disabled={!hatProfil || schaltet || ledgerUnbekannt}
+            disabled={!hatProfil || toggling || ledgerUnbekannt}
             hint={
               ledgerSchweigt
                 ? t("profil.freigabeSchweigt")
@@ -208,7 +208,7 @@ export function ProfilePage() {
                         : "profil.freigabeOhneProfil",
                     )
             }
-            onChange={(naechster) => void schalte(naechster)}
+            onChange={(naechster) => void toggle(naechster)}
           />
         </CardContent>
       </Card>
@@ -217,18 +217,18 @@ export function ProfilePage() {
         <CardContent>
           <Box
             component="form"
-            onSubmit={(ereignis) => {
-              ereignis.preventDefault();
-              void speichere();
+            onSubmit={(event) => {
+              event.preventDefault();
+              void save();
             }}
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
             <TextField
               label={t("profil.ueberschrift")}
               helperText={t("profil.ueberschriftHinweis")}
-              value={formular.headline}
-              onChange={(ereignis) =>
-                aendere("headline", ereignis.target.value)
+              value={form.headline}
+              onChange={(event) =>
+                change("headline", event.target.value)
               }
               slotProps={{ htmlInput: { maxLength: 120 } }}
               required
@@ -239,20 +239,20 @@ export function ProfilePage() {
               helperText={t("profil.ueberMichHinweis")}
               multiline
               rows={6}
-              value={formular.bio}
-              onChange={(ereignis) => aendere("bio", ereignis.target.value)}
+              value={form.bio}
+              onChange={(event) => change("bio", event.target.value)}
               slotProps={{ htmlInput: { maxLength: 4000 } }}
               fullWidth
             />
             <DraftHelp
-              onDraft={(entwurf) => aendere("bio", entwurf)}
-              hasText={formular.bio.trim().length > 0}
+              onDraft={(draft) => change("bio", draft)}
+              hasText={form.bio.trim().length > 0}
             />
             <TextField
               label={t("profil.ort")}
-              value={formular.location}
-              onChange={(ereignis) =>
-                aendere("location", ereignis.target.value)
+              value={form.location}
+              onChange={(event) =>
+                change("location", event.target.value)
               }
               slotProps={{ htmlInput: { maxLength: 120 } }}
               fullWidth
@@ -263,8 +263,8 @@ export function ProfilePage() {
               // „PostgreSQL" wird. Ohne ihn sähe es aus, als hätte die Seite
               // etwas an der Eingabe verändert, ohne zu fragen.
               helperText={t("profil.faehigkeitenHinweis")}
-              value={formular.skills}
-              onChange={(ereignis) => aendere("skills", ereignis.target.value)}
+              value={form.skills}
+              onChange={(event) => change("skills", event.target.value)}
               fullWidth
             />
             {/* Eine Ankreuzbox und KEIN Schalter: dies ist ein Profilfeld, und
@@ -273,9 +273,9 @@ export function ProfilePage() {
             <FormControlLabel
               control={
                 <Checkbox
-                  checked={formular.remote_ok}
-                  onChange={(ereignis) =>
-                    aendere("remote_ok", ereignis.target.checked)
+                  checked={form.remote_ok}
+                  onChange={(event) =>
+                    change("remote_ok", event.target.checked)
                   }
                 />
               }
@@ -285,15 +285,15 @@ export function ProfilePage() {
             {fehler !== null ? <ErrorBlock error={fehler} /> : null}
             {/* `role="status"` und nicht `alert`: eine Bestätigung, die den
                 Vorleser unterbricht, ist Lärm. */}
-            {gespeichert && fehler === null ? (
+            {saved && fehler === null ? (
               <Alert severity="success" role="status">
                 {t("profil.gespeichert")}
               </Alert>
             ) : null}
 
             <Box>
-              <Button type="submit" variant="contained" disabled={speichert}>
-                {speichert
+              <Button type="submit" variant="contained" disabled={saving}>
+                {saving
                   ? t("allgemein.speichernLaeuft")
                   : t("allgemein.speichern")}
               </Button>

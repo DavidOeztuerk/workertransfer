@@ -66,7 +66,7 @@ export function DeleteAccountPage() {
   const firmen = useAppSelector((state) => state.auth.memberships);
 
   const [fragt, setFragt] = useState(false);
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [angenommen, setAngenommen] = useState(false);
 
@@ -105,10 +105,10 @@ export function DeleteAccountPage() {
 
   async function loeschen() {
     setLaeuft(true);
-    const ergebnis = await loeschungVerlangen();
+    const result = await loeschungVerlangen();
     setLaeuft(false);
 
-    if (ergebnis.ok) {
+    if (result.ok) {
       setFehler(null);
       setAngenommen(true);
 
@@ -121,7 +121,7 @@ export function DeleteAccountPage() {
       // widerrufene Sitzung mit 401 — der Speicher bliebe stehen.
       dispatch(sitzungBeendet());
     } else {
-      setFehler(ergebnis.error.detail);
+      setFehler(result.error.detail);
     }
   }
 
@@ -133,9 +133,9 @@ export function DeleteAccountPage() {
     >
       <Abschnitt titel={t("loeschung.wasTitel")}>
         <Box component="ul" sx={{ pl: 2.5, m: 0, mb: 2 }}>
-          {WAS_VERSCHWINDET.map((nummer) => (
-            <Typography component="li" key={nummer} sx={{ mb: 0.5 }}>
-              {t(`loeschung.was${nummer}`)}
+          {WAS_VERSCHWINDET.map((number) => (
+            <Typography component="li" key={number} sx={{ mb: 0.5 }}>
+              {t(`loeschung.was${number}`)}
             </Typography>
           ))}
         </Box>
@@ -212,9 +212,9 @@ export function DeleteAccountPage() {
                   variant="contained"
                   color="error"
                   onClick={() => void loeschen()}
-                  disabled={laeuft}
+                  disabled={running}
                 >
-                  {laeuft ? t("loeschung.laeuft") : t("loeschung.bestaetigen")}
+                  {running ? t("loeschung.laeuft") : t("loeschung.bestaetigen")}
                 </Button>
                 <Button
                   variant="text"
@@ -222,7 +222,7 @@ export function DeleteAccountPage() {
                     setFragt(false);
                     setFehler(null);
                   }}
-                  disabled={laeuft}
+                  disabled={running}
                 >
                   {t("allgemein.abbrechen")}
                 </Button>

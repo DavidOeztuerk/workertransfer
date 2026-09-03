@@ -26,8 +26,8 @@ import { useThemeMode } from "./shared/hooks/useThemeMode";
 export function AppRoot() {
   const { theme } = useThemeMode();
   const dispatch = useAppDispatch();
-  const sprachvorliebe = useAppSelector((state) => state.preferences.language);
-  const kontosprache = useAppSelector(
+  const languagePreference = useAppSelector((state) => state.preferences.language);
+  const accountLanguage = useAppSelector(
     (state) => state.auth.session?.language ?? null,
   );
 
@@ -38,17 +38,17 @@ export function AppRoot() {
   // Sonst zöge die Kontosprache jedem, der ausdrücklich dem Gerät folgen will,
   // seine Wahl unter den Füssen weg — bei jedem Anmelden aufs Neue.
   useEffect(() => {
-    if (kontosprache === null || hatEigeneSprachwahl()) return;
-    if (SPRACHEN.includes(kontosprache as Sprache)) {
-      dispatch(languageSet(kontosprache as Sprache));
+    if (accountLanguage === null || hatEigeneSprachwahl()) return;
+    if (SPRACHEN.includes(accountLanguage as Sprache)) {
+      dispatch(languageSet(accountLanguage as Sprache));
     }
-  }, [dispatch, kontosprache]);
+  }, [dispatch, accountLanguage]);
 
   // Beim Zeichnen und nicht in einem Effekt: ein Effekt liefe NACH dem ersten
   // Bild, und dann steht die Seite einen Wimpernschlag lang auf Deutsch, bevor
   // sie auf Französisch umspringt. Der Aufruf ist idempotent — er tut nichts,
   // wenn die Sprache schon stimmt.
-  spracheAnwenden(sprachvorliebe);
+  spracheAnwenden(languagePreference);
 
   return (
     <I18nextProvider i18n={i18n}>

@@ -71,21 +71,21 @@ export async function listCandidates(
   filters: CandidateFilters = NO_FILTERS,
   signal?: AbortSignal
 ): Promise<KandidatenSeite> {
-  const antwort = await request<{ items?: Profile[]; next_cursor?: string | null }>(
+  const answer = await request<{ items?: Profile[]; next_cursor?: string | null }>(
     PROFILE_BASE_URL,
     `/candidates${candidateQuery(cursor, filters)}`,
     { signal },
     "fehler.listeNichtGeladen2"
   );
-  if (antwort.ok) {
+  if (answer.ok) {
     return {
       ok: true,
-      items: antwort.value?.items ?? [],
-      nextCursor: antwort.value?.next_cursor ?? null,
+      items: answer.value?.items ?? [],
+      nextCursor: answer.value?.next_cursor ?? null,
     };
   }
   return deuten<KandidatenFehler>(
-    antwort.error,
+    answer.error,
     {
       0: { reason: "offline", titel: "fehler.keineVerbindung" },
       401: {

@@ -37,31 +37,31 @@ const PFAD = "/me/notification-preferences";
  * Schalterstellung behaupten.
  */
 export async function ladeWahl(signal?: AbortSignal): Promise<Benachrichtigungswahl | null> {
-  const antwort = await request<Benachrichtigungswahl>(
+  const answer = await request<Benachrichtigungswahl>(
     API_BASE_URL,
     PFAD,
     { signal },
     "fehler.einstellungenNichtAbrufbar"
   );
 
-  return antwort.ok ? (antwort.value ?? null) : null;
+  return answer.ok ? (answer.value ?? null) : null;
 }
 
 export type Speicherergebnis =
-  | { ok: true; wahl: Benachrichtigungswahl }
+  | { ok: true; choice: Benachrichtigungswahl }
   | { ok: false; error: ApiError };
 
 /** Speichert alle vier auf einmal — der Endpunkt kennt keine Teiländerung. */
 export async function speichereWahl(
-  wahl: Benachrichtigungswahl,
+  choice: Benachrichtigungswahl,
   signal?: AbortSignal
 ): Promise<Speicherergebnis> {
-  const antwort = await request<Benachrichtigungswahl>(
+  const answer = await request<Benachrichtigungswahl>(
     API_BASE_URL,
     PFAD,
-    { method: "PUT", body: wahl, signal },
+    { method: "PUT", body: choice, signal },
     "fehler.einstellungenNichtGespeichert"
   );
 
-  return antwort.ok ? { ok: true, wahl: antwort.value ?? wahl } : { ok: false, error: antwort.error };
+  return answer.ok ? { ok: true, choice: answer.value ?? choice } : { ok: false, error: answer.error };
 }

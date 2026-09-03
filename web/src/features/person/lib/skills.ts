@@ -13,6 +13,6 @@
 export function parseSkills(raw: string): string[] {
   return raw
     .split(",")
-    .map((eintrag) => eintrag.trim())
-    .filter((eintrag) => eintrag.length > 0);
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
 }

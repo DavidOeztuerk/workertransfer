@@ -28,14 +28,14 @@ function Seitenladefeld() {
  * Läge es weiter oben, verschwände beim Navigieren die halbe Seite.
  */
 export function lazyRoute(
-  laden: () => Promise<Record<string, ComponentType>>,
+  load: () => Promise<Record<string, ComponentType>>,
   name: string
 ): React.ReactElement {
   // `lazy` erwartet einen Vorgabeexport; unsere Seiten sind benannte Exporte,
   // weil ein benannter Export beim Umbenennen mitzieht und ein Vorgabeexport
   // still zu etwas anderem wird.
   const Seite = lazy(async () => {
-    const modul = await laden();
+    const modul = await load();
     const komponente = modul[name];
 
     if (komponente === undefined) {

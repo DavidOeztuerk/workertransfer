@@ -29,13 +29,13 @@ import {
  * von der Anfrage dann nur erfährt, wenn er zufällig vorbeischaut.
  */
 const SCHALTER: {
-  schluessel: keyof Benachrichtigungswahl;
+  key: keyof Benachrichtigungswahl;
   name: string;
 }[] = [
-  { schluessel: "market_request", name: "markt" },
-  { schluessel: "resume_request", name: "lebenslauf" },
-  { schluessel: "transfer_update", name: "transfer" },
-  { schluessel: "application_update", name: "bewerbung" },
+  { key: "market_request", name: "markt" },
+  { key: "resume_request", name: "lebenslauf" },
+  { key: "transfer_update", name: "transfer" },
+  { key: "application_update", name: "bewerbung" },
 ];
 
 /**
@@ -55,15 +55,15 @@ const SCHALTER: {
  */
 export function SettingsPage() {
   const { t } = useTranslation();
-  const sitzung = useAppSelector((state) => state.auth.session);
+  const session = useAppSelector((state) => state.auth.session);
   const status = useAppSelector((state) => state.auth.status);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [speichert, setSpeichert] = useState(false);
+  const [saving, setSpeichert] = useState(false);
 
-  const wahl = useAsync(
+  const choice = useAsync(
     (signal) => ladeWahl(signal),
-    [sitzung?.userId],
-    sitzung !== null,
+    [session?.userId],
+    session !== null,
   );
 
   if (status === "anonymous") {
@@ -75,28 +75,28 @@ export function SettingsPage() {
     );
   }
 
-  const unbekannt = wahl.laedt || wahl.wert === null;
-  const werte = wahl.wert ?? ALLES_AN;
+  const unbekannt = choice.laedt || choice.value === null;
+  const werte = choice.value ?? ALLES_AN;
 
   async function umschalten(
-    schluessel: keyof Benachrichtigungswahl,
+    key: keyof Benachrichtigungswahl,
     neu: boolean,
   ) {
-    const naechste = { ...werte, [schluessel]: neu };
+    const nextValue = { ...werte, [key]: neu };
     setSpeichert(true);
-    wahl.setze(naechste);
+    choice.setze(nextValue);
 
-    const ergebnis = await speichereWahl(naechste);
+    const result = await speichereWahl(nextValue);
     setSpeichert(false);
 
-    if (ergebnis.ok) {
+    if (result.ok) {
       setFehler(null);
-      wahl.setze(ergebnis.wahl);
+      choice.setze(result.choice);
     } else {
-      setFehler(ergebnis.error.detail);
+      setFehler(result.error.detail);
       // Zurueck auf das, was der Dienst wirklich hat — die Anzeige darf keine
       // Einstellung behaupten, die nicht gespeichert wurde.
-      wahl.erneut();
+      choice.again();
     }
   }
 
@@ -118,25 +118,25 @@ export function SettingsPage() {
             </Alert>
           ) : null}
 
-          {wahl.laedt ? (
+          {choice.laedt ? (
             <LoadingBlock label={t("einstellungen.laden")} />
           ) : null}
 
-          {wahl.wert === null && !wahl.laedt ? (
+          {choice.value === null && !choice.laedt ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
               {t("einstellungen.nichtAbrufbar")}
             </Alert>
           ) : null}
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {SCHALTER.map((eintrag) => (
+            {SCHALTER.map((entry) => (
               <ConsentSwitch
-                key={eintrag.schluessel}
-                label={t(`einstellungen.${eintrag.name}Label`)}
-                hint={t(`einstellungen.${eintrag.name}Hinweis`)}
-                checked={werte[eintrag.schluessel]}
-                disabled={speichert || unbekannt}
-                onChange={(neu) => void umschalten(eintrag.schluessel, neu)}
+                key={entry.key}
+                label={t(`einstellungen.${entry.name}Label`)}
+                hint={t(`einstellungen.${entry.name}Hinweis`)}
+                checked={werte[entry.key]}
+                disabled={saving || unbekannt}
+                onChange={(neu) => void umschalten(entry.key, neu)}
               />
             ))}
           </Box>

@@ -38,8 +38,8 @@ type Art = "person" | "company";
  */
 export function RegisterPage() {
   const { t } = useTranslation();
-  const status = useAppSelector((zustand) => zustand.auth.status);
-  const [suchparameter] = useSearchParams();
+  const status = useAppSelector((state) => state.auth.status);
+  const [searchParams] = useSearchParams();
 
   // Die Voreinstellung ist „person", und zwar ausdrücklich: registrieren ist
   // der Akt einer natürlichen Person (ADR-0017), und der Normalfall auf einem
@@ -48,7 +48,7 @@ export function RegisterPage() {
   // landet jemand, der „Als Unternehmen entdecken" klickt, im Personenformular
   // und merkt es erst nach der Bestätigungsmail.
   const [art, setArt] = useState<Art>(
-    suchparameter.get("as") === "company" ? "company" : "person",
+    searchParams.get("as") === "company" ? "company" : "person",
   );
 
   const [unternehmensname, setUnternehmensname] = useState("");
@@ -57,7 +57,7 @@ export function RegisterPage() {
   const [anzeigename, setAnzeigename] = useState("");
 
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
   const [abgeschickt, setAbgeschickt] = useState(false);
 
   const personHinweis = useId();
@@ -73,19 +73,19 @@ export function RegisterPage() {
 
   if (status === "authenticated") return <Navigate to="/overview" replace />;
 
-  async function absenden(ereignis: React.FormEvent) {
-    ereignis.preventDefault();
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
     setFehler(null);
     setLaeuft(true);
-    const ergebnis = await registriere({
+    const result = await registriere({
       email,
       password: passwort,
       anzeigename,
       ...(art === "company" ? { unternehmensname } : {}),
     });
     setLaeuft(false);
-    if (ergebnis.ok) setAbgeschickt(true);
-    else setFehler(ergebnis.meldung);
+    if (result.ok) setAbgeschickt(true);
+    else setFehler(result.meldung);
   }
 
   if (abgeschickt) return <FastGeschafft email={email} />;
@@ -96,7 +96,7 @@ export function RegisterPage() {
 
       <Box
         component="form"
-        onSubmit={absenden}
+        onSubmit={submit}
         noValidate
         sx={{ display: "grid", gap: 2.5 }}
       >
@@ -111,8 +111,8 @@ export function RegisterPage() {
           <RadioGroup
             name="art"
             value={art}
-            onChange={(ereignis) =>
-              setArt(ereignis.target.value === "company" ? "company" : "person")
+            onChange={(event) =>
+              setArt(event.target.value === "company" ? "company" : "person")
             }
           >
             <Box>
@@ -166,7 +166,7 @@ export function RegisterPage() {
               : t("registrierung.emailHinweisPerson")
           }
           value={email}
-          onChange={(ereignis) => setEmail(ereignis.target.value)}
+          onChange={(event) => setEmail(event.target.value)}
           required
         />
 
@@ -176,7 +176,7 @@ export function RegisterPage() {
             autoComplete="organization"
             helperText={t("registrierung.firmennameHinweis")}
             value={unternehmensname}
-            onChange={(ereignis) => setUnternehmensname(ereignis.target.value)}
+            onChange={(event) => setUnternehmensname(event.target.value)}
             required
           />
         ) : null}
@@ -197,14 +197,14 @@ export function RegisterPage() {
           autoComplete="new-password"
           helperText={t("registrierung.passwortHinweis")}
           value={passwort}
-          onChange={(ereignis) => setPasswort(ereignis.target.value)}
+          onChange={(event) => setPasswort(event.target.value)}
           required
         />
         <TextField
           label={t("registrierung.anzeigename")}
           autoComplete="name"
           value={anzeigename}
-          onChange={(ereignis) => setAnzeigename(ereignis.target.value)}
+          onChange={(event) => setAnzeigename(event.target.value)}
           required
         />
 
@@ -214,9 +214,9 @@ export function RegisterPage() {
           type="submit"
           variant="contained"
           size="large"
-          disabled={laeuft || freemail}
+          disabled={running || freemail}
         >
-          {laeuft ? t("registrierung.laeuft") : t("registrierung.knopf")}
+          {running ? t("registrierung.laeuft") : t("registrierung.knopf")}
         </Button>
       </Box>
     </AuthCard>
@@ -234,16 +234,16 @@ export function RegisterPage() {
  */
 function FastGeschafft({ email }: { email: string }) {
   const { t } = useTranslation();
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
   const [gesendet, setGesendet] = useState(false);
   const [gescheitert, setGescheitert] = useState(false);
 
   async function erneutSenden() {
     setLaeuft(true);
     setGescheitert(false);
-    const ergebnis = await sendeBestaetigungErneut(email);
+    const result = await sendeBestaetigungErneut(email);
     setLaeuft(false);
-    if (ergebnis.ok) setGesendet(true);
+    if (result.ok) setGesendet(true);
     else setGescheitert(true);
   }
 
@@ -257,8 +257,8 @@ function FastGeschafft({ email }: { email: string }) {
             NICHTS: der Aufruf warf, die Zusage wurde nie gesetzt. Und ein 429
             von der Bremse (3/min) erzeugte die Zusage „ist unterwegs", obwohl
             nichts unterwegs war. */}
-        <Button variant="outlined" onClick={erneutSenden} disabled={laeuft}>
-          {laeuft ? t("registrierung.erneutLaeuft") : t("registrierung.erneut")}
+        <Button variant="outlined" onClick={erneutSenden} disabled={running}>
+          {running ? t("registrierung.erneutLaeuft") : t("registrierung.erneut")}
         </Button>
 
         {gescheitert ? (

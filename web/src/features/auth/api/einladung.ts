@@ -24,18 +24,18 @@ export type Einladungsergebnis =
 // zurück, den niemand nachschlägt. Genau das ist einmal passiert, an der
 // Formulierungshilfe, und die E2E-Reise hat es gefunden.
 export async function nimmAn(token: string, signal?: AbortSignal): Promise<Einladungsergebnis> {
-  const antwort = await request<Membership>(
+  const answer = await request<Membership>(
     API_BASE_URL,
     "/invitations/accept",
     { method: "POST", body: { token }, signal },
     "fehler.einladungNichtAngenommen"
   );
 
-  if (antwort.ok) {
-    return { ok: true, mitgliedschaft: antwort.value as Membership };
+  if (answer.ok) {
+    return { ok: true, mitgliedschaft: answer.value as Membership };
   }
 
-  if (antwort.error.status === 401) {
+  if (answer.error.status === 401) {
     return {
       ok: false,
       brauchtKonto: true,
@@ -43,8 +43,8 @@ export async function nimmAn(token: string, signal?: AbortSignal): Promise<Einla
     };
   }
 
-  if (antwort.error.status === 400) {
-    return { ok: false, brauchtKonto: false, meldung: antwort.error.detail };
+  if (answer.error.status === 400) {
+    return { ok: false, brauchtKonto: false, meldung: answer.error.detail };
   }
 
   return {

@@ -39,8 +39,8 @@ export function CareerPage() {
     gesucht !== "",
   );
 
-  const profil = unternehmen.data?.ok ? unternehmen.data.profile : undefined;
-  const tenantId = profil?.tenant_id;
+  const profile = unternehmen.data?.ok ? unternehmen.data.profile : undefined;
+  const tenantId = profile?.tenant_id;
 
   const stellen = useAsync(
     (signal) =>
@@ -74,7 +74,7 @@ export function CareerPage() {
     );
   }
 
-  if (profil === undefined) {
+  if (profile === undefined) {
     return (
       <PageShell title={t("karriere.keineFirmaTitel")} narrow>
         <Card>
@@ -91,45 +91,45 @@ export function CareerPage() {
     );
   }
 
-  const ergebnis = stellen.data;
-  const liste = ergebnis?.ok ? ergebnis.items : [];
+  const result = stellen.data;
+  const list = result?.ok ? result.items : [];
   const abrufGescheitert =
-    ergebnis !== null && ergebnis !== undefined && !ergebnis.ok;
+    result !== null && result !== undefined && !result.ok;
 
   return (
-    <PageShell title={profil.display_name} narrow>
-      {profil.website !== null ? (
+    <PageShell title={profile.display_name} narrow>
+      {profile.website !== null ? (
         <Box sx={{ mb: 3 }}>
-          <Link href={profil.website} target="_blank" rel="noreferrer noopener">
-            {profil.website}
+          <Link href={profile.website} target="_blank" rel="noreferrer noopener">
+            {profile.website}
           </Link>
         </Box>
       ) : null}
 
-      {profil.about !== "" ? (
+      {profile.about !== "" ? (
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h2" sx={{ mb: 1 }}>
               {t("karriere.ueberUns")}
             </Typography>
-            <Typography>{profil.about}</Typography>
+            <Typography>{profile.about}</Typography>
           </CardContent>
         </Card>
       ) : null}
 
-      {profil.locations.length > 0 || profil.benefits.length > 0 ? (
+      {profile.locations.length > 0 || profile.benefits.length > 0 ? (
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            {profil.locations.length > 0 ? (
-              <Typography sx={{ mb: profil.benefits.length > 0 ? 1.5 : 0 }}>
+            {profile.locations.length > 0 ? (
+              <Typography sx={{ mb: profile.benefits.length > 0 ? 1.5 : 0 }}>
                 {t("karriere.standorte", {
-                  orte: profil.locations.join(", "),
+                  orte: profile.locations.join(", "),
                 })}
               </Typography>
             ) : null}
-            {profil.benefits.length > 0 ? (
+            {profile.benefits.length > 0 ? (
               <Box component="ul" sx={{ pl: 2.5, m: 0 }}>
-                {profil.benefits.map((vorteil: string) => (
+                {profile.benefits.map((vorteil: string) => (
                   <Typography component="li" key={vorteil}>
                     {vorteil}
                   </Typography>
@@ -157,11 +157,11 @@ export function CareerPage() {
             </Alert>
           ) : null}
 
-          {!stellen.pending && !abrufGescheitert && liste.length === 0 ? (
+          {!stellen.pending && !abrufGescheitert && list.length === 0 ? (
             <EmptyBlock title={t("karriere.leer")} />
           ) : null}
 
-          {liste.length > 0 ? (
+          {list.length > 0 ? (
             <Box
               component="ul"
               sx={{
@@ -173,7 +173,7 @@ export function CareerPage() {
                 m: 0,
               }}
             >
-              {liste.map((stelle) => (
+              {list.map((stelle) => (
                 <Card key={stelle.id} component="li" variant="outlined">
                   <CardContent
                     sx={{

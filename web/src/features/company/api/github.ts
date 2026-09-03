@@ -41,16 +41,16 @@ export async function getGitHub(
   subjectId: string,
   signal?: AbortSignal
 ): Promise<{ ok: true; connection: GitHubConnection | null } | Fehlschlag<"unavailable">> {
-  const antwort = await request<GitHubConnection>(
+  const answer = await request<GitHubConnection>(
     GITHUB_BASE_URL,
     `/github/${subjectId}`,
     { signal },
     "fehler.verbindungNichtGeladen"
   );
-  if (antwort.ok) return { ok: true, connection: antwort.value ?? null };
-  if (antwort.error.status === 404) return { ok: true, connection: null };
+  if (answer.ok) return { ok: true, connection: answer.value ?? null };
+  if (answer.error.status === 404) return { ok: true, connection: null };
   return deuten<"unavailable">(
-    antwort.error,
+    answer.error,
     { 503: { reason: "unavailable", titel: "fehler.ledgerSchweigt" } },
     "unavailable"
   );

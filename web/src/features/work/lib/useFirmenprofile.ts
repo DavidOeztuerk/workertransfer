@@ -21,40 +21,40 @@ export function useFirmenprofile(tenantIds: string[]): Record<string, CompanyPro
   // Zwei Spiegel neben dem Zustand: `geladen` hält, was schon beantwortet ist,
   // `laeuft`, was gerade unterwegs ist. Ohne beide würde bei jedem Rendern neu
   // gefragt oder eine abgebrochene Anfrage nie nachgeholt.
-  const geladen = useRef<Record<string, CompanyProfile | null>>({});
-  const laeuft = useRef<Set<string>>(new Set());
+  const loaded = useRef<Record<string, CompanyProfile | null>>({});
+  const running = useRef<Set<string>>(new Set());
 
   // Eine Zeichenkette als Abhängigkeit: ein frisches Array wäre bei jedem
   // Rendern ein anderes und triebe den Effekt endlos.
-  const schluessel = [...new Set(tenantIds)].sort().join(",");
+  const key = [...new Set(tenantIds)].sort().join(",");
 
   useEffect(() => {
-    const ids = schluessel === "" ? [] : schluessel.split(",");
-    const offen = ids.filter((id) => !(id in geladen.current) && !laeuft.current.has(id));
-    if (offen.length === 0) return;
-    for (const id of offen) laeuft.current.add(id);
+    const ids = key === "" ? [] : key.split(",");
+    const open = ids.filter((id) => !(id in loaded.current) && !running.current.has(id));
+    if (open.length === 0) return;
+    for (const id of open) running.current.add(id);
 
-    const abbruch = new AbortController();
-    let lebt = true;
+    const abort = new AbortController();
+    let alive = true;
     void Promise.all(
-      offen.map(async (id) => [id, await getCompanyProfile(id, abbruch.signal)] as const)
+      open.map(async (id) => [id, await getCompanyProfile(id, abort.signal)] as const)
     ).then((paare) => {
-      if (!lebt) return;
-      for (const [id, wert] of paare) {
-        geladen.current[id] = wert;
-        laeuft.current.delete(id);
+      if (!alive) return;
+      for (const [id, value] of paare) {
+        loaded.current[id] = value;
+        running.current.delete(id);
       }
-      setProfile({ ...geladen.current });
+      setProfile({ ...loaded.current });
     });
 
     return () => {
-      lebt = false;
-      abbruch.abort();
+      alive = false;
+      abort.abort();
       // Abgebrochene bleiben NICHT als „unterwegs" stehen — sonst fehlte der
       // Name für den Rest der Sitzung, weil niemand sie je wieder holt.
-      for (const id of offen) if (!(id in geladen.current)) laeuft.current.delete(id);
+      for (const id of open) if (!(id in loaded.current)) running.current.delete(id);
     };
-  }, [schluessel]);
+  }, [key]);
 
   return profile;
 }

@@ -18,7 +18,7 @@ import { useAppSelector } from "../../../core/store/hooks";
 import { type Aufgabenstand, ladeAufgaben } from "../api/aufgaben";
 
 interface Eintrag {
-  schluessel: string;
+  key: string;
   anzahl: number;
   ziel: string;
 }
@@ -32,29 +32,29 @@ interface Eintrag {
  * womöglich noch anders. Die Kataloge tragen `_one`/`_other`, und die Regel
  * kommt aus der Sprache statt aus dieser Datei.
  */
-function eintraegeFuerMich(stand: Aufgabenstand): Eintrag[] {
+function eintraegeFuerMich(current: Aufgabenstand): Eintrag[] {
   const eintraege: Eintrag[] = [];
 
-  if (stand.marktanfragen > 0) {
+  if (current.marktanfragen > 0) {
     eintraege.push({
-      schluessel: "uebersicht.marktanfragen",
-      anzahl: stand.marktanfragen,
+      key: "uebersicht.marktanfragen",
+      anzahl: current.marktanfragen,
       ziel: "/market",
     });
   }
 
-  if (stand.lebenslaufanfragen > 0) {
+  if (current.lebenslaufanfragen > 0) {
     eintraege.push({
-      schluessel: "uebersicht.lebenslaufanfragen",
-      anzahl: stand.lebenslaufanfragen,
+      key: "uebersicht.lebenslaufanfragen",
+      anzahl: current.lebenslaufanfragen,
       ziel: "/resume",
     });
   }
 
-  if (stand.eigeneGespraeche > 0) {
+  if (current.eigeneGespraeche > 0) {
     eintraege.push({
-      schluessel: "uebersicht.gespraeche",
-      anzahl: stand.eigeneGespraeche,
+      key: "uebersicht.gespraeche",
+      anzahl: current.eigeneGespraeche,
       ziel: "/transfers",
     });
   }
@@ -62,12 +62,12 @@ function eintraegeFuerMich(stand: Aufgabenstand): Eintrag[] {
   return eintraege;
 }
 
-function eintraegeFuerDieFirma(stand: Aufgabenstand): Eintrag[] {
-  if (stand.firmenvorgaenge === 0) return [];
+function eintraegeFuerDieFirma(current: Aufgabenstand): Eintrag[] {
+  if (current.firmenvorgaenge === 0) return [];
   return [
     {
-      schluessel: "uebersicht.firmenvorgaenge",
-      anzahl: stand.firmenvorgaenge,
+      key: "uebersicht.firmenvorgaenge",
+      anzahl: current.firmenvorgaenge,
       ziel: "/company/transfers",
     },
   ];
@@ -87,10 +87,10 @@ function Liste({ titel, eintraege }: { titel: string; eintraege: Eintrag[] }) {
           component="ul"
           sx={{ listStyle: "none", m: 0, p: 0, display: "grid", gap: 1 }}
         >
-          {eintraege.map((eintrag) => (
-            <Box component="li" key={eintrag.ziel}>
-              <Link component={RouterLink} to={eintrag.ziel}>
-                {t(eintrag.schluessel, { count: eintrag.anzahl })}
+          {eintraege.map((entry) => (
+            <Box component="li" key={entry.ziel}>
+              <Link component={RouterLink} to={entry.ziel}>
+                {t(entry.key, { count: entry.anzahl })}
               </Link>
             </Box>
           ))}
@@ -117,28 +117,28 @@ function Liste({ titel, eintraege }: { titel: string; eintraege: Eintrag[] }) {
  */
 export function OverviewPage() {
   const { t } = useTranslation();
-  const status = useAppSelector((zustand) => zustand.auth.status);
-  const session = useAppSelector((zustand) => zustand.auth.session);
+  const status = useAppSelector((state) => state.auth.status);
+  const session = useAppSelector((state) => state.auth.session);
   // `tenantId === null` heisst „handelt als Person" (ADR-0017) — kein Fehler,
   // sondern der Normalfall auf einem Transfermarkt.
   const mitFirma = session?.tenantId != null;
 
-  const [stand, setStand] = useState<Aufgabenstand | null>(null);
+  const [current, setStand] = useState<Aufgabenstand | null>(null);
 
   useEffect(() => {
     if (status !== "authenticated") return;
 
-    const abbruch = new AbortController();
+    const abort = new AbortController();
     setStand(null);
-    void ladeAufgaben(mitFirma, abbruch.signal).then((ergebnis) => {
+    void ladeAufgaben(mitFirma, abort.signal).then((result) => {
       // Nach einem Abbruch kommt hier die abgebrochene Anfrage als Netzfehler
       // an. Sie darf den Stand nicht mehr anfassen — sonst zeigt die Seite die
       // Unvollständigkeit einer Abfrage, die niemand mehr wollte.
-      if (abbruch.signal.aborted) return;
-      setStand(ergebnis);
+      if (abort.signal.aborted) return;
+      setStand(result);
     });
 
-    return () => abbruch.abort();
+    return () => abort.abort();
   }, [status, mitFirma]);
 
   if (status === "unknown") {
@@ -151,8 +151,8 @@ export function OverviewPage() {
 
   if (status === "anonymous") return <Navigate to="/login" replace />;
 
-  const meine = stand === null ? [] : eintraegeFuerMich(stand);
-  const firmen = stand === null ? [] : eintraegeFuerDieFirma(stand);
+  const meine = current === null ? [] : eintraegeFuerMich(current);
+  const firmen = current === null ? [] : eintraegeFuerDieFirma(current);
   const nichts = meine.length === 0 && firmen.length === 0;
 
   return (
@@ -161,15 +161,15 @@ export function OverviewPage() {
       narrow
       lead={t("uebersicht.lead")}
     >
-      {stand === null ? <LoadingBlock /> : null}
+      {current === null ? <LoadingBlock /> : null}
 
-      {stand?.unvollstaendig === true ? (
+      {current?.unvollstaendig === true ? (
         <Alert severity="warning" sx={{ mb: 2 }}>
           {t("uebersicht.unvollstaendig")}
         </Alert>
       ) : null}
 
-      {stand !== null && nichts && !stand.unvollstaendig ? (
+      {current !== null && nichts && !current.unvollstaendig ? (
         <EmptyBlock
           title={t("uebersicht.leerTitel")}
           hint={t("uebersicht.leerHinweis")}

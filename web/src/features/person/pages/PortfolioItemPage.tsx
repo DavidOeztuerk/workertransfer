@@ -53,16 +53,16 @@ const zuEntwurf = (arbeit: Arbeit): Entwurf => ({
 });
 
 /** Leere Felder werden `null`, nicht `""` — „nicht angegeben" ist kein leerer Wert. */
-function zuArbeit(entwurf: Entwurf): Arbeit {
-  const jahr = entwurf.year.trim();
+function zuArbeit(draft: Entwurf): Arbeit {
+  const jahr = draft.year.trim();
 
   return {
-    title: entwurf.title.trim(),
-    summary: entwurf.summary.trim(),
-    url: entwurf.url.trim() === "" ? null : entwurf.url.trim(),
-    role: entwurf.role.trim(),
+    title: draft.title.trim(),
+    summary: draft.summary.trim(),
+    url: draft.url.trim() === "" ? null : draft.url.trim(),
+    role: draft.role.trim(),
     year: jahr === "" ? null : Number(jahr),
-    attachment: entwurf.attachment,
+    attachment: draft.attachment,
   };
 }
 
@@ -84,22 +84,22 @@ export function PortfolioItemPage() {
   const { stelle } = useParams();
   const navigate = useNavigate();
   const status = useAppSelector((state) => state.auth.status);
-  const sitzung = useAppSelector((state) => state.auth.session);
+  const session = useAppSelector((state) => state.auth.session);
 
   const neu = stelle === undefined;
-  const schaufenster = useAsync(
+  const showcase = useAsync(
     (signal) => ladeMeines(signal),
-    [sitzung?.userId],
-    sitzung !== null,
+    [session?.userId],
+    session !== null,
   );
 
-  const [entwurf, setEntwurf] = useState<Entwurf>(LEER);
-  const [geladen, setGeladen] = useState(false);
+  const [draft, setEntwurf] = useState<Entwurf>(LEER);
+  const [loaded, setGeladen] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
 
-  const arbeiten = schaufenster.wert?.ok
-    ? (schaufenster.wert.wert?.items ?? [])
+  const arbeiten = showcase.value?.ok
+    ? (showcase.value.value?.items ?? [])
     : [];
   const position = neu ? arbeiten.length : Number(stelle);
   const vorhanden =
@@ -109,10 +109,10 @@ export function PortfolioItemPage() {
     position < arbeiten.length;
 
   useEffect(() => {
-    if (geladen || !schaufenster.wert?.ok) return;
+    if (loaded || !showcase.value?.ok) return;
     if (vorhanden) setEntwurf(zuEntwurf(arbeiten[position] as Arbeit));
     setGeladen(true);
-  }, [geladen, schaufenster.wert, vorhanden, arbeiten, position]);
+  }, [loaded, showcase.value, vorhanden, arbeiten, position]);
 
   if (status === "anonymous") {
     return (
@@ -123,7 +123,7 @@ export function PortfolioItemPage() {
     );
   }
 
-  if (schaufenster.laedt) {
+  if (showcase.laedt) {
     return (
       <PageShell title={t("arbeiten.einzelTitel")} narrow>
         <LoadingBlock label={t("arbeiten.einzelLaden")} />
@@ -149,42 +149,42 @@ export function PortfolioItemPage() {
     );
   }
 
-  function aendere(teil: Partial<Entwurf>) {
-    setEntwurf((vorher) => ({ ...vorher, ...teil }));
+  function change(teil: Partial<Entwurf>) {
+    setEntwurf((before) => ({ ...before, ...teil }));
     setFehler(null);
   }
 
   async function speichern() {
-    const naechste = [...arbeiten];
-    if (neu) naechste.push(zuArbeit(entwurf));
-    else naechste[position] = zuArbeit(entwurf);
+    const nextValue = [...arbeiten];
+    if (neu) nextValue.push(zuArbeit(draft));
+    else nextValue[position] = zuArbeit(draft);
 
     setLaeuft(true);
-    const ergebnis = await speichereMeines(naechste);
+    const result = await speichereMeines(nextValue);
     setLaeuft(false);
 
-    if (ergebnis.ok) void navigate("/portfolio");
-    else setFehler(ergebnis.error.detail);
+    if (result.ok) void navigate("/portfolio");
+    else setFehler(result.error.detail);
   }
 
   async function entfernen() {
     setLaeuft(true);
-    const ergebnis = await speichereMeines(
+    const result = await speichereMeines(
       arbeiten.filter((_, i) => i !== position),
     );
     setLaeuft(false);
 
-    if (ergebnis.ok) void navigate("/portfolio");
-    else setFehler(ergebnis.error.detail);
+    if (result.ok) void navigate("/portfolio");
+    else setFehler(result.error.detail);
   }
 
-  async function dateiWaehlen(datei: File) {
+  async function dateiWaehlen(file: File) {
     setLaeuft(true);
-    const ergebnis = await haengeAn(datei);
+    const result = await haengeAn(file);
     setLaeuft(false);
 
-    if (ergebnis.ok) aendere({ attachment: ergebnis.wert.name });
-    else setFehler(ergebnis.error.detail);
+    if (result.ok) change({ attachment: result.value.name });
+    else setFehler(result.error.detail);
   }
 
   return (
@@ -192,8 +192,8 @@ export function PortfolioItemPage() {
       title={
         neu
           ? t("arbeiten.einzelNeu")
-          : entwurf.title !== ""
-            ? entwurf.title
+          : draft.title !== ""
+            ? draft.title
             : t("arbeiten.einzelTitel")
       }
       narrow
@@ -214,41 +214,41 @@ export function PortfolioItemPage() {
 
           <Box
             component="form"
-            onSubmit={(ereignis) => {
-              ereignis.preventDefault();
+            onSubmit={(event) => {
+              event.preventDefault();
               void speichern();
             }}
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
             <TextField
               label={t("arbeiten.feldTitel")}
-              value={entwurf.title}
-              onChange={(e) => aendere({ title: e.target.value })}
+              value={draft.title}
+              onChange={(e) => change({ title: e.target.value })}
               required
             />
             <TextField
               label={t("arbeiten.feldWorum")}
-              value={entwurf.summary}
-              onChange={(e) => aendere({ summary: e.target.value })}
+              value={draft.summary}
+              onChange={(e) => change({ summary: e.target.value })}
               helperText={t("arbeiten.feldWorumHinweis")}
               multiline
               minRows={3}
             />
             <TextField
               label={t("arbeiten.feldLink")}
-              value={entwurf.url}
-              onChange={(e) => aendere({ url: e.target.value })}
+              value={draft.url}
+              onChange={(e) => change({ url: e.target.value })}
               helperText={t("arbeiten.feldLinkHinweis")}
             />
             <TextField
               label={t("arbeiten.feldRolle")}
-              value={entwurf.role}
-              onChange={(e) => aendere({ role: e.target.value })}
+              value={draft.role}
+              onChange={(e) => change({ role: e.target.value })}
             />
             <TextField
               label={t("arbeiten.feldJahr")}
-              value={entwurf.year}
-              onChange={(e) => aendere({ year: e.target.value })}
+              value={draft.year}
+              onChange={(e) => change({ year: e.target.value })}
             />
 
             <Box>
@@ -260,7 +260,7 @@ export function PortfolioItemPage() {
                   eine Datei hängt. */}
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 {t(
-                  entwurf.attachment !== null
+                  draft.attachment !== null
                     ? "arbeiten.dateiHaengtAn"
                     : "arbeiten.keineDatei",
                 )}
@@ -269,27 +269,27 @@ export function PortfolioItemPage() {
                 component="label"
                 variant="outlined"
                 size="small"
-                disabled={laeuft}
+                disabled={running}
               >
                 {t("arbeiten.dateiWaehlen")}
                 <input
                   type="file"
                   hidden
                   accept="image/png,image/jpeg,application/pdf"
-                  onChange={(ereignis) => {
-                    const datei = ereignis.target.files?.[0];
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
                     // Das Feld zurücksetzen, damit dieselbe Datei erneut
                     // gewählt werden kann.
-                    ereignis.target.value = "";
-                    if (datei !== undefined) void dateiWaehlen(datei);
+                    event.target.value = "";
+                    if (file !== undefined) void dateiWaehlen(file);
                   }}
                 />
               </Button>
             </Box>
 
             <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
-              <Button type="submit" variant="contained" disabled={laeuft}>
-                {laeuft
+              <Button type="submit" variant="contained" disabled={running}>
+                {running
                   ? t("allgemein.speichernLaeuft")
                   : t("allgemein.speichern")}
               </Button>
@@ -298,9 +298,9 @@ export function PortfolioItemPage() {
                   variant="text"
                   color="error"
                   onClick={() => void entfernen()}
-                  disabled={laeuft}
+                  disabled={running}
                 >
-                  {laeuft
+                  {running
                     ? t("arbeiten.entfernenLaeuft")
                     : t("arbeiten.entfernen")}
                 </Button>

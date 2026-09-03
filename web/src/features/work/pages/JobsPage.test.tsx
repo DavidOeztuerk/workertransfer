@@ -21,10 +21,10 @@ function stubFetch(
   const spion = vi.fn(
     async (input: string | URL | Request, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
-      const antwort = routen(url, init);
-      const status = antwort.status ?? 200;
+      const answer = routen(url, init);
+      const status = answer.status ?? 200;
       return new Response(
-        status === 204 ? null : JSON.stringify(antwort.body ?? null),
+        status === 204 ? null : JSON.stringify(answer.body ?? null),
         {
           status,
           headers: { "content-type": "application/json" },

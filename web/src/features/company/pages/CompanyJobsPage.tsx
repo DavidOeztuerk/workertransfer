@@ -46,7 +46,7 @@ export function CompanyJobsPage() {
   const { t } = useTranslation();
   const { fuerFirma } = useHandelnder();
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
 
   const stellen = useAsync(
     (signal) => listOwnJobs(signal),
@@ -70,16 +70,16 @@ export function CompanyJobsPage() {
 
   async function schalten(id: string, veroeffentlichen: boolean) {
     setLaeuft(true);
-    const ergebnis = veroeffentlichen
+    const result = veroeffentlichen
       ? await publishJob(id)
       : await closeJob(id);
     setLaeuft(false);
-    setFehler(ergebnis.ok ? null : ergebnis.error.detail);
+    setFehler(result.ok ? null : result.error.detail);
     stellen.reload();
   }
 
-  const ergebnis = stellen.data;
-  const liste = ergebnis?.ok ? ergebnis.jobs : [];
+  const result = stellen.data;
+  const list = result?.ok ? result.jobs : [];
 
   return (
     <PageShell
@@ -112,11 +112,11 @@ export function CompanyJobsPage() {
             <LoadingBlock label={t("firmenstellen.laden")} />
           ) : null}
 
-          {ergebnis !== null && !ergebnis.ok ? (
-            <Alert severity="error">{ergebnis.error.detail}</Alert>
+          {result !== null && !result.ok ? (
+            <Alert severity="error">{result.error.detail}</Alert>
           ) : null}
 
-          {ergebnis?.ok && liste.length === 0 ? (
+          {result?.ok && list.length === 0 ? (
             <EmptyBlock
               title={t("firmenstellen.leer")}
               action={
@@ -131,7 +131,7 @@ export function CompanyJobsPage() {
             />
           ) : null}
 
-          {liste.length > 0 ? (
+          {list.length > 0 ? (
             <Box
               component="ul"
               sx={{
@@ -143,7 +143,7 @@ export function CompanyJobsPage() {
                 m: 0,
               }}
             >
-              {liste.map((stelle: Job) => (
+              {list.map((stelle: Job) => (
                 <Card key={stelle.id} component="li" variant="outlined">
                   <CardContent
                     sx={{
@@ -168,7 +168,7 @@ export function CompanyJobsPage() {
                             variant="contained"
                             size="small"
                             onClick={() => void schalten(stelle.id, true)}
-                            disabled={laeuft}
+                            disabled={running}
                           >
                             {t("firmenstellen.veroeffentlichen")}
                           </Button>
@@ -177,7 +177,7 @@ export function CompanyJobsPage() {
                           variant="text"
                           size="small"
                           onClick={() => void schalten(stelle.id, false)}
-                          disabled={laeuft}
+                          disabled={running}
                         >
                           {t("firmenstellen.schliessen")}
                         </Button>
