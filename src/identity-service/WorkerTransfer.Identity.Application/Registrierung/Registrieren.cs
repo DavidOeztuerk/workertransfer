@@ -18,7 +18,8 @@ public sealed record RegistrierenBefehl(
     string Email,
     string Passwort,
     string Anzeigename,
-    string? Firmenname = null) : IBefehl<Registrierergebnis>;
+    string? Firmenname = null,
+    Kontosprache Kontosprache = Sprachwahl.Vorgabe) : IBefehl<Registrierergebnis>;
 
 /// <summary>What registering produced.</summary>
 public abstract record Registrierergebnis
@@ -108,12 +109,17 @@ public sealed class RegistrierenHandler(
 
         if (vorhanden is not null)
         {
-            postkorb.Doppelanmeldung(vorhanden.Email, vorhanden.Id);
+            // Die Kontosprache des BESTEHENDEN Kontos, nicht die der Anfrage: diese
+            // Mail geht an den rechtmäßigen Inhaber, und der hat gewählt. Die
+            // Anfrage kommt womöglich von jemand anderem.
+            postkorb.Doppelanmeldung(
+                vorhanden.Email, vorhanden.Id, vorhanden.Kontosprache);
             return new Registrierergebnis.Angenommen();
         }
 
         var konto = User.Register(
-            request.Email, eintrag, request.Anzeigename, request.Firmenname);
+            request.Email, eintrag, request.Anzeigename, request.Firmenname,
+            request.Kontosprache);
 
         await benutzer.AddAsync(konto, cancellationToken);
 
@@ -138,7 +144,8 @@ public sealed class RegistrierenHandler(
                 ConsumedAt: null),
             cancellationToken);
 
-        postkorb.Bestaetigungslink(konto.Email, konto.Id, klartext);
+        postkorb.Bestaetigungslink(
+            konto.Email, konto.Id, klartext, konto.Kontosprache);
 
         return new Registrierergebnis.Angenommen();
     }

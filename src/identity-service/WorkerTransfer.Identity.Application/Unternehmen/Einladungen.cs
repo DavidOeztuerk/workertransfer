@@ -22,6 +22,7 @@ public sealed class MitgliedEinladenHandler(
     Firmenzugriff zugriff,
     IInvitationRepository einladungen,
     ICompanyRepository firmen,
+    IUserRepository benutzer,
     IEinmaltoken einmaltoken,
     IPostkorb postkorb,
     IAuditTrail protokoll,
@@ -48,7 +49,20 @@ public sealed class MitgliedEinladenHandler(
 
         var firma = await firmen.FindByIdAsync(request.Firma, cancellationToken);
 
-        postkorb.Einladung(einladung.Email, request.Wer, firma?.Name ?? string.Empty, klartext);
+        // Die Kontosprache der EINLADENDEN, und das ist eine bewusste Notlösung:
+        // die eingeladene Adresse hat hier womöglich gar kein Konto — genau
+        // dafür ist die Einladung da. Es gibt also keine Zeile von ihr, die man
+        // lesen könnte. Wer eine Kollegin einlädt, schreibt ihr am ehesten in
+        // der Kontosprache, in der er selbst arbeitet.
+        var einladenderKonto = await benutzer.FindByIdAsync(
+            request.Wer, cancellationToken);
+
+        postkorb.Einladung(
+            einladung.Email,
+            request.Wer,
+            firma?.Name ?? string.Empty,
+            klartext,
+            einladenderKonto?.Kontosprache ?? Sprachwahl.Vorgabe);
 
         await protokoll.AppendAsync(
             new AuditEvent(

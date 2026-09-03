@@ -1,4 +1,5 @@
 using Girder.Core.Identity;
+using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Application.Anmelden;
 
@@ -14,4 +15,5 @@ namespace WorkerTransfer.Identity.Application.Anmelden;
 /// system reads <c>user_tenant_memberships</c> per operation — and a field
 /// nobody reads is a field that goes stale and is then believed.
 /// </remarks>
-public sealed record Kontoansicht(SubjectId Wer, string? Email, TenantId? Firma);
+public sealed record Kontoansicht(
+    SubjectId Wer, string? Email, TenantId? Firma, Kontosprache Sprache);

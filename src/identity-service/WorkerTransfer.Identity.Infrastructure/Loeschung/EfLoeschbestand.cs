@@ -63,13 +63,19 @@ public sealed class EfLoeschbestand(IdentityDbContext kontext, ITokenSessionServ
     }
 
     /// <inheritdoc />
-    public Task<string?> AdresseAsync(
+    public async Task<Schlussanschrift?> AdresseAsync(
         SubjectId wer,
-        CancellationToken cancellationToken = default) =>
-        kontext.Users
-            .Where(zeile => zeile.Id == wer.Value)
-            .Select(zeile => (string?)zeile.Email)
+        CancellationToken cancellationToken = default)
+    {
+        var zeile = await kontext.Users
+            .Where(eintrag => eintrag.Id == wer.Value)
+            .Select(eintrag => new { eintrag.Email, eintrag.Language })
             .FirstOrDefaultAsync(cancellationToken);
+
+        return zeile is null
+            ? null
+            : new Schlussanschrift(zeile.Email, Sprachwahl.Aus(zeile.Language));
+    }
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<TenantId>> SchliesseAbAsync(

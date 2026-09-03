@@ -7,6 +7,7 @@ interface SessionBody {
   user_id: string;
   email: string;
   tenant_id: string | null;
+  language: string;
 }
 
 interface MembershipBody {
@@ -19,6 +20,7 @@ const toSession = (body: SessionBody): Session => ({
   userId: body.user_id,
   email: body.email,
   tenantId: body.tenant_id,
+  language: body.language,
 });
 
 /**
@@ -102,5 +104,28 @@ export const actForCompany = createAppThunk<Session | null, string>(
     );
     if (!answer.ok) return rejectWithValue(answer.error);
     return await dispatch(loadSession()).unwrap();
+  }
+);
+
+/**
+ * Die gewählte Sprache ans Konto schreiben.
+ *
+ * <strong>Nur für Angemeldete, und ein Fehlschlag wird geschluckt.</strong> Die
+ * Oberfläche hat schon umgeschaltet, als der Mensch geklickt hat; sie
+ * zurückzudrehen, weil der Server gerade nicht antwortet, wäre die schlechtere
+ * von zwei Antworten. Was verlorengeht, ist die Sprache der nächsten MAIL —
+ * unangenehm, aber kein Grund, die Seite zurückspringen zu lassen.
+ */
+export const spracheSpeichern = createAppThunk<null, string>(
+  "auth/spracheSpeichern",
+  async (sprache, { rejectWithValue }) => {
+    const answer = await request<unknown>(
+      API_BASE_URL,
+      "/account/language",
+      { method: "PUT", body: { language: sprache } },
+      "fehler.einstellungenNichtGespeichert"
+    );
+    if (!answer.ok) return rejectWithValue(answer.error);
+    return null;
   }
 );

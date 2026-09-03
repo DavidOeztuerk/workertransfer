@@ -30,6 +30,19 @@ public sealed class RoutenkarteTests
         public int Ohne { get; init; }
         public int Person { get; init; }
         public int Firma { get; init; }
+
+        /// <summary>
+        /// Der Rumpf, den <c>scripts/routenkarte.sh</c> mitschickt.
+        /// </summary>
+        /// <remarks>
+        /// Fast nirgends gesetzt: die meisten Endpunkte sehen gar nicht hinein,
+        /// und der Durchlauf schickt sonst `{}`. Wo ein Endpunkt den Rumpf
+        /// PRÜFT, mässe die Karte ohne dieses Feld die Antwort auf eine leere
+        /// Anfrage und schriebe sie als die des Endpunkts auf — `PUT
+        /// /account/language` etwa antwortete 422 statt 200, und die Karte
+        /// hielte das für die Wahrheit.
+        /// </remarks>
+        public string? Rumpf { get; init; }
     }
 
     private sealed class Gruppe

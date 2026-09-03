@@ -61,7 +61,8 @@ public class RegistrierenTests
                                            && t.ConsumedAt == null),
             Arg.Any<CancellationToken>());
         _postkorb.Received(1).Bestaetigungslink(
-            "anna@example.com", Arg.Any<SubjectId>(), "klartext");
+            "anna@example.com", Arg.Any<SubjectId>(), "klartext",
+            Arg.Any<Kontosprache>());
     }
 
     /// <summary>
@@ -95,9 +96,11 @@ public class RegistrierenTests
         await _benutzer.DidNotReceive().AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
         await _tokens.DidNotReceive().AddAsync(
             Arg.Any<VerificationToken>(), Arg.Any<CancellationToken>());
-        _postkorb.Received(1).Doppelanmeldung("besetzt@example.com", Arg.Any<SubjectId>());
+        _postkorb.Received(1).Doppelanmeldung(
+            "besetzt@example.com", Arg.Any<SubjectId>(), Arg.Any<Kontosprache>());
         _postkorb.DidNotReceive().Bestaetigungslink(
-            Arg.Any<string>(), Arg.Any<SubjectId>(), Arg.Any<string>());
+            Arg.Any<string>(), Arg.Any<SubjectId>(), Arg.Any<string>(),
+            Arg.Any<Kontosprache>());
     }
 
     /// <summary>

@@ -60,7 +60,8 @@ public sealed class SitzungsstandHandler(ICurrentPrincipal akteur, IUserReposito
             return Sitzungsstand.Aktiv(new Kontoansicht(
                 handelnder.Subject,
                 konto?.Email,
-                handelnder.Acting is Capacity.ForCompany firma ? firma.Tenant : null));
+                handelnder.Acting is Capacity.ForCompany firma ? firma.Tenant : null,
+                konto?.Kontosprache ?? Sprachwahl.Vorgabe));
         }
 
         // Without a sign-in the answer is the same whatever cookies came with

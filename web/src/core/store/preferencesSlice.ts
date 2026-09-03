@@ -75,6 +75,24 @@ export function spracheDesGeraets(): Sprache {
   return SPRACHEN.includes(nur as Sprache) ? (nur as Sprache) : "de";
 }
 
+/**
+ * Hat dieses GERÄT schon einmal eine Sprache gewählt?
+ *
+ * Der Unterschied zu <c>gespeicherteSprache()</c> ist der ganze Punkt: die gibt
+ * „system" zurück, wenn nichts gespeichert ist UND wenn jemand „Wie mein Gerät"
+ * gewählt hat. Für die Frage „darf die Kontosprache das hier überschreiben?"
+ * sind das zwei verschiedene Fälle, und nur `null` heisst „nie gewählt".
+ */
+export function hatEigeneSprachwahl(): boolean {
+  try {
+    return localStorage.getItem(SPRACHSPEICHER) !== null;
+  } catch {
+    // Nicht lesen zu können heisst nicht „nie gewählt": in dem Fall ist gar
+    // nichts bekannt, und die Kontosprache ist die bessere Auskunft.
+    return false;
+  }
+}
+
 /** Welche Sprache wirklich gezeichnet wird. */
 export function aufgeloest(vorliebe: Sprachvorliebe): Sprache {
   return vorliebe === "system" ? spracheDesGeraets() : vorliebe;

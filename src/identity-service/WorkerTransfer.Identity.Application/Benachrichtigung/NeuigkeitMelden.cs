@@ -39,7 +39,7 @@ public sealed class NeuigkeitMeldenHandler(IUserRepository benutzer, IPostkorb p
             return false;
         }
 
-        postkorb.Neuigkeit(konto.Email, konto.Id);
+        postkorb.Neuigkeit(konto.Email, konto.Id, konto.Kontosprache);
 
         return true;
     }

@@ -158,9 +158,13 @@ def karte_lesen(pfad):
 
 gruppen = karte_lesen(karte)["gruppen"]
 
-def frag(methode, pfad, keks):
+def frag(methode, pfad, keks, rumpf=None):
+    # `{}` als Vorgabe, weil die allermeisten Endpunkte gar nicht hineinsehen.
+    # Wo doch, traegt der Eintrag ein `rumpf:` — sonst maesse die Karte die
+    # Antwort auf eine LEERE Anfrage und schriebe sie als die des Endpunkts auf.
     anfrage = urllib.request.Request(
-        base + pfad, method=methode, data=b"{}",
+        base + pfad, method=methode,
+        data=(rumpf or "{}").encode(),
         headers={"Content-Type": "application/json", **({"Cookie": keks} if keks else {})})
     try:
         with urllib.request.urlopen(anfrage) as antwort:

@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using MediatR;
 using WorkerTransfer.Identity.Application.Registrierung;
+using WorkerTransfer.Identity.Domain.Users;
 
 using WorkerTransfer.ServiceDefaults;
 
@@ -57,9 +58,19 @@ public static class RegistrierungsEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
+            // Der Kopf ist hier eine ERSTE VERMUTUNG und nirgends sonst. Die
+            // Bestätigungsmail ist das Erste, was dieses Konto je bekommt, und
+            // sie geht raus, bevor jemand eine Sprache wählen konnte — ohne
+            // diesen Griff wäre sie immer deutsch. Ab dann steht die Sprache in
+            // der Zeile, und der Kopf wird nie wieder gelesen: er ist eine
+            // Angabe des Geräts, keine Entscheidung der Person.
+            var vermutet = Sprachwahl.AusKopf(
+                context.Request.Headers.AcceptLanguage.ToString());
+
             var ergebnis = await mediator.Send(
                 new RegistrierenBefehl(
-                    body.Email, body.Password, body.DisplayName, body.CompanyName),
+                    body.Email, body.Password, body.DisplayName, body.CompanyName,
+                    vermutet),
                 cancellationToken);
 
             switch (ergebnis)

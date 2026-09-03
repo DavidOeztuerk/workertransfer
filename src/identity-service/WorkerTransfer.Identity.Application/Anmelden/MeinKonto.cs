@@ -31,6 +31,7 @@ public sealed class MeinKontoHandler(ICurrentPrincipal akteur, IUserRepository b
         return new Kontoansicht(
             handelnder.Subject,
             konto?.Email,
-            handelnder.Acting is Capacity.ForCompany firma ? firma.Tenant : null);
+            handelnder.Acting is Capacity.ForCompany firma ? firma.Tenant : null,
+            konto?.Kontosprache ?? Sprachwahl.Vorgabe);
     }
 }

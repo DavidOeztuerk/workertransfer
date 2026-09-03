@@ -5,9 +5,11 @@ import { useTranslation } from "react-i18next";
 import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
 import {
   SPRACHEN,
+  aufgeloest,
   languageSet,
   type Sprachvorliebe,
 } from "../../../core/store/preferencesSlice";
+import { spracheSpeichern } from "../../../features/auth/store/authThunks";
 
 /**
  * Die Sprachwahl im Kopf.
@@ -16,11 +18,28 @@ import {
  * als Startwert — sonst gäbe es keinen Weg zurück. Wer einmal Französisch wählt,
  * müsste sonst für immer wählen, auch wenn er das Gerät später umstellt
  * (ADR-0031).
+ *
+ * <strong>Die Wahl geht zweimal hin</strong>, und die beiden Ziele beantworten
+ * verschiedene Fragen. Der lokale Speicher trägt sie durch das Neuladen, auch
+ * ohne Konto. Das KONTO trägt sie in die Mails: eine Löschbestätigung wird Tage
+ * später von einem Zusteller geschrieben, ohne Anfrage und ohne Browser — dort
+ * gibt es nur die Zeile. Wer abgemeldet wählt, ändert deshalb nur das Erste.
  */
 export function LanguagePicker() {
   const dispatch = useAppDispatch();
   const vorliebe = useAppSelector((state) => state.preferences.language);
+  const angemeldet = useAppSelector((state) => state.auth.status === "authenticated");
   const { t } = useTranslation();
+
+  function waehle(gewaehlt: Sprachvorliebe) {
+    dispatch(languageSet(gewaehlt));
+
+    // Ans Konto geht die AUFGELÖSTE Sprache, nicht „system": der Server hat
+    // kein Gerät, dem er folgen könnte, und eine Mail muss eine Sprache haben.
+    if (angemeldet) {
+      void dispatch(spracheSpeichern(aufgeloest(gewaehlt)));
+    }
+  }
 
   return (
     <TextField
@@ -28,7 +47,7 @@ export function LanguagePicker() {
       size="small"
       label={t("sprache.label")}
       value={vorliebe}
-      onChange={(ereignis) => dispatch(languageSet(ereignis.target.value as Sprachvorliebe))}
+      onChange={(ereignis) => waehle(ereignis.target.value as Sprachvorliebe)}
       sx={{ minWidth: 150 }}
     >
       <MenuItem value="system">{t("sprache.system")}</MenuItem>

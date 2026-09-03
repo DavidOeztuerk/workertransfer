@@ -455,3 +455,25 @@ gruppen:
     eintraege:
       - { methode: POST, pfad: '/account/erasure', ohne: 401, person: 202, firma: 202 }
       - { methode: GET, pfad: '/candidates/00000000-0000-0000-0000-000000000001', ohne: 404, person: 404, firma: 404 }
+
+  - name: 'Die Sprache des Kontos'
+    warum: |
+      `PUT /account/language` schreibt, in welcher Sprache jemand ANGESCHRIEBEN
+      wird. Sie steht als Spalte am Konto und nicht am `Accept-Language` der
+      Anfrage, und das ist keine Bequemlichkeit: die Loeschbestaetigung wird
+      geschrieben, wenn der letzte von acht Diensten quittiert hat — Tage
+      spaeter, von einem Zusteller, ohne Browser und ohne Kopf. Stuende die
+      Sprache an der Anfrage, waere ausgerechnet die letzte Nachricht an ein
+      franzoesisches Konto deutsch.
+
+      Es gibt KEINE Kennung im Rumpf. Nur der Aufrufer selbst, aus demselben
+      Grund wie bei der Loeschung: eine Kennung waere das Einzige zwischen einem
+      Aufrufer und einem fremden Konto.
+
+      Beide angemeldeten Spalten antworten gleich — die Sprache gehoert der
+      PERSON, nicht dem Unternehmen, fuer das sie gerade handelt (ADR-0017).
+      Eine unbekannte Sprache gibt 422 und nicht stillschweigend Deutsch: eine
+      Wahl, die nicht wirkt und nichts sagt, sieht wie ein Fehler der
+      Oberflaeche aus.
+    eintraege:
+      - { methode: PUT, pfad: '/account/language', ohne: 401, person: 200, firma: 200, rumpf: '{"language":"de"}' }
