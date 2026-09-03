@@ -207,7 +207,11 @@ Correlation and tenant flow through the request, set by middleware in `ServiceDe
 
 Company membership is a relation, not a column on the user — one person may act for several companies (ADR-0018). Email is globally unique. `POST /auth/login` returns a person token with **no** tenant claim; `POST /auth/company/{id}` verifies membership and only then mints a token carrying the tenant. So the client names the company but the server decides, and the tenant in the token never came from client input. `null` means "acted as a person", not "missing".
 
-The access token carries `sub`, `email`, `jti`, `iat`, `exp`, `iss`, `aud`, `session_id` and — only while acting for a company — `tenant`. **Nothing else.** During the migration it also carried `tenant_id` and `type`; both are gone, and `TokenformTests` now pins their *absence* in both capacities. Roles and permissions are not in the token: they are read from the membership table per operation, so the token was never authoritative.
+The access token carries `sub`, `email`, `jti`, `iat`, `exp`, `iss`, `aud`, `session_id`, the long-form `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier` (a duplicate of `sub`), and — only while acting for a company — `tenant`. **Nothing else.** During the migration it also carried `tenant_id` and `type`; both are gone.
+
+That ninth claim was undocumented until it was **measured against the running stack on 03.09.2026** — this file said "eight, nothing else", the wire said nine. It stays, and the reason is Girder's: `MapInboundClaims = false` switches off the framework's own derivation, and seventeen readers resolve the caller through that name, two of them in provider packages that cannot see Girder's assembly. Dropping it saves seventy bytes and turns every one of those into a silent `null`.
+
+The lesson is the test, not the claim: `TokenformTests` forbade two *names* and would never have noticed a ninth. It now pins the **complete set** in both capacities — a set comparison, not a membership check. Roles and permissions are not in the token: they are read from the membership table per operation, so the token was never authoritative.
 
 `AuthMiddleware` resolves the principal from an `Authorization: Bearer` header **or** the `access` cookie, in that order. Both carriers are needed: service-to-service and CLI callers send the header; the browser never sees the `httpOnly` token and can only replay it as a cookie. Any new service verifying identity tokens must accept both.
 

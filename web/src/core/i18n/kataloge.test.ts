@@ -73,6 +73,11 @@ describe("die Kataloge", () => {
       "fr:stellen.faehigkeitenBeispiel",
       // Ein Copyright-Vermerk ist in jeder Sprache derselbe.
       "en:fuss.rechte",
+      // Ein Firmenname ist in jeder Sprache derselbe.
+      "en:einstellungen.anbieterAnthropic",
+      "fr:einstellungen.anbieterAnthropic",
+      // „Adresse" heisst auf Franzoesisch gleich.
+      "fr:einstellungen.adresse",
       "fr:fuss.rechte",
       "fr:kandidaten.faehigkeitenBeispiel",
     ]);
