@@ -299,9 +299,14 @@ jobs:
       # Erwartet wird 200: eine Stellenliste ist oeffentlich, weil die
       # Karriereseite ueber genau diesen Endpunkt geht. Der Beleg fuer das
       # Routen ist wie zuvor die ANTWORT und nicht ihr Erfolg — die Seitenform
-      # `items`/`next` kann nur jobs-service geschrieben haben. Eine fehlende
-      # Route waere ein leerer 404 von Ocelot, ein toter Dienst ein 502, und
-      # die Oberflaeche schickte HTML.
+      # kann nur jobs-service geschrieben haben. Eine fehlende Route waere ein
+      # leerer 404 von Ocelot, ein toter Dienst ein 502, und die Oberflaeche
+      # schickte HTML.
+      #
+      # Geprueft wird `items` UND `total_pages`. Nur `items` genuegt nicht mehr,
+      # seit die Liste blaettert: `total_pages` ist das Feld, an dem ein
+      # Rueckfall auf die alte Zeigerform auffiele, und genau der faellt sonst
+      # nirgends auf — die Oberflaeche zeigte dann stumm eine Seite.
       - name: Lesend durch das Gateway
         run: |
           code=$(curl -s -o antwort.json -w '%{http_code}' http://localhost:8090/jobs)
@@ -309,6 +314,9 @@ jobs:
           [ "$code" = "200" ] || { echo "::error::/jobs lieferte ${code}, erwartet 200."; cat antwort.json; exit 1; }
           grep -q '"items"' antwort.json || {
             echo "::error::/jobs wurde nicht von jobs-service beantwortet:"; cat antwort.json; exit 1; }
+          grep -q '"total_pages"' antwort.json || {
+            echo "::error::/jobs antwortet ohne Blaetterform (Rueckfall auf den Zeiger?):"
+            cat antwort.json; exit 1; }
 
       # Und die Fehlergestalt, an einem Dienst, den sonst kein Schritt hier
       # anfasst. Der Schritt oben belegte sie frueher nebenbei; seit /jobs

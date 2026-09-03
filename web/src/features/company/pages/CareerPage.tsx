@@ -44,7 +44,7 @@ export function CareerPage() {
 
   const stellen = useAsync(
     (signal) =>
-      searchJobs({ company: tenantId as string, limit: 50 }, undefined, signal),
+      searchJobs({ company: tenantId as string }, 1, 50, signal),
     [tenantId],
     tenantId !== undefined,
   );

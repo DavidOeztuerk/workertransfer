@@ -23,7 +23,10 @@ export function PageShell({
   children: React.ReactNode;
 }) {
   return (
-    <Container maxWidth={narrow ? "sm" : "lg"} sx={{ py: { xs: 3.5, md: 6 } }}>
+    <Container
+      maxWidth={narrow ? "sm" : "lg"}
+      sx={{ py: { xs: 4, md: 7 }, px: { xs: 2, sm: 3, md: 4 } }}
+    >
       <Box
         sx={{
           display: "flex",

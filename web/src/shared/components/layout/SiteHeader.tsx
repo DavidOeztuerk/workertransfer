@@ -56,7 +56,11 @@ export function SiteHeader() {
         borderColor: "divider",
       }}
     >
-      <Container maxWidth="lg">
+      {/* Das Randmass steht in allen drei Hüllen gleich (Kopf, Inhalt, Fuss).
+          Vorher trug jede ihr eigenes, und der Anmeldeknopf klebte rechts am
+          Rand — bei einer Kopfzeile fällt das am stärksten auf, weil sie auf
+          jeder Seite steht. */}
+      <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
         <Toolbar disableGutters sx={{ gap: 2, minHeight: { xs: 60, md: 66 } }}>
           <Typography
             component={RouterLink}
@@ -102,7 +106,12 @@ export function SiteHeader() {
             </>
           ) : (
             // EIN Zugang, immer sichtbar — auch auf /login und /register.
-            <Button component={RouterLink} to="/login" variant="contained" size="small">
+            <Button
+              component={RouterLink}
+              to="/login"
+              variant="contained"
+              sx={{ ml: 1, px: 2.5, flexShrink: 0 }}
+            >
               {t("kopf.anmelden")}
             </Button>
           )}

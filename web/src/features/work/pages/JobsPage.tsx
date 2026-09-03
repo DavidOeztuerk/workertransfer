@@ -5,7 +5,6 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Link from "@mui/material/Link";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
@@ -14,16 +13,14 @@ import {
   ErrorBlock,
   LoadingBlock,
   PageShell,
+  PaginationControls,
 } from "../../../shared/components/ui";
 import type { CompanyProfile } from "../../company/api/companies";
 import {
-  EMPLOYMENT_TYPES,
-  REMOTE_MODES,
   employmentLabel,
-  type EmploymentType,
   type Job,
   remoteLabel,
-  type RemoteMode,
+  type SearchFilters,
   type SucheFehlschlag,
   searchJobs,
 } from "../api/jobs";
@@ -31,17 +28,38 @@ import { getMyProfile } from "../api/profile";
 import { Requirements } from "../components/Requirements";
 import { merkeStelle } from "../lib/intent";
 import { useHandelnder } from "../lib/session";
-import { useAsync, useSeiten } from "../lib/useAsync";
+import { useAsync } from "../lib/useAsync";
 import { useFirmenprofile } from "../lib/useFirmenprofile";
+import {
+  type Seitenergebnis,
+  useBlaettern,
+} from "../../../shared/hooks/useBlaettern";
+import { size } from "../../../styles/tokens/spacing";
+import {
+  JobFilterSidebar,
+  LEERER_FILTER,
+  type Stellenfilter,
+} from "../components/JobFilterSidebar";
 
-interface Filters {
-  q: string;
-  location: string;
-  remote: RemoteMode | "";
-  employment: EmploymentType | "";
+/**
+ * Aus dem Formularzustand wird die Anfrage.
+ *
+ * Die Fähigkeiten stehen im Formular als EINE Zeichenkette, weil man sie so
+ * tippt, und gehen als Liste hinaus, weil der Server sie so erwartet. Die
+ * Trennung passiert genau hier und nirgends sonst.
+ */
+function zuFiltern(filter: Stellenfilter): SearchFilters {
+  return {
+    q: filter.q,
+    location: filter.location,
+    remote: filter.remote,
+    employment: filter.employment,
+    skills: filter.skills
+      .split(",")
+      .map((einzeln) => einzeln.trim())
+      .filter((einzeln) => einzeln !== ""),
+  };
 }
-
-const EMPTY: Filters = { q: "", location: "", remote: "", employment: "" };
 
 /**
  * Die offenen Stellen — die einzige Liste dieser Anwendung, die ohne Konto
@@ -54,18 +72,22 @@ const EMPTY: Filters = { q: "", location: "", remote: "", employment: "" };
 export function JobsPage() {
   const { t } = useTranslation();
   const { signedIn, laedt } = useHandelnder();
-  const [form, setForm] = useState<Filters>(EMPTY);
-  const [applied, setApplied] = useState<Filters>(EMPTY);
+  const [form, setForm] = useState<Stellenfilter>(LEERER_FILTER);
+  const [applied, setApplied] = useState<Stellenfilter>(LEERER_FILTER);
   const navigate = useNavigate();
 
   const load = useCallback(
-    (cursor: string | undefined, signal: AbortSignal) =>
-      searchJobs(applied, cursor, signal).then((result) =>
-        result.ok ? result : ({ ok: false, fehler: result } as const),
+    (page: number, pageSize: number, signal: AbortSignal) =>
+      searchJobs(zuFiltern(applied), page, pageSize, signal).then(
+        (result): Seitenergebnis<Job, SucheFehlschlag> =>
+          result.ok
+            ? { ok: true, seite: result }
+            : { ok: false, fehler: result },
       ),
     [applied],
   );
-  const list = useSeiten<Job, SucheFehlschlag>(load, JSON.stringify(applied));
+
+  const list = useBlaettern<Job, SucheFehlschlag>(load, JSON.stringify(applied));
 
   // Einmal für die ganze Seite, nicht je Stelle. Solange die Sitzung unbekannt
   // ist, wird NICHT gefragt — sonst liefe beim Kaltstart ein Abruf, dessen
@@ -96,89 +118,25 @@ export function JobsPage() {
       title={t("stellen.titel")}
       lead={t("stellen.lead")}
     >
-      <Card sx={{ mb: 3 }}>
-        <CardContent
-          component="form"
-          onSubmit={(event: React.FormEvent) => {
-            event.preventDefault();
-            setApplied(form);
+      <Box
+        sx={{
+          display: "grid",
+          gap: { xs: 3, md: 4 },
+          gridTemplateColumns: { xs: "1fr", md: `${size.filterSidebar}px 1fr` },
+          alignItems: "start",
+        }}
+      >
+        <JobFilterSidebar
+          entwurf={form}
+          onChange={setForm}
+          onSubmit={() => setApplied(form)}
+          onReset={() => {
+            setForm(LEERER_FILTER);
+            setApplied(LEERER_FILTER);
           }}
-          sx={{
-            display: "grid",
-            gap: 2,
-            gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr) auto" },
-            alignItems: "end",
-          }}
-        >
-          <TextField
-            label={t("stellen.suchbegriff")}
-            placeholder={t("stellen.suchbegriffBeispiel")}
-            value={form.q}
-            onChange={(event) => setForm({ ...form, q: event.target.value })}
-          />
-          <TextField
-            label={t("stellen.ort")}
-            value={form.location}
-            onChange={(event) =>
-              setForm({ ...form, location: event.target.value })
-            }
-          />
-          {/* Native Auswahlfelder: MUIs Voreinstellung ist ein Listenfeld aus
-              `div`s, das weder `selectOption` noch ein Screenreader als
-              Auswahlfeld bedient. */}
-          <TextField
-            select
-            label={t("stellen.arbeitsform")}
-            value={form.remote}
-            slotProps={{
-              select: { native: true },
-              inputLabel: { shrink: true },
-            }}
-            onChange={(event) =>
-              setForm({
-                ...form,
-                remote: event.target.value as RemoteMode | "",
-              })
-            }
-          >
-            <option value="">{t("stellen.egal")}</option>
-            {REMOTE_MODES.map((value) => (
-              <option key={value} value={value}>
-                {remoteLabel(value)}
-              </option>
-            ))}
-          </TextField>
-          {/* Diesen Filter gab es schon: `searchJobs` schickt `employment` seit
-              immer mit, nur konnte niemand ihn setzen. Ein Wähler dafür ist kein
-              neues Versprechen, sondern das Einlösen eines vorhandenen. */}
-          <TextField
-            select
-            label={t("stellen.beschaeftigungsart")}
-            value={form.employment}
-            slotProps={{
-              select: { native: true },
-              inputLabel: { shrink: true },
-            }}
-            onChange={(event) =>
-              setForm({
-                ...form,
-                employment: event.target.value as EmploymentType | "",
-              })
-            }
-          >
-            <option value="">{t("stellen.egal")}</option>
-            {EMPLOYMENT_TYPES.map((value) => (
-              <option key={value} value={value}>
-                {employmentLabel(value)}
-              </option>
-            ))}
-          </TextField>
-          <Button type="submit" variant="contained">
-            {t("stellen.suchen")}
-          </Button>
-        </CardContent>
-      </Card>
+        />
 
+        <Box>
       {/* Reihenfolge auf jeder Liste: lädt, dann Fehler, dann leer, dann Inhalt. */}
       {list.pending && list.items.length === 0 ? (
         <LoadingBlock label={t("stellen.wirdGesucht")} />
@@ -196,7 +154,17 @@ export function JobsPage() {
       {list.items.length > 0 ? (
         <Box
           component="ul"
-          sx={{ listStyle: "none", p: 0, m: 0, display: "grid", gap: 2 }}
+          sx={{
+            listStyle: "none",
+            p: 0,
+            m: 0,
+            display: "grid",
+            gap: 2,
+            // Zwei Spalten ab `lg`. Zwölf Karten untereinander sind zwölf
+            // Bildschirmhöhen; nebeneinander ist es eine Liste, die man
+            // überblickt.
+            gridTemplateColumns: { xs: "1fr", lg: "repeat(2, 1fr)" },
+          }}
         >
           {list.items.map((job) => (
             <Box component="li" key={job.id}>
@@ -238,37 +206,33 @@ export function JobsPage() {
                       {t("stellen.bewerben")}
                     </Button>
                   ) : (
-                    <Box sx={{ mt: 2 }}>
-                      {/*
-                        Ein KNOPF, kein Wort in einem Satz. Vorher stand hier
-                        „Zum Bewerben anmelden." und nur das letzte Wort war ein
-                        Link — für ein Programm anklickbar, für einen Menschen
-                        Fließtext. Wer bewerben will, sucht einen Knopf, und er
-                        muss dasselbe Gewicht haben wie der für Angemeldete.
-                      */}
-                      <Button
-                        type="button"
-                        variant="contained"
-                        onClick={() => {
-                          // Erst merken, dann wechseln. Dieser Knopf ist die
-                          // EINZIGE Stelle, an der die Absicht entsteht — wer
-                          // über die Kopfzeile zur Anmeldung geht, hat keine
-                          // geäußert, und dann darf ihn auch nichts irgendwohin
-                          // zurückwerfen.
-                          merkeStelle(job.id, job.title);
-                          void navigate("/login");
-                        }}
-                      >
-                        {t("stellen.bewerben")}
-                      </Button>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mt: 1 }}
-                      >
-                        {t("stellen.kontoNoetig")}
-                      </Typography>
-                    </Box>
+                    /*
+                      Derselbe Knopf wie für Angemeldete, und OHNE den Satz
+                      „dafür brauchst du ein Konto". Er stand unter jeder Karte
+                      und erklärte etwas, das im nächsten Augenblick ohnehin auf
+                      dem Bildschirm steht: wer klickt, landet in der Anmeldung
+                      und sieht dort, warum. Zwölf Karten mit zwölf Hinweisen auf
+                      dieselbe Sache sind Lärm.
+
+                      Ein KNOPF und kein Wort in einem Satz: wer bewerben will,
+                      sucht einen Knopf, und er muss dasselbe Gewicht haben wie
+                      der für Angemeldete.
+                    */
+                    <Button
+                      type="button"
+                      variant="contained"
+                      sx={{ mt: 2 }}
+                      onClick={() => {
+                        // Erst merken, dann wechseln. Dieser Knopf ist die
+                        // EINZIGE Stelle, an der die Absicht entsteht — wer über
+                        // die Kopfzeile zur Anmeldung geht, hat keine geäussert,
+                        // und dann darf ihn auch nichts irgendwohin zurückwerfen.
+                        merkeStelle(job.id, job.title);
+                        void navigate("/login");
+                      }}
+                    >
+                      {t("stellen.bewerben")}
+                    </Button>
                   )}
                 </CardContent>
               </Card>
@@ -277,11 +241,16 @@ export function JobsPage() {
         </Box>
       ) : null}
 
-      {list.mehr ? (
-        <Button onClick={list.weiter} disabled={list.pending} sx={{ mt: 2 }}>
-          {list.pending ? t("allgemein.laden") : t("stellen.mehrLaden")}
-        </Button>
-      ) : null}
+          <PaginationControls
+            page={list.page}
+            pageSize={list.pageSize}
+            totalItems={list.totalItems}
+            totalPages={list.totalPages}
+            onPage={list.gehe}
+            onPageSize={list.setzeGroesse}
+          />
+        </Box>
+      </Box>
     </PageShell>
   );
 }

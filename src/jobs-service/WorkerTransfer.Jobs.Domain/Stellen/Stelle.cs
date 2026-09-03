@@ -248,7 +248,21 @@ public sealed class Stelle
 }
 
 /// <summary>Eine Seite Stellen und wo es weitergeht.</summary>
-public sealed record Stellenseite(IReadOnlyList<Stelle> Eintraege, string? Weiter);
+/// <summary>Eine Seite Stellen und wie viele es insgesamt gibt.</summary>
+/// <remarks>
+/// <strong>Gesamtzahl statt Zeiger</strong>, seit die Liste blätterbar ist: wer
+/// „Seite 3 von 9" sehen und dorthin springen will, braucht die Zahl. Ein Zeiger
+/// kann nur vorwärts, und die Frage „wie viele gibt es überhaupt" beantwortet er
+/// nie.
+/// <para>
+/// Gezählt werden ANZEIGEN. Auf einer Kandidatenliste wäre dieselbe Zahl eine
+/// Aussage über Menschen und damit ADR-0026 zuwider; deshalb steht sie hier und
+/// nicht in einem gemeinsamen Listentyp.
+/// </para>
+/// </remarks>
+/// <param name="Eintraege">Die Stellen dieser Seite.</param>
+/// <param name="Gesamt">Wie viele Stellen der Filter insgesamt trifft.</param>
+public sealed record Stellenseite(IReadOnlyList<Stelle> Eintraege, int Gesamt);
 
 /// <summary>Findet und speichert Anzeigen.</summary>
 public interface IStellenspeicher
@@ -270,6 +284,10 @@ public interface IStellenspeicher
     /// Der Stand wird hier gefiltert und nicht vom Aufrufer: ein Parameter
     /// <c>status=draft</c> wäre ein Weg, fremde Entwürfe zu lesen.
     /// </remarks>
+    /// <param name="seite">
+    /// Die Seite, 1-basiert. Menschen zählen ab eins, und diese Zahl steht so
+    /// in der Adresszeile.
+    /// </param>
     /// <param name="suchbegriff">
     /// Freitext über Titel und Beschreibung. Leer heisst „alles".
     /// </param>
@@ -284,8 +302,8 @@ public interface IStellenspeicher
     /// Vollzeit, Teilzeit und so weiter. Leer heisst „alles".
     /// </param>
     Task<Stellenseite> SucheAsync(
+        int seite,
         int anzahl,
-        string? zeiger,
         IReadOnlyList<string>? faehigkeiten,
         string ort,
         Remotegrad? remote,

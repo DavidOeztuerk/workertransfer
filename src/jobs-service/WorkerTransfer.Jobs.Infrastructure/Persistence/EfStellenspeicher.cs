@@ -49,8 +49,8 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
 
     /// <inheritdoc />
     public async Task<Stellenseite> SucheAsync(
+        int seite,
         int anzahl,
-        string? zeiger,
         IReadOnlyList<string>? faehigkeiten,
         string ort,
         Remotegrad? remote,
@@ -101,44 +101,54 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
                 || EF.Functions.ILike(kandidat.Description, gesucht));
         }
 
-        // Der Zeiger ist der Zeitpunkt der Veröffentlichung plus die Id: zwei
-        // Anzeigen in derselben Millisekunde bekommen sonst je nach Laune der
-        // Datenbank eine andere Reihenfolge, und eine Seite überspringt eine.
-        if (Zeiger.Lies(zeiger) is { } weiter)
-        {
-            abfrage = abfrage.Where(kandidat =>
-                kandidat.PublishedAt < weiter.Am
-                || (kandidat.PublishedAt == weiter.Am && kandidat.Id < weiter.Id));
-        }
-
-        var zeilen = await abfrage
+        // Die Reihenfolge ist Veröffentlichungszeitpunkt UND Id. Zwei Anzeigen in
+        // derselben Millisekunde bekämen sonst je nach Laune der Datenbank eine
+        // andere Reihenfolge, und ein Eintrag stünde auf zwei Seiten oder auf
+        // keiner.
+        var sortiert = abfrage
             .OrderByDescending(kandidat => kandidat.PublishedAt)
-            .ThenByDescending(kandidat => kandidat.Id)
-            .Take(anzahl + 1)
-            .ToListAsync(cancellationToken);
+            .ThenByDescending(kandidat => kandidat.Id);
 
-        var mehr = zeilen.Count > anzahl;
-        var seite = zeilen.Take(anzahl).Select(ZumAggregat).ToList();
-
-        // Nach Fähigkeiten wird im Speicher gefiltert, nicht in SQL. Der Grund
-        // ist der Wortschatz: „Postgres" in der Anfrage muss „PostgreSQL" in
-        // der Anzeige treffen, und die Kanonisierung steht im Code, nicht in
-        // der Datenbank. Bei einer Seite von zwanzig ist das billig; würde es
-        // teuer, gehörte die kanonische Form in eine eigene Spalte — und nicht
-        // die Regel in SQL nachgebaut.
+        // FÄHIGKEITEN ZWINGEN ZUM VOLLEN DURCHGANG, und das ist kein Versehen.
+        //
+        // Gefiltert wird im Speicher, weil der Wortschatz im Code steht:
+        // „Postgres" in der Anfrage muss „PostgreSQL" in der Anzeige treffen,
+        // und diese Regel gibt es in SQL nicht (ADR-0023). Solange nur
+        // vorwärtsgeblättert wurde, genügte es, das auf einer Seite zu tun.
+        //
+        // Mit Seitennummern geht das nicht mehr: die Gesamtzahl muss die
+        // gefilterte Menge zählen, sonst steht „Seite 1 von 9" über drei
+        // Treffern. Also erst filtern, dann zählen, dann schneiden.
+        //
+        // Der Preis ist eine volle Abfrage, wenn jemand nach Fähigkeiten sucht.
+        // Bei dieser Menge ist das billig. Würde es teuer, gehörte die
+        // kanonische Form in eine eigene Spalte — und nicht die Regel in SQL
+        // nachgebaut.
         if (faehigkeiten is { Count: > 0 })
         {
             var gesucht = Faehigkeitenliste.Aus(faehigkeiten).Werte;
 
-            seite = [.. seite.Where(stelle => gesucht.All(einzeln =>
-                stelle.Faehigkeiten.Werte.Contains(einzeln, StringComparer.OrdinalIgnoreCase)))];
+            var alle = await sortiert.ToListAsync(cancellationToken);
+            var passend = alle
+                .Select(ZumAggregat)
+                .Where(stelle => gesucht.All(einzeln =>
+                    stelle.Faehigkeiten.Werte.Contains(einzeln, StringComparer.OrdinalIgnoreCase)))
+                .ToList();
+
+            return new Stellenseite(
+                [.. passend.Skip((seite - 1) * anzahl).Take(anzahl)],
+                passend.Count);
         }
 
-        var letzte = mehr ? zeilen[anzahl - 1] : null;
+        // Ohne Fähigkeitsfilter zählt und schneidet die Datenbank.
+        var gesamt = await sortiert.CountAsync(cancellationToken);
 
-        return new Stellenseite(
-            seite,
-            letzte?.PublishedAt is { } am ? new Zeiger(am, letzte.Id).ToString() : null);
+        var zeilen = await sortiert
+            .Skip((seite - 1) * anzahl)
+            .Take(anzahl)
+            .ToListAsync(cancellationToken);
+
+        return new Stellenseite([.. zeilen.Select(ZumAggregat)], gesamt);
     }
 
     /// <inheritdoc />
