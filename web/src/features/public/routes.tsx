@@ -19,4 +19,15 @@ import { HomePage } from "./pages/HomePage";
 export const publicRoutes: RouteObject[] = [
   { index: true, element: <HomePage /> },
   { path: "/overview", element: lazyRoute(() => import("./pages/OverviewPage"), "OverviewPage") },
+
+  // Die vier rechtlichen Seiten. Sie liegen in EINEM Modul und werden deshalb
+  // auch als eines geladen — vier getrennte Bündel für vier Textseiten wären
+  // vier Anfragen für zusammen wenige Kilobyte.
+  { path: "/imprint", element: lazyRoute(() => import("./pages/LegalPages"), "ImprintPage") },
+  { path: "/privacy", element: lazyRoute(() => import("./pages/LegalPages"), "PrivacyPage") },
+  { path: "/terms", element: lazyRoute(() => import("./pages/LegalPages"), "TermsPage") },
+  {
+    path: "/accessibility",
+    element: lazyRoute(() => import("./pages/LegalPages"), "AccessibilityPage"),
+  },
 ];

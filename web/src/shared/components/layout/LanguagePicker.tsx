@@ -54,7 +54,10 @@ export function LanguagePicker() {
       label={t("sprache.label")}
       value={vorliebe}
       onChange={(event) => choose(event.target.value as Sprachvorliebe)}
-      sx={{ minWidth: 150 }}
+      // Fest begrenzt: in der Kopfzeile nahm das Feld die halbe Breite. Ein
+      // Auswahlfeld mit vier kurzen Einträgen braucht keine Fläche, es braucht
+      // nur genug für den längsten davon.
+      sx={{ width: 148, flexShrink: 0 }}
     >
       <option value="system">{t("sprache.system")}</option>
       {SPRACHEN.map((language) => (

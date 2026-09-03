@@ -68,6 +68,9 @@ describe("die Kataloge", () => {
       "fr:kopf.github",
       // Produktnamen, in jeder Sprache dieselben.
       "en:kandidaten.faehigkeitenBeispiel",
+      // Ein Copyright-Vermerk ist in jeder Sprache derselbe.
+      "en:fuss.rechte",
+      "fr:fuss.rechte",
       "fr:kandidaten.faehigkeitenBeispiel",
     ]);
 

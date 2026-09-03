@@ -1,11 +1,12 @@
 import Box from "@mui/material/Box";
 import { Outlet } from "react-router-dom";
 
+import { SiteFooter } from "./SiteFooter";
 import { SiteHeader } from "./SiteHeader";
 import { SessionGate } from "./SessionGate";
 
 /**
- * Der Rahmen um jede Seite: Kopfzeile, Inhalt.
+ * Der Rahmen um jede Seite: Kopfzeile, Inhalt, Fusszeile.
  *
  * `SessionGate` liegt darum und nicht darin — es lädt die Sitzung EINMAL beim
  * Start. Läge die Prüfung in jeder Seite, liefe sie bei jedem Wechsel neu, und
@@ -19,6 +20,7 @@ export function AppLayout() {
         <Box component="main" sx={{ flexGrow: 1 }}>
           <Outlet />
         </Box>
+        <SiteFooter />
       </Box>
     </SessionGate>
   );
