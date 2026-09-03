@@ -14,8 +14,8 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 import { CompanySwitcher } from "./CompanySwitcher";
 import { useAppSelector } from "../../../core/store/hooks";
-import LoginIcon from "@mui/icons-material/LoginOutlined";
-import MenuIcon from "@mui/icons-material/MenuOutlined";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import MenuIcon from "@mui/icons-material/Menu";
 import Drawer from "@mui/material/Drawer";
 import IconButton from "@mui/material/IconButton";
 import List from "@mui/material/List";
@@ -23,6 +23,7 @@ import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import Tooltip from "@mui/material/Tooltip";
 import { SettingsMenu } from "./SettingsMenu";
+import { ProfilAvatar } from "../ui";
 
 /**
  * Die Kopfzeile.
@@ -137,27 +138,29 @@ export function SiteHeader() {
           ) : (
             // EIN Zugang, immer sichtbar — auch auf /login und /register.
             <>
-              {/* Auf schmalen Bildschirmen ein Symbol, sonst der Knopf. Ein
-                  Knopf mit Text kostet hier 91px — genau die, die der
-                  Navigation fehlten. Das Symbol trägt dasselbe `aria-label`,
-                  ein Vorleser hört also in beiden Fällen „Anmelden". */}
+              {/* EIN NUTZERSYMBOL, in beiden Breiten dasselbe.
+                  Vorher stand hier auf schmalen Bildschirmen ein Anmeldepfeil
+                  und auf breiten ein Knopf — zwei Bilder für dieselbe Stelle,
+                  und wer das Fenster zieht, sucht danach neu. Das Symbol ist
+                  jetzt immer dasselbe wie das des angemeldeten Kontos, nur
+                  ohne Initialen: der Platz gehört dem Konto, ob eines offen ist
+                  oder nicht. */}
               <Tooltip title={t("kopf.anmelden")}>
                 <IconButton
                   component={RouterLink}
                   to="/login"
                   aria-label={t("kopf.anmelden")}
                   size="small"
-                  color="primary"
-                  sx={{ display: { xs: "inline-flex", sm: "none" } }}
+                  sx={{ color: "text.secondary" }}
                 >
-                  <LoginIcon fontSize="small" />
+                  <AccountCircleIcon />
                 </IconButton>
               </Tooltip>
               <Button
                 component={RouterLink}
                 to="/login"
                 variant="contained"
-                sx={{ ml: 1, px: 2.5, flexShrink: 0, display: { xs: "none", sm: "inline-flex" } }}
+                sx={{ ml: 0.5, px: 2.5, flexShrink: 0, display: { xs: "none", sm: "inline-flex" } }}
               >
                 {t("kopf.anmelden")}
               </Button>
@@ -243,19 +246,27 @@ function NavLink({
 function AccountMenu() {
   const { t } = useTranslation();
   const [anker, setAnker] = useState<null | HTMLElement>(null);
+  const name = useAppSelector((state) => state.auth.session?.displayName ?? "");
 
   return (
     <>
-      <Button
-        size="small"
-        endIcon={<ExpandMoreIcon />}
-        onClick={(event) => setAnker(event.currentTarget)}
-        aria-haspopup="menu"
-        aria-expanded={anker !== null}
-        sx={{ color: "text.secondary" }}
-      >
-        Mein Konto
-      </Button>
+      {/* DAS BILD DER PERSON, nicht ein Knopf mit dem Wort „Mein Konto".
+          Solange niemand ein Foto hochgeladen hat, stehen dort die Initialen
+          auf einer Farbe, die dem Namen folgt — beständig über Geräte hinweg,
+          sonst wäre sie kein Erkennungsmerkmal. Kommt das Foto, füllt es
+          `src` und sonst ändert sich nichts. */}
+      <Tooltip title={t("kopf.meinKonto")}>
+        <IconButton
+          onClick={(event) => setAnker(event.currentTarget)}
+          aria-haspopup="menu"
+          aria-expanded={anker !== null}
+          aria-label={t("kopf.meinKonto")}
+          size="small"
+          sx={{ ml: 0.5, p: 0.25 }}
+        >
+          <ProfilAvatar name={name} size={32} />
+        </IconButton>
+      </Tooltip>
       <Menu
         anchorEl={anker}
         open={anker !== null}

@@ -38,9 +38,13 @@ test("die Sprachwahl wechselt die Oberfläche und erreicht die Mail", async ({ p
   await page.goto("/market");
   await expect(page.getByRole("heading", { name: "Mein Marktstatus" })).toBeVisible();
 
-  // Umschalten auf Französisch. Der Wähler steht im Kopf und heisst dort noch
-  // „Sprache", weil die Oberfläche in diesem Moment deutsch ist.
-  await page.getByLabel("Sprache").selectOption("fr");
+  // Umschalten auf Französisch. Die Wahl steht im ZAHNRAD der Kopfzeile — sie
+  // stand einmal als Auswahlfeld im Fuss, und der Gedanke „das stellt man
+  // einmal ein, also gehört es nach unten" war praktisch falsch: wer die
+  // Sprache wechselt, WEIL er die Oberfläche nicht lesen kann, scrollt nicht
+  // erst an das Seitenende.
+  await page.getByRole("button", { name: "Darstellung und Sprache" }).click();
+  await page.getByRole("menuitemradio", { name: "Français" }).click();
 
   // Der Beleg, dass wirklich gezeichnet wird und nicht nur der Store umfiel.
   await expect(
@@ -82,6 +86,8 @@ test("die Sprachwahl wechselt die Oberfläche und erreicht die Mail", async ({ p
   // einem Zustand steht, den niemand erwartet. Die Sprache heisst jetzt
   // „Langue" — die Oberfläche ist ja französisch.
   await page.goto("/market");
-  await page.getByLabel("Langue").selectOption("de");
+  // Das Zahnrad heisst jetzt französisch — die Oberfläche ist es ja.
+  await page.getByRole("button", { name: "Affichage et langue" }).click();
+  await page.getByRole("menuitemradio", { name: "Deutsch" }).click();
   await expect(page.getByRole("heading", { name: "Mein Marktstatus" })).toBeVisible();
 });

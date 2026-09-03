@@ -160,10 +160,11 @@ export function JobsPage() {
             m: 0,
             display: "grid",
             gap: 2,
-            // Zwei Spalten ab `lg`. Zwölf Karten untereinander sind zwölf
-            // Bildschirmhöhen; nebeneinander ist es eine Liste, die man
-            // überblickt.
-            gridTemplateColumns: { xs: "1fr", lg: "repeat(2, 1fr)" },
+            // EINE Spalte, auf jeder Breite. Zwei nebeneinander waren kürzer
+            // und schlechter: Stellen sind verschieden lang, also entstanden
+            // ungleiche Karten mit Löchern dazwischen, und der Blick musste
+            // nach jeder Karte zurück nach links springen. Eine Liste liest man
+            // von oben nach unten.
           }}
         >
           {list.items.map((job) => (

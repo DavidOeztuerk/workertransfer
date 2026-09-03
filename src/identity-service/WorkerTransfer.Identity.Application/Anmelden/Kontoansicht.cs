@@ -16,4 +16,8 @@ namespace WorkerTransfer.Identity.Application.Anmelden;
 /// nobody reads is a field that goes stale and is then believed.
 /// </remarks>
 public sealed record Kontoansicht(
-    SubjectId Wer, string? Email, TenantId? Firma, Kontosprache Sprache);
+    SubjectId Wer,
+    string? Email,
+    TenantId? Firma,
+    Kontosprache Sprache,
+    string Anzeigename);
