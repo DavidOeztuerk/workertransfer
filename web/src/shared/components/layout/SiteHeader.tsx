@@ -12,8 +12,6 @@ import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
-import { ColorModeToggle } from "./ColorModeToggle";
-import { LanguagePicker } from "./LanguagePicker";
 import { CompanySwitcher } from "./CompanySwitcher";
 import { useAppSelector } from "../../../core/store/hooks";
 
@@ -95,9 +93,6 @@ export function SiteHeader() {
           </Box>
 
           <Box sx={{ flexGrow: 1 }} />
-
-          <LanguagePicker />
-          <ColorModeToggle />
 
           {signedIn ? (
             <>
