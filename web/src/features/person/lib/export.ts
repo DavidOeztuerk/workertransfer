@@ -37,17 +37,17 @@ export const abschnitt = (ok: boolean, daten: unknown): Abschnitt =>
  */
 export function baueAuskunft(
   abschnitte: Record<string, Abschnitt>,
-  jetzt: Date = new Date()
+  now: Date = new Date()
 ): Datenauskunft {
   return {
-    erzeugt_am: jetzt.toISOString(),
+    erzeugt_am: now.toISOString(),
     unvollständig: Object.entries(abschnitte)
-      .filter(([, wert]) => wert.status !== "ok")
+      .filter(([, value]) => value.status !== "ok")
       .map(([name]) => name),
     abschnitte,
   };
 }
 
 /** Ein Dateiname, der in einem Downloads-Ordner noch etwas sagt. */
-export const dateiname = (jetzt: Date = new Date()): string =>
-  `workertransfer-meine-daten-${jetzt.toISOString().slice(0, 10)}.json`;
+export const dateiname = (now: Date = new Date()): string =>
+  `workertransfer-meine-daten-${now.toISOString().slice(0, 10)}.json`;

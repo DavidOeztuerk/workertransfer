@@ -37,8 +37,8 @@ const LEERE_STATION: Station = {
 };
 
 /** Leer heisst „läuft noch", nicht „unbekannt" — deshalb `null` und nicht `""`. */
-function endeNormalisieren(wert: string): string | null {
-  const getrimmt = wert.trim();
+function normaliseEnd(value: string): string | null {
+  const getrimmt = value.trim();
   return getrimmt === "" ? null : getrimmt;
 }
 
@@ -56,34 +56,34 @@ function endeNormalisieren(wert: string): string | null {
 export function ResumePage() {
   const { t } = useTranslation();
   const status = useAppSelector((state) => state.auth.status);
-  const sitzung = useAppSelector((state) => state.auth.session);
+  const session = useAppSelector((state) => state.auth.session);
 
   const lebenslauf = useAsync(
     (signal) => ladeMeinen(signal),
-    [sitzung?.userId],
-    sitzung !== null,
+    [session?.userId],
+    session !== null,
   );
   const anfragen = useAsync(
     (signal) => ladeMeineAnfragen(signal),
-    [sitzung?.userId],
-    sitzung !== null,
+    [session?.userId],
+    session !== null,
   );
 
-  const [zeilen, setZeilen] = useState<Station[]>([]);
-  const [gespeichert, setGespeichert] = useState(false);
+  const [rows, setZeilen] = useState<Station[]>([]);
+  const [saved, setGespeichert] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
 
   // Das Formular folgt dem geladenen Stand — aber nur, wenn wirklich einer da
   // ist. Bei einem Ladefehler bleibt es leer UND die Seite sagt warum; ein
   // stilles leeres Formular waere die Einladung, den Lebenslauf zu ueberschreiben.
   useEffect(() => {
-    if (lebenslauf.wert?.ok && lebenslauf.wert.wert !== null) {
+    if (lebenslauf.value?.ok && lebenslauf.value.value !== null) {
       setZeilen(
-        lebenslauf.wert.wert.positions.map((station) => ({ ...station })),
+        lebenslauf.value.value.positions.map((station) => ({ ...station })),
       );
     }
-  }, [lebenslauf.wert]);
+  }, [lebenslauf.value]);
 
   if (status === "anonymous") {
     return (
@@ -94,45 +94,45 @@ export function ResumePage() {
     );
   }
 
-  function aendere(index: number, teil: Partial<Station>) {
-    setZeilen((vorher) =>
-      vorher.map((zeile, i) => (i === index ? { ...zeile, ...teil } : zeile)),
+  function change(index: number, teil: Partial<Station>) {
+    setZeilen((before) =>
+      before.map((row, i) => (i === index ? { ...row, ...teil } : row)),
     );
     setGespeichert(false);
   }
 
   async function speichern() {
     setLaeuft(true);
-    const ergebnis = await speichereMeinen({
-      positions: zeilen,
+    const result = await speichereMeinen({
+      positions: rows,
       education: [],
     });
     setLaeuft(false);
 
-    if (ergebnis.ok) {
+    if (result.ok) {
       setFehler(null);
       setGespeichert(true);
-      lebenslauf.setze({ ok: true, wert: ergebnis.wert });
+      lebenslauf.setze({ ok: true, value: result.value });
     } else {
-      setFehler(ergebnis.error.detail);
+      setFehler(result.error.detail);
       setGespeichert(false);
     }
   }
 
-  async function beantworteAnfrage(id: string, erteilen: boolean) {
+  async function beantworteAnfrage(id: string, grant: boolean) {
     setLaeuft(true);
-    const ergebnis = await beantworten(id, erteilen);
+    const result = await beantworten(id, grant);
     setLaeuft(false);
-    if (!ergebnis.ok) setFehler(ergebnis.error.detail);
-    anfragen.erneut();
+    if (!result.ok) setFehler(result.error.detail);
+    anfragen.again();
   }
 
   async function nimmZurueck(id: string) {
     setLaeuft(true);
-    const ergebnis = await zuruecknehmen(id);
+    const result = await zuruecknehmen(id);
     setLaeuft(false);
-    if (!ergebnis.ok) setFehler(ergebnis.error.detail);
-    anfragen.erneut();
+    if (!result.ok) setFehler(result.error.detail);
+    anfragen.again();
   }
 
   return (
@@ -151,15 +151,15 @@ export function ResumePage() {
             <LoadingBlock label={t("lebenslauf.anfragenLaden")} />
           ) : null}
 
-          {anfragen.wert && !anfragen.wert.ok ? (
-            <ErrorBlock error={anfragen.wert.error} />
+          {anfragen.value && !anfragen.value.ok ? (
+            <ErrorBlock error={anfragen.value.error} />
           ) : null}
 
-          {anfragen.wert?.ok && anfragen.wert.wert.length === 0 ? (
+          {anfragen.value?.ok && anfragen.value.value.length === 0 ? (
             <EmptyBlock title={t("lebenslauf.anfragenLeer")} />
           ) : null}
 
-          {anfragen.wert?.ok && anfragen.wert.wert.length > 0 ? (
+          {anfragen.value?.ok && anfragen.value.value.length > 0 ? (
             <Box
               component="ul"
               sx={{
@@ -171,13 +171,13 @@ export function ResumePage() {
                 m: 0,
               }}
             >
-              {anfragen.wert.wert.map((anfrage) => (
+              {anfragen.value.value.map((anfrage) => (
                 <Anfragezeile
                   key={anfrage.id}
                   anfrage={anfrage}
-                  gesperrt={laeuft}
-                  onAntwort={(erteilen) =>
-                    void beantworteAnfrage(anfrage.id, erteilen)
+                  locked={running}
+                  onAntwort={(grant) =>
+                    void beantworteAnfrage(anfrage.id, grant)
                   }
                   onZurueck={() => void nimmZurueck(anfrage.id)}
                 />
@@ -197,8 +197,8 @@ export function ResumePage() {
             <LoadingBlock label={t("lebenslauf.laden")} />
           ) : null}
 
-          {lebenslauf.wert && !lebenslauf.wert.ok ? (
-            <ErrorBlock error={lebenslauf.wert.error} />
+          {lebenslauf.value && !lebenslauf.value.ok ? (
+            <ErrorBlock error={lebenslauf.value.error} />
           ) : null}
 
           {fehler !== null ? (
@@ -207,7 +207,7 @@ export function ResumePage() {
             </Alert>
           ) : null}
 
-          {gespeichert ? (
+          {saved ? (
             <Alert severity="success" sx={{ mb: 2 }} role="status">
               {t("lebenslauf.gespeichert")}
             </Alert>
@@ -215,46 +215,46 @@ export function ResumePage() {
 
           <Box
             component="form"
-            onSubmit={(ereignis) => {
-              ereignis.preventDefault();
+            onSubmit={(event) => {
+              event.preventDefault();
               void speichern();
             }}
           >
-            {zeilen.map((zeile, index) => (
+            {rows.map((row, index) => (
               <Box key={index} sx={{ mb: 3 }}>
                 <Typography variant="h3" sx={{ mb: 1.5 }}>
-                  {t("lebenslauf.station", { nummer: index + 1 })}
+                  {t("lebenslauf.station", { number: index + 1 })}
                 </Typography>
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <TextField
                     label={t("lebenslauf.arbeitgeber")}
-                    value={zeile.employer}
+                    value={row.employer}
                     onChange={(e) =>
-                      aendere(index, { employer: e.target.value })
+                      change(index, { employer: e.target.value })
                     }
                     required
                   />
                   <TextField
                     label={t("lebenslauf.position")}
-                    value={zeile.title}
-                    onChange={(e) => aendere(index, { title: e.target.value })}
+                    value={row.title}
+                    onChange={(e) => change(index, { title: e.target.value })}
                     required
                   />
                   <TextField
                     label={t("lebenslauf.von")}
-                    value={zeile.started_on}
+                    value={row.started_on}
                     onChange={(e) =>
-                      aendere(index, { started_on: e.target.value })
+                      change(index, { started_on: e.target.value })
                     }
                     helperText={t("lebenslauf.vonHinweis")}
                     required
                   />
                   <TextField
                     label={t("lebenslauf.bis")}
-                    value={zeile.ended_on ?? ""}
+                    value={row.ended_on ?? ""}
                     onChange={(e) =>
-                      aendere(index, {
-                        ended_on: endeNormalisieren(e.target.value),
+                      change(index, {
+                        ended_on: normaliseEnd(e.target.value),
                       })
                     }
                     helperText={t("lebenslauf.bisHinweis")}
@@ -268,13 +268,13 @@ export function ResumePage() {
               <Button
                 variant="outlined"
                 onClick={() =>
-                  setZeilen((vorher) => [...vorher, { ...LEERE_STATION }])
+                  setZeilen((before) => [...before, { ...LEERE_STATION }])
                 }
               >
                 {t("lebenslauf.stationHinzufuegen")}
               </Button>
-              <Button type="submit" variant="contained" disabled={laeuft}>
-                {laeuft
+              <Button type="submit" variant="contained" disabled={running}>
+                {running
                   ? t("allgemein.speichernLaeuft")
                   : t("allgemein.speichern")}
               </Button>
@@ -296,20 +296,20 @@ export function ResumePage() {
  */
 function Anfragezeile({
   anfrage,
-  gesperrt,
+  locked,
   onAntwort,
   onZurueck,
 }: {
   anfrage: Lebenslaufanfrage;
-  gesperrt: boolean;
-  onAntwort: (erteilen: boolean) => void;
+  locked: boolean;
+  onAntwort: (grant: boolean) => void;
   onZurueck: () => void;
 }) {
   const { t } = useTranslation();
-  const offen = anfrage.status === "PENDING";
+  const open = anfrage.status === "PENDING";
   const haeltZugriff = anfrage.status === "GRANTED" && anfrage.active === true;
 
-  const stand = offen
+  const current = open
     ? t("lebenslauf.standOffen")
     : anfrage.status === "DECLINED"
       ? t("lebenslauf.standAbgelehnt")
@@ -335,18 +335,18 @@ function Anfragezeile({
             {t("lebenslauf.anfrageTitel")}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {stand}
+            {current}
           </Typography>
         </Box>
 
         <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
-          {offen ? (
+          {open ? (
             <>
               <Button
                 variant="contained"
                 size="small"
                 onClick={() => onAntwort(true)}
-                disabled={gesperrt}
+                disabled={locked}
               >
                 {t("allgemein.freigeben")}
               </Button>
@@ -354,7 +354,7 @@ function Anfragezeile({
                 variant="text"
                 size="small"
                 onClick={() => onAntwort(false)}
-                disabled={gesperrt}
+                disabled={locked}
               >
                 {t("allgemein.ablehnen")}
               </Button>
@@ -365,7 +365,7 @@ function Anfragezeile({
               variant="text"
               size="small"
               onClick={onZurueck}
-              disabled={gesperrt}
+              disabled={locked}
             >
               {t("allgemein.zurueckziehen")}
             </Button>

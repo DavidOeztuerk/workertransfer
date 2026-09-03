@@ -37,7 +37,7 @@ export const PERSON: Session = {
   tenantId: null, language: "de",
 };
 
-export function testStore(vorgabe: AuthVorgabe = {}) {
+export function testStore(fallback: AuthVorgabe = {}) {
   return configureStore({
     reducer: { auth, preferences },
     preloadedState: {
@@ -45,9 +45,9 @@ export function testStore(vorgabe: AuthVorgabe = {}) {
         // Voreinstellung „anonymous" und nicht „unknown": `unknown` heisst „noch
         // nicht gefragt", und die Seiten dieses Bereichs zeichnen dann einen
         // Ladezustand statt eines Inhalts.
-        status: vorgabe.status ?? "anonymous",
-        session: vorgabe.session ?? null,
-        memberships: vorgabe.memberships ?? [],
+        status: fallback.status ?? "anonymous",
+        session: fallback.session ?? null,
+        memberships: fallback.memberships ?? [],
         error: null,
         pending: false,
       },
@@ -61,12 +61,12 @@ export const ANGEMELDET: AuthVorgabe = { status: "authenticated", session: PERSO
 export function renderMitStore(
   ui: ReactElement,
   {
-    auth: vorgabe,
+    auth: fallback,
     route = "/",
     ...options
   }: RenderOptions & { auth?: AuthVorgabe; route?: string } = {}
 ) {
-  const store = testStore(vorgabe);
+  const store = testStore(fallback);
 
   function Wrapper({ children }: { children: ReactNode }) {
     return (

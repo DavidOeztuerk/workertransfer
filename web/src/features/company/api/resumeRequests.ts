@@ -33,15 +33,15 @@ export type AnfrageFehler =
 export type AnfrageErgebnis = { ok: true; request: ResumeRequest } | Fehlschlag<AnfrageFehler>;
 
 export async function requestResume(subjectId: string): Promise<AnfrageErgebnis> {
-  const antwort = await request<ResumeRequest>(
+  const answer = await request<ResumeRequest>(
     RESUME_BASE_URL,
     `/resumes/${subjectId}/requests`,
     { method: "POST" },
     "fehler.anfrageNichtGestellt"
   );
-  if (antwort.ok) return { ok: true, request: antwort.value };
+  if (answer.ok) return { ok: true, request: answer.value };
   return deuten<AnfrageFehler>(
-    antwort.error,
+    answer.error,
     {
       0: { reason: "offline", titel: "fehler.keineVerbindung" },
       409: { reason: "already-asked", titel: "fehler.bereitsGefragt" },

@@ -26,7 +26,7 @@ export interface Handelnder {
   session: Session | null;
   /** Die Sitzung ist noch unbekannt — zeichne einen Ladezustand. */
   laedt: boolean;
-  angemeldet: boolean;
+  signedIn: boolean;
   /** Die eigene Subject-ID, oder `null`. */
   subjectId: string | null;
   /** Das Unternehmen, für das gerade gehandelt wird, oder `null`. */
@@ -36,17 +36,17 @@ export interface Handelnder {
 }
 
 export function useHandelnder(): Handelnder {
-  const status = useAppSelector((zustand) => zustand.auth.status);
-  const session = useAppSelector((zustand) => zustand.auth.session);
-  const angemeldet = status === "authenticated" && session !== null;
+  const status = useAppSelector((state) => state.auth.status);
+  const session = useAppSelector((state) => state.auth.session);
+  const signedIn = status === "authenticated" && session !== null;
 
   return {
     status,
     session,
     laedt: status === "unknown",
-    angemeldet,
-    subjectId: angemeldet ? session.userId : null,
-    tenantId: angemeldet ? session.tenantId : null,
-    fuerFirma: angemeldet && session.tenantId !== null,
+    signedIn,
+    subjectId: signedIn ? session.userId : null,
+    tenantId: signedIn ? session.tenantId : null,
+    fuerFirma: signedIn && session.tenantId !== null,
   };
 }

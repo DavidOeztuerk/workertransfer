@@ -60,7 +60,7 @@ export interface Lebenslaufanfrage {
   active?: boolean | null;
 }
 
-export type Antwort<T> = { ok: true; wert: T } | { ok: false; error: ApiError };
+export type Antwort<T> = { ok: true; value: T } | { ok: false; error: ApiError };
 
 /**
  * Der eigene Lebenslauf.
@@ -73,48 +73,48 @@ export type Antwort<T> = { ok: true; wert: T } | { ok: false; error: ApiError };
  * nicht abrufbar ist — und der nächste Speichern-Klick überschriebe ihn.
  */
 export async function ladeMeinen(signal?: AbortSignal): Promise<Antwort<Lebenslauf | null>> {
-  const antwort = await request<Lebenslauf>(
+  const answer = await request<Lebenslauf>(
     RESUME_BASE_URL,
     "/resumes/me",
     { signal },
     "fehler.lebenslaufNichtAbrufbar"
   );
 
-  if (antwort.ok) return { ok: true, wert: antwort.value ?? null };
-  if (antwort.error.status === 404) return { ok: true, wert: null };
-  return { ok: false, error: antwort.error };
+  if (answer.ok) return { ok: true, value: answer.value ?? null };
+  if (answer.error.status === 404) return { ok: true, value: null };
+  return { ok: false, error: answer.error };
 }
 
 export async function speichereMeinen(
   eingabe: Lebenslaufeingabe,
   signal?: AbortSignal
 ): Promise<Antwort<Lebenslauf>> {
-  const antwort = await request<Lebenslauf>(
+  const answer = await request<Lebenslauf>(
     RESUME_BASE_URL,
     "/resumes/me",
     { method: "PUT", body: eingabe, signal },
     "fehler.lebenslaufNichtGespeichert"
   );
 
-  return antwort.ok
-    ? { ok: true, wert: antwort.value as Lebenslauf }
-    : { ok: false, error: antwort.error };
+  return answer.ok
+    ? { ok: true, value: answer.value as Lebenslauf }
+    : { ok: false, error: answer.error };
 }
 
 /** Die Anfragen, die an mich gestellt wurden. */
 export async function ladeMeineAnfragen(
   signal?: AbortSignal
 ): Promise<Antwort<Lebenslaufanfrage[]>> {
-  const antwort = await request<Lebenslaufanfrage[]>(
+  const answer = await request<Lebenslaufanfrage[]>(
     RESUME_BASE_URL,
     "/resumes/me/requests",
     { signal },
     "fehler.anfragenNichtAbrufbar"
   );
 
-  return antwort.ok
-    ? { ok: true, wert: antwort.value ?? [] }
-    : { ok: false, error: antwort.error };
+  return answer.ok
+    ? { ok: true, value: answer.value ?? [] }
+    : { ok: false, error: answer.error };
 }
 
 /**
@@ -125,31 +125,31 @@ export async function ladeMeineAnfragen(
  * es wurde also NICHTS geändert. Wer daraus „fehlgeschlagen" macht, lässt offen,
  * ob die Rücknahme vielleicht doch griff.
  */
-async function handeln(pfad: string, signal?: AbortSignal): Promise<Antwort<Lebenslaufanfrage>> {
-  const antwort = await request<Lebenslaufanfrage>(
+async function handeln(path: string, signal?: AbortSignal): Promise<Antwort<Lebenslaufanfrage>> {
+  const answer = await request<Lebenslaufanfrage>(
     RESUME_BASE_URL,
-    pfad,
+    path,
     { method: "POST", signal },
     "fehler.anfrageNichtBeantwortet"
   );
 
-  if (!antwort.ok && antwort.error.status === 503) {
+  if (!answer.ok && answer.error.status === 503) {
     return {
       ok: false,
       error: {
-        ...antwort.error,
+        ...answer.error,
         detail: i18n.t("fehler.ledgerSchweigtOhneAenderung"),
       },
     };
   }
 
-  return antwort.ok
-    ? { ok: true, wert: antwort.value as Lebenslaufanfrage }
-    : { ok: false, error: antwort.error };
+  return answer.ok
+    ? { ok: true, value: answer.value as Lebenslaufanfrage }
+    : { ok: false, error: answer.error };
 }
 
-export const beantworten = (id: string, erteilen: boolean, signal?: AbortSignal) =>
-  handeln(`/resumes/requests/${id}/${erteilen ? "grant" : "decline"}`, signal);
+export const beantworten = (id: string, grant: boolean, signal?: AbortSignal) =>
+  handeln(`/resumes/requests/${id}/${grant ? "grant" : "decline"}`, signal);
 
 export const zuruecknehmen = (id: string, signal?: AbortSignal) =>
   handeln(`/resumes/requests/${id}/revoke`, signal);

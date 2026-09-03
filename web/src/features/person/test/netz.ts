@@ -38,9 +38,9 @@ export interface Netz {
   /** Alles, was hinausging — in der Reihenfolge des Aufrufs. */
   aufrufe: Aufruf[];
   /** Der letzte Aufruf auf diesen Schlüssel, oder `undefined`. */
-  letzter: (schluessel: string) => Aufruf | undefined;
+  letzter: (key: string) => Aufruf | undefined;
   /** Eine Reaktion nachträglich ändern (etwa für den zweiten Klick). */
-  setze: (schluessel: string, reaktion: Reaktion) => void;
+  setze: (key: string, reaktion: Reaktion) => void;
 }
 
 function pfadVon(input: string): string {
@@ -66,8 +66,8 @@ export function netz(reaktionen: Reaktionen = {}): Netz {
   const aufrufe: Aufruf[] = [];
 
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
-    const roh = typeof input === "string" ? input : input.toString();
-    const url = pfadVon(roh);
+    const raw = typeof input === "string" ? input : input.toString();
+    const url = pfadVon(raw);
     const path = url.split("?")[0] ?? url;
     const method = (init?.method ?? "GET").toUpperCase();
 
@@ -95,21 +95,28 @@ export function netz(reaktionen: Reaktionen = {}): Netz {
       );
     }
 
-    const { status = 200, body: rumpf } =
+    // `antwortRumpf`, weil `body` in dieser Funktion schon der ANFRAGE gehört.
+    const { status = 200, body: antwortRumpf } =
       typeof reaktion === "function" ? await reaktion(aufruf) : reaktion;
 
-    return new Response(rumpf === undefined ? null : JSON.stringify(rumpf), {
-      status,
-      headers: rumpf === undefined ? undefined : { "content-type": "application/json" },
-    });
+    return new Response(
+      antwortRumpf === undefined ? null : JSON.stringify(antwortRumpf),
+      {
+        status,
+        headers:
+          antwortRumpf === undefined
+            ? undefined
+            : { "content-type": "application/json" },
+      }
+    );
   });
 
   return {
     aufrufe,
-    letzter: (schluessel) => {
-      const [method, path] = schluessel.split(" ");
+    letzter: (key) => {
+      const [method, path] = key.split(" ");
       return [...aufrufe].reverse().find((a) => a.method === method && a.path === path);
     },
-    setze: (schluessel, reaktion) => tabelle.set(schluessel, reaktion),
+    setze: (key, reaktion) => tabelle.set(key, reaktion),
   };
 }

@@ -98,10 +98,10 @@ export function CandidateCard({
 function Lebenslaufanfrage({ subjectId }: { subjectId: string }) {
   const { t } = useTranslation();
   const [meldung, setMeldung] = useState<string | null>(null);
-  const [gefragt, setGefragt] = useState(false);
-  const [laeuft, setLaeuft] = useState(false);
+  const [asked, setGefragt] = useState(false);
+  const [running, setLaeuft] = useState(false);
 
-  if (gefragt) {
+  if (asked) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         {t("kandidaten.lebenslaufGefragt")}
@@ -119,21 +119,21 @@ function Lebenslaufanfrage({ subjectId }: { subjectId: string }) {
       <Button
         variant="text"
         size="small"
-        disabled={laeuft}
+        disabled={running}
         onClick={() => {
           setLaeuft(true);
-          void requestResume(subjectId).then((ergebnis) => {
+          void requestResume(subjectId).then((result) => {
             setLaeuft(false);
-            if (ergebnis.ok) {
+            if (result.ok) {
               setMeldung(null);
               setGefragt(true);
             } else {
-              setMeldung(ergebnis.error.detail);
+              setMeldung(result.error.detail);
             }
           });
         }}
       >
-        {laeuft ? t("kandidaten.wirdGefragt") : t("kandidaten.lebenslaufAnfragen")}
+        {running ? t("kandidaten.wirdGefragt") : t("kandidaten.lebenslaufAnfragen")}
       </Button>
     </Box>
   );
@@ -158,16 +158,16 @@ function Marktzugang({
 }) {
   const { t } = useTranslation();
   const [meldung, setMeldung] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
 
   const erteilt = anfrage?.status === "GRANTED";
-  const stand = useAsync(
+  const current = useAsync(
     (signal) => getMarketStatus(subjectId, signal),
     [subjectId],
     erteilt,
   );
 
-  const status = stand.data?.ok === true ? stand.data.status : null;
+  const status = current.data?.ok === true ? current.data.status : null;
 
   return (
     <Box sx={{ mb: 1 }}>
@@ -181,17 +181,17 @@ function Marktzugang({
         <Button
           variant="text"
           size="small"
-          disabled={laeuft}
+          disabled={running}
           onClick={() => {
             setLaeuft(true);
-            void requestMarketStatus(subjectId).then((ergebnis) => {
+            void requestMarketStatus(subjectId).then((result) => {
               setLaeuft(false);
-              setMeldung(ergebnis.ok ? null : ergebnis.error.detail);
+              setMeldung(result.ok ? null : result.error.detail);
               onGeaendert();
             });
           }}
         >
-          {laeuft ? t("kandidaten.wirdGefragt") : t("kandidaten.marktAnfragen")}
+          {running ? t("kandidaten.wirdGefragt") : t("kandidaten.marktAnfragen")}
         </Button>
       ) : null}
 
@@ -207,7 +207,7 @@ function Marktzugang({
         </Typography>
       ) : null}
 
-      {erteilt && status === null && !stand.pending ? (
+      {erteilt && status === null && !current.pending ? (
         <Typography variant="body2" color="text.secondary">
           {t("kandidaten.marktNichtEinsehbar")}
         </Typography>
@@ -227,25 +227,25 @@ function Marktzugang({
               variant="contained"
               size="small"
               sx={{ mt: 1 }}
-              disabled={laeuft}
+              disabled={running}
               onClick={() => {
                 setLaeuft(true);
                 void expressInterest(
                   subjectId,
                   t("kandidaten.interesseText"),
                 ).then(
-                  (ergebnis: Awaited<ReturnType<typeof expressInterest>>) => {
+                  (result: Awaited<ReturnType<typeof expressInterest>>) => {
                     setLaeuft(false);
                     setMeldung(
-                      ergebnis.ok
+                      result.ok
                         ? t("kandidaten.interesseHinterlegt")
-                        : ergebnis.error.detail,
+                        : result.error.detail,
                     );
                   },
                 );
               }}
             >
-              {laeuft
+              {running
                 ? t("kandidaten.interesseLaeuft")
                 : t("kandidaten.interesseZeigen")}
             </Button>
@@ -265,33 +265,33 @@ function Marktzugang({
  */
 function GitHubBelege({ subjectId }: { subjectId: string }) {
   const { t, i18n } = useTranslation();
-  const verbindung = useAsync(
+  const connection = useAsync(
     (signal) => getGitHub(subjectId, signal),
     [subjectId],
   );
-  const stand =
-    verbindung.data?.ok === true ? verbindung.data.connection : null;
+  const current =
+    connection.data?.ok === true ? connection.data.connection : null;
 
-  if (stand === null) return null;
+  if (current === null) return null;
 
   return (
     <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: "divider" }}>
       <Link
-        href={`https://github.com/${stand.login}`}
+        href={`https://github.com/${current.login}`}
         target="_blank"
         rel="noreferrer noopener"
         variant="body2"
       >
-        github.com/{stand.login}
+        github.com/{current.login}
       </Link>
 
-      {stand.repositories.length === 0 ? (
+      {current.repositories.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
           {t("kandidaten.keineRepos")}
         </Typography>
       ) : (
         <Box component="ul" sx={{ pl: 2.5, my: 1 }}>
-          {stand.repositories.slice(0, 5).map((repo) => (
+          {current.repositories.slice(0, 5).map((repo) => (
             <Typography component="li" variant="body2" key={repo.name}>
               <Link href={repo.url} target="_blank" rel="noreferrer noopener">
                 {repo.name}
@@ -302,10 +302,10 @@ function GitHubBelege({ subjectId }: { subjectId: string }) {
         </Box>
       )}
 
-      {stand.fetched_at !== null ? (
+      {current.fetched_at !== null ? (
         <Typography variant="caption" color="text.secondary">
           {t("kandidaten.standVom", {
-            zeitpunkt: new Date(stand.fetched_at).toLocaleDateString(
+            zeitpunkt: new Date(current.fetched_at).toLocaleDateString(
               i18n.language,
             ),
           })}

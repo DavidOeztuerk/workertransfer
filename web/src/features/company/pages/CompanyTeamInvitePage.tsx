@@ -40,8 +40,8 @@ export function CompanyTeamInvitePage() {
   const [email, setEmail] = useState("");
   const [rolle, setRolle] = useState<Role>("member");
   const [fehler, setFehler] = useState<string | null>(null);
-  const [verschickt, setVerschickt] = useState(false);
-  const [laeuft, setLaeuft] = useState(false);
+  const [sent, setVerschickt] = useState(false);
+  const [running, setLaeuft] = useState(false);
 
   const mitglieder = useAsync(
     (signal) => listMembers(tenantId as string, signal),
@@ -49,17 +49,17 @@ export function CompanyTeamInvitePage() {
     fuerFirma,
   );
 
-  const zurueck = (
+  const back = (
     <Link component={RouterLink} to="/company/team" variant="body2">
       {t("mannschaft.zurueck")}
     </Link>
   );
 
-  const rahmen = (inhalt: React.ReactNode) => (
+  const rahmen = (content: React.ReactNode) => (
     <PageShell title={t("mannschaft.einladen")} narrow>
-      <Box sx={{ mb: 2 }}>{zurueck}</Box>
+      <Box sx={{ mb: 2 }}>{back}</Box>
       <Card>
-        <CardContent>{inhalt}</CardContent>
+        <CardContent>{content}</CardContent>
       </Card>
     </PageShell>
   );
@@ -76,9 +76,9 @@ export function CompanyTeamInvitePage() {
     return rahmen(<LoadingBlock label={t("mannschaft.mitgliederLaden")} />);
   }
 
-  const liste = mitglieder.data?.ok ? mitglieder.data.members : [];
+  const list = mitglieder.data?.ok ? mitglieder.data.members : [];
   const istAdmin =
-    liste.find((eintrag: CompanyMember) => eintrag.user_id === subjectId)
+    list.find((entry: CompanyMember) => entry.user_id === subjectId)
       ?.role === "admin";
 
   if (!istAdmin) {
@@ -91,15 +91,15 @@ export function CompanyTeamInvitePage() {
 
   async function einladen() {
     setLaeuft(true);
-    const ergebnis = await inviteMember(tenantId as string, email, rolle);
+    const result = await inviteMember(tenantId as string, email, rolle);
     setLaeuft(false);
 
-    if (ergebnis.ok) {
+    if (result.ok) {
       setFehler(null);
       setVerschickt(true);
       setEmail("");
     } else {
-      setFehler(ergebnis.error.detail);
+      setFehler(result.error.detail);
       setVerschickt(false);
     }
   }
@@ -107,8 +107,8 @@ export function CompanyTeamInvitePage() {
   return rahmen(
     <Box
       component="form"
-      onSubmit={(ereignis) => {
-        ereignis.preventDefault();
+      onSubmit={(event) => {
+        event.preventDefault();
         void einladen();
       }}
       sx={{
@@ -148,14 +148,14 @@ export function CompanyTeamInvitePage() {
         </Alert>
       ) : null}
 
-      {verschickt ? (
+      {sent ? (
         <Alert severity="success" role="status" sx={{ alignSelf: "stretch" }}>
           {t("mannschaft.verschickt")}
         </Alert>
       ) : null}
 
-      <Button type="submit" variant="contained" disabled={laeuft}>
-        {laeuft ? t("mannschaft.verschicktLaeuft") : t("mannschaft.einladen")}
+      <Button type="submit" variant="contained" disabled={running}>
+        {running ? t("mannschaft.verschicktLaeuft") : t("mannschaft.einladen")}
       </Button>
     </Box>,
   );

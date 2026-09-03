@@ -10,19 +10,19 @@ type Antwort = { status?: number; body?: unknown };
 
 /** Antwortet je Pfad. `new URL(...).pathname` statt `includes` — exakt. */
 function antworten(karte: Record<string, Antwort>) {
-  const gefragt: { pfad: string; rumpf: string }[] = [];
+  const asked: { path: string; body: string }[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
-      const pfad = new URL(url).pathname;
-      gefragt.push({ pfad, rumpf: String(init?.body ?? "") });
-      const antwort = karte[pfad] ?? { body: {} };
-      return new Response(JSON.stringify(antwort.body ?? {}), {
-        status: antwort.status ?? 200,
+      const path = new URL(url).pathname;
+      asked.push({ path, body: String(init?.body ?? "") });
+      const answer = karte[path] ?? { body: {} };
+      return new Response(JSON.stringify(answer.body ?? {}), {
+        status: answer.status ?? 200,
       });
     }),
   );
-  return gefragt;
+  return asked;
 }
 
 const SITZUNG = {
@@ -80,7 +80,7 @@ describe("LoginPage", () => {
   });
 
   it("schickt E-Mail und Passwort, und sonst nichts", async () => {
-    const gefragt = antworten({ "/auth/login": {}, "/auth/session": SITZUNG });
+    const asked = antworten({ "/auth/login": {}, "/auth/session": SITZUNG });
     const user = userEvent.setup();
     renderMitStore(seite(), { route: "/login" });
 
@@ -89,12 +89,12 @@ describe("LoginPage", () => {
     await user.click(screen.getByRole("button", { name: /Anmelden/i }));
 
     await screen.findByText("Übersicht");
-    const anmeldung = gefragt.find((eintrag) => eintrag.pfad === "/auth/login");
-    expect(anmeldung?.rumpf).toContain('"email"');
-    expect(anmeldung?.rumpf).toContain('"password"');
+    const signIn = asked.find((entry) => entry.path === "/auth/login");
+    expect(signIn?.body).toContain('"email"');
+    expect(signIn?.body).toContain('"password"');
     // Der Mandant kommt nie vom Client — er entsteht erst beim Wechsel in ein
     // Unternehmen, und dort entscheidet ihn der Server (ADR-0018).
-    expect(anmeldung?.rumpf).not.toContain("tenant");
+    expect(signIn?.body).not.toContain("tenant");
   });
 
   it("zeigt den Fehlschlag als Meldung und leitet nicht weiter", async () => {

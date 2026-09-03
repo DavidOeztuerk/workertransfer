@@ -31,16 +31,16 @@ export interface AuthVorgabe {
   memberships?: Membership[];
 }
 
-export function testStore(vorgabe: AuthVorgabe = {}) {
+export function testStore(fallback: AuthVorgabe = {}) {
   return configureStore({
     reducer: { auth, preferences },
     preloadedState: {
       auth: {
         // Voreinstellung „anonymous" und nicht „unknown": `unknown` heisst „noch
         // nicht gefragt", und Seiten, die darauf warten, rendern dann nichts.
-        status: vorgabe.status ?? "anonymous",
-        session: vorgabe.session ?? null,
-        memberships: vorgabe.memberships ?? [],
+        status: fallback.status ?? "anonymous",
+        session: fallback.session ?? null,
+        memberships: fallback.memberships ?? [],
         error: null,
         pending: false,
       },
@@ -51,12 +51,12 @@ export function testStore(vorgabe: AuthVorgabe = {}) {
 export function renderMitStore(
   ui: ReactElement,
   {
-    auth: vorgabe,
+    auth: fallback,
     route = "/",
     ...options
   }: RenderOptions & { auth?: AuthVorgabe; route?: string } = {}
 ) {
-  const store = testStore(vorgabe);
+  const store = testStore(fallback);
 
   function Wrapper({ children }: { children: ReactNode }) {
     return (

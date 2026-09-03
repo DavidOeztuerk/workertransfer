@@ -50,17 +50,17 @@ const TITEL: Record<Transfer["status"], string> = {
  */
 export function TransfersPage() {
   const { t } = useTranslation();
-  const { angemeldet, subjectId } = useHandelnder();
+  const { signedIn, subjectId } = useHandelnder();
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
 
   const gespraeche = useAsync(
     (signal) => listMyTransfers(signal),
     [subjectId],
-    angemeldet,
+    signedIn,
   );
 
-  if (!angemeldet) {
+  if (!signedIn) {
     return (
       <PageShell title={t("gespraeche.titel")} narrow>
         <Card>
@@ -77,16 +77,16 @@ export function TransfersPage() {
     );
   }
 
-  async function ziehen(id: string, zug: PersonAction) {
+  async function ziehen(id: string, move: PersonAction) {
     setLaeuft(true);
-    const ergebnis = await personMove(id, zug);
+    const result = await personMove(id, move);
     setLaeuft(false);
-    if (!ergebnis.ok) setFehler(ergebnis.error.detail);
+    if (!result.ok) setFehler(result.error.detail);
     else setFehler(null);
     gespraeche.reload();
   }
 
-  const liste = gespraeche.data?.ok ? gespraeche.data.transfers : [];
+  const list = gespraeche.data?.ok ? gespraeche.data.transfers : [];
 
   return (
     <PageShell title={t("gespraeche.titel")} narrow lead="">
@@ -115,7 +115,7 @@ export function TransfersPage() {
         <Alert severity="error">{gespraeche.data.error.detail}</Alert>
       ) : null}
 
-      {gespraeche.data?.ok && liste.length === 0 ? (
+      {gespraeche.data?.ok && list.length === 0 ? (
         <EmptyBlock title={t("gespraeche.leer")} />
       ) : null}
 
@@ -130,12 +130,12 @@ export function TransfersPage() {
           m: 0,
         }}
       >
-        {liste.map((gespraech: Transfer) => (
+        {list.map((gespraech: Transfer) => (
           <Gespraechskarte
             key={gespraech.id}
             gespraech={gespraech}
-            gesperrt={laeuft}
-            onZug={(zug) => void ziehen(gespraech.id, zug)}
+            locked={running}
+            onZug={(move) => void ziehen(gespraech.id, move)}
           />
         ))}
       </Box>
@@ -145,12 +145,12 @@ export function TransfersPage() {
 
 function Gespraechskarte({
   gespraech,
-  gesperrt,
+  locked,
   onZug,
 }: {
   gespraech: Transfer;
-  gesperrt: boolean;
-  onZug: (zug: PersonAction) => void;
+  locked: boolean;
+  onZug: (move: PersonAction) => void;
 }) {
   const { t } = useTranslation();
   const laeuftNoch = RUNNING.includes(gespraech.status);
@@ -216,7 +216,7 @@ function Gespraechskarte({
             <Button
               variant="contained"
               onClick={() => onZug("accept-talk")}
-              disabled={gesperrt}
+              disabled={locked}
             >
               {t("gespraeche.gespraechAnnehmen")}
             </Button>
@@ -225,7 +225,7 @@ function Gespraechskarte({
             <Button
               variant="contained"
               onClick={() => onZug("accept-offer")}
-              disabled={gesperrt}
+              disabled={locked}
             >
               {t("gespraeche.angebotAnnehmen")}
             </Button>
@@ -234,7 +234,7 @@ function Gespraechskarte({
             <Button
               variant="contained"
               onClick={() => onZug("confirm-release")}
-              disabled={gesperrt}
+              disabled={locked}
             >
               {t("gespraeche.freigabeBestaetigen")}
             </Button>
@@ -243,7 +243,7 @@ function Gespraechskarte({
             <Button
               variant="text"
               onClick={() => onZug("decline")}
-              disabled={gesperrt}
+              disabled={locked}
             >
               {t("allgemein.ablehnen")}
             </Button>

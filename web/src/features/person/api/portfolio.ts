@@ -27,7 +27,7 @@ export interface Schaufenster {
   updated_at: string;
 }
 
-export type Antwort<T> = { ok: true; wert: T } | { ok: false; error: ApiError };
+export type Antwort<T> = { ok: true; value: T } | { ok: false; error: ApiError };
 
 /**
  * Das eigene Schaufenster.
@@ -38,16 +38,16 @@ export type Antwort<T> = { ok: true; wert: T } | { ok: false; error: ApiError };
  * nur gerade nicht abrufbar sind — und das nächste Speichern löschte sie.
  */
 export async function ladeMeines(signal?: AbortSignal): Promise<Antwort<Schaufenster | null>> {
-  const antwort = await request<Schaufenster>(
+  const answer = await request<Schaufenster>(
     PORTFOLIO_BASE_URL,
     "/portfolios/me",
     { signal },
     "fehler.arbeitenNichtAbrufbar"
   );
 
-  if (antwort.ok) return { ok: true, wert: antwort.value ?? null };
-  if (antwort.error.status === 404) return { ok: true, wert: null };
-  return { ok: false, error: antwort.error };
+  if (answer.ok) return { ok: true, value: answer.value ?? null };
+  if (answer.error.status === 404) return { ok: true, value: null };
+  return { ok: false, error: answer.error };
 }
 
 /**
@@ -60,16 +60,16 @@ export async function speichereMeines(
   arbeiten: Arbeit[],
   signal?: AbortSignal
 ): Promise<Antwort<Schaufenster>> {
-  const antwort = await request<Schaufenster>(
+  const answer = await request<Schaufenster>(
     PORTFOLIO_BASE_URL,
     "/portfolios/me",
     { method: "PUT", body: { items: arbeiten }, signal },
     "fehler.arbeitenNichtGespeichert"
   );
 
-  return antwort.ok
-    ? { ok: true, wert: antwort.value as Schaufenster }
-    : { ok: false, error: antwort.error };
+  return answer.ok
+    ? { ok: true, value: answer.value as Schaufenster }
+    : { ok: false, error: answer.error };
 }
 
 export interface Anhang {
@@ -89,16 +89,16 @@ export interface Anhang {
  * Eigener Aufruf statt <c>request</c>: hier geht ein <c>FormData</c> über die
  * Leitung, kein JSON, und der Browser muss die Grenzmarkierung selbst setzen.
  */
-export async function haengeAn(datei: File, signal?: AbortSignal): Promise<Antwort<Anhang>> {
-  const rumpf = new FormData();
-  rumpf.append("file", datei);
+export async function haengeAn(file: File, signal?: AbortSignal): Promise<Antwort<Anhang>> {
+  const body = new FormData();
+  body.append("file", file);
 
-  let antwort: Response;
+  let answer: Response;
   try {
-    antwort = await fetch(`${PORTFOLIO_BASE_URL}/portfolios/me/attachments`, {
+    answer = await fetch(`${PORTFOLIO_BASE_URL}/portfolios/me/attachments`, {
       method: "POST",
       credentials: "include",
-      body: rumpf,
+      body: body,
       signal,
     });
   } catch {
@@ -112,18 +112,18 @@ export async function haengeAn(datei: File, signal?: AbortSignal): Promise<Antwo
     };
   }
 
-  if (!antwort.ok) {
+  if (!answer.ok) {
     return {
       ok: false,
       error: {
-        status: antwort.status,
+        status: answer.status,
         title: i18n.t("fehler.dateiAbgelehnt"),
         detail: i18n.t("fehler.dateiNichtAngenommen"),
       },
     };
   }
 
-  return { ok: true, wert: (await antwort.json()) as Anhang };
+  return { ok: true, value: (await answer.json()) as Anhang };
 }
 
 /** Wo eine Datei liegt. Zusammengesetzt wie serverseitig: Person und Name. */

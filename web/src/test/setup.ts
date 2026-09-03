@@ -47,10 +47,10 @@ function inMemoryStorage(): Storage {
       return daten.size;
     },
     clear: () => daten.clear(),
-    getItem: (schluessel: string) => daten.get(schluessel) ?? null,
+    getItem: (key: string) => daten.get(key) ?? null,
     key: (index: number) => [...daten.keys()][index] ?? null,
-    removeItem: (schluessel: string) => void daten.delete(schluessel),
-    setItem: (schluessel: string, wert: string) => void daten.set(schluessel, String(wert)),
+    removeItem: (key: string) => void daten.delete(key),
+    setItem: (key: string, value: string) => void daten.set(key, String(value)),
   };
 }
 

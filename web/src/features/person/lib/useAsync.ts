@@ -15,12 +15,12 @@ import { useCallback, useEffect, useState } from "react";
  * „leer", und `wert === undefined` ist nicht „nichts vorhanden".
  */
 export interface AsyncZustand<T> {
-  wert: T | undefined;
+  value: T | undefined;
   laedt: boolean;
   /** Neu laden — nach einer Änderung, die die Antwort verändert hat. */
-  erneut: () => void;
+  again: () => void;
   /** Den Wert von Hand setzen, wenn die Antwort ihn schon mitbrachte. */
-  setze: (wert: T) => void;
+  setze: (value: T) => void;
 }
 
 /**
@@ -29,48 +29,48 @@ export interface AsyncZustand<T> {
  *   Der Zustand bleibt dann für immer im Laden — die Seite fragt vorher ab.
  */
 export function useAsync<T>(
-  laden: (signal: AbortSignal) => Promise<T>,
+  load: (signal: AbortSignal) => Promise<T>,
   deps: unknown[],
   aktiv = true
 ): AsyncZustand<T> {
-  const [wert, setzeWert] = useState<T | undefined>(undefined);
+  const [value, setzeWert] = useState<T | undefined>(undefined);
   const [laedt, setzeLaedt] = useState(aktiv);
   const [runde, setzeRunde] = useState(0);
 
   // Die Abhängigkeiten kommen vom Aufrufer; `laden` selbst ist bei jedem
   // Rendern eine neue Funktion und darf deshalb NICHT in die Liste.
-  const ruf = useCallback(laden, deps);
+  const ruf = useCallback(load, deps);
 
   useEffect(() => {
     if (!aktiv) {
       setzeLaedt(false);
       return;
     }
-    const abbruch = new AbortController();
-    let lebt = true;
+    const abort = new AbortController();
+    let alive = true;
     setzeLaedt(true);
-    void ruf(abbruch.signal).then(
-      (antwort) => {
-        if (!lebt) return;
-        setzeWert(antwort);
+    void ruf(abort.signal).then(
+      (answer) => {
+        if (!alive) return;
+        setzeWert(answer);
         setzeLaedt(false);
       },
       () => {
         // Ein abgebrochener Aufruf ist kein Ergebnis. Die API-Module werfen
         // ohnehin nicht — ein Statuscode ist dort eine Antwort.
-        if (lebt) setzeLaedt(false);
+        if (alive) setzeLaedt(false);
       }
     );
     return () => {
-      lebt = false;
-      abbruch.abort();
+      alive = false;
+      abort.abort();
     };
   }, [ruf, aktiv, runde]);
 
   return {
-    wert,
+    value,
     laedt,
-    erneut: useCallback(() => setzeRunde((n) => n + 1), []),
+    again: useCallback(() => setzeRunde((n) => n + 1), []),
     setze: useCallback((neu: T) => {
       setzeWert(neu);
       setzeLaedt(false);

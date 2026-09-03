@@ -22,12 +22,12 @@ import { PORTFOLIO_VISIBILITY, isGranted, setGranted } from "../api/consent";
 import { type Arbeit, anhangUrl, ladeMeines } from "../api/portfolio";
 
 /** Rolle und Jahr, soweit angegeben — und ob eine Datei hängt. */
-function einordnung(arbeit: Arbeit, mitDatei: string): string {
-  const teile: string[] = [];
-  if (arbeit.role !== "") teile.push(arbeit.role);
-  if (arbeit.year !== null) teile.push(String(arbeit.year));
-  if (arbeit.attachment !== null) teile.push(mitDatei);
-  return teile.join(" · ");
+function summaryLine(arbeit: Arbeit, mitDatei: string): string {
+  const parts: string[] = [];
+  if (arbeit.role !== "") parts.push(arbeit.role);
+  if (arbeit.year !== null) parts.push(String(arbeit.year));
+  if (arbeit.attachment !== null) parts.push(mitDatei);
+  return parts.join(" · ");
 }
 
 /**
@@ -44,13 +44,13 @@ function einordnung(arbeit: Arbeit, mitDatei: string): string {
 export function PortfolioPage() {
   const { t } = useTranslation();
   const status = useAppSelector((state) => state.auth.status);
-  const sitzung = useAppSelector((state) => state.auth.session);
-  const subjectId = sitzung?.userId ?? null;
+  const session = useAppSelector((state) => state.auth.session);
+  const subjectId = session?.userId ?? null;
 
   const [fehler, setFehler] = useState<string | null>(null);
-  const [schaltet, setSchaltet] = useState(false);
+  const [toggling, setSchaltet] = useState(false);
 
-  const schaufenster = useAsync(
+  const showcase = useAsync(
     (signal) => ladeMeines(signal),
     [subjectId],
     subjectId !== null,
@@ -71,18 +71,18 @@ export function PortfolioPage() {
     );
   }
 
-  const arbeiten = schaufenster.wert?.ok
-    ? (schaufenster.wert.wert?.items ?? [])
+  const arbeiten = showcase.value?.ok
+    ? (showcase.value.value?.items ?? [])
     : [];
   const hatArbeiten = arbeiten.length > 0;
 
   // `undefined` heisst „wird noch geladen", `null` heisst „der Ledger schweigt".
-  const ledgerSchweigt = freigabe.wert === null;
+  const ledgerSchweigt = freigabe.value === null;
   const ledgerUnbekannt = freigabe.laedt || ledgerSchweigt;
 
   async function umschalten(neu: boolean) {
     setSchaltet(true);
-    const ergebnis = await setGranted(
+    const result = await setGranted(
       subjectId as string,
       PORTFOLIO_VISIBILITY,
       neu,
@@ -90,16 +90,16 @@ export function PortfolioPage() {
     );
     setSchaltet(false);
 
-    if (ergebnis.ok) {
+    if (result.ok) {
       setFehler(null);
-      freigabe.setze(ergebnis.granted);
+      freigabe.setze(result.granted);
     } else {
-      setFehler(ergebnis.error.detail);
-      freigabe.erneut();
+      setFehler(result.error.detail);
+      freigabe.again();
     }
   }
 
-  const hinweis = ledgerSchweigt
+  const hint = ledgerSchweigt
     ? t("arbeiten.freigabeSchweigt")
     : freigabe.laedt
       ? t("arbeiten.freigabePruefung")
@@ -130,9 +130,9 @@ export function PortfolioPage() {
         <CardContent>
           <ConsentSwitch
             label={t("arbeiten.freigabeLabel")}
-            hint={hinweis}
-            checked={freigabe.wert === true}
-            disabled={!hatArbeiten || schaltet || ledgerUnbekannt}
+            hint={hint}
+            checked={freigabe.value === true}
+            disabled={!hatArbeiten || toggling || ledgerUnbekannt}
             onChange={(neu) => void umschalten(neu)}
           />
         </CardContent>
@@ -140,15 +140,15 @@ export function PortfolioPage() {
 
       <Card>
         <CardContent>
-          {schaufenster.laedt ? (
+          {showcase.laedt ? (
             <LoadingBlock label={t("arbeiten.laden")} />
           ) : null}
 
-          {schaufenster.wert && !schaufenster.wert.ok ? (
-            <ErrorBlock error={schaufenster.wert.error} />
+          {showcase.value && !showcase.value.ok ? (
+            <ErrorBlock error={showcase.value.error} />
           ) : null}
 
-          {!schaufenster.laedt && schaufenster.wert?.ok && !hatArbeiten ? (
+          {!showcase.laedt && showcase.value?.ok && !hatArbeiten ? (
             <EmptyBlock
               title={t("arbeiten.leerTitel")}
               hint={t("arbeiten.leerHinweis")}
@@ -191,7 +191,7 @@ export function PortfolioPage() {
                       <Box>
                         <Typography variant="h4">{arbeit.title}</Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {einordnung(arbeit, t("arbeiten.mitDatei"))}
+                          {summaryLine(arbeit, t("arbeiten.mitDatei"))}
                         </Typography>
                       </Box>
                       <Box

@@ -35,19 +35,19 @@ export function DraftHelp({
   hasText: boolean;
 }) {
   const { t } = useTranslation();
-  const [wunsch, setzeWunsch] = useState("");
+  const [wish, setzeWunsch] = useState("");
   const [problem, setzeProblem] = useState<string | null>(null);
-  const [laeuft, setzeLaeuft] = useState(false);
+  const [running, setzeLaeuft] = useState(false);
 
   async function frage() {
     setzeLaeuft(true);
-    const ergebnis = await draftProfileText(wunsch);
+    const result = await draftProfileText(wish);
     setzeLaeuft(false);
-    if (ergebnis.ok) {
+    if (result.ok) {
       setzeProblem(null);
-      onDraft(ergebnis.draft);
+      onDraft(result.draft);
     } else {
-      setzeProblem(ergebnis.message);
+      setzeProblem(result.message);
     }
   }
 
@@ -56,8 +56,8 @@ export function DraftHelp({
       <TextField
         label={t(hasText ? "entwurf.labelUmformulieren" : "entwurf.labelNeu")}
         helperText={t("entwurf.hinweis")}
-        value={wunsch}
-        onChange={(ereignis) => setzeWunsch(ereignis.target.value)}
+        value={wish}
+        onChange={(event) => setzeWunsch(event.target.value)}
         slotProps={{ htmlInput: { maxLength: 200 } }}
         fullWidth
       />
@@ -70,9 +70,9 @@ export function DraftHelp({
           type="button"
           variant="text"
           onClick={() => void frage()}
-          disabled={laeuft}
+          disabled={running}
         >
-          {laeuft
+          {running
             ? t("entwurf.laeuft")
             : t(hasText ? "entwurf.knopfErsetzt" : "entwurf.knopfNeu")}
         </Button>

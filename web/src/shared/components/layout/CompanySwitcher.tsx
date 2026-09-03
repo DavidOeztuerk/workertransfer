@@ -44,8 +44,8 @@ export function CompanySwitcher() {
       label={t("kopf.handelnAls")}
       value={tenantId ?? ""}
       onChange={(event) => {
-        const gewaehlt = event.target.value;
-        if (gewaehlt !== "") void dispatch(actForCompany(gewaehlt));
+        const chosen = event.target.value;
+        if (chosen !== "") void dispatch(actForCompany(chosen));
       }}
       sx={{ minWidth: 200, display: { xs: "none", md: "block" } }}
     >

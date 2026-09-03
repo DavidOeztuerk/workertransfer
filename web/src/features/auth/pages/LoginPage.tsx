@@ -28,9 +28,9 @@ export function LoginPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
-  const status = useAppSelector((zustand) => zustand.auth.status);
-  const pending = useAppSelector((zustand) => zustand.auth.pending);
-  const fehler = useAppSelector((zustand) => zustand.auth.error);
+  const status = useAppSelector((state) => state.auth.status);
+  const pending = useAppSelector((state) => state.auth.pending);
+  const fehler = useAppSelector((state) => state.auth.error);
 
   const [email, setEmail] = useState("");
   const [passwort, setPasswort] = useState("");
@@ -53,15 +53,15 @@ export function LoginPage() {
   // stille Weg zum selben Ziel.
   if (status === "authenticated") return <Navigate to="/overview" replace />;
 
-  async function absenden(ereignis: React.FormEvent) {
-    ereignis.preventDefault();
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
     setStummerFehlschlag(null);
     dispatch(errorCleared());
 
-    const ergebnis = await dispatch(login({ email, password: passwort }));
+    const result = await dispatch(login({ email, password: passwort }));
 
-    if (login.fulfilled.match(ergebnis)) {
-      if (ergebnis.payload !== null) {
+    if (login.fulfilled.match(result)) {
+      if (result.payload !== null) {
         // Hier hing früher der Rückweg zur gemerkten Stelle:
         // `const stelle = gemerkteStelle(); vergissStelle();`
         // `window.location.href = stelle === null ? "/" : "/jobs/" + stelle + "/apply"`.
@@ -80,7 +80,7 @@ export function LoginPage() {
 
     // `payload` gesetzt heisst: der Slice zeigt den Fehler des Servers. Nur der
     // andere Fall braucht hier einen eigenen Satz.
-    if (ergebnis.payload === undefined) {
+    if (result.payload === undefined) {
       setStummerFehlschlag(t("anmeldung.fehlgeschlagen"));
     }
   }
@@ -94,7 +94,7 @@ export function LoginPage() {
 
       <Box
         component="form"
-        onSubmit={absenden}
+        onSubmit={submit}
         noValidate
         sx={{ display: "grid", gap: 2 }}
       >
@@ -105,7 +105,7 @@ export function LoginPage() {
           // mahnt es in der Konsole selbst an.
           autoComplete="username"
           value={email}
-          onChange={(ereignis) => setEmail(ereignis.target.value)}
+          onChange={(event) => setEmail(event.target.value)}
           required
         />
         <TextField
@@ -113,7 +113,7 @@ export function LoginPage() {
           type="password"
           autoComplete="current-password"
           value={passwort}
-          onChange={(ereignis) => setPasswort(ereignis.target.value)}
+          onChange={(event) => setPasswort(event.target.value)}
           required
         />
 

@@ -38,7 +38,7 @@ export function ConsentsPage() {
   const { t } = useTranslation();
   const { subjectId, unbekannt } = usePerson();
   const [fehler, setzeFehler] = useState<ApiError | null>(null);
-  const [beschaeftigt, setzeBeschaeftigt] = useState(false);
+  const [busy, setzeBeschaeftigt] = useState(false);
 
   const freigaben = useAsync(
     (signal) => listMyConsents(signal),
@@ -46,9 +46,9 @@ export function ConsentsPage() {
     subjectId !== null,
   );
 
-  const ergebnis = freigaben.wert;
+  const result = freigaben.value;
   const consents: GrantedConsent[] =
-    ergebnis?.ok === true ? ergebnis.consents : [];
+    result?.ok === true ? result.consents : [];
 
   // Die Namen kommen frisch vom companies-service. Sie im Ledger zu führen
   // hiesse, eine Kopie zu halten, die veraltet, sobald ein Unternehmen sich
@@ -75,21 +75,21 @@ export function ConsentsPage() {
     [tenantIds.join(",")],
     tenantIds.length > 0,
   );
-  const nameFuer = namen.wert ?? new Map<string, string>();
+  const nameFuer = namen.value ?? new Map<string, string>();
 
   const zuruecknehmen = useCallback(
     async (capability: string) => {
       if (subjectId === null) return;
       setzeBeschaeftigt(true);
-      const ergebnis = await setGranted(
+      const result = await setGranted(
         subjectId,
         capability,
         false,
         t("freigaben.widerrufsgrund"),
       );
       setzeBeschaeftigt(false);
-      setzeFehler(ergebnis.ok ? null : ergebnis.error);
-      freigaben.erneut();
+      setzeFehler(result.ok ? null : result.error);
+      freigaben.again();
     },
     [subjectId, freigaben, t],
   );
@@ -129,11 +129,11 @@ export function ConsentsPage() {
 
           {/* Kein leerer Zustand bei einem Fehler: „du hast nichts freigegeben"
               wäre hier die beruhigendste falsche Antwort, die es gibt. */}
-          {ergebnis !== undefined && !ergebnis.ok ? (
-            <ErrorBlock error={ergebnis.error} />
+          {result !== undefined && !result.ok ? (
+            <ErrorBlock error={result.error} />
           ) : null}
 
-          {ergebnis?.ok && consents.length === 0 ? (
+          {result?.ok && consents.length === 0 ? (
             <EmptyBlock
               title={t("freigaben.leerTitel")}
               hint={t("freigaben.leerHinweis")}
@@ -151,7 +151,7 @@ export function ConsentsPage() {
                       parseCapability(consent.capability).tenantId ?? "",
                     ) ?? null
                   }
-                  beschaeftigt={beschaeftigt}
+                  busy={busy}
                   onWithdraw={() => void zuruecknehmen(consent.capability)}
                 />
               ))}
@@ -166,26 +166,26 @@ export function ConsentsPage() {
 function ConsentZeile({
   consent,
   firmenname,
-  beschaeftigt,
+  busy,
   onWithdraw,
 }: {
   consent: GrantedConsent;
   firmenname: string | null;
-  beschaeftigt: boolean;
+  busy: boolean;
   onWithdraw: () => void;
 }) {
   const { t, i18n } = useTranslation();
-  const teile = parseCapability(consent.capability);
+  const parts = parseCapability(consent.capability);
   // Eine unbekannte Form wird gezeigt, nicht verschluckt — und lässt sich
   // trotzdem zurückziehen.
   // Übersetzt wird NUR die erkannte Form. Die rohe Zeichenkette durch `t()` zu
   // schicken zerlegt sie: i18next liest ein `:` als Namensraumtrenner, und aus
   // `something.entirely:new` wird `new`. Eine unbekannte Freigabe muss aber
   // wörtlich dastehen — sonst weiss niemand, was er da zurückzieht.
-  const was = teile.area === null ? consent.capability : t(teile.area);
-  const wer = teile.public
+  const was = parts.area === null ? consent.capability : t(parts.area);
+  const wer = parts.public
     ? t("freigaben.alleUnternehmen")
-    : teile.tenantId !== null
+    : parts.tenantId !== null
       ? (firmenname ?? t("freigaben.einUnternehmen"))
       : t("freigaben.empfaengerUnbekannt");
 
@@ -215,7 +215,7 @@ function ConsentZeile({
           })}
         </Typography>
       </Box>
-      <Button variant="text" onClick={onWithdraw} disabled={beschaeftigt}>
+      <Button variant="text" onClick={onWithdraw} disabled={busy}>
         {t("allgemein.zurueckziehen")}
       </Button>
     </ListItem>

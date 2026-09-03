@@ -42,7 +42,7 @@ export function SiteHeader() {
   const status = useAppSelector((state) => state.auth.status);
   const session = useAppSelector((state) => state.auth.session);
 
-  const angemeldet = status === "authenticated";
+  const signedIn = status === "authenticated";
   const alsFirma = session?.tenantId != null;
 
   return (
@@ -79,7 +79,7 @@ export function SiteHeader() {
             <NavLink to="/jobs" current={pathname}>
               Stellen
             </NavLink>
-            {angemeldet ? (
+            {signedIn ? (
               <>
                 <NavLink to="/overview" current={pathname}>
                   Übersicht
@@ -99,7 +99,7 @@ export function SiteHeader() {
           <LanguagePicker />
           <ColorModeToggle />
 
-          {angemeldet ? (
+          {signedIn ? (
             <>
               <CompanySwitcher />
               {alsFirma ? <FirmenMenu /> : null}

@@ -39,10 +39,10 @@ interface PreferencesState {
  * Seitendaten, in einer Vorschau. Ein Fehler beim LESEN einer Vorliebe darf die
  * Anwendung nicht am Start hindern.
  */
-function gespeichert(): ColorPreference {
+function saved(): ColorPreference {
   try {
-    const wert = localStorage.getItem(SPEICHER);
-    return wert === "light" || wert === "dark" || wert === "system" ? wert : "system";
+    const value = localStorage.getItem(SPEICHER);
+    return value === "light" || value === "dark" || value === "system" ? value : "system";
   } catch {
     return "system";
   }
@@ -51,9 +51,9 @@ function gespeichert(): ColorPreference {
 /** Wie <see cref="gespeichert"/>, und aus denselben Gründen fehlertolerant. */
 function gespeicherteSprache(): Sprachvorliebe {
   try {
-    const wert = localStorage.getItem(SPRACHSPEICHER);
-    return wert === "system" || SPRACHEN.includes(wert as Sprache)
-      ? (wert as Sprachvorliebe)
+    const value = localStorage.getItem(SPRACHSPEICHER);
+    return value === "system" || SPRACHEN.includes(value as Sprache)
+      ? (value as Sprachvorliebe)
       : "system";
   } catch {
     return "system";
@@ -69,8 +69,8 @@ function gespeicherteSprache(): Sprachvorliebe {
  * gar nicht da ist.
  */
 export function spracheDesGeraets(): Sprache {
-  const roh = typeof navigator === "undefined" ? "" : (navigator.language ?? "");
-  const nur = roh.toLowerCase().split("-")[0];
+  const raw = typeof navigator === "undefined" ? "" : (navigator.language ?? "");
+  const nur = raw.toLowerCase().split("-")[0];
 
   return SPRACHEN.includes(nur as Sprache) ? (nur as Sprache) : "de";
 }
@@ -101,7 +101,7 @@ export function aufgeloest(vorliebe: Sprachvorliebe): Sprache {
 const preferencesSlice = createSlice({
   name: "preferences",
   initialState: {
-    colorMode: gespeichert(),
+    colorMode: saved(),
     language: gespeicherteSprache(),
   } as PreferencesState,
   reducers: {

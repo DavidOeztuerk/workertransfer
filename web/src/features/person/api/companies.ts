@@ -21,12 +21,12 @@ export async function getCompanyName(
   tenantId: string,
   signal?: AbortSignal
 ): Promise<string | null> {
-  const antwort = await request<CompanyName>(
+  const answer = await request<CompanyName>(
     COMPANIES_BASE_URL,
     `/companies/${tenantId}/profile`,
     { signal }
   );
-  if (!antwort.ok) return null;
-  const name = antwort.value?.display_name;
+  if (!answer.ok) return null;
+  const name = answer.value?.display_name;
   return typeof name === "string" && name !== "" ? name : null;
 }

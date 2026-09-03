@@ -33,8 +33,8 @@ const STAND: Record<ApplicationStatus, string> = {
 };
 
 /** Läuft die Bewerbung noch — also sieht das Unternehmen gerade etwas? */
-const laeuft = (stand: ApplicationStatus) =>
-  stand === "submitted" || stand === "reviewing";
+const running = (current: ApplicationStatus) =>
+  current === "submitted" || current === "reviewing";
 
 /**
  * Was mit dieser Bewerbung geöffnet wurde.
@@ -44,12 +44,12 @@ const laeuft = (stand: ApplicationStatus) =>
  */
 function freigegeben(
   bewerbung: Application,
-  t: (schluessel: string) => string,
+  t: (key: string) => string,
 ): string {
-  const teile = [t("bewerbungen.teilProfil")];
-  if (bewerbung.shares_resume) teile.push(t("bewerbungen.teilLebenslauf"));
-  if (bewerbung.shares_portfolio) teile.push(t("bewerbungen.teilArbeiten"));
-  return teile.join(", ");
+  const parts = [t("bewerbungen.teilProfil")];
+  if (bewerbung.shares_resume) parts.push(t("bewerbungen.teilLebenslauf"));
+  if (bewerbung.shares_portfolio) parts.push(t("bewerbungen.teilArbeiten"));
+  return parts.join(", ");
 }
 
 /**
@@ -66,17 +66,17 @@ function freigegeben(
  */
 export function ApplicationsPage() {
   const { t } = useTranslation();
-  const { angemeldet, subjectId } = useHandelnder();
+  const { signedIn, subjectId } = useHandelnder();
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuftGerade, setLaeuftGerade] = useState(false);
 
   const bewerbungen = useAsync(
     (signal) => listMyApplications(signal),
     [subjectId],
-    angemeldet,
+    signedIn,
   );
 
-  if (!angemeldet) {
+  if (!signedIn) {
     return (
       <PageShell title={t("bewerbungen.titel")} narrow>
         <Card>
@@ -95,15 +95,15 @@ export function ApplicationsPage() {
 
   async function zurueckziehen(id: string) {
     setLaeuftGerade(true);
-    const ergebnis = await withdrawApplication(id);
+    const result = await withdrawApplication(id);
     setLaeuftGerade(false);
 
-    setFehler(ergebnis.ok ? null : ergebnis.error.detail);
+    setFehler(result.ok ? null : result.error.detail);
     bewerbungen.reload();
   }
 
-  const ergebnis = bewerbungen.data;
-  const liste = ergebnis?.ok ? ergebnis.applications : [];
+  const result = bewerbungen.data;
+  const list = result?.ok ? result.applications : [];
 
   return (
     <PageShell
@@ -126,11 +126,11 @@ export function ApplicationsPage() {
             <LoadingBlock label={t("bewerbungen.laden")} />
           ) : null}
 
-          {ergebnis !== null && !ergebnis.ok ? (
-            <Alert severity="error">{ergebnis.error.detail}</Alert>
+          {result !== null && !result.ok ? (
+            <Alert severity="error">{result.error.detail}</Alert>
           ) : null}
 
-          {ergebnis?.ok && liste.length === 0 ? (
+          {result?.ok && list.length === 0 ? (
             <EmptyBlock
               title={t("bewerbungen.leerTitel")}
               action={
@@ -141,7 +141,7 @@ export function ApplicationsPage() {
             />
           ) : null}
 
-          {liste.length > 0 ? (
+          {list.length > 0 ? (
             <Box
               component="ul"
               sx={{
@@ -153,7 +153,7 @@ export function ApplicationsPage() {
                 m: 0,
               }}
             >
-              {liste.map((bewerbung: Application) => (
+              {list.map((bewerbung: Application) => (
                 <Card key={bewerbung.id} component="li" variant="outlined">
                   <CardContent
                     sx={{
@@ -169,15 +169,15 @@ export function ApplicationsPage() {
                         {t(STAND[bewerbung.status])}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {laeuft(bewerbung.status)
+                        {running(bewerbung.status)
                           ? t("bewerbungen.freigegeben", {
-                              teile: freigegeben(bewerbung, t),
+                              parts: freigegeben(bewerbung, t),
                             })
                           : t("bewerbungen.nichtMehrSichtbar")}
                       </Typography>
                     </Box>
 
-                    {laeuft(bewerbung.status) ? (
+                    {running(bewerbung.status) ? (
                       <Button
                         variant="text"
                         size="small"

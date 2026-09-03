@@ -89,8 +89,8 @@ function wartetAufDasUnternehmen(vorgang: VorgangZeile): boolean {
   );
 }
 
-const offen = (zeilen: AnfrageZeile[]): number =>
-  zeilen.filter((zeile) => zeile.status === "PENDING").length;
+const open = (rows: AnfrageZeile[]): number =>
+  rows.filter((row) => row.status === "PENDING").length;
 
 /**
  * Fragt alle vier Quellen und legt die Antworten nebeneinander.
@@ -114,8 +114,8 @@ export async function ladeAufgaben(
 
   return {
     ...LEER,
-    marktanfragen: markt.ok ? offen(markt.value ?? []) : 0,
-    lebenslaufanfragen: lebenslauf.ok ? offen(lebenslauf.value ?? []) : 0,
+    marktanfragen: markt.ok ? open(markt.value ?? []) : 0,
+    lebenslaufanfragen: lebenslauf.ok ? open(lebenslauf.value ?? []) : 0,
     eigeneGespraeche: eigene.ok ? (eigene.value ?? []).filter(wartetAufDiePerson).length : 0,
     firmenvorgaenge: firma.ok ? (firma.value ?? []).filter(wartetAufDasUnternehmen).length : 0,
     unvollstaendig: !markt.ok || !lebenslauf.ok || !eigene.ok || !firma.ok,

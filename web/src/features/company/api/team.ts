@@ -50,16 +50,16 @@ export async function listMembers(
   tenantId: string,
   signal?: AbortSignal
 ): Promise<MitgliederErgebnis> {
-  const antwort = await request<CompanyMember[]>(
+  const answer = await request<CompanyMember[]>(
     API_BASE_URL,
     `/companies/${tenantId}/members`,
     { signal },
     "fehler.mannschaftNichtGeladen"
   );
-  if (antwort.ok) return { ok: true, members: antwort.value ?? [] };
-  if (antwort.error.status === 404) return { ok: true, members: [] };
+  if (answer.ok) return { ok: true, members: answer.value ?? [] };
+  if (answer.error.status === 404) return { ok: true, members: [] };
   return deuten<"fehlgeschlagen">(
-    antwort.error,
+    answer.error,
     { 0: { reason: "fehlgeschlagen", titel: "fehler.keineVerbindung" } },
     "fehlgeschlagen"
   );
@@ -69,16 +69,16 @@ export async function listInvitations(
   tenantId: string,
   signal?: AbortSignal
 ): Promise<EinladungenErgebnis> {
-  const antwort = await request<Invitation[]>(
+  const answer = await request<Invitation[]>(
     API_BASE_URL,
     `/companies/${tenantId}/invitations`,
     { signal },
     "fehler.einladungenNichtGeladen"
   );
-  if (antwort.ok) return { ok: true, invitations: antwort.value ?? [] };
-  if (antwort.error.status === 404) return { ok: true, invitations: [] };
+  if (answer.ok) return { ok: true, invitations: answer.value ?? [] };
+  if (answer.error.status === 404) return { ok: true, invitations: [] };
   return deuten<"fehlgeschlagen">(
-    antwort.error,
+    answer.error,
     { 0: { reason: "fehlgeschlagen", titel: "fehler.keineVerbindung" } },
     "fehlgeschlagen"
   );
@@ -89,7 +89,7 @@ export async function inviteMember(
   email: string,
   role: Role
 ): Promise<EinladenErgebnis> {
-  const antwort = await request<Invitation>(
+  const answer = await request<Invitation>(
     API_BASE_URL,
     `/companies/${tenantId}/invitations`,
     // Kein Unternehmen im Rumpf: es steht im Pfad und wird gegen die
@@ -97,9 +97,9 @@ export async function inviteMember(
     { method: "POST", body: { email, role } },
     "fehler.einladungNichtAngelegt"
   );
-  if (antwort.ok) return { ok: true, invitation: antwort.value };
+  if (answer.ok) return { ok: true, invitation: answer.value };
   return deuten<"not-admin" | "not-yours" | "invalid" | "offline">(
-    antwort.error,
+    answer.error,
     {
       0: { reason: "offline", titel: "fehler.keineVerbindung" },
       403: {
@@ -118,15 +118,15 @@ export async function withdrawInvitation(
 ): Promise<{ ok: true } | Fehlschlag<"fehlgeschlagen">> {
   // `204` ohne Rumpf — `request()` gibt dafür `undefined` zurück, statt den
   // Parser in einen Fehler laufen zu lassen, der wie ein Serverfehler aussähe.
-  const antwort = await request<void>(
+  const answer = await request<void>(
     API_BASE_URL,
     `/companies/${tenantId}/invitations/${invitationId}`,
     { method: "DELETE" },
     "fehler.einladungNichtZurueckgezogen"
   );
-  if (antwort.ok) return { ok: true };
+  if (answer.ok) return { ok: true };
   return deuten<"fehlgeschlagen">(
-    antwort.error,
+    answer.error,
     { 0: { reason: "fehlgeschlagen", titel: "fehler.keineVerbindung" } },
     "fehlgeschlagen"
   );
@@ -144,15 +144,15 @@ export async function removeMember(
   tenantId: string,
   memberId: string
 ): Promise<EntfernenErgebnis> {
-  const antwort = await request<void>(
+  const answer = await request<void>(
     API_BASE_URL,
     `/companies/${tenantId}/members/${memberId}`,
     { method: "DELETE" },
     "fehler.mitgliedNichtEntfernt"
   );
-  if (antwort.ok) return { ok: true };
+  if (answer.ok) return { ok: true };
   return deuten<"last-admin" | "not-admin" | "offline">(
-    antwort.error,
+    answer.error,
     {
       0: { reason: "offline", titel: "fehler.keineVerbindung" },
       409: {

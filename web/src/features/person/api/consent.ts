@@ -37,13 +37,13 @@ export async function isGranted(
   capability: string,
   signal?: AbortSignal
 ): Promise<boolean | null> {
-  const antwort = await request<{ granted?: unknown; deleted?: unknown }>(
+  const answer = await request<{ granted?: unknown; deleted?: unknown }>(
     CONSENT_BASE_URL,
     "/consent/check",
     { method: "POST", body: { subject_id: subjectId, capability }, signal }
   );
-  if (!antwort.ok) return null;
-  return antwort.value?.granted === true && antwort.value.deleted !== true;
+  if (!answer.ok) return null;
+  return answer.value?.granted === true && answer.value.deleted !== true;
 }
 
 /**
@@ -59,7 +59,7 @@ export async function setGranted(
   granted: boolean,
   withdrawalReason: string
 ): Promise<ConsentResult> {
-  const antwort = await request<{ granted?: unknown }>(
+  const answer = await request<{ granted?: unknown }>(
     CONSENT_BASE_URL,
     granted ? "/consent/grant" : "/consent/revoke",
     {
@@ -70,8 +70,8 @@ export async function setGranted(
     },
     "fehler.freigabeNichtGeaendert"
   );
-  if (!antwort.ok) return { ok: false, error: antwort.error };
-  return { ok: true, granted: antwort.value?.granted === true };
+  if (!answer.ok) return { ok: false, error: answer.error };
+  return { ok: true, granted: answer.value?.granted === true };
 }
 
 export interface GrantedConsent {
@@ -95,14 +95,14 @@ export type MyConsentsResult =
  * falsche Antwort, die das System geben kann.
  */
 export async function listMyConsents(signal?: AbortSignal): Promise<MyConsentsResult> {
-  const antwort = await request<GrantedConsent[]>(
+  const answer = await request<GrantedConsent[]>(
     CONSENT_BASE_URL,
     "/consent/me",
     { signal },
     "fehler.freigabenNichtGeladen"
   );
-  if (!antwort.ok) return { ok: false, error: antwort.error };
-  return { ok: true, consents: antwort.value ?? [] };
+  if (!answer.ok) return { ok: false, error: answer.error };
+  return { ok: true, consents: answer.value ?? [] };
 }
 
 export interface ParsedCapability {
@@ -153,12 +153,12 @@ export type ConsentHistoryResult =
 export async function listMyConsentHistory(
   signal?: AbortSignal
 ): Promise<ConsentHistoryResult> {
-  const antwort = await request<ConsentHistoryEntry[]>(
+  const answer = await request<ConsentHistoryEntry[]>(
     CONSENT_BASE_URL,
     "/consent/me/history",
     { signal },
     "fehler.historieNichtGeladen"
   );
-  if (!antwort.ok) return { ok: false, error: antwort.error };
-  return { ok: true, events: antwort.value ?? [] };
+  if (!answer.ok) return { ok: false, error: answer.error };
+  return { ok: true, events: answer.value ?? [] };
 }

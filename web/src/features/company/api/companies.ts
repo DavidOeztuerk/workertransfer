@@ -54,12 +54,12 @@ export async function getCompanyProfile(
   tenantId: string,
   signal?: AbortSignal
 ): Promise<CompanyProfile | null> {
-  const antwort = await request<CompanyProfile>(
+  const answer = await request<CompanyProfile>(
     COMPANIES_BASE_URL,
     `/companies/${tenantId}/profile`,
     { signal }
   );
-  return antwort.ok ? (antwort.value ?? null) : null;
+  return answer.ok ? (answer.value ?? null) : null;
 }
 
 /**
@@ -79,15 +79,15 @@ export async function getCompanyProfile(
 export async function getOwnCompanyProfile(
   signal?: AbortSignal
 ): Promise<EigenesProfilErgebnis> {
-  const antwort = await request<CompanyProfile | null>(
+  const answer = await request<CompanyProfile | null>(
     COMPANIES_BASE_URL,
     "/companies/me/profile",
     { signal },
     "fehler.profilNichtAbrufbar"
   );
-  if (antwort.ok) return { ok: true, profile: antwort.value ?? null };
+  if (answer.ok) return { ok: true, profile: answer.value ?? null };
   return deuten<"unavailable">(
-    antwort.error,
+    answer.error,
     {
       0: { reason: "unavailable", titel: "fehler.profilNichtAbrufbar" },
     },
@@ -98,7 +98,7 @@ export async function getOwnCompanyProfile(
 export async function saveCompanyProfile(
   input: CompanyProfileInput
 ): Promise<SpeicherErgebnis> {
-  const antwort = await request<CompanyProfile>(
+  const answer = await request<CompanyProfile>(
     COMPANIES_BASE_URL,
     "/companies/me/profile",
     // Kein `tenant_id`: das Unternehmen steht im Token und wird gegen die
@@ -106,9 +106,9 @@ export async function saveCompanyProfile(
     { method: "PUT", body: input },
     "fehler.profilNichtGespeichert"
   );
-  if (antwort.ok) return { ok: true, profile: antwort.value };
+  if (answer.ok) return { ok: true, profile: answer.value };
   return deuten<"no-company" | "invalid" | "offline">(
-    antwort.error,
+    answer.error,
     {
       0: { reason: "offline", titel: "fehler.keineVerbindung" },
       403: { reason: "no-company", titel: "fehler.firmaWaehlenHandelnd" },
@@ -135,16 +135,16 @@ export async function getCompanyBySlug(
   slug: string,
   signal?: AbortSignal
 ): Promise<SlugErgebnis> {
-  const antwort = await request<CompanyProfile>(
+  const answer = await request<CompanyProfile>(
     COMPANIES_BASE_URL,
     `/companies/by-slug/${encodeURIComponent(slug)}`,
     { signal },
     "fehler.seiteNichtAbrufbar"
   );
-  if (antwort.ok && antwort.value !== undefined && antwort.value !== null) {
-    return { ok: true, profile: antwort.value };
+  if (answer.ok && answer.value !== undefined && answer.value !== null) {
+    return { ok: true, profile: answer.value };
   }
-  if (antwort.ok) {
+  if (answer.ok) {
     return {
       ok: false,
       reason: "unavailable",
@@ -156,7 +156,7 @@ export async function getCompanyBySlug(
     };
   }
   return deuten<"not-found" | "unavailable">(
-    antwort.error,
+    answer.error,
     {
       0: { reason: "unavailable", titel: "fehler.keineVerbindung" },
       404: {

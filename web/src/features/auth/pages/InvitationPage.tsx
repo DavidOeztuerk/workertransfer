@@ -31,15 +31,15 @@ type Lage =
  */
 export function InvitationPage() {
   const { t } = useTranslation();
-  const [suche] = useSearchParams();
-  const [lage, setLage] = useState<Lage>({ art: "laeuft" });
-  const gestartet = useRef(false);
+  const [searchParams] = useSearchParams();
+  const [state, setLage] = useState<Lage>({ art: "laeuft" });
+  const started = useRef(false);
 
   useEffect(() => {
-    if (gestartet.current) return;
-    gestartet.current = true;
+    if (started.current) return;
+    started.current = true;
 
-    const token = suche.get("token") ?? "";
+    const token = searchParams.get("token") ?? "";
 
     if (token === "") {
       setLage({
@@ -50,24 +50,24 @@ export function InvitationPage() {
       return;
     }
 
-    void nimmAn(token).then((ergebnis: Einladungsergebnis) => {
+    void nimmAn(token).then((result: Einladungsergebnis) => {
       setLage(
-        ergebnis.ok
+        result.ok
           ? {
               art: "dabei",
-              name: ergebnis.mitgliedschaft.name,
-              rolle: ergebnis.mitgliedschaft.role,
+              name: result.mitgliedschaft.name,
+              rolle: result.mitgliedschaft.role,
             }
           : {
               art: "abgelehnt",
-              brauchtKonto: ergebnis.brauchtKonto,
-              meldung: ergebnis.meldung,
+              brauchtKonto: result.brauchtKonto,
+              meldung: result.meldung,
             },
       );
     });
-  }, [suche, t]);
+  }, [searchParams, t]);
 
-  if (lage.art === "laeuft") {
+  if (state.art === "laeuft") {
     return (
       <AuthCard
         title={t("einladung.laeuftTitel")}
@@ -78,15 +78,15 @@ export function InvitationPage() {
     );
   }
 
-  if (lage.art === "dabei") {
+  if (state.art === "dabei") {
     return (
       <AuthCard
-        title={t("einladung.willkommen", { name: lage.name })}
+        title={t("einladung.willkommen", { name: state.name })}
         lead={t("einladung.zusage")}
       >
         <Typography sx={{ mb: 2 }}>
           {t(
-            lage.rolle === "admin"
+            state.rolle === "admin"
               ? "einladung.alsAdmin"
               : "einladung.alsMitglied",
           )}
@@ -107,10 +107,10 @@ export function InvitationPage() {
       lead={t("einladung.zusage")}
     >
       <Alert severity="error" sx={{ mb: 2 }}>
-        {lage.meldung}
+        {state.meldung}
       </Alert>
       <Box>
-        {lage.brauchtKonto ? (
+        {state.brauchtKonto ? (
           <Typography variant="body2">
             <Trans
               i18nKey="einladung.brauchtKonto"

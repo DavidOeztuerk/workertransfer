@@ -70,19 +70,19 @@ const SCHREIBFEHLER: Partial<
 };
 
 async function schreiben(path: string, body?: unknown): Promise<BewerbungErgebnis> {
-  const antwort = await request<Application>(
+  const answer = await request<Application>(
     APPLICATIONS_BASE_URL,
     path,
     { method: "POST", body },
     "fehler.bewerbungNichtGesendet"
   );
-  if (antwort.ok) return { ok: true, application: antwort.value };
+  if (answer.ok) return { ok: true, application: answer.value };
   // `409` behält den Satz des Servers: der Zustand passt nicht, und die Person
   // soll nicht am Formular nach dem Fehler suchen.
-  if (antwort.error.status === 409) {
-    return { ok: false, reason: "already", error: antwort.error };
+  if (answer.error.status === 409) {
+    return { ok: false, reason: "already", error: answer.error };
   }
-  return deuten<BewerbungFehler>(antwort.error, SCHREIBFEHLER, "invalid");
+  return deuten<BewerbungFehler>(answer.error, SCHREIBFEHLER, "invalid");
 }
 
 export function apply(input: ApplicationInput): Promise<BewerbungErgebnis> {
@@ -100,33 +100,33 @@ export function advanceApplication(
   return schreiben(`/applications/${applicationId}/status`, { status });
 }
 
-async function liste(path: string, signal?: AbortSignal): Promise<ListenErgebnis> {
-  const antwort = await request<Application[]>(
+async function list(path: string, signal?: AbortSignal): Promise<ListenErgebnis> {
+  const answer = await request<Application[]>(
     APPLICATIONS_BASE_URL,
     path,
     { signal },
     "fehler.listeNichtGeladen"
   );
-  if (antwort.ok) return { ok: true, applications: antwort.value ?? [] };
+  if (answer.ok) return { ok: true, applications: answer.value ?? [] };
   // Kein Konto bzw. kein aktives Unternehmen: ein behebbarer Zustand, kein
   // Fehler, den man melden müsste.
-  if (antwort.error.status === 401 || antwort.error.status === 403) {
+  if (answer.error.status === 401 || answer.error.status === 403) {
     return { ok: true, applications: [] };
   }
   return deuten<"fehlgeschlagen" | "offline">(
-    antwort.error,
+    answer.error,
     { 0: { reason: "offline", titel: "fehler.keineVerbindung" } },
     "fehlgeschlagen"
   );
 }
 
 export function listMyApplications(signal?: AbortSignal): Promise<ListenErgebnis> {
-  return liste("/applications/me", signal);
+  return list("/applications/me", signal);
 }
 
 export function listApplicationsForJob(
   jobId: string,
   signal?: AbortSignal
 ): Promise<ListenErgebnis> {
-  return liste(`/jobs/${jobId}/applications`, signal);
+  return list(`/jobs/${jobId}/applications`, signal);
 }

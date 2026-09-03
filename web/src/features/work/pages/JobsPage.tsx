@@ -53,27 +53,27 @@ const EMPTY: Filters = { q: "", location: "", remote: "", employment: "" };
  */
 export function JobsPage() {
   const { t } = useTranslation();
-  const { angemeldet, laedt } = useHandelnder();
+  const { signedIn, laedt } = useHandelnder();
   const [form, setForm] = useState<Filters>(EMPTY);
   const [applied, setApplied] = useState<Filters>(EMPTY);
   const navigate = useNavigate();
 
-  const laden = useCallback(
+  const load = useCallback(
     (cursor: string | undefined, signal: AbortSignal) =>
-      searchJobs(applied, cursor, signal).then((ergebnis) =>
-        ergebnis.ok ? ergebnis : ({ ok: false, fehler: ergebnis } as const),
+      searchJobs(applied, cursor, signal).then((result) =>
+        result.ok ? result : ({ ok: false, fehler: result } as const),
       ),
     [applied],
   );
-  const liste = useSeiten<Job, SucheFehlschlag>(laden, JSON.stringify(applied));
+  const list = useSeiten<Job, SucheFehlschlag>(load, JSON.stringify(applied));
 
   // Einmal für die ganze Seite, nicht je Stelle. Solange die Sitzung unbekannt
   // ist, wird NICHT gefragt — sonst liefe beim Kaltstart ein Abruf, dessen
   // Antwort feststeht (401), und die Passung flackerte kurz auf.
-  const profil = useAsync(
+  const profile = useAsync(
     (signal) => getMyProfile(signal),
-    [angemeldet],
-    angemeldet,
+    [signedIn],
+    signedIn,
   );
 
   /*
@@ -87,9 +87,9 @@ export function JobsPage() {
    *   eine Liste — abgleichen.
    */
   const meineSkills: string[] | null =
-    !angemeldet || profil.pending ? null : (profil.data?.skills ?? []);
+    !signedIn || profile.pending ? null : (profile.data?.skills ?? []);
 
-  const firmen = useFirmenprofile(liste.items.map((job) => job.tenant_id));
+  const firmen = useFirmenprofile(list.items.map((job) => job.tenant_id));
 
   return (
     <PageShell
@@ -142,9 +142,9 @@ export function JobsPage() {
             }
           >
             <option value="">{t("stellen.egal")}</option>
-            {REMOTE_MODES.map((wert) => (
-              <option key={wert} value={wert}>
-                {remoteLabel(wert)}
+            {REMOTE_MODES.map((value) => (
+              <option key={value} value={value}>
+                {remoteLabel(value)}
               </option>
             ))}
           </TextField>
@@ -167,9 +167,9 @@ export function JobsPage() {
             }
           >
             <option value="">{t("stellen.egal")}</option>
-            {EMPLOYMENT_TYPES.map((wert) => (
-              <option key={wert} value={wert}>
-                {employmentLabel(wert)}
+            {EMPLOYMENT_TYPES.map((value) => (
+              <option key={value} value={value}>
+                {employmentLabel(value)}
               </option>
             ))}
           </TextField>
@@ -180,32 +180,32 @@ export function JobsPage() {
       </Card>
 
       {/* Reihenfolge auf jeder Liste: lädt, dann Fehler, dann leer, dann Inhalt. */}
-      {liste.pending && liste.items.length === 0 ? (
+      {list.pending && list.items.length === 0 ? (
         <LoadingBlock label={t("stellen.wirdGesucht")} />
       ) : null}
 
-      {liste.fehler !== null ? <ErrorBlock error={liste.fehler.error} /> : null}
+      {list.fehler !== null ? <ErrorBlock error={list.fehler.error} /> : null}
 
-      {!liste.pending && liste.fehler === null && liste.items.length === 0 ? (
+      {!list.pending && list.fehler === null && list.items.length === 0 ? (
         <EmptyBlock
           title={t("stellen.leerTitel")}
           hint={t("stellen.leerHinweis")}
         />
       ) : null}
 
-      {liste.items.length > 0 ? (
+      {list.items.length > 0 ? (
         <Box
           component="ul"
           sx={{ listStyle: "none", p: 0, m: 0, display: "grid", gap: 2 }}
         >
-          {liste.items.map((job) => (
+          {list.items.map((job) => (
             <Box component="li" key={job.id}>
               <Card>
                 <CardContent>
                   <Typography variant="h3" sx={{ mb: 0.5 }}>
                     {job.title}
                   </Typography>
-                  <Hiring profil={firmen[job.tenant_id]} />
+                  <Hiring profile={firmen[job.tenant_id]} />
                   <Typography
                     variant="body2"
                     color="text.secondary"
@@ -221,7 +221,7 @@ export function JobsPage() {
                   </Typography>
                   <Requirements skills={job.skills} mine={meineSkills} />
 
-                  {laedt ? null : angemeldet ? (
+                  {laedt ? null : signedIn ? (
                     /*
                       Ein LINK auf eine eigene Adresse, kein aufklappendes
                       Formular in der Karte. Das Formular überlebt damit ein
@@ -277,9 +277,9 @@ export function JobsPage() {
         </Box>
       ) : null}
 
-      {liste.mehr ? (
-        <Button onClick={liste.weiter} disabled={liste.pending} sx={{ mt: 2 }}>
-          {liste.pending ? t("allgemein.laden") : t("stellen.mehrLaden")}
+      {list.mehr ? (
+        <Button onClick={list.weiter} disabled={list.pending} sx={{ mt: 2 }}>
+          {list.pending ? t("allgemein.laden") : t("stellen.mehrLaden")}
         </Button>
       ) : null}
     </PageShell>
@@ -294,22 +294,22 @@ export function JobsPage() {
  * einem Platzhalter wie „Unbekanntes Unternehmen" zu füllen wäre eine Aussage,
  * die niemand gemacht hat.
  */
-function Hiring({ profil }: { profil: CompanyProfile | null | undefined }) {
+function Hiring({ profile }: { profile: CompanyProfile | null | undefined }) {
   const { t } = useTranslation();
-  if (profil === undefined || profil === null) return null;
+  if (profile === undefined || profile === null) return null;
 
   return (
     <Typography variant="body2" sx={{ mb: 0.5 }}>
-      <Box component="strong">{profil.display_name}</Box>
-      {profil.website !== null ? (
+      <Box component="strong">{profile.display_name}</Box>
+      {profile.website !== null ? (
         <>
           {" · "}
-          <Link href={profil.website} target="_blank" rel="noreferrer noopener">
+          <Link href={profile.website} target="_blank" rel="noreferrer noopener">
             {t("stellen.website")}
           </Link>
         </>
       ) : null}
-      {profil.benefits.length > 0 ? <> · {profil.benefits.join(", ")}</> : null}
+      {profile.benefits.length > 0 ? <> · {profile.benefits.join(", ")}</> : null}
     </Typography>
   );
 }

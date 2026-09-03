@@ -49,7 +49,7 @@ export function CandidatesPage() {
   const { t } = useTranslation();
   const { fuerFirma } = useHandelnder();
 
-  const [entwurf, setEntwurf] = useState({
+  const [draft, setEntwurf] = useState({
     skills: "",
     location: "",
     remoteOnly: false,
@@ -61,14 +61,14 @@ export function CandidatesPage() {
 
   const seiten = useSeiten<Profile, string>(
     (cursor, signal) =>
-      listCandidates(cursor, filter, signal).then((ergebnis) =>
-        ergebnis.ok
+      listCandidates(cursor, filter, signal).then((result) =>
+        result.ok
           ? {
               ok: true as const,
-              items: ergebnis.items,
-              nextCursor: ergebnis.nextCursor,
+              items: result.items,
+              nextCursor: result.nextCursor,
             }
-          : { ok: false as const, fehler: ergebnis.error.detail },
+          : { ok: false as const, fehler: result.error.detail },
       ),
     JSON.stringify(filter),
     fuerFirma,
@@ -121,15 +121,15 @@ export function CandidatesPage() {
         <CardContent>
           <Box
             component="form"
-            onSubmit={(ereignis) => {
-              ereignis.preventDefault();
+            onSubmit={(event) => {
+              event.preventDefault();
               setFilter({
-                skills: entwurf.skills
+                skills: draft.skills
                   .split(",")
-                  .map((eintrag) => eintrag.trim())
-                  .filter((eintrag) => eintrag !== ""),
-                location: entwurf.location,
-                remoteOnly: entwurf.remoteOnly,
+                  .map((entry) => entry.trim())
+                  .filter((entry) => entry !== ""),
+                location: draft.location,
+                remoteOnly: draft.remoteOnly,
               });
             }}
             sx={{
@@ -143,18 +143,18 @@ export function CandidatesPage() {
               label={t("kandidaten.faehigkeiten")}
               helperText={t("kandidaten.faehigkeitenHinweis")}
               placeholder={t("kandidaten.faehigkeitenBeispiel")}
-              value={entwurf.skills}
+              value={draft.skills}
               onChange={(e) =>
-                setEntwurf((jetzt) => ({ ...jetzt, skills: e.target.value }))
+                setEntwurf((now) => ({ ...now, skills: e.target.value }))
               }
             />
             <TextField
               label={t("kandidaten.ort")}
               helperText={t("kandidaten.ortHinweis")}
               placeholder={t("kandidaten.ortBeispiel")}
-              value={entwurf.location}
+              value={draft.location}
               onChange={(e) =>
-                setEntwurf((jetzt) => ({ ...jetzt, location: e.target.value }))
+                setEntwurf((now) => ({ ...now, location: e.target.value }))
               }
             />
 
@@ -164,10 +164,10 @@ export function CandidatesPage() {
               <FormControlLabel
                 control={
                   <Checkbox
-                    checked={entwurf.remoteOnly}
+                    checked={draft.remoteOnly}
                     onChange={(e) =>
-                      setEntwurf((jetzt) => ({
-                        ...jetzt,
+                      setEntwurf((now) => ({
+                        ...now,
                         remoteOnly: e.target.checked,
                       }))
                     }
@@ -220,11 +220,11 @@ export function CandidatesPage() {
             m: 0,
           }}
         >
-          {seiten.items.map((profil: Profile) => (
+          {seiten.items.map((profile: Profile) => (
             <CandidateCard
-              key={profil.subject_id}
-              profile={profil}
-              marketRequest={marktanfragen.get(profil.subject_id)}
+              key={profile.subject_id}
+              profile={profile}
+              marketRequest={marktanfragen.get(profile.subject_id)}
               onGeaendert={() => anfragen.reload()}
             />
           ))}

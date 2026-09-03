@@ -52,7 +52,7 @@ export function CompanyTransfersPage() {
   const { t } = useTranslation();
   const { fuerFirma, tenantId } = useHandelnder();
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
 
   const transfers = useAsync(
     (signal) => listCompanyTransfers(signal),
@@ -74,11 +74,11 @@ export function CompanyTransfersPage() {
     );
   }
 
-  async function ziehen(id: string, zug: CompanyAction) {
+  async function ziehen(id: string, move: CompanyAction) {
     setLaeuft(true);
-    const ergebnis = await companyMove(id, zug);
+    const result = await companyMove(id, move);
     setLaeuft(false);
-    setFehler(ergebnis.ok ? null : ergebnis.error.detail);
+    setFehler(result.ok ? null : result.error.detail);
     transfers.reload();
   }
 
@@ -89,7 +89,7 @@ export function CompanyTransfersPage() {
     abloese: string,
   ) {
     setLaeuft(true);
-    const ergebnis = await makeOffer(id, {
+    const result = await makeOffer(id, {
       note: text,
       start_on: start.trim() === "" ? null : start.trim(),
       // Euro im Feld, Cent auf dem Draht — gerundet, damit "1,005" nicht als
@@ -98,12 +98,12 @@ export function CompanyTransfersPage() {
         abloese.trim() === "" ? null : Math.round(Number(abloese) * 100),
     });
     setLaeuft(false);
-    setFehler(ergebnis.ok ? null : ergebnis.error.detail);
+    setFehler(result.ok ? null : result.error.detail);
     transfers.reload();
   }
 
-  const ergebnis = transfers.data;
-  const liste = ergebnis?.ok ? ergebnis.transfers : [];
+  const result = transfers.data;
+  const list = result?.ok ? result.transfers : [];
 
   return (
     <PageShell
@@ -126,11 +126,11 @@ export function CompanyTransfersPage() {
         </Card>
       ) : null}
 
-      {ergebnis !== null && !ergebnis.ok ? (
-        <Alert severity="error">{ergebnis.error.detail}</Alert>
+      {result !== null && !result.ok ? (
+        <Alert severity="error">{result.error.detail}</Alert>
       ) : null}
 
-      {ergebnis?.ok && liste.length === 0 ? (
+      {result?.ok && list.length === 0 ? (
         <EmptyBlock title={t("firmentransfers.leer")} />
       ) : null}
 
@@ -145,12 +145,12 @@ export function CompanyTransfersPage() {
           m: 0,
         }}
       >
-        {liste.map((transfer: Transfer) => (
+        {list.map((transfer: Transfer) => (
           <Transferkarte
             key={transfer.id}
             transfer={transfer}
-            gesperrt={laeuft}
-            onZug={(zug) => void ziehen(transfer.id, zug)}
+            locked={running}
+            onZug={(move) => void ziehen(transfer.id, move)}
             onAngebot={(text, start, abloese) =>
               void anbieten(transfer.id, text, start, abloese)
             }
@@ -163,13 +163,13 @@ export function CompanyTransfersPage() {
 
 function Transferkarte({
   transfer,
-  gesperrt,
+  locked,
   onZug,
   onAngebot,
 }: {
   transfer: Transfer;
-  gesperrt: boolean;
-  onZug: (zug: CompanyAction) => void;
+  locked: boolean;
+  onZug: (move: CompanyAction) => void;
   onAngebot: (text: string, start: string, abloese: string) => void;
 }) {
   const { t } = useTranslation();
@@ -244,8 +244,8 @@ function Transferkarte({
         {transfer.status === "talking" ? (
           <Box
             component="form"
-            onSubmit={(ereignis) => {
-              ereignis.preventDefault();
+            onSubmit={(event) => {
+              event.preventDefault();
               onAngebot(text, start, abloese);
             }}
             sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}
@@ -273,7 +273,7 @@ function Transferkarte({
               onChange={(e) => setAbloese(e.target.value)}
             />
             <Box>
-              <Button type="submit" variant="contained" disabled={gesperrt}>
+              <Button type="submit" variant="contained" disabled={locked}>
                 {t("firmentransfers.angebotMachen")}
               </Button>
             </Box>
@@ -285,7 +285,7 @@ function Transferkarte({
             <Button
               variant="contained"
               onClick={() => onZug("complete")}
-              disabled={gesperrt}
+              disabled={locked}
             >
               {t("firmentransfers.abschliessen")}
             </Button>
@@ -294,7 +294,7 @@ function Transferkarte({
             <Button
               variant="text"
               onClick={() => onZug("withdraw")}
-              disabled={gesperrt}
+              disabled={locked}
             >
               {t("allgemein.zurueckziehen")}
             </Button>

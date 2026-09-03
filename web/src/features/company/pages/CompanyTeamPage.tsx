@@ -41,7 +41,7 @@ export function CompanyTeamPage() {
   const { t } = useTranslation();
   const { fuerFirma, tenantId, subjectId } = useHandelnder();
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
 
   const mitglieder = useAsync(
     (signal) => listMembers(tenantId as string, signal),
@@ -69,9 +69,9 @@ export function CompanyTeamPage() {
     );
   }
 
-  const liste = mitglieder.data?.ok ? mitglieder.data.members : [];
-  const meineRolle = liste.find(
-    (eintrag: CompanyMember) => eintrag.user_id === subjectId,
+  const list = mitglieder.data?.ok ? mitglieder.data.members : [];
+  const meineRolle = list.find(
+    (entry: CompanyMember) => entry.user_id === subjectId,
   )?.role;
   const istAdmin = meineRolle === "admin";
 
@@ -79,17 +79,17 @@ export function CompanyTeamPage() {
 
   async function entfernen(userId: string) {
     setLaeuft(true);
-    const ergebnis = await removeMember(tenantId as string, userId);
+    const result = await removeMember(tenantId as string, userId);
     setLaeuft(false);
-    setFehler(ergebnis.ok ? null : ergebnis.error.detail);
+    setFehler(result.ok ? null : result.error.detail);
     mitglieder.reload();
   }
 
   async function zurueckziehen(id: string) {
     setLaeuft(true);
-    const ergebnis = await withdrawInvitation(tenantId as string, id);
+    const result = await withdrawInvitation(tenantId as string, id);
     setLaeuft(false);
-    setFehler(ergebnis.ok ? null : ergebnis.error.detail);
+    setFehler(result.ok ? null : result.error.detail);
     einladungen.reload();
   }
 
@@ -132,7 +132,7 @@ export function CompanyTeamPage() {
             <Alert severity="error">{mitglieder.data.error.detail}</Alert>
           ) : null}
 
-          {liste.length > 0 ? (
+          {list.length > 0 ? (
             <Box
               component="ul"
               sx={{
@@ -144,25 +144,25 @@ export function CompanyTeamPage() {
                 m: 0,
               }}
             >
-              {liste.map((eintrag: CompanyMember) => (
+              {list.map((entry: CompanyMember) => (
                 <Zeile
-                  key={eintrag.user_id}
-                  titel={eintrag.display_name}
+                  key={entry.user_id}
+                  titel={entry.display_name}
                   meta={t(
-                    eintrag.role === "admin"
+                    entry.role === "admin"
                       ? "mannschaft.rolleAdmin"
                       : "mannschaft.rolleMitglied",
                   )}
-                  aktion={
+                  action={
                     istAdmin ? (
                       <Button
                         variant="text"
                         size="small"
-                        onClick={() => void entfernen(eintrag.user_id)}
-                        disabled={laeuft}
+                        onClick={() => void entfernen(entry.user_id)}
+                        disabled={running}
                       >
                         {t(
-                          eintrag.user_id === subjectId
+                          entry.user_id === subjectId
                             ? "mannschaft.verlassen"
                             : "mannschaft.entfernen",
                         )}
@@ -199,22 +199,22 @@ export function CompanyTeamPage() {
               data-testid="invitation-list"
               sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}
             >
-              {offene.map((eintrag: Invitation) => (
+              {offene.map((entry: Invitation) => (
                 <Zeile
-                  key={eintrag.id}
-                  titel={eintrag.email}
+                  key={entry.id}
+                  titel={entry.email}
                   meta={t(
-                    eintrag.role === "admin"
+                    entry.role === "admin"
                       ? "mannschaft.rolleAdmin"
                       : "mannschaft.rolleMitglied",
                   )}
-                  aktion={
+                  action={
                     istAdmin ? (
                       <Button
                         variant="text"
                         size="small"
-                        onClick={() => void zurueckziehen(eintrag.id)}
-                        disabled={laeuft}
+                        onClick={() => void zurueckziehen(entry.id)}
+                        disabled={running}
                       >
                         {t("allgemein.zurueckziehen")}
                       </Button>
@@ -233,11 +233,11 @@ export function CompanyTeamPage() {
 function Zeile({
   titel,
   meta,
-  aktion,
+  action,
 }: {
   titel: string;
   meta: string;
-  aktion?: React.ReactNode;
+  action?: React.ReactNode;
 }) {
   return (
     <Card component="li" variant="outlined">
@@ -256,8 +256,8 @@ function Zeile({
             {meta}
           </Typography>
         </Box>
-        {aktion !== undefined ? (
-          <Box sx={{ flexShrink: 0 }}>{aktion}</Box>
+        {action !== undefined ? (
+          <Box sx={{ flexShrink: 0 }}>{action}</Box>
         ) : null}
       </CardContent>
     </Card>

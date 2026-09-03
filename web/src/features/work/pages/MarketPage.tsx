@@ -34,10 +34,10 @@ import {
 } from "../api/market";
 
 /** Nur die Werte — Beschriftung und Hinweis stehen in den Katalogen. */
-const WAHLEN: { wert: Availability; name: string }[] = [
-  { wert: "open", name: "Open" },
-  { wert: "listening", name: "Listening" },
-  { wert: "unavailable", name: "Unavailable" },
+const WAHLEN: { value: Availability; name: string }[] = [
+  { value: "open", name: "Open" },
+  { value: "listening", name: "Listening" },
+  { value: "unavailable", name: "Unavailable" },
 ];
 
 /**
@@ -53,40 +53,40 @@ const WAHLEN: { wert: Availability; name: string }[] = [
  */
 export function MarketPage() {
   const { t } = useTranslation();
-  const { angemeldet, subjectId } = useHandelnder();
+  const { signedIn, subjectId } = useHandelnder();
 
-  const stand = useAsync(
+  const current = useAsync(
     (signal) => getMyMarketStatus(signal),
     [subjectId],
-    angemeldet,
+    signedIn,
   );
   const anfragen = useAsync(
     (signal) => listMyMarketRequests(signal),
     [subjectId],
-    angemeldet,
+    signedIn,
   );
 
   const [verfuegbarkeit, setVerfuegbarkeit] =
     useState<Availability>("unavailable");
-  const [beschaeftigt, setBeschaeftigt] = useState(false);
+  const [busy, setBeschaeftigt] = useState(false);
   const [notiz, setNotiz] = useState("");
-  const [gespeichert, setGespeichert] = useState(false);
+  const [saved, setGespeichert] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
-  const [uebernommen, setUebernommen] = useState(false);
+  const [running, setLaeuft] = useState(false);
+  const [adopted, setUebernommen] = useState(false);
 
   // Der geladene Stand fuellt das Formular GENAU EINMAL. Liefe das bei jeder
   // Antwort, ueberschriebe ein Neuladen die gerade getippte Notiz — und ein
   // Speichern schriebe sie zurueck, ohne dass jemand es merkt.
   useEffect(() => {
-    if (uebernommen || !stand.data?.ok) return;
-    setVerfuegbarkeit(stand.data.status.availability);
-    setBeschaeftigt(stand.data.status.employed);
-    setNotiz(stand.data.status.note);
+    if (adopted || !current.data?.ok) return;
+    setVerfuegbarkeit(current.data.status.availability);
+    setBeschaeftigt(current.data.status.employed);
+    setNotiz(current.data.status.note);
     setUebernommen(true);
-  }, [uebernommen, stand.data]);
+  }, [adopted, current.data]);
 
-  if (!angemeldet) {
+  if (!signedIn) {
     return (
       <PageShell title={t("markt.titel")} narrow>
         <Card>
@@ -107,40 +107,40 @@ export function MarketPage() {
 
   async function speichern() {
     setLaeuft(true);
-    const ergebnis = await saveMyMarketStatus({
+    const result = await saveMyMarketStatus({
       availability: verfuegbarkeit,
-      employed: beschaeftigt,
+      employed: busy,
       note: notiz,
     });
     setLaeuft(false);
 
-    if (ergebnis.ok) {
+    if (result.ok) {
       setFehler(null);
       setGespeichert(true);
-      stand.reload();
+      current.reload();
     } else {
-      setFehler(ergebnis.error.detail);
+      setFehler(result.error.detail);
       setGespeichert(false);
     }
   }
 
-  async function beantworten(id: string, erteilen: boolean) {
+  async function beantworten(id: string, grant: boolean) {
     setLaeuft(true);
-    const ergebnis = await answerMarketRequest(id, erteilen);
+    const result = await answerMarketRequest(id, grant);
     setLaeuft(false);
-    if (!ergebnis.ok) setFehler(ergebnis.error.detail);
+    if (!result.ok) setFehler(result.error.detail);
     anfragen.reload();
   }
 
   async function zurueckziehen(id: string) {
     setLaeuft(true);
-    const ergebnis = await revokeMarketAccess(id);
+    const result = await revokeMarketAccess(id);
     setLaeuft(false);
-    if (!ergebnis.ok) setFehler(ergebnis.error.detail);
+    if (!result.ok) setFehler(result.error.detail);
     anfragen.reload();
   }
 
-  const liste = anfragen.data?.ok ? anfragen.data.requests : [];
+  const list = anfragen.data?.ok ? anfragen.data.requests : [];
 
   return (
     <PageShell
@@ -168,11 +168,11 @@ export function MarketPage() {
             <Alert severity="error">{anfragen.data.error.detail}</Alert>
           ) : null}
 
-          {anfragen.data?.ok && liste.length === 0 ? (
+          {anfragen.data?.ok && list.length === 0 ? (
             <EmptyBlock title={t("markt.anfragenLeer")} />
           ) : null}
 
-          {liste.length > 0 ? (
+          {list.length > 0 ? (
             <Box
               component="ul"
               sx={{
@@ -184,13 +184,13 @@ export function MarketPage() {
                 m: 0,
               }}
             >
-              {liste.map((anfrage: MarketRequest) => (
+              {list.map((anfrage: MarketRequest) => (
                 <Anfragezeile
                   key={anfrage.id}
                   anfrage={anfrage}
-                  gesperrt={laeuft}
-                  onAntwort={(erteilen) =>
-                    void beantworten(anfrage.id, erteilen)
+                  locked={running}
+                  onAntwort={(grant) =>
+                    void beantworten(anfrage.id, grant)
                   }
                   onZurueck={() => void zurueckziehen(anfrage.id)}
                 />
@@ -206,11 +206,11 @@ export function MarketPage() {
             {t("markt.ansprechbar")}
           </Typography>
 
-          {stand.pending ? (
+          {current.pending ? (
             <LoadingBlock label={t("markt.standLaden")} />
           ) : null}
 
-          {gespeichert ? (
+          {saved ? (
             <Alert severity="success" sx={{ mb: 2 }} role="status">
               {t("markt.gespeichert")}
             </Alert>
@@ -218,8 +218,8 @@ export function MarketPage() {
 
           <Box
             component="form"
-            onSubmit={(ereignis) => {
-              ereignis.preventDefault();
+            onSubmit={(event) => {
+              event.preventDefault();
               void speichern();
             }}
           >
@@ -231,24 +231,24 @@ export function MarketPage() {
                 aria-labelledby="markt-status"
                 name="availability"
                 value={verfuegbarkeit}
-                onChange={(ereignis) => {
+                onChange={(event) => {
                   setGespeichert(false);
-                  setVerfuegbarkeit(ereignis.target.value as Availability);
+                  setVerfuegbarkeit(event.target.value as Availability);
                 }}
               >
-                {WAHLEN.map((wahl) => (
-                  <Box key={wahl.wert} sx={{ mb: 0.5 }}>
+                {WAHLEN.map((choice) => (
+                  <Box key={choice.value} sx={{ mb: 0.5 }}>
                     <FormControlLabel
-                      value={wahl.wert}
+                      value={choice.value}
                       control={<Radio />}
-                      label={t(`markt.wahl${wahl.name}`)}
+                      label={t(`markt.wahl${choice.name}`)}
                     />
                     <Typography
                       variant="body2"
                       color="text.secondary"
                       sx={{ ml: 4 }}
                     >
-                      {t(`markt.wahl${wahl.name}Hinweis`)}
+                      {t(`markt.wahl${choice.name}Hinweis`)}
                     </Typography>
                   </Box>
                 ))}
@@ -269,10 +269,10 @@ export function MarketPage() {
             <FormControlLabel
               control={
                 <Checkbox
-                  checked={beschaeftigt}
-                  onChange={(ereignis) => {
+                  checked={busy}
+                  onChange={(event) => {
                     setGespeichert(false);
-                    setBeschaeftigt(ereignis.target.checked);
+                    setBeschaeftigt(event.target.checked);
                   }}
                 />
               }
@@ -283,9 +283,9 @@ export function MarketPage() {
             <TextField
               label={t("markt.notiz")}
               value={notiz}
-              onChange={(ereignis) => {
+              onChange={(event) => {
                 setGespeichert(false);
-                setNotiz(ereignis.target.value);
+                setNotiz(event.target.value);
               }}
               helperText={t("markt.notizHinweis")}
               multiline
@@ -293,8 +293,8 @@ export function MarketPage() {
               sx={{ mb: 2 }}
             />
 
-            <Button type="submit" variant="contained" disabled={laeuft}>
-              {laeuft ? t("markt.speichernLaeuft") : t("markt.speichern")}
+            <Button type="submit" variant="contained" disabled={running}>
+              {running ? t("markt.speichernLaeuft") : t("markt.speichern")}
             </Button>
           </Box>
         </CardContent>
@@ -311,20 +311,20 @@ export function MarketPage() {
  */
 function Anfragezeile({
   anfrage,
-  gesperrt,
+  locked,
   onAntwort,
   onZurueck,
 }: {
   anfrage: MarketRequest;
-  gesperrt: boolean;
-  onAntwort: (erteilen: boolean) => void;
+  locked: boolean;
+  onAntwort: (grant: boolean) => void;
   onZurueck: () => void;
 }) {
   const { t } = useTranslation();
-  const offen = anfrage.status === "PENDING";
+  const open = anfrage.status === "PENDING";
   const haeltZugriff = anfrage.status === "GRANTED" && anfrage.active === true;
 
-  const stand = offen
+  const current = open
     ? t("markt.standOffen")
     : anfrage.status === "DECLINED"
       ? t("markt.standAbgelehnt")
@@ -350,18 +350,18 @@ function Anfragezeile({
             {t("markt.anfrageTitel")}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {stand}
+            {current}
           </Typography>
         </Box>
 
         <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
-          {offen ? (
+          {open ? (
             <>
               <Button
                 variant="contained"
                 size="small"
                 onClick={() => onAntwort(true)}
-                disabled={gesperrt}
+                disabled={locked}
               >
                 {t("allgemein.freigeben")}
               </Button>
@@ -369,7 +369,7 @@ function Anfragezeile({
                 variant="text"
                 size="small"
                 onClick={() => onAntwort(false)}
-                disabled={gesperrt}
+                disabled={locked}
               >
                 {t("allgemein.ablehnen")}
               </Button>
@@ -380,7 +380,7 @@ function Anfragezeile({
               variant="text"
               size="small"
               onClick={onZurueck}
-              disabled={gesperrt}
+              disabled={locked}
             >
               {t("allgemein.zurueckziehen")}
             </Button>

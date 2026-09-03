@@ -54,20 +54,20 @@ export function deuten<R extends string>(
   tabelle: Partial<Record<number, Deutung<R>>>,
   ersatzgrund: R
 ): Fehlschlag<R> {
-  const deutung = tabelle[error.status];
-  if (deutung === undefined) return { ok: false, reason: ersatzgrund, error };
+  const reading = tabelle[error.status];
+  if (reading === undefined) return { ok: false, reason: ersatzgrund, error };
 
   // Übersetzt wird HIER und nicht beim Aufbau der Tabelle: die Tabellen stehen
   // auf Modulebene, ihre Werte entstünden also beim Laden — lange bevor jemand
   // eine Sprache wählen konnte.
-  const titel = i18n.t(deutung.titel);
+  const titel = i18n.t(reading.titel);
   return {
     ok: false,
-    reason: deutung.reason,
+    reason: reading.reason,
     error: {
       ...error,
       title: titel,
-      detail: deutung.text === undefined ? titel : i18n.t(deutung.text),
+      detail: reading.text === undefined ? titel : i18n.t(reading.text),
     },
   };
 }

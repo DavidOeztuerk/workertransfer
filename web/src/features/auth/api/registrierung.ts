@@ -84,7 +84,7 @@ export function isPublicEmailDomain(email: string): boolean {
  * darf auch keiner dazukommen. Er wäre ein Aufzählungskanal.
  */
 export async function registriere(eingabe: RegistrierEingabe): Promise<RegistrierErgebnis> {
-  const antwort = await request<unknown>(
+  const answer = await request<unknown>(
     API_BASE_URL,
     "/auth/register",
     {
@@ -107,7 +107,7 @@ export async function registriere(eingabe: RegistrierEingabe): Promise<Registrie
     "fehler.registrierungFehlgeschlagen"
   );
 
-  return antwort.ok ? { ok: true } : { ok: false, meldung: antwort.error.detail };
+  return answer.ok ? { ok: true } : { ok: false, meldung: answer.error.detail };
 }
 
 interface BestaetigungsRumpf {
@@ -124,20 +124,20 @@ interface BestaetigungsRumpf {
  * `ok: true` mit undefiniertem Wert.
  */
 export async function bestaetigeEmail(token: string): Promise<BestaetigungsErgebnis> {
-  const antwort = await request<BestaetigungsRumpf>(
+  const answer = await request<BestaetigungsRumpf>(
     API_BASE_URL,
     "/auth/verify-email",
     { method: "POST", body: { token } },
     "fehler.bestaetigungslinkUngueltig"
   );
 
-  if (antwort.ok) {
-    const rumpf = antwort.value ?? {};
+  if (answer.ok) {
+    const body = answer.value ?? {};
     return {
       ok: true,
-      ...(typeof rumpf.company === "string" ? { unternehmen: rumpf.company } : {}),
-      ...(typeof rumpf.company_error === "string"
-        ? { unternehmenFehler: rumpf.company_error }
+      ...(typeof body.company === "string" ? { unternehmen: body.company } : {}),
+      ...(typeof body.company_error === "string"
+        ? { unternehmenFehler: body.company_error }
         : {}),
     };
   }
@@ -145,7 +145,7 @@ export async function bestaetigeEmail(token: string): Promise<BestaetigungsErgeb
   // 410 ist ein eigener Fall, damit die Seite „neuen Link senden" anbieten kann
   // statt in eine Sackgasse zu führen. Ein UNGÜLTIGER Link wird auch beim
   // zweiten Versuch nicht gültig — dort gibt es nichts anzubieten.
-  const abgelaufen = antwort.error.status === 410;
+  const abgelaufen = answer.error.status === 410;
   return {
     ok: false,
     abgelaufen,
@@ -168,11 +168,11 @@ export async function bestaetigeEmail(token: string): Promise<BestaetigungsErgeb
  * nicht über die Adresse im Rumpf.
  */
 export async function sendeBestaetigungErneut(email: string): Promise<VersandErgebnis> {
-  const antwort = await request<unknown>(
+  const answer = await request<unknown>(
     API_BASE_URL,
     "/auth/resend-verification",
     { method: "POST", body: { email } },
     "fehler.mailNichtAngefordert"
   );
-  return antwort.ok ? { ok: true } : { ok: false };
+  return answer.ok ? { ok: true } : { ok: false };
 }

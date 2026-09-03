@@ -97,19 +97,19 @@ export function gemerkteStelle(): string | null {
 export function gemerkteStelleMitTitel(): GemerkteStelle | null {
   const s = speicher();
   if (s === null) return null;
-  const roh = s.getItem(SCHLUESSEL);
-  if (roh === null) return null;
+  const raw = s.getItem(SCHLUESSEL);
+  if (raw === null) return null;
   try {
-    const wert = JSON.parse(roh) as Partial<Gemerkt>;
-    if (typeof wert.jobId !== "string" || !UUID.test(wert.jobId)) {
+    const value = JSON.parse(raw) as Partial<Gemerkt>;
+    if (typeof value.jobId !== "string" || !UUID.test(value.jobId)) {
       vergissStelle();
       return null;
     }
-    if (typeof wert.gemerktAm !== "number" || Date.now() - wert.gemerktAm > GUELTIG_MS) {
+    if (typeof value.gemerktAm !== "number" || Date.now() - value.gemerktAm > GUELTIG_MS) {
       vergissStelle();
       return null;
     }
-    return { jobId: wert.jobId, titel: typeof wert.titel === "string" ? wert.titel : "" };
+    return { jobId: value.jobId, titel: typeof value.titel === "string" ? value.titel : "" };
   } catch {
     vergissStelle();
     return null;

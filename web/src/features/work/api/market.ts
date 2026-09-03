@@ -82,18 +82,18 @@ export type AnfragenListe = { ok: true; requests: MarketRequest[] } | Fehlschlag
  * Aussage des Servers und keine der Oberfläche.
  */
 export async function getMyMarketStatus(signal?: AbortSignal): Promise<StatusErgebnis> {
-  const antwort = await request<MarketStatus>(
+  const answer = await request<MarketStatus>(
     TRANSFER_BASE_URL,
     "/market/me",
     { signal },
     "fehler.marktstatusNichtAbrufbar"
   );
-  if (antwort.ok) return { ok: true, status: antwort.value };
+  if (answer.ok) return { ok: true, status: answer.value };
   return {
     ok: false,
     reason: "unavailable",
     error: {
-      ...antwort.error,
+      ...answer.error,
       title: i18n.t("fehler.marktstatusNichtAbrufbar"),
       detail: i18n.t("fehler.marktstatusUnveraenderbar"),
     },
@@ -101,7 +101,7 @@ export async function getMyMarketStatus(signal?: AbortSignal): Promise<StatusErg
 }
 
 export async function saveMyMarketStatus(input: MarketStatusInput): Promise<SpeicherErgebnis> {
-  const antwort = await request<MarketStatus>(
+  const answer = await request<MarketStatus>(
     TRANSFER_BASE_URL,
     "/market/me",
     {
@@ -111,9 +111,9 @@ export async function saveMyMarketStatus(input: MarketStatusInput): Promise<Spei
     },
     "fehler.marktstatusNichtGespeichert"
   );
-  if (antwort.ok) return { ok: true, status: antwort.value };
+  if (answer.ok) return { ok: true, status: answer.value };
   return deuten<"unauthenticated" | "invalid" | "offline">(
-    antwort.error,
+    answer.error,
     {
       0: { reason: "offline", titel: "fehler.keineVerbindung" },
       401: {
@@ -146,26 +146,26 @@ const ANFRAGEFEHLER: Partial<Record<number, Deutung<AnfrageFehler>>> =
   };
 
 export async function requestMarketStatus(subjectId: string): Promise<AnfrageErgebnis> {
-  const antwort = await request<MarketRequest>(
+  const answer = await request<MarketRequest>(
     TRANSFER_BASE_URL,
     `/market/${subjectId}/requests`,
     { method: "POST" },
     "fehler.anfrageNichtGestellt"
   );
-  if (antwort.ok) return { ok: true, request: antwort.value };
-  return deuten<AnfrageFehler>(antwort.error, ANFRAGEFEHLER, "offline");
+  if (answer.ok) return { ok: true, request: answer.value };
+  return deuten<AnfrageFehler>(answer.error, ANFRAGEFEHLER, "offline");
 }
 
 async function post(path: string): Promise<AnfrageErgebnis> {
-  const antwort = await request<MarketRequest>(
+  const answer = await request<MarketRequest>(
     TRANSFER_BASE_URL,
     path,
     { method: "POST" },
     "fehler.anfrageNichtBeantwortet"
   );
-  if (antwort.ok) return { ok: true, request: antwort.value };
+  if (answer.ok) return { ok: true, request: answer.value };
   return deuten<AnfrageFehler>(
-    antwort.error,
+    answer.error,
     {
       0: { reason: "offline", titel: "fehler.keineVerbindung" },
       503: {
@@ -189,17 +189,17 @@ export function revokeMarketAccess(requestId: string): Promise<AnfrageErgebnis> 
 }
 
 async function listRequests(path: string, signal?: AbortSignal): Promise<AnfragenListe> {
-  const antwort = await request<MarketRequest[]>(
+  const answer = await request<MarketRequest[]>(
     TRANSFER_BASE_URL,
     path,
     { signal },
     "fehler.listeNichtGeladen"
   );
-  if (antwort.ok) return { ok: true, requests: antwort.value ?? [] };
+  if (answer.ok) return { ok: true, requests: answer.value ?? [] };
   // `503` NICHT als leere Liste zeigen: das wäre die Behauptung, niemand habe
   // gefragt oder freigegeben — und das weiß in diesem Moment niemand.
   return deuten<"unavailable">(
-    antwort.error,
+    answer.error,
     {
       0: { reason: "unavailable", titel: "fehler.keineVerbindung" },
       503: { reason: "unavailable", titel: "fehler.ledgerSchweigt" },
@@ -227,16 +227,16 @@ export async function getMarketStatus(
   subjectId: string,
   signal?: AbortSignal
 ): Promise<{ ok: true; status: MarketStatus | null } | Fehlschlag<"unavailable">> {
-  const antwort = await request<MarketStatus>(
+  const answer = await request<MarketStatus>(
     TRANSFER_BASE_URL,
     `/market/${subjectId}`,
     { signal },
     "fehler.marktstatusNichtGeladen"
   );
-  if (antwort.ok) return { ok: true, status: antwort.value ?? null };
-  if (antwort.error.status === 404) return { ok: true, status: null };
+  if (answer.ok) return { ok: true, status: answer.value ?? null };
+  if (answer.error.status === 404) return { ok: true, status: null };
   return deuten<"unavailable">(
-    antwort.error,
+    answer.error,
     { 503: { reason: "unavailable", titel: "fehler.ledgerSchweigt" } },
     "unavailable"
   );

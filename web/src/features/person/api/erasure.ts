@@ -13,12 +13,12 @@ export type Loeschergebnis = { ok: true } | { ok: false; error: ApiError };
  * hier ergänzen könnte, ohne die Zusage zu brechen.
  */
 export async function loeschungVerlangen(signal?: AbortSignal): Promise<Loeschergebnis> {
-  const antwort = await request<void>(
+  const answer = await request<void>(
     API_BASE_URL,
     "/account/erasure",
     { method: "POST", signal },
     "fehler.loeschungNichtAngenommen"
   );
 
-  return antwort.ok ? { ok: true } : { ok: false, error: antwort.error };
+  return answer.ok ? { ok: true } : { ok: false, error: answer.error };
 }

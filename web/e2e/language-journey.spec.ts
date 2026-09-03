@@ -67,10 +67,10 @@ test("die Sprachwahl wechselt die Oberfläche und erreicht die Mail", async ({ p
   // ein bestätigtes Konto schickt der Endpunkt bewusst gar nichts.)
   const seit = Date.now();
 
-  const antwort = await page.request.post("/auth/register", {
+  const answer = await page.request.post("/auth/register", {
     data: { email, password: "geheim-und-lang-genug", display_name: "Doppelt" },
   });
-  expect(antwort.status()).toBe(201);
+  expect(answer.status()).toBe(201);
 
   // `after` ist nicht kosmetisch: ohne ihn fände die Suche die deutsche
   // Bestätigungsmail von vorhin, und der Test wäre grün, ohne etwas zu belegen.

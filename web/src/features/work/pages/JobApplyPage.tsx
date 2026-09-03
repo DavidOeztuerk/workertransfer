@@ -41,13 +41,13 @@ export function JobApplyPage() {
   const { t } = useTranslation();
   const { jobId } = useParams();
   const navigate = useNavigate();
-  const { angemeldet, subjectId } = useHandelnder();
+  const { signedIn, subjectId } = useHandelnder();
 
   const [anschreiben, setAnschreiben] = useState("");
   const [lebenslauf, setLebenslauf] = useState(false);
   const [arbeiten, setArbeiten] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
+  const [running, setLaeuft] = useState(false);
   const [gesendet, setGesendet] = useState(false);
 
   const gueltig = typeof jobId === "string" && jobId !== "";
@@ -57,13 +57,13 @@ export function JobApplyPage() {
     [jobId],
     gueltig,
   );
-  const profil = useAsync(
+  const profile = useAsync(
     (signal) => getMyProfile(signal),
     [subjectId],
-    angemeldet,
+    signedIn,
   );
 
-  const zurueck = (
+  const back = (
     <Link component={RouterLink} to="/jobs" variant="body2">
       {t("bewerbung.zurueck")}
     </Link>
@@ -72,7 +72,7 @@ export function JobApplyPage() {
   if (!gueltig) {
     return (
       <PageShell title={t("bewerbung.stelleFehltTitel")} narrow>
-        <Box sx={{ mb: 2 }}>{zurueck}</Box>
+        <Box sx={{ mb: 2 }}>{back}</Box>
         <Card>
           <CardContent>
             <Typography>{t("bewerbung.adresseUngueltig")}</Typography>
@@ -85,7 +85,7 @@ export function JobApplyPage() {
   if (stelle.pending) {
     return (
       <PageShell title={t("bewerbung.titel")} narrow>
-        <Box sx={{ mb: 2 }}>{zurueck}</Box>
+        <Box sx={{ mb: 2 }}>{back}</Box>
         <Card>
           <CardContent>
             <LoadingBlock label={t("bewerbung.laden")} />
@@ -100,7 +100,7 @@ export function JobApplyPage() {
   if (anzeige === null) {
     return (
       <PageShell title={t("bewerbung.stelleFehltTitel")} narrow>
-        <Box sx={{ mb: 2 }}>{zurueck}</Box>
+        <Box sx={{ mb: 2 }}>{back}</Box>
         <Card>
           <CardContent>
             <Typography>
@@ -115,7 +115,7 @@ export function JobApplyPage() {
   if (gesendet) {
     return (
       <PageShell title={t("bewerbung.abgeschickt")} narrow>
-        <Box sx={{ mb: 2 }}>{zurueck}</Box>
+        <Box sx={{ mb: 2 }}>{back}</Box>
         <Card>
           <CardContent>
             {/* Wo man es zurücknimmt, steht dort, wo man es getan hat — nicht in
@@ -134,10 +134,10 @@ export function JobApplyPage() {
     );
   }
 
-  if (!angemeldet) {
+  if (!signedIn) {
     return (
       <PageShell title={anzeige.title} narrow>
-        <Box sx={{ mb: 2 }}>{zurueck}</Box>
+        <Box sx={{ mb: 2 }}>{back}</Box>
         <Card>
           <CardContent>
             <Typography sx={{ mb: 2 }}>
@@ -163,13 +163,13 @@ export function JobApplyPage() {
 
   // `null` heisst „unbekannt" und unterdrückt die Passung; ein leeres Feld
   // heisst „nichts eingetragen" und führt zum Hinweis aufs Profil.
-  const meineFaehigkeiten = profil.pending ? null : (profil.data?.skills ?? []);
+  const meineFaehigkeiten = profile.pending ? null : (profile.data?.skills ?? []);
 
   const stellenId = anzeige.id;
 
-  async function absenden() {
+  async function submit() {
     setLaeuft(true);
-    const ergebnis = await apply({
+    const result = await apply({
       job_id: stellenId,
       message: anschreiben,
       shares_resume: lebenslauf,
@@ -177,11 +177,11 @@ export function JobApplyPage() {
     });
     setLaeuft(false);
 
-    if (ergebnis.ok) {
+    if (result.ok) {
       setFehler(null);
       setGesendet(true);
     } else {
-      setFehler(ergebnis.error.detail);
+      setFehler(result.error.detail);
     }
   }
 
@@ -191,7 +191,7 @@ export function JobApplyPage() {
       narrow
       lead={anzeige.location !== "" ? anzeige.location : undefined}
     >
-      <Box sx={{ mb: 2 }}>{zurueck}</Box>
+      <Box sx={{ mb: 2 }}>{back}</Box>
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
@@ -203,9 +203,9 @@ export function JobApplyPage() {
         <CardContent>
           <Box
             component="form"
-            onSubmit={(ereignis) => {
-              ereignis.preventDefault();
-              void absenden();
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submit();
             }}
           >
             <TextField
@@ -251,8 +251,8 @@ export function JobApplyPage() {
               </Alert>
             ) : null}
 
-            <Button type="submit" variant="contained" disabled={laeuft}>
-              {laeuft ? t("bewerbung.absendenLaeuft") : t("bewerbung.absenden")}
+            <Button type="submit" variant="contained" disabled={running}>
+              {running ? t("bewerbung.absendenLaeuft") : t("bewerbung.absenden")}
             </Button>
           </Box>
         </CardContent>

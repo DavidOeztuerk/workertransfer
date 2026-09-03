@@ -29,7 +29,7 @@ export interface Abruf<T> {
 }
 
 export function useAsync<T>(
-  laden: (signal: AbortSignal) => Promise<T>,
+  load: (signal: AbortSignal) => Promise<T>,
   deps: DependencyList,
   aktiv = true
 ): Abruf<T> {
@@ -40,32 +40,32 @@ export function useAsync<T>(
   // Die Funktion wechselt bei jedem Rendern die Identität; stünde sie in den
   // Abhängigkeiten, liefe der Abruf endlos. Der Aufrufer nennt stattdessen die
   // Werte, an denen die Antwort wirklich hängt.
-  const ladenRef = useRef(laden);
-  ladenRef.current = laden;
+  const ladenRef = useRef(load);
+  ladenRef.current = load;
 
   useEffect(() => {
     if (!aktiv) {
       setPending(false);
       return;
     }
-    const abbruch = new AbortController();
-    let lebt = true;
+    const abort = new AbortController();
+    let alive = true;
     setPending(true);
-    void ladenRef.current(abbruch.signal).then(
-      (wert) => {
-        if (!lebt) return;
-        setData(wert);
+    void ladenRef.current(abort.signal).then(
+      (value) => {
+        if (!alive) return;
+        setData(value);
         setPending(false);
       },
       () => {
         // Die Clients werfen nicht; kommt hier trotzdem etwas an, ist es der
         // Abbruch selbst. Ein hängender Ladezustand wäre die schlechtere Folge.
-        if (lebt) setPending(false);
+        if (alive) setPending(false);
       }
     );
     return () => {
-      lebt = false;
-      abbruch.abort();
+      alive = false;
+      abort.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, runde, aktiv]);
@@ -100,7 +100,7 @@ export interface Blaettern<T, F> {
 }
 
 interface Lage<T, F> {
-  schluessel: string;
+  key: string;
   cursor: string | undefined;
   items: T[];
   next: string | null;
@@ -109,12 +109,12 @@ interface Lage<T, F> {
 }
 
 export function useSeiten<T, F>(
-  laden: (cursor: string | undefined, signal: AbortSignal) => Promise<SeitenErgebnis<T, F>>,
-  schluessel: string,
+  load: (cursor: string | undefined, signal: AbortSignal) => Promise<SeitenErgebnis<T, F>>,
+  key: string,
   aktiv = true
 ): Blaettern<T, F> {
-  const leer = (key: string): Lage<T, F> => ({
-    schluessel: key,
+  const empty = (forKey: string): Lage<T, F> => ({
+    key: forKey,
     cursor: undefined,
     items: [],
     next: null,
@@ -122,7 +122,7 @@ export function useSeiten<T, F>(
     fehler: null,
   });
 
-  const [lage, setLage] = useState<Lage<T, F>>(() => leer(schluessel));
+  const [state, setLage] = useState<Lage<T, F>>(() => empty(key));
 
   // Zurücksetzen WÄHREND des Renderns, nicht in einem Effekt. Ein Effekt liefe
   // erst nach dem Festschreiben — der Abruf-Effekt hätte dann schon einmal mit
@@ -130,52 +130,55 @@ export function useSeiten<T, F>(
   // lieferten sich ein Rennen um dieselbe Liste. React verwirft das laufende
   // Rendern und beginnt neu; ein zusätzlicher Durchlauf, keine zusätzliche
   // Anfrage.
-  if (lage.schluessel !== schluessel) setLage(leer(schluessel));
+  if (state.key !== key) setLage(empty(key));
 
-  const ladenRef = useRef(laden);
-  ladenRef.current = laden;
+  const ladenRef = useRef(load);
+  ladenRef.current = load;
 
-  const key = lage.schluessel;
-  const cursor = lage.cursor;
+  // Der Schlüssel, den der ZUSTAND trägt — nicht der verlangte. Während
+  // eines Wechsels sind das zwei verschiedene, und genau darauf beruht
+  // die Prüfung weiter unten.
+  const stateKey = state.key;
+  const cursor = state.cursor;
 
   useEffect(() => {
     if (!aktiv) return;
-    const abbruch = new AbortController();
-    let lebt = true;
-    void ladenRef.current(cursor, abbruch.signal).then(
-      (ergebnis) => {
-        if (!lebt) return;
-        setLage((bisher) => {
-          if (bisher.schluessel !== key || bisher.cursor !== cursor) return bisher;
-          if (!ergebnis.ok) return { ...bisher, pending: false, fehler: ergebnis.fehler };
+    const abort = new AbortController();
+    let alive = true;
+    void ladenRef.current(cursor, abort.signal).then(
+      (result) => {
+        if (!alive) return;
+        setLage((previous) => {
+          if (previous.key !== stateKey || previous.cursor !== cursor) return previous;
+          if (!result.ok) return { ...previous, pending: false, fehler: result.fehler };
           return {
-            ...bisher,
+            ...previous,
             pending: false,
             fehler: null,
             // Ohne Cursor ist es eine neue Suche; mit Cursor kommt sie dazu.
-            items: cursor === undefined ? ergebnis.items : [...bisher.items, ...ergebnis.items],
-            next: ergebnis.nextCursor,
+            items: cursor === undefined ? result.items : [...previous.items, ...result.items],
+            next: result.nextCursor,
           };
         });
       },
       () => {
-        if (lebt) setLage((bisher) => ({ ...bisher, pending: false }));
+        if (alive) setLage((previous) => ({ ...previous, pending: false }));
       }
     );
     return () => {
-      lebt = false;
-      abbruch.abort();
+      alive = false;
+      abort.abort();
     };
-  }, [key, cursor, aktiv]);
+  }, [stateKey, cursor, aktiv]);
 
   return {
-    items: lage.items,
-    pending: lage.pending,
-    fehler: lage.fehler,
-    mehr: lage.next !== null,
+    items: state.items,
+    pending: state.pending,
+    fehler: state.fehler,
+    mehr: state.next !== null,
     weiter: () =>
-      setLage((bisher) =>
-        bisher.next === null ? bisher : { ...bisher, cursor: bisher.next, pending: true }
+      setLage((previous) =>
+        previous.next === null ? previous : { ...previous, cursor: previous.next, pending: true }
       ),
   };
 }

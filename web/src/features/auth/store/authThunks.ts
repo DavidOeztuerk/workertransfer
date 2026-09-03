@@ -56,8 +56,8 @@ export const login = createAppThunk<Session | null, { email: string; password: s
     if (!answer.ok) return rejectWithValue(answer.error);
 
     // Das Token liegt im httpOnly-Cookie; wer angemeldet ist, steht in /me.
-    const sitzung = await dispatch(loadSession()).unwrap();
-    return sitzung;
+    const session = await dispatch(loadSession()).unwrap();
+    return session;
   }
 );
 
@@ -118,11 +118,11 @@ export const actForCompany = createAppThunk<Session | null, string>(
  */
 export const spracheSpeichern = createAppThunk<null, string>(
   "auth/spracheSpeichern",
-  async (sprache, { rejectWithValue }) => {
+  async (language, { rejectWithValue }) => {
     const answer = await request<unknown>(
       API_BASE_URL,
       "/account/language",
-      { method: "PUT", body: { language: sprache } },
+      { method: "PUT", body: { language: language } },
       "fehler.einstellungenNichtGespeichert"
     );
     if (!answer.ok) return rejectWithValue(answer.error);

@@ -45,7 +45,7 @@ export type ProfileLoad = { ok: true; profile: Profile | null } | { ok: false; e
 export type SaveResult = { ok: true; profile: Profile } | { ok: false; error: ApiError };
 
 export async function getMyProfile(signal?: AbortSignal): Promise<ProfileLoad> {
-  const antwort = await request<Profile | null>(
+  const answer = await request<Profile | null>(
     PROFILE_BASE_URL,
     "/profiles/me",
     { signal },
@@ -54,15 +54,15 @@ export async function getMyProfile(signal?: AbortSignal): Promise<ProfileLoad> {
   // 404 heisst hier „noch keins" — bei der EIGENEN Ressource gibt es die
   // Doppeldeutigkeit „versteckt oder nicht vorhanden" nicht, die ADR-0020 für
   // fremde Profile herstellt.
-  if (!antwort.ok) {
-    if (antwort.error.status === 404) return { ok: true, profile: null };
-    return { ok: false, error: antwort.error };
+  if (!answer.ok) {
+    if (answer.error.status === 404) return { ok: true, profile: null };
+    return { ok: false, error: answer.error };
   }
-  return { ok: true, profile: antwort.value ?? null };
+  return { ok: true, profile: answer.value ?? null };
 }
 
 export async function saveMyProfile(input: ProfileInput): Promise<SaveResult> {
-  const antwort = await request<Profile>(
+  const answer = await request<Profile>(
     PROFILE_BASE_URL,
     "/profiles/me",
     {
@@ -80,8 +80,8 @@ export async function saveMyProfile(input: ProfileInput): Promise<SaveResult> {
     },
     "fehler.profilNichtGespeichert"
   );
-  if (!antwort.ok) return { ok: false, error: antwort.error };
-  return { ok: true, profile: antwort.value };
+  if (!answer.ok) return { ok: false, error: answer.error };
+  return { ok: true, profile: answer.value };
 }
 
 /**
@@ -100,20 +100,20 @@ export type DraftResult =
   | { ok: false; message: string };
 
 export async function draftProfileText(wish: string): Promise<DraftResult> {
-  const antwort = await request<{ draft: string }>(
+  const answer = await request<{ draft: string }>(
     PROFILE_BASE_URL,
     "/profiles/me/draft",
     { method: "POST", body: { wish } },
     "fehler.entwurfNichtVerfuegbar"
   );
-  if (!antwort.ok) {
+  if (!answer.ok) {
     // ÜBERSETZT, nicht durchgereicht. `message` ist hier ein fertiger Satz für
     // die Oberfläche und kein Schlüssel — anders als in den `deuten`-Tabellen,
     // die `deuten()` selbst auflöst. Der Unterschied ist einmal übersehen
     // worden, und dann stand `fehler.entwurfNichtVerfuegbarLang` wörtlich im
     // Warnkasten: i18next gibt einen Schlüssel unverändert zurück, wenn ihn
     // niemand nachschlägt.
-    if (antwort.error.status === 401) {
+    if (answer.error.status === 401) {
       return { ok: false, message: i18n.t("fehler.sitzungAbgelaufenLang") };
     }
     // 503 heisst „nicht eingerichtet ODER Anbieter still" — von aussen dasselbe,
@@ -121,7 +121,7 @@ export async function draftProfileText(wish: string): Promise<DraftResult> {
     // wird die Art des Fehlschlags, nie der Inhalt.
     return { ok: false, message: i18n.t("fehler.entwurfNichtVerfuegbarLang") };
   }
-  return { ok: true, draft: antwort.value?.draft ?? "" };
+  return { ok: true, draft: answer.value?.draft ?? "" };
 }
 
 /** `null` heisst: der Ledger hat nicht geantwortet (siehe `isGranted`). */
