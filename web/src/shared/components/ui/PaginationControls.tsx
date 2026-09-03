@@ -40,7 +40,18 @@ export function PaginationControls({
   const theme = useTheme();
   const schmal = useMediaQuery(theme.breakpoints.down("sm"));
 
-  const von = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
+  // NICHTS ZU BLAETTERN, ALSO KEINE LEISTE.
+  //
+  // Vorher stand hier „Nichts gefunden" — und daneben sagte der Leerblock
+  // „Dazu wurde nichts gefunden." Zweimal dieselbe Auskunft untereinander, und
+  // die E2E-Reise fiel darueber: zwei Treffer auf denselben Text. Der Leerblock
+  // sagt es besser (er bietet auch gleich einen Ausweg an), also schweigt die
+  // Leiste. Zu sortieren gibt es hier ohnehin nichts.
+  if (totalItems === 0) {
+    return null;
+  }
+
+  const von = (page - 1) * pageSize + 1;
   const bis = Math.min(page * pageSize, totalItems);
 
   return (
@@ -58,9 +69,7 @@ export function PaginationControls({
       }}
     >
       <Typography variant="body2" color="text.secondary" role="status">
-        {totalItems === 0
-          ? t("blaettern.leer")
-          : t("blaettern.bereich", { von, bis, gesamt: totalItems })}
+        {t("blaettern.bereich", { von, bis, gesamt: totalItems })}
       </Typography>
 
       <Box

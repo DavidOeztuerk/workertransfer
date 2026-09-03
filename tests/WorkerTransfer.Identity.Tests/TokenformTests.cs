@@ -54,6 +54,58 @@ public class TokenformTests
     }
 
     /// <summary>
+    /// Der VOLLSTAENDIGE Anspruchssatz — nicht nur die verbotenen.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Der Anlass ist gemessen.</strong> `CLAUDE.md` sagte, das Token
+    /// trage acht Ansprueche „und nichts sonst". Am laufenden Stapel gemessen
+    /// waren es NEUN: Girder legt zusaetzlich
+    /// <c>http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier</c>
+    /// hinein, eine Verdopplung von <c>sub</c> in der langen WS-Schreibweise.
+    ///
+    /// <para>
+    /// Sie ist in Girder BEGRUENDET und bleibt: <c>MapInboundClaims = false</c>
+    /// schaltet die Ableitung aus, und siebzehn Leser holen den Aufrufer ueber
+    /// diesen Namen — zwei davon in Fremdpaketen, die diese Assembly nicht
+    /// sehen. Sie fallenzulassen spart siebzig Byte und macht aus jedem dieser
+    /// Leser ein stilles <c>null</c>.
+    /// </para>
+    ///
+    /// <para>
+    /// <strong>Der Fehler lag also in der Zusage, nicht im Token</strong> — und
+    /// darin, dass kein Test den ganzen Satz hielt. Die Reihe unten verbot zwei
+    /// Namen; einen NEUNTEN haette sie nie bemerkt. Dieser Test tut es: er
+    /// vergleicht die Menge, nicht einzelne Mitglieder.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Das_Token_traegt_genau_diese_Ansprueche()
+    {
+        string[] erwartetAlsPerson =
+        [
+            "sub",
+            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
+            "email",
+            "jti",
+            "iat",
+            "exp",
+            "iss",
+            "aud",
+            "session_id"
+        ];
+
+        var alsPerson = await IssueAsync(Capacity.AsSelf.Instance);
+        alsPerson.EnumerateObject().Select(feld => feld.Name)
+            .Should().BeEquivalentTo(erwartetAlsPerson);
+
+        // Fuer eine Firma kommt GENAU EINER dazu: `tenant`. Nicht `tenant_id`,
+        // nicht `roles` — die Mitgliedschaft entscheidet je Anfrage (ADR-0018).
+        var fuerFirma = await IssueAsync(new Capacity.ForCompany(Firma));
+        fuerFirma.EnumerateObject().Select(feld => feld.Name)
+            .Should().BeEquivalentTo([.. erwartetAlsPerson, "tenant"]);
+    }
+
+    /// <summary>
     /// Die beiden Ansprueche aus der Uebergangszeit, jetzt als Verbot.
     /// </summary>
     /// <remarks>
