@@ -35,7 +35,7 @@ export const loadSession = createAppThunk<Session | null>(
       API_BASE_URL,
       "/auth/session",
       {},
-      "Die Sitzung konnte nicht geprüft werden."
+      "fehler.sitzungNichtGeprueft"
     );
     if (!answer.ok) return rejectWithValue(answer.error);
     return answer.value?.user ? toSession(answer.value.user) : null;
@@ -49,7 +49,7 @@ export const login = createAppThunk<Session | null, { email: string; password: s
       API_BASE_URL,
       "/auth/login",
       { method: "POST", body: { email: eingabe.email, password: eingabe.password } },
-      "Anmeldung fehlgeschlagen."
+      "fehler.anmeldungFehlgeschlagen"
     );
     if (!answer.ok) return rejectWithValue(answer.error);
 
@@ -64,7 +64,7 @@ export const logout = createAppThunk<void>("auth/logout", async (_arg, { rejectW
     API_BASE_URL,
     "/auth/logout",
     { method: "POST" },
-    "Abmeldung fehlgeschlagen."
+    "fehler.abmeldungFehlgeschlagen"
   );
   if (!answer.ok) return rejectWithValue(answer.error);
 });
@@ -76,7 +76,7 @@ export const loadMemberships = createAppThunk<Membership[]>(
       API_BASE_URL,
       "/me/companies",
       {},
-      "Die Unternehmen konnten nicht geladen werden."
+      "fehler.firmenNichtGeladen"
     );
     if (!answer.ok) return rejectWithValue(answer.error);
     return answer.value ?? [];
@@ -98,7 +98,7 @@ export const actForCompany = createAppThunk<Session | null, string>(
       API_BASE_URL,
       `/auth/company/${tenantId}`,
       { method: "POST" },
-      "Der Wechsel ist fehlgeschlagen."
+      "fehler.wechselFehlgeschlagen"
     );
     if (!answer.ok) return rejectWithValue(answer.error);
     return await dispatch(loadSession()).unwrap();

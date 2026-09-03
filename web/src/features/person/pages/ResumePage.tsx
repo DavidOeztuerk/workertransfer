@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -53,6 +54,7 @@ function endeNormalisieren(wert: string): string | null {
  * erwartet, soll sie sehen, ohne an seinem eigenen Lebenslauf vorbeizuscrollen.
  */
 export function ResumePage() {
+  const { t } = useTranslation();
   const status = useAppSelector((state) => state.auth.status);
   const sitzung = useAppSelector((state) => state.auth.session);
 
@@ -86,8 +88,8 @@ export function ResumePage() {
   if (status === "anonymous") {
     return (
       <AnmeldungNoetig
-        titel="Mein Lebenslauf"
-        zweck="deinen Lebenslauf zu bearbeiten"
+        titel={t("lebenslauf.titel")}
+        satz="lebenslauf.anmelden"
       />
     );
   }
@@ -135,22 +137,18 @@ export function ResumePage() {
 
   return (
     <PageShell
-      title="Mein Lebenslauf"
+      title={t("lebenslauf.titel")}
       narrow
-      lead={
-        "Diesen Lebenslauf sieht niemand, bis du ihn einem Unternehmen freigibst — Unternehmen " +
-        "für Unternehmen, jedes einzeln. Eine Freigabe kannst du jederzeit zurückziehen; sie " +
-        "wirkt sofort."
-      }
+      lead={t("lebenslauf.lead")}
     >
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            Anfragen
+            {t("lebenslauf.anfragen")}
           </Typography>
 
           {anfragen.laedt ? (
-            <LoadingBlock label="Anfragen werden geladen…" />
+            <LoadingBlock label={t("lebenslauf.anfragenLaden")} />
           ) : null}
 
           {anfragen.wert && !anfragen.wert.ok ? (
@@ -158,7 +156,7 @@ export function ResumePage() {
           ) : null}
 
           {anfragen.wert?.ok && anfragen.wert.wert.length === 0 ? (
-            <EmptyBlock title="Bislang hat niemand nach deinem Lebenslauf gefragt." />
+            <EmptyBlock title={t("lebenslauf.anfragenLeer")} />
           ) : null}
 
           {anfragen.wert?.ok && anfragen.wert.wert.length > 0 ? (
@@ -192,11 +190,11 @@ export function ResumePage() {
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            Stationen
+            {t("lebenslauf.stationen")}
           </Typography>
 
           {lebenslauf.laedt ? (
-            <LoadingBlock label="Lebenslauf wird geladen…" />
+            <LoadingBlock label={t("lebenslauf.laden")} />
           ) : null}
 
           {lebenslauf.wert && !lebenslauf.wert.ok ? (
@@ -211,7 +209,7 @@ export function ResumePage() {
 
           {gespeichert ? (
             <Alert severity="success" sx={{ mb: 2 }} role="status">
-              Lebenslauf gespeichert.
+              {t("lebenslauf.gespeichert")}
             </Alert>
           ) : null}
 
@@ -225,11 +223,11 @@ export function ResumePage() {
             {zeilen.map((zeile, index) => (
               <Box key={index} sx={{ mb: 3 }}>
                 <Typography variant="h3" sx={{ mb: 1.5 }}>
-                  Station {index + 1}
+                  {t("lebenslauf.station", { nummer: index + 1 })}
                 </Typography>
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <TextField
-                    label="Arbeitgeber"
+                    label={t("lebenslauf.arbeitgeber")}
                     value={zeile.employer}
                     onChange={(e) =>
                       aendere(index, { employer: e.target.value })
@@ -237,29 +235,29 @@ export function ResumePage() {
                     required
                   />
                   <TextField
-                    label="Position"
+                    label={t("lebenslauf.position")}
                     value={zeile.title}
                     onChange={(e) => aendere(index, { title: e.target.value })}
                     required
                   />
                   <TextField
-                    label="Von"
+                    label={t("lebenslauf.von")}
                     value={zeile.started_on}
                     onChange={(e) =>
                       aendere(index, { started_on: e.target.value })
                     }
-                    helperText="Monat, zum Beispiel 2020-01"
+                    helperText={t("lebenslauf.vonHinweis")}
                     required
                   />
                   <TextField
-                    label="Bis"
+                    label={t("lebenslauf.bis")}
                     value={zeile.ended_on ?? ""}
                     onChange={(e) =>
                       aendere(index, {
                         ended_on: endeNormalisieren(e.target.value),
                       })
                     }
-                    helperText="Leer lassen, wenn du noch dort bist."
+                    helperText={t("lebenslauf.bisHinweis")}
                   />
                 </Box>
                 <Divider sx={{ mt: 3 }} />
@@ -273,10 +271,12 @@ export function ResumePage() {
                   setZeilen((vorher) => [...vorher, { ...LEERE_STATION }])
                 }
               >
-                Station hinzufügen
+                {t("lebenslauf.stationHinzufuegen")}
               </Button>
               <Button type="submit" variant="contained" disabled={laeuft}>
-                {laeuft ? "Wird gespeichert…" : "Speichern"}
+                {laeuft
+                  ? t("allgemein.speichernLaeuft")
+                  : t("allgemein.speichern")}
               </Button>
             </Box>
           </Box>
@@ -305,16 +305,19 @@ function Anfragezeile({
   onAntwort: (erteilen: boolean) => void;
   onZurueck: () => void;
 }) {
+  const { t } = useTranslation();
   const offen = anfrage.status === "PENDING";
   const haeltZugriff = anfrage.status === "GRANTED" && anfrage.active === true;
 
   const stand = offen
-    ? "Noch nicht beantwortet"
+    ? t("lebenslauf.standOffen")
     : anfrage.status === "DECLINED"
-      ? "Abgelehnt — dieses Unternehmen kann nicht erneut fragen"
-      : haeltZugriff
-        ? "Freigegeben — das Unternehmen sieht deinen Lebenslauf"
-        : "Freigabe zurückgezogen";
+      ? t("lebenslauf.standAbgelehnt")
+      : t(
+          haeltZugriff
+            ? "lebenslauf.standFreigegeben"
+            : "lebenslauf.standZurueckgezogen",
+        );
 
   return (
     <Card component="li" variant="outlined">
@@ -329,7 +332,7 @@ function Anfragezeile({
       >
         <Box>
           <Typography variant="h4">
-            Ein Unternehmen fragt nach deinem Lebenslauf
+            {t("lebenslauf.anfrageTitel")}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {stand}
@@ -345,7 +348,7 @@ function Anfragezeile({
                 onClick={() => onAntwort(true)}
                 disabled={gesperrt}
               >
-                Freigeben
+                {t("allgemein.freigeben")}
               </Button>
               <Button
                 variant="text"
@@ -353,7 +356,7 @@ function Anfragezeile({
                 onClick={() => onAntwort(false)}
                 disabled={gesperrt}
               >
-                Ablehnen
+                {t("allgemein.ablehnen")}
               </Button>
             </>
           ) : null}
@@ -364,7 +367,7 @@ function Anfragezeile({
               onClick={onZurueck}
               disabled={gesperrt}
             >
-              Zurückziehen
+              {t("allgemein.zurueckziehen")}
             </Button>
           ) : null}
         </Box>

@@ -68,7 +68,7 @@ export async function setGranted(
         ? { subject_id: subjectId, capability }
         : { subject_id: subjectId, capability, reason: withdrawalReason },
     },
-    "Die Freigabe konnte nicht geändert werden."
+    "fehler.freigabeNichtGeaendert"
   );
   if (!antwort.ok) return { ok: false, error: antwort.error };
   return { ok: true, granted: antwort.value?.granted === true };
@@ -99,7 +99,7 @@ export async function listMyConsents(signal?: AbortSignal): Promise<MyConsentsRe
     CONSENT_BASE_URL,
     "/consent/me",
     { signal },
-    "Deine Freigaben liessen sich nicht laden."
+    "fehler.freigabenNichtGeladen"
   );
   if (!antwort.ok) return { ok: false, error: antwort.error };
   return { ok: true, consents: antwort.value ?? [] };
@@ -114,12 +114,13 @@ export interface ParsedCapability {
   public: boolean;
 }
 
+/** Die bekannten Bereiche. Der Wert ist ein Katalogschlüssel, kein Satz. */
 const AREAS: Record<string, string> = {
-  profile: "Profil",
-  resume: "Lebenslauf",
-  portfolio: "Arbeiten",
-  market: "Marktstatus",
-  github: "GitHub",
+  profile: "freigaben.bereichProfile",
+  resume: "freigaben.bereichResume",
+  portfolio: "freigaben.bereichPortfolio",
+  market: "freigaben.bereichMarket",
+  github: "freigaben.bereichGithub",
 };
 
 /**
@@ -156,7 +157,7 @@ export async function listMyConsentHistory(
     CONSENT_BASE_URL,
     "/consent/me/history",
     { signal },
-    "Die Historie liess sich nicht laden."
+    "fehler.historieNichtGeladen"
   );
   if (!antwort.ok) return { ok: false, error: antwort.error };
   return { ok: true, events: antwort.value ?? [] };

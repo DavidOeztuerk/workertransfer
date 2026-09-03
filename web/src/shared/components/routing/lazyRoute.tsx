@@ -1,6 +1,14 @@
 import { Suspense, lazy, type ComponentType } from "react";
+import { useTranslation } from "react-i18next";
 
 import { LoadingBlock } from "../ui";
+
+/** Eigene Komponente, damit der Text zur ZEICHENZEIT übersetzt wird — beim
+ *  Modulaufbau stünde die Sprache fest, bevor jemand sie wählen konnte. */
+function Seitenladefeld() {
+  const { t } = useTranslation();
+  return <LoadingBlock label={t("allgemein.seiteLaedt")} />;
+}
 
 /**
  * Eine Route, deren Seite erst beim Betreten geladen wird.
@@ -38,7 +46,7 @@ export function lazyRoute(
   });
 
   return (
-    <Suspense fallback={<LoadingBlock label="Seite wird geladen …" />}>
+    <Suspense fallback={<Seitenladefeld />}>
       <Seite />
     </Suspense>
   );

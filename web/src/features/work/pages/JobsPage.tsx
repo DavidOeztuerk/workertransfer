@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
@@ -16,10 +17,12 @@ import {
 } from "../../../shared/components/ui";
 import type { CompanyProfile } from "../../company/api/companies";
 import {
-  EMPLOYMENT_LABEL,
+  EMPLOYMENT_TYPES,
+  REMOTE_MODES,
+  employmentLabel,
   type EmploymentType,
   type Job,
-  REMOTE_LABEL,
+  remoteLabel,
   type RemoteMode,
   type SucheFehlschlag,
   searchJobs,
@@ -49,6 +52,7 @@ const EMPTY: Filters = { q: "", location: "", remote: "", employment: "" };
  * flackerte, während jemand ein Wort tippt.
  */
 export function JobsPage() {
+  const { t } = useTranslation();
   const { angemeldet, laedt } = useHandelnder();
   const [form, setForm] = useState<Filters>(EMPTY);
   const [applied, setApplied] = useState<Filters>(EMPTY);
@@ -89,8 +93,8 @@ export function JobsPage() {
 
   return (
     <PageShell
-      title="Offene Stellen"
-      lead="Was hier steht, haben Unternehmen selbst veröffentlicht. Zum Lesen brauchst du kein Konto — erst zum Bewerben."
+      title={t("stellen.titel")}
+      lead={t("stellen.lead")}
     >
       <Card sx={{ mb: 3 }}>
         <CardContent
@@ -107,13 +111,13 @@ export function JobsPage() {
           }}
         >
           <TextField
-            label="Suchbegriff"
-            placeholder="Python, Pflege, Vertrieb …"
+            label={t("stellen.suchbegriff")}
+            placeholder={t("stellen.suchbegriffBeispiel")}
             value={form.q}
             onChange={(event) => setForm({ ...form, q: event.target.value })}
           />
           <TextField
-            label="Ort"
+            label={t("stellen.ort")}
             value={form.location}
             onChange={(event) =>
               setForm({ ...form, location: event.target.value })
@@ -124,7 +128,7 @@ export function JobsPage() {
               Auswahlfeld bedient. */}
           <TextField
             select
-            label="Arbeitsform"
+            label={t("stellen.arbeitsform")}
             value={form.remote}
             slotProps={{
               select: { native: true },
@@ -137,17 +141,19 @@ export function JobsPage() {
               })
             }
           >
-            <option value="">Egal</option>
-            <option value="none">Vor Ort</option>
-            <option value="hybrid">Hybrid</option>
-            <option value="full">Vollständig remote</option>
+            <option value="">{t("stellen.egal")}</option>
+            {REMOTE_MODES.map((wert) => (
+              <option key={wert} value={wert}>
+                {remoteLabel(wert)}
+              </option>
+            ))}
           </TextField>
           {/* Diesen Filter gab es schon: `searchJobs` schickt `employment` seit
               immer mit, nur konnte niemand ihn setzen. Ein Wähler dafür ist kein
               neues Versprechen, sondern das Einlösen eines vorhandenen. */}
           <TextField
             select
-            label="Beschäftigungsart"
+            label={t("stellen.beschaeftigungsart")}
             value={form.employment}
             slotProps={{
               select: { native: true },
@@ -160,29 +166,30 @@ export function JobsPage() {
               })
             }
           >
-            <option value="">Egal</option>
-            <option value="full_time">Vollzeit</option>
-            <option value="part_time">Teilzeit</option>
-            <option value="contract">Auf Vertragsbasis</option>
-            <option value="internship">Praktikum</option>
+            <option value="">{t("stellen.egal")}</option>
+            {EMPLOYMENT_TYPES.map((wert) => (
+              <option key={wert} value={wert}>
+                {employmentLabel(wert)}
+              </option>
+            ))}
           </TextField>
           <Button type="submit" variant="contained">
-            Suchen
+            {t("stellen.suchen")}
           </Button>
         </CardContent>
       </Card>
 
       {/* Reihenfolge auf jeder Liste: lädt, dann Fehler, dann leer, dann Inhalt. */}
       {liste.pending && liste.items.length === 0 ? (
-        <LoadingBlock label="Wird gesucht …" />
+        <LoadingBlock label={t("stellen.wirdGesucht")} />
       ) : null}
 
       {liste.fehler !== null ? <ErrorBlock error={liste.fehler.error} /> : null}
 
       {!liste.pending && liste.fehler === null && liste.items.length === 0 ? (
         <EmptyBlock
-          title="Dazu wurde nichts gefunden."
-          hint="Andere Begriffe führen vielleicht weiter."
+          title={t("stellen.leerTitel")}
+          hint={t("stellen.leerHinweis")}
         />
       ) : null}
 
@@ -204,9 +211,10 @@ export function JobsPage() {
                     color="text.secondary"
                     sx={{ mb: 1.5 }}
                   >
-                    {job.location !== "" ? job.location : "Ort nicht angegeben"}{" "}
-                    · {REMOTE_LABEL[job.remote]} ·{" "}
-                    {EMPLOYMENT_LABEL[job.employment]}
+                    {job.location !== ""
+                      ? job.location
+                      : t("stellen.ortFehlt")}{" "}
+                    · {remoteLabel(job.remote)} · {employmentLabel(job.employment)}
                   </Typography>
                   <Typography sx={{ whiteSpace: "pre-line" }}>
                     {job.description}
@@ -227,7 +235,7 @@ export function JobsPage() {
                       variant="contained"
                       sx={{ mt: 2 }}
                     >
-                      Bewerben
+                      {t("stellen.bewerben")}
                     </Button>
                   ) : (
                     <Box sx={{ mt: 2 }}>
@@ -251,15 +259,14 @@ export function JobsPage() {
                           void navigate("/login");
                         }}
                       >
-                        Bewerben
+                        {t("stellen.bewerben")}
                       </Button>
                       <Typography
                         variant="body2"
                         color="text.secondary"
                         sx={{ mt: 1 }}
                       >
-                        Dafür brauchst du ein Konto — danach geht es direkt zur
-                        Bewerbung.
+                        {t("stellen.kontoNoetig")}
                       </Typography>
                     </Box>
                   )}
@@ -272,7 +279,7 @@ export function JobsPage() {
 
       {liste.mehr ? (
         <Button onClick={liste.weiter} disabled={liste.pending} sx={{ mt: 2 }}>
-          {liste.pending ? "Wird geladen …" : "Mehr laden"}
+          {liste.pending ? t("allgemein.laden") : t("stellen.mehrLaden")}
         </Button>
       ) : null}
     </PageShell>
@@ -288,6 +295,7 @@ export function JobsPage() {
  * die niemand gemacht hat.
  */
 function Hiring({ profil }: { profil: CompanyProfile | null | undefined }) {
+  const { t } = useTranslation();
   if (profil === undefined || profil === null) return null;
 
   return (
@@ -297,7 +305,7 @@ function Hiring({ profil }: { profil: CompanyProfile | null | undefined }) {
         <>
           {" · "}
           <Link href={profil.website} target="_blank" rel="noreferrer noopener">
-            Website
+            {t("stellen.website")}
           </Link>
         </>
       ) : null}

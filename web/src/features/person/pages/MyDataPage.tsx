@@ -1,4 +1,5 @@
 import Alert from "@mui/material/Alert";
+import { Trans, useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
@@ -45,6 +46,7 @@ import { listMyApplications } from "../../work/api/applications";
  * Pflichtreihenfolge.
  */
 export function MyDataPage() {
+  const { t } = useTranslation();
   const status = useAppSelector((state) => state.auth.status);
   const sitzung = useAppSelector((state) => state.auth.session);
 
@@ -129,7 +131,12 @@ export function MyDataPage() {
   );
 
   if (status === "anonymous") {
-    return <AnmeldungNoetig titel="Meine Daten" zweck="deine Daten zu sehen" />;
+    return (
+      <AnmeldungNoetig
+        titel={t("meineDaten.titel")}
+        satz="meineDaten.anmelden"
+      />
+    );
   }
 
   const ergebnis =
@@ -154,23 +161,19 @@ export function MyDataPage() {
 
   return (
     <PageShell
-      title="Meine Daten"
+      title={t("meineDaten.titel")}
       narrow
-      lead={
-        "Alles, was diese Plattform über dich gespeichert hat, in einer Datei. Sie entsteht in " +
-        "deinem Browser und wird nirgends abgelegt — es gibt also nichts, das liegen bleibt."
-      }
+      lead={t("meineDaten.lead")}
     >
       <Card sx={{ mb: 3 }}>
         <CardContent>
           {auskunft.laedt ? (
-            <LoadingBlock label="Daten werden gesammelt…" />
+            <LoadingBlock label={t("meineDaten.laden")} />
           ) : null}
 
           {fehlend.length > 0 ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              Diese Teile konnten nicht geladen werden: {fehlend.join(", ")}.
-              Die Datei sagt das ebenfalls — sie ist unvollständig.
+              {t("meineDaten.unvollstaendig", { teile: fehlend.join(", ") })}
             </Alert>
           ) : null}
 
@@ -204,14 +207,18 @@ export function MyDataPage() {
                           : "warning.main"
                       }
                     >
-                      {eintrag.status === "ok" ? "enthalten" : "fehlt"}
+                      {t(
+                        eintrag.status === "ok"
+                          ? "meineDaten.enthalten"
+                          : "meineDaten.fehlt",
+                      )}
                     </Typography>
                   </Box>
                 ))}
               </Box>
 
               <Button variant="contained" onClick={herunterladen}>
-                Als JSON herunterladen
+                {t("meineDaten.herunterladen")}
               </Button>
             </>
           ) : null}
@@ -221,22 +228,18 @@ export function MyDataPage() {
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 1.5 }}>
-            Was hier nicht steht
+            {t("meineDaten.nichtHierTitel")}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            Löschen ist ein eigener Weg und steht bewusst nicht als Knopf neben
-            einem Herunterladen-Knopf: hier lässt sich nichts falsch anklicken,
-            was sich nicht rückgängig machen ließe. Was dabei passiert, steht
-            vollständig auf{" "}
-            <Link component={RouterLink} to="/delete-account">
-              Konto löschen
-            </Link>{" "}
-            — vor dem Klick, nicht danach.
+            <Trans
+              i18nKey="meineDaten.nichtHierText"
+              components={{
+                1: <Link component={RouterLink} to="/delete-account" />,
+              }}
+            />
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Du musst hier nichts herunterladen, bevor du löschst. Der Verweis
-            geht in beide Richtungen, damit niemand glaubt, es gäbe eine
-            Pflichtreihenfolge.
+            {t("meineDaten.keineReihenfolge")}
           </Typography>
         </CardContent>
       </Card>

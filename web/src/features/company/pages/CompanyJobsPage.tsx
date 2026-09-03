@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -21,10 +22,11 @@ import {
   publishJob,
 } from "../../work/api/jobs";
 
+/** Der Stand als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
 const STAND: Record<string, string> = {
-  draft: "Entwurf — sieht nur ihr",
-  published: "Veröffentlicht",
-  closed: "Geschlossen",
+  draft: "firmenstellen.standDraft",
+  published: "firmenstellen.standPublished",
+  closed: "firmenstellen.standClosed",
 };
 
 /**
@@ -41,6 +43,7 @@ const STAND: Record<string, string> = {
  * Oberfläche, aber die Verlinkung muss deshalb auffindbar sein.
  */
 export function CompanyJobsPage() {
+  const { t } = useTranslation();
   const { fuerFirma } = useHandelnder();
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
@@ -53,12 +56,11 @@ export function CompanyJobsPage() {
 
   if (!fuerFirma) {
     return (
-      <PageShell title="Unsere Stellen" narrow>
+      <PageShell title={t("firmenstellen.titel")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              Stellen verwaltet nur, wer für ein Unternehmen handelt. Wechsle
-              oben auf ein Unternehmen.
+              {t("firmenstellen.nurFirma")}
             </Typography>
           </CardContent>
         </Card>
@@ -81,19 +83,16 @@ export function CompanyJobsPage() {
 
   return (
     <PageShell
-      title="Unsere Stellen"
+      title={t("firmenstellen.titel")}
       narrow
-      lead={
-        "Ein Entwurf sieht niemand außer euch. Veröffentlicht ist er für alle sichtbar, auch ohne " +
-        "Konto — und geschlossen bleibt geschlossen."
-      }
+      lead={t("firmenstellen.lead")}
       actions={
         <Button
           component={RouterLink}
           to="/company/jobs/new"
           variant="contained"
         >
-          Neue Stelle
+          {t("firmenstellen.neu")}
         </Button>
       }
     >
@@ -110,7 +109,7 @@ export function CompanyJobsPage() {
               geglückte Antwort verlangte, blieb die Karte währenddessen
               vollständig leer. */}
           {stellen.pending ? (
-            <LoadingBlock label="Stellen werden geladen…" />
+            <LoadingBlock label={t("firmenstellen.laden")} />
           ) : null}
 
           {ergebnis !== null && !ergebnis.ok ? (
@@ -119,14 +118,14 @@ export function CompanyJobsPage() {
 
           {ergebnis?.ok && liste.length === 0 ? (
             <EmptyBlock
-              title="Noch keine Stelle angelegt."
+              title={t("firmenstellen.leer")}
               action={
                 <Button
                   component={RouterLink}
                   to="/company/jobs/new"
                   variant="contained"
                 >
-                  Neue Stelle
+                  {t("firmenstellen.neu")}
                 </Button>
               }
             />
@@ -158,7 +157,7 @@ export function CompanyJobsPage() {
                     <Box>
                       <Typography variant="h4">{stelle.title}</Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {STAND[stelle.status] ?? stelle.status}
+                        {t(STAND[stelle.status] ?? stelle.status)}
                       </Typography>
                     </Box>
 
@@ -171,7 +170,7 @@ export function CompanyJobsPage() {
                             onClick={() => void schalten(stelle.id, true)}
                             disabled={laeuft}
                           >
-                            Veröffentlichen
+                            {t("firmenstellen.veroeffentlichen")}
                           </Button>
                         ) : null}
                         <Button
@@ -180,7 +179,7 @@ export function CompanyJobsPage() {
                           onClick={() => void schalten(stelle.id, false)}
                           disabled={laeuft}
                         >
-                          Schließen
+                          {t("firmenstellen.schliessen")}
                         </Button>
                       </Box>
                     ) : null}

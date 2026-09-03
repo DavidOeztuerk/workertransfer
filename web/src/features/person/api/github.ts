@@ -1,6 +1,7 @@
 import { request } from "../../../core/api/client";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import { GITHUB_BASE_URL } from "../../../env";
+import type { Fehlerschluessel } from "../../../shared/api/fehler";
 
 /**
  * Die eigene, nachgewiesene GitHub-Verbindung.
@@ -38,7 +39,7 @@ export async function ladeMeine(signal?: AbortSignal): Promise<Antwort<Verbindun
     GITHUB_BASE_URL,
     "/github/me",
     { signal },
-    "Die Verbindung ist gerade nicht abrufbar."
+    "fehler.verbindungNichtAbrufbar"
   );
 
   if (antwort.ok) return { ok: true, wert: antwort.value ?? null };
@@ -49,7 +50,7 @@ export async function ladeMeine(signal?: AbortSignal): Promise<Antwort<Verbindun
 async function handeln(
   pfad: string,
   optionen: Parameters<typeof request>[2],
-  fallback: string
+  fallback: Fehlerschluessel
 ): Promise<Antwort<Verbindung>> {
   const antwort = await request<Verbindung>(GITHUB_BASE_URL, pfad, optionen, fallback);
 
@@ -63,7 +64,7 @@ export const nenneKonto = (login: string, signal?: AbortSignal) =>
   handeln(
     "/github/me",
     { method: "POST", body: { login }, signal },
-    "Das Konto konnte nicht angenommen werden."
+    "fehler.kontoNichtAngenommen"
   );
 
 /**
@@ -77,7 +78,7 @@ export const pruefeNachweis = (signal?: AbortSignal) =>
   handeln(
     "/github/me/verify",
     { method: "POST", signal },
-    "Der Nachweis konnte nicht geprüft werden."
+    "fehler.nachweisNichtGeprueft"
   );
 
 /**
@@ -88,7 +89,7 @@ export const pruefeNachweis = (signal?: AbortSignal) =>
  * einmal auf Bitte hinsieht.
  */
 export const holeNeu = (signal?: AbortSignal) =>
-  handeln("/github/me/refresh", { method: "POST", signal }, "Es konnte nichts geholt werden.");
+  handeln("/github/me/refresh", { method: "POST", signal }, "fehler.nichtsGeholt");
 
 /** Die Verbindung trennen. */
 export async function trenne(signal?: AbortSignal): Promise<boolean> {
@@ -96,7 +97,7 @@ export async function trenne(signal?: AbortSignal): Promise<boolean> {
     GITHUB_BASE_URL,
     "/github/me",
     { method: "DELETE", signal },
-    "Die Verbindung konnte nicht getrennt werden."
+    "fehler.verbindungNichtGetrennt"
   );
 
   return antwort.ok;

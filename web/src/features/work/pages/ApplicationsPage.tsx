@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
+import Link from "@mui/material/Link";
 import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
@@ -21,12 +23,13 @@ import {
   withdrawApplication,
 } from "../api/applications";
 
+/** Der Stand als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
 const STAND: Record<ApplicationStatus, string> = {
-  submitted: "Abgeschickt",
-  reviewing: "Wird gelesen",
-  rejected: "Abgelehnt",
-  withdrawn: "Zurückgezogen — deine Daten sind wieder zu",
-  hired: "Zusage",
+  submitted: "bewerbungen.standSubmitted",
+  reviewing: "bewerbungen.standReviewing",
+  rejected: "bewerbungen.standRejected",
+  withdrawn: "bewerbungen.standWithdrawn",
+  hired: "bewerbungen.standHired",
 };
 
 /** Läuft die Bewerbung noch — also sieht das Unternehmen gerade etwas? */
@@ -39,10 +42,13 @@ const laeuft = (stand: ApplicationStatus) =>
  * Das Profil ist immer dabei — ohne es gäbe es nichts zu lesen. Lebenslauf und
  * Arbeiten nur, wenn die Person sie beim Bewerben ausdrücklich mitgegeben hat.
  */
-function freigegeben(bewerbung: Application): string {
-  const teile = ["Profil"];
-  if (bewerbung.shares_resume) teile.push("Lebenslauf");
-  if (bewerbung.shares_portfolio) teile.push("Arbeiten");
+function freigegeben(
+  bewerbung: Application,
+  t: (schluessel: string) => string,
+): string {
+  const teile = [t("bewerbungen.teilProfil")];
+  if (bewerbung.shares_resume) teile.push(t("bewerbungen.teilLebenslauf"));
+  if (bewerbung.shares_portfolio) teile.push(t("bewerbungen.teilArbeiten"));
   return teile.join(", ");
 }
 
@@ -59,6 +65,7 @@ function freigegeben(bewerbung: Application): string {
  * oder bereits zurückgezogenen wäre der Knopf eine Handlung ohne Wirkung.
  */
 export function ApplicationsPage() {
+  const { t } = useTranslation();
   const { angemeldet, subjectId } = useHandelnder();
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuftGerade, setLaeuftGerade] = useState(false);
@@ -71,20 +78,14 @@ export function ApplicationsPage() {
 
   if (!angemeldet) {
     return (
-      <PageShell title="Meine Bewerbungen" narrow>
+      <PageShell title={t("bewerbungen.titel")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              Bitte{" "}
-              <Button
-                component={RouterLink}
-                to="/login"
-                variant="text"
-                size="small"
-              >
-                anmelden
-              </Button>
-              , um deine Bewerbungen zu sehen.
+              <Trans
+                i18nKey="bewerbungen.anmelden"
+                components={{ 1: <Link component={RouterLink} to="/login" /> }}
+              />
             </Typography>
           </CardContent>
         </Card>
@@ -106,13 +107,9 @@ export function ApplicationsPage() {
 
   return (
     <PageShell
-      title="Meine Bewerbungen"
+      title={t("bewerbungen.titel")}
       narrow
-      lead={
-        "Solange eine Bewerbung läuft, sieht das Unternehmen dein Profil — und was du sonst " +
-        "freigegeben hast. Ziehst du sie zurück, ist der Zugriff sofort zu; der Vorgang bleibt " +
-        "beim Unternehmen als das stehen, was er war."
-      }
+      lead={t("bewerbungen.lead")}
     >
       {fehler !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -126,7 +123,7 @@ export function ApplicationsPage() {
               Ladezustand FEHLTE im alten Code — solange die Liste unterwegs
               war, griff keiner der Zweige und man sah eine leere Karte. */}
           {bewerbungen.pending ? (
-            <LoadingBlock label="Bewerbungen werden geladen…" />
+            <LoadingBlock label={t("bewerbungen.laden")} />
           ) : null}
 
           {ergebnis !== null && !ergebnis.ok ? (
@@ -135,10 +132,10 @@ export function ApplicationsPage() {
 
           {ergebnis?.ok && liste.length === 0 ? (
             <EmptyBlock
-              title="Noch keine Bewerbung."
+              title={t("bewerbungen.leerTitel")}
               action={
                 <Button component={RouterLink} to="/jobs" variant="contained">
-                  Offene Stellen ansehen
+                  {t("bewerbungen.leerKnopf")}
                 </Button>
               }
             />
@@ -169,12 +166,14 @@ export function ApplicationsPage() {
                   >
                     <Box>
                       <Typography variant="h4">
-                        {STAND[bewerbung.status]}
+                        {t(STAND[bewerbung.status])}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         {laeuft(bewerbung.status)
-                          ? `Freigegeben: ${freigegeben(bewerbung)}`
-                          : "Das Unternehmen sieht deine Daten nicht mehr."}
+                          ? t("bewerbungen.freigegeben", {
+                              teile: freigegeben(bewerbung, t),
+                            })
+                          : t("bewerbungen.nichtMehrSichtbar")}
                       </Typography>
                     </Box>
 
@@ -186,7 +185,7 @@ export function ApplicationsPage() {
                         disabled={laeuftGerade}
                         sx={{ flexShrink: 0 }}
                       >
-                        Zurückziehen
+                        {t("allgemein.zurueckziehen")}
                       </Button>
                     ) : null}
                   </CardContent>

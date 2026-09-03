@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -64,6 +65,7 @@ function zuFormular(profil: Profile | null): FormState {
  * der Freigabe nichts.
  */
 export function ProfilePage() {
+  const { t } = useTranslation();
   const { subjectId, unbekannt } = usePerson();
 
   const profil = useAsync(
@@ -138,7 +140,7 @@ export function ProfilePage() {
 
   if (unbekannt) {
     return (
-      <PageShell title="Mein Profil" narrow>
+      <PageShell title={t("profil.titel")} narrow>
         <LoadingBlock />
       </PageShell>
     );
@@ -146,7 +148,7 @@ export function ProfilePage() {
 
   if (subjectId === null) {
     return (
-      <AnmeldungNoetig titel="Mein Profil" zweck="dein Profil zu bearbeiten" />
+      <AnmeldungNoetig titel={t("profil.titel")} satz="profil.anmelden" />
     );
   }
 
@@ -154,8 +156,8 @@ export function ProfilePage() {
     // Kein leeres Formular, das sich nachträglich füllt: wer in der Zwischenzeit
     // zu tippen anfängt, verliert seine Eingabe, sobald die Antwort eintrifft.
     return (
-      <PageShell title="Mein Profil" narrow>
-        <LoadingBlock label="Profil wird geladen…" />
+      <PageShell title={t("profil.titel")} narrow>
+        <LoadingBlock label={t("profil.laden")} />
       </PageShell>
     );
   }
@@ -166,7 +168,7 @@ export function ProfilePage() {
     // leer. Der Ladezustand ist dann vorbei, die Seite sähe aus wie „noch
     // nichts eingetragen".
     return (
-      <PageShell title="Mein Profil" narrow>
+      <PageShell title={t("profil.titel")} narrow>
         <ErrorBlock error={geladen.error} />
       </PageShell>
     );
@@ -185,24 +187,26 @@ export function ProfilePage() {
 
   return (
     <PageShell
-      title="Mein Profil"
+      title={t("profil.titel")}
       narrow
-      lead="Was hier steht, sieht zunächst niemand. Sichtbar wird es erst, wenn du es freigibst — und unsichtbar in dem Moment, in dem du die Freigabe zurückziehst."
+      lead={t("profil.lead")}
     >
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <ConsentSwitch
-            label="Profil für Unternehmen freigeben"
+            label={t("profil.freigabeLabel")}
             checked={freigegeben}
             disabled={!hatProfil || schaltet || ledgerUnbekannt}
             hint={
               ledgerSchweigt
-                ? "Ob eine Freigabe gilt, ist gerade nicht abrufbar. Solange das so ist, ändert dieser Schalter nichts — sonst würdest du etwas freigeben, dessen Stand niemand kennt."
+                ? t("profil.freigabeSchweigt")
                 : freigabe.laedt
-                  ? "Freigabe wird geprüft…"
-                  : hatProfil
-                    ? "Wirkt sofort. Ein Widerruf entzieht den Zugriff, ohne dass du jemanden darum bitten musst."
-                    : "Erst ein Profil speichern — freigeben lässt sich nur, was es gibt."
+                  ? t("profil.freigabePruefung")
+                  : t(
+                      hatProfil
+                        ? "profil.freigabeWirkt"
+                        : "profil.freigabeOhneProfil",
+                    )
             }
             onChange={(naechster) => void schalte(naechster)}
           />
@@ -220,8 +224,8 @@ export function ProfilePage() {
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
             <TextField
-              label="Überschrift"
-              helperText="Eine Zeile, die sagt, worum es dir geht."
+              label={t("profil.ueberschrift")}
+              helperText={t("profil.ueberschriftHinweis")}
               value={formular.headline}
               onChange={(ereignis) =>
                 aendere("headline", ereignis.target.value)
@@ -231,8 +235,8 @@ export function ProfilePage() {
               fullWidth
             />
             <TextField
-              label="Über mich"
-              helperText="Freitext. Was ein Lebenslauf nicht hergibt."
+              label={t("profil.ueberMich")}
+              helperText={t("profil.ueberMichHinweis")}
               multiline
               rows={6}
               value={formular.bio}
@@ -245,7 +249,7 @@ export function ProfilePage() {
               hasText={formular.bio.trim().length > 0}
             />
             <TextField
-              label="Ort"
+              label={t("profil.ort")}
               value={formular.location}
               onChange={(ereignis) =>
                 aendere("location", ereignis.target.value)
@@ -254,11 +258,11 @@ export function ProfilePage() {
               fullWidth
             />
             <TextField
-              label="Fähigkeiten"
+              label={t("profil.faehigkeiten")}
               // Der Hinweis erklärt, warum aus „postgres" nach dem Speichern
               // „PostgreSQL" wird. Ohne ihn sähe es aus, als hätte die Seite
               // etwas an der Eingabe verändert, ohne zu fragen.
-              helperText="Mit Komma getrennt, zum Beispiel: Python, FastAPI, PostgreSQL. Bekannte Schreibweisen vereinheitlichen wir — aus „postgres“ wird „PostgreSQL“. Was wir nicht kennen, bleibt genau so stehen."
+              helperText={t("profil.faehigkeitenHinweis")}
               value={formular.skills}
               onChange={(ereignis) => aendere("skills", ereignis.target.value)}
               fullWidth
@@ -275,7 +279,7 @@ export function ProfilePage() {
                   }
                 />
               }
-              label="Remote-Arbeit kommt für mich in Frage"
+              label={t("profil.remote")}
             />
 
             {fehler !== null ? <ErrorBlock error={fehler} /> : null}
@@ -283,13 +287,15 @@ export function ProfilePage() {
                 Vorleser unterbricht, ist Lärm. */}
             {gespeichert && fehler === null ? (
               <Alert severity="success" role="status">
-                Profil gespeichert.
+                {t("profil.gespeichert")}
               </Alert>
             ) : null}
 
             <Box>
               <Button type="submit" variant="contained" disabled={speichert}>
-                {speichert ? "Wird gespeichert…" : "Speichern"}
+                {speichert
+                  ? t("allgemein.speichernLaeuft")
+                  : t("allgemein.speichern")}
               </Button>
             </Box>
           </Box>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -13,12 +14,14 @@ import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { PageShell } from "../../../shared/components/ui";
 import { useHandelnder } from "../lib/session";
 import {
-  EMPLOYMENT_LABEL,
+  EMPLOYMENT_TYPES,
   type EmploymentType,
-  REMOTE_LABEL,
+  REMOTE_MODES,
   type RemoteMode,
   createJob,
   draftJobText,
+  employmentLabel,
+  remoteLabel,
 } from "../../work/api/jobs";
 
 interface Entwurf {
@@ -53,6 +56,7 @@ const faehigkeiten = (roh: string): string[] =>
  * dem Unternehmen.
  */
 export function CompanyJobNewPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { fuerFirma } = useHandelnder();
 
@@ -62,19 +66,18 @@ export function CompanyJobNewPage() {
 
   const zurueck = (
     <Link component={RouterLink} to="/company/jobs" variant="body2">
-      Zurück zu unseren Stellen
+      {t("firmenstellen.zurueck")}
     </Link>
   );
 
   if (!fuerFirma) {
     return (
-      <PageShell title="Neue Stelle" narrow>
+      <PageShell title={t("firmenstellen.neu")} narrow>
         <Box sx={{ mb: 2 }}>{zurueck}</Box>
         <Card>
           <CardContent>
             <Typography>
-              Stellen legt nur an, wer für ein Unternehmen handelt. Wechsle oben
-              auf ein Unternehmen.
+              {t("firmenstellen.neuNurFirma")}
             </Typography>
           </CardContent>
         </Card>
@@ -99,7 +102,7 @@ export function CompanyJobNewPage() {
   }
 
   return (
-    <PageShell title="Neue Stelle" narrow>
+    <PageShell title={t("firmenstellen.neu")} narrow>
       <Box sx={{ mb: 2 }}>{zurueck}</Box>
 
       <Card>
@@ -119,7 +122,7 @@ export function CompanyJobNewPage() {
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
             <TextField
-              label="Titel"
+              label={t("firmenstellen.feldTitel")}
               value={entwurf.title}
               onChange={(e) =>
                 setEntwurf({ ...entwurf, title: e.target.value })
@@ -127,7 +130,7 @@ export function CompanyJobNewPage() {
               required
             />
             <TextField
-              label="Beschreibung"
+              label={t("firmenstellen.beschreibung")}
               value={entwurf.description}
               onChange={(e) =>
                 setEntwurf({ ...entwurf, description: e.target.value })
@@ -136,8 +139,8 @@ export function CompanyJobNewPage() {
               minRows={5}
             />
             <TextField
-              label="Ort"
-              helperText="Leer lassen, wenn es keinen festen gibt."
+              label={t("firmenstellen.ort")}
+              helperText={t("firmenstellen.ortHinweis")}
               value={entwurf.location}
               onChange={(e) =>
                 setEntwurf({ ...entwurf, location: e.target.value })
@@ -145,21 +148,21 @@ export function CompanyJobNewPage() {
             />
             <TextField
               select
-              label="Arbeitsform"
+              label={t("firmenstellen.arbeitsform")}
               value={entwurf.remote}
               onChange={(e) =>
                 setEntwurf({ ...entwurf, remote: e.target.value as RemoteMode })
               }
             >
-              {Object.entries(REMOTE_LABEL).map(([wert, label]) => (
+              {REMOTE_MODES.map((wert) => (
                 <MenuItem key={wert} value={wert}>
-                  {label}
+                  {remoteLabel(wert)}
                 </MenuItem>
               ))}
             </TextField>
             <TextField
               select
-              label="Beschäftigung"
+              label={t("firmenstellen.beschaeftigung")}
               value={entwurf.employment}
               onChange={(e) =>
                 setEntwurf({
@@ -168,15 +171,15 @@ export function CompanyJobNewPage() {
                 })
               }
             >
-              {Object.entries(EMPLOYMENT_LABEL).map(([wert, label]) => (
+              {EMPLOYMENT_TYPES.map((wert) => (
                 <MenuItem key={wert} value={wert}>
-                  {label}
+                  {employmentLabel(wert)}
                 </MenuItem>
               ))}
             </TextField>
             <TextField
-              label="Gesuchte Fähigkeiten"
-              helperText="Mit Komma trennen."
+              label={t("firmenstellen.faehigkeiten")}
+              helperText={t("firmenstellen.faehigkeitenHinweis")}
               value={entwurf.skills}
               onChange={(e) =>
                 setEntwurf({ ...entwurf, skills: e.target.value })
@@ -192,7 +195,9 @@ export function CompanyJobNewPage() {
 
             <Box>
               <Button type="submit" variant="contained" disabled={laeuft}>
-                {laeuft ? "Wird angelegt…" : "Entwurf anlegen"}
+                {laeuft
+                  ? t("firmenstellen.anlegenLaeuft")
+                  : t("firmenstellen.anlegen")}
               </Button>
             </Box>
           </Box>
@@ -222,6 +227,7 @@ function Formulierungshilfe({
   entwurf: Entwurf;
   onVorschlag: (text: string) => void;
 }) {
+  const { t } = useTranslation();
   const [wunsch, setWunsch] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
@@ -231,17 +237,10 @@ function Formulierungshilfe({
   return (
     <Box sx={{ p: 2, borderRadius: 2, bgcolor: "action.hover" }}>
       <TextField
-        label={
-          hatText
-            ? "Anzeige umformulieren lassen"
-            : "Beim Schreiben helfen lassen"
-        }
-        helperText={
-          "Optional: was euch wichtig ist („kürzer“, „weniger Floskeln“). Titel, Beschreibung, " +
-          "Ort und die gesuchten Fähigkeiten gehen dafür an Anthropic — nichts über Bewerbende. " +
-          "Anforderungen erfindet der Vorschlag keine dazu, und gespeichert wird er erst, wenn " +
-          "ihr den Entwurf anlegt."
-        }
+        label={t(
+          hatText ? "firmenstellen.hilfeUmformulieren" : "firmenstellen.hilfeNeu",
+        )}
+        helperText={t("firmenstellen.hilfeHinweis")}
         value={wunsch}
         onChange={(e) => setWunsch(e.target.value)}
         slotProps={{ htmlInput: { maxLength: 200 } }}
@@ -279,10 +278,12 @@ function Formulierungshilfe({
         }}
       >
         {laeuft
-          ? "Wird geschrieben…"
-          : hatText
-            ? "Vorschlag holen (ersetzt die Beschreibung)"
-            : "Vorschlag holen"}
+          ? t("firmenstellen.hilfeLaeuft")
+          : t(
+              hatText
+                ? "firmenstellen.hilfeKnopfErsetzt"
+                : "firmenstellen.hilfeKnopf",
+            )}
       </Button>
     </Box>
   );

@@ -11,7 +11,7 @@
 
 import { request } from "../../../core/api/client";
 import { GITHUB_BASE_URL } from "../../../env";
-import { type Fehlschlag, deuten } from "./fehler";
+import { type Fehlschlag, deuten } from "../../../shared/api/fehler";
 
 export interface GitHubRepository {
   name: string;
@@ -45,13 +45,13 @@ export async function getGitHub(
     GITHUB_BASE_URL,
     `/github/${subjectId}`,
     { signal },
-    "Die Verbindung ließ sich nicht laden."
+    "fehler.verbindungNichtGeladen"
   );
   if (antwort.ok) return { ok: true, connection: antwort.value ?? null };
   if (antwort.error.status === 404) return { ok: true, connection: null };
   return deuten<"unavailable">(
     antwort.error,
-    { 503: { reason: "unavailable", title: "Der Consent-Ledger antwortet gerade nicht." } },
+    { 503: { reason: "unavailable", titel: "fehler.ledgerSchweigt" } },
     "unavailable"
   );
 }

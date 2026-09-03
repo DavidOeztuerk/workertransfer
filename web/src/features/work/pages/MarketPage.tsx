@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -61,6 +62,7 @@ const WAHLEN: { wert: Availability; label: string; hinweis: string }[] = [
  * speichert, ohne etwas zu wählen, darf nicht versehentlich ansprechbar werden.
  */
 export function MarketPage() {
+  const { t } = useTranslation();
   const { angemeldet, subjectId } = useHandelnder();
 
   const stand = useAsync(
@@ -228,7 +230,7 @@ export function MarketPage() {
 
           {gespeichert ? (
             <Alert severity="success" sx={{ mb: 2 }} role="status">
-              Marktstatus gespeichert.
+              {t("markt.gespeichert")}
             </Alert>
           ) : null}
 
@@ -292,25 +294,25 @@ export function MarketPage() {
                   }}
                 />
               }
-              label="Ich arbeite gerade irgendwo"
+              label={t("markt.beschaeftigt")}
               sx={{ mb: 2, display: "block" }}
             />
 
             <TextField
-              label="Notiz"
+              label={t("markt.notiz")}
               value={notiz}
               onChange={(ereignis) => {
                 setGespeichert(false);
                 setNotiz(ereignis.target.value);
               }}
-              helperText="Was du suchst, in eigenen Worten. Sieht nur, wer freigeschaltet ist."
+              helperText={t("markt.notizHinweis")}
               multiline
               minRows={3}
               sx={{ mb: 2 }}
             />
 
             <Button type="submit" variant="contained" disabled={laeuft}>
-              {laeuft ? "Wird gespeichert…" : "Speichern"}
+              {laeuft ? t("markt.speichernLaeuft") : t("markt.speichern")}
             </Button>
           </Box>
         </CardContent>

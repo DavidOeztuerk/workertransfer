@@ -1,4 +1,6 @@
 import type { ApiError } from "../store/thunkHelpers";
+import { i18n } from "../i18n/i18n";
+import type { Fehlerschluessel } from "../../shared/api/fehler";
 
 /**
  * Der eine Weg nach draussen.
@@ -23,11 +25,17 @@ export interface RequestOptions {
 /** Was der Aufrufer bekommt: die Antwort ODER die Aussage, was fehlte. */
 export type ApiResult<T> = { ok: true; value: T } | { ok: false; error: ApiError };
 
-const NETZ: ApiError = {
-  status: 0,
-  title: "Keine Verbindung",
-  detail: "Der Dienst ist gerade nicht erreichbar.",
-};
+/**
+ * Der Netzfehler als FUNKTION und nicht als Konstante: ein `const` entstünde
+ * beim Laden des Moduls, also bevor jemand eine Sprache wählen konnte.
+ */
+function netzfehler(): ApiError {
+  return {
+    status: 0,
+    title: i18n.t("fehler.keineVerbindungKurz"),
+    detail: i18n.t("fehler.dienstNichtErreichbar"),
+  };
+}
 
 /**
  * Liest ein Problemdokument aus, ohne ihm zu vertrauen.
@@ -36,7 +44,13 @@ const NETZ: ApiError = {
  * Proxy dazwischen). Dann steht hier ein brauchbarer Satz statt eines
  * Parserfehlers, der in der Oberfläche als weisse Seite ankäme.
  */
-async function problem(response: Response, fallback: string): Promise<ApiError> {
+async function problem(
+  response: Response,
+  fallbackSchluessel: Fehlerschluessel
+): Promise<ApiError> {
+  // Übersetzt bei der ANTWORT, nicht beim Aufbau der Aufrufstelle: die
+  // Vorgabewerte stehen in Signaturen und entstünden beim Laden des Moduls.
+  const fallback = i18n.t(fallbackSchluessel);
   try {
     const body = (await response.json()) as Partial<ApiError> & { detail?: string };
     return {
@@ -55,7 +69,7 @@ export async function request<T>(
   baseUrl: string,
   path: string,
   options: RequestOptions = {},
-  fallbackMessage = "Die Anfrage ist fehlgeschlagen."
+  fallbackMessage: Fehlerschluessel = "fehler.anfrageFehlgeschlagen"
 ): Promise<ApiResult<T>> {
   const { method = "GET", body, signal } = options;
 
@@ -69,7 +83,7 @@ export async function request<T>(
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    return { ok: false, error: NETZ };
+    return { ok: false, error: netzfehler() };
   }
 
   if (!response.ok) {

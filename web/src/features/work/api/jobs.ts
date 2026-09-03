@@ -8,7 +8,12 @@
 
 import { request } from "../../../core/api/client";
 import { JOBS_BASE_URL } from "../../../env";
-import { type Fehlschlag, deuten } from "./fehler";
+import { i18n } from "../../../core/i18n/i18n";
+import {
+  type Deutung,
+  type Fehlschlag,
+  deuten,
+} from "../../../shared/api/fehler";
 
 export type RemoteMode = "none" | "hybrid" | "full";
 export type EmploymentType = "full_time" | "part_time" | "contract" | "internship";
@@ -68,19 +73,36 @@ export type JobErgebnis = { ok: true; job: Job } | Fehlschlag<JobFehler>;
 
 export type EigeneJobsErgebnis = { ok: true; jobs: Job[] } | Fehlschlag<SucheFehler>;
 
-/** Werte aus dem Vertrag sind keine Sätze für Menschen. */
-export const REMOTE_LABEL: Record<RemoteMode, string> = {
-  none: "Vor Ort",
-  hybrid: "Hybrid",
-  full: "Vollständig remote",
-};
+/**
+ * Werte aus dem Vertrag sind keine Sätze für Menschen.
+ *
+ * FUNKTIONEN und keine Tabellen: eine Konstante entstünde beim Laden des
+ * Moduls und trüge dann für immer die Sprache, die in diesem Augenblick galt.
+ */
+/** Die erlaubten Werte, in Anzeigereihenfolge — für Auswahlfelder. */
+export const REMOTE_MODES: RemoteMode[] = ["none", "hybrid", "full"];
 
-export const EMPLOYMENT_LABEL: Record<EmploymentType, string> = {
-  full_time: "Vollzeit",
-  part_time: "Teilzeit",
-  contract: "Auf Vertragsbasis",
-  internship: "Praktikum",
-};
+export const EMPLOYMENT_TYPES: EmploymentType[] = [
+  "full_time",
+  "part_time",
+  "contract",
+  "internship",
+];
+
+export function remoteLabel(wert: RemoteMode): string {
+  const schluessel = { none: "None", hybrid: "Hybrid", full: "Full" } as const;
+  return i18n.t(`stelle.remote${schluessel[wert]}`);
+}
+
+export function employmentLabel(wert: EmploymentType): string {
+  const schluessel = {
+    full_time: "FullTime",
+    part_time: "PartTime",
+    contract: "Contract",
+    internship: "Internship",
+  } as const;
+  return i18n.t(`stelle.employment${schluessel[wert]}`);
+}
 
 export function suchAnfrage(filters: SearchFilters, cursor?: string): string {
   const params = new URLSearchParams();
@@ -109,12 +131,12 @@ export async function searchJobs(
     JOBS_BASE_URL,
     `/jobs${suchAnfrage(filters, cursor)}`,
     { signal },
-    "Die Suche ist fehlgeschlagen."
+    "fehler.sucheFehlgeschlagen"
   );
   if (!antwort.ok) {
     return deuten<SucheFehler>(
       antwort.error,
-      { 0: { reason: "offline", title: "Keine Verbindung zum Server." } },
+      { 0: { reason: "offline", titel: "fehler.keineVerbindung" } },
       "fehlgeschlagen"
     );
   }
@@ -142,7 +164,7 @@ export async function listOwnJobs(signal?: AbortSignal): Promise<EigeneJobsErgeb
     JOBS_BASE_URL,
     "/companies/me/jobs",
     { signal },
-    "Die Liste ließ sich nicht laden."
+    "fehler.listeNichtGeladen"
   );
   if (antwort.ok) return { ok: true, jobs: antwort.value ?? [] };
   // Kein aktives Unternehmen ist ein behebbarer Zustand, kein Fehler. Die Seite
@@ -151,20 +173,20 @@ export async function listOwnJobs(signal?: AbortSignal): Promise<EigeneJobsErgeb
   if (antwort.error.status === 403) return { ok: true, jobs: [] };
   return deuten<SucheFehler>(
     antwort.error,
-    { 0: { reason: "offline", title: "Keine Verbindung zum Server." } },
+    { 0: { reason: "offline", titel: "fehler.keineVerbindung" } },
     "fehlgeschlagen"
   );
 }
 
-const SCHREIBFEHLER: Partial<Record<number, { reason: JobFehler; title: string; detail?: string }>> =
+const SCHREIBFEHLER: Partial<Record<number, Deutung<JobFehler>>> =
   {
-    0: { reason: "offline", title: "Keine Verbindung zum Server." },
+    0: { reason: "offline", titel: "fehler.keineVerbindung" },
     403: {
       reason: "no-company",
-      title: "Ausschreiben kann nur, wer für ein Unternehmen handelt.",
-      detail: "Wechsle oben auf ein Unternehmen.",
+      titel: "fehler.nurFirmaAusschreiben",
+      text: "fehler.firmaWaehlen",
     },
-    404: { reason: "not-found", title: "Diese Ausschreibung gibt es nicht." },
+    404: { reason: "not-found", titel: "fehler.ausschreibungFehlt" },
   };
 
 async function schreiben(
@@ -176,7 +198,7 @@ async function schreiben(
     JOBS_BASE_URL,
     path,
     { method, body },
-    "Die Ausschreibung konnte nicht gespeichert werden."
+    "fehler.ausschreibungNichtGespeichert"
   );
   if (antwort.ok) return { ok: true, job: antwort.value };
   // `409` bleibt beim Satz des Servers: die Eingabe ist in Ordnung, der Zustand
@@ -227,13 +249,13 @@ export async function draftJobText(input: {
     JOBS_BASE_URL,
     "/jobs/draft",
     { method: "POST", body: input },
-    "Die Formulierungshilfe ist gerade nicht verfügbar. Dein Text bleibt unverändert."
+    "fehler.entwurfNichtVerfuegbarLang"
   );
   if (antwort.ok) return { ok: true, draft: antwort.value?.draft ?? "" };
   return deuten<"no-company" | "unavailable">(
     antwort.error,
     {
-      403: { reason: "no-company", title: "Dafür musst du für ein Unternehmen handeln." },
+      403: { reason: "no-company", titel: "fehler.fuerFirmaHandelnNoetig" },
     },
     "unavailable"
   );

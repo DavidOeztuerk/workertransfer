@@ -1,4 +1,5 @@
 import Alert from "@mui/material/Alert";
+import { useTranslation } from "react-i18next";
 import AlertTitle from "@mui/material/AlertTitle";
 import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -7,11 +8,13 @@ import Typography from "@mui/material/Typography";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 
 /** Während geladen wird. Mit Text, damit ein Screenreader es ansagt. */
-export function LoadingBlock({ label = "Wird geladen …" }: { label?: string }) {
+export function LoadingBlock({ label }: { label?: string }) {
+  const { t } = useTranslation();
+
   return (
     <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", py: 4 }} role="status">
       <CircularProgress size={18} />
-      <Typography color="text.secondary">{label}</Typography>
+      <Typography color="text.secondary">{label ?? t("allgemein.laden")}</Typography>
     </Box>
   );
 }
@@ -24,6 +27,8 @@ export function LoadingBlock({ label = "Wird geladen …" }: { label?: string })
  * weglässt, zwingt die Person, den Zeitpunkt zu schätzen.
  */
 export function ErrorBlock({ error, title }: { error: ApiError; title?: string }) {
+  const { t } = useTranslation();
+
   return (
     <Alert severity="error" sx={{ my: 2 }}>
       <AlertTitle>{title ?? error.title}</AlertTitle>
@@ -33,7 +38,7 @@ export function ErrorBlock({ error, title }: { error: ApiError; title?: string }
           component="p"
           sx={{ mt: 1, mb: 0, fontSize: "0.8125rem", opacity: 0.8, fontFamily: "monospace" }}
         >
-          Kennung: {error.correlationId}
+          {t("allgemein.kennung")}: {error.correlationId}
         </Box>
       ) : null}
     </Alert>

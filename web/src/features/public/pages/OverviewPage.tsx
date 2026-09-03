@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -17,40 +18,43 @@ import { useAppSelector } from "../../../core/store/hooks";
 import { type Aufgabenstand, ladeAufgaben } from "../api/aufgaben";
 
 interface Eintrag {
-  text: string;
+  schluessel: string;
+  anzahl: number;
   ziel: string;
 }
 
-/** Ein Satz je Anzahl, ausformuliert — „1 Gespräche" liest sich wie ein Fehler. */
+/**
+ * Nur Schlüssel und Anzahl — die Beugung macht i18next.
+ *
+ * Vorher stand hier je ein ausformulierter Satz für „1" und für „mehr", weil
+ * „1 Gespräche" wie ein Fehler liest. Diese Verzweigung ist eine Aussage über
+ * das DEUTSCHE Zahlwort; Französisch zählt anders, und eine dritte Sprache
+ * womöglich noch anders. Die Kataloge tragen `_one`/`_other`, und die Regel
+ * kommt aus der Sprache statt aus dieser Datei.
+ */
 function eintraegeFuerMich(stand: Aufgabenstand): Eintrag[] {
   const eintraege: Eintrag[] = [];
 
   if (stand.marktanfragen > 0) {
     eintraege.push({
-      text:
-        stand.marktanfragen === 1
-          ? "1 Unternehmen möchte sehen, ob du ansprechbar bist"
-          : `${stand.marktanfragen} Unternehmen möchten sehen, ob du ansprechbar bist`,
+      schluessel: "uebersicht.marktanfragen",
+      anzahl: stand.marktanfragen,
       ziel: "/market",
     });
   }
 
   if (stand.lebenslaufanfragen > 0) {
     eintraege.push({
-      text:
-        stand.lebenslaufanfragen === 1
-          ? "1 Anfrage nach deinem Lebenslauf"
-          : `${stand.lebenslaufanfragen} Anfragen nach deinem Lebenslauf`,
+      schluessel: "uebersicht.lebenslaufanfragen",
+      anzahl: stand.lebenslaufanfragen,
       ziel: "/resume",
     });
   }
 
   if (stand.eigeneGespraeche > 0) {
     eintraege.push({
-      text:
-        stand.eigeneGespraeche === 1
-          ? "1 Gespräch wartet auf dich"
-          : `${stand.eigeneGespraeche} Gespräche warten auf dich`,
+      schluessel: "uebersicht.gespraeche",
+      anzahl: stand.eigeneGespraeche,
       ziel: "/transfers",
     });
   }
@@ -62,16 +66,16 @@ function eintraegeFuerDieFirma(stand: Aufgabenstand): Eintrag[] {
   if (stand.firmenvorgaenge === 0) return [];
   return [
     {
-      text:
-        stand.firmenvorgaenge === 1
-          ? "1 Transfer wartet auf euch"
-          : `${stand.firmenvorgaenge} Transfers warten auf euch`,
+      schluessel: "uebersicht.firmenvorgaenge",
+      anzahl: stand.firmenvorgaenge,
       ziel: "/company/transfers",
     },
   ];
 }
 
 function Liste({ titel, eintraege }: { titel: string; eintraege: Eintrag[] }) {
+  const { t } = useTranslation();
+
   return (
     <Card sx={{ mb: 2 }}>
       <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
@@ -86,7 +90,7 @@ function Liste({ titel, eintraege }: { titel: string; eintraege: Eintrag[] }) {
           {eintraege.map((eintrag) => (
             <Box component="li" key={eintrag.ziel}>
               <Link component={RouterLink} to={eintrag.ziel}>
-                {eintrag.text}
+                {t(eintrag.schluessel, { count: eintrag.anzahl })}
               </Link>
             </Box>
           ))}
@@ -112,6 +116,7 @@ function Liste({ titel, eintraege }: { titel: string; eintraege: Eintrag[] }) {
  * später einen `overview`-Slice will, ändert zuerst dort.
  */
 export function OverviewPage() {
+  const { t } = useTranslation();
   const status = useAppSelector((zustand) => zustand.auth.status);
   const session = useAppSelector((zustand) => zustand.auth.session);
   // `tenantId === null` heisst „handelt als Person" (ADR-0017) — kein Fehler,
@@ -138,7 +143,7 @@ export function OverviewPage() {
 
   if (status === "unknown") {
     return (
-      <PageShell title="Was liegt an" narrow>
+      <PageShell title={t("uebersicht.titel")} narrow>
         <LoadingBlock />
       </PageShell>
     );
@@ -152,34 +157,35 @@ export function OverviewPage() {
 
   return (
     <PageShell
-      title="Was liegt an"
+      title={t("uebersicht.titel")}
       narrow
-      lead="Nur Dinge, die auf eine Entscheidung von dir warten. Was von selbst läuft, steht hier nicht — sonst wäre es eine Liste, und Listen übersieht man."
+      lead={t("uebersicht.lead")}
     >
       {stand === null ? <LoadingBlock /> : null}
 
       {stand?.unvollstaendig === true ? (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          Ein Teil konnte nicht geladen werden. Was hier steht, ist deshalb
-          womöglich unvollständig.
+          {t("uebersicht.unvollstaendig")}
         </Alert>
       ) : null}
 
       {stand !== null && nichts && !stand.unvollstaendig ? (
         <EmptyBlock
-          title="Gerade wartet nichts auf dich."
-          hint="Du entscheidest, was von dir sichtbar ist — nachsehen kannst du das jederzeit."
+          title={t("uebersicht.leerTitel")}
+          hint={t("uebersicht.leerHinweis")}
           action={
             <Button component={RouterLink} to="/consents" variant="outlined">
-              Meine Freigaben
+              {t("uebersicht.leerKnopf")}
             </Button>
           }
         />
       ) : null}
 
-      {meine.length > 0 ? <Liste titel="Für dich" eintraege={meine} /> : null}
+      {meine.length > 0 ? (
+        <Liste titel={t("uebersicht.fuerDich")} eintraege={meine} />
+      ) : null}
       {firmen.length > 0 ? (
-        <Liste titel="Für dein Unternehmen" eintraege={firmen} />
+        <Liste titel={t("uebersicht.fuerDieFirma")} eintraege={firmen} />
       ) : null}
     </PageShell>
   );

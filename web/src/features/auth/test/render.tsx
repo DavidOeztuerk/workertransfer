@@ -2,11 +2,13 @@ import { ThemeProvider } from "@mui/material/styles";
 import { configureStore } from "@reduxjs/toolkit";
 import { type RenderOptions, render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
+import { I18nextProvider } from "react-i18next";
 import { Provider } from "react-redux";
 import { MemoryRouter } from "react-router-dom";
 
 import preferences from "../../../core/store/preferencesSlice";
 import { buildTheme } from "../../../styles/theme";
+import { i18n } from "../../../core/i18n/i18n";
 import auth from "../store/authSlice";
 import type { Membership, Session, SessionStatus } from "../types/session";
 
@@ -59,9 +61,17 @@ export function renderMitStore(
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <Provider store={store}>
-        <ThemeProvider theme={buildTheme("light")}>
-          <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
-        </ThemeProvider>
+        {/*
+          Die Kataloge gehoeren in den Testwirt, sonst zeigt `useTranslation`
+          den Schluessel statt des Textes — und ein Test, der `sprache.label`
+          sucht, sagt nichts ueber die Oberflaeche. Deutsch fest, wie in der
+          Playwright-Konfiguration und aus demselben Grund (ADR-0031).
+        */}
+        <I18nextProvider i18n={i18n}>
+          <ThemeProvider theme={buildTheme("light")}>
+            <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+          </ThemeProvider>
+        </I18nextProvider>
       </Provider>
     );
   }

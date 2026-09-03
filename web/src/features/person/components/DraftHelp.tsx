@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -33,6 +34,7 @@ export function DraftHelp({
   onDraft: (draft: string) => void;
   hasText: boolean;
 }) {
+  const { t } = useTranslation();
   const [wunsch, setzeWunsch] = useState("");
   const [problem, setzeProblem] = useState<string | null>(null);
   const [laeuft, setzeLaeuft] = useState(false);
@@ -52,10 +54,8 @@ export function DraftHelp({
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       <TextField
-        label={
-          hasText ? "Text umformulieren lassen" : "Beim Schreiben helfen lassen"
-        }
-        helperText="Optional: was dir wichtig ist („kürzer“, „sachlicher“, „ich bin Pflegefachkraft“). Dein Profiltext und deine Fähigkeiten gehen dafür an Anthropic. Name und Adresse nicht. Gespeichert wird nichts — der Vorschlag landet nur im Feld oben, und du entscheidest."
+        label={t(hasText ? "entwurf.labelUmformulieren" : "entwurf.labelNeu")}
+        helperText={t("entwurf.hinweis")}
         value={wunsch}
         onChange={(ereignis) => setzeWunsch(ereignis.target.value)}
         slotProps={{ htmlInput: { maxLength: 200 } }}
@@ -73,10 +73,8 @@ export function DraftHelp({
           disabled={laeuft}
         >
           {laeuft
-            ? "Wird geschrieben…"
-            : hasText
-              ? "Vorschlag holen (ersetzt den Text oben)"
-              : "Vorschlag holen"}
+            ? t("entwurf.laeuft")
+            : t(hasText ? "entwurf.knopfErsetzt" : "entwurf.knopfNeu")}
         </Button>
       </Box>
     </Box>

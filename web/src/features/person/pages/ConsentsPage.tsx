@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
@@ -25,8 +26,6 @@ import { useAsync } from "../lib/useAsync";
 import { usePerson } from "../lib/session";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 
-const WITHDRAWAL_REASON = "Auf der Seite Meine Freigaben zurückgezogen";
-
 /**
  * Die Seite, die einer Consent-Plattform gefehlt hat.
  *
@@ -36,6 +35,7 @@ const WITHDRAWAL_REASON = "Auf der Seite Meine Freigaben zurückgezogen";
  * man nicht findet, ist keiner.
  */
 export function ConsentsPage() {
+  const { t } = useTranslation();
   const { subjectId, unbekannt } = usePerson();
   const [fehler, setzeFehler] = useState<ApiError | null>(null);
   const [beschaeftigt, setzeBeschaeftigt] = useState(false);
@@ -85,18 +85,18 @@ export function ConsentsPage() {
         subjectId,
         capability,
         false,
-        WITHDRAWAL_REASON,
+        t("freigaben.widerrufsgrund"),
       );
       setzeBeschaeftigt(false);
       setzeFehler(ergebnis.ok ? null : ergebnis.error);
       freigaben.erneut();
     },
-    [subjectId, freigaben],
+    [subjectId, freigaben, t],
   );
 
   if (unbekannt) {
     return (
-      <PageShell title="Meine Freigaben" narrow>
+      <PageShell title={t("freigaben.titel")} narrow>
         <LoadingBlock />
       </PageShell>
     );
@@ -105,17 +105,17 @@ export function ConsentsPage() {
   if (subjectId === null) {
     return (
       <AnmeldungNoetig
-        titel="Meine Freigaben"
-        zweck="deine Freigaben zu sehen"
+        titel={t("freigaben.titel")}
+        satz="freigaben.anmelden"
       />
     );
   }
 
   return (
     <PageShell
-      title="Meine Freigaben"
+      title={t("freigaben.titel")}
       narrow
-      lead="Alles, was gerade gilt — an einer Stelle. Zurückziehen wirkt sofort: der nächste Zugriff läuft ins Leere, ohne Umweg über uns. Was hier nicht steht, sieht niemand."
+      lead={t("freigaben.lead")}
     >
       {fehler !== null ? <ErrorBlock error={fehler} /> : null}
 
@@ -124,7 +124,7 @@ export function ConsentsPage() {
           {/* Reihenfolge nach dem Muster: lädt, dann Fehler, dann leer, dann
               Inhalt. */}
           {freigaben.laedt ? (
-            <LoadingBlock label="Freigaben werden geladen…" />
+            <LoadingBlock label={t("freigaben.laden")} />
           ) : null}
 
           {/* Kein leerer Zustand bei einem Fehler: „du hast nichts freigegeben"
@@ -135,8 +135,8 @@ export function ConsentsPage() {
 
           {ergebnis?.ok && consents.length === 0 ? (
             <EmptyBlock
-              title="Du hast im Moment nichts freigegeben."
-              hint="Niemand sieht etwas von dir."
+              title={t("freigaben.leerTitel")}
+              hint={t("freigaben.leerHinweis")}
             />
           ) : null}
 
@@ -174,15 +174,20 @@ function ConsentZeile({
   beschaeftigt: boolean;
   onWithdraw: () => void;
 }) {
+  const { t, i18n } = useTranslation();
   const teile = parseCapability(consent.capability);
   // Eine unbekannte Form wird gezeigt, nicht verschluckt — und lässt sich
   // trotzdem zurückziehen.
-  const was = teile.area ?? consent.capability;
+  // Übersetzt wird NUR die erkannte Form. Die rohe Zeichenkette durch `t()` zu
+  // schicken zerlegt sie: i18next liest ein `:` als Namensraumtrenner, und aus
+  // `something.entirely:new` wird `new`. Eine unbekannte Freigabe muss aber
+  // wörtlich dastehen — sonst weiss niemand, was er da zurückzieht.
+  const was = teile.area === null ? consent.capability : t(teile.area);
   const wer = teile.public
-    ? "Alle Unternehmen"
+    ? t("freigaben.alleUnternehmen")
     : teile.tenantId !== null
-      ? (firmenname ?? "Ein Unternehmen")
-      : "Empfänger unbekannt";
+      ? (firmenname ?? t("freigaben.einUnternehmen"))
+      : t("freigaben.empfaengerUnbekannt");
 
   return (
     <ListItem
@@ -201,12 +206,17 @@ function ConsentZeile({
           {was} · {wer}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Freigegeben am{" "}
-          {new Date(consent.granted_at).toLocaleDateString("de-DE")}
+          {/* Das Datum folgt der GEWÄHLTEN Sprache, nicht dem Gerät: sonst
+              stünde ein deutscher Satz neben einem amerikanischen Datum. */}
+          {t("freigaben.freigegebenAm", {
+            datum: new Date(consent.granted_at).toLocaleDateString(
+              i18n.language,
+            ),
+          })}
         </Typography>
       </Box>
       <Button variant="text" onClick={onWithdraw} disabled={beschaeftigt}>
-        Zurückziehen
+        {t("allgemein.zurueckziehen")}
       </Button>
     </ListItem>
   );

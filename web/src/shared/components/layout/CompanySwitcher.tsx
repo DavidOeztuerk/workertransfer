@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import TextField from "@mui/material/TextField";
+import { useTranslation } from "react-i18next";
 
 import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
 import { actForCompany, loadMemberships } from "../../../features/auth/store/authThunks";
@@ -17,6 +18,7 @@ import { actForCompany, loadMemberships } from "../../../features/auth/store/aut
  * neu ausgestellt werden.
  */
 export function CompanySwitcher() {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const memberships = useAppSelector((state) => state.auth.memberships);
   const tenantId = useAppSelector((state) => state.auth.session?.tenantId ?? null);
@@ -39,7 +41,7 @@ export function CompanySwitcher() {
       // schwebende Beschriftung laege sonst darueber.
       slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
       size="small"
-      label="Handeln als"
+      label={t("kopf.handelnAls")}
       value={tenantId ?? ""}
       onChange={(event) => {
         const gewaehlt = event.target.value;
@@ -48,7 +50,7 @@ export function CompanySwitcher() {
       sx={{ minWidth: 200, display: { xs: "none", md: "block" } }}
     >
       <option value="" disabled>
-        Ich selbst (Abmelden nötig)
+        {t("kopf.ichSelbst")}
       </option>
       {memberships.map((firma) => (
         <option key={firma.id} value={firma.id}>

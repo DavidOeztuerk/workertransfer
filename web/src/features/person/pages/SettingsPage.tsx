@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
@@ -29,31 +30,12 @@ import {
  */
 const SCHALTER: {
   schluessel: keyof Benachrichtigungswahl;
-  label: string;
-  hinweis: string;
+  name: string;
 }[] = [
-  {
-    schluessel: "market_request",
-    label: "Wenn ein Unternehmen deinen Marktstatus sehen möchte",
-    hinweis:
-      "Ohne diese Nachricht erfährst du davon nur, wenn du zufällig vorbeischaust.",
-  },
-  {
-    schluessel: "resume_request",
-    label: "Wenn ein Unternehmen nach deinem Lebenslauf fragt",
-    hinweis:
-      "Auch hier entscheidest du — aber nur, wenn du von der Frage weißt.",
-  },
-  {
-    schluessel: "transfer_update",
-    label: "Wenn sich bei einem Gespräch etwas tut",
-    hinweis: "Interesse, Angebot, Rückzug.",
-  },
-  {
-    schluessel: "application_update",
-    label: "Wenn sich bei einer Bewerbung etwas tut",
-    hinweis: "Nur Züge des Unternehmens — deine eigenen kennst du.",
-  },
+  { schluessel: "market_request", name: "markt" },
+  { schluessel: "resume_request", name: "lebenslauf" },
+  { schluessel: "transfer_update", name: "transfer" },
+  { schluessel: "application_update", name: "bewerbung" },
 ];
 
 /**
@@ -72,6 +54,7 @@ const SCHALTER: {
  * hat.
  */
 export function SettingsPage() {
+  const { t } = useTranslation();
   const sitzung = useAppSelector((state) => state.auth.session);
   const status = useAppSelector((state) => state.auth.status);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -86,8 +69,8 @@ export function SettingsPage() {
   if (status === "anonymous") {
     return (
       <AnmeldungNoetig
-        titel="Einstellungen"
-        zweck="deine Einstellungen zu ändern"
+        titel={t("einstellungen.titel")}
+        satz="einstellungen.anmelden"
       />
     );
   }
@@ -119,20 +102,14 @@ export function SettingsPage() {
 
   return (
     <PageShell
-      title="Einstellungen"
+      title={t("einstellungen.titel")}
       narrow
-      lead={
-        "Was in einer Mail steht, ist bewusst wenig: „Es gibt etwas Neues für dich.“ " +
-        "Kein Firmenname, kein Vorgang, keine Anzahl. Eine Mail kann in einem Postfach " +
-        "landen, das nicht nur dir gehört — und dann wäre der Satz, der sie nützlicher " +
-        "machte, genau der, der dich den Arbeitsplatz kostet. Was es ist, steht hinter " +
-        "der Anmeldung."
-      }
+      lead={t("einstellungen.lead")}
     >
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            Benachrichtigungen
+            {t("einstellungen.benachrichtigungen")}
           </Typography>
 
           {fehler !== null ? (
@@ -142,14 +119,12 @@ export function SettingsPage() {
           ) : null}
 
           {wahl.laedt ? (
-            <LoadingBlock label="Einstellungen werden geladen…" />
+            <LoadingBlock label={t("einstellungen.laden")} />
           ) : null}
 
           {wahl.wert === null && !wahl.laedt ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              Deine Einstellungen sind gerade nicht abrufbar. Solange das so
-              ist, ändern die Schalter nichts — sonst würdest du etwas
-              speichern, das du nie eingestellt hast.
+              {t("einstellungen.nichtAbrufbar")}
             </Alert>
           ) : null}
 
@@ -157,8 +132,8 @@ export function SettingsPage() {
             {SCHALTER.map((eintrag) => (
               <ConsentSwitch
                 key={eintrag.schluessel}
-                label={eintrag.label}
-                hint={eintrag.hinweis}
+                label={t(`einstellungen.${eintrag.name}Label`)}
+                hint={t(`einstellungen.${eintrag.name}Hinweis`)}
                 checked={werte[eintrag.schluessel]}
                 disabled={speichert || unbekannt}
                 onChange={(neu) => void umschalten(eintrag.schluessel, neu)}
@@ -167,8 +142,7 @@ export function SettingsPage() {
           </Box>
 
           <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
-            Höchstens eine Mail pro Stunde, egal wie viel passiert — auch der
-            Zeitpunkt einer Mail verrät etwas.
+            {t("einstellungen.takt")}
           </Typography>
         </CardContent>
       </Card>

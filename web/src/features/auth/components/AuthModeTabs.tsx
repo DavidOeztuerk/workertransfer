@@ -1,4 +1,5 @@
 import { Link as RouterLink } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 
@@ -14,19 +15,26 @@ import Tabs from "@mui/material/Tabs";
  * Adresse, sind teilbar, und der Zurück-Knopf tut, was er soll.
  */
 export function AuthModeTabs({ current }: { current: "login" | "register" }) {
+  const { t } = useTranslation();
+
   return (
     <Tabs
       value={current}
       variant="fullWidth"
       sx={{ mb: 3, borderBottom: 1, borderColor: "divider" }}
-      aria-label="Anmelden oder neues Konto anlegen"
+      aria-label={t("anmeldung.reiterBeschriftung")}
     >
-      <Tab component={RouterLink} to="/login" value="login" label="Anmelden" />
+      <Tab
+        component={RouterLink}
+        to="/login"
+        value="login"
+        label={t("anmeldung.reiterAnmelden")}
+      />
       <Tab
         component={RouterLink}
         to="/register"
         value="register"
-        label="Konto anlegen"
+        label={t("anmeldung.reiterRegistrieren")}
       />
     </Tabs>
   );

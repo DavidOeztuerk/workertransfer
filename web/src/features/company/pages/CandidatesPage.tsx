@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -45,6 +46,7 @@ import {
  * niemand.
  */
 export function CandidatesPage() {
+  const { t } = useTranslation();
   const { fuerFirma } = useHandelnder();
 
   const [entwurf, setEntwurf] = useState({
@@ -92,12 +94,11 @@ export function CandidatesPage() {
   // Protokollen des Ledgers.
   if (!fuerFirma) {
     return (
-      <PageShell title="Kandidatinnen und Kandidaten" narrow>
+      <PageShell title={t("kandidaten.titel")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              Profile sehen nur Unternehmen. Wechsle oben auf ein Unternehmen —
-              oder lass dich von jemandem aus deinem Unternehmen einladen.
+              {t("kandidaten.nurFirma")}
             </Typography>
           </CardContent>
         </Card>
@@ -107,11 +108,8 @@ export function CandidatesPage() {
 
   return (
     <PageShell
-      title="Kandidatinnen und Kandidaten"
-      lead={
-        "Hier steht ausschließlich, wer sein Profil freigegeben hat. Wer die Freigabe zurückzieht, " +
-        "verschwindet beim nächsten Laden — ohne Umweg über uns."
-      }
+      title={t("kandidaten.titel")}
+      lead={t("kandidaten.lead")}
     >
       {seiten.fehler !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -142,8 +140,8 @@ export function CandidatesPage() {
             }}
           >
             <TextField
-              label="Fähigkeiten"
-              helperText="Mit Komma trennen. Es zählt, wer ALLE davon kann."
+              label={t("kandidaten.faehigkeiten")}
+              helperText={t("kandidaten.faehigkeitenHinweis")}
               placeholder="Python, Kubernetes"
               value={entwurf.skills}
               onChange={(e) =>
@@ -151,8 +149,8 @@ export function CandidatesPage() {
               }
             />
             <TextField
-              label="Ort"
-              helperText="Ein Teil genügt."
+              label={t("kandidaten.ort")}
+              helperText={t("kandidaten.ortHinweis")}
               placeholder="Berlin"
               value={entwurf.location}
               onChange={(e) =>
@@ -175,18 +173,16 @@ export function CandidatesPage() {
                     }
                   />
                 }
-                label="Nur wer Remote angegeben hat"
+                label={t("kandidaten.nurRemote")}
               />
               <Typography variant="body2" color="text.secondary">
-                Ohne Haken erscheinen alle. Es gibt keinen Filter für „nur vor
-                Ort" — ein fehlender Haken heißt „nicht ja gesagt", nicht „lehnt
-                ab".
+                {t("kandidaten.nurRemoteHinweis")}
               </Typography>
             </Box>
 
             <Box sx={{ display: "flex", gap: 1.5 }}>
               <Button type="submit" variant="contained">
-                Suchen
+                {t("kandidaten.suchen")}
               </Button>
               {hatFilter ? (
                 <Button
@@ -196,7 +192,7 @@ export function CandidatesPage() {
                     setFilter(NO_FILTERS);
                   }}
                 >
-                  Filter zurücksetzen
+                  {t("kandidaten.filterZuruecksetzen")}
                 </Button>
               ) : null}
             </Box>
@@ -207,7 +203,7 @@ export function CandidatesPage() {
       {seiten.pending && seiten.items.length === 0 ? (
         <Card>
           <CardContent>
-            <LoadingBlock label="Profile werden geladen…" />
+            <LoadingBlock label={t("kandidaten.laden")} />
           </CardContent>
         </Card>
       ) : null}
@@ -239,11 +235,11 @@ export function CandidatesPage() {
       seiten.fehler === null &&
       seiten.items.length === 0 ? (
         hatFilter ? (
-          <EmptyBlock title="Auf diese Suche passt gerade niemand, der sein Profil freigegeben hat." />
+          <EmptyBlock title={t("kandidaten.leerMitFilter")} />
         ) : (
           <EmptyBlock
-            title="Im Moment hat niemand sein Profil freigegeben."
-            hint="Das ist kein Fehler — es ist die Voreinstellung."
+            title={t("kandidaten.leerTitel")}
+            hint={t("kandidaten.leerHinweis")}
           />
         )
       ) : null}
@@ -256,7 +252,7 @@ export function CandidatesPage() {
             onClick={seiten.weiter}
             disabled={seiten.pending}
           >
-            {seiten.pending ? "Wird geladen…" : "Mehr laden"}
+            {seiten.pending ? t("allgemein.laden") : t("kandidaten.mehrLaden")}
           </Button>
         </Box>
       ) : null}

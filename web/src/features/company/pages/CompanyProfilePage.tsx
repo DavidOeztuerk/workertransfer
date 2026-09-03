@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -46,6 +47,7 @@ const liste = (roh: string): string[] =>
  * jeder Antwort, überschriebe ein Neuladen den gerade getippten Text.
  */
 export function CompanyProfilePage() {
+  const { t } = useTranslation();
   const { fuerFirma, tenantId } = useHandelnder();
 
   const [entwurf, setEntwurf] = useState<Entwurf>(LEER);
@@ -77,12 +79,11 @@ export function CompanyProfilePage() {
 
   if (!fuerFirma) {
     return (
-      <PageShell title="Unser Unternehmen" narrow>
+      <PageShell title={t("firmenprofil.titel")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              Das Unternehmensprofil bearbeitet nur, wer für ein Unternehmen
-              handelt. Wechsle oben auf ein Unternehmen.
+              {t("firmenprofil.nurFirma")}
             </Typography>
           </CardContent>
         </Card>
@@ -112,17 +113,14 @@ export function CompanyProfilePage() {
 
   return (
     <PageShell
-      title="Unser Unternehmen"
+      title={t("firmenprofil.titel")}
       narrow
-      lead={
-        "Das sehen Bewerber neben jeder eurer Stellen. Solange hier nichts steht, bleibt eine " +
-        "Ausschreibung anonym — Titel und Beschreibung, sonst nichts."
-      }
+      lead={t("firmenprofil.lead")}
     >
       <Card>
         <CardContent>
           {profil.pending ? (
-            <LoadingBlock label="Profil wird geladen…" />
+            <LoadingBlock label={t("firmenprofil.laden")} />
           ) : null}
 
           {fehler !== null ? (
@@ -133,7 +131,7 @@ export function CompanyProfilePage() {
 
           {gespeichert ? (
             <Alert severity="success" role="status" sx={{ mb: 2 }}>
-              Profil gespeichert.
+              {t("firmenprofil.gespeichert")}
             </Alert>
           ) : null}
 
@@ -146,8 +144,8 @@ export function CompanyProfilePage() {
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
             <TextField
-              label="Anzeigename"
-              helperText="Wie ihr auftretet — nicht zwingend der Name aus dem Handelsregister."
+              label={t("firmenprofil.anzeigename")}
+              helperText={t("firmenprofil.anzeigenameHinweis")}
               value={entwurf.display_name}
               onChange={(e) => {
                 setEntwurf({ ...entwurf, display_name: e.target.value });
@@ -156,8 +154,8 @@ export function CompanyProfilePage() {
               required
             />
             <TextField
-              label="Über uns"
-              helperText="Wer ihr seid und woran ihr arbeitet."
+              label={t("firmenprofil.ueberUns")}
+              helperText={t("firmenprofil.ueberUnsHinweis")}
               value={entwurf.about}
               onChange={(e) => {
                 setEntwurf({ ...entwurf, about: e.target.value });
@@ -167,8 +165,8 @@ export function CompanyProfilePage() {
               minRows={4}
             />
             <TextField
-              label="Website"
-              helperText="Optional, und nur http oder https."
+              label={t("firmenprofil.website")}
+              helperText={t("firmenprofil.websiteHinweis")}
               value={entwurf.website}
               onChange={(e) => {
                 setEntwurf({ ...entwurf, website: e.target.value });
@@ -176,8 +174,8 @@ export function CompanyProfilePage() {
               }}
             />
             <TextField
-              label="Standorte"
-              helperText="Mit Komma getrennt, zum Beispiel: Berlin, Hamburg"
+              label={t("firmenprofil.standorte")}
+              helperText={t("firmenprofil.standorteHinweis")}
               value={entwurf.locations}
               onChange={(e) => {
                 setEntwurf({ ...entwurf, locations: e.target.value });
@@ -185,8 +183,8 @@ export function CompanyProfilePage() {
               }}
             />
             <TextField
-              label="Leistungen"
-              helperText="Mit Komma getrennt, zum Beispiel: Homeoffice, Weiterbildung"
+              label={t("firmenprofil.leistungen")}
+              helperText={t("firmenprofil.leistungenHinweis")}
               value={entwurf.benefits}
               onChange={(e) => {
                 setEntwurf({ ...entwurf, benefits: e.target.value });
@@ -196,7 +194,9 @@ export function CompanyProfilePage() {
 
             <Box>
               <Button type="submit" variant="contained" disabled={laeuft}>
-                {laeuft ? "Wird gespeichert…" : "Speichern"}
+                {laeuft
+                  ? t("allgemein.speichernLaeuft")
+                  : t("allgemein.speichern")}
               </Button>
             </Box>
           </Box>

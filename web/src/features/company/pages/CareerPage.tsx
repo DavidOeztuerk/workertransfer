@@ -14,7 +14,8 @@ import {
 } from "../../../shared/components/ui";
 import { useAsync } from "../lib/useAsync";
 import { getCompanyBySlug } from "../api/companies";
-import { REMOTE_LABEL, searchJobs } from "../../work/api/jobs";
+import { remoteLabel, searchJobs } from "../../work/api/jobs";
+import { Trans, useTranslation } from "react-i18next";
 
 /**
  * <c>/careers/&lt;kürzel&gt;</c> — die öffentliche Seite eines Unternehmens.
@@ -31,6 +32,7 @@ export function CareerPage() {
   const { slug } = useParams();
   const gesucht = slug ?? "";
 
+  const { t } = useTranslation();
   const unternehmen = useAsync(
     (signal) => getCompanyBySlug(gesucht, signal),
     [gesucht],
@@ -49,10 +51,10 @@ export function CareerPage() {
 
   if (unternehmen.pending) {
     return (
-      <PageShell title="Karriere" narrow>
+      <PageShell title={t("karriere.titel")} narrow>
         <Card>
           <CardContent>
-            <LoadingBlock label="Unternehmen wird geladen…" />
+            <LoadingBlock label={t("karriere.laden")} />
           </CardContent>
         </Card>
       </PageShell>
@@ -64,10 +66,9 @@ export function CareerPage() {
     unternehmen.data.reason === "unavailable"
   ) {
     return (
-      <PageShell title="Karriere" narrow>
+      <PageShell title={t("karriere.titel")} narrow>
         <Alert severity="warning">
-          {unternehmen.data.error.detail} Das heißt nicht, dass es dieses
-          Unternehmen nicht gibt — versuch es später noch einmal.
+          {unternehmen.data.error.detail} {t("karriere.nichtAbrufbar")}
         </Alert>
       </PageShell>
     );
@@ -75,14 +76,14 @@ export function CareerPage() {
 
   if (profil === undefined) {
     return (
-      <PageShell title="Diese Seite gibt es nicht" narrow>
+      <PageShell title={t("karriere.keineFirmaTitel")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              Unter dieser Adresse ist kein Unternehmen hinterlegt.{" "}
-              <Link component={RouterLink} to="/jobs">
-                Alle offenen Stellen
-              </Link>
+              <Trans
+                i18nKey="karriere.keineFirma"
+                components={{ 1: <Link component={RouterLink} to="/jobs" /> }}
+              />
             </Typography>
           </CardContent>
         </Card>
@@ -109,7 +110,7 @@ export function CareerPage() {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h2" sx={{ mb: 1 }}>
-              Über uns
+              {t("karriere.ueberUns")}
             </Typography>
             <Typography>{profil.about}</Typography>
           </CardContent>
@@ -121,7 +122,9 @@ export function CareerPage() {
           <CardContent>
             {profil.locations.length > 0 ? (
               <Typography sx={{ mb: profil.benefits.length > 0 ? 1.5 : 0 }}>
-                Standorte: {profil.locations.join(", ")}
+                {t("karriere.standorte", {
+                  orte: profil.locations.join(", "),
+                })}
               </Typography>
             ) : null}
             {profil.benefits.length > 0 ? (
@@ -140,23 +143,22 @@ export function CareerPage() {
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            Offene Stellen
+            {t("karriere.offeneStellen")}
           </Typography>
 
           {/* Reihenfolge: lädt, dann Fehler, dann leer, dann Inhalt. */}
           {stellen.pending ? (
-            <LoadingBlock label="Stellen werden geladen…" />
+            <LoadingBlock label={t("karriere.stellenLaden")} />
           ) : null}
 
           {abrufGescheitert ? (
             <Alert severity="warning">
-              Die offenen Stellen sind gerade nicht abrufbar. Das heißt nicht,
-              dass es keine gibt — versuch es später noch einmal.
+              {t("karriere.stellenNichtAbrufbar")}
             </Alert>
           ) : null}
 
           {!stellen.pending && !abrufGescheitert && liste.length === 0 ? (
-            <EmptyBlock title="Zurzeit ist nichts ausgeschrieben." />
+            <EmptyBlock title={t("karriere.leer")} />
           ) : null}
 
           {liste.length > 0 ? (
@@ -187,8 +189,8 @@ export function CareerPage() {
                       <Typography variant="body2" color="text.secondary">
                         {stelle.location !== ""
                           ? stelle.location
-                          : "Ort nicht angegeben"}{" "}
-                        · {REMOTE_LABEL[stelle.remote] ?? stelle.remote}
+                          : t("karriere.ortFehlt")}{" "}
+                        · {remoteLabel(stelle.remote)}
                       </Typography>
                     </Box>
                     <Button
@@ -198,7 +200,7 @@ export function CareerPage() {
                       size="small"
                       sx={{ flexShrink: 0 }}
                     >
-                      Bewerben
+                      {t("karriere.bewerben")}
                     </Button>
                   </CardContent>
                 </Card>
