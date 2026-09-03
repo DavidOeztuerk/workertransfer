@@ -12,29 +12,34 @@ namespace WorkerTransfer.Identity.Infrastructure.Security;
 /// <c>iss</c>, <c>aud</c>, <c>session_id</c> and — while acting for a company —
 /// <c>tenant</c>.
 /// <para>
-/// <b>Hier stand „Mehr steht nicht drin", und das war falsch.</b> Girder legt
-/// drei weitere Ansprüche dazu, unaufgefordert und ohne dass eine Zeile hier
-/// sie nennt (gemessen an einem echten Token, in beiden Handlungsformen):
+/// Dazu <b>einen</b> weiteren, unaufgefordert:
 /// <c>http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier</c>
-/// — dieselbe Kennung wie <c>sub</c>, noch einmal —, sowie
-/// <c>email_verified</c> und <c>account_status</c>.
+/// — dieselbe Kennung wie <c>sub</c>, noch einmal. Er bleibt, und das ist
+/// gemessen: Girder prüft Token mit <c>MapInboundClaims = false</c>, leitet ihn
+/// also nicht aus <c>sub</c> ab, und siebzehn Leser in Girder lösen den
+/// Aufrufer darüber auf — zwei davon in Anbieterpaketen. Rund siebzig Bytes
+/// gespart, siebzehn stille Nulls gewonnen.
 /// </para>
 /// <para>
-/// Die letzten beiden sind schlimmer als überflüssig: sie tragen <b>immer</b>
-/// dieselben Werte, <c>false</c> und <c>"Active"</c>, weil
-/// <c>UserClaims</c> sie so vorbelegt und niemand sie hier setzt. Ein Konto,
-/// dessen Adresse gerade bestätigt wurde, trägt <c>email_verified: false</c>;
-/// ein gesperrtes trägt <c>account_status: "Active"</c>. Girders eigene
-/// Richtlinien <c>EmailVerifiedHandler</c> und <c>ActiveAccountHandler</c>
-/// lesen genau diese Ansprüche — wer sie einschaltet, sperrt entweder alle aus
-/// oder lässt Gesperrte durch.
+/// <b>Bis Girder 4.1.0 waren es drei.</b> <c>email_verified</c> und
+/// <c>account_status</c> standen in jedem Token und trugen <b>immer</b>
+/// dieselben Werte, <c>false</c> und <c>"Active"</c>, weil <c>UserClaims</c>
+/// sie so vorbelegte und niemand sie hier setzt. Ein Konto, dessen Adresse
+/// gerade bestätigt wurde, trug <c>email_verified: false</c>; ein gesperrtes
+/// trug <c>account_status: "Active"</c>. Girders eigene Richtlinien
+/// <c>EmailVerifiedHandler</c> und <c>ActiveAccountHandler</c> lesen genau
+/// diese Ansprüche — die eine sperrte damit jeden aus, die andere ließ jeden
+/// durch. Seit 4.1.0 sind beide Felder <c>bool?</c> und <c>string?</c> ohne
+/// Vorgabe: ungesagt heißt nicht geschrieben, und beide Prüfer lehnen mangels
+/// Anspruch ab.
 /// </para>
 /// <para>
-/// Uns kostet es heute nichts: wir benutzen beide Richtlinien nicht, und der
-/// Kontostand wird je Anfrage aus der Datenbank gelesen. Gemeldet als
-/// <c>bugs/token-traegt-zwei-konstante-luegen.md</c>. <b>Kein Umweg hier</b> —
-/// die Ansprüche wegzufiltern hiesse, an Girders Ausgabe vorbeizubauen, und der
-/// Umweg bliebe stehen, wenn der Fehler behoben ist.
+/// Uns kostete es nichts, weil wir beide Richtlinien nicht benutzen und der
+/// Kontostand je Anfrage aus der Datenbank kommt. <b>Umgangen wurde es nie</b>
+/// — die Ansprüche hier wegzufiltern hiesse, an Girders Ausgabe vorbeizubauen,
+/// und der Umweg wäre jetzt stehen geblieben.
+/// <see cref="WorkerTransfer.Identity.Tests"/> nagelt die geschlossene Menge
+/// fest, nicht mehr einzelne Namen: was hier steht, ist ab jetzt vollständig.
 /// </para>
 /// <para>
 /// Zur Uebergangszeit standen hier zwei weitere: <c>tenant_id</c> neben Girders
@@ -45,9 +50,11 @@ namespace WorkerTransfer.Identity.Infrastructure.Security;
 /// </para>
 /// <para>
 /// Roles and permissions are not written. They are read from
-/// <c>user_tenant_memberships</c> per operation, never from a token, and
-/// <c>CustomClaims</c> could only carry them as a string — see
-/// <c>bugs/customclaims-kann-keine-liste-ausdruecken.md</c>.
+/// <c>user_tenant_memberships</c> per operation, never from a token — so the
+/// token was never authoritative about them. Seit Girder 4.1.0 <em>ließen</em>
+/// sie sich als Liste schreiben (<c>UserClaims.CustomClaimArrays</c>); dass wir
+/// es nicht tun, ist damit wieder eine Entscheidung statt einer Grenze der
+/// Bibliothek. Ein Recht im Token wirkte bei einer Entziehung erst beim Ablauf.
 /// </para>
 /// </remarks>
 public sealed class GirderAccessTokenIssuer(IJwtService jwt) : IAccessTokenIssuer

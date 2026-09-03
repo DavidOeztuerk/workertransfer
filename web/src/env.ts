@@ -94,5 +94,10 @@ export const TRANSFER_BASE_URL = resolve(
 export const GITHUB_BASE_URL = resolve(
   "GITHUB_BASE_URL",
   import.meta.env.VITE_GITHUB_BASE_URL,
-  8010
+  // 8011, nicht 8010 — 8010 gehört notification-service. Der Versatz kam beim
+  // Hinzufügen jenes Dienstes und blieb unbemerkt, weil ihn NIEMAND sonst
+  // benutzt: die Oberfläche redet mit notification-service gar nicht, die
+  // Benachrichtigungs-Einstellungen liegen bei identity. Wer /github öffnete,
+  // schickte sein Konto an den falschen Dienst.
+  8011
 );

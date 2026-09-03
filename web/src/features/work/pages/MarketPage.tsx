@@ -9,7 +9,7 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import FormLabel from "@mui/material/FormLabel";
 import Radio from "@mui/material/Radio";
 import RadioGroup from "@mui/material/RadioGroup";
-import Switch from "@mui/material/Switch";
+import Checkbox from "@mui/material/Checkbox";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
@@ -271,15 +271,25 @@ export function MarketPage() {
               </RadioGroup>
             </FormControl>
 
+            {/*
+              Ein Kasten und KEIN Schalter, und das ist dieselbe Regel wie beim
+              Einwilligungsschalter — nur andersherum gelesen.
+
+              Ein Schalter sagt: es gilt sofort. Das trifft auf den
+              Einwilligungsschalter zu, und deshalb ist er dort einer. Diese
+              Angabe steht in einem Formular mit „Speichern": wer sie umlegt und
+              die Seite verlaesst, hat nichts geaendert. Ein Schalter versprach
+              hier eine Unmittelbarkeit, die es nicht gibt — und ausgerechnet bei
+              der heikelsten Angabe der Plattform.
+            */}
             <FormControlLabel
               control={
-                <Switch
+                <Checkbox
                   checked={beschaeftigt}
                   onChange={(ereignis) => {
                     setGespeichert(false);
                     setBeschaeftigt(ereignis.target.checked);
                   }}
-                  slotProps={{ input: { role: "switch" } }}
                 />
               }
               label="Ich arbeite gerade irgendwo"

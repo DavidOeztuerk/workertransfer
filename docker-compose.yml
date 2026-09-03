@@ -194,6 +194,11 @@ services:
       ASPNETCORE_URLS: "http://0.0.0.0:8003"
       ConnectionStrings__profile: Host=postgres;Port=5432;Database=profile;Username=worker;Password=worker
       Consent__Adresse: http://consent-service:8002
+      # Die KI-Naht. LEER ist gueltig und die Vorgabe: ohne Schluessel wird kein
+      # externer Dienst gerufen, und die Oberflaeche sagt das (ADR-0024).
+      # Deshalb `:-` und nicht `:?` — ein fehlender Schluessel darf den Stapel
+      # nicht anhalten, anders als die drei echten Geheimnisse.
+      Draft__Schluessel: ${ANTHROPIC_API_KEY:-}
     ports:
       - "8003:8003"
 
@@ -234,6 +239,11 @@ services:
       SERVICE_DIR: jobs
       ASPNETCORE_URLS: "http://0.0.0.0:8006"
       ConnectionStrings__jobs: Host=postgres;Port=5432;Database=jobs;Username=worker;Password=worker
+      # Die KI-Naht. LEER ist gueltig und die Vorgabe: ohne Schluessel wird kein
+      # externer Dienst gerufen, und die Oberflaeche sagt das (ADR-0024).
+      # Deshalb `:-` und nicht `:?` — ein fehlender Schluessel darf den Stapel
+      # nicht anhalten, anders als die drei echten Geheimnisse.
+      Draft__Schluessel: ${ANTHROPIC_API_KEY:-}
     ports:
       - "8006:8006"
 

@@ -54,6 +54,9 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
         IReadOnlyList<string>? faehigkeiten,
         string ort,
         Remotegrad? remote,
+        string suchbegriff = "",
+        Guid? firma = null,
+        string beschaeftigung = "",
         CancellationToken cancellationToken = default)
     {
         // Der Stand wird HIER gefiltert und nie vom Aufrufer: ein
@@ -70,6 +73,32 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
         {
             var gesucht = Stand(grad);
             abfrage = abfrage.Where(kandidat => kandidat.RemoteMode == gesucht);
+        }
+
+        // Der Firmenfilter traegt die Karriereseite. Ohne ihn zeigte
+        // `/careers/<kuerzel>` die Anzeigen ALLER Unternehmen unter dem Namen
+        // eines einzigen — die Oberflaeche schickte `company` seit jeher, und
+        // dieser Dienst hat ihn nie gelesen.
+        if (firma is { } mandant)
+        {
+            abfrage = abfrage.Where(kandidat => kandidat.TenantId == mandant);
+        }
+
+        if (!string.IsNullOrWhiteSpace(beschaeftigung))
+        {
+            abfrage = abfrage.Where(kandidat => kandidat.EmploymentType == beschaeftigung);
+        }
+
+        // Freitext ueber Titel UND Beschreibung, ohne Ruecksicht auf Gross- und
+        // Kleinschreibung. Bewusst kein Volltextindex: die Menge ist klein, und
+        // ein Index brauchte eine Sprachentscheidung, die niemand getroffen hat
+        // — deutsche und englische Anzeigen stehen nebeneinander.
+        if (!string.IsNullOrWhiteSpace(suchbegriff))
+        {
+            var gesucht = $"%{suchbegriff.Trim()}%";
+            abfrage = abfrage.Where(kandidat =>
+                EF.Functions.ILike(kandidat.Title, gesucht)
+                || EF.Functions.ILike(kandidat.Description, gesucht));
         }
 
         // Der Zeiger ist der Zeitpunkt der Veröffentlichung plus die Id: zwei

@@ -17,11 +17,16 @@ builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange
 
 builder.Services.AddOcelot(builder.Configuration);
 
-// Die Bremse. Der Zähler kommt von Girder und ist nachgemessen richtig; keine
-// seiner DREI Zwischenschichten taugt hier — zwei bremsen nicht, die dritte ist
-// nirgends verdrahtet, und alle drei glauben X-Forwarded-For bedingungslos
-// (bugs/ratenbegrenzung-drei-wege-zwei-bremsen-nicht.md). Also der Speicher von
-// dort, die Kette von hier.
+// Die Bremse. Der Zähler kommt von Girder, die Kette von hier.
+//
+// Girders eigene Zwischenschicht ist seit 4.0.0 nachgemessen in Ordnung — sie
+// liest die Herkunft allein aus Connection.RemoteIpAddress, ein gefälschtes
+// X-Forwarded-For hebt sie nicht mehr auf, sie zählt je Herkunft und kann
+// Je-Pfad-Grenzen. Sie steht hier trotzdem nicht, und der Grund ist klein und
+// genau benannt: ihre Abweisung ist application/json mit einem traceId — also
+// weder Problemdokument noch Korrelationskennung, fest verdrahtet ohne Haken
+// (bugs/abweisung-der-bremse-ist-kein-problemdokument.md). Wer sich ausgesperrt
+// meldet, soll eine Kennung nennen können. Landet das, fällt diese Kette weg.
 //
 // `InMemoryRateLimitStore` zählt IM PROZESS. Das bindet das Gateway an
 // replicaCount: 1 — der Ausweg ist ein Registrierungswechsel auf

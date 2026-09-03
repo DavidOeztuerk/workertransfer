@@ -68,7 +68,13 @@ public sealed class HttpBenachrichtigung(
             // Der ganze Inhalt: über wen und welcher Art. Kein Text, kein
             // Grund, kein Firmenname — der Empfänger liest den aktuellen Stand
             // selbst, weshalb eine zweite Zustellung auch harmlos ist.
-            Content = JsonContent.Create(new { userId = empfaenger.Value, kind = art })
+            Content = JsonContent.Create(
+                // `user_id`, nicht `userId`. Der Empfaenger deklariert
+                // [JsonPropertyName("user_id")]; camelCase band still auf
+                // Guid.Empty, und der Dienst antwortete 500. Gemessen: der
+                // ganze Benachrichtigungsweg war tot — 18 Ausgangszeilen, alle
+                // nach zehn Versuchen aufgegeben, keine einzige Mail.
+                new { user_id = empfaenger.Value, kind = art })
         };
 
         anfrage.Headers.Add("X-Notify-Secret", _einstellungen.Geheimnis);

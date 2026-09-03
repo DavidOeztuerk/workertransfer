@@ -160,8 +160,13 @@ test("die Passung sieht die Person — und niemand rechnet sie auf dem Server", 
   // Zwei von drei — und der zweite Haken ist der, den es ohne das Vokabular
   // nicht gäbe.
   await expect(candidate.getByText(/2 von 3 genannten Fähigkeiten/)).toBeVisible();
-  // Keine Prozentzahl, nirgends — und der Name der fehlenden steht da.
-  await expect(candidate.locator('[data-match="missing"]')).toHaveText("Go");
+  // Keine Prozentzahl, nirgends — und der Name der fehlenden steht da. Die
+  // Zelle trägt daneben ein Kreuz und „(fehlt dir)"; geprüft wird der Name,
+  // denn das ist die Zusage: ein Haken sagt, WELCHE Fähigkeit fehlt, wo eine
+  // Zahl genau das verstecken würde. Die Anzahl steht mit dabei, sonst würde
+  // eine zweite fehlende Fähigkeit hier unbemerkt durchgehen.
+  await expect(candidate.locator('[data-match="missing"]')).toHaveCount(1);
+  await expect(candidate.locator('[data-match="missing"]')).toContainText("Go");
   await expect(candidate.getByText(/%/)).toHaveCount(0);
 
   // Und dasselbe auf der Bewerbungsseite: dort hilft es beim Formulieren, zu
@@ -171,7 +176,8 @@ test("die Passung sieht die Person — und niemand rechnet sie auf dem Server", 
   await candidate.getByRole("link", { name: /^Bewerben$/ }).click();
   await expect(candidate).toHaveURL(/\/jobs\/[0-9a-f-]{36}\/apply$/);
   await expect(candidate.getByText(/2 von 3 genannten Fähigkeiten/)).toBeVisible();
-  await expect(candidate.locator('[data-match="missing"]')).toHaveText("Go");
+  await expect(candidate.locator('[data-match="missing"]')).toHaveCount(1);
+  await expect(candidate.locator('[data-match="missing"]')).toContainText("Go");
   await expect(candidate.getByText(/%/)).toHaveCount(0);
 
   await recruiterContext.close();
@@ -210,8 +216,12 @@ test("ohne Anbieter sagt die Formulierungshilfe es — statt still nichts zu tun
 
   await recruiter.getByRole("button", { name: /Vorschlag holen/i }).click();
 
-  // Ehrlich aus: eine Meldung, kein stiller Fehlschlag.
-  await expect(recruiter.getByRole("alert")).toContainText(/nicht verfügbar/i);
+  // Ehrlich aus: eine Meldung, kein stiller Fehlschlag. Der Satz nennt die
+  // Ursache, nicht nur den Zustand — „kein Anbieter eingerichtet" ist etwas,
+  // das jemand ändern kann, „nicht verfügbar" wäre bloß eine Absage.
+  await expect(recruiter.getByRole("alert")).toContainText(
+    /kein Entwurfsanbieter eingerichtet/i
+  );
   // Und der Text des Unternehmens steht unverändert da. Ein Fehlschlag, der
   // die Arbeit löscht, wäre schlimmer als gar keine Funktion.
   await expect(recruiter.getByLabel(/Beschreibung/i)).toHaveValue(eigenerText);

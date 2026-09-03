@@ -221,11 +221,19 @@ async function tokenFromMail(
   const pattern = new RegExp(`${linkPath}\\?token=([A-Za-z0-9_-]+)`);
   const deadline = Date.now() + MAIL_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const list = await mailpit<{ messages?: MailpitMessage[] }>("/api/v1/messages?limit=50");
-    const hit = (list?.messages ?? []).find(
-      (message) =>
-        message.Subject.includes(subjectPart) &&
-        message.To.some((to) => to.Address.toLowerCase() === address.toLowerCase())
+    // GEZIELT nach der Adresse fragen, nicht in den neuesten 50 blättern.
+    //
+    // Mailpit sammelt über einen ganzen Lauf hunderte Nachrichten. Wer nur die
+    // neuesten 50 ansieht, findet eine Mail nicht mehr, sobald zwischen ihrem
+    // Versand und dem Nachsehen fünfzig andere eingingen — und das passiert bei
+    // jeder Reise, die auf etwas Langsames wartet. Der Test meldete dann „keine
+    // Mail" und beschuldigte damit das Produkt für ein Fenster, das zu klein
+    // war.
+    const list = await mailpit<{ messages?: MailpitMessage[] }>(
+      `/api/v1/search?query=${encodeURIComponent(`to:${address}`)}&limit=50`
+    );
+    const hit = (list?.messages ?? []).find((message) =>
+      message.Subject.includes(subjectPart)
     );
     if (hit !== undefined) {
       const body = await mailpit<{ Text?: string; HTML?: string }>(`/api/v1/message/${hit.ID}`);
@@ -265,13 +273,15 @@ export async function lastMailFor(
 ): Promise<{ subject: string; text: string } | null> {
   const deadline = Date.now() + MAIL_TIMEOUT_MS;
   while (Date.now() < deadline) {
+    // Siehe `tokenFromMail`: gezielt nach der Adresse, nicht in den neuesten 50.
+    // Hier wiegt es schwerer — die Abschlussmail der Löschkaskade kommt Minuten
+    // nach dem Auslöser, und in dieser Zeit laufen leicht fünfzig andere ein.
+    // Der Test meldete dann „die Kaskade wurde nie fertig", obwohl sie es war.
     const list = await mailpit<{ messages?: (MailpitMessage & { Created?: string })[] }>(
-      "/api/v1/messages?limit=50"
+      `/api/v1/search?query=${encodeURIComponent(`to:${address}`)}&limit=50`
     );
     const hit = (list?.messages ?? []).find(
-      (message) =>
-        message.To.some((to) => to.Address.toLowerCase() === address.toLowerCase()) &&
-        new Date(message.Created ?? 0).getTime() >= after
+      (message) => new Date(message.Created ?? 0).getTime() >= after
     );
     if (hit !== undefined) {
       const body = await mailpit<MailpitDetail>(`/api/v1/message/${hit.ID}`);

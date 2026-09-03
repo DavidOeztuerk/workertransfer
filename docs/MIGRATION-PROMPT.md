@@ -237,7 +237,7 @@ builder.Services.AddIdentityInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-app.UseSharedInfrastructure(builder.Environment, serviceName, pipeline => pipeline
+app.UseGirder(builder.Environment, serviceName, pipeline => pipeline
     .UseExceptionHandling()
     .UseCorrelationId()
     .UseSecurityHeaders()
@@ -336,7 +336,7 @@ builder.Services.AddOcelot(builder.Configuration);
 
 var app = builder.Build();
 
-app.UseSharedInfrastructure(builder.Environment, "gateway", pipeline => pipeline
+app.UseGirder(builder.Environment, "gateway", pipeline => pipeline
     .UseExceptionHandling()
     .UseCorrelationId()
     .UseSecurityHeaders()
@@ -440,7 +440,8 @@ genau diese Herabstufung, zehnmal wiederholt. **Also identity zuerst.**
 - **`verify_aud: False`** in `packages/worker-auth/src/worker_auth/jwt.py` (Ü-1).
   Girder kann nicht ohne `aud` ausstellen — eine leere Zielgruppe lehnt
   `JwtService` schon im Konstruktor ab. Ticket:
-  `bugs/jwtservice-kann-nicht-ohne-aud-ausstellen.md`.
+  Ticket `jwtservice-kann-nicht-ohne-aud-ausstellen` — am 02.09.2026 entfernt:
+  es beschrieb eine Python-Gegenstelle, die es nicht mehr gibt.
 - **`IssuerValidator`/`AudienceValidator` als Delegat** statt abgeschalteter
   Flaggen (Ü-2): *fehlt* der Anspruch, ist es der alte Aussteller und wird
   angenommen; *steht* er drin, muss er unserer sein. Eine Regel, die man
@@ -835,7 +836,7 @@ Damit du es nicht suchst. Nichts davon blockiert Schritt 2.
 
 | | |
 |---|---|
-| **Ausstellen ohne `aud`** | Geht nicht, und deshalb muss `worker_auth` es ignorieren. `bugs/jwtservice-kann-nicht-ohne-aud-ausstellen.md` |
+| **Ausstellen ohne `aud`** | Geht nicht, und deshalb musste `worker_auth` es ignorieren. Ticket `jwtservice-kann-nicht-ohne-aud-ausstellen`, am 02.09.2026 entfernt — `worker_auth` war Python und ist weg. |
 | **Listenwertige `CustomClaims`** | Geht nicht — ein `Dictionary<string, string>` kann keine Liste. `bugs/customclaims-kann-keine-liste-ausdruecken.md` |
 | **Outbox** | Gibt es nicht. Gebraucht bei identity (Löschkaskade) und transfer |
 | **Transaktions-Behavior** | Gibt es nicht. Die UnitOfWork je Anfrage ist unsere |

@@ -3,6 +3,7 @@ using Girder.Infrastructure.Builder;
 using Girder.Infrastructure.Builder.Modules;
 using Girder.Infrastructure.Extensions;
 using Girder.Infrastructure.Security.Identity;
+using Girder.Infrastructure.Security.InputSanitization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -65,8 +66,32 @@ public static class Dienstgrundlage
         IConfiguration configuration,
         IHostEnvironment environment,
         string dienstname,
-        Action<GirderBuilder>? weitere = null) =>
-        services.AddGirder(configuration, environment, dienstname, girder =>
+        Action<GirderBuilder>? weitere = null)
+    {
+        // Die Eingabepruefung sieht NICHT in JSON-Ruempfe. Gemessen, nicht
+        // vermutet.
+        //
+        // Sie laeuft vor allem anderen und kann kein Feld benennen — eine
+        // Anfrage, die sie abweist, hat den Fachpruefer nie erreicht. Damit wird
+        // aus einem 422, das sagt WELCHES Feld falsch ist, ein blankes 400
+        // „malicious input". Gemessen an fuenf Faellen in drei Diensten:
+        // `javascript:alert(1)` und `data:text/html,<script>` als Portfolio-Link,
+        // dieselben zwei am Arbeitgeberprofil, und `../../etc/passwd` als
+        // GitHub-Anmeldename. Alle fuenf werden weiterhin abgewiesen — nur sagt
+        // die Antwort dem Menschen im Formular jetzt weniger als vorher.
+        //
+        // Das ist hier zu verschmerzen und anderswo nicht: unsere gesamte
+        // Schreibflaeche ist gepruefte Fachschicht mit RFC-9457-Antworten samt
+        // Feldnamen, wir bauen kein SQL aus Zeichenketten (EF mit Parametern),
+        // und die Ausgabe entkommt React. Der Kantenfilter verdeckt hier also
+        // bessere Pruefer, statt etwas zu decken.
+        //
+        // Query-String und die zwei Adresskoepfe bleiben geprueft — das ist die
+        // Flaeche, auf der ein Wert ohne Fachpruefer ankommt.
+        services.Configure<InputSanitizationOptions>(
+            optionen => optionen.InspectJsonBodies = false);
+
+        return services.AddGirder(configuration, environment, dienstname, girder =>
         {
             girder
                 .UseDefaults()
@@ -155,10 +180,50 @@ public static class Dienstgrundlage
                     "ResourceRead und ResourceOwner ruft kein Endpunkt hier, und "
                     + "das Modul verlangt einen Speicher. Unsere Autorisierung "
                     + "sind die Permission-Richtlinien, und die entscheidet "
-                    + "Mitgliedschaftsrecht aus der Tabelle statt aus Anspruechen");
+                    + "Mitgliedschaftsrecht aus der Tabelle statt aus Anspruechen")
+
+                // Seit 4.1.0 ist die abriegelnde Zwischenschicht ein eigenes
+                // Modul, getrennt vom Richtlinienanbieter — genau die Trennung,
+                // die uns gefehlt hat. Vorher hing beides an `Authorization`, und
+                // dann war die Wahl: entweder niemand beantwortet die
+                // Permission-Richtlinien, oder alles ausserhalb der aufgezaehlten
+                // Flaeche antwortet 401.
+                //
+                // `PermissionMiddleware` verlangt fuer JEDE Anfrage
+                // Authentifizierung, ausser der Endpunkt traegt `[AllowAnonymous]`
+                // oder eine eigene `IEndpointAccessPolicy` erklaert ihn fuer
+                // oeffentlich. Fail-closed, und fuer ein System ohne oeffentliche
+                // Flaeche richtig. Wir haben eine: `/auth/login`,
+                // `/auth/register`, `/auth/session`, die Karriereseite unter
+                // `/companies/by-slug/{k}`, die Gesundheitsproben — und die
+                // Diensteingaenge hinter einem Geheimniskopf statt hinter einem
+                // Token (`/notifications`, `/erasure`, `/internal/notify`).
+                //
+                // Gemessen, was sie kostet: mit ihr antwortet `POST
+                // /notifications` mit 401 in Girders Umschlag, obwohl der
+                // Geheimniskopf stimmt — die Ablehnung faellt vor unserem
+                // Fehlerdokument und vor dem Endpunkt.
+                //
+                // Sie einzuschalten hiesse, unsere oeffentliche Flaeche ein
+                // ZWEITES Mal zu erklaeren, neben den Endpunkten und neben
+                // `docs/routenkarte.yml`. Zwei Listen ueber dieselbe Frage gehen
+                // auseinander, und die Karte ist die, die gefahren wird. Dazu
+                // kommt: die Middleware liest Rechte aus ANSPRUECHEN, und unser
+                // Token traegt keine — sie koennte also ohnehin nur durchwinken
+                // oder ablehnen, nie erlauben.
+                //
+                // `Authorization` bleibt und ist deshalb hier NICHT genannt: der
+                // PermissionPolicyProvider traegt die Firmenrechte.
+                .Without(
+                    GirderModule.PermissionEnforcement,
+                    "unsere oeffentliche Flaeche steht an den Endpunkten und in "
+                    + "docs/routenkarte.yml; sie hier ein zweites Mal zu erklaeren "
+                    + "hiesse zwei Listen ueber dieselbe Frage. Der "
+                    + "Richtlinienanbieter (Authorization) bleibt");
 
             weitere?.Invoke(girder);
         });
+    }
 
     /// <summary>
     /// The extra a service needs to <em>issue</em> tokens. identity-service only.
@@ -180,11 +245,14 @@ public static class Dienstgrundlage
 
     /// <summary>Die Kette, und wer ihre Reihenfolge bestimmt.</summary>
     /// <remarks>
-    /// <para><strong>Die Reihenfolge gehört Girder.</strong> Vorher stand hier
-    /// eine eigene Liste aus fünf Gliedern — und damit auch die Verantwortung
-    /// dafür, dass zwei vertauschte Zeilen nichts kaputt machen. Jetzt steht
-    /// hier der Aufruf ohne Lambda: dieselbe Kette, die jeder andere
-    /// Girder-Dienst fährt.</para>
+    /// <para><strong>Die Reihenfolge gehört Girder.</strong> Hier stand zuletzt
+    /// Girders Vorgabekette abgeschrieben, dreizehn Glieder lang, mit drei
+    /// ausgelassenen Zeilen — nicht aus Gestaltung, sondern aus Zwang: die Kette
+    /// wusste bis 4.0.2 von der Modulauswahl nichts und brach ohne die
+    /// Auslassung beim Start ab. Seit 4.1.0 liest sie
+    /// <c>GirderComposition</c>, also steht hier wieder der Aufruf ohne Lambda:
+    /// dieselbe Kette, die jeder andere Girder-Dienst fährt, und jede Abwahl
+    /// oben wirkt einmal statt zweimal.</para>
     ///
     /// <para>Zwei Glieder kommen danach, und beide aus einem Grund:</para>
     ///
@@ -209,66 +277,21 @@ public static class Dienstgrundlage
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        // Girders Vorgabekette, WORTGLEICH — bis auf eine ausgelassene Zeile.
+        // Girders Vorgabekette, ohne Lambda.
         //
-        // Eigentlich stuende hier `UseSharedInfrastructure(environment,
-        // dienstname)` ohne Lambda, damit die Reihenfolge Girder gehoert. Das
-        // geht nicht: die Vorgabekette ruft `UseRateLimiting()` fest, und die
-        // Kette kennt die Modulauswahl nicht — `GirderComposition` kommt in
-        // Girder.Infrastructure nicht vor. Die Dienstseite hat `Without(...)`,
-        // die Kette hat nichts Entsprechendes.
+        // Hier standen dreizehn abgeschriebene Zeilen mit drei Auslassungen. Sie
+        // standen da, weil die Kette bis 4.0.2 jedes Glied bedingungslos rief und
+        // von `Without(...)` nichts wusste: `UseRateLimiting()` haette jeden
+        // Dienst beim Start abgebrochen. Die Kopie war also kein Entwurf, sondern
+        // ein Zwang — und genau die Sorte Duplikat, die beim naechsten
+        // Girder-Release still falsch wird: kommt ein Glied hinzu, fehlt es hier,
+        // kein Bau bricht, kein Test faellt, die Kette ist einfach kuerzer.
         //
-        // Ohne die Auslassung bricht jeder Dienst beim Start:
-        // „UseRateLimiting() needs IDistributedRateLimitStore". Das ist kein
-        // Fehler, sondern die RequiresProvider-Mechanik — nur eben auf einer
-        // Seite, die von der Abwahl nichts weiss.
-        //
-        // Diese Liste ist deshalb eine KOPIE und keine Gestaltung. Sie faellt
-        // weg, sobald die Kette die Auswahl liest.
-        //
-        // DREI Zeilen fehlen. Zwei gehoeren zu je einem `Without(...)` oben; das
-        // Paar erzwingt nichts, wer dort abwaehlt und hier vergisst, bekommt
-        // einen Startabbruch — besser als still, aber eben erst beim Starten.
-        //
-        // Die dritte ist `UsePermissions()`, und die ist keine Folge, sondern
-        // eine EIGENE Entscheidung:
-        //
-        // `PermissionMiddleware` verlangt fuer JEDE Anfrage Authentifizierung,
-        // ausser der Endpunkt traegt `[AllowAnonymous]` oder eine eigene
-        // `IEndpointAccessPolicy` erklaert ihn fuer oeffentlich. Fail-closed,
-        // und als Vorgabe fuer ein System, das keine oeffentliche Flaeche hat,
-        // richtig. Wir haben eine: `/auth/login`, `/auth/register`,
-        // `/auth/session`, die Karriereseite unter `/companies/by-slug/{k}`,
-        // die Gesundheitsproben — und die Diensteingaenge hinter einem
-        // Geheimniskopf statt hinter einem Token (`/notifications`,
-        // `/erasure`, `/internal/notify`).
-        //
-        // Gemessen, was es kostet: mit der Zeile antwortet `POST /notifications`
-        // mit 401 in Girders Umschlag, obwohl der Geheimniskopf stimmt — die
-        // Ablehnung faellt vor unserem Fehlerdokument und vor dem Endpunkt.
-        //
-        // Sie einzuschalten hiesse, unsere oeffentliche Flaeche ein ZWEITES Mal
-        // zu erklaeren, neben den Endpunkten und neben `docs/routenkarte.yml`.
-        // Zwei Listen ueber dieselbe Frage gehen auseinander, und die Karte ist
-        // die, die gefahren wird. Dazu kommt: die Middleware liest Rechte aus
-        // ANSPRUECHEN, und unser Token traegt keine — sie koennte also ohnehin
-        // nur durchwinken oder ablehnen, nie erlauben.
-        app.UseSharedInfrastructure(environment, dienstname, kette => kette
-            .UseSecurityHeaders()
-            .UseCorrelationId()
-            .UseRequestLogging()
-            .UseTelemetry()
-            .UseExceptionHandling()
-            .UseInputSanitization()
-            .UseSerilogLogging()
-            .UseCors()
-            .UseSwagger()
-            // .UseRateLimiting()  — siehe Without(GirderModule.RateLimiting)
-            .UseHealthCheckEndpoints()
-            .UseAuth()
-            .UseSecurityAudit());
-            // .UsePermissions()   — siehe unten
-            // .UseHttpCaching()   — siehe Without(GirderModule.HttpResponseCaching)
+        // Seit 4.1.0 liest die Kette `GirderComposition`. Jede Abwahl oben wirkt
+        // damit auch hier — RateLimiting, HttpResponseCaching und
+        // PermissionEnforcement fallen von selbst weg, und ihre Begruendung steht
+        // an genau einer Stelle.
+        app.UseGirder(environment, dienstname);
 
         app.UseGirderPrincipal();
         app.UseMiddleware<ProblemDetailsMiddleware>();

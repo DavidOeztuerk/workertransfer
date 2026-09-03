@@ -34,10 +34,11 @@ public sealed class NurGirderKontext(DbContextOptions<NurGirderKontext> options)
 /// own atomicity and opens a transaction of its own while consuming a token —
 /// so whether the two compose decides how the sign-in commands are cut.
 /// <para>
-/// Deliberately built out of Girder alone: it is the reproduction for
-/// <c>bugs/sitzungsspeicher-vertraegt-keine-aeussere-transaktion.md</c>, and a
-/// reproduction that needs WorkerTransfer code proves nothing about whose the
-/// error is.
+/// Deliberately built out of Girder alone. It began as the reproduction for a
+/// Girder bug — the store opened a second transaction and threw
+/// <c>"The connection is already in a transaction"</c> — fixed in 3.0.1. The
+/// ticket is gone; the test stays, because what it pins is ours: that the two
+/// sign-in routes really do commit their audit row together with the change.
 /// </para>
 /// </remarks>
 [Collection(PostgresCollection.Name)]
@@ -130,5 +131,50 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
         // hing und dessen Commit überlebt hat; ohne sie stünde hier Rotated.
         var nochmal = await sitzungen.RefreshAsync(angemeldet.RefreshToken);
         nochmal.Outcome.Should().Be(ConsumeOutcome.RotatedWithinGrace);
+    }
+
+    /// <summary>
+    /// Und eine Abmeldung ebenso — die zweite Route aus demselben Ticket.
+    /// </summary>
+    /// <remarks>
+    /// <c>POST /auth/logout</c> ist zusammengesetzt: erst den Token verbrauchen,
+    /// um die Sitzung zu kennen, dann die Sitzung schliessen. Beide Schritte
+    /// liegen in der Klammer des Aufrufers, weil daneben die Pruefspurzeile
+    /// <c>token_revoke</c> faellt — und ein Eintrag, der ohne die Abmeldung
+    /// committet, behauptet etwas, das nicht geschehen ist.
+    /// <para>
+    /// Bis Girder 3.0.1 stand hier derselbe Fehler wie eine Zeile hoeher. Der
+    /// Test steht trotzdem eigens da: die Erneuerung deckt nur den ersten der
+    /// beiden Schritte ab, und <c>SignOutAsync</c> ist ein anderer Aufruf.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Eine_Abmeldung_laeuft_in_einer_offenen_Transaktion()
+    {
+        using var bereich = _anbieter.CreateScope();
+        var kontext = bereich.ServiceProvider.GetRequiredService<NurGirderKontext>();
+        var sitzungen = bereich.ServiceProvider.GetRequiredService<ITokenSessionService>();
+
+        var angemeldet = await sitzungen.SignInAsync(SubjectId.New());
+
+        await using var klammer = await kontext.Database.BeginTransactionAsync();
+
+        var verbraucht = await sitzungen.RefreshAsync(angemeldet.RefreshToken);
+
+        if (verbraucht is not { Session: { } sitzung })
+        {
+            throw new InvalidOperationException(
+                "die Erneuerung nannte keine Sitzung — der Test prueft dann nichts");
+        }
+
+        await sitzungen.SignOutAsync(sitzung);
+        await klammer.CommitAsync();
+
+        // Nach dem Commit des Aufrufers ist die Sitzung wirklich zu. Ohne die
+        // Abmeldung traege der eben gedrehte Token noch das Kulanzfenster und
+        // wuerde erneuern — deshalb ist genau er die Probe.
+        var danach = await sitzungen.RefreshAsync(verbraucht.RefreshToken!);
+        danach.Succeeded.Should().BeFalse(
+            "die Abmeldung lag in derselben Klammer und hat deren Commit ueberlebt");
     }
 }

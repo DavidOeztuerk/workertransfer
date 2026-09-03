@@ -119,6 +119,7 @@ const AREAS: Record<string, string> = {
   resume: "Lebenslauf",
   portfolio: "Arbeiten",
   market: "Marktstatus",
+  github: "GitHub",
 };
 
 /**

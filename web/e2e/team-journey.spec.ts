@@ -44,9 +44,21 @@ test("eine Einladung lässt genau die eingeladene Person herein", async ({ brows
   await actAsCompany(admin, companyName);
   await admin.goto("/company/team");
   await expect(admin.getByText("E2E Chefin")).toBeVisible();
+
+  // Das Einladen liegt auf einer eigenen Adresse, nicht als Formular in der
+  // Liste. „Einladen" heisst deshalb zweimal etwas anderes: auf der Mannschaft
+  // ist es ein LINK dorthin, auf der Seite selbst der Absendeknopf. Die Rollen
+  // auseinanderzuhalten ist hier nicht Kosmetik — `getByRole("button")` fände
+  // den Link nicht, und ein `getByText` fände beide.
+  await admin.getByRole("link", { name: /Einladen/i }).click();
+  await expect(admin).toHaveURL(/\/company\/team\/invite$/);
   await admin.getByLabel(/E-Mail/i).fill(colleagueEmail);
   await admin.getByRole("button", { name: /Einladen/i }).click();
   await expect(admin.getByText(/Einladung verschickt/i)).toBeVisible();
+
+  // Und die Liste steht auf der Mannschaftsseite — die offene Einladung muss
+  // dort auftauchen, sonst hat das Absenden nur eine Meldung erzeugt.
+  await admin.getByRole("link", { name: /Zurück zur Mannschaft/i }).click();
   await expect(admin.getByTestId("invitation-list").getByText(colleagueEmail)).toBeVisible();
 
   const token = await invitationTokenFor(colleagueEmail);

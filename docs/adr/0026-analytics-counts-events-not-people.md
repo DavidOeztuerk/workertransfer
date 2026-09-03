@@ -78,10 +78,14 @@ eine eigene Entscheidung mit eigenem Anlass; heute gibt es ihn nicht.
 ## Konsequenzen
 
 - `GET /companies/me/application-stats` liefert `by_status` und `total`, sonst
-  nichts. Ein Test hält die Feldmenge der Antwort fest — was es nicht gibt,
-  kann nicht herausgehen (dieselbe Strenge wie bei `DraftContext`, ADR-0024).
+  nichts. `Die_Zahlen_tragen_genau_zwei_Felder` hält die Feldmenge der Antwort
+  fest — was es nicht gibt, kann nicht herausgehen (dieselbe Strenge wie bei
+  `DraftContext`, ADR-0024).
 - Ein Test prüft die Abgrenzung: ein fremdes Unternehmen sieht seine eigene
-  (leere) Zahl, nie diese. `403` ohne aktives Unternehmen.
+  (leere) Zahl, nie diese (`Die_Zahlen_zaehlen_nur_die_eigenen_Vorgaenge`).
+  `403` ohne aktives Unternehmen — `Ohne_Unternehmen_gibt_es_keine_Zahlen`,
+  und zwar gegen *diesen* Endpunkt: die 403 war lange nur an
+  `/jobs/{id}/applications` geprüft, was über ihn nichts aussagt.
 - Sechs Abhängigkeiten weniger im Workspace (elasticsearch, meilisearch,
   qdrant-client und deren Anhang).
 - **Bewusst nicht gebaut:** Dashboards, Zeitreihen, Trichter-Auswertungen

@@ -234,10 +234,32 @@ gruppen:
 
   - name: 'Stellen — die mittlere Spalte ist hier die wichtige'
     warum: |
-      `GET /jobs` ist **401 ohne Token und 200 mit**, fuer Person wie Firma: eine
-      Stellenliste steht hinter der Anmeldung. Genau diese Zeile stand in
-      `scripts/k8s-up.sh` als 200 — der Grund, warum diese Karte ein Test ist und
-      keine Abhakliste.
+      `GET /jobs` ist **200 in allen drei Spalten** — eine veroeffentlichte
+      Anzeige findet auch, wer kein Konto hat. Der Speicher filtert auf
+      `status == "published"`; Entwuerfe und Geschlossenes bleiben drinnen, und
+      zwar dort und nie ueber einen Parameter des Aufrufers.
+
+      **Hier stand lange 401**, mit der Begruendung „eine Stellenliste steht
+      hinter der Anmeldung". Sie hielt der eigenen Karte nicht stand: weiter
+      unten steht bei den Arbeitgeberprofilen „weil die Karriereseite
+      oeffentlich ist" — und `/careers/<kuerzel>` holt seine Stellen ueber genau
+      diesen Endpunkt. Ein anonymer Besucher sah dort Name und Beschreibung des
+      Unternehmens, aber keine einzige Stelle. Zwei Zeilen derselben Karte, die
+      sich widersprachen.
+
+      Dass diese Zeile einmal in `scripts/k8s-up.sh` als 200 stand, war damals
+      trotzdem ein Fehler — damals stimmte 401. Der Grund, warum diese Karte ein
+      Test ist und keine Abhakliste, bleibt derselbe.
+
+      **`GET /jobs/{id}` fiel kurz darauf aus demselben Grund**, und dort war der
+      Preis groesser als eine leere Seite: `applications-service` fragt genau
+      diesen Endpunkt Dienst-zu-Dienst, ob es die Stelle gibt — ohne Token, weil
+      er keines hat. Sein eigener Quelltext nannte den Endpunkt „bewusst ohne
+      Anmeldung"; er war es nicht, und deshalb endete **jede** Bewerbung mit 503.
+      Gemessen im Protokoll: „jobs-service antwortete mit 401". Die drei Spalten
+      stehen jetzt alle auf 404, und das ist die Aussage: fuer eine erfundene
+      Kennung, einen fremden Entwurf und eine geschlossene Stelle antwortet der
+      Dienst gleich — ein 403 daneben verriete, welche Kennungen belegt sind.
 
       Alles Schreibende gibt **403 fuer die Person**: wer fuer keine Firma
       handelt, schreibt keine Anzeige. Das ist ADR-0017 in einer Spalte.
@@ -247,8 +269,8 @@ gruppen:
       - { methode: PUT, pfad: '/jobs/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 404 }
       - { methode: POST, pfad: '/jobs/00000000-0000-0000-0000-000000000001/publish', ohne: 401, person: 403, firma: 404 }
       - { methode: POST, pfad: '/jobs/00000000-0000-0000-0000-000000000001/close', ohne: 401, person: 403, firma: 404 }
-      - { methode: GET, pfad: '/jobs', ohne: 401, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/jobs/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/jobs', ohne: 200, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/jobs/00000000-0000-0000-0000-000000000001', ohne: 404, person: 404, firma: 404 }
       - { methode: GET, pfad: '/companies/me/jobs', ohne: 401, person: 403, firma: 200 }
 
   - name: 'Bewerbungen'
@@ -263,12 +285,22 @@ gruppen:
       Autorisierung steht davor — die Person bekommt 403, ohne dass ihr Rumpf
       ueberhaupt angesehen wird.
 
-      `POST /applications` gibt 503: applications-service fragt jobs-service nach
-      der Stelle, und ueber eine, die es nicht gibt, kann er nichts sagen.
+      `POST /applications` gibt 404 mit `No such job`. Hier stand 503 mit der
+      Begruendung, applications-service koenne ueber eine Stelle, die es nicht
+      gibt, nichts sagen — er kann: es gibt sie nicht. 503 hiess nie
+      „unbekannt", sondern „hat nicht geantwortet", und genau das war der Fall,
+      solange der Draht zwischen den beiden Diensten kaputt war. Das ist die
+      DRITTE Stelle in dieser Karte, an der eine 503 ein festgehaltenes Symptom
+      war und die Begruendung daneben nachgereicht — die anderen beiden waren
+      der Einwilligungs-Ledger.
+
+      Gegengeprobt, weil ein Endpunkt, der immer 404 sagt, genauso aussaehe:
+      dieselbe Anfrage auf eine Stelle, die es GIBT, gibt 201.
+
       `GET /jobs/{id}/applications` und `/companies/me/application-stats` sehen
       nur Firmen — eine Bewerberliste ist nichts, was eine Privatperson abruft.
     eintraege:
-      - { methode: POST, pfad: '/applications', ohne: 401, person: 503, firma: 503 }
+      - { methode: POST, pfad: '/applications', ohne: 401, person: 404, firma: 404 }
       - { methode: GET, pfad: '/applications/me', ohne: 401, person: 200, firma: 200 }
       - { methode: POST, pfad: '/applications/00000000-0000-0000-0000-000000000001/withdraw', ohne: 401, person: 404, firma: 404 }
       - { methode: POST, pfad: '/applications/00000000-0000-0000-0000-000000000001/status', ohne: 401, person: 403, firma: 422 }

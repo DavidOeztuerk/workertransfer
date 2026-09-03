@@ -20,8 +20,7 @@ workertransfer/
 │   └── shared/               ServiceDefaults, Outbox, Skills, Contracts.*
 ├── tests/                    one suite per service, plus Gateway, Outbox,
 │                             Skills and Ganzes (cross-service guards)
-├── apps/web/                 React app (pnpm workspace member)
-├── packages/ui/              shared React components (pnpm)
+├── web/                      React app — the whole frontend, own lockfile
 ├── docs/                     ADRs, architecture, product constraints, vision
 ├── bugs/                     open Girder debts, each with a reproduction
 ├── deploy/                   Helm chart and kind cluster

@@ -30,6 +30,28 @@ was Girders README oder die XML-Doku zusagt?** Eine Zusage, die nicht gilt, ist
 ein Fehler. Etwas, das nirgends zugesagt ist, ist erst mal eine offene Frage —
 auch die gehört hierher, dann als `Art: Lücke`.
 
+## Wenn Girder den Fehler behebt
+
+Dann geht das Ticket **weg** — es wird nicht auf „erledigt" gehakt und liegen
+gelassen. Ein Ordner, in dem behobene Tickets stehen bleiben, beantwortet die
+Frage „was ist hier offen?" nach kurzer Zeit falsch, und dann liest sie niemand
+mehr.
+
+Drei Dinge vorher, in dieser Reihenfolge:
+
+1. **Nachmessen**, an der neuen Fassung und ohne WorkerTransfer-Code. Ein
+   Änderungsprotokoll ist keine Messung.
+2. **Den Umweg entfernen**, falls einer beschlossen wurde — das ist der ganze
+   Grund, warum das Ticket geschrieben wurde.
+3. **Die tragende Begründung retten.** Was hier stand und weiterhin eine
+   Entscheidung trägt, gehört an den Ort dieser Entscheidung: in den Kommentar
+   an der Registrierung, in die `Without`-Begründung, in `CLAUDE.md`. Erst dann
+   löschen. Eine Begründung, die nicht mehr stimmt, ist schlimmer als keine —
+   und eine, die mit ihrer Datei verschwindet, war nie eine.
+
+Was **nicht** hierher gehört, war nie ein Girder-Fehler: unsere eigenen offenen
+Punkte sind Arbeit, kein Ticket. Sie werden behoben, nicht abgelegt.
+
 ## Ablage
 
 Eine Datei je Fehler, benannt nach dem, was kaputt ist:

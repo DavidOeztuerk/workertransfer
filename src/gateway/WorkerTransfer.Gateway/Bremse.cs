@@ -99,33 +99,35 @@ public sealed class Bremseinstellungen
 /// Ausweg ist ein Registrierungswechsel, kein Umbau:
 /// <c>RedisDistributedRateLimitStore</c> erfüllt dieselbe Schnittstelle.</para>
 ///
-/// <para><strong>Warum nicht Girders Bremse.</strong> Der alte Grund ist weg:
-/// Girder hatte drei Ratenbegrenzungen, zwei bremsten nicht, die dritte war
-/// nirgends verdrahtet, und alle drei glaubten <c>X-Forwarded-For</c> ohne jede
-/// Vertrauensliste. Das ist seit 4.0.0 behoben und in H2 nachgemessen: es bleibt
-/// eine, sie bremst, sie zählt je Herkunft, sie liest den Kopf nicht mehr, und
-/// ein gefälschtes <c>X-Forwarded-For: 127.0.0.1</c> hebt sie nicht auf — obwohl
-/// die Ausnahmeliste weiterhin Loopback trägt, denn die Herkunft kommt jetzt
-/// allein aus <c>Connection.RemoteIpAddress</c>. Je-Pfad-Grenzen kann sie auch.</para>
+/// <para><strong>Warum nicht Girders Bremse.</strong> Zwei Gründe sind
+/// weggefallen, und beide waren einmal <em>der</em> Grund — sie stehen hier, weil
+/// eine Begründung, die nicht mehr stimmt, schlimmer ist als keine.</para>
 ///
-/// <para>Was sie <em>nicht</em> kann, ist der Grund, warum diese Kette bleibt:
-/// <strong>ihre Abweisung ist kein Problemdokument und trägt keine
-/// Korrelationskennung.</strong> Sie schreibt <c>application/json</c> mit einem
-/// <c>traceId</c> aus <c>HttpContext.TraceIdentifier</c>, fest verdrahtet, ohne
-/// Haken zum Anpassen. Genau das ist hier zugesagt: wer sich beschwert,
-/// ausgesperrt worden zu sein, soll eine Kennung nennen können — und der Browser
-/// soll keine zweite Fehlergestalt lernen müssen.
-/// <c>Die_Abweisung_nennt_kein_Konto</c> nagelt beides fest. Gemeldet als
-/// <c>bugs/abweisung-der-bremse-ist-kein-problemdokument.md</c>; kommt es, fällt
-/// diese Kette weg.</para>
+/// <para>Der erste: Girder hatte drei Ratenbegrenzungen, zwei bremsten nicht, die
+/// dritte war nirgends verdrahtet, und alle drei glaubten <c>X-Forwarded-For</c>
+/// ohne jede Vertrauensliste. Seit 4.0.0 behoben und in H2 nachgemessen. Der
+/// zweite: ihre Abweisung war <c>application/json</c> mit einem <c>traceId</c>,
+/// fest verdrahtet. Seit 4.1.0 ist sie ein <c>application/problem+json</c> und
+/// nennt die Korrelationskennung; die fremden Je-Pfad-Vorgaben
+/// (<c>/api/auth/login</c> und sechs weitere aus Skillswap, die beim Binden
+/// ergänzt statt ersetzt wurden) sind dort ebenfalls weg.</para>
 ///
-/// <para>Zwei kleinere Unterschiede stehen daneben, keiner davon trägt allein:
-/// die Grenzen lägen in einer zweiten Datei statt neben den Routen (heute nagelt
-/// <c>BremsenkarteTests</c> fest, dass jeder gebremste Pfad eine Route hat), und
-/// Girders Optionsklasse bringt fremde Je-Pfad-Vorgaben mit (<c>/api/auth/login</c>
-/// und sechs weitere aus Skillswap), die beim Binden nicht ersetzt, sondern
-/// ergänzt werden — gemessen: <c>/api/auth/register</c> wurde bei 3 gebremst,
-/// obwohl es diese Route hier nicht gibt.</para>
+/// <para><strong>Der Grund, der bleibt, ist die Gestalt, nicht ein Mangel:</strong>
+/// Girders Zwischenschicht ist eine <em>globale</em> Bremse mit Verfeinerung je
+/// Pfad — jeder Pfad ohne eigenen Eintrag bekommt die Vorgabegrenze
+/// (<c>RequestsPerMinute</c>, gelesen in <c>CheckRateLimitsAsync</c>:
+/// <c>endpointSpecificLimits ?? defaultLimits</c>). Diese hier bremst
+/// <em>fünf benannte Pfade</em> und rührt alles andere nicht an. Durch das
+/// Gateway läuft aber auch die ganze Oberfläche; eine Vorgabegrenze über allem
+/// hieße, jeden Bilderabruf mitzuzählen. Man könnte sie auf eine unerreichbar
+/// hohe Zahl setzen — dann stünde in der Konfiguration eine Grenze, die keine
+/// ist, und die eigentliche Auswahl läge trotzdem woanders.</para>
+///
+/// <para>Zwei kleinere Unterschiede stehen daneben, keiner trägt allein: die
+/// Grenzen lägen in einer zweiten Datei statt neben den Routen (heute nagelt
+/// <c>BremsenkarteTests</c> fest, dass jeder gebremste Pfad wirklich eine Route
+/// hat), und diese Antwort trägt ihre eigenen Sicherheitsköpfe — siehe
+/// <c>Abweisen</c> —, was Girders nicht tut.</para>
 ///
 /// <para>Der <em>Zähler</em> von Girder war schon immer nachgemessen richtig, und
 /// den benutzen wir: <c>IDistributedRateLimitStore</c>. Eigen ist hier nur die

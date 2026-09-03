@@ -49,12 +49,21 @@ step "dotnet build" dotnet build WorkerTransfer.slnx
 step "dotnet test" ./scripts/test-dotnet.sh
 
 # --- Frontend ----------------------------------------------------------------
-step "tsc" pnpm -r run check
-step "vitest" pnpm -r run test
+# `cd web` und nicht `pnpm -r`: seit die Wurzel kein Paket mehr ist, gibt es
+# keinen Workspace, ueber den `-r` laufen koennte — der Aufruf endete mit
+# ERR_PNPM_NO_PKG_MANIFEST, und damit waren alle drei Frontend-Schritte tot,
+# ausgerechnet in dem Werkzeug, das jeden roten Schritt melden soll.
+#
+# `pnpm build` gehoert dazu: tsc und Vitest laufen beide NICHT ueber den
+# Bauweg, ein Fehler, der erst beim Buendeln auftritt, faellt sonst erst im
+# Bild auf.
+step "tsc" sh -c "cd web && pnpm check"
+step "vitest" sh -c "cd web && pnpm test"
+step "vite build" sh -c "cd web && pnpm build"
 
 # --- E2E (nur auf Wunsch, braucht den laufenden Stack) ------------------------
 if [[ $WITH_E2E -eq 1 ]]; then
-  step "playwright" pnpm --filter @workertransfer/web run e2e
+  step "playwright" sh -c "cd web && pnpm e2e"
 fi
 
 # --- Was blieb ungeprüft? ----------------------------------------------------
@@ -83,9 +92,9 @@ curl -sf --max-time 2 http://localhost:8003/health/live >/dev/null 2>&1 && docke
 #      Zahl und zerreißen jedes Muster. Deshalb erst entfärben.
 #   2. vitest meldet zwei Zeilen mit „passed" — „Test Files 41 passed" und
 #      „Tests 336 passed". Ohne das genauere Muster käme die Dateizahl heraus.
-#   3. `pnpm -r` läuft über zwei Pakete, also gibt es zwei „Tests"-Zeilen. Die
-#      letzte zu nehmen hieße, das zuletzt fertige Paket zu melden — hier wird
-#      summiert.
+#   3. Summiert statt „die letzte Zeile": früher lief `pnpm -r` über zwei
+#      Pakete und lieferte zwei „Tests"-Zeilen. Heute ist es eines, aber die
+#      Summe bleibt richtig — und bleibt richtig, wenn wieder eines dazukommt.
 count_from() {
   local log="$1" pattern="$2" mode="${3:-last}" nums
   [[ -f "$log" ]] || return 0

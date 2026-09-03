@@ -346,6 +346,31 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
+    /// Der Wunsch ist begrenzt — und ein zu langer ist eine Eingabe, kein Ausfall.
+    /// </summary>
+    /// <remarks>
+    /// Er war das einzige Feld dieses Endpunkts, das an keinem Wertobjekt
+    /// vorbeikommt: Überschrift, Text und Fähigkeiten stammen aus dem
+    /// gespeicherten Profil und sind dort begrenzt, der Wunsch kam roh aus dem
+    /// Rumpf und ging ungeprüft an den fremden Anbieter. Geprüft wird beides —
+    /// 501 abgelehnt, 500 durchgelassen: eine Grenze, die auch das Erlaubte
+    /// abweist, merkt man erst an einer echten Anfrage.
+    /// </remarks>
+    [Theory]
+    [InlineData(500, HttpStatusCode.OK)]
+    [InlineData(501, HttpStatusCode.UnprocessableEntity)]
+    public async Task Ein_zu_langer_Wunsch_ist_ein_422(int laenge, HttpStatusCode erwartet)
+    {
+        var browser = AlsPerson(Guid.CreateVersion7());
+        await Schreibe(browser);
+
+        var antwort = await browser.PostAsJsonAsync(
+            "/profiles/me/draft", new { wish = new string('a', laenge) });
+
+        antwort.StatusCode.Should().Be(erwartet);
+    }
+
+    /// <summary>
     /// Nichts wird gespeichert — nicht der Prompt, nicht die Antwort, und keine
     /// Zeile darüber, dass jemand um Hilfe gebeten hat.
     /// </summary>

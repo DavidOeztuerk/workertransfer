@@ -60,6 +60,15 @@ public static class StellenEndpoints
                     context, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", fehler.Message);
             }
+            catch (Eingabefehler fehler)
+            {
+                // Ein zu langer Wunsch ist eine Eingabe, kein Ausfall: 422, nicht
+                // 503. Ohne diesen Zweig verliesse er den Dienst als 500 — und
+                // ein 500 sagt dem Aufrufer, es liege nicht an ihm.
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", fehler.Message);
+            }
         });
 
         stellen.MapPost("/", async (
@@ -121,27 +130,42 @@ public static class StellenEndpoints
         // Öffentlich für jeden Angemeldeten — und ohne jede Sortierung nach
         // Passung. Wie gut jemand zu einer Stelle passt, rechnet der Browser
         // und zeigt es der Person (ADR-0022).
+        // OHNE Anmeldung, und das ist eine Korrektur.
+        //
+        // Hier stand eine Sperre auf `akteur.Current is null`. Sie gab nichts
+        // preis, was nicht ohnehin oeffentlich waere — der Speicher filtert auf
+        // `status == "published"`, und veroeffentlicht heisst in dieser Domaene
+        // "fuer alle sichtbar, auch ohne Konto". Sie kostete aber genau das,
+        // wofuer eine Anzeige da ist: `/careers/<kuerzel>` ist als oeffentliche
+        // Seite dokumentiert (docs/routenkarte.yml) und zeigte einem anonymen
+        // Besucher trotzdem keine einzige Stelle. Eine Ausschreibung, die man
+        // nur nach Anmeldung sieht, erreicht genau die nicht, fuer die sie
+        // gedacht ist.
+        //
+        // Entwuerfe und geschlossene Anzeigen bleiben drinnen: der Stand wird
+        // im Speicher gefiltert und nie vom Aufrufer.
         stellen.MapGet("/", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is null)
-            {
-                await NichtAngemeldet(context);
-                return;
-            }
-
             var anfrage = context.Request.Query;
 
+            // `q`, `company` und `employment` wurden von der Oberflaeche seit
+            // jeher geschickt und hier NIE gelesen. Die Suchmaske suchte also
+            // nichts, der Beschaeftigungsfilter filterte nichts — und die
+            // Karriereseite zeigte die Anzeigen ALLER Unternehmen unter dem
+            // Namen eines einzigen.
             var seite = await mediator.Send(
                 new StellensucheAbfrage(
                     Anzahl(anfrage["limit"]),
                     anfrage["cursor"],
                     anfrage["skill"].Count > 0 ? [.. anfrage["skill"]!] : null,
                     anfrage["location"].ToString(),
-                    Grad(anfrage["remote"])),
+                    Grad(anfrage["remote"]),
+                    anfrage["q"].ToString(),
+                    Guid.TryParse(anfrage["company"], out var firma) ? firma : null,
+                    anfrage["employment"].ToString()),
                 cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
@@ -149,6 +173,18 @@ public static class StellenEndpoints
                 cancellationToken);
         });
 
+        // Ohne Anmeldung lesbar, genau wie die Liste — und aus denselben zwei
+        // Gruenden. Die Karriereseite ist eine Adresse, die man weitergibt: wer
+        // sie oeffnet, hat kein Konto, und ein 401 machte aus der Anzeige eine
+        // Anmeldeaufforderung. Und applications-service fragt hier
+        // Dienst-zu-Dienst nach, ob es die Stelle gibt — ohne Token, weil er
+        // keines hat; das Tor liess deshalb JEDE Bewerbung mit 503 enden.
+        //
+        // Sicher ist das ohne Zutun: der Handler gibt eine Stelle nur heraus,
+        // wenn sie dem fragenden Unternehmen gehoert ODER veroeffentlicht ist.
+        // Ohne Token ist die Firma `null`, also bleibt allein das
+        // Veroeffentlichte — Entwurf, geschlossen und nicht vorhanden sind
+        // ununterscheidbar 404.
         stellen.MapGet("/{id:guid}", async (
             Guid id,
             IMediator mediator,
@@ -156,16 +192,10 @@ public static class StellenEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
-            {
-                await NichtAngemeldet(context);
-                return;
-            }
-
             var stelle = await mediator.Send(
                 new StelleAbfrage(
                     id,
-                    handelnder.Acting is Capacity.ForCompany firma ? firma.Tenant : null),
+                    akteur.Current?.Acting is Capacity.ForCompany firma ? firma.Tenant : null),
                 cancellationToken);
 
             await Zeige(context, stelle, cancellationToken);

@@ -95,6 +95,20 @@ public sealed class HttpEntwerfer(
             throw new EntwurfNichtVerfuegbar(
                 $"Der Entwurfsanbieter antwortet nicht ({fehler.GetType().Name}).");
         }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Ein abgelaufenes `client.Timeout` kommt als TaskCanceledException
+            // und NICHT als HttpRequestException — ohne diesen Zweig verliesse
+            // es den Dienst als 500, obwohl es dieselbe Aussage ist wie ein
+            // Verbindungsfehler: der Anbieter antwortet nicht.
+            //
+            // Die Bedingung trennt die beiden Faelle, die sich denselben
+            // Ausnahmetyp teilen. Ist das Token des Aufrufers gezogen, hat der
+            // Browser aufgelegt — dann ist gar nichts kaputt, und die Ausnahme
+            // gehoert weitergereicht statt in eine 503 verwandelt.
+            throw new EntwurfNichtVerfuegbar(
+                "Der Entwurfsanbieter antwortet nicht (Zeitueberschreitung).");
+        }
 
         using (antwort)
         {
