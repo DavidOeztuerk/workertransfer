@@ -172,12 +172,48 @@ Test bei jeder Textänderung mürbe.
 
 Zuletzt, weil Phase 3 dieselben Dateien anfasst.
 
-- **Kommentare auf das Nötigste.** Heute: `src/shared` 51 %, `src/gateway` 53 %
-  der Zeilen. Ziel unter 10 %. Was geht: Historie („hier stand früher…", „das
-  kostete uns…") — die gehört in Commit-Text und ADR. Was bleibt: was der Code
-  ohne den Satz falsch verstanden würde.
-- **Alles auf Englisch** — Bezeichner und Kommentare. Sichtbare Texte sind ab
-  Phase 3 ohnehin keine Literale mehr.
+- **Bezeichner auf Englisch — erledigt im Frontend.** Rund 1.200 Vorkommen in 87
+  Dateien. Die **Fachsprache bleibt deutsch** (`Einwilligung`, `Stelle`,
+  `Bewerbung`, `Marktstatus`): sie ist die Sprache dieser Domäne, steht so in
+  CLAUDE.md und in jedem ADR, und ADR-0031 hält ausdrücklich fest, dass sie nicht
+  Teil der Übersetzung ist.
+
+- **Kommentare auf unter 10 % — versucht, gemessen, NICHT ausgeliefert.**
+
+  Der Bestand ist nicht das, was der Plan annahm. Gemessen am 03.09.2026:
+  9.543 Kommentarzeilen in `src/`, davon **2.811 XML-Pflichtzeilen**
+  (`<summary>`, `<param>`, `<returns>`) und der Rest überwiegend begründende
+  `<remarks>`. Unter 10 % (~3.100 Zeilen) hiesse: die `<summary>` jedes
+  öffentlichen Members löschen. XML-Doku ist hier **keine** Bauvorgabe
+  (`GenerateDocumentationFile` steht nirgends), also ginge es technisch.
+
+  Ein mechanischer Schnitt wurde gebaut und dreimal verschieden scharf
+  gemessen — behalten, was eine Messung, ein Verbot, eine Falle oder einen
+  ADR-Verweis trägt:
+
+  | Schärfe | Zeilen weg | Rest |
+  |---|---|---|
+  | streng behalten | 678 | 30 % |
+  | Messung/Verbot/ADR | 3.092 | 21 % |
+  | nur Messung/ADR | 4.138 | 20 % |
+
+  Selbst der schärfste erreicht das Ziel nicht, und die Stichprobe hat gezeigt,
+  warum er es nicht darf: **entfernt wurden unter anderem die Sätze, die
+  erklären, warum 503 und nicht 404** — die Kernregel aus ADR-0020. Sie tragen
+  keines der Merkmale, weil sie als Argument geschrieben sind („404 hiesse zu
+  behaupten…") und nicht als Befehl.
+
+  Der Befund ist damit: **in dieser Codebasis SIND die Kommentare überwiegend
+  die Begründung.** Ein Filter kann Zierrat und Grund hier nicht trennen. Der
+  Schnitt wurde zurückgenommen.
+
+  Was ohne Verlust ginge und eine Entscheidung braucht:
+  1. **Doppelte Begründungen an Aufrufstellen.** `Umgebung.Laden()` erklärt sich
+     in zwölf `Program.cs` noch einmal; der kanonische Satz steht an der Methode.
+     Solche Kopien sind sicher zu löschen — sie einzeln zu finden ist Handarbeit.
+  2. **`<remarks>` ganz aufgeben und die Gründe in die ADRs ziehen.** Dann liegt
+     der Grund an EINER Stelle statt an der, wo man ihn braucht. Das ist die
+     Entscheidung, die zu treffen ist — nicht eine Formatierungsfrage.
 
 ---
 
