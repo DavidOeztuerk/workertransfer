@@ -40,14 +40,21 @@ public sealed record StelleSchreibenV1(
     [property: JsonPropertyName("employment_type")] string EmploymentType = "full_time",
     [property: JsonPropertyName("skills")] IReadOnlyList<string>? Skills = null);
 
-/// <summary>Eine Seite Anzeigen.</summary>
-/// <remarks>
-/// Ohne Gesamtzahl, und aus demselben Grund wie bei den Kandidaten: sie sagte
-/// über die Differenz etwas darüber aus, was gefiltert wurde.
-/// </remarks>
-public sealed record StellenseiteV1(
-    [property: JsonPropertyName("items")] IReadOnlyList<StelleV1> Items,
-    [property: JsonPropertyName("next")] string? Next);
+// EINE SEITE ANZEIGEN GIBT ES HIER NICHT MEHR — sie ist jetzt
+// `Seitenantwort<StelleV1>` aus `ServiceDefaults`, damit jede blätterbare
+// Liste denselben Umschlag hat.
+//
+// Der Satz, der hier stand, verdient es, nicht verlorenzugehen: „ohne
+// Gesamtzahl, und aus demselben Grund wie bei den Kandidaten: sie sagte über
+// die Differenz etwas darüber aus, was gefiltert wurde."
+//
+// Das stimmt — bei KANDIDATEN. Dort ist die Differenz zwischen „42 insgesamt"
+// und „3 angezeigt" die Auskunft, wie viele Menschen sich verborgen haben, und
+// genau die darf niemand bekommen (ADR-0026). Eine Stellenanzeige ist aber
+// keine Person: sie wurde von einem Unternehmen veröffentlicht, um gesehen zu
+// werden, und „9 Treffer" sagt über niemanden etwas.
+//
+// Die Kandidatenliste bleibt deshalb beim Zeiger und bekommt KEINE Gesamtzahl.
 
 /// <summary>Was ein Unternehmen schickt, um sich beim Formulieren helfen zu lassen.</summary>
 public sealed record EntwurfV1(

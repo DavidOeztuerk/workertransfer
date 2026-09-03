@@ -20,7 +20,7 @@ export function AuthCard({
   children: React.ReactNode;
 }) {
   return (
-    <Container maxWidth="sm" sx={{ py: { xs: 5, md: 9 } }}>
+    <Container maxWidth="sm" sx={{ py: { xs: 5, md: 9 }, px: { xs: 2, sm: 3 } }}>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h1" sx={{ mb: lead ? 1 : 0 }}>
           {title}

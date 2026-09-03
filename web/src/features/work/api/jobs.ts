@@ -53,11 +53,15 @@ export interface SearchFilters {
   q?: string;
   /** Nur die Stellen eines Unternehmens — für die Karriere-Seite. */
   company?: string;
-  /** Seitengröße; der Server deckelt sie ohnehin bei 50. */
-  limit?: number;
   location?: string;
   remote?: RemoteMode | "";
   employment?: EmploymentType | "";
+  /**
+   * Gesuchte Fähigkeiten. Der Server erwartet sie als WIEDERHOLTEN Parameter
+   * (`?skill=a&skill=b`), nicht als Liste in einem — eine kommagetrennte
+   * Zeichenkette wäre eine zweite Trennregel neben der, die es schon gibt.
+   */
+  skills?: string[];
 }
 
 export type SucheFehler = "offline" | "fehlgeschlagen";
@@ -66,7 +70,14 @@ export type JobFehler = "not-found" | "no-company" | "conflict" | "invalid" | "o
 export type SucheFehlschlag = Fehlschlag<SucheFehler>;
 
 export type SucheErgebnis =
-  | { ok: true; items: Job[]; nextCursor: string | null }
+  | {
+      ok: true;
+      items: Job[];
+      page: number;
+      pageSize: number;
+      totalItems: number;
+      totalPages: number;
+    }
   | SucheFehlschlag;
 
 export type JobErgebnis = { ok: true; job: Job } | Fehlschlag<JobFehler>;
@@ -104,7 +115,7 @@ export function employmentLabel(value: EmploymentType): string {
   return i18n.t(`stelle.employment${key[value]}`);
 }
 
-export function suchAnfrage(filters: SearchFilters, cursor?: string): string {
+export function suchAnfrage(filters: SearchFilters, page = 1, pageSize?: number): string {
   const params = new URLSearchParams();
   // Leere Filter gar nicht erst senden: `remote=` würde der Server als Filter
   // auf einen leeren Wert lesen und nichts finden.
@@ -116,20 +127,29 @@ export function suchAnfrage(filters: SearchFilters, cursor?: string): string {
     params.set("employment", filters.employment);
   if (filters.company !== undefined && filters.company !== "")
     params.set("company", filters.company);
-  if (filters.limit !== undefined) params.set("limit", String(filters.limit));
-  if (cursor !== undefined && cursor !== "") params.set("cursor", cursor);
+  // Wiederholt, einer je Fähigkeit — siehe `SearchFilters.skills`.
+  for (const skill of filters.skills ?? []) params.append("skill", skill);
+  if (page > 1) params.set("page", String(page));
+  if (pageSize !== undefined) params.set("page_size", String(pageSize));
   const query = params.toString();
   return query === "" ? "" : `?${query}`;
 }
 
 export async function searchJobs(
   filters: SearchFilters = {},
-  cursor?: string,
+  page = 1,
+  pageSize?: number,
   signal?: AbortSignal
 ): Promise<SucheErgebnis> {
-  const answer = await request<{ items?: Job[]; next_cursor?: string | null }>(
+  const answer = await request<{
+    items?: Job[];
+    page?: number;
+    page_size?: number;
+    total_items?: number;
+    total_pages?: number;
+  }>(
     JOBS_BASE_URL,
-    `/jobs${suchAnfrage(filters, cursor)}`,
+    `/jobs${suchAnfrage(filters, page, pageSize)}`,
     { signal },
     "fehler.sucheFehlgeschlagen"
   );
@@ -143,7 +163,12 @@ export async function searchJobs(
   return {
     ok: true,
     items: answer.value?.items ?? [],
-    nextCursor: answer.value?.next_cursor ?? null,
+    // Die Werte des SERVERS und nicht die der Anfrage: bei `page_size=100000`
+    // deckelt er, und die Leiste muss zeichnen, was wirklich geliefert wurde.
+    page: answer.value?.page ?? page,
+    pageSize: answer.value?.page_size ?? (pageSize ?? 12),
+    totalItems: answer.value?.total_items ?? 0,
+    totalPages: answer.value?.total_pages ?? 1,
   };
 }
 

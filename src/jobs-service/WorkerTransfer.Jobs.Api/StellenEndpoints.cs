@@ -158,8 +158,8 @@ public static class StellenEndpoints
             // Namen eines einzigen.
             var seite = await mediator.Send(
                 new StellensucheAbfrage(
-                    Anzahl(anfrage["limit"]),
-                    anfrage["cursor"],
+                    Seitenwahl.Seite(anfrage["page"]),
+                    Seitenwahl.Groesse(anfrage["page_size"]),
                     anfrage["skill"].Count > 0 ? [.. anfrage["skill"]!] : null,
                     anfrage["location"].ToString(),
                     Grad(anfrage["remote"]),
@@ -169,7 +169,11 @@ public static class StellenEndpoints
                 cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                new StellenseiteV1([.. seite.Eintraege.Select(Antwort)], seite.Weiter),
+                new Seitenantwort<StelleV1>(
+                    [.. seite.Eintraege.Select(Antwort)],
+                    Seitenwahl.Seite(anfrage["page"]),
+                    Seitenwahl.Groesse(anfrage["page_size"]),
+                    seite.Gesamt),
                 cancellationToken);
         });
 
@@ -306,9 +310,6 @@ public static class StellenEndpoints
         Grad(koerper.RemoteMode) ?? Remotegrad.None,
         Anstellung(koerper.EmploymentType),
         koerper.Skills ?? []);
-
-    private static int Anzahl(string? roh) =>
-        int.TryParse(roh, out var wert) && wert is > 0 and <= 50 ? wert : 20;
 
     private static Remotegrad? Grad(string? roh) => roh?.Trim().ToLowerInvariant() switch
     {

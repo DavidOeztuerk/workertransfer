@@ -477,6 +477,16 @@ const de = {
     keineFaehigkeiten: "Trage Fähigkeiten in deinem <1>Profil</1> ein, dann siehst du hier, was davon du mitbringst.",
     hastDu: " (hast du)",
     fehltDir: " (fehlt dir)",
+    filter: "Filter",
+    filterZuruecksetzen: "Zurücksetzen",
+    filterAnzeigen: "Filter anzeigen",
+    aktiveFilter_one: "1 Filter aktiv",
+    aktiveFilter_other: "{{count}} Filter aktiv",
+    faehigkeiten: "Fähigkeiten",
+    faehigkeitenHinweis: "Mit Komma trennen. Bekannte Schreibweisen werden vereinheitlicht.",
+    faehigkeitenBeispiel: "Python, Kubernetes",
+    treffer_one: "1 Stelle",
+    treffer_other: "{{count}} Stellen",
   },
 
   bewerbung: {
@@ -818,6 +828,16 @@ const de = {
     a11y4: "Wer „weniger Bewegung“ eingestellt hat, bekommt keine Animationen.",
     a11yLueckenTitel: "Bekannte Lücken",
     a11yLuecken: "Die Kontrastwerte im Dunkelmodus sind gemessen, aber nicht auf jeder Seite einzeln nachgewiesen. Lange Formulare haben noch keine Sprungmarken.",
+  },
+
+  blaettern: {
+    bereich: "{{von}}–{{bis}} von {{gesamt}}",
+    leer: "Nichts gefunden",
+    proSeite: "Pro Seite",
+    seitenwahl: "Seiten",
+    vorige: "Vorige Seite",
+    naechste: "Nächste Seite",
+    seite: "Seite {{nummer}}",
   },
 };
 

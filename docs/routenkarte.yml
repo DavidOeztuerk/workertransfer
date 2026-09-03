@@ -270,6 +270,7 @@ gruppen:
       - { methode: POST, pfad: '/jobs/00000000-0000-0000-0000-000000000001/publish', ohne: 401, person: 403, firma: 404 }
       - { methode: POST, pfad: '/jobs/00000000-0000-0000-0000-000000000001/close', ohne: 401, person: 403, firma: 404 }
       - { methode: GET, pfad: '/jobs', ohne: 200, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/jobs?page=2&page_size=5', ohne: 200, person: 200, firma: 200 }
       - { methode: GET, pfad: '/jobs/00000000-0000-0000-0000-000000000001', ohne: 404, person: 404, firma: 404 }
       - { methode: GET, pfad: '/companies/me/jobs', ohne: 401, person: 403, firma: 200 }
 

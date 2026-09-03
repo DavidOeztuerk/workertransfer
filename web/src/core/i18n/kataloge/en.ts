@@ -474,6 +474,16 @@ const en: Katalog = {
     keineFaehigkeiten: "Enter skills in your <1>profile</1>, then you will see here which of them you bring.",
     hastDu: " (you have this)",
     fehltDir: " (you are missing this)",
+    filter: "Filters",
+    filterZuruecksetzen: "Reset",
+    filterAnzeigen: "Show filters",
+    aktiveFilter_one: "1 filter active",
+    aktiveFilter_other: "{{count}} filters active",
+    faehigkeiten: "Skills",
+    faehigkeitenHinweis: "Separate with commas. Spellings we know are unified.",
+    faehigkeitenBeispiel: "Python, Kubernetes",
+    treffer_one: "1 position",
+    treffer_other: "{{count}} positions",
   },
 
   bewerbung: {
@@ -815,6 +825,16 @@ const en: Katalog = {
     a11y4: "Anybody who set “reduce motion” gets no animations.",
     a11yLueckenTitel: "Known gaps",
     a11yLuecken: "The contrast values in dark mode are measured but not evidenced page by page. Long forms have no skip links yet.",
+  },
+
+  blaettern: {
+    bereich: "{{von}}–{{bis}} of {{gesamt}}",
+    leer: "Nothing found",
+    proSeite: "Per page",
+    seitenwahl: "Pages",
+    vorige: "Previous page",
+    naechste: "Next page",
+    seite: "Page {{nummer}}",
   },
 };
 

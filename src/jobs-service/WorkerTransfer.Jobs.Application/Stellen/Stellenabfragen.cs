@@ -32,8 +32,8 @@ public sealed class MeineStellenHandler(IStellenspeicher speicher)
 /// </para>
 /// </remarks>
 public sealed record StellensucheAbfrage(
+    int Seite,
     int Anzahl,
-    string? Zeiger,
     IReadOnlyList<string>? Faehigkeiten = null,
     string Ort = "",
     Remotegrad? Remote = null,
@@ -52,7 +52,7 @@ public sealed class StellensucheHandler(IStellenspeicher speicher)
         ArgumentNullException.ThrowIfNull(request);
 
         return speicher.SucheAsync(
-            request.Anzahl, request.Zeiger, request.Faehigkeiten,
+            request.Seite, request.Anzahl, request.Faehigkeiten,
             request.Ort, request.Remote, request.Suchbegriff, request.Firma,
             request.Beschaeftigung, cancellationToken);
     }

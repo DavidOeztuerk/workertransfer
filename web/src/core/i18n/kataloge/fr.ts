@@ -474,6 +474,16 @@ const fr: Katalog = {
     keineFaehigkeiten: "Renseignez des compétences dans votre <1>profil</1> ; vous verrez alors ici lesquelles vous possédez.",
     hastDu: " (vous l’avez)",
     fehltDir: " (elle vous manque)",
+    filter: "Filtres",
+    filterZuruecksetzen: "Réinitialiser",
+    filterAnzeigen: "Afficher les filtres",
+    aktiveFilter_one: "1 filtre actif",
+    aktiveFilter_other: "{{count}} filtres actifs",
+    faehigkeiten: "Compétences",
+    faehigkeitenHinweis: "Séparez par des virgules. Les graphies connues sont harmonisées.",
+    faehigkeitenBeispiel: "Python, Kubernetes",
+    treffer_one: "1 poste",
+    treffer_other: "{{count}} postes",
   },
 
   bewerbung: {
@@ -815,6 +825,16 @@ const fr: Katalog = {
     a11y4: "Qui a réglé « réduire les animations » n’en reçoit aucune.",
     a11yLueckenTitel: "Lacunes connues",
     a11yLuecken: "Les valeurs de contraste en mode sombre sont mesurées mais pas démontrées page par page. Les formulaires longs n’ont pas encore de liens d’évitement.",
+  },
+
+  blaettern: {
+    bereich: "{{von}}–{{bis}} sur {{gesamt}}",
+    leer: "Rien trouvé",
+    proSeite: "Par page",
+    seitenwahl: "Pages",
+    vorige: "Page précédente",
+    naechste: "Page suivante",
+    seite: "Page {{nummer}}",
   },
 };
 

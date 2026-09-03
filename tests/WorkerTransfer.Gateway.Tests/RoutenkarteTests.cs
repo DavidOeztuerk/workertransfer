@@ -82,10 +82,19 @@ public sealed class RoutenkarteTests
     /// Passt ein Pfad zu einer Routenvorlage? <c>/auth/{rest}</c> deckt
     /// <c>/auth/login</c> ab, aber nicht <c>/auth</c> selbst.
     /// </summary>
+    /// <remarks>
+    /// Die Abfragezeichenkette wird abgeschnitten, bevor verglichen wird.
+    /// Ocelot routet nach dem PFAD; ein Eintrag darf trotzdem
+    /// <c>/jobs?page=2</c> nennen, weil die Karte festhält, was eine bestimmte
+    /// ANFRAGE antwortet — und eine zweite Seite ist eine andere Anfrage als die
+    /// erste.
+    /// </remarks>
     private static bool Passt(string vorlage, string pfad)
     {
+        var ohneAbfrage = pfad.Split('?')[0];
+
         var teileV = vorlage.Trim('/').Split('/');
-        var teileP = pfad.Trim('/').Split('/');
+        var teileP = ohneAbfrage.Trim('/').Split('/');
 
         // Der letzte Platzhalter ist gierig: `/auth/{rest}` faengt auch
         // `/auth/company/{id}`. Genau so verhaelt sich Ocelot.
@@ -224,8 +233,11 @@ public sealed class RoutenkarteTests
 
         foreach (var eintrag in Eintraege().Where(e => e.Ohne is >= 200 and < 300))
         {
+            // Ohne Abfragezeichenkette: `/jobs?page=2` ist derselbe ENDPUNKT
+            // wie `/jobs`, und die Liste hier zählt Endpunkte. Ein Parameter
+            // macht nichts öffentlich, was es nicht schon war.
             offen.Should().Contain(
-                eintrag.Pfad,
+                eintrag.Pfad.Split('?')[0],
                 $"'{eintrag.Methode} {eintrag.Pfad}' antwortet ohne Token mit "
                 + $"{eintrag.Ohne} — das ist ein oeffentlicher Endpunkt, und "
                 + "dass er einer ist, gehoert ausdruecklich hingeschrieben");
