@@ -8,14 +8,12 @@ import Typography from "@mui/material/Typography";
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
 
 import { AuthCard } from "../components/AuthCard";
+import { useTranslation } from "react-i18next";
 import {
   type BestaetigungsErgebnis,
   bestaetigeEmail,
   sendeBestaetigungErneut,
 } from "../api/registrierung";
-
-const LEAD =
-  "Die Bestätigung stellt sicher, dass niemand deine Adresse für sich benutzt.";
 
 type Zustand =
   | { phase: "laeuft" }
@@ -48,6 +46,7 @@ function bestaetigeEinmal(token: string): Promise<BestaetigungsErgebnis> {
 }
 
 export function VerifyPage() {
+  const { t } = useTranslation();
   const [suchparameter] = useSearchParams();
   const token = suchparameter.get("token") ?? "";
 
@@ -58,7 +57,7 @@ export function VerifyPage() {
       setZustand({
         phase: "gescheitert",
         abgelaufen: false,
-        meldung: "Es fehlt ein Bestätigungslink.",
+        meldung: t("bestaetigung.fehltLink"),
       });
       return;
     }
@@ -73,13 +72,16 @@ export function VerifyPage() {
             },
       );
     });
-  }, [token]);
+  }, [token, t]);
 
   if (zustand.phase === "laeuft") {
     return (
-      <AuthCard title="Wird bestätigt…" lead={LEAD}>
+      <AuthCard
+        title={t("bestaetigung.laeuftTitel")}
+        lead={t("bestaetigung.lead")}
+      >
         <Typography role="status" color="text.secondary">
-          Einen Moment bitte.
+          {t("bestaetigung.laeuftText")}
         </Typography>
       </AuthCard>
     );
@@ -96,11 +98,11 @@ export function VerifyPage() {
       // sonst auch „Wird bestätigt…", und der Test war zufrieden, während die
       // Bestätigung noch lief.
       <AuthCard
-        title="E-Mail bestätigt"
+        title={t("bestaetigung.fertigTitel")}
         lead={
           zustand.unternehmen !== undefined
-            ? `Dein Konto ist freigeschaltet, und ${zustand.unternehmen} ist angelegt — du bist dort Administrator.`
-            : "Dein Konto ist freigeschaltet."
+            ? t("bestaetigung.fertigMitFirma", { name: zustand.unternehmen })
+            : t("bestaetigung.fertigOhneFirma")
         }
       >
         <Box sx={{ display: "grid", gap: 2 }}>
@@ -115,20 +117,17 @@ export function VerifyPage() {
               hat, hat dort Kollegen. */}
           {zustand.unternehmenFehler === "domain_already_claimed" ? (
             <Alert severity="warning">
-              Dein Konto ist da, das Unternehmen nicht: für deine Domain gibt es
-              hier schon eines. Bitte jemanden aus deinem Unternehmen, dich
-              einzuladen — dann handelst du unter demselben Dach.
+              {t("bestaetigung.domainVergeben")}
             </Alert>
           ) : zustand.unternehmenFehler !== undefined ? (
             <Alert severity="warning">
-              Dein Konto ist da, das Unternehmen konnte nicht angelegt werden.
-              Bitte jemanden aus deinem Unternehmen, dich einzuladen.
+              {t("bestaetigung.firmaGescheitert")}
             </Alert>
           ) : null}
 
           <Typography variant="body2">
             <Link component={RouterLink} to="/login">
-              Zur Anmeldung
+              {t("bestaetigung.zurAnmeldung")}
             </Link>
           </Typography>
         </Box>
@@ -154,6 +153,7 @@ function Gescheitert({
   abgelaufen: boolean;
   meldung: string;
 }) {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [laeuft, setLaeuft] = useState(false);
   const [gesendet, setGesendet] = useState(false);
@@ -170,7 +170,10 @@ function Gescheitert({
   }
 
   return (
-    <AuthCard title="Bestätigung fehlgeschlagen" lead={LEAD}>
+    <AuthCard
+      title={t("bestaetigung.gescheitertTitel")}
+      lead={t("bestaetigung.lead")}
+    >
       <Box sx={{ display: "grid", gap: 2 }}>
         <Alert severity="error">{meldung}</Alert>
 
@@ -182,28 +185,29 @@ function Gescheitert({
             sx={{ display: "grid", gap: 2 }}
           >
             <TextField
-              label="E-Mail"
+              label={t("bestaetigung.email")}
               type="email"
               autoComplete="username"
-              helperText="An diese Adresse schicken wir einen neuen Link."
+              helperText={t("bestaetigung.emailHinweis")}
               value={email}
               onChange={(ereignis) => setEmail(ereignis.target.value)}
               required
             />
             <Button type="submit" variant="contained" disabled={laeuft}>
-              {laeuft ? "Wird gesendet…" : "Neuen Link senden"}
+              {laeuft
+                ? t("bestaetigung.neuerLinkLaeuft")
+                : t("bestaetigung.neuerLink")}
             </Button>
 
             {gescheitert ? (
               <Alert severity="error">
-                Die E-Mail konnte gerade nicht angefordert werden. Versuch es
-                später noch einmal.
+                {t("bestaetigung.neuerLinkGescheitert")}
               </Alert>
             ) : null}
             {/* Eine Bestätigung unterbricht nicht — deshalb `role="status"`. */}
             {gesendet ? (
               <Alert role="status" severity="success">
-                Falls nötig, ist die E-Mail unterwegs.
+                {t("bestaetigung.neuerLinkGesendet")}
               </Alert>
             ) : null}
           </Box>

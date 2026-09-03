@@ -159,6 +159,7 @@ function NavLink({
  * gehören nicht in dieselbe Liste.
  */
 function AccountMenu() {
+  const { t } = useTranslation();
   const [anker, setAnker] = useState<null | HTMLElement>(null);
 
   return (
@@ -180,19 +181,19 @@ function AccountMenu() {
         onClick={() => setAnker(null)}
         slotProps={{ paper: { sx: { minWidth: 232, mt: 1 } } }}
       >
-        <Eintrag to="/profile">Profil</Eintrag>
-        <Eintrag to="/resume">Lebenslauf</Eintrag>
-        <Eintrag to="/portfolio">Arbeitsproben</Eintrag>
-        <Eintrag to="/github">GitHub</Eintrag>
-        <Eintrag to="/applications">Bewerbungen</Eintrag>
+        <Eintrag to="/profile">{t("kopf.profil")}</Eintrag>
+        <Eintrag to="/resume">{t("kopf.lebenslauf")}</Eintrag>
+        <Eintrag to="/portfolio">{t("kopf.arbeiten")}</Eintrag>
+        <Eintrag to="/github">{t("kopf.github")}</Eintrag>
+        <Eintrag to="/applications">{t("kopf.bewerbungen")}</Eintrag>
         <Divider />
-        <Eintrag to="/consents">Freigaben</Eintrag>
-        <Eintrag to="/my-data">Meine Daten</Eintrag>
-        <Eintrag to="/settings">Einstellungen</Eintrag>
+        <Eintrag to="/consents">{t("kopf.freigaben")}</Eintrag>
+        <Eintrag to="/my-data">{t("kopf.meineDaten")}</Eintrag>
+        <Eintrag to="/settings">{t("kopf.einstellungen")}</Eintrag>
 
         <Divider />
-        <Eintrag to="/delete-account">Konto löschen</Eintrag>
-        <Eintrag to="/logout">Abmelden</Eintrag>
+        <Eintrag to="/delete-account">{t("kopf.kontoLoeschen")}</Eintrag>
+        <Eintrag to="/logout">{t("kopf.abmelden")}</Eintrag>
       </Menu>
     </>
   );
@@ -207,6 +208,7 @@ function AccountMenu() {
  * die Adresse direkt tippt, bekommt dieselbe Antwort wie über dieses Menü.
  */
 function FirmenMenu() {
+  const { t } = useTranslation();
   const [anker, setAnker] = useState<null | HTMLElement>(null);
 
   return (
@@ -228,12 +230,12 @@ function FirmenMenu() {
         onClick={() => setAnker(null)}
         slotProps={{ paper: { sx: { minWidth: 232, mt: 1 } } }}
       >
-        <Eintrag to="/candidates">Kandidatinnen</Eintrag>
-        <Eintrag to="/company/jobs">Unsere Stellen</Eintrag>
-        <Eintrag to="/company/transfers">Unsere Gespräche</Eintrag>
+        <Eintrag to="/candidates">{t("kopf.kandidaten")}</Eintrag>
+        <Eintrag to="/company/jobs">{t("kopf.unsereStellen")}</Eintrag>
+        <Eintrag to="/company/transfers">{t("kopf.unsereGespraeche")}</Eintrag>
         <Divider />
-        <Eintrag to="/company/profile">Unternehmensprofil</Eintrag>
-        <Eintrag to="/company/team">Team</Eintrag>
+        <Eintrag to="/company/profile">{t("kopf.firmenprofil")}</Eintrag>
+        <Eintrag to="/company/team">{t("kopf.team")}</Eintrag>
       </Menu>
     </>
   );

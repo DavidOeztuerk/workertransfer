@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -37,6 +38,7 @@ import { getMyProfile } from "../api/profile";
  * Zahl; und wer nichts eingetragen hat, bekommt kein „0 von 3".
  */
 export function JobApplyPage() {
+  const { t } = useTranslation();
   const { jobId } = useParams();
   const navigate = useNavigate();
   const { angemeldet, subjectId } = useHandelnder();
@@ -63,17 +65,17 @@ export function JobApplyPage() {
 
   const zurueck = (
     <Link component={RouterLink} to="/jobs" variant="body2">
-      Zurück zu den offenen Stellen
+      {t("bewerbung.zurueck")}
     </Link>
   );
 
   if (!gueltig) {
     return (
-      <PageShell title="Diese Stelle gibt es nicht" narrow>
+      <PageShell title={t("bewerbung.stelleFehltTitel")} narrow>
         <Box sx={{ mb: 2 }}>{zurueck}</Box>
         <Card>
           <CardContent>
-            <Typography>Die Adresse nennt keine gültige Stelle.</Typography>
+            <Typography>{t("bewerbung.adresseUngueltig")}</Typography>
           </CardContent>
         </Card>
       </PageShell>
@@ -82,11 +84,11 @@ export function JobApplyPage() {
 
   if (stelle.pending) {
     return (
-      <PageShell title="Bewerben" narrow>
+      <PageShell title={t("bewerbung.titel")} narrow>
         <Box sx={{ mb: 2 }}>{zurueck}</Box>
         <Card>
           <CardContent>
-            <LoadingBlock label="Stelle wird geladen…" />
+            <LoadingBlock label={t("bewerbung.laden")} />
           </CardContent>
         </Card>
       </PageShell>
@@ -97,12 +99,12 @@ export function JobApplyPage() {
 
   if (anzeige === null) {
     return (
-      <PageShell title="Diese Stelle gibt es nicht" narrow>
+      <PageShell title={t("bewerbung.stelleFehltTitel")} narrow>
         <Box sx={{ mb: 2 }}>{zurueck}</Box>
         <Card>
           <CardContent>
             <Typography>
-              Sie wurde zurückgezogen, oder es gab sie nie.
+              {t("bewerbung.stelleZurueckgezogen")}
             </Typography>
           </CardContent>
         </Card>
@@ -112,18 +114,19 @@ export function JobApplyPage() {
 
   if (gesendet) {
     return (
-      <PageShell title="Bewerbung abgeschickt" narrow>
+      <PageShell title={t("bewerbung.abgeschickt")} narrow>
         <Box sx={{ mb: 2 }}>{zurueck}</Box>
         <Card>
           <CardContent>
             {/* Wo man es zurücknimmt, steht dort, wo man es getan hat — nicht in
                 einer Hilfe, die man erst suchen muss. */}
             <Typography>
-              Zurückziehen kannst du sie jederzeit unter{" "}
-              <Link component={RouterLink} to="/applications">
-                Meine Bewerbungen
-              </Link>{" "}
-              — dann sieht das Unternehmen deine Daten nicht mehr.
+              <Trans
+                i18nKey="bewerbung.abgeschicktText"
+                components={{
+                  1: <Link component={RouterLink} to="/applications" />,
+                }}
+              />
             </Typography>
           </CardContent>
         </Card>
@@ -138,8 +141,7 @@ export function JobApplyPage() {
         <Card>
           <CardContent>
             <Typography sx={{ mb: 2 }}>
-              Zum Bewerben brauchst du ein Konto — danach geht es hierher
-              zurück.
+              {t("bewerbung.kontoNoetig")}
             </Typography>
             {/* Erst merken, dann wechseln. Wer über die Kopfzeile zur Anmeldung
                 geht, hat keine Absicht geäußert und wird auch nicht
@@ -151,7 +153,7 @@ export function JobApplyPage() {
                 void navigate("/login");
               }}
             >
-              Anmelden und bewerben
+              {t("bewerbung.anmeldenUndBewerben")}
             </Button>
           </CardContent>
         </Card>
@@ -207,8 +209,8 @@ export function JobApplyPage() {
             }}
           >
             <TextField
-              label="Anschreiben"
-              helperText="Optional. Was dich mit dieser Stelle verbindet."
+              label={t("bewerbung.anschreiben")}
+              helperText={t("bewerbung.anschreibenHinweis")}
               multiline
               minRows={4}
               value={anschreiben}
@@ -219,8 +221,7 @@ export function JobApplyPage() {
 
             {/* Das Profil steht bewusst NICHT zur Wahl. */}
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Dein Profil geht immer mit — ohne es wäre es keine Bewerbung. Was
-              du zusätzlich freigibst, entscheidest du:
+              {t("bewerbung.profilImmerDabei")}
             </Typography>
 
             <Box sx={{ display: "flex", flexDirection: "column", mb: 2 }}>
@@ -231,7 +232,7 @@ export function JobApplyPage() {
                     onChange={(e) => setLebenslauf(e.target.checked)}
                   />
                 }
-                label="Lebenslauf"
+                label={t("bewerbung.lebenslauf")}
               />
               <FormControlLabel
                 control={
@@ -240,7 +241,7 @@ export function JobApplyPage() {
                     onChange={(e) => setArbeiten(e.target.checked)}
                   />
                 }
-                label="Meine Arbeiten"
+                label={t("bewerbung.meineArbeiten")}
               />
             </Box>
 
@@ -251,7 +252,7 @@ export function JobApplyPage() {
             ) : null}
 
             <Button type="submit" variant="contained" disabled={laeuft}>
-              {laeuft ? "Wird gesendet…" : "Bewerbung abschicken"}
+              {laeuft ? t("bewerbung.absendenLaeuft") : t("bewerbung.absenden")}
             </Button>
           </Box>
         </CardContent>
