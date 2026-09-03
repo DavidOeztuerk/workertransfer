@@ -1,4 +1,3 @@
-import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import { useTranslation } from "react-i18next";
 
@@ -44,19 +43,26 @@ export function LanguagePicker() {
   return (
     <TextField
       select
+      // NATIV, wie beim Unternehmenswähler und aus demselben Grund: MUIs
+      // Voreinstellung ist ein Listenfeld aus `div`s, das weder ein
+      // Screenreader noch `selectOption` als Auswahlfeld bedient. Ausgerechnet
+      // die Sprachwahl unbedienbar zu machen wäre die schlechteste Stelle
+      // dafür — sie ist der Weg heraus für den, der die Oberfläche gerade
+      // nicht lesen kann.
+      slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
       size="small"
       label={t("sprache.label")}
       value={vorliebe}
       onChange={(ereignis) => waehle(ereignis.target.value as Sprachvorliebe)}
       sx={{ minWidth: 150 }}
     >
-      <MenuItem value="system">{t("sprache.system")}</MenuItem>
+      <option value="system">{t("sprache.system")}</option>
       {SPRACHEN.map((sprache) => (
         // Der Name der Sprache steht IN dieser Sprache: wer die Oberfläche
         // gerade nicht lesen kann, sucht „Deutsch", nicht „German".
-        <MenuItem key={sprache} value={sprache}>
+        <option key={sprache} value={sprache}>
           {t(`sprache.${sprache}`)}
-        </MenuItem>
+        </option>
       ))}
     </TextField>
   );

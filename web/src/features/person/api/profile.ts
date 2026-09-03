@@ -107,17 +107,19 @@ export async function draftProfileText(wish: string): Promise<DraftResult> {
     "fehler.entwurfNichtVerfuegbar"
   );
   if (!antwort.ok) {
+    // ÜBERSETZT, nicht durchgereicht. `message` ist hier ein fertiger Satz für
+    // die Oberfläche und kein Schlüssel — anders als in den `deuten`-Tabellen,
+    // die `deuten()` selbst auflöst. Der Unterschied ist einmal übersehen
+    // worden, und dann stand `fehler.entwurfNichtVerfuegbarLang` wörtlich im
+    // Warnkasten: i18next gibt einen Schlüssel unverändert zurück, wenn ihn
+    // niemand nachschlägt.
     if (antwort.error.status === 401) {
-      return { ok: false, message: "fehler.sitzungAbgelaufenLang" };
+      return { ok: false, message: i18n.t("fehler.sitzungAbgelaufenLang") };
     }
     // 503 heisst „nicht eingerichtet ODER Anbieter still" — von aussen dasselbe,
     // und beides heisst „später noch einmal", nicht „falsch gemacht". Gemeldet
     // wird die Art des Fehlschlags, nie der Inhalt.
-    return {
-      ok: false,
-      message:
-        "fehler.entwurfNichtVerfuegbarLang",
-    };
+    return { ok: false, message: i18n.t("fehler.entwurfNichtVerfuegbarLang") };
   }
   return { ok: true, draft: antwort.value?.draft ?? "" };
 }

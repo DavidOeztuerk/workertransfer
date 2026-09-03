@@ -201,7 +201,8 @@ for gruppe in gruppen:
             continue
         for spalte, keks in spalten.items():
             geprueft += 1
-            ist = frag(eintrag["methode"], eintrag["pfad"], keks)
+            ist = frag(
+                eintrag["methode"], eintrag["pfad"], keks, eintrag.get("rumpf"))
             soll = eintrag[spalte]
             if ist != soll:
                 abweichungen.append(
