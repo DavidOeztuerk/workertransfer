@@ -24,6 +24,7 @@ using WorkerTransfer.Identity.Infrastructure.Loeschung;
 using WorkerTransfer.Identity.Infrastructure.Post;
 using WorkerTransfer.Identity.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.Identity.Infrastructure.Sicherheit;
 
 namespace WorkerTransfer.Identity.Infrastructure;
 
@@ -74,6 +75,13 @@ public static class IdentityInfrastructure
         services.AddScoped<IVerificationTokenRepository, EfVerificationTokenRepository>();
         services.AddScoped<UnternehmenAnlegen>();
         services.AddScoped<IInvitationRepository, EfInvitationRepository>();
+        services.AddScoped<IKontoeinstellungen, EfKontoeinstellungen>();
+
+        // Der Hauptschlüssel wird EINMAL beim Start gelesen, nicht je Anfrage:
+        // fehlt er, soll der Dienst beim Hochfahren sterben und nicht beim
+        // ersten Menschen, der etwas hinterlegen will.
+        services.AddSingleton<Geheimnisspeicher>();
+        services.AddScoped<IGeheimnisse, Geheimnisse>();
         services.AddScoped<Firmenzugriff>();
         services.AddScoped<ILoeschbestand, EfLoeschbestand>();
 

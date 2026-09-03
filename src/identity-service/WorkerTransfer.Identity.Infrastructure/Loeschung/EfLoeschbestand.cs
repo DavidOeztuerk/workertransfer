@@ -123,6 +123,16 @@ public sealed class EfLoeschbestand(IdentityDbContext kontext, ITokenSessionServ
             .Where(token => token.SubjectId == wer.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
+        // Die Einstellungen — und mit ihnen der hinterlegte Schlüssel.
+        //
+        // Ausdrücklich hier und nicht über einen Fremdschlüssel: `subject_id`
+        // ist der PRIMÄRSCHLÜSSEL dieser Tabelle und zeigt auf nichts, also
+        // räumt kein CASCADE sie mit weg. Genau die Sorte Zeile, die nach einer
+        // Löschung stehen bleibt — und diese hier hielte ein Geheimnis.
+        await kontext.AccountSettings
+            .Where(zeile => zeile.SubjectId == wer.Value)
+            .ExecuteDeleteAsync(cancellationToken);
+
         // And now the deletion itself: afterwards nothing in this system maps a
         // subject id to a person. sessions, email_verification_tokens and
         // user_tenant_memberships fall with it through ON DELETE CASCADE;

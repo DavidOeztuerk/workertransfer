@@ -478,3 +478,25 @@ gruppen:
       Oberflaeche aus.
     eintraege:
       - { methode: PUT, pfad: '/account/language', ohne: 401, person: 200, firma: 200, rumpf: '{"language":"de"}' }
+
+  - name: 'Die Einstellungen des Kontos'
+    warum: |
+      `GET/PUT /account/settings` traegt, was eine Person UEBER SICH entschieden
+      hat: Verfall der eigenen Daten, welcher KI-Anbieter gefragt werden darf,
+      ob Anfragen protokolliert werden. Alles Entscheidungen, keine
+      Ableitungen — kein Wert wird aus dem Verhalten geschlossen.
+
+      `PUT /account/ai-key` ist ABSICHTLICH getrennt und gibt NICHTS zurueck.
+      Der Schluessel geht in eine Richtung: die Antwort auf `GET
+      /account/settings` sagt, DASS einer hinterlegt ist und wie seine letzten
+      vier Zeichen lauten, und mehr nicht. Ein Geheimnis, das man abrufen kann,
+      ist eines, das man abziehen kann.
+
+      Keine Kennung im Rumpf, in keinem der drei. Nur der Aufrufer selbst.
+
+      Beide angemeldeten Spalten antworten gleich: die Einstellungen gehoeren
+      der PERSON, nicht dem Unternehmen, fuer das sie gerade handelt (ADR-0017).
+    eintraege:
+      - { methode: GET, pfad: '/account/settings', ohne: 401, person: 200, firma: 200 }
+      - { methode: PUT, pfad: '/account/settings', ohne: 401, person: 200, firma: 200, rumpf: '{"delete_after_months":null,"ai_provider":"none","ai_base_url":"","ai_model":"","ai_audit_log":false}' }
+      - { methode: PUT, pfad: '/account/ai-key', ohne: 401, person: 200, firma: 200, rumpf: '{"key":""}' }

@@ -4,11 +4,34 @@ using WorkerTransfer.Identity.Application.Anmelden;
 
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.Identity.Domain.Users;
+using System.Text.Json.Serialization;
+using WorkerTransfer.Identity.Application.Konto;
 
 namespace WorkerTransfer.Identity.Api;
 
 /// <summary>What a caller sends to sign in.</summary>
 public sealed record LoginBody(string Email, string Password);
+
+/// <summary>Was ein Aufrufer schickt, um seine Einstellungen zu ändern.</summary>
+/// <param name="DeleteAfterMonths">Verfall in Monaten, oder <c>null</c>.</param>
+/// <param name="AiProvider">none, openai_compatible oder anthropic.</param>
+/// <param name="AiBaseUrl">Die Adresse des Anbieters.</param>
+/// <param name="AiModel">Das Modell.</param>
+/// <param name="AiAuditLog">Ob Anfragen protokolliert werden.</param>
+public sealed record EinstellungenBody(
+    [property: JsonPropertyName("delete_after_months")] int? DeleteAfterMonths,
+    [property: JsonPropertyName("ai_provider")] string AiProvider = "none",
+    [property: JsonPropertyName("ai_base_url")] string AiBaseUrl = "",
+    [property: JsonPropertyName("ai_model")] string AiModel = "",
+    [property: JsonPropertyName("ai_audit_log")] bool AiAuditLog = false);
+
+/// <summary>Was ein Aufrufer schickt, um einen Schlüssel zu hinterlegen.</summary>
+/// <param name="Key">
+/// Der Schlüssel im Klartext. Leer heisst ENTFERNEN — ein Feld, das bei leer
+/// nichts tut, hat keinen Weg zurück zu „keiner".
+/// </param>
+public sealed record SchluesselBody(
+    [property: JsonPropertyName("key")] string? Key);
 
 /// <summary>What a caller sends to change their language.</summary>
 /// <param name="Language">A tag this platform has texts for: de, en or fr.</param>
@@ -238,6 +261,90 @@ public static class AuthEndpoints
             await SchreibeOk(context, cancellationToken);
         });
 
+        // Die eigenen Einstellungen. Unter `/account`, wie die Sprache und die
+        // Löschung — es geht um das Konto, nicht um das Anmelden.
+        app.MapGet("/account/settings", async (
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status401Unauthorized,
+                    "Request failed", "not authenticated");
+                return;
+            }
+
+            var stand = await mediator.Send(
+                new EinstellungenAbfrage(handelnder.Subject), cancellationToken);
+
+            await context.Response.WriteAsJsonAsync(Einstellungen(stand), cancellationToken);
+        });
+
+        app.MapPut("/account/settings", async (
+            EinstellungenBody body,
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status401Unauthorized,
+                    "Request failed", "not authenticated");
+                return;
+            }
+
+            try
+            {
+                var stand = await mediator.Send(
+                    new EinstellungenSetzenBefehl(
+                        handelnder.Subject,
+                        body.DeleteAfterMonths,
+                        body.AiProvider,
+                        body.AiBaseUrl,
+                        body.AiModel,
+                        body.AiAuditLog),
+                    cancellationToken);
+
+                await context.Response.WriteAsJsonAsync(Einstellungen(stand), cancellationToken);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                // Der Verfall liegt ausserhalb der Grenzen. 422 und nicht 400:
+                // der Rumpf war lesbar, sein Inhalt ist es nicht.
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", "invalid: delete_after_months");
+            }
+        });
+
+        // Der Schlüssel getrennt, und ohne Rückgabe. Er geht in eine Richtung.
+        app.MapPut("/account/ai-key", async (
+            SchluesselBody body,
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status401Unauthorized,
+                    "Request failed", "not authenticated");
+                return;
+            }
+
+            await mediator.Send(
+                new SchluesselSetzenBefehl(handelnder.Subject, body.Key ?? string.Empty),
+                cancellationToken);
+
+            await SchreibeOk(context, cancellationToken);
+        });
+
         app.MapGet("/me", async (
             IMediator mediator,
             HttpContext context,
@@ -273,6 +380,21 @@ public static class AuthEndpoints
         // Anmelden Deutsch sehen — sonst wäre die Wahl nur so lange gültig, wie
         // derselbe Browser sie sich merkt.
         ["language"] = Sprachwahl.Etikett(konto.Sprache)
+    };
+
+    /// <summary>Die Einstellungen auf dem Draht — snake_case, wie überall.</summary>
+    private static Dictionary<string, object?> Einstellungen(Einstellungsansicht stand) => new()
+    {
+        ["delete_after_months"] = stand.LoeschungNachMonaten,
+        ["ai_provider"] = stand.Anbieter,
+        ["ai_base_url"] = stand.Adresse,
+        ["ai_model"] = stand.Modell,
+        // NICHT der Schlüssel — nur, dass es einen gibt, und seine letzten vier
+        // Zeichen. Ein Geheimnis, das man abrufen kann, ist eines, das man
+        // abziehen kann.
+        ["ai_key_present"] = stand.SchluesselDa,
+        ["ai_key_tail"] = stand.SchluesselEndung,
+        ["ai_audit_log"] = stand.KiProtokoll
     };
 
     private static Task SchreibeOk(HttpContext context, CancellationToken cancellationToken) =>

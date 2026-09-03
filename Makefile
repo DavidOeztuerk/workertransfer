@@ -67,7 +67,7 @@ env:  # .env aus der Vorlage anlegen und die drei Geheimnisse wuerfeln.
 		echo "Zum Neuwuerfeln: rm .env && make env"; \
 	else \
 		cp .env.example .env; \
-		for s in WORKERTRANSFER_JWT_SECRET WORKERTRANSFER_NOTIFY_SECRET WORKERTRANSFER_ERASURE_SECRET; do \
+		for s in WORKERTRANSFER_JWT_SECRET WORKERTRANSFER_NOTIFY_SECRET WORKERTRANSFER_ERASURE_SECRET WORKERTRANSFER_SECRETS_KEY; do \
 			wert=$$(openssl rand -base64 32); \
 			tmp=$$(mktemp); \
 			awk -v k="$$s" -v v="$$wert" '$$0 == k "=" { print k "=" v; next } { print }' .env > "$$tmp" && mv "$$tmp" .env; \

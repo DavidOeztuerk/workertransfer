@@ -3,6 +3,7 @@ using WorkerTransfer.Outbox;
 using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.Identity.Domain.Audit;
 using WorkerTransfer.Identity.Domain.Users;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Identity.Infrastructure.Persistence;
 
@@ -47,6 +48,44 @@ public sealed class UserRow
     public int Version { get; set; }
 }
 
+/// <summary>Was eine Person über sich entschieden hat.</summary>
+/// <remarks>
+/// <strong>Eine Personenzeile</strong> (siehe die Anmerkung unten): der
+/// Schlüssel IST die Person, es gibt keine `subject_id`-Spalte daneben. Der
+/// Löschwächter erkennt solche Tabellen an der Anmerkung und nicht am
+/// Spaltennamen — sonst übersähe er ausgerechnet die, die am meisten halten.
+/// </remarks>
+public sealed class KontoeinstellungenRow
+{
+    /// <summary>Wessen. Zugleich der Schlüssel.</summary>
+    public Guid SubjectId { get; set; }
+
+    /// <summary>Verfall in Monaten, oder <c>null</c> für „nie von selbst".</summary>
+    public int? DeleteAfterMonths { get; set; }
+
+    /// <summary>Der KI-Anbieter als Etikett: none, openai_compatible, anthropic.</summary>
+    public string AiProvider { get; set; } = "none";
+
+    /// <summary>Seine Adresse.</summary>
+    public string AiBaseUrl { get; set; } = string.Empty;
+
+    /// <summary>Sein Modell.</summary>
+    public string AiModel { get; set; } = string.Empty;
+
+    /// <summary>Der Schlüssel, verschlüsselt. Nie im Klartext.</summary>
+    public string AiKeyEncrypted { get; set; } = string.Empty;
+
+    /// <summary>Die letzten vier Zeichen, zum Wiedererkennen.</summary>
+    public string AiKeyTail { get; set; } = string.Empty;
+
+    /// <summary>Ob festgehalten wird, DASS eine Anfrage hinausging.</summary>
+    public bool AiAuditLog { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+}
+
 /// <summary>The tables this service reads and writes.</summary>
 /// <remarks>
 /// Tracking is off for the whole context rather than per query. Per query it is
@@ -59,6 +98,9 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     : DbContext(options)
 {
     public DbSet<UserRow> Users => Set<UserRow>();
+
+    /// <summary>Was eine Person über sich entschieden hat.</summary>
+    public DbSet<KontoeinstellungenRow> AccountSettings => Set<KontoeinstellungenRow>();
 
     public DbSet<AuditEventRow> AuditEvents => Set<AuditEventRow>();
 
@@ -97,6 +139,27 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(row => row.CreatedAt).HasColumnName("created_at");
             entity.Property(row => row.UpdatedAt).HasColumnName("updated_at");
             entity.Property(row => row.Version).HasColumnName("version").IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<KontoeinstellungenRow>(entity =>
+        {
+            entity.ToTable("account_settings");
+            // `Personenzeile`: der Schlüssel IST die Person. Ohne diese
+            // Anmerkung fände der Löschwächter die Tabelle nicht — er sucht
+            // nach Spaltennamen UND nach dieser Anmerkung, genau weil solche
+            // Tabellen keine `subject_id` neben dem Schlüssel haben.
+            entity.HasAnnotation(Personenzeile.Anmerkung, true);
+            entity.HasKey(row => row.SubjectId);
+            entity.Property(row => row.SubjectId).HasColumnName("subject_id");
+            entity.Property(row => row.DeleteAfterMonths).HasColumnName("delete_after_months");
+            entity.Property(row => row.AiProvider).HasColumnName("ai_provider");
+            entity.Property(row => row.AiBaseUrl).HasColumnName("ai_base_url");
+            entity.Property(row => row.AiModel).HasColumnName("ai_model");
+            entity.Property(row => row.AiKeyEncrypted).HasColumnName("ai_key_encrypted");
+            entity.Property(row => row.AiKeyTail).HasColumnName("ai_key_tail");
+            entity.Property(row => row.AiAuditLog).HasColumnName("ai_audit_log");
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at");
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at");
         });
 
         modelBuilder.Entity<AuditEventRow>(entity =>
