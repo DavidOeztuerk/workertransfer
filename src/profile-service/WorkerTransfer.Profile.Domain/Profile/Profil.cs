@@ -30,6 +30,14 @@ public sealed class Profil
     /// <summary>Wie lang eine Ortsangabe sein darf.</summary>
     public const int HoechstlaengeOrt = 120;
 
+    /// <summary>Wie lang der Wunsch an die Formulierungshilfe höchstens ist.</summary>
+    /// <remarks>
+    /// Deutlich kürzer als der Text (4000), weil er etwas anderes ist: eine
+    /// Anweisung, kein Inhalt. Wer hier mehr braucht, schreibt keinen Wunsch
+    /// mehr, sondern schickt Text an einen fremden Anbieter vorbei am Profil.
+    /// </remarks>
+    public const int HoechstlaengeWunsch = 500;
+
     private Profil(
         SubjectId wer,
         string ueberschrift,

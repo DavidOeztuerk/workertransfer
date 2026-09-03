@@ -112,4 +112,59 @@ public class TokenformTests
         payload.Claim("iss").Should().Be(Tokenform.Issuer);
         payload.Claim("aud").Should().Be(Tokenform.Audience);
     }
+
+    /// <summary>
+    /// Die <strong>geschlossene</strong> Menge — nicht einzelne Namen.
+    /// </summary>
+    /// <remarks>
+    /// <para>Jeder Test darueber prueft einen Namen, den jemand aufgeschrieben
+    /// hat. Was dabei durchrutscht, ist der Anspruch, an den niemand gedacht
+    /// hat — und genau das ist passiert: das Token trug drei Ansprueche mehr,
+    /// als der Kommentar am Aussteller aufzaehlte, weil Girder sie
+    /// unaufgefordert dazulegte. Zwei davon
+    /// (<c>email_verified</c>, <c>account_status</c>) sagten IMMER dasselbe,
+    /// weil sie in <c>UserClaims</c> vorbelegt waren und niemand hier sie
+    /// setzte. Kein Test konnte das finden, weil keiner nach dem Ganzen
+    /// fragte.</para>
+    ///
+    /// <para>Seit Girder 4.1.0 stehen die beiden nur noch im Token, wenn jemand
+    /// sie sagt. Diese Liste ist ab jetzt die Zusage: waechst sie, faellt der
+    /// Test, und jemand muss entscheiden, ob der neue Anspruch hier hingehoert.</para>
+    ///
+    /// <para><c>nameidentifier</c> ist die lange WS-Federation-URI und
+    /// verdoppelt <c>sub</c>. Sie steht mit Absicht drin und bleibt: Girder
+    /// prueft Token mit <c>MapInboundClaims = false</c>, leitet sie also nicht
+    /// aus <c>sub</c> ab, und siebzehn Leser in Girder loesen den Aufrufer
+    /// darueber auf.</para>
+    /// </remarks>
+    [Fact]
+    public async Task Das_Token_traegt_genau_diese_Ansprueche_und_keinen_mehr()
+    {
+        var alsPerson = await IssueAsync(Capacity.AsSelf.Instance);
+        var fuerFirma = await IssueAsync(new Capacity.ForCompany(Firma));
+
+        var gemeinsam = new[]
+        {
+            "sub",
+            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
+            "email",
+            "jti",
+            "iat",
+            "session_id",
+            "exp",
+            "iss",
+            "aud"
+        };
+
+        Namen(alsPerson).Should().BeEquivalentTo(
+            gemeinsam,
+            "wer als Person handelt, traegt keinen Mandanten");
+
+        Namen(fuerFirma).Should().BeEquivalentTo(
+            [.. gemeinsam, "tenant"],
+            "die Firma ist der EINZIGE Unterschied zwischen den beiden Formen");
+    }
+
+    private static IEnumerable<string> Namen(System.Text.Json.JsonElement payload) =>
+        payload.EnumerateObject().Select(eigenschaft => eigenschaft.Name);
 }

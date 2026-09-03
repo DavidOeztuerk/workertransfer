@@ -61,6 +61,9 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
 
     private HttpClient AlsPerson() => Mit(Tokenform.Person(Guid.CreateVersion7()));
 
+    /// <summary>Ohne Token — so, wie ein anonymer Besucher fragt.</summary>
+    private HttpClient Ohne() => _dienst.CreateClient();
+
     private HttpClient Mit(string token)
     {
         var browser = _dienst.CreateClient();
@@ -144,6 +147,183 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
 
         gefunden.GetProperty("items").EnumerateArray()
             .Should().Contain(eintrag => eintrag.GetProperty("id").GetGuid() == id);
+    }
+
+    /// <summary>
+    /// Eine veröffentlichte Anzeige findet auch, wer kein Konto hat.
+    /// </summary>
+    /// <remarks>
+    /// <para>Hier stand eine Sperre auf <c>akteur.Current is null</c>, und sie
+    /// war eine Kostenstelle ohne Gegenwert: der Speicher filtert ohnehin auf
+    /// <c>status == "published"</c>, und veröffentlicht heisst in dieser Domäne
+    /// „für alle sichtbar, auch ohne Konto".</para>
+    ///
+    /// <para>Bezahlt hat sie die Karriereseite. <c>/careers/&lt;kürzel&gt;</c>
+    /// ist in <c>docs/routenkarte.yml</c> ausdrücklich als öffentlich
+    /// beschrieben und zeigte einem anonymen Besucher trotzdem keine einzige
+    /// Stelle — Name und Beschreibung des Unternehmens ja, seine Anzeigen
+    /// nicht.</para>
+    /// </remarks>
+    [Fact]
+    public async Task Eine_veroeffentlichte_Anzeige_sieht_auch_wer_kein_Konto_hat()
+    {
+        var id = await Veroeffentlicht(AlsFirma(Guid.CreateVersion7()));
+
+        var antwort = await Ohne().GetAsync("/jobs");
+
+        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(antwort)).GetProperty("items").EnumerateArray()
+            .Should().Contain(eintrag => eintrag.GetProperty("id").GetGuid() == id);
+    }
+
+    /// <summary>Ein Entwurf bleibt auch für einen anonymen Aufrufer drinnen.</summary>
+    /// <remarks>
+    /// Die Gegenprobe zur Öffnung. Der Stand wird im Speicher gefiltert und nie
+    /// vom Aufrufer — ein <c>status=draft</c> auf der Leitung wäre sonst der Weg
+    /// zu fremden Entwürfen.
+    /// </remarks>
+    [Fact]
+    public async Task Ein_Entwurf_bleibt_auch_ohne_Konto_verborgen()
+    {
+        var angelegt = await Schreibe(AlsFirma(Guid.CreateVersion7()), "Geheimer Entwurf");
+        var id = (await Json(angelegt)).GetProperty("id").GetGuid();
+
+        var gefunden = await Json(await Ohne().GetAsync("/jobs"));
+
+        gefunden.GetProperty("items").EnumerateArray()
+            .Should().NotContain(eintrag => eintrag.GetProperty("id").GetGuid() == id);
+    }
+
+    /// <summary>
+    /// Eine einzelne Anzeige liest auch, wer kein Konto hat — und ein Entwurf
+    /// bleibt dabei ununterscheidbar von „gibt es nicht".
+    /// </summary>
+    /// <remarks>
+    /// Der Endpunkt war hinter der Anmeldung, und das kostete zweierlei. Die
+    /// Karriereseite ist eine Adresse zum Weitergeben: wer sie öffnet, hat kein
+    /// Konto, und ein 401 machte aus der Anzeige eine Anmeldeaufforderung. Und
+    /// <c>applications-service</c> fragt hier Dienst-zu-Dienst nach, ob es die
+    /// Stelle gibt — ohne Token, weil er keines hat. Gemessen: <b>jede</b>
+    /// Bewerbung endete mit 503, und im Protokoll stand „jobs-service
+    /// antwortete mit 401".
+    /// <para>
+    /// Der zweite Teil ist die Gegenprobe zur Öffnung und der wichtigere: ein
+    /// Entwurf darf nicht 403 antworten, denn ein 403 neben einem 404 sagt
+    /// „hier ist etwas, du darfst nur nicht" — und damit liesse sich abfragen,
+    /// welche Kennungen belegt sind.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Eine_Anzeige_liest_auch_wer_kein_Konto_hat()
+    {
+        var firma = Guid.CreateVersion7();
+        var entwurf = (await Json(await Schreibe(AlsFirma(firma), "Geheimer Entwurf")))
+            .GetProperty("id").GetGuid();
+        var offen = (await Json(await Schreibe(AlsFirma(firma), "Offene Stelle")))
+            .GetProperty("id").GetGuid();
+        (await AlsFirma(firma).PostAsync($"/jobs/{offen}/publish", null))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var sichtbar = await Ohne().GetAsync($"/jobs/{offen}");
+        var beiEntwurf = await Ohne().GetAsync($"/jobs/{entwurf}");
+        var beiErfundener = await Ohne().GetAsync($"/jobs/{Guid.CreateVersion7()}");
+
+        sichtbar.StatusCode.Should().Be(
+            HttpStatusCode.OK, "eine veroeffentlichte Anzeige ist oeffentlich");
+        (await Json(sichtbar)).GetProperty("title").GetString().Should().Be("Offene Stelle");
+
+        beiEntwurf.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        beiErfundener.StatusCode.Should().Be(
+            beiEntwurf.StatusCode,
+            "ein Entwurf und eine erfundene Kennung muessen gleich antworten");
+    }
+
+    /// <summary>
+    /// Ein Suchbegriff, der ein SQL-Wort enthält, wird beantwortet und nicht
+    /// abgewiesen.
+    /// </summary>
+    /// <remarks>
+    /// Der Anlass ist Girders <c>UseInputSanitization()</c>. Sie trifft das
+    /// <b>bloße</b> Schlüsselwort an einer Wortgrenze, und ein Bindestrich ist
+    /// eine: <c>Union-Investment</c> — eine reale deutsche Fondsgesellschaft —
+    /// kam als <b>400</b> zurück, ebenso <c>Select-Kundenberater</c> und
+    /// <c>Drop-In-Zentrum</c>. Auf einer Stellenbörse ist das kein Randfall,
+    /// sondern eine normale Suche, die ohne Erklärung scheitert.
+    /// <para>
+    /// Die Middleware ist deshalb aus <c>Dienstgrundlage.cs</c> entfernt
+    /// (<c>bugs/eingabepruefung-weist-gewoehnliche-woerter-ab.md</c>). Dieser
+    /// Test ist der Grund, warum das auffällt, wenn jemand sie zurückholt:
+    /// dann steht hier eine rote Zeile mit einem Firmennamen darin, statt einer
+    /// Suche, die im Betrieb still nicht funktioniert.
+    /// </para>
+    /// <para>
+    /// Geprüft wird der <b>Statuscode</b> und nicht das Ergebnis: dass nichts
+    /// gefunden wird, ist in Ordnung — dass die Frage nicht gestellt werden
+    /// darf, ist es nicht.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("Union-Investment")]
+    [InlineData("Select-Kundenberater")]
+    [InlineData("Drop-In-Zentrum")]
+    [InlineData("Update-Managerin")]
+    public async Task Ein_Suchbegriff_mit_einem_SQL_Wort_wird_beantwortet(string begriff)
+    {
+        var antwort = await Ohne().GetAsync(
+            $"/jobs?q={Uri.EscapeDataString(begriff)}");
+
+        antwort.StatusCode.Should().Be(
+            HttpStatusCode.OK,
+            "„{0}\" ist ein Suchbegriff und keine Injektion", begriff);
+    }
+
+    /// <summary>
+    /// <c>company</c> filtert wirklich — sonst zeigt die Karriereseite fremde
+    /// Anzeigen unter dem eigenen Namen.
+    /// </summary>
+    /// <remarks>
+    /// Der Parameter wurde von der Oberfläche <strong>seit jeher</strong>
+    /// geschickt und vom Dienst nie gelesen. Ohne diesen Test fällt das nicht
+    /// auf: die Liste ist nicht leer, sie ist nur falsch — und eine
+    /// Karriereseite mit fremden Stellen sieht aus wie eine volle.
+    /// </remarks>
+    [Fact]
+    public async Task Der_Firmenfilter_zeigt_nur_die_eigenen_Anzeigen()
+    {
+        var meine = Guid.CreateVersion7();
+        var fremde = Guid.CreateVersion7();
+
+        var meineId = await Veroeffentlicht(AlsFirma(meine));
+        var fremdeId = await Veroeffentlicht(AlsFirma(fremde));
+
+        var gefunden = await Json(await Ohne().GetAsync($"/jobs?company={meine}"));
+        var eintraege = gefunden.GetProperty("items").EnumerateArray().ToList();
+
+        eintraege.Should().Contain(eintrag => eintrag.GetProperty("id").GetGuid() == meineId);
+        eintraege.Should().NotContain(eintrag => eintrag.GetProperty("id").GetGuid() == fremdeId);
+    }
+
+    /// <summary>Der Suchbegriff sucht — über Titel und Beschreibung.</summary>
+    /// <remarks>
+    /// Auch <c>q</c> wurde geschickt und nie gelesen: die Suchmaske war
+    /// Dekoration. Sie lieferte immer alles, was so lange nicht auffällt, wie
+    /// wenige Anzeigen im Bestand sind.
+    /// </remarks>
+    [Fact]
+    public async Task Der_Suchbegriff_trifft_Titel_und_Beschreibung()
+    {
+        var firma = AlsFirma(Guid.CreateVersion7());
+        var gesucht = await Veroeffentlicht(firma);
+        var anderes = (await Json(await Schreibe(firma, "Gaertnerin"))).GetProperty("id").GetGuid();
+        (await firma.PostAsync($"/jobs/{anderes}/publish", null))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var gefunden = await Json(await Ohne().GetAsync("/jobs?q=entwickler"));
+        var eintraege = gefunden.GetProperty("items").EnumerateArray().ToList();
+
+        // Kleingeschrieben gesucht, gross geschrieben gespeichert.
+        eintraege.Should().Contain(eintrag => eintrag.GetProperty("id").GetGuid() == gesucht);
+        eintraege.Should().NotContain(eintrag => eintrag.GetProperty("id").GetGuid() == anderes);
     }
 
     [Fact]
@@ -266,6 +446,34 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
 
         prompt.Should().NotContain(firma.ToString(), "keine tenant_id");
         prompt.Should().Contain("kuerzer");
+    }
+
+    /// <summary>
+    /// Der Wunsch ist begrenzt — und ein zu langer ist eine Eingabe, kein Ausfall.
+    /// </summary>
+    /// <remarks>
+    /// Er war das einzige Feld dieses Endpunkts, das an keinem Wertobjekt
+    /// vorbeikommt: Titel, Beschreibung, Ort und Fähigkeiten sind in der Domäne
+    /// längst begrenzt, der Wunsch kam roh aus dem Rumpf und ging ungeprüft an
+    /// den fremden Anbieter. Geprüft wird beides — dass 501 Zeichen abgelehnt
+    /// werden, und dass 500 durchgehen: eine Grenze, die auch das Erlaubte
+    /// abweist, merkt man erst an einer echten Anfrage.
+    /// </remarks>
+    [Theory]
+    [InlineData(500, HttpStatusCode.OK)]
+    [InlineData(501, HttpStatusCode.UnprocessableEntity)]
+    public async Task Ein_zu_langer_Wunsch_ist_ein_422(int laenge, HttpStatusCode erwartet)
+    {
+        var antwort = await AlsFirma(Guid.CreateVersion7()).PostAsJsonAsync("/jobs/draft", new
+        {
+            title = "Entwicklerin",
+            description = "Wir bauen verteilte Systeme.",
+            skills = new[] { "C#" },
+            location = "Berlin",
+            wish = new string('a', laenge)
+        });
+
+        antwort.StatusCode.Should().Be(erwartet);
     }
 
     /// <summary>

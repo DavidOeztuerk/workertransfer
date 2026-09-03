@@ -57,12 +57,16 @@ Fähigkeiten und den Wunsch der Person — **kein Name, keine E-Mail-Adresse,
 keine `subject_id`, kein Arbeitgeber, kein Lebenslauf, keine Bewerbung, kein
 Marktstatus.** Eine Datenklasse und kein freies `dict`, weil ein `dict` beim
 nächsten Feature stillschweigend einen Schlüssel mehr trägt. Ein Test nagelt
-die Feldmenge fest.
+die Feldmenge fest: `EntwurfsgrenzeTests` (Reihe `Ganzes`), gegen eine
+ausgeschriebene Menge statt gegen eine Verbotsliste — wer ein Feld hinzufügt,
+schreibt es dort hin.
 
 **4. Nichts davon im Protokoll.** `product-scope.md` verbietet CVs und Verträge
 im Log; der Selbstbeschreibungstext einer Person gehört in dieselbe Klasse.
-Fehler melden die Fehlerart, nie den Inhalt — ein Test prüft, dass ein
-Netzwerkfehler den Prompt nicht mitschleppt.
+Fehler melden die Fehlerart, nie den Inhalt — `EntwurfsfehlerTests` (Reihe
+`Ganzes`) prüft es für beide Seiten und für alle vier Fehlschläge:
+Verbindungsfehler, Fehlerantwort samt fremdem Rumpf, Zeitablauf des Anbieters,
+und den Abbruch des Aufrufers, der ausdrücklich *kein* Anbieterausfall ist.
 
 ## Was das Modell tun soll — und was nicht
 

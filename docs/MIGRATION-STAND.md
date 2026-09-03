@@ -823,8 +823,9 @@ selbst voreinstellt: acht Anfragen gegen eine Grenze von fünf ergaben achtmal
 korrekt (nachgesehen), und der Zähler darunter arbeitet korrekt (nachgesehen) —
 der Fehler sitzt dazwischen.
 
-Ticket: `bugs/ratenbegrenzung-drei-wege-zwei-bremsen-nicht.md`, mit einer
-Reproduktion ohne eine Zeile WorkerTransfer. Nebenbefund darin:
+Ticket `ratenbegrenzung-drei-wege-zwei-bremsen-nicht` (behoben in 4.0.0,
+am 02.09.2026 aus `bugs/` entfernt), mit einer Reproduktion ohne eine Zeile
+WorkerTransfer. Nebenbefund darin:
 `AddInMemoryRateLimiting()` registriert **nicht**, was `UseDistributedRateLimiting()`
 braucht — zwei Untersysteme mit fast gleichen Namen, die nicht zusammenpassen.
 
@@ -1038,7 +1039,9 @@ dritte bremst und ist nirgends verdrahtet; alle drei glauben `X-Forwarded-For`
 bedingungslos, und eine Vertrauensliste gibt es in Girder nirgends. Acht
 Anfragen gegen eine Grenze von drei kamen durch, nur weil ein Kopf mitgeschickt
 wurde. Ticket neu geschrieben:
-`bugs/ratenbegrenzung-drei-wege-zwei-bremsen-nicht.md`.
+`ratenbegrenzung-drei-wege-zwei-bremsen-nicht` — behoben in 4.0.0, am
+02.09.2026 entfernt; was davon offen blieb, steht in
+`bugs/abweisung-der-bremse-ist-kein-problemdokument.md`.
 
 **`AddResilience` allein wirkt nicht.** Es registriert nur
 `ICircuitBreakerFactory` und `IRetryPolicyFactory` — es umhüllt keinen
@@ -1162,7 +1165,9 @@ Firmenrechte hängen, und zwar lautlos: jeder geschützte Endpunkt hätte 403
 gegeben. Mit **4.0.2** ruft das Modul `AddAuthorization()` und steht in der
 Vorgabe; `ResourceAuthorization` ist ein eigenes Modul.
 
-**Der `KeyRing` fehlte im Container** (`bugs/jwt-modul-registriert-den-verbraucher-ohne-seinen-schluesselbund.md`).
+**Der `KeyRing` fehlte im Container** (Ticket
+`jwt-modul-registriert-den-verbraucher-ohne-seinen-schluesselbund`, am
+02.09.2026 entfernt).
 Der Katalog registrierte `IJwtService` bedingungslos, das einzige
 `AddSingleton(keys)` stand auf dem alten Modulweg. Reproduziert mit null
 Fremdcode. Behoben in **4.0.2**, und der Fix sitzt an der Stelle, an der sich
@@ -1331,7 +1336,8 @@ Derselbe Denkfehler steckt in `ResilientHttpPolicyHandler`: er macht aus jedem
 Nicht-2xx eine **Ausnahme** und wiederholt sie dreimal. Ein `404` würde also
 dreimal nachgefragt und käme als `HttpRequestException` an.
 
-Ticket: `bugs/statuscodes-werden-als-stoerung-behandelt.md`. Der Kern in einem
+Ticket `statuscodes-werden-als-stoerung-behandelt` (behoben in 4.0.0 und
+4.0.1, am 02.09.2026 entfernt). Der Kern in einem
 Satz: **ein Statuscode ist hier eine Aussage, keine Störung.**
 
 ### Und wieder eine Annahme des Auftrags, die die Messung korrigiert

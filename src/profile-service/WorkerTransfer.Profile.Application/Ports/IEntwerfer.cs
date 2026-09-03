@@ -1,3 +1,5 @@
+using WorkerTransfer.Profile.Domain.Profile;
+
 namespace WorkerTransfer.Profile.Application.Ports;
 
 /// <summary>Der Anbieter hat nicht geantwortet — oder es ist keiner eingerichtet.</summary>
@@ -33,6 +35,20 @@ public sealed record Entwurfslage(
     IReadOnlyList<string> Faehigkeiten,
     string Wunsch)
 {
+    /// <summary>Der Wunsch, geprüft.</summary>
+    /// <remarks>
+    /// Die Prüfung steht hier und nicht am Endpunkt, weil dieser Typ die Grenze
+    /// ist: eine zweite Aufrufstelle — ein Stapelauftrag, ein zweiter Endpunkt —
+    /// bekäme sie sonst nicht mit. Und sie ist die einzige Länge in dieser
+    /// Klasse, die geprüft werden muss: Überschrift, Text und Fähigkeiten kommen
+    /// aus dem gespeicherten Profil und sind dort längst begrenzt, der Wunsch
+    /// dagegen kommt roh aus dem Rumpf der Anfrage.
+    /// </remarks>
+    public string Wunsch { get; init; } =
+        Wunsch is { Length: > Profil.HoechstlaengeWunsch }
+            ? throw new WunschFehler()
+            : Wunsch;
+
     /// <summary>Woran das Modell sich zu halten hat.</summary>
     /// <remarks>
     /// „Schreibe ALS die Person“ ist der Kern: der Entwurf ist ein Vorschlag für

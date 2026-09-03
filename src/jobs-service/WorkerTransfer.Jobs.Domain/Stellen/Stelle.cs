@@ -66,6 +66,14 @@ public sealed class Stelle
     /// <summary>Wie lang eine Ortsangabe sein darf.</summary>
     public const int HoechstlaengeOrt = 160;
 
+    /// <summary>Wie lang der Wunsch an die Formulierungshilfe höchstens ist.</summary>
+    /// <remarks>
+    /// Dieselbe Zahl wie im profile-service, und aus demselben Grund: der Wunsch
+    /// ist eine Anweisung, kein Inhalt. Die Beschreibung darf 20000 Zeichen
+    /// haben — sie ist die Anzeige. Der Wunsch ist es nicht.
+    /// </remarks>
+    public const int HoechstlaengeWunsch = 500;
+
     private Stelle(
         Guid id,
         TenantId firma,
@@ -262,12 +270,28 @@ public interface IStellenspeicher
     /// Der Stand wird hier gefiltert und nicht vom Aufrufer: ein Parameter
     /// <c>status=draft</c> wäre ein Weg, fremde Entwürfe zu lesen.
     /// </remarks>
+    /// <param name="suchbegriff">
+    /// Freitext über Titel und Beschreibung. Leer heisst „alles".
+    /// </param>
+    /// <param name="firma">
+    /// Nur die Anzeigen eines Unternehmens — für die Karriereseite. <c>null</c>
+    /// heisst „alle". Ohne diesen Filter zeigte <c>/careers/&lt;kürzel&gt;</c>
+    /// die Anzeigen ALLER Unternehmen unter dem Namen eines einzigen; der
+    /// Parameter wurde von der Oberfläche seit jeher geschickt und vom Dienst
+    /// nie gelesen.
+    /// </param>
+    /// <param name="beschaeftigung">
+    /// Vollzeit, Teilzeit und so weiter. Leer heisst „alles".
+    /// </param>
     Task<Stellenseite> SucheAsync(
         int anzahl,
         string? zeiger,
         IReadOnlyList<string>? faehigkeiten,
         string ort,
         Remotegrad? remote,
+        string suchbegriff = "",
+        Guid? firma = null,
+        string beschaeftigung = "",
         CancellationToken cancellationToken = default);
 
     /// <summary>Zieht alle Anzeigen eines Unternehmens zurück.</summary>

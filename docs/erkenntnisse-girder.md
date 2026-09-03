@@ -370,17 +370,26 @@ Gegengeprobt: Angabe entfernen → genau eine Zeile fällt und nennt das Feld.
 
 ---
 
-## Offen
+## Offen — nichts mehr, Stand 03.09.2026
 
-Zwei Dinge, beide bei Girder:
+Was hier als offen stand, ist mit **Girder 4.1.0** behoben. Der Abschnitt bleibt
+stehen, weil das Ergebnis interessanter ist als die Liste:
 
-**Die Abweisung der Bremse** ist kein Problemdokument und trägt keine
-Korrelationskennung — `bugs/abweisung-der-bremse-ist-kein-problemdokument.md`.
-Kommt das, fällt `Bremse.cs` weg.
+**Die Abweisung der Bremse** ist jetzt `application/problem+json` und nennt die
+Korrelationskennung; `traceId` steht weiter daneben, weil jemand ihn schon liest.
+Die Kleinigkeiten aus derselben Messung sind mit: `EndpointSpecificLimits` ist
+leer statt mit sieben Skillswap-Pfaden vorbelegt, und `ClientAddress.Of` bildet
+`::ffff:a.b.c.d` auf IPv4 ab. `WhitelistedIps` trägt weiterhin Loopback — nicht
+fälschbar, aber jetzt in der XML-Doku als das benannt, was es ist: eine stille
+Ausnahme in genau der Umgebung, in der man die Bremse zuerst ausprobiert.
 
-**Kleinigkeiten aus derselben Messung**, im selben Ticket notiert:
-`WhitelistedIps` trägt per Vorgabe Loopback (nicht mehr fälschbar, aber auf dem
-eigenen Rechner sieht die Bremse dadurch aus, als bremse sie nicht);
-`EndpointSpecificLimits` ist mit sieben fremden Pfaden aus Skillswap vorbelegt,
-die beim Binden ergänzt statt ersetzt werden; und `ClientAddress.Of`
-normalisiert `::ffff:a.b.c.d` nicht, was demselben Rechner zwei Töpfe gibt.
+**`Bremse.cs` fällt trotzdem nicht weg**, und das ist der eigentliche Ertrag
+dieser Messung: der Grund, der sie hielt, war ein Mangel und ist weg — geblieben
+ist ein Unterschied in der *Gestalt*. Girders Zwischenschicht ist eine **globale**
+Bremse mit Verfeinerung je Pfad; jeder Pfad ohne eigenen Eintrag bekommt die
+Vorgabegrenze. Durch unser Gateway läuft auch die ganze Oberfläche. Unsere bremst
+fünf benannte Pfade und rührt nichts anderes an. Ein Mangel wird behoben, eine
+Gestalt bleibt — und nur die zweite Sorte Grund trägt auf Dauer.
+
+Die vollständige Aufstellung dessen, was 4.1.0 geändert hat und was hier davon
+abhing, steht in [`GIRDER-ANPASSUNGEN.md`](GIRDER-ANPASSUNGEN.md).

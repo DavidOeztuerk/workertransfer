@@ -36,7 +36,10 @@ public sealed record StellensucheAbfrage(
     string? Zeiger,
     IReadOnlyList<string>? Faehigkeiten = null,
     string Ort = "",
-    Remotegrad? Remote = null) : IAbfrage<Stellenseite>;
+    Remotegrad? Remote = null,
+    string Suchbegriff = "",
+    Guid? Firma = null,
+    string Beschaeftigung = "") : IAbfrage<Stellenseite>;
 
 /// <inheritdoc cref="StellensucheAbfrage" />
 public sealed class StellensucheHandler(IStellenspeicher speicher)
@@ -50,7 +53,8 @@ public sealed class StellensucheHandler(IStellenspeicher speicher)
 
         return speicher.SucheAsync(
             request.Anzahl, request.Zeiger, request.Faehigkeiten,
-            request.Ort, request.Remote, cancellationToken);
+            request.Ort, request.Remote, request.Suchbegriff, request.Firma,
+            request.Beschaeftigung, cancellationToken);
     }
 }
 

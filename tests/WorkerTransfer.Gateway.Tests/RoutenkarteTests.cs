@@ -186,11 +186,13 @@ public sealed class RoutenkarteTests
     /// </summary>
     /// <remarks>
     /// Die schaerfste Zeile der Karte, und deshalb steht sie als eigener Test
-    /// da. Drei Endpunkte antworten anonym mit 2xx, und jeder aus einem Grund,
+    /// da. Vier Endpunkte antworten anonym mit 2xx, und jeder aus einem Grund,
     /// der in seiner Gruppe steht: <c>/auth/session</c> beantwortet die Frage
     /// „bin ich angemeldet?", <c>/auth/resend-verification</c> antwortet fuer
-    /// bekannte und unbekannte Adressen gleich, und die Karriereseite ist
-    /// oeffentlich.
+    /// bekannte und unbekannte Adressen gleich, die Karriereseite ist
+    /// oeffentlich — und <c>GET /jobs</c> ist es seit derselben Entscheidung:
+    /// die Karriereseite holt ihre Stellen ueber genau diesen Endpunkt, und
+    /// solange er 401 gab, war sie nur halb oeffentlich.
     /// <para>
     /// Wer einen vierten hinzufuegt, muss diese Liste anfassen — und dabei
     /// merken, dass er gerade etwas oeffentlich macht.
@@ -203,7 +205,8 @@ public sealed class RoutenkarteTests
         [
             "/auth/session",
             "/auth/resend-verification",
-            "/companies/by-slug/gibt-es-nicht"
+            "/companies/by-slug/gibt-es-nicht",
+            "/jobs"
         ];
 
         foreach (var eintrag in Eintraege().Where(e => e.Ohne is >= 200 and < 300))

@@ -9,7 +9,8 @@ import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
 import { PageShell } from "../../../shared/components/ui";
-import { useAppSelector } from "../../../core/store/hooks";
+import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
+import { sitzungBeendet } from "../../auth/store/authSlice";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 import { loeschungVerlangen } from "../api/erasure";
 
@@ -66,6 +67,7 @@ function Abschnitt({
  * sonst liest die Person direkt nach dem Löschen „Bitte anmelden“.
  */
 export function DeleteAccountPage() {
+  const dispatch = useAppDispatch();
   const status = useAppSelector((state) => state.auth.status);
   const firmen = useAppSelector((state) => state.auth.memberships);
 
@@ -114,6 +116,15 @@ export function DeleteAccountPage() {
     if (ergebnis.ok) {
       setFehler(null);
       setAngenommen(true);
+
+      // Der Server hat jede Sitzung schon widerrufen — der Speicher muss
+      // nachziehen, sonst zeigt der Kopf weiter das Konto-Menü, während diese
+      // Seite „Du bist abgemeldet" sagt. Zwei Aussagen über dieselbe Sache, und
+      // die sichtbarere ist die falsche.
+      //
+      // NICHT `logout()`: das fragt den Server, und der antwortet auf eine
+      // widerrufene Sitzung mit 401 — der Speicher bliebe stehen.
+      dispatch(sitzungBeendet());
     } else {
       setFehler(ergebnis.error.detail);
     }

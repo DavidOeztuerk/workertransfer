@@ -66,7 +66,14 @@ public sealed class HttpPostbote(
             using var anfrage = new HttpRequestMessage(
                 HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), "/internal/notify"))
             {
-                Content = JsonContent.Create(new { userId = wer.Value })
+                // `user_id`, nicht `userId`. identity-service deklariert
+                // [JsonPropertyName("user_id")]; camelCase band still auf
+                // Guid.Empty. Dieser Fehlschlag ist der stillste im System —
+                // er wirft nicht, er protokolliert eine Warnung, und der
+                // Ausgangskorb sieht ihn nie. Gemessen: im Postfach standen
+                // ausschliesslich Bestaetigungsmails, die identity selbst
+                // verschickt.
+                Content = JsonContent.Create(new { user_id = wer.Value })
             };
 
             anfrage.Headers.Add("X-Notify-Secret", _einstellungen.Geheimnis);

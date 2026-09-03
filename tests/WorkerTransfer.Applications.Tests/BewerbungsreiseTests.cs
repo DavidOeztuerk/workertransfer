@@ -402,6 +402,52 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
         zahlen.GetProperty("by_status").GetProperty("submitted").GetInt32().Should().Be(1);
     }
 
+    /// <summary>
+    /// Die Antwort trägt genau zwei Felder — was es nicht gibt, kann nicht
+    /// herausgehen.
+    /// </summary>
+    /// <remarks>
+    /// ADR-0026 sagt zu: „Ein Test hält die Feldmenge der Antwort fest — was es
+    /// nicht gibt, kann nicht herausgehen (dieselbe Strenge wie bei
+    /// <c>DraftContext</c>, ADR-0024)." <b>Den Test gab es nicht.</b> Geprüft
+    /// wurden drei Werte, und ein viertes Feld wäre still hinausgegangen.
+    /// <para>
+    /// Genau dagegen steht die Zusage: eine Auswertung wächst nicht durch eine
+    /// Entscheidung, sondern durch ein „das können wir auch gleich mitgeben" —
+    /// und der nächste Schritt wäre eine Zahl je Person, die ADR-0022 verbietet.
+    /// Eine geschlossene Menge macht diesen Schritt sichtbar, statt ihn zu
+    /// verhindern: wer sie erweitert, schreibt es hier hin.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Die_Zahlen_tragen_genau_zwei_Felder()
+    {
+        var unternehmen = AlsFirma(Guid.CreateVersion7(), Guid.CreateVersion7());
+
+        var zahlen = await Json(
+            await unternehmen.GetAsync("/companies/me/application-stats"));
+
+        zahlen.EnumerateObject().Select(feld => feld.Name).Should().BeEquivalentTo(
+            ["total", "by_status"],
+            "ADR-0026 nennt diese Menge und keine groessere");
+    }
+
+    /// <summary>Ohne aktives Unternehmen gibt es keine Zahlen.</summary>
+    /// <remarks>
+    /// ADR-0026 nennt die 403 ausdrücklich. Geprüft war sie nur an
+    /// <c>/jobs/{id}/applications</c> — ein anderer Endpunkt, dessen grüner Test
+    /// über diesen nichts aussagt. Die Zahlen sind die Auswertung eines
+    /// Unternehmens; wer für keines handelt, fragt nach fremden.
+    /// </remarks>
+    [Fact]
+    public async Task Ohne_Unternehmen_gibt_es_keine_Zahlen()
+    {
+        var antwort = await AlsPerson(Guid.CreateVersion7())
+            .GetAsync("/companies/me/application-stats");
+
+        antwort.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     /// <summary>Ohne Anmeldung geht nichts.</summary>
     [Fact]
     public async Task Ohne_Token_ist_es_401()

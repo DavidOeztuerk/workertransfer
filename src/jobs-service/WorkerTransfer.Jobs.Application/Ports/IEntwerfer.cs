@@ -1,3 +1,5 @@
+using WorkerTransfer.Jobs.Domain.Stellen;
+
 namespace WorkerTransfer.Jobs.Application.Ports;
 
 /// <summary>Der Anbieter hat nicht geantwortet — oder es ist keiner eingerichtet.</summary>
@@ -38,6 +40,18 @@ public sealed record Anzeigenentwurf(
     string Ort,
     string Wunsch)
 {
+    /// <summary>Der Wunsch, geprüft.</summary>
+    /// <remarks>
+    /// Die Prüfung steht hier und nicht am Endpunkt, weil dieser Typ die Grenze
+    /// ist — eine zweite Aufrufstelle bekäme sie sonst nicht mit. Titel,
+    /// Beschreibung, Ort und Fähigkeiten sind bereits Wertobjekte der Domäne und
+    /// dort begrenzt; der Wunsch kommt roh aus dem Rumpf der Anfrage.
+    /// </remarks>
+    public string Wunsch { get; init; } =
+        Wunsch is { Length: > Stelle.HoechstlaengeWunsch }
+            ? throw new WunschFehler()
+            : Wunsch;
+
     /// <summary>Woran das Modell sich zu halten hat.</summary>
     public static string Regeln =>
         "Du hilfst einem Unternehmen, seine eigene Stellenanzeige zu "

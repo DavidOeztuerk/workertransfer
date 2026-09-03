@@ -58,7 +58,13 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   await recruiter.goto("/company/profile");
   await recruiter.getByLabel(/Anzeigename/i).fill(companyName);
   await recruiter.getByRole("button", { name: /Speichern/i }).click();
-  await expect(recruiter.getByText(/gespeichert/i)).toBeVisible();
+  // Auf die BESTAETIGUNG warten, nicht auf `/gespeichert/i`: der Knopf heisst
+  // waehrend des Speicherns „Wird gespeichert…", und das Muster traf ihn. Die
+  // Reise zog dann weiter, waehrend die Anfrage noch lief — `goto()` bricht sie
+  // ab, und das Profil wurde nie geschrieben. Gemessen: die Seite zeigte
+  // spaeter „Marktstatus · Ein Unternehmen" statt des Firmennamens, und in
+  // `company_profiles` stand keine Zeile.
+  await expect(recruiter.getByText(/Profil gespeichert/i)).toBeVisible();
 
   await recruiter.goto("/candidates");
   const card = recruiter.locator("li").filter({ hasText: headline });

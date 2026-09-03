@@ -190,6 +190,27 @@ function Transferkarte({
           {TITEL[transfer.status]}
         </Typography>
 
+        {/*
+          Die Regel stand hier nur im Kommentar, und `darfAbschliessen` setzte
+          sie still um: bei nötiger Freigabe fehlte der Abschluss-Knopf einfach.
+          Eine Regel, die wirkt, ohne sich zu zeigen, sieht von aussen aus wie
+          ein Fehler — und wer sie nicht kennt, sucht ihn im Falschen.
+
+          Der Satz sagt zwei Dinge, und beide gehören dem Unternehmen: dass der
+          letzte Schritt nicht ihm gehört, und dass die Plattform den jetzigen
+          Arbeitgeber NICHT fragt. Das zweite ist keine Feinheit — es ist das
+          Versprechen, an dem dieser Markt für die Person überhaupt hängt.
+        */}
+        {transfer.requires_release && !transfer.release_confirmed ? (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <strong>Braucht eine Freigabe.</strong> Die Person arbeitet gerade
+            woanders. Den Abschluss macht deshalb sie, sobald sie bestätigt hat,
+            dass ihr Arbeitgeber sie gehen lässt — ihr könnt ihn nicht für sie
+            machen. <strong>Diese Plattform fragt ihn nicht</strong>: sie weiß
+            nicht, wer er ist, und will es nicht wissen.
+          </Alert>
+        ) : null}
+
         {zeigtAngebot ? (
           <Box
             component="dl"

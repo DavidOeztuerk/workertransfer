@@ -150,6 +150,15 @@ public static class ProfilEndpoints
                     context, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", fehler.Message);
             }
+            catch (Eingabefehler fehler)
+            {
+                // Ein zu langer Wunsch ist eine Eingabe, kein Ausfall: 422, nicht
+                // 503. Ohne diesen Zweig verliesse er den Dienst als 500 — und
+                // ein 500 sagt dem Aufrufer, es liege nicht an ihm.
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", fehler.Message);
+            }
         });
 
         profile.MapGet("/{subjectId:guid}", async (

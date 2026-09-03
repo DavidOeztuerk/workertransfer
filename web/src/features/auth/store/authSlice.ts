@@ -29,6 +29,23 @@ const authSlice = createSlice({
     errorCleared(state) {
       state.error = null;
     },
+
+    /**
+     * Die Sitzung ist auf dem Server schon weg — der Speicher zieht nach.
+     *
+     * Nicht dasselbe wie `logout`: das *bittet* den Server abzumelden. Nach
+     * einer angenommenen Kontolöschung ist jede Sitzung bereits widerrufen, ein
+     * `POST /auth/logout` bekäme 401, `logout.fulfilled` liefe nie, und der
+     * Speicher bliebe auf „angemeldet" stehen. Genau das war zu sehen: die
+     * Löschseite sagte „Du bist abgemeldet", während der Kopf weiter das
+     * Konto-Menü zeigte.
+     */
+    sitzungBeendet(state) {
+      state.session = null;
+      state.memberships = [];
+      state.status = "anonymous";
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -77,5 +94,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { errorCleared } = authSlice.actions;
+export const { errorCleared, sitzungBeendet } = authSlice.actions;
 export default authSlice.reducer;

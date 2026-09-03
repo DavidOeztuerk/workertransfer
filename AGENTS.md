@@ -4,7 +4,7 @@ The short reference. `CLAUDE.md` carries the reasons; this file carries the comm
 
 ## What this is
 
-WorkerTransfer is a consent-first talent-mobility platform, written in **.NET 10 on Girder 3.0.1** (a shared foundation library from GitHub Packages) with a React frontend.
+WorkerTransfer is a consent-first talent-mobility platform, written in **.NET 10 on Girder 4.1.0** (a shared foundation library from GitHub Packages) with a React frontend.
 
 It was a Python (`uv`) monorepo until August 2026 and was translated by hand. **No Python remains** — no `uv`, `ruff`, `mypy`, `pytest`, `alembic`, no `apps/<service>`, no `packages/worker-*`. A document that names those is describing the predecessor. `docs/MIGRATION-STAND.md` says what changed and what was measured.
 
@@ -22,8 +22,7 @@ src/
   gateway/            Ocelot — the single entrance
   shared/             ServiceDefaults, Outbox, Skills, Contracts.{Identity,Consent,Erasure}
 tests/                fifteen suites, one per service plus Gateway, Outbox, Skills, Ganzes
-apps/web/             the React app — deliberately not under src/
-packages/ui/          its component library — deliberately not under src/
+web/                  the React app — deliberately not under src/, and the WHOLE frontend
 deploy/  docker/  scripts/  docs/  bugs/
 ```
 
@@ -34,9 +33,10 @@ Eleven services plus the gateway. Ports 8001–8011, gateway on 8090.
 ```bash
 dotnet build WorkerTransfer.slnx   # warnings are errors
 ./scripts/test-dotnet.sh           # the suites, ONE AT A TIME
-pnpm check                         # tsc --noEmit
-pnpm test                          # Vitest
-pnpm build                         # the bundle
+cd web && pnpm check               # tsc --noEmit
+cd web && pnpm test                # Vitest
+cd web && pnpm build               # the bundle
+cd web && pnpm e2e                 # the Playwright journeys (needs `make up`)
 ```
 
 **Build and test in separate invocations.** Chained, the Testcontainers suites fail and look like real test failures.
@@ -59,7 +59,7 @@ make k8s-up / k8s-down / k8s-lint
 ```
 
 Single suite: `dotnet test tests/WorkerTransfer.<X>.Tests/WorkerTransfer.<X>.Tests.csproj --no-build`
-Single frontend test: `pnpm --filter @workertransfer/web exec vitest run src/app.test.tsx`
+Single frontend test: `cd web && pnpm exec vitest run src/app.test.tsx`. There is no workspace and no root `package.json` any more — `pnpm -r` and `--filter` fail with `ERR_PNPM_NO_PKG_MANIFEST`.
 
 Restore needs a NuGet login for `Girder.*` (GitHub Packages); `NuGet.Config` pins source mapping so only Girder may come from there.
 
@@ -139,7 +139,8 @@ Five paths, per origin, per minute, configured in `ocelot.json` beside the route
 - **`X-Forwarded-For` is deliberately not read.** The caller sets it, so trusting it hands the attacker the counter's key. A test pins that a forged one changes nothing.
 - **After the health probes, before authentication.** A braked liveness probe would be the outage; a brake behind bcrypt would cost a hash per attempt.
 - **The counter is in-process** → the gateway stays at one replica. The way out is a registration change to `RedisDistributedRateLimitStore`, same interface.
-- **None of Girder's three rate limiters is used.** Measured, all three (bugs/ratenbegrenzung-drei-wege-zwei-bremsen-nicht.md): two do not brake, the third does but has no wiring anywhere in Girder — and all three trust `X-Forwarded-For` unconditionally, with no trusted-proxy list in the library at all. Girder's *counter* is sound and is what we use.
+- **Girder's input sanitization middleware runs, since 4.1.0 — but not over JSON bodies.** Until 4.0.2 it matched a *bare* SQL keyword on a word boundary (a hyphen is one), so `/jobs?q=Union-Investment` answered **400**, and because every request from the deletion page carried `Referer: …/delete-account` that whole page was dead down to its `/auth/session`. Fixed: it matches injection *syntax*, the `Referer` is not input, and JSON string values are inspected. We set `InspectJsonBodies = false` anyway (reason in `Dienstgrundlage.cs`): the filter runs first and cannot name a field, so a 422 saying *which* field is wrong becomes a blunt 400 — measured on five cases across three services. They are still refused; the person filling in the form is just told less. Query string and the two address headers stay inspected.
+- **Girder's rate limiter is sound since 4.0.0, and is still left out of the eleven services — for topology, not distrust.** Measured without foreign code: `ClientAddress.Of` reads only `Connection.RemoteIpAddress`, a forged `X-Forwarded-For: 127.0.0.1` no longer lifts the brake, it counts per origin, does per-path limits and sets `X-RateLimit-*` and `Retry-After`. But **a service behind the gateway sees only the gateway as the origin**, so every caller would share one bucket. Braking happens at the entrance. `Bremse.cs` stays there for a reason of *kind*, not of defect (its 429 has been a problem document with a correlation id since 4.1.0): Girder's middleware is a **global** brake with per-path refinement, and the whole UI travels through this gateway. Ours brakes five named paths and touches nothing else.
 
 ## Branches
 
