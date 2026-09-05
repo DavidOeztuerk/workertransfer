@@ -185,6 +185,7 @@ ausschreiben '{
   "title": "Senior Backend Engineer (.NET)",
   "description": "Du uebernimmst einen unserer Steuerungsdienste von der ersten Zeile bis in den Betrieb. Das heisst: du entscheidest ueber die Grenzen, du schreibst die Tests, und du bekommst den Anruf, wenn er nicht antwortet — deshalb hast du auch die Freiheit, ihn so zu bauen, dass er antwortet.\n\nWir arbeiten in .NET, mit PostgreSQL und Kubernetes. Kein Microservice-Zoo: sieben Dienste, klare Schnitte, jeder mit eigener Datenbank.",
   "location": "Hamburg",
+  "postal_code": "20095",
   "remote_mode": "hybrid",
   "employment_type": "full_time",
   "skills": ["C#", ".NET", "PostgreSQL", "Kubernetes"]
@@ -194,6 +195,7 @@ ausschreiben '{
   "title": "Site Reliability Engineer",
   "description": "Unsere Anlagen stehen auf See, und die Leitung dorthin ist nicht immer da. Du sorgst dafuer, dass die Systeme das aushalten: Beobachtbarkeit, die etwas sagt, Alarme, die jemand liest, und Wiederanlaufverfahren, die jemand schon einmal geuebt hat.",
   "location": "Husum",
+  "postal_code": "25813",
   "remote_mode": "none",
   "employment_type": "full_time",
   "skills": ["Kubernetes", "Terraform", "Prometheus", "Linux"]
@@ -203,6 +205,7 @@ ausschreiben '{
   "title": "Frontend-Entwicklung (React, Teilzeit)",
   "description": "Die Leitwarte ist eine Oberflaeche, an der Menschen acht Stunden sitzen. Sie muss lesbar sein, wenn draussen die Sonne blendet, und bedienbar mit Handschuhen. Du arbeitest eng mit den Leuten, die sie benutzen.",
   "location": "Hamburg",
+  "postal_code": "20095",
   "remote_mode": "full",
   "employment_type": "part_time",
   "skills": ["React", "TypeScript", "Accessibility"]
@@ -212,6 +215,7 @@ ausschreiben '{
   "title": "Werkstudent:in Datenanalyse",
   "description": "Aus Betriebsdaten Fragen beantworten, die vorher niemand gestellt hat. Kein fertiges Aufgabenpaket — wir zeigen dir die Daten und du sagst uns, was darin steckt.",
   "location": "Hamburg",
+  "postal_code": "20095",
   "remote_mode": "hybrid",
   "employment_type": "internship",
   "skills": ["Python", "SQL"]

@@ -18,7 +18,14 @@ public sealed record EintragV1(
     [property: JsonPropertyName("url")] string? Url = null,
     [property: JsonPropertyName("role")] string Role = "",
     [property: JsonPropertyName("year")] int? Year = null,
-    [property: JsonPropertyName("attachment")] string? Attachment = null);
+    [property: JsonPropertyName("attachment")] string? Attachment = null,
+    /// <summary>Womit gearbeitet wurde — von der Person selbst genannt.</summary>
+    /// <remarks>
+    /// Vereinheitlicht durch denselben Wortschatz wie das Profil (ADR-0023).
+    /// Sie machen die Arbeit nicht durchsuchbar: suchbar wird eine Fähigkeit
+    /// erst im Profil, und dorthin kommt sie mit einem Klick.
+    /// </remarks>
+    [property: JsonPropertyName("technologies")] IReadOnlyList<string>? Technologies = null);
 
 /// <summary>Ein Portfolio, wie es gelesen wird.</summary>
 public sealed record PortfolioV1(

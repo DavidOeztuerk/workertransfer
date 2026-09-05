@@ -13,6 +13,7 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
+  waehleImFeld,
 } from "./stack";
 
 skipWithoutStack();
@@ -42,8 +43,19 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();
 
+  /*
+    Die Profilfreigabe steht auf dieser Seite jetzt als SCHALTER, nicht als
+    Zeile mit „Zurückziehen": sie lässt sich hier auch ERTEILEN, und dieselbe
+    Freigabe zweimal zu zeigen — einmal als Schalter, einmal als Zeile — liesse
+    niemanden wissen, welche der beiden gilt.
+
+    Der Prüfgegenstand bleibt: was gilt, steht hier. Nur eben als Zustand eines
+    Schalters statt als Eintrag einer Liste.
+  */
   await candidate.goto("/consents");
-  await expect(candidate.getByText(/Profil · Alle Unternehmen/)).toBeVisible();
+  await expect(
+    candidate.getByRole("switch", { name: /Profil freigeben/ })
+  ).toBeChecked();
 
   // Ein Unternehmen holt sich eine empfängerbezogene Freigabe.
   const recruiterContext = await browser.newContext();
@@ -51,7 +63,7 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
+  await waehleImFeld(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   // Ein Unternehmensprofil, damit die Seite einen Namen statt einer UUID zeigt.
@@ -89,9 +101,12 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   await row.getByRole("button", { name: /Freigeben/i }).click();
   await expect(row.getByText(/Freigegeben/i)).toBeVisible();
 
-  // Beide Freigaben stehen auf EINER Seite — mit Firmennamen, nicht mit UUID.
+  // Beide Freigaben stehen auf EINER Seite — die globale als Schalter, die
+  // empfängerbezogene als Zeile mit Firmennamen statt UUID.
   await candidate.goto("/consents");
-  await expect(candidate.getByText(/Profil · Alle Unternehmen/)).toBeVisible();
+  await expect(
+    candidate.getByRole("switch", { name: /Profil freigeben/ })
+  ).toBeChecked();
   await expect(candidate.getByText(new RegExp(`Marktstatus · ${companyName}`))).toBeVisible();
 
   // Zurückziehen wirkt sofort — der nächste Zugriff des Unternehmens ist leer.
@@ -113,7 +128,9 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
 
   // Das Profil steht weiterhin da: zurückgezogen wurde genau eine Freigabe.
   await candidate.goto("/consents");
-  await expect(candidate.getByText(/Profil · Alle Unternehmen/)).toBeVisible();
+  await expect(
+    candidate.getByRole("switch", { name: /Profil freigeben/ })
+  ).toBeChecked();
 
   await candidateContext.close();
   await recruiterContext.close();
@@ -162,7 +179,7 @@ test("die Suche findet nur, was freigegeben ist", async ({ browser }) => {
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
+  await waehleImFeld(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/candidates");
@@ -276,6 +293,15 @@ test("GitHub verbinden verlangt einen Nachweis — und rechnet keine Note", asyn
   await expect(person.getByText(/Belege, keine Noten/)).toBeVisible();
   await expect(person.getByText(/kein Abgleich im Hintergrund/)).toBeVisible();
 
+  // DER SCHNELLE WEG STEHT VORN und verlangt keinen Namen: GitHub meldet das
+  // Konto selbst. Er ist hier nur zu sehen, nicht zu gehen — die Reise darf
+  // github.com nicht aufrufen.
+  await expect(
+    person.getByRole("button", { name: "Mit GitHub anmelden" })
+  ).toBeVisible();
+
+  // Der Weg von Hand liegt darunter und wird aufgeklappt.
+  await person.getByRole("button", { name: /Oder von Hand/ }).click();
   await person.getByLabel(/GitHub-Benutzername/).fill(`e2e-nutzer-${stamp}`);
   await person.getByRole("button", { name: "Weiter" }).click();
 
@@ -289,7 +315,16 @@ test("GitHub verbinden verlangt einen Nachweis — und rechnet keine Note", asyn
   // GitHub kennt diesen Benutzer nicht — also bleibt es bei „nicht bewiesen",
   // und nichts wird gezeigt.
   await expect(person.getByRole("alert")).toBeVisible();
+  // NACH DEM NEULADEN ist der Weg von Hand wieder zu — der Gist draengt sich
+  // niemandem auf. Was offen dasteht, ist das genannte Konto samt Ausweg: wer
+  // sich vertippt hat, scheitert sonst an der Anmeldung (der Namensvergleich
+  // lehnt ab) und faende den Knopf dagegen hinter einem Aufklapper.
   await person.reload();
+  await expect(person.getByText(/Genanntes Konto/)).toBeVisible();
+  await expect(person.getByRole("button", { name: "Anderes Konto" })).toBeVisible();
+  await expect(person.locator(".github__challenge")).toBeHidden();
+
+  await person.getByRole("button", { name: /Oder von Hand/ }).click();
   await expect(person.locator(".github__challenge")).toBeVisible();
 
   await context.close();

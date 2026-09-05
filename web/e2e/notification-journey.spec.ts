@@ -15,6 +15,7 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
+  waehleImFeld,
 } from "./stack";
 
 skipWithoutStack();
@@ -45,7 +46,7 @@ test("eine Anfrage erreicht die Person per Mail — und die Mail verrät nicht, 
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
+  await waehleImFeld(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   // Ab hier zählt nur, was nach diesem Zeitpunkt zugestellt wird — die
@@ -127,7 +128,7 @@ test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser })
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
+  await waehleImFeld(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   const since = Date.now();

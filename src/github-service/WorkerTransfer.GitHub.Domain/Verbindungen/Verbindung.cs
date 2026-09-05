@@ -12,6 +12,9 @@ public sealed class NichtNachgewiesen() : Exception("This connection is not veri
 /// <summary>Diese Verbindung ist bereits nachgewiesen.</summary>
 public sealed class SchonNachgewiesen() : Exception("This connection is already verified");
 
+/// <summary>Diese Verbindung nennt bereits ein Konto.</summary>
+public sealed class SchonGenannt() : Exception("This connection already names an account");
+
 /// <summary>Ein Beleg. Alle Felder kommen von GitHub, keins ist gerechnet.</summary>
 /// <remarks>
 /// <c>Sterne</c> steht hier, weil GitHub es meldet — <em>weitergegeben, nicht
@@ -19,13 +22,57 @@ public sealed class SchonNachgewiesen() : Exception("This connection is already 
 /// Reihenfolge über Menschen nach Sternen wäre die ADR-0022-Punktzahl durch die
 /// Hintertür, auch wenn sie „Aktivität" hieße.
 /// </remarks>
+/// <param name="Sprachen">
+/// Welche Sprachen in diesem Repository vorkommen — die MENGE, nie ihr Anteil.
+/// </param>
+/// <remarks>
+/// <strong>Die Menge und nicht die Bytes, und das ist der ganze Unterschied.</strong>
+/// GitHub liefert unter <c>/languages</c> ein Byte je Sprache. Genau daraus
+/// rechnete das gelöschte Paket sein „Können": <c>bytes / total_bytes</c> —
+/// „eine eingecheckte Abhängigkeit schlägt jede sorgfältige Bibliothek" (ADR-0022
+/// §2). Die Zahlen hier gar nicht erst abzulegen ist billiger, als sie später zu
+/// verteidigen: was nicht da ist, kann niemand aufsummieren.
+/// </remarks>
+/// <param name="Themen">
+/// Die Topics, die der Besitzer selbst am Repository gesetzt hat.
+/// </param>
+/// <remarks>
+/// Der stärkste Beleg von allen, weil er eine <em>Nennung</em> ist: „react",
+/// „kubernetes" hat ein Mensch dorthin geschrieben, nicht ein Zähler abgeleitet.
+/// </remarks>
 public sealed record Repository(
     string Name,
     string Beschreibung,
     string? Sprache,
     int Sterne,
     string Adresse,
-    DateTimeOffset? ZuletztGeschoben);
+    DateTimeOffset? ZuletztGeschoben,
+    IReadOnlyList<string> Sprachen,
+    IReadOnlyList<string> Themen);
+
+/// <summary>Ein Abzug: die Belege und wie vollständig sie sind.</summary>
+/// <param name="Repositories">Die Belege selbst.</param>
+/// <param name="SprachenVollstaendig">
+/// Ob für <em>jedes</em> Repository die Sprachen geholt werden konnten.
+/// </param>
+/// <remarks>
+/// <strong>Das zweite Feld ist keine Zierde, sondern ADR-0022 §3.</strong>
+/// GitHub meldet die Sprachen eines Repositories nur einzeln, ein Aufruf je
+/// Repository, und ohne Token sind sechzig Anfragen in der Stunde erlaubt.
+/// Irgendwann ist Schluss — und dann steht bei den übrigen nur die
+/// Hauptsprache. Das <em>nicht</em> zu sagen wäre genau die stillschweigende
+/// Vollständigkeit, die der ADR verbietet: „Python" läse sich dann wie „nur
+/// Python", und der Mensch dahinter sähe schmaler aus, als er ist.
+/// <para>
+/// Es sitzt am Abzug und nicht am <see cref="Repository" />, weil es eine
+/// Aussage über unseren <em>Abruf</em> ist und nicht über das Repository.
+/// Dessen acht Felder sind alle von GitHub abgeschrieben, und
+/// <c>Adr0022Tests</c> hält das fest.
+/// </para>
+/// </remarks>
+public sealed record Abzug(
+    IReadOnlyList<Repository> Repositories,
+    bool SprachenVollstaendig);
 
 /// <summary>Die Verbindung zu einem GitHub-Konto — bewiesen, nicht behauptet.</summary>
 /// <remarks>
@@ -51,11 +98,12 @@ public sealed class Verbindung
 
     private Verbindung(
         SubjectId wer,
-        string login,
+        string? login,
         string einmalzeichenfolge,
         DateTimeOffset? nachgewiesenAm,
         DateTimeOffset? geholtAm,
-        List<Repository> repositories)
+        List<Repository> repositories,
+        bool sprachenVollstaendig)
     {
         Wer = wer;
         Login = login;
@@ -63,13 +111,22 @@ public sealed class Verbindung
         NachgewiesenAm = nachgewiesenAm;
         GeholtAm = geholtAm;
         _repositories = repositories;
+        SprachenVollstaendig = sprachenVollstaendig;
     }
 
     /// <summary>Wessen Verbindung. Sie <em>ist</em> der Schlüssel.</summary>
     public SubjectId Wer { get; }
 
-    /// <summary>Der GitHub-Benutzername.</summary>
-    public string Login { get; private set; }
+    /// <summary>Der GitHub-Benutzername, oder <c>null</c>: noch nicht genannt.</summary>
+    /// <remarks>
+    /// <strong><c>null</c> ist ein Zustand, kein Fehlen.</strong> Über GitHubs
+    /// eigene Anmeldung wird das Konto nicht genannt, sondern <em>gemeldet</em>:
+    /// GitHub nennt allein das Konto, das wirklich zugestimmt hat. Bis die
+    /// Antwort da ist, weiß diese Verbindung ihren Namen noch nicht — und ihn
+    /// vorher abzufragen wäre eine Frage, auf die nur der Gist eine Antwort
+    /// braucht.
+    /// </remarks>
+    public string? Login { get; private set; }
 
     /// <summary>Die Zeichenfolge, die im öffentlichen Gist stehen muss.</summary>
     /// <remarks>
@@ -88,6 +145,13 @@ public sealed class Verbindung
     /// <summary>Der Abzug, neueste zuerst.</summary>
     public IReadOnlyList<Repository> Repositories => _repositories;
 
+    /// <summary>Konnten für jedes Repository die Sprachen geholt werden?</summary>
+    /// <remarks>
+    /// <c>false</c> heißt: bei einigen steht nur die Hauptsprache. Die
+    /// Oberfläche muss das sagen — siehe <see cref="Abzug" />.
+    /// </remarks>
+    public bool SprachenVollstaendig { get; private set; } = true;
+
     /// <summary>Ist die Verbindung bewiesen?</summary>
     public bool Nachgewiesen => NachgewiesenAm is not null;
 
@@ -103,17 +167,31 @@ public sealed class Verbindung
     /// <summary>Nennt einen Benutzernamen und würfelt die Einmalzeichenfolge.</summary>
     /// <exception cref="Loginfehler">Der Benutzername taugt nicht.</exception>
     public static Verbindung Oeffne(SubjectId wer, string login) =>
-        new(wer, Geprueft(login), NeueZeichenfolge(), null, null, []);
+        new(wer, Geprueft(login), NeueZeichenfolge(), null, null, [], true);
+
+    /// <summary>Eröffnet eine Verbindung, deren Konto GitHub selbst nennen wird.</summary>
+    /// <remarks>
+    /// Der Weg über GitHubs Anmeldung. Hier wird <strong>nichts behauptet</strong>:
+    /// Es gibt kein genanntes Konto, also auch nichts zu vergleichen — und
+    /// deshalb auch keine Gelegenheit, sich am falschen Namen auszusperren.
+    /// Die Einmalzeichenfolge entsteht trotzdem sofort, denn sie ist der
+    /// <c>state</c> der Anmeldung: sie beweist, dass der Rücksprung zu dieser
+    /// Anfrage gehört.
+    /// </remarks>
+    public static Verbindung Erwarte(SubjectId wer) =>
+        new(wer, null, NeueZeichenfolge(), null, null, [], true);
 
     /// <summary>Die Verbindung, wie eine Zeile sie hält.</summary>
     public static Verbindung Stelle_her(
         SubjectId wer,
-        string login,
+        string? login,
         string einmalzeichenfolge,
         DateTimeOffset? nachgewiesenAm,
         DateTimeOffset? geholtAm,
-        IReadOnlyList<Repository> repositories) =>
-        new(wer, login, einmalzeichenfolge, nachgewiesenAm, geholtAm, [.. repositories]);
+        IReadOnlyList<Repository> repositories,
+        bool sprachenVollstaendig = true) =>
+        new(wer, login, einmalzeichenfolge, nachgewiesenAm, geholtAm,
+            [.. repositories], sprachenVollstaendig);
 
     /// <summary>Ein anderes Konto nennen — der Nachweis fällt damit weg.</summary>
     /// <remarks>
@@ -126,7 +204,7 @@ public sealed class Verbindung
     {
         var neuer = Geprueft(login);
 
-        if (string.Equals(neuer, Login, StringComparison.OrdinalIgnoreCase))
+        if (Login is not null && string.Equals(neuer, Login, StringComparison.OrdinalIgnoreCase))
         {
             // Nur die Schreibweise hat sich geändert — das ist kein anderes
             // Konto, und ein erbrachter Nachweis gilt weiter.
@@ -139,6 +217,26 @@ public sealed class Verbindung
         NachgewiesenAm = null;
         GeholtAm = null;
         _repositories.Clear();
+        SprachenVollstaendig = true;
+    }
+
+    /// <summary>Trägt den Namen ein, den GitHub gemeldet hat.</summary>
+    /// <remarks>
+    /// Nur für eine Verbindung, die noch keinen trägt. Wäre schon einer
+    /// genannt, dann müsste er <em>verglichen</em> und nicht überschrieben
+    /// werden — sonst nennt jemand <c>torvalds</c>, meldet sich selbst an und
+    /// bekäme den Nachweis stillschweigend auf sein eigenes Konto umgeschrieben.
+    /// </remarks>
+    /// <exception cref="SchonGenannt">Es steht bereits ein Konto darauf.</exception>
+    /// <exception cref="Loginfehler">Der Benutzername taugt nicht.</exception>
+    public void Nenne_erstmalig(string login)
+    {
+        if (Login is not null)
+        {
+            throw new SchonGenannt();
+        }
+
+        Login = Geprueft(login);
     }
 
     /// <summary>Hält fest, dass der Nachweis erbracht ist.</summary>
@@ -160,14 +258,17 @@ public sealed class Verbindung
     /// gehabt zu haben.
     /// </remarks>
     /// <exception cref="NichtNachgewiesen">Die Verbindung ist nicht bewiesen.</exception>
-    public void Lege_ab(IReadOnlyList<Repository> repositories, DateTimeOffset jetzt)
+    public void Lege_ab(Abzug abzug, DateTimeOffset jetzt)
     {
-        ArgumentNullException.ThrowIfNull(repositories);
+        ArgumentNullException.ThrowIfNull(abzug);
 
         if (!Nachgewiesen)
         {
             throw new NichtNachgewiesen();
         }
+
+        var repositories = abzug.Repositories;
+        SprachenVollstaendig = abzug.SprachenVollstaendig;
 
         // Neueste zuerst. NICHT nach Sternen: die messen Sichtbarkeit, nicht
         // Arbeit — und eine Sortierung ist bereits eine Wertung.

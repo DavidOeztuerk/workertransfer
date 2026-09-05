@@ -10,6 +10,7 @@ public sealed record Stellenangaben(
     string Titel,
     string Beschreibung,
     string Ort,
+    string Postleitzahl,
     Remotegrad Remote,
     Anstellungsart Art,
     IReadOnlyList<string> Faehigkeiten);
@@ -37,6 +38,7 @@ public sealed class StelleAnlegenHandler(IStellenspeicher speicher, TimeProvider
 
         var stelle = Stelle.Lege_an(
             request.Firma, angaben.Titel, angaben.Beschreibung, angaben.Ort,
+            angaben.Postleitzahl,
             angaben.Remote, angaben.Art, Faehigkeitenliste.Aus(angaben.Faehigkeiten),
             uhr.GetUtcNow());
 
@@ -75,7 +77,8 @@ public sealed class StelleAendernHandler(IStellenspeicher speicher, TimeProvider
         var angaben = request.Angaben;
 
         stelle.Aendere(
-            angaben.Titel, angaben.Beschreibung, angaben.Ort, angaben.Remote,
+            angaben.Titel, angaben.Beschreibung, angaben.Ort, angaben.Postleitzahl,
+            angaben.Remote,
             angaben.Art, Faehigkeitenliste.Aus(angaben.Faehigkeiten), uhr.GetUtcNow());
 
         await speicher.SichereAsync(stelle, cancellationToken);

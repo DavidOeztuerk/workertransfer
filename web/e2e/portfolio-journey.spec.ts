@@ -10,6 +10,7 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
+  waehleImFeld,
 } from "./stack";
 
 skipWithoutStack();
@@ -61,7 +62,7 @@ test("Profil und Portfolio sind zwei getrennte Freigaben", async ({ browser }) =
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
+  await waehleImFeld(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   // Das Profil ist da — die Arbeiten nicht. Genau das ist der Punkt: die

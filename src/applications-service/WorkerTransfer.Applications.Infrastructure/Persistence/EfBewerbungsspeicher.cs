@@ -112,7 +112,10 @@ public sealed class EfBewerbungsspeicher(ApplicationsDbContext kontext) : IBewer
             new TenantId(zeile.TenantId),
             new SubjectId(zeile.SubjectId),
             zeile.Message,
-            new Mitgeschicktes(zeile.SharesResume, zeile.SharesPortfolio),
+            new Mitgeschicktes(
+                zeile.SharesResume,
+                zeile.SharesPortfolio,
+                System.Text.Json.JsonSerializer.Deserialize<List<Guid>>(zeile.Documents) ?? []),
             Bewerbungsstaende.Lies(zeile.Status)
             ?? throw new InvalidOperationException(
                 $"Unbekannter Bewerbungsstand in der Datenbank: {zeile.Status}"),
@@ -146,6 +149,8 @@ public sealed class EfBewerbungsspeicher(ApplicationsDbContext kontext) : IBewer
         zeile.Message = bewerbung.Nachricht;
         zeile.SharesResume = bewerbung.Mitgeschickt.Lebenslauf;
         zeile.SharesPortfolio = bewerbung.Mitgeschickt.Portfolio;
+        zeile.Documents = System.Text.Json.JsonSerializer.Serialize(
+            bewerbung.Mitgeschickt.Unterlagen);
         zeile.Status = Bewerbungsstaende.Wort(bewerbung.Stand);
         zeile.UpdatedAt = bewerbung.GeaendertAm.UtcDateTime;
         zeile.AnsweredAt = bewerbung.BeantwortetAm?.UtcDateTime;

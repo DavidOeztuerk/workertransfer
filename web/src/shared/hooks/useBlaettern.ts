@@ -14,6 +14,15 @@ export interface Seite<T> {
   pageSize: number;
   totalItems: number;
   totalPages: number;
+  /**
+   * Wie viele Einträge ein Filter nicht beurteilen konnte und deshalb
+   * weggelassen hat. `null`, wenn die Frage sich nicht stellte.
+   *
+   * Steht hier und nicht nur bei den Stellen, weil es die Eigenschaft einer
+   * Seite ist und nicht die einer Domäne: jede Liste, deren Filter über einen
+   * Teil der Menge nichts sagen kann, muss das sagen können.
+   */
+  omitted?: number | null;
 }
 
 /** Ein Ergebnis: entweder eine Seite oder ein Fehlschlag. */
@@ -27,6 +36,8 @@ export interface Blaettern<T, F> {
   pageSize: number;
   totalItems: number;
   totalPages: number;
+  /** Siehe `Seite.omitted`. */
+  omitted: number | null;
   pending: boolean;
   fehler: F | null;
   gehe: (page: number) => void;
@@ -67,13 +78,30 @@ export function useBlaettern<T, F>(
     items: T[];
     totalItems: number;
     totalPages: number;
+    omitted: number | null;
     pending: boolean;
     fehler: F | null;
-  }>({ key, items: [], totalItems: 0, totalPages: 1, pending: aktiv, fehler: null });
+  }>({
+    key,
+    items: [],
+    totalItems: 0,
+    totalPages: 1,
+    omitted: null,
+    pending: aktiv,
+    fehler: null,
+  });
 
   // Siehe oben: WÄHREND des Zeichnens, nicht im Effekt.
   if (state.key !== key) {
-    setState({ key, items: [], totalItems: 0, totalPages: 1, pending: aktiv, fehler: null });
+    setState({
+      key,
+      items: [],
+      totalItems: 0,
+      totalPages: 1,
+      omitted: null,
+      pending: aktiv,
+      fehler: null,
+    });
     setPage(1);
   }
 
@@ -98,6 +126,7 @@ export function useBlaettern<T, F>(
                 items: result.seite.items,
                 totalItems: result.seite.totalItems,
                 totalPages: result.seite.totalPages,
+                omitted: result.seite.omitted ?? null,
                 pending: false,
                 fehler: null,
               }
@@ -135,6 +164,7 @@ export function useBlaettern<T, F>(
     pageSize,
     totalItems: state.totalItems,
     totalPages: state.totalPages,
+    omitted: state.omitted,
     pending: state.pending,
     fehler: state.fehler,
     gehe,

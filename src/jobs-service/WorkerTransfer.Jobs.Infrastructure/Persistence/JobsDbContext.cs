@@ -17,6 +17,9 @@ public sealed class StellenZeile
 
     public string Location { get; set; } = string.Empty;
 
+    /// <summary>Die Postleitzahl. Leer, wenn keine angegeben wurde.</summary>
+    public string PostalCode { get; set; } = string.Empty;
+
     public string RemoteMode { get; set; } = "none";
 
     public string EmploymentType { get; set; } = "full_time";
@@ -52,6 +55,8 @@ public sealed class JobsDbContext(DbContextOptions<JobsDbContext> options) : DbC
             zeile.Property(eintrag => eintrag.Description)
                 .HasColumnName("description").IsRequired();
             zeile.Property(eintrag => eintrag.Location).HasColumnName("location").IsRequired();
+            zeile.Property(eintrag => eintrag.PostalCode)
+                .HasColumnName("postal_code").IsRequired().HasDefaultValue(string.Empty);
             zeile.Property(eintrag => eintrag.RemoteMode).HasColumnName("remote_mode").IsRequired();
             zeile.Property(eintrag => eintrag.EmploymentType)
                 .HasColumnName("employment_type").IsRequired();

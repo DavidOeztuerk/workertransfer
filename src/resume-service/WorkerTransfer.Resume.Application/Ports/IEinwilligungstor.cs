@@ -38,6 +38,21 @@ public static class Einwilligungsschluessel
     /// see.
     /// </remarks>
     public static string Lebenslauf(TenantId firma) => $"resume.visibility:tenant:{firma}";
+
+    /// <summary>Zeugnisse und Zertifikate — eine eigene Fähigkeit.</summary>
+    /// <remarks>
+    /// <strong>Nicht unter <c>resume</c> mitgeführt</strong>, obwohl beides
+    /// „Unterlagen" heißt: der Werdegang ist selbst geschriebener Text, ein
+    /// Zeugnis ist ein Dokument Dritter mit Namen, Noten und Unterschriften.
+    /// Wer das eine zeigen will und das andere nicht, muss das können — und
+    /// eine Fähigkeit, die zwei Dinge freigibt, lässt sich nur ganz oder gar
+    /// nicht widerrufen (ADR-0035).
+    /// <para>
+    /// Auch hier ohne öffentliches Gegenstück: es gibt <c>documents.visibility:
+    /// tenant:&lt;id&gt;</c> und nichts, was „alle" hieße.
+    /// </para>
+    /// </remarks>
+    public static string Unterlagen(TenantId firma) => $"documents.visibility:tenant:{firma}";
 }
 
 /// <summary>Reads <em>and</em> writes the ledger — unlike the profile service.</summary>
@@ -56,6 +71,15 @@ public interface IEinwilligungstor
     /// <summary>Whether this company may read this person's résumé right now.</summary>
     /// <exception cref="EinwilligungSchweigt">The ledger did not answer.</exception>
     Task<bool> DarfLebenslaufLesenAsync(
+        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default);
+
+    /// <summary>Ob dieses Unternehmen die Unterlagen dieser Person sehen darf.</summary>
+    /// <remarks>
+    /// Synchron und ohne Zwischenspeicher wie alles hier: ein Widerruf muss auf
+    /// den nächsten Aufruf wirken, nicht auf den übernächsten (ADR-0013).
+    /// </remarks>
+    /// <exception cref="EinwilligungSchweigt">The ledger did not answer.</exception>
+    Task<bool> DarfUnterlagenSehenAsync(
         SubjectId wer, TenantId firma, CancellationToken cancellationToken = default);
 
     /// <summary>

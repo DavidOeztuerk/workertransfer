@@ -19,7 +19,11 @@ internal sealed record EintragZeile(
     [property: JsonPropertyName("url")] string? Url,
     [property: JsonPropertyName("role")] string Role,
     [property: JsonPropertyName("year")] int? Year,
-    [property: JsonPropertyName("attachment")] string? Attachment);
+    [property: JsonPropertyName("attachment")] string? Attachment,
+    // Nachträglich dazugekommen: ältere Zeilen haben das Feld nicht, und `null`
+    // wird beim Lesen zu einer leeren Liste. Eine Nachwanderung braucht es
+    // nicht — beim nächsten Speichern steht es da.
+    [property: JsonPropertyName("technologies")] IReadOnlyList<string>? Technologies = null);
 
 /// <summary>Liest und schreibt <c>portfolios</c>.</summary>
 public sealed class EfPortfoliospeicher(PortfolioDbContext kontext, TimeProvider uhr)
@@ -42,7 +46,7 @@ public sealed class EfPortfoliospeicher(PortfolioDbContext kontext, TimeProvider
         var eintraege = (JsonSerializer.Deserialize<List<EintragZeile>>(zeile.Items) ?? [])
             .Select(gelesen => Eintrag.Aus(
                 gelesen.Title, jetzt, gelesen.Summary, gelesen.Url,
-                gelesen.Role, gelesen.Year, gelesen.Attachment))
+                gelesen.Role, gelesen.Year, gelesen.Attachment, gelesen.Technologies))
             .ToList();
 
         return Domain.Portfolios.Portfolio.Stelle_her(
@@ -61,7 +65,7 @@ public sealed class EfPortfoliospeicher(PortfolioDbContext kontext, TimeProvider
         var geschrieben = JsonSerializer.Serialize(
             portfolio.Eintraege.Select(eintrag => new EintragZeile(
                 eintrag.Titel, eintrag.Zusammenfassung, eintrag.Link,
-                eintrag.Rolle, eintrag.Jahr, eintrag.Anhang)));
+                eintrag.Rolle, eintrag.Jahr, eintrag.Anhang, eintrag.Technologien)));
 
         var vorhanden = await kontext.Portfolios
             .AsTracking()

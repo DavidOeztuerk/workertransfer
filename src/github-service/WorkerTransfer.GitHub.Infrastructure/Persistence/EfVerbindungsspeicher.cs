@@ -18,7 +18,12 @@ internal sealed record RepoAblage(
     [property: JsonPropertyName("language")] string? Language,
     [property: JsonPropertyName("stars")] int Stars,
     [property: JsonPropertyName("url")] string Url,
-    [property: JsonPropertyName("pushed_at")] DateTimeOffset? PushedAt);
+    [property: JsonPropertyName("pushed_at")] DateTimeOffset? PushedAt,
+    // Nachträglich dazugekommen: ältere Zeilen haben die beiden Felder nicht,
+    // und `null` wird beim Lesen zu einer leeren Liste. Eine Nachwanderung
+    // braucht es dafür nicht — beim nächsten Abruf stehen sie da.
+    [property: JsonPropertyName("languages")] IReadOnlyList<string>? Languages = null,
+    [property: JsonPropertyName("topics")] IReadOnlyList<string>? Topics = null);
 
 /// <summary>Liest und schreibt <c>github_connections</c>.</summary>
 public sealed class EfVerbindungsspeicher(GitHubDbContext kontext) : IVerbindungsspeicher
@@ -73,10 +78,12 @@ public sealed class EfVerbindungsspeicher(GitHubDbContext kontext) : IVerbindung
         zeile.Challenge = verbindung.Einmalzeichenfolge;
         zeile.VerifiedAt = verbindung.NachgewiesenAm?.UtcDateTime;
         zeile.FetchedAt = verbindung.GeholtAm?.UtcDateTime;
+        zeile.LanguagesComplete = verbindung.SprachenVollstaendig;
         zeile.Repositories = JsonSerializer.Serialize(
             verbindung.Repositories.Select(eintrag => new RepoAblage(
                 eintrag.Name, eintrag.Beschreibung, eintrag.Sprache,
-                eintrag.Sterne, eintrag.Adresse, eintrag.ZuletztGeschoben)));
+                eintrag.Sterne, eintrag.Adresse, eintrag.ZuletztGeschoben,
+                eintrag.Sprachen, eintrag.Themen)));
         zeile.UpdatedAt = DateTime.UtcNow;
     }
 
@@ -95,7 +102,9 @@ public sealed class EfVerbindungsspeicher(GitHubDbContext kontext) : IVerbindung
             [
                 .. abgelegt.Select(eintrag => new Repository(
                     eintrag.Name, eintrag.Description, eintrag.Language,
-                    eintrag.Stars, eintrag.Url, eintrag.PushedAt))
-            ]);
+                    eintrag.Stars, eintrag.Url, eintrag.PushedAt,
+                    eintrag.Languages ?? [], eintrag.Topics ?? []))
+            ],
+            zeile.LanguagesComplete);
     }
 }

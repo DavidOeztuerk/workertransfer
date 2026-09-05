@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
@@ -22,6 +23,7 @@ import {
   remoteLabel,
   type SearchFilters,
   type SucheFehlschlag,
+  ortZuPunkt,
   searchJobs,
 } from "../api/jobs";
 import { getMyProfile } from "../api/profile";
@@ -40,6 +42,23 @@ import {
   LEERER_FILTER,
   type Stellenfilter,
 } from "../components/JobFilterSidebar";
+import { useGeolocation } from "../../../shared/hooks/useGeolocation";
+
+/**
+ * Was gesucht wurde: die Filter des Formulars UND der Punkt, der beim Absenden
+ * bekannt war.
+ *
+ * Der Standort steht getrennt, weil er kein Formularfeld ist: er kommt vom
+ * Browser, nicht aus einer Eingabe. Er gehört aber in denselben Zustand wie die
+ * Filter, damit ein Wechsel des Standorts dieselbe Wirkung hat wie ein
+ * Filterwechsel — nämlich eine neue Suche ab Seite eins.
+ */
+interface Angewandt extends Stellenfilter {
+  lat: number | null;
+  lon: number | null;
+}
+
+const NICHTS_GESUCHT: Angewandt = { ...LEERER_FILTER, lat: null, lon: null };
 
 /**
  * Aus dem Formularzustand wird die Anfrage.
@@ -48,7 +67,26 @@ import {
  * tippt, und gehen als Liste hinaus, weil der Server sie so erwartet. Die
  * Trennung passiert genau hier und nirgends sonst.
  */
-function zuFiltern(filter: Stellenfilter): SearchFilters {
+function zuFiltern(filter: Angewandt): SearchFilters {
+  const radiusKm = Number(filter.radius);
+
+  /*
+   * Der Radius geht mit, sobald einer gewählt wurde. Die Koordinaten nur, wenn
+   * es welche gibt — sonst ist der ORT die Mitte, und der Dienst löst ihn auf.
+   *
+   * Die Oberfläche lässt eine Entfernung ohnehin erst zu, wenn eine Mitte da
+   * ist: ein Standort oder ein getippter Ort.
+   */
+  const umkreis =
+    Number.isFinite(radiusKm) && radiusKm > 0
+      ? {
+          radiusKm,
+          ...(filter.lat !== null && filter.lon !== null
+            ? { lat: filter.lat, lon: filter.lon }
+            : {}),
+        }
+      : {};
+
   return {
     q: filter.q,
     location: filter.location,
@@ -58,6 +96,7 @@ function zuFiltern(filter: Stellenfilter): SearchFilters {
       .split(",")
       .map((einzeln) => einzeln.trim())
       .filter((einzeln) => einzeln !== ""),
+    ...umkreis,
   };
 }
 
@@ -70,11 +109,60 @@ function zuFiltern(filter: Stellenfilter): SearchFilters {
  * flackerte, während jemand ein Wort tippt.
  */
 export function JobsPage() {
+  // OHNE Vorspann. Hier stand „Was hier steht, haben Unternehmen selbst
+  // veröffentlicht. Zum Lesen brauchst du kein Konto — erst zum Bewerben."
+  // Beide Sätze erklären, was die Seite selbst schon zeigt: dass sie ohne
+  // Anmeldung dasteht, und dass unter jeder Karte ein Knopf „Bewerben" sitzt.
+  // Zwei Zeilen, die den ersten Treffer nach unten schieben.
   const { t } = useTranslation();
   const { signedIn, laedt } = useHandelnder();
   const [form, setForm] = useState<Stellenfilter>(LEERER_FILTER);
-  const [applied, setApplied] = useState<Stellenfilter>(LEERER_FILTER);
+  const [applied, setApplied] = useState<Angewandt>(NICHTS_GESUCHT);
   const navigate = useNavigate();
+
+  // Der Standort wird nie beim Laden erfragt — nur auf Knopfdruck in der
+  // Seitenleiste, und er wird nirgends gespeichert. Siehe `useGeolocation`.
+  const ortung = useGeolocation();
+
+  /*
+   * DER GEFUNDENE STANDORT WIRD SICHTBAR — er landet im Ortsfeld.
+   *
+   * Ein Umkreis um einen unsichtbaren Punkt ist eine Zumutung: die Liste würde
+   * sich ändern, und niemand könnte sagen, wovon aus gemessen wurde. Der Name
+   * kommt aus derselben Tabelle wie die Suche selbst, nicht von einem
+   * Fremdanbieter.
+   *
+   * Der Merker verhindert die Schleife: das Setzen ändert das Formular, das
+   * Formular ist aber keine Abhängigkeit dieses Effekts — geholt wird je
+   * Position genau einmal.
+   */
+  const geholtFuer = useRef<string | null>(null);
+
+  useEffect(() => {
+    const standort = ortung.standort;
+
+    if (standort === null) {
+      geholtFuer.current = null;
+      return;
+    }
+
+    const schluessel = `${standort.lat},${standort.lon}`;
+
+    if (geholtFuer.current === schluessel) return;
+    geholtFuer.current = schluessel;
+
+    const abbruch = new AbortController();
+
+    void ortZuPunkt(standort.lat, standort.lon, abbruch.signal).then((name) => {
+      // `null` heisst „nichts in der Nähe" — dann bleibt das Feld, wie es war,
+      // statt einen Ort zu behaupten.
+      if (name !== null) {
+        setForm((vorher) => ({ ...vorher, location: name }));
+      }
+    });
+
+    return () => abbruch.abort();
+  }, [ortung.standort]);
 
   const load = useCallback(
     (page: number, pageSize: number, signal: AbortSignal) =>
@@ -114,10 +202,7 @@ export function JobsPage() {
   const firmen = useFirmenprofile(list.items.map((job) => job.tenant_id));
 
   return (
-    <PageShell
-      title={t("stellen.titel")}
-      lead={t("stellen.lead")}
-    >
+    <PageShell title={t("stellen.titel")}>
       <Box
         sx={{
           display: "grid",
@@ -129,10 +214,18 @@ export function JobsPage() {
         <JobFilterSidebar
           entwurf={form}
           onChange={setForm}
-          onSubmit={() => setApplied(form)}
+          ortung={ortung}
+          onSubmit={() =>
+            setApplied({
+              ...form,
+              lat: ortung.standort?.lat ?? null,
+              lon: ortung.standort?.lon ?? null,
+            })
+          }
           onReset={() => {
             setForm(LEERER_FILTER);
-            setApplied(LEERER_FILTER);
+            setApplied(NICHTS_GESUCHT);
+            ortung.vergiss();
           }}
         />
 
@@ -149,6 +242,18 @@ export function JobsPage() {
           title={t("stellen.leerTitel")}
           hint={t("stellen.leerHinweis")}
         />
+      ) : null}
+
+      {/*
+        WAS DER FILTER NICHT BEURTEILEN KONNTE, steht über der Liste und nicht
+        klein darunter. Eine Umkreissuche kann über eine Anzeige, deren Ort die
+        Ortstabelle nicht kennt, nichts sagen — sie stumm wegzulassen ergäbe ein
+        Ergebnis, das vollständig aussieht und es nicht ist (ADR-0022 §3).
+      */}
+      {list.omitted !== null && list.omitted > 0 ? (
+        <Alert severity="info" icon={false} sx={{ mb: 2 }}>
+          {t("stellen.ohneOrt", { count: list.omitted })}
+        </Alert>
       ) : null}
 
       {list.items.length > 0 ? (

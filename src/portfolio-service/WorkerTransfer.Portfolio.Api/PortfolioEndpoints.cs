@@ -248,14 +248,14 @@ public static class PortfolioEndpoints
 
         return [.. (koerper.Items ?? []).Select(eintrag => Eintrag.Aus(
             eintrag.Title, jetzt, eintrag.Summary, eintrag.Url,
-            eintrag.Role, eintrag.Year, eintrag.Attachment))];
+            eintrag.Role, eintrag.Year, eintrag.Attachment, eintrag.Technologies))];
     }
 
     private static PortfolioV1 Antwort(Domain.Portfolios.Portfolio portfolio) => new(
         portfolio.Wer.Value,
         [.. portfolio.Eintraege.Select(eintrag => new EintragV1(
             eintrag.Titel, eintrag.Zusammenfassung, eintrag.Link,
-            eintrag.Rolle, eintrag.Jahr, eintrag.Anhang))],
+            eintrag.Rolle, eintrag.Jahr, eintrag.Anhang, eintrag.Technologien))],
         portfolio.GeaendertAm);
 
     private static Task NichtAngemeldet(HttpContext context) =>

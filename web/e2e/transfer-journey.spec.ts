@@ -13,6 +13,7 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
+  waehleImFeld,
 } from "./stack";
 
 skipWithoutStack();
@@ -53,8 +54,8 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
-  // Warten, bis der Wechsel wirklich gilt: `selectOption` stößt ihn nur an.
+  await waehleImFeld(recruiter, /Handeln als/i, companyName);
+  // Warten, bis der Wechsel wirklich gilt: Die Wahl stößt ihn nur an.
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/candidates");
@@ -179,7 +180,7 @@ test("ohne Freigabe des Marktstatus gibt es nichts zu sehen und nichts zu tun", 
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
+  await waehleImFeld(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/candidates");

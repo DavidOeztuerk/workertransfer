@@ -24,7 +24,8 @@ public static class Einwilligungsschluessel
     /// mitschickt. Jede nennt <em>diesen einen</em> Empfänger, nie „alle":
     /// wer sich bei einem Unternehmen bewirbt, hat den anderen nichts gesagt.
     /// </remarks>
-    public static IReadOnlyList<string> Fuer(TenantId firma, bool lebenslauf, bool portfolio)
+    public static IReadOnlyList<string> Fuer(
+        TenantId firma, bool lebenslauf, bool portfolio, bool unterlagen = false)
     {
         var schluessel = new List<string> { $"profile.visibility:tenant:{firma}" };
 
@@ -38,6 +39,16 @@ public static class Einwilligungsschluessel
             schluessel.Add($"portfolio.visibility:tenant:{firma}");
         }
 
+        if (unterlagen)
+        {
+            // EIGENE Fähigkeit und nicht unter `resume` mitgeführt: Zeugnisse
+            // und Zertifikate sind eine andere Datenklasse als der Werdegang,
+            // und wer sie einzeln zurückziehen will, muss das können. Eine
+            // Fähigkeit, die zwei Dinge freigibt, lässt sich nur ganz oder gar
+            // nicht widerrufen.
+            schluessel.Add($"documents.visibility:tenant:{firma}");
+        }
+
         return schluessel;
     }
 
@@ -49,7 +60,7 @@ public static class Einwilligungsschluessel
     /// und der Ledger verträgt einen Widerruf ohne vorherige Erteilung.
     /// </remarks>
     public static IReadOnlyList<string> Alles(TenantId firma) =>
-        Fuer(firma, lebenslauf: true, portfolio: true);
+        Fuer(firma, lebenslauf: true, portfolio: true, unterlagen: true);
 }
 
 /// <summary>Schreibt in den Ledger — und liest nie aus ihm.</summary>

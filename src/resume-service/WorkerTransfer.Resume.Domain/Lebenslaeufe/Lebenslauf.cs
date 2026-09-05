@@ -50,6 +50,24 @@ public sealed class Lebenslauf
     /// <summary>When it last changed.</summary>
     public DateTimeOffset Geaendert { get; private set; }
 
+    /// <summary>In welcher Vorlage er gesetzt wird.</summary>
+    /// <remarks>
+    /// Ein Name, kein Layout — siehe <see cref="Lebenslaeufe.Vorlage" />. Er
+    /// steht am Lebenslauf und nicht an der Bewerbung, weil die Person ihn
+    /// einmal wählt und nicht je Unternehmen; und weil sie ihn danach ändern
+    /// darf, ohne dass eine abgeschickte Bewerbung sich rückwirkend umzieht:
+    /// die Mappe zeigt die Vorlage, die zum Zeitpunkt des Lesens gilt, und das
+    /// ist die der Person.
+    /// </remarks>
+    public Vorlage Vorlage { get; private set; } = Vorlage.Schlicht;
+
+    /// <summary>Wählt die Vorlage.</summary>
+    public void Waehle_vorlage(Vorlage vorlage, DateTimeOffset jetzt)
+    {
+        Vorlage = vorlage;
+        Geaendert = jetzt;
+    }
+
     /// <summary>Writes a new one.</summary>
     /// <exception cref="Lebenslaufregel">The entries break a rule of the whole.</exception>
     public static Lebenslauf Anlegen(
@@ -76,9 +94,13 @@ public sealed class Lebenslauf
         IReadOnlyList<Station> stationen,
         IReadOnlyList<Ausbildung> ausbildungen,
         DateTimeOffset angelegt,
-        DateTimeOffset geaendert) =>
+        DateTimeOffset geaendert,
+        Vorlage vorlage = Vorlage.Schlicht) =>
         new(wer, Sortiert(stationen, s => s.Ende, s => s.Beginn),
-            Sortiert(ausbildungen, a => a.Ende, a => a.Beginn), angelegt, geaendert);
+            Sortiert(ausbildungen, a => a.Ende, a => a.Beginn), angelegt, geaendert)
+        {
+            Vorlage = vorlage
+        };
 
     /// <summary>Replaces both lists at once.</summary>
     /// <remarks>

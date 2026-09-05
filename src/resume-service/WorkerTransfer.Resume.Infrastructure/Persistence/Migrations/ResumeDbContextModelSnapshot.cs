@@ -23,7 +23,9 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "audit_action", new[] { "resume_saved", "resume_requested", "request_granted", "request_declined", "access_revoked", "subject_erased" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "document_kind", new[] { "zeugnis", "zertifikat", "sonstiges" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "request_status", new[] { "pending", "granted", "declined" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "resume_template", new[] { "schlicht", "klassisch", "modern" });
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("WorkerTransfer.Outbox.OutboxZeile", b =>
@@ -133,6 +135,10 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("positions");
 
+                    b.Property<int>("Template")
+                        .HasColumnType("integer")
+                        .HasColumnName("template");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -140,6 +146,8 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("resumes", (string)null);
+
+                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.PruefZeile", b =>
@@ -180,6 +188,53 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence.Migrations
                     b.HasIndex("TargetId");
 
                     b.ToTable("audit_events", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.UnterlageZeile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SizeBytes")
+                        .HasColumnType("integer")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("storage_key");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubjectId");
+
+                    b.ToTable("resume_documents", (string)null);
                 });
 #pragma warning restore 612, 618
         }

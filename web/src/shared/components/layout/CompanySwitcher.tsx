@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import { useTranslation } from "react-i18next";
 
@@ -39,7 +40,6 @@ export function CompanySwitcher() {
       // E2E-Reisen findet. Die MUI-Fassung sieht nur so aus.
       // `inputLabel.shrink`: ein natives Feld zeigt seinen Wert sofort, die
       // schwebende Beschriftung laege sonst darueber.
-      slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
       size="small"
       label={t("kopf.handelnAls")}
       value={tenantId ?? ""}
@@ -49,13 +49,13 @@ export function CompanySwitcher() {
       }}
       sx={{ minWidth: 200, display: { xs: "none", md: "block" } }}
     >
-      <option value="" disabled>
+      <MenuItem value="" disabled>
         {t("kopf.ichSelbst")}
-      </option>
+      </MenuItem>
       {memberships.map((firma) => (
-        <option key={firma.id} value={firma.id}>
+        <MenuItem key={firma.id} value={firma.id}>
           {firma.name}
-        </option>
+        </MenuItem>
       ))}
     </TextField>
   );

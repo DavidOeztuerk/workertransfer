@@ -304,6 +304,7 @@ public static class BewerbungsEndpoints
             bewerbung.Nachricht,
             bewerbung.Mitgeschickt.Lebenslauf,
             bewerbung.Mitgeschickt.Portfolio,
+            bewerbung.Mitgeschickt.Unterlagen,
             Bewerbungsstaende.Wort(bewerbung.Stand),
             bewerbung.AngelegtAm,
             bewerbung.GeaendertAm);

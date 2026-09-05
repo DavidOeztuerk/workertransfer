@@ -357,6 +357,17 @@ gruppen:
       - { methode: GET, pfad: '/github/me', ohne: 401, person: 200, firma: 200 }
       - { methode: DELETE, pfad: '/github/me', ohne: 401, person: 204, firma: 204 }
       - { methode: GET, pfad: '/github/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+      # Die Anmeldung ueber GitHub. `/github/oauth` traegt nichts Persoenliches
+      # — es sagt, ob DIESER SERVER sie eingerichtet hat — und legt nichts an;
+      # `/me/oauth/start` legt an und wird darum erst auf Knopfdruck gerufen.
+      - { methode: GET, pfad: '/github/oauth', ohne: 401, person: 200, firma: 200 }
+      - { methode: POST, pfad: '/github/me/oauth/start', ohne: 401, person: 200, firma: 200 }
+      # 422 und nicht 404, und die Zeile darueber ist der Grund: `start` hat
+      # gerade eine Verbindung angelegt (ohne genanntes Konto — den Namen
+      # meldet GitHub). Es gibt hier also etwas, nur passt der `state` nicht —
+      # „nicht bewiesen" statt „nichts da". Vor der Umstellung legte `start`
+      # nichts an und dieselbe Anfrage bekam 404.
+      - { methode: POST, pfad: '/github/me/oauth/finish', ohne: 401, person: 422, firma: 422 }
 
   - name: 'Benachrichtigungen'
     warum: |

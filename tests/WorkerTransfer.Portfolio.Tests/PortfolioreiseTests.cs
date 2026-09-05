@@ -107,6 +107,65 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
             }
         });
 
+    /// <summary>
+    /// Technologien an einer Arbeit: <strong>vereinheitlicht und entdoppelt</strong>.
+    /// </summary>
+    /// <remarks>
+    /// Derselbe Wortschatz wie im Profil und am Lebenslauf — „postgres" heisst
+    /// überall „PostgreSQL" (ADR-0023). Erst vereinheitlichen, dann entdoppeln:
+    /// anders herum stünden beide Schreibweisen als zwei Einträge da.
+    /// <para>
+    /// Der Grund für das Feld: es ist ein Ort, an dem jemand NENNEN kann, was
+    /// er kann. Durchsuchbar wird die Arbeit dadurch nicht — suchbar ist nur
+    /// das Profil, und dorthin kommt eine Fähigkeit mit einem Klick.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Technologien_werden_vereinheitlicht_und_entdoppelt()
+    {
+        var browser = Als(Guid.CreateVersion7());
+
+        var geschrieben = await browser.PutAsJsonAsync("/portfolios/me", new
+        {
+            items = new[]
+            {
+                new
+                {
+                    title = "Ein Projekt",
+                    summary = string.Empty,
+                    url = (string?)null,
+                    role = string.Empty,
+                    year = (int?)null,
+                    attachment = (string?)null,
+                    technologies = new[] { "postgres", "PostgreSQL", " Go ", string.Empty }
+                }
+            }
+        });
+
+        geschrieben.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await Json(geschrieben)).GetProperty("items")[0]
+            .GetProperty("technologies").EnumerateArray()
+            .Select(eintrag => eintrag.GetString())
+            .Should().Equal("PostgreSQL", "Go");
+    }
+
+    /// <summary>Eine Arbeit ohne Technologien ist kein Fehler, sondern leer.</summary>
+    /// <remarks>
+    /// Ältere Zeilen tragen das Feld gar nicht — sie sollen weiterlesbar sein,
+    /// ohne dass jemand eine Nachwanderung fährt.
+    /// </remarks>
+    [Fact]
+    public async Task Ohne_Technologien_bleibt_die_Liste_leer()
+    {
+        var browser = Als(Guid.CreateVersion7());
+
+        var geschrieben = await Schreibe(browser);
+
+        (await Json(geschrieben)).GetProperty("items")[0]
+            .GetProperty("technologies").GetArrayLength().Should().Be(0);
+    }
+
     private async Task<string> LadeHoch(HttpClient browser, string inhalt = "Arbeitsprobe")
     {
         using var formular = new MultipartFormDataContent();

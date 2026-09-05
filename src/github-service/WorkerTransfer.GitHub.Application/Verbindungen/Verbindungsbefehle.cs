@@ -38,6 +38,48 @@ public sealed record VerbindenBefehl(SubjectId Wer, string Login)
 /// <summary>Nachweis prüfen und im selben Zug den Abzug holen.</summary>
 public sealed record NachweisenBefehl(SubjectId Wer) : IBefehl<Verbindungsergebnis>;
 
+/// <summary>Ist die Anmeldung über GitHub überhaupt eingerichtet?</summary>
+/// <remarks>
+/// Eine Aussage über <em>diesen Server</em>, nicht über einen Menschen: sie
+/// trägt nichts Persönliches und legt nichts an. Die Oberfläche braucht sie,
+/// bevor jemand klickt — ein Knopf, der auf eine Adresse zeigt, die es nicht
+/// gibt, wäre schlimmer als kein Knopf, und andersherum wäre die Gist-Anleitung
+/// als einziger Weg eine Zumutung, wo ein Knopf genügt.
+/// </remarks>
+public sealed record AnmeldungMoeglichAbfrage : IAbfrage<bool>;
+
+/// <summary>Wohin der Browser für die Anmeldung bei GitHub geschickt wird.</summary>
+/// <remarks>
+/// <strong>Ein Befehl, weil er etwas anlegt.</strong> Wer noch gar keine
+/// Verbindung hat, bekommt hier eine ohne genanntes Konto: den Namen meldet
+/// GitHub. Früher stand hier eine Abfrage, die ohne Verbindung <c>null</c>
+/// zurückgab — und damit musste jeder <em>erst</em> ein Konto tippen, um sich
+/// anmelden zu dürfen. Das war die Anforderung des Gists, nicht die der
+/// Anmeldung: der Gist muss wissen, in wessen Gists er sucht; GitHub sagt es
+/// von selbst.
+/// <para>
+/// Weil er anlegt, läuft er durch <c>TransaktionsBehavior</c> — eine Abfrage
+/// täte das nicht, und die neue Zeile hinge ohne Commit in der Luft.
+/// </para>
+/// </remarks>
+public sealed record AnmeldungBeginnenBefehl(SubjectId Wer) : IBefehl<Anmeldebeginn>;
+
+/// <summary>Das Ergebnis von <see cref="AnmeldungBeginnenBefehl" />.</summary>
+/// <param name="Adresse">
+/// Wohin der Browser geht — oder <c>null</c>, wenn keine Anmeldung eingerichtet
+/// ist.
+/// </param>
+public sealed record Anmeldebeginn(Uri? Adresse);
+
+/// <summary>Die Rückkehr von GitHub.</summary>
+/// <param name="Code">Der Einmalcode aus der Adresszeile.</param>
+/// <param name="Zustand">
+/// Was GitHub unverändert zurückgereicht hat. Muss der Einmalzeichenfolge der
+/// Verbindung entsprechen — sonst gehört die Antwort zu einer anderen Anfrage.
+/// </param>
+public sealed record AnmeldungAbschliessenBefehl(SubjectId Wer, string Code, string Zustand)
+    : IBefehl<Verbindungsergebnis>;
+
 /// <summary>Den Abzug neu holen.</summary>
 public sealed record AuffrischenBefehl(SubjectId Wer) : IBefehl<Verbindungsergebnis>;
 
@@ -54,10 +96,14 @@ public sealed record SichtbareVerbindungAbfrage(SubjectId Wer) : IAbfrage<Verbin
 public sealed class Verbindungsbefehle(
     IVerbindungsspeicher speicher,
     IGitHub github,
+    IGitHubAnmeldung anmeldung,
     IEinwilligungstor tor,
     TimeProvider uhr) :
     IRequestHandler<VerbindenBefehl, Verbindungsergebnis>,
     IRequestHandler<NachweisenBefehl, Verbindungsergebnis>,
+    IRequestHandler<AnmeldungMoeglichAbfrage, bool>,
+    IRequestHandler<AnmeldungBeginnenBefehl, Anmeldebeginn>,
+    IRequestHandler<AnmeldungAbschliessenBefehl, Verbindungsergebnis>,
     IRequestHandler<AuffrischenBefehl, Verbindungsergebnis>,
     IRequestHandler<TrennenBefehl, bool>,
     IRequestHandler<MeineVerbindungAbfrage, Verbindung?>,
@@ -98,6 +144,105 @@ public sealed class Verbindungsbefehle(
     }
 
     /// <inheritdoc />
+    public Task<bool> Handle(
+        AnmeldungMoeglichAbfrage request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return Task.FromResult(anmeldung.Eingerichtet);
+    }
+
+    /// <inheritdoc />
+    public async Task<Anmeldebeginn> Handle(
+        AnmeldungBeginnenBefehl request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!anmeldung.Eingerichtet)
+        {
+            return new Anmeldebeginn(null);
+        }
+
+        var verbindung = await speicher.HoleAsync(request.Wer, cancellationToken);
+
+        if (verbindung is null)
+        {
+            // NICHTS BEHAUPTEN. Die Verbindung entsteht ohne genanntes Konto —
+            // den Namen meldet GitHub gleich selbst, und nur für das Konto, das
+            // wirklich zugestimmt hat. Es gibt also nichts zu vergleichen und
+            // damit auch keine Möglichkeit, jemandem einen fremden Nachweis
+            // unterzuschieben.
+            verbindung = Verbindung.Erwarte(request.Wer);
+            await speicher.SichereAsync(verbindung, cancellationToken);
+        }
+
+        return new Anmeldebeginn(anmeldung.Anmeldeadresse(verbindung.Einmalzeichenfolge));
+    }
+
+    /// <inheritdoc />
+    public async Task<Verbindungsergebnis> Handle(
+        AnmeldungAbschliessenBefehl request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var verbindung = await speicher.HoleAsync(request.Wer, cancellationToken);
+
+        if (verbindung is null)
+        {
+            return new Verbindungsergebnis.Keine();
+        }
+
+        // DER ZUSTAND ZUERST. Er beweist, dass diese Antwort zu unserer Anfrage
+        // gehört — ohne die Prüfung könnte jemand einer angemeldeten Person
+        // einen fremden Code unterschieben und ihr damit ein fremdes Konto
+        // anhängen.
+        if (!string.Equals(
+                request.Zustand, verbindung.Einmalzeichenfolge, StringComparison.Ordinal))
+        {
+            return new Verbindungsergebnis.NichtBewiesen();
+        }
+
+        if (verbindung.Nachgewiesen)
+        {
+            return new Verbindungsergebnis.Erledigt(verbindung);
+        }
+
+        var angemeldet = await anmeldung.AnmeldenamenAsync(request.Code, cancellationToken);
+
+        if (angemeldet is null)
+        {
+            return new Verbindungsergebnis.NichtBewiesen();
+        }
+
+        if (verbindung.Login is null)
+        {
+            // Nichts genannt, also nichts zu vergleichen: GitHub meldet allein
+            // das Konto, das zugestimmt hat. Der gemeldete Name IST hier der
+            // Nachweis.
+            try
+            {
+                verbindung.Nenne_erstmalig(angemeldet);
+            }
+            catch (Loginfehler fehler)
+            {
+                // GitHub hat etwas gemeldet, das kein Benutzername sein kann.
+                return new Verbindungsergebnis.Eingabe(fehler.Message);
+            }
+        }
+        else if (!string.Equals(angemeldet, verbindung.Login, StringComparison.OrdinalIgnoreCase))
+        {
+            // GENANNT HEISST VERGLICHEN. Wer `torvalds` eingetragen und sich
+            // selbst angemeldet hat, hat über `torvalds` nichts bewiesen.
+            return new Verbindungsergebnis.NichtBewiesen();
+        }
+
+        verbindung.Weise_nach(uhr.GetUtcNow());
+        await speicher.SichereAsync(verbindung, cancellationToken);
+
+        return new Verbindungsergebnis.Erledigt(verbindung);
+    }
+
+    /// <inheritdoc />
     public async Task<Verbindungsergebnis> Handle(
         NachweisenBefehl request, CancellationToken cancellationToken)
     {
@@ -112,11 +257,19 @@ public sealed class Verbindungsbefehle(
 
         if (!verbindung.Nachgewiesen)
         {
+            // DER GIST BRAUCHT EINEN NAMEN, die Anmeldung nicht: gesucht wird
+            // in den Gists eines bestimmten Kontos. Wer die Anmeldung begonnen
+            // hat, trägt noch keinen — dann ist hier nichts zu prüfen.
+            if (verbindung.Login is not { } login)
+            {
+                return new Verbindungsergebnis.Eingabe("no account named yet");
+            }
+
             // GitHubSchweigt fliegt bewusst durch: der Endpunkt macht daraus
             // 503. Es hier auf „nicht bewiesen" abzubilden hieße, jemandem den
             // Nachweis abzusprechen, weil WIR gerade nicht fragen konnten.
             var gefunden = await github.HatNachweisgistAsync(
-                verbindung.Login, verbindung.Einmalzeichenfolge, cancellationToken);
+                login, verbindung.Einmalzeichenfolge, cancellationToken);
 
             if (!gefunden)
             {
@@ -198,9 +351,18 @@ public sealed class Verbindungsbefehle(
 
     private async Task Hole(Verbindung verbindung, CancellationToken cancellationToken)
     {
-        var repositories = await github.RepositoriesAsync(verbindung.Login, cancellationToken);
+        // Nachgewiesen heißt benannt — der Nachweis trägt den Namen entweder
+        // ein oder vergleicht ihn. Die Prüfung steht hier trotzdem, weil eine
+        // Anfrage ohne Namen sonst als halbe Adresse zu GitHub hinausginge und
+        // dort etwas anderes bedeutete.
+        if (verbindung.Login is not { } login)
+        {
+            throw new NichtNachgewiesen();
+        }
 
-        verbindung.Lege_ab(repositories, uhr.GetUtcNow());
+        var abzug = await github.RepositoriesAsync(login, cancellationToken);
+
+        verbindung.Lege_ab(abzug, uhr.GetUtcNow());
 
         await speicher.SichereAsync(verbindung, cancellationToken);
     }

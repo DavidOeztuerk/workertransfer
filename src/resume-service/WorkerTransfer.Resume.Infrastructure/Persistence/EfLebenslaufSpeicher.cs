@@ -17,7 +17,11 @@ internal sealed record StationsSatz(
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("started_on")] string StartedOn,
     [property: JsonPropertyName("ended_on")] string? EndedOn,
-    [property: JsonPropertyName("description")] string Description);
+    [property: JsonPropertyName("description")] string Description,
+    // Nachträglich dazugekommen: ältere Zeilen haben das Feld nicht, und `null`
+    // wird beim Lesen zu einer leeren Liste. Eine Nachwanderung braucht es
+    // nicht — beim nächsten Speichern steht es da.
+    [property: JsonPropertyName("technologies")] IReadOnlyList<string>? Technologies = null);
 
 /// <summary>One stretch of education as it lies in the jsonb column.</summary>
 internal sealed record AusbildungsSatz(
@@ -76,6 +80,7 @@ public sealed class EfLebenslaufSpeicher(ResumeDbContext kontext) : ILebenslaufS
 
         zeile.Positions = Schreibe(lebenslauf.Stationen);
         zeile.Education = Schreibe(lebenslauf.Ausbildungen);
+        zeile.Template = lebenslauf.Vorlage;
         zeile.UpdatedAt = lebenslauf.Geaendert.UtcDateTime;
     }
 
@@ -90,18 +95,21 @@ public sealed class EfLebenslaufSpeicher(ResumeDbContext kontext) : ILebenslaufS
             new SubjectId(zeile.Id),
             [.. stationen.Select(s => Station.Aus(
                 s.Employer, s.Title, Monat.Lies(s.StartedOn),
-                s.EndedOn is null ? null : Monat.Lies(s.EndedOn), s.Description))],
+                s.EndedOn is null ? null : Monat.Lies(s.EndedOn), s.Description,
+                s.Technologies ?? []))],
             [.. ausbildungen.Select(a => Ausbildung.Aus(
                 a.Institution, a.Qualification, Monat.Lies(a.StartedOn),
                 a.EndedOn is null ? null : Monat.Lies(a.EndedOn)))],
             new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
-            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero));
+            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero),
+            zeile.Template);
     }
 
     private static string Schreibe(IReadOnlyList<Station> stationen) =>
         JsonSerializer.Serialize(
             stationen.Select(s => new StationsSatz(
-                s.Arbeitgeber, s.Titel, s.Beginn.ToString(), s.Ende?.ToString(), s.Beschreibung)),
+                s.Arbeitgeber, s.Titel, s.Beginn.ToString(), s.Ende?.ToString(), s.Beschreibung,
+                s.Technologien)),
             Format);
 
     private static string Schreibe(IReadOnlyList<Ausbildung> ausbildungen) =>

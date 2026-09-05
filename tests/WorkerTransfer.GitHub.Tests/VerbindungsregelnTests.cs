@@ -23,7 +23,8 @@ public class VerbindungsregelnTests
         Verbindung.Oeffne(new SubjectId(Guid.CreateVersion7()), "anna-dev");
 
     private static Repository Beleg(string name) =>
-        new(name, "Ein Repository", "Go", 0, $"https://github.com/anna/{name}", Jetzt);
+        new(name, "Ein Repository", "Go", 0, $"https://github.com/anna/{name}", Jetzt,
+            ["Go"], ["cli"]);
 
     /// <summary>Ohne Nachweis kein Abzug.</summary>
     [Fact]
@@ -31,7 +32,8 @@ public class VerbindungsregelnTests
     {
         var verbindung = Offen();
 
-        var versuch = () => verbindung.Lege_ab([Beleg("fremde-arbeit")], Jetzt);
+        var versuch = () => verbindung.Lege_ab(
+            new Abzug([Beleg("fremde-arbeit")], true), Jetzt);
 
         versuch.Should().Throw<NichtNachgewiesen>();
         verbindung.Repositories.Should().BeEmpty();

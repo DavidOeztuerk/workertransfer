@@ -432,15 +432,37 @@ export async function login(page: Page, email: string): Promise<void> {
 
 
 /**
+ * Ein Eintrag in einem Auswahlfeld — für MUIs eigenes, nicht für ein natives.
+ *
+ * <strong>`selectOption` greift hier nicht.</strong> Es setzt den Wert eines
+ * echten `<select>`; MUI zeichnet stattdessen ein `role="combobox"` und öffnet
+ * ein `role="listbox"`. Der Weg dorthin ist deshalb der eines Menschen:
+ * aufklappen, den Eintrag anklicken.
+ *
+ * Nativ waren die Felder bis zum 03.09.2026 — und das kostete die Gestalt: macOS
+ * legt sein eigenes Fenster über das Feld und schiebt es nach links, damit der
+ * gewählte Eintrag über dem Feld liegt. Auf jedem System anders, und nirgends
+ * wie der Rest der Oberfläche.
+ */
+export async function waehleImFeld(
+  page: Page,
+  beschriftung: RegExp | string,
+  eintrag: string
+): Promise<void> {
+  await page.getByLabel(beschriftung).click();
+  await page.getByRole("option", { name: eintrag, exact: true }).click();
+}
+
+/**
  * Warten, bis der Wechsel auf ein Unternehmen wirklich gilt.
  *
- * `selectOption` stößt ihn nur an: der Server stellt ein neues Token aus, das
- * Cookie wird ersetzt, die Sitzung neu geladen. Sofort weiterzuklicken gewinnt
- * das Rennen etwa jedes zweite Mal. Das Unternehmens-Menü erscheint erst mit
- * aktivem Tenant und ist damit das ehrliche Signal.
+ * Die Wahl stößt ihn nur an: der Server stellt ein neues Token aus, das Cookie
+ * wird ersetzt, die Sitzung neu geladen. Sofort weiterzuklicken gewinnt das
+ * Rennen etwa jedes zweite Mal. Das Unternehmens-Menü erscheint erst mit aktivem
+ * Tenant und ist damit das ehrliche Signal.
  */
 export async function switchToCompany(page: Page, companyName: string): Promise<void> {
   await page.goto("/");
-  await page.getByLabel(/Handeln als/i).selectOption({ label: companyName });
+  await waehleImFeld(page, /Handeln als/i, companyName);
   await expect(page.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 }

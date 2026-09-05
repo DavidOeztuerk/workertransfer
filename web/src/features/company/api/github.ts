@@ -20,6 +20,10 @@ export interface GitHubRepository {
   stars: number;
   url: string;
   pushed_at: string | null;
+  /** Die MENGE der Sprachen, nie ihr Anteil (ADR-0022 §2). */
+  languages: string[];
+  /** Die Topics, die der Besitzer selbst gesetzt hat — eine Nennung. */
+  topics: string[];
 }
 
 export interface GitHubConnection {

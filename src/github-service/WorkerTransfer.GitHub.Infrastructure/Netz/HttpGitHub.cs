@@ -27,6 +27,21 @@ public sealed class GitHubeinstellungen
     /// </remarks>
     public string Token { get; set; } = string.Empty;
 
+    /// <summary>Womit dieser Dienst sich bei GitHub meldet.</summary>
+    /// <remarks>
+    /// <strong>Pflicht, nicht Höflichkeit.</strong> GitHubs API beantwortet
+    /// JEDE Anfrage ohne <c>User-Agent</c> mit <c>403</c> — nicht mit 400, nicht
+    /// mit einer Meldung, die das Wort nennt. Gemessen am 04.09.2026: dieselbe
+    /// Adresse antwortet mit Kopf <c>200</c> und ohne ihn <c>403</c>.
+    /// <para>
+    /// Solange er fehlte, hat dieser Dienst NIE funktioniert: der Gist-Nachweis
+    /// nicht und der Abruf der Repositories auch nicht. Beides endete in
+    /// „github unavailable", und weil das genau wie ein Ausfall bei GitHub
+    /// aussieht, hat es niemand als eigenen Fehler gelesen.
+    /// </para>
+    /// </remarks>
+    public string Benutzerkennung { get; set; } = "WorkerTransfer";
+
     /// <summary>Wie lange ein Abruf dauern darf.</summary>
     public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(10);
 }
@@ -43,6 +58,13 @@ internal sealed record RepoEintrag(
     [property: JsonPropertyName("stargazers_count")] int StargazersCount,
     [property: JsonPropertyName("html_url")] string? HtmlUrl,
     [property: JsonPropertyName("pushed_at")] DateTimeOffset? PushedAt,
+    /// <summary>Was der Besitzer selbst an das Repository geschrieben hat.</summary>
+    /// <remarks>
+    /// Kommt seit 2022 ohne Zutun in der Liste mit — kein zweiter Aufruf, kein
+    /// besonderer Kopf. Und es ist der stärkste Beleg von allen, weil er eine
+    /// NENNUNG ist: „kubernetes" hat ein Mensch dorthin geschrieben.
+    /// </remarks>
+    [property: JsonPropertyName("topics")] IReadOnlyList<string>? Topics,
     [property: JsonPropertyName("fork")] bool Fork);
 
 /// <summary>Fragt GitHub — einmal, auf Bitte eines Menschen.</summary>
@@ -78,8 +100,33 @@ public sealed class HttpGitHub(
             string.Equals(eintrag.Description, gesucht, StringComparison.Ordinal)) ?? false;
     }
 
+    /// <summary>
+    /// Wie viele Repositories höchstens einzeln nach ihren Sprachen gefragt
+    /// werden.
+    /// </summary>
+    /// <remarks>
+    /// Ein Aufruf JE Repository — bei hundert wären das hundert.
+    /// <para>
+    /// <strong>Ohne Token unterblieb das früher ganz, und das war falsch.</strong>
+    /// Gemessen am 05.09.2026: GitHub meldet für <c>workertransfer</c> sieben
+    /// Sprachen, die Seite zeigte eine — nämlich die Hauptsprache aus der
+    /// Liste. Der Grund war das Ratenlimit, aber der Preis war eine Ansicht,
+    /// die schmaler aussah als die Wahrheit, ohne es zu sagen (ADR-0022 §3).
+    /// Sechzig Anfragen in der Stunde reichen sehr wohl für zehn Repositories
+    /// je Abruf — das sind elf Anfragen und damit fünf Abrufe in der Stunde.
+    /// </para>
+    /// <para>
+    /// Mit Token sind fünftausend erlaubt; dreissig sind dann ein Abruf, der in
+    /// Sekunden fertig ist statt in einer Minute.
+    /// </para>
+    /// </remarks>
+    private const int SprachenMitToken = 30;
+
+    /// <summary>Dasselbe ohne Token — knapper, aber nicht null.</summary>
+    private const int SprachenOhneToken = 10;
+
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Repository>> RepositoriesAsync(
+    public async Task<Abzug> RepositoriesAsync(
         string login, CancellationToken cancellationToken = default)
     {
         var eintraege = await HoleAsync<List<RepoEintrag>>(
@@ -89,25 +136,70 @@ public sealed class HttpGitHub(
 
         if (eintraege is null)
         {
+            return new Abzug([], true);
+        }
+
+        // Forks bleiben draußen: eine Kopie fremder Arbeit ist kein Beleg für
+        // eigene, und sie unter „meine Repositories" zu zeigen wäre genau die
+        // stillschweigende Behauptung, die ADR-0022 ausschließt.
+        var eigene = eintraege.Where(eintrag => !eintrag.Fork).ToList();
+
+        // Die Liste kommt nach `pushed` sortiert — wenn das Budget nicht für
+        // alle reicht, bekommen die zuletzt bearbeiteten ihre Sprachen.
+        var budget = _einstellungen.Token.Length == 0
+            ? SprachenOhneToken
+            : SprachenMitToken;
+
+        var belege = new List<Repository>(eigene.Count);
+
+        foreach (var eintrag in eigene)
+        {
+            var name = eintrag.Name ?? string.Empty;
+
+            belege.Add(new Repository(
+                name,
+                eintrag.Description ?? string.Empty,
+                eintrag.Language,
+                eintrag.StargazersCount,
+                eintrag.HtmlUrl ?? string.Empty,
+                eintrag.PushedAt,
+                belege.Count < budget
+                    ? await SprachenAsync(login, name, cancellationToken)
+                    : [],
+                eintrag.Topics ?? []));
+        }
+
+        return new Abzug(belege, eigene.Count <= budget);
+    }
+
+    /// <summary>Welche Sprachen in einem Repository vorkommen.</summary>
+    /// <remarks>
+    /// <strong>Nur die Namen, nie die Bytes.</strong> GitHub antwortet mit
+    /// <c>{"Go": 12345, "Shell": 210}</c>; genau aus diesen Zahlen rechnete das
+    /// gelöschte Paket sein „Können" als <c>bytes / total_bytes</c> — „eine
+    /// eingecheckte Abhängigkeit schlägt jede sorgfältige Bibliothek" (ADR-0022
+    /// §2). Sie hier gar nicht erst mitzunehmen ist billiger, als sie später zu
+    /// verteidigen.
+    /// <para>
+    /// Ohne Token wird trotzdem gefragt, nur für weniger Repositories — wie
+    /// viele, steht bei <see cref="SprachenOhneToken" />. Was übrig bleibt,
+    /// meldet der <see cref="Abzug" /> als unvollständig, damit die Oberfläche
+    /// es sagen kann.
+    /// </para>
+    /// </remarks>
+    private async Task<IReadOnlyList<string>> SprachenAsync(
+        string login, string repository, CancellationToken cancellationToken)
+    {
+        if (repository.Length == 0)
+        {
             return [];
         }
 
-        return
-        [
-            .. eintraege
-                // Forks bleiben draußen: eine Kopie fremder Arbeit ist kein
-                // Beleg für eigene, und sie unter „meine Repositories" zu
-                // zeigen wäre genau die stillschweigende Behauptung, die
-                // ADR-0022 ausschließt.
-                .Where(eintrag => !eintrag.Fork)
-                .Select(eintrag => new Repository(
-                    eintrag.Name ?? string.Empty,
-                    eintrag.Description ?? string.Empty,
-                    eintrag.Language,
-                    eintrag.StargazersCount,
-                    eintrag.HtmlUrl ?? string.Empty,
-                    eintrag.PushedAt))
-        ];
+        var gemeldet = await HoleAsync<Dictionary<string, long>>(
+            $"/repos/{Uri.EscapeDataString(login)}/{Uri.EscapeDataString(repository)}/languages",
+            cancellationToken);
+
+        return gemeldet is null ? [] : [.. gemeldet.Keys];
     }
 
     private async Task<T?> HoleAsync<T>(string pfad, CancellationToken cancellationToken)
@@ -120,6 +212,10 @@ public sealed class HttpGitHub(
 
         anfrage.Headers.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+
+        // Ohne diesen Kopf antwortet GitHub auf alles mit 403. Siehe
+        // `GitHubeinstellungen.Benutzerkennung`.
+        anfrage.Headers.UserAgent.ParseAdd(_einstellungen.Benutzerkennung);
 
         if (_einstellungen.Token is { Length: > 0 } token)
         {

@@ -38,6 +38,10 @@ describe("die Kataloge", () => {
   // liesse die französische Zeile stillschweigend mit durch.
   it("übersetzen wirklich, statt Deutsch zu kopieren", () => {
     const erlaubt = new Set([
+      // Eine Masseinheit ist keine Übersetzung. „km" heisst in allen drei
+      // Sprachen km, und ein erfundener Unterschied wäre falsch.
+      "en:stellen.kilometer",
+      "fr:stellen.kilometer",
       // Sprachnamen stehen in ihrer eigenen Sprache, in jedem Katalog.
       "en:sprache.de",
       "en:sprache.en",

@@ -5,6 +5,12 @@ sagt: ein Transfermarkt. Dazu ein dritter, den wir vergessen hatten.
 
 Dies ist ein Entwurf, keine Beschreibung. Vor dem Code steht ein ADR.
 
+Was davon **schon dasteht** — teils unter anderem Namen —, und wo dieser
+Entwurf einer bereits getroffenen Entscheidung widerspricht, steht in
+[`SCOUT-UND-BERATER-BESTAND.md`](SCOUT-UND-BERATER-BESTAND.md). Das ist eine
+Messung; dieses Dokument ist eine Absicht. Wo beide sich widersprechen,
+gewinnt die Messung.
+
 ---
 
 ## Das Bild

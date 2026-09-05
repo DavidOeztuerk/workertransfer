@@ -161,14 +161,14 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Der Rückzug widerruft alle drei — auch, was gar nicht erteilt wurde.
+    /// Der Rückzug widerruft alle vier — auch, was gar nicht erteilt wurde.
     /// </summary>
     /// <remarks>
     /// Das schließt die Lücke, die ein geglückter Ledger-Aufruf mit
     /// fehlgeschlagenem Commit hinterlassen hätte.
     /// </remarks>
     [Fact]
-    public async Task Zurueckziehen_widerruft_bedingungslos_alle_drei()
+    public async Task Zurueckziehen_widerruft_bedingungslos_alle_vier()
     {
         var firma = Guid.CreateVersion7();
         var wer = Guid.CreateVersion7();
@@ -185,7 +185,13 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
         _ledger.Widerrufen.Should().Equal(
             $"profile.visibility:tenant:{firma}",
             $"resume.visibility:tenant:{firma}",
-            $"portfolio.visibility:tenant:{firma}");
+            $"portfolio.visibility:tenant:{firma}",
+            // Die vierte kam mit der Bewerbungsmappe dazu (ADR-0035). Sie ist
+            // eigenstaendig und nicht unter `resume` mitgefuehrt: der Werdegang
+            // ist selbst geschriebener Text, ein Zeugnis ein Dokument Dritter
+            // mit Namen und Noten — wer das eine zeigen will und das andere
+            // nicht, muss das koennen.
+            $"documents.visibility:tenant:{firma}");
     }
 
     /// <summary>Eine fremde Bewerbung ist von außen wie keine.</summary>

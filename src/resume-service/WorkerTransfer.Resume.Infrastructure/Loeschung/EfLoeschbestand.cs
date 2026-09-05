@@ -1,5 +1,6 @@
 using Girder.Core.Identity;
 using Microsoft.EntityFrameworkCore;
+using WorkerTransfer.Ablage;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.Resume.Application.Ports;
 using WorkerTransfer.Resume.Infrastructure.Persistence;
@@ -20,7 +21,7 @@ namespace WorkerTransfer.Resume.Infrastructure.Loeschung;
 /// assumption ADR-0027 §3 abolishes.
 /// </para>
 /// </remarks>
-public sealed class EfLoeschbestand(ResumeDbContext kontext) : ILoeschbestand
+public sealed class EfLoeschbestand(ResumeDbContext kontext, IAblage ablage) : ILoeschbestand
 {
     /// <inheritdoc />
     public async Task<int> LoescheAsync(
@@ -32,6 +33,30 @@ public sealed class EfLoeschbestand(ResumeDbContext kontext) : ILoeschbestand
         await kontext.Lebenslaeufe
             .Where(zeile => zeile.Id == wer.Value)
             .ExecuteDeleteAsync(cancellationToken);
+
+        // DIE UNTERLAGEN — Zeilen UND Dateien.
+        //
+        // Zuerst die Schluessel lesen, dann die Zeilen loeschen, dann die
+        // Dateien: nach `ExecuteDelete` weiss niemand mehr, wo die Bytes lagen,
+        // und sie laegen fuer immer da. Die Oberflaeche saehe leer aus, die
+        // Platte nicht — genau die gebrochene Zusage, die ADR-0027 ausschliesst.
+        //
+        // Die Dateien zuletzt, weil ein Abbruch dazwischen eine Datei ohne
+        // Zeile hinterlaesst: unerreichbar und aufraeumbar. Andersherum bliebe
+        // eine Zeile ohne Datei stehen und sähe aus wie eine Unterlage.
+        var schluessel = await kontext.Unterlagen
+            .Where(zeile => zeile.SubjectId == wer.Value)
+            .Select(zeile => zeile.StorageKey)
+            .ToListAsync(cancellationToken);
+
+        await kontext.Unterlagen
+            .Where(zeile => zeile.SubjectId == wer.Value)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        foreach (var eintrag in schluessel)
+        {
+            await ablage.LoescheAsync(eintrag, cancellationToken);
+        }
 
         // Asked ABOUT them: the row is the statement "company X asked about
         // this human being".

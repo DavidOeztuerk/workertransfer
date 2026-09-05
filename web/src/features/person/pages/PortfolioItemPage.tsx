@@ -32,6 +32,7 @@ interface Entwurf {
   role: string;
   year: string;
   attachment: string | null;
+  technologies: string[];
 }
 
 const LEER: Entwurf = {
@@ -41,6 +42,7 @@ const LEER: Entwurf = {
   role: "",
   year: "",
   attachment: null,
+  technologies: [],
 };
 
 const zuEntwurf = (arbeit: Arbeit): Entwurf => ({
@@ -50,6 +52,7 @@ const zuEntwurf = (arbeit: Arbeit): Entwurf => ({
   role: arbeit.role,
   year: arbeit.year === null ? "" : String(arbeit.year),
   attachment: arbeit.attachment,
+  technologies: arbeit.technologies,
 });
 
 /** Leere Felder werden `null`, nicht `""` — „nicht angegeben" ist kein leerer Wert. */
@@ -63,6 +66,7 @@ function zuArbeit(draft: Entwurf): Arbeit {
     role: draft.role.trim(),
     year: jahr === "" ? null : Number(jahr),
     attachment: draft.attachment,
+    technologies: draft.technologies,
   };
 }
 
@@ -285,6 +289,22 @@ export function PortfolioItemPage() {
                   }}
                 />
               </Button>
+
+              {/*
+                WAS für eine Datei, in welchem Format, wie gross — und was mit
+                ihr passiert. Vorher stand hier „Datei / Keine Datei. / Datei
+                wählen" und sonst nichts: die erlaubten Formate erfuhr man erst,
+                wenn der Dienst eine Datei ABLEHNTE, und die Zehn-Megabyte-Grenze
+                gar nicht. Ein Feld, dessen Regeln man durch Scheitern lernt,
+                ist kein Feld, sondern ein Rätsel.
+              */}
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mt: 1 }}
+              >
+                {t("arbeiten.dateiHinweis")}
+              </Typography>
             </Box>
 
             <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>

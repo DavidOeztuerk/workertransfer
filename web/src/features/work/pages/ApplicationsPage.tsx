@@ -171,7 +171,7 @@ export function ApplicationsPage() {
                       <Typography variant="body2" color="text.secondary">
                         {running(bewerbung.status)
                           ? t("bewerbungen.freigegeben", {
-                              parts: freigegeben(bewerbung, t),
+                              teile: freigegeben(bewerbung, t),
                             })
                           : t("bewerbungen.nichtMehrSichtbar")}
                       </Typography>

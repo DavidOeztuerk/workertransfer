@@ -7,4 +7,11 @@
   <ItemGroup>
     <PackageReference Include="Girder.Core" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Derselbe Wortschatz wie im Profil und am Lebenslauf: „postgres" heisst
+         ueberall „PostgreSQL". Zwei Schreibweisen waeren zwei Vorschlaege
+         (ADR-0023). -->
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Skills\WorkerTransfer.Skills.csproj" />
+  </ItemGroup>
+
 </Project>

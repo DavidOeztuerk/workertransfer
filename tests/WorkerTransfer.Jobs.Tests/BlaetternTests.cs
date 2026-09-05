@@ -64,15 +64,23 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
     private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
         JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
 
-    /// <summary>Legt <paramref name="wie viele"/> veröffentlichte Anzeigen an.</summary>
-    private async Task LegeAn(HttpClient browser, int wieViele, params string[] faehigkeiten)
+    /// <summary>Legt <paramref name="wieViele"/> veröffentlichte Anzeigen an.</summary>
+    /// <remarks>
+    /// Das <paramref name="kennwort"/> steht in der Beschreibung und lässt sich
+    /// als <c>q</c> zurückgeben. Alle Reihen dieser Sammlung teilen sich EINE
+    /// Datenbank — wer eine absolute Gesamtzahl prüft, muss seine eigenen Zeilen
+    /// einklammern, sonst zählt er die einer anderen Reihe mit und ist nur so
+    /// lange grün, wie niemand sonst dieselbe Fähigkeit schreibt.
+    /// </remarks>
+    private async Task LegeAn(
+        HttpClient browser, int wieViele, string kennwort = "", params string[] faehigkeiten)
     {
         for (var i = 0; i < wieViele; i++)
         {
             var angelegt = await browser.PostAsJsonAsync("/jobs", new
             {
                 title = $"Stelle {Guid.NewGuid():N}",
-                description = "Wir bauen verteilte Systeme.",
+                description = $"Wir bauen verteilte Systeme. {kennwort}",
                 location = "Berlin",
                 remote_mode = "hybrid",
                 employment_type = "full_time",
@@ -171,11 +179,13 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
     public async Task Ein_Faehigkeitsfilter_zaehlt_die_gefilterte_Menge()
     {
         var firma = AlsFirma(Guid.CreateVersion7());
-        await LegeAn(firma, 3, "Rust");
-        await LegeAn(firma, 9, "Cobol");
+        var kennwort = $"faehigkeit{Guid.NewGuid():N}";
+        await LegeAn(firma, 3, kennwort, "Rust");
+        await LegeAn(firma, 9, kennwort, "Cobol");
 
         var seite = await Json(
-            await _dienst.CreateClient().GetAsync("/jobs?skill=Rust&page_size=2"));
+            await _dienst.CreateClient().GetAsync(
+                $"/jobs?q={kennwort}&skill=Rust&page_size=2"));
 
         seite.GetProperty("total_items").GetInt32().Should().Be(3);
         seite.GetProperty("total_pages").GetInt32().Should().Be(2);

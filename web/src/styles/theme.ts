@@ -244,13 +244,34 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
         },
       },
 
+      // KEIN NATIVES AUSWAHLFELD MEHR, und der Grund ist gemessen.
+      //
+      // Der alte Kommentar hier behauptete, MUIs eigenes Auswahlfeld werde
+      // „weder von `selectOption` noch von einem Screenreader als Auswahlfeld
+      // bedient". Die zweite Hälfte ist falsch: MUI zeichnet `role="combobox"`
+      // mit `aria-expanded` und ein `role="listbox"`, und genau das lesen
+      // Vorleser als Auswahlfeld. Nur `selectOption` von Playwright greift
+      // nicht — dafür steht in `e2e/stack.ts` ein Helfer.
+      //
+      // Was ein natives Feld kostet, ist auf einem Bildschirmfoto zu sehen:
+      // macOS legt sein eigenes Fenster über das Feld, schiebt es nach links,
+      // damit der GEWÄHLTE Eintrag über dem Feld zu liegen kommt, und zeichnet
+      // es in Systemfarben. Auf jedem Betriebssystem anders, und nirgends wie
+      // der Rest dieser Oberfläche.
       MuiSelect: {
-        styleOverrides: {
-          // Platz für den Pfeil. Ohne das schiebt sich der längste Eintrag
-          // („Wie mein Gerät") unter das Symbol und wird abgeschnitten —
-          // MUI setzt das Padding nur für die eigene Listenvariante, nicht für
-          // ein natives `select`.
-          select: { paddingRight: "34px !important" },
+        defaultProps: {
+          // Kein abdunkelnder Hintergrund: eine Liste mit vier Einträgen ist
+          // kein Dialog.
+          MenuProps: { slotProps: { backdrop: { invisible: true } } },
+
+          // „Egal" ist eine Wahl und muss dastehen.
+          //
+          // MUI zeichnet bei einem leeren Wert NICHTS in das geschlossene Feld
+          // — der Eintrag `<MenuItem value="">Egal</MenuItem>` bleibt also
+          // unsichtbar, und das Feld sieht aus, als sei nichts eingestellt.
+          // Ein natives `select` zeigte ihn; beim Umstieg wäre das still
+          // verlorengegangen.
+          displayEmpty: true,
         },
       },
 

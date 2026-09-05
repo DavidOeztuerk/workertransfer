@@ -1,3 +1,5 @@
+using WorkerTransfer.Skills;
+
 using System.Text.RegularExpressions;
 
 namespace WorkerTransfer.Portfolio.Domain.Portfolios;
@@ -27,6 +29,13 @@ public sealed partial record Eintrag
     /// <summary>Wie lang ein Anhangname sein darf.</summary>
     public const int HoechstlaengeAnhang = 80;
 
+    /// <summary>Wie viele Technologien eine Arbeit nennen darf.</summary>
+    /// <remarks>
+    /// Zwölf, dieselbe Zahl wie an einer Lebenslauf-Station: wer dreissig
+    /// aufzählt, sagt über eine einzelne Arbeit nichts mehr.
+    /// </remarks>
+    public const int HoechsteTechnologien = 12;
+
     /// <summary>Vor diesem Jahr hat niemand hier etwas veröffentlicht.</summary>
     public const int FruehestesJahr = 1900;
 
@@ -42,7 +51,13 @@ public sealed partial record Eintrag
         new HashSet<string>(StringComparer.Ordinal) { "http", "https" };
 
     private Eintrag(
-        string titel, string zusammenfassung, string? link, string rolle, int? jahr, string? anhang)
+        string titel,
+        string zusammenfassung,
+        string? link,
+        string rolle,
+        int? jahr,
+        string? anhang,
+        IReadOnlyList<string> technologien)
     {
         Titel = titel;
         Zusammenfassung = zusammenfassung;
@@ -50,10 +65,25 @@ public sealed partial record Eintrag
         Rolle = rolle;
         Jahr = jahr;
         Anhang = anhang;
+        Technologien = technologien;
     }
 
     /// <summary>Worum es geht.</summary>
     public string Titel { get; }
+
+    /// <summary>Womit gearbeitet wurde — von der Person selbst genannt.</summary>
+    /// <remarks>
+    /// <strong>Eine Nennung, keine Ableitung.</strong> Niemand liest aus einem
+    /// Titel heraus, welche Werkzeuge dahinterstecken; hier steht, was die
+    /// Person geschrieben hat, durch denselben Wortschatz vereinheitlicht wie
+    /// im Profil (ADR-0023: benennt um, folgert nie).
+    /// <para>
+    /// Sie macht die Arbeit nicht durchsuchbar. Suchbar wird eine Fähigkeit
+    /// erst, wenn sie im PROFIL steht — dorthin kommt sie mit einem Klick,
+    /// nicht von allein.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<string> Technologien { get; }
 
     /// <summary>Was die Person selbst darüber geschrieben hat.</summary>
     public string Zusammenfassung { get; }
@@ -91,14 +121,51 @@ public sealed partial record Eintrag
         string? link = null,
         string rolle = "",
         int? jahr = null,
-        string? anhang = null) =>
+        string? anhang = null,
+        IEnumerable<string>? technologien = null) =>
         new(
             Text("Der Titel", titel, pflicht: true, HoechstlaengeTitel),
             Text("Die Zusammenfassung", zusammenfassung, pflicht: false, HoechstlaengeZusammenfassung),
             Geprueft(link),
             Text("Die Rolle", rolle, pflicht: false, HoechstlaengeRolle),
             Jahreszahl(jahr, jetzt),
-            Anhangname(anhang));
+            Anhangname(anhang),
+            Vereinheitlicht(technologien ?? []));
+
+    /// <summary>Erst vereinheitlichen, dann entdoppeln — die Reihenfolge trägt.</summary>
+    /// <remarks>
+    /// Andersherum stünden „postgres" und „PostgreSQL" als zwei Einträge da und
+    /// würden erst danach beide zu „PostgreSQL" (ADR-0023).
+    /// </remarks>
+    private static IReadOnlyList<string> Vereinheitlicht(IEnumerable<string> roh)
+    {
+        var gesehen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var werte = new List<string>();
+
+        foreach (var einzeln in roh)
+        {
+            var geprueft = Text(
+                "Die Technologie", einzeln, pflicht: false, Faehigkeitsgrenzen.Hoechstlaenge);
+
+            if (geprueft.Length == 0)
+            {
+                continue;
+            }
+
+            var kanonisch = Wortschatz.Kanonisch(geprueft);
+
+            if (gesehen.Add(kanonisch))
+            {
+                werte.Add(kanonisch);
+            }
+        }
+
+        return werte.Count > HoechsteTechnologien
+            ? throw new TextFehler(
+                "Die Technologien",
+                $"sind mehr als {HoechsteTechnologien}")
+            : werte;
+    }
 
     private static string Text(string feld, string? wert, bool pflicht, int grenze)
     {

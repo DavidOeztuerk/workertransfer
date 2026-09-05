@@ -28,6 +28,7 @@ interface Entwurf {
   title: string;
   description: string;
   location: string;
+  postalCode: string;
   remote: RemoteMode;
   employment: EmploymentType;
   skills: string;
@@ -37,6 +38,7 @@ const LEER: Entwurf = {
   title: "",
   description: "",
   location: "",
+  postalCode: "",
   remote: "none",
   employment: "full_time",
   skills: "",
@@ -91,6 +93,7 @@ export function CompanyJobNewPage() {
       title: draft.title,
       description: draft.description,
       location: draft.location,
+      postal_code: draft.postalCode,
       remote: draft.remote,
       employment: draft.employment,
       skills: faehigkeiten(draft.skills),
@@ -138,14 +141,36 @@ export function CompanyJobNewPage() {
               multiline
               minRows={5}
             />
-            <TextField
-              label={t("firmenstellen.ort")}
-              helperText={t("firmenstellen.ortHinweis")}
-              value={draft.location}
-              onChange={(e) =>
-                setEntwurf({ ...draft, location: e.target.value })
-              }
-            />
+            <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 2fr" } }}>
+              {/*
+                Die Postleitzahl steht VOR dem Ort und ist schmaler — so
+                schreibt man eine Adresse, und so sieht man auf einen Blick,
+                dass beides zusammengehört.
+
+                Sie ist freiwillig und trotzdem wichtig: ohne sie fällt die
+                Anzeige aus jeder Umkreissuche, deren Ortsname nicht eindeutig
+                ist. Der Hinweistext sagt das, statt es als Pflichtfeld zu
+                erzwingen — ein Unternehmen, das nur „bundesweit" anzugeben
+                hat, soll trotzdem ausschreiben können.
+              */}
+              <TextField
+                label={t("firmenstellen.plz")}
+                helperText={t("firmenstellen.plzHinweis")}
+                value={draft.postalCode}
+                slotProps={{ htmlInput: { maxLength: 10, inputMode: "numeric" } }}
+                onChange={(e) =>
+                  setEntwurf({ ...draft, postalCode: e.target.value })
+                }
+              />
+              <TextField
+                label={t("firmenstellen.ort")}
+                helperText={t("firmenstellen.ortHinweis")}
+                value={draft.location}
+                onChange={(e) =>
+                  setEntwurf({ ...draft, location: e.target.value })
+                }
+              />
+            </Box>
             <TextField
               select
               label={t("firmenstellen.arbeitsform")}

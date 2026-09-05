@@ -15,7 +15,7 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.."
 
-reihen=(Outbox Skills Ganzes Gateway Identity Consent Profile Resume Portfolio
+reihen=(Ablage Outbox Skills Ganzes Gateway Identity Consent Profile Resume Portfolio
         Jobs Applications Companies Transfer GitHub Notification)
 
 rot=0

@@ -94,6 +94,35 @@ public sealed class ProblemDetailsMiddleware(
             await Schreibe(context, kaputt.StatusCode,
                 "Request failed", "malformed request body");
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            /*
+             * DER AUFRUFER HAT AUFGELEGT — das ist kein Serverfehler.
+             *
+             * Gemessen an einem E2E-Lauf: 853 der 866 Fehlerzeilen im ganzen
+             * Stapel waren genau das. Der Browser bricht Anfragen ab, sobald
+             * eine Seite wechselt oder ein Abruf einen älteren ablöst
+             * (`AbortController`), und jede einzelne wurde zu einem
+             * „Unhandled request exception" samt 500. Die dreizehn ECHTEN
+             * Fehler standen dazwischen und waren nicht zu finden.
+             *
+             * <strong>Die Bedingung trägt das Ganze.</strong> Ohne
+             * `context.RequestAborted.IsCancellationRequested` verschwände auch
+             * eine Zeitüberschreitung, die WIR verursacht haben — ein
+             * `HttpClient`, der aufgibt, wirft dieselbe Ausnahme, und das ist
+             * ein echter Ausfall, der ein 500 verdient.
+             *
+             * Geantwortet wird 499 („Client Closed Request"): niemand liest es
+             * mehr, aber die Telemetrie unterscheidet damit „abgebrochen" von
+             * „kaputt". Ein 200 wäre eine Lüge, ein 500 ein Fehlalarm.
+             */
+            logger.LogDebug("Request aborted by the caller");
+
+            if (!context.Response.HasStarted)
+            {
+                context.Response.StatusCode = 499;
+            }
+        }
         catch (Exception exception)
         {
             // The exception, not the request body: a failure is exactly when

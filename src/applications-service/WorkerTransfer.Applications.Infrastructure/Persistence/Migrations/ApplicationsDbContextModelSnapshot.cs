@@ -22,6 +22,43 @@ namespace WorkerTransfer.Applications.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("WorkerTransfer.Applications.Infrastructure.Persistence.AnmerkungsZeile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("body");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("draft_id");
+
+                    b.Property<string>("Quote")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("quote");
+
+                    b.Property<bool>("Resolved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("resolved");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DraftId");
+
+                    b.ToTable("application_draft_comments", (string)null);
+                });
+
             modelBuilder.Entity("WorkerTransfer.Applications.Infrastructure.Persistence.BewerbungsZeile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -35,6 +72,13 @@ namespace WorkerTransfer.Applications.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("[]")
+                        .HasColumnName("documents");
 
                     b.Property<Guid>("JobId")
                         .HasColumnType("uuid")
@@ -84,6 +128,74 @@ namespace WorkerTransfer.Applications.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("uq_application_job_subject");
 
                     b.ToTable("applications", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Applications.Infrastructure.Persistence.EntwurfsZeile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Documents")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("documents");
+
+                    b.Property<string>("Error")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_id");
+
+                    b.Property<bool>("SharesResume")
+                        .HasColumnType("boolean")
+                        .HasColumnName("shares_resume");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("subject");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubjectId");
+
+                    b.ToTable("application_drafts", (string)null);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Outbox.OutboxZeile", b =>

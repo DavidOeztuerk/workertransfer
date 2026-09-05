@@ -59,6 +59,7 @@ const STELLE = {
   title: "Backend-Entwicklung",
   description: "Wir bauen Dienste.",
   location: "Berlin",
+  postal_code: "10115",
   remote_mode: "hybrid",
   employment_type: "full_time",
   skills: ["Python", "Kubernetes", "Go"],
@@ -89,7 +90,13 @@ afterEach(() => {
  * Eine Antwort in der Seitenform. Die Gesamtzahl folgt aus dem Inhalt, damit
  * ein Test nicht versehentlich eine Blätterleiste behauptet, die es nicht gibt.
  */
-function seite(items: unknown[], page = 1, totalItems = items.length, pageSize = 12) {
+function seite(
+  items: unknown[],
+  page = 1,
+  totalItems = items.length,
+  pageSize = 12,
+  omitted?: number,
+) {
   return {
     items,
     page,
@@ -98,7 +105,66 @@ function seite(items: unknown[], page = 1, totalItems = items.length, pageSize =
     total_pages: Math.max(1, Math.ceil(totalItems / pageSize)),
     has_next: page * pageSize < totalItems,
     has_previous: page > 1,
+    // Fehlt, wenn ohne Umkreis gesucht wurde — genau wie beim Dienst.
+    ...(omitted === undefined ? {} : { omitted }),
   };
+}
+
+/**
+ * Legt eine Ortung in den Browser, die antwortet wie ausgemacht.
+ *
+ * `jsdom` bringt gar keine mit — ohne dieses Stück ist `"geolocation" in
+ * navigator` falsch, der Knopf abgeschaltet und jede Probe darunter grün, ohne
+ * je etwas geprüft zu haben.
+ */
+function stubOrtung(
+  antwort:
+    | { coords: { latitude: number; longitude: number } }
+    | { code: number },
+) {
+  const getCurrentPosition = vi.fn(
+    (
+      gelungen: PositionCallback,
+      gescheitert?: PositionErrorCallback | null,
+    ) => {
+      if ("coords" in antwort) {
+        gelungen(antwort as unknown as GeolocationPosition);
+        return;
+      }
+
+      gescheitert?.({
+        code: antwort.code,
+        message: "",
+        PERMISSION_DENIED: 1,
+        POSITION_UNAVAILABLE: 2,
+        TIMEOUT: 3,
+      } as GeolocationPositionError);
+    },
+  );
+
+  Object.defineProperty(navigator, "geolocation", {
+    value: { getCurrentPosition },
+    configurable: true,
+  });
+
+  return getCurrentPosition;
+}
+
+afterEach(() => {
+  // @ts-expect-error — in jsdom gibt es die Eigenschaft sonst gar nicht.
+  delete navigator.geolocation;
+});
+
+/**
+ * Ein MUI-Auswahlfeld wird geklickt, nicht `selectOption`-t.
+ *
+ * Es ist kein `<select>`: MUI zeichnet eine Schaltfläche mit
+ * `role="combobox"` und eine Liste mit `role="listbox"`. Dieselbe Hilfe steht
+ * in `web/e2e/stack.ts` für die Playwright-Reisen.
+ */
+async function waehleImFeld(beschriftung: RegExp, eintrag: string) {
+  await userEvent.click(screen.getByLabelText(beschriftung));
+  await userEvent.click(await screen.findByRole("option", { name: eintrag }));
 }
 
 describe("JobsPage", () => {
@@ -316,6 +382,289 @@ describe("JobsPage", () => {
     renderMitStore(<JobsPage />);
 
     expect(await screen.findByText("1–12 von 26")).toBeInTheDocument();
+  });
+
+  /**
+   * <strong>Die Position wird GERUNDET, bevor sie das Haus verlässt.</strong>
+   *
+   * Die wichtigste Probe dieses Filters, und sie prüft nicht, dass er
+   * funktioniert, sondern was er preisgibt. Die Adresszeile steht in jedem
+   * Zugriffsprotokoll; ein GPS-Wert mit sieben Nachkommastellen wäre dort die
+   * Wohnung. Zwei Stellen sind gut ein Kilometer — und feiner könnte an keiner
+   * Antwort etwas ändern, weil die Anzeigen Städte nennen.
+   */
+  it("rundet den Standort, bevor er in die Adresszeile kommt", async () => {
+    const spion = stubFetch((url) =>
+      url.includes("/jobs/place")
+        ? { body: { location: "Berlin" } }
+        : { body: seite([]) },
+    );
+    const geortet = stubOrtung({
+      coords: { latitude: 52.5170365, longitude: 13.3888599 },
+    });
+
+    renderMitStore(<JobsPage />);
+    await screen.findByText("Dazu wurde nichts gefunden.");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Meinen Standort verwenden/i }),
+    );
+    expect(geortet).toHaveBeenCalled();
+
+    await waehleImFeld(/Entfernung/i, "25 km");
+    await userEvent.click(screen.getByRole("button", { name: /^Suchen$/i }));
+
+    await waitFor(() => {
+      const url = spion.mock.calls
+        .map(([wert]) => String(wert))
+        .find((wert) => wert.includes("radius_km"));
+
+      expect(url).toBeDefined();
+      expect(url).toContain("lat=52.52");
+      expect(url).toContain("lon=13.39");
+      expect(url).toContain("radius_km=25");
+      // Der rohe Wert darf nirgends auftauchen — auch nicht abgeschnitten.
+      expect(url).not.toContain("52.517");
+      expect(url).not.toContain("13.388");
+    });
+  });
+
+  /**
+   * Ohne Standort ist die Entfernung nicht wählbar.
+   *
+   * Ein Feld, das man bedienen kann und das dann nichts tut, ist schlimmer als
+   * ein abgeschaltetes: „25 km" ohne Punkt ist keine Frage, die der Dienst
+   * beantworten könnte — er liesse sie stillschweigend fallen, und die Liste
+   * sähe aus wie ein Ergebnis.
+   */
+  it("lässt die Entfernung erst zu, wenn ein Standort da ist", async () => {
+    stubFetch(() => ({ body: seite([]) }));
+    stubOrtung({ coords: { latitude: 52.52, longitude: 13.41 } });
+
+    renderMitStore(<JobsPage />);
+    await screen.findByText("Dazu wurde nichts gefunden.");
+
+    expect(screen.getByLabelText(/Entfernung/i)).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Meinen Standort verwenden/i }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(/Entfernung/i)).not.toHaveAttribute(
+        "aria-disabled",
+      ),
+    );
+  });
+
+  /**
+   * Ein abgelehnter Zugriff wird beim Namen genannt.
+   *
+   * Ein gemeinsames „Standort nicht verfügbar" liesse offen, ob die Person
+   * selbst abgelehnt hat — dann wäre „nochmal versuchen" schlicht falsch.
+   */
+  it("sagt, wenn der Standortzugriff abgelehnt wurde", async () => {
+    stubFetch(() => ({ body: seite([]) }));
+    stubOrtung({ code: 1 });
+
+    renderMitStore(<JobsPage />);
+    await screen.findByText("Dazu wurde nichts gefunden.");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Meinen Standort verwenden/i }),
+    );
+
+    expect(await screen.findByText(/abgelehnt/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Entfernung/i)).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  /**
+   * <strong>Was der Filter nicht beurteilen konnte, steht auf dem Bildschirm.</strong>
+   *
+   * Eine Umkreissuche kann über eine Anzeige, deren Ort die Ortstabelle nicht
+   * kennt, nichts sagen. Sie stumm wegzulassen ergäbe ein Ergebnis, das
+   * vollständig aussieht und es nicht ist — die Lüge durch Auslassen aus
+   * ADR-0022 §3.
+   */
+  it("nennt die Anzeigen, über deren Ort nichts bekannt ist", async () => {
+    stubFetch((url) =>
+      url.includes("/jobs")
+        ? { body: seite([STELLE], 1, 1, 12, 3) }
+        : { status: 404 },
+    );
+
+    renderMitStore(<JobsPage />);
+
+    expect(
+      await screen.findByText(/3 Anzeigen nennen keinen Ort, den wir kennen/i),
+    ).toBeInTheDocument();
+  });
+
+  /** Ohne Umkreissuche gibt es nichts auszulassen — und keinen Hinweis. */
+  it("meldet nichts Ausgelassenes, wenn ohne Umkreis gesucht wurde", async () => {
+    stubFetch((url) =>
+      url.includes("/jobs") ? { body: seite([STELLE]) } : { status: 404 },
+    );
+
+    renderMitStore(<JobsPage />);
+    await screen.findByText("Backend-Entwicklung");
+
+    expect(
+      screen.queryByText(/nennen keinen Ort, den wir kennen/i),
+    ).not.toBeInTheDocument();
+  });
+
+  /**
+   * Standort vergessen nimmt die Entfernung mit.
+   *
+   * Ein stehengebliebenes „25 km" ohne Punkt sähe wie ein aktiver Filter aus
+   * und wäre keiner — die Liste zeigte still wieder alles.
+   */
+  it("vergisst mit dem Standort auch die gewählte Entfernung", async () => {
+    const spion = stubFetch(() => ({ body: seite([]) }));
+    stubOrtung({ coords: { latitude: 52.52, longitude: 13.41 } });
+
+    renderMitStore(<JobsPage />);
+    await screen.findByText("Dazu wurde nichts gefunden.");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Meinen Standort verwenden/i }),
+    );
+    await waehleImFeld(/Entfernung/i, "25 km");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Standort vergessen/i }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /^Suchen$/i }));
+
+    await waitFor(() =>
+      expect(
+        spion.mock.calls.every(
+          ([url]) => !String(url).includes("radius_km"),
+        ),
+      ).toBe(true),
+    );
+    expect(screen.getByLabelText(/Entfernung/i)).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  /**
+   * Bei „vollständig remote" verschwindet die Entfernung.
+   *
+   * Der Dienst lässt voll remote ausgeschriebene Stellen unabhängig vom Radius
+   * durch — die Kombination liefert also dasselbe wie „nur remote" allein. Ein
+   * Bedienelement, das sichtbar dasteht und nachweisbar nichts tut, ist
+   * schlimmer als keines. Und der schon gewählte Radius geht MIT, sonst zählte
+   * er als aktiver Filter und käme beim Zurückschalten unbemerkt wieder.
+   */
+  it("nimmt bei „vollständig remote“ die Entfernung ganz weg", async () => {
+    const spion = stubFetch(() => ({ body: seite([]) }));
+    stubOrtung({ coords: { latitude: 52.52, longitude: 13.41 } });
+
+    renderMitStore(<JobsPage />);
+    await screen.findByText("Dazu wurde nichts gefunden.");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Meinen Standort verwenden/i }),
+    );
+    await waehleImFeld(/Entfernung/i, "25 km");
+
+    await waehleImFeld(/Arbeitsform/i, "Vollständig remote");
+
+    expect(screen.queryByLabelText(/Entfernung/i)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Suchen$/i }));
+
+    await waitFor(() => {
+      const urls = spion.mock.calls.map(([url]) => String(url));
+      expect(urls.some((url) => url.includes("remote=full"))).toBe(true);
+    });
+    expect(
+      spion.mock.calls.every(([url]) => !String(url).includes("radius_km")),
+    ).toBe(true);
+
+    // Und zurück: das Feld ist wieder da — auf „Egal", nicht auf dem alten Wert.
+    await waehleImFeld(/Arbeitsform/i, "Hybrid");
+    expect(screen.getByLabelText(/Entfernung/i)).toHaveTextContent("Egal");
+  });
+
+  /**
+   * <strong>Der gefundene Standort wird SICHTBAR.</strong>
+   *
+   * Ein Umkreis um einen unsichtbaren Punkt ist eine Zumutung: die Liste ändert
+   * sich, und niemand kann sagen, wovon aus gemessen wurde. Der Name kommt aus
+   * derselben Tabelle wie die Suche selbst (`/jobs/place`), nicht von einem
+   * Fremdanbieter.
+   */
+  it("trägt den gefundenen Standort in das Ortsfeld ein", async () => {
+    stubFetch((url) =>
+      url.includes("/jobs/place")
+        ? { body: { location: "Berlin" } }
+        : { body: seite([]) },
+    );
+    stubOrtung({ coords: { latitude: 52.5170365, longitude: 13.3888599 } });
+
+    renderMitStore(<JobsPage />);
+    await screen.findByText("Dazu wurde nichts gefunden.");
+
+    expect(screen.getByLabelText("Ort")).toHaveValue("");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Meinen Standort verwenden/i }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Ort")).toHaveValue("Berlin"),
+    );
+  });
+
+  /**
+   * Ein getippter Ort ist auch eine Mitte.
+   *
+   * Vorher hing die Entfernung allein am Ortungsknopf. Wer „Leipzig" tippt und
+   * „50 km" will, meint aber „um Leipzig herum" — und braucht dafür weder GPS
+   * noch die Erlaubnis dazu.
+   */
+  it("lässt die Entfernung auch ohne GPS zu, wenn ein Ort dasteht", async () => {
+    const spion = stubFetch(() => ({ body: seite([]) }));
+
+    renderMitStore(<JobsPage />);
+    await screen.findByText("Dazu wurde nichts gefunden.");
+
+    expect(screen.getByLabelText(/Entfernung/i)).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+
+    await userEvent.type(screen.getByLabelText("Ort"), "Leipzig");
+
+    expect(screen.getByLabelText(/Entfernung/i)).not.toHaveAttribute(
+      "aria-disabled",
+    );
+
+    await waehleImFeld(/Entfernung/i, "50 km");
+    await userEvent.click(screen.getByRole("button", { name: /^Suchen$/i }));
+
+    // Der Ort geht MIT hinaus — der Dienst macht ihn zur Mitte, weil eine
+    // Entfernung danebensteht. Koordinaten hat der Browser keine.
+    await waitFor(() => {
+      const url = spion.mock.calls
+        .map(([wert]) => String(wert))
+        .find((wert) => wert.includes("radius_km"));
+
+      expect(url).toBeDefined();
+      expect(url).toContain("location=Leipzig");
+      expect(url).toContain("radius_km=50");
+      expect(url).not.toContain("lat=");
+    });
   });
 
   it("zeigt einen gescheiterten Abruf als Fehler, nicht als leere Liste", async () => {

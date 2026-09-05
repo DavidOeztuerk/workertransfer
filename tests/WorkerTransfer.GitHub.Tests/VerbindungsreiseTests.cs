@@ -19,6 +19,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 {
     private WebApplicationFactory<Program> _dienst = null!;
     private readonly ProbeGitHub _github = new();
+    private readonly ProbeAnmeldung _anmeldung = new();
     private readonly Probeledger _ledger = new();
 
     public Task InitializeAsync()
@@ -34,6 +35,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
             host.ConfigureTestServices(dienste =>
             {
                 dienste.Replace(ServiceDescriptor.Scoped<IGitHub>(_ => _github));
+                dienste.Replace(ServiceDescriptor.Scoped<IGitHubAnmeldung>(_ => _anmeldung));
                 dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _ledger));
             });
         });
@@ -58,6 +60,10 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
         JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
 
+    /// <summary>Der <c>state</c> aus der Anmeldeadresse.</summary>
+    private static string Zustand(string adresse) =>
+        System.Web.HttpUtility.ParseQueryString(new Uri(adresse).Query)["state"]!;
+
     private static Task<HttpResponseMessage> Verbinde(HttpClient browser, string login) =>
         browser.PostAsJsonAsync("/github/me", new { login });
 
@@ -65,7 +71,183 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         string name, string? sprache = "Go", int sterne = 0, int tageAlt = 0) =>
         new(name, $"Ein Repository namens {name}", sprache, sterne,
             $"https://github.com/anna/{name}",
-            DateTimeOffset.UnixEpoch.AddDays(1000 - tageAlt));
+            DateTimeOffset.UnixEpoch.AddDays(1000 - tageAlt),
+            sprache is null ? [] : [sprache], ["verteilte-systeme"]);
+
+    /// <summary>Wer ein Konto GENANNT hat, muss dasselbe nachweisen.</summary>
+    /// <remarks>
+    /// Der Vergleich gilt weiterhin — nur eben dort, wo es etwas zu vergleichen
+    /// gibt. Wer nichts genannt hat, bekommt den gemeldeten Namen eingetragen
+    /// (siehe <see cref="Anmelden_ohne_Nennung_traegt_den_gemeldeten_Namen_ein" />).
+    /// </remarks>
+    [Fact]
+    public async Task Nennen_anmelden_sehen()
+    {
+        var ihr = AlsPerson(Guid.CreateVersion7());
+
+        var offen = await Json(await Verbinde(ihr, "anna-dev"));
+        var zustand = offen.GetProperty("challenge_description").GetString()!
+            .Replace("workertransfer-verify-", string.Empty, StringComparison.Ordinal);
+
+        var beginn = await Json(await ihr.PostAsync("/github/me/oauth/start", null));
+        beginn.GetProperty("url").GetString().Should().Contain(zustand);
+
+        // Was der Browser bei GitHub täte, ist hier ein Code, der auf den
+        // Anmeldenamen führt.
+        _anmeldung.Codes["ein-code"] = "anna-dev";
+        _github.Repos["anna-dev"] = [Repo("werkzeug")];
+
+        var fertig = await Json(await ihr.PostAsJsonAsync(
+            "/github/me/oauth/finish", new { code = "ein-code", state = zustand }));
+
+        fertig.GetProperty("verified").GetBoolean().Should().BeTrue();
+        fertig.GetProperty("challenge_description").ValueKind
+            .Should().Be(JsonValueKind.Null);
+    }
+
+    /// <summary>
+    /// <strong>Wer sich als jemand anderes anmeldet, beweist nichts.</strong>
+    /// </summary>
+    /// <remarks>
+    /// Der gefährlichste Fall des ganzen Ablaufs: jemand trägt <c>torvalds</c>
+    /// ein und meldet sich mit dem eigenen Konto an. Ohne den Namensvergleich
+    /// stünde danach ein Nachweis für ein fremdes Konto — und dessen Arbeit
+    /// erschiene als seine.
+    /// </remarks>
+    [Fact]
+    public async Task Eine_Anmeldung_mit_fremdem_Konto_beweist_nichts()
+    {
+        var ihr = AlsPerson(Guid.CreateVersion7());
+
+        var offen = await Json(await Verbinde(ihr, "torvalds"));
+        var zustand = offen.GetProperty("challenge_description").GetString()!
+            .Replace("workertransfer-verify-", string.Empty, StringComparison.Ordinal);
+
+        _anmeldung.Codes["mein-code"] = "anna-dev";
+
+        var antwort = await ihr.PostAsJsonAsync(
+            "/github/me/oauth/finish", new { code = "mein-code", state = zustand });
+
+        // 422 und nicht 404: die Anfrage war in Ordnung, der Nachweis fehlte.
+        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        var danach = await Json(await ihr.GetAsync("/github/me"));
+        danach.GetProperty("verified").GetBoolean().Should().BeFalse();
+    }
+
+    /// <summary>Ein fremder Zustand beweist nichts.</summary>
+    /// <remarks>
+    /// Er ist der Schutz gegen eine untergeschobene Rückkehr: ohne ihn könnte
+    /// jemand einer angemeldeten Person seinen eigenen Code unterschieben und
+    /// ihr damit sein Konto anhängen.
+    /// </remarks>
+    [Fact]
+    public async Task Ein_fremder_Zustand_beweist_nichts()
+    {
+        var ihr = AlsPerson(Guid.CreateVersion7());
+
+        await Verbinde(ihr, "anna-dev");
+        _anmeldung.Codes["ein-code"] = "anna-dev";
+
+        var antwort = await ihr.PostAsJsonAsync(
+            "/github/me/oauth/finish",
+            new { code = "ein-code", state = "ein-anderer-zustand" });
+
+        // 422 und nicht 404: die Anfrage war in Ordnung, der Nachweis fehlte.
+        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        var danach = await Json(await ihr.GetAsync("/github/me"));
+        danach.GetProperty("verified").GetBoolean().Should().BeFalse();
+    }
+
+    /// <summary>Ohne Zugangsdaten gibt es keine Adresse — und der Gist bleibt.</summary>
+    [Fact]
+    public async Task Ohne_eingerichtete_Anmeldung_gibt_es_keine_Adresse()
+    {
+        _anmeldung.Eingerichtet = false;
+
+        var ihr = AlsPerson(Guid.CreateVersion7());
+        await Verbinde(ihr, "anna-dev");
+
+        var beginn = await Json(await ihr.PostAsync("/github/me/oauth/start", null));
+
+        beginn.GetProperty("url").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    /// <summary>Ohne genanntes Konto führt die Anmeldung trotzdem hin.</summary>
+    /// <remarks>
+    /// Vorher stand hier die umgekehrte Erwartung, und sie war die Anforderung
+    /// des GISTS an einem Ort, an dem der Gist nichts zu suchen hat: er muss
+    /// wissen, in wessen Gists er sucht — die Anmeldung nicht, denn GitHub
+    /// meldet allein das Konto, das zugestimmt hat. Gemessen am 05.09.2026 an
+    /// einem echten Konto: der Namensschritt hat niemanden geschützt, sondern
+    /// die Person ausgesperrt, auf deren Verbindung noch ein alter Name stand.
+    /// </remarks>
+    [Fact]
+    public async Task Ohne_genanntes_Konto_fuehrt_die_Anmeldung_trotzdem_hin()
+    {
+        var ihr = AlsPerson(Guid.CreateVersion7());
+
+        var beginn = await Json(await ihr.PostAsync("/github/me/oauth/start", null));
+
+        beginn.GetProperty("url").GetString().Should().NotBeNullOrEmpty();
+
+        // Und die Verbindung, die dabei entsteht, BEHAUPTET NICHTS: kein
+        // Konto, kein Nachweis.
+        var danach = await Json(await ihr.GetAsync("/github/me"));
+        danach.GetProperty("login").ValueKind.Should().Be(JsonValueKind.Null);
+        danach.GetProperty("verified").GetBoolean().Should().BeFalse();
+    }
+
+    /// <summary>Wer nichts genannt hat, bekommt den gemeldeten Namen.</summary>
+    /// <remarks>
+    /// Der Ersatz für den Namensvergleich, und er ist nicht schwächer: GitHub
+    /// meldet ausschliesslich das Konto, das die Zustimmung erteilt hat. Ein
+    /// fremdes lässt sich hier nicht unterschieben, weil es gar nicht erst
+    /// genannt werden kann.
+    /// </remarks>
+    [Fact]
+    public async Task Anmelden_ohne_Nennung_traegt_den_gemeldeten_Namen_ein()
+    {
+        var ihr = AlsPerson(Guid.CreateVersion7());
+
+        var beginn = await Json(await ihr.PostAsync("/github/me/oauth/start", null));
+        var zustand = Zustand(beginn.GetProperty("url").GetString()!);
+
+        _anmeldung.Codes["ein-code"] = "anna-dev";
+        _github.Repos["anna-dev"] = [Repo("werkzeug")];
+
+        var fertig = await Json(await ihr.PostAsJsonAsync(
+            "/github/me/oauth/finish", new { code = "ein-code", state = zustand }));
+
+        fertig.GetProperty("login").GetString().Should().Be("anna-dev");
+        fertig.GetProperty("verified").GetBoolean().Should().BeTrue();
+    }
+
+    /// <summary>Die Auskunft, ob dieser Server die Anmeldung anbietet.</summary>
+    /// <remarks>
+    /// Sie legt nichts an — im Gegensatz zu <c>/me/oauth/start</c>. Genau
+    /// deshalb darf die Oberfläche sie beim Betrachten der Seite stellen,
+    /// ohne für jeden Besuch eine Zeile zu hinterlassen.
+    /// </remarks>
+    [Fact]
+    public async Task Die_Einrichtung_ist_erfragbar_und_legt_nichts_an()
+    {
+        var ihr = AlsPerson(Guid.CreateVersion7());
+
+        var gefragt = await Json(await ihr.GetAsync("/github/oauth"));
+        gefragt.GetProperty("available").GetBoolean().Should().BeTrue();
+
+        // Ohne Verbindung antwortet `/github/me` mit 200 und JSON-`null` —
+        // die Frage ist erlaubt, die Antwort lautet „keine".
+        (await Json(await ihr.GetAsync("/github/me"))).ValueKind
+            .Should().Be(JsonValueKind.Null);
+
+        _anmeldung.Eingerichtet = false;
+
+        var ohne = await Json(await ihr.GetAsync("/github/oauth"));
+        ohne.GetProperty("available").GetBoolean().Should().BeFalse();
+    }
 
     /// <summary>Der ganze Weg: nennen, Gist anlegen, beweisen, sehen.</summary>
     [Fact]
@@ -233,7 +415,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         _github.Repos["anna-dev"] =
         [
-            new Repository("ohne-datum", string.Empty, null, 0, "https://x", null),
+            new Repository("ohne-datum", string.Empty, null, 0, "https://x", null, [], []),
             Repo("mit-datum", tageAlt: 900)
         ];
 

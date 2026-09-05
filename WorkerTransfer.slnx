@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/" />
   <Folder Name="/src/shared/">
+    <Project Path="src/shared/WorkerTransfer.Ablage/WorkerTransfer.Ablage.csproj" />
     <Project Path="src/shared/WorkerTransfer.Contracts.Consent/WorkerTransfer.Contracts.Consent.csproj" />
     <Project Path="src/shared/WorkerTransfer.Contracts.Erasure/WorkerTransfer.Contracts.Erasure.csproj" />
     <Project Path="src/shared/WorkerTransfer.Contracts.Identity/WorkerTransfer.Contracts.Identity.csproj" />
@@ -102,6 +103,7 @@
     <Project Path="tests/WorkerTransfer.Portfolio.Tests/WorkerTransfer.Portfolio.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Profile.Tests/WorkerTransfer.Profile.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Resume.Tests/WorkerTransfer.Resume.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Ablage.Tests/WorkerTransfer.Ablage.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Skills.Tests/WorkerTransfer.Skills.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Transfer.Tests/WorkerTransfer.Transfer.Tests.csproj" />
   </Folder>

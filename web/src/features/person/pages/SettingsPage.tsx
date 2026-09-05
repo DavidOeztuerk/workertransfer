@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
+import MenuItem from "@mui/material/MenuItem";
 import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
 
@@ -197,17 +198,16 @@ function Datenschutzblock() {
               label={t("einstellungen.verfall")}
               value={String(einstellungen.deleteAfterMonths ?? "")}
               helperText={t("einstellungen.verfallHinweis")}
-              slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
               onChange={(event) =>
                 void setze(event.target.value === "" ? null : Number(event.target.value))
               }
               sx={{ maxWidth: 360 }}
             >
-              <option value="">{t("einstellungen.verfallNie")}</option>
+              <MenuItem value="">{t("einstellungen.verfallNie")}</MenuItem>
               {[6, 12, 24, 36].map((monate) => (
-                <option key={monate} value={monate}>
+                <MenuItem key={monate} value={monate}>
                   {t("einstellungen.verfallMonate", { count: monate })}
-                </option>
+                </MenuItem>
               ))}
             </TextField>
 
@@ -282,12 +282,13 @@ function KiBlock() {
               label={t("einstellungen.anbieter")}
               value={einstellungen.provider}
               helperText={t("einstellungen.anbieterHinweis")}
-              slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
               onChange={(event) => void setze({ provider: event.target.value as KiAnbieter })}
             >
-              <option value="none">{t("einstellungen.anbieterKeiner")}</option>
-              <option value="openai_compatible">{t("einstellungen.anbieterOllama")}</option>
-              <option value="anthropic">{t("einstellungen.anbieterAnthropic")}</option>
+              <MenuItem value="none">{t("einstellungen.anbieterKeiner")}</MenuItem>
+              <MenuItem value="openai_compatible">
+                {t("einstellungen.anbieterOllama")}
+              </MenuItem>
+              <MenuItem value="anthropic">{t("einstellungen.anbieterAnthropic")}</MenuItem>
             </TextField>
 
             {einstellungen.provider !== "none" ? (

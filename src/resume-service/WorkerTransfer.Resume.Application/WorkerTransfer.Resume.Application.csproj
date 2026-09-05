@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WorkerTransfer.Resume.Domain\WorkerTransfer.Resume.Domain.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Ablage\WorkerTransfer.Ablage.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.Outbox\WorkerTransfer.Outbox.csproj" />
   </ItemGroup>
 
