@@ -41,6 +41,8 @@ public static class GitHubInfrastructure
             configuration.GetSection(Einwilligungseinstellungen.Abschnitt));
         services.Configure<GitHubeinstellungen>(
             configuration.GetSection(GitHubeinstellungen.Abschnitt));
+        services.Configure<GitHubAnmeldeeinstellungen>(
+            configuration.GetSection(GitHubAnmeldeeinstellungen.Abschnitt));
         services.Configure<Loescheinstellungen>(
             configuration.GetSection(Loescheinstellungen.Abschnitt));
 
@@ -59,6 +61,11 @@ public static class GitHubInfrastructure
         services.AddScoped<IEinwilligungstor, HttpEinwilligungstor>();
         services.AddScoped<IAufrufertoken, HttpAufrufertoken>();
         services.AddScoped<IGitHub, HttpGitHub>();
+        // Ohne Zugangsdaten meldet sie sich als „nicht eingerichtet", und der
+        // Gist bleibt der Weg. Registriert wird sie trotzdem — ein Dienst, der
+        // je nach Konfiguration andere Abhängigkeiten hat, fällt erst beim
+        // ersten Aufruf um statt beim Start.
+        services.AddScoped<IGitHubAnmeldung, HttpGitHubAnmeldung>();
 
         services.AddCQRS(typeof(VerbindenBefehl).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));

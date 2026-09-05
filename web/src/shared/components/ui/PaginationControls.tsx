@@ -1,4 +1,6 @@
+import { useId } from "react";
 import Box from "@mui/material/Box";
+import MenuItem from "@mui/material/MenuItem";
 import Pagination from "@mui/material/Pagination";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
@@ -20,6 +22,12 @@ export const SEITENGROESSEN = [12, 24, 48, 96] as const;
  * <strong>Sie verschwindet nicht bei einer Seite.</strong> Die Wahl der
  * Seitengrösse bleibt sichtbar, denn genau dann will jemand sie vielleicht
  * verkleinern; nur die Nummernleiste selbst geht weg, weil sie nichts anbietet.
+ *
+ * <strong>Zwei Gruppen, nicht drei Dinge nebeneinander.</strong> Links steht,
+ * WO man ist — der Bereich und die Nummern gehören zusammen und werden auch so
+ * gelesen. Rechts steht, WIE VIEL auf eine Seite kommt. Vorher trieb ein
+ * <c>space-between</c> den Bereich ganz nach links, die Nummern in die Mitte
+ * und die Grösse nach rechts: drei Inseln, deren Zusammenhang niemand sieht.
  */
 export function PaginationControls({
   page,
@@ -39,6 +47,7 @@ export function PaginationControls({
   const { t } = useTranslation();
   const theme = useTheme();
   const schmal = useMediaQuery(theme.breakpoints.down("sm"));
+  const groessenFeld = useId();
 
   // NICHTS ZU BLAETTERN, ALSO KEINE LEISTE.
   //
@@ -59,28 +68,39 @@ export function PaginationControls({
       sx={{
         display: "flex",
         flexDirection: { xs: "column", sm: "row" },
-        alignItems: { xs: "stretch", sm: "center" },
+        // `flex-start` und NICHT `stretch`: gestreckt füllt jede Gruppe die
+        // ganze Breite, und ihr `space-between` riss dann „Pro Seite" und das
+        // Feld an die gegenüberliegenden Ränder — zwei Dinge, die zusammen
+        // gehören, so weit auseinander wie möglich.
+        alignItems: { xs: "flex-start", sm: "center" },
         justifyContent: "space-between",
-        gap: 2,
-        mt: 4,
-        pt: 3,
+        gap: { xs: 1.5, sm: 2 },
+        // Enger als vorher (mt 4 / pt 3). Die Leiste ist eine Fusszeile der
+        // Liste, kein eigener Abschnitt — sie soll an ihr hängen.
+        mt: 3,
+        pt: 2,
         borderTop: 1,
         borderColor: "divider",
       }}
     >
-      <Typography variant="body2" color="text.secondary" role="status">
-        {t("blaettern.bereich", { von, bis, gesamt: totalItems })}
-      </Typography>
-
+      {/* LINKS: wo man ist. Bereich und Nummern sind EINE Aussage. */}
       <Box
         sx={{
           display: "flex",
           alignItems: "center",
-          gap: 2,
+          gap: { xs: 1.5, sm: 2 },
           flexWrap: "wrap",
-          justifyContent: { xs: "space-between", sm: "flex-end" },
         }}
       >
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          role="status"
+          sx={{ whiteSpace: "nowrap" }}
+        >
+          {t("blaettern.bereich", { von, bis, gesamt: totalItems })}
+        </Typography>
+
         {totalPages > 1 ? (
           <Pagination
             count={totalPages}
@@ -100,22 +120,47 @@ export function PaginationControls({
             }
           />
         ) : null}
+      </Box>
+
+      {/*
+        RECHTS: wie viel auf eine Seite kommt — Beschriftung NEBEN dem Feld.
+
+        Die Beschriftung steht als eigenes `label` daneben und nicht als
+        `label`-Eigenschaft am Feld: die Oberfläche setzt Feldbeschriftungen
+        grundsätzlich ÜBER das Feld (siehe `MuiInputLabel` im Thema), und hier
+        wäre das eine zweizeilige Insel neben einer einzeiligen Leiste. Über
+        `htmlFor` bleibt es trotzdem eine echte Beschriftung.
+      */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          flexShrink: 0,
+        }}
+      >
+        <Typography
+          component="label"
+          htmlFor={groessenFeld}
+          variant="body2"
+          color="text.secondary"
+          sx={{ whiteSpace: "nowrap" }}
+        >
+          {t("blaettern.proSeite")}
+        </Typography>
 
         <TextField
           select
           size="small"
-          label={t("blaettern.proSeite")}
+          id={groessenFeld}
           value={String(pageSize)}
           onChange={(ereignis) => onPageSize(Number(ereignis.target.value))}
-          // Nativ, wie jedes Auswahlfeld hier: MUIs Vorgabe ist ein Listenfeld
-          // aus `div`s, das kein Screenreader als Auswahlfeld bedient.
-          slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
-          sx={{ width: 104, flexShrink: 0 }}
+          sx={{ width: 88, flexShrink: 0 }}
         >
           {SEITENGROESSEN.map((groesse) => (
-            <option key={groesse} value={groesse}>
+            <MenuItem key={groesse} value={groesse}>
               {groesse}
-            </option>
+            </MenuItem>
           ))}
         </TextField>
       </Box>

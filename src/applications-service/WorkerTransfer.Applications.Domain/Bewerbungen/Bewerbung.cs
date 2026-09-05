@@ -41,10 +41,22 @@ public sealed class UebergangNichtErlaubt(Bewerbungsstand jetzt, Bewerbungsstand
 /// ohne jede Angabe zur Person ist keine, und „ich bewerbe mich, aber ihr dürft
 /// nichts von mir sehen" ist keine Wahl, die jemand ernsthaft trifft.
 /// </remarks>
-public sealed record Mitgeschicktes(bool Lebenslauf = false, bool Portfolio = false)
+public sealed record Mitgeschicktes(
+    bool Lebenslauf = false,
+    bool Portfolio = false,
+    IReadOnlyList<Guid>? Unterlagen = null)
 {
     /// <summary>Immer wahr. Kein Feld, damit es niemand auf falsch setzt.</summary>
     public bool Profil => true;
+
+    /// <summary>Welche Unterlagen beiliegen — die Kennungen, in ihrer Reihenfolge.</summary>
+    /// <remarks>
+    /// <strong>Eine Momentaufnahme, kein Verweis auf „alles, was sie hat".</strong>
+    /// Wer später eine Unterlage hochlädt, hat sie dieser Bewerbung nicht
+    /// beigelegt; wer eine löscht, hat sie trotzdem geschickt. Die Liste hier
+    /// sagt, was tatsächlich hinausging.
+    /// </remarks>
+    public IReadOnlyList<Guid> Unterlagen { get; init; } = Unterlagen ?? [];
 }
 
 /// <summary>Eine Bewerbung.</summary>

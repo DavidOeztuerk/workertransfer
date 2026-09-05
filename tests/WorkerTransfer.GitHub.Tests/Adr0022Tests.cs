@@ -65,8 +65,23 @@ public class Adr0022Tests
     /// Ein Repository trägt genau das, was GitHub gemeldet hat.
     /// </summary>
     /// <remarks>
-    /// Sechs Felder, alle abgeschrieben, keins gerechnet. Ein siebtes wäre die
+    /// Acht Felder, alle abgeschrieben, keins gerechnet. Ein neuntes wäre die
     /// Stelle, an der aus einem Beleg eine Wertung wird.
+    /// <para>
+    /// <strong>Die zwei jüngsten sind der Grund, diesen Test genau zu lesen.</strong>
+    /// <c>Themen</c> sind die Topics, die der Besitzer selbst gesetzt hat — eine
+    /// Nennung, abgeschrieben. <c>Sprachen</c> ist die MENGE der Sprachen eines
+    /// Repositories, und das ist die Grenze: GitHub liefert dazu ein Byte je
+    /// Sprache, und genau daraus rechnete das gelöschte Paket sein „Können"
+    /// (<c>bytes / total_bytes</c>, ADR-0022 §2). Die Namen sind eine Tatsache
+    /// über ein Repository; die Zahlen wären das Rohmaterial für eine Aussage
+    /// über einen Menschen. Sie stehen deshalb nirgends — siehe
+    /// <c>HttpGitHubTests.Sprachen_kommen_als_Menge_ohne_Bytes</c>.
+    /// </para>
+    /// <para>
+    /// Wer hier ein Feld ergänzt, prüft zuerst: kommt es SO von GitHub, oder
+    /// ist es gerechnet? Nur das Erste darf dazu.
+    /// </para>
     /// </remarks>
     [Fact]
     public void Ein_Repository_traegt_nur_Abgeschriebenes()
@@ -79,12 +94,27 @@ public class Adr0022Tests
                 nameof(Repository.Sprache),
                 nameof(Repository.Sterne),
                 nameof(Repository.Adresse),
-                nameof(Repository.ZuletztGeschoben));
+                nameof(Repository.ZuletztGeschoben),
+                nameof(Repository.Sprachen),
+                nameof(Repository.Themen));
     }
 
     /// <summary>
     /// Und die Verbindung trägt keine Zusammenfassung über den Menschen.
     /// </summary>
+    /// <remarks>
+    /// <c>SprachenVollstaendig</c> ist die einzige Eigenschaft hier, die nicht
+    /// von GitHub abgeschrieben ist — und sie darf es sein, weil sie über
+    /// <em>uns</em> spricht und nicht über die Person: sie sagt, ob unser
+    /// Abruf für jedes Repository die Sprachen holen konnte. Genau das
+    /// verlangt ADR-0022 §3, und ohne sie läse sich eine gekürzte Menge wie
+    /// eine vollständige.
+    /// <para>
+    /// Wer hier eine Eigenschaft ergänzt, beantwortet zuerst: spricht sie über
+    /// den Abruf oder über den Menschen? Über den Menschen darf hier nichts
+    /// stehen, das gerechnet ist.
+    /// </para>
+    /// </remarks>
     [Fact]
     public void Eine_Verbindung_traegt_keine_Zusammenfassung()
     {
@@ -97,6 +127,7 @@ public class Adr0022Tests
                 nameof(Verbindung.NachgewiesenAm),
                 nameof(Verbindung.GeholtAm),
                 nameof(Verbindung.Repositories),
+                nameof(Verbindung.SprachenVollstaendig),
                 nameof(Verbindung.Nachgewiesen));
     }
 }

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.Resume.Domain.Anfragen;
+using WorkerTransfer.Resume.Domain.Lebenslaeufe;
 using WorkerTransfer.Resume.Domain.Pruefspur;
 
 namespace WorkerTransfer.Resume.Infrastructure.Persistence;
@@ -31,9 +32,40 @@ public sealed class LebenslaufZeile
     /// <summary>The <c>education</c> jsonb column, as written.</summary>
     public string Education { get; set; } = "[]";
 
+    /// <summary>In welcher Vorlage der Lebenslauf gesetzt wird.</summary>
+    public Vorlage Template { get; set; } = Vorlage.Schlicht;
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>Eine Zeile von <c>resume_documents</c>.</summary>
+/// <remarks>
+/// <strong>Ohne Bytes.</strong> Der Inhalt liegt in der Ablage (ADR-0035);
+/// hier steht nur, wo. Eine Datenbank, in der Dateien liegen, wandert
+/// vollstaendig in jede Sicherung und in jeden Abzug, den irgendwer einmal
+/// fuer eine Fehlersuche zieht.
+/// </remarks>
+public sealed class UnterlageZeile
+{
+    public Guid Id { get; set; }
+
+    /// <summary>Wem sie gehoert.</summary>
+    public Guid SubjectId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public Unterlagenart Kind { get; set; }
+
+    public string ContentType { get; set; } = string.Empty;
+
+    public int SizeBytes { get; set; }
+
+    /// <summary>Der Schluessel in der Ablage.</summary>
+    public string StorageKey { get; set; } = string.Empty;
+
+    public DateTime CreatedAt { get; set; }
 }
 
 /// <summary>One row of <c>resume_requests</c>.</summary>
@@ -105,6 +137,9 @@ public sealed class ResumeDbContext(DbContextOptions<ResumeDbContext> options) :
     /// <summary>The requests.</summary>
     public DbSet<AnfrageZeile> Anfragen => Set<AnfrageZeile>();
 
+    /// <summary>Die beigelegten Unterlagen.</summary>
+    public DbSet<UnterlageZeile> Unterlagen => Set<UnterlageZeile>();
+
     /// <summary>The trail.</summary>
     public DbSet<PruefZeile> Pruefspur => Set<PruefZeile>();
 
@@ -114,6 +149,8 @@ public sealed class ResumeDbContext(DbContextOptions<ResumeDbContext> options) :
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
         modelBuilder.HasPostgresEnum<Anfragestand>(name: Enumnamen.Anfragestand);
+        modelBuilder.HasPostgresEnum<Unterlagenart>(name: Enumnamen.Unterlagenart);
+        modelBuilder.HasPostgresEnum<Vorlage>(name: Enumnamen.Vorlage);
         modelBuilder.HasPostgresEnum<Pruefhandlung>(name: Enumnamen.Pruefhandlung);
 
         modelBuilder.Entity<LebenslaufZeile>(entity =>
@@ -132,8 +169,28 @@ public sealed class ResumeDbContext(DbContextOptions<ResumeDbContext> options) :
                 .HasColumnName("positions").HasColumnType("jsonb").IsRequired();
             entity.Property(zeile => zeile.Education)
                 .HasColumnName("education").HasColumnType("jsonb").IsRequired();
+            entity.Property(zeile => zeile.Template)
+                .HasColumnName("template").IsRequired();
             entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(zeile => zeile.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        });
+
+        modelBuilder.Entity<UnterlageZeile>(entity =>
+        {
+            entity.ToTable("resume_documents");
+            entity.HasKey(zeile => zeile.Id);
+            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(zeile => zeile.SubjectId).HasColumnName("subject_id").IsRequired();
+            entity.HasIndex(zeile => zeile.SubjectId);
+            entity.Property(zeile => zeile.Name)
+                .HasColumnName("name").HasMaxLength(Unterlage.HoechstlaengeName).IsRequired();
+            entity.Property(zeile => zeile.Kind).HasColumnName("kind").IsRequired();
+            entity.Property(zeile => zeile.ContentType)
+                .HasColumnName("content_type").HasMaxLength(64).IsRequired();
+            entity.Property(zeile => zeile.SizeBytes).HasColumnName("size_bytes").IsRequired();
+            entity.Property(zeile => zeile.StorageKey)
+                .HasColumnName("storage_key").HasMaxLength(128).IsRequired();
+            entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
         });
 
         modelBuilder.Entity<AnfrageZeile>(entity =>
@@ -192,6 +249,12 @@ public static class Enumnamen
 {
     /// <summary>Behind <c>resume_requests.status</c>.</summary>
     public const string Anfragestand = "request_status";
+
+    /// <summary>Hinter <c>resume_documents.kind</c>.</summary>
+    public const string Unterlagenart = "document_kind";
+
+    /// <summary>Hinter <c>resumes.template</c>.</summary>
+    public const string Vorlage = "resume_template";
 
     /// <summary>Behind <c>audit_events.action</c>.</summary>
     public const string Pruefhandlung = "audit_action";

@@ -31,6 +31,15 @@ export interface Job {
   title: string;
   description: string;
   location: string;
+  /**
+   * Die Postleitzahl. Leer, wenn keine angegeben wurde.
+   *
+   * Eigenes Feld und nicht Teil von `location`: der Ortsname darf mehrdeutig
+   * sein („Neustadt" gibt es zwanzigmal), die Postleitzahl ist es nicht — und
+   * nur sie macht die Umkreissuche über einem kleinen Ort verlässlich
+   * (ADR-0032).
+   */
+  postal_code: string;
   remote: RemoteMode;
   employment: EmploymentType;
   /** Was die Stelle verlangt — die Liste, gegen die im Browser abgeglichen wird. */
@@ -62,6 +71,7 @@ interface JobDraht {
   title: string;
   description: string;
   location: string;
+  postal_code: string;
   remote_mode: RemoteMode;
   employment_type: EmploymentType;
   skills: string[];
@@ -78,6 +88,7 @@ function zurAnzeige(draht: JobDraht): Job {
     title: draht.title,
     description: draht.description,
     location: draht.location,
+    postal_code: draht.postal_code ?? "",
     remote: draht.remote_mode,
     employment: draht.employment_type,
     skills: draht.skills ?? [],
@@ -91,6 +102,7 @@ export interface JobInput {
   title: string;
   description: string;
   location: string;
+  postal_code: string;
   remote: RemoteMode;
   employment: EmploymentType;
   skills: string[];
@@ -109,6 +121,21 @@ export interface SearchFilters {
    * Zeichenkette wäre eine zweite Trennregel neben der, die es schon gibt.
    */
   skills?: string[];
+  /**
+   * „Höchstens N Kilometer von hier."
+   *
+   * <strong>Der Radius geht auch ohne Koordinaten hinaus.</strong> Dann ist
+   * `location` die Mitte, und der Dienst löst den Ortsnamen mit derselben
+   * Tabelle auf, mit der er auch die Anzeigen verortet — wer „Leipzig" tippt
+   * und „50 km" wählt, braucht dafür weder GPS noch die Erlaubnis dazu.
+   *
+   * `lat` und `lon` gehen nur GEMEINSAM mit und sind bereits GERUNDET (siehe
+   * `useGeolocation`): sie stehen in einer Adresszeile und damit in
+   * Zugriffsprotokollen.
+   */
+  lat?: number;
+  lon?: number;
+  radiusKm?: number;
 }
 
 export type SucheFehler = "offline" | "fehlgeschlagen";
@@ -124,6 +151,14 @@ export type SucheErgebnis =
       pageSize: number;
       totalItems: number;
       totalPages: number;
+      /**
+       * Wie viele Anzeigen die Umkreissuche NICHT beurteilen konnte, weil ihr
+       * Ort unbekannt ist. `null`, wenn ohne Umkreis gesucht wurde.
+       *
+       * Die Zahl muss auf den Bildschirm. Ein Ortsfilter, der stumm weglässt,
+       * liefert ein Ergebnis, das vollständig aussieht und es nicht ist.
+       */
+      omitted: number | null;
     }
   | SucheFehlschlag;
 
@@ -176,10 +211,44 @@ export function suchAnfrage(filters: SearchFilters, page = 1, pageSize?: number)
     params.set("company", filters.company);
   // Wiederholt, einer je Fähigkeit — siehe `SearchFilters.skills`.
   for (const skill of filters.skills ?? []) params.append("skill", skill);
+  // Der Radius allein genügt — ohne Koordinaten ist der Ort die Mitte.
+  if (filters.radiusKm !== undefined) {
+    params.set("radius_km", String(filters.radiusKm));
+  }
+  // Koordinaten aber nur GEMEINSAM: eine halbe Position ist keine.
+  if (filters.lat !== undefined && filters.lon !== undefined) {
+    params.set("lat", String(filters.lat));
+    params.set("lon", String(filters.lon));
+  }
   if (page > 1) params.set("page", String(page));
   if (pageSize !== undefined) params.set("page_size", String(pageSize));
   const query = params.toString();
   return query === "" ? "" : `?${query}`;
+}
+
+/**
+ * Der nächstgelegene bekannte Ort zu einem Punkt.
+ *
+ * Damit die suchende Person SIEHT, wovon aus gemessen wird — ein Umkreis um
+ * einen unsichtbaren Punkt ist eine Zumutung. Der Punkt ist derselbe bereits
+ * gerundete, der auch an die Suche geht (siehe `useGeolocation`), und die
+ * Antwort kommt aus einer Tabelle im Dienst, nicht von einem Fremdanbieter.
+ *
+ * `null` heisst „nichts in der Nähe" — dann bleibt das Ortsfeld leer, statt
+ * einen Ort zu behaupten.
+ */
+export async function ortZuPunkt(
+  lat: number,
+  lon: number,
+  signal?: AbortSignal
+): Promise<string | null> {
+  const answer = await request<{ location?: string | null }>(
+    JOBS_BASE_URL,
+    `/jobs/place?lat=${lat}&lon=${lon}`,
+    { signal }
+  );
+
+  return answer.ok ? (answer.value?.location ?? null) : null;
 }
 
 export async function searchJobs(
@@ -194,6 +263,7 @@ export async function searchJobs(
     page_size?: number;
     total_items?: number;
     total_pages?: number;
+    omitted?: number;
   }>(
     JOBS_BASE_URL,
     `/jobs${suchAnfrage(filters, page, pageSize)}`,
@@ -216,6 +286,10 @@ export async function searchJobs(
     pageSize: answer.value?.page_size ?? (pageSize ?? 12),
     totalItems: answer.value?.total_items ?? 0,
     totalPages: answer.value?.total_pages ?? 1,
+    // `?? null` und nicht `?? 0`: das Feld FEHLT, wenn ohne Umkreis gesucht
+    // wurde, und eine 0 behauptete, es sei nichts ausgelassen worden. Das ist
+    // ein anderer Satz als „danach wurde nicht gefragt".
+    omitted: answer.value?.omitted ?? null,
   };
 }
 

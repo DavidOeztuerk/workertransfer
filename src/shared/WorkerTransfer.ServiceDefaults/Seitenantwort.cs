@@ -28,11 +28,28 @@ namespace WorkerTransfer.ServiceDefaults;
 /// <param name="Seite">Die aktuelle Seite, 1-basiert. Menschen zählen ab eins.</param>
 /// <param name="Seitengroesse">Wie viele Einträge angefragt wurden.</param>
 /// <param name="Gesamt">Wie viele Einträge es insgesamt gibt.</param>
+/// <param name="Ausgelassen">
+/// Wie viele Einträge ein Filter <em>nicht beurteilen konnte</em> und deshalb
+/// weggelassen hat. <c>null</c>, wenn die Frage sich nicht stellte — dann steht
+/// das Feld auch nicht in der Antwort.
+/// <para>
+/// <strong>Es steht hier, damit die Oberfläche es sagen KANN.</strong> Ein
+/// Filter, der einen Teil der Menge nicht beurteilen kann, liefert sonst ein
+/// Ergebnis, das vollständig aussieht und es nicht ist — dieselbe Lüge durch
+/// Auslassen, die ADR-0022 §3 verbietet. Der erste Anwendungsfall ist die
+/// Umkreissuche nach Stellen: Anzeigen mit unbekanntem Ort fallen heraus, und
+/// wer „25 km um mich" wählt, muss erfahren, dass darüber nicht geurteilt
+/// wurde.
+/// </para>
+/// </param>
 public sealed record Seitenantwort<T>(
     [property: JsonPropertyName("items")] IReadOnlyList<T> Items,
     [property: JsonPropertyName("page")] int Seite,
     [property: JsonPropertyName("page_size")] int Seitengroesse,
-    [property: JsonPropertyName("total_items")] int Gesamt)
+    [property: JsonPropertyName("total_items")] int Gesamt,
+    [property: JsonPropertyName("omitted")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    int? Ausgelassen = null)
 {
     /// <summary>Wie viele Seiten es gibt. Mindestens eine, auch bei null Einträgen.</summary>
     /// <remarks>

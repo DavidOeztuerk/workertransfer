@@ -19,6 +19,13 @@ export interface Arbeit {
   year: number | null;
   /** Name einer hochgeladenen Datei — vom Server vergeben, nie selbst gewählt. */
   attachment: string | null;
+  /**
+   * Womit gearbeitet wurde — von der Person selbst genannt.
+   *
+   * Macht die Arbeit nicht durchsuchbar: suchbar wird eine Fähigkeit erst im
+   * Profil, und dorthin kommt sie mit einem Klick.
+   */
+  technologies: string[];
 }
 
 export interface Schaufenster {

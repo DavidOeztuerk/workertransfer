@@ -216,6 +216,13 @@ services:
       Consent__Adresse: http://consent-service:8002
       Notifications__Adresse: http://notification-service:8010
       Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      # Wo die Zertifikate liegen. Ein BAND und kein Ordner im Abbild: ein
+      # `up -d --build` ersetzt den Behaelter, und mit ihm waeren die Dateien
+      # fort — waehrend ihre Zeilen in der Datenbank stehen blieben. Genau
+      # diese Haelfte-fort-Haelfte-da-Lage ist die schlimmste (ADR-0035).
+      Ablage__Verzeichnis: /daten/ablage
+    volumes:
+      - resume-ablage:/daten/ablage
     ports:
       - "8004:8004"
 
@@ -262,6 +269,17 @@ services:
       Jobs__Adresse: http://jobs-service:8006
       Notifications__Adresse: http://notification-service:8010
       Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      # Der Anschreiben-Agent. Leer heisst: es wird NICHTS gerufen, und die
+      # Oberflaeche sagt es — statt einen leeren Entwurf zu zeigen, den jemand
+      # versehentlich freigibt (ADR-0034).
+      Draft__Schluessel: ${ANTHROPIC_API_KEY:-}
+      # Woher die EIGENEN Angaben der bewerbenden Person kommen. Serverseitig
+      # geholt und nicht vom Browser geschickt: „nur die eigenen Daten" ist eine
+      # Zusage, die allein der Server halten kann.
+      Auskunft__Identity: http://identity-service:8001
+      Auskunft__Profile: http://profile-service:8003
+      Auskunft__Resume: http://resume-service:8004
+      Auskunft__Companies: http://companies-service:8008
     ports:
       - "8007:8007"
 
@@ -315,6 +333,11 @@ services:
       ConnectionStrings__github: Host=postgres;Port=5432;Database=github;Username=worker;Password=worker
       Consent__Adresse: http://consent-service:8002
       GitHub__Token: ${WORKERTRANSFER_GITHUB_TOKEN:-}
+      # Leer heisst: keine Anmeldung ueber GitHub, und der Gist bleibt der Weg.
+      # Eine Voreinstellung, die ein Geheimnis enthaelt, IST das Geheimnis.
+      GitHub__OAuth__Kennung: ${WORKERTRANSFER_GITHUB_OAUTH_ID:-}
+      GitHub__OAuth__Geheimnis: ${WORKERTRANSFER_GITHUB_OAUTH_SECRET:-}
+      GitHub__OAuth__Rueckadresse: ${WORKERTRANSFER_GITHUB_OAUTH_RUECKADRESSE:-}
     ports:
       - "8011:8011"
   gateway:
@@ -379,3 +402,4 @@ secrets:
 volumes:
   postgres-data:
   portfolio-data:
+  resume-ablage:

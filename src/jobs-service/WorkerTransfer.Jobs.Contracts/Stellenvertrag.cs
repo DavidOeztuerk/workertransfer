@@ -19,6 +19,7 @@ public sealed record StelleV1(
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("description")] string Description,
     [property: JsonPropertyName("location")] string Location,
+    [property: JsonPropertyName("postal_code")] string PostalCode,
     [property: JsonPropertyName("remote_mode")] string RemoteMode,
     [property: JsonPropertyName("employment_type")] string EmploymentType,
     [property: JsonPropertyName("skills")] IReadOnlyList<string> Skills,
@@ -36,6 +37,7 @@ public sealed record StelleSchreibenV1(
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("description")] string Description,
     [property: JsonPropertyName("location")] string Location = "",
+    [property: JsonPropertyName("postal_code")] string PostalCode = "",
     [property: JsonPropertyName("remote_mode")] string RemoteMode = "none",
     [property: JsonPropertyName("employment_type")] string EmploymentType = "full_time",
     [property: JsonPropertyName("skills")] IReadOnlyList<string>? Skills = null);

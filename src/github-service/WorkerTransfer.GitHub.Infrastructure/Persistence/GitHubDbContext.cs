@@ -17,7 +17,8 @@ public sealed class VerbindungsZeile
     /// <summary>Die Subjekt-Kennung. Sie <em>ist</em> der Schlüssel.</summary>
     public Guid Id { get; set; }
 
-    public string Login { get; set; } = string.Empty;
+    /// <summary><c>null</c>: noch kein Konto genannt.</summary>
+    public string? Login { get; set; }
 
     public string Challenge { get; set; } = string.Empty;
 
@@ -27,6 +28,9 @@ public sealed class VerbindungsZeile
 
     /// <summary>Der Abzug, als jsonb.</summary>
     public string Repositories { get; set; } = "[]";
+
+    /// <summary>Konnten fuer jedes Repository die Sprachen geholt werden?</summary>
+    public bool LanguagesComplete { get; set; } = true;
 
     public DateTime CreatedAt { get; set; }
 
@@ -62,16 +66,27 @@ public sealed class GitHubDbContext(DbContextOptions<GitHubDbContext> options)
             entity.HasAnnotation(Personenzeile.Anmerkung, true);
             entity.HasKey(zeile => zeile.Id);
             entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
+            // OHNE `IsRequired`: eine Verbindung, die über GitHubs Anmeldung
+            // entsteht, kennt ihr Konto noch nicht — den Namen meldet GitHub.
+            // Eine leere Zeichenkette statt `null` wäre ein Name, den es nicht
+            // gibt, und würde in jeder Abfrage mitgezählt.
             entity.Property(zeile => zeile.Login)
                 .HasColumnName("login")
-                .HasMaxLength(Verbindung.HoechstlaengeLogin)
-                .IsRequired();
+                .HasMaxLength(Verbindung.HoechstlaengeLogin);
             entity.Property(zeile => zeile.Challenge)
                 .HasColumnName("challenge").HasMaxLength(64).IsRequired();
             entity.Property(zeile => zeile.VerifiedAt).HasColumnName("verified_at");
             entity.Property(zeile => zeile.FetchedAt).HasColumnName("fetched_at");
             entity.Property(zeile => zeile.Repositories)
                 .HasColumnName("repositories").HasColumnType("jsonb").IsRequired();
+            // Vorgabe `true`: bestehende Zeilen stammen aus einer Zeit, in der
+            // ohne Token gar keine Sprachen geholt wurden. `false` zu setzen
+            // waere ehrlicher fuer die Vergangenheit und laestiger fuer die
+            // Gegenwart — der naechste Abruf schreibt ohnehin den wahren Wert,
+            // und bis dahin behauptet die Zeile nichts, was sie nicht belegen
+            // koennte: sie zeigt schlicht, was sie hat.
+            entity.Property(zeile => zeile.LanguagesComplete)
+                .HasColumnName("languages_complete").HasDefaultValue(true).IsRequired();
             entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(zeile => zeile.UpdatedAt).HasColumnName("updated_at").IsRequired();
         });

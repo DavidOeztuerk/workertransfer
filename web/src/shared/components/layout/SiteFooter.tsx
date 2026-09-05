@@ -28,7 +28,10 @@ export function SiteFooter() {
     <Box
       component="footer"
       sx={{
-        mt: 10,
+        // Vorher 10 (40 px). Zusammen mit dem Seitenrand darunter klaffte
+        // unter dem letzten Element — meist einer Blätterleiste — ein Loch von
+        // achtundsechzig Pixeln.
+        mt: 5,
         borderTop: 1,
         borderColor: "divider",
         bgcolor: "background.paper",

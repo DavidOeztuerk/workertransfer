@@ -63,6 +63,13 @@ public sealed class HttpEinwilligungstor(
         ErteiltAsync(wer, Einwilligungsschluessel.Lebenslauf(firma), cancellationToken);
 
     /// <inheritdoc />
+    public Task<bool> DarfUnterlagenSehenAsync(
+        SubjectId wer,
+        TenantId firma,
+        CancellationToken cancellationToken = default) =>
+        ErteiltAsync(wer, Einwilligungsschluessel.Unterlagen(firma), cancellationToken);
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<bool>> DuerfenLebenslaufLesenAsync(
         IReadOnlyList<(SubjectId Wer, TenantId Firma)> paare,
         CancellationToken cancellationToken = default)

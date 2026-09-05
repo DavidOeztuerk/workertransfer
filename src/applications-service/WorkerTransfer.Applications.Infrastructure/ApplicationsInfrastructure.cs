@@ -10,6 +10,8 @@ using WorkerTransfer.Applications.Application.Bewerbungen;
 using WorkerTransfer.Applications.Application.Ports;
 using WorkerTransfer.Applications.Domain.Bewerbungen;
 using WorkerTransfer.Applications.Infrastructure.Benachrichtigung;
+using WorkerTransfer.Applications.Infrastructure.Anschreiben;
+using WorkerTransfer.Applications.Infrastructure.Auskunft;
 using WorkerTransfer.Applications.Infrastructure.Einwilligung;
 using WorkerTransfer.Applications.Infrastructure.Loeschung;
 using WorkerTransfer.Applications.Infrastructure.Persistence;
@@ -50,6 +52,10 @@ public static class ApplicationsInfrastructure
             configuration.GetSection(Benachrichtigungseinstellungen.Abschnitt));
         services.Configure<Loescheinstellungen>(
             configuration.GetSection(Loescheinstellungen.Abschnitt));
+        services.Configure<Anschreibeneinstellungen>(
+            configuration.GetSection(Anschreibeneinstellungen.Abschnitt));
+        services.Configure<Auskunftseinstellungen>(
+            configuration.GetSection(Auskunftseinstellungen.Abschnitt));
 
 
         services.AddSingleton(_ => ApplicationsDbContextFactory.Datenquelle(connectionString));
@@ -66,6 +72,33 @@ public static class ApplicationsInfrastructure
         services.AddScoped<IEinwilligungsschreiber, HttpEinwilligungsschreiber>();
         services.AddScoped<IStellenauskunft, HttpStellenauskunft>();
         services.AddScoped<IAufrufertoken, HttpAufrufertoken>();
+        services.AddScoped<IEntwurfsspeicher, EfEntwurfsspeicher>();
+
+        // Die eigenen Angaben und der Firmenname — beide über HTTP, beide mit
+        // dem Token des Aufrufers. Ein Adapter für zwei Ports, weil er dieselbe
+        // Verbindung und dieselben Einstellungen benutzt; zwei Klassen wären
+        // zwei Stellen, an denen ein Zeitlimit fehlen kann.
+        services.AddScoped<HttpBewerberauskunft>();
+        services.AddScoped<IBewerberauskunft>(
+            anbieter => anbieter.GetRequiredService<HttpBewerberauskunft>());
+        services.AddScoped<IUnternehmensauskunft>(
+            anbieter => anbieter.GetRequiredService<HttpBewerberauskunft>());
+
+        // OHNE SCHLÜSSEL WIRD NICHTS GERUFEN, und die Oberfläche sagt es. Der
+        // Ersatz liefert keine Vorlage, sondern die Auskunft, dass es ihn nicht
+        // gibt — ein Anschreiben, das nicht vom Modell kommt, aber so aussieht,
+        // wäre die schlechtere Antwort (ADR-0024, ADR-0034).
+        var anschreiben = new Anschreibeneinstellungen();
+        configuration.GetSection(Anschreibeneinstellungen.Abschnitt).Bind(anschreiben);
+
+        if (anschreiben.Schluessel.Length > 0)
+        {
+            services.AddScoped<IAnschreiber, HttpAnschreiber>();
+        }
+        else
+        {
+            services.AddScoped<IAnschreiber, KeinAnschreiber>();
+        }
 
         // Vorher ging die Benachrichtigung nach dem Commit als HTTP-Aufruf
         // hinaus, dessen Fehler geschluckt wurde — die Zusage stimmte, aber die

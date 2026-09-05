@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
+using WorkerTransfer.Ablage;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.Resume.Application.Anfragen;
 using WorkerTransfer.Resume.Application.Behaviors;
@@ -61,6 +62,13 @@ public static class ResumeInfrastructure
 
         services.AddScoped<ILebenslaufSpeicher, EfLebenslaufSpeicher>();
         services.AddScoped<IAnfragenSpeicher, EfAnfragenSpeicher>();
+        services.AddScoped<IUnterlagenSpeicher, EfUnterlagenSpeicher>();
+
+        // Die Ablage aus ADR-0021, zurueck in .NET (ADR-0035). Sie steht hier
+        // und nicht in `ServiceDefaults`: ob ein Dienst Dateien haelt, ist eine
+        // Entscheidung, und Entscheidungen gehoeren in den Kompositionswurzel
+        // des Dienstes, der sie trifft (ADR-0003).
+        services.AddAblage(configuration);
         services.AddScoped<IPruefspur, EfPruefspur>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<ILoeschbestand, EfLoeschbestand>();

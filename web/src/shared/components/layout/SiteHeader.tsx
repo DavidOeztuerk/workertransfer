@@ -137,34 +137,23 @@ export function SiteHeader() {
             </>
           ) : (
             // EIN Zugang, immer sichtbar — auch auf /login und /register.
-            <>
-              {/* EIN NUTZERSYMBOL, in beiden Breiten dasselbe.
-                  Vorher stand hier auf schmalen Bildschirmen ein Anmeldepfeil
-                  und auf breiten ein Knopf — zwei Bilder für dieselbe Stelle,
-                  und wer das Fenster zieht, sucht danach neu. Das Symbol ist
-                  jetzt immer dasselbe wie das des angemeldeten Kontos, nur
-                  ohne Initialen: der Platz gehört dem Konto, ob eines offen ist
-                  oder nicht. */}
-              <Tooltip title={t("kopf.anmelden")}>
-                <IconButton
-                  component={RouterLink}
-                  to="/login"
-                  aria-label={t("kopf.anmelden")}
-                  size="small"
-                  sx={{ color: "text.secondary" }}
-                >
-                  <AccountCircleIcon />
-                </IconButton>
-              </Tooltip>
-              <Button
+            /* EIN NUTZERSYMBOL, auf JEDER Breite, und kein Knopf daneben.
+               Vorher stand schmal ein Symbol und breit zusätzlich ein Knopf mit
+               Text — zwei Bedienelemente für dieselbe Handlung, und beim Ziehen
+               des Fensters erschien und verschwand eines davon. An genau der
+               Stelle steht angemeldet der Avatar; ob ein Konto offen ist oder
+               nicht, darf die Stelle nicht wandern. */
+            <Tooltip title={t("kopf.anmelden")}>
+              <IconButton
                 component={RouterLink}
                 to="/login"
-                variant="contained"
-                sx={{ ml: 0.5, px: 2.5, flexShrink: 0, display: { xs: "none", sm: "inline-flex" } }}
+                aria-label={t("kopf.anmelden")}
+                size="small"
+                sx={{ ml: 0.5, p: 0.25, color: "text.secondary" }}
               >
-                {t("kopf.anmelden")}
-              </Button>
-            </>
+                <AccountCircleIcon sx={{ fontSize: 32 }} />
+              </IconButton>
+            </Tooltip>
           )}
         </Toolbar>
       </Container>

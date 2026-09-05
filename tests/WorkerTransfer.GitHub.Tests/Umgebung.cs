@@ -49,6 +49,40 @@ public sealed class PostgresCollection : ICollectionFixture<Postgres>
 }
 
 /// <summary>Ein GitHub, das der Test bestückt.</summary>
+/// <summary>GitHubs Anmeldung, als Attrappe.</summary>
+/// <remarks>
+/// Sie ersetzt den ganzen Rücksprung: was ein Browser bei GitHub täte, ist hier
+/// eine Zuordnung von Einmalcode auf Anmeldenamen.
+/// </remarks>
+public sealed class ProbeAnmeldung : IGitHubAnmeldung
+{
+    /// <summary>Welcher Code auf welchen Anmeldenamen führt.</summary>
+    public Dictionary<string, string> Codes { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Ob überhaupt Zugangsdaten hinterlegt sind.</summary>
+    public bool Eingerichtet { get; set; } = true;
+
+    /// <summary>Wenn gesetzt, schweigt GitHub.</summary>
+    public bool Schweigt { get; set; }
+
+    /// <summary>Mit welchen Zuständen die Anmeldung begonnen wurde.</summary>
+    public List<string> Zustaende { get; } = [];
+
+    /// <inheritdoc />
+    public Uri Anmeldeadresse(string zustand)
+    {
+        Zustaende.Add(zustand);
+        return new Uri($"https://github.test/login/oauth/authorize?state={zustand}");
+    }
+
+    /// <inheritdoc />
+    public Task<string?> AnmeldenamenAsync(
+        string code, CancellationToken cancellationToken = default) =>
+        Schweigt
+            ? throw new GitHubSchweigt("github is unreachable")
+            : Task.FromResult(Codes.GetValueOrDefault(code));
+}
+
 public sealed class ProbeGitHub : IGitHub
 {
     /// <summary>Welche Gist-Beschreibungen es je Konto gibt.</summary>
@@ -89,14 +123,18 @@ public sealed class ProbeGitHub : IGitHub
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<Repository>> RepositoriesAsync(
+    public Task<Abzug> RepositoriesAsync(
         string login, CancellationToken cancellationToken = default)
     {
         Stumm(login);
 
-        return Task.FromResult<IReadOnlyList<Repository>>(
-            Repos.TryGetValue(login, out var vorhandene) ? vorhandene : []);
+        return Task.FromResult(new Abzug(
+            Repos.TryGetValue(login, out var vorhandene) ? vorhandene : [],
+            SprachenVollstaendig));
     }
+
+    /// <summary>Was die Probe über die Vollständigkeit der Sprachen meldet.</summary>
+    public bool SprachenVollstaendig { get; set; } = true;
 
     private void Stumm(string login)
     {

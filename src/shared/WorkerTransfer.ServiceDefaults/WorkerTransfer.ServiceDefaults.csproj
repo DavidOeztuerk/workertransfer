@@ -26,4 +26,11 @@
     <ProjectReference Include="..\WorkerTransfer.Contracts.Identity\WorkerTransfer.Contracts.Identity.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Die Ortstabelle reist IM Bild mit. Sie ist der Grund, warum kein
+         Geokodierdienst gerufen wird (ADR-0032), und ohne sie kennt die
+         Umkreissuche keinen einzigen Ort. -->
+    <EmbeddedResource Include="Postleitzahlen.txt" />
+  </ItemGroup>
+
 </Project>

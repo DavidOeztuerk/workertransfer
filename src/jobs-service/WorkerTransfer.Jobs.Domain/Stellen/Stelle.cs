@@ -66,6 +66,15 @@ public sealed class Stelle
     /// <summary>Wie lang eine Ortsangabe sein darf.</summary>
     public const int HoechstlaengeOrt = 160;
 
+    /// <summary>Wie lang eine Postleitzahl sein darf.</summary>
+    /// <remarks>
+    /// Zehn, nicht fünf: Deutschland hat fünf Stellen, Österreich und die
+    /// Schweiz vier, und „D-10115" schreiben genug Leute, dass ein Feld, das
+    /// es abweist, mehr Ärger macht als es Ordnung schafft. Gelesen werden
+    /// ohnehin nur die Ziffern (<c>Ortskunde</c>).
+    /// </remarks>
+    public const int HoechstlaengePlz = 10;
+
     /// <summary>Wie lang der Wunsch an die Formulierungshilfe höchstens ist.</summary>
     /// <remarks>
     /// Dieselbe Zahl wie im profile-service, und aus demselben Grund: der Wunsch
@@ -80,6 +89,7 @@ public sealed class Stelle
         string titel,
         string beschreibung,
         string ort,
+        string postleitzahl,
         Remotegrad remote,
         Anstellungsart art,
         Faehigkeitenliste faehigkeiten,
@@ -93,6 +103,7 @@ public sealed class Stelle
         Titel = titel;
         Beschreibung = beschreibung;
         Ort = ort;
+        Postleitzahl = postleitzahl;
         Remote = remote;
         Art = art;
         Faehigkeiten = faehigkeiten;
@@ -116,6 +127,18 @@ public sealed class Stelle
 
     /// <summary>Wo.</summary>
     public string Ort { get; private set; }
+
+    /// <summary>Die Postleitzahl. Leer, wenn keine angegeben wurde.</summary>
+    /// <remarks>
+    /// <strong>Ein eigenes Feld und nicht Teil von <see cref="Ort"/>.</strong>
+    /// Der Ortsname ist Freitext und darf mehrdeutig sein — „Neustadt" gibt es
+    /// zwanzigmal. Die Postleitzahl ist es nicht, und nur sie macht die
+    /// Umkreissuche über einem kleinen Ort verlässlich. Ohne sie bleibt die
+    /// Anzeige auffindbar, fällt aber aus einer Umkreissuche heraus, wenn ihr
+    /// Ortsname nicht eindeutig ist — und das wird der suchenden Person gesagt
+    /// (ADR-0032), nicht verschwiegen.
+    /// </remarks>
+    public string Postleitzahl { get; private set; }
 
     /// <summary>Wie viel Remote.</summary>
     public Remotegrad Remote { get; private set; }
@@ -148,6 +171,7 @@ public sealed class Stelle
         string titel,
         string beschreibung,
         string ort,
+        string postleitzahl,
         Remotegrad remote,
         Anstellungsart art,
         Faehigkeitenliste faehigkeiten,
@@ -157,6 +181,7 @@ public sealed class Stelle
             Text("Der Titel", titel, pflicht: true, HoechstlaengeTitel),
             Text("Die Beschreibung", beschreibung, pflicht: true, HoechstlaengeBeschreibung),
             Text("Der Ort", ort, pflicht: false, HoechstlaengeOrt),
+            Text("Die Postleitzahl", postleitzahl, pflicht: false, HoechstlaengePlz),
             remote, art, faehigkeiten, Stellenstand.Draft, jetzt, jetzt, null);
 
     /// <summary>Die Anzeige, wie eine Zeile sie hält.</summary>
@@ -166,6 +191,7 @@ public sealed class Stelle
         string titel,
         string beschreibung,
         string ort,
+        string postleitzahl,
         Remotegrad remote,
         Anstellungsart art,
         Faehigkeitenliste faehigkeiten,
@@ -173,7 +199,7 @@ public sealed class Stelle
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm,
         DateTimeOffset? veroeffentlichtAm) =>
-        new(id, firma, titel, beschreibung, ort, remote, art, faehigkeiten,
+        new(id, firma, titel, beschreibung, ort, postleitzahl, remote, art, faehigkeiten,
             stand, angelegtAm, geaendertAm, veroeffentlichtAm);
 
     /// <summary>Ändert den Inhalt.</summary>
@@ -182,6 +208,7 @@ public sealed class Stelle
         string titel,
         string beschreibung,
         string ort,
+        string postleitzahl,
         Remotegrad remote,
         Anstellungsart art,
         Faehigkeitenliste faehigkeiten,
@@ -198,6 +225,8 @@ public sealed class Stelle
         Beschreibung = Text(
             "Die Beschreibung", beschreibung, pflicht: true, HoechstlaengeBeschreibung);
         Ort = Text("Der Ort", ort, pflicht: false, HoechstlaengeOrt);
+        Postleitzahl = Text(
+            "Die Postleitzahl", postleitzahl, pflicht: false, HoechstlaengePlz);
         Remote = remote;
         Art = art;
         Faehigkeiten = faehigkeiten;
@@ -262,7 +291,17 @@ public sealed class Stelle
 /// </remarks>
 /// <param name="Eintraege">Die Stellen dieser Seite.</param>
 /// <param name="Gesamt">Wie viele Stellen der Filter insgesamt trifft.</param>
-public sealed record Stellenseite(IReadOnlyList<Stelle> Eintraege, int Gesamt);
+/// <param name="OhneOrt">
+/// Wie viele Anzeigen eine Umkreissuche NICHT beurteilen konnte, weil ihre
+/// Ortsangabe unbekannt ist. Ohne Umkreissuche immer null.
+/// <para>
+/// Diese Zahl muss die Oberfläche nennen. Sie stillschweigend wegzulassen wäre
+/// dieselbe Lüge durch Auslassen, die ADR-0022 §3 verbietet: wer nach „25 km um
+/// mich" sucht, hält das Ergebnis sonst für vollständig, obwohl der Filter über
+/// einen Teil der Anzeigen gar nichts sagen konnte.
+/// </para>
+/// </param>
+public sealed record Stellenseite(IReadOnlyList<Stelle> Eintraege, int Gesamt, int OhneOrt = 0);
 
 /// <summary>Findet und speichert Anzeigen.</summary>
 public interface IStellenspeicher
@@ -301,6 +340,16 @@ public interface IStellenspeicher
     /// <param name="beschaeftigung">
     /// Vollzeit, Teilzeit und so weiter. Leer heisst „alles".
     /// </param>
+    /// <param name="umkreis">
+    /// „Höchstens N Kilometer von hier." <c>null</c> heisst „egal wo".
+    /// <para>
+    /// Voll remote ausgeschriebene Stellen sind IMMER dabei, unabhängig vom
+    /// Radius: von wo aus sie erreichbar sind, ist bei ihnen keine Frage der
+    /// Entfernung. Sie wegen eines Ortsfilters auszublenden hiesse, genau die
+    /// Anzeigen zu verstecken, die für jemanden ausserhalb der Ballungsräume
+    /// die interessantesten sind.
+    /// </para>
+    /// </param>
     Task<Stellenseite> SucheAsync(
         int seite,
         int anzahl,
@@ -310,6 +359,7 @@ public interface IStellenspeicher
         string suchbegriff = "",
         Guid? firma = null,
         string beschaeftigung = "",
+        Umkreis? umkreis = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Zieht alle Anzeigen eines Unternehmens zurück.</summary>

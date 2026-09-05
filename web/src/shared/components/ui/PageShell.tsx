@@ -25,7 +25,14 @@ export function PageShell({
   return (
     <Container
       maxWidth={narrow ? "sm" : "lg"}
-      sx={{ py: { xs: 4, md: 7 }, px: { xs: 2, sm: 3, md: 4 } }}
+      // Unten weniger als oben, und das ist Absicht: über dem Titel schafft
+      // Luft den Anfang, unter dem letzten Element ist sie nur Leere vor der
+      // Fusszeile.
+      sx={{
+        pt: { xs: 4, md: 7 },
+        pb: { xs: 3, md: 4 },
+        px: { xs: 2, sm: 3, md: 4 },
+      }}
     >
       <Box
         sx={{

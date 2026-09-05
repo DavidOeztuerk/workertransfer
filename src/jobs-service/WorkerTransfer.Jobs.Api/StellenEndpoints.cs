@@ -1,3 +1,4 @@
+using System.Globalization;
 using Girder.Core.Identity;
 using MediatR;
 using WorkerTransfer.Jobs.Application.Entwurf;
@@ -156,16 +157,39 @@ public static class StellenEndpoints
             // nichts, der Beschaeftigungsfilter filterte nichts — und die
             // Karriereseite zeigte die Anzeigen ALLER Unternehmen unter dem
             // Namen eines einzigen.
+            var ort = anfrage["location"].ToString();
+
+            // Der Umkreis kommt als drei Zahlen und wird HIER zu einem Wert
+            // oder zu nichts. `lat` und `lon` sind bereits im Browser gerundet
+            // (zwei Nachkommastellen, gut ein Kilometer) — sie stehen in einer
+            // Adresszeile und damit in Zugriffsprotokollen, und genauer könnte
+            // an keiner Antwort etwas ändern, weil die Orte der Anzeigen
+            // Stadtmittelpunkte sind.
+            var radius = Zahl(anfrage["radius_km"]);
+
+            var umkreis = Umkreis.Aus(Zahl(anfrage["lat"]), Zahl(anfrage["lon"]), radius)
+                // OHNE Koordinaten ist der ORT die Mitte. Wer „Leipzig" tippt
+                // und „50 km" wählt, meint „um Leipzig herum" — und braucht
+                // dafür weder GPS noch die Erlaubnis dazu.
+                ?? (Ortskunde.Finde(null, ort) is { } mitte
+                    ? Umkreis.Aus(mitte.Breite, mitte.Laenge, radius)
+                    : null);
+
             var seite = await mediator.Send(
                 new StellensucheAbfrage(
                     Seitenwahl.Seite(anfrage["page"]),
                     Seitenwahl.Groesse(anfrage["page_size"]),
                     anfrage["skill"].Count > 0 ? [.. anfrage["skill"]!] : null,
-                    anfrage["location"].ToString(),
+                    // MIT Umkreis ist der Ort die MITTE und kein Textfilter.
+                    // Beides zugleich hiesse „innerhalb von 25 km UND das Wort
+                    // muss vorkommen" — und schlösse genau die Nachbarorte aus,
+                    // wegen derer jemand einen Umkreis wählt.
+                    umkreis is null ? ort : string.Empty,
                     Grad(anfrage["remote"]),
                     anfrage["q"].ToString(),
                     Guid.TryParse(anfrage["company"], out var firma) ? firma : null,
-                    anfrage["employment"].ToString()),
+                    anfrage["employment"].ToString(),
+                    umkreis),
                 cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
@@ -173,7 +197,35 @@ public static class StellenEndpoints
                     [.. seite.Eintraege.Select(Antwort)],
                     Seitenwahl.Seite(anfrage["page"]),
                     Seitenwahl.Groesse(anfrage["page_size"]),
-                    seite.Gesamt),
+                    seite.Gesamt,
+                    // Nur bei einer Umkreissuche. Ohne sie wurde nichts
+                    // ausgelassen, und eine `0` behauptete, die Frage sei
+                    // gestellt worden.
+                    umkreis is null ? null : seite.OhneOrt),
+                cancellationToken);
+        });
+
+        // Der Ort zu einem Punkt — die Gegenrichtung der Umkreissuche.
+        //
+        // Ohne Anmeldung, wie die Liste selbst: geantwortet wird aus einer
+        // Tabelle, die im Bild mitreist (ADR-0032). Sie sagt nichts ueber
+        // irgendjemanden, und der Punkt, der hereinkommt, ist derselbe bereits
+        // gerundete, der auch an die Suche geht.
+        stellen.MapGet("/place", async (
+            HttpContext context, CancellationToken cancellationToken) =>
+        {
+            var punkt = Zahl(context.Request.Query["lat"]) is { } breite
+                        && Zahl(context.Request.Query["lon"]) is { } laenge
+                        && breite is >= -90 and <= 90
+                        && laenge is >= -180 and <= 180
+                ? new Ortspunkt(breite, laenge)
+                : (Ortspunkt?)null;
+
+            // Kein Ort in der Naehe ist kein Fehler, sondern eine Auskunft: der
+            // Punkt liegt ausserhalb von DE, AT und CH. Ein 404 waere hier
+            // irrefuehrend — die Adresse gibt es.
+            await context.Response.WriteAsJsonAsync(
+                new { location = punkt is { } p ? Ortskunde.NaechsterOrt(p) : null },
                 cancellationToken);
         });
 
@@ -306,7 +358,7 @@ public static class StellenEndpoints
                 context, StatusCodes.Status403Forbidden, "Request failed", "no active company");
 
     private static Stellenangaben Angaben(StelleSchreibenV1 koerper) => new(
-        koerper.Title, koerper.Description, koerper.Location,
+        koerper.Title, koerper.Description, koerper.Location, koerper.PostalCode,
         Grad(koerper.RemoteMode) ?? Remotegrad.None,
         Anstellung(koerper.EmploymentType),
         koerper.Skills ?? []);
@@ -318,6 +370,19 @@ public static class StellenEndpoints
         "full" => Remotegrad.Full,
         _ => null
     };
+
+    /// <summary>Eine Zahl aus der Abfrage, oder <c>null</c>.</summary>
+    /// <remarks>
+    /// <c>InvariantCulture</c> ist nicht kosmetisch: eine Adresszeile trägt
+    /// <c>52.52</c>, und ein Server mit deutschem Gebietsschema läse den Punkt
+    /// ohne diese Angabe als Tausendertrennzeichen — aus 52.52 würde 5252, und
+    /// die Umkreissuche zeigte nichts, ohne einen Fehler zu melden.
+    /// </remarks>
+    private static double? Zahl(string? roh) =>
+        double.TryParse(
+            roh, NumberStyles.Float, CultureInfo.InvariantCulture, out var wert)
+            ? wert
+            : null;
 
     private static Anstellungsart Anstellung(string? roh) => roh?.Trim().ToLowerInvariant() switch
     {
@@ -333,6 +398,7 @@ public static class StellenEndpoints
         stelle.Titel,
         stelle.Beschreibung,
         stelle.Ort,
+        stelle.Postleitzahl,
         stelle.Remote.ToString().ToLowerInvariant(),
         stelle.Art switch
         {

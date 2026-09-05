@@ -17,6 +17,7 @@ import {
 } from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
+import { parseSkills } from "../lib/skills";
 import { useAsync } from "../lib/useAsync";
 import {
   type Lebenslaufanfrage,
@@ -34,6 +35,7 @@ const LEERE_STATION: Station = {
   started_on: "",
   ended_on: null,
   description: "",
+  technologies: [],
 };
 
 /** Leer heisst „läuft noch", nicht „unbekannt" — deshalb `null` und nicht `""`. */
@@ -223,7 +225,7 @@ export function ResumePage() {
             {rows.map((row, index) => (
               <Box key={index} sx={{ mb: 3 }}>
                 <Typography variant="h3" sx={{ mb: 1.5 }}>
-                  {t("lebenslauf.station", { number: index + 1 })}
+                  {t("lebenslauf.station", { nummer: index + 1 })}
                 </Typography>
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <TextField
@@ -258,6 +260,28 @@ export function ResumePage() {
                       })
                     }
                     helperText={t("lebenslauf.bisHinweis")}
+                  />
+
+                  {/*
+                    WOMIT — der zweite Ort, an dem jemand sagen kann, was er
+                    kann. Er steht hier und nicht nur im Profil, weil eine
+                    Fähigkeit an einer Station etwas anderes aussagt als eine im
+                    Profil: nicht „ich kann das", sondern „damit habe ich dort
+                    gearbeitet". Ein Unternehmen, das den Lebenslauf lesen darf,
+                    sieht den Unterschied.
+
+                    Durchsuchbar macht das die Station nicht — dafür muss die
+                    Fähigkeit ins Profil, und dorthin kommt sie mit einem Klick.
+                  */}
+                  <TextField
+                    label={t("lebenslauf.technologien")}
+                    helperText={t("lebenslauf.technologienHinweis")}
+                    value={row.technologies.join(", ")}
+                    onChange={(e) =>
+                      change(index, {
+                        technologies: parseSkills(e.target.value),
+                      })
+                    }
                   />
                 </Box>
                 <Divider sx={{ mt: 3 }} />

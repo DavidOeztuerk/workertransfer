@@ -12,6 +12,7 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
+  waehleImFeld,
 } from "./stack";
 
 skipWithoutStack();
@@ -19,7 +20,7 @@ skipWithoutStack();
 /**
  * Auf ein Unternehmen wechseln — und warten, bis es wirklich gilt.
  *
- * `selectOption` stößt den Wechsel nur an: der Server stellt ein neues Token
+ * Die Wahl stößt den Wechsel nur an: der Server stellt ein neues Token
  * aus, das Cookie wird ersetzt, die Sitzung neu geladen. Sofort weiterzuklicken
  * gewinnt das Rennen manchmal und manchmal nicht — die Seite zeigt dann „Wähle
  * oben ein Unternehmen", obwohl eines gewählt wurde. Der Mannschaftslink
@@ -27,7 +28,7 @@ skipWithoutStack();
  */
 async function actAsCompany(page: import("@playwright/test").Page, name: string) {
   await page.goto("/");
-  await page.getByLabel(/Handeln als/i).selectOption({ label: name });
+  await waehleImFeld(page, /Handeln als/i, name);
   await expect(page.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 }
 

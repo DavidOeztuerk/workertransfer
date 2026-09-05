@@ -19,7 +19,15 @@ public sealed record StationV1(
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("started_on")] string StartedOn,
     [property: JsonPropertyName("ended_on")] string? EndedOn,
-    [property: JsonPropertyName("description")] string Description = "");
+    [property: JsonPropertyName("description")] string Description = "",
+    /// <summary>Womit dort gearbeitet wurde — von der Person selbst genannt.</summary>
+    /// <remarks>
+    /// Vereinheitlicht durch denselben Wortschatz wie das Profil, damit
+    /// „postgres" hier wie dort „PostgreSQL" heisst (ADR-0023). Sie machen die
+    /// Station nicht durchsuchbar: ein Lebenslauf ist einzeln freigegeben
+    /// (ADR-0020), und suchbar wird eine Fähigkeit erst im Profil.
+    /// </remarks>
+    [property: JsonPropertyName("technologies")] IReadOnlyList<string>? Technologies = null);
 
 /// <summary>One stretch of education on the wire.</summary>
 public sealed record AusbildungV1(
@@ -39,7 +47,32 @@ public sealed record LebenslaufV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("positions")] IReadOnlyList<StationV1> Positions,
     [property: JsonPropertyName("education")] IReadOnlyList<AusbildungV1> Education,
-    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt);
+    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt,
+    /// <summary>In welcher Vorlage der Lebenslauf gesetzt wird.</summary>
+    /// <remarks>
+    /// Ein NAME, kein Layout: wie es aussieht, liegt in der Oberfläche und
+    /// gilt für beide Seiten — die Person sieht dasselbe wie das Unternehmen,
+    /// dem sie den Lebenslauf schickt (ADR-0035).
+    /// </remarks>
+    [property: JsonPropertyName("template")] string Template = "schlicht");
+
+/// <summary>Eine beigelegte Unterlage — ohne ihre Bytes.</summary>
+/// <remarks>
+/// Der Inhalt kommt über eine eigene Adresse, damit eine Liste nicht ein
+/// Dutzend Dateien mitschleppt. <c>content_type</c> ist das, was die
+/// SIGNATUR ergeben hat, nie das, was der Hochladende behauptet hat.
+/// </remarks>
+public sealed record UnterlageV1(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("kind")] string Kind,
+    [property: JsonPropertyName("content_type")] string ContentType,
+    [property: JsonPropertyName("size_bytes")] int SizeBytes,
+    [property: JsonPropertyName("uploaded_at")] DateTimeOffset UploadedAt);
+
+/// <summary>Welche Vorlage gewählt wird.</summary>
+public sealed record VorlageWaehlenV1(
+    [property: JsonPropertyName("template")] string Template);
 
 /// <summary>A résumé as it is written.</summary>
 /// <remarks>

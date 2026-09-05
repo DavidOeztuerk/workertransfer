@@ -89,6 +89,66 @@ describe("Katalogschlüssel", () => {
     expect(fehlend, "benutzte Schlüssel ohne Eintrag im Katalog").toEqual([]);
   });
 
+  /**
+   * Jede Einsetzung, die ein Text verlangt, wird auch übergeben.
+   *
+   * <strong>Der Anlass ist gemessen.</strong> Der Lebenslauf zeigte über jeder
+   * Station wörtlich <code>Station {{nummer}}</code>, dreimal untereinander. Der
+   * Katalog schrieb <code>"Station {{nummer}}"</code>, die Aufrufstelle übergab
+   * <code>{ number: … }</code> — ein englischer Name für einen deutschen
+   * Platzhalter. i18next füllt einen unbekannten Platzhalter nicht und meckert
+   * auch nicht; er bleibt einfach stehen.
+   *
+   * Der Wächter oben hätte das nie bemerkt: der Schlüssel EXISTIERT ja. Geprüft
+   * wird deshalb der Platzhalter, nicht der Schlüssel.
+   *
+   * Geprüft wird nur, was an derselben Stelle als Objektliteral danebensteht.
+   * Wo die Werte aus einer Variablen kommen, schweigt der Wächter — lieber eine
+   * Lücke als ein Test, den man mit Umschreiben zum Schweigen bringt.
+   */
+  it("bekommen jede Einsetzung, die ihr Text verlangt", () => {
+    // `t("pfad", { a: …, b: … })` — nur mit unmittelbarem Objektliteral.
+    const muster = /\bt\(\s*"([a-z][A-Za-z0-9.]+)"\s*,\s*\{([^{}]*)\}/g;
+    const fehlend: string[] = [];
+
+    for (const datei of dateien(WURZEL)) {
+      if (datei.includes("/kataloge/")) continue;
+      const inhalt = readFileSync(datei, "utf8");
+
+      for (const fund of inhalt.matchAll(muster)) {
+        const pfad = fund[1];
+        const rumpf = fund[2];
+        if (pfad === undefined || rumpf === undefined) continue;
+
+        const text =
+          schlage(pfad) ?? schlage(`${pfad}_other`) ?? schlage(`${pfad}_one`);
+        if (typeof text !== "string") continue;
+
+        const verlangt = [...text.matchAll(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g)]
+          .map((treffer) => treffer[1])
+          .filter((name): name is string => name !== undefined);
+
+        // Beide Schreibweisen zählen: `{ nummer: 3 }` UND die Kurzform
+        // `{ km }`. Nur nach `name:` zu suchen war der erste Versuch, und er
+        // meldete vier Stellen als kaputt, die vollkommen in Ordnung sind.
+        const uebergeben = new Set(
+          rumpf
+            .split(",")
+            .map((teil) => /^\s*([A-Za-z0-9_]+)/.exec(teil)?.[1])
+            .filter((name): name is string => name !== undefined)
+        );
+
+        for (const name of verlangt) {
+          if (!uebergeben.has(name)) {
+            fehlend.push(`${datei.replace(WURZEL, "")}: ${pfad} verlangt {{${name}}}`);
+          }
+        }
+      }
+    }
+
+    expect(fehlend, "Platzhalter ohne übergebenen Wert").toEqual([]);
+  });
+
   it("stehen nie roh in einem Feld, das gezeichnet wird", () => {
     const muster = new RegExp(`\\b(${ANZEIGEFELDER.join("|")}):\\s*"(fehler\\.[A-Za-z]+)"`, "g");
     const treffer: string[] = [];

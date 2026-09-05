@@ -2,6 +2,7 @@ using System.Text.Json;
 using Girder.Core.Identity;
 using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.Jobs.Domain.Stellen;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Jobs.Infrastructure.Persistence;
 
@@ -57,6 +58,7 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
         string suchbegriff = "",
         Guid? firma = null,
         string beschaeftigung = "",
+        Umkreis? umkreis = null,
         CancellationToken cancellationToken = default)
     {
         // Der Stand wird HIER gefiltert und nie vom Aufrufer: ein
@@ -109,38 +111,93 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
             .OrderByDescending(kandidat => kandidat.PublishedAt)
             .ThenByDescending(kandidat => kandidat.Id);
 
-        // FÄHIGKEITEN ZWINGEN ZUM VOLLEN DURCHGANG, und das ist kein Versehen.
+        // ZWEI FILTER ZWINGEN ZUM VOLLEN DURCHGANG, und das ist kein Versehen.
         //
-        // Gefiltert wird im Speicher, weil der Wortschatz im Code steht:
-        // „Postgres" in der Anfrage muss „PostgreSQL" in der Anzeige treffen,
-        // und diese Regel gibt es in SQL nicht (ADR-0023). Solange nur
-        // vorwärtsgeblättert wurde, genügte es, das auf einer Seite zu tun.
+        // Fähigkeiten: gefiltert wird im Speicher, weil der Wortschatz im Code
+        // steht — „Postgres" in der Anfrage muss „PostgreSQL" in der Anzeige
+        // treffen, und diese Regel gibt es in SQL nicht (ADR-0023).
         //
-        // Mit Seitennummern geht das nicht mehr: die Gesamtzahl muss die
-        // gefilterte Menge zählen, sonst steht „Seite 1 von 9" über drei
-        // Treffern. Also erst filtern, dann zählen, dann schneiden.
+        // Entfernung: aus demselben Grund. Die Anzeige speichert einen
+        // ORTSNAMEN, keine Koordinaten, und die Tabelle, die daraus einen Punkt
+        // macht, steht im Code (`Ortskunde`). Zwei Spalten `latitude`/`longitude`
+        // wären schneller und HÄTTEN EINEN FEHLER, den es hier nicht gibt: ein
+        // Ort, der der Tabelle heute fehlt und morgen ergänzt wird, wirkt sofort
+        // — mit Spalten bräuchte jede Anzeige eine Nachwanderung, und wer sie
+        // vergisst, bekommt eine Umkreissuche, die still an alten Zeilen
+        // vorbeiläuft.
         //
-        // Der Preis ist eine volle Abfrage, wenn jemand nach Fähigkeiten sucht.
-        // Bei dieser Menge ist das billig. Würde es teuer, gehörte die
-        // kanonische Form in eine eigene Spalte — und nicht die Regel in SQL
+        // Mit Seitennummern geht Filtern-auf-einer-Seite ohnehin nicht mehr: die
+        // Gesamtzahl muss die gefilterte Menge zählen, sonst steht „Seite 1 von
+        // 9" über drei Treffern. Also erst filtern, dann zählen, dann schneiden.
+        //
+        // Der Preis ist eine volle Abfrage. Bei dieser Menge ist das billig.
+        // Würde es teuer, gehörten die kanonische Fähigkeit und der Punkt in
+        // eigene Spalten — samt Nachwanderung, und nicht die Regel in SQL
         // nachgebaut.
-        if (faehigkeiten is { Count: > 0 })
+        if (faehigkeiten is { Count: > 0 } || umkreis is not null)
         {
-            var gesucht = Faehigkeitenliste.Aus(faehigkeiten).Werte;
-
             var alle = await sortiert.ToListAsync(cancellationToken);
-            var passend = alle
-                .Select(ZumAggregat)
-                .Where(stelle => gesucht.All(einzeln =>
-                    stelle.Faehigkeiten.Werte.Contains(einzeln, StringComparer.OrdinalIgnoreCase)))
-                .ToList();
+            IEnumerable<Stelle> passend = alle.Select(ZumAggregat);
+
+            if (faehigkeiten is { Count: > 0 })
+            {
+                var gesucht = Faehigkeitenliste.Aus(faehigkeiten).Werte;
+
+                passend = passend.Where(stelle => gesucht.All(einzeln =>
+                    stelle.Faehigkeiten.Werte.Contains(einzeln, StringComparer.OrdinalIgnoreCase)));
+            }
+
+            var ohneOrt = 0;
+
+            if (umkreis is { } kreis)
+            {
+                var mitte = new Ortspunkt(kreis.Breite, kreis.Laenge);
+                var drin = new List<Stelle>();
+
+                foreach (var stelle in passend)
+                {
+                    // Voll remote ist IMMER dabei. Von wo aus so eine Stelle
+                    // erreichbar ist, ist keine Frage der Entfernung — und sie
+                    // wegen eines Ortsfilters zu verstecken träfe genau die
+                    // Anzeigen, die für jemanden ausserhalb der Ballungsräume
+                    // die interessantesten sind.
+                    if (stelle.Remote is Remotegrad.Full)
+                    {
+                        drin.Add(stelle);
+                        continue;
+                    }
+
+                    // Die Postleitzahl ZUERST — sie ist eindeutig, der
+                    // Ortsname muss es nicht sein.
+                    var punkt = Ortskunde.Finde(stelle.Postleitzahl, stelle.Ort);
+
+                    // Unbekannter Ort heisst NICHT „weit weg", sondern „darüber
+                    // wissen wir nichts". Der Unterschied wird gezählt und
+                    // hinausgereicht, statt ihn verschwinden zu lassen.
+                    if (punkt is not { } ziel)
+                    {
+                        ohneOrt++;
+                        continue;
+                    }
+
+                    if (Ortskunde.EntfernungKm(mitte, ziel) <= kreis.RadiusKm)
+                    {
+                        drin.Add(stelle);
+                    }
+                }
+
+                passend = drin;
+            }
+
+            var liste = passend as List<Stelle> ?? [.. passend];
 
             return new Stellenseite(
-                [.. passend.Skip((seite - 1) * anzahl).Take(anzahl)],
-                passend.Count);
+                [.. liste.Skip((seite - 1) * anzahl).Take(anzahl)],
+                liste.Count,
+                ohneOrt);
         }
 
-        // Ohne Fähigkeitsfilter zählt und schneidet die Datenbank.
+        // Ohne diese beiden zählt und schneidet die Datenbank.
         var gesamt = await sortiert.CountAsync(cancellationToken);
 
         var zeilen = await sortiert
@@ -175,6 +232,7 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
         zeile.Title,
         zeile.Description,
         zeile.Location,
+        zeile.PostalCode,
         Grad(zeile.RemoteMode),
         Anstellung(zeile.EmploymentType),
         Faehigkeitenliste.Stelle_her(JsonSerializer.Deserialize<List<string>>(zeile.Skills) ?? []),
@@ -202,6 +260,7 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
         zeile.Title = stelle.Titel;
         zeile.Description = stelle.Beschreibung;
         zeile.Location = stelle.Ort;
+        zeile.PostalCode = stelle.Postleitzahl;
         zeile.RemoteMode = Stand(stelle.Remote);
         zeile.EmploymentType = Stand(stelle.Art);
         zeile.Skills = JsonSerializer.Serialize(stelle.Faehigkeiten.Werte);

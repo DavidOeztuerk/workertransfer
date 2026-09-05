@@ -26,7 +26,7 @@ public static class VerbindungsEndpoints
     /// </remarks>
     private static readonly IResult Geschrieben = Results.Empty;
 
-    /// <summary>Bildet die sechs Routen dieses Dienstes ab.</summary>
+    /// <summary>Bildet die Routen dieses Dienstes ab.</summary>
     public static IEndpointRouteBuilder MapVerbindungsEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
@@ -100,6 +100,75 @@ public static class VerbindungsEndpoints
 
             var ergebnis = await mediator.Send(
                 new NachweisenBefehl(handelnder.Subject), cancellationToken);
+
+            await Beantworte(context, ergebnis, eigen: true, cancellationToken);
+        });
+
+        // DER WEG ÜBER GITHUBS EIGENE ANMELDUNG — er ersetzt den Gist, nicht
+        // die Nennung. Ohne hinterlegte Zugangsdaten antwortet er mit `null`,
+        // und die Oberfläche bietet weiter den Gist an.
+        github.MapPost("/me/oauth/start", async (
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await NichtAngemeldet(context);
+                return;
+            }
+
+            var beginn = await mediator.Send(
+                new AnmeldungBeginnenBefehl(handelnder.Subject), cancellationToken);
+
+            await context.Response.WriteAsJsonAsync(
+                new AnmeldebeginnV1(beginn.Adresse?.ToString()), cancellationToken);
+        });
+
+        // OHNE `/me`, WEIL NICHTS PERSÖNLICHES DARIN STEHT: die Frage lautet,
+        // ob dieser Server die Anmeldung eingerichtet hat. Sie legt nichts an —
+        // im Gegensatz zu `/me/oauth/start`, das genau deshalb erst auf
+        // Knopfdruck gerufen wird und nicht beim Betrachten der Seite.
+        github.MapGet("/oauth", async (
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            // Angemeldet, obwohl nichts Persönliches darin steht: die Antwort
+            // hilft nur beim Verbinden, und das kann ohnehin nur, wer
+            // angemeldet ist. Eine neue offene Tür ohne Grund ist eine zu viel.
+            if (akteur.Current is null)
+            {
+                await NichtAngemeldet(context);
+                return;
+            }
+
+            var moeglich = await mediator.Send(
+                new AnmeldungMoeglichAbfrage(), cancellationToken);
+
+            await context.Response.WriteAsJsonAsync(
+                new AnmeldungMoeglichV1(moeglich), cancellationToken);
+        });
+
+        github.MapPost("/me/oauth/finish", async (
+            AnmeldungAbschliessenV1 koerper,
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await NichtAngemeldet(context);
+                return;
+            }
+
+            var ergebnis = await mediator.Send(
+                new AnmeldungAbschliessenBefehl(
+                    handelnder.Subject, koerper.Code, koerper.State),
+                cancellationToken);
 
             await Beantworte(context, ergebnis, eigen: true, cancellationToken);
         });
@@ -218,9 +287,15 @@ public static class VerbindungsEndpoints
             case Verbindungsergebnis.NichtBewiesen:
                 // 422, nicht 404: die Anfrage war in Ordnung, der Nachweis
                 // fehlte.
+                //
+                // Die Meldung nennt den WEG nicht mehr. Sie lautete „no public
+                // gist with that description was found" — richtig, solange es
+                // nur den Gist gab, und irreführend, seit die Anmeldung über
+                // GitHub daneben steht: wer dort ein fremdes Konto autorisiert,
+                // hätte gelesen, sein Gist fehle.
                 await ProblemDetailsMiddleware.Schreibe(
                     context, StatusCodes.Status422UnprocessableEntity,
-                    "Request failed", "no public gist with that description was found");
+                    "Request failed", "the account was not proven");
                 return;
 
             case Verbindungsergebnis.Eingabe eingabe:
@@ -251,6 +326,8 @@ public static class VerbindungsEndpoints
             [
                 .. verbindung.Repositories.Select(eintrag => new RepositoryV1(
                     eintrag.Name, eintrag.Beschreibung, eintrag.Sprache,
-                    eintrag.Sterne, eintrag.Adresse, eintrag.ZuletztGeschoben))
-            ]);
+                    eintrag.Sterne, eintrag.Adresse, eintrag.ZuletztGeschoben,
+                    eintrag.Sprachen, eintrag.Themen))
+            ],
+            verbindung.SprachenVollstaendig);
 }

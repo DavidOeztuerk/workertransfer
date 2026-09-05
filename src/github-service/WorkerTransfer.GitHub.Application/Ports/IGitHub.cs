@@ -30,7 +30,12 @@ public interface IGitHub
         string login, string einmalzeichenfolge, CancellationToken cancellationToken = default);
 
     /// <summary>Die öffentlichen Repositories dieses Kontos.</summary>
+    /// <remarks>
+    /// Der <see cref="Abzug" /> trägt neben den Belegen, ob die Sprachen für
+    /// jeden davon geholt werden konnten — ADR-0022 §3 verlangt, dass eine
+    /// unvollständige Menge sich als unvollständig zu erkennen gibt.
+    /// </remarks>
     /// <exception cref="GitHubSchweigt">GitHub hat nicht geantwortet.</exception>
-    Task<IReadOnlyList<Repository>> RepositoriesAsync(
+    Task<Abzug> RepositoriesAsync(
         string login, CancellationToken cancellationToken = default);
 }

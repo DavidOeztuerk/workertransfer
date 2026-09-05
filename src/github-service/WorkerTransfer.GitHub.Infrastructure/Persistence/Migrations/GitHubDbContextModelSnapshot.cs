@@ -42,8 +42,13 @@ namespace WorkerTransfer.GitHub.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fetched_at");
 
+                    b.Property<bool>("LanguagesComplete")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("languages_complete");
+
                     b.Property<string>("Login")
-                        .IsRequired()
                         .HasMaxLength(39)
                         .HasColumnType("character varying(39)")
                         .HasColumnName("login");
@@ -64,6 +69,8 @@ namespace WorkerTransfer.GitHub.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("github_connections", (string)null);
+
+                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
                 });
 #pragma warning restore 612, 618
         }

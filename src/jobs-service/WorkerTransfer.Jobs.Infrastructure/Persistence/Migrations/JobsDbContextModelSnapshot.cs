@@ -48,6 +48,13 @@ namespace WorkerTransfer.Jobs.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("location");
 
+                    b.Property<string>("PostalCode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("")
+                        .HasColumnName("postal_code");
+
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("published_at");

@@ -15,6 +15,9 @@ import { CONSENT_BASE_URL } from "../../../env";
  */
 export const PROFILE_VISIBILITY = "profile.visibility:public";
 export const PORTFOLIO_VISIBILITY = "portfolio.visibility:public";
+// Der Dienst prüft sie seit jeher (`IEinwilligungstor.Sichtbarkeit`), die
+// Oberfläche kannte sie nur zum ANZEIGEN — erteilen konnte man sie nirgends.
+export const GITHUB_VISIBILITY = "github.visibility:public";
 
 export type ConsentResult = { ok: true; granted: boolean } | { ok: false; error: ApiError };
 

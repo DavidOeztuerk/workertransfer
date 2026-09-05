@@ -176,7 +176,7 @@ export function MyDataPage() {
 
           {missing.length > 0 ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              {t("meineDaten.unvollstaendig", { parts: missing.join(", ") })}
+              {t("meineDaten.unvollstaendig", { teile: missing.join(", ") })}
             </Alert>
           ) : null}
 

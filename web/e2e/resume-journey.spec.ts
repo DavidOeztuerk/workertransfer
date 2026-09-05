@@ -12,6 +12,7 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
+  waehleImFeld,
 } from "./stack";
 
 skipWithoutStack();
@@ -53,8 +54,8 @@ test("ein Lebenslauf erreicht nur das Unternehmen, dem er freigegeben wurde", as
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
-  // Warten, bis der Wechsel wirklich gilt. `selectOption` stößt ihn nur an: der
+  await waehleImFeld(recruiter, /Handeln als/i, companyName);
+  // Warten, bis der Wechsel wirklich gilt. Die Wahl stößt ihn nur an: der
   // Server stellt ein neues Token aus, das Cookie wird ersetzt, die Sitzung neu
   // geladen. Sofort weiterzuklicken gewinnt das Rennen etwa jedes zweite Mal —
   // /candidates zeigt dann "Profile sehen nur Unternehmen", die Karte fehlt,

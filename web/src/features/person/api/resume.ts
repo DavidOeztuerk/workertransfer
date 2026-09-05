@@ -18,6 +18,14 @@ export interface Station {
   /** `null` heisst „läuft noch" — nicht „unbekannt". */
   ended_on: string | null;
   description: string;
+  /**
+   * Womit dort gearbeitet wurde — von der Person selbst genannt.
+   *
+   * Sie machen die Station nicht durchsuchbar: ein Lebenslauf ist einzeln
+   * freigegeben (ADR-0020). Suchbar wird eine Fähigkeit erst im Profil, und
+   * dorthin kommt sie mit einem Klick.
+   */
+  technologies: string[];
 }
 
 export interface Ausbildung {

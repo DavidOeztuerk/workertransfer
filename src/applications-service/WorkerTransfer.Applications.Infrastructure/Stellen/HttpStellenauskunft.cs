@@ -26,7 +26,10 @@ public sealed class Stelleneinstellungen
 internal sealed record Stellenantwort(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("tenant_id")] Guid TenantId,
-    [property: JsonPropertyName("title")] string Title);
+    [property: JsonPropertyName("title")] string Title,
+    [property: JsonPropertyName("description")] string? Description = null,
+    [property: JsonPropertyName("location")] string? Location = null,
+    [property: JsonPropertyName("skills")] IReadOnlyList<string>? Skills = null);
 
 /// <summary>Fragt den Jobs-Dienst.</summary>
 /// <remarks>
@@ -97,7 +100,12 @@ public sealed class HttpStellenauskunft(
                     ?? throw new StelleSchweigt("jobs-service sandte nichts.");
 
                 return new OeffentlicheStelle(
-                    gelesen.Id, new TenantId(gelesen.TenantId), gelesen.Title);
+                    gelesen.Id,
+                    new TenantId(gelesen.TenantId),
+                    gelesen.Title,
+                    gelesen.Description ?? string.Empty,
+                    gelesen.Location ?? string.Empty,
+                    gelesen.Skills ?? []);
             }
             catch (JsonException fehler)
             {

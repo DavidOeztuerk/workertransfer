@@ -10,6 +10,7 @@ import {
   switchToCompany,
   uniqueCompanyDomain,
   uniqueEmail,
+  waehleImFeld,
 } from "./stack";
 
 skipWithoutStack();
@@ -25,7 +26,7 @@ test("eine veröffentlichte Stelle findet auch, wer kein Konto hat", async ({ br
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
+  await waehleImFeld(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   // Erst das Unternehmensprofil: ohne es bleibt die Stelle anonym.
@@ -227,4 +228,126 @@ test("ohne Anbieter sagt die Formulierungshilfe es — statt still nichts zu tun
   await expect(recruiter.getByLabel(/Beschreibung/i)).toHaveValue(eigenerText);
 
   await context.close();
+});
+
+/**
+ * Die Umkreissuche. Nur hier prüfbar, und zwar aus zwei Gründen.
+ *
+ * Erstens braucht sie eine echte Ortungsschnittstelle: `navigator.geolocation`
+ * gibt es in jsdom nicht, jeder Einheitentest arbeitet also gegen eine
+ * Erfindung. Zweitens ist genau hier die Naht, an der schon einmal etwas
+ * verlorenging — der Browser schickt `radius_km`, der Dienst liest `radius_km`,
+ * und ob die Zahl dazwischen ankommt, sieht keine der beiden Seiten allein.
+ *
+ * <strong>Die Position wird GERUNDET, bevor sie das Haus verlässt</strong>, und
+ * dieser Test hält das mit: die Adresszeile steht in jedem Zugriffsprotokoll.
+ */
+test("die Umkreissuche filtert nach Entfernung — und sagt, worüber sie nichts weiß", async ({
+  browser,
+}) => {
+  const domain = uniqueCompanyDomain();
+  const recruiterEmail = uniqueEmail(domain);
+  const companyName = `E2E Umkreis ${Date.now()}`;
+  const marke = `E2EUmkreis${Date.now()}`;
+
+  const recruiterContext = await browser.newContext();
+  const recruiter = await recruiterContext.newPage();
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
+  await login(recruiter, recruiterEmail);
+  await recruiter.goto("/");
+  await waehleImFeld(recruiter, /Handeln als/i, companyName);
+
+  // Drei Anzeigen, drei Fälle: nah, fern, und eine, über deren Ort die
+  // Ortstabelle nichts weiß. Der dritte ist der eigentliche Prüfgegenstand.
+  const orte = [
+    // Der nahe Fall trägt eine POSTLEITZAHL und KEINEN Ortsnamen. Das ist der
+    // Prüfgegenstand des eigenen Feldes: es gibt nichts anderes, woraus ein
+    // Punkt kommen könnte — wird das Feld nicht gelesen, gilt die Anzeige als
+    // „Ort unbekannt" und fällt heraus.
+    { ort: "", plz: "10115", titel: `${marke} Nah` },
+    // Leipzig und nicht Hamburg: rund 150 km von Berlin, also AUSSERHALB der
+    // fünfundzwanzig und INNERHALB der zweihundert. Hamburg liegt 255 km
+    // entfernt — die grösste wählbare Entfernung hätte es nie eingefangen, und
+    // die Probe hätte den Radius gar nicht geprüft, sondern nur bewiesen, dass
+    // die Liste leer bleibt.
+    { ort: "Leipzig", plz: "", titel: `${marke} Fern` },
+    // Fünf Wörter Prosa, keine Postleitzahl: darüber weiss die Ortstabelle
+    // nichts, und „Hof" daraus zu pflücken wäre Raten (siehe Ortskunde).
+    { ort: "Auf dem Hof meiner Oma", plz: "", titel: `${marke} Unbekannt` },
+  ];
+
+  for (const { ort, plz, titel } of orte) {
+    await recruiter.goto("/company/jobs/new");
+    await recruiter.getByLabel("Titel").fill(titel);
+    await recruiter.getByLabel(/Beschreibung/i).fill(`Was zu tun ist. ${marke}`);
+    await recruiter.getByLabel("Ort", { exact: true }).fill(ort);
+    await recruiter.getByLabel(/^PLZ$/i).fill(plz);
+    await recruiter.getByRole("button", { name: /Entwurf anlegen/i }).click();
+
+    const zeile = recruiter.locator("li").filter({ hasText: titel });
+    await expect(zeile).toBeVisible();
+    await zeile.getByRole("button", { name: /Veröffentlichen/i }).click();
+    await expect(zeile.getByText("Veröffentlicht")).toBeVisible();
+  }
+
+  // Ein anonymer Besucher, der in Berlin steht. Die Erlaubnis wird hier
+  // erteilt, weil ein Systemdialog im Testlauf niemanden fragen kann — was
+  // geprüft wird, ist ohnehin nicht der Dialog, sondern was danach hinausgeht.
+  const besucherKontext = await browser.newContext({
+    permissions: ["geolocation"],
+    geolocation: { latitude: 52.5170365, longitude: 13.3888599 },
+  });
+  const besucher = await besucherKontext.newPage();
+
+  const anfragen: string[] = [];
+  besucher.on("request", (anfrage) => {
+    if (anfrage.url().includes("/jobs?")) anfragen.push(anfrage.url());
+  });
+
+  await besucher.goto("/jobs");
+  await besucher.getByLabel(/Suchbegriff/i).fill(marke);
+
+  // Ohne Standort ist die Entfernung nicht wählbar — ein Feld, das man bedienen
+  // kann und das dann nichts tut, wäre schlimmer als ein abgeschaltetes.
+  await expect(besucher.getByLabel(/Entfernung/i)).toHaveAttribute("aria-disabled", "true");
+
+  await besucher.getByRole("button", { name: /Meinen Standort verwenden/i }).click();
+  await expect(besucher.getByLabel(/Entfernung/i)).not.toHaveAttribute("aria-disabled", "true");
+
+  await waehleImFeld(besucher, /Entfernung/i, "25 km");
+  await besucher.getByRole("button", { name: /^Suchen$/i }).click();
+
+  await expect(besucher.getByText(`${marke} Nah`)).toBeVisible();
+  await expect(besucher.getByText(`${marke} Fern`)).toHaveCount(0);
+  await expect(besucher.getByText(`${marke} Unbekannt`)).toHaveCount(0);
+
+  // Und sie SAGT, dass sie über eine Anzeige nichts sagen konnte. Ohne diesen
+  // Satz sähe das Ergebnis vollständig aus und wäre es nicht.
+  await expect(
+    besucher.getByText(/nennt keinen Ort, den wir kennen|nennen keinen Ort, den wir kennen/)
+  ).toBeVisible();
+
+  // Der rohe Ortungswert darf in keiner Adresszeile stehen — gerundet auf zwei
+  // Stellen sind das gut ein Kilometer, und feiner könnte an keiner Antwort
+  // etwas ändern, weil Anzeigen Städte nennen.
+  const mitUmkreis = anfragen.filter((adresse) => adresse.includes("radius_km"));
+  expect(mitUmkreis.length).toBeGreaterThan(0);
+  for (const adresse of mitUmkreis) {
+    expect(adresse).toContain("lat=52.52");
+    expect(adresse).toContain("lon=13.39");
+    expect(adresse).not.toContain("52.517");
+    expect(adresse).not.toContain("13.388");
+  }
+
+  // Zweihundert Kilometer holen Leipzig dazu — sonst wäre nicht bewiesen, dass
+  // der Radius überhaupt gelesen wird. Die Anzeige ohne bekannten Ort bleibt
+  // auch dann draussen: unbekannt heisst nicht „weit weg", und kein Radius der
+  // Welt macht daraus eine Aussage.
+  await waehleImFeld(besucher, /Entfernung/i, "200 km");
+  await besucher.getByRole("button", { name: /^Suchen$/i }).click();
+  await expect(besucher.getByText(`${marke} Fern`)).toBeVisible();
+  await expect(besucher.getByText(`${marke} Unbekannt`)).toHaveCount(0);
+
+  await recruiterContext.close();
+  await besucherKontext.close();
 });

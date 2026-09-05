@@ -154,6 +154,22 @@ The lesson is worth more than the code: **a hand-written replacement outlives it
 
 **In the eleven services the module stays out for a reason that has nothing to do with Girder and will not change:** a service behind the gateway sees the gateway as the origin — every caller as one. The brake belongs at the entrance, and there it is.
 
+### github-service: the header that made it never work
+
+**Every request needs a `User-Agent`.** GitHub answers *everything* without one with `403` — not a 400, not a message naming the header. Measured 04.09.2026 against the same address: with the header `200`, without it `403`. While it was missing, this service had never worked: neither the gist proof nor the repository fetch, and both surfaced as "github unavailable", which reads exactly like an outage *at GitHub*. `HttpGitHubTests.Jede_Anfrage_traegt_eine_Benutzerkennung` pins it.
+
+**Evidence carries topics and the language SET, never the bytes.** GitHub reports a byte count per language; that is precisely what the deleted package turned into "skill" as `bytes / total_bytes` (ADR-0022 §2). The names are a fact about a repository, the numbers would be the raw material for a statement about a person — so they are not stored, and a test serialises a fetched repository to prove the numbers do not travel even as text. Topics are the strongest evidence of all because they are a *naming*: a human wrote "kubernetes" onto that repository.
+
+**Evidence becomes a suggestion, never a claim.** The profile page offers those words under the skills field; one click fills the form, and only *Save* makes it a naming. That is the bridge the scout needs — the search index knows only what a person typed — and it is two deliberate acts so neither happens by accident.
+
+**Proof runs over OAuth when configured, over a gist otherwise.** `GitHub__OAuth__*` empty means the gist stays, and the button does not appear.
+
+**OAuth needs no name typed first, and that correction was measured.** The naming step was the *gist's* requirement wearing the wrong hat: a gist search must know whose gists to look in. GitHub reports only the account that actually granted consent, so there is nothing to compare and no foreign account to slip in. Measured 05.09.2026 against a real account: the step protected nobody and locked out the person whose connection still carried an older name (the sample data's `sindresorhus`), answering 422 on a correct authorisation. So `POST /me/oauth/start` now *creates* a connection with `Login = null` — "not named yet", a state and not a gap — and `finish` writes in the login GitHub reports. **Where a name was typed it is still compared**, unchanged and for the old reason: otherwise someone names `torvalds`, authorises themselves, and walks away with a proof for a foreign account. Two tests hold the two halves apart, and the comparison has a counter-probe.
+
+`start` is a *command*, not a query, precisely because it creates that row — a query would run outside `TransaktionsBehavior` and the row would never commit. It is therefore called **on click, never on page load**: prefetching it would leave a row for everyone who merely looked at the page. What the page *may* ask on load is `GET /github/oauth` → `{"available": bool}`, a statement about this server's configuration that holds nothing personal and creates nothing.
+
+The one-time string already on the connection is the OAuth `state`. **No scope is requested and the access token is not kept**: it is needed for a single `GET /user`, and what you do not store you cannot lose.
+
 ### CI
 
 `.github/workflows/ci.yml` has five jobs: `backend-quality` (restore → build → `scripts/test-dotnet.sh`, in separate steps), `frontend-quality` (check, test, **build**), `e2e` (the Playwright journeys against the full stack), `dependency-audit` (`dotnet list package --vulnerable` + `pnpm audit --prod`), and `images`.
@@ -212,6 +228,8 @@ The access token carries `sub`, `email`, `jti`, `iat`, `exp`, `iss`, `aud`, `ses
 That ninth claim was undocumented until it was **measured against the running stack on 03.09.2026** — this file said "eight, nothing else", the wire said nine. It stays, and the reason is Girder's: `MapInboundClaims = false` switches off the framework's own derivation, and seventeen readers resolve the caller through that name, two of them in provider packages that cannot see Girder's assembly. Dropping it saves seventy bytes and turns every one of those into a silent `null`.
 
 The lesson is the test, not the claim: `TokenformTests` forbade two *names* and would never have noticed a ninth. It now pins the **complete set** in both capacities — a set comparison, not a membership check. Roles and permissions are not in the token: they are read from the membership table per operation, so the token was never authoritative.
+
+**Two suites, because one of them could not have caught it.** `TokenformTests` calls Girder's issuer directly; `TokenformAmDrahtTests` goes the whole way — register, confirm, sign in, switch to a company — and reads the token where a browser gets it, out of the `Set-Cookie`. Between the issuer and the wire sit the service's settings, its wiring and the cookie, and a claim added by *that* layer would be invisible to the first suite. The endpoint suite also pins something the unit suite cannot: **the token never appears in a response body.** It leaves only as the `httpOnly` cookie, so no script in the browser can read it, and there is no second path to the same string for someone to log by accident. Re-measured at the running stack on 04.09.2026: nine as a person, ten for a company, both matching.
 
 `AuthMiddleware` resolves the principal from an `Authorization: Bearer` header **or** the `access` cookie, in that order. Both carriers are needed: service-to-service and CLI callers send the header; the browser never sees the `httpOnly` token and can only replay it as a cookie. Any new service verifying identity tokens must accept both.
 

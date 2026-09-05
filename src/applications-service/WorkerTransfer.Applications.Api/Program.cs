@@ -28,6 +28,7 @@ await app.WandereAsync<ApplicationsDbContext>();
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
 app.MapBewerbungsEndpoints();
+app.MapEntwurfsEndpoints();
 app.MapLoeschEndpoints();
 
 await app.RunAsync();

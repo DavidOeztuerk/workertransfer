@@ -52,6 +52,25 @@ public sealed class Probetor : IEinwilligungstor
             : Task.FromResult(LebenslaufFrei.Contains((wer.Value, firma.Value)));
     }
 
+    /// <summary>Welche Paare die Unterlagen freigegeben haben.</summary>
+    /// <remarks>
+    /// Eine EIGENE Menge und nicht dieselbe wie beim Lebenslauf: die Probe soll
+    /// den Fall abbilden können, in dem der Werdegang freigegeben ist und die
+    /// Zeugnisse nicht. Zwei Fähigkeiten, die sich eine Probe teilen, sind im
+    /// Test immer gleichzeitig gesetzt — und dann prüft niemand die Trennung.
+    /// </remarks>
+    public HashSet<(Guid, Guid)> UnterlagenFrei { get; } = [];
+
+    /// <inheritdoc />
+    public Task<bool> DarfUnterlagenSehenAsync(
+        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default)
+    {
+        Fragen++;
+        return Schweigt
+            ? throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht")
+            : Task.FromResult(UnterlagenFrei.Contains((wer.Value, firma.Value)));
+    }
+
     /// <summary>
     /// The service does not decide the release itself — it asks the ledger to
     /// record it. Here that write is what the answer to a request turns into.
@@ -171,6 +190,94 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
                 }
             }
         });
+
+    /// <summary>
+    /// Technologien an einer Station: <strong>vereinheitlicht und entdoppelt</strong>.
+    /// </summary>
+    /// <remarks>
+    /// Derselbe Wortschatz wie im Profil — „postgres" wird hier wie dort
+    /// „PostgreSQL" (ADR-0023). Erst vereinheitlichen, dann entdoppeln: anders
+    /// herum stünden beide Schreibweisen als zwei Einträge da und würden erst
+    /// danach beide zu „PostgreSQL".
+    /// <para>
+    /// Der Grund, warum das Feld überhaupt existiert: es ist der zweite Ort, an
+    /// dem jemand NENNEN kann, was er kann. Durchsuchbar wird das nicht — ein
+    /// Lebenslauf ist einzeln freigegeben (ADR-0020) — aber es wird im Profil
+    /// mit einem Klick zu einer Nennung, und die ist suchbar.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Technologien_werden_vereinheitlicht_und_entdoppelt()
+    {
+        var browser = AlsPerson(Guid.CreateVersion7());
+
+        var geschrieben = await browser.PutAsJsonAsync("/resumes/me", new
+        {
+            positions = new[]
+            {
+                new
+                {
+                    employer = "Beispiel GmbH",
+                    title = "Entwicklerin",
+                    started_on = "2020-03",
+                    ended_on = (string?)null,
+                    description = string.Empty,
+                    technologies = new[] { "postgres", "PostgreSQL", " Go ", string.Empty }
+                }
+            },
+            education = Array.Empty<object>()
+        });
+
+        geschrieben.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var station = (await Json(geschrieben)).GetProperty("positions")[0];
+
+        station.GetProperty("technologies").EnumerateArray()
+            .Select(eintrag => eintrag.GetString())
+            .Should().Equal("PostgreSQL", "Go");
+    }
+
+    /// <summary>Mehr als zwölf sagen über eine einzelne Stelle nichts mehr.</summary>
+    [Fact]
+    public async Task Zu_viele_Technologien_werden_abgewiesen()
+    {
+        var browser = AlsPerson(Guid.CreateVersion7());
+
+        var antwort = await browser.PutAsJsonAsync("/resumes/me", new
+        {
+            positions = new[]
+            {
+                new
+                {
+                    employer = "Beispiel GmbH",
+                    title = "Entwicklerin",
+                    started_on = "2020-03",
+                    ended_on = (string?)null,
+                    description = string.Empty,
+                    technologies = Enumerable.Range(1, 13).Select(i => $"Werkzeug{i}").ToArray()
+                }
+            },
+            education = Array.Empty<object>()
+        });
+
+        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    /// <summary>Eine Station ohne Technologien ist kein Fehler, sondern leer.</summary>
+    /// <remarks>
+    /// Ältere Zeilen tragen das Feld gar nicht — sie sollen weiterlesbar sein,
+    /// ohne dass jemand eine Nachwanderung fährt.
+    /// </remarks>
+    [Fact]
+    public async Task Ohne_Technologien_bleibt_die_Liste_leer()
+    {
+        var browser = AlsPerson(Guid.CreateVersion7());
+
+        var geschrieben = await Schreibe(browser);
+        var station = (await Json(geschrieben)).GetProperty("positions")[0];
+
+        station.GetProperty("technologies").GetArrayLength().Should().Be(0);
+    }
 
     /// <summary>The whole way: write, be asked, say yes, be read, take it back.</summary>
     [Fact]

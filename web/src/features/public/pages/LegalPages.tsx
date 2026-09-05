@@ -83,6 +83,15 @@ export function ImprintPage() {
       <Abschnitt titel={t("recht.impressumStreit")}>
         <Absatz>{t("recht.impressumStreitText")}</Absatz>
       </Abschnitt>
+
+      {/*
+        Die Namensnennung für GeoNames. Sie steht hier und nicht nur in
+        NOTICE.md, weil CC BY sie gegenüber den NUTZENDEN verlangt und eine
+        Datei im Quellbaum niemand von ihnen sieht.
+      */}
+      <Abschnitt titel={t("recht.impressumDaten")}>
+        <Absatz>{t("recht.impressumDatenText")}</Absatz>
+      </Abschnitt>
     </PageShell>
   );
 }

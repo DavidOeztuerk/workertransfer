@@ -17,6 +17,7 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
+  waehleImFeld,
 } from "./stack";
 
 skipWithoutStack();
@@ -60,7 +61,7 @@ test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort",
   // Ohne aktives Unternehmen zeigt die Seite nur einen Hinweis — der Wechsel
   // ist der Punkt, an dem der Server den Tenant ins Token schreibt (ADR-0018).
   await recruiter.goto("/");
-  await recruiter.getByLabel(/Handeln als/i).selectOption({ label: companyName });
+  await waehleImFeld(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/candidates");
