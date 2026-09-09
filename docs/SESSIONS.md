@@ -17,10 +17,15 @@ Sitzung unten ist eine *eigene* Arbeit und gehört auf einen *eigenen* Zweig von
 prüfen. Der Weg ist der aus CLAUDE.md und hat keine Abkürzung:
 `feature → develop → main`, nie ein Feature-Zweig direkt nach main.
 
-Also je Sitzung: `git switch develop && git pull && git switch -c <name>`,
-am Ende ein PR nach `develop`. Fahre `./scripts/test-dotnet.sh` und
-`pnpm check` lokal, bevor du den PR aufmachst — die CI ist grün, und wer sie
-rot hinterlässt, nimmt der nächsten Sitzung ihren Maßstab.
+**Du musst dafür nichts tun.** Jeder Prompt unten legt seinen Zweig selbst an
+und führt am Ende selbst zusammen: committen, pushen, PR nach `develop`, auf
+die fünf Jobs warten, **erst dann** mergen. Du kopierst einen Kasten und
+bekommst am Ende einen gemergten `develop` zurück.
+
+Die eine Bedingung, die dabei nicht verhandelbar ist: **ein roter Lauf wird
+nicht gemergt.** Kein `--admin`, kein „ist nur die eine Reise". Die Pipeline
+ist seit dem 09.09.2026 grün, und sie ist der Maßstab, an dem sich die nächste
+Sitzung misst — wer sie rot hinterlässt, nimmt ihn der nächsten weg.
 
 | # | Sitzung | Hängt ab von | Umfang |
 |---|---|---|---|
@@ -30,6 +35,7 @@ rot hinterlässt, nimmt der nächsten Sitzung ihren Maßstab.
 | 4 | `advisor-service` | 1 | groß |
 | 5 | `assessment-service` | 3, 4 | mittel |
 | 6 | Aufräumen | — | klein |
+| 7 | Girder veröffentlichen (anderes Repo) | — | mittel |
 
 ---
 
@@ -66,6 +72,9 @@ Prompt unten noch einmal, damit du nur einen Kasten kopieren musst.
 ## Sitzung 1 — Berufsfelder und Belege
 
 ```
+ZUERST, ohne zu fragen: git switch develop && git pull && git switch -c feature/berufsfelder-und-belege
+Diese Sitzung arbeitet NIE direkt auf develop.
+
 Du arbeitest im Repository WorkerTransfer (.NET 10 auf Girder 4.4.0, React).
 Lies: CLAUDE.md, docs/PLAN-TRANSFERMARKT.md (PBI-1), docs/adr/0033-beleg-und-sichtbarkeit.md,
 docs/adr/0023-skill-vocabulary-renames-never-infers.md.
@@ -112,6 +121,21 @@ add; ein aenderndes SichereAsync braucht .AsTracking(); Warnungen sind Fehler;
 dein .env ist NICHT das der CI — leere Zugangsdaten in .env.example heissen
 "nicht eingerichtet", und eine Pruefung dagegen ist lokal gruen und in der CI
 rot; E2E einmal am Ende, mit eindeutigen Selektoren.
+
+ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
+1. Lokal gruen machen, in GETRENNTEN Aufrufen:
+     dotnet build WorkerTransfer.slnx
+     ./scripts/test-dotnet.sh
+     cd web && pnpm check && pnpm test && pnpm build && cd ..
+2. Committen. Die Nachricht nennt den GRUND, nicht die geaenderte Datei.
+3. git push -u origin feature/berufsfelder-und-belege
+4. gh pr create --base develop --fill
+5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
+6. ERST DANN:  gh pr merge --merge --delete-branch
+
+Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
+--admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
+Massstab.
 ```
 
 ---
@@ -119,6 +143,9 @@ rot; E2E einmal am Ende, mit eindeutigen Selektoren.
 ## Sitzung 2 — Rollen erzwingen
 
 ```
+ZUERST, ohne zu fragen: git switch develop && git pull && git switch -c feature/rollen-erzwingen
+Diese Sitzung arbeitet NIE direkt auf develop.
+
 Du arbeitest im Repository WorkerTransfer (.NET 10 auf Girder 4.4.0).
 Lies: CLAUDE.md (Abschnitte "Request context" und "Die Girder-Module"),
 docs/PLAN-TRANSFERMARKT.md (PBI-2), docs/routenkarte.yml.
@@ -148,6 +175,21 @@ FALLEN: build und test nie zusammen; nie dotnet test ueber die Loesung;
 Warnungen sind Fehler; dein .env ist NICHT das der CI — leere Zugangsdaten in
 .env.example heissen "nicht eingerichtet"; eine Gegenprobe muss KOMPILIEREN,
 sonst liest sich der Build-Fehler wie ein bestandener Test.
+
+ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
+1. Lokal gruen machen, in GETRENNTEN Aufrufen:
+     dotnet build WorkerTransfer.slnx
+     ./scripts/test-dotnet.sh
+     cd web && pnpm check && pnpm test && pnpm build && cd ..
+2. Committen. Die Nachricht nennt den GRUND, nicht die geaenderte Datei.
+3. git push -u origin feature/rollen-erzwingen
+4. gh pr create --base develop --fill
+5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
+6. ERST DANN:  gh pr merge --merge --delete-branch
+
+Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
+--admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
+Massstab.
 ```
 
 ---
@@ -155,6 +197,9 @@ sonst liest sich der Build-Fehler wie ein bestandener Test.
 ## Sitzung 3 — `scout-service`
 
 ```
+ZUERST, ohne zu fragen: git switch develop && git pull && git switch -c feature/scout-service
+Diese Sitzung arbeitet NIE direkt auf develop.
+
 Du arbeitest im Repository WorkerTransfer (.NET 10 auf Girder 4.4.0).
 Lies: docs/adr/0036-scout-service.md (angenommen, Code fehlt),
 docs/adr/0033-beleg-und-sichtbarkeit.md, docs/SCOUT-UND-BERATER-BESTAND.md,
@@ -195,6 +240,21 @@ SichereAsync braucht .AsTracking(); Dienst-zu-Dienst-Ruempfe sind TYPISIERTE
 Vertraege, nie anonyme Objekte; Warnungen sind Fehler; dein .env ist NICHT das
 der CI — leere Zugangsdaten in .env.example heissen "nicht eingerichtet";
 E2E einmal am Ende.
+
+ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
+1. Lokal gruen machen, in GETRENNTEN Aufrufen:
+     dotnet build WorkerTransfer.slnx
+     ./scripts/test-dotnet.sh
+     cd web && pnpm check && pnpm test && pnpm build && cd ..
+2. Committen. Die Nachricht nennt den GRUND, nicht die geaenderte Datei.
+3. git push -u origin feature/scout-service
+4. gh pr create --base develop --fill
+5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
+6. ERST DANN:  gh pr merge --merge --delete-branch
+
+Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
+--admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
+Massstab.
 ```
 
 ---
@@ -202,6 +262,9 @@ E2E einmal am Ende.
 ## Sitzung 4 — `advisor-service`
 
 ```
+ZUERST, ohne zu fragen: git switch develop && git pull && git switch -c feature/advisor-service
+Diese Sitzung arbeitet NIE direkt auf develop.
+
 Du arbeitest im Repository WorkerTransfer (.NET 10 auf Girder 4.4.0).
 Lies: docs/adr/0037-advisor-service.md (angenommen, Code fehlt),
 docs/adr/0020-visibility-lives-in-the-ledger.md,
@@ -231,6 +294,21 @@ ABNAHME: der jetzige Arbeitgeber sieht die eigene Belegschaft NICHT im Scout;
 eine Stufenfreigabe wirkt sofort, ein Widerruf ebenso.
 
 FALLEN: wie in Sitzung 3.
+
+ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
+1. Lokal gruen machen, in GETRENNTEN Aufrufen:
+     dotnet build WorkerTransfer.slnx
+     ./scripts/test-dotnet.sh
+     cd web && pnpm check && pnpm test && pnpm build && cd ..
+2. Committen. Die Nachricht nennt den GRUND, nicht die geaenderte Datei.
+3. git push -u origin feature/advisor-service
+4. gh pr create --base develop --fill
+5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
+6. ERST DANN:  gh pr merge --merge --delete-branch
+
+Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
+--admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
+Massstab.
 ```
 
 ---
@@ -238,6 +316,9 @@ FALLEN: wie in Sitzung 3.
 ## Sitzung 5 — `assessment-service`
 
 ```
+ZUERST, ohne zu fragen: git switch develop && git pull && git switch -c feature/assessment-service
+Diese Sitzung arbeitet NIE direkt auf develop.
+
 Du arbeitest im Repository WorkerTransfer (.NET 10 auf Girder 4.4.0).
 Lies: docs/SCOUT-UND-BERATER.md (Abschnitt assessment-service),
 docs/adr/0022-*.md, docs/PLAN-TRANSFERMARKT.md (PBI-5).
@@ -256,6 +337,21 @@ Die drei Regeln, die eine Aufgabe von einer Pruefung mit Note unterscheiden:
 Danach der Dienst, Aufbau wie die anderen.
 
 FALLEN: wie in Sitzung 3.
+
+ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
+1. Lokal gruen machen, in GETRENNTEN Aufrufen:
+     dotnet build WorkerTransfer.slnx
+     ./scripts/test-dotnet.sh
+     cd web && pnpm check && pnpm test && pnpm build && cd ..
+2. Committen. Die Nachricht nennt den GRUND, nicht die geaenderte Datei.
+3. git push -u origin feature/assessment-service
+4. gh pr create --base develop --fill
+5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
+6. ERST DANN:  gh pr merge --merge --delete-branch
+
+Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
+--admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
+Massstab.
 ```
 
 ---
@@ -263,6 +359,9 @@ FALLEN: wie in Sitzung 3.
 ## Sitzung 6 — Aufräumen
 
 ```
+ZUERST, ohne zu fragen: git switch develop && git pull && git switch -c feature/aufraeumen
+Diese Sitzung arbeitet NIE direkt auf develop.
+
 Du arbeitest im Repository WorkerTransfer.
 Lies: docs/REVIEW-09-09.md (Fund 7), docs/PLAN-TRANSFERMARKT.md (PBI-6).
 
@@ -292,6 +391,21 @@ Vier kleine, unabhaengige Arbeiten:
 FALLEN: build und test nie zusammen; nie Images bauen waehrend Tests laufen;
 dein .env ist NICHT das der CI — was bei dir eingerichtet ist, ist es dort
 nicht.
+
+ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
+1. Lokal gruen machen, in GETRENNTEN Aufrufen:
+     dotnet build WorkerTransfer.slnx
+     ./scripts/test-dotnet.sh
+     cd web && pnpm check && pnpm test && pnpm build && cd ..
+2. Committen. Die Nachricht nennt den GRUND, nicht die geaenderte Datei.
+3. git push -u origin feature/aufraeumen
+4. gh pr create --base develop --fill
+5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
+6. ERST DANN:  gh pr merge --merge --delete-branch
+
+Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
+--admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
+Massstab.
 ```
 
 ---
@@ -299,6 +413,9 @@ nicht.
 ## Optional, nach Sitzung 1 — Vorschläge aus den eigenen Unterlagen
 
 ```
+ZUERST, ohne zu fragen: git switch develop && git pull && git switch -c feature/vorschlaege-aus-unterlagen
+Diese Sitzung arbeitet NIE direkt auf develop.
+
 Du arbeitest im Repository WorkerTransfer.
 Lies: docs/PLAN-TRANSFERMARKT.md (PBI-7 und den Abschnitt "Die KI-Frage"),
 docs/adr/0033-beleg-und-sichtbarkeit.md, docs/adr/0024-*.md.
@@ -319,4 +436,99 @@ AUFLAGEN:
 - Der Index lebt im selben Dienst wie die Unterlagen (resume-service) und faellt
   mit der Loeschung (ADR-0027).
 - Nichts davon ist durchsuchbar, bevor die Person gespeichert hat.
+
+ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
+1. Lokal gruen machen, in GETRENNTEN Aufrufen:
+     dotnet build WorkerTransfer.slnx
+     ./scripts/test-dotnet.sh
+     cd web && pnpm check && pnpm test && pnpm build && cd ..
+2. Committen. Die Nachricht nennt den GRUND, nicht die geaenderte Datei.
+3. git push -u origin feature/vorschlaege-aus-unterlagen
+4. gh pr create --base develop --fill
+5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
+6. ERST DANN:  gh pr merge --merge --delete-branch
+
+Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
+--admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
+Massstab.
 ```
+
+---
+
+## Sitzung 7 — Girder veröffentlichen
+
+**Anderes Repository.** Diese Sitzung arbeitet in `~/Projects/Girder`, nicht in
+WorkerTransfer. Sie ist unabhängig von 1–6 und kann jederzeit laufen.
+
+**Warum es sich lohnt:** `workertransfer` ist öffentlich und hängt an einem
+**privaten** Paket — niemand außer dem Autor kann das öffentliche Repo bauen,
+und ein Fork-PR kann es prinzipiell nie. Das ist der eigentliche Grund, nicht
+die CI: die war am 09.09.2026 mit einem Repo-Geheimnis in zwei Minuten gelöst.
+
+**Warum sie nicht selbst veröffentlicht:** nuget.org kennt kein Löschen, nur
+*unlisten*. Was einmal draußen ist, bleibt abrufbar. Diese Sitzung bereitet
+deshalb alles vor und **hört vor dem `dotnet nuget push` auf** — der letzte
+Griff bleibt beim Menschen.
+
+```
+Du arbeitest im Repository Girder (~/Projects/Girder), NICHT in WorkerTransfer.
+
+ZUERST, ohne zu fragen: git switch main && git pull && git switch -c oeffentlich-machen
+Diese Sitzung arbeitet NIE direkt auf main.
+
+ZIEL: Girder so weit bringen, dass eine Veroeffentlichung auf nuget.org eine
+Entscheidung ist und kein Risiko. NICHT veroeffentlichen.
+
+Ausgangslage, gemessen am 09.09.2026: das Repo ist privat, es gibt nur eine
+README.md — keine LICENSE, keine SECURITY.md. Auf nuget.org sind `girder`,
+`girder.core`, `girder.abstractions`, `girder.http` und `girder.infrastructure`
+alle FREI.
+
+1. LICENSE. Ohne sie darf niemand das Paket benutzen, "oeffentlich" waere also
+   folgenlos. Schlage eine vor (MIT oder Apache-2.0), nenne den Unterschied in
+   zwei Saetzen — Apache-2.0 gibt zusaetzlich einen Patentschutz — und trage
+   sie in jede .csproj als PackageLicenseExpression ein.
+
+2. SECURITY.md. Diese Bibliothek traegt JWT, Passwort-Hashing, Maskierung,
+   Ratenbremse und die Egress-Grenze. Oeffentlich heisst: jemand findet etwas
+   und braucht einen Weg, es zu melden, der nicht das oeffentliche Issue-Board
+   ist. Nenne Adresse und erwartete Antwortzeit.
+
+3. VERSIONSPOLITIK in die README. Girder ging 3.0.1 -> 4.4.0 in kurzer Zeit,
+   mit echten Bruechen (AddCommunication, PermissionEnforcement neu,
+   InputSanitization umgebaut). Solange nur ein Nutzer da ist, kostet ein Bruch
+   einen Nachmittag; oeffentlich kostet er Fremden ihre Builds. Schreibe hin,
+   was eine Hauptversion bedeutet und wie lange die vorige noch Korrekturen
+   bekommt.
+
+4. PAKETANGABEN in die .csproj: Beschreibung, Autor, Projektadresse,
+   Quellverweis (RepositoryUrl), Symbole und deterministischer Bau.
+   `dotnet pack -c Release` muss ohne Warnung durchlaufen — auch NU5* zaehlt.
+
+5. DIE QUELLE DURCHSEHEN, BEVOR sie oeffentlich wird. Suche nach allem, was
+   nicht hinausgehoert: Zugangsdaten, interne Adressen, Kundennamen,
+   Beispieldaten mit echten Personen. Auch in der HISTORIE, nicht nur im
+   Arbeitsbaum — `git log -p` findet, was ein Commit spaeter entfernt hat.
+   Was du findest, MELDEST du; entfernen aus der Historie ist eine eigene
+   Entscheidung.
+
+6. Ein PROBEPAKET, lokal: `dotnet pack`, dann in einem Wegwerf-Projekt aus dem
+   Ordner installieren und einmal bauen. Das findet fehlende Abhaengigkeiten,
+   die im selben Arbeitsbereich nie auffallen.
+
+HALT HIER. Fasse zusammen, was fehlt, damit `dotnet nuget push` gefahrlos ist,
+und nenne die Befehle — fuehre sie NICHT aus. nuget.org kennt kein Loeschen,
+nur unlisten, und diese Bibliothek traegt Sicherheitsfunktionen.
+
+ZUM SCHLUSS:
+1. Committen, git push -u origin oeffentlich-machen
+2. gh pr create --base main --fill
+3. Warten, bis die Pruefungen gruen sind: gh pr checks --watch
+4. ERST DANN: gh pr merge --merge --delete-branch
+Kein Veroeffentlichen, auch nicht "nur als Vorabversion".
+```
+
+**Danach in WorkerTransfer:** erst wenn Girder wirklich auf nuget.org liegt,
+fällt in `.github/workflows/ci.yml` die NuGet-Anmeldung weg und in
+`NuGet.Config` zeigt das Package Source Mapping für `Girder.*` auf nuget.org
+statt auf GitHub. Vorher nicht — sonst restauriert nichts mehr.
