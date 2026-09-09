@@ -198,7 +198,31 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Umgebung anlegen
-        run: make env
+        run: |
+          make env
+
+          # GITHUB-ANMELDUNG EINRICHTEN — MIT ERFUNDENEN WERTEN, UND DAS IST
+          # SICHER.
+          #
+          # `.env.example` laesst die drei leer, und das ist dort richtig: leer
+          # heisst „nicht eingerichtet", dann bleibt der Gist und der Knopf
+          # „Mit GitHub anmelden" erscheint gar nicht. Genau daran fielen zwei
+          # Pruefungen, die gegen einen eingerichteten Stapel geschrieben sind:
+          # `consents-journey` erwartet den Knopf, und die Routenkarte erwartet
+          # auf `/github/me/oauth/finish` ein 422 — das es nur gibt, WEIL
+          # `start` eine Zeile angelegt hat. Ohne Einrichtung legt `start`
+          # nichts an und `finish` antwortet 404. Beide Antworten sind richtig;
+          # sie unterscheiden sich in der Konfiguration.
+          #
+          # Erfunden duerfen die Werte sein, weil nichts damit nach draussen
+          # geht: `start` baut die Adresse im Prozess zusammen, und in `finish`
+          # steht der Zustandsvergleich VOR dem Austausch des Codes — eine
+          # Anfrage mit fremdem `state` faellt auf 422, ohne github.com je zu
+          # fragen. Die Reise sieht den Knopf nur an; sie klickt ihn nicht.
+          {
+            echo "WORKERTRANSFER_GITHUB_OAUTH_ID=ci-erfunden"
+            echo "WORKERTRANSFER_GITHUB_OAUTH_SECRET=ci-erfunden"
+          } >> .env
 
       # Hier faehrt `web` MIT — anders als im Bilder-Job. Die Reisen gehen
       # durch das Gateway auf :8090, und dort beantwortet die Oberflaeche
@@ -350,7 +374,31 @@ jobs:
       # eine eingebaute Vorgabe mehr. `make env` legt sie an und wuerfelt die
       # drei frisch — je Lauf andere, was hier genau richtig ist.
       - name: Umgebung anlegen
-        run: make env
+        run: |
+          make env
+
+          # GITHUB-ANMELDUNG EINRICHTEN — MIT ERFUNDENEN WERTEN, UND DAS IST
+          # SICHER.
+          #
+          # `.env.example` laesst die drei leer, und das ist dort richtig: leer
+          # heisst „nicht eingerichtet", dann bleibt der Gist und der Knopf
+          # „Mit GitHub anmelden" erscheint gar nicht. Genau daran fielen zwei
+          # Pruefungen, die gegen einen eingerichteten Stapel geschrieben sind:
+          # `consents-journey` erwartet den Knopf, und die Routenkarte erwartet
+          # auf `/github/me/oauth/finish` ein 422 — das es nur gibt, WEIL
+          # `start` eine Zeile angelegt hat. Ohne Einrichtung legt `start`
+          # nichts an und `finish` antwortet 404. Beide Antworten sind richtig;
+          # sie unterscheiden sich in der Konfiguration.
+          #
+          # Erfunden duerfen die Werte sein, weil nichts damit nach draussen
+          # geht: `start` baut die Adresse im Prozess zusammen, und in `finish`
+          # steht der Zustandsvergleich VOR dem Austausch des Codes — eine
+          # Anfrage mit fremdem `state` faellt auf 422, ohne github.com je zu
+          # fragen. Die Reise sieht den Knopf nur an; sie klickt ihn nicht.
+          {
+            echo "WORKERTRANSFER_GITHUB_OAUTH_ID=ci-erfunden"
+            echo "WORKERTRANSFER_GITHUB_OAUTH_SECRET=ci-erfunden"
+          } >> .env
 
       # DER EIGENTLICHE BELEG.
       #
