@@ -1,0 +1,556 @@
+# Die Routenkarte — jede Route durch das Gateway, mit ihrer erwarteten Antwort.
+#
+# Das hier ist KEINE Abhakliste, sondern die Datei, die ein Test faehrt. Der
+# Unterschied ist nicht akademisch: `scripts/k8s-up.sh` behauptete, `GET /jobs`
+# gebe 200, und wuchs damit in ein Skript hinein, das nie gelaufen war. Es gibt
+# 401, weil eine Stellenliste hinter der Anmeldung steht. Eine Liste, die
+# niemand faehrt, ist am Tag nach ihrer Erstellung falsch.
+#
+# ---------------------------------------------------------------------------
+# DREI SPALTEN, WEIL ES DREI HANDLUNGSFORMEN GIBT (ADR-0017)
+#
+#   ohne    kein Token
+#   person  angemeldet, KEINE Firma — `tenant_id` ist null
+#   firma   angemeldet und fuer eine Firma handelnd
+#
+# Die mittlere ist die, die man vergisst. Ein Mensch ohne Firma ist auf einem
+# Transfermarkt der NORMALFALL, nicht der Sonderfall — und die Zeilen, in denen
+# sie sich von der rechten unterscheidet, sind genau die Stellen, an denen
+# ADR-0017 wirklich etwas tut. Wo `person` und `firma` gleich sind, sagt die
+# Zeile: hier spielt die Firma keine Rolle.
+#
+# ---------------------------------------------------------------------------
+# WIE DIESE ZAHLEN ENTSTANDEN SIND
+#
+# Gemessen gegen den laufenden Stapel, nicht gelesen. Aber NICHT einfach
+# abgeschrieben: jede Zeile wurde danach gegen die Absicht gehalten, und wo
+# beide auseinandergingen, wurde der CODE geaendert und nicht die Zahl. Fuenf
+# Endpunkte antworteten auf einen kaputten Rumpf mit 500, einer davon
+# `/auth/login`; die stehen jetzt mit 422 hier. Eine Route zu viel ist
+# verschwunden.
+#
+# Die Kennungen in den Pfaden EXISTIEREN NICHT. Das ist Absicht: so misst die
+# Karte die Auskunftsbereitschaft und nicht den Inhalt einer bestimmten Zeile.
+# Wo eine nicht existierende Kennung 404 gibt und eine fremde ebenfalls, ist
+# genau das die Zusage.
+#
+# ---------------------------------------------------------------------------
+# WER SIE FAEHRT
+#
+#   scripts/routenkarte.sh            gegen den laufenden Stapel (make up)
+#   RoutenkarteTests (Gateway.Tests)  ohne Stapel: jede Route hat einen Eintrag
+#
+# Der zweite ist der, der eine NEUE Route rotlaufen laesst. Ohne ihn waere die
+# Karte genau so lange vollstaendig, bis jemand einen Endpunkt hinzufuegt.
+
+gruppen:
+  - name: 'Anmeldung — offen, und mit Absicht auskunftslos'
+    warum: |
+      Diese Endpunkte beantwortet auch, wer kein Token hat. Zwei Antworten hier
+      sind Absicht und keine Nachlaessigkeit:
+
+      `/auth/register` und `/auth/resend-verification` antworten fuer bekannte und
+      unbekannte Adressen GLEICH. Ein Unterschied verriete die Mitgliedschaft auf
+      dieser Plattform, ohne den Ledger zu fragen — auf einem Transfermarkt ist
+      das die Auskunft, die jemanden den Arbeitsplatz kosten kann.
+
+      `/auth/session` antwortet 200 auch ohne Token, mit `{"user":null,
+      "state":"anonymous"}`. Das ist die Frage der Oberflaeche „bin ich
+      angemeldet?", und ein 401 waere darauf keine Antwort, sondern ein Fehler.
+
+      `/auth/resend-verification` steht hier mit 422, weil der Rumpf `{}` GAR
+      KEINE Adresse enthaelt — eine Aussage ueber die Anfrage, nicht ueber ein
+      Konto. Die Zusage bleibt und ist nachgemessen: mit einer Adresse antwortet
+      der Endpunkt fuer eine bekannte und eine unbekannte GLEICH mit 202. Vorher
+      stand hier 202 auch fuer den leeren Rumpf; das war nicht falsch, aber es
+      nahm Muell an und nannte es angenommen.
+
+      422 statt 500 bei kaputtem Rumpf: bis D2 lief ein fehlendes Passwort bis in
+      den Passwortpruefer und kam als 500 zurueck.
+
+      `/auth/register` stand hier als einziger der vier mit **400** — die
+      Fachschicht wies das leere Passwort ab, bevor irgendetwas den Rumpf ansah.
+      Ein Rumpf ohne `displayName` kam dagegen als **500** zurueck, denn ihn wies
+      niemand ab: er lief bis in die Datenbank
+      (`null value in column "display_name"`). Beides ist seit H2 dieselbe
+      Antwort wie ueberall sonst, 422 mit `invalid: <felder>`, weil ein kaputter
+      Rumpf ueberall dieselbe Sache ist. Der Prueferklasse fehlte genau diese
+      eine Tuer.
+    eintraege:
+      - { methode: POST, pfad: '/auth/register', ohne: 422, person: 422, firma: 422 }
+      - { methode: POST, pfad: '/auth/login', ohne: 422, person: 422, firma: 422 }
+      - { methode: POST, pfad: '/auth/verify-email', ohne: 422, person: 422, firma: 422 }
+      - { methode: POST, pfad: '/auth/resend-verification', ohne: 422, person: 422, firma: 422 }
+      - { methode: POST, pfad: '/auth/refresh', ohne: 401, person: 200, firma: 200 }
+      - { methode: POST, pfad: '/auth/company/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 403 }
+      - { methode: GET, pfad: '/auth/session', ohne: 200, person: 200, firma: 200 }
+
+  - name: 'Das eigene Konto'
+    warum: |
+      Ohne Token 401, mit Token die eigene Auskunft. `/auth/company/{id}` gibt
+      403 statt 404: „du bist dort nicht Mitglied" ist eine Aussage ueber den
+      Aufrufer und verraet nichts ueber die Firma.
+
+      `POST /companies` gibt beiden 422: mit `{}` fehlt der Name, und das
+      entscheidet seit H4 ein Validator in der Pipeline — vor jeder Frage
+      danach, wem welche Domaene gehoert.
+
+      HIER STANDEN 400 und 409, und der Unterschied war lehrreich: die Firma
+      bekam 409, weil die Domaenenpruefung VOR der Namenspruefung lief, die
+      Person 400, weil ihre Domaene frei war. Mit dem Validator ist das aus
+      einem leeren Rumpf nicht mehr abzulesen.
+
+      Verloren ist die Eigenschaft nicht, nur diese Beobachtung: mit einem
+      GUELTIGEN Namen antwortet die Firma weiterhin 409 (nachgemessen). Eine
+      Domaene gehoert genau einer Firma (ADR-0019), und das gilt auch fuer die
+      eigene.
+
+      HIER STAND ZWEIMAL 409, und das war falsch gemessen: `example.org`, die
+      Domaene beider Prinzipale, war von einem frueheren Lauf auf DERSELBEN
+      Datenbank beansprucht. Nach `docker compose down -v` kippte die Zeile auf
+      400, nach einem einzigen Probeaufruf wieder auf 409.
+
+      Eine Zeile, die von Resten eines frueheren Laufs abhaengt, ist genau die
+      Abhakliste, gegen die diese Karte gebaut ist — nur diesmal in ihr selbst.
+      Behoben wurde deshalb nicht die Zahl, sondern der PRUEFSTAND:
+      `scripts/routenkarte.sh` gibt jetzt auch der Person eine eigene Domaene je
+      Lauf. Seitdem stehen beide Werte durch Konstruktion fest.
+    eintraege:
+      - { methode: GET, pfad: '/me', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/me/companies', ohne: 401, person: 200, firma: 200 }
+      - { methode: POST, pfad: '/companies', ohne: 401, person: 422, firma: 422 }
+
+  - name: 'Firmenverwaltung — 404 fuer eine fremde Firma'
+    warum: |
+      Zwei Antworten, und der Unterschied ist seit H1 neu:
+
+      LESEN gibt 404. Wer kein Mitglied ist, soll nicht erfahren, ob es die
+      Firma gibt; die Kennung hier existiert nicht, und die Antwort ist
+      dieselbe wie fuer eine, die es gibt und zu der man nicht gehoert.
+
+      SCHREIBEN gibt 403 — `POST /invitations` und `DELETE /members/{id}`
+      haengen an einer Richtlinie (`Permission:company.*`), und die entscheidet,
+      BEVOR der Rumpf ueberhaupt angesehen wird. Zuvor gaben sie 400 (Rumpf
+      kaputt) beziehungsweise 404 (kein Mitglied).
+
+      Der Wechsel war eine FOLGE, keine Absicht — er fiel beim Fahren dieser
+      Karte auf. Nachgeprueft traegt er trotzdem: die Richtlinie antwortet 403
+      unabhaengig davon, ob die Firma existiert, verraet also nichts. Und 403
+      heisst hier dasselbe wie ueberall sonst: eine Aussage ueber den AUFRUFER
+      („du darfst das nicht"), keine ueber die Sache. Dass die Autorisierung vor
+      der Eingabepruefung steht, ist ausserdem die Reihenfolge, die dieses
+      System schon bei `/invitations/accept` ausdruecklich gewaehlt hat — sonst
+      lernte ein Fremder aus dem Unterschied 400/403, dass sein Rumpf in Ordnung
+      war.
+    eintraege:
+      - { methode: POST, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations', ohne: 401, person: 403, firma: 403 }
+      - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations', ohne: 401, person: 404, firma: 404 }
+      - { methode: DELETE, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations/00000000-0000-0000-0000-000000000002', ohne: 401, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/members', ohne: 401, person: 404, firma: 404 }
+      - { methode: DELETE, pfad: '/companies/00000000-0000-0000-0000-000000000001/members/00000000-0000-0000-0000-000000000002', ohne: 401, person: 403, firma: 403 }
+      - { methode: POST, pfad: '/invitations/accept', ohne: 401, person: 422, firma: 422 }
+
+  - name: 'Einwilligung — der Ledger'
+    warum: |
+      `/consent/grant` und `/revoke` geben 403 fuer beide Handlungsformen: eine
+      Einwilligung erteilt und widerruft nur, wem sie gehoert, und der Rumpf nennt
+      hier ein fremdes Subjekt. `/consent/me` nimmt KEINE Subjektkennung entgegen,
+      weder im Pfad noch in der Abfrage — eine fremde Liste sagte, welche anderen
+      Firmen Zugriff halten (ADR-0013).
+    eintraege:
+      - { methode: POST, pfad: '/consent/grant', ohne: 401, person: 403, firma: 403 }
+      - { methode: POST, pfad: '/consent/revoke', ohne: 401, person: 403, firma: 403 }
+      - { methode: GET, pfad: '/consent/me', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/consent/me/history', ohne: 401, person: 200, firma: 200 }
+      - { methode: POST, pfad: '/consent/check', ohne: 401, person: 422, firma: 422 }
+      - { methode: POST, pfad: '/consent/check-batch', ohne: 401, person: 422, firma: 422 }
+
+  - name: 'Profil und Kandidaten — hier sitzt ADR-0020'
+    warum: |
+      Die interessanteste Zeile der ganzen Karte ist `GET /profiles/{id}`:
+      **403 fuer die Person, 404 fuer die Firma.** Das ist kein Zufall und keine
+      Unsauberkeit.
+
+      403 heisst „du handelst fuer keine Firma" — eine Aussage ueber den
+      AUFRUFER, die ueber das Profil nichts verraet. 404 heisst „verborgen oder
+      nicht vorhanden", und die beiden muessen bis aufs Byte gleich aussehen,
+      sonst wird aus dem Unterschied eine Auskunft darueber, wer hier ein Profil
+      hat.
+
+      `/candidates` ist dieselbe Regel eine Ebene hoeher: eine Kandidatenliste
+      sieht nur, wer fuer eine Firma handelt.
+
+      `/profiles/me` ist 200 null, solange noch keins da ist — 404 waere der
+      Normalfall in der Browserkonsole. Fremde Profile bleiben 404 (ADR-0020).
+
+      `/profiles/me/draft` gibt 503, weil kein Schluessel fuer die KI-Naht
+      gesetzt ist. Der Entwurf sagt das, statt so zu tun, als koenne er es
+      (ADR-0024).
+    eintraege:
+      - { methode: PUT, pfad: '/profiles/me', ohne: 401, person: 422, firma: 422 }
+      - { methode: GET, pfad: '/profiles/me', ohne: 401, person: 200, firma: 200 }
+      - { methode: POST, pfad: '/profiles/me/draft', ohne: 401, person: 503, firma: 503 }
+      - { methode: GET, pfad: '/profiles/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 404 }
+      - { methode: GET, pfad: '/candidates', ohne: 401, person: 403, firma: 200 }
+
+  - name: 'Lebenslauf — strenger als das Profil'
+    warum: |
+      Ein Profil ist ein Aushang, ein Lebenslauf nennt echte Arbeitgeber mit
+      Daten — genau das, was ein jetziger Arbeitgeber nicht sehen darf. Es gibt
+      deshalb keinen oeffentlichen Schalter: eine Firma FRAGT, die Person
+      antwortet, und die Freigabe gilt fuer diese eine Firma.
+
+      `POST /resumes/{id}/requests` gibt 404 fuer die Firma: gefragt werden darf
+      nur, wer die PROFIL-Freigabe hat, und ein nicht existierendes Subjekt hat
+      keine. 404 heisst hier wie ueberall "verborgen oder nicht vorhanden", und
+      die beiden muessen ununterscheidbar bleiben.
+
+      **Hier stand bis zum Drahtnamen-Fund 503, mit einer Begruendung, die
+      falsch war** — "der Ledger kann ueber ein nicht existierendes Subjekt
+      nichts sagen". Er kann: keine Freigabe, also nein. 503 heisst nicht
+      "unbekannt", sondern "hat nicht geantwortet", und das traf zu, weil
+      resume-service den Ledger mit `subjectId` fragte, waehrend der auf
+      `subject_id` hoerte. Die Karte hielt also ein Symptom fest und hatte sich
+      einen Grund dafuer geschrieben. Das ist die unangenehmste Art, falsch zu
+      liegen: mit Begruendung.
+    eintraege:
+      - { methode: PUT, pfad: '/resumes/me', ohne: 401, person: 422, firma: 422 }
+      - { methode: GET, pfad: '/resumes/me', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/resumes/me/requests', ohne: 401, person: 200, firma: 200 }
+      - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/grant', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/revoke', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/resumes/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, firma: 404 }
+      - { methode: GET, pfad: '/resumes/requests', ohne: 401, person: 403, firma: 200 }
+      - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 404 }
+      - { methode: POST, pfad: '/resumes/me/documents', ohne: 401, person: 415, firma: 415 }
+      - { methode: GET, pfad: '/resumes/me/documents', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001/content', ohne: 401, person: 404, firma: 404 }
+      - { methode: DELETE, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+      - { methode: PUT, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001/as-cv', ohne: 401, person: 404, firma: 404 }
+      - { methode: PUT, pfad: '/resumes/me/template', ohne: 401, person: 422, firma: 422 }
+      - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001/documents', ohne: 401, person: 403, firma: 200 }
+      - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001/documents/00000000-0000-0000-0000-000000000002/content', ohne: 401, person: 403, firma: 404 }
+
+  - name: 'Portfolio'
+    warum: |
+      `POST /me/attachments` gibt 415, weil der Rumpf kein `multipart/form-data`
+      ist — die Pruefung der Form kommt vor allem anderen.
+    eintraege:
+      - { methode: PUT, pfad: '/portfolios/me', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/portfolios/me', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/portfolios/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/portfolios/me/attachments', ohne: 401, person: 415, firma: 415 }
+      - { methode: GET, pfad: '/portfolios/00000000-0000-0000-0000-000000000001/attachments/x.pdf', ohne: 401, person: 404, firma: 404 }
+
+  - name: 'Stellen — die mittlere Spalte ist hier die wichtige'
+    warum: |
+      `GET /jobs` ist **200 in allen drei Spalten** — eine veroeffentlichte
+      Anzeige findet auch, wer kein Konto hat. Der Speicher filtert auf
+      `status == "published"`; Entwuerfe und Geschlossenes bleiben drinnen, und
+      zwar dort und nie ueber einen Parameter des Aufrufers.
+
+      **Hier stand lange 401**, mit der Begruendung „eine Stellenliste steht
+      hinter der Anmeldung". Sie hielt der eigenen Karte nicht stand: weiter
+      unten steht bei den Arbeitgeberprofilen „weil die Karriereseite
+      oeffentlich ist" — und `/careers/<kuerzel>` holt seine Stellen ueber genau
+      diesen Endpunkt. Ein anonymer Besucher sah dort Name und Beschreibung des
+      Unternehmens, aber keine einzige Stelle. Zwei Zeilen derselben Karte, die
+      sich widersprachen.
+
+      Dass diese Zeile einmal in `scripts/k8s-up.sh` als 200 stand, war damals
+      trotzdem ein Fehler — damals stimmte 401. Der Grund, warum diese Karte ein
+      Test ist und keine Abhakliste, bleibt derselbe.
+
+      **`GET /jobs/{id}` fiel kurz darauf aus demselben Grund**, und dort war der
+      Preis groesser als eine leere Seite: `applications-service` fragt genau
+      diesen Endpunkt Dienst-zu-Dienst, ob es die Stelle gibt — ohne Token, weil
+      er keines hat. Sein eigener Quelltext nannte den Endpunkt „bewusst ohne
+      Anmeldung"; er war es nicht, und deshalb endete **jede** Bewerbung mit 503.
+      Gemessen im Protokoll: „jobs-service antwortete mit 401". Die drei Spalten
+      stehen jetzt alle auf 404, und das ist die Aussage: fuer eine erfundene
+      Kennung, einen fremden Entwurf und eine geschlossene Stelle antwortet der
+      Dienst gleich — ein 403 daneben verriete, welche Kennungen belegt sind.
+
+      Alles Schreibende gibt **403 fuer die Person**: wer fuer keine Firma
+      handelt, schreibt keine Anzeige. Das ist ADR-0017 in einer Spalte.
+    eintraege:
+      - { methode: POST, pfad: '/jobs/draft', ohne: 401, person: 403, firma: 503 }
+      - { methode: POST, pfad: '/jobs', ohne: 401, person: 403, firma: 422 }
+      - { methode: PUT, pfad: '/jobs/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 404 }
+      - { methode: POST, pfad: '/jobs/00000000-0000-0000-0000-000000000001/publish', ohne: 401, person: 403, firma: 404 }
+      - { methode: POST, pfad: '/jobs/00000000-0000-0000-0000-000000000001/close', ohne: 401, person: 403, firma: 404 }
+      - { methode: GET, pfad: '/jobs', ohne: 200, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/jobs?page=2&page_size=5', ohne: 200, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/jobs/00000000-0000-0000-0000-000000000001', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/companies/me/jobs', ohne: 401, person: 403, firma: 200 }
+
+  - name: 'Bewerbungen'
+    warum: |
+      `POST /{id}/status` gibt der Firma 422 und nicht 404: mit `{}` als Rumpf
+      fehlt der Stand, und das ist eine kaputte ANFRAGE. Seit H4 entscheidet das
+      ein Validator in der Pipeline, bevor der Handler nach der Bewerbung sucht.
+
+      Die Reihenfolge ist Absicht und verraet nichts: 422 spricht ueber den
+      Rumpf des Aufrufers, 404 ueber unsere Daten. Mit einem gueltigen Stand und
+      einer Kennung, die es nicht gibt, kommt weiterhin 404. Und die
+      Autorisierung steht davor — die Person bekommt 403, ohne dass ihr Rumpf
+      ueberhaupt angesehen wird.
+
+      `POST /applications` gibt 404 mit `No such job`. Hier stand 503 mit der
+      Begruendung, applications-service koenne ueber eine Stelle, die es nicht
+      gibt, nichts sagen — er kann: es gibt sie nicht. 503 hiess nie
+      „unbekannt", sondern „hat nicht geantwortet", und genau das war der Fall,
+      solange der Draht zwischen den beiden Diensten kaputt war. Das ist die
+      DRITTE Stelle in dieser Karte, an der eine 503 ein festgehaltenes Symptom
+      war und die Begruendung daneben nachgereicht — die anderen beiden waren
+      der Einwilligungs-Ledger.
+
+      Gegengeprobt, weil ein Endpunkt, der immer 404 sagt, genauso aussaehe:
+      dieselbe Anfrage auf eine Stelle, die es GIBT, gibt 201.
+
+      `GET /jobs/{id}/applications` und `/companies/me/application-stats` sehen
+      nur Firmen — eine Bewerberliste ist nichts, was eine Privatperson abruft.
+
+      `GET /applications/{id}` ist die Mappe: fremd und nicht vorhanden bleiben
+      404, ununterscheidbar. Die Entwürfe (`/applications/drafts`) gehören der
+      Person; eine erfundene Kennung ist 404, die Liste leer 200. `POST /drafts`
+      mit `{}` ist 422, weil `job_ids` fehlt — das Schreiben ist ein eigener
+      Aufruf je Entwurf.
+    eintraege:
+      - { methode: POST, pfad: '/applications', ohne: 401, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/applications/me', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/applications/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/00000000-0000-0000-0000-000000000001/withdraw', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/00000000-0000-0000-0000-000000000001/status', ohne: 401, person: 403, firma: 422 }
+      - { methode: GET, pfad: '/jobs/00000000-0000-0000-0000-000000000001/applications', ohne: 401, person: 403, firma: 200 }
+      - { methode: GET, pfad: '/companies/me/application-stats', ohne: 401, person: 403, firma: 200 }
+      - { methode: POST, pfad: '/applications/drafts', ohne: 401, person: 422, firma: 422 }
+      - { methode: GET, pfad: '/applications/drafts', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+      - { methode: PATCH, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+      - { methode: PUT, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/attachments', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/comments', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/write', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/revise', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/approve', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/send', ohne: 401, person: 404, firma: 404 }
+      - { methode: DELETE, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+
+  - name: 'Arbeitgeberprofil — das oeffentliche Schaufenster'
+    warum: |
+      `/companies/by-slug/{kuerzel}` und `/companies/{id}/profile` antworten
+      OHNE Token, weil die Karriereseite oeffentlich ist. Ein unbekanntes
+      Kuerzel ist 404. Eine Tenant-Id ohne Schaufenster ist 200 null — sonst
+      loggt jede Stellenkarte einen Fehler.
+    eintraege:
+      - { methode: PUT, pfad: '/companies/me/profile', ohne: 401, person: 403, firma: 422 }
+      - { methode: GET, pfad: '/companies/me/profile', ohne: 401, person: 403, firma: 200 }
+      - { methode: GET, pfad: '/companies/by-slug/gibt-es-nicht', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/profile', ohne: 200, person: 200, firma: 200 }
+
+  - name: 'Markt und Transfers'
+    warum: |
+      `/market/me` gehoert der Person: ob sie im Markt steht, entscheidet sie.
+      Die Listen und alles Anbahnende gehoeren der Firma — 403 in der mittleren
+      Spalte.
+    eintraege:
+      - { methode: PUT, pfad: '/market/me', ohne: 401, person: 422, firma: 422 }
+      - { methode: GET, pfad: '/market/me', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/market/me/requests', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/market/requests', ohne: 401, person: 403, firma: 200 }
+      - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/grant', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/revoke', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/market/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, firma: 404 }
+      - { methode: GET, pfad: '/market/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 404 }
+      - { methode: POST, pfad: '/transfers', ohne: 401, person: 403, firma: 422 }
+      - { methode: GET, pfad: '/transfers/me', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/transfers', ohne: 401, person: 403, firma: 200 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/accept-talk', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/accept-offer', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/confirm-release', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/offer', ohne: 401, person: 403, firma: 404 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/complete', ohne: 401, person: 403, firma: 404 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/withdraw', ohne: 401, person: 403, firma: 404 }
+
+  - name: 'GitHub — die eigene, bewiesene Verbindung'
+    warum: |
+      Der Dienst wurde UNTER ADR-0022 gebaut, nicht von ihm verurteilt. Was er
+      haelt, ist die selbst verknuepfte und per Challenge bewiesene Verbindung
+      einer Person — keine Zahl ueber einen Menschen.
+    eintraege:
+      - { methode: POST, pfad: '/github/me', ohne: 401, person: 422, firma: 422 }
+      - { methode: POST, pfad: '/github/me/verify', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/github/me/refresh', ohne: 401, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/github/me', ohne: 401, person: 200, firma: 200 }
+      - { methode: DELETE, pfad: '/github/me', ohne: 401, person: 204, firma: 204 }
+      - { methode: GET, pfad: '/github/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+      # Die Anmeldung ueber GitHub. `/github/oauth` traegt nichts Persoenliches
+      # — es sagt, ob DIESER SERVER sie eingerichtet hat — und legt nichts an;
+      # `/me/oauth/start` legt an und wird darum erst auf Knopfdruck gerufen.
+      - { methode: GET, pfad: '/github/oauth', ohne: 401, person: 200, firma: 200 }
+      - { methode: POST, pfad: '/github/me/oauth/start', ohne: 401, person: 200, firma: 200 }
+      # 422 und nicht 404, und die Zeile darueber ist der Grund: `start` hat
+      # gerade eine Verbindung angelegt (ohne genanntes Konto — den Namen
+      # meldet GitHub). Es gibt hier also etwas, nur passt der `state` nicht —
+      # „nicht bewiesen" statt „nichts da". Vor der Umstellung legte `start`
+      # nichts an und dieselbe Anfrage bekam 404.
+      - { methode: POST, pfad: '/github/me/oauth/finish', ohne: 401, person: 422, firma: 422 }
+
+  - name: 'Benachrichtigungen'
+    warum: |
+      `POST /notifications` ist seit H4 KEIN Endpunkt mehr — der Diensteingang
+      liegt unter `/internal/notifications` und hat dort keine Gateway-Route.
+      Beide antworten von aussen 404.
+
+      Er antwortet auch INNEN mit 404 statt 401, wenn das gemeinsame Geheimnis
+      fehlt: ein 401 bestaetigte, dass es den Endpunkt gibt.
+    eintraege:
+      - { methode: POST, pfad: '/notifications', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/notifications/me', ohne: 401, person: 200, firma: 200 }
+      - { methode: POST, pfad: '/notifications/me/read', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/me/notification-preferences', ohne: 401, person: 200, firma: 200 }
+      - { methode: PUT, pfad: '/me/notification-preferences', ohne: 401, person: 200, firma: 200 }
+
+  - name: 'Die Tueren, die es von aussen nicht gibt'
+    warum: |
+      Drei Dienst-zu-Dienst-Eingaenge hinter einem gemeinsamen Geheimnis. Keiner
+      hat eine Route: „loesche alles ueber diesen Menschen" gehoert nicht an den
+      oeffentlichen Ursprung, bewacht von einem Kopf.
+
+      `/companies/withdrawal` STAND bis D2 in der Landkarte und antwortete
+      oeffentlich mit 401 — womit es bestaetigte, dass es ihn gibt. Aufgefallen
+      ist das erst, als jede Route einzeln mit ihrer erwarteten Antwort geprueft
+      wurde. Gebraucht wurde die Route nie: identity-service ruft jobs-service
+      direkt an.
+    eintraege:
+      - { methode: POST, pfad: '/erasure', ohne: 404, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/internal/notify', ohne: 404, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/internal/notifications', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/internal/companies/00000000-0000-0000-0000-000000000001/members', ohne: 404, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/companies/withdrawal', ohne: 404, person: 404, firma: 404 }
+
+  - name: 'Die nackten Praefixe — was ein Prefix ohne Rest antwortet'
+    warum: |
+      Ocelot braucht je Praefix ZWEI Zeilen: `/consent` und `/consent/{rest}`.
+      Die nackte Form zeigt hier auf einen Dienst, der dort meist gar nichts
+      anbietet — deshalb steht sie in der Karte, sonst waere fuer die Haelfte
+      aller Routen nirgends aufgeschrieben, was sie tun.
+
+      Drei Antworten kommen vor, und die dritte ist ein Fund:
+
+      404 — dort liegt kein Endpunkt. Der Regelfall.
+
+      405 bei `/companies` und `/applications` — dort liegt ein POST, und GET
+      ist nicht erlaubt. Hier ist das harmlos: dass es diese Ressourcen gibt,
+      ist keine Auskunft.
+
+      `/notifications` STAND hier mit 405 und war der Fund dieser Gruppe: der
+      Dienst antwortet auf den Diensteingang ohne das gemeinsame Geheimnis
+      bewusst mit 404 und nicht mit 401, weil ein 401 bestaetigte, dass es den
+      Endpunkt gibt — und ein GET auf denselben Pfad bestaetigte es dann doch.
+      405 heisst „diesen Pfad gibt es, nur nicht mit dieser Methode"; die
+      Verschleierung wurde also vom Rahmenwerk unterlaufen.
+
+      Behoben in H4, und nicht durch eine Sonderregel: der Diensteingang ist
+      nach `/internal/notifications` umgezogen. Dort gibt es keine
+      Gateway-Route, wie bei `/erasure` und `/internal/notify` — womit sich
+      alle drei Dienst-zu-Dienst-Tueren gleich verhalten. `/notifications`
+      antwortet jetzt auf JEDE Methode 404, nicht unterscheidbar von einem
+      Pfad, den es nicht gibt (gemessen ueber GET, POST, PUT, DELETE, PATCH).
+    eintraege:
+      - { methode: GET, pfad: '/auth', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/invitations', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/account', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/consent', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/profiles', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/resumes', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/portfolios', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/market', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/github', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/companies', ohne: 405, person: 405, firma: 405 }
+      - { methode: GET, pfad: '/applications', ohne: 405, person: 405, firma: 405 }
+      - { methode: GET, pfad: '/notifications', ohne: 404, person: 404, firma: 404 }
+
+  - name: 'Kontoloeschung und die Kandidatensuche im Einzelnen'
+    warum: |
+      Zwei Routen, die beim ersten Durchmessen fehlten — und die zweite fehlte
+      aus einem Grund, der es wert ist, hier zu stehen: `/account/erasure`
+      LOESCHT DEN AUFRUFER. Ein Durchlauf, der einfach jeden Endpunkt anfasst,
+      haette sich dabei selbst das Konto weggenommen und danach lauter 401
+      gemessen, die keine Zusage sind, sondern eine Folge. Gemessen wurde sie
+      deshalb mit einem eigenen Wegwerfkonto.
+
+      202 und nicht 200: die Loeschung ist NICHT sofort fertig. Sie widerruft
+      sofort jede Sitzung und legt das Konto still, kaskadiert dann aber ueber
+      die Outbox an acht Empfaenger, und erst danach faellt die Zeile in
+      `users`. „Angenommen" ist die einzige ehrliche Antwort — `/delete-account`
+      sagt dem Menschen deshalb „laeuft" und nie „erledigt" (ADR-0027).
+
+      Es gibt KEIN Begruendungsfeld. Von jemandem, der gehen will, eine
+      Rechtfertigung zu verlangen, ist ein Hebel gegen ihn.
+
+      `/candidates/{id}` gibt 404 in allen drei Spalten: es gibt dort keinen
+      Endpunkt. Eine Kandidatenansicht je Person gaebe es nur ueber
+      `/profiles/{id}`, und die haengt am Ledger.
+    eintraege:
+      - { methode: POST, pfad: '/account/erasure', ohne: 401, person: 202, firma: 202 }
+      - { methode: GET, pfad: '/candidates/00000000-0000-0000-0000-000000000001', ohne: 404, person: 404, firma: 404 }
+
+  - name: 'Die Sprache des Kontos'
+    warum: |
+      `PUT /account/language` schreibt, in welcher Sprache jemand ANGESCHRIEBEN
+      wird. Sie steht als Spalte am Konto und nicht am `Accept-Language` der
+      Anfrage, und das ist keine Bequemlichkeit: die Loeschbestaetigung wird
+      geschrieben, wenn der letzte von acht Diensten quittiert hat — Tage
+      spaeter, von einem Zusteller, ohne Browser und ohne Kopf. Stuende die
+      Sprache an der Anfrage, waere ausgerechnet die letzte Nachricht an ein
+      franzoesisches Konto deutsch.
+
+      Es gibt KEINE Kennung im Rumpf. Nur der Aufrufer selbst, aus demselben
+      Grund wie bei der Loeschung: eine Kennung waere das Einzige zwischen einem
+      Aufrufer und einem fremden Konto.
+
+      Beide angemeldeten Spalten antworten gleich — die Sprache gehoert der
+      PERSON, nicht dem Unternehmen, fuer das sie gerade handelt (ADR-0017).
+      Eine unbekannte Sprache gibt 422 und nicht stillschweigend Deutsch: eine
+      Wahl, die nicht wirkt und nichts sagt, sieht wie ein Fehler der
+      Oberflaeche aus.
+    eintraege:
+      - { methode: PUT, pfad: '/account/language', ohne: 401, person: 200, firma: 200, rumpf: '{"language":"de"}' }
+
+  - name: 'Die Einstellungen des Kontos'
+    warum: |
+      `GET/PUT /account/settings` traegt, was eine Person UEBER SICH entschieden
+      hat: Verfall der eigenen Daten, welcher KI-Anbieter gefragt werden darf,
+      ob Anfragen protokolliert werden. Alles Entscheidungen, keine
+      Ableitungen — kein Wert wird aus dem Verhalten geschlossen.
+
+      `PUT /account/ai-key` ist ABSICHTLICH getrennt und gibt NICHTS zurueck.
+      Der Schluessel geht in eine Richtung: die Antwort auf `GET
+      /account/settings` sagt, DASS einer hinterlegt ist und wie seine letzten
+      vier Zeichen lauten, und mehr nicht. Ein Geheimnis, das man abrufen kann,
+      ist eines, das man abziehen kann.
+
+      Keine Kennung im Rumpf, in keinem der drei. Nur der Aufrufer selbst.
+
+      Beide angemeldeten Spalten antworten gleich: die Einstellungen gehoeren
+      der PERSON, nicht dem Unternehmen, fuer das sie gerade handelt (ADR-0017).
+    eintraege:
+      - { methode: GET, pfad: '/account/settings', ohne: 401, person: 200, firma: 200 }
+      - { methode: PUT, pfad: '/account/settings', ohne: 401, person: 200, firma: 200, rumpf: '{"delete_after_months":null,"ai_provider":"none","ai_base_url":"","ai_model":"","ai_audit_log":false}' }
+      - { methode: PUT, pfad: '/account/ai-key', ohne: 401, person: 200, firma: 200, rumpf: '{"key":""}' }
+
+  - name: 'Klarname und Bewerbungsanschrift'
+    warum: |
+      Vor- und Nachname leben auf dem Konto (ADR-0038), die Anschrift nur als
+      Vorlage fuer den Briefkopf. Beides gehoert der PERSON, nicht dem
+      Unternehmen, fuer das sie gerade handelt. Die Session traegt den
+      Klarnamen, nie die Anschrift — sonst zöge die Bewerberauskunft sie in
+      den Prompt.
+    eintraege:
+      - { methode: PUT, pfad: '/account/name', ohne: 401, person: 200, firma: 200, rumpf: '{"given_name":"Anna","family_name":"Beispiel"}' }
+      - { methode: GET, pfad: '/account/address', ohne: 401, person: 200, firma: 200 }
+      - { methode: PUT, pfad: '/account/address', ohne: 401, person: 200, firma: 200, rumpf: '{"line1":"","line2":"","postal_code":"","city":"","country":"DE","phone":""}' }

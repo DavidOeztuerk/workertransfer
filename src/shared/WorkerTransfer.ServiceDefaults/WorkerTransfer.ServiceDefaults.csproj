@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Nur fuer `Umgebung.Laden()`: eine .env-Datei in die Prozessumgebung. -->
+    <PackageReference Include="DotNetEnv" />
+    <PackageReference Include="Girder.Infrastructure" />
+    <!--
+      Nur fuer `Wanderung`: jeder der zehn Dienste besitzt ein eigenes Schema
+      und wandert es selbst. Relational, nicht Npgsql — welche Datenbank es
+      ist, entscheidet der Dienst.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WorkerTransfer.Contracts.Identity\WorkerTransfer.Contracts.Identity.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Die Ortstabelle reist IM Bild mit. Sie ist der Grund, warum kein
+         Geokodierdienst gerufen wird (ADR-0032), und ohne sie kennt die
+         Umkreissuche keinen einzigen Ort. -->
+    <EmbeddedResource Include="Postleitzahlen.txt" />
+  </ItemGroup>
+
+</Project>

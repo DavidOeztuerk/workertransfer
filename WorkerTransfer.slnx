@@ -1,0 +1,110 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/shared/">
+    <Project Path="src/shared/WorkerTransfer.Ablage/WorkerTransfer.Ablage.csproj" />
+    <Project Path="src/shared/WorkerTransfer.Contracts.Consent/WorkerTransfer.Contracts.Consent.csproj" />
+    <Project Path="src/shared/WorkerTransfer.Contracts.Erasure/WorkerTransfer.Contracts.Erasure.csproj" />
+    <Project Path="src/shared/WorkerTransfer.Contracts.Identity/WorkerTransfer.Contracts.Identity.csproj" />
+    <Project Path="src/shared/WorkerTransfer.Outbox/WorkerTransfer.Outbox.csproj" />
+    <Project Path="src/shared/WorkerTransfer.ServiceDefaults/WorkerTransfer.ServiceDefaults.csproj" />
+    <Project Path="src/shared/WorkerTransfer.Skills/WorkerTransfer.Skills.csproj" />
+  </Folder>
+  <Folder Name="/src/applications-service/">
+    <Project Path="src/applications-service/WorkerTransfer.Applications.Api/WorkerTransfer.Applications.Api.csproj" />
+    <Project Path="src/applications-service/WorkerTransfer.Applications.Application/WorkerTransfer.Applications.Application.csproj" />
+    <Project Path="src/applications-service/WorkerTransfer.Applications.Contracts/WorkerTransfer.Applications.Contracts.csproj" />
+    <Project Path="src/applications-service/WorkerTransfer.Applications.Domain/WorkerTransfer.Applications.Domain.csproj" />
+    <Project Path="src/applications-service/WorkerTransfer.Applications.Infrastructure/WorkerTransfer.Applications.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/companies-service/">
+    <Project Path="src/companies-service/WorkerTransfer.Companies.Api/WorkerTransfer.Companies.Api.csproj" />
+    <Project Path="src/companies-service/WorkerTransfer.Companies.Application/WorkerTransfer.Companies.Application.csproj" />
+    <Project Path="src/companies-service/WorkerTransfer.Companies.Contracts/WorkerTransfer.Companies.Contracts.csproj" />
+    <Project Path="src/companies-service/WorkerTransfer.Companies.Domain/WorkerTransfer.Companies.Domain.csproj" />
+    <Project Path="src/companies-service/WorkerTransfer.Companies.Infrastructure/WorkerTransfer.Companies.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/consent-service/">
+    <Project Path="src/consent-service/WorkerTransfer.Consent.Api/WorkerTransfer.Consent.Api.csproj" />
+    <Project Path="src/consent-service/WorkerTransfer.Consent.Application/WorkerTransfer.Consent.Application.csproj" />
+    <Project Path="src/consent-service/WorkerTransfer.Consent.Contracts/WorkerTransfer.Consent.Contracts.csproj" />
+    <Project Path="src/consent-service/WorkerTransfer.Consent.Domain/WorkerTransfer.Consent.Domain.csproj" />
+    <Project Path="src/consent-service/WorkerTransfer.Consent.Infrastructure/WorkerTransfer.Consent.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/gateway/">
+    <Project Path="src/gateway/WorkerTransfer.Gateway/WorkerTransfer.Gateway.csproj" />
+  </Folder>
+  <Folder Name="/src/github-service/">
+    <Project Path="src/github-service/WorkerTransfer.GitHub.Api/WorkerTransfer.GitHub.Api.csproj" />
+    <Project Path="src/github-service/WorkerTransfer.GitHub.Application/WorkerTransfer.GitHub.Application.csproj" />
+    <Project Path="src/github-service/WorkerTransfer.GitHub.Contracts/WorkerTransfer.GitHub.Contracts.csproj" />
+    <Project Path="src/github-service/WorkerTransfer.GitHub.Domain/WorkerTransfer.GitHub.Domain.csproj" />
+    <Project Path="src/github-service/WorkerTransfer.GitHub.Infrastructure/WorkerTransfer.GitHub.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/identity-service/">
+    <Project Path="src/identity-service/WorkerTransfer.Identity.Api/WorkerTransfer.Identity.Api.csproj" />
+    <Project Path="src/identity-service/WorkerTransfer.Identity.Application/WorkerTransfer.Identity.Application.csproj" />
+    <Project Path="src/identity-service/WorkerTransfer.Identity.Contracts/WorkerTransfer.Identity.Contracts.csproj" />
+    <Project Path="src/identity-service/WorkerTransfer.Identity.Domain/WorkerTransfer.Identity.Domain.csproj" />
+    <Project Path="src/identity-service/WorkerTransfer.Identity.Infrastructure/WorkerTransfer.Identity.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/jobs-service/">
+    <Project Path="src/jobs-service/WorkerTransfer.Jobs.Api/WorkerTransfer.Jobs.Api.csproj" />
+    <Project Path="src/jobs-service/WorkerTransfer.Jobs.Application/WorkerTransfer.Jobs.Application.csproj" />
+    <Project Path="src/jobs-service/WorkerTransfer.Jobs.Contracts/WorkerTransfer.Jobs.Contracts.csproj" />
+    <Project Path="src/jobs-service/WorkerTransfer.Jobs.Domain/WorkerTransfer.Jobs.Domain.csproj" />
+    <Project Path="src/jobs-service/WorkerTransfer.Jobs.Infrastructure/WorkerTransfer.Jobs.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/notification-service/">
+    <Project Path="src/notification-service/WorkerTransfer.Notification.Api/WorkerTransfer.Notification.Api.csproj" />
+    <Project Path="src/notification-service/WorkerTransfer.Notification.Application/WorkerTransfer.Notification.Application.csproj" />
+    <Project Path="src/notification-service/WorkerTransfer.Notification.Contracts/WorkerTransfer.Notification.Contracts.csproj" />
+    <Project Path="src/notification-service/WorkerTransfer.Notification.Domain/WorkerTransfer.Notification.Domain.csproj" />
+    <Project Path="src/notification-service/WorkerTransfer.Notification.Infrastructure/WorkerTransfer.Notification.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/portfolio-service/">
+    <Project Path="src/portfolio-service/WorkerTransfer.Portfolio.Api/WorkerTransfer.Portfolio.Api.csproj" />
+    <Project Path="src/portfolio-service/WorkerTransfer.Portfolio.Application/WorkerTransfer.Portfolio.Application.csproj" />
+    <Project Path="src/portfolio-service/WorkerTransfer.Portfolio.Contracts/WorkerTransfer.Portfolio.Contracts.csproj" />
+    <Project Path="src/portfolio-service/WorkerTransfer.Portfolio.Domain/WorkerTransfer.Portfolio.Domain.csproj" />
+    <Project Path="src/portfolio-service/WorkerTransfer.Portfolio.Infrastructure/WorkerTransfer.Portfolio.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/profile-service/">
+    <Project Path="src/profile-service/WorkerTransfer.Profile.Api/WorkerTransfer.Profile.Api.csproj" />
+    <Project Path="src/profile-service/WorkerTransfer.Profile.Application/WorkerTransfer.Profile.Application.csproj" />
+    <Project Path="src/profile-service/WorkerTransfer.Profile.Contracts/WorkerTransfer.Profile.Contracts.csproj" />
+    <Project Path="src/profile-service/WorkerTransfer.Profile.Domain/WorkerTransfer.Profile.Domain.csproj" />
+    <Project Path="src/profile-service/WorkerTransfer.Profile.Infrastructure/WorkerTransfer.Profile.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/resume-service/">
+    <Project Path="src/resume-service/WorkerTransfer.Resume.Api/WorkerTransfer.Resume.Api.csproj" />
+    <Project Path="src/resume-service/WorkerTransfer.Resume.Application/WorkerTransfer.Resume.Application.csproj" />
+    <Project Path="src/resume-service/WorkerTransfer.Resume.Contracts/WorkerTransfer.Resume.Contracts.csproj" />
+    <Project Path="src/resume-service/WorkerTransfer.Resume.Domain/WorkerTransfer.Resume.Domain.csproj" />
+    <Project Path="src/resume-service/WorkerTransfer.Resume.Infrastructure/WorkerTransfer.Resume.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/transfer-service/">
+    <Project Path="src/transfer-service/WorkerTransfer.Transfer.Api/WorkerTransfer.Transfer.Api.csproj" />
+    <Project Path="src/transfer-service/WorkerTransfer.Transfer.Application/WorkerTransfer.Transfer.Application.csproj" />
+    <Project Path="src/transfer-service/WorkerTransfer.Transfer.Contracts/WorkerTransfer.Transfer.Contracts.csproj" />
+    <Project Path="src/transfer-service/WorkerTransfer.Transfer.Domain/WorkerTransfer.Transfer.Domain.csproj" />
+    <Project Path="src/transfer-service/WorkerTransfer.Transfer.Infrastructure/WorkerTransfer.Transfer.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WorkerTransfer.Applications.Tests/WorkerTransfer.Applications.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Companies.Tests/WorkerTransfer.Companies.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Consent.Tests/WorkerTransfer.Consent.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Ganzes.Tests/WorkerTransfer.Ganzes.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Gateway.Tests/WorkerTransfer.Gateway.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.GitHub.Tests/WorkerTransfer.GitHub.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Identity.Tests/WorkerTransfer.Identity.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Jobs.Tests/WorkerTransfer.Jobs.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Notification.Tests/WorkerTransfer.Notification.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Outbox.Tests/WorkerTransfer.Outbox.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Portfolio.Tests/WorkerTransfer.Portfolio.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Profile.Tests/WorkerTransfer.Profile.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Resume.Tests/WorkerTransfer.Resume.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Ablage.Tests/WorkerTransfer.Ablage.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Skills.Tests/WorkerTransfer.Skills.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Transfer.Tests/WorkerTransfer.Transfer.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WorkerTransfer.Consent.Application\WorkerTransfer.Consent.Application.csproj" />
+    <ProjectReference Include="..\WorkerTransfer.Consent.Contracts\WorkerTransfer.Consent.Contracts.csproj" />
+    <ProjectReference Include="..\WorkerTransfer.Consent.Infrastructure\WorkerTransfer.Consent.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Consent\WorkerTransfer.Contracts.Consent.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Erasure\WorkerTransfer.Contracts.Erasure.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Ocelot" />
+    <!--
+      Girders Zwischenschichten fuer Bremse und Korrelation — und seit 4.2.0
+      kosten sie nichts weiter: `Girder.Http` bringt NULL Fremdpakete mit,
+      waehrend `Girder.Infrastructure` vierundvierzig zoege. Genau dieser Preis
+      war der Grund, warum hier vorher beides von Hand stand.
+    -->
+    <PackageReference Include="Girder.Abstractions" />
+    <PackageReference Include="Girder.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Nur fuer `Umgebung.Laden()`. Das Gateway ruft bewusst NICHT
+      `AddWorkerTransferDefaults` — es hat keine Datenbank, keine CQRS-Pipeline
+      und keine Endpunkte, die ein Token pruefen. Aber die Konfiguration soll
+      es genauso lesen wie die elf anderen: ein zweiter Weg dafuer waere ein
+      zweiter Ort, an dem ein Schluessel fehlen kann.
+    -->
+    <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Die Landkarte reist mit dem Bild. Sie ist kein Anhängsel der
+      Konfiguration, sondern das Einzige, was dieser Dienst tut.
+    -->
+    <Content Update="ocelot.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

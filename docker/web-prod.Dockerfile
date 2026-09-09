@@ -17,23 +17,21 @@ RUN npm install --global --force corepack@latest && corepack enable
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/web/package.json apps/web/
-COPY packages/ui/package.json packages/ui/
+COPY web/package.json web/pnpm-lock.yaml ./
 
 RUN pnpm install --frozen-lockfile
 
-COPY . /app
+COPY web/ /app
 
 # Ohne gesetzte VITE_-Variablen — und das ist der Punkt. Sie würden hier fest
 # in das Bündel eingesetzt und das Image an eine Umgebung binden. Die Adressen
-# kommen zur Laufzeit aus /config.js (siehe apps/web/src/env.ts und ADR-0028).
-RUN pnpm --filter @workertransfer/web build
+# kommen zur Laufzeit aus /config.js (siehe web/src/env.ts und ADR-0028).
+RUN pnpm build
 
 FROM nginx:1.29-alpine AS runtime
 
 COPY docker/web-nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80
 
