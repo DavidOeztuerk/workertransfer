@@ -147,10 +147,20 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
+      # Der Pfad steht als `runner.temp` an BEIDEN Enden, und das ist der Fix.
+      #
+      # Hier stand `$HOME` (Shell, richtig) und beim Bau `${{ env.HOME }}`
+      # (Ausdruckskontext) — und der `env`-Kontext kennt `HOME` NICHT, er
+      # enthaelt nur, was ein `env:`-Block deklariert. Der Ausdruck wurde zu
+      # einer leeren Zeichenkette, die Datei hiess `/.nuget/NuGet/NuGet.Config`,
+      # und BuildKit sagte dazu `##[warning]secret file not found` — eine
+      # WARNUNG. Der Bau lief weiter, ohne jede Anmeldung, und starb zweihundert
+      # Zeilen spaeter an `401 (Unauthorized)`. Genau daran sind die zwei zu
+      # unterscheiden: 403 heisst angemeldet und abgewiesen, 401 heisst gar
+      # nicht angemeldet.
       - name: NuGet-Anmeldung
         run: |
-          mkdir -p "$HOME/.nuget/NuGet"
-          cat > "$HOME/.nuget/NuGet/NuGet.Config" <<'XML'
+          cat > "${{ runner.temp }}/NuGet.Config" <<'XML'
           <?xml version="1.0" encoding="utf-8"?>
           <configuration>
             <packageSources>
@@ -167,6 +177,15 @@ jobs:
           </configuration>
           XML
 
+          # Eine fehlende Anmeldung darf nicht als Warnung durchgehen. Sie hier
+          # zu benennen kostet eine Zeile und spart die Suche nach einem 401,
+          # das nach einem kaputten Feed aussieht. Geprueft wird die GESTALT —
+          # dass ueberhaupt ein Wert drinsteht —, nie der Wert selbst.
+          if grep -q 'ClearTextPassword" value=""' "${{ runner.temp }}/NuGet.Config"; then
+            echo "::error::Kein Token: weder GIRDER_TOKEN noch GITHUB_TOKEN lieferte einen Wert."
+            exit 1
+          fi
+
       - name: Dienstbild bauen
         uses: docker/build-push-action@v6
         with:
@@ -174,7 +193,7 @@ jobs:
           file: docker/dotnet-service.Dockerfile
           load: true
           tags: workertransfer-dotnet:local
-          secret-files: nuget_config=${{ env.HOME }}/.nuget/NuGet/NuGet.Config
+          secret-files: nuget_config=${{ runner.temp }}/NuGet.Config
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -259,10 +278,20 @@ jobs:
       # Sie liegt unter $HOME/.nuget/NuGet/ — genau dort, wo `secrets:` in
       # docker-compose.yml sie sucht und wo ein Mensch sie hat. Ein zweiter Ort
       # allein fuer die CI waere ein zweiter Ort, an dem sie fehlen kann.
+      # Der Pfad steht als `runner.temp` an BEIDEN Enden, und das ist der Fix.
+      #
+      # Hier stand `$HOME` (Shell, richtig) und beim Bau `${{ env.HOME }}`
+      # (Ausdruckskontext) — und der `env`-Kontext kennt `HOME` NICHT, er
+      # enthaelt nur, was ein `env:`-Block deklariert. Der Ausdruck wurde zu
+      # einer leeren Zeichenkette, die Datei hiess `/.nuget/NuGet/NuGet.Config`,
+      # und BuildKit sagte dazu `##[warning]secret file not found` — eine
+      # WARNUNG. Der Bau lief weiter, ohne jede Anmeldung, und starb zweihundert
+      # Zeilen spaeter an `401 (Unauthorized)`. Genau daran sind die zwei zu
+      # unterscheiden: 403 heisst angemeldet und abgewiesen, 401 heisst gar
+      # nicht angemeldet.
       - name: NuGet-Anmeldung
         run: |
-          mkdir -p "$HOME/.nuget/NuGet"
-          cat > "$HOME/.nuget/NuGet/NuGet.Config" <<'XML'
+          cat > "${{ runner.temp }}/NuGet.Config" <<'XML'
           <?xml version="1.0" encoding="utf-8"?>
           <configuration>
             <packageSources>
@@ -279,6 +308,15 @@ jobs:
           </configuration>
           XML
 
+          # Eine fehlende Anmeldung darf nicht als Warnung durchgehen. Sie hier
+          # zu benennen kostet eine Zeile und spart die Suche nach einem 401,
+          # das nach einem kaputten Feed aussieht. Geprueft wird die GESTALT —
+          # dass ueberhaupt ein Wert drinsteht —, nie der Wert selbst.
+          if grep -q 'ClearTextPassword" value=""' "${{ runner.temp }}/NuGet.Config"; then
+            echo "::error::Kein Token: weder GIRDER_TOKEN noch GITHUB_TOKEN lieferte einen Wert."
+            exit 1
+          fi
+
       # EIN Bild fuer alle elf Dienste und das Gateway (ADR-0028). Ohne
       # `build-arg`: sie unterscheiden sich nur in SERVICE_DIR, und das setzt
       # der Behaelter, nicht der Bau.
@@ -292,7 +330,7 @@ jobs:
           file: docker/dotnet-service.Dockerfile
           load: true
           tags: workertransfer-dotnet:local
-          secret-files: nuget_config=${{ env.HOME }}/.nuget/NuGet/NuGet.Config
+          secret-files: nuget_config=${{ runner.temp }}/NuGet.Config
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
