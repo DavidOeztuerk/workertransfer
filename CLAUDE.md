@@ -204,6 +204,11 @@ The older comment claimed the run token "reiche dafür". That was an assumption,
 
 Measured locally while the workflow was being repaired: both audits are clean (79 projects named, no vulnerable packages; `pnpm audit --prod` finds none), and the frontend gate passes end to end (`tsc` clean, 150 tests in 20 files, `vite build` green). So once the entitlement stands, what remains untested by anything but CI is the .NET half.
 
+**And behind the entitlement stood two more, both of the same family: something was read in a place that spelled it differently.** The `GIRDER_TOKEN` secret cleared the restore — `dependency-audit` went green — and uncovered them.
+
+- **`scripts/test-dotnet.sh` read its own output in German.** It grepped `^(Bestanden!|Fehler!)` and `erfolgreich:`; the runner answers `Passed! - Failed: 0, Passed: 966, Skipped: 0`. All sixteen suites reported *"keine Ausgabe — die Reihe lief gar nicht"* while in fact running and passing — Identity took two minutes and still counted as never started. The guard was right to be loud; it was reading the wrong language. `DOTNET_CLI_UI_LANGUAGE=en` is now exported **in the script**, not in the workflow: whoever reads the output owns its language, or the result depends on who called. The same trap `dependency-audit` already documented, one directory over.
+- **The docker secret file was named with `${{ env.HOME }}`, and the `env` context has no `HOME`.** It holds only what an `env:` block declares, so the expression became empty, the path read `/.nuget/NuGet/NuGet.Config`, and BuildKit answered `##[warning]secret file not found` — a *warning*. The build carried on with no credentials at all and died two hundred lines later on `401 (Unauthorized)`. **That is how to tell the two apart: 403 is authenticated-and-refused, 401 is never authenticated.** Both ends now say `${{ runner.temp }}`, and a missing token is named on the spot instead of surfacing as a broken feed — the check reads the *shape*, never the value.
+
 ### Branches and the one path back
 
 `feature → develop → main`, never a feature branch straight into main.
