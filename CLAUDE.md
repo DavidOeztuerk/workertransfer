@@ -191,9 +191,18 @@ The one-time string already on the connection is the OAuth `state`. **No scope i
 - **No `permissions:` block at all**, so the run token carried the account default, which does not include `packages`. Every `dotnet restore` answered `NU1301 … 403 (Forbidden)` for each Girder package in turn — that reads like a broken feed and is a missing line in the workflow. The block now names `contents: read` as well, because an explicit block *replaces* the default rather than adding to it: `packages` alone would take checkout away.
 - **`pnpm/action-setup@v4` with no `with:`**, on all three Node jobs. It looks for `packageManager` in the **root** `package.json`, and that file went away when the workspace collapsed into `web/`. Five seconds in: `Error: No pnpm version is specified.` The fix is a pointer (`package_json_file: web/package.json`), never a `version:` here — a second number is the one that stays behind at the next bump.
 
-**Girder is a private package and this repository is public**, so the run token is not automatically entitled to it: a package grants access per repository. `GIRDER_TOKEN` (a PAT with `read:packages`) therefore goes first at all four login points, with the run token as the fallback — `${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}`. The older comment claimed the run token "reiche dafür"; that was an assumption and was never measured. **A pull request from a fork cannot build here either way** — it gets no secrets and no entitlement to a private dependency.
+The pnpm half is **proved**: `frontend-quality` went green on the next run — and with it the open question about **node 25**, which this machine (24) could not answer.
 
-Measured locally while the workflow was being repaired, so the remaining unknown is small: both audits are clean (79 projects named, no vulnerable packages; `pnpm audit --prod` finds none), and the frontend gate passes end to end (`tsc` clean, 150 tests in 20 files, `vite build` green). Not verified locally: the runner is on **node 25** and this machine has 24 — the one divergence that has bitten before.
+**The `permissions:` block is necessary and not sufficient, and that too is now measured rather than reasoned.** With the block in place the run token still answers `403 (Forbidden)` on every Girder package. `403` is the informative part: the token authenticated and was *refused*, so the missing thing is not a scope but an **entitlement**. **Girder is a private package and this repository is public**, and a package grants access per repository — the run token of `workertransfer` has no claim on a package published from `girder` until somebody says so.
+
+There are exactly two ways to say so, and both are account-level actions no workflow can perform:
+
+- **Package settings → *Manage Actions access* → add `workertransfer`.** The better one: nothing to rotate, and the entitlement is visible where the package lives.
+- **A `GIRDER_TOKEN` secret** — a PAT with `read:packages`. It hangs on no repository grant, which is why it goes *first* at all four login points, with the run token as the fallback: `${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}`.
+
+The older comment claimed the run token "reiche dafür". That was an assumption, it was never measured, and it is false. **A pull request from a fork cannot build here under either fix** — it gets no secrets and no entitlement to a private dependency.
+
+Measured locally while the workflow was being repaired: both audits are clean (79 projects named, no vulnerable packages; `pnpm audit --prod` finds none), and the frontend gate passes end to end (`tsc` clean, 150 tests in 20 files, `vite build` green). So once the entitlement stands, what remains untested by anything but CI is the .NET half.
 
 ### Branches and the one path back
 

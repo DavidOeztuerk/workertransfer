@@ -11,13 +11,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# OHNE DIESEN BLOCK KOMMT KEIN LAUF AN GIRDER.
+# NOETIG, ABER NICHT HINREICHEND — und das ist nachgemessen.
 #
 # Der Lauftoken bekommt seine Rechte aus der Vorgabe des Kontos, und `packages`
-# steht dort nicht darin. Gemessen am 09.09.2026: `dotnet restore` antwortete
-# fuer JEDES Girder-Paket mit `NU1301 … 403 (Forbidden)`, und zwar in
-# Millisekunden — das sieht aus wie ein kaputtes Paket und ist eine fehlende
-# Zeile hier.
+# steht dort nicht darin. Mit dem Block ist der Bereich da; der Zugriff ist es
+# nicht: gemessen am 09.09.2026 antwortet `dotnet restore` weiterhin mit
+# `403 (Forbidden)` fuer jedes Girder-Paket. Die 403 ist die Auskunft — der
+# Token wurde ANGENOMMEN und ABGEWIESEN. Girder ist ein privates Paket, dieses
+# Repository ist oeffentlich, und ein Paket gewaehrt Zugriff je Repository.
+# Das loest nur eins von beidem: `workertransfer` in den Paketeinstellungen
+# freigeben, oder ein `GIRDER_TOKEN` hinterlegen (siehe unten).
 #
 # `contents: read` steht dabei, weil ein ausgeschriebener Block die Vorgabe
 # ERSETZT: nur `packages` zu nennen naehme dem Lauf das Auschecken.
