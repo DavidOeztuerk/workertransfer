@@ -19,7 +19,8 @@ prüfen. Der Weg ist der aus CLAUDE.md und hat keine Abkürzung:
 
 **Du musst dafür nichts tun.** Jeder Prompt unten legt seinen Zweig selbst an
 und führt am Ende selbst zusammen: committen, pushen, PR nach `develop`, auf
-die fünf Jobs warten, **erst dann** mergen. Du kopierst einen Kasten und
+die fünf Jobs warten, **erst dann** mergen — und danach noch einmal auf den
+Lauf sehen, den der Merge auf `develop` auslöst. Du kopierst einen Kasten und
 bekommst am Ende einen gemergten `develop` zurück.
 
 Die eine Bedingung, die dabei nicht verhandelbar ist: **ein roter Lauf wird
@@ -35,7 +36,7 @@ Sitzung misst — wer sie rot hinterlässt, nimmt ihn der nächsten weg.
 | 4 | `advisor-service` | 1 | groß |
 | 5 | `assessment-service` | 3, 4 | mittel |
 | 6 | Aufräumen | — | klein |
-| 7 | Girder auf nuget.org (anderes Repo) | — | klein |
+| 7 | ~~Girder auf nuget.org~~ ✅ erledigt 10.09.2026 | — | — |
 
 ---
 
@@ -132,6 +133,10 @@ ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
 4. gh pr create --base develop --fill
 5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
 6. ERST DANN:  gh pr merge --merge --delete-branch
+7. UND DANN NOCH EINMAL HINSEHEN — der PR prueft den Merge-VORSCHLAG, nicht
+   das Ergebnis. Am 09.09.2026 war #67 gruen und develop danach rot:
+     gh run watch $(gh run list --branch develop --limit 1 --json databaseId --jq '.[0].databaseId')
+   Ist der rot, ist es deine Aufgabe, nicht die der naechsten Sitzung.
 
 Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
 --admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
@@ -186,6 +191,10 @@ ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
 4. gh pr create --base develop --fill
 5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
 6. ERST DANN:  gh pr merge --merge --delete-branch
+7. UND DANN NOCH EINMAL HINSEHEN — der PR prueft den Merge-VORSCHLAG, nicht
+   das Ergebnis. Am 09.09.2026 war #67 gruen und develop danach rot:
+     gh run watch $(gh run list --branch develop --limit 1 --json databaseId --jq '.[0].databaseId')
+   Ist der rot, ist es deine Aufgabe, nicht die der naechsten Sitzung.
 
 Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
 --admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
@@ -251,6 +260,10 @@ ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
 4. gh pr create --base develop --fill
 5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
 6. ERST DANN:  gh pr merge --merge --delete-branch
+7. UND DANN NOCH EINMAL HINSEHEN — der PR prueft den Merge-VORSCHLAG, nicht
+   das Ergebnis. Am 09.09.2026 war #67 gruen und develop danach rot:
+     gh run watch $(gh run list --branch develop --limit 1 --json databaseId --jq '.[0].databaseId')
+   Ist der rot, ist es deine Aufgabe, nicht die der naechsten Sitzung.
 
 Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
 --admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
@@ -305,6 +318,10 @@ ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
 4. gh pr create --base develop --fill
 5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
 6. ERST DANN:  gh pr merge --merge --delete-branch
+7. UND DANN NOCH EINMAL HINSEHEN — der PR prueft den Merge-VORSCHLAG, nicht
+   das Ergebnis. Am 09.09.2026 war #67 gruen und develop danach rot:
+     gh run watch $(gh run list --branch develop --limit 1 --json databaseId --jq '.[0].databaseId')
+   Ist der rot, ist es deine Aufgabe, nicht die der naechsten Sitzung.
 
 Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
 --admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
@@ -348,6 +365,10 @@ ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
 4. gh pr create --base develop --fill
 5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
 6. ERST DANN:  gh pr merge --merge --delete-branch
+7. UND DANN NOCH EINMAL HINSEHEN — der PR prueft den Merge-VORSCHLAG, nicht
+   das Ergebnis. Am 09.09.2026 war #67 gruen und develop danach rot:
+     gh run watch $(gh run list --branch develop --limit 1 --json databaseId --jq '.[0].databaseId')
+   Ist der rot, ist es deine Aufgabe, nicht die der naechsten Sitzung.
 
 Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
 --admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
@@ -402,6 +423,10 @@ ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
 4. gh pr create --base develop --fill
 5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
 6. ERST DANN:  gh pr merge --merge --delete-branch
+7. UND DANN NOCH EINMAL HINSEHEN — der PR prueft den Merge-VORSCHLAG, nicht
+   das Ergebnis. Am 09.09.2026 war #67 gruen und develop danach rot:
+     gh run watch $(gh run list --branch develop --limit 1 --json databaseId --jq '.[0].databaseId')
+   Ist der rot, ist es deine Aufgabe, nicht die der naechsten Sitzung.
 
 Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
 --admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
@@ -447,6 +472,10 @@ ZUM SCHLUSS — SELBER ERLEDIGEN, nicht zurueckfragen:
 4. gh pr create --base develop --fill
 5. Warten, bis ALLE FUENF Jobs gruen sind:  gh pr checks --watch
 6. ERST DANN:  gh pr merge --merge --delete-branch
+7. UND DANN NOCH EINMAL HINSEHEN — der PR prueft den Merge-VORSCHLAG, nicht
+   das Ergebnis. Am 09.09.2026 war #67 gruen und develop danach rot:
+     gh run watch $(gh run list --branch develop --limit 1 --json databaseId --jq '.[0].databaseId')
+   Ist der rot, ist es deine Aufgabe, nicht die der naechsten Sitzung.
 
 Rot heisst reparieren und wiederholen. NIE einen roten Lauf mergen, nie
 --admin. Wer die Pipeline rot hinterlaesst, nimmt der naechsten Sitzung ihren
@@ -455,99 +484,38 @@ Massstab.
 
 ---
 
-## Sitzung 7 — Girder auf nuget.org
+## Sitzung 7 — Girder auf nuget.org  ✅ ERLEDIGT (10.09.2026)
 
-**Anderes Repository** (`~/Projects/Girder`), unabhängig von 1–6.
+Nichts mehr zu tun — hier steht nur noch, was daraus wurde.
 
-**Warum es sein muss, gemessen am 10.09.2026:** Das Girder-Repo ist seit heute
-**öffentlich** (MIT). Der Paketfeed ist es nicht — GitHub Packages antwortet auf
-NuGet auch bei öffentlichem Repo weiterhin `401` ohne Anmeldung. Gemessen, nicht
-vermutet. **nuget.org ist damit der einzige Weg zu einer Installation ohne
-Token**, und solange die Pakete nicht dort liegen, braucht `workertransfer`
-sein `GIRDER_TOKEN` weiter und ein Fork-PR kann nicht bauen.
+Das Girder-Repo ist **öffentlich** (MIT), `LICENSE` und `SECURITY.md` liegen,
+die README trägt eine Versionspolitik, und `publish.yml` schiebt nach GitHub
+Packages **und** nach nuget.org.
 
-**Schon erledigt, nicht neu bauen:** `LICENSE` (MIT) und `SECURITY.md` liegen
-seit dem 10.09.2026. Die Paketangaben sind vollständig (Autor, Copyright, Tags,
-Source Link, Symbolpakete, README im Paket), `dotnet pack` läuft fehler- und
-warnungsfrei und erzeugt 12 Pakete, und eine release-getriggerte `publish.yml`
-existiert. Es fehlen **zwei** Dinge.
+**Der Schlüssel ist keiner: nuget.org macht das über OIDC** (Trusted
+Publishing). Der Lauf tauscht ein von GitHub signiertes Token gegen einen
+Schlüssel, der eine Stunde gilt — nichts zu rotieren, nichts, das abläuft.
+Dafür trägt `publish.yml` `id-token: write`, und der nuget.org-Profilname steht
+als Repository-**Variable** `NUGET_USER` (nicht als Geheimnis: `vars` ist im
+`if:` eines Schritts verfügbar, `secrets` nicht).
 
-```
-ZUERST, ohne zu fragen: git switch main && git pull && git switch -c nuget-org
-Diese Sitzung arbeitet NIE direkt auf main.
+Was noch von Hand fehlt: die Trusted-Publishing-Richtlinie auf nuget.org
+(Repository Owner `DavidOeztuerk`, Repository `girder`, Workflow File
+`publish.yml`, Environment leer, Scope *Push new packages and package
+versions*, Glob `Girder.*`), die Variable `NUGET_USER`, und ein Release.
+Fehlt eines davon, endet der Release-Lauf **grün** und sagt, was fehlt.
 
-Du arbeitest im Repository Girder (~/Projects/Girder), NICHT in WorkerTransfer.
+### Und erst wenn die Pakete auf nuget.org liegen
 
-ZIEL: Die zwoelf Girder-Pakete auf nuget.org veroeffentlichbar machen.
+Dann fällt in WorkerTransfer einiges weg — **vorher nicht, sonst restauriert
+nichts mehr**, weder lokal noch in Docker:
 
-Pruefe zuerst nach, was schon da ist, und baue es NICHT neu: LICENSE,
-SECURITY.md, die Paketangaben in Directory.Build.props, publish.yml.
-`dotnet pack Girder.slnx -c Release` muss warnungsfrei durchlaufen — auch NU5*.
-
-1. publish.yml um nuget.org erweitern. Der GitHub-Packages-Schritt BLEIBT:
-   workertransfer zieht heute von dort, und der Umstieg passiert erst, wenn die
-   Pakete auf nuget.org wirklich liegen. Der neue Schritt danach:
-
-     - name: Push to nuget.org
-       run: |
-         dotnet nuget push "packages/*.nupkg" \
-           --source https://api.nuget.org/v3/index.json \
-           --api-key "${{ secrets.NUGET_API_KEY }}" \
-           --skip-duplicate
-
-   `--skip-duplicate`, damit ein wiederholter Lauf nicht rot wird. Die
-   .snupkg-Symbolpakete reisen mit dem nupkg-Push automatisch mit — pruefe das
-   nach, statt es zu glauben.
-
-   Der Schritt darf NICHT laufen, wenn das Geheimnis fehlt, sonst faellt jeder
-   Release-Lauf rot aus, bis jemand es anlegt:
-     if: ${{ secrets.NUGET_API_KEY != '' }}
-   Pruefe, ob GitHub das an dieser Stelle zulaesst; wenn nicht, pruefe im
-   Skript und beende mit einer Meldung, die das Geheimnis NENNT.
-
-2. VERSIONSPOLITIK in die README. Girder ging 3.0.1 -> 4.4.0 in vier Wochen mit
-   echten Bruechen (AddCommunication, PermissionEnforcement neu,
-   InputSanitization umgebaut). Solange ein Nutzer da war, kostete ein Bruch
-   einen Nachmittag; oeffentlich kostet er Fremden ihre Builds. Schreibe hin:
-   was eine Hauptversion bedeutet, wie lange die vorige noch Korrekturen
-   bekommt, und wie ein Bruch angekuendigt wird. SECURITY.md verweist bereits
-   auf diesen Abschnitt — er muss also existieren.
-
-EMPFOHLENE PROBE, wenn es die Zeit hergibt: nuget.org hat eine Testinstanz
-(int.nugettest.org) mit eigenem Schluessel. Eine Version dorthin zu schieben
-kostet zehn Minuten und ist die einzige Gelegenheit, den ganzen Weg zu ueben —
-auf nuget.org selbst gibt es keinen zweiten Versuch.
-
-HALT DANN. Fuehre `dotnet nuget push` gegen nuget.org NICHT aus und lege
-NUGET_API_KEY nicht an. nuget.org kennt kein Loeschen, nur unlisten: was einmal
-draussen ist, bleibt unter seiner Version fuer immer abrufbar. Sage stattdessen
-genau, welche Schritte der Mensch tun muss.
-
-ZUM SCHLUSS:
-1. Committen, git push -u origin nuget-org
-2. gh pr create --base main --fill
-3. gh pr checks --watch
-4. ERST DANN: gh pr merge --merge --delete-branch
-```
-
-### Danach, von Hand — und in dieser Reihenfolge
-
-1. **API-Schlüssel** auf nuget.org erzeugen. Eng fassen: Glob `Girder.*`, nur
-   *Push new packages and package versions*, mit Ablaufdatum.
-2. Als `NUGET_API_KEY` hinterlegen: `gh secret set NUGET_API_KEY --repo DavidOeztuerk/girder`
-3. **Release anlegen** — `publish.yml` hängt am Release-Ereignis.
-4. Nachsehen, dass alle zwölf Pakete da sind. Die Namen waren am 09.09.2026
-   frei; nuget.org braucht anschließend einige Minuten für die Indizierung.
-
-### Und erst dann in WorkerTransfer
-
-Wenn die Pakete auf nuget.org liegen, fällt dort einiges weg — **vorher nicht,
-sonst restauriert nichts mehr**:
-
-- die vier NuGet-Anmeldungen in `.github/workflows/ci.yml`
-- `packages: read` in dessen `permissions:`
-- das `GIRDER_TOKEN`-Geheimnis
+- die vier NuGet-Anmeldungen in `.github/workflows/ci.yml` und `packages: read`
+- das Geheimnis `GIRDER_TOKEN`
+- in `docker/dotnet-service.Dockerfile` die Zeile `--mount=type=secret,id=nuget_config`
+- in `docker-compose.yml` das Geheimnis `nuget_config` samt seiner Verweise
 - in `NuGet.Config` zeigt das Source Mapping für `Girder.*` auf nuget.org
 
-Der Lohn: ein Fork-PR kann bauen, und ein frischer Klon braucht keinen Token
-mehr. Das ist eine eigene, kleine Sitzung — kein Anhängsel dieser hier.
+Der Lohn: ein Fork-PR kann bauen, und ein frischer Klon braucht keinen Token —
+heute scheitert daran schon `docker compose up`. Das ist eine eigene, kleine
+Sitzung.
