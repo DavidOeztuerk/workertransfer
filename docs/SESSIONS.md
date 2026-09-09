@@ -35,7 +35,7 @@ Sitzung misst — wer sie rot hinterlässt, nimmt ihn der nächsten weg.
 | 4 | `advisor-service` | 1 | groß |
 | 5 | `assessment-service` | 3, 4 | mittel |
 | 6 | Aufräumen | — | klein |
-| 7 | Girder veröffentlichen (anderes Repo) | — | mittel |
+| 7 | Girder auf nuget.org (anderes Repo) | — | klein |
 
 ---
 
@@ -455,80 +455,99 @@ Massstab.
 
 ---
 
-## Sitzung 7 — Girder veröffentlichen
+## Sitzung 7 — Girder auf nuget.org
 
-**Anderes Repository.** Diese Sitzung arbeitet in `~/Projects/Girder`, nicht in
-WorkerTransfer. Sie ist unabhängig von 1–6 und kann jederzeit laufen.
+**Anderes Repository** (`~/Projects/Girder`), unabhängig von 1–6.
 
-**Warum es sich lohnt:** `workertransfer` ist öffentlich und hängt an einem
-**privaten** Paket — niemand außer dem Autor kann das öffentliche Repo bauen,
-und ein Fork-PR kann es prinzipiell nie. Das ist der eigentliche Grund, nicht
-die CI: die war am 09.09.2026 mit einem Repo-Geheimnis in zwei Minuten gelöst.
+**Warum es sein muss, gemessen am 10.09.2026:** Das Girder-Repo ist seit heute
+**öffentlich** (MIT). Der Paketfeed ist es nicht — GitHub Packages antwortet auf
+NuGet auch bei öffentlichem Repo weiterhin `401` ohne Anmeldung. Gemessen, nicht
+vermutet. **nuget.org ist damit der einzige Weg zu einer Installation ohne
+Token**, und solange die Pakete nicht dort liegen, braucht `workertransfer`
+sein `GIRDER_TOKEN` weiter und ein Fork-PR kann nicht bauen.
 
-**Warum sie nicht selbst veröffentlicht:** nuget.org kennt kein Löschen, nur
-*unlisten*. Was einmal draußen ist, bleibt abrufbar. Diese Sitzung bereitet
-deshalb alles vor und **hört vor dem `dotnet nuget push` auf** — der letzte
-Griff bleibt beim Menschen.
+**Schon erledigt, nicht neu bauen:** `LICENSE` (MIT) und `SECURITY.md` liegen
+seit dem 10.09.2026. Die Paketangaben sind vollständig (Autor, Copyright, Tags,
+Source Link, Symbolpakete, README im Paket), `dotnet pack` läuft fehler- und
+warnungsfrei und erzeugt 12 Pakete, und eine release-getriggerte `publish.yml`
+existiert. Es fehlen **zwei** Dinge.
 
 ```
-Du arbeitest im Repository Girder (~/Projects/Girder), NICHT in WorkerTransfer.
-
-ZUERST, ohne zu fragen: git switch main && git pull && git switch -c oeffentlich-machen
+ZUERST, ohne zu fragen: git switch main && git pull && git switch -c nuget-org
 Diese Sitzung arbeitet NIE direkt auf main.
 
-ZIEL: Girder so weit bringen, dass eine Veroeffentlichung auf nuget.org eine
-Entscheidung ist und kein Risiko. NICHT veroeffentlichen.
+Du arbeitest im Repository Girder (~/Projects/Girder), NICHT in WorkerTransfer.
 
-Ausgangslage, gemessen am 09.09.2026: das Repo ist privat, es gibt nur eine
-README.md — keine LICENSE, keine SECURITY.md. Auf nuget.org sind `girder`,
-`girder.core`, `girder.abstractions`, `girder.http` und `girder.infrastructure`
-alle FREI.
+ZIEL: Die zwoelf Girder-Pakete auf nuget.org veroeffentlichbar machen.
 
-1. LICENSE. Ohne sie darf niemand das Paket benutzen, "oeffentlich" waere also
-   folgenlos. Schlage eine vor (MIT oder Apache-2.0), nenne den Unterschied in
-   zwei Saetzen — Apache-2.0 gibt zusaetzlich einen Patentschutz — und trage
-   sie in jede .csproj als PackageLicenseExpression ein.
+Pruefe zuerst nach, was schon da ist, und baue es NICHT neu: LICENSE,
+SECURITY.md, die Paketangaben in Directory.Build.props, publish.yml.
+`dotnet pack Girder.slnx -c Release` muss warnungsfrei durchlaufen — auch NU5*.
 
-2. SECURITY.md. Diese Bibliothek traegt JWT, Passwort-Hashing, Maskierung,
-   Ratenbremse und die Egress-Grenze. Oeffentlich heisst: jemand findet etwas
-   und braucht einen Weg, es zu melden, der nicht das oeffentliche Issue-Board
-   ist. Nenne Adresse und erwartete Antwortzeit.
+1. publish.yml um nuget.org erweitern. Der GitHub-Packages-Schritt BLEIBT:
+   workertransfer zieht heute von dort, und der Umstieg passiert erst, wenn die
+   Pakete auf nuget.org wirklich liegen. Der neue Schritt danach:
 
-3. VERSIONSPOLITIK in die README. Girder ging 3.0.1 -> 4.4.0 in kurzer Zeit,
-   mit echten Bruechen (AddCommunication, PermissionEnforcement neu,
-   InputSanitization umgebaut). Solange nur ein Nutzer da ist, kostet ein Bruch
-   einen Nachmittag; oeffentlich kostet er Fremden ihre Builds. Schreibe hin,
-   was eine Hauptversion bedeutet und wie lange die vorige noch Korrekturen
-   bekommt.
+     - name: Push to nuget.org
+       run: |
+         dotnet nuget push "packages/*.nupkg" \
+           --source https://api.nuget.org/v3/index.json \
+           --api-key "${{ secrets.NUGET_API_KEY }}" \
+           --skip-duplicate
 
-4. PAKETANGABEN in die .csproj: Beschreibung, Autor, Projektadresse,
-   Quellverweis (RepositoryUrl), Symbole und deterministischer Bau.
-   `dotnet pack -c Release` muss ohne Warnung durchlaufen — auch NU5* zaehlt.
+   `--skip-duplicate`, damit ein wiederholter Lauf nicht rot wird. Die
+   .snupkg-Symbolpakete reisen mit dem nupkg-Push automatisch mit — pruefe das
+   nach, statt es zu glauben.
 
-5. DIE QUELLE DURCHSEHEN, BEVOR sie oeffentlich wird. Suche nach allem, was
-   nicht hinausgehoert: Zugangsdaten, interne Adressen, Kundennamen,
-   Beispieldaten mit echten Personen. Auch in der HISTORIE, nicht nur im
-   Arbeitsbaum — `git log -p` findet, was ein Commit spaeter entfernt hat.
-   Was du findest, MELDEST du; entfernen aus der Historie ist eine eigene
-   Entscheidung.
+   Der Schritt darf NICHT laufen, wenn das Geheimnis fehlt, sonst faellt jeder
+   Release-Lauf rot aus, bis jemand es anlegt:
+     if: ${{ secrets.NUGET_API_KEY != '' }}
+   Pruefe, ob GitHub das an dieser Stelle zulaesst; wenn nicht, pruefe im
+   Skript und beende mit einer Meldung, die das Geheimnis NENNT.
 
-6. Ein PROBEPAKET, lokal: `dotnet pack`, dann in einem Wegwerf-Projekt aus dem
-   Ordner installieren und einmal bauen. Das findet fehlende Abhaengigkeiten,
-   die im selben Arbeitsbereich nie auffallen.
+2. VERSIONSPOLITIK in die README. Girder ging 3.0.1 -> 4.4.0 in vier Wochen mit
+   echten Bruechen (AddCommunication, PermissionEnforcement neu,
+   InputSanitization umgebaut). Solange ein Nutzer da war, kostete ein Bruch
+   einen Nachmittag; oeffentlich kostet er Fremden ihre Builds. Schreibe hin:
+   was eine Hauptversion bedeutet, wie lange die vorige noch Korrekturen
+   bekommt, und wie ein Bruch angekuendigt wird. SECURITY.md verweist bereits
+   auf diesen Abschnitt — er muss also existieren.
 
-HALT HIER. Fasse zusammen, was fehlt, damit `dotnet nuget push` gefahrlos ist,
-und nenne die Befehle — fuehre sie NICHT aus. nuget.org kennt kein Loeschen,
-nur unlisten, und diese Bibliothek traegt Sicherheitsfunktionen.
+EMPFOHLENE PROBE, wenn es die Zeit hergibt: nuget.org hat eine Testinstanz
+(int.nugettest.org) mit eigenem Schluessel. Eine Version dorthin zu schieben
+kostet zehn Minuten und ist die einzige Gelegenheit, den ganzen Weg zu ueben —
+auf nuget.org selbst gibt es keinen zweiten Versuch.
+
+HALT DANN. Fuehre `dotnet nuget push` gegen nuget.org NICHT aus und lege
+NUGET_API_KEY nicht an. nuget.org kennt kein Loeschen, nur unlisten: was einmal
+draussen ist, bleibt unter seiner Version fuer immer abrufbar. Sage stattdessen
+genau, welche Schritte der Mensch tun muss.
 
 ZUM SCHLUSS:
-1. Committen, git push -u origin oeffentlich-machen
+1. Committen, git push -u origin nuget-org
 2. gh pr create --base main --fill
-3. Warten, bis die Pruefungen gruen sind: gh pr checks --watch
+3. gh pr checks --watch
 4. ERST DANN: gh pr merge --merge --delete-branch
-Kein Veroeffentlichen, auch nicht "nur als Vorabversion".
 ```
 
-**Danach in WorkerTransfer:** erst wenn Girder wirklich auf nuget.org liegt,
-fällt in `.github/workflows/ci.yml` die NuGet-Anmeldung weg und in
-`NuGet.Config` zeigt das Package Source Mapping für `Girder.*` auf nuget.org
-statt auf GitHub. Vorher nicht — sonst restauriert nichts mehr.
+### Danach, von Hand — und in dieser Reihenfolge
+
+1. **API-Schlüssel** auf nuget.org erzeugen. Eng fassen: Glob `Girder.*`, nur
+   *Push new packages and package versions*, mit Ablaufdatum.
+2. Als `NUGET_API_KEY` hinterlegen: `gh secret set NUGET_API_KEY --repo DavidOeztuerk/girder`
+3. **Release anlegen** — `publish.yml` hängt am Release-Ereignis.
+4. Nachsehen, dass alle zwölf Pakete da sind. Die Namen waren am 09.09.2026
+   frei; nuget.org braucht anschließend einige Minuten für die Indizierung.
+
+### Und erst dann in WorkerTransfer
+
+Wenn die Pakete auf nuget.org liegen, fällt dort einiges weg — **vorher nicht,
+sonst restauriert nichts mehr**:
+
+- die vier NuGet-Anmeldungen in `.github/workflows/ci.yml`
+- `packages: read` in dessen `permissions:`
+- das `GIRDER_TOKEN`-Geheimnis
+- in `NuGet.Config` zeigt das Source Mapping für `Girder.*` auf nuget.org
+
+Der Lohn: ein Fork-PR kann bauen, und ein frischer Klon braucht keinen Token
+mehr. Das ist eine eigene, kleine Sitzung — kein Anhängsel dieser hier.
