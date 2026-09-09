@@ -10,6 +10,18 @@ Dateien zu lesen sind.
 **Die Reihenfolge ist nicht beliebig.** 1 ist die Grundlage für 3 und 4; 2 ist
 unabhängig und kann jederzeit dazwischen; 5 verlangt 3 und 4.
 
+**Erst PR #66 zusammenführen, dann anfangen.** Die .NET-Migration liegt auf
+`dotnet-migration` und ist seit dem 09.09.2026 grün durch alle fünf Jobs. Jede
+Sitzung unten ist eine *eigene* Arbeit und gehört auf einen *eigenen* Zweig von
+`develop` aus — sonst wächst #66 unbegrenzt weiter und niemand kann ihn mehr
+prüfen. Der Weg ist der aus CLAUDE.md und hat keine Abkürzung:
+`feature → develop → main`, nie ein Feature-Zweig direkt nach main.
+
+Also je Sitzung: `git switch develop && git pull && git switch -c <name>`,
+am Ende ein PR nach `develop`. Fahre `./scripts/test-dotnet.sh` und
+`pnpm check` lokal, bevor du den PR aufmachst — die CI ist grün, und wer sie
+rot hinterlässt, nimmt der nächsten Sitzung ihren Maßstab.
+
 | # | Sitzung | Hängt ab von | Umfang |
 |---|---|---|---|
 | 1 | Berufsfelder und Belege | — | groß |
@@ -39,6 +51,15 @@ Prompt unten noch einmal, damit du nur einen Kasten kopieren musst.
 6. **E2E einmal am Ende.** Und der Selektor muss eindeutig sein: ein
    `getByRole("button", { name: /Speichern/i })` traf ab dem zweiten
    Speichern-Knopf zwei Elemente und legte vierzehn Reisen still lahm.
+7. **Dein `.env` ist nicht das `.env` der CI.** `make env` baut aus
+   `.env.example`, und dort sind Zugangsdaten **leer** — leer heißt „nicht
+   eingerichtet", und die Oberfläche zeigt dann bewusst etwas anderes. Eine
+   Prüfung, die gegen deinen eingerichteten Stapel geschrieben ist, ist lokal
+   grün und in der CI rot, **ohne dass eine der beiden Seiten unrecht hat**.
+   Gemessen am 09.09.2026: der Knopf „Mit GitHub anmelden" erscheint nur mit
+   gesetztem `GitHub__OAuth__*`, und `POST /github/me/oauth/finish` antwortet
+   ohne ihn 404 statt 422. Wer eine Reise oder eine Kartenzeile schreibt, fragt
+   sich vorher: hängt das an etwas, das nur bei mir gesetzt ist?
 
 ---
 
@@ -88,7 +109,9 @@ Kanonisierung ohne Folgerung.
 FALLEN: build und test nie zusammen; nie dotnet test ueber die Loesung, nur
 ./scripts/test-dotnet.sh; nach jeder Modelaenderung sofort dotnet ef migrations
 add; ein aenderndes SichereAsync braucht .AsTracking(); Warnungen sind Fehler;
-E2E einmal am Ende, mit eindeutigen Selektoren.
+dein .env ist NICHT das der CI — leere Zugangsdaten in .env.example heissen
+"nicht eingerichtet", und eine Pruefung dagegen ist lokal gruen und in der CI
+rot; E2E einmal am Ende, mit eindeutigen Selektoren.
 ```
 
 ---
@@ -122,8 +145,9 @@ Gegenprobe: RequirePermission an einer Route entfernen -> der Test faellt (und
 danach mit --no-incremental neu bauen).
 
 FALLEN: build und test nie zusammen; nie dotnet test ueber die Loesung;
-Warnungen sind Fehler; eine Gegenprobe muss KOMPILIEREN, sonst liest sich der
-Build-Fehler wie ein bestandener Test.
+Warnungen sind Fehler; dein .env ist NICHT das der CI — leere Zugangsdaten in
+.env.example heissen "nicht eingerichtet"; eine Gegenprobe muss KOMPILIEREN,
+sonst liest sich der Build-Fehler wie ein bestandener Test.
 ```
 
 ---
@@ -168,7 +192,9 @@ Benachrichtigungsart, nennt KEIN Unternehmen, ueber den Postausgang
 FALLEN: build und test nie zusammen; nie dotnet test ueber die Loesung; nach
 jeder Modelaenderung sofort dotnet ef migrations add; ein aenderndes
 SichereAsync braucht .AsTracking(); Dienst-zu-Dienst-Ruempfe sind TYPISIERTE
-Vertraege, nie anonyme Objekte; Warnungen sind Fehler; E2E einmal am Ende.
+Vertraege, nie anonyme Objekte; Warnungen sind Fehler; dein .env ist NICHT das
+der CI — leere Zugangsdaten in .env.example heissen "nicht eingerichtet";
+E2E einmal am Ende.
 ```
 
 ---
@@ -263,7 +289,9 @@ Vier kleine, unabhaengige Arbeiten:
    Kuerzung zurueckgenommen. Entscheide, ob sie kommt — und schreib die
    Entscheidung dorthin.
 
-FALLEN: build und test nie zusammen; nie Images bauen waehrend Tests laufen.
+FALLEN: build und test nie zusammen; nie Images bauen waehrend Tests laufen;
+dein .env ist NICHT das der CI — was bei dir eingerichtet ist, ist es dort
+nicht.
 ```
 
 ---
