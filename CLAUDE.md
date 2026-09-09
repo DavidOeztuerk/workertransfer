@@ -186,7 +186,11 @@ The one-time string already on the connection is the OAuth `state`. **No scope i
 
 **There is no `dependabot.yml`** (deleted 08.08.2026). This job is the only thing that asks.
 
-**Two lines were missing, and between them they took every job down.** Measured 09.09.2026 on PR #66 — the first run of this workflow on the .NET branch, and the last green run of *any* CI here was 13.08.2026, in the Python era. All five jobs red:
+**CI is green on the .NET branch as of 09.09.2026** — the first time, and the last green run before it was 13.08.2026, in the Python era. What it actually drove, rather than merely reporting a tick: **966** .NET tests (0 red, 0 skipped), **23** Playwright journeys, **414** route-map answers across the three principals, **79** projects scanned for vulnerable packages, plus both shipped images built, the whole compose stack up, and the chart rendered.
+
+Getting there took four fixes, and **not one of them was in the product code**. Every single one was a place where two sides named the same thing differently, and each stayed invisible until something outside this machine ran it. That is the pattern worth keeping:
+
+**Two lines were missing, and between them they took every job down.** All five jobs red:
 
 - **No `permissions:` block at all**, so the run token carried the account default, which does not include `packages`. Every `dotnet restore` answered `NU1301 … 403 (Forbidden)` for each Girder package in turn — that reads like a broken feed and is a missing line in the workflow. The block now names `contents: read` as well, because an explicit block *replaces* the default rather than adding to it: `packages` alone would take checkout away.
 - **`pnpm/action-setup@v4` with no `with:`**, on all three Node jobs. It looks for `packageManager` in the **root** `package.json`, and that file went away when the workspace collapsed into `web/`. Five seconds in: `Error: No pnpm version is specified.` The fix is a pointer (`package_json_file: web/package.json`), never a `version:` here — a second number is the one that stays behind at the next bump.
@@ -381,7 +385,7 @@ So the allowed hosts are **derived from configuration** and never listed in code
 Two things drive it, and they answer different questions:
 
 - **`RoutenkarteTests`** (in the gateway suite, no stack needed) asserts the map is **complete**: every route in `ocelot.json` has at least one entry. Add a route without an entry and it goes red. Without this, the map would be correct exactly until the next endpoint.
-- **`scripts/routenkarte.sh`** (`make routenkarte`, needs `make up`) drives all 315 answers against the running stack. It is a script rather than a test suite on purpose: a suite that needs a stack skips itself without one, and a skipped test looks exactly like a passing one.
+- **`scripts/routenkarte.sh`** (`make routenkarte`, needs `make up`) drives all 414 answers against the running stack. It is a script rather than a test suite on purpose: a suite that needs a stack skips itself without one, and a skipped test looks exactly like a passing one.
 
 The reason it is a test at all: `scripts/k8s-up.sh` claimed `GET /jobs` answers 200 at a time when it answered **401**, and the script had never run, so nobody found out. (It answers 200 again today, but for a reason that was decided rather than assumed — see the map's own note.) A list nobody drives is wrong the day after it is written.
 
