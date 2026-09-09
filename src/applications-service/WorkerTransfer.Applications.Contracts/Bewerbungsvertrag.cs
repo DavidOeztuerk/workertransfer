@@ -31,7 +31,23 @@ public sealed record BewerbungV1(
     [property: JsonPropertyName("documents")] IReadOnlyList<Guid> Documents,
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
-    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt);
+    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt,
+    /// <summary>
+    /// Briefkopf zum Sendezeitpunkt (ADR-0038). Snapshot, nicht die aktuelle
+    /// Kontoanschrift. Nie im Anschreibenkontext.
+    /// </summary>
+    [property: JsonPropertyName("applicant_contact")] BewerbungskontaktV1 ApplicantContact);
+
+/// <summary>Der Briefkopf, wie er beim Senden festgehalten wurde.</summary>
+public sealed record BewerbungskontaktV1(
+    [property: JsonPropertyName("full_name")] string FullName,
+    [property: JsonPropertyName("line1")] string Line1,
+    [property: JsonPropertyName("line2")] string Line2,
+    [property: JsonPropertyName("postal_code")] string PostalCode,
+    [property: JsonPropertyName("city")] string City,
+    [property: JsonPropertyName("country")] string Country,
+    [property: JsonPropertyName("phone")] string Phone,
+    [property: JsonPropertyName("email")] string Email);
 
 /// <summary>Was eine Person schickt, um sich zu bewerben.</summary>
 /// <remarks>
@@ -93,7 +109,8 @@ public sealed record EntwurfV1(
     [property: JsonPropertyName("shares_resume")] bool SharesResume,
     [property: JsonPropertyName("documents")] IReadOnlyList<Guid> Documents,
     [property: JsonPropertyName("comments")] IReadOnlyList<AnmerkungV1> Comments,
-    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt);
+    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt,
+    [property: JsonPropertyName("writing_started_at")] DateTimeOffset? WritingStartedAt = null);
 
 /// <summary>Für welche Stellen Entwürfe entstehen sollen.</summary>
 public sealed record EntwuerfeAnlegenV1(

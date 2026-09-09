@@ -47,6 +47,7 @@ public static class Tokenform
     public static IReadOnlySet<string> NiemalsImToken { get; } =
         new HashSet<string>(StringComparer.Ordinal)
         {
-            "email", "name", "display_name", "roles", "permissions", "phone"
+            "email", "name", "display_name", "given_name", "family_name",
+            "address", "roles", "permissions", "phone"
         };
 }

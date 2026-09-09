@@ -30,11 +30,16 @@ public sealed record StationV1(
     [property: JsonPropertyName("technologies")] IReadOnlyList<string>? Technologies = null);
 
 /// <summary>One stretch of education on the wire.</summary>
+/// <param name="Kind">
+/// <c>schule</c> oder <c>ausbildung</c>. Fehlt es, ist es eine berufliche
+/// Ausbildung — ältere Zeilen tragen das Feld nicht.
+/// </param>
 public sealed record AusbildungV1(
     [property: JsonPropertyName("institution")] string Institution,
     [property: JsonPropertyName("qualification")] string Qualification,
     [property: JsonPropertyName("started_on")] string StartedOn,
-    [property: JsonPropertyName("ended_on")] string? EndedOn);
+    [property: JsonPropertyName("ended_on")] string? EndedOn,
+    [property: JsonPropertyName("kind")] string? Kind = null);
 
 /// <summary>A résumé as it is read.</summary>
 /// <remarks>

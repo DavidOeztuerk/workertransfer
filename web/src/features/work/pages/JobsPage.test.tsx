@@ -2,6 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { vergissKontext } from "../lib/kontext";
 import { renderMitStore } from "../test/render";
 import { JobsPage } from "./JobsPage";
 
@@ -73,7 +74,7 @@ const SITZUNG = {
   session: {
     userId: "33333333-3333-4333-8333-333333333333",
     email: "a@b.de",
-    tenantId: null, language: "de", displayName: "Anna Beispiel",
+    tenantId: null, language: "de", displayName: "Anna Beispiel", givenName: "", familyName: "",
   },
 };
 
@@ -84,6 +85,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vergissKontext();
 });
 
 /**
@@ -317,6 +319,30 @@ describe("JobsPage", () => {
     ) as Record<string, unknown>;
     expect(gemerkt.jobId).toBe(STELLE.id);
     expect(JSON.stringify(gemerkt)).not.toContain("/");
+  });
+
+  it("zeigt die Auswahlkästchen nur nach der Anmeldung", async () => {
+    stubFetch((url) =>
+      url.includes("/jobs") ? { body: seite([STELLE]) } : { status: 404 },
+    );
+
+    renderMitStore(<JobsPage />);
+    await screen.findByText("Backend-Entwicklung");
+    expect(screen.queryByRole("checkbox", { name: /Stelle auswählen/i })).not.toBeInTheDocument();
+  });
+
+  it("lässt angemeldet mehrere Stellen auswählen", async () => {
+    stubFetch((url) => {
+      if (url.includes("/jobs")) return { body: seite([STELLE]) };
+      if (url.includes("/profiles/me")) return { status: 404 };
+      return { status: 404 };
+    });
+
+    renderMitStore(<JobsPage />, { auth: SITZUNG });
+    await screen.findByText("Backend-Entwicklung");
+    const kasten = await screen.findByRole("checkbox", { name: /Stelle auswählen/i });
+    await userEvent.click(kasten);
+    expect(await screen.findByText(/1 Stelle ausgewählt/i)).toBeInTheDocument();
   });
 
   /**
@@ -685,5 +711,125 @@ describe("JobsPage", () => {
     ).not.toBeInTheDocument();
     // Die Korrelationskennung ist der einzige Faden zurück durch alle Dienste.
     expect(screen.getByText(/abc-123/)).toBeInTheDocument();
+  });
+
+  it("zeigt bereits beworben statt Bewerben", async () => {
+    stubFetch((url) => {
+      if (url.includes("/jobs/") || url.endsWith("/jobs") || url.includes("/jobs?")) {
+        return { body: seite([STELLE]) };
+      }
+      if (url.includes("/applications/me")) {
+        return {
+          body: [{ id: "a1", job_id: STELLE.id, status: "submitted" }],
+        };
+      }
+      if (url.includes("/applications/drafts")) return { body: [] };
+      return { status: 404 };
+    });
+
+    renderMitStore(<JobsPage />, { auth: SITZUNG });
+    await screen.findByText("Backend-Entwicklung");
+    expect(screen.getByRole("button", { name: /Bereits beworben/i })).toBeDisabled();
+    expect(screen.queryByRole("link", { name: /^Bewerben$/i })).toBeNull();
+  });
+
+  it("zeigt Entwurf öffnen, wenn ein offener Entwurf da ist", async () => {
+    stubFetch((url) => {
+      if (url.includes("/jobs/") || url.endsWith("/jobs") || url.includes("/jobs?")) {
+        return { body: seite([STELLE]) };
+      }
+      if (url.includes("/applications/me")) return { body: [] };
+      if (url.includes("/applications/drafts")) {
+        return {
+          body: [
+            {
+              id: "d1",
+              job_id: STELLE.id,
+              status: "review",
+              subject: "",
+              body: "",
+              version: 1,
+              error: "",
+              shares_resume: true,
+              documents: [],
+              comments: [],
+              updated_at: "2026-09-07T00:00:00Z",
+            },
+          ],
+        };
+      }
+      return { status: 404 };
+    });
+
+    renderMitStore(<JobsPage />, { auth: SITZUNG });
+    await screen.findByText("Backend-Entwicklung");
+    expect(screen.getByRole("link", { name: /Entwurf öffnen/i })).toHaveAttribute(
+      "href",
+      "/applications/drafts/d1",
+    );
+    expect(screen.getByRole("checkbox", { name: /Stelle auswählen/i })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /^Bewerben$/i })).toBeNull();
+  });
+
+  it("legt beim Bewerben einen Entwurf an und startet das Schreiben", async () => {
+    const spion = stubFetch((url, init) => {
+      if (url.includes("/jobs/") || url.endsWith("/jobs") || url.includes("/jobs?")) {
+        return { body: seite([STELLE]) };
+      }
+      if (url.includes("/applications/me")) return { body: [] };
+      if (init?.method === "POST" && url.includes("/applications/drafts") && !url.includes("/write")) {
+        return {
+          status: 201,
+          body: [
+            {
+              id: "d-neu",
+              job_id: STELLE.id,
+              status: "generating",
+              subject: "",
+              body: "",
+              version: 1,
+              error: "",
+              shares_resume: true,
+              documents: [],
+              comments: [],
+              updated_at: "2026-09-07T00:00:00Z",
+            },
+          ],
+        };
+      }
+      if (url.includes("/write")) {
+        return {
+          body: {
+            id: "d-neu",
+            job_id: STELLE.id,
+            status: "generating",
+            subject: "",
+            body: "",
+            version: 1,
+            error: "",
+            shares_resume: true,
+            documents: [],
+            comments: [],
+            updated_at: "2026-09-07T00:00:00Z",
+          },
+        };
+      }
+      if (url.includes("/applications/drafts")) return { body: [] };
+      return { status: 404 };
+    });
+
+    renderMitStore(<JobsPage />, { auth: SITZUNG });
+    await screen.findByText("Backend-Entwicklung");
+    await userEvent.click(screen.getByRole("button", { name: /^Bewerben$/i }));
+
+    await waitFor(() => {
+      const posts = spion.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === "POST",
+      );
+      expect(
+        posts.some(([url]) => String(url).includes("/applications/drafts") && !String(url).includes("/write")),
+      ).toBe(true);
+      expect(posts.some(([url]) => String(url).includes("/write"))).toBe(true);
+    });
   });
 });

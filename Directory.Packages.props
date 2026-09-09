@@ -9,7 +9,7 @@
     -->
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
 
-    <GirderVersion>4.2.2</GirderVersion>
+    <GirderVersion>4.4.0</GirderVersion>
   </PropertyGroup>
 
   <ItemGroup Label="Girder">

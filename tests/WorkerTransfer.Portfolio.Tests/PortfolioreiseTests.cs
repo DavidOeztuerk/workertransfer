@@ -412,7 +412,9 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
         geloescht.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(geloescht)).GetProperty("retained").GetInt32().Should().Be(0);
 
-        (await ihr.GetAsync("/portfolios/me")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var nachher = await ihr.GetAsync("/portfolios/me");
+        nachher.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await nachher.Content.ReadAsStringAsync()).Trim().Should().Be("null");
         Directory.Exists(ordner).Should().BeFalse("die Arbeitsproben sind mitgegangen");
     }
 

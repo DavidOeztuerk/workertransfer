@@ -51,6 +51,31 @@ public sealed class MitgliederHandler(
     }
 }
 
+/// <summary>Die Mitglieder eines Unternehmens — für Dienst-zu-Dienst, ohne Aufrufer.</summary>
+/// <remarks>
+/// Das Geheimnis am internen Endpunkt IST die Autorisierung. Die öffentliche
+/// Abfrage prüft Mitgliedschaft, weil sie einem Menschen antwortet; hier
+/// antwortet der Dienst einem Dienst, und <c>SubjectId.Empty</c> als
+/// Stellvertreter würde <c>NotAMemberException</c> werfen.
+/// </remarks>
+public sealed record InterneMitgliederAbfrage(TenantId Firma)
+    : IAbfrage<IReadOnlyList<Firmenmitglied>>;
+
+/// <inheritdoc cref="InterneMitgliederAbfrage" />
+public sealed class InterneMitgliederHandler(IMembershipRepository mitgliedschaften)
+    : IRequestHandler<InterneMitgliederAbfrage, IReadOnlyList<Firmenmitglied>>
+{
+    /// <inheritdoc />
+    public Task<IReadOnlyList<Firmenmitglied>> Handle(
+        InterneMitgliederAbfrage request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return mitgliedschaften.ListMembersAsync(request.Firma, cancellationToken);
+    }
+}
+
 /// <summary>Which invitations are still waiting?</summary>
 public sealed record OffeneEinladungenAbfrage(SubjectId Wer, TenantId Firma)
     : IAbfrage<IReadOnlyList<Invitation>>;

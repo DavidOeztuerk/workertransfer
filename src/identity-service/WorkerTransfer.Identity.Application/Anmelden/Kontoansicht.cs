@@ -20,4 +20,6 @@ public sealed record Kontoansicht(
     string? Email,
     TenantId? Firma,
     Kontosprache Sprache,
-    string Anzeigename);
+    string Anzeigename,
+    string? Vorname = null,
+    string? Nachname = null);

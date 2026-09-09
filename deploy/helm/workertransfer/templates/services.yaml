@@ -63,6 +63,17 @@ spec:
       ACHTUNG bei replicas > 1: dann wandern zwei Pods dasselbe Schema. Siehe
       values.yaml — die Zahl steht dort nicht zufällig auf 1.
       */}}
+      {{- if $svc.persistence }}
+      {{/*
+      Named volumes and PVCs come in as root. fsGroup makes the mount
+      writable for uid 10001 without the process staying root. Compose
+      has no fsGroup — there the entrypoint chowns and drops.
+      */}}
+      securityContext:
+        fsGroup: 10001
+        runAsUser: 10001
+        runAsNonRoot: true
+      {{- end }}
       containers:
         - name: service
           image: "{{ $root.Values.image.repository }}:{{ $root.Values.image.tag }}"

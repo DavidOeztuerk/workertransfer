@@ -36,15 +36,24 @@ test("ein Lebenslauf erreicht nur das Unternehmen, dem er freigegeben wurde", as
   // fragen, sonst wäre die Anfrage ein Kanal, um die Existenz zu erfahren.
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
-  await candidate.getByRole("button", { name: /Speichern/i }).click();
+  await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();
 
   await candidate.goto("/resume");
-  await candidate.getByRole("button", { name: /Station hinzufügen/i }).click();
+  // Die Seite fragt zuerst, WIE der Lebenslauf vorliegen soll — selbst
+  // geschrieben oder als Datei. Diese Reise schreibt ihn selbst.
+  const wegManuell = candidate.getByRole("button", { name: /Selbst schreiben/i });
+  await expect(wegManuell).toBeVisible();
+  await wegManuell.click();
+  // KEIN Klick auf „hinzufügen": die Wahl „selbst schreiben" legt bereits eine
+  // leere Zeile an. Ein zusätzlicher Klick erzeugte eine zweite, und
+  // `getByLabel(/Arbeitgeber/i)` träfe dann beide. (Der Knopf heisst inzwischen
+  // ohnehin „Stelle hinzufügen" — Beruf, Ausbildung und Schule sind getrennt.)
+  await expect(candidate.getByLabel(/Arbeitgeber/i)).toBeVisible();
   await candidate.getByLabel(/Arbeitgeber/i).fill(employer);
-  await candidate.getByLabel(/Position/i).fill("Backend-Entwicklerin");
+  await candidate.getByLabel(/Tätigkeit/i).fill("Backend-Entwicklerin");
   await candidate.getByLabel("Von").fill("2020-01");
   await candidate.getByRole("button", { name: /^Speichern$/ }).click();
   await expect(candidate.getByText(/Lebenslauf gespeichert/i)).toBeVisible();

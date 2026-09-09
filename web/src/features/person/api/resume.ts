@@ -2,6 +2,7 @@ import { request } from "../../../core/api/client";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import { RESUME_BASE_URL } from "../../../env";
 import { i18n } from "../../../core/i18n/i18n";
+import { deuten } from "../../../shared/api/fehler";
 
 /**
  * Der Lebenslauf — strenger als das Profil, und das ist der ganze Entwurf.
@@ -33,6 +34,8 @@ export interface Ausbildung {
   qualification: string;
   started_on: string;
   ended_on: string | null;
+  /** Fehlt bei älteren Einträgen — dann berufliche Ausbildung. */
+  kind?: "schule" | "ausbildung";
 }
 
 export interface Lebenslauf {
@@ -40,11 +43,23 @@ export interface Lebenslauf {
   positions: Station[];
   education: Ausbildung[];
   updated_at: string;
+  template: "schlicht" | "klassisch" | "modern";
 }
 
 export interface Lebenslaufeingabe {
   positions: Station[];
   education: Ausbildung[];
+}
+
+export type Unterlagenart = "zeugnis" | "zertifikat" | "sonstiges" | "lebenslauf";
+
+export interface UnterlageV1 {
+  id: string;
+  name: string;
+  kind: Unterlagenart;
+  content_type: string;
+  size_bytes: number;
+  uploaded_at: string;
 }
 
 export type Anfragestand = "PENDING" | "GRANTED" | "DECLINED";
@@ -106,6 +121,192 @@ export async function speichereMeinen(
 
   return answer.ok
     ? { ok: true, value: answer.value as Lebenslauf }
+    : { ok: false, error: answer.error };
+}
+
+export async function getMyDocuments(signal?: AbortSignal): Promise<Antwort<UnterlageV1[]>> {
+  const answer = await request<UnterlageV1[]>(
+    RESUME_BASE_URL,
+    "/resumes/me/documents",
+    { signal },
+    "fehler.unterlagenNichtGeladen"
+  );
+
+  return answer.ok
+    ? { ok: true, value: answer.value ?? [] }
+    : { ok: false, error: answer.error };
+}
+
+/** Upload einer Unterlage. */
+export async function uploadDocument(
+  file: File,
+  name: string,
+  kind: Unterlagenart,
+  signal?: AbortSignal
+): Promise<Antwort<UnterlageV1>> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("name", name);
+  formData.append("kind", kind);
+
+  const answer = await request<UnterlageV1>(
+    RESUME_BASE_URL,
+    "/resumes/me/documents",
+    { method: "POST", body: formData, signal },
+    "fehler.unterlageNichtHochgeladen"
+  );
+
+  if (answer.ok) return { ok: true, value: answer.value };
+  const gedeutet = deuten<"invalid" | "too-large" | "too-many" | "offline">(
+    answer.error,
+    {
+      0: { reason: "offline", titel: "fehler.keineVerbindung" },
+      413: { reason: "too-large", titel: "fehler.dateiZuGross" },
+      415: { reason: "invalid", titel: "fehler.dateiNichtAngenommen" },
+      422: { reason: "too-many", titel: "fehler.dateiNichtAngenommen" },
+    },
+    "invalid"
+  );
+  return { ok: false, error: gedeutet.error };
+}
+
+export interface Unterlageninhalt {
+  url: string;
+  contentType: string;
+}
+
+/** Inhalt einer eigenen Unterlage als Objekt-URL — anzeigen, nicht herunterladen. */
+export async function holeEigenenInhalt(
+  documentId: string,
+  signal?: AbortSignal
+): Promise<Antwort<Unterlageninhalt>> {
+  return holeInhalt(`/resumes/me/documents/${documentId}/content`, signal);
+}
+
+/** Inhalt einer fremden Unterlage — Ledger-geprüft. */
+export async function holeFremdenInhalt(
+  subjectId: string,
+  documentId: string,
+  signal?: AbortSignal
+): Promise<Antwort<Unterlageninhalt>> {
+  return holeInhalt(`/resumes/${subjectId}/documents/${documentId}/content`, signal);
+}
+
+async function holeInhalt(
+  path: string,
+  signal?: AbortSignal
+): Promise<Antwort<Unterlageninhalt>> {
+  try {
+    const response = await fetch(`${RESUME_BASE_URL}${path}`, {
+      credentials: "include",
+      signal,
+    });
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: {
+          status: response.status,
+          title: i18n.t("fehler.unterlagenNichtGeladen"),
+          detail: i18n.t("fehler.unterlagenNichtGeladen"),
+        },
+      };
+    }
+    const blob = await response.blob();
+    return {
+      ok: true,
+      value: { url: URL.createObjectURL(blob), contentType: blob.type },
+    };
+  } catch {
+    return {
+      ok: false,
+      error: {
+        status: 0,
+        title: i18n.t("fehler.keineVerbindungKurz"),
+        detail: i18n.t("fehler.dienstNichtErreichbar"),
+      },
+    };
+  }
+}
+
+/** Sichtbarer Lebenslauf einer Person — 404 heißt verborgen oder nicht vorhanden. */
+export async function ladeSichtbaren(
+  subjectId: string,
+  signal?: AbortSignal
+): Promise<Antwort<Lebenslauf | null>> {
+  const answer = await request<Lebenslauf>(
+    RESUME_BASE_URL,
+    `/resumes/${subjectId}`,
+    { signal },
+    "fehler.lebenslaufNichtAbrufbar"
+  );
+  if (answer.ok) return { ok: true, value: answer.value ?? null };
+  if (answer.error.status === 404) return { ok: true, value: null };
+  return { ok: false, error: answer.error };
+}
+
+export async function ladeSichtbareUnterlagen(
+  subjectId: string,
+  signal?: AbortSignal
+): Promise<Antwort<UnterlageV1[]>> {
+  const answer = await request<UnterlageV1[]>(
+    RESUME_BASE_URL,
+    `/resumes/${subjectId}/documents`,
+    { signal },
+    "fehler.unterlagenNichtGeladen"
+  );
+  return answer.ok
+    ? { ok: true, value: answer.value ?? [] }
+    : { ok: false, error: answer.error };
+}
+
+/** Diese Datei ist der Lebenslauf. Die vorige Lebenslauf-Datei wird zur Beilage. */
+export async function alsLebenslauf(
+  documentId: string,
+  signal?: AbortSignal
+): Promise<Antwort<void>> {
+  const answer = await request<void>(
+    RESUME_BASE_URL,
+    `/resumes/me/documents/${documentId}/as-cv`,
+    { method: "PUT", signal },
+    "fehler.unterlageNichtHochgeladen"
+  );
+
+  return answer.ok
+    ? { ok: true, value: undefined }
+    : { ok: false, error: answer.error };
+}
+
+/** Löschen einer Unterlage. */
+export async function deleteDocument(
+  documentId: string,
+  signal?: AbortSignal
+): Promise<Antwort<void>> {
+  const answer = await request<void>(
+    RESUME_BASE_URL,
+    `/resumes/me/documents/${documentId}`,
+    { method: "DELETE", signal },
+    "fehler.unterlageNichtGeloescht"
+  );
+
+  return answer.ok
+    ? { ok: true, value: undefined }
+    : { ok: false, error: answer.error };
+}
+
+/** Vorlage setzen. */
+export async function setTemplate(
+  template: "schlicht" | "klassisch" | "modern",
+  signal?: AbortSignal
+): Promise<Antwort<{ template: string }>> {
+  const answer = await request<{ template: string }>(
+    RESUME_BASE_URL,
+    "/resumes/me/template",
+    { method: "PUT", body: { template }, signal },
+    "fehler.vorlageNichtGesetzt"
+  );
+
+  return answer.ok
+    ? { ok: true, value: answer.value }
     : { ok: false, error: answer.error };
 }
 

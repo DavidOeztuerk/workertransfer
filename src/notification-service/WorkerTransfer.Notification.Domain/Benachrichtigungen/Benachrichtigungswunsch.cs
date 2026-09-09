@@ -2,7 +2,7 @@ using Girder.Core.Identity;
 
 namespace WorkerTransfer.Notification.Domain.Benachrichtigungen;
 
-/// <summary>Vier Schalter und eine Drossel, alles an der Person.</summary>
+/// <summary>Fünf Schalter und eine Drossel, alles an der Person.</summary>
 /// <remarks>
 /// Die Drossel steht hier und nicht in einer eigenen Tabelle: es gibt genau
 /// eine je Person, sie ist kein eigener Gegenstand, und eine zweite Tabelle

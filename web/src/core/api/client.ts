@@ -1,6 +1,7 @@
 import type { ApiError } from "../store/thunkHelpers";
 import { i18n } from "../i18n/i18n";
 import type { Fehlerschluessel } from "../../shared/api/fehler";
+import { brauchtKeineErneuerung, erneuereEinmal } from "./refreshGate";
 
 /**
  * Der eine Weg nach draussen.
@@ -20,6 +21,11 @@ export interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   signal?: AbortSignal;
+  /**
+   * Kein 401→Refresh. Für den Refresh selbst und für Auth-Pfade, deren 401
+   * die fachliche Absage ist (falsches Passwort, toter Refresh).
+   */
+  ohneErneuerung?: boolean;
 }
 
 /** Was der Aufrufer bekommt: die Antwort ODER die Aussage, was fehlte. */
@@ -64,6 +70,30 @@ async function problem(
   }
 }
 
+type SessionExpiredHandler = () => void;
+const expiredHandlers = new Set<SessionExpiredHandler>();
+
+/**
+ * Registriert einen Listener, der gerufen wird, wenn eine Sitzung abgelaufen
+ * ist und nicht mehr erneuert werden konnte (z. B. Docker-Neustart oder toter Refresh).
+ */
+export function onSessionExpired(handler: SessionExpiredHandler): () => void {
+  expiredHandlers.add(handler);
+  return () => {
+    expiredHandlers.delete(handler);
+  };
+}
+
+export function notifySessionExpired(): void {
+  for (const handler of Array.from(expiredHandlers)) {
+    try {
+      handler();
+    } catch {
+      // Fehler im Handler dürfen den HTTP-Fluss nicht brechen
+    }
+  }
+}
+
 /** Ein Aufruf. Wirft nicht — ein Statuscode ist eine Antwort, keine Störung. */
 export async function request<T>(
   baseUrl: string,
@@ -71,19 +101,49 @@ export async function request<T>(
   options: RequestOptions = {},
   fallbackMessage: Fehlerschluessel = "fehler.anfrageFehlgeschlagen"
 ): Promise<ApiResult<T>> {
-  const { method = "GET", body, signal } = options;
+  return senden(baseUrl, path, options, fallbackMessage, false);
+}
+
+async function senden<T>(
+  baseUrl: string,
+  path: string,
+  options: RequestOptions,
+  fallbackMessage: Fehlerschluessel,
+  schonErneuert: boolean
+): Promise<ApiResult<T>> {
+  const { method = "GET", body, signal, ohneErneuerung } = options;
 
   let response: Response;
   try {
+    const form = typeof FormData !== "undefined" && body instanceof FormData;
     response = await fetch(`${baseUrl}${path}`, {
       method,
       credentials: "include",
       signal,
-      headers: body === undefined ? undefined : { "content-type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: body === undefined || form ? undefined : { "content-type": "application/json" },
+      body: body === undefined ? undefined : form ? (body as FormData) : JSON.stringify(body),
     });
   } catch {
     return { ok: false, error: netzfehler() };
+  }
+
+  if (
+    response.status === 401 &&
+    !schonErneuert &&
+    ohneErneuerung !== true &&
+    !brauchtKeineErneuerung(path)
+  ) {
+    // Access-JWT tot, Refresh-Cookie vielleicht noch da. Ein Flug, Original
+    // einmal wiederholen. Tokens bleiben im Cookie — kein Bearer, kein Speicher.
+    const erneuert = await erneuereEinmal(baseUrl);
+    if (erneuert) {
+      return senden(baseUrl, path, options, fallbackMessage, true);
+    }
+    // Refresh fehlgeschlagen: die Sitzung ist definitiv tot.
+    notifySessionExpired();
+  } else if (response.status === 401 && schonErneuert) {
+    // Selbst nach erfolgreicher Erneuerung antwortet der Dienst 401.
+    notifySessionExpired();
   }
 
   if (!response.ok) {

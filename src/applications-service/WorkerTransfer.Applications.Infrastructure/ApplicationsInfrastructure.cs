@@ -17,6 +17,7 @@ using WorkerTransfer.Applications.Infrastructure.Loeschung;
 using WorkerTransfer.Applications.Infrastructure.Persistence;
 using WorkerTransfer.Applications.Infrastructure.Security;
 using WorkerTransfer.Applications.Infrastructure.Stellen;
+using WorkerTransfer.Applications.Infrastructure.Unternehmen;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.ServiceDefaults;
 
@@ -50,6 +51,8 @@ public static class ApplicationsInfrastructure
             configuration.GetSection(Stelleneinstellungen.Abschnitt));
         services.Configure<Benachrichtigungseinstellungen>(
             configuration.GetSection(Benachrichtigungseinstellungen.Abschnitt));
+        services.Configure<UnternehmensmitgliederEinstellungen>(
+            configuration.GetSection(UnternehmensmitgliederEinstellungen.Abschnitt));
         services.Configure<Loescheinstellungen>(
             configuration.GetSection(Loescheinstellungen.Abschnitt));
         services.Configure<Anschreibeneinstellungen>(
@@ -83,22 +86,22 @@ public static class ApplicationsInfrastructure
             anbieter => anbieter.GetRequiredService<HttpBewerberauskunft>());
         services.AddScoped<IUnternehmensauskunft>(
             anbieter => anbieter.GetRequiredService<HttpBewerberauskunft>());
+        services.AddScoped<IKontaktauskunft>(
+            anbieter => anbieter.GetRequiredService<HttpBewerberauskunft>());
 
-        // OHNE SCHLÜSSEL WIRD NICHTS GERUFEN, und die Oberfläche sagt es. Der
-        // Ersatz liefert keine Vorlage, sondern die Auskunft, dass es ihn nicht
-        // gibt — ein Anschreiben, das nicht vom Modell kommt, aber so aussieht,
-        // wäre die schlechtere Antwort (ADR-0024, ADR-0034).
-        var anschreiben = new Anschreibeneinstellungen();
-        configuration.GetSection(Anschreibeneinstellungen.Abschnitt).Bind(anschreiben);
+        services.AddScoped<IUnternehmensmitgliederAbfrage, HttpUnternehmensmitgliederAbfrage>();
 
-        if (anschreiben.Schluessel.Length > 0)
-        {
-            services.AddScoped<IAnschreiber, HttpAnschreiber>();
-        }
-        else
-        {
-            services.AddScoped<IAnschreiber, KeinAnschreiber>();
-        }
+        // Der Zugang kommt aus den Kontoeinstellungen der Person (Ollama,
+        // MiniMax, Anthropic). Draft__Schluessel bleibt ein Fallback für die
+        // Plattform, nicht die einzige Quelle — sonst antwortet Schreiben
+        // 503, während die Oberfläche schon einen Anbieter zeigt.
+        services.AddScoped<IKiZugangAbfrage, HttpKiZugang>();
+        services.AddScoped<IAnschreiber, HttpAnschreiber>();
+        services.AddSingleton<AnschreibenArbeiter>();
+        services.AddSingleton<IAnschreibenSchlange>(anbieter =>
+            anbieter.GetRequiredService<AnschreibenArbeiter>());
+        services.AddHostedService(anbieter =>
+            anbieter.GetRequiredService<AnschreibenArbeiter>());
 
         // Vorher ging die Benachrichtigung nach dem Commit als HTTP-Aufruf
         // hinaus, dessen Fehler geschluckt wurde — die Zusage stimmte, aber die

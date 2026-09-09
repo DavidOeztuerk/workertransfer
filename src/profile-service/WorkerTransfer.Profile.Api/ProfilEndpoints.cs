@@ -107,15 +107,10 @@ public static class ProfilEndpoints
             var profil = await mediator.Send(
                 new MeinProfilAbfrage(handelnder.Subject), cancellationToken);
 
-            if (profil is null)
-            {
-                await ProblemDetailsMiddleware.Schreibe(
-                    context, StatusCodes.Status404NotFound,
-                    "Request failed", "no profile yet");
-                return;
-            }
-
-            await context.Response.WriteAsJsonAsync(Antwort(profil), cancellationToken);
+            // 200 null, nicht 404: „noch keins" ist der Normalfall, und der
+            // Browser macht aus jedem 404 eine Konsolezeile.
+            await context.Response.WriteAsJsonAsync(
+                profil is null ? null : Antwort(profil), cancellationToken);
         });
 
         profile.MapPost("/me/draft", async (

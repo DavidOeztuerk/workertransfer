@@ -19,7 +19,9 @@ public sealed record RegistrierenBefehl(
     string Passwort,
     string Anzeigename,
     string? Firmenname = null,
-    Kontosprache Kontosprache = Sprachwahl.Vorgabe) : IBefehl<Registrierergebnis>;
+    Kontosprache Kontosprache = Sprachwahl.Vorgabe,
+    string? Vorname = null,
+    string? Nachname = null) : IBefehl<Registrierergebnis>;
 
 /// <summary>What registering produced.</summary>
 public abstract record Registrierergebnis
@@ -119,7 +121,7 @@ public sealed class RegistrierenHandler(
 
         var konto = User.Register(
             request.Email, eintrag, request.Anzeigename, request.Firmenname,
-            request.Kontosprache);
+            request.Kontosprache, request.Vorname, request.Nachname);
 
         await benutzer.AddAsync(konto, cancellationToken);
 

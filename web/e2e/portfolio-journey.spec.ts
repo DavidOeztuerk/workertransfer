@@ -31,7 +31,7 @@ test("Profil und Portfolio sind zwei getrennte Freigaben", async ({ browser }) =
   // Profil anlegen und freigeben.
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
-  await candidate.getByRole("button", { name: /Speichern/i }).click();
+  await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();

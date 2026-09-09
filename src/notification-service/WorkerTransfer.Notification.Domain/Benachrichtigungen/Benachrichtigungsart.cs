@@ -25,25 +25,29 @@ public enum Benachrichtigungsart
     ApplicationUpdate,
 
     /// <summary>Ein Transfer-Vorgang hat sich bewegt.</summary>
-    TransferUpdate
+    TransferUpdate,
+
+    /// <summary>Eine Bewerbung ist bei einem Unternehmen eingegangen.</summary>
+    ApplicationReceived
 }
 
 /// <summary>Die Worte, mit denen eine Art auf der Leitung steht.</summary>
 /// <remarks>
 /// Dieselben Worte, die die absendenden Dienste in ihre Outbox schreiben —
 /// <c>resume_request</c>, <c>market_request</c>, <c>application_update</c>,
-/// <c>transfer_update</c>. Zwei Schreibweisen für dieselbe Art wären zwei
+/// <c>transfer_update</c>, <c>application_received</c>. Zwei Schreibweisen für dieselbe Art wären zwei
 /// Gelegenheiten, eine Nachricht stillschweigend fallen zu lassen.
 /// </remarks>
 public static class Benachrichtigungsarten
 {
-    /// <summary>Alle vier, für die Einstellungen.</summary>
+    /// <summary>Alle fünf, für die Einstellungen.</summary>
     public static readonly IReadOnlyList<Benachrichtigungsart> Alle =
     [
         Benachrichtigungsart.ResumeRequest,
         Benachrichtigungsart.MarketRequest,
         Benachrichtigungsart.ApplicationUpdate,
-        Benachrichtigungsart.TransferUpdate
+        Benachrichtigungsart.TransferUpdate,
+        Benachrichtigungsart.ApplicationReceived
     ];
 
     /// <summary>Das Wort zur Art.</summary>
@@ -53,6 +57,7 @@ public static class Benachrichtigungsarten
         Benachrichtigungsart.MarketRequest => "market_request",
         Benachrichtigungsart.ApplicationUpdate => "application_update",
         Benachrichtigungsart.TransferUpdate => "transfer_update",
+        Benachrichtigungsart.ApplicationReceived => "application_received",
         _ => throw new ArgumentOutOfRangeException(nameof(art))
     };
 
@@ -63,6 +68,7 @@ public static class Benachrichtigungsarten
         "market_request" => Benachrichtigungsart.MarketRequest,
         "application_update" => Benachrichtigungsart.ApplicationUpdate,
         "transfer_update" => Benachrichtigungsart.TransferUpdate,
+        "application_received" => Benachrichtigungsart.ApplicationReceived,
         _ => null
     };
 }

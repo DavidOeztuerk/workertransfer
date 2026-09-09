@@ -18,4 +18,9 @@ public interface IGeheimnisse
     /// <param name="klartext">Das Geheimnis.</param>
     /// <returns>Höchstens vier Zeichen.</returns>
     string Endung(string klartext);
+
+    /// <summary>Entschlüsselt, was <see cref="Verschluessele"/> geschrieben hat.</summary>
+    /// <param name="gespeichert">Was in der Zeile steht.</param>
+    /// <returns>Der Klartext, oder <c>null</c>, wenn nichts da oder unlesbar.</returns>
+    string? Entschluessele(string? gespeichert);
 }

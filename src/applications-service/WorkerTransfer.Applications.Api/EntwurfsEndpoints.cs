@@ -59,6 +59,14 @@ public static class EntwurfsEndpoints
 
                 return Geschrieben;
             }
+            catch (FirmaSchweigt)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                    "Request failed", "identity-service did not answer");
+
+                return Geschrieben;
+            }
         });
 
         entwuerfe.MapPost("/", async (
@@ -74,8 +82,26 @@ public static class EntwurfsEndpoints
                 return;
             }
 
+            // WER NACH NICHTS FRAGT, BEKOMMT KEIN 201.
+            //
+            // Eine leere Liste legte null Entwuerfe an und meldete trotzdem
+            // „Created" — ein Statuscode, der etwas behauptet, das nicht
+            // geschehen ist. Gemessen an der Routenkarte, die 422 als Absicht
+            // festhielt; die Karte hatte recht.
+            //
+            // NICHT betroffen: eine Liste mit Kennungen, die es nicht (mehr)
+            // gibt. Eine geschlossene Ausschreibung ist keine fehlerhafte
+            // Anfrage, und die Antwort ist dann eine kuerzere Liste.
+            if (koerper?.JobIds is not { Count: > 0 } stellen)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", "invalid: job_ids");
+                return;
+            }
+
             var angelegt = await mediator.Send(
-                new EntwuerfeAnlegenBefehl(handelnder.Subject, koerper?.JobIds ?? []),
+                new EntwuerfeAnlegenBefehl(handelnder.Subject, stellen),
                 cancellationToken);
 
             context.Response.StatusCode = StatusCodes.Status201Created;
@@ -84,10 +110,12 @@ public static class EntwurfsEndpoints
         });
 
         entwuerfe.MapPost("/{id:guid}/write", Schritt(
-            (id, wer) => new EntwurfSchreibenBefehl(wer, id)));
+            (id, wer) => new EntwurfSchreibenBefehl(wer, id),
+            AnschreibenauftragArt.Schreiben));
 
         entwuerfe.MapPost("/{id:guid}/revise", Schritt(
-            (id, wer) => new UeberarbeitenBefehl(wer, id)));
+            (id, wer) => new UeberarbeitenBefehl(wer, id),
+            AnschreibenauftragArt.Ueberarbeiten));
 
         entwuerfe.MapPost("/{id:guid}/approve", Schritt(
             (id, wer) => new FreigebenBefehl(wer, id)));
@@ -98,6 +126,7 @@ public static class EntwurfsEndpoints
         entwuerfe.MapGet("/", async (
             IMediator mediator,
             ICurrentPrincipal akteur,
+            IAnschreibenSchlange schlange,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -110,6 +139,11 @@ public static class EntwurfsEndpoints
             var meine = await mediator.Send(
                 new MeineEntwuerfeAbfrage(handelnder.Subject), cancellationToken);
 
+            foreach (var offen in meine)
+            {
+                StarteWennEntsteht(offen, handelnder.Subject, context, schlange);
+            }
+
             await context.Response.WriteAsJsonAsync(
                 meine.Select(Antwort).ToArray(), cancellationToken);
         });
@@ -118,6 +152,7 @@ public static class EntwurfsEndpoints
             Guid id,
             IMediator mediator,
             ICurrentPrincipal akteur,
+            IAnschreibenSchlange schlange,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -137,6 +172,8 @@ public static class EntwurfsEndpoints
                     "Request failed", "no such draft");
                 return;
             }
+
+            StarteWennEntsteht(entwurf, handelnder.Subject, context, schlange);
 
             await context.Response.WriteAsJsonAsync(Antwort(entwurf), cancellationToken);
         });
@@ -183,7 +220,7 @@ public static class EntwurfsEndpoints
                 await mediator.Send(
                     new BeilagenWaehlenBefehl(
                         handelnder.Subject, id,
-                        koerper?.SharesResume ?? false,
+                        koerper?.SharesResume ?? true,
                         koerper?.Documents ?? []),
                     cancellationToken),
                 cancellationToken);
@@ -241,11 +278,14 @@ public static class EntwurfsEndpoints
     /// wäre viermal dieselbe Gelegenheit, die Anmeldeprüfung oder eine
     /// Fehlerabbildung zu vergessen.
     /// </remarks>
-    private static Delegate Schritt(Func<Guid, SubjectId, IRequest<Entwurfsergebnis>> baue) =>
+    private static Delegate Schritt(
+        Func<Guid, SubjectId, IRequest<Entwurfsergebnis>> baue,
+        AnschreibenauftragArt? danach = null) =>
         async (
             Guid id,
             IMediator mediator,
             ICurrentPrincipal akteur,
+            IAnschreibenSchlange schlange,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -255,11 +295,63 @@ public static class EntwurfsEndpoints
                 return;
             }
 
-            await Beantworte(
-                context,
-                await mediator.Send(baue(id, handelnder.Subject), cancellationToken),
-                cancellationToken);
+            var ergebnis = await mediator.Send(
+                baue(id, handelnder.Subject), cancellationToken);
+
+            await Beantworte(context, ergebnis, cancellationToken);
+
+            if (danach is { } art && ergebnis is Entwurfsergebnis.Erledigt)
+            {
+                schlange.Plane(new Anschreibenauftrag(
+                    handelnder.Subject, id, Traeger(context), art));
+            }
         };
+
+    /// <summary>
+    /// Der Worker lebt im Prozess. Nach einem Neustart ist die Schlange leer,
+    /// der Entwurf steht aber weiter auf Entsteht — dann schreibt niemand, und
+    /// die Oberfläche pollt einen leeren Brief. Ein GET reicht, um denselben
+    /// Auftrag erneut anzustellen; läuft er schon, lehnt Plane ab.
+    /// </summary>
+    private static void StarteWennEntsteht(
+        Bewerbungsentwurf entwurf,
+        SubjectId wer,
+        HttpContext context,
+        IAnschreibenSchlange schlange)
+    {
+        if (entwurf.Stand != Entwurfsstand.Entsteht)
+        {
+            return;
+        }
+
+        if (schlange.Laeuft(entwurf.Id))
+        {
+            return;
+        }
+
+        schlange.Plane(new Anschreibenauftrag(
+            wer,
+            entwurf.Id,
+            Traeger(context),
+            entwurf.HatOffeneAnmerkungen
+                ? AnschreibenauftragArt.Ueberarbeiten
+                : AnschreibenauftragArt.Schreiben));
+    }
+
+    private static string? Traeger(HttpContext context)
+    {
+        var kopf = context.Request.Headers.Authorization.ToString();
+
+        if (kopf.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return kopf["Bearer ".Length..];
+        }
+
+        return context.Request.Cookies.TryGetValue("access", out var ausCookie)
+               && !string.IsNullOrEmpty(ausCookie)
+            ? ausCookie
+            : null;
+    }
 
     private static async Task Beantworte(
         HttpContext context, Entwurfsergebnis ergebnis, CancellationToken cancellationToken)
@@ -321,5 +413,6 @@ public static class EntwurfsEndpoints
             .. entwurf.Anmerkungen.Select(eintrag => new AnmerkungV1(
                 eintrag.Id, eintrag.Text, eintrag.Zitat, eintrag.Erledigt, eintrag.Angelegt))
         ],
-        entwurf.Geaendert);
+        entwurf.Geaendert,
+        entwurf.SchreibenBegonnen);
 }

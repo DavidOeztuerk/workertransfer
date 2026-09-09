@@ -41,7 +41,8 @@ public static class ArbeitgeberEndpoints
                 var profil = await mediator.Send(
                     new ProfilSichernBefehl(
                         firma, body.DisplayName, body.About, body.Website,
-                        body.Locations, body.Benefits),
+                        body.Locations, body.Benefits,
+                        body.Line1, body.PostalCode, body.City, body.Country, body.Phone),
                     cancellationToken);
 
                 await context.Response.WriteAsJsonAsync(Antwort(profil), cancellationToken);
@@ -88,7 +89,7 @@ public static class ArbeitgeberEndpoints
             var profil = await mediator.Send(
                 new ProfilNachKuerzelAbfrage(kuerzel), cancellationToken);
 
-            await Beantworte(context, profil, cancellationToken);
+            await Beantworte(context, profil, fehltIst404: true, cancellationToken);
         });
 
         // Öffentlich, ohne Anmeldung. 404, solange nichts angelegt wurde — dann
@@ -104,7 +105,7 @@ public static class ArbeitgeberEndpoints
             var profil = await mediator.Send(
                 new OeffentlichesProfilAbfrage(new TenantId(tenantId)), cancellationToken);
 
-            await Beantworte(context, profil, cancellationToken);
+            await Beantworte(context, profil, fehltIst404: false, cancellationToken);
         });
 
         return app;
@@ -139,14 +140,22 @@ public static class ArbeitgeberEndpoints
     private static async Task Beantworte(
         HttpContext context,
         Arbeitgeberprofil? profil,
+        bool fehltIst404,
         CancellationToken cancellationToken)
     {
         if (profil is null)
         {
-            await ProblemDetailsMiddleware.Schreibe(
-                context, StatusCodes.Status404NotFound,
-                "Request failed", "No such company profile");
+            // Kürzel: die Adresse selbst behauptet eine Firma. Tenant-Id:
+            // die Stelle ist anonym, 200 null — sonst loggt /jobs jede Karte.
+            if (fehltIst404)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status404NotFound,
+                    "Request failed", "No such company profile");
+                return;
+            }
 
+            await context.Response.WriteAsJsonAsync(profil, cancellationToken);
             return;
         }
 
@@ -161,5 +170,10 @@ public static class ArbeitgeberEndpoints
             profil.Netzseite,
             profil.Orte,
             profil.Leistungen,
+            profil.Zeile1,
+            profil.Postleitzahl,
+            profil.Ort,
+            profil.Land,
+            profil.Telefon,
             profil.GeaendertAm);
 }

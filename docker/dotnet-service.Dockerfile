@@ -73,8 +73,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Nicht als root. Das Bild bedient HTTP und schreibt nichts ausser Protokoll.
+# USER bleibt hier root, damit der Entrypoint ein named Volume chownen
+# kann; er wechselt selbst auf uid 10001, bevor `dotnet` startet. Ein
+# `USER 10001` an dieser Stelle liess POST /resumes/me/documents mit
+# 500 sterben: /daten/ablage kommt als root:root ins Volume.
 RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin dienst
-USER 10001
 
 WORKDIR /app
 COPY --from=bau --chown=10001:10001 /veroeffentlicht /app

@@ -18,6 +18,11 @@ export interface CompanyProfile {
   website: string | null;
   locations: string[];
   benefits: string[];
+  line1: string;
+  postal_code: string;
+  city: string;
+  country: string;
+  phone: string;
   updated_at: string;
 }
 
@@ -27,6 +32,11 @@ export interface CompanyProfileInput {
   website: string | null;
   locations: string[];
   benefits: string[];
+  line1?: string;
+  postal_code?: string;
+  city?: string;
+  country?: string;
+  phone?: string;
 }
 
 export type SpeicherErgebnis =

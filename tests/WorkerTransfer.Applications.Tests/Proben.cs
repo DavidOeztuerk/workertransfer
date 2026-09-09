@@ -51,6 +51,34 @@ public sealed class Probeledger : IEinwilligungsschreiber
     }
 }
 
+/// <summary>Eine Mitgliederabfrage, die antwortet, was der Test bestimmt.</summary>
+public sealed class Probemitglieder : IUnternehmensmitgliederAbfrage
+{
+    private readonly Dictionary<TenantId, IReadOnlyList<SubjectId>> _mitglieder = [];
+
+    /// <summary>Wenn gesetzt, schweigt der Dienst.</summary>
+    public bool Schweigt { get; set; }
+
+    /// <summary>Legt Mitglieder für ein Unternehmen fest.</summary>
+    public void Fuer(TenantId firma, params SubjectId[] mitglieder)
+    {
+        _mitglieder[firma] = mitglieder;
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<SubjectId>> HoleAsync(
+        TenantId firma,
+        CancellationToken cancellationToken = default)
+    {
+        if (Schweigt)
+        {
+            throw new FirmaSchweigt("Probe: der Identitaetsdienst schweigt.");
+        }
+
+        return Task.FromResult(_mitglieder.GetValueOrDefault(firma, []));
+    }
+}
+
 /// <summary>Ein Jobs-Dienst, der antwortet, was der Test bestimmt.</summary>
 public sealed class Probestellen : IStellenauskunft
 {
@@ -78,6 +106,20 @@ public sealed class Probestellen : IStellenauskunft
 
         return Task.FromResult(_offen.GetValueOrDefault(stelle));
     }
+}
+
+/// <summary>Ein KI-Zugang, den der Test bestimmt — Vorgabe: keiner.</summary>
+public sealed class ProbeKiZugang : IKiZugangAbfrage
+{
+    /// <summary>Was zurückkommt. Ohne Setzen: kein Anbieter.</summary>
+    public KiZugang Wert { get; set; } =
+        new("none", string.Empty, string.Empty, string.Empty);
+
+    /// <inheritdoc />
+    public Task<KiZugang> HoleAsync(
+        Girder.Core.Identity.SubjectId wer,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Wert);
 }
 
 /// <summary>Eine Zustellung, die nichts tut — die Outbox-Zeile ist der Prüfstein.</summary>

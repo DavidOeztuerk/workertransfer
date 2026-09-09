@@ -123,7 +123,8 @@ public sealed class EfBewerbungsspeicher(ApplicationsDbContext kontext) : IBewer
             new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero),
             zeile.AnsweredAt is { } beantwortet
                 ? new DateTimeOffset(beantwortet, TimeSpan.Zero)
-                : null);
+                : null,
+            LiesKontakt(zeile.ApplicantContact));
 
     private static BewerbungsZeile ZurZeile(Bewerbung bewerbung)
     {
@@ -154,5 +155,63 @@ public sealed class EfBewerbungsspeicher(ApplicationsDbContext kontext) : IBewer
         zeile.Status = Bewerbungsstaende.Wort(bewerbung.Stand);
         zeile.UpdatedAt = bewerbung.GeaendertAm.UtcDateTime;
         zeile.AnsweredAt = bewerbung.BeantwortetAm?.UtcDateTime;
+        zeile.ApplicantContact = System.Text.Json.JsonSerializer.Serialize(
+            new KontaktDraht(bewerbung.Kontakt));
+    }
+
+    private static Bewerbungskontakt LiesKontakt(string roh)
+    {
+        if (string.IsNullOrWhiteSpace(roh) || roh == "{}")
+        {
+            return Bewerbungskontakt.Leer;
+        }
+
+        try
+        {
+            var draht = System.Text.Json.JsonSerializer.Deserialize<KontaktDraht>(roh);
+            return draht is null
+                ? Bewerbungskontakt.Leer
+                : new Bewerbungskontakt(
+                    draht.Klarname ?? string.Empty,
+                    draht.Zeile1 ?? string.Empty,
+                    draht.Zeile2 ?? string.Empty,
+                    draht.Postleitzahl ?? string.Empty,
+                    draht.Ort ?? string.Empty,
+                    string.IsNullOrEmpty(draht.Land) ? "DE" : draht.Land,
+                    draht.Telefon ?? string.Empty,
+                    draht.Email ?? string.Empty);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return Bewerbungskontakt.Leer;
+        }
+    }
+
+    private sealed record KontaktDraht(
+        [property: System.Text.Json.Serialization.JsonPropertyName("full_name")] string? Klarname = null,
+        [property: System.Text.Json.Serialization.JsonPropertyName("line1")] string? Zeile1 = null,
+        [property: System.Text.Json.Serialization.JsonPropertyName("line2")] string? Zeile2 = null,
+        [property: System.Text.Json.Serialization.JsonPropertyName("postal_code")] string? Postleitzahl = null,
+        [property: System.Text.Json.Serialization.JsonPropertyName("city")] string? Ort = null,
+        [property: System.Text.Json.Serialization.JsonPropertyName("country")] string? Land = null,
+        [property: System.Text.Json.Serialization.JsonPropertyName("phone")] string? Telefon = null,
+        [property: System.Text.Json.Serialization.JsonPropertyName("email")] string? Email = null)
+    {
+        public KontaktDraht() : this(null, null, null, null, null, null, null, null)
+        {
+        }
+
+        public KontaktDraht(Bewerbungskontakt kontakt)
+            : this(
+                kontakt.Klarname,
+                kontakt.Zeile1,
+                kontakt.Zeile2,
+                kontakt.Postleitzahl,
+                kontakt.Ort,
+                kontakt.Land,
+                kontakt.Telefon,
+                kontakt.Email)
+        {
+        }
     }
 }

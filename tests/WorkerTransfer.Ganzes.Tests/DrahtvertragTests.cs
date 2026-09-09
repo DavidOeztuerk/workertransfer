@@ -70,6 +70,7 @@ public class DrahtvertragTests
         // consent ledger did not answer", und die Kandidatenliste war leer.
         { "contracts.consent", typeof(Contracts.Consent.EinwilligungsfrageV1) },
         { "contracts.erasure", typeof(Contracts.Erasure.LoeschungV1) },
+        { "contracts.identity", typeof(Contracts.Identity.Tokenform) },
 
         // Und die Vertragsschicht JEDES Dienstes, die eine hat. Sie liegt in
         // einer EIGENEN Assembly — wer nur die Api-Schicht scannt, sieht sie
@@ -128,13 +129,13 @@ public class DrahtvertragTests
             + "schickt snake_case, und der Wert kommt nie an", dienst);
     }
 
-    /// <summary>Die Liste deckt alle elf Api-Schichten und beide Vertraege ab.</summary>
+    /// <summary>Die Liste deckt alle elf Api-Schichten und die drei geteilten Vertraege ab.</summary>
     [Fact]
     public void Die_Liste_deckt_alle_Dienste_ab()
     {
         var dienste = ApiSchichten.Select(zeile => (string)zeile[0]!).ToArray();
 
-        dienste.Should().HaveCount(21);
+        dienste.Should().HaveCount(22);
         dienste.Should().OnlyHaveUniqueItems();
     }
 

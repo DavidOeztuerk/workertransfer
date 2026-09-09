@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Girder](https://github.com/DavidOeztuerk) 4.2.2** — a shared foundation library of this author's, pulled from GitHub Packages — plus a React app.
+WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Girder](https://github.com/DavidOeztuerk) 4.4.0** — a shared foundation library of this author's, pulled from GitHub Packages — plus a React app.
 
 Eleven services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
 
@@ -14,7 +14,7 @@ The repository was a Python (`uv`) monorepo until August 2026 and was translated
 
 ```
 src/            eleven services, gateway/, shared/
-tests/          fifteen test projects
+tests/          sixteen test projects
 web/            the React app — deliberately not under src/
 docs/  bugs/  deploy/  docker/  scripts/  .github/
 WorkerTransfer.slnx  Directory.Build.props  Directory.Packages.props  NuGet.Config
@@ -39,7 +39,7 @@ package.json  pnpm-lock.yaml  pnpm-workspace.yaml  turbo.json  tsconfig.base.jso
 | `notification-service` | 8010 | notification preferences and an inbox |
 | `github-service` | 8011 | a person's own, verified GitHub connection |
 
-The gateway (`src/gateway`, port 8090) is the single entrance. `src/shared/` holds six things and no more: `ServiceDefaults` (the one call every service makes), `Outbox`, `Skills`, and three `Contracts.*` packages (`Identity`, `Consent`, `Erasure`) that carry versioned boundary DTOs — never a shared domain model.
+The gateway (`src/gateway`, port 8090) is the single entrance. `src/shared/` holds seven things and no more: `ServiceDefaults` (the one call every service makes), `Outbox`, `Skills`, `Ablage` (bytes for certificates, never a PDF the server rendered), and three `Contracts.*` packages (`Identity`, `Consent`, `Erasure`) that carry versioned boundary DTOs — never a shared domain model.
 
 The vision documents in [`docs/vision/`](docs/vision/) describe a much larger future state. **Treat them as intent, not description.**
 
@@ -124,6 +124,10 @@ Load-bearing, and easy to undo by tidying up (ADR-0028):
 Five paths are braked — `/auth/login` (20/min), `/auth/register` (5), `/auth/resend-verification` (3), `/auth/verify-email` (20), `/auth/refresh` (60) — per origin, per minute. The rules live in `ocelot.json` next to the routes they select from, as Girder's own `DistributedRateLimiting` section; the middleware is **Girder's**, and there is no hand-written brake here any more.
 
 **The three defaults are `0`, and that is the whole trick.** A limit of zero writes no counter, so only the five named paths count. Without it a default would apply to every path — and the whole UI travels through this gateway, so each asset fetch would count. `BremsenkarteTests` pins both: the five paths, and that the defaults stay at zero.
+
+**`WORKERTRANSFER_BREMSE_FAKTOR` multiplies every limit, and it is why a measurement can look broken.** Measured 09.09.2026: six calls to `/auth/register` (limit 5) all came back `201`, and the answer carried `X-RateLimit-Limit: 200` — a number that appears nowhere in `ocelot.json`. It is `5 × 40`: `.env` sets the factor to 40 so an E2E run does not brake itself. **A factor and not a switch, deliberately** — the limiter still counts, still keys per origin, still answers with its own headers, so what is measured is the real path and not a disabled one. With the factor at `1` the promise holds exactly: three through, the fourth `429` with `X-RateLimit-Limit: 3`, `X-RateLimit-Remaining: 0`, `Retry-After: 60`, an RFC 9457 body, and the supplied correlation id in **both** header and body.
+
+Two suites, because one could not have found this: `BremsenkarteTests` asserts each braked path has a route — a statement about the *selection*. `BremsenbindungTests` binds the real `ocelot.json` to Girder's options type and asserts what arrives — the *binding*. A configuration that never lands still has perfectly valid paths.
 
 **Per origin, never per email address.** Keying on the address would build exactly the enumeration channel `/auth/register` closes: a braked answer would confirm the address exists. It would also let a stranger lock out anyone whose address they know. The key is path plus origin, and the brake never reads the body — a test sends five *different* addresses from one origin and requires them to share one bucket.
 
@@ -213,6 +217,8 @@ Mediator via Girder's `AddCQRS`, but with **our own `IBefehl` / `IAbfrage` marke
 
 RFC 9457 problem documents, everywhere, from `ServiceDefaults.ProblemDetailsMiddleware`. Every response carries a `correlationId`. **No values in logs** — shapes, not contents. Girder logs no values either, neither redacted nor scrubbed; do not build that back.
 
+**Girder 4.4.0 masks log properties by exact name, and here it has nothing to do — measured, not hoped.** The running stack shows `[REDACTED]` zero times. That reading would be ambiguous on its own, so `MaskierungTests` supplies the other half: `Username`, `Email` and `City` *are* redacted, `SecretName` and `TokenId` are visible again (the 4.3.0 substring bug), the comparison is exact (`Emailvorlage` survives), and our own German property names stay readable. The reason nothing goes dark is twofold — our templates are German against an English list, and Girder's `LoggingBehavior` writes shapes anyway: `Shape of RegistrierenBefehl: {Email: string(34), …}` is a length, never an address. **Naming a log property `Email` would make it unreadable**, and that test says so.
+
 An endpoint filter that has already written a response must return `Results.Empty`, never `null`: with headers sent, the framework writes a JSON null after them, which tears the connection on a POST-with-body and is invisible on a GET except in the log.
 
 ### Request context
@@ -247,6 +253,10 @@ EF Core, one `DbContext` per service, one database per service — **no shared d
 
 **Aggregates come back detached from the repositories.** A mutation reaches the database only via an explicit save. Forgetting it costs nothing at test time and silently loses the write in production.
 
+**And the save itself needs `.AsTracking()`, because every context runs `QueryTrackingBehavior.NoTracking`.** A repository that reads a row, assigns to it and relies on `SaveChanges` writes *nothing* — the row came back detached, the assignments go nowhere, and the caller still gets its `204`. Measured 09.09.2026 on `PUT /resumes/me/documents/{id}/as-cv`: 204 returned, the kind stayed `sonstiges`.
+
+**The insert path hides it**, because `Add` always tracks. So it surfaces only at the first *mutating* caller, which may arrive months after the repository was written — `EfUnterlagenSpeicher` was the only one of nineteen without `AsTracking()`, and had no mutating caller until then. When you write a `SichereAsync`, the read inside it takes `.AsTracking()`; when you review one, that is the line to look for.
+
 `Personenzeile` is an EF annotation put on tables whose *key* is the person (`profiles`, `portfolios`, `github_connections`, `resumes`, `notification_preferences`, `market_status`). It exists so the erasure guard can recognise them: those tables have no `subject_id` column, because the id *is* the subject, and a guard looking only for column names would miss exactly the tables that hold the most.
 
 ### The outbox
@@ -255,9 +265,23 @@ EF Core, one `DbContext` per service, one database per service — **no shared d
 
 The table deliberately holds **no content**, only a user id and a kind. An outbox is durable storage and ends up in every backup, so a payload column would be an invitation to write message text into it. **Never carry an email address into it.** Giving up means leaving the row, never deleting it. Delivery is **at-least-once**. There is no broker, and none is planned.
 
-### The Girder modules, all nineteen
+### The Girder modules
 
-Girder 4.1.0 names **26** modules in `GirderModule` (`Girder.Abstractions/Hosting/GirderModule.cs`). `UseDefaults()` asks for **19**; the remaining seven are opt-in because they need a decision Girder may not make. Our composition root takes the defaults, adds `Principal` (plus `PasswordHashing` and `TokenSessions` for identity only), and declares **six** exclusions with a reason each. Every one of the 26 is accounted for.
+**Every service reports its own composition at startup, by name**, and that report is the only thing that catches a drift between intent and default. Measured 09.09.2026 on 4.4.0, consent-service:
+
+```
+Girder für consent-service: 19 Module in Betrieb (Logging, HttpContextAccess,
+JsonOptions, Jwt, SecurityMonitoring, Resilience, SecretManagement, Audit,
+InputSanitization, HealthChecks, Caching, Observability, SecurityHeaders,
+Authorization, CorrelationPropagation, ApiDocumentation, Cors, Principal,
+SovereignPlatform), 6 ausgelassen
+```
+
+**It reports names rather than a count, and that was itself a measurement.** The same `19` stood before and after a new `AddSovereignPlatform` line — the number could not show the difference it existed to report.
+
+**The report contradicts the table below, and the report wins.** Five modules run that the table calls "bewusst nicht": `SecurityMonitoring`, `Resilience`, `SecretManagement`, `Audit`, `Caching`. That is not a regression — the table describes the 3.0.1-era `InfrastructureBuilder` *methods*, and those decisions were about hand-wiring them one by one. `UseDefaults()` in 4.4.0 brings them, and taking the defaults was the later, deliberate decision (a module runs unless there is a measured reason against it). **The reasons in the table still describe what each area does; they no longer describe whether it is switched on.** Whoever revisits one of them starts from the running report, not from the table.
+
+Our composition root takes `UseDefaults()`, adds `Principal` and `SovereignPlatform` (plus `PasswordHashing` and `TokenSessions` for identity only), and declares **six** exclusions with a reason each: `RateLimiting`, `HttpResponseCaching`, `Communication`, `Encryption`, `ResourceAuthorization`, `PermissionEnforcement`.
 
 **The chain now honours those exclusions too**, which it did not before 4.1.0. `UseWorkerTransferDefaults` used to carry a thirteen-line copy of Girder's default chain with three lines left out — not a design, a workaround: the chain called every step unconditionally and `UseRateLimiting()` aborted startup. It reads `GirderComposition` now, so `app.UseGirder(environment, dienstname)` is the whole thing and a `Without(...)` takes effect once instead of twice. The two exclusions that are real decisions are `RateLimiting` and `PermissionEnforcement`, both topology; the other four record decisions about modules that are not in the defaults anyway.
 
@@ -295,6 +319,25 @@ Two rules that produced most of the corrections here:
 | `AddResourceAuthorization` | **offen** | Ressourcen- und Eigentümerprüfungen. Die Richtlinien stehen jetzt; ob dieses Modul darüber hinaus etwas trägt, ist ungemessen. |
 
 **Nicht in dieser Tabelle, weil kein Modul:** `AddCQRS` (aus `Girder.Application`) ruft jeder Dienst selbst, und `worker`-eigene Pipeline-Glieder (`TransaktionsBehavior`, identity zusätzlich `VersandBehavior`) hängen daneben.
+
+### `SovereignPlatform` — angenommen, und die Hosts kommen aus der Konfiguration
+
+New in 4.4.0 and taken, but only after a measurement that came close to costing the platform. `AddSovereignPlatform` bundles four things: the egress boundary, the log masking, the sovereignty report and an audit trail. The **egress guard hangs on every client from `IHttpClientFactory` and *refuses*, it does not log** — and measured before registering anything (`EgressTests`, in the cross-cutting suite):
+
+```
+default "loopback + RFC1918"
+  http://consent-service:8002   → REFUSED   ← a name is not an address
+  https://api.github.com        → REFUSED
+  http://10.0.0.5:8002          → allowed   ← the other half
+```
+
+Adopted naively that is every service-to-service call gone, **in the stack and not in the tests**, because the tests use fakes rather than real clients.
+
+So the allowed hosts are **derived from configuration** and never listed in code: `Consent__Adresse`, `Jobs__Adresse`, `Auskunft__*`, `Erasure__Adressen__*` are already in the environment, and what a service calls it has said there. A second list would be the one that goes stale first — and nobody would notice, because the call is simply refused. `Draft__Adresse` and `GitHub__Adresse` therefore moved out of the source and into compose: a built-in destination abroad is exactly what a sovereignty report exists to surface.
+
+**The gateway is exempt** — it never calls `AddWorkerTransferDefaults`, so no guard runs there and Ocelot's routing is untouched. Measured rather than assumed; otherwise the `Host`/`Port` pairs from `ocelot.json` would have had to be covered too.
+
+**Girder's audit trail comes along and is refused, as a mechanism rather than a comment.** There is no `WithoutAuditTrail()`; the bundle is one module. Girder's fallback sink writes to a list in the process — it survives no rollback and sits *beside* our transaction instead of inside it, so it does not satisfy ADR-0012, which `EfPruefspur` does. `VerweigerndePruefspur` is registered as the sink: never called, and whoever does call it gets a sentence saying where to go instead. A silent store that looks like an audit trail would only be noticed when somebody needs the trail and finds it empty.
 
 ### Und dieselbe Frage an unseren Eigenbau
 
@@ -379,6 +422,8 @@ These are the parts that are easy to undo by "cleaning up". Each has a reason, a
 
 `resume-service` is the same idea one step stricter. A profile is a notice board; a CV names real employers with dates — exactly what a current employer must not see. So there is **no public switch**: a company asks, the person answers, and the release covers that one company. The load-bearing distinction is that **the request is not the permission**: granted means "was granted once", not "holds now", so a resume request has neither an active flag nor a revoked timestamp. After a withdrawal the request stays granted and the read still comes up empty — that is the design, not a bug to fix. Asking requires the *profile* release, never the existence of a CV: "has already written one" is a fact about the person nobody should be able to probe for.
 
+Certificates ride a capability of their own: `documents.visibility:tenant:<id>` (ADR-0035). They are not folded under `resume` — a career history is self-written text, a certificate is a third-party document with names and grades, and whoever wants to show one without the other must be able to.
+
 ### Erasure: the default deletes completely (ADR-0027)
 
 `POST /account/erasure` at identity-service — self only, **no reason field**: demanding a justification from someone who wants to leave is a lever against them. It immediately revokes every session and disables the account, then cascades over the **outbox** to eight recipients (`consent`, `profile`, `resume`, `portfolio`, `applications`, `transfer`, `github`, `notification`) and identity itself, last. `jobs-service` and `companies-service` are **not** recipients — they hold nothing about a natural person, and `LoeschempfaengerTests` goes red the moment any service grows a personal table and is not on the list. That guard reads the **EF model**, not the source, and uses two signals: personal column names *and* the `Personenzeile` annotation.
@@ -433,9 +478,9 @@ So the line is not "no analysis". It is the **direction of the question**: requi
 
 ### Planned, not built: scout, advisor, assessment
 
-[`docs/SCOUT-UND-BERATER.md`](docs/SCOUT-UND-BERATER.md) is a **draft**, in the same category as the vision documents: intent, not description. It sketches three future services — `scout-service` (a requirement in, people with checklists and evidence out), `advisor-service` (a person's mandate and their staged conversations with a company), `assessment-service` (a named, bounded task whose evaluation belongs to the process and not to the person) — together with their conditions, the interface rules that carry them, and four Playwright journeys that double as acceptance.
+[`docs/SCOUT-UND-BERATER.md`](docs/SCOUT-UND-BERATER.md) is a **draft**. The inventory in [`docs/SCOUT-UND-BERATER-BESTAND.md`](docs/SCOUT-UND-BERATER-BESTAND.md) measured what already exists and **refutes parts of that draft**. ADR-0036 (`scout-service`) and ADR-0037 (`advisor-service`) are the decisions; they are not built. ADR-0034 is the cover-letter agent, ADR-0035 the application folder. **No agent builds scout, advisor or assessment.**
 
-**None of it is built, and no agent builds any of it.** Each needs its own ADR first — the document itself says so, and names the open questions still to settle. It is recorded here so that nobody throws away, while tidying up, something that is about to be needed.
+When an application arrives, company **members** get a mail of kind `application_received`. A company has no mailbox. The outbox stays content-free (ADR-0025): id and kind, never a name.
 
 ## Conventions that bite
 
@@ -460,5 +505,5 @@ So the line is not "no analysis". It is the **direction of the question**: requi
 - `docs/adr/` — the architecture decision records. They predate the migration and still govern.
 - `docs/SCOUT-UND-BERATER.md` — planned, not built. See above.
 - `docs/glossary.md` — the terms.
-- `bugs/` — open Girder debts, each with a reproduction.
+- `bugs/` — Girder debts, each with a reproduction. All currently closed: the correlation id reaches stdout since 4.3.0, measured across a real service hop on 09.09.2026.
 - `AGENTS.md` — concise command + convention reference.

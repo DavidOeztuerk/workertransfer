@@ -4,6 +4,8 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import Button from "@mui/material/Button";
+import Checkbox from "@mui/material/Checkbox";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Divider from "@mui/material/Divider";
@@ -31,6 +33,8 @@ import {
   pruefeNachweis,
   trenne,
 } from "../api/github";
+import { getMyProfile, saveMyProfile } from "../api/profile";
+import { ausRepositories, vorschlaegeAus } from "../lib/vorschlaege";
 
 /**
  * <c>/github</c> — die eigene, nachgewiesene Verbindung.
@@ -57,6 +61,7 @@ export function GitHubPage() {
   const [vonHand, setVonHand] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [running, setLaeuft] = useState(false);
+  const [uebernehmen, setUebernehmen] = useState(false);
 
   const connection = useAsync(
     (signal) => ladeMeine(signal),
@@ -447,10 +452,39 @@ export function GitHubPage() {
               </Box>
             )}
 
-            <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+            <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={uebernehmen}
+                    onChange={(_, an) => setUebernehmen(an)}
+                  />
+                }
+                label={t("github.faehigkeitenUebernehmen")}
+              />
               <Button
                 variant="outlined"
-                onClick={() => void run(() => holeNeu())}
+                onClick={() =>
+                  void run(async () => {
+                    const result = await holeNeu();
+                    if (!result.ok || !uebernehmen || !result.value) return result;
+                    const profil = await getMyProfile();
+                    if (!profil.ok || profil.profile === null) return result;
+                    const extra = vorschlaegeAus(
+                      ausRepositories(result.value.repositories),
+                      profil.profile.skills,
+                    );
+                    if (extra.length === 0) return result;
+                    await saveMyProfile({
+                      headline: profil.profile.headline,
+                      bio: profil.profile.bio,
+                      location: profil.profile.location,
+                      remote_ok: profil.profile.remote_ok,
+                      skills: [...profil.profile.skills, ...extra].slice(0, 30),
+                    });
+                    return result;
+                  })
+                }
                 disabled={running}
               >
                 {running

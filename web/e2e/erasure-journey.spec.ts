@@ -125,9 +125,9 @@ test("eine Löschung wird verlangt, läuft durch — und der Nachweis bleibt", a
   // nichts weg ist, wo nie etwas war.
   await page.goto("/profile");
   await page.getByLabel(/Überschrift/i).fill(headline);
-  await page.getByLabel(/Ort/i).fill("Bremen");
+  await page.getByLabel("Standort", { exact: true }).fill("Bremen");
   await page.getByLabel(/Fähigkeiten/i).fill("Python, Go");
-  await page.getByRole("button", { name: /Speichern/i }).click();
+  await page.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(page.getByText(/Profil gespeichert/i)).toBeVisible();
 
   // Eine Freigabe erteilen: sie ist später der BELEG, dass gelöscht wurde.

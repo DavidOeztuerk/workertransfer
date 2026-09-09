@@ -85,7 +85,12 @@ public sealed class EfProfilspeicher(CompaniesDbContext kontext) : IProfilspeich
             Liste(zeile.Locations),
             Liste(zeile.Benefits),
             new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
-            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero));
+            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero),
+            zeile.Line1,
+            zeile.PostalCode,
+            zeile.City,
+            zeile.Country,
+            zeile.Phone);
 
     private static ProfilZeile ZurZeile(Arbeitgeberprofil profil)
     {
@@ -110,6 +115,11 @@ public sealed class EfProfilspeicher(CompaniesDbContext kontext) : IProfilspeich
         zeile.Website = profil.Netzseite;
         zeile.Locations = JsonSerializer.Serialize(profil.Orte);
         zeile.Benefits = JsonSerializer.Serialize(profil.Leistungen);
+        zeile.Line1 = profil.Zeile1;
+        zeile.PostalCode = profil.Postleitzahl;
+        zeile.City = profil.Ort;
+        zeile.Country = profil.Land;
+        zeile.Phone = profil.Telefon;
         zeile.UpdatedAt = profil.GeaendertAm.UtcDateTime;
     }
 

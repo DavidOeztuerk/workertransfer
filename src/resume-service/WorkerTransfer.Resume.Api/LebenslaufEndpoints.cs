@@ -114,14 +114,8 @@ public static class LebenslaufEndpoints
             var lebenslauf = await mediator.Send(
                 new MeinLebenslaufAbfrage(handelnder.Subject), cancellationToken);
 
-            if (lebenslauf is null)
-            {
-                await ProblemDetailsMiddleware.Schreibe(
-                    context, StatusCodes.Status404NotFound, "Request failed", "no resume yet");
-                return;
-            }
-
-            await context.Response.WriteAsJsonAsync(Antwort(lebenslauf), cancellationToken);
+            await context.Response.WriteAsJsonAsync(
+                lebenslauf is null ? null : Antwort(lebenslauf), cancellationToken);
         });
 
         // The person's own list, and the one place where "was granted" and
@@ -392,8 +386,12 @@ public static class LebenslaufEndpoints
 
             if (!anfrage.HasFormContentType)
             {
+                // 415 UND NICHT 400: die Anfrage ist wohlgeformt, nur ihr
+                // Medienformat wird hier nicht bedient. 400 hiesse „ich konnte
+                // deinen Rumpf nicht lesen" und schickt den Aufrufer auf die
+                // Suche nach einem Tippfehler, den es nicht gibt.
                 await ProblemDetailsMiddleware.Schreibe(
-                    context, StatusCodes.Status400BadRequest,
+                    context, StatusCodes.Status415UnsupportedMediaType,
                     "Request failed", "expected multipart/form-data");
                 return;
             }
@@ -532,6 +530,27 @@ public static class LebenslaufEndpoints
                 : StatusCodes.Status404NotFound;
         });
 
+        unterlagen.MapPut("/{id:guid}/as-cv", async (
+            Guid id,
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await NichtAngemeldet(context);
+                return;
+            }
+
+            var gesetzt = await mediator.Send(
+                new UnterlageAlsLebenslaufBefehl(handelnder.Subject, id), cancellationToken);
+
+            context.Response.StatusCode = gesetzt
+                ? StatusCodes.Status204NoContent
+                : StatusCodes.Status404NotFound;
+        });
+
         lebenslaeufe.MapPut("/me/template", async (
             VorlageWaehlenV1 koerper,
             IMediator mediator,
@@ -658,7 +677,8 @@ public static class LebenslaufEndpoints
             station.Ende?.ToString(), station.Beschreibung, station.Technologien))],
         [.. lebenslauf.Ausbildungen.Select(ausbildung => new AusbildungV1(
             ausbildung.Einrichtung, ausbildung.Abschluss, ausbildung.Beginn.ToString(),
-            ausbildung.Ende?.ToString()))],
+            ausbildung.Ende?.ToString(),
+            ausbildung.Art == Ausbildungsart.Schule ? "schule" : "ausbildung"))],
         lebenslauf.Geaendert,
         Vorlagenwort(lebenslauf.Vorlage));
 
@@ -688,6 +708,7 @@ public static class LebenslaufEndpoints
     {
         Unterlagenart.Zeugnis => "zeugnis",
         Unterlagenart.Zertifikat => "zertifikat",
+        Unterlagenart.Lebenslauf => "lebenslauf",
         _ => "sonstiges"
     };
 
@@ -702,6 +723,7 @@ public static class LebenslaufEndpoints
     {
         "zeugnis" => Unterlagenart.Zeugnis,
         "zertifikat" => Unterlagenart.Zertifikat,
+        "lebenslauf" => Unterlagenart.Lebenslauf,
         _ => Unterlagenart.Sonstiges
     };
 
@@ -731,7 +753,8 @@ public static class LebenslaufEndpoints
     private static IReadOnlyList<Ausbildung> Ausbildungen(LebenslaufSpeichernV1 body) =>
         [.. body.Education.Select(ausbildung => Ausbildung.Aus(
             ausbildung.Institution, ausbildung.Qualification, Monat.Lies(ausbildung.StartedOn),
-            ausbildung.EndedOn is null ? null : Monat.Lies(ausbildung.EndedOn)))];
+            ausbildung.EndedOn is null ? null : Monat.Lies(ausbildung.EndedOn),
+            ausbildung.Kind == "schule" ? Ausbildungsart.Schule : Ausbildungsart.Ausbildung))];
 
     private static Task NichtAngemeldet(HttpContext context) =>
         ProblemDetailsMiddleware.Schreibe(

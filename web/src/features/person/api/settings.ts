@@ -5,7 +5,7 @@ import { API_BASE_URL } from "../../../env";
 /**
  * Die Benachrichtigungs-Einstellungen bei identity-service.
  *
- * Vier Schalter, alle voreingestellt AN: wer nicht erfährt, dass gefragt wurde,
+ * Fünf Schalter, alle voreingestellt AN: wer nicht erfährt, dass gefragt wurde,
  * hat keine Wahl, sondern nur den Anschein einer.
  *
  * Die Feldnamen sind der Draht und deshalb snake_case — nicht der Geschmack
@@ -16,6 +16,7 @@ export interface Benachrichtigungswahl {
   market_request: boolean;
   application_update: boolean;
   transfer_update: boolean;
+  application_received: boolean;
 }
 
 /** Was gilt, solange niemand etwas eingestellt hat. */
@@ -24,6 +25,7 @@ export const ALLES_AN: Benachrichtigungswahl = {
   market_request: true,
   application_update: true,
   transfer_update: true,
+  application_received: true,
 };
 
 const PFAD = "/me/notification-preferences";
@@ -51,7 +53,7 @@ export type Speicherergebnis =
   | { ok: true; choice: Benachrichtigungswahl }
   | { ok: false; error: ApiError };
 
-/** Speichert alle vier auf einmal — der Endpunkt kennt keine Teiländerung. */
+/** Speichert alle fünf auf einmal — der Endpunkt kennt keine Teiländerung. */
 export async function speichereWahl(
   choice: Benachrichtigungswahl,
   signal?: AbortSignal

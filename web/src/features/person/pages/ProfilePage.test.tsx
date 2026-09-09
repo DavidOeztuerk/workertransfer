@@ -39,6 +39,27 @@ beforeEach(() => {
     "GET /github/me": { status: 404 },
     "GET /resumes/me": { status: 404 },
     "GET /portfolios/me": { status: 404 },
+    "GET /account/address": {
+      body: {
+        line1: "",
+        line2: "",
+        postal_code: "",
+        city: "",
+        country: "DE",
+        phone: "",
+      },
+    },
+    "PUT /account/name": { body: { status: "ok" } },
+    "PUT /account/address": {
+      body: {
+        line1: "",
+        line2: "",
+        postal_code: "",
+        city: "",
+        country: "DE",
+        phone: "",
+      },
+    },
   });
 });
 

@@ -1,10 +1,11 @@
 # Die Korrelationskennung steht in der Datei, aber nicht auf der Konsole
 
-- **Girder-Fassung:** 4.2.2
+- **Girder-Fassung:** gefunden in 4.2.2, **behoben in 4.3.0**
 - **Gefunden beim:** Messen am laufenden `docker compose`-Stapel (03.09.2026)
 - **Art:** Lücke
 - **Blockiert:** nein — die Kennung reist korrekt; sie ist nur dort unsichtbar,
   wo im Betrieb jemand hinsieht
+- **Status:** ✅ **geschlossen am 09.09.2026**, nachgemessen auf 4.4.0 (unten)
 
 ## Was passiert
 
@@ -109,4 +110,44 @@ absoluter Pfad wäre eindeutiger als ein relativer.
 
 ## Stand
 
-Offen. Gemeldet 03.09.2026 aus WorkerTransfer.
+**Behoben in Girder 4.3.0, nachgemessen am 09.09.2026 auf 4.4.0.**
+
+Die Entwicklungsvorlage trägt jetzt `[{CorrelationId}]`. Gemessen am laufenden
+`docker compose`-Stapel, in beiden Stufen — die zweite ist die, die zählt:
+
+**Ein Dienst.** `POST /consent/check` mit `X-Correlation-ID: mess-c1-eins`:
+
+```
+workertransfer-consent | [16:14:05 INF] [mess-c1-eins] Serilog…RequestLoggingMiddleware:
+                          HTTP POST /consent/check responded 401 in 28.5419 ms
+workertransfer-consent | [16:14:05 WRN] [mess-c1-eins] Girder…TelemetryMiddleware:
+                          HTTP POST /consent/check responded 401 in 35.81ms
+```
+
+**Über einen Dienstsprung.** `POST /applications/drafts` mit
+`X-Correlation-ID: mess-c1-sprung` — applications-service fragt jobs-service
+nach der Stelle:
+
+| Dienst | Treffer auf stdout |
+|---|---|
+| applications-service | 6 |
+| jobs-service | **7** |
+
+Die Kennung überlebt also einen echten HTTP-Sprung und steht in **beiden**
+Protokollen. Damit ist der Faden wieder durchgehend — genau das, was hier
+gefehlt hat.
+
+**Nebenbei bestätigt:** Serilog lässt eine fehlende Eigenschaft leer. Zeilen
+ausserhalb einer Anfrage tragen `[]` statt eines Platzhalters:
+
+```
+workertransfer-consent | [12:21:44 INF] [] WorkerTransfer.Consent.Api:
+                          Girder für consent-service: 19 Module in Betrieb, 6 ausgelassen
+```
+
+Der zweite Punkt des Tickets — die Dateisenke schreibt wegen ADR-0028 nach
+`/app/$SERVICE_DIR/logs/` statt nach `/app/logs/` — ist **nicht** Teil dieser
+Behebung und auch nicht nachgemessen worden. Er kostet nichts, solange niemand
+die Datei im Behälter sucht; wer sie sucht, findet sie einen Ordner tiefer.
+
+Gemeldet 03.09.2026, geschlossen 09.09.2026.

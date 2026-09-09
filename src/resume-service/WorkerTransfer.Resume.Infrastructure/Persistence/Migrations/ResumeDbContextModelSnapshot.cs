@@ -23,7 +23,7 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "audit_action", new[] { "resume_saved", "resume_requested", "request_granted", "request_declined", "access_revoked", "subject_erased" });
-            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "document_kind", new[] { "zeugnis", "zertifikat", "sonstiges" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "document_kind", new[] { "zeugnis", "zertifikat", "sonstiges", "lebenslauf" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "request_status", new[] { "pending", "granted", "declined" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "resume_template", new[] { "schlicht", "klassisch", "modern" });
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);

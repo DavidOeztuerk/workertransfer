@@ -66,6 +66,21 @@ export function candidateQuery(cursor?: string, filters: CandidateFilters = NO_F
  * schweigt" ist es nicht, und eine leere Seite ist überhaupt kein Fehler.
  * Alles in eine Meldung zu werfen würde die Person raten lassen, was zu tun ist.
  */
+/** Ein einzelnes Profil — 404 heißt verborgen oder nicht vorhanden. */
+export async function getCandidateProfile(
+  subjectId: string,
+  signal?: AbortSignal
+): Promise<Profile | null> {
+  const answer = await request<Profile>(
+    PROFILE_BASE_URL,
+    `/profiles/${subjectId}`,
+    { signal },
+    "fehler.profilNichtAbrufbar"
+  );
+  if (answer.ok) return answer.value ?? null;
+  return null;
+}
+
 export async function listCandidates(
   cursor?: string,
   filters: CandidateFilters = NO_FILTERS,

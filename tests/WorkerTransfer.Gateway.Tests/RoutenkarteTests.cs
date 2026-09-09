@@ -228,6 +228,7 @@ public sealed class RoutenkarteTests
             "/auth/session",
             "/auth/resend-verification",
             "/companies/by-slug/gibt-es-nicht",
+            "/companies/00000000-0000-0000-0000-000000000001/profile",
             "/jobs"
         ];
 

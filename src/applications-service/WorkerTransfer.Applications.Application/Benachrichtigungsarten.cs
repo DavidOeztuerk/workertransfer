@@ -16,4 +16,13 @@ public static class Benachrichtigungsarten
     /// Person nicht: sie weiß, was sie getan hat.
     /// </remarks>
     public const string Bewegt = "application_update";
+
+    /// <summary>
+    /// Eine Bewerbung ist bei einem Unternehmen eingegangen.
+    /// </summary>
+    /// <remarks>
+    /// Geht an die MITGLIEDER des Unternehmens, nicht an die Firma selbst.
+    /// Eine Firma hat kein Postfach.
+    /// </remarks>
+    public const string Angekommen = "application_received";
 }

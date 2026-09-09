@@ -36,7 +36,7 @@ test("eine Anfrage erreicht die Person per Mail — und die Mail verrät nicht, 
 
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
-  await candidate.getByRole("button", { name: /Speichern/i }).click();
+  await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();
@@ -106,7 +106,7 @@ test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser })
 
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
-  await candidate.getByRole("button", { name: /Speichern/i }).click();
+  await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();

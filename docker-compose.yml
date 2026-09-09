@@ -35,6 +35,10 @@
 
 x-dienst: &dienst
   restart: unless-stopped
+  # Ollama und MiniMax laufen auf der Maschine, nicht im Behälter.
+  # Ohne diesen Eintrag ist localhost im Dienst der Behälter selbst.
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
   build:
     context: .
     dockerfile: docker/dotnet-service.Dockerfile
@@ -202,6 +206,11 @@ services:
       # Deshalb `:-` und nicht `:?` — ein fehlender Schluessel darf den Stapel
       # nicht anhalten, anders als die drei echten Geheimnisse.
       Draft__Schluessel: ${ANTHROPIC_API_KEY:-}
+      # Die Adresse steht HIER und nicht nur als Vorgabe im Quelltext: eine
+      # eingebaute Zieladresse nach draussen ist genau das, was der
+      # Souveraenitaetsbericht sichtbar machen soll — und die Egress-Grenze
+      # liest ihre erlaubten Hosts aus der Konfiguration (Dienstgrundlage.cs).
+      Draft__Adresse: https://api.anthropic.com/v1/messages
     ports:
       - "8003:8003"
 
@@ -220,6 +229,10 @@ services:
       # `up -d --build` ersetzt den Behaelter, und mit ihm waeren die Dateien
       # fort — waehrend ihre Zeilen in der Datenbank stehen blieben. Genau
       # diese Haelfte-fort-Haelfte-da-Lage ist die schlimmste (ADR-0035).
+      #
+      # Das Band kommt als root:root. Der Entrypoint chownt es auf uid 10001
+      # und gibt root danach ab — sonst 500 beim ersten Unterverzeichnis
+      # (gemessen: UnauthorizedAccessException auf /daten/ablage/<subject>).
       Ablage__Verzeichnis: /daten/ablage
     volumes:
       - resume-ablage:/daten/ablage
@@ -254,6 +267,11 @@ services:
       # Deshalb `:-` und nicht `:?` — ein fehlender Schluessel darf den Stapel
       # nicht anhalten, anders als die drei echten Geheimnisse.
       Draft__Schluessel: ${ANTHROPIC_API_KEY:-}
+      # Die Adresse steht HIER und nicht nur als Vorgabe im Quelltext: eine
+      # eingebaute Zieladresse nach draussen ist genau das, was der
+      # Souveraenitaetsbericht sichtbar machen soll — und die Egress-Grenze
+      # liest ihre erlaubten Hosts aus der Konfiguration (Dienstgrundlage.cs).
+      Draft__Adresse: https://api.anthropic.com/v1/messages
     ports:
       - "8006:8006"
 
@@ -269,10 +287,19 @@ services:
       Jobs__Adresse: http://jobs-service:8006
       Notifications__Adresse: http://notification-service:8010
       Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      # Mitglieder eines Unternehmens — dieselbe Adresse und dasselbe Geheimnis
+      # wie der Benachrichtigungsweg. Eine Firma hat kein Postfach.
+      Identity__Adresse: http://identity-service:8001
+      Identity__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
       # Der Anschreiben-Agent. Leer heisst: es wird NICHTS gerufen, und die
       # Oberflaeche sagt es — statt einen leeren Entwurf zu zeigen, den jemand
       # versehentlich freigibt (ADR-0034).
       Draft__Schluessel: ${ANTHROPIC_API_KEY:-}
+      # Die Adresse steht HIER und nicht nur als Vorgabe im Quelltext: eine
+      # eingebaute Zieladresse nach draussen ist genau das, was der
+      # Souveraenitaetsbericht sichtbar machen soll — und die Egress-Grenze
+      # liest ihre erlaubten Hosts aus der Konfiguration (Dienstgrundlage.cs).
+      Draft__Adresse: https://api.anthropic.com/v1/messages
       # Woher die EIGENEN Angaben der bewerbenden Person kommen. Serverseitig
       # geholt und nicht vom Browser geschickt: „nur die eigenen Daten" ist eine
       # Zusage, die allein der Server halten kann.
@@ -338,6 +365,9 @@ services:
       GitHub__OAuth__Kennung: ${WORKERTRANSFER_GITHUB_OAUTH_ID:-}
       GitHub__OAuth__Geheimnis: ${WORKERTRANSFER_GITHUB_OAUTH_SECRET:-}
       GitHub__OAuth__Rueckadresse: ${WORKERTRANSFER_GITHUB_OAUTH_RUECKADRESSE:-}
+      # Wie bei Draft__Adresse: das Ziel gehoert in die Konfiguration, damit
+      # Bericht und Egress-Grenze es sehen.
+      GitHub__Adresse: https://api.github.com
     ports:
       - "8011:8011"
   gateway:

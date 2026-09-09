@@ -97,13 +97,14 @@ ihre Umgebung.
       key: WORKER_ERASURE_SECRET
 {{/*
 Das Meldegeheimnis heisst je nach Seite anders und ist DASSELBE: bei
-identity-service ist es `Notify__Geheimnis` (er prüft es), bei
-notification-service `Identity__Geheimnis` (er legt es vor), und die drei
+identity-service ist es `Notify__Geheimnis` (er prüft es), bei jedem Dienst
+mit `Identity__Adresse` `Identity__Geheimnis` (er legt es vor), und die
 absendenden Dienste tragen es als `Notifications__Geheimnis`.
 
 Ausdrücklich ein ANDERES als das der Löschung (ADR-0027 §4.4): "darf eine Mail
 anstossen" und "darf alles über einen Menschen löschen" dürfen nicht dasselbe
-Papier sein.
+Papier sein. Die Bedingungen sind unabhängig: applications-service hat BEIDE
+Adressen und braucht BEIDE Namen für dasselbe Geheimnis.
 */}}
 {{- if eq $svc.name "identity-service" }}
 - name: Notify__Geheimnis
@@ -111,13 +112,15 @@ Papier sein.
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_NOTIFY_SECRET
-{{- else if eq $svc.name "notification-service" }}
+{{- end }}
+{{- if hasKey ($svc.env | default dict) "Identity__Adresse" }}
 - name: Identity__Geheimnis
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_NOTIFY_SECRET
-{{- else if hasKey ($svc.env | default dict) "Notifications__Adresse" }}
+{{- end }}
+{{- if hasKey ($svc.env | default dict) "Notifications__Adresse" }}
 - name: Notifications__Geheimnis
   valueFrom:
     secretKeyRef:

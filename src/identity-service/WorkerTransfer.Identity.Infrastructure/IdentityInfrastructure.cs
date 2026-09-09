@@ -76,6 +76,7 @@ public static class IdentityInfrastructure
         services.AddScoped<UnternehmenAnlegen>();
         services.AddScoped<IInvitationRepository, EfInvitationRepository>();
         services.AddScoped<IKontoeinstellungen, EfKontoeinstellungen>();
+        services.AddScoped<IAnschriften, EfAnschriften>();
 
         // Der Hauptschlüssel wird EINMAL beim Start gelesen, nicht je Anfrage:
         // fehlt er, soll der Dienst beim Hochfahren sterben und nicht beim

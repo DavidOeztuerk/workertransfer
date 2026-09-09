@@ -19,6 +19,11 @@ interface Entwurf {
   website: string;
   locations: string;
   benefits: string;
+  line1: string;
+  postal_code: string;
+  city: string;
+  country: string;
+  phone: string;
 }
 
 const LEER: Entwurf = {
@@ -27,6 +32,11 @@ const LEER: Entwurf = {
   website: "",
   locations: "",
   benefits: "",
+  line1: "",
+  postal_code: "",
+  city: "",
+  country: "DE",
+  phone: "",
 };
 
 /** Mit Komma getrennt, Leeres fällt weg — „nichts angegeben" ist keine leere Zeile. */
@@ -72,6 +82,11 @@ export function CompanyProfilePage() {
         website: current.website ?? "",
         locations: current.locations.join(", "),
         benefits: current.benefits.join(", "),
+        line1: current.line1 ?? "",
+        postal_code: current.postal_code ?? "",
+        city: current.city ?? "",
+        country: current.country || "DE",
+        phone: current.phone ?? "",
       });
     }
     setUebernommen(true);
@@ -99,6 +114,11 @@ export function CompanyProfilePage() {
       website: draft.website.trim() === "" ? null : draft.website.trim(),
       locations: list(draft.locations),
       benefits: list(draft.benefits),
+      line1: draft.line1,
+      postal_code: draft.postal_code,
+      city: draft.city,
+      country: draft.country,
+      phone: draft.phone,
     });
     setLaeuft(false);
 
@@ -179,6 +199,50 @@ export function CompanyProfilePage() {
               value={draft.locations}
               onChange={(e) => {
                 setEntwurf({ ...draft, locations: e.target.value });
+                setGespeichert(false);
+              }}
+            />
+            <TextField
+              label={t("firmenprofil.strasse")}
+              helperText={t("firmenprofil.strasseHinweis")}
+              value={draft.line1}
+              onChange={(e) => {
+                setEntwurf({ ...draft, line1: e.target.value });
+                setGespeichert(false);
+              }}
+            />
+            <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 2fr 1fr" } }}>
+              <TextField
+                label={t("firmenprofil.plz")}
+                value={draft.postal_code}
+                onChange={(e) => {
+                  setEntwurf({ ...draft, postal_code: e.target.value });
+                  setGespeichert(false);
+                }}
+              />
+              <TextField
+                label={t("firmenprofil.ort")}
+                value={draft.city}
+                onChange={(e) => {
+                  setEntwurf({ ...draft, city: e.target.value });
+                  setGespeichert(false);
+                }}
+              />
+              <TextField
+                label={t("firmenprofil.land")}
+                value={draft.country}
+                onChange={(e) => {
+                  setEntwurf({ ...draft, country: e.target.value });
+                  setGespeichert(false);
+                }}
+                slotProps={{ htmlInput: { maxLength: 2 } }}
+              />
+            </Box>
+            <TextField
+              label={t("firmenprofil.telefon")}
+              value={draft.phone}
+              onChange={(e) => {
+                setEntwurf({ ...draft, phone: e.target.value });
                 setGespeichert(false);
               }}
             />

@@ -11,11 +11,26 @@ namespace WorkerTransfer.Applications.Infrastructure.Security;
 /// </remarks>
 public sealed class HttpAufrufertoken(IHttpContextAccessor zugriff) : IAufrufertoken
 {
+    private static readonly AsyncLocal<string?> Uebersteuert = new();
+
+    /// <summary>Setzt das Token für den Hintergrundauftrag.</summary>
+    public static IDisposable Mit(string? wert)
+    {
+        var vorher = Uebersteuert.Value;
+        Uebersteuert.Value = wert;
+        return new Rueckgabe(vorher);
+    }
+
     /// <inheritdoc />
     public string? Wert
     {
         get
         {
+            if (Uebersteuert.Value is { Length: > 0 } gesetzt)
+            {
+                return gesetzt;
+            }
+
             var anfrage = zugriff.HttpContext?.Request;
 
             if (anfrage is null)
@@ -35,5 +50,10 @@ public sealed class HttpAufrufertoken(IHttpContextAccessor zugriff) : IAufrufert
                 ? ausCookie
                 : null;
         }
+    }
+
+    private sealed class Rueckgabe(string? vorher) : IDisposable
+    {
+        public void Dispose() => Uebersteuert.Value = vorher;
     }
 }

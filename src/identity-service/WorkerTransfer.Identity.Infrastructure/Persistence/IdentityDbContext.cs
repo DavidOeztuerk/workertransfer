@@ -32,6 +32,12 @@ public sealed class UserRow
     /// <summary>The company meant at registration. <c>null</c> means a person.</summary>
     public string? PendingCompanyName { get; set; }
 
+    /// <summary>Bürgerlicher Vorname. Nullable — Art. 25, ADR-0038.</summary>
+    public string? GivenName { get; set; }
+
+    /// <summary>Bürgerlicher Nachname.</summary>
+    public string? FamilyName { get; set; }
+
     /// <summary>The <c>language</c> column: two letters, never null.</summary>
     /// <remarks>
     /// A plain string and not the enum: a mail written by a dispatcher days
@@ -86,6 +92,34 @@ public sealed class KontoeinstellungenRow
     public DateTime UpdatedAt { get; set; }
 }
 
+/// <summary>
+/// Die Bewerbungsanschrift — Vorlage für Briefkopf, nie für Suche, nie für KI.
+/// </summary>
+/// <remarks>
+/// Personenzeile: der Schlüssel IST die Person. Ohne die Anmerkung fände der
+/// Löschwächter die Tabelle nicht (ADR-0027/0038).
+/// </remarks>
+public sealed class AnschriftRow
+{
+    public Guid SubjectId { get; set; }
+
+    public string Line1 { get; set; } = string.Empty;
+
+    public string Line2 { get; set; } = string.Empty;
+
+    public string PostalCode { get; set; } = string.Empty;
+
+    public string City { get; set; } = string.Empty;
+
+    public string Country { get; set; } = "DE";
+
+    public string Phone { get; set; } = string.Empty;
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+}
+
 /// <summary>The tables this service reads and writes.</summary>
 /// <remarks>
 /// Tracking is off for the whole context rather than per query. Per query it is
@@ -101,6 +135,9 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
     /// <summary>Was eine Person über sich entschieden hat.</summary>
     public DbSet<KontoeinstellungenRow> AccountSettings => Set<KontoeinstellungenRow>();
+
+    /// <summary>Bewerbungsanschrift. Personenzeile.</summary>
+    public DbSet<AnschriftRow> Addresses => Set<AnschriftRow>();
 
     public DbSet<AuditEventRow> AuditEvents => Set<AuditEventRow>();
 
@@ -132,6 +169,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(row => row.Email).HasColumnName("email").HasColumnType("citext");
             entity.Property(row => row.PasswordHash).HasColumnName("password_hash");
             entity.Property(row => row.DisplayName).HasColumnName("display_name");
+            entity.Property(row => row.GivenName).HasColumnName("given_name");
+            entity.Property(row => row.FamilyName).HasColumnName("family_name");
             entity.Property(row => row.Status).HasColumnName("status");
             entity.Property(row => row.Roles).HasColumnName("roles").HasColumnType("jsonb");
             entity.Property(row => row.PendingCompanyName).HasColumnName("pending_company_name");
@@ -158,6 +197,22 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(row => row.AiKeyEncrypted).HasColumnName("ai_key_encrypted");
             entity.Property(row => row.AiKeyTail).HasColumnName("ai_key_tail");
             entity.Property(row => row.AiAuditLog).HasColumnName("ai_audit_log");
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at");
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<AnschriftRow>(entity =>
+        {
+            entity.ToTable("addresses");
+            entity.HasAnnotation(Personenzeile.Anmerkung, true);
+            entity.HasKey(row => row.SubjectId);
+            entity.Property(row => row.SubjectId).HasColumnName("subject_id");
+            entity.Property(row => row.Line1).HasColumnName("line1");
+            entity.Property(row => row.Line2).HasColumnName("line2");
+            entity.Property(row => row.PostalCode).HasColumnName("postal_code");
+            entity.Property(row => row.City).HasColumnName("city");
+            entity.Property(row => row.Country).HasColumnName("country");
+            entity.Property(row => row.Phone).HasColumnName("phone");
             entity.Property(row => row.CreatedAt).HasColumnName("created_at");
             entity.Property(row => row.UpdatedAt).HasColumnName("updated_at");
         });

@@ -37,6 +37,20 @@ public sealed record SchluesselBody(
 /// <param name="Language">A tag this platform has texts for: de, en or fr.</param>
 public sealed record SprachwahlBody(string Language);
 
+/// <summary>Bürgerlicher Vor- und Nachname. Leer heisst entfernen.</summary>
+public sealed record KlarnameBody(
+    [property: JsonPropertyName("given_name")] string? GivenName,
+    [property: JsonPropertyName("family_name")] string? FamilyName);
+
+/// <summary>Bewerbungsanschrift. Nie an ein Modell, nie ins Token.</summary>
+public sealed record AnschriftBody(
+    [property: JsonPropertyName("line1")] string? Line1,
+    [property: JsonPropertyName("line2")] string? Line2,
+    [property: JsonPropertyName("postal_code")] string? PostalCode,
+    [property: JsonPropertyName("city")] string? City,
+    [property: JsonPropertyName("country")] string? Country,
+    [property: JsonPropertyName("phone")] string? Phone);
+
 /// <summary><c>/auth/*</c> and <c>/me</c>.</summary>
 /// <remarks>
 /// The cookies keep the names, paths and flags the Python service used:
@@ -261,6 +275,84 @@ public static class AuthEndpoints
             await SchreibeOk(context, cancellationToken);
         });
 
+        app.MapPut("/account/name", async (
+            KlarnameBody body,
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status401Unauthorized,
+                    "Request failed", "not authenticated");
+                return;
+            }
+
+            var erledigt = await mediator.Send(
+                new KlarnameSetzenBefehl(handelnder.Subject, body.GivenName, body.FamilyName),
+                cancellationToken);
+
+            if (!erledigt)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status404NotFound,
+                    "Request failed", "no such account");
+                return;
+            }
+
+            await SchreibeOk(context, cancellationToken);
+        });
+
+        app.MapGet("/account/address", async (
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status401Unauthorized,
+                    "Request failed", "not authenticated");
+                return;
+            }
+
+            var stand = await mediator.Send(
+                new AnschriftAbfrage(handelnder.Subject), cancellationToken);
+            await context.Response.WriteAsJsonAsync(AnschriftAntwort(stand), cancellationToken);
+        });
+
+        app.MapPut("/account/address", async (
+            AnschriftBody body,
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status401Unauthorized,
+                    "Request failed", "not authenticated");
+                return;
+            }
+
+            var stand = await mediator.Send(
+                new AnschriftSetzenBefehl(
+                    handelnder.Subject,
+                    body.Line1,
+                    body.Line2,
+                    body.PostalCode,
+                    body.City,
+                    body.Country,
+                    body.Phone),
+                cancellationToken);
+
+            await context.Response.WriteAsJsonAsync(AnschriftAntwort(stand), cancellationToken);
+        });
+
         // Die eigenen Einstellungen. Unter `/account`, wie die Sprache und die
         // Löschung — es geht um das Konto, nicht um das Anmelden.
         app.MapGet("/account/settings", async (
@@ -384,7 +476,21 @@ public static class AuthEndpoints
         // Farbe daneben folgt ihm. Aus einer Adresse liesse sich beides auch
         // ableiten — es waere nur falsch, denn `max.werber@…` ergibt „M" und
         // nicht „MW".
-        ["display_name"] = konto.Anzeigename
+        ["display_name"] = konto.Anzeigename,
+        // Klarname für Signatur und Briefkopf. Keine Anschrift hier: die
+        // Bewerberauskunft liest die Session, und Anschrift darf nicht ins Modell.
+        ["given_name"] = konto.Vorname,
+        ["family_name"] = konto.Nachname
+    };
+
+    private static Dictionary<string, string> AnschriftAntwort(Anschriftansicht stand) => new()
+    {
+        ["line1"] = stand.Zeile1,
+        ["line2"] = stand.Zeile2,
+        ["postal_code"] = stand.Postleitzahl,
+        ["city"] = stand.Ort,
+        ["country"] = stand.Land,
+        ["phone"] = stand.Telefon
     };
 
     /// <summary>Die Einstellungen auf dem Draht — snake_case, wie überall.</summary>

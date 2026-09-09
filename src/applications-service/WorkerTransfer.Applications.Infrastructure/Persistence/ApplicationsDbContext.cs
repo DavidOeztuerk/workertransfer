@@ -59,6 +59,12 @@ public sealed class BewerbungsZeile
 
     /// <summary><c>null</c>, solange nicht entschieden.</summary>
     public DateTime? AnsweredAt { get; set; }
+
+    /// <summary>
+    /// Snapshot des Briefkopfs (ADR-0038). jsonb, weil er als Ganzes geschrieben
+    /// und gelesen wird und nie der Suchschlüssel ist.
+    /// </summary>
+    public string ApplicantContact { get; set; } = "{}";
 }
 
 /// <summary>Eine Zeile von <c>application_drafts</c>.</summary>
@@ -103,6 +109,9 @@ public sealed class EntwurfsZeile
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>Start dieses Schreibens. Null, sobald es nicht mehr Entsteht.</summary>
+    public DateTime? WritingStartedAt { get; set; }
 }
 
 /// <summary>Eine Zeile von <c>application_draft_comments</c>.</summary>
@@ -180,6 +189,11 @@ public sealed class ApplicationsDbContext(DbContextOptions<ApplicationsDbContext
             entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(zeile => zeile.UpdatedAt).HasColumnName("updated_at").IsRequired();
             entity.Property(zeile => zeile.AnsweredAt).HasColumnName("answered_at");
+            entity.Property(zeile => zeile.ApplicantContact)
+                .HasColumnName("applicant_contact")
+                .HasColumnType("jsonb")
+                .HasDefaultValue("{}")
+                .IsRequired();
 
             entity.HasIndex(zeile => zeile.JobId);
             entity.HasIndex(zeile => zeile.TenantId);
@@ -218,6 +232,7 @@ public sealed class ApplicationsDbContext(DbContextOptions<ApplicationsDbContext
                 .HasColumnName("documents").HasColumnType("jsonb").IsRequired();
             entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(zeile => zeile.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(zeile => zeile.WritingStartedAt).HasColumnName("writing_started_at");
 
             entity.HasIndex(zeile => zeile.SubjectId);
 

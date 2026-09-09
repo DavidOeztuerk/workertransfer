@@ -32,13 +32,13 @@ interface Draht {
 }
 
 const zuAnsicht = (draht: Draht): Kontoeinstellungen => ({
-  deleteAfterMonths: draht.delete_after_months,
-  provider: draht.ai_provider as KiAnbieter,
-  baseUrl: draht.ai_base_url,
-  model: draht.ai_model,
-  keyPresent: draht.ai_key_present,
-  keyTail: draht.ai_key_tail,
-  auditLog: draht.ai_audit_log,
+  deleteAfterMonths: draht.delete_after_months ?? null,
+  provider: (draht.ai_provider as KiAnbieter) ?? "none",
+  baseUrl: draht.ai_base_url ?? "",
+  model: draht.ai_model ?? "",
+  keyPresent: draht.ai_key_present === true,
+  keyTail: draht.ai_key_tail ?? "",
+  auditLog: draht.ai_audit_log === true,
 });
 
 /** Die eigenen Einstellungen. `null` heisst: nicht abrufbar. */

@@ -36,7 +36,7 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
   // fragen, sonst wäre die Anfrage ein Kanal, um die Existenz zu erfahren.
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
-  await candidate.getByRole("button", { name: /Speichern/i }).click();
+  await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();
@@ -165,7 +165,7 @@ test("ohne Freigabe des Marktstatus gibt es nichts zu sehen und nichts zu tun", 
 
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
-  await candidate.getByRole("button", { name: /Speichern/i }).click();
+  await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();

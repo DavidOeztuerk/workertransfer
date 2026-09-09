@@ -26,6 +26,12 @@ export interface Abruf<T> {
   data: T | null;
   /** Noch einmal fragen — nach einer Änderung, die die Antwort verschiebt. */
   reload: () => void;
+  /**
+   * Still nachfragen, ohne den vorigen Abruf abzubrechen und ohne
+   * Ladezustand. Für den Schreibfortschritt: ein `reload` jede Sekunde
+   * bricht die Antwort ab, und der Brief bleibt leer.
+   */
+  poll: () => void;
 }
 
 export function useAsync<T>(
@@ -42,6 +48,7 @@ export function useAsync<T>(
   // Werte, an denen die Antwort wirklich hängt.
   const ladenRef = useRef(load);
   ladenRef.current = load;
+  const pollNr = useRef(0);
 
   useEffect(() => {
     if (!aktiv) {
@@ -70,7 +77,22 @@ export function useAsync<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, runde, aktiv]);
 
-  return { pending, data, reload: () => setRunde((n) => n + 1) };
+  return {
+    pending,
+    data,
+    reload: () => setRunde((n) => n + 1),
+    poll: () => {
+      if (!aktiv) return;
+      const nr = ++pollNr.current;
+      void ladenRef.current(new AbortController().signal).then(
+        (value) => {
+          if (nr !== pollNr.current) return;
+          setData(value);
+        },
+        () => undefined,
+      );
+    },
+  };
 }
 
 /**

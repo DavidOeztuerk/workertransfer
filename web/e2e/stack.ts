@@ -313,6 +313,11 @@ export async function registerAndConfirm(
     await page.getByRole("radio", { name: "Für ein Unternehmen" }).check();
     await page.getByLabel("Name des Unternehmens").fill(companyName);
   }
+  // Erst warten, dann tippen: `fill()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das groessere expect-Budget. Unter Last
+  // scheiterte die Reise sonst am Feld statt am Pruefgegenstand — dieselbe
+  // Lehre, die weiter unten schon fuer das Klicken steht.
+  await expect(page.getByLabel(/E-Mail/i)).toBeVisible();
   await page.getByLabel(/E-Mail/i).fill(email);
   await page.getByLabel(/Passwort/i).first().fill(E2E_PASSWORD);
   // Pflichtfeld. Fehlt es, blockt die native Formularvalidierung das Absenden
@@ -401,6 +406,11 @@ export async function registerAndConfirm(
  */
 export async function login(page: Page, email: string): Promise<void> {
   await page.goto("/login");
+  // Erst warten, dann tippen: `fill()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das groessere expect-Budget. Unter Last
+  // scheiterte die Reise sonst am Feld statt am Pruefgegenstand — dieselbe
+  // Lehre, die weiter unten schon fuer das Klicken steht.
+  await expect(page.getByLabel(/E-Mail/i)).toBeVisible();
   await page.getByLabel(/E-Mail/i).fill(email);
   await page.getByLabel(/Passwort/i).fill(E2E_PASSWORD);
   await page.getByRole("button", { name: /Anmelden/i }).click();

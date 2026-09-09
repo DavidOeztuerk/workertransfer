@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using Girder.Core.Identity;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Applications.Application.Ports;
+using WorkerTransfer.Applications.Domain.Bewerbungen;
 
 namespace WorkerTransfer.Applications.Infrastructure.Auskunft;
 
@@ -35,7 +36,18 @@ internal sealed record Sitzungsantwort(
 
 internal sealed record Sitzungsbenutzer(
     [property: JsonPropertyName("display_name")] string? DisplayName,
+    [property: JsonPropertyName("given_name")] string? GivenName,
+    [property: JsonPropertyName("family_name")] string? FamilyName,
+    [property: JsonPropertyName("email")] string? Email,
     [property: JsonPropertyName("language")] string? Language);
+
+internal sealed record Anschriftantwort(
+    [property: JsonPropertyName("line1")] string? Line1,
+    [property: JsonPropertyName("line2")] string? Line2,
+    [property: JsonPropertyName("postal_code")] string? PostalCode,
+    [property: JsonPropertyName("city")] string? City,
+    [property: JsonPropertyName("country")] string? Country,
+    [property: JsonPropertyName("phone")] string? Phone);
 
 internal sealed record Profilantwort(
     [property: JsonPropertyName("headline")] string? Headline,
@@ -53,8 +65,17 @@ internal sealed record Stationsantwort(
 internal sealed record Lebenslaufantwort(
     [property: JsonPropertyName("positions")] IReadOnlyList<Stationsantwort>? Positions);
 
-internal sealed record Firmenprofilantwort(
-    [property: JsonPropertyName("name")] string? Name);
+/// <summary>
+/// Öffentliches Arbeitgeberprofil — dieselben Namen wie
+/// <c>ArbeitgeberprofilV1</c>. <c>name</c> statt <c>display_name</c> kam
+/// immer leer an, und der Brief ging ohne Firma hinaus.
+/// </summary>
+public sealed record Firmenprofilantwort(
+    [property: JsonPropertyName("display_name")] string? Name,
+    [property: JsonPropertyName("line1")] string? Line1 = null,
+    [property: JsonPropertyName("postal_code")] string? PostalCode = null,
+    [property: JsonPropertyName("city")] string? City = null,
+    [property: JsonPropertyName("country")] string? Country = null);
 
 /// <summary>Holt die eigenen Angaben — mit dem Token des Aufrufers.</summary>
 /// <remarks>
@@ -74,7 +95,7 @@ internal sealed record Firmenprofilantwort(
 public sealed class HttpBewerberauskunft(
     IHttpClientFactory fabrik,
     IOptions<Auskunftseinstellungen> einstellungen,
-    IAufrufertoken token) : IBewerberauskunft, IUnternehmensauskunft
+    IAufrufertoken token) : IBewerberauskunft, IUnternehmensauskunft, IKontaktauskunft
 {
     /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
     public const string Klient = "auskunft";
@@ -92,7 +113,7 @@ public sealed class HttpBewerberauskunft(
             _einstellungen.Resume, "/resumes/me", cancellationToken);
 
         return new Eigenbild(
-            sitzung?.User?.DisplayName ?? string.Empty,
+            Klarname(sitzung?.User),
             profil?.Headline ?? string.Empty,
             profil?.Bio ?? string.Empty,
             profil?.Skills ?? [],
@@ -121,6 +142,43 @@ public sealed class HttpBewerberauskunft(
             cancellationToken);
 
         return profil?.Name ?? string.Empty;
+    }
+
+    /// <inheritdoc />
+    public async Task<Bewerbungskontakt> HoleKontaktAsync(CancellationToken cancellationToken = default)
+    {
+        // Geteilter Name mit IBewerberauskunft — deshalb explizit. Anschrift
+        // darf in Eigenbild NICHT landen; dieser Weg ist nur der Snapshot.
+        try
+        {
+            var sitzung = await LiesAsync<Sitzungsantwort>(
+                _einstellungen.Identity, "/auth/session", cancellationToken);
+            var anschrift = await LiesAsync<Anschriftantwort>(
+                _einstellungen.Identity, "/account/address", cancellationToken);
+
+            return new Bewerbungskontakt(
+                Klarname(sitzung?.User),
+                anschrift?.Line1 ?? string.Empty,
+                anschrift?.Line2 ?? string.Empty,
+                anschrift?.PostalCode ?? string.Empty,
+                anschrift?.City ?? string.Empty,
+                string.IsNullOrEmpty(anschrift?.Country) ? "DE" : anschrift.Country,
+                anschrift?.Phone ?? string.Empty,
+                sitzung?.User?.Email ?? string.Empty);
+        }
+        catch (BewerberSchweigt)
+        {
+            return Bewerbungskontakt.Leer;
+        }
+    }
+
+    /// <summary>
+    /// Vor- und Nachname, sonst der Anzeigename. Nie eine Anschrift.
+    /// </summary>
+    internal static string Klarname(Sitzungsbenutzer? wer)
+    {
+        var voll = $"{wer?.GivenName} {wer?.FamilyName}".Trim();
+        return voll.Length > 0 ? voll : wer?.DisplayName ?? string.Empty;
     }
 
     /// <summary>Ein GET mit dem Token des Aufrufers. <c>null</c> heißt „nichts da".</summary>

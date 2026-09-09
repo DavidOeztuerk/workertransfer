@@ -96,6 +96,7 @@ public sealed class EfEntwurfsspeicher(ApplicationsDbContext kontext) : IEntwurf
         ArgumentNullException.ThrowIfNull(entwurf);
 
         var zeile = await kontext.Entwuerfe
+            .AsTracking()
             .FirstOrDefaultAsync(eintrag => eintrag.Id == entwurf.Id, cancellationToken);
 
         if (zeile is null)
@@ -115,12 +116,14 @@ public sealed class EfEntwurfsspeicher(ApplicationsDbContext kontext) : IEntwurf
         zeile.SharesResume = entwurf.TeiltLebenslauf;
         zeile.Documents = JsonSerializer.Serialize(entwurf.Unterlagen);
         zeile.UpdatedAt = entwurf.Geaendert.UtcDateTime;
+        zeile.WritingStartedAt = entwurf.SchreibenBegonnen?.UtcDateTime;
 
         // Die Anmerkungen: neue anlegen, abgehakte nachziehen. Gelöscht wird
         // keine — eine Anmerkung ist der Beleg dafür, dass jemand widersprochen
         // hat, und sie verschwinden zu lassen hiesse, die Fassungsgeschichte
         // um ihre Begründung zu bringen.
         var vorhandene = await kontext.Anmerkungen
+            .AsTracking()
             .Where(eintrag => eintrag.DraftId == entwurf.Id)
             .ToListAsync(cancellationToken);
 
@@ -202,5 +205,8 @@ public sealed class EfEntwurfsspeicher(ApplicationsDbContext kontext) : IEntwurf
                     new DateTimeOffset(eintrag.CreatedAt, TimeSpan.Zero)))
             ],
             new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
-            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero));
+            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero),
+            zeile.WritingStartedAt is { } start
+                ? new DateTimeOffset(start, TimeSpan.Zero)
+                : null);
 }

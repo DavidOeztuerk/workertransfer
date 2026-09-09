@@ -24,6 +24,7 @@ import { ladeMeinen, ladeMeineAnfragen } from "../api/resume";
 import { ladeMeines } from "../api/portfolio";
 import { ladeMeine as ladeGitHub } from "../api/github";
 import { ladeWahl } from "../api/settings";
+import { ladeAnschrift } from "../api/zivilidentitaet";
 import { getMyMarketStatus, listMyMarketRequests } from "../../work/api/market";
 import { listMyTransfers } from "../../work/api/transfers";
 import { listMyApplications } from "../../work/api/applications";
@@ -54,6 +55,7 @@ export function MyDataPage() {
     async (signal): Promise<Record<string, Abschnitt>> => {
       const [
         benachrichtigungen,
+        anschrift,
         profile,
         lebenslauf,
         lebenslaufAnfragen,
@@ -67,6 +69,7 @@ export function MyDataPage() {
         verlauf,
       ] = await Promise.all([
         ladeWahl(signal),
+        ladeAnschrift(signal),
         getMyProfile(signal),
         ladeMeinen(signal),
         ladeMeineAnfragen(signal),
@@ -81,7 +84,10 @@ export function MyDataPage() {
       ]);
 
       return {
-        konto: abschnitt(session !== null, session),
+        konto: abschnitt(session !== null, {
+          ...session,
+          anschrift: anschrift ?? undefined,
+        }),
         benachrichtigungen: abschnitt(
           benachrichtigungen !== null,
           benachrichtigungen ?? undefined,

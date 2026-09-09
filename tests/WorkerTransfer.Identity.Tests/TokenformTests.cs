@@ -139,6 +139,23 @@ public class TokenformTests
     /// siehe <c>bugs/customclaims-kann-keine-liste-ausdruecken.md</c>.
     /// </summary>
     [Theory]
+    [InlineData("given_name")]
+    [InlineData("family_name")]
+    [InlineData("address")]
+    [InlineData("phone")]
+    [InlineData("display_name")]
+    public async Task Klarname_und_Anschrift_stehen_nicht_im_Token(string anspruch)
+    {
+        WorkerTransfer.Contracts.Identity.Tokenform.NiemalsImToken.Should().Contain(anspruch);
+
+        var alsPerson = await IssueAsync(Capacity.AsSelf.Instance);
+        var fuerFirma = await IssueAsync(new Capacity.ForCompany(Firma));
+
+        alsPerson.Has(anspruch).Should().BeFalse();
+        fuerFirma.Has(anspruch).Should().BeFalse();
+    }
+
+    [Theory]
     [InlineData("roles")]
     [InlineData("permissions")]
     public async Task Rollen_und_Berechtigungen_stehen_nicht_im_Token(string anspruch)

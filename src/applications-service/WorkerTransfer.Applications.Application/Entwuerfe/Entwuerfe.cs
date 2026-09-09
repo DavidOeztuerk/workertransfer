@@ -82,9 +82,7 @@ public sealed record EntwurfLoeschenBefehl(SubjectId Wer, Guid Id) : IBefehl<boo
 public sealed class Entwurfsbefehle(
     IEntwurfsspeicher speicher,
     IStellenauskunft stellen,
-    IAnschreiber anschreiber,
-    IBewerberauskunft bewerber,
-    IUnternehmensauskunft unternehmen,
+    IKiZugangAbfrage ki,
     TimeProvider uhr) :
     IRequestHandler<EntwuerfeAnlegenBefehl, IReadOnlyList<Bewerbungsentwurf>>,
     IRequestHandler<EntwurfSchreibenBefehl, Entwurfsergebnis>,
@@ -156,40 +154,44 @@ public sealed class Entwurfsbefehle(
             return new Entwurfsergebnis.Keiner();
         }
 
-        // OHNE ANBIETER ENTSTEHT NICHTS. Ein leerer Entwurf im Stand `Pruefen`
-        // waere eine Einladung, ihn versehentlich freizugeben (ADR-0034).
-        if (!anschreiber.Eingerichtet)
-        {
-            return new Entwurfsergebnis.KeinAnbieter(
-                "Es ist kein Entwurfsanbieter eingerichtet.");
-        }
-
-        var kontext = await Kontext(entwurf, cancellationToken);
-
-        if (kontext is null)
-        {
-            return new Entwurfsergebnis.Keiner();
-        }
+        // Der Modellaufruf läuft hinter der Anfrage (AnschreibenArbeiter).
+        // Hier nur: ohne Anbieter sofort scheitern, sonst Entsteht merken.
+        KiZugang zugang;
 
         try
         {
-            var ausgabe = await anschreiber.SchreibeAsync(kontext, cancellationToken);
-            var (betreff, text) = Anschreibenformat.Lies(ausgabe);
-
-            entwurf.Nimm_text_an(betreff, text, uhr.GetUtcNow());
+            zugang = await ki.HoleAsync(request.Wer, cancellationToken);
         }
         catch (AnschreibenNichtVerfuegbar fehler)
         {
-            // Die ART wird vermerkt, nie der Inhalt — und der Entwurf bleibt
-            // stehen, damit die Person es erneut versuchen kann.
             entwurf.Scheitere(fehler.Message, uhr.GetUtcNow());
             await speicher.SichereAsync(entwurf, cancellationToken);
 
             return new Entwurfsergebnis.KeinAnbieter(fehler.Message);
         }
-        catch (Eingabefehler fehler)
+
+        if (!zugang.IstEingerichtet)
         {
-            return new Entwurfsergebnis.Eingabe(fehler.Message);
+            var grund = "Es ist kein Entwurfsanbieter eingerichtet.";
+            entwurf.Scheitere(grund, uhr.GetUtcNow());
+            await speicher.SichereAsync(entwurf, cancellationToken);
+
+            return new Entwurfsergebnis.KeinAnbieter(grund);
+        }
+
+        try
+        {
+            // Auch aus Entsteht: sonst bleibt SchreibenBegonnen leer (Anlegen
+            // setzt es nicht), und die Oberfläche zählt bei jedem Besuch von 0.
+            // Leeren nur, wenn wirklich neu geschrieben wird — ein laufendes
+            // Schreiben darf sein Bruchstück nicht verlieren.
+            entwurf.Beginne_schreiben(
+                uhr.GetUtcNow(),
+                leeren: entwurf.Stand != Entwurfsstand.Entsteht);
+        }
+        catch (EntwurfsschrittNichtErlaubt fehler)
+        {
+            return new Entwurfsergebnis.Zustandskonflikt(fehler.Message);
         }
 
         await speicher.SichereAsync(entwurf, cancellationToken);
@@ -273,41 +275,30 @@ public sealed class Entwurfsbefehle(
                 "Es gibt keine offene Anmerkung — nichts zu überarbeiten.");
         }
 
-        if (!anschreiber.Eingerichtet)
-        {
-            return new Entwurfsergebnis.KeinAnbieter(
-                "Es ist kein Entwurfsanbieter eingerichtet.");
-        }
-
-        var kontext = await Kontext(entwurf, cancellationToken);
-
-        if (kontext is null)
-        {
-            return new Entwurfsergebnis.Keiner();
-        }
-
-        // Woertlich, samt Zitat: die Anmerkungen sind der ganze Auftrag.
-        var auftraege = entwurf.OffeneAnmerkungen
-            .Select(eintrag => eintrag.Zitat.Length > 0
-                ? $"Zur markierten Stelle [{eintrag.Zitat}]: {eintrag.Text}"
-                : eintrag.Text)
-            .ToArray();
+        KiZugang zugang;
 
         try
         {
-            var ausgabe = await anschreiber.UeberarbeiteAsync(
-                kontext, entwurf.Betreff, entwurf.Text, auftraege, cancellationToken);
-            var (betreff, text) = Anschreibenformat.Lies(ausgabe);
-
-            entwurf.Ueberarbeite(betreff, text, uhr.GetUtcNow());
+            zugang = await ki.HoleAsync(request.Wer, cancellationToken);
         }
         catch (AnschreibenNichtVerfuegbar fehler)
         {
             return new Entwurfsergebnis.KeinAnbieter(fehler.Message);
         }
-        catch (Eingabefehler fehler)
+
+        if (!zugang.IstEingerichtet)
         {
-            return new Entwurfsergebnis.Eingabe(fehler.Message);
+            return new Entwurfsergebnis.KeinAnbieter(
+                "Es ist kein Entwurfsanbieter eingerichtet.");
+        }
+
+        try
+        {
+            entwurf.Beginne_schreiben(uhr.GetUtcNow(), leeren: false);
+        }
+        catch (EntwurfsschrittNichtErlaubt fehler)
+        {
+            return new Entwurfsergebnis.Zustandskonflikt(fehler.Message);
         }
 
         await speicher.SichereAsync(entwurf, cancellationToken);
@@ -379,35 +370,6 @@ public sealed class Entwurfsbefehle(
         return new Entwurfsergebnis.Erledigt(entwurf);
     }
 
-    /// <summary>Baut den Kontext — serverseitig, aus eigenen Daten und der Anzeige.</summary>
-    private async Task<Anschreibenkontext?> Kontext(
-        Bewerbungsentwurf entwurf, CancellationToken cancellationToken)
-    {
-        var stelle = await stellen.HoleAsync(entwurf.Stelle, cancellationToken);
-
-        if (stelle is null)
-        {
-            return null;
-        }
-
-        var eigen = await bewerber.HoleAsync(cancellationToken);
-        var firma = await unternehmen.NameAsync(stelle.Firma, cancellationToken);
-
-        return new Anschreibenkontext(
-            stelle.Titel,
-            // Der Firmenname ist hier die ANSCHRIFT, keine Aussage: man kann
-            // keinen Brief schreiben, ohne zu wissen, an wen (ADR-0034).
-            firma,
-            stelle.Ort,
-            stelle.Beschreibung,
-            stelle.Faehigkeiten,
-            eigen.Name,
-            eigen.Ueberschrift,
-            eigen.Text,
-            eigen.Faehigkeiten,
-            eigen.Werdegang,
-            eigen.Sprache);
-    }
 }
 
 /// <summary>Das Ausgabeformat des Modells, gelesen statt geraten.</summary>
@@ -442,8 +404,19 @@ public static class Anschreibenformat
             {
                 var umbruch = danach.IndexOf('\n');
 
-                betreff = umbruch >= 0 ? danach[..umbruch] : danach;
-                text = umbruch >= 0 ? danach[(umbruch + 1)..] : string.Empty;
+                if (umbruch < 0)
+                {
+                    // Betreffzeile noch nicht fertig. Den Rohtext als Körper
+                    // zeigen — sonst bleibt der Brief minutenlang leer, während
+                    // das Modell den Betreff tippt.
+                    betreff = string.Empty;
+                    text = ganzes;
+                }
+                else
+                {
+                    betreff = danach[..umbruch];
+                    text = danach[(umbruch + 1)..];
+                }
             }
         }
 
@@ -469,6 +442,8 @@ public sealed class EntwurfSendenHandler(
     IStellenauskunft stellen,
     IEinwilligungsschreiber ledger,
     IOutbox outbox,
+    IUnternehmensmitgliederAbfrage mitglieder,
+    IKontaktauskunft kontakt,
     TimeProvider uhr) : IRequestHandler<EntwurfSendenBefehl, Entwurfsergebnis>
 {
     /// <inheritdoc />
@@ -501,9 +476,12 @@ public sealed class EntwurfSendenHandler(
                 "Diese Stelle ist nicht mehr ausgeschrieben.");
         }
 
+        var firmenMitglieder = await mitglieder.HoleAsync(stelle.Firma, cancellationToken);
+
         var jetzt = uhr.GetUtcNow();
         var mitgeschickt = new Mitgeschicktes(
             entwurf.TeiltLebenslauf, Portfolio: false, entwurf.Unterlagen);
+        var briefkopf = await kontakt.HoleKontaktAsync(cancellationToken);
 
         var vorhanden = await bewerbungen.HoleAsync(stelle.Id, request.Wer, cancellationToken);
         Bewerbung bewerbung;
@@ -513,11 +491,12 @@ public sealed class EntwurfSendenHandler(
             if (vorhanden is null)
             {
                 bewerbung = Bewerbung.Schicke_ab(
-                    stelle.Id, stelle.Firma, request.Wer, entwurf.Text, mitgeschickt, jetzt);
+                    stelle.Id, stelle.Firma, request.Wer, entwurf.Text, mitgeschickt, jetzt,
+                    briefkopf);
             }
             else
             {
-                vorhanden.Schicke_erneut(entwurf.Text, mitgeschickt, jetzt);
+                vorhanden.Schicke_erneut(entwurf.Text, mitgeschickt, jetzt, briefkopf);
                 bewerbung = vorhanden;
             }
         }
@@ -548,10 +527,14 @@ public sealed class EntwurfSendenHandler(
         entwurf.Vermerke_versand(jetzt);
         await entwuerfe.SichereAsync(entwurf, cancellationToken);
 
-        // Die Person erfaehrt, dass ihre Bewerbung heraus ist. Das Unternehmen
-        // zu benachrichtigen braucht die Mitgliederliste und steht in Phase 5.
+        // Die Person erfaehrt, dass ihre Bewerbung heraus ist.
         await outbox.VermerkeAsync(
             request.Wer, Benachrichtigungsarten.Bewegt, cancellationToken);
+
+        foreach (var mitglied in firmenMitglieder)
+        {
+            await outbox.VermerkeAsync(mitglied, Benachrichtigungsarten.Angekommen, cancellationToken);
+        }
 
         return new Entwurfsergebnis.Erledigt(entwurf);
     }

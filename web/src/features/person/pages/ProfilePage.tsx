@@ -40,6 +40,7 @@ import { useAsync } from "../lib/useAsync";
 import { usePerson } from "../lib/session";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 import { DraftHelp } from "../components/DraftHelp";
+import { Zivilidentitaet } from "../components/Zivilidentitaet";
 
 interface FormState {
   headline: string;
@@ -330,6 +331,7 @@ export function ProfilePage() {
             />
             <TextField
               label={t("profil.ort")}
+              helperText={t("profil.ortHinweis")}
               value={form.location}
               onChange={(event) =>
                 change("location", event.target.value)
@@ -422,6 +424,8 @@ export function ProfilePage() {
           </Box>
         </CardContent>
       </Card>
+
+      <Zivilidentitaet />
     </PageShell>
   );
 }

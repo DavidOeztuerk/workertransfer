@@ -15,6 +15,8 @@ export interface RegistrierEingabe {
   email: string;
   password: string;
   anzeigename: string;
+  vorname?: string;
+  nachname?: string;
   /**
    * Gesetzt heisst: hier registriert sich ein Unternehmen.
    *
@@ -96,6 +98,8 @@ export async function registriere(eingabe: RegistrierEingabe): Promise<Registrie
         // `display_name`. Mit `displayName` kommt die Eingabe nicht herein —
         // gemessen, und der Fehler sah aus wie ein leeres Formular.
         display_name: eingabe.anzeigename,
+        ...(eingabe.vorname ? { given_name: eingabe.vorname } : {}),
+        ...(eingabe.nachname ? { family_name: eingabe.nachname } : {}),
         // Nur mitschicken, wenn es eine Absicht gibt: `company_name` ist im
         // Vertrag optional, und ein `null` im Rumpf wäre eine Aussage, die
         // niemand gemacht hat.

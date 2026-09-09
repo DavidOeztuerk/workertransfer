@@ -461,9 +461,14 @@
       "Priority": 10
     },
     {
+      // Schreiben und Überarbeiten streamen Token vom Modell. Ocelot bricht
+      // sonst nach 90 Sekunden ab (DownstreamRoute.DefaultTimeoutSeconds),
+      // obwohl der Brief schon unterwegs ist. Drei Minuten: das Modell darf
+      // langsam sein, ein hängender Dienst nicht ewig.
       "UpstreamPathTemplate": "/applications/{rest}",
       "DownstreamPathTemplate": "/applications/{rest}",
       "DownstreamScheme": "http",
+      "Timeout": 180,
       "DownstreamHostAndPorts": [
         {
           "Host": "applications-service",
