@@ -7,7 +7,7 @@
 # Nur das Release entfernen und den Cluster behalten: `helm uninstall workertransfer`.
 #
 # Nur PAUSIEREN statt löschen: `docker stop workertransfer-control-plane`, zurück
-# mit `docker start`. Das ist der richtige Weg vor `uv run pytest` (Testcontainers
+# mit `docker start`. Das ist der richtige Weg vor `make test` (Testcontainers
 # und der Cluster vertragen sich nicht). Aber Vorsicht mit der Erwartung: nach dem
 # Start antwortet `kubectl` schon nach Sekunden, bis alle fünfzehn Pods BEREIT
 # sind vergehen jedoch ein bis zwei Minuten. Solange gibt das Gateway 502 —

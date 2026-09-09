@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\WorkerTransfer.Identity.Application\WorkerTransfer.Identity.Application.csproj" />
+    <ProjectReference Include="..\WorkerTransfer.Identity.Contracts\WorkerTransfer.Identity.Contracts.csproj" />
+    <ProjectReference Include="..\WorkerTransfer.Identity.Infrastructure\WorkerTransfer.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Identity\WorkerTransfer.Contracts.Identity.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Girder.Infrastructure" />
+    <PackageReference Include="Girder.InMemory" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

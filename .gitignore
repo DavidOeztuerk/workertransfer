@@ -3,23 +3,16 @@
 .env.*
 !.env.example
 
-.venv/
-__pycache__/
 *.py[cod]
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
 .coverage
 coverage.xml
 htmlcov/
 
 node_modules/
-# Der Web-Container legt seinen pnpm-Store im bind-gemounteten Repo ab.
-.pnpm-store/
 # Playwright-Artefakte: Traces und Screenshots eines Laufs, keine Quellen.
 test-results/
 playwright-report/
-.turbo/
+
 dist/
 build/
 *.egg-info/
@@ -38,3 +31,12 @@ var/
 # Quellen — und plattformabhängig, deshalb bewusst keine Referenzbilder im
 # Repository (Schriftglättung darwin vs. linux erzeugt Fehlalarme).
 .screenshots/
+
+# .NET
+**/bin*
+**/obj*
+**/TestResults/
+
+# Das Gespraechsprotokoll, das beim Umstieg auf Girder 4 als Vorlage diente.
+# Gehoert nicht ins Projekt.
+kon.txt

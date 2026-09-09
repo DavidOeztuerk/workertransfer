@@ -1,0 +1,126 @@
+$ vitest run
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/davidozturk/Projects/workertransfer/apps/web[39m
+
+Not implemented: navigation to another Document
+ [32m✓[39m src/routes/company-transfers.test.tsx [2m([22m[2m14 tests[22m[2m)[22m[33m 2162[2mms[22m[39m
+     [33m[2m✓[22m[39m sagt beim Laden, dass geladen wird [33m 387[2mms[22m[39m
+     [33m[2m✓[22m[39m schickt Angebot, Start und Ablöse so, wie sie im Formular stehen [33m 1046[2mms[22m[39m
+Not implemented: navigation to another Document
+ [32m✓[39m src/routes/market.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 2357[2mms[22m[39m
+     [33m[2m✓[22m[39m asks for a login rather than showing a status nobody owns [33m 442[2mms[22m[39m
+     [33m[2m✓[22m[39m preselects the loaded status — never a friendlier one [33m 320[2mms[22m[39m
+     [33m[2m✓[22m[39m sends exactly what was chosen [33m 960[2mms[22m[39m
+ [32m✓[39m src/routes/resume.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 2378[2mms[22m[39m
+     [33m[2m✓[22m[39m treats an empty end date as 'still there' rather than as a gap [33m 1215[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps a rejected form on screen and does not claim success [33m 383[2mms[22m[39m
+ [32m✓[39m src/routes/transfers.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 2493[2mms[22m[39m
+     [33m[2m✓[22m[39m offers declining in every running state — from a trap there is no exit [33m 794[2mms[22m[39m
+     [33m[2m✓[22m[39m turns euros into cents when making an offer [33m 824[2mms[22m[39m
+ [32m✓[39m src/routes/account-deletion.test.tsx [2m([22m[2m24 tests[22m[2m)[22m[33m 2678[2mms[22m[39m
+     [33m[2m✓[22m[39m asks for a login rather than offering to delete nothing [33m 445[2mms[22m[39m
+       [33m[2m✓[22m[39m lets someone step back out — wanting to look is not wanting to delete [33m 304[2mms[22m[39m
+ [32m✓[39m src/routes/portfolio-item.test.tsx [2m([22m[2m14 tests[22m[2m)[22m[33m 2979[2mms[22m[39m
+     [33m[2m✓[22m[39m sends an empty link as null, not as an empty string [33m 980[2mms[22m[39m
+     [33m[2m✓[22m[39m hängt an, statt zu ersetzen — vorhandene Arbeiten bleiben stehen [33m 559[2mms[22m[39m
+     [33m[2m✓[22m[39m uploads immediately and keeps the name for the save [33m 391[2mms[22m[39m
+ [32m✓[39m src/routes/profile.test.tsx [2m([22m[2m16 tests[22m[2m)[22m[33m 3122[2mms[22m[39m
+     [33m[2m✓[22m[39m splits the skills field on commas and drops the blanks [33m 1293[2mms[22m[39m
+ [32m✓[39m src/routes/jobs.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[33m 3375[2mms[22m[39m
+     [33m[2m✓[22m[39m passes the typed query to the server [33m 1093[2mms[22m[39m
+     [33m[2m✓[22m[39m loads the next page from the cursor and keeps the first [33m 305[2mms[22m[39m
+ [32m✓[39m src/routes/candidates.test.tsx [2m([22m[2m23 tests[22m[2m)[22m[33m 4385[2mms[22m[39m
+     [33m[2m✓[22m[39m shows nothing at all while the ledger is silent [33m 450[2mms[22m[39m
+     [33m[2m✓[22m[39m searches only when asked, not on every keystroke [33m 396[2mms[22m[39m
+     [33m[2m✓[22m[39m splits several skills on commas [33m 462[2mms[22m[39m
+     [33m[2m✓[22m[39m offers a reset only once something is filtered [33m 511[2mms[22m[39m
+ [32m✓[39m src/routes/company-job-new.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 4821[2mms[22m[39m
+     [33m[2m✓[22m[39m creates a draft, never a published job [33m 1121[2mms[22m[39m
+     [33m[2m✓[22m[39m sends the required skills as a list, not as a line of text [33m 1126[2mms[22m[39m
+     [33m[2m✓[22m[39m sends the advert as it stands in the form, skills as a list [33m 642[2mms[22m[39m
+     [33m[2m✓[22m[39m warns before it overwrites a description that is already written [33m 350[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps the text when the provider is silent [33m 320[2mms[22m[39m
+     [33m[2m✓[22m[39m führt nach dem Anlegen zurück auf die Liste [33m 644[2mms[22m[39m
+ [32m✓[39m src/routes/register.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 6270[2mms[22m[39m
+     [33m[2m✓[22m[39m registers with a private address and shows the confirmation hint [33m 1445[2mms[22m[39m
+     [33m[2m✓[22m[39m sends display_name in snake_case and no tenant [33m 530[2mms[22m[39m
+     [33m[2m✓[22m[39m says so when the mail could not even be requested [33m 648[2mms[22m[39m
+     [33m[2m✓[22m[39m confirms the resend when it went out [33m 775[2mms[22m[39m
+     [33m[2m✓[22m[39m shows the same hint for a known address as for a new one [33m 555[2mms[22m[39m
+     [33m[2m✓[22m[39m registers a person by default, without asking about a company [33m 421[2mms[22m[39m
+     [33m[2m✓[22m[39m says right away that a mass provider cannot become a company [33m 304[2mms[22m[39m
+     [33m[2m✓[22m[39m sends the company name, and never a tenant [33m 706[2mms[22m[39m
+     [33m[2m✓[22m[39m sends no company_name at all when registering as a person [33m 593[2mms[22m[39m
+ [32m✓[39m src/routes/company-profile.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1852[2mms[22m[39m
+     [33m[2m✓[22m[39m zeigt bei einem Ausfall KEIN leeres Formular [33m 408[2mms[22m[39m
+     [33m[2m✓[22m[39m splits the lists on commas and drops the blanks [33m 664[2mms[22m[39m
+ [32m✓[39m src/routes/job-apply.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[33m 1746[2mms[22m[39m
+     [33m[2m✓[22m[39m sends what was ticked [33m 643[2mms[22m[39m
+ [32m✓[39m src/routes/login.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1924[2mms[22m[39m
+     [33m[2m✓[22m[39m renders the German heading [33m 491[2mms[22m[39m
+     [33m[2m✓[22m[39m submits the form and redirects on a successful login [33m 676[2mms[22m[39m
+     [33m[2m✓[22m[39m führt nach dem Anmelden auf die Bewerbungsseite der gemerkten Stelle [33m 376[2mms[22m[39m
+     [33m[2m✓[22m[39m shows the error message on a failed login and does not redirect [33m 367[2mms[22m[39m
+ [32m✓[39m src/routes/github.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 1785[2mms[22m[39m
+     [33m[2m✓[22m[39m asks for a login rather than showing a connection nobody owns [33m 530[2mms[22m[39m
+ [32m✓[39m src/routes/company-team-invite.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1722[2mms[22m[39m
+     [33m[2m✓[22m[39m offers the invite form to an admin [33m 311[2mms[22m[39m
+     [33m[2m✓[22m[39m invites with the address and the chosen role [33m 879[2mms[22m[39m
+     [33m[2m✓[22m[39m says the same thing whether or not the address already has an account [33m 422[2mms[22m[39m
+ [32m✓[39m src/routes/portfolio.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1101[2mms[22m[39m
+     [33m[2m✓[22m[39m listet die Arbeiten und verlinkt jede auf ihre eigene Adresse [33m 687[2mms[22m[39m
+ [32m✓[39m src/routes/settings.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 1255[2mms[22m[39m
+     [33m[2m✓[22m[39m asks for a login rather than showing settings nobody owns [33m 499[2mms[22m[39m
+ [32m✓[39m src/routes/team.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 1218[2mms[22m[39m
+     [33m[2m✓[22m[39m withdraws an invitation through the server [33m 553[2mms[22m[39m
+ [32m✓[39m src/routes/verify.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 1091[2mms[22m[39m
+     [33m[2m✓[22m[39m burns a single-use token only once, however often the page mounts [33m 568[2mms[22m[39m
+ [32m✓[39m src/routes/company-jobs.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1167[2mms[22m[39m
+     [33m[2m✓[22m[39m sagt beim Laden, dass geladen wird — statt einer leeren Karte [33m 411[2mms[22m[39m
+     [33m[2m✓[22m[39m offers publishing only for a draft [33m 314[2mms[22m[39m
+ [32m✓[39m src/routes/career.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 861[2mms[22m[39m
+     [33m[2m✓[22m[39m shows the company without any login [33m 541[2mms[22m[39m
+ [32m✓[39m src/routes/applications.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1134[2mms[22m[39m
+     [33m[2m✓[22m[39m names what is currently shared [33m 311[2mms[22m[39m
+     [33m[2m✓[22m[39m still offers it while the company is reading [33m 495[2mms[22m[39m
+ [32m✓[39m src/routes/my-data.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1015[2mms[22m[39m
+     [33m[2m✓[22m[39m asks for a login rather than collecting data for nobody [33m 596[2mms[22m[39m
+ [32m✓[39m src/routes/invitation.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 828[2mms[22m[39m
+     [33m[2m✓[22m[39m uses a single-use token exactly once, even across a second mount [33m 715[2mms[22m[39m
+ [32m✓[39m src/routes/home.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 1179[2mms[22m[39m
+     [33m[2m✓[22m[39m carries exactly one first-level heading [33m 629[2mms[22m[39m
+ [32m✓[39m src/app.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1140[2mms[22m[39m
+     [33m[2m✓[22m[39m states the consent-first product promise [33m 842[2mms[22m[39m
+ [32m✓[39m src/auth/session.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 923[2mms[22m[39m
+     [33m[2m✓[22m[39m clears the cached session after POST /auth/logout [33m 617[2mms[22m[39m
+ [32m✓[39m src/routes/overview.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 1253[2mms[22m[39m
+     [33m[2m✓[22m[39m admits an incomplete picture instead of claiming nothing is waiting [33m 781[2mms[22m[39m
+ [32m✓[39m src/companies/client.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32m✓[39m src/routes/consents.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 1512[2mms[22m[39m
+     [33m[2m✓[22m[39m asks for a login rather than showing consents nobody owns [33m 648[2mms[22m[39m
+ [32m✓[39m src/resume/pending-badge.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 224[2mms[22m[39m
+ [32m✓[39m src/auth/client.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+ [32m✓[39m src/jobs/intent.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/resume/client.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+ [32m✓[39m src/jobs/client.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 41[2mms[22m[39m
+ [32m✓[39m src/auth/team.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m src/settings/client.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 55[2mms[22m[39m
+ [32m✓[39m src/styles.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m src/export/build.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/market/client.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m src/profile/client.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 74[2mms[22m[39m
+ [32m✓[39m src/portfolio/client.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32m✓[39m src/applications/client.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m src/transfers/client.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/consent/parse.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/account/client.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/consent/client.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/profile/candidates.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/jobs/match.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/profile/search.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m51 passed[39m[22m[90m (51)[39m
+[2m      Tests [22m [1m[32m464 passed[39m[22m[90m (464)[39m
+[2m   Start at [22m 13:40:10
+[2m   Duration [22m 26.75s[2m (transform 11.61s, setup 35.06s, import 25.52s, tests 62.59s, environment 136.72s)[22m
+

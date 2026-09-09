@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\portfolio-service\WorkerTransfer.Portfolio.Api\WorkerTransfer.Portfolio.Api.csproj" />
+    <ProjectReference Include="..\..\src\portfolio-service\WorkerTransfer.Portfolio.Application\WorkerTransfer.Portfolio.Application.csproj" />
+    <ProjectReference Include="..\..\src\portfolio-service\WorkerTransfer.Portfolio.Domain\WorkerTransfer.Portfolio.Domain.csproj" />
+    <ProjectReference Include="..\..\src\portfolio-service\WorkerTransfer.Portfolio.Infrastructure\WorkerTransfer.Portfolio.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

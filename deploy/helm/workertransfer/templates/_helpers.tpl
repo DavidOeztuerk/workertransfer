@@ -1,8 +1,10 @@
 {{/*
 Gemeinsame Bausteine. Die interessanten sind die letzten beiden:
 `workertransfer.serviceEnv` ist die eine Stelle, an der die Umgebung eines
-Dienstes entsteht — Deployment und Migrations-Job holen sie beide von hier,
-damit eine Migration nie gegen eine andere Datenbank läuft als der Dienst.
+Dienstes entsteht. Zur Python-Zeit holten Deployment UND Migrations-Job sie von
+hier; seit der Dienst sein Schema beim Start selbst wandert, gibt es nur noch
+einen Abnehmer — und damit keine Gelegenheit mehr, dass die beiden gegen
+verschiedene Datenbanken laufen.
 */}}
 
 {{- define "workertransfer.labels" -}}
@@ -51,8 +53,8 @@ Die Umgebung eines Dienstes.
 
 Aufruf: {{ include "workertransfer.serviceEnv" (dict "root" $ "svc" $svc) }}
 
-WORKER_DB_PASSWORD steht bewusst VOR WORKER_DATABASE_URL: Kubernetes ersetzt
-$(VAR) nur durch Variablen, die weiter oben in derselben Liste stehen. Aus
+DB_PASSWORT steht bewusst VOR der Verbindungszeichenfolge: Kubernetes ersetzt
+$(VAR) nur durch Variablen, die weiter oben in DERSELBEN Liste stehen. Aus
 `envFrom` ginge es nicht — deshalb kommt das Passwort hier einzeln.
 */}}
 {{- define "workertransfer.serviceEnv" -}}
@@ -60,47 +62,82 @@ $(VAR) nur durch Variablen, die weiter oben in derselben Liste stehen. Aus
 {{- $svc := .svc -}}
 - name: SERVICE_DIR
   value: {{ $svc.dir | quote }}
-- name: WORKER_PORT
-  value: {{ $svc.port | quote }}
-- name: WORKER_DB_PASSWORD
+{{/*
+0.0.0.0, nicht localhost: im Behälter beantwortete der Dienstport sonst nichts.
+*/}}
+- name: ASPNETCORE_URLS
+  value: {{ printf "http://0.0.0.0:%v" $svc.port | quote }}
+- name: DB_PASSWORT
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: POSTGRES_PASSWORD
-- name: WORKER_DATABASE_URL
-  value: {{ printf "postgresql+asyncpg://%s:$(WORKER_DB_PASSWORD)@%s:%v/%s" $root.Values.postgres.user $root.Values.postgres.host $root.Values.postgres.port $svc.database | quote }}
+{{/*
+Der Schlüssel heisst wie die Datenbank, weil der Dienst sie so erfragt:
+`GetConnectionString("<name>")`. Zwei Namen für dieselbe Sache wären zwei
+Gelegenheiten, sie auseinanderlaufen zu lassen.
+*/}}
+- name: {{ printf "ConnectionStrings__%s" $svc.database }}
+  value: {{ printf "Host=%s;Port=%v;Database=%s;Username=%s;Password=$(DB_PASSWORT)" $root.Values.postgres.host $root.Values.postgres.port $svc.database $root.Values.postgres.user | quote }}
 {{/*
 Die drei geteilten Geheimnisse. Einzeln aufgeführt statt als `envFrom` über das
-ganze Secret: sonst bekäme JEDER Dienst auch WORKER_ANTHROPIC_API_KEY, und ein
-Schlüssel, den acht von zehn Diensten nicht brauchen, gehört nicht in ihre
-Umgebung.
+ganze Secret: sonst bekäme JEDER Dienst auch den Schlüssel der
+Formulierungshilfe, und einer, den neun von elf nicht brauchen, gehört nicht in
+ihre Umgebung.
 */}}
-- name: WORKER_JWT_SECRET
+- name: JwtSettings__Secret
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_JWT_SECRET
-- name: WORKER_NOTIFY_SECRET
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "workertransfer.secretName" $root }}
-      key: WORKER_NOTIFY_SECRET
-- name: WORKER_ERASURE_SECRET
+- name: Erasure__Geheimnis
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_ERASURE_SECRET
+{{/*
+Das Meldegeheimnis heisst je nach Seite anders und ist DASSELBE: bei
+identity-service ist es `Notify__Geheimnis` (er prüft es), bei jedem Dienst
+mit `Identity__Adresse` `Identity__Geheimnis` (er legt es vor), und die
+absendenden Dienste tragen es als `Notifications__Geheimnis`.
+
+Ausdrücklich ein ANDERES als das der Löschung (ADR-0027 §4.4): "darf eine Mail
+anstossen" und "darf alles über einen Menschen löschen" dürfen nicht dasselbe
+Papier sein. Die Bedingungen sind unabhängig: applications-service hat BEIDE
+Adressen und braucht BEIDE Namen für dasselbe Geheimnis.
+*/}}
+{{- if eq $svc.name "identity-service" }}
+- name: Notify__Geheimnis
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "workertransfer.secretName" $root }}
+      key: WORKER_NOTIFY_SECRET
+{{- end }}
+{{- if hasKey ($svc.env | default dict) "Identity__Adresse" }}
+- name: Identity__Geheimnis
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "workertransfer.secretName" $root }}
+      key: WORKER_NOTIFY_SECRET
+{{- end }}
+{{- if hasKey ($svc.env | default dict) "Notifications__Adresse" }}
+- name: Notifications__Geheimnis
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "workertransfer.secretName" $root }}
+      key: WORKER_NOTIFY_SECRET
+{{- end }}
 {{- if $svc.drafting }}
 {{/*
 Die Formulierungshilfe (ADR-0024). LEER heisst: sie ist aus, und die
 Oberfläche sagt das — es wird dann kein fremder Dienst angerufen.
 */}}
-- name: WORKER_ANTHROPIC_API_KEY
+- name: Draft__Schluessel
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_ANTHROPIC_API_KEY
-- name: WORKER_DRAFTING_MODEL
+- name: Draft__Modell
   value: {{ $root.Values.draftingModel | quote }}
 {{- end }}
 {{- range $key, $value := ($svc.env | default dict) }}

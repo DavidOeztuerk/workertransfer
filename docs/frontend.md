@@ -1,103 +1,68 @@
 # Frontend architecture
 
-The frontend is a pnpm workspace driven by Turborepo:
+Alles Frontend liegt in **`web/`** — ein Verzeichnis, ein `package.json`, ein
+Lockfile. Es gibt keinen pnpm-Workspace, kein Turborepo, kein `packages/ui` und
+kein `package.json` in der Wurzel mehr. `pnpm -r` und `--filter` scheitern hier
+mit `ERR_PNPM_NO_PKG_MANIFEST`; jeder Befehl läuft aus `web/`.
 
 ```text
-apps/web              Vite + React application shell
-packages/ui           accessible, product-owned UI primitives and design tokens
+web/src/
+  main.tsx  AppRoot.tsx  env.ts
+  core/       api/ (ein fetch-Client)  router/ (createBrowserRouter)
+              store/ (Redux Toolkit)   config/
+  features/   public/  auth/  person/  work/  company/
+              je Feature: api/  components/  pages/  lib/  routes.tsx  test/
+  shared/     components/{layout,ui,routing}  hooks/  pages/
+  styles/     tokens/{colors,spacing,typography}.ts  theme.ts
+  test/
+web/e2e/      die Playwright-Reisen
 ```
 
-The application owns feature modules, pages, route composition, API clients, and
-server-state hooks. `packages/ui` contains only portable design-system primitives;
-it must not import feature logic, application state, or backend clients.
+**Feature-driven**: was zu einer Fachlichkeit gehört, liegt beieinander — der
+API-Client neben den Seiten, die ihn rufen, und den Bauteilen, die nur dort
+vorkommen. Was zwei Features teilen, zieht nach `shared/`, und erst dann. Ein
+Feature importiert **nie** aus einem anderen Feature; braucht es etwas von dort,
+gehört das nach `shared/` oder `core/`.
 
-## What exists today (10.08.2026)
+## Der Aufbau
 
-- **26 Routen** unter `apps/web/src/routes/` (5.224 Zeilen ohne Tests), von `/`
-  und `/login` bis `/konto-loeschen` und `/company/team`. Die vollständige Liste
-  steht in CLAUDE.md.
-- **Session state**: `src/auth/session.ts` (`useSession` / `useLogout`) ist die
-  einzige Quelle für „bin ich angemeldet", getragen von TanStack Query über
-  `GET /me`. `src/auth/client.ts` ist der cookie-basierte Client;
-  `LoginResult` ist eine diskriminierte Union und wirft bei falschen
-  Zugangsdaten nicht.
-- **`packages/ui`**: **20 Bauteile**, handgeschriebenes CSS mit `--wt-*` Custom
-  Properties. **Kein** Tailwind, Shadcn, Radix, Storybook, ESLint oder Prettier.
-  Das Paket exportiert rohes TypeScript (kein Build-Schritt).
-- **Kein i18n.** Deutsch ist in JSX hartkodiert und an einer Stelle im
-  API-Client (`"Anmeldung fehlgeschlagen"`); die Tests prüfen die deutschen
-  Literale direkt. Jede Textänderung kostet einen Test.
-- **Formulare** benutzen einfaches `useState` — kein React Hook Form, kein Zod.
-- **Passung** (`src/jobs/match.ts`) wird im Browser gerechnet und existiert
-  nirgends sonst: eine Liste mit Haken, niemals eine Zahl (ADR-0022).
+**MUI 9 mit Emotion** trägt die Oberfläche. Es gibt kein handgeschriebenes CSS
+mehr und keine `--wt-*`-Eigenschaften: Farben, Abstände und Schrift stehen in
+`src/styles/tokens/` als einzige Quelle, `src/styles/theme.ts` baut daraus das
+MUI-Theme für hell und dunkel. **Ein Farbliteral in einer Komponente ist ein
+Mangel, keine Abkürzung** — es entzieht sich dem Themenwechsel und ist beim
+nächsten Farbwechsel die eine Stelle, die niemand findet.
 
-## Das Design-System
+Der Modus kommt aus `useThemeMode()` — bewusst nicht `useTheme`, das gehört MUI
+und läse sich an der Aufrufstelle wie dessen Hook.
 
-Regeln, die in ADR-0029 begründet sind:
+**Die Palette lässt Grün bewusst aus.** Auf einer Plattform, die über
+Einwilligungen entscheidet, *ist* Grün ein Signal („erteilt") und darf nicht
+zugleich die Hausfarbe sein — die Vermischung nimmt dem Signal seine Bedeutung.
+Indigo trägt, Bernstein akzentuiert sparsam, und Grün/Rot/Bernstein bleiben frei
+für erteilt, widerrufen, läuft.
 
-- **Natives Element vor selbstgebautem.** `Select` ist ein `<select>`, `Dialog`
-  ein `<dialog>` mit `showModal()`, `RadioGroup` sind Radios mit gemeinsamem
-  `name`. Wer ein Verhalten nicht sauber selbst hinbekommt, nimmt das native
-  Element — ein hübscher Dialog, den man mit der Tastatur nicht verlassen kann,
-  ist schlechter als ein hässlicher.
-- **Tokens nur in `packages/ui/src/styles/tokens.css`.** Ein
-  `var(--wt-x, fallback)` ist **verboten**, auch bei definiertem Token: der
-  Fallback war der Weg, auf dem einmal eine zweite Palette entstand. Zwei
-  Wächtertests halten das fest.
-- **CSS gehört nach `packages/ui/src/styles/<bauteil>.css`**, eine Datei je
-  Bauteil, eingebunden über die reine `@import`-Liste in
-  `packages/ui/src/styles.css`. In `apps/web/src/styles.css` gehört nur, was
-  wirklich das Layout **genau einer** Seite ist.
-- **Kein Bauteil, das einen Menschen als Zahl darstellt** (ADR-0022): kein
-  Score, kein Prozent, kein Ranking, kein Fortschrittsbalken über Personen.
-- **Kein Dark-Mode**, solange niemand ihn anfordert.
+**Redux Toolkit** hält den Zustand. Jeder Thunk geht über `createAppThunk`
+(`core/store/thunkHelpers.ts`), damit `rejectValue` überall dieselbe Gestalt hat:
+`ApiError` mit `status`, `title`, `detail` und `correlationId`. Ohne diese eine
+Gestalt prüft jede Komponente einen anderen Fehler, und einer davon wird
+vergessen.
 
-### Inventar
+**`react-router-dom` mit `createBrowserRouter`.** Jedes Feature bringt seine
+Routen in `features/<name>/routes.tsx` selbst mit; `core/router/` fügt sie
+zusammen. Seiten werden über `lazyRoute()` nachgeladen, mit einem `Suspense`
+**je Route** — so bleibt die Kopfzeile stehen, während der Inhalt kommt.
 
-| Bauteil | Wofür |
-|---|---|
-| `Button` | `primary` / `secondary` / `quiet` |
-| `Card` | abgesetzte Fläche mit Rahmen und Schatten |
-| `Field` | einzeiliges Feld mit Label, Hinweis, Fehler |
-| `TextArea` | wie `Field`, mehrzeilig |
-| `Select` | natives `<select>` in der `Field`-Hülle |
-| `Checkbox` | Kästchen — gilt **mit dem Absenden** |
-| `Switch` | `button[role="switch"]` — wirkt **sofort** |
-| `Fieldset` | benannte Feldgruppe (`<fieldset>` + `<legend>`) |
-| `RadioGroup` | Auswahl aus wenigen benannten Zuständen |
-| `Page` | Seitengerüst: `<main>`, eine `<h1>`, Vorspann, Nachsatz, Rückweg |
-| `RowList` / `Row` | eine Zeile je Vorgang: Titel, Meta, Aktionen |
-| `DescriptionList` | Begriff/Wert-Paare als `<dl>` |
-| `Loading` | Ladeanzeige — das Label sagt, **was** lädt |
-| `Skeleton` | Platzhalter, `aria-hidden`, immer neben ein `Loading` |
-| `Alert` | `error` unterbricht (`role="alert"`), `notice` wartet (`role="status"`) |
-| `Empty` | „hier ist noch nichts" — bewusst ohne `role` |
-| `LiveRegion` / `useAnnounce` | sagt Ergebnisse an, die man sonst nur sieht |
-| `Toast` | kurze Bestätigung; verschwindet **nicht** von selbst |
-| `Badge` | Zähler für **Vorgänge**, niemals für Personen |
-| `VisuallyHidden` | gelesen, aber nicht gesehen — das Gegenteil von `aria-hidden` |
-
-Der Unterschied zwischen `Checkbox` und `Switch` ist keine Kosmetik: eine
-Checkbox verspricht „gilt, wenn du absendest", ein Switch wirkt sofort. Bei
-einer Einwilligung entscheidet dieses Versprechen, was die Person glaubt getan
-zu haben.
-
-`Skeleton`, `Dialog` und `Toast` haben heute **keinen Aufrufer**. Der letzte
-E3-PR entscheidet je Bauteil: Verbraucher oder Löschung (ADR-0029 §6).
-
-## Wie eine Route ab jetzt aussieht
-
-Festgelegt an `/login`, `/register` und `/` (Schnitt E2). Wer eine Route
-umstellt, schreibt sie nach diesem Muster ab.
+## Wie eine Route aussieht
 
 ### Die vier Zustände, in dieser Reihenfolge
 
 ```tsx
-const query = useQuery({ queryKey: […], queryFn: … });
+const { data, status, error } = useAppSelector(auswahl);
 
-if (query.isPending) return <Loading label="Portfolio wird geladen…" />;
-if (query.isError)   return <Alert>{fehlertext}</Alert>;
-if (leer)            return <Empty title="Noch keine Arbeiten." />;
+if (status === "pending") return <LoadingBlock label="Portfolio wird geladen…" />;
+if (error !== null)       return <ErrorBlock error={error} />;
+if (data.length === 0)    return <EmptyBlock title="Noch keine Arbeiten." />;
 return <Inhalt … />;
 ```
 
@@ -105,107 +70,83 @@ return <Inhalt … />;
 scheiterte, ist kein Leerzustand, und „hier ist noch nichts" wäre dann die
 beruhigendste falsche Antwort, die es gibt.
 
-- Das `label` von `Loading` ist **routenspezifisch** und kommt vom Aufrufer:
-  „was lädt", nicht „dass etwas lädt".
-- Der Fehlertext kommt **vom Server** und wird nie erfunden. Wo ein Client eine
-  diskriminierte Union zurückgibt (`LoginResult`), wird sie ausgewertet statt
-  `try/catch` um alles zu legen.
-- `Alert` ohne Variante unterbricht (`role="alert"`); Bestätigungen bekommen
-  `variant="notice"` (`role="status"`).
+Die drei Bauteile stehen in `shared/components/ui/StateBlock.tsx`:
+
+- `LoadingBlock` trägt ein **routenspezifisches** `label` vom Aufrufer: *was*
+  lädt, nicht *dass* etwas lädt. Es hat `role="status"`, sonst erfährt ein
+  Screenreader nichts.
+- `ErrorBlock` zeigt den Text **vom Server** und erfindet nie einen — und
+  darunter klein die `correlationId`. Sie ist der einzige Faden, an dem sich eine
+  Beschwerde durch alle Dienste zurückverfolgen lässt; wer sie weglässt, zwingt
+  die Person, den Zeitpunkt zu schätzen.
+- `EmptyBlock` darf **„leer" und „nicht freigegeben" nie verwischen**. Wer nichts
+  sieht, weil niemand freigegeben hat, muss einen anderen Satz lesen als jemand,
+  der wirklich nichts angelegt hat.
 
 ### Mutationen
-
-```tsx
-<Button type="submit" disabled={busy}>{busy ? "Anmeldung läuft…" : "Anmelden"}</Button>
-{fehler !== null ? <Alert>{fehler}</Alert> : null}
-```
 
 Jede Mutation braucht **drei** sichtbare Zustände: läuft, ging schief, ging
 durch. Fehlt der mittlere, entsteht ein Knopf, der bei einem Netzfehler nichts
 tut — genau das war der Fall bei „E-Mail erneut senden". Für Erfolge, die keine
-Navigation auslösen, kommt `useAnnounce()` dazu, sonst erfährt ein Screenreader
-nichts.
+Navigation auslösen, kommt eine Ansage dazu.
 
 ### Navigieren
 
-`Button` mit `href` ist ein `<a>`, ohne `href` ein `<button>`. Was navigiert,
-muss ein Link sein — ein `<button onClick={navigate}>` nimmt Mittelklick, neuen
-Tab, Adresse-kopieren und die Vorschau in der Statusleiste.
+Was navigiert, muss ein Link sein. Ein `<button onClick={navigate}>` nimmt
+Mittelklick, neuen Tab, Adresse-kopieren und die Vorschau in der Statusleiste.
+In MUI heißt das `component={RouterLink}` beziehungsweise `href`.
 
-### Wo CSS hingehört
+### Der Draht ist snake_case
 
-| Ort | Was |
-|---|---|
-| `packages/ui/src/styles/<bauteil>.css` | portable Primitives — Knopf, Feld, Karte, Zeile |
-| `apps/web/src/routes/<route>.css`, neben der Route | Layout **genau einer** Seite oder einer Produkt-Hülle (`home.css`, `auth-layout.css`) |
-| `apps/web/src/styles.css` | nur noch, was mehrere noch nicht umgestellte Routen teilen — schrumpft mit jedem Schnitt |
+Die API-Typen bilden ihn ab, statt ihn zu übersetzen. Eine camelCase-Fassung
+dazwischen war schon einmal ein schwerer Fehler: die Felder kamen beim Server
+nicht an, und niemand sah es, weil das Formular danach trotzdem grün meldete.
+Einwortfelder verdecken den Unterschied — nur zusammengesetzte Namen gehen
+auseinander, und die fallen erst in einer echten Anfrage auf.
 
-**Nicht tokenisieren, was kein Systemwert ist.** `1.6` ist nicht
-`--wt-leading-normal` (1.55), `0.9rem` keine Systemschriftgröße. In E1 hat genau
-dieses Zusammenziehen jedes Formular um einen Pixel verschoben; gefunden hat es
-der Screenshot-Vergleich, kein Test.
+### Was eine Änderung nicht darf
 
-**Eine geteilte Klasse zieht erst um, wenn ihr letzter Aufrufer weg ist.**
-`.auth__alert` liegt weiter in `styles.css`, weil acht nicht umgestellte Routen
-sie benutzen — der Name lügt, die Abhängigkeit nicht.
+- **Texte ändern, wo es nicht ausdrücklich gewollt ist**: die Oberfläche ist
+  deutsch und **hartcodiert**, es gibt keine i18n-Schicht, und die Tests prüfen
+  die deutschen Literale direkt.
+- **Eine Zusage verlieren.** Beispiele: „Danach geht es zurück zu: *Stelle*",
+  das Ziel `/jobs/<id>/apply` nach dem Anmelden, und für eine bekannte Adresse
+  **dieselbe** Antwort wie für eine neue.
+- **Einen Einwilligungsschalter zur Ankreuzbox machen.** `ConsentSwitch` ist ein
+  `button[role="switch"]`: eine Ankreuzbox verspricht, die Änderung gelte beim
+  Absenden, und bei einer Einwilligung ist dieser Unterschied nicht kosmetisch.
 
-### Was eine Umstellung nicht darf
+## Tests
 
-- Texte ändern, wo es nicht ausdrücklich gewollt ist: die Tests prüfen die
-  deutschen Literale direkt.
-- Eine Zusage verlieren. Beispiele aus diesen drei Routen: „Danach geht es
-  zurück zu: *Stelle*" (`ZurueckHinweis`), das Ziel `/jobs/<id>/apply` nach dem
-  Anmelden, und für eine bekannte Adresse **dieselbe** Antwort wie für eine neue.
-  Das Ziel war bis 12.08.2026 `/jobs?stelle=<id>` — und von **keinem** Test
-  gedeckt, obwohl es der einzige Weg zurück ist.
-- Eine sichtbare Änderung unangekündigt lassen. Jeder PR trägt zwei Listen: was
-  sich absichtlich geändert hat, und welche Testzahl sich deswegen bewegt hat.
+Geprüft wird **Verhalten** — Rolle, zugänglicher Name, Tastatur, Fokus — und
+**nicht** Klassennamen: `screen.getByRole(...)` statt `container.querySelector`.
+Wo eine Ausnahme nötig ist, steht der Grund als Kommentar im Test.
 
-### Tests im Design-System
-
-Jedes Bauteil hat einen Test, der **Verhalten** prüft — Rolle, zugänglicher
-Name, zugängliche Beschreibung, Tastatur, Fokus — und **nicht** Klassennamen.
-`screen.getByRole(...)` statt `container.querySelector(".wt-…")`; wo eine
-Ausnahme nötig ist, steht der Grund als Kommentar im Test.
-
-**Eine Grenze, die man kennen muss:** jsdom implementiert
-`HTMLDialogElement.showModal()` nicht (Issue #3294). Der Ersatz in
-`packages/ui/src/test/setup.ts` setzt nur `open` und löst `close` aus und ahmt
-die Fokusfalle **absichtlich nicht** nach — sonst prüften die Tests unseren
-eigenen Ersatz. Fokusfalle und Esc gehören deshalb in eine Browser-Prüfung.
+Die Playwright-Reisen in `web/e2e/` laufen gegen den **echten** Compose-Stapel;
+es gibt bewusst keinen `webServer` in `playwright.config.ts`, weil ein halb
+hochgefahrenes Umfeld genau die Integration wegabstrahierte, für die es sie
+gibt. **Ohne Stapel überspringen sie sich selbst**, und ein übersprungener Test
+sieht aus wie ein bestandener — deshalb liest der CI-Job `e2e` die Zahl der
+gefahrenen Reisen und geht rot, wenn es zu wenige waren.
 
 ## Commands
 
 ```bash
-pnpm install
-pnpm check      # tsc --noEmit across the workspace
-pnpm test       # Vitest (apps/web und packages/ui)
-pnpm build
-pnpm dev
-make check-web  # pnpm check + pnpm test, die Gate-Schritte 5 und 6
+cd web && pnpm check     # tsc --noEmit
+cd web && pnpm test      # Vitest
+cd web && pnpm build     # das Bündel — gehört dazu, siehe unten
+cd web && pnpm e2e       # die Reisen (braucht `make up`)
 ```
 
-Alle vier laufen im CI-Job `frontend-quality` auf **Node 25**. Die Node-Version
-in `ci.yml` (zwei Stellen) muss dem Major im Dockerfile entsprechen, sonst
-prüft die CI etwas anderes als ausgeliefert wird.
+`pnpm build` ist kein Beiwerk: `tsc` und Vitest laufen beide **nicht** über den
+Bauweg, und ein Fehler, der erst beim Bündeln auftritt, fällt sonst erst im Bild
+auf — und das baut hier niemand nebenbei.
 
-Playwright-E2E liegt in `apps/web/e2e/` und läuft gegen den **echten**
-`docker compose`-Stapel; ohne Stapel überspringen sich die Reisen selbst.
+## Laufzeitkonfiguration, nicht Bauzeit
 
-Screenshot-Aufnahmen für den Vorher/Nachher-Vergleich in einem PR:
-
-```bash
-docker compose up -d
-SHOT_TAG=nachher pnpm --filter @workertransfer/web run shots
-```
-
-Sie liegen in `apps/web/e2e-shots/` mit **eigener** Konfiguration und heißen
-`*.shots.ts`, damit `playwright test` sie nicht einsammelt: `scripts/validate.sh`
-zählt bestandene Reisen aus dem Protokoll, und Aufnahmen in derselben Suite
-würden diesen Zähler entwerten. Ausgabe nach `.screenshots/<tag>/`, nicht
-verfolgt.
-
-`VITE_API_BASE_URL` ist als Turborepo-Build-Input deklariert. Geheimnisse tragen
-nie ein `VITE_`-Präfix. `apps/web/src/env.ts` löst die Dienstadressen in drei
-Schritten auf (`window.__WT_CONFIG__` → `VITE_*` → Port-Rückfall), weil ein
-gebautes Artefakt keine eingebackenen URLs haben darf (ADR-0028).
+`vite build` backt `import.meta.env.VITE_*` in das Bündel. Ein Bild mit
+eingebackenen Adressen kann nicht in zwei Umgebungen dasselbe sein. `web/src/env.ts`
+löst deshalb in drei Schritten auf — `window.__WT_CONFIG__` → `VITE_*` →
+Port-Rückfall — und `web/public/config.js` ist ein leeres Objekt, das lokal
+nichts ändert. Nur das Helm-Chart legt ein echtes darüber. Das nicht zu einem
+Bauargument „vereinfachen".

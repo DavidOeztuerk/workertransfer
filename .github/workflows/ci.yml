@@ -5,115 +5,616 @@ on:
   push:
     branches: [main, develop]
 
+# Ein zweiter Anstoss auf denselben Zweig macht den ersten wertlos — und der
+# Bildjob ist der teuerste hier.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# NOETIG, ABER NICHT HINREICHEND — und das ist nachgemessen.
+#
+# Der Lauftoken bekommt seine Rechte aus der Vorgabe des Kontos, und `packages`
+# steht dort nicht darin. Mit dem Block ist der Bereich da; der Zugriff ist es
+# nicht: gemessen am 09.09.2026 antwortet `dotnet restore` weiterhin mit
+# `403 (Forbidden)` fuer jedes Girder-Paket. Die 403 ist die Auskunft — der
+# Token wurde ANGENOMMEN und ABGEWIESEN. Girder ist ein privates Paket, dieses
+# Repository ist oeffentlich, und ein Paket gewaehrt Zugriff je Repository.
+# Das loest nur eins von beidem: `workertransfer` in den Paketeinstellungen
+# freigeben, oder ein `GIRDER_TOKEN` hinterlegen (siehe unten).
+#
+# `contents: read` steht dabei, weil ein ausgeschriebener Block die Vorgabe
+# ERSETZT: nur `packages` zu nennen naehme dem Lauf das Auschecken.
+permissions:
+  contents: read
+  packages: read
+
+env:
+  # Eine Zahl fuer alle drei Orte: `docker/web.Dockerfile`,
+  # `docker/web-prod.Dockerfile` und die beiden Node-Jobs. Genau dieser
+  # Gleichlauf fehlte, als ein Sprung auf node 25 durch die CI kam und das
+  # Bild zerlegte: node 25 bringt kein corepack mehr mit, und kein Job hier
+  # baute je ein Bild.
+  NODE_MAJOR: "25"
+
 jobs:
+  # --------------------------------------------------------------------------
   backend-quality:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.14"
-      - uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-      - run: uv sync --all-packages --all-groups --locked
-      - run: uv run ruff format --check .
-      - run: uv run ruff check .
-      - run: uv run mypy packages apps
-      # Testcontainers (identity-service integration suite) needs a reachable
-      # Docker daemon. ubuntu-latest has Docker, so the integration tests run
-      # here; on Docker-less runners they self-skip (ADR-0011 offline-skip).
-      - run: uv run pytest
-
-  frontend-quality:
-    # apps/web and packages/ui were previously ungated: TypeScript errors,
-    # failing Vitest suites and broken Vite builds could all merge green because
-    # CI only ran the Python job. AGENTS.md already declares `pnpm check` and
-    # `pnpm test` as binding steps 5 and 6 of the verification order.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          # Dieselbe Hauptversion wie `docker/web.Dockerfile`. Läuft der
-          # Container auf 25 und die CI auf 24, prüft niemand mehr das, was
-          # ausgeliefert wird — und der Unterschied fällt erst auf, wenn er
-          # etwas kaputt macht.
-          node-version: "25"
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm check
-      - run: pnpm test
-      - run: pnpm build
-
-  # Bekannte Lücken in Abhängigkeiten — der dritte Job neben Backend und
-  # Frontend (ULTRAPLAN Phase 10, „Dependency-Scanning").
-  #
-  # Er läuft NICHT mit `continue-on-error`. Ein Scan, der rot sein darf, wird
-  # nach der zweiten Woche ignoriert, und dann ist er schlechter als keiner:
-  # er erzeugt das Gefühl, jemand schaue hin.
-  dependency-audit:
+    name: .NET — bauen und testen
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - name: uv einrichten
-        uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-dotnet@v5
         with:
-          enable-cache: true
+          dotnet-version: "10.0.x"
 
-      - name: Python-Abhängigkeiten prüfen
-        # `uv export` statt `uv sync`: pip-audit braucht nur die Liste, nicht
-        # die installierte Umgebung. Ohne die Dev-Gruppe — ein Testwerkzeug
-        # läuft nie in Produktion, und ein Fund dort würde den Blick auf die
-        # echten verstellen.
+      # Girder liegt in GitHub Packages und verlangt eine Anmeldung.
+      #
+      # Hier stand „der `GITHUB_TOKEN` reicht dafuer" — das war eine Annahme und
+      # nie gemessen. Er reicht nur, wenn das Paket DIESEM Repository Zugriff
+      # gewaehrt (Paketeinstellungen → Manage Actions access). Ist das nicht
+      # eingerichtet, antwortet die Quelle mit 403, und zwar fuer jedes Paket
+      # einzeln.
+      #
+      # Deshalb geht `GIRDER_TOKEN` vor, wenn es hinterlegt ist: ein PAT mit
+      # `read:packages` haengt an keiner Repository-Freigabe. Ohne das Geheimnis
+      # bleibt es beim Lauftoken, und dann muss die Freigabe stehen.
+      - name: NuGet-Anmeldung
         run: |
-          # --all-packages: die Abhängigkeiten stecken in den Workspace-
-          # MITGLIEDERN, nicht im Wurzelprojekt (`dependencies = []`). Ohne das
-          # liefert der Export drei Zeilen, und der Scan prüfte praktisch
-          # nichts — ein grüner Bericht über eine leere Liste.
-          # --no-emit-workspace: die eigenen Pakete stehen in keiner
-          # Schwachstellendatenbank.
-          uv export --all-packages --no-dev --no-emit-workspace \
-            --format requirements-txt > requirements.txt
-          # Der Wächter gegen genau den Fehler von oben: eine kurze Liste ist
-          # hier kein gutes Zeichen, sondern ein kaputter Export.
-          lines=$(grep -c '==' requirements.txt || true)
-          echo "$lines Abhängigkeiten werden geprüft."
-          if [ "$lines" -lt 50 ]; then
-            echo "::error::Nur $lines Abhängigkeiten — der Export ist kaputt, nicht die Liste kurz."
+          dotnet nuget update source GitHub \
+            --username "${{ github.actor }}" \
+            --password "${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}" \
+            --store-password-in-clear-text
+
+      - run: dotnet restore WorkerTransfer.slnx
+
+      # Warnungen sind Fehler (Directory.Build.props) — der Bau IST das Tor.
+      - name: Bauen
+        run: dotnet build WorkerTransfer.slnx --no-restore
+
+      # BAUEN UND TESTEN IN GETRENNTEN SCHRITTEN, und die Reihen EINZELN.
+      # `dotnet test` ueber die Projektmappe startet fuenfzehn
+      # Postgres-Behaelter gleichzeitig; der ResourceReaper von Testcontainers
+      # laeuft dann in eine Zeitueberschreitung und ALLE Reihen fallen binnen
+      # einer Millisekunde mit TypeInitializationException. Das sieht aus wie
+      # ein kaputter Bau und ist keiner.
+      #
+      # ubuntu-latest hat einen Docker-Daemon, die Integrationsreihen laufen
+      # hier also wirklich. Das Skript faellt rot, wenn eine Reihe gar nichts
+      # ausgefuehrt hat — eine Reihe, die sich still ueberspringt, sieht sonst
+      # genauso aus wie eine bestandene.
+      - name: Testen
+        run: ./scripts/test-dotnet.sh
+
+  # --------------------------------------------------------------------------
+  frontend-quality:
+    name: Oberflaeche — pruefen, testen, bauen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # DIE VERSION STEHT IN `web/package.json`, und nur dort.
+      #
+      # Die Aktion sucht `packageManager` per Vorgabe in der WURZEL — die
+      # `package.json` dort gibt es seit dem Zusammenlegen des Arbeitsbereichs
+      # nicht mehr (CLAUDE.md: `web/` traegt seine eigene Sperrdatei). Ohne
+      # diesen Zeiger bricht sie nach fuenf Sekunden mit „No pnpm version is
+      # specified" ab.
+      #
+      # Der Zeiger und keine `version:`-Zeile: eine zweite Zahl hier waere die,
+      # die beim naechsten Sprung stehen bleibt.
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_MAJOR }}
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: web
+      - run: pnpm check
+        working-directory: web
+      - run: pnpm test
+        working-directory: web
+
+      # `pnpm build` gehoert dazu und ist nicht nur Kosmetik: tsc und Vitest
+      # laufen beide nicht ueber den Bauweg, und ein Fehler, der erst beim
+      # Buendeln auftritt, faellt sonst erst im Bild auf.
+      - run: pnpm build
+        working-directory: web
+
+  # --------------------------------------------------------------------------
+  # DIE ZWEITE LUECKE: die Reisen liefen nirgends automatisch.
+  #
+  # Playwright stand bisher nur hinter `make validate-e2e`, also hinter einer
+  # Entscheidung eines Menschen — und die Reisen sind das Einzige, was den Draht
+  # zwischen Oberflaeche und Diensten wirklich anfasst. Genau dort sass eine
+  # ganze Fehlerklasse: Felder in camelCase, die der Dienst in snake_case
+  # erwartet, kamen nie an, und JEDE Reihe blieb gruen, weil keine von ihnen
+  # ueber beide Seiten laeuft.
+  #
+  # Ein eigener Job und kein Schritt im Bilder-Job: sonst verdeckt eine rote
+  # Reise den Bildbau (und umgekehrt), und beide brauchen unterschiedlich lange.
+  # Die Bilder kommen aus demselben Cache, der Bau kostet hier also wenig.
+  e2e:
+    name: Reisen — durch den ganzen Stapel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Der Pfad steht als `runner.temp` an BEIDEN Enden, und das ist der Fix.
+      #
+      # Hier stand `$HOME` (Shell, richtig) und beim Bau `${{ env.HOME }}`
+      # (Ausdruckskontext) — und der `env`-Kontext kennt `HOME` NICHT, er
+      # enthaelt nur, was ein `env:`-Block deklariert. Der Ausdruck wurde zu
+      # einer leeren Zeichenkette, die Datei hiess `/.nuget/NuGet/NuGet.Config`,
+      # und BuildKit sagte dazu `##[warning]secret file not found` — eine
+      # WARNUNG. Der Bau lief weiter, ohne jede Anmeldung, und starb zweihundert
+      # Zeilen spaeter an `401 (Unauthorized)`. Genau daran sind die zwei zu
+      # unterscheiden: 403 heisst angemeldet und abgewiesen, 401 heisst gar
+      # nicht angemeldet.
+      - name: NuGet-Anmeldung
+        run: |
+          cat > "${{ runner.temp }}/NuGet.Config" <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+              <add key="GitHub" value="https://nuget.pkg.github.com/DavidOeztuerk/index.json" />
+            </packageSources>
+            <packageSourceCredentials>
+              <GitHub>
+                <add key="Username" value="${{ github.actor }}" />
+                <add key="ClearTextPassword" value="${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}" />
+              </GitHub>
+            </packageSourceCredentials>
+          </configuration>
+          XML
+
+          # Eine fehlende Anmeldung darf nicht als Warnung durchgehen. Sie hier
+          # zu benennen kostet eine Zeile und spart die Suche nach einem 401,
+          # das nach einem kaputten Feed aussieht. Geprueft wird die GESTALT —
+          # dass ueberhaupt ein Wert drinsteht —, nie der Wert selbst.
+          if grep -q 'ClearTextPassword" value=""' "${{ runner.temp }}/NuGet.Config"; then
+            echo "::error::Kein Token: weder GIRDER_TOKEN noch GITHUB_TOKEN lieferte einen Wert."
             exit 1
           fi
-          # Die fünf starlette-IDs sind AUSDRÜCKLICH ausgenommen, nicht
-          # übersehen: die Behebungen liegen in starlette 1.x, und FastAPI
-          # pinnt `<0.53`. Ein Upgrade ist also nicht möglich, ohne FastAPI zu
-          # brechen — geprüft, nicht vermutet (`uv lock --upgrade-package`
-          # ließ 0.52.1 stehen).
-          #
-          # Ausgenommen statt den Scan zu entschärfen: ohne `--strict` oder mit
-          # `continue-on-error` würde JEDER künftige Fund mit durchrutschen.
-          # So bleibt der Job scharf und meldet alles Neue.
-          #
-          # ZU PRÜFEN, sobald FastAPI starlette 1.x unterstützt — dann müssen
-          # diese Zeilen weg.
-          uvx pip-audit --requirement requirements.txt --strict \
-            --ignore-vuln PYSEC-2026-161 \
-            --ignore-vuln PYSEC-2026-248 \
-            --ignore-vuln PYSEC-2026-249 \
-            --ignore-vuln PYSEC-2026-2280 \
-            --ignore-vuln PYSEC-2026-2281
 
-      - name: Node einrichten
-        uses: actions/setup-node@v7
+      - name: Dienstbild bauen
+        uses: docker/build-push-action@v6
         with:
-          # Mit `frontend-quality` und dem Container gleichziehen.
-          node-version: 25
+          context: .
+          file: docker/dotnet-service.Dockerfile
+          load: true
+          tags: workertransfer-dotnet:local
+          secret-files: nuget_config=${{ runner.temp }}/NuGet.Config
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - uses: pnpm/action-setup@v6
+      - name: Umgebung anlegen
+        run: |
+          make env
 
-      - name: Frontend-Abhängigkeiten prüfen
-        # `--prod`: was nur beim Bauen läuft, erreicht keinen Browser.
+          # GITHUB-ANMELDUNG EINRICHTEN — MIT ERFUNDENEN WERTEN, UND DAS IST
+          # SICHER.
+          #
+          # `.env.example` laesst die drei leer, und das ist dort richtig: leer
+          # heisst „nicht eingerichtet", dann bleibt der Gist und der Knopf
+          # „Mit GitHub anmelden" erscheint gar nicht. Genau daran fielen zwei
+          # Pruefungen, die gegen einen eingerichteten Stapel geschrieben sind:
+          # `consents-journey` erwartet den Knopf, und die Routenkarte erwartet
+          # auf `/github/me/oauth/finish` ein 422 — das es nur gibt, WEIL
+          # `start` eine Zeile angelegt hat. Ohne Einrichtung legt `start`
+          # nichts an und `finish` antwortet 404. Beide Antworten sind richtig;
+          # sie unterscheiden sich in der Konfiguration.
+          #
+          # Erfunden duerfen die Werte sein, weil nichts damit nach draussen
+          # geht: `start` baut die Adresse im Prozess zusammen, und in `finish`
+          # steht der Zustandsvergleich VOR dem Austausch des Codes — eine
+          # Anfrage mit fremdem `state` faellt auf 422, ohne github.com je zu
+          # fragen. Die Reise sieht den Knopf nur an; sie klickt ihn nicht.
+          {
+            echo "WORKERTRANSFER_GITHUB_OAUTH_ID=ci-erfunden"
+            echo "WORKERTRANSFER_GITHUB_OAUTH_SECRET=ci-erfunden"
+          } >> .env
+
+      # Hier faehrt `web` MIT — anders als im Bilder-Job. Die Reisen gehen
+      # durch das Gateway auf :8090, und dort beantwortet die Oberflaeche
+      # alles, was `Sec-Fetch-Dest: document` traegt. Ohne sie faenden die
+      # Reisen eine Dienstantwort statt einer Seite.
+      - name: Der Stapel faehrt hoch
+        run: |
+          docker compose up -d --wait --wait-timeout 480
+          docker compose ps
+
+      # Der Zeiger auf `web/package.json` — Begruendung bei `frontend-quality`.
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_MAJOR }}
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: web
+
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: web
+
+      # Ohne laufenden Stapel ueberspringen sich die Reisen SELBST, und ein
+      # uebersprungener Test sieht aus wie ein bestandener. Deshalb wird die
+      # Zahl gelesen: null gefahrene Reisen ist hier ein Fehlschlag, kein
+      # gruener Lauf.
+      - name: Die Reisen
+        working-directory: web
+        run: |
+          set -o pipefail
+          pnpm e2e --reporter=line 2>&1 | tee reisen.log
+          gefahren=$(grep -oE '[0-9]+ passed' reisen.log | tail -1 | grep -oE '[0-9]+' || echo 0)
+          echo "Reisen gruen: ${gefahren}"
+          [ "${gefahren:-0}" -ge 15 ] || {
+            echo "::error::Nur ${gefahren} Reisen liefen — der Stapel stand wohl nicht."; exit 1; }
+
+      - name: Was die Reisen sahen, wenn etwas rot war
+        if: failure()
+        run: |
+          docker compose logs --tail 80
+          ls -R web/test-results 2>/dev/null | head -40
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: reisen-spuren
+          path: web/test-results
+          retention-days: 7
+
+      - name: Stapel abbauen
+        if: always()
+        run: docker compose down -v
+
+  # --------------------------------------------------------------------------
+  # DER JOB, DEN ES VORHER NICHT GAB.
+  #
+  # Bis hierher hat die CI nie einen Behaelter gebaut. Eine gruene CI, die kein
+  # Bild baut, sagt nichts ueber das, was ausgeliefert wird — genau so kam der
+  # Sprung auf node 25 durch und zerlegte das Oberflaechenbild. Dieser Job
+  # faengt diese Klasse.
+  images:
+    name: Bilder — bauen und den Stapel wirklich hochfahren
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Die NuGet-Anmeldung als BuildKit-Geheimnis, nicht als Bauargument: ein
+      # Zugriff in einem Bauargument steht im Bauverlauf und in jeder Schicht.
+      #
+      # Sie liegt unter $HOME/.nuget/NuGet/ — genau dort, wo `secrets:` in
+      # docker-compose.yml sie sucht und wo ein Mensch sie hat. Ein zweiter Ort
+      # allein fuer die CI waere ein zweiter Ort, an dem sie fehlen kann.
+      # Der Pfad steht als `runner.temp` an BEIDEN Enden, und das ist der Fix.
+      #
+      # Hier stand `$HOME` (Shell, richtig) und beim Bau `${{ env.HOME }}`
+      # (Ausdruckskontext) — und der `env`-Kontext kennt `HOME` NICHT, er
+      # enthaelt nur, was ein `env:`-Block deklariert. Der Ausdruck wurde zu
+      # einer leeren Zeichenkette, die Datei hiess `/.nuget/NuGet/NuGet.Config`,
+      # und BuildKit sagte dazu `##[warning]secret file not found` — eine
+      # WARNUNG. Der Bau lief weiter, ohne jede Anmeldung, und starb zweihundert
+      # Zeilen spaeter an `401 (Unauthorized)`. Genau daran sind die zwei zu
+      # unterscheiden: 403 heisst angemeldet und abgewiesen, 401 heisst gar
+      # nicht angemeldet.
+      - name: NuGet-Anmeldung
+        run: |
+          cat > "${{ runner.temp }}/NuGet.Config" <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+              <add key="GitHub" value="https://nuget.pkg.github.com/DavidOeztuerk/index.json" />
+            </packageSources>
+            <packageSourceCredentials>
+              <GitHub>
+                <add key="Username" value="${{ github.actor }}" />
+                <add key="ClearTextPassword" value="${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}" />
+              </GitHub>
+            </packageSourceCredentials>
+          </configuration>
+          XML
+
+          # Eine fehlende Anmeldung darf nicht als Warnung durchgehen. Sie hier
+          # zu benennen kostet eine Zeile und spart die Suche nach einem 401,
+          # das nach einem kaputten Feed aussieht. Geprueft wird die GESTALT —
+          # dass ueberhaupt ein Wert drinsteht —, nie der Wert selbst.
+          if grep -q 'ClearTextPassword" value=""' "${{ runner.temp }}/NuGet.Config"; then
+            echo "::error::Kein Token: weder GIRDER_TOKEN noch GITHUB_TOKEN lieferte einen Wert."
+            exit 1
+          fi
+
+      # EIN Bild fuer alle elf Dienste und das Gateway (ADR-0028). Ohne
+      # `build-arg`: sie unterscheiden sich nur in SERVICE_DIR, und das setzt
+      # der Behaelter, nicht der Bau.
+      #
+      # Die Marke ist die, die docker-compose.yml erwartet — deshalb baut
+      # Compose weiter unten nichts nach, sondern nimmt genau dieses Bild.
+      - name: Dienstbild bauen
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/dotnet-service.Dockerfile
+          load: true
+          tags: workertransfer-dotnet:local
+          secret-files: nuget_config=${{ runner.temp }}/NuGet.Config
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Das ausgelieferte Oberflaechenbild — nicht der Vite-Entwicklungsserver
+      # aus `docker/web.Dockerfile`, sondern das, was in den Cluster geht.
+      - name: Oberflaechenbild bauen
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web-prod.Dockerfile
+          load: true
+          tags: workertransfer/web:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Ohne .env faehrt nichts hoch, und das ist Absicht: kein Geheimnis hat
+      # eine eingebaute Vorgabe mehr. `make env` legt sie an und wuerfelt die
+      # drei frisch — je Lauf andere, was hier genau richtig ist.
+      - name: Umgebung anlegen
+        run: |
+          make env
+
+          # GITHUB-ANMELDUNG EINRICHTEN — MIT ERFUNDENEN WERTEN, UND DAS IST
+          # SICHER.
+          #
+          # `.env.example` laesst die drei leer, und das ist dort richtig: leer
+          # heisst „nicht eingerichtet", dann bleibt der Gist und der Knopf
+          # „Mit GitHub anmelden" erscheint gar nicht. Genau daran fielen zwei
+          # Pruefungen, die gegen einen eingerichteten Stapel geschrieben sind:
+          # `consents-journey` erwartet den Knopf, und die Routenkarte erwartet
+          # auf `/github/me/oauth/finish` ein 422 — das es nur gibt, WEIL
+          # `start` eine Zeile angelegt hat. Ohne Einrichtung legt `start`
+          # nichts an und `finish` antwortet 404. Beide Antworten sind richtig;
+          # sie unterscheiden sich in der Konfiguration.
+          #
+          # Erfunden duerfen die Werte sein, weil nichts damit nach draussen
+          # geht: `start` baut die Adresse im Prozess zusammen, und in `finish`
+          # steht der Zustandsvergleich VOR dem Austausch des Codes — eine
+          # Anfrage mit fremdem `state` faellt auf 422, ohne github.com je zu
+          # fragen. Die Reise sieht den Knopf nur an; sie klickt ihn nicht.
+          {
+            echo "WORKERTRANSFER_GITHUB_OAUTH_ID=ci-erfunden"
+            echo "WORKERTRANSFER_GITHUB_OAUTH_SECRET=ci-erfunden"
+          } >> .env
+
+      # DER EIGENTLICHE BELEG.
+      #
+      # Nicht "der Behaelter lief noch nach drei Sekunden" — das ist gemessen
+      # und taugt nichts: ein Dienst, der beim Start ueber seine Konfiguration
+      # faellt, brennt danach noch minutenlang auf einem Kern, und `Running`
+      # sagt in dieser Zeit `true`. Gefragt wird deshalb, was zaehlt:
+      # `--wait` wartet auf die Gesundheitsprobe JEDES Behaelters, und die
+      # ruft /health/live im Behaelter selbst auf.
+      #
+      # `web` bleibt draussen: das ist der Vite-Entwicklungsserver, nicht das
+      # ausgelieferte Bild. Die Liste kommt aus Compose, damit ein neuer Dienst
+      # automatisch mitfaehrt statt hier vergessen zu werden.
+      - name: Der Stapel faehrt hoch
+        run: |
+          docker compose up -d --wait --wait-timeout 420 \
+            $(docker compose config --services | grep -v '^web$')
+          docker compose ps
+
+      # Lesend durch das Gateway. /jobs gehoert jobs-service, / gehoert der
+      # Oberflaeche — es wird also wirklich geroutet und nicht bloss irgendwas
+      # beantwortet.
+      #
+      # Erwartet wird 200: eine Stellenliste ist oeffentlich, weil die
+      # Karriereseite ueber genau diesen Endpunkt geht. Der Beleg fuer das
+      # Routen ist wie zuvor die ANTWORT und nicht ihr Erfolg — die Seitenform
+      # kann nur jobs-service geschrieben haben. Eine fehlende Route waere ein
+      # leerer 404 von Ocelot, ein toter Dienst ein 502, und die Oberflaeche
+      # schickte HTML.
+      #
+      # Geprueft wird `items` UND `total_pages`. Nur `items` genuegt nicht mehr,
+      # seit die Liste blaettert: `total_pages` ist das Feld, an dem ein
+      # Rueckfall auf die alte Zeigerform auffiele, und genau der faellt sonst
+      # nirgends auf — die Oberflaeche zeigte dann stumm eine Seite.
+      - name: Lesend durch das Gateway
+        run: |
+          code=$(curl -s -o antwort.json -w '%{http_code}' http://localhost:8090/jobs)
+          echo "GET /jobs -> ${code}"
+          [ "$code" = "200" ] || { echo "::error::/jobs lieferte ${code}, erwartet 200."; cat antwort.json; exit 1; }
+          grep -q '"items"' antwort.json || {
+            echo "::error::/jobs wurde nicht von jobs-service beantwortet:"; cat antwort.json; exit 1; }
+          grep -q '"total_pages"' antwort.json || {
+            echo "::error::/jobs antwortet ohne Blaetterform (Rueckfall auf den Zeiger?):"
+            cat antwort.json; exit 1; }
+
+      # Und die Fehlergestalt, an einem Dienst, den sonst kein Schritt hier
+      # anfasst. Der Schritt oben belegte sie frueher nebenbei; seit /jobs
+      # oeffentlich ist, belegt ihn niemand mehr. Ein 401 ohne
+      # Problemdokument waere Ocelots eigene Abweisung — dann liefe die
+      # Authentifizierung im Gateway statt im Dienst, und das faellt sonst
+      # nirgends auf.
+      - name: Die Fehlergestalt kommt aus einem Dienst
+        run: |
+          code=$(curl -s -o abgewiesen.json -w '%{http_code}' http://localhost:8090/consent/me)
+          echo "GET /consent/me -> ${code}"
+          [ "$code" = "401" ] || { echo "::error::/consent/me lieferte ${code}, erwartet 401."; cat abgewiesen.json; exit 1; }
+          grep -q '"correlationId"' abgewiesen.json || {
+            echo "::error::kein RFC-9457-Dokument mit correlationId:"; cat abgewiesen.json; exit 1; }
+
+      # Und schreibend. ERST das beweist, dass die Wanderungen wirklich liefen:
+      # der Lesepfad oben antwortet auch, wenn keine einzige Tabelle existiert.
+      - name: Schreibend, quer durch identity
+        run: |
+          adresse="ci-beweis-${GITHUB_RUN_ID}@example.org"
+          status=$(curl -s -o antwort.json -w '%{http_code}' \
+            -X POST http://localhost:8090/auth/register \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"${adresse}\",\"password\":\"ein-ausreichend-langes-passwort\",\"display_name\":\"CI Beweis\"}")
+          echo "POST /auth/register -> ${status}"
+          [ "$status" = "201" ] || { echo "::error::Registrierung lieferte ${status}."; cat antwort.json; exit 1; }
+
+      # Die ganze Routenkarte: jeder Endpunkt, drei Handlungsformen.
+      #
+      # Sie steht hier und nicht in der Testreihe, weil sie den laufenden
+      # Stapel braucht — und eine Reihe, die sich ohne ihn ueberspringt, sieht
+      # aus wie eine bestandene. Hier laeuft der Stapel ohnehin schon.
+      - name: Die Routenkarte stimmt noch
+        run: ./scripts/routenkarte.sh
+
+      # Bei einem roten Schritt sind die Protokolle das Einzige, was hilft —
+      # der Stapel ist eine Zeile spaeter weg.
+      - name: Protokolle, wenn etwas rot war
+        if: failure()
+        run: docker compose logs --tail 60
+
+      - name: Stapel abbauen
+        if: always()
+        run: docker compose down -v
+
+      # Das Oberflaechenbild getrennt: nginx braucht nichts von alledem. Es muss
+      # sein index.html ausliefern UND config.js daneben — `vite build` backt
+      # VITE_* in das Buendel, deshalb loest web/src/env.ts zur Laufzeit
+      # ueber window.__WT_CONFIG__ auf. Fehlt die Datei, faellt das erst im
+      # Cluster auf.
+      - name: Die Oberflaeche liefert aus
+        run: |
+          cid=$(docker run -d -p 8099:80 workertransfer/web:ci)
+          for _ in $(seq 1 30); do
+            sleep 1
+            curl -sf http://localhost:8099/ -o index.html 2>/dev/null && break
+          done
+          grep -q '<div id="root">' index.html || {
+            echo "::error::Das Oberflaechenbild liefert kein index.html."
+            docker logs "$cid" 2>&1 | tail -20; exit 1; }
+          curl -sf http://localhost:8099/config.js -o config.js || {
+            echo "::error::/config.js fehlt — die Laufzeitaufloesung haette nichts zu lesen."
+            exit 1; }
+          docker rm -f "$cid" >/dev/null
+          echo "  index.html und config.js kommen an."
+
+      - uses: azure/setup-helm@v4
+
+      # Das Chart wird nicht ausgerollt, sondern gerendert. `make k8s-lint` ist
+      # der lokale Zwilling dieses Schritts — dieselbe Zeile, kein zweiter Ort.
+      - name: Chart rendert
+        run: make k8s-lint
+
+  # --------------------------------------------------------------------------
+  # Bekannte Luecken in Abhaengigkeiten.
+  #
+  # Er laeuft NICHT mit `continue-on-error`. Ein Scan, der rot sein darf, wird
+  # nach der zweiten Woche ignoriert — und ist dann schlechter als keiner, weil
+  # er das Gefuehl erzeugt, jemand schaue hin.
+  #
+  # Es gibt kein `dependabot.yml` (geloescht am 08.08.2026, sein uv-Lauf wurde
+  # nie fertig). Dieser Job ist damit die einzige Stelle, die ueberhaupt fragt.
+  dependency-audit:
+    name: Abhaengigkeiten — bekannte Luecken
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: NuGet-Anmeldung
+        run: |
+          dotnet nuget update source GitHub \
+            --username "${{ github.actor }}" \
+            --password "${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}" \
+            --store-password-in-clear-text
+
+      - run: dotnet restore WorkerTransfer.slnx
+
+      - name: .NET-Pakete pruefen
+        env:
+          # Die Ausgabe wird GELESEN, also muss ihre Sprache feststehen. Lokal
+          # antwortet dasselbe Kommando deutsch („Fuer das angegebene Projekt
+          # ... liegen keine anfaelligen Pakete vor"), auf dem Laeufer englisch
+          # — ein grep auf einen der beiden Saetze waere in der jeweils anderen
+          # Umgebung still immer wahr.
+          DOTNET_CLI_UI_LANGUAGE: en
+        # `--include-transitive`: die meisten Funde stecken nicht in dem, was
+        # wir selbst erklaeren, sondern eine Ebene darunter.
+        #
+        # Zwei Pruefungen, und die zweite ist die wichtigere:
+        #
+        # 1. `dotnet list package --vulnerable` FAELLT NICHT ROT AUS, wenn es
+        #    etwas findet — es schreibt es nur hin. Ohne diese Auswertung waere
+        #    der Schritt ein gruener Haken ueber einer Fundliste.
+        # 2. Die Ausgabe muss ueberhaupt Projekte genannt haben. Genau dieser
+        #    Gedanke stand schon in der alten CI („bricht ab, wenn der Export
+        #    unter 50 Eintraege liefert"): ein Scan, der aus irgendeinem Grund
+        #    nichts untersucht hat, ist von einem sauberen Ergebnis sonst nicht
+        #    zu unterscheiden.
+        #
+        # Gesucht wird nach dem SATZ, nicht nach den Schweregradwoertern: die
+        # Tabellenspalte heisst je nach Version anders, der Satz „has the
+        # following vulnerable packages" ist die Aussage selbst.
+        run: |
+          set -o pipefail
+          dotnet list WorkerTransfer.slnx package --vulnerable --include-transitive \
+            | tee funde.txt
+
+          projekte=$(grep -c "The given project" funde.txt || true)
+          if [ "$projekte" -lt 50 ]; then
+            echo "::error::Der Scan nennt nur ${projekte} Projekte — er hat nichts untersucht."
+            exit 1
+          fi
+          echo "Untersucht: ${projekte} Projekte."
+
+          if grep -q "has the following vulnerable packages" funde.txt; then
+            echo "::error::Verwundbare Pakete gefunden — siehe Liste oben."
+            exit 1
+          fi
+
+      # Der Zeiger auf `web/package.json` — Begruendung bei `frontend-quality`.
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_MAJOR }}
+
+      # HIER stand eine Kopie der Frontend-Folge (install, check, test, build) —
+      # also genau das, was `frontend-quality` ohnehin tut, und KEINE Pruefung.
+      #
+      # Sie ist ein Ueberbleibsel des Entdoppelns: die Datei definierte
+      # `dependency-audit` zweimal, und die beiden Fassungen waren nicht gleich.
+      # Die eine hatte DOTNET_CLI_UI_LANGUAGE, die andere diesen Schritt. Beim
+      # Aufloesen blieb die erste stehen — und damit fiel der pnpm-Teil des
+      # Jobs still aus, waehrend CLAUDE.md ihn weiter als seine Haelfte
+      # beschrieb. Ein Audit, das niemand ausfuehrt, ist schlechter als keines:
+      # es steht im Dokument und beruhigt.
+      - name: Frontend-Pakete pruefen
+        # `--prod`: was nur beim Bauen laeuft, erreicht keinen Browser.
         # `moderate` als Schwelle, damit „low" nicht jede Woche blockiert.
         run: pnpm audit --prod --audit-level moderate
+        working-directory: web
 
+  # --------------------------------------------------------------------------
+  # DER JOB, DEN ES VORHER NICHT GAB.
+  #
+  # Bis hierher hat die CI nie einen Behaelter gebaut. Eine gruene CI, die kein
+  # Bild baut, sagt nichts ueber das, was ausgeliefert wird — genau so kam der
+  # Sprung auf node 25 durch und zerlegte das Oberflaechenbild. Dieser Job
+  # faengt diese Klasse.

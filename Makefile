@@ -1,83 +1,113 @@
-# WorkerTransfer — local developer tasks.
+# Ein Ziel je Frage, die jemand wirklich stellt.
 #
-# The binding gate order (AGENTS.md) is: ruff format → ruff check → mypy →
-# pytest → pnpm check → pnpm test. `make check` runs all six fail-fast;
-# `make check-py` / `make check-web` run one ecosystem each. CI
-# (`.github/workflows/ci.yml`) runs the same steps in the same order, split
-# across a backend and a frontend job. `make fix` autoremits format/import
-# issues.
-#
-# Python lifecycle goes through `uv` (never pip/poetry); frontend through `pnpm`.
+# `check` ist das Tor: baut, prueft, testet — und BAUT UND TESTET IN GETRENNTEN
+# AUFRUFEN. Verkettet scheitern die Testcontainers-Reihen und sehen dabei aus
+# wie echte Testfehler.
 
-.PHONY: help check check-py check-web validate validate-e2e lint fix type test test-web sync ci clean dev k8s-up k8s-down k8s-lint k8s-seed
+.DEFAULT_GOAL := help
+DOTNET_SLN := WorkerTransfer.slnx
 
-help:  # Show this help (default target).
-	@# `0-9` im Muster, sonst fehlen k8s-up/-down/-seed/-lint in dieser Liste —
-	@# vorhanden, aber unsichtbar, und damit für niemanden auffindbar.
-	@# Die Breite passt zum längsten Namen (`validate-e2e`).
+.PHONY: help check check-dotnet check-web build test test-web validate validate-e2e \
+        fix dev env up down images routenkarte k8s-up k8s-down k8s-lint k8s-seed clean
+
+help:  # Diese Liste.
+	@# `0-9` im Muster, sonst fehlen k8s-up/-down/-seed/-lint — vorhanden, aber
+	@# unsichtbar, und damit fuer niemanden auffindbar.
 	@awk 'BEGIN {FS = ":.*#"} /^[a-zA-Z0-9_-]+:.*# / {printf "  \033[36m%-13s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-check: check-py check-web  # Definition-of-Done gate: all six steps, fail-fast.
+check: check-dotnet check-web  # Das Tor: alles, fail-fast.
 
-check-py:  # Python gate: format-check → lint → types → tests.
-	uv run ruff format --check .
-	uv run ruff check .
-	uv run mypy packages apps
-	uv run pytest
+check-dotnet: build test  # Erst bauen, dann testen — in dieser Reihenfolge.
 
-validate:  # Wie check, aber läuft durch und berichtet den Stand statt beim ersten Fehler zu enden.
+build:  # Uebersetzen. Warnungen sind Fehler (Directory.Build.props).
+	dotnet build $(DOTNET_SLN)
+
+test:  # Die Testreihen, EINZELN.
+	@# Nicht `dotnet test` ueber die Projektmappe: vierzehn Reihen starten dann
+	@# vierzehn Container gleichzeitig, der ResourceReaper von Testcontainers
+	@# laeuft in eine Zeitueberschreitung, und ALLE Reihen fallen binnen einer
+	@# Millisekunde mit TypeInitializationException. Das sieht aus wie ein
+	@# kaputter Bau und ist keiner.
+	@./scripts/test-dotnet.sh
+
+check-web:  # Frontend: TypeScript + Vitest + Buendeln.
+	@# `pnpm build` gehoert dazu. tsc und Vitest laufen beide NICHT ueber den
+	@# Bauweg; ein Fehler, der erst beim Buendeln auftritt, faellt sonst erst im
+	@# Bild auf — und das baut hier niemand nebenbei.
+	cd web && pnpm check
+	cd web && pnpm test
+	cd web && pnpm build
+
+test-web:  # Nur die Frontend-Reihe.
+	cd web && pnpm test
+
+validate:  # Wie check, aber laeuft durch und berichtet jeden roten Schritt.
 	./scripts/validate.sh
 
-validate-e2e:  # Zusätzlich die Browser-Reise; braucht den laufenden Stack.
+routenkarte:  # docs/routenkarte.yml gegen den laufenden Stapel fahren.
+	@# Die VOLLSTAENDIGKEIT der Karte prueft RoutenkarteTests und laeuft in
+	@# jeder Reihe mit. Hier werden die ANTWORTEN geprueft, und dafuer braucht
+	@# es den Stapel: `make up` zuerst.
+	./scripts/routenkarte.sh
+
+validate-e2e:  # Zusaetzlich die Browser-Reise; braucht den laufenden Stapel.
 	./scripts/validate.sh --e2e
 
-check-web:  # Frontend gate: TypeScript + Vitest across the pnpm workspace.
-	pnpm check
-	pnpm test
+fix:  # Formatieren.
+	dotnet format $(DOTNET_SLN)
 
-lint:  # Static gates only (no tests): format-check + lint.
-	uv run ruff format --check .
-	uv run ruff check .
+env:  # .env aus der Vorlage anlegen und die drei Geheimnisse wuerfeln.
+	@# Der erste Befehl in einem frischen Klon. Danach laeuft `make up`.
+	@#
+	@# Die Geheimnisse stehen in .env.example LEER — ein eingebauter Vorgabewert
+	@# waere das Geheimnis selbst, und es laege in git. Hier entstehen sie neu,
+	@# je Klon andere.
+	@if [ -f .env ]; then \
+		echo ".env gibt es schon — nichts geaendert."; \
+		echo "Zum Neuwuerfeln: rm .env && make env"; \
+	else \
+		cp .env.example .env; \
+		for s in WORKERTRANSFER_JWT_SECRET WORKERTRANSFER_NOTIFY_SECRET WORKERTRANSFER_ERASURE_SECRET WORKERTRANSFER_SECRETS_KEY; do \
+			wert=$$(openssl rand -base64 32); \
+			tmp=$$(mktemp); \
+			awk -v k="$$s" -v v="$$wert" '$$0 == k "=" { print k "=" v; next } { print }' .env > "$$tmp" && mv "$$tmp" .env; \
+		done; \
+		echo ".env angelegt, drei Geheimnisse frisch gewuerfelt."; \
+		echo "Sie ist ignoriert und gehoert nicht in git."; \
+	fi
 
-fix:  # Autoremit format + import issues (ruff format + ruff check --fix).
-	uv run ruff format .
-	uv run ruff check . --fix
+up:  # Der ganze Stapel lokal: Postgres, Mailpit, elf Dienste, Gateway, Oberflaeche.
+	docker compose up -d --build
 
-type:  # Type-check only.
-	uv run mypy packages apps
+down:  # Anhalten. `make down ARGS=-v` wirft auch die Datenbanken weg.
+	docker compose down $(ARGS)
 
-test:  # Run pytest only.
-	uv run pytest
-
-test-web:  # Run the frontend test suite only.
-	pnpm test
-
-sync:  # Install every workspace package + dev group.
-	uv sync --all-packages --all-groups
-
-ci: check  # Mirror the CI job locally (same steps, same order).
-
-dev:  # Start backend + frontend together locally.
-	./scripts/run-dev.sh
+dev: up  # Alias fuer `up` — der Stapel IST die Entwicklungsumgebung.
 
 k8s-up:  # Lokale Staging-Umgebung auf kind — bauen, ausrollen, BELEGEN.
 	./scripts/k8s-up.sh
 
-k8s-down:  # Den kind-Cluster samt Daten löschen.
+k8s-down:  # Den kind-Cluster samt Daten loeschen.
 	./scripts/k8s-down.sh
 
 k8s-seed:  # Testdaten in die laufende Umgebung: Firma, drei Stellen, ein Bewerber-Konto.
 	./scripts/k8s-seed.sh
 
-k8s-lint:  # Chart prüfen, ohne Cluster: helm lint + rendern.
+images:  # Beide ausgelieferten Bilder bauen. Der lokale Zwilling des CI-Jobs.
+	@# Eine gruene Pruefung, die kein Bild baut, sagt nichts ueber das, was
+	@# ausgeliefert wird: der Sprung auf node 25 kam so durch und zerlegte das
+	@# Oberflaechenbild (node 25 bringt kein corepack mehr mit).
+	docker build -f docker/dotnet-service.Dockerfile \
+		--secret "id=nuget_config,src=$(HOME)/.nuget/NuGet/NuGet.Config" \
+		-t workertransfer-dotnet:local .
+	docker build -f docker/web-prod.Dockerfile -t workertransfer/web:local .
+
+k8s-lint:  # Chart pruefen, ohne Cluster: helm lint + rendern.
 	helm lint deploy/helm/workertransfer \
-		--set-file gateway.dynamicConfig=docker/traefik/dynamic.yml \
 		--set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql
 	helm template deploy/helm/workertransfer \
-		--set-file gateway.dynamicConfig=docker/traefik/dynamic.yml \
 		--set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql > /dev/null
 	@echo "Chart rendert."
 
-clean:  # Remove caches + bytecode artifacts.
-	find . -type d -name __pycache__ -prune -exec rm -rf {} +
-	rm -rf .mypy_cache .pytest_cache .ruff_cache
+clean:  # Bau- und Testreste.
+	find src tests -type d \( -name bin -o -name obj -o -name TestResults \) -prune -exec rm -rf {} +

@@ -59,7 +59,7 @@ m=re.search(r'token=([A-Za-z0-9_.-]+)', t); print(m.group(1) if m else '')")
 
 konto() {  # konto <mail> <anzeigename> <cookiedatei>
   curl -s -o /dev/null -X POST "$BASE/auth/register" -H 'Content-Type: application/json' \
-    -d "{\"email\":\"$1\",\"password\":\"$PW\",\"display_name\":\"$2\"}"
+    -d "{\"email\":\"$1\",\"password\":\"$PW\",\"displayName\":\"$2\"}"
   bestaetigen "$1"
   curl -s -c "$3" -o /dev/null -X POST "$BASE/auth/login" \
     -H 'Content-Type: application/json' -d "{\"email\":\"$1\",\"password\":\"$PW\"}"

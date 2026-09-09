@@ -1,0 +1,408 @@
+// Client für jobs-service.
+//
+// Anders als die meisten: Suche und Einzelansicht brauchen KEINE Anmeldung.
+// Eine Ausschreibung, die man nur angemeldet sieht, ist keine Ausschreibung.
+// `credentials: "include"` schadet dabei nicht — ist ein Cookie da, wird es
+// mitgeschickt, ist keines da, antwortet der Server trotzdem. Deshalb geht
+// auch diese Seite über `request()` und nicht an ihm vorbei.
+
+import { request } from "../../../core/api/client";
+import { JOBS_BASE_URL } from "../../../env";
+import { i18n } from "../../../core/i18n/i18n";
+import {
+  type Deutung,
+  type Fehlschlag,
+  deuten,
+} from "../../../shared/api/fehler";
+
+export type RemoteMode = "none" | "hybrid" | "full";
+export type EmploymentType = "full_time" | "part_time" | "contract" | "internship";
+export type JobStatus = "draft" | "published" | "closed";
+
+/**
+ * Der Draht ist snake_case, und diese Typen bilden ihn ab, statt ihn zu
+ * übersetzen. Eine camelCase-Fassung dazwischen war schon einmal ein schwerer
+ * Fehler: die Felder kamen beim Server nicht an, und niemand sah es, weil das
+ * Formular danach trotzdem grün meldete.
+ */
+export interface Job {
+  id: string;
+  tenant_id: string;
+  title: string;
+  description: string;
+  location: string;
+  /**
+   * Die Postleitzahl. Leer, wenn keine angegeben wurde.
+   *
+   * Eigenes Feld und nicht Teil von `location`: der Ortsname darf mehrdeutig
+   * sein („Neustadt" gibt es zwanzigmal), die Postleitzahl ist es nicht — und
+   * nur sie macht die Umkreissuche über einem kleinen Ort verlässlich
+   * (ADR-0032).
+   */
+  postal_code: string;
+  remote: RemoteMode;
+  employment: EmploymentType;
+  /** Was die Stelle verlangt — die Liste, gegen die im Browser abgeglichen wird. */
+  skills: string[];
+  status: JobStatus;
+  published_at: string | null;
+  updated_at: string;
+}
+
+/**
+ * Wie eine Anzeige auf dem DRAHT aussieht.
+ *
+ * <strong>Nicht dasselbe wie <c>Job</c>, und genau daran ist es einmal
+ * gescheitert.</strong> Der Dienst schreibt <c>remote_mode</c> und
+ * <c>employment_type</c>; der Typ oben heisst <c>remote</c> und
+ * <c>employment</c>. Solange die Antwort direkt auf <c>Job</c> gecastet wurde,
+ * waren beide Felder still <c>undefined</c> — TypeScript sieht in eine
+ * JSON-Antwort nicht hinein, und ein Cast ist eine Behauptung, keine Prüfung.
+ *
+ * Sichtbar wurde es erst, als aus der Nachschlagetabelle eine Funktion wurde:
+ * `REMOTE_LABEL[undefined]` ergibt `undefined` und zeichnet nichts,
+ * `remoteLabel(undefined)` ergibt `stelle.remoteundefined` und steht in der
+ * Karte. Dieselbe Klasse Fehler wie bei den vier Benachrichtigungssprüngen —
+ * ein Name, der auf beiden Seiten anders heisst, und niemand merkt es.
+ */
+interface JobDraht {
+  id: string;
+  tenant_id: string;
+  title: string;
+  description: string;
+  location: string;
+  postal_code: string;
+  remote_mode: RemoteMode;
+  employment_type: EmploymentType;
+  skills: string[];
+  status: JobStatus;
+  published_at: string | null;
+  updated_at: string;
+}
+
+/** Vom Draht in die Gestalt, mit der die Oberfläche arbeitet. */
+function zurAnzeige(draht: JobDraht): Job {
+  return {
+    id: draht.id,
+    tenant_id: draht.tenant_id,
+    title: draht.title,
+    description: draht.description,
+    location: draht.location,
+    postal_code: draht.postal_code ?? "",
+    remote: draht.remote_mode,
+    employment: draht.employment_type,
+    skills: draht.skills ?? [],
+    status: draht.status,
+    published_at: draht.published_at,
+    updated_at: draht.updated_at,
+  };
+}
+
+export interface JobInput {
+  title: string;
+  description: string;
+  location: string;
+  postal_code: string;
+  remote: RemoteMode;
+  employment: EmploymentType;
+  skills: string[];
+}
+
+export interface SearchFilters {
+  q?: string;
+  /** Nur die Stellen eines Unternehmens — für die Karriere-Seite. */
+  company?: string;
+  location?: string;
+  remote?: RemoteMode | "";
+  employment?: EmploymentType | "";
+  /**
+   * Gesuchte Fähigkeiten. Der Server erwartet sie als WIEDERHOLTEN Parameter
+   * (`?skill=a&skill=b`), nicht als Liste in einem — eine kommagetrennte
+   * Zeichenkette wäre eine zweite Trennregel neben der, die es schon gibt.
+   */
+  skills?: string[];
+  /**
+   * „Höchstens N Kilometer von hier."
+   *
+   * <strong>Der Radius geht auch ohne Koordinaten hinaus.</strong> Dann ist
+   * `location` die Mitte, und der Dienst löst den Ortsnamen mit derselben
+   * Tabelle auf, mit der er auch die Anzeigen verortet — wer „Leipzig" tippt
+   * und „50 km" wählt, braucht dafür weder GPS noch die Erlaubnis dazu.
+   *
+   * `lat` und `lon` gehen nur GEMEINSAM mit und sind bereits GERUNDET (siehe
+   * `useGeolocation`): sie stehen in einer Adresszeile und damit in
+   * Zugriffsprotokollen.
+   */
+  lat?: number;
+  lon?: number;
+  radiusKm?: number;
+}
+
+export type SucheFehler = "offline" | "fehlgeschlagen";
+export type JobFehler = "not-found" | "no-company" | "conflict" | "invalid" | "offline";
+
+export type SucheFehlschlag = Fehlschlag<SucheFehler>;
+
+export type SucheErgebnis =
+  | {
+      ok: true;
+      items: Job[];
+      page: number;
+      pageSize: number;
+      totalItems: number;
+      totalPages: number;
+      /**
+       * Wie viele Anzeigen die Umkreissuche NICHT beurteilen konnte, weil ihr
+       * Ort unbekannt ist. `null`, wenn ohne Umkreis gesucht wurde.
+       *
+       * Die Zahl muss auf den Bildschirm. Ein Ortsfilter, der stumm weglässt,
+       * liefert ein Ergebnis, das vollständig aussieht und es nicht ist.
+       */
+      omitted: number | null;
+    }
+  | SucheFehlschlag;
+
+export type JobErgebnis = { ok: true; job: Job } | Fehlschlag<JobFehler>;
+
+export type EigeneJobsErgebnis = { ok: true; jobs: Job[] } | Fehlschlag<SucheFehler>;
+
+/**
+ * Werte aus dem Vertrag sind keine Sätze für Menschen.
+ *
+ * FUNKTIONEN und keine Tabellen: eine Konstante entstünde beim Laden des
+ * Moduls und trüge dann für immer die Sprache, die in diesem Augenblick galt.
+ */
+/** Die erlaubten Werte, in Anzeigereihenfolge — für Auswahlfelder. */
+export const REMOTE_MODES: RemoteMode[] = ["none", "hybrid", "full"];
+
+export const EMPLOYMENT_TYPES: EmploymentType[] = [
+  "full_time",
+  "part_time",
+  "contract",
+  "internship",
+];
+
+export function remoteLabel(value: RemoteMode): string {
+  const key = { none: "None", hybrid: "Hybrid", full: "Full" } as const;
+  return i18n.t(`stelle.remote${key[value]}`);
+}
+
+export function employmentLabel(value: EmploymentType): string {
+  const key = {
+    full_time: "FullTime",
+    part_time: "PartTime",
+    contract: "Contract",
+    internship: "Internship",
+  } as const;
+  return i18n.t(`stelle.employment${key[value]}`);
+}
+
+export function suchAnfrage(filters: SearchFilters, page = 1, pageSize?: number): string {
+  const params = new URLSearchParams();
+  // Leere Filter gar nicht erst senden: `remote=` würde der Server als Filter
+  // auf einen leeren Wert lesen und nichts finden.
+  if (filters.q !== undefined && filters.q !== "") params.set("q", filters.q);
+  if (filters.location !== undefined && filters.location !== "")
+    params.set("location", filters.location);
+  if (filters.remote !== undefined && filters.remote !== "") params.set("remote", filters.remote);
+  if (filters.employment !== undefined && filters.employment !== "")
+    params.set("employment", filters.employment);
+  if (filters.company !== undefined && filters.company !== "")
+    params.set("company", filters.company);
+  // Wiederholt, einer je Fähigkeit — siehe `SearchFilters.skills`.
+  for (const skill of filters.skills ?? []) params.append("skill", skill);
+  // Der Radius allein genügt — ohne Koordinaten ist der Ort die Mitte.
+  if (filters.radiusKm !== undefined) {
+    params.set("radius_km", String(filters.radiusKm));
+  }
+  // Koordinaten aber nur GEMEINSAM: eine halbe Position ist keine.
+  if (filters.lat !== undefined && filters.lon !== undefined) {
+    params.set("lat", String(filters.lat));
+    params.set("lon", String(filters.lon));
+  }
+  if (page > 1) params.set("page", String(page));
+  if (pageSize !== undefined) params.set("page_size", String(pageSize));
+  const query = params.toString();
+  return query === "" ? "" : `?${query}`;
+}
+
+/**
+ * Der nächstgelegene bekannte Ort zu einem Punkt.
+ *
+ * Damit die suchende Person SIEHT, wovon aus gemessen wird — ein Umkreis um
+ * einen unsichtbaren Punkt ist eine Zumutung. Der Punkt ist derselbe bereits
+ * gerundete, der auch an die Suche geht (siehe `useGeolocation`), und die
+ * Antwort kommt aus einer Tabelle im Dienst, nicht von einem Fremdanbieter.
+ *
+ * `null` heisst „nichts in der Nähe" — dann bleibt das Ortsfeld leer, statt
+ * einen Ort zu behaupten.
+ */
+export async function ortZuPunkt(
+  lat: number,
+  lon: number,
+  signal?: AbortSignal
+): Promise<string | null> {
+  const answer = await request<{ location?: string | null }>(
+    JOBS_BASE_URL,
+    `/jobs/place?lat=${lat}&lon=${lon}`,
+    { signal }
+  );
+
+  return answer.ok ? (answer.value?.location ?? null) : null;
+}
+
+export async function searchJobs(
+  filters: SearchFilters = {},
+  page = 1,
+  pageSize?: number,
+  signal?: AbortSignal
+): Promise<SucheErgebnis> {
+  const answer = await request<{
+    items?: JobDraht[];
+    page?: number;
+    page_size?: number;
+    total_items?: number;
+    total_pages?: number;
+    omitted?: number;
+  }>(
+    JOBS_BASE_URL,
+    `/jobs${suchAnfrage(filters, page, pageSize)}`,
+    { signal },
+    "fehler.sucheFehlgeschlagen"
+  );
+  if (!answer.ok) {
+    return deuten<SucheFehler>(
+      answer.error,
+      { 0: { reason: "offline", titel: "fehler.keineVerbindung" } },
+      "fehlgeschlagen"
+    );
+  }
+  return {
+    ok: true,
+    items: (answer.value?.items ?? []).map(zurAnzeige),
+    // Die Werte des SERVERS und nicht die der Anfrage: bei `page_size=100000`
+    // deckelt er, und die Leiste muss zeichnen, was wirklich geliefert wurde.
+    page: answer.value?.page ?? page,
+    pageSize: answer.value?.page_size ?? (pageSize ?? 12),
+    totalItems: answer.value?.total_items ?? 0,
+    totalPages: answer.value?.total_pages ?? 1,
+    // `?? null` und nicht `?? 0`: das Feld FEHLT, wenn ohne Umkreis gesucht
+    // wurde, und eine 0 behauptete, es sei nichts ausgelassen worden. Das ist
+    // ein anderer Satz als „danach wurde nicht gefragt".
+    omitted: answer.value?.omitted ?? null,
+  };
+}
+
+/**
+ * Eine einzelne Stelle, oder `null`.
+ *
+ * `null` deckt „zurückgezogen" und „gab es nie" gemeinsam ab — welcher der
+ * beiden Fälle vorliegt, ist eine Aussage über das Unternehmen, die niemand von
+ * uns erwarten kann.
+ */
+export async function getJob(jobId: string, signal?: AbortSignal): Promise<Job | null> {
+  const answer = await request<JobDraht>(JOBS_BASE_URL, `/jobs/${jobId}`, { signal });
+  return answer.ok && answer.value !== undefined ? zurAnzeige(answer.value) : null;
+}
+
+export async function listOwnJobs(signal?: AbortSignal): Promise<EigeneJobsErgebnis> {
+  const answer = await request<JobDraht[]>(
+    JOBS_BASE_URL,
+    "/companies/me/jobs",
+    { signal },
+    "fehler.listeNichtGeladen"
+  );
+  if (answer.ok) return { ok: true, jobs: (answer.value ?? []).map(zurAnzeige) };
+  // Kein aktives Unternehmen ist ein behebbarer Zustand, kein Fehler. Die Seite
+  // fragt ohne Unternehmen ohnehin nicht, aber die Antwort bleibt dieselbe wie
+  // zuvor: eine leere Liste, keine Meldung.
+  if (answer.error.status === 403) return { ok: true, jobs: [] };
+  return deuten<SucheFehler>(
+    answer.error,
+    { 0: { reason: "offline", titel: "fehler.keineVerbindung" } },
+    "fehlgeschlagen"
+  );
+}
+
+const SCHREIBFEHLER: Partial<Record<number, Deutung<JobFehler>>> =
+  {
+    0: { reason: "offline", titel: "fehler.keineVerbindung" },
+    403: {
+      reason: "no-company",
+      titel: "fehler.nurFirmaAusschreiben",
+      text: "fehler.firmaWaehlen",
+    },
+    404: { reason: "not-found", titel: "fehler.ausschreibungFehlt" },
+  };
+
+async function schreiben(
+  path: string,
+  method: "POST" | "PUT",
+  body?: unknown
+): Promise<JobErgebnis> {
+  const answer = await request<JobDraht>(
+    JOBS_BASE_URL,
+    path,
+    { method, body },
+    "fehler.ausschreibungNichtGespeichert"
+  );
+  if (answer.ok) return { ok: true, job: zurAnzeige(answer.value) };
+  // `409` bleibt beim Satz des Servers: die Eingabe ist in Ordnung, der Zustand
+  // passt nicht — das ist etwas anderes als ein Formularfehler, und der Dienst
+  // weiß besser, was gerade nicht geht.
+  if (answer.error.status === 409) {
+    return { ok: false, reason: "conflict", error: answer.error };
+  }
+  return deuten<JobFehler>(answer.error, SCHREIBFEHLER, "invalid");
+}
+
+// Kein `tenant_id` im Rumpf: das Unternehmen steht im Token und wird gegen die
+// Mitgliedschaft geprüft. Was der Client nicht senden kann, kann er nicht
+// fälschen.
+export function createJob(input: JobInput): Promise<JobErgebnis> {
+  return schreiben("/jobs", "POST", input);
+}
+
+export function updateJob(jobId: string, input: JobInput): Promise<JobErgebnis> {
+  return schreiben(`/jobs/${jobId}`, "PUT", input);
+}
+
+export function publishJob(jobId: string): Promise<JobErgebnis> {
+  return schreiben(`/jobs/${jobId}/publish`, "POST");
+}
+
+export function closeJob(jobId: string): Promise<JobErgebnis> {
+  return schreiben(`/jobs/${jobId}/close`, "POST");
+}
+
+/**
+ * Die eigene Anzeige verständlicher formulieren lassen (ADR-0024).
+ *
+ * Der Unternehmens-Agent — und er sagt über niemanden etwas. Er arbeitet an
+ * einem Text, den das Unternehmen selbst verfasst hat. Nichts wird gespeichert:
+ * weder die Bitte noch die Antwort.
+ */
+export type EntwurfErgebnis = { ok: true; draft: string } | Fehlschlag<"no-company" | "unavailable">;
+
+export async function draftJobText(input: {
+  title: string;
+  description: string;
+  location: string;
+  skills: string[];
+  wish: string;
+}): Promise<EntwurfErgebnis> {
+  const answer = await request<{ draft: string }>(
+    JOBS_BASE_URL,
+    "/jobs/draft",
+    { method: "POST", body: input },
+    "fehler.entwurfNichtVerfuegbarLang"
+  );
+  if (answer.ok) return { ok: true, draft: answer.value?.draft ?? "" };
+  return deuten<"no-company" | "unavailable">(
+    answer.error,
+    {
+      403: { reason: "no-company", titel: "fehler.fuerFirmaHandelnNoetig" },
+    },
+    "unavailable"
+  );
+}
