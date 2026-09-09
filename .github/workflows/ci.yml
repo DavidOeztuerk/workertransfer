@@ -11,6 +11,20 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# OHNE DIESEN BLOCK KOMMT KEIN LAUF AN GIRDER.
+#
+# Der Lauftoken bekommt seine Rechte aus der Vorgabe des Kontos, und `packages`
+# steht dort nicht darin. Gemessen am 09.09.2026: `dotnet restore` antwortete
+# fuer JEDES Girder-Paket mit `NU1301 … 403 (Forbidden)`, und zwar in
+# Millisekunden — das sieht aus wie ein kaputtes Paket und ist eine fehlende
+# Zeile hier.
+#
+# `contents: read` steht dabei, weil ein ausgeschriebener Block die Vorgabe
+# ERSETZT: nur `packages` zu nennen naehme dem Lauf das Auschecken.
+permissions:
+  contents: read
+  packages: read
+
 env:
   # Eine Zahl fuer alle drei Orte: `docker/web.Dockerfile`,
   # `docker/web-prod.Dockerfile` und die beiden Node-Jobs. Genau dieser
@@ -31,14 +45,22 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      # Girder liegt in GitHub Packages und verlangt eine Anmeldung. Der
-      # `GITHUB_TOKEN` reicht dafuer und wird je Lauf frisch ausgestellt — ein
-      # eigenes Geheimnis waere ein zweiter Ort, an dem eines ablaufen kann.
+      # Girder liegt in GitHub Packages und verlangt eine Anmeldung.
+      #
+      # Hier stand „der `GITHUB_TOKEN` reicht dafuer" — das war eine Annahme und
+      # nie gemessen. Er reicht nur, wenn das Paket DIESEM Repository Zugriff
+      # gewaehrt (Paketeinstellungen → Manage Actions access). Ist das nicht
+      # eingerichtet, antwortet die Quelle mit 403, und zwar fuer jedes Paket
+      # einzeln.
+      #
+      # Deshalb geht `GIRDER_TOKEN` vor, wenn es hinterlegt ist: ein PAT mit
+      # `read:packages` haengt an keiner Repository-Freigabe. Ohne das Geheimnis
+      # bleibt es beim Lauftoken, und dann muss die Freigabe stehen.
       - name: NuGet-Anmeldung
         run: |
           dotnet nuget update source GitHub \
             --username "${{ github.actor }}" \
-            --password "${{ secrets.GITHUB_TOKEN }}" \
+            --password "${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}" \
             --store-password-in-clear-text
 
       - run: dotnet restore WorkerTransfer.slnx
@@ -68,7 +90,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # DIE VERSION STEHT IN `web/package.json`, und nur dort.
+      #
+      # Die Aktion sucht `packageManager` per Vorgabe in der WURZEL — die
+      # `package.json` dort gibt es seit dem Zusammenlegen des Arbeitsbereichs
+      # nicht mehr (CLAUDE.md: `web/` traegt seine eigene Sperrdatei). Ohne
+      # diesen Zeiger bricht sie nach fuenf Sekunden mit „No pnpm version is
+      # specified" ab.
+      #
+      # Der Zeiger und keine `version:`-Zeile: eine zweite Zahl hier waere die,
+      # die beim naechsten Sprung stehen bleibt.
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
 
       - uses: actions/setup-node@v6
         with:
@@ -124,7 +158,7 @@ jobs:
             <packageSourceCredentials>
               <GitHub>
                 <add key="Username" value="${{ github.actor }}" />
-                <add key="ClearTextPassword" value="${{ secrets.GITHUB_TOKEN }}" />
+                <add key="ClearTextPassword" value="${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}" />
               </GitHub>
             </packageSourceCredentials>
           </configuration>
@@ -153,7 +187,10 @@ jobs:
           docker compose up -d --wait --wait-timeout 480
           docker compose ps
 
+      # Der Zeiger auf `web/package.json` — Begruendung bei `frontend-quality`.
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
 
       - uses: actions/setup-node@v6
         with:
@@ -233,7 +270,7 @@ jobs:
             <packageSourceCredentials>
               <GitHub>
                 <add key="Username" value="${{ github.actor }}" />
-                <add key="ClearTextPassword" value="${{ secrets.GITHUB_TOKEN }}" />
+                <add key="ClearTextPassword" value="${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}" />
               </GitHub>
             </packageSourceCredentials>
           </configuration>
@@ -413,7 +450,7 @@ jobs:
         run: |
           dotnet nuget update source GitHub \
             --username "${{ github.actor }}" \
-            --password "${{ secrets.GITHUB_TOKEN }}" \
+            --password "${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}" \
             --store-password-in-clear-text
 
       - run: dotnet restore WorkerTransfer.slnx
@@ -460,7 +497,10 @@ jobs:
             exit 1
           fi
 
+      # Der Zeiger auf `web/package.json` — Begruendung bei `frontend-quality`.
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
 
       - uses: actions/setup-node@v6
         with:
