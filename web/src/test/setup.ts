@@ -11,15 +11,23 @@ import { configure } from "@testing-library/react";
  * das war der Befund: ein Volllauf mit 2 roten Tests, der nächste mit 7, jedes
  * Mal andere Dateien, und alle grün, sobald sie einzeln laufen.
  *
- * Verschärft hat es die Umstellung auf `packages/ui`: jede Route zieht seither
- * mehr Module, und der erste Aufbau dauert unter Volllast länger als eine
- * Sekunde.
- *
  * Eine Testsuite, deren Ergebnis von der Maschinenlast abhängt, ist keine. Die
  * höhere Grenze verlangsamt keinen grünen Lauf: sie greift nur dort, wo vorher
  * abgebrochen wurde.
+ *
+ * VON 5 AUF 10 SEKUNDEN, gemessen am 09.09.2026 auf dem Läufer: `DraftPage`
+ * fiel dort an `findByRole("button", { name: /Lebenslauf bearbeiten/i })`,
+ * lokal fünfmal hintereinander grün. Der Grund ist keine Langsamkeit, sondern
+ * eine KETTE: der Knopf heißt „Lebenslauf bearbeiten" erst, wenn `/resumes/me`
+ * geantwortet hat, und der wird erst nach dem Entwurf geholt — Entwurf →
+ * Render → Effekt → Lebenslauf → Render. Eine einzelne Wartezeit muss die
+ * ganze Kette überdauern, nicht nur einen Abruf.
+ *
+ * Die Schwelle abzusenken heißt, diese Tests wieder von der Tagesform des
+ * Läufers abhängig zu machen — und ein Lauf, der mal rot und mal grün ist,
+ * wird nach der zweiten Woche ignoriert.
  */
-configure({ asyncUtilTimeout: 5_000 });
+configure({ asyncUtilTimeout: 10_000 });
 
 /**
  * Ein eigener, berechenbarer `localStorage` für die Testreihe.
