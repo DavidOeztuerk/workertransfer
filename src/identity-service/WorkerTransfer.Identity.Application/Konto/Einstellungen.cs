@@ -154,3 +154,38 @@ public sealed class SchluesselSetzenHandler(
         return true;
     }
 }
+
+/// <summary>
+/// Der KI-Zugang einer Person — intern, mit Klartextschlüssel.
+/// </summary>
+/// <remarks>
+/// Nur über <c>/internal/account/{id}/ai</c>. Der Browser bekommt diese
+/// Gestalt nie: <c>GET /account/settings</c> trägt den Schlüssel absichtlich
+/// nicht.
+/// </remarks>
+public sealed record InternerKiZugang(
+    string Anbieter, string Adresse, string Modell, string Schluessel);
+
+/// <summary>Den KI-Zugang einer Person lesen — für andere Dienste, nicht für den Browser.</summary>
+public sealed record InterneKiZugangAbfrage(SubjectId Wer) : IAbfrage<InternerKiZugang>;
+
+/// <inheritdoc cref="InterneKiZugangAbfrage" />
+public sealed class InterneKiZugangHandler(
+    IKontoeinstellungen speicher, IGeheimnisse geheimnisse)
+    : IRequestHandler<InterneKiZugangAbfrage, InternerKiZugang>
+{
+    /// <inheritdoc />
+    public async Task<InternerKiZugang> Handle(
+        InterneKiZugangAbfrage request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var stand = await speicher.HoleAsync(request.Wer, cancellationToken);
+
+        return new InternerKiZugang(
+            EinstellungenHandler.Etikett(stand.Anbieter),
+            stand.Adresse,
+            stand.Modell,
+            geheimnisse.Entschluessele(stand.SchluesselVerschluesselt) ?? string.Empty);
+    }
+}

@@ -17,6 +17,7 @@ import {
 } from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
+import { Zivilidentitaet } from "../components/Zivilidentitaet";
 import { useAsync } from "../lib/useAsync";
 import {
   type KiAnbieter,
@@ -33,7 +34,7 @@ import {
 } from "../api/settings";
 
 /**
- * Die vier Schalter, wörtlich aus dem alten Code übernommen.
+ * Die fünf Schalter. Der fünfte ist der Eingang einer Bewerbung beim Unternehmen.
  *
  * Der Hinweis unter jedem sagt, was das Abschalten <em>kostet</em>, nicht was
  * der Schalter tut. Wer „Marktstatus-Anfragen" abschaltet, soll wissen, dass er
@@ -47,6 +48,7 @@ const SCHALTER: {
   { key: "resume_request", name: "lebenslauf" },
   { key: "transfer_update", name: "transfer" },
   { key: "application_update", name: "bewerbung" },
+  { key: "application_received", name: "eingang" },
 ];
 
 /**
@@ -158,6 +160,7 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
+      <Zivilidentitaet />
       <Datenschutzblock />
       <KiBlock />
       <Nachweisblock />
@@ -280,7 +283,7 @@ function KiBlock() {
             <TextField
               select
               label={t("einstellungen.anbieter")}
-              value={einstellungen.provider}
+              value={einstellungen.provider ?? "none"}
               helperText={t("einstellungen.anbieterHinweis")}
               onChange={(event) => void setze({ provider: event.target.value as KiAnbieter })}
             >
@@ -296,20 +299,20 @@ function KiBlock() {
                 <TextField
                   label={t("einstellungen.adresse")}
                   helperText={t("einstellungen.adresseHinweis")}
-                  value={einstellungen.baseUrl}
+                  value={einstellungen.baseUrl ?? ""}
                   onChange={(event) =>
                     stand.setze({ ...einstellungen, baseUrl: event.target.value })
                   }
-                  onBlur={() => void setze({ baseUrl: einstellungen.baseUrl })}
+                  onBlur={() => void setze({ baseUrl: einstellungen.baseUrl ?? "" })}
                 />
                 <TextField
                   label={t("einstellungen.modell")}
                   helperText={t("einstellungen.modellHinweis")}
-                  value={einstellungen.model}
+                  value={einstellungen.model ?? ""}
                   onChange={(event) =>
                     stand.setze({ ...einstellungen, model: event.target.value })
                   }
-                  onBlur={() => void setze({ model: einstellungen.model })}
+                  onBlur={() => void setze({ model: einstellungen.model ?? "" })}
                 />
 
                 {!eigenerServer ? (
@@ -338,7 +341,7 @@ function KiBlock() {
                 <ConsentSwitch
                   label={t("einstellungen.kiProtokoll")}
                   hint={t("einstellungen.kiProtokollHinweis")}
-                  checked={einstellungen.auditLog}
+                  checked={einstellungen.auditLog === true}
                   onChange={(next) => void setze({ auditLog: next })}
                 />
               </>

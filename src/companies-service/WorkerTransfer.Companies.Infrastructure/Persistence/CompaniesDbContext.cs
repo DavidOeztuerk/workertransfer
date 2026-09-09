@@ -27,6 +27,16 @@ public sealed class ProfilZeile
     /// <summary>Die <c>benefits</c>-Spalte, als jsonb.</summary>
     public string Benefits { get; set; } = "[]";
 
+    public string Line1 { get; set; } = string.Empty;
+
+    public string PostalCode { get; set; } = string.Empty;
+
+    public string City { get; set; } = string.Empty;
+
+    public string Country { get; set; } = "DE";
+
+    public string Phone { get; set; } = string.Empty;
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
@@ -76,6 +86,11 @@ public sealed class CompaniesDbContext(DbContextOptions<CompaniesDbContext> opti
                 .HasColumnName("locations").HasColumnType("jsonb").IsRequired();
             entity.Property(zeile => zeile.Benefits)
                 .HasColumnName("benefits").HasColumnType("jsonb").IsRequired();
+            entity.Property(zeile => zeile.Line1).HasColumnName("line1").HasColumnType("text").IsRequired();
+            entity.Property(zeile => zeile.PostalCode).HasColumnName("postal_code").HasColumnType("text").IsRequired();
+            entity.Property(zeile => zeile.City).HasColumnName("city").HasColumnType("text").IsRequired();
+            entity.Property(zeile => zeile.Country).HasColumnName("country").HasColumnType("text").IsRequired();
+            entity.Property(zeile => zeile.Phone).HasColumnName("phone").HasColumnType("text").IsRequired();
 
             entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(zeile => zeile.UpdatedAt).HasColumnName("updated_at").IsRequired();

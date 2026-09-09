@@ -25,7 +25,19 @@ export interface Session {
    * `max.werber@…` ergäbe „M" und nicht „MW".
    */
   displayName: string;
+  /** Bürgerlicher Vorname, oder leer. Nie im Token, nie an die KI als Anschrift. */
+  givenName: string;
+  /** Bürgerlicher Nachname, oder leer. */
+  familyName: string;
 }
+
+/**
+ * Was `GET /auth/session` über den Zustand sagt — unabhängig vom User-Objekt.
+ *
+ * `renewable` heisst: Access tot, Refresh-Cookie da. Die Oberfläche muss dann
+ * `POST /auth/refresh` rufen, sonst wirkt die Sitzung nach 15 Minuten tot.
+ */
+export type SessionWireState = "active" | "renewable" | "anonymous";
 
 /** Eine Firma, für die jemand handeln darf. */
 export interface Membership {

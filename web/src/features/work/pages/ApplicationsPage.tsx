@@ -111,6 +111,11 @@ export function ApplicationsPage() {
       narrow
       lead={t("bewerbungen.lead")}
     >
+      <Typography variant="body2" sx={{ mb: 2 }}>
+        <Link component={RouterLink} to="/applications/drafts">
+          {t("bewerbungen.zuEntwuerfen")}
+        </Link>
+      </Typography>
       {fehler !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
           {fehler}

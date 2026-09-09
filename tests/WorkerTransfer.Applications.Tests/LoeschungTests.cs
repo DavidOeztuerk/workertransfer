@@ -26,6 +26,7 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     private WebApplicationFactory<Program> _dienst = null!;
     private readonly Probeledger _ledger = new();
     private readonly Probestellen _stellen = new();
+    private readonly Probemitglieder _mitglieder = new();
 
     public Task InitializeAsync()
     {
@@ -43,6 +44,7 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
                     ServiceDescriptor.Scoped<IEinwilligungsschreiber>(_ => _ledger));
                 dienste.Replace(ServiceDescriptor.Scoped<IStellenauskunft>(_ => _stellen));
                 dienste.Replace(ServiceDescriptor.Scoped<IZustellung, Probezustellung>());
+                dienste.Replace(ServiceDescriptor.Scoped<IUnternehmensmitgliederAbfrage>(_ => _mitglieder));
             });
         });
 
@@ -144,6 +146,9 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         var wer = Guid.CreateVersion7();
         var firma = Guid.CreateVersion7();
         var stelle = _stellen.Oeffentlich(firma);
+
+        _mitglieder.Fuer(new TenantId(firma), new SubjectId(Guid.CreateVersion7()));
+
         var person = Mit(Tokenform.Person(wer));
 
         var angelegt = JsonDocument

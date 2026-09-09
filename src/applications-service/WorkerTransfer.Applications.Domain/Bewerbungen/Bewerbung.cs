@@ -95,7 +95,8 @@ public sealed class Bewerbung
         Bewerbungsstand stand,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm,
-        DateTimeOffset? beantwortetAm)
+        DateTimeOffset? beantwortetAm,
+        Bewerbungskontakt kontakt)
     {
         Id = id;
         Stelle = stelle;
@@ -107,6 +108,7 @@ public sealed class Bewerbung
         AngelegtAm = angelegtAm;
         GeaendertAm = geaendertAm;
         BeantwortetAm = beantwortetAm;
+        Kontakt = kontakt;
     }
 
     /// <summary>Welche Bewerbung.</summary>
@@ -148,6 +150,15 @@ public sealed class Bewerbung
     public DateTimeOffset? BeantwortetAm { get; private set; }
 
     /// <summary>
+    /// Briefkopf zum Zeitpunkt des Sendens — Klarname, Anschrift, Telefon, Mail.
+    /// </summary>
+    /// <remarks>
+    /// Snapshot, nicht Verweis (ADR-0038): ein späterer Umzug darf die
+    /// Firmenmappe nicht umschreiben. Nie im Anschreibenkontext, nie an ein Modell.
+    /// </remarks>
+    public Bewerbungskontakt Kontakt { get; private set; }
+
+    /// <summary>
     /// Läuft sie noch — und damit die Freigabe der Daten?
     /// </summary>
     /// <remarks>
@@ -165,9 +176,11 @@ public sealed class Bewerbung
         SubjectId wer,
         string nachricht,
         Mitgeschicktes mitgeschickt,
-        DateTimeOffset jetzt) =>
+        DateTimeOffset jetzt,
+        Bewerbungskontakt? kontakt = null) =>
         new(Guid.CreateVersion7(), stelle, firma, wer, Text(nachricht), mitgeschickt,
-            Bewerbungsstand.Submitted, jetzt, jetzt, null);
+            Bewerbungsstand.Submitted, jetzt, jetzt, null,
+            kontakt ?? Bewerbungskontakt.Leer);
 
     /// <summary>Die Bewerbung, wie eine Zeile sie hält.</summary>
     public static Bewerbung Stelle_her(
@@ -180,9 +193,10 @@ public sealed class Bewerbung
         Bewerbungsstand stand,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm,
-        DateTimeOffset? beantwortetAm) =>
+        DateTimeOffset? beantwortetAm,
+        Bewerbungskontakt? kontakt = null) =>
         new(id, stelle, firma, wer, nachricht, mitgeschickt, stand,
-            angelegtAm, geaendertAm, beantwortetAm);
+            angelegtAm, geaendertAm, beantwortetAm, kontakt ?? Bewerbungskontakt.Leer);
 
     /// <summary>Nach einem Rückzug erneut bewerben — eine neue Entscheidung.</summary>
     /// <remarks>
@@ -190,7 +204,11 @@ public sealed class Bewerbung
     /// schon gefallen ist.
     /// </remarks>
     /// <exception cref="UebergangNichtErlaubt">Sie wurde nicht zurückgezogen.</exception>
-    public void Schicke_erneut(string nachricht, Mitgeschicktes mitgeschickt, DateTimeOffset jetzt)
+    public void Schicke_erneut(
+        string nachricht,
+        Mitgeschicktes mitgeschickt,
+        DateTimeOffset jetzt,
+        Bewerbungskontakt? kontakt = null)
     {
         if (Stand is not Bewerbungsstand.Withdrawn)
         {
@@ -199,6 +217,7 @@ public sealed class Bewerbung
 
         Nachricht = Text(nachricht);
         Mitgeschickt = mitgeschickt;
+        Kontakt = kontakt ?? Bewerbungskontakt.Leer;
         Stand = Bewerbungsstand.Submitted;
         BeantwortetAm = null;
         GeaendertAm = jetzt;
@@ -265,6 +284,25 @@ public sealed class Bewerbung
             ? throw new NachrichtFehler(HoechstlaengeNachricht)
             : bereinigt;
     }
+}
+
+/// <summary>
+/// Briefkopf zum Sendezeitpunkt. Gehört der Mappe, nicht dem Prompt (ADR-0038).
+/// </summary>
+public sealed record Bewerbungskontakt(
+    string Klarname,
+    string Zeile1,
+    string Zeile2,
+    string Postleitzahl,
+    string Ort,
+    string Land,
+    string Telefon,
+    string Email)
+{
+    /// <summary>Nichts hinterlegt — der Briefkopf bleibt leer, das Senden nicht.</summary>
+    public static Bewerbungskontakt Leer { get; } =
+        new(string.Empty, string.Empty, string.Empty, string.Empty,
+            string.Empty, "DE", string.Empty, string.Empty);
 }
 
 /// <summary>Findet und speichert Bewerbungen.</summary>

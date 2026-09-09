@@ -3,6 +3,7 @@ using Girder.Core.Identity;
 using WorkerTransfer.Applications.Application.Entwuerfe;
 using WorkerTransfer.Applications.Application.Ports;
 using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Infrastructure.Anschreiben;
 
 namespace WorkerTransfer.Applications.Tests;
 
@@ -168,6 +169,109 @@ public sealed class EntwurfsregelnTests
         versuch.Should().Throw<AnmerkungFehler>();
     }
 
+    /// <summary>
+    /// Nach einem fehlgeschlagenen Schreiben darf die Person selbst schreiben.
+    /// </summary>
+    /// <remarks>
+    /// Aus <c>Entsteht</c> ist <c>Aendere_selbst</c> verboten. Ohne Anbieter
+    /// muss der Entwurf deshalb auf <c>Fehlgeschlagen</c> fallen — sonst bleibt
+    /// die Zeile ewig „wird geschrieben" und der Brief bleibt leer.
+    /// </remarks>
+    [Fact]
+    public void Nach_einem_fehlgeschlagenen_Schreiben_darf_man_selbst_aendern()
+    {
+        var entwurf = Bewerbungsentwurf.Beginne(
+            Guid.CreateVersion7(), new TenantId(Guid.CreateVersion7()),
+            new SubjectId(Guid.CreateVersion7()), Jetzt);
+
+        entwurf.Scheitere("Es ist kein Entwurfsanbieter eingerichtet.", Jetzt);
+        entwurf.Aendere_selbst("Bewerbung", "Ich schreibe selbst.", Jetzt);
+
+        entwurf.Stand.Should().Be(Entwurfsstand.Pruefen);
+        entwurf.Text.Should().Be("Ich schreibe selbst.");
+    }
+
+    /// <summary>
+    /// Nach einem Fehlschlag darf das Modell denselben Entwurf noch einmal
+    /// füllen — sonst verfällt eine gelungene Antwort als 422.
+    /// </summary>
+    [Fact]
+    public void Nach_einem_Fehlschlag_darf_das_Modell_nochmal_schreiben()
+    {
+        var entwurf = Bewerbungsentwurf.Beginne(
+            Guid.CreateVersion7(), new TenantId(Guid.CreateVersion7()),
+            new SubjectId(Guid.CreateVersion7()), Jetzt);
+
+        entwurf.Scheitere("Der Entwurfsanbieter antwortet mit 404.", Jetzt);
+        entwurf.Nimm_text_an("Bewerbung", "Sehr geehrte Damen und Herren.", Jetzt);
+
+        entwurf.Stand.Should().Be(Entwurfsstand.Pruefen);
+        entwurf.Text.Should().Be("Sehr geehrte Damen und Herren.");
+        entwurf.Fehler.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// Ein Anschreiben bleibt kurz: 1500 Tokens haben ein lokales Modell
+    /// über die Minute gedrückt, und länger als eine Minute wartet niemand.
+    /// </summary>
+    [Fact]
+    public void Das_Anschreiben_fordert_keine_lange_Antwort()
+    {
+        HttpAnschreiber.HoechsteToken.Should().BeLessThanOrEqualTo(1500);
+        Anschreibenkontext.Regeln.Should().Contain("250");
+        Anschreibenkontext.Regeln.Should().Contain("Muttersprachler");
+        Anschreibenkontext.Regeln.Should().Contain("Erfinde");
+        Anschreibenkontext.Regeln.Should().Contain("Signatur");
+    }
+
+    [Fact]
+    public void Ein_Bruchstueck_bleibt_Entsteht()
+    {
+        var entwurf = Bewerbungsentwurf.Beginne(
+            Guid.CreateVersion7(), new TenantId(Guid.CreateVersion7()),
+            new SubjectId(Guid.CreateVersion7()), Jetzt);
+
+        entwurf.Beginne_schreiben(Jetzt);
+        var start = entwurf.SchreibenBegonnen;
+
+        entwurf.Nimm_bruchstueck("Bewerbung", "Sehr geehrte", Jetzt.AddSeconds(12));
+
+        entwurf.Stand.Should().Be(Entwurfsstand.Entsteht);
+        entwurf.Text.Should().Be("Sehr geehrte");
+        entwurf.Fassung.Should().Be(1);
+        entwurf.SchreibenBegonnen.Should().Be(start);
+    }
+
+    [Fact]
+    public void Das_erste_Schreiben_setzt_den_Start()
+    {
+        var entwurf = Bewerbungsentwurf.Beginne(
+            Guid.CreateVersion7(), new TenantId(Guid.CreateVersion7()),
+            new SubjectId(Guid.CreateVersion7()), Jetzt);
+
+        entwurf.SchreibenBegonnen.Should().BeNull();
+
+        entwurf.Beginne_schreiben(Jetzt, leeren: false);
+
+        entwurf.SchreibenBegonnen.Should().Be(Jetzt);
+        entwurf.Stand.Should().Be(Entwurfsstand.Entsteht);
+    }
+
+    [Fact]
+    public void Nach_einem_Fehlschlag_beginnt_das_Schreiben_wieder()
+    {
+        var entwurf = Bewerbungsentwurf.Beginne(
+            Guid.CreateVersion7(), new TenantId(Guid.CreateVersion7()),
+            new SubjectId(Guid.CreateVersion7()), Jetzt);
+
+        entwurf.Scheitere("Zeitüberschreitung", Jetzt);
+        entwurf.Beginne_schreiben(Jetzt);
+
+        entwurf.Stand.Should().Be(Entwurfsstand.Entsteht);
+        entwurf.Fehler.Should().BeEmpty();
+        entwurf.Text.Should().BeEmpty();
+    }
+
     /// <summary>Der ganze Weg, mit jedem Sprung als eigener Handlung.</summary>
     [Fact]
     public void Der_ganze_Weg_verlangt_jeden_Schritt_einzeln()
@@ -222,6 +326,25 @@ public sealed class EntwurfsregelnTests
                 nameof(Anschreibenkontext.Sprache));
     }
 
+    /// <summary>
+    /// Anschrift, Mail und Telefon gehören auf den Briefbogen, nicht ins Modell
+    /// (ADR-0038). Die Allowlist oben reicht nicht: ein Feld <c>Anschrift</c>
+    /// anstelle von <c>EigeneUeberschrift</c> würde die Liste nur verschieben.
+    /// </summary>
+    [Theory]
+    [InlineData("anschrift")]
+    [InlineData("address")]
+    [InlineData("email")]
+    [InlineData("telefon")]
+    [InlineData("phone")]
+    [InlineData("gehalt")]
+    public void Der_Kontext_traegt_keine_Anschrift(string wort)
+    {
+        typeof(Anschreibenkontext).GetProperties()
+            .Select(eigenschaft => eigenschaft.Name.ToLowerInvariant())
+            .Should().NotContain(name => name.Contains(wort, StringComparison.Ordinal));
+    }
+
     /// <summary>Und keine Zahl über einen Menschen, auch nicht die eigene.</summary>
     /// <remarks>
     /// ADR-0022 an der Stelle, an der er am leichtesten zu übersehen ist:
@@ -268,5 +391,10 @@ public sealed class EntwurfsregelnTests
         // — leer und nicht erfunden.
         Anschreibenformat.Lies("Sehr geehrte …")
             .Should().Be((string.Empty, "Sehr geehrte …"));
+
+        // Unvollständige Betreffzeile: den Rohtext zeigen, sonst bleibt der
+        // Brief leer, während das Modell den Betreff noch tippt.
+        Anschreibenformat.Lies("BETREFF: Bewerbung als")
+            .Should().Be((string.Empty, "BETREFF: Bewerbung als"));
     }
 }

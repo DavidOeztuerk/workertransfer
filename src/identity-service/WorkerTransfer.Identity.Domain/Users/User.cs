@@ -46,7 +46,9 @@ public sealed class User
         AccountStatus status,
         IReadOnlyList<string> roles,
         string? pendingCompanyName,
-        Kontosprache sprache)
+        Kontosprache sprache,
+        string? givenName,
+        string? familyName)
     {
         Id = id;
         Email = email;
@@ -56,6 +58,8 @@ public sealed class User
         Roles = roles;
         PendingCompanyName = pendingCompanyName;
         Kontosprache = sprache;
+        GivenName = LeerAlsNull(givenName);
+        FamilyName = LeerAlsNull(familyName);
     }
 
     /// <summary>Who this is.</summary>
@@ -69,6 +73,30 @@ public sealed class User
 
     /// <summary>The name they chose to be shown under.</summary>
     public string DisplayName { get; }
+
+    /// <summary>
+    /// Bürgerlicher Vorname — für Briefkopf und Signatur, nicht für die Suche.
+    /// </summary>
+    /// <remarks>
+    /// Getrennt vom Anzeigenamen (ADR-0038). Leer/fehlend ist die Vorgabe
+    /// (Art. 25): wer sich nur umsieht, muss keinen Klarnamen hinterlegen.
+    /// </remarks>
+    public string? GivenName { get; private set; }
+
+    /// <summary>Bürgerlicher Nachname. Siehe <see cref="GivenName"/>.</summary>
+    public string? FamilyName { get; private set; }
+
+    /// <summary>
+    /// Was unter das Anschreiben gehört: Vor- und Nachname, sonst der Anzeigename.
+    /// </summary>
+    public string Klarname
+    {
+        get
+        {
+            var voll = $"{GivenName} {FamilyName}".Trim();
+            return voll.Length > 0 ? voll : DisplayName;
+        }
+    }
 
     /// <summary>Where the account stands.</summary>
     public AccountStatus Status { get; private set; }
@@ -115,9 +143,12 @@ public sealed class User
         string passwordHash,
         string displayName,
         string? pendingCompanyName = null,
-        Kontosprache sprache = Sprachwahl.Vorgabe) =>
+        Kontosprache sprache = Sprachwahl.Vorgabe,
+        string? givenName = null,
+        string? familyName = null) =>
         new(SubjectId.New(), email, passwordHash, displayName,
-            AccountStatus.Pending, ["user"], pendingCompanyName, sprache);
+            AccountStatus.Pending, ["user"], pendingCompanyName, sprache,
+            givenName, familyName);
 
     /// <summary>The account as a row holds it.</summary>
     /// <remarks>For repositories. Everything here is already true.</remarks>
@@ -129,9 +160,11 @@ public sealed class User
         AccountStatus status,
         IReadOnlyList<string> roles,
         string? pendingCompanyName,
-        Kontosprache sprache = Sprachwahl.Vorgabe) =>
+        Kontosprache sprache = Sprachwahl.Vorgabe,
+        string? givenName = null,
+        string? familyName = null) =>
         new(id, email, passwordHash, displayName, status, roles,
-            pendingCompanyName, sprache);
+            pendingCompanyName, sprache, givenName, familyName);
 
     /// <summary>The address was confirmed.</summary>
     /// <remarks>
@@ -170,6 +203,23 @@ public sealed class User
     /// </remarks>
     /// <param name="sprache">What they picked.</param>
     public void SpracheWaehlen(Kontosprache sprache) => Kontosprache = sprache;
+
+    /// <summary>Bürgerlichen Namen setzen oder leeren.</summary>
+    /// <remarks>
+    /// Leer heisst ENTFERNEN, nicht „unverändert": sonst gäbe es keinen Weg
+    /// zurück zu „keiner". Der Anzeigename bleibt unberührt.
+    /// </remarks>
+    public void SetzeKlarname(string? givenName, string? familyName)
+    {
+        GivenName = LeerAlsNull(givenName);
+        FamilyName = LeerAlsNull(familyName);
+    }
+
+    private static string? LeerAlsNull(string? wert)
+    {
+        var getrimmt = wert?.Trim();
+        return string.IsNullOrEmpty(getrimmt) ? null : getrimmt;
+    }
 
     /// <summary>
     /// Refuses a sign-in the account is not in a state for.

@@ -1,3 +1,5 @@
+using WorkerTransfer.Applications.Domain.Bewerbungen;
+
 namespace WorkerTransfer.Applications.Application.Ports;
 
 /// <summary>Es ist kein Anbieter eingerichtet — oder er antwortet nicht.</summary>
@@ -57,41 +59,46 @@ public sealed record Anschreibenkontext(
     /// Feder.
     /// </remarks>
     public const string Regeln = """
-        Du schreibst ein Bewerbungsanschreiben — in der Ich-Form, aus der Sicht
-        der Person, die sich bewirbt.
+        Du schreibst ein Bewerbungsanschreiben in der Ich-Form.
+
+        Sprache: genau die angegebene (de, en oder fr). Schreibe wie ein
+        Muttersprachler. Nur vollstaendige, grammatisch korrekte Saetze.
+        Keine Wortschoepfungen, keine falschen Verbformen, keine woertlich
+        uebersetzten Floskeln, keine halben Konstruktionen.
 
         1. Verwende ausschliesslich die angegebenen Angaben der Person. Erfinde
            KEINE Qualifikationen, keine Arbeitgeber, keine Zeitraeume, keine
-           Abschluesse und keine Zahlen. Was nicht dasteht, kommt nicht vor.
-        2. Beziehe dich konkret auf die Stellenbeschreibung und belege das mit
-           Angaben aus dem Werdegang der Person.
-        3. Keine Selbstbewertung in Zahlen — kein Prozentwert, keine Note, kein
+           Abschluesse, keine Orte, keine Familie und keine Zahlen. Was nicht
+           dasteht, existiert nicht — auch keinen Hof, keine Oma, keine Tools.
+        2. Ist der Werdegang dünn: erfinde nichts. Schreib trotzdem einen
+           vollstaendigen Brief — Anrede, zwei bis vier Absaetze, Schluss —
+           aus Ueberschrift, Text, Faehigkeiten und der Stellenanzeige.
+        3. Beziehe dich konkret auf die Stellenbeschreibung. Belege nur mit
+           Angaben, die dastehen.
+        4. Keine Selbstbewertung in Zahlen — kein Prozentwert, keine Note, kein
            "zu 90 % geeignet".
-        4. Keine Floskeln wie "hiermit bewerbe ich mich".
-        5. Hoechstens eine Seite, etwa 250 bis 350 Woerter Haupttext.
-        6. Antworte in der angegebenen Sprache.
+        5. Keine Floskeln wie "hiermit bewerbe ich mich".
+        6. Haupttext 180 bis 250 Woerter — eine Seite, nicht ein duenner Absatz.
+        7. Die Signatur ist GENAU der volle Name aus den Angaben, kein Spitzname
+           und kein anderer Name.
 
-        Ausgabeformat, genau so:
+        Ausgabeformat, genau so, vollstaendige Woerter, kein fehlender Buchstabe:
         BETREFF: <Betreffzeile>
         ---
-        <Anschreiben mit Anrede und Gruss, ohne Briefkopf>
+        <Anschreiben mit Anrede, Absaetzen und Gruss, ohne Briefkopf>
         """;
 }
 
 /// <summary>Entwirft ein Anschreiben — auf Bitte, und nur dann.</summary>
 public interface IAnschreiber
 {
-    /// <summary>Ob überhaupt ein Anbieter eingerichtet ist.</summary>
-    /// <remarks>
-    /// Wird gefragt, BEVOR ein Entwurf entsteht: ein leerer Entwurf im Zustand
-    /// „Pruefen" wäre eine Einladung, ihn versehentlich freizugeben (ADR-0034).
-    /// </remarks>
-    bool Eingerichtet { get; }
-
     /// <summary>Schreibt. Behält nichts.</summary>
     /// <exception cref="AnschreibenNichtVerfuegbar">Kein Anbieter, oder er schweigt.</exception>
     Task<string> SchreibeAsync(
-        Anschreibenkontext kontext, CancellationToken cancellationToken = default);
+        KiZugang zugang,
+        Anschreibenkontext kontext,
+        Func<string, Task>? fortschritt = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Überarbeitet anhand der Anmerkungen.</summary>
     /// <remarks>
@@ -100,10 +107,12 @@ public interface IAnschreiber
     /// </remarks>
     /// <exception cref="AnschreibenNichtVerfuegbar">Kein Anbieter, oder er schweigt.</exception>
     Task<string> UeberarbeiteAsync(
+        KiZugang zugang,
         Anschreibenkontext kontext,
         string betreff,
         string text,
         IReadOnlyList<string> anmerkungen,
+        Func<string, Task>? fortschritt = null,
         CancellationToken cancellationToken = default);
 }
 
@@ -120,6 +129,20 @@ public interface IBewerberauskunft
     /// <summary>Profil und Werdegang der bewerbenden Person.</summary>
     /// <exception cref="BewerberSchweigt">Ein beteiligter Dienst antwortete nicht.</exception>
     Task<Eigenbild> HoleAsync(CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Briefkopf — Klarname und Anschrift. Nie Teil von <see cref="Anschreibenkontext"/>.
+/// </summary>
+/// <remarks>
+/// Eigener Port, damit niemand sie in den Prompt mischt (ADR-0038). Ein
+/// Ausfall liefert leer, nicht eine Ausnahme: Senden darf an der Anschrift
+/// nicht scheitern.
+/// </remarks>
+public interface IKontaktauskunft
+{
+    /// <summary>Was zum Sendezeitpunkt auf dem Briefkopf steht.</summary>
+    Task<Bewerbungskontakt> HoleKontaktAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>Was die Person über sich selbst geschrieben hat.</summary>

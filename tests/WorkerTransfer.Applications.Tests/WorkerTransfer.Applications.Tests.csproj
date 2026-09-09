@@ -23,5 +23,6 @@
     <ProjectReference Include="..\..\src\applications-service\WorkerTransfer.Applications.Application\WorkerTransfer.Applications.Application.csproj" />
     <ProjectReference Include="..\..\src\applications-service\WorkerTransfer.Applications.Domain\WorkerTransfer.Applications.Domain.csproj" />
     <ProjectReference Include="..\..\src\applications-service\WorkerTransfer.Applications.Infrastructure\WorkerTransfer.Applications.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\shared\WorkerTransfer.Contracts.Identity\WorkerTransfer.Contracts.Identity.csproj" />
   </ItemGroup>
 </Project>

@@ -168,7 +168,8 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         foreach (var feld in new[]
                  {
-                     "resume_request", "market_request", "application_update", "transfer_update"
+                     "resume_request", "market_request", "application_update", "transfer_update",
+                     "application_received"
                  })
         {
             wuensche.GetProperty(feld).GetBoolean().Should().BeTrue(feld);
@@ -242,6 +243,35 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         gelesen.GetProperty("resume_request").GetBoolean().Should().BeFalse();
         gelesen.GetProperty("application_update").GetBoolean().Should().BeTrue();
+        gelesen.GetProperty("application_received").GetBoolean().Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Wer die Art abbestellt hat, bekommt keine Mail — der Eintrag im
+    /// Postfach bleibt trotzdem.
+    /// </summary>
+    [Fact]
+    public async Task ApplicationReceived_abbestellt_heisst_keine_Post()
+    {
+        var anna = Guid.CreateVersion7();
+        var ihr = AlsPerson(anna);
+
+        await ihr.PutAsJsonAsync("/me/notification-preferences", new
+        {
+            resume_request = true,
+            market_request = true,
+            application_update = true,
+            transfer_update = true,
+            application_received = false
+        });
+
+        await Melde(anna, "application_received");
+
+        _postbote.Gebeten.Should().BeEmpty();
+
+        var postfach = await Json(await ihr.GetAsync("/notifications/me"));
+        postfach.GetArrayLength().Should().Be(1);
+        postfach[0].GetProperty("kind").GetString().Should().Be("application_received");
     }
 
     /// <summary>Gelesen ist gelesen — und ein zweites Mal ändert nichts.</summary>

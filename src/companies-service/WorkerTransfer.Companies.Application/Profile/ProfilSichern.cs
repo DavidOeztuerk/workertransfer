@@ -17,7 +17,12 @@ public sealed record ProfilSichernBefehl(
     string UeberUns,
     string? Netzseite,
     IReadOnlyList<string>? Orte,
-    IReadOnlyList<string>? Leistungen) : IBefehl<Arbeitgeberprofil>;
+    IReadOnlyList<string>? Leistungen,
+    string? Zeile1 = null,
+    string? Postleitzahl = null,
+    string? Ort = null,
+    string? Land = null,
+    string? Telefon = null) : IBefehl<Arbeitgeberprofil>;
 
 /// <summary>Legt an oder ändert — und vergibt das Kürzel genau einmal.</summary>
 public sealed class ProfilSichernHandler(IProfilspeicher speicher, TimeProvider uhr)
@@ -44,13 +49,17 @@ public sealed class ProfilSichernHandler(IProfilspeicher speicher, TimeProvider 
 
             profil = Arbeitgeberprofil.Lege_an(
                 request.Firma, kuerzel, request.Anzeigename, request.UeberUns,
-                request.Netzseite, request.Orte, request.Leistungen, jetzt);
+                request.Netzseite, request.Orte, request.Leistungen, jetzt,
+                request.Zeile1, request.Postleitzahl, request.Ort, request.Land,
+                request.Telefon);
         }
         else
         {
             vorhanden.Aendere(
                 request.Anzeigename, request.UeberUns, request.Netzseite,
-                request.Orte, request.Leistungen, jetzt);
+                request.Orte, request.Leistungen, jetzt,
+                request.Zeile1, request.Postleitzahl, request.Ort, request.Land,
+                request.Telefon);
 
             profil = vorhanden;
         }

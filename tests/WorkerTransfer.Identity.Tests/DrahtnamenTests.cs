@@ -119,6 +119,22 @@ public class DrahtnamenTests(Postgres postgres) : IAsyncLifetime
             .StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
+    /// <summary>Auch Vor- und Nachname, sonst bindet camelCase nichts.</summary>
+    [Fact]
+    public async Task Auch_der_Klarname_kommt_in_snake_case_an()
+    {
+        using var inhalt = new StringContent(
+            $$"""
+            {"email":"{{NeueAdresse()}}","password":"geheim-und-lang-genug",
+             "display_name":"Anna","given_name":"Anna","family_name":"Beispiel"}
+            """,
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        (await Browser().PostAsync("/auth/register", inhalt))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
     /// <summary>
     /// camelCase wird NICHT angenommen — sonst nähme der Dienst beides an und
     /// der Vertrag wäre wieder keiner.

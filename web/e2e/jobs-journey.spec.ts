@@ -32,7 +32,7 @@ test("eine veröffentlichte Stelle findet auch, wer kein Konto hat", async ({ br
   // Erst das Unternehmensprofil: ohne es bleibt die Stelle anonym.
   await recruiter.goto("/company/profile");
   await recruiter.getByLabel(/Anzeigename/i).fill(companyName);
-  await recruiter.getByRole("button", { name: /Speichern/i }).click();
+  await recruiter.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(recruiter.getByText(/Profil gespeichert/i)).toBeVisible();
 
   await recruiter.goto("/company/jobs/new");
@@ -148,7 +148,7 @@ test("die Passung sieht die Person — und niemand rechnet sie auf dem Server", 
   // Klein geschrieben, mit Leerzeichen — und „postgres" statt „PostgreSQL".
   // Beides darf den Abgleich nicht kosten.
   await candidate.getByLabel(/Fähigkeiten/i).fill("python , postgres");
-  await candidate.getByRole("button", { name: /Speichern/i }).click();
+  await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
   // Sichtbar umbenannt: die Person sieht, was gespeichert wurde. Das ist der
   // Grund, warum das Vokabular nichts erfinden und nichts ablehnen darf — man
@@ -170,16 +170,10 @@ test("die Passung sieht die Person — und niemand rechnet sie auf dem Server", 
   await expect(candidate.locator('[data-match="missing"]')).toContainText("Go");
   await expect(candidate.getByText(/%/)).toHaveCount(0);
 
-  // Und dasselbe auf der Bewerbungsseite: dort hilft es beim Formulieren, zu
-  // sehen, welche Fähigkeit fehlt. Zwei Dienste antworten dafür, und der
-  // Abgleich entsteht erst im Browser — nur hier steht beides zugleich zur
-  // Verfügung.
-  await candidate.getByRole("link", { name: /^Bewerben$/ }).click();
-  await expect(candidate).toHaveURL(/\/jobs\/[0-9a-f-]{36}\/apply$/);
-  await expect(candidate.getByText(/2 von 3 genannten Fähigkeiten/)).toBeVisible();
-  await expect(candidate.locator('[data-match="missing"]')).toHaveCount(1);
-  await expect(candidate.locator('[data-match="missing"]')).toContainText("Go");
-  await expect(candidate.getByText(/%/)).toHaveCount(0);
+  // Hier stand dieselbe Prüfung ein zweites Mal, auf `/jobs/{id}/apply`. Diese
+  // Seite ist heute eine Weiche auf den Entwurf und zeigt die Häkchenliste
+  // nicht mehr — die Prüfung oben deckt die Zusage vollständig ab, und eine,
+  // die eine verschwundene Ansicht prüft, deckt gar nichts ab.
 
   await recruiterContext.close();
   await anonymousContext.close();

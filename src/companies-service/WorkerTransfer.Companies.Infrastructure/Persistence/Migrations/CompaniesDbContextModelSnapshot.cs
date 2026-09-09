@@ -38,6 +38,16 @@ namespace WorkerTransfer.Companies.Infrastructure.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("benefits");
 
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("city");
+
+                    b.Property<string>("Country")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("country");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -47,10 +57,25 @@ namespace WorkerTransfer.Companies.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("display_name");
 
+                    b.Property<string>("Line1")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("line1");
+
                     b.Property<string>("Locations")
                         .IsRequired()
                         .HasColumnType("jsonb")
                         .HasColumnName("locations");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("PostalCode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("postal_code");
 
                     b.Property<string>("Slug")
                         .IsRequired()

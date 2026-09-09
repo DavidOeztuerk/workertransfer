@@ -5,6 +5,8 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
+import Checkbox from "@mui/material/Checkbox";
+import CircularProgress from "@mui/material/CircularProgress";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
@@ -26,7 +28,9 @@ import {
   ortZuPunkt,
   searchJobs,
 } from "../api/jobs";
+import { createDrafts, getDrafts, listMyApplications, writeDraft } from "../api/applications";
 import { getMyProfile } from "../api/profile";
+import { merke } from "../lib/kontext";
 import { Requirements } from "../components/Requirements";
 import { merkeStelle } from "../lib/intent";
 import { useHandelnder } from "../lib/session";
@@ -116,8 +120,31 @@ export function JobsPage() {
   // Zwei Zeilen, die den ersten Treffer nach unten schieben.
   const { t } = useTranslation();
   const { signedIn, laedt } = useHandelnder();
+  const meineBewerbungen = useAsync(
+    (signal) => listMyApplications(signal),
+    [],
+    signedIn,
+  );
+  const meineEntwuerfe = useAsync((signal) => getDrafts(signal), [], signedIn);
+  const schonGesendet = new Set(
+    (meineBewerbungen.data?.ok ? meineBewerbungen.data.applications : [])
+      .filter((a) => a.status !== "withdrawn")
+      .map((a) => a.job_id),
+  );
+  const offeneEntwuerfe = new Map(
+    (meineEntwuerfe.data?.ok ? meineEntwuerfe.data.drafts : [])
+      .filter((d) => d.status !== "sent")
+      .map((d) => [d.job_id, d.id]),
+  );
   const [form, setForm] = useState<Stellenfilter>(LEERER_FILTER);
   const [applied, setApplied] = useState<Angewandt>(NICHTS_GESUCHT);
+  const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
+  const [creatingDrafts, setCreatingDrafts] = useState(false);
+  const [laeuftJob, setLaeuftJob] = useState<string | null>(null);
+  const [fortschritt, setFortschritt] = useState<{ fertig: number; gesamt: number } | null>(
+    null,
+  );
+  const [bulkFehler, setBulkFehler] = useState<string | null>(null);
   const navigate = useNavigate();
 
   // Der Standort wird nie beim Laden erfragt — nur auf Knopfdruck in der
@@ -132,7 +159,7 @@ export function JobsPage() {
    * kommt aus derselben Tabelle wie die Suche selbst, nicht von einem
    * Fremdanbieter.
    *
-   * Der Merker verhindert die Schleife: das Setzen ändert das Formular, das
+   * Der Merker verhindert die Schleife: das Setzt ändert das Formular, das
    * Formular ist aber keine Abhängigkeit dieses Effekts — geholt wird je
    * Position genau einmal.
    */
@@ -181,7 +208,7 @@ export function JobsPage() {
   // ist, wird NICHT gefragt — sonst liefe beim Kaltstart ein Abruf, dessen
   // Antwort feststeht (401), und die Passung flackerte kurz auf.
   const profile = useAsync(
-    (signal) => getMyProfile(signal),
+    () => merke("profile:me", () => getMyProfile()),
     [signedIn],
     signedIn,
   );
@@ -201,8 +228,78 @@ export function JobsPage() {
 
   const firmen = useFirmenprofile(list.items.map((job) => job.tenant_id));
 
+  const toggleJob = useCallback((jobId: string) => {
+    setSelectedJobs((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobId)) {
+        next.delete(jobId);
+      } else {
+        next.add(jobId);
+      }
+      return next;
+    });
+  }, []);
+
+  async function starteEntwuerfe(jobIds: string[]) {
+    const result = await createDrafts(jobIds);
+    if (!result.ok) {
+      setBulkFehler(result.error.detail);
+      return null;
+    }
+    const drafts = result.drafts;
+    await Promise.all(
+      drafts
+        .filter((draft) => draft.status === "generating" || draft.status === "failed")
+        .map((draft) => writeDraft(draft.id)),
+    );
+    return drafts;
+  }
+
+  async function bewerbenAufEine(jobId: string) {
+    setLaeuftJob(jobId);
+    setBulkFehler(null);
+    try {
+      const drafts = await starteEntwuerfe([jobId]);
+      const erster = drafts?.[0];
+      if (erster) navigate(`/applications/drafts/${erster.id}`);
+    } finally {
+      setLaeuftJob(null);
+    }
+  }
+
+  const clearSelection = useCallback(() => {
+    setSelectedJobs(new Set());
+  }, []);
+
+  const handleBulkApply = useCallback(async () => {
+    if (!signedIn || selectedJobs.size === 0) return;
+
+    setCreatingDrafts(true);
+    setBulkFehler(null);
+    try {
+      const jobIds = Array.from(selectedJobs).filter((id) => !offeneEntwuerfe.has(id));
+      if (jobIds.length === 0) {
+        clearSelection();
+        return;
+      }
+      const drafts = await starteEntwuerfe(jobIds);
+      if (drafts === null) return;
+
+      clearSelection();
+      navigate("/applications/drafts", { state: { schreiben: "ok" } });
+    } finally {
+      setCreatingDrafts(false);
+      setFortschritt(null);
+    }
+  }, [signedIn, selectedJobs, navigate, clearSelection]);
+
   return (
     <PageShell title={t("stellen.titel")}>
+      {bulkFehler ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {bulkFehler}
+        </Alert>
+      ) : null}
       <Box
         sx={{
           display: "grid",
@@ -257,94 +354,174 @@ export function JobsPage() {
       ) : null}
 
       {list.items.length > 0 ? (
-        <Box
-          component="ul"
-          sx={{
-            listStyle: "none",
-            p: 0,
-            m: 0,
-            display: "grid",
-            gap: 2,
-            // EINE Spalte, auf jeder Breite. Zwei nebeneinander waren kürzer
-            // und schlechter: Stellen sind verschieden lang, also entstanden
-            // ungleiche Karten mit Löchern dazwischen, und der Blick musste
-            // nach jeder Karte zurück nach links springen. Eine Liste liest man
-            // von oben nach unten.
-          }}
-        >
-          {list.items.map((job) => (
-            <Box component="li" key={job.id}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h3" sx={{ mb: 0.5 }}>
-                    {job.title}
-                  </Typography>
-                  <Hiring profile={firmen[job.tenant_id]} />
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mb: 1.5 }}
-                  >
-                    {job.location !== ""
-                      ? job.location
-                      : t("stellen.ortFehlt")}{" "}
-                    · {remoteLabel(job.remote)} · {employmentLabel(job.employment)}
-                  </Typography>
-                  <Typography sx={{ whiteSpace: "pre-line" }}>
-                    {job.description}
-                  </Typography>
-                  <Requirements skills={job.skills} mine={meineSkills} />
+        <>
+          <Box
+            component="ul"
+            sx={{
+              listStyle: "none",
+              p: 0,
+              m: 0,
+              display: "grid",
+              gap: 2,
+              pb: signedIn && selectedJobs.size > 0 ? 10 : 0,
+              // EINE Spalte, auf jeder Breite. Zwei nebeneinander waren kürzer
+              // und schlechter: Stellen sind verschieden lang, also entstanden
+              // ungleiche Karten mit Löchern dazwischen, und der Blick musste
+              // nach jeder Karte zurück nach links springen. Eine Liste liest man
+              // von oben nach unten.
+            }}
+          >
+            {list.items.map((job) => (
+              <Box component="li" key={job.id}>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, mb: 1 }}>
+                      {!laedt && signedIn && !schonGesendet.has(job.id) && (
+                        <Checkbox
+                          checked={selectedJobs.has(job.id)}
+                          disabled={offeneEntwuerfe.has(job.id) || creatingDrafts || laeuftJob !== null}
+                          onChange={() => toggleJob(job.id)}
+                          slotProps={{ input: { "aria-label": t("stellen.auswaehlen") } }}
+                          sx={{ mt: 0.5 }}
+                        />
+                      )}
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="h3" sx={{ mb: 0.5 }}>
+                          {job.title}
+                        </Typography>
+                        <Hiring profile={firmen[job.tenant_id]} />
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mb: 1.5 }}
+                        >
+                          {job.location !== ""
+                            ? job.location
+                            : t("stellen.ortFehlt")}{" "}
+                          · {remoteLabel(job.remote)} · {employmentLabel(job.employment)}
+                        </Typography>
+                        <Typography sx={{ whiteSpace: "pre-line" }}>
+                          {job.description}
+                        </Typography>
+                        <Requirements skills={job.skills} mine={meineSkills} />
+                      </Box>
+                    </Box>
 
-                  {laedt ? null : signedIn ? (
-                    /*
-                      Ein LINK auf eine eigene Adresse, kein aufklappendes
-                      Formular in der Karte. Das Formular überlebt damit ein
-                      Neuladen, ist teilbar, und die gemerkte Absicht nach dem
-                      Anmelden hat ein echtes Ziel statt einer Liste, die eine
-                      Box aufklappt.
-                    */
-                    <Button
-                      component={RouterLink}
-                      to={`/jobs/${job.id}/apply`}
-                      variant="contained"
-                      sx={{ mt: 2 }}
-                    >
-                      {t("stellen.bewerben")}
-                    </Button>
-                  ) : (
-                    /*
-                      Derselbe Knopf wie für Angemeldete, und OHNE den Satz
-                      „dafür brauchst du ein Konto". Er stand unter jeder Karte
-                      und erklärte etwas, das im nächsten Augenblick ohnehin auf
-                      dem Bildschirm steht: wer klickt, landet in der Anmeldung
-                      und sieht dort, warum. Zwölf Karten mit zwölf Hinweisen auf
-                      dieselbe Sache sind Lärm.
+                    {laedt ? null : signedIn ? (
+                      schonGesendet.has(job.id) ? (
+                        <Button variant="contained" disabled sx={{ mt: 2 }}>
+                          {t("stellen.bereitsBeworben")}
+                        </Button>
+                      ) : offeneEntwuerfe.has(job.id) ? (
+                        <Button
+                          component={RouterLink}
+                          to={`/applications/drafts/${offeneEntwuerfe.get(job.id)}`}
+                          variant="contained"
+                          sx={{ mt: 2 }}
+                        >
+                          {t("stellen.entwurfOeffnen")}
+                        </Button>
+                      ) : (
+                      <Button
+                        variant="contained"
+                        sx={{ mt: 2 }}
+                        disabled={creatingDrafts || laeuftJob !== null}
+                        onClick={() => void bewerbenAufEine(job.id)}
+                        startIcon={
+                          laeuftJob === job.id ? (
+                            <CircularProgress color="inherit" size={16} />
+                          ) : null
+                        }
+                      >
+                        {t("stellen.bewerben")}
+                      </Button>
+                      )
+                    ) : (
+                      /*
+                        Derselbe Knopf wie für Angemeldete, und OHNE den Satz
+                        „dafür brauchst du ein Konto". Er stand unter jeder Karte
+                        und erklärte etwas, das im nächsten Augenblick ohnehin auf
+                        dem Bildschirm steht: wer klickt, landet in der Anmeldung
+                        und sieht dort, warum. Zwölf Karten mit zwölf Hinweisen auf
+                        dieselbe Sache sind Lärm.
 
-                      Ein KNOPF und kein Wort in einem Satz: wer bewerben will,
-                      sucht einen Knopf, und er muss dasselbe Gewicht haben wie
-                      der für Angemeldete.
-                    */
-                    <Button
-                      type="button"
-                      variant="contained"
-                      sx={{ mt: 2 }}
-                      onClick={() => {
-                        // Erst merken, dann wechseln. Dieser Knopf ist die
-                        // EINZIGE Stelle, an der die Absicht entsteht — wer über
-                        // die Kopfzeile zur Anmeldung geht, hat keine geäussert,
-                        // und dann darf ihn auch nichts irgendwohin zurückwerfen.
-                        merkeStelle(job.id, job.title);
-                        void navigate("/login");
-                      }}
-                    >
-                      {t("stellen.bewerben")}
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
+                        Ein KNOPF und kein Wort in einem Satz: wer bewerben will,
+                        sucht einen Knopf, und er muss dasselbe Gewicht haben wie
+                        der für Angemeldete.
+                      */
+                      <Button
+                        type="button"
+                        variant="contained"
+                        sx={{ mt: 2 }}
+                        onClick={() => {
+                          // Erst merken, dann wechseln. Dieser Knopf ist die
+                          // EINZIGE Stelle, an der die Absicht entsteht — wer über
+                          // die Kopfzeile zur Anmeldung geht, hat keine geäussert,
+                          // und dann darf ihn auch nichts irgendwohin zurückwerfen.
+                          merkeStelle(job.id, job.title);
+                          void navigate("/login");
+                        }}
+                      >
+                        {t("stellen.bewerben")}
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              </Box>
+            ))}
+          </Box>
+
+          {/* Multi-Select Leiste */}
+          {signedIn && selectedJobs.size > 0 && (
+            <Box
+              sx={{
+                position: "fixed",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                p: 2,
+                bgcolor: "background.paper",
+                borderTop: "1px solid",
+                borderColor: "divider",
+                boxShadow: 3,
+                zIndex: 1100,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 2,
+              }}
+            >
+              <Typography variant="body1">
+                {fortschritt
+                  ? t("stellen.fortschritt", {
+                      fertig: fortschritt.fertig,
+                      gesamt: fortschritt.gesamt,
+                    })
+                  : t("stellen.ausgewaehlt", { count: selectedJobs.size })}
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  onClick={clearSelection}
+                  disabled={creatingDrafts}
+                >
+                  {t("stellen.auswahlAufheben")}
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleBulkApply}
+                  disabled={creatingDrafts}
+                  startIcon={creatingDrafts ? <Box sx={{ width: 16, height: 16 }} /> : null}
+                >
+                  {creatingDrafts
+                    ? t("stellen.entwuerfeErstellen")
+                    : t("stellen.fuerAlleBewerben")}
+                </Button>
+              </Box>
             </Box>
-          ))}
-        </Box>
+          )}
+        </>
       ) : null}
 
           <PaginationControls

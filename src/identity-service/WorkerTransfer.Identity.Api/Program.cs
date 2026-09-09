@@ -58,6 +58,7 @@ app.MapRegistrierungsEndpoints();
 app.MapUnternehmensEndpoints();
 app.MapMeldeEndpoints();
 app.MapLoeschEndpoints();
+app.MapInterneEndpoints();
 
 await app.RunAsync();
 

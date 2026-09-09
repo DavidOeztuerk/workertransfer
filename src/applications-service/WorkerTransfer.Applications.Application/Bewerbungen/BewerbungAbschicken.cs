@@ -1,6 +1,7 @@
 using Girder.Core.Identity;
 using MediatR;
 using WorkerTransfer.Applications.Application.Nachrichten;
+using WorkerTransfer.Outbox;
 using WorkerTransfer.Applications.Application.Ports;
 using WorkerTransfer.Applications.Domain.Bewerbungen;
 
@@ -33,6 +34,9 @@ public sealed class BewerbungAbschickenHandler(
     IBewerbungsspeicher speicher,
     IStellenauskunft stellen,
     IEinwilligungsschreiber ledger,
+    IOutbox outbox,
+    IUnternehmensmitgliederAbfrage mitglieder,
+    IKontaktauskunft kontakt,
     TimeProvider uhr) : IRequestHandler<BewerbungAbschickenBefehl, Bewerbungsergebnis>
 {
     /// <inheritdoc />
@@ -49,8 +53,14 @@ public sealed class BewerbungAbschickenHandler(
             return new Bewerbungsergebnis.KeineStelle();
         }
 
+        // Mitglieder ZUERST: scheitert identity, darf der Ledger nichts
+        // erteilen. Die Suche ist nicht die Mail (ADR-0025); eine Freigabe
+        // ohne Vorgang wäre die Lücke, die der Rückzug sonst räumen müsste.
+        var firmenMitglieder = await mitglieder.HoleAsync(stelle.Firma, cancellationToken);
+
         var jetzt = uhr.GetUtcNow();
         var mitgeschickt = new Mitgeschicktes(request.TeiltLebenslauf, request.TeiltPortfolio);
+        var briefkopf = await kontakt.HoleKontaktAsync(cancellationToken);
         var vorhanden = await speicher.HoleAsync(stelle.Id, request.Wer, cancellationToken);
 
         Bewerbung bewerbung;
@@ -67,11 +77,12 @@ public sealed class BewerbungAbschickenHandler(
                     request.Wer,
                     request.Nachricht,
                     mitgeschickt,
-                    jetzt);
+                    jetzt,
+                    briefkopf);
             }
             else
             {
-                vorhanden.Schicke_erneut(request.Nachricht, mitgeschickt, jetzt);
+                vorhanden.Schicke_erneut(request.Nachricht, mitgeschickt, jetzt, briefkopf);
                 bewerbung = vorhanden;
             }
         }
@@ -91,6 +102,14 @@ public sealed class BewerbungAbschickenHandler(
             cancellationToken);
 
         await speicher.SichereAsync(bewerbung, cancellationToken);
+
+        // Das Unternehmen benachrichtigen: je Mitglied eine Outbox-Zeile.
+        // Der Postausgang bleibt inhaltsfrei (ADR-0025): Kennung und Art,
+        // nie ein Name, nie eine Stelle, nie eine E-Mail-Adresse.
+        foreach (var mitglied in firmenMitglieder)
+        {
+            await outbox.VermerkeAsync(mitglied, Benachrichtigungsarten.Angekommen, cancellationToken);
+        }
 
         return new Bewerbungsergebnis.Erledigt(bewerbung);
     }

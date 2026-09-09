@@ -4,7 +4,7 @@ The short reference. `CLAUDE.md` carries the reasons; this file carries the comm
 
 ## What this is
 
-WorkerTransfer is a consent-first talent-mobility platform, written in **.NET 10 on Girder 4.2.2** (a shared foundation library from GitHub Packages) with a React frontend.
+WorkerTransfer is a consent-first talent-mobility platform, written in **.NET 10 on Girder 4.4.0** (a shared foundation library from GitHub Packages) with a React frontend.
 
 It was a Python (`uv`) monorepo until August 2026 and was translated by hand. **No Python remains** — no `uv`, `ruff`, `mypy`, `pytest`, `alembic`, no `apps/<service>`, no `packages/worker-*`. A document that names those is describing the predecessor. `docs/MIGRATION-STAND.md` says what changed and what was measured.
 
@@ -20,8 +20,8 @@ src/
   applications-service/  companies-service/  transfer-service/
   notification-service/  github-service/
   gateway/            Ocelot — the single entrance
-  shared/             ServiceDefaults, Outbox, Skills, Contracts.{Identity,Consent,Erasure}
-tests/                fifteen suites, one per service plus Gateway, Outbox, Skills, Ganzes
+  shared/             ServiceDefaults, Outbox, Skills, Ablage, Contracts.{Identity,Consent,Erasure}
+tests/                sixteen suites, one per service plus Gateway, Outbox, Skills, Ablage, Ganzes
 web/                  the React app — deliberately not under src/, and the WHOLE frontend
 deploy/  docker/  scripts/  docs/  bugs/
 ```

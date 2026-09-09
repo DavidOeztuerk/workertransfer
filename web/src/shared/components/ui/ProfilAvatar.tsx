@@ -41,7 +41,12 @@ export function ProfilAvatar({
           fontSize: size * 0.4,
           fontWeight: 660,
           bgcolor: src != null ? undefined : farbeFuer(name),
-          color: "#fff",
+          // Der Name aus dem Thema, kein Literal: `farbeFuer` liefert eine
+          // Helligkeit von 38 %, also traegt der Kreis hellen Text — aber
+          // welche Farbe „hell" heisst, entscheidet das Thema und nicht diese
+          // Komponente. Hier stand ein ausgeschriebener Weisswert — die
+          // einzige Stelle im Baum, an der eine Farbe wortwoertlich dastand.
+          color: "common.white",
         },
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}

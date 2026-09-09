@@ -7,9 +7,10 @@ public sealed class Unterlagenfehler(string was) : Exception(was);
 
 /// <summary>Was für eine Unterlage das ist.</summary>
 /// <remarks>
-/// Drei Arten und keine vierte „Sonstiges mit Unterart". Die Art ordnet für
-/// den Menschen, der die Mappe liest; sie wird nirgends ausgewertet und trägt
-/// keine Wertung — ein Zertifikat ist nicht mehr wert als ein Zeugnis.
+/// Die Art ordnet für den Menschen, der die Mappe liest. Ein Zertifikat ist
+/// nicht mehr wert als ein Zeugnis. <see cref="Lebenslauf"/> ist der andere
+/// Weg, den Werdegang zu hinterlegen: eine Datei statt des gesetzten
+/// Formulars — deshalb höchstens eine, und ohne CSS-Vorlage.
 /// </remarks>
 public enum Unterlagenart
 {
@@ -20,7 +21,10 @@ public enum Unterlagenart
     Zertifikat,
 
     /// <summary>Alles andere, was jemand beilegen will.</summary>
-    Sonstiges
+    Sonstiges,
+
+    /// <summary>Der Lebenslauf als Datei, nicht als gesetztes Formular.</summary>
+    Lebenslauf
 }
 
 /// <summary>Eine beigelegte Datei — Zeugnis, Zertifikat, sonst etwas.</summary>
@@ -80,8 +84,8 @@ public sealed class Unterlage
     /// <summary>Wie die Person sie genannt hat.</summary>
     public string Name { get; }
 
-    /// <summary>Zeugnis, Zertifikat oder sonst etwas.</summary>
-    public Unterlagenart Art { get; }
+    /// <summary>Zeugnis, Zertifikat, Lebenslauf-Datei oder sonst etwas.</summary>
+    public Unterlagenart Art { get; private set; }
 
     /// <summary>Der Typ, wie ihn die Signatur ergab.</summary>
     public string Inhaltstyp { get; }
@@ -94,6 +98,9 @@ public sealed class Unterlage
 
     /// <summary>Wann sie kam.</summary>
     public DateTimeOffset Hochgeladen { get; }
+
+    /// <summary>Macht diese Datei zum Lebenslauf. Höchstens eine darf das sein.</summary>
+    public void Ordne_zu(Unterlagenart art) => Art = art;
 
     /// <summary>Nimmt eine Unterlage an.</summary>
     /// <param name="wer">Wem sie gehört.</param>

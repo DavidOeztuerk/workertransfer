@@ -9,6 +9,15 @@ namespace WorkerTransfer.Applications.Application.Bewerbungen;
 public sealed record MeineBewerbungenAbfrage(SubjectId Wer)
     : IAbfrage<IReadOnlyList<Bewerbung>>;
 
+/// <summary>Eine Bewerbung, wenn der Aufrufer sie sehen darf.</summary>
+/// <remarks>
+/// 404 für fremd und für nicht vorhanden bleibt ununterscheidbar. Die Mappe
+/// des Unternehmens hängt an dieser einen Kennung; ohne sie müsste die
+/// Oberfläche die Stelle kennen, bevor sie die Bewerbung öffnet.
+/// </remarks>
+public sealed record BewerbungLesenAbfrage(Guid Id, TenantId? Firma, SubjectId? Person)
+    : IAbfrage<Bewerbung?>;
+
 /// <summary>Die Bewerbungen auf eine Stelle dieses Unternehmens.</summary>
 public sealed record BewerbungenZurStelleAbfrage(Guid Stelle, TenantId Firma)
     : IAbfrage<IReadOnlyList<Bewerbung>>;
@@ -41,6 +50,7 @@ public sealed record FirmenzahlenAbfrage(TenantId Firma)
 /// </remarks>
 public sealed class Bewerbungslisten(IBewerbungsspeicher speicher) :
     IRequestHandler<MeineBewerbungenAbfrage, IReadOnlyList<Bewerbung>>,
+    IRequestHandler<BewerbungLesenAbfrage, Bewerbung?>,
     IRequestHandler<BewerbungenZurStelleAbfrage, IReadOnlyList<Bewerbung>>,
     IRequestHandler<FirmenzahlenAbfrage, IReadOnlyDictionary<Bewerbungsstand, int>>
 {
@@ -52,6 +62,33 @@ public sealed class Bewerbungslisten(IBewerbungsspeicher speicher) :
         ArgumentNullException.ThrowIfNull(request);
 
         return speicher.FuerPersonAsync(request.Wer, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<Bewerbung?> Handle(
+        BewerbungLesenAbfrage request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var bewerbung = await speicher.HoleAsync(request.Id, cancellationToken);
+
+        if (bewerbung is null)
+        {
+            return null;
+        }
+
+        if (request.Firma is { } firma && bewerbung.Firma == firma)
+        {
+            return bewerbung;
+        }
+
+        if (request.Person is { } person && bewerbung.Wer == person)
+        {
+            return bewerbung;
+        }
+
+        return null;
     }
 
     /// <inheritdoc />

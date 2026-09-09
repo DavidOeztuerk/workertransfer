@@ -264,4 +264,45 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
         var danach = bereich.ServiceProvider.GetRequiredService<IdentityDbContext>();
         (await danach.AccountSettings.AnyAsync(e => e.SubjectId == wer)).Should().BeFalse();
     }
+
+    /// <summary>
+    /// Der interne Draht trägt den Schlüssel — ohne Geheimnis ist er unsichtbar.
+    /// </summary>
+    [Fact]
+    public async Task Ohne_Geheimnis_gibt_es_den_internen_Zugang_nicht()
+    {
+        var (_, wer) = await Angemeldet();
+
+        var antwort = await _dienst.CreateClient()
+            .GetAsync($"/internal/account/{wer}/ai");
+
+        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    /// <summary>Ollama braucht keinen Schlüssel, der interne Draht sagt das.</summary>
+    [Fact]
+    public async Task Ein_eigener_Server_reist_ohne_Schluessel()
+    {
+        var (browser, wer) = await Angemeldet();
+
+        (await browser.PutAsJsonAsync("/account/settings", new
+        {
+            delete_after_months = (int?)null,
+            ai_provider = "openai_compatible",
+            ai_base_url = "http://localhost:11434/v1/chat/completions",
+            ai_model = "qwen2.5-coder:7b",
+            ai_audit_log = false
+        })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var intern = _dienst.CreateClient();
+        intern.DefaultRequestHeaders.Add("X-Notify-Secret", "melde-geheimnis");
+
+        var zugang = await Json(await intern.GetAsync($"/internal/account/{wer}/ai"));
+
+        zugang.GetProperty("provider").GetString().Should().Be("openai_compatible");
+        zugang.GetProperty("base_url").GetString()
+            .Should().Be("http://localhost:11434/v1/chat/completions");
+        zugang.GetProperty("model").GetString().Should().Be("qwen2.5-coder:7b");
+        zugang.GetProperty("key").GetString().Should().BeEmpty();
+    }
 }

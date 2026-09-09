@@ -409,8 +409,9 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
         geloescht.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(geloescht)).GetProperty("retained").GetInt32().Should().Be(0);
 
-        (await AlsPerson(anna).GetAsync("/profiles/me")).StatusCode
-            .Should().Be(HttpStatusCode.NotFound);
+        var nachher = await AlsPerson(anna).GetAsync("/profiles/me");
+        nachher.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await nachher.Content.ReadAsStringAsync()).Trim().Should().Be("null");
     }
 
     [Fact]

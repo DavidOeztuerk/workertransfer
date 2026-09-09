@@ -223,6 +223,12 @@ services:
     env:
       Consent__Adresse: http://consent-service:8002
       Notifications__Adresse: http://notification-service:8010
+      Ablage__Verzeichnis: /daten/ablage
+    # Gleicher Grund wie portfolio: ohne Volume sind die Dateien beim
+    # naechsten Pod weg, die Zeilen in Postgres stehen noch (ADR-0035).
+    persistence:
+      size: 2Gi
+      mountPath: /daten/ablage
 
   - name: portfolio-service
     dir: portfolio
@@ -251,6 +257,7 @@ services:
       Consent__Adresse: http://consent-service:8002
       Jobs__Adresse: http://jobs-service:8006
       Notifications__Adresse: http://notification-service:8010
+      Identity__Adresse: http://identity-service:8001
 
   - name: companies-service
     dir: companies

@@ -77,6 +77,58 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
                     b.ToTable("girder_refresh_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.AnschriftRow", b =>
+                {
+                    b.Property<Guid>("SubjectId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("city");
+
+                    b.Property<string>("Country")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("country");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Line1")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("line1");
+
+                    b.Property<string>("Line2")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("line2");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("PostalCode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("postal_code");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("SubjectId");
+
+                    b.ToTable("addresses", (string)null);
+
+                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                });
+
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.AuditEventRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -335,6 +387,14 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("citext")
                         .HasColumnName("email");
+
+                    b.Property<string>("FamilyName")
+                        .HasColumnType("text")
+                        .HasColumnName("family_name");
+
+                    b.Property<string>("GivenName")
+                        .HasColumnType("text")
+                        .HasColumnName("given_name");
 
                     b.Property<string>("Language")
                         .IsRequired()

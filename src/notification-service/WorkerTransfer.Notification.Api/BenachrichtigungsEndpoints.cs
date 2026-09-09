@@ -171,7 +171,8 @@ public static class BenachrichtigungsEndpoints
                         [Benachrichtigungsart.ResumeRequest] = body.ResumeRequest,
                         [Benachrichtigungsart.MarketRequest] = body.MarketRequest,
                         [Benachrichtigungsart.ApplicationUpdate] = body.ApplicationUpdate,
-                        [Benachrichtigungsart.TransferUpdate] = body.TransferUpdate
+                        [Benachrichtigungsart.TransferUpdate] = body.TransferUpdate,
+                        [Benachrichtigungsart.ApplicationReceived] = body.ApplicationReceived
                     }),
                 cancellationToken);
 
@@ -214,5 +215,6 @@ public static class BenachrichtigungsEndpoints
         new(wunsch.Will(Benachrichtigungsart.ResumeRequest),
             wunsch.Will(Benachrichtigungsart.MarketRequest),
             wunsch.Will(Benachrichtigungsart.ApplicationUpdate),
-            wunsch.Will(Benachrichtigungsart.TransferUpdate));
+            wunsch.Will(Benachrichtigungsart.TransferUpdate),
+            wunsch.Will(Benachrichtigungsart.ApplicationReceived));
 }

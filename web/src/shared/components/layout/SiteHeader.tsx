@@ -268,6 +268,7 @@ function AccountMenu() {
         <Eintrag to="/portfolio">{t("kopf.arbeiten")}</Eintrag>
         <Eintrag to="/github">{t("kopf.github")}</Eintrag>
         <Eintrag to="/applications">{t("kopf.bewerbungen")}</Eintrag>
+        <Eintrag to="/applications/drafts">{t("kopf.entwuerfe")}</Eintrag>
         <Divider />
         <Eintrag to="/consents">{t("kopf.freigaben")}</Eintrag>
         <Eintrag to="/my-data">{t("kopf.meineDaten")}</Eintrag>
@@ -314,6 +315,7 @@ function FirmenMenu() {
       >
         <Eintrag to="/candidates">{t("kopf.kandidaten")}</Eintrag>
         <Eintrag to="/company/jobs">{t("kopf.unsereStellen")}</Eintrag>
+        <Eintrag to="/company/applications">{t("kopf.unsereBewerbungen")}</Eintrag>
         <Eintrag to="/company/transfers">{t("kopf.unsereGespraeche")}</Eintrag>
         <Divider />
         <Eintrag to="/company/profile">{t("kopf.firmenprofil")}</Eintrag>

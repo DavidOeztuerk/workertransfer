@@ -46,6 +46,11 @@ public sealed class Arbeitgeberprofil
         Netzseite = werte.Netzseite;
         Orte = werte.Orte;
         Leistungen = werte.Leistungen;
+        Zeile1 = werte.Zeile1;
+        Postleitzahl = werte.Postleitzahl;
+        Ort = werte.Ort;
+        Land = werte.Land;
+        Telefon = werte.Telefon;
         AngelegtAm = angelegtAm;
         GeaendertAm = geaendertAm;
     }
@@ -81,6 +86,17 @@ public sealed class Arbeitgeberprofil
     /// <summary>Was geboten wird.</summary>
     public IReadOnlyList<string> Leistungen { get; private set; }
 
+    /// <summary>Straße für den Briefkopf. Leer, wenn nicht hinterlegt.</summary>
+    public string Zeile1 { get; private set; }
+
+    public string Postleitzahl { get; private set; }
+
+    public string Ort { get; private set; }
+
+    public string Land { get; private set; }
+
+    public string Telefon { get; private set; }
+
     /// <summary>Wann es angelegt wurde.</summary>
     public DateTimeOffset AngelegtAm { get; }
 
@@ -97,8 +113,15 @@ public sealed class Arbeitgeberprofil
         string? netzseite,
         IReadOnlyList<string>? orte,
         IReadOnlyList<string>? leistungen,
-        DateTimeOffset jetzt) =>
-        new(firma, kuerzel, Pruefe(anzeigename, ueberUns, netzseite, orte, leistungen),
+        DateTimeOffset jetzt,
+        string? zeile1 = null,
+        string? postleitzahl = null,
+        string? ort = null,
+        string? land = null,
+        string? telefon = null) =>
+        new(firma, kuerzel,
+            Pruefe(anzeigename, ueberUns, netzseite, orte, leistungen,
+                zeile1, postleitzahl, ort, land, telefon),
             jetzt, jetzt);
 
     /// <summary>Das Profil, wie eine Zeile es hält.</summary>
@@ -111,9 +134,15 @@ public sealed class Arbeitgeberprofil
         IReadOnlyList<string> orte,
         IReadOnlyList<string> leistungen,
         DateTimeOffset angelegtAm,
-        DateTimeOffset geaendertAm) =>
+        DateTimeOffset geaendertAm,
+        string zeile1 = "",
+        string postleitzahl = "",
+        string ort = "",
+        string land = "DE",
+        string telefon = "") =>
         new(firma, kuerzel,
-            new Geprueftes(anzeigename, ueberUns, netzseite, orte, leistungen),
+            new Geprueftes(anzeigename, ueberUns, netzseite, orte, leistungen,
+                zeile1, postleitzahl, ort, land, telefon),
             angelegtAm, geaendertAm);
 
     /// <summary>Schreibt die Felder neu — das Kürzel nicht.</summary>
@@ -124,17 +153,28 @@ public sealed class Arbeitgeberprofil
         string? netzseite,
         IReadOnlyList<string>? orte,
         IReadOnlyList<string>? leistungen,
-        DateTimeOffset jetzt)
+        DateTimeOffset jetzt,
+        string? zeile1 = null,
+        string? postleitzahl = null,
+        string? ort = null,
+        string? land = null,
+        string? telefon = null)
     {
         // Erst vollständig prüfen, dann schreiben: ein abgelehntes Formular
         // darf kein halb geändertes Aggregat hinterlassen.
-        var geprueft = Pruefe(anzeigename, ueberUns, netzseite, orte, leistungen);
+        var geprueft = Pruefe(anzeigename, ueberUns, netzseite, orte, leistungen,
+            zeile1, postleitzahl, ort, land, telefon);
 
         Anzeigename = geprueft.Anzeigename;
         UeberUns = geprueft.UeberUns;
         Netzseite = geprueft.Netzseite;
         Orte = geprueft.Orte;
         Leistungen = geprueft.Leistungen;
+        Zeile1 = geprueft.Zeile1;
+        Postleitzahl = geprueft.Postleitzahl;
+        Ort = geprueft.Ort;
+        Land = geprueft.Land;
+        Telefon = geprueft.Telefon;
         GeaendertAm = jetzt;
     }
 
@@ -149,19 +189,38 @@ public sealed class Arbeitgeberprofil
         string UeberUns,
         string? Netzseite,
         IReadOnlyList<string> Orte,
-        IReadOnlyList<string> Leistungen);
+        IReadOnlyList<string> Leistungen,
+        string Zeile1,
+        string Postleitzahl,
+        string Ort,
+        string Land,
+        string Telefon);
 
     private static Geprueftes Pruefe(
         string anzeigename,
         string ueberUns,
         string? netzseite,
         IReadOnlyList<string>? orte,
-        IReadOnlyList<string>? leistungen) =>
-        new(Text("Display name", anzeigename, pflicht: true, HoechstlaengeAnzeigename),
+        IReadOnlyList<string>? leistungen,
+        string? zeile1 = null,
+        string? postleitzahl = null,
+        string? ort = null,
+        string? land = null,
+        string? telefon = null)
+    {
+        var iso = Text("country", land, pflicht: false, 2).ToUpperInvariant();
+        return new(
+            Text("Display name", anzeigename, pflicht: true, HoechstlaengeAnzeigename),
             Text("About", ueberUns, pflicht: false, HoechstlaengeUeberUns),
             Link(netzseite),
             Eintraege("locations", orte),
-            Eintraege("benefits", leistungen));
+            Eintraege("benefits", leistungen),
+            Text("line1", zeile1, pflicht: false, 120),
+            Text("postal_code", postleitzahl, pflicht: false, 16),
+            Text("city", ort, pflicht: false, 80),
+            iso.Length == 2 ? iso : "DE",
+            Text("phone", telefon, pflicht: false, 40));
+    }
 
     private static string Text(string feld, string? wert, bool pflicht, int grenze)
     {

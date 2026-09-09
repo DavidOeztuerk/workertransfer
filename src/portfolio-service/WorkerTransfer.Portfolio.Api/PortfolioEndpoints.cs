@@ -86,15 +86,8 @@ public static class PortfolioEndpoints
             var portfolio = await mediator.Send(
                 new MeinPortfolioAbfrage(handelnder.Subject), cancellationToken);
 
-            if (portfolio is null)
-            {
-                await ProblemDetailsMiddleware.Schreibe(
-                    context, StatusCodes.Status404NotFound,
-                    "Request failed", "no portfolio yet");
-                return;
-            }
-
-            await context.Response.WriteAsJsonAsync(Antwort(portfolio), cancellationToken);
+            await context.Response.WriteAsJsonAsync(
+                portfolio is null ? null : Antwort(portfolio), cancellationToken);
         });
 
         portfolios.MapGet("/{subjectId:guid}", async (

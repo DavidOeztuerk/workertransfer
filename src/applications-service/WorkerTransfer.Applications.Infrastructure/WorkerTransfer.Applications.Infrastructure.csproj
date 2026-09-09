@@ -10,6 +10,7 @@
     <ProjectReference Include="..\WorkerTransfer.Applications.Application\WorkerTransfer.Applications.Application.csproj" />
     <ProjectReference Include="..\WorkerTransfer.Applications.Domain\WorkerTransfer.Applications.Domain.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.Outbox\WorkerTransfer.Outbox.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Identity\WorkerTransfer.Contracts.Identity.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
   </ItemGroup>
 

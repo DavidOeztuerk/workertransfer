@@ -1,4 +1,5 @@
 using Girder.Abstractions.Hosting;
+using Microsoft.Extensions.Logging;
 using Girder.Infrastructure.Builder;
 using Girder.Infrastructure.Builder.Modules;
 using Girder.Infrastructure.Extensions;
@@ -125,6 +126,36 @@ public static class Dienstgrundlage
                 // braucht eine Schluesselverteilung, keine Codeaenderung hier.
                 .UseJwt(jwt => jwt.FromSharedSecret())
 
+                // DIE EGRESS-GRENZE, UND WOHER SIE IHRE HOSTS KENNT.
+                //
+                // `AddSovereignPlatform` buendelt vier Dinge: die Egress-Grenze,
+                // die Maskierung im Protokoll, den Souveraenitaetsbericht und
+                // eine Pruefspur. Die ersten drei sind der Grund; die vierte
+                // laesst sich nicht abwaehlen und bekommt deshalb unten eine
+                // Senke, die sagt, dass sie nicht benutzt wird.
+                //
+                // GEMESSEN, BEVOR DAS HIER STAND (`EgressTests`): der Waechter
+                // WEIST AB statt zu protokollieren, und ein Containername faellt
+                // NICHT unter „loopback und RFC1918" — `consent-service` ist
+                // keine Adresse, die sich als IP lesen laesst. Naiv uebernommen
+                // waere das der Ausfall jedes Dienst-zu-Dienst-Aufrufs gewesen,
+                // und zwar erst im Stapel, nicht im Test.
+                //
+                // Die Hosts kommen deshalb aus der KONFIGURATION und nicht aus
+                // einer Liste hier: `Consent__Adresse`, `Jobs__Adresse`,
+                // `Auskunft__*`, `Erasure__Adressen__*` stehen ohnehin in der
+                // Umgebung, und was ein Dienst ruft, hat er dort schon gesagt.
+                // Eine zweite Liste waere die, die als Erste veraltet — und ihr
+                // Veralten faellt niemandem auf, weil der Aufruf dann einfach
+                // abgewiesen wird.
+                //
+                // Was NICHT in der Konfiguration steht, darf auch nicht
+                // hinaus. Genau das ist der Zweck: ein Telemetriezug mit einer
+                // eingebauten Vorgabeadresse, ein SDK, das nach Hause telefoniert.
+                .AddSovereignPlatform(souveraen => souveraen
+                    .Allow([.. GerufeneHosts(configuration)])
+                    .WithAuditSink<VerweigerndePruefspur>())
+
                 // Girders Bremse steht in der Vorgabe, und sie ist in 4.0.2
                 // nachgemessen in Ordnung (H2, Messung 1): sie bremst, sie zaehlt
                 // je Herkunft, sie liest X-Forwarded-For nicht mehr, und ein
@@ -136,12 +167,14 @@ public static class Dienstgrundlage
                 // DES GATEWAYS — fuer jeden Aufrufer dieselbe. Eine Bremse hier
                 // wuerfe alle Menschen in einen Topf: wer als Erster fuenfmal
                 // danebentippt, sperrt die ganze Welt aus. Die Bremse gehoert an
-                // den Eingang, und dort steht sie (src/gateway/.../Bremse.cs).
+                // den Eingang, und dort steht seit 4.2.0 GIRDERS EIGENES MODUL,
+                // konfiguriert in `ocelot.json` — der frueher hier genannte
+                // Eigenbau `Bremse.cs` ist geloescht.
                 .Without(
                     GirderModule.RateLimiting,
                     "ein Dienst hinter dem Gateway sieht als Herkunft nur das "
                     + "Gateway, also alle Aufrufer als einen — gebremst wird am "
-                    + "Eingang, in Bremse.cs")
+                    + "Eingang, in ocelot.json")
 
                 // Steht ohnehin nicht in der Vorgabe. Hier genannt, damit die
                 // Entscheidung im Quelltext steht und nicht im Gedaechtnis.
@@ -312,6 +345,97 @@ public static class Dienstgrundlage
         app.UseGirderPrincipal();
         app.UseMiddleware<ProblemDetailsMiddleware>();
 
+        BerichteZusammensetzung(app, dienstname);
+
         return app;
+    }
+
+    /// <summary>Jeder Host, den dieser Dienst laut Konfiguration ruft.</summary>
+    /// <remarks>
+    /// <para><strong>Eine Ableitung, keine Liste.</strong> Gelesen wird die
+    /// ganze Konfiguration; jeder Wert, der sich als absolute http- oder
+    /// https-Adresse lesen lässt, gibt seinen Host her. Damit deckt die
+    /// Egress-Grenze genau das ab, was in der Umgebung steht — und kann nicht
+    /// hinter ihr zurückbleiben, weil es dieselbe Quelle ist.</para>
+    ///
+    /// <para>Verbindungszeichenfolgen fallen dabei durch (<c>Host=postgres;…</c>
+    /// ist keine URL), und das ist richtig: Postgres wird nicht über einen
+    /// <c>HttpClient</c> gerufen, die Egress-Grenze sieht es nie.</para>
+    ///
+    /// <para><strong>Zwei Ziele stehen deshalb in der Umgebung, die früher nur
+    /// im Quelltext standen</strong> — <c>Draft__Adresse</c> und
+    /// <c>GitHub__Adresse</c>. Eine eingebaute Vorgabeadresse nach draußen ist
+    /// genau das, was ein Souveränitätsbericht sichtbar machen soll; sie im
+    /// Code zu lassen hieße, sie vor ihm zu verstecken.</para>
+    /// </remarks>
+    private static IReadOnlyList<string> GerufeneHosts(IConfiguration configuration) =>
+    [
+        .. configuration.AsEnumerable()
+            .Select(eintrag => eintrag.Value)
+            .Where(wert => !string.IsNullOrWhiteSpace(wert))
+            .Select(wert =>
+                Uri.TryCreate(wert, UriKind.Absolute, out var adresse)
+                && (adresse.Scheme == Uri.UriSchemeHttp || adresse.Scheme == Uri.UriSchemeHttps)
+                    ? adresse.Host
+                    : null)
+            .Where(host => host is { Length: > 0 })
+            .Select(host => host!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(host => host, StringComparer.OrdinalIgnoreCase)
+    ];
+
+    /// <summary>Sagt beim Start, was dieser Dienst fährt — und was er warum nicht.</summary>
+    /// <remarks>
+    /// <para><strong>Die Absicht steht in <c>Dienstgrundlage.cs</c>, die
+    /// Wirklichkeit im Container.</strong> Bis 4.0.2 konnten die beiden
+    /// auseinanderlaufen, ohne dass es jemand merkte: die Kette rief jedes Glied
+    /// bedingungslos, ein <c>Without(...)</c> wirkte nur bei der Registrierung,
+    /// und ob die Auslassung wirklich ankam, sah man erst am Absturz. Genau
+    /// dafür gibt es <c>GirderComposition</c>, und ein Bericht, den niemand
+    /// ausgibt, ist keiner.</para>
+    ///
+    /// <para><strong>Ausgegeben wird nur die Zahl der geführten Module und jede
+    /// Auslassung mit ihrem Grund.</strong> Die vollständige Liste wäre bei
+    /// neunzehn Einträgen zwölfmal dasselbe im Startprotokoll; die Auslassungen
+    /// sind das, worüber jemand entschieden hat, und nur sie können von der
+    /// Absicht abweichen. Wer alles sehen will, liest
+    /// <c>GirderComposition.Included</c> aus dem Container.</para>
+    ///
+    /// <para>Kein Wert wandert dabei ins Protokoll: ein Modulname ist eine
+    /// Aufzählung, ein Grund ein Satz, den wir selbst geschrieben haben.</para>
+    /// </remarks>
+    private static void BerichteZusammensetzung(WebApplication app, string dienstname)
+    {
+        var zusammensetzung = app.Services.GetService<GirderComposition>();
+
+        if (zusammensetzung is null)
+        {
+            // Nicht werfen: der Bericht ist Auskunft, keine Zusage. Ein Dienst,
+            // der wegen einer fehlenden Auskunft nicht startet, tauscht ein
+            // kleines Problem gegen ein grosses.
+            app.Logger.LogWarning(
+                "Girder meldet keine Zusammensetzung für {Dienst} — der Bericht bleibt leer",
+                dienstname);
+
+            return;
+        }
+
+        // MIT NAMEN, nicht nur mit einer Zahl. „19 Module in Betrieb" liest sich
+        // wie eine Bestaetigung und ist keine: dass eine Entscheidung von oben
+        // wirklich ankam, sieht man erst am Namen. Gemessen am 09.09.2026 stand
+        // dieselbe 19 vor und nach einer neuen `AddSovereignPlatform`-Zeile —
+        // die Zahl konnte den Unterschied nicht zeigen, den sie melden sollte.
+        app.Logger.LogInformation(
+            "Girder für {Dienst}: {Gefuehrt} Module in Betrieb ({Module}), {Ausgelassen} ausgelassen",
+            dienstname,
+            zusammensetzung.Included.Count,
+            string.Join(", ", zusammensetzung.Included),
+            zusammensetzung.Excluded.Count);
+
+        foreach (var (modul, grund) in zusammensetzung.Excluded)
+        {
+            app.Logger.LogInformation(
+                "Girder-Modul {Modul} nicht in Betrieb: {Grund}", modul, grund);
+        }
     }
 }

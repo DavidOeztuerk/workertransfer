@@ -33,6 +33,8 @@ public sealed class MeinKontoHandler(ICurrentPrincipal akteur, IUserRepository b
             konto?.Email,
             handelnder.Acting is Capacity.ForCompany firma ? firma.Tenant : null,
             konto?.Kontosprache ?? Sprachwahl.Vorgabe,
-            konto?.DisplayName ?? string.Empty);
+            konto?.DisplayName ?? string.Empty,
+            konto?.GivenName,
+            konto?.FamilyName);
     }
 }

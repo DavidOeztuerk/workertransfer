@@ -34,7 +34,9 @@ public sealed record RegisterBody(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("password")] string Password,
     [property: JsonPropertyName("display_name")] string DisplayName,
-    [property: JsonPropertyName("company_name")] string? CompanyName = null);
+    [property: JsonPropertyName("company_name")] string? CompanyName = null,
+    [property: JsonPropertyName("given_name")] string? GivenName = null,
+    [property: JsonPropertyName("family_name")] string? FamilyName = null);
 
 /// <summary>What a caller sends to confirm.</summary>
 public sealed record VerifyEmailBody(string Token);
@@ -70,7 +72,7 @@ public static class RegistrierungsEndpoints
             var ergebnis = await mediator.Send(
                 new RegistrierenBefehl(
                     body.Email, body.Password, body.DisplayName, body.CompanyName,
-                    vermutet),
+                    vermutet, body.GivenName, body.FamilyName),
                 cancellationToken);
 
             switch (ergebnis)

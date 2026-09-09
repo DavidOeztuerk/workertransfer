@@ -42,6 +42,9 @@ public sealed record UnterlageInhaltAbfrage(SubjectId Wer, Guid Id)
 /// <summary>Eine Unterlage wieder wegnehmen.</summary>
 public sealed record UnterlageLoeschenBefehl(SubjectId Wer, Guid Id) : IBefehl<bool>;
 
+/// <summary>Diese Datei ist der Lebenslauf — die vorige Lebenslauf-Datei nicht mehr.</summary>
+public sealed record UnterlageAlsLebenslaufBefehl(SubjectId Wer, Guid Id) : IBefehl<bool>;
+
 /// <summary>Die Vorlage des eigenen Lebenslaufs wählen.</summary>
 public sealed record VorlageWaehlenBefehl(SubjectId Wer, Vorlage Vorlage) : IBefehl<bool>;
 
@@ -55,6 +58,7 @@ public sealed class Unterlagenbefehle(
     IRequestHandler<MeineUnterlagenAbfrage, IReadOnlyList<Unterlage>>,
     IRequestHandler<UnterlageInhaltAbfrage, (Unterlage Unterlage, byte[] Inhalt)?>,
     IRequestHandler<UnterlageLoeschenBefehl, bool>,
+    IRequestHandler<UnterlageAlsLebenslaufBefehl, bool>,
     IRequestHandler<VorlageWaehlenBefehl, bool>
 {
     /// <inheritdoc />
@@ -75,6 +79,17 @@ public sealed class Unterlagenbefehle(
         }
 
         var vorhandene = await speicher.AlleAsync(request.Wer, cancellationToken);
+
+        if (request.Art == Unterlagenart.Lebenslauf)
+        {
+            foreach (var alt in vorhandene.Where(u => u.Art == Unterlagenart.Lebenslauf))
+            {
+                await speicher.LoescheAsync(request.Wer, alt.Id, cancellationToken);
+                await ablage.LoescheAsync(alt.Ablageschluessel, cancellationToken);
+            }
+
+            vorhandene = await speicher.AlleAsync(request.Wer, cancellationToken);
+        }
 
         if (vorhandene.Count >= Unterlage.HoechsteAnzahl)
         {
@@ -153,6 +168,41 @@ public sealed class Unterlagenbefehle(
         // sähe fuer die Person aus wie eine Unterlage, die es noch gibt.
         await speicher.LoescheAsync(request.Wer, request.Id, cancellationToken);
         await ablage.LoescheAsync(unterlage.Ablageschluessel, cancellationToken);
+
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> Handle(
+        UnterlageAlsLebenslaufBefehl request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var alle = await speicher.AlleAsync(request.Wer, cancellationToken);
+        var treffer = alle.FirstOrDefault(u => u.Id == request.Id);
+
+        if (treffer is null)
+        {
+            return false;
+        }
+
+        foreach (var unterlage in alle)
+        {
+            if (unterlage.Id == request.Id)
+            {
+                unterlage.Ordne_zu(Unterlagenart.Lebenslauf);
+            }
+            else if (unterlage.Art == Unterlagenart.Lebenslauf)
+            {
+                unterlage.Ordne_zu(Unterlagenart.Sonstiges);
+            }
+            else
+            {
+                continue;
+            }
+
+            await speicher.SichereAsync(unterlage, cancellationToken);
+        }
 
         return true;
     }

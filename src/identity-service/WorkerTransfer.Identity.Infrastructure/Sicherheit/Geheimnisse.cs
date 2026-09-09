@@ -16,4 +16,7 @@ public sealed class Geheimnisse(Geheimnisspeicher speicher) : IGeheimnisse
 
     /// <inheritdoc />
     public string Endung(string klartext) => Geheimnisspeicher.Endung(klartext);
+
+    /// <inheritdoc />
+    public string? Entschluessele(string? gespeichert) => speicher.Entschluessele(gespeichert);
 }

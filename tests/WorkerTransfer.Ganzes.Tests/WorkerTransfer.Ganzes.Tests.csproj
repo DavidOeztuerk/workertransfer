@@ -35,6 +35,7 @@
     <ProjectReference Include="..\..\src\github-service\WorkerTransfer.GitHub.Infrastructure\WorkerTransfer.GitHub.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\notification-service\WorkerTransfer.Notification.Infrastructure\WorkerTransfer.Notification.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\shared\WorkerTransfer.Contracts.Erasure\WorkerTransfer.Contracts.Erasure.csproj" />
+    <ProjectReference Include="..\..\src\shared\WorkerTransfer.Contracts.Identity\WorkerTransfer.Contracts.Identity.csproj" />
     <ProjectReference Include="..\..\src\identity-service\WorkerTransfer.Identity.Api\WorkerTransfer.Identity.Api.csproj" />
     <ProjectReference Include="..\..\src\consent-service\WorkerTransfer.Consent.Api\WorkerTransfer.Consent.Api.csproj" />
     <ProjectReference Include="..\..\src\profile-service\WorkerTransfer.Profile.Api\WorkerTransfer.Profile.Api.csproj" />

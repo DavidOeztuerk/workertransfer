@@ -69,6 +69,13 @@ namespace WorkerTransfer.Applications.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("answered_at");
 
+                    b.Property<string>("ApplicantContact")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("{}")
+                        .HasColumnName("applicant_contact");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -190,6 +197,10 @@ namespace WorkerTransfer.Applications.Infrastructure.Persistence.Migrations
                     b.Property<int>("Version")
                         .HasColumnType("integer")
                         .HasColumnName("version");
+
+                    b.Property<DateTime?>("WritingStartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("writing_started_at");
 
                     b.HasKey("Id");
 

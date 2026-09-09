@@ -46,21 +46,42 @@ public sealed class Anschreibeneinstellungen
 public sealed class KeinAnschreiber : IAnschreiber
 {
     /// <inheritdoc />
-    public bool Eingerichtet => false;
-
-    /// <inheritdoc />
     public Task<string> SchreibeAsync(
-        Anschreibenkontext kontext, CancellationToken cancellationToken = default) =>
-        throw new AnschreibenNichtVerfuegbar("Es ist kein Entwurfsanbieter eingerichtet.");
+        KiZugang zugang,
+        Anschreibenkontext kontext,
+        Func<string, Task>? fortschritt = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(zugang);
+        ArgumentNullException.ThrowIfNull(kontext);
+        _ = fortschritt;
+        _ = cancellationToken;
+
+        return Task.FromException<string>(
+            new AnschreibenNichtVerfuegbar("Es ist kein Entwurfsanbieter eingerichtet."));
+    }
 
     /// <inheritdoc />
     public Task<string> UeberarbeiteAsync(
+        KiZugang zugang,
         Anschreibenkontext kontext,
         string betreff,
         string text,
         IReadOnlyList<string> anmerkungen,
-        CancellationToken cancellationToken = default) =>
-        throw new AnschreibenNichtVerfuegbar("Es ist kein Entwurfsanbieter eingerichtet.");
+        Func<string, Task>? fortschritt = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(zugang);
+        ArgumentNullException.ThrowIfNull(kontext);
+        ArgumentNullException.ThrowIfNull(anmerkungen);
+        _ = betreff;
+        _ = text;
+        _ = fortschritt;
+        _ = cancellationToken;
+
+        return Task.FromException<string>(
+            new AnschreibenNichtVerfuegbar("Es ist kein Entwurfsanbieter eingerichtet."));
+    }
 }
 
 /// <summary>Fragt ein Modell — auf Bitte, einmal, und behält nichts.</summary>
@@ -77,28 +98,39 @@ public sealed class HttpAnschreiber(
     /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
     public const string Klient = "anschreiben";
 
+    /// <summary>
+    /// Obergrenze der Antwort. Streaming trägt die Wartezeit; 1200 Tokens
+    /// reichen für 250 Wörter. 1500 haben ein lokales 7B früher über die
+    /// Minute gedrückt, bevor der Strom Stück für Stück ankam.
+    /// </summary>
+    public const int HoechsteToken = 1200;
+
     private readonly Anschreibeneinstellungen _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public bool Eingerichtet => _einstellungen.Schluessel.Length > 0;
-
-    /// <inheritdoc />
     public Task<string> SchreibeAsync(
-        Anschreibenkontext kontext, CancellationToken cancellationToken = default)
+        KiZugang zugang,
+        Anschreibenkontext kontext,
+        Func<string, Task>? fortschritt = null,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(zugang);
         ArgumentNullException.ThrowIfNull(kontext);
 
-        return FrageAsync(Auftrag(kontext), cancellationToken);
+        return FrageAsync(zugang, Auftrag(kontext), fortschritt, cancellationToken);
     }
 
     /// <inheritdoc />
     public Task<string> UeberarbeiteAsync(
+        KiZugang zugang,
         Anschreibenkontext kontext,
         string betreff,
         string text,
         IReadOnlyList<string> anmerkungen,
+        Func<string, Task>? fortschritt = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(zugang);
         ArgumentNullException.ThrowIfNull(kontext);
         ArgumentNullException.ThrowIfNull(anmerkungen);
 
@@ -118,7 +150,7 @@ public sealed class HttpAnschreiber(
             bau.AppendLine($"{nummer + 1}. {anmerkungen[nummer]}");
         }
 
-        return FrageAsync(bau.ToString(), cancellationToken);
+        return FrageAsync(zugang, bau.ToString(), fortschritt, cancellationToken);
     }
 
     /// <summary>Der Auftrag, aus dem Kontext und sonst nichts.</summary>
@@ -134,11 +166,11 @@ public sealed class HttpAnschreiber(
         bau.AppendLine($"- Beschreibung: {kontext.StellenBeschreibung}");
         bau.AppendLine();
         bau.AppendLine("## Die bewerbende Person (ihre eigenen Angaben)");
-        bau.AppendLine($"- Name: {kontext.EigenerName}");
+        bau.AppendLine($"- Voller Name (Signatur, GENAU so): {kontext.EigenerName}");
         bau.AppendLine($"- Überschrift: {kontext.EigeneUeberschrift}");
         bau.AppendLine($"- Über sich: {kontext.EigenerText}");
         bau.AppendLine($"- Genannte Fähigkeiten: {string.Join(", ", kontext.EigeneFaehigkeiten)}");
-        bau.AppendLine($"- Sprache: {kontext.Sprache}");
+        bau.AppendLine($"- Sprache: {kontext.Sprache} (in dieser Sprache, grammatisch korrekt)");
         bau.AppendLine();
         bau.AppendLine("## Werdegang");
 
@@ -157,48 +189,40 @@ public sealed class HttpAnschreiber(
         return bau.ToString();
     }
 
-    private async Task<string> FrageAsync(string auftrag, CancellationToken cancellationToken)
+    private async Task<string> FrageAsync(
+        KiZugang zugang,
+        string auftrag,
+        Func<string, Task>? fortschritt,
+        CancellationToken cancellationToken)
     {
-        if (!Eingerichtet)
+        if (!zugang.IstEingerichtet)
         {
             throw new AnschreibenNichtVerfuegbar("Es ist kein Entwurfsanbieter eingerichtet.");
         }
 
         using var client = fabrik.CreateClient(Klient);
 
+        // Mit ResponseHeadersRead gilt dieses Limit bis zum ersten Byte, nicht
+        // bis zum letzten Token. Sonst stirbt ein lokales Modell nach einer
+        // Minute, obwohl es schon geschrieben hat — gemessen an Ollama.
         client.Timeout = _einstellungen.Zeitueberschreitung;
 
-        using var anfrage = new HttpRequestMessage(HttpMethod.Post, _einstellungen.Adresse)
-        {
-            Content = JsonContent.Create(new
-            {
-                model = _einstellungen.Modell,
-                max_tokens = 1500,
-                system = Anschreibenkontext.Regeln,
-                messages = new[] { new { role = "user", content = auftrag } }
-            })
-        };
-
-        anfrage.Headers.Add("x-api-key", _einstellungen.Schluessel);
-        anfrage.Headers.Add("anthropic-version", "2023-06-01");
+        using var anfrage = BaueAnfrage(zugang, auftrag);
 
         HttpResponseMessage antwort;
 
         try
         {
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            antwort = await client.SendAsync(
+                anfrage, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         }
         catch (HttpRequestException fehler)
         {
-            // Die Art, nie der Inhalt.
             throw new AnschreibenNichtVerfuegbar(
                 $"Der Entwurfsanbieter antwortet nicht ({fehler.GetType().Name}).");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            // Ein abgelaufenes `client.Timeout` kommt als TaskCanceledException
-            // und nicht als HttpRequestException. Die Bedingung trennt es vom
-            // Fall „der Browser hat aufgelegt" — dann ist nichts kaputt.
             throw new AnschreibenNichtVerfuegbar(
                 "Der Entwurfsanbieter antwortet nicht (Zeitüberschreitung).");
         }
@@ -213,19 +237,19 @@ public sealed class HttpAnschreiber(
 
             try
             {
-                using var gelesen = await JsonDocument.ParseAsync(
-                    await antwort.Content.ReadAsStreamAsync(cancellationToken),
-                    cancellationToken: cancellationToken);
-
-                var text = gelesen.RootElement
-                    .GetProperty("content")[0]
-                    .GetProperty("text")
-                    .GetString();
+                await using var strom = await antwort.Content.ReadAsStreamAsync(cancellationToken);
+                var text = await LiesStromAsync(
+                    zugang.Anbieter, strom, _einstellungen.Zeitueberschreitung,
+                    fortschritt, cancellationToken);
 
                 return text is { Length: > 0 }
                     ? text
                     : throw new AnschreibenNichtVerfuegbar(
                         "Der Entwurfsanbieter sandte einen leeren Text.");
+            }
+            catch (AnschreibenNichtVerfuegbar)
+            {
+                throw;
             }
             catch (Exception fehler)
                 when (fehler is JsonException or KeyNotFoundException or IndexOutOfRangeException
@@ -235,5 +259,262 @@ public sealed class HttpAnschreiber(
                     "Der Entwurfsanbieter sandte eine unbrauchbare Antwort.");
             }
         }
+    }
+
+    private static HttpRequestMessage BaueAnfrage(KiZugang zugang, string auftrag)
+    {
+        if (zugang.Anbieter == "openai_compatible")
+        {
+            var anfrage = new HttpRequestMessage(HttpMethod.Post, zugang.Adresse)
+            {
+                Content = JsonContent.Create(new
+                {
+                    model = zugang.Modell,
+                    max_tokens = HoechsteToken,
+                    stream = true,
+                    messages = new[]
+                    {
+                        new { role = "system", content = Anschreibenkontext.Regeln },
+                        new { role = "user", content = auftrag }
+                    }
+                })
+            };
+
+            if (zugang.Schluessel.Length > 0)
+            {
+                anfrage.Headers.TryAddWithoutValidation(
+                    "Authorization", $"Bearer {zugang.Schluessel}");
+            }
+
+            return anfrage;
+        }
+
+        var anthropic = new HttpRequestMessage(HttpMethod.Post, zugang.Adresse)
+        {
+            Content = JsonContent.Create(new
+            {
+                model = zugang.Modell,
+                max_tokens = HoechsteToken,
+                stream = true,
+                system = Anschreibenkontext.Regeln,
+                messages = new[] { new { role = "user", content = auftrag } }
+            })
+        };
+
+        anthropic.Headers.Add("x-api-key", zugang.Schluessel);
+        anthropic.Headers.Add("anthropic-version", "2023-06-01");
+        return anthropic;
+    }
+
+    /// <summary>
+    /// Liest Server-Sent Events oder ein einziges JSON — OpenAI-kompatibel
+    /// und Anthropic. Ein Token nach dem anderen, nicht erst das Ganze.
+    /// </summary>
+    /// <remarks>
+    /// Zwischen zwei Zeilen darf so lange Pause sein wie das Zeitlimit, nicht
+    /// für den ganzen Brief. Ein lokales Modell, das langsam schreibt, aber
+    /// schreibt, darf fertig werden. Kommt gar nichts mehr, und es liegt schon
+    /// ein Anschreiben da, gilt das Stück — sonst wäre eine Minute Schreiben
+    /// wieder ein leerer Fehlschlag.
+    /// </remarks>
+    public static async Task<string> LiesStromAsync(
+        string anbieter,
+        Stream strom,
+        TimeSpan stall,
+        Func<string, Task>? fortschritt = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(anbieter);
+        ArgumentNullException.ThrowIfNull(strom);
+
+        using var stallToken = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        // Erstes Token darf länger dauern als die Pause zwischen zwei. Leere
+        // SSE-Zeilen dürfen die Uhr NICHT zurücksetzen — sonst läuft ein
+        // stummer Strom minutenlang, ohne dass je ein Buchstabe ankommt.
+        stallToken.CancelAfter(stall);
+
+        using var leser = new StreamReader(strom);
+        var text = new StringBuilder();
+        var roh = new StringBuilder();
+
+        try
+        {
+            while (await leser.ReadLineAsync(stallToken.Token) is { } zeile)
+            {
+
+                if (zeile.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var payload = zeile["data:".Length..].Trim();
+
+                    if (payload.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    if (payload == "[DONE]")
+                    {
+                        break;
+                    }
+
+                    await NimmDeltaAsync(
+                        anbieter, payload, text, stallToken, stall, fortschritt);
+                    continue;
+                }
+
+                if (zeile.StartsWith("event:", StringComparison.OrdinalIgnoreCase)
+                    || zeile.StartsWith(':')
+                    || zeile.Length == 0)
+                {
+                    continue;
+                }
+
+                // Ollama nativ und andere NDJSON-Anbieter: eine JSON-Zeile
+                // je Token, ohne `data:`-Präfix. Ohne diesen Zweig landet
+                // alles in `roh` und der Brief erscheint erst am Ende.
+                if (zeile[0] == '{')
+                {
+                    await NimmDeltaAsync(
+                        anbieter, zeile, text, stallToken, stall, fortschritt);
+                    continue;
+                }
+
+                roh.Append(zeile);
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            if (text.Length > 0)
+            {
+                return text.ToString();
+            }
+
+            throw new AnschreibenNichtVerfuegbar(
+                "Der Entwurfsanbieter antwortet nicht (Zeitüberschreitung).");
+        }
+
+        if (text.Length > 0)
+        {
+            return text.ToString();
+        }
+
+        if (roh.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        using var gelesen = JsonDocument.Parse(roh.ToString());
+
+        return LiesText(anbieter, gelesen.RootElement) ?? string.Empty;
+    }
+
+    private static async Task NimmDeltaAsync(
+        string anbieter,
+        string json,
+        StringBuilder text,
+        CancellationTokenSource stallToken,
+        TimeSpan stall,
+        Func<string, Task>? fortschritt)
+    {
+        string? stueck;
+
+        try
+        {
+            stueck = LiesDelta(anbieter, json);
+        }
+        catch (JsonException)
+        {
+            return;
+        }
+
+        if (stueck is not { Length: > 0 })
+        {
+            return;
+        }
+
+        text.Append(stueck);
+        stallToken.CancelAfter(stall);
+
+        if (fortschritt is not null)
+        {
+            await fortschritt(text.ToString());
+        }
+    }
+
+    /// <summary>Ein Token aus einem SSE-Stück — oder null, wenn keins drin ist.</summary>
+    public static string? LiesDelta(string anbieter, string json)
+    {
+        ArgumentNullException.ThrowIfNull(anbieter);
+        ArgumentException.ThrowIfNullOrEmpty(json);
+
+        using var gelesen = JsonDocument.Parse(json);
+
+        return LiesDelta(anbieter, gelesen.RootElement);
+    }
+
+    private static string? LiesDelta(string anbieter, JsonElement wurzel)
+    {
+        if (anbieter == "openai_compatible")
+        {
+            if (wurzel.TryGetProperty("choices", out var auswahl) && auswahl.GetArrayLength() > 0)
+            {
+                var erstes = auswahl[0];
+
+                if (erstes.TryGetProperty("delta", out var delta)
+                    && delta.TryGetProperty("content", out var inhalt)
+                    && inhalt.ValueKind == JsonValueKind.String)
+                {
+                    return inhalt.GetString();
+                }
+
+                if (erstes.TryGetProperty("message", out var nachricht)
+                    && nachricht.TryGetProperty("content", out var ganzes)
+                    && ganzes.ValueKind == JsonValueKind.String)
+                {
+                    return ganzes.GetString();
+                }
+            }
+
+            // Ollama `/api/chat`: { "message": { "content": "…" }, "done": false }
+            if (wurzel.TryGetProperty("message", out var ollama)
+                && ollama.TryGetProperty("content", out var ollamaText)
+                && ollamaText.ValueKind == JsonValueKind.String)
+            {
+                return ollamaText.GetString();
+            }
+
+            // Ollama `/api/generate`: { "response": "…", "done": false }
+            if (wurzel.TryGetProperty("response", out var generiert)
+                && generiert.ValueKind == JsonValueKind.String)
+            {
+                return generiert.GetString();
+            }
+
+            return null;
+        }
+
+        if (wurzel.TryGetProperty("type", out var typ)
+            && typ.GetString() == "content_block_delta"
+            && wurzel.TryGetProperty("delta", out var anthropic)
+            && anthropic.TryGetProperty("text", out var stueck)
+            && stueck.ValueKind == JsonValueKind.String)
+        {
+            return stueck.GetString();
+        }
+
+        return null;
+    }
+
+    private static string? LiesText(string anbieter, JsonElement wurzel)
+    {
+        if (anbieter == "openai_compatible")
+        {
+            return wurzel
+                .GetProperty("choices")[0]
+                .GetProperty("message")
+                .GetProperty("content")
+                .GetString();
+        }
+
+        return wurzel.GetProperty("content")[0].GetProperty("text").GetString();
     }
 }

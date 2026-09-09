@@ -55,6 +55,8 @@ export function RegisterPage() {
   const [email, setEmail] = useState("");
   const [passwort, setPasswort] = useState("");
   const [anzeigename, setAnzeigename] = useState("");
+  const [vorname, setVorname] = useState("");
+  const [nachname, setNachname] = useState("");
 
   const [fehler, setFehler] = useState<string | null>(null);
   const [running, setLaeuft] = useState(false);
@@ -81,6 +83,8 @@ export function RegisterPage() {
       email,
       password: passwort,
       anzeigename,
+      ...(vorname.trim() ? { vorname: vorname.trim() } : {}),
+      ...(nachname.trim() ? { nachname: nachname.trim() } : {}),
       ...(art === "company" ? { unternehmensname } : {}),
     });
     setLaeuft(false);
@@ -202,11 +206,29 @@ export function RegisterPage() {
         />
         <TextField
           label={t("registrierung.anzeigename")}
-          autoComplete="name"
+          autoComplete="nickname"
+          helperText={t("registrierung.anzeigenameHinweis")}
           value={anzeigename}
           onChange={(event) => setAnzeigename(event.target.value)}
           required
         />
+        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
+          <TextField
+            label={t("zivil.vorname")}
+            autoComplete="given-name"
+            value={vorname}
+            onChange={(event) => setVorname(event.target.value)}
+          />
+          <TextField
+            label={t("zivil.nachname")}
+            autoComplete="family-name"
+            value={nachname}
+            onChange={(event) => setNachname(event.target.value)}
+          />
+        </Box>
+        <Typography variant="body2" color="text.secondary">
+          {t("zivil.klarnameHinweis")}
+        </Typography>
 
         {fehler !== null ? <Alert severity="error">{fehler}</Alert> : null}
 

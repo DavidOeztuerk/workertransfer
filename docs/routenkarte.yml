@@ -180,12 +180,15 @@ gruppen:
       `/candidates` ist dieselbe Regel eine Ebene hoeher: eine Kandidatenliste
       sieht nur, wer fuer eine Firma handelt.
 
+      `/profiles/me` ist 200 null, solange noch keins da ist — 404 waere der
+      Normalfall in der Browserkonsole. Fremde Profile bleiben 404 (ADR-0020).
+
       `/profiles/me/draft` gibt 503, weil kein Schluessel fuer die KI-Naht
       gesetzt ist. Der Entwurf sagt das, statt so zu tun, als koenne er es
       (ADR-0024).
     eintraege:
       - { methode: PUT, pfad: '/profiles/me', ohne: 401, person: 422, firma: 422 }
-      - { methode: GET, pfad: '/profiles/me', ohne: 401, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/profiles/me', ohne: 401, person: 200, firma: 200 }
       - { methode: POST, pfad: '/profiles/me/draft', ohne: 401, person: 503, firma: 503 }
       - { methode: GET, pfad: '/profiles/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 404 }
       - { methode: GET, pfad: '/candidates', ohne: 401, person: 403, firma: 200 }
@@ -212,7 +215,7 @@ gruppen:
       liegen: mit Begruendung.
     eintraege:
       - { methode: PUT, pfad: '/resumes/me', ohne: 401, person: 422, firma: 422 }
-      - { methode: GET, pfad: '/resumes/me', ohne: 401, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/resumes/me', ohne: 401, person: 200, firma: 200 }
       - { methode: GET, pfad: '/resumes/me/requests', ohne: 401, person: 200, firma: 200 }
       - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/grant', ohne: 401, person: 404, firma: 404 }
       - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, firma: 404 }
@@ -220,6 +223,14 @@ gruppen:
       - { methode: POST, pfad: '/resumes/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, firma: 404 }
       - { methode: GET, pfad: '/resumes/requests', ohne: 401, person: 403, firma: 200 }
       - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 404 }
+      - { methode: POST, pfad: '/resumes/me/documents', ohne: 401, person: 415, firma: 415 }
+      - { methode: GET, pfad: '/resumes/me/documents', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001/content', ohne: 401, person: 404, firma: 404 }
+      - { methode: DELETE, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+      - { methode: PUT, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001/as-cv', ohne: 401, person: 404, firma: 404 }
+      - { methode: PUT, pfad: '/resumes/me/template', ohne: 401, person: 422, firma: 422 }
+      - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001/documents', ohne: 401, person: 403, firma: 200 }
+      - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001/documents/00000000-0000-0000-0000-000000000002/content', ohne: 401, person: 403, firma: 404 }
 
   - name: 'Portfolio'
     warum: |
@@ -300,24 +311,43 @@ gruppen:
 
       `GET /jobs/{id}/applications` und `/companies/me/application-stats` sehen
       nur Firmen — eine Bewerberliste ist nichts, was eine Privatperson abruft.
+
+      `GET /applications/{id}` ist die Mappe: fremd und nicht vorhanden bleiben
+      404, ununterscheidbar. Die Entwürfe (`/applications/drafts`) gehören der
+      Person; eine erfundene Kennung ist 404, die Liste leer 200. `POST /drafts`
+      mit `{}` ist 422, weil `job_ids` fehlt — das Schreiben ist ein eigener
+      Aufruf je Entwurf.
     eintraege:
       - { methode: POST, pfad: '/applications', ohne: 401, person: 404, firma: 404 }
       - { methode: GET, pfad: '/applications/me', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/applications/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
       - { methode: POST, pfad: '/applications/00000000-0000-0000-0000-000000000001/withdraw', ohne: 401, person: 404, firma: 404 }
       - { methode: POST, pfad: '/applications/00000000-0000-0000-0000-000000000001/status', ohne: 401, person: 403, firma: 422 }
       - { methode: GET, pfad: '/jobs/00000000-0000-0000-0000-000000000001/applications', ohne: 401, person: 403, firma: 200 }
       - { methode: GET, pfad: '/companies/me/application-stats', ohne: 401, person: 403, firma: 200 }
+      - { methode: POST, pfad: '/applications/drafts', ohne: 401, person: 422, firma: 422 }
+      - { methode: GET, pfad: '/applications/drafts', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+      - { methode: PATCH, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+      - { methode: PUT, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/attachments', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/comments', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/write', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/revise', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/approve', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/send', ohne: 401, person: 404, firma: 404 }
+      - { methode: DELETE, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
 
   - name: 'Arbeitgeberprofil — das oeffentliche Schaufenster'
     warum: |
       `/companies/by-slug/{kuerzel}` und `/companies/{id}/profile` antworten
-      OHNE Token, weil die Karriereseite oeffentlich ist. 404 steht hier fuer
-      „gibt es nicht" — die Kennungen in dieser Karte existieren nicht.
+      OHNE Token, weil die Karriereseite oeffentlich ist. Ein unbekanntes
+      Kuerzel ist 404. Eine Tenant-Id ohne Schaufenster ist 200 null — sonst
+      loggt jede Stellenkarte einen Fehler.
     eintraege:
       - { methode: PUT, pfad: '/companies/me/profile', ohne: 401, person: 403, firma: 422 }
       - { methode: GET, pfad: '/companies/me/profile', ohne: 401, person: 403, firma: 200 }
       - { methode: GET, pfad: '/companies/by-slug/gibt-es-nicht', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/profile', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/profile', ohne: 200, person: 200, firma: 200 }
 
   - name: 'Markt und Transfers'
     warum: |
@@ -399,6 +429,7 @@ gruppen:
       - { methode: POST, pfad: '/erasure', ohne: 404, person: 404, firma: 404 }
       - { methode: POST, pfad: '/internal/notify', ohne: 404, person: 404, firma: 404 }
       - { methode: POST, pfad: '/internal/notifications', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/internal/companies/00000000-0000-0000-0000-000000000001/members', ohne: 404, person: 404, firma: 404 }
       - { methode: POST, pfad: '/companies/withdrawal', ohne: 404, person: 404, firma: 404 }
 
   - name: 'Die nackten Praefixe — was ein Prefix ohne Rest antwortet'
@@ -511,3 +542,15 @@ gruppen:
       - { methode: GET, pfad: '/account/settings', ohne: 401, person: 200, firma: 200 }
       - { methode: PUT, pfad: '/account/settings', ohne: 401, person: 200, firma: 200, rumpf: '{"delete_after_months":null,"ai_provider":"none","ai_base_url":"","ai_model":"","ai_audit_log":false}' }
       - { methode: PUT, pfad: '/account/ai-key', ohne: 401, person: 200, firma: 200, rumpf: '{"key":""}' }
+
+  - name: 'Klarname und Bewerbungsanschrift'
+    warum: |
+      Vor- und Nachname leben auf dem Konto (ADR-0038), die Anschrift nur als
+      Vorlage fuer den Briefkopf. Beides gehoert der PERSON, nicht dem
+      Unternehmen, fuer das sie gerade handelt. Die Session traegt den
+      Klarnamen, nie die Anschrift — sonst zöge die Bewerberauskunft sie in
+      den Prompt.
+    eintraege:
+      - { methode: PUT, pfad: '/account/name', ohne: 401, person: 200, firma: 200, rumpf: '{"given_name":"Anna","family_name":"Beispiel"}' }
+      - { methode: GET, pfad: '/account/address', ohne: 401, person: 200, firma: 200 }
+      - { methode: PUT, pfad: '/account/address', ohne: 401, person: 200, firma: 200, rumpf: '{"line1":"","line2":"","postal_code":"","city":"","country":"DE","phone":""}' }

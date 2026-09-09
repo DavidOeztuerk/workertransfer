@@ -74,6 +74,38 @@ public static class BewerbungsEndpoints
                 meine.Select(Antwort), cancellationToken);
         });
 
+        bewerbungen.MapGet("/{id:guid}", async (
+            Guid id,
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await NichtAngemeldet(context);
+                return;
+            }
+
+            TenantId? firma = handelnder.Acting is Capacity.ForCompany fuer
+                ? fuer.Tenant
+                : null;
+
+            var bewerbung = await mediator.Send(
+                new BewerbungLesenAbfrage(id, firma, handelnder.Subject),
+                cancellationToken);
+
+            if (bewerbung is null)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status404NotFound,
+                    "Request failed", "No such application");
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(Antwort(bewerbung), cancellationToken);
+        });
+
         // Zurückziehen — der Vorgang bleibt, die Daten sind weg. Dass jemand
         // sich beworben und zurückgezogen hat, gehört zur Geschichte des
         // Verfahrens im Unternehmen; die Person dahinter ist danach nicht mehr
@@ -219,6 +251,14 @@ public static class BewerbungsEndpoints
 
                 return Geschrieben;
             }
+            catch (FirmaSchweigt)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                    "Request failed", "identity-service did not answer");
+
+                return Geschrieben;
+            }
         });
 
         return gruppe;
@@ -307,7 +347,16 @@ public static class BewerbungsEndpoints
             bewerbung.Mitgeschickt.Unterlagen,
             Bewerbungsstaende.Wort(bewerbung.Stand),
             bewerbung.AngelegtAm,
-            bewerbung.GeaendertAm);
+            bewerbung.GeaendertAm,
+            new BewerbungskontaktV1(
+                bewerbung.Kontakt.Klarname,
+                bewerbung.Kontakt.Zeile1,
+                bewerbung.Kontakt.Zeile2,
+                bewerbung.Kontakt.Postleitzahl,
+                bewerbung.Kontakt.Ort,
+                bewerbung.Kontakt.Land,
+                bewerbung.Kontakt.Telefon,
+                bewerbung.Kontakt.Email));
 
     private static Task NichtAngemeldet(HttpContext context) =>
         ProblemDetailsMiddleware.Schreibe(

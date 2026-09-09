@@ -20,13 +20,19 @@ public sealed record EingangV1(
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
     [property: JsonPropertyName("read_at")] DateTimeOffset? ReadAt);
 
-/// <summary>Die vier Schalter.</summary>
+/// <summary>Die fünf Schalter.</summary>
 /// <remarks>
 /// Ohne die Drossel: sie ist keine Einstellung, sondern eine Eigenschaft des
 /// Dienstes, und ein Feld dafür wäre eine Einladung, sie abzuschalten.
+/// <para>
+/// <c>application_received</c> hat den Vorgabewert <c>true</c>: eine neue Art
+/// darf nicht stillschweigend ausbleiben, weil ein älterer Rumpf sie nicht
+/// kennt. Fehlt das Feld, bleibt der Schalter an.
+/// </para>
 /// </remarks>
 public sealed record BenachrichtigungswuenscheV1(
     [property: JsonPropertyName("resume_request")] bool ResumeRequest,
     [property: JsonPropertyName("market_request")] bool MarketRequest,
     [property: JsonPropertyName("application_update")] bool ApplicationUpdate,
-    [property: JsonPropertyName("transfer_update")] bool TransferUpdate);
+    [property: JsonPropertyName("transfer_update")] bool TransferUpdate,
+    [property: JsonPropertyName("application_received")] bool ApplicationReceived = true);

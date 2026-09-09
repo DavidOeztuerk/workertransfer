@@ -38,7 +38,7 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
 
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
-  await candidate.getByRole("button", { name: /Speichern/i }).click();
+  await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();
@@ -69,7 +69,7 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   // Ein Unternehmensprofil, damit die Seite einen Namen statt einer UUID zeigt.
   await recruiter.goto("/company/profile");
   await recruiter.getByLabel(/Anzeigename/i).fill(companyName);
-  await recruiter.getByRole("button", { name: /Speichern/i }).click();
+  await recruiter.getByRole("button", { name: "Speichern", exact: true }).click();
   // Auf die BESTAETIGUNG warten, nicht auf `/gespeichert/i`: der Knopf heisst
   // waehrend des Speicherns „Wird gespeichert…", und das Muster traf ihn. Die
   // Reise zog dann weiter, waehrend die Anfrage noch lief — `goto()` bricht sie
@@ -156,8 +156,8 @@ test("die Suche findet nur, was freigegeben ist", async ({ browser }) => {
   await visible.goto("/profile");
   await visible.getByLabel(/Überschrift/i).fill(visibleHeadline);
   await visible.getByLabel(/Fähigkeiten/i).fill(skill);
-  await visible.getByLabel(/Ort/i).fill("Berlin");
-  await visible.getByRole("button", { name: /Speichern/i }).click();
+  await visible.getByLabel("Standort", { exact: true }).fill("Berlin");
+  await visible.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(visible.getByText(/Profil gespeichert/i)).toBeVisible();
   await visible.getByRole("switch").click();
   await expect(visible.getByRole("switch")).toBeChecked();
@@ -169,8 +169,8 @@ test("die Suche findet nur, was freigegeben ist", async ({ browser }) => {
   await hidden.goto("/profile");
   await hidden.getByLabel(/Überschrift/i).fill(hiddenHeadline);
   await hidden.getByLabel(/Fähigkeiten/i).fill(skill);
-  await hidden.getByLabel(/Ort/i).fill("Berlin");
-  await hidden.getByRole("button", { name: /Speichern/i }).click();
+  await hidden.getByLabel("Standort", { exact: true }).fill("Berlin");
+  await hidden.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(hidden.getByText(/Profil gespeichert/i)).toBeVisible();
   // Kein Klick auf den Schalter: dieses Profil bleibt verborgen.
 
@@ -213,7 +213,7 @@ test("die Auskunft nennt jeden Abschnitt — auch die leeren", async ({ browser 
 
   await person.goto("/profile");
   await person.getByLabel(/Überschrift/i).fill(headline);
-  await person.getByRole("button", { name: /Speichern/i }).click();
+  await person.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(person.getByText(/Profil gespeichert/i)).toBeVisible();
   await person.getByRole("switch").click();
   await expect(person.getByRole("switch")).toBeChecked();

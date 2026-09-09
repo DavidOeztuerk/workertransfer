@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -17,7 +17,7 @@ import { Requirements } from "../components/Requirements";
 import { useHandelnder } from "../lib/session";
 import { merkeStelle } from "../lib/intent";
 import { useAsync } from "../lib/useAsync";
-import { apply } from "../api/applications";
+import { apply, createDrafts, writeDraft } from "../api/applications";
 import { getJob } from "../api/jobs";
 import { getMyProfile } from "../api/profile";
 
@@ -52,6 +52,27 @@ export function JobApplyPage() {
 
   const gueltig = typeof jobId === "string" && jobId !== "";
 
+  useEffect(() => {
+    if (!signedIn || !gueltig) return;
+    let weg = false;
+    void (async () => {
+      const angelegt = await createDrafts([jobId as string]);
+      if (weg) return;
+      if (!angelegt.ok || angelegt.drafts.length === 0) {
+        setFehler(angelegt.ok ? t("bewerbung.stelleZurueckgezogen") : angelegt.error.detail);
+        return;
+      }
+      const draft = angelegt.drafts[0]!;
+      if (draft.status === "generating" || draft.status === "failed") {
+        await writeDraft(draft.id);
+      }
+      if (!weg) navigate(`/applications/drafts/${draft.id}`, { replace: true });
+    })();
+    return () => {
+      weg = true;
+    };
+  }, [signedIn, gueltig, jobId, navigate]);
+
   const stelle = useAsync(
     (signal) => getJob(jobId as string, signal),
     [jobId],
@@ -68,6 +89,23 @@ export function JobApplyPage() {
       {t("bewerbung.zurueck")}
     </Link>
   );
+
+  if (signedIn && gueltig) {
+    return (
+      <PageShell title={t("bewerbung.titel")} narrow>
+        <Box sx={{ mb: 2 }}>{back}</Box>
+        <Card>
+          <CardContent>
+            {fehler ? (
+              <Alert severity="error">{fehler}</Alert>
+            ) : (
+              <LoadingBlock label={t("bewerbung.laden")} />
+            )}
+          </CardContent>
+        </Card>
+      </PageShell>
+    );
+  }
 
   if (!gueltig) {
     return (

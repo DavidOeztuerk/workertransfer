@@ -10,6 +10,26 @@
 # nur eine Schicht tiefer.
 set -eu
 
+# Named volumes mount as root:root. A `chown` in the Dockerfile never
+# reaches them: the mount overlays the directory. Measured 08.09.2026:
+# POST /resumes/me/documents answered 500 UnauthorizedAccessException on
+# /daten/ablage/<subject> — the handler ran, the write did not.
+#
+# If we started as root, take ownership of the dirs we actually write and
+# drop to uid 10001. If the runtime already runs as 10001 (Kubernetes
+# runAsUser / fsGroup), skip this and leave the volume to the platform.
+if [ "$(id -u)" = "0" ]; then
+  for d in /daten/ablage \
+           /var/lib/workertransfer/portfolio \
+           /var/lib/workertransfer/portfolio-attachments; do
+    if [ -d "$d" ]; then
+      chown 10001:10001 "$d"
+    fi
+  done
+  exec setpriv --reuid=10001 --regid=10001 --init-groups \
+    -- /usr/local/bin/entrypoint.sh "$@"
+fi
+
 if [ -z "${SERVICE_DIR:-}" ]; then
   echo "entrypoint: SERVICE_DIR ist nicht gesetzt" >&2
   exit 1

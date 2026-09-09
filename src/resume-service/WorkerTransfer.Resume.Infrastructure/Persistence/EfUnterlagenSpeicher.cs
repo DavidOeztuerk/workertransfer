@@ -73,7 +73,21 @@ public sealed class EfUnterlagenSpeicher(ResumeDbContext kontext) : IUnterlagenS
     {
         ArgumentNullException.ThrowIfNull(unterlage);
 
+        // `AsTracking()` IST DER SCHREIBVORGANG, nicht eine Feinheit.
+        //
+        // Der ganze Kontext faehrt `QueryTrackingBehavior.NoTracking`
+        // (`ResumeDbContextFactory`), und ohne diese Zeile kommt die Zeile
+        // ABGELOEST zurueck: die Zuweisungen unten laufen ins Leere, `SaveChanges`
+        // sieht nichts, und der Aufrufer bekommt trotzdem seine 204. Gemessen am
+        // 09.09.2026 an `PUT /resumes/me/documents/{id}/as-cv` — die Antwort war
+        // 204, die Art blieb `sonstiges`.
+        //
+        // Der Anlegepfad blieb davon unberuehrt, weil `Add` immer verfolgt. Genau
+        // deshalb faellt so etwas erst beim ersten AENDERNDEN Aufrufer auf, und
+        // dieser Speicher hatte bis dahin keinen. Alle achtzehn anderen Speicher
+        // im Baum rufen `AsTracking()`; dieser war der einzige ohne.
         var vorhanden = await kontext.Unterlagen
+            .AsTracking()
             .FirstOrDefaultAsync(zeile => zeile.Id == unterlage.Id, cancellationToken);
 
         if (vorhanden is null)

@@ -68,6 +68,39 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
             benefits = leistungen ?? ["Homeoffice"]
         });
 
+    [Fact]
+    public async Task Die_Briefanschrift_ueberlebt_die_Runde()
+    {
+        var firma = Guid.CreateVersion7();
+        var browser = AlsFirma(firma);
+
+        var geschrieben = await browser.PutAsJsonAsync("/companies/me/profile", new
+        {
+            display_name = "Muster GmbH",
+            about = "Wir bauen verteilte Systeme.",
+            website = "https://muster.example",
+            locations = new[] { "Berlin" },
+            benefits = new[] { "Homeoffice" },
+            line1 = "Musterstraße 1",
+            postal_code = "10115",
+            city = "Berlin",
+            country = "DE",
+            phone = "+493012345"
+        });
+
+        geschrieben.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var oeffentlich = await Json(
+            await _dienst.CreateClient().GetAsync($"/companies/{firma}/profile"));
+
+        oeffentlich.GetProperty("line1").GetString().Should().Be("Musterstraße 1");
+        oeffentlich.GetProperty("postal_code").GetString().Should().Be("10115");
+        oeffentlich.GetProperty("city").GetString().Should().Be("Berlin");
+        oeffentlich.GetProperty("country").GetString().Should().Be("DE");
+        oeffentlich.GetProperty("phone").GetString().Should().Be("+493012345");
+        oeffentlich.GetProperty("display_name").GetString().Should().Be("Muster GmbH");
+    }
+
     /// <summary>Der gewöhnliche Weg: einmal schreiben, öffentlich lesbar sein.</summary>
     [Fact]
     public async Task Ein_Profil_ist_ohne_Anmeldung_lesbar()
@@ -191,7 +224,8 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
         var antwort = await _dienst.CreateClient()
             .GetAsync($"/companies/{Guid.CreateVersion7()}/profile");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await antwort.Content.ReadAsStringAsync()).Trim().Should().Be("null");
     }
 
     /// <summary>Ein Kürzel, das es nicht gibt, ist 404 und kein Absturz.</summary>

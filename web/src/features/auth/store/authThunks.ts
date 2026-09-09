@@ -1,7 +1,7 @@
 import { API_BASE_URL } from "../../../env";
 import { request } from "../../../core/api/client";
 import { createAppThunk } from "../../../core/store/thunkHelpers";
-import type { Membership, Session } from "../types/session";
+import type { Membership, Session, SessionWireState } from "../types/session";
 
 interface SessionBody {
   user_id: string;
@@ -9,6 +9,13 @@ interface SessionBody {
   tenant_id: string | null;
   language: string;
   display_name: string;
+  given_name?: string | null;
+  family_name?: string | null;
+}
+
+interface SessionAntwort {
+  user: SessionBody | null;
+  state?: SessionWireState;
 }
 
 interface MembershipBody {
@@ -23,6 +30,8 @@ const toSession = (body: SessionBody): Session => ({
   tenantId: body.tenant_id,
   language: body.language,
   displayName: body.display_name ?? "",
+  givenName: body.given_name ?? "",
+  familyName: body.family_name ?? "",
 });
 
 /**
@@ -34,15 +43,54 @@ const toSession = (body: SessionBody): Session => ({
  */
 export const loadSession = createAppThunk<Session | null>(
   "auth/loadSession",
-  async (_arg, { rejectWithValue }) => {
-    const answer = await request<{ user: SessionBody | null }>(
+  async (_arg, { rejectWithValue, dispatch }) => {
+    const answer = await request<SessionAntwort>(
       API_BASE_URL,
       "/auth/session",
-      {},
+      { ohneErneuerung: true },
       "fehler.sitzungNichtGeprueft"
     );
     if (!answer.ok) return rejectWithValue(answer.error);
+
+    // Access tot, Refresh da: bewusst erneuern, nicht als abgemeldet zeichnen.
+    // `GET /auth/session` antwortet 200 mit user:null — ohne diesen Zweig
+    // wäre nach 15 Minuten jede Seite die Anmeldeaufforderung.
+    if (answer.value?.state === "renewable") {
+      const erneuert = await dispatch(erneuern());
+      if (erneuert.meta.requestStatus !== "fulfilled" || !erneuert.payload) {
+        return null;
+      }
+      const erneut = await request<SessionAntwort>(
+        API_BASE_URL,
+        "/auth/session",
+        { ohneErneuerung: true },
+        "fehler.sitzungNichtGeprueft"
+      );
+      if (!erneut.ok) return rejectWithValue(erneut.error);
+      return erneut.value?.user ? toSession(erneut.value.user) : null;
+    }
+
     return answer.value?.user ? toSession(answer.value.user) : null;
+  }
+);
+
+/**
+ * Rotiert die httpOnly-Cookies. Kein Rumpf, kein Token im JSON.
+ *
+ * `ohneErneuerung`: ein 401 hier IST die Absage, kein Anlass für einen zweiten
+ * Versuch — der Server löscht den toten Refresh-Cookie sonst in einer Schleife.
+ */
+export const erneuern = createAppThunk<boolean>(
+  "auth/erneuern",
+  async (_arg, { rejectWithValue }) => {
+    const answer = await request<unknown>(
+      API_BASE_URL,
+      "/auth/refresh",
+      { method: "POST", ohneErneuerung: true },
+      "fehler.sitzungNichtGeprueft"
+    );
+    if (!answer.ok) return rejectWithValue(answer.error);
+    return true;
   }
 );
 

@@ -79,6 +79,22 @@ describe("RegisterPage", () => {
     expect(asked[0]?.body).not.toContain("tenant_id");
   });
 
+  it("schickt Vor- und Nachname in snake_case, wenn sie dastehen", async () => {
+    const asked = antworten({ status: 201 });
+    const user = userEvent.setup();
+    renderMitStore(<RegisterPage />, { route: "/register" });
+
+    await user.type(screen.getByLabelText(/E-Mail/i), "a@b.com");
+    await user.type(screen.getByLabelText(/Passwort/i), "strongpassword1");
+    await user.type(screen.getByLabelText(/Anzeigename/i), "Max");
+    await user.type(screen.getByLabelText(/^Vorname$/i), "Maximilian");
+    await user.type(screen.getByLabelText(/^Nachname$/i), "Muster");
+    await user.click(screen.getByRole("button", { name: /Registrieren/i }));
+
+    expect(asked[0]?.body).toContain('"given_name":"Maximilian"');
+    expect(asked[0]?.body).toContain('"family_name":"Muster"');
+  });
+
   it("sagt bei einer bekannten Adresse dasselbe wie bei einer neuen", async () => {
     // Der Server antwortet auch bei bekannter Adresse 201 — kein
     // Aufzählungskanal. Die Oberfläche darf daraus nichts anderes machen.

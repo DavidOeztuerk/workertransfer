@@ -28,7 +28,8 @@ internal sealed record AusbildungsSatz(
     [property: JsonPropertyName("institution")] string Institution,
     [property: JsonPropertyName("qualification")] string Qualification,
     [property: JsonPropertyName("started_on")] string StartedOn,
-    [property: JsonPropertyName("ended_on")] string? EndedOn);
+    [property: JsonPropertyName("ended_on")] string? EndedOn,
+    [property: JsonPropertyName("kind")] string? Kind = null);
 
 /// <summary>Reads and writes <c>resumes</c>.</summary>
 /// <remarks>
@@ -99,7 +100,8 @@ public sealed class EfLebenslaufSpeicher(ResumeDbContext kontext) : ILebenslaufS
                 s.Technologies ?? []))],
             [.. ausbildungen.Select(a => Ausbildung.Aus(
                 a.Institution, a.Qualification, Monat.Lies(a.StartedOn),
-                a.EndedOn is null ? null : Monat.Lies(a.EndedOn)))],
+                a.EndedOn is null ? null : Monat.Lies(a.EndedOn),
+                a.Kind == "schule" ? Ausbildungsart.Schule : Ausbildungsart.Ausbildung))],
             new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
             new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero),
             zeile.Template);
@@ -115,6 +117,7 @@ public sealed class EfLebenslaufSpeicher(ResumeDbContext kontext) : ILebenslaufS
     private static string Schreibe(IReadOnlyList<Ausbildung> ausbildungen) =>
         JsonSerializer.Serialize(
             ausbildungen.Select(a => new AusbildungsSatz(
-                a.Einrichtung, a.Abschluss, a.Beginn.ToString(), a.Ende?.ToString())),
+                a.Einrichtung, a.Abschluss, a.Beginn.ToString(), a.Ende?.ToString(),
+                a.Art == Ausbildungsart.Schule ? "schule" : "ausbildung")),
             Format);
 }

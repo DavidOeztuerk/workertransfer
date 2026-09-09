@@ -42,9 +42,9 @@ test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort",
 
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
-  await candidate.getByLabel(/Ort/i).fill("Hamburg");
+  await candidate.getByLabel("Standort", { exact: true }).fill("Hamburg");
   await candidate.getByLabel(/Fähigkeiten/i).fill("Python, PostgreSQL");
-  await candidate.getByRole("button", { name: /Speichern/i }).click();
+  await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
 
   // Erst nach dem Speichern schaltbar: freigeben lässt sich nur, was es gibt.

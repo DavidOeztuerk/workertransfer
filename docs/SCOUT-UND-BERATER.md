@@ -152,10 +152,10 @@ POST /scout/searches/{id}/approach  Entwurf einer Ansprache — an einen Mensche
 4. **Die Ansprache ist ein Entwurf.** Der Dienst schreibt niemandem. Ein Mensch
    liest, ändert und schickt.
 
-**Und die Person sieht es.** `GET /me/scouting` zeigt: *„Du bist am 3. März in
-einer Suche von Firma X aufgetaucht."* Das ist der Unterschied zwischen einem
-Scout und einer Datenbank mit Noten — und es ist der Grund, warum das hier
-gebaut werden darf.
+**Und die Person sieht es.** ~~`GET /me/scouting` zeigt: *„Du bist am 3. März in
+einer Suche von Firma X aufgetaucht."*~~ Das wäre die sensibelste Tabelle im
+System. ADR-0033 und ADR-0036: eine Nachricht „dein Profil wurde entdeckt",
+ohne Firmennamen, höchstens eine je Tag. Kein `/me/scouting`.
 
 ### `advisor-service` — der Berater
 
@@ -326,7 +326,7 @@ Playwright-Journeys, aus vier Blickwinkeln. Sie sind zugleich die Abnahme.
    → Prüfen: der Lebenslauf ist nicht öffentlich, nur der übernommene Skill
 5  Mandat setzen: sichtbar für alle · frühester Termin 1.10. · Spanne ab Stufe 2
    · jetziger Arbeitgeber NEIN
-6  Später: /me/scouting zeigt "Firma X hat dich am 3.3. gefunden"
+6  Später: Nachricht „dein Profil wurde entdeckt" (kein Firmenname, ADR-0036)
 7  Widerruf: Sichtbarkeit auf "niemand"
    → Prüfen: dieselbe Suche findet nichts mehr, beim NÄCHSTEN Aufruf
 ```

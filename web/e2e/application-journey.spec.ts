@@ -53,7 +53,7 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   await login(candidate, candidateEmail);
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
-  await candidate.getByRole("button", { name: /Speichern/i }).click();
+  await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
   await expect(candidate.getByRole("switch")).not.toBeChecked();
 
@@ -70,35 +70,57 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
   // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
   await expect(jobCard).toBeVisible();
-  // „Bewerben" ist ein LINK auf eine eigene Adresse, kein Knopf, der in der
-  // Karte etwas aufklappt. Der Klick verlässt die Liste — und dass das durch
-  // Router UND Gateway wirklich funktioniert, prüft nur diese Reise: im
+
+  // DER WEG ZUR BEWERBUNGSSEITE HAT SICH GEÄNDERT, ihre Prüfung nicht.
+  //
+  // „Bewerben" auf der Karte war einmal ein Link auf `/jobs/{id}/apply`; heute
+  // ist es ein Knopf, der einen ENTWURF anlegt und dorthin führt — so gewollt.
+  // Die Seite `/jobs/{id}/apply` gibt es weiterhin, und sie ist von der
+  // Karriereseite aus erreichbar.
+  //
+  // Was diese Reise als Einzige beweist, hängt aber nicht am Klick, sondern an
+  // der ADRESSE: dass ein Deep-Link durch Router UND Gateway ankommt. Im
   // Browsertest ist die Route gemockt, und ein `Sec-Fetch-Dest`-Fehler zeigt
-  // sich ausschließlich am echten Deep-Link.
-  await jobCard.getByRole("link", { name: /^Bewerben$/ }).click();
-  await expect(candidate).toHaveURL(/\/jobs\/[0-9a-f-]{36}\/apply$/);
-  await expect(candidate.getByRole("heading", { level: 1, name: jobTitle })).toBeVisible();
-  // Und derselbe Zustand nach F5. Der Klick allein beweist nichts über das
-  // Gateway — der Router schaltet im Browser um, ohne zu fragen. Erst das
-  // Neuladen schickt die Adresse wirklich hin, und unter `/jobs/…` liegt
-  // zusätzlich das echte `GET /jobs/{id}` des jobs-service: dass die
-  // Dokumentregel (`Sec-Fetch-Dest: document`, priority 200) darüber gewinnt,
-  // ist zu prüfen und nicht anzunehmen.
+  // sich ausschließlich hier. Also wird die Kennung über die öffentliche
+  // Schnittstelle geholt und die Adresse direkt angesteuert — dieselbe
+  // Aussage, ohne einen Knopf zu prüfen, den es so nicht mehr gibt.
+  const gefunden = await candidate.request.get(
+    `/jobs?q=${encodeURIComponent(jobTitle)}`);
+  const jobId = (await gefunden.json()).items[0].id as string;
+
+  // `/jobs/{id}/apply` IST HEUTE EINE WEICHE, kein Formular mehr: für eine
+  // angemeldete Person legt die Seite einen Entwurf an und führt dorthin. Das
+  // war ausdrücklich gewollt — wer sich bewirbt, soll beim Anschreiben landen
+  // und nicht bei einem leeren Textfeld.
+  //
+  // Der Deep-Link bleibt trotzdem das, was NUR diese Reise beweist: dass die
+  // Adresse durch Router UND Gateway ankommt. Im Browsertest ist die Route
+  // gemockt, und ein `Sec-Fetch-Dest`-Fehler zeigt sich ausschliesslich hier.
+  await candidate.goto(`/jobs/${jobId}/apply`);
+  await expect(candidate).toHaveURL(
+    /\/applications\/drafts\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+
+  // Und derselbe Zustand nach F5 — jetzt unter `/applications/…`, wo dieselbe
+  // Dokumentregel greifen muss.
   await candidate.reload();
-  await expect(candidate.getByRole("heading", { level: 1, name: jobTitle })).toBeVisible();
-  await candidate.getByRole("button", { name: /Bewerbung abschicken/i }).click();
-  // Auf BEIDE Ausgänge warten — Bestätigung oder Fehlermeldung. Nur auf die
-  // Bestätigung zu warten meldet nach 30 Sekunden bloß, dass sie fehlt, und
-  // verschweigt, ob die Bewerbung abgelehnt wurde oder ob überhaupt etwas
-  // ankam. Dieselbe Lehre wie bei der Anmelde-Hilfe in stack.ts, und dort hat
-  // sie einen echten Fehler sichtbar gemacht.
-  const sent = candidate.getByText(/Bewerbung abgeschickt/i);
-  const rejected = candidate.getByRole("alert");
-  await expect(sent.or(rejected).first()).toBeVisible();
-  if (await rejected.isVisible()) {
-    throw new Error(`Bewerbung abgelehnt: ${await rejected.innerText()}`);
-  }
-  await expect(sent).toBeVisible();
+  await expect(candidate.getByRole("heading", { level: 1 })).toBeVisible();
+
+  // Selbst schreiben, freigeben, senden. Die Zusage dieser Reise ist nicht das
+  // Formular, sondern die EINWILLIGUNG: das Abschicken zeigt dem Unternehmen
+  // das Profil, das Zurückziehen nimmt es weg.
+  await candidate.getByRole("button", { name: /Selbst schreiben/i }).click();
+  await candidate.getByLabel(/Betreff/i).fill("Bewerbung");
+  await candidate
+    .getByLabel(/^Text$/i)
+    .fill("Sehr geehrte Damen und Herren,\n\nich bewerbe mich.");
+  await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
+
+  await expect(candidate.getByRole("button", { name: /Freigeben/i }))
+    .toBeVisible({ timeout: 10_000 });
+  await candidate.getByRole("button", { name: /Freigeben/i }).click();
+  await expect(candidate.getByRole("button", { name: /Senden/i })).toBeEnabled();
+  await candidate.getByRole("button", { name: /Senden/i }).click();
+  await expect(candidate.getByRole("button", { name: /Senden/i })).toHaveCount(0);
 
   // Jetzt sieht das Unternehmen das Profil — allein wegen der Bewerbung.
   await recruiter.goto("/candidates");

@@ -158,7 +158,8 @@ public sealed class Bewerbungsentwurf
         List<Guid> unterlagen,
         List<Anmerkung> anmerkungen,
         DateTimeOffset angelegt,
-        DateTimeOffset geaendert)
+        DateTimeOffset geaendert,
+        DateTimeOffset? schreibenBegonnen = null)
     {
         Id = id;
         Stelle = stelle;
@@ -174,6 +175,7 @@ public sealed class Bewerbungsentwurf
         _anmerkungen = anmerkungen;
         Angelegt = angelegt;
         Geaendert = geaendert;
+        SchreibenBegonnen = schreibenBegonnen;
     }
 
     /// <summary>Die Kennung.</summary>
@@ -225,11 +227,17 @@ public sealed class Bewerbungsentwurf
     /// <summary>Wann zuletzt etwas geschah.</summary>
     public DateTimeOffset Geaendert { get; private set; }
 
+    /// <summary>
+    /// Wann dieses Schreiben begann. Unverändert, solange der Stand Entsteht
+    /// ist — sonst springt die Oberfläche bei jedem Bruchstück auf null Sekunden.
+    /// </summary>
+    public DateTimeOffset? SchreibenBegonnen { get; private set; }
+
     /// <summary>Beginnt einen Entwurf. Das Modell schreibt noch nicht.</summary>
     public static Bewerbungsentwurf Beginne(
         Guid stelle, TenantId firma, SubjectId wer, DateTimeOffset jetzt) =>
         new(Guid.CreateVersion7(), stelle, firma, wer, string.Empty, string.Empty,
-            Entwurfsstand.Entsteht, 1, string.Empty, false, [], [], jetzt, jetzt);
+            Entwurfsstand.Entsteht, 1, string.Empty, true, [], [], jetzt, jetzt);
 
     /// <summary>Der Entwurf, wie Zeilen ihn halten. Prüft nichts.</summary>
     public static Bewerbungsentwurf Stelle_her(
@@ -246,14 +254,50 @@ public sealed class Bewerbungsentwurf
         IReadOnlyList<Guid> unterlagen,
         IReadOnlyList<Anmerkung> anmerkungen,
         DateTimeOffset angelegt,
-        DateTimeOffset geaendert) =>
+        DateTimeOffset geaendert,
+        DateTimeOffset? schreibenBegonnen = null) =>
         new(id, stelle, firma, wer, betreff, text, stand, fassung, fehler,
             teiltLebenslauf, [.. unterlagen],
-            [.. anmerkungen.OrderBy(eintrag => eintrag.Angelegt)], angelegt, geaendert);
+            [.. anmerkungen.OrderBy(eintrag => eintrag.Angelegt)], angelegt, geaendert,
+            schreibenBegonnen);
 
-    /// <summary>Das Modell hat geschrieben.</summary>
-    /// <exception cref="EntwurfsschrittNichtErlaubt">Er entstand gar nicht.</exception>
-    public void Nimm_text_an(string? betreff, string? text, DateTimeOffset jetzt)
+    /// <summary>Startet (noch einmal) das Schreiben — der Brief wird leer.</summary>
+    /// <remarks>
+    /// Aus Fehlgeschlagen zurück nach Entsteht, damit die Oberfläche „wird
+    /// geschrieben" zeigt und das Modell denselben Entwurf füllen darf.
+    /// </remarks>
+    public void Beginne_schreiben(DateTimeOffset jetzt, bool leeren = true)
+    {
+        if (Stand is not (Entwurfsstand.Entsteht or Entwurfsstand.Fehlgeschlagen
+            or Entwurfsstand.Ueberarbeiten or Entwurfsstand.Pruefen))
+        {
+            throw new EntwurfsschrittNichtErlaubt(Stand, "geschrieben werden");
+        }
+
+        if (leeren)
+        {
+            Betreff = string.Empty;
+            Text = string.Empty;
+        }
+
+        Fehler = string.Empty;
+        Stand = Entwurfsstand.Entsteht;
+        // Schon laufendes Schreiben behält den Start — sonst springt die
+        // Oberfläche bei einem zweiten Klick oder einem Poll auf null Sekunden.
+        if (SchreibenBegonnen is null)
+        {
+            SchreibenBegonnen = jetzt;
+        }
+
+        Geaendert = jetzt;
+    }
+
+    /// <summary>Ein Zwischenstand, während das Modell noch schreibt.</summary>
+    /// <remarks>
+    /// Keine neue Fassung, kein Sprung nach Prüfen — sonst wäre ein halber
+    /// Brief freigabefähig.
+    /// </remarks>
+    public void Nimm_bruchstueck(string? betreff, string? text, DateTimeOffset jetzt)
     {
         if (Stand != Entwurfsstand.Entsteht)
         {
@@ -261,7 +305,25 @@ public sealed class Bewerbungsentwurf
         }
 
         Setze_text(betreff, text);
+        Geaendert = jetzt;
+    }
+
+    /// <summary>Das Modell hat geschrieben.</summary>
+    /// <exception cref="EntwurfsschrittNichtErlaubt">Er entstand gar nicht.</exception>
+    public void Nimm_text_an(string? betreff, string? text, DateTimeOffset jetzt)
+    {
+        // Auch aus Fehlgeschlagen: „noch einmal schreiben" ist derselbe
+        // Schritt, nur nach einem misslungenen Versuch. Ihn zu verbieten
+        // verwirft eine fertige Modellantwort als 422.
+        if (Stand is not (Entwurfsstand.Entsteht or Entwurfsstand.Fehlgeschlagen))
+        {
+            throw new EntwurfsschrittNichtErlaubt(Stand, "geschrieben werden");
+        }
+
+        Setze_text(betreff, text);
         Stand = Entwurfsstand.Pruefen;
+        Fehler = string.Empty;
+        SchreibenBegonnen = null;
         Geaendert = jetzt;
     }
 
@@ -274,6 +336,7 @@ public sealed class Bewerbungsentwurf
     {
         Stand = Entwurfsstand.Fehlgeschlagen;
         Fehler = (grund ?? string.Empty).Trim();
+        SchreibenBegonnen = null;
         Geaendert = jetzt;
     }
 
@@ -359,7 +422,7 @@ public sealed class Bewerbungsentwurf
     /// <exception cref="OffeneAnmerkungen">Es gibt keinen Auftrag.</exception>
     public void Ueberarbeite(string? betreff, string? text, DateTimeOffset jetzt)
     {
-        if (Stand is Entwurfsstand.Gesendet or Entwurfsstand.Entsteht)
+        if (Stand == Entwurfsstand.Gesendet)
         {
             throw new EntwurfsschrittNichtErlaubt(Stand, "überarbeitet werden");
         }
@@ -378,6 +441,7 @@ public sealed class Bewerbungsentwurf
 
         Fassung++;
         Stand = Entwurfsstand.Pruefen;
+        SchreibenBegonnen = null;
         Geaendert = jetzt;
     }
 
