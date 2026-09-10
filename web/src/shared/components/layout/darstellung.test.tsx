@@ -6,15 +6,9 @@ import { renderMitStore } from "../../../features/auth/test/render";
 import { DarstellungsAbschnitte } from "./darstellung";
 
 /**
- * Darstellung und Sprache, als zwei benannte Abschnitte mit je einem
- * Auswahlfeld.
- *
- * <strong>Der Vorgänger war ein Zahnrad mit einer flachen Liste</strong>, und
- * er hatte einen Fehler, den erst diese Fassung sichtbar macht: die Darstellung
- * kannte dort nur ein zweiwertiges Umschalten. Der Store führt seit jeher
- * `system | light | dark` — „System" war vorhanden und über die Oberfläche
- * nicht erreichbar. Wer einmal umschaltete, kam nie wieder zurück zu „folgt dem
- * Gerät", ohne den lokalen Speicher zu leeren.
+ * Darstellung und Sprache als zwei Abschnitte mit je einem Auswahlfeld. Die
+ * Darstellung hat drei Werte — der Vorgänger konnte nur zweiwertig umschalten,
+ * „System" war unerreichbar.
  */
 describe("Darstellung und Sprache", () => {
   async function oeffne(feld: string) {
@@ -38,8 +32,6 @@ describe("Darstellung und Sprache", () => {
   it("steht ohne Wahl auf „System“ — und sagt das auch", async () => {
     await oeffne("Darstellung");
 
-    // Ohne diesen Wert wäre die Voreinstellung unsichtbar, und die Wahl sähe
-    // aus wie „hell", obwohl niemand hell gewählt hat.
     expect(
       within(screen.getByRole("listbox")).getByRole("option", { name: /System/ }),
     ).toHaveAttribute("aria-selected", "true");
@@ -52,8 +44,6 @@ describe("Darstellung und Sprache", () => {
       within(screen.getByRole("listbox")).getByRole("option", { name: "Dunkel" }),
     );
 
-    // Zugeklappt muss stehen, was GILT — sonst ist das Feld eine Liste und
-    // keine Einstellung.
     expect(screen.getByRole("combobox", { name: "Darstellung" })).toHaveTextContent(
       "Dunkel",
     );
@@ -64,8 +54,6 @@ describe("Darstellung und Sprache", () => {
 
     const liste = screen.getByRole("listbox");
     expect(within(liste).getAllByRole("option")).toHaveLength(4);
-    // Der Name der Sprache steht IN dieser Sprache: wer die Oberfläche gerade
-    // nicht lesen kann, sucht „Deutsch", nicht „German".
     expect(within(liste).getByRole("option", { name: /Français/ })).toBeInTheDocument();
   });
 

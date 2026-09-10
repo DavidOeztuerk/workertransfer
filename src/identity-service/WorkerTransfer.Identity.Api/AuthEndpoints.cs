@@ -39,9 +39,7 @@ public sealed record SprachwahlBody(string Language);
 
 /// <summary>Was ein Aufrufer schickt, um sein Berufsfeld zu wählen.</summary>
 /// <param name="OccupationalField">
-/// Eines der elf Etiketten aus <see cref="Berufsfeldwahl"/>. <c>null</c> oder
-/// leer heisst ENTFERNEN — ohne diesen Weg wäre eine einmal getroffene Wahl
-/// endgültig (ADR-0039).
+/// Eines der Etiketten aus <see cref="Berufsfeldwahl"/>. Leer heisst entfernen.
 /// </param>
 public sealed record BerufsfeldBody(
     [property: JsonPropertyName("occupational_field")] string? OccupationalField);
@@ -284,10 +282,7 @@ public static class AuthEndpoints
             await SchreibeOk(context, cancellationToken);
         });
 
-        // Das Berufsfeld liegt neben der Sprache und aus demselben Grund: es ist
-        // eine Entscheidung über das eigene Konto und hat mit dem Anmelden
-        // nichts zu tun. Es steht NICHT im Token — aus ihm folgt kein Recht,
-        // sondern nur, was die Oberfläche anbietet (ADR-0039).
+        // Neben der Sprache: eine Entscheidung über das eigene Konto.
         app.MapPut("/account/occupational-field", async (
             BerufsfeldBody body,
             IMediator mediator,
@@ -303,10 +298,7 @@ public static class AuthEndpoints
                 return;
             }
 
-            // Unbekanntes wird ABGESAGT und nicht stillschweigend zu „keins".
-            // Sonst verschwände ein Tippfehler in der Spalte, die Oberfläche
-            // zeigte weiter die neutrale Ansicht, und niemand wüsste warum.
-            // Dieselbe Regel wie bei `PUT /account/language`.
+            // Unbekanntes wird abgesagt, nicht still zu „keins" gemacht.
             if (!Berufsfeldwahl.Kennen(body.OccupationalField))
             {
                 await ProblemDetailsMiddleware.Schreibe(
@@ -537,9 +529,7 @@ public static class AuthEndpoints
         // Bewerberauskunft liest die Session, und Anschrift darf nicht ins Modell.
         ["given_name"] = konto.Vorname,
         ["family_name"] = konto.Nachname,
-        // Damit die Oberfläche weiss, WAS sie anbieten soll — und nur dafür.
-        // `null` heisst „nicht angegeben" und bekommt die neutrale Ansicht:
-        // wer nichts gewählt hat, sieht, was er vorher sah (ADR-0039).
+        // Damit die Oberfläche weiss, was sie anbieten soll (ADR-0039).
         ["occupational_field"] = Berufsfeldwahl.Etikett(konto.Berufsfeld)
     };
 

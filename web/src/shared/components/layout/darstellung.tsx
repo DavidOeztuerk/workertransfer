@@ -19,14 +19,9 @@ import { useThemeMode } from "../../hooks/useThemeMode";
 import { WahlFeld, type Wahlmoeglichkeit } from "../ui/WahlFeld";
 
 /**
- * Die Fahne steht bei der SPRACHE in der Liste — und nie am zugeklappten Feld.
- *
- * <strong>Eine Fahne ist ein Land und keine Sprache.</strong> Deutsch spricht
- * auch, wer in Wien oder Bern lebt; Englisch ist nicht Grossbritannien. Als
- * einziges Erkennungszeichen wäre sie deshalb falsch. In der aufgeklappten
- * Liste steht sie neben dem ausgeschriebenen Namen und hilft beim schnellen
- * Finden — zugeklappt trägt das Feld eine Weltkugel, die keine Herkunft
- * behauptet.
+ * Fahnen nur in der aufgeklappten Liste, neben dem ausgeschriebenen Namen.
+ * Eine Fahne ist ein Land und keine Sprache — als einziges Erkennungszeichen
+ * wäre sie falsch.
  */
 const FAHNEN: Record<string, string> = { de: "🇩🇪", en: "🇬🇧", fr: "🇫🇷" };
 
@@ -43,19 +38,9 @@ export interface Vorliebe<T extends string> {
 }
 
 /**
- * Darstellung und Sprache — die Daten, nicht die Darstellung.
- *
- * <strong>Sie stehen hier, weil sie an ZWEI Stellen gebraucht werden</strong>,
- * und zwar in zwei verschiedenen Formen: im Kontomenü als knappes Untermenü
- * („Darstellung ▸ Dunkel"), auf der Einstellungsseite als Abschnitt mit
- * Überschrift und erklärendem Satz. Beides aus einer Quelle, sonst kennt das
- * eine beim nächsten Eintrag eine Möglichkeit, die das andere nicht hat.
- *
- * <strong>Die Darstellung hat DREI Werte.</strong> Der Store kennt
- * `system | light | dark` seit jeher, das alte Zahnrad rief aber nur ein
- * zweiwertiges `toggle()` — „System" war vorhanden und über die Oberfläche
- * nicht erreichbar. Wer einmal umschaltete, kam nie wieder zurück zu „folgt dem
- * Gerät", ohne den lokalen Speicher zu leeren.
+ * Darstellung und Sprache als Daten — verwendet vom Kontomenü (knappes
+ * Untermenü) und von der Einstellungsseite (Abschnitt mit Auswahlfeld). Eine
+ * Quelle, damit beide dieselben Möglichkeiten kennen.
  */
 export function useVorlieben(): {
   darstellung: Vorliebe<ColorPreference>;
@@ -85,8 +70,7 @@ export function useVorlieben(): {
       hinweis: t("darstellung.systemHinweis"),
       symbol: <LanguageOutlinedIcon fontSize="small" />,
     },
-    // Der Name der Sprache steht IN dieser Sprache: wer die Oberfläche gerade
-    // nicht lesen kann, sucht „Deutsch", nicht „German".
+    // Der Name der Sprache steht in dieser Sprache.
     ...SPRACHEN.map((wert) => ({
       wert: wert as Sprachvorliebe,
       name: t(`sprache.${wert}`),
@@ -101,8 +85,8 @@ export function useVorlieben(): {
   function waehleSprache(gewaehlt: Sprachvorliebe) {
     dispatch(languageSet(gewaehlt));
 
-    // Ans Konto geht die AUFGELÖSTE Sprache, nicht „system": der Server hat kein
-    // Gerät, dem er folgen könnte, und eine Mail muss eine Sprache haben.
+    // Ans Konto geht die aufgelöste Sprache, nicht „system": eine Mail muss
+    // eine Sprache haben.
     if (signedIn) {
       void dispatch(spracheSpeichern(aufgeloest(gewaehlt)));
     }
@@ -126,7 +110,6 @@ export function useVorlieben(): {
       beschreibung: t("sprache.lead"),
       wert: gewaehlteSprache,
       name: jetztSprache?.name ?? "",
-      // Zugeklappt eine Weltkugel und keine Fahne — siehe oben.
       symbol: <LanguageOutlinedIcon fontSize="small" />,
       moeglichkeiten: sprachWahl,
       waehle: waehleSprache,
@@ -134,16 +117,7 @@ export function useVorlieben(): {
   };
 }
 
-/**
- * Darstellung und Sprache als zwei benannte Abschnitte — für die
- * Einstellungsseite.
- *
- * <strong>Hier steht die ausführliche Fassung, im Kontomenü die knappe.</strong>
- * Ein Menü ist eine Liste von Wegen; ein Abschnitt mit Überschrift, erklärendem
- * Satz und Auswahlfeld ist eine Seite. Beides in dasselbe Menü zu legen stapelt
- * zwei Bedienarten übereinander: Einträge, die einen wegbringen, und Felder,
- * die einen dabehalten.
- */
+/** Die ausführliche Fassung für die Einstellungsseite. */
 export function DarstellungsAbschnitte() {
   const { darstellung, sprache } = useVorlieben();
 

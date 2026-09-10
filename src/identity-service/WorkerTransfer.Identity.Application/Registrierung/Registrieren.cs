@@ -11,9 +11,7 @@ namespace WorkerTransfer.Identity.Application.Registrierung;
 
 /// <summary>Register an account.</summary>
 /// <param name="Berufsfeld">
-/// In welcher Arbeitswelt die Person steht — <c>null</c>, und das ist der
-/// Normalfall. Die Registrierung fragt, verlangt aber nicht: eine Pflichtangabe
-/// hier wäre eine Hürde vor dem ersten Nutzen (ADR-0039).
+/// In welcher Arbeitswelt die Person steht. <c>null</c> ist der Normalfall.
 /// </param>
 /// <param name="Firmenname">
 /// Set means "a company is registering here". It becomes a company only when

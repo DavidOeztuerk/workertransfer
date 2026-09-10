@@ -31,10 +31,8 @@ public sealed class BestaetigungPruefung : AbstractValidator<AdresseBestaetigenB
 /// fragen. Eine Formprüfung sieht nur die Zeichenkette und kann diese Zusage
 /// deshalb gar nicht brechen.
 /// <para>
-/// Dieselbe Prüfung wie bei der Registrierung, und aus demselben Grund: dieser
-/// Weg baut ebenfalls eine <c>MailMessage</c>. Ohne sie liefe „erneut senden"
-/// an eine kaputte Adresse in denselben verschluckten Versandfehler — nur dass
-/// die Antwort weiterhin 202 lautet.
+/// Dieselbe Formprüfung wie bei der Registrierung: auch dieser Weg baut eine
+/// <c>MailMessage</c>.
 /// </para>
 /// </remarks>
 public sealed class ErneutSendenPruefung : AbstractValidator<BestaetigungErneutSendenBefehl>

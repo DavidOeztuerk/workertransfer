@@ -20,6 +20,7 @@ import { expect, test } from "@playwright/test";
 
 import {
   lastMailFor,
+  GATEWAY_URL,
   login,
   registerAndConfirm,
   skipWithoutStack,
@@ -44,7 +45,9 @@ test("die Sprachwahl wechselt die Oberfläche und erreicht die Mail", async ({ p
   // wechselt, WEIL er die Oberfläche nicht lesen kann, scrollt nicht erst an
   // das Seitenende.
   await page.getByRole("button", { name: "Mein Konto" }).click();
-  await page.getByRole("menuitemradio", { name: "Français" }).click();
+  await page.getByRole("menuitem", { name: /Sprache/ }).click();
+  // Die Wahl schliesst das Menü — sonst liegt es als Modal über der Seite.
+  await page.getByRole("menuitemradio", { name: /Français/ }).click();
 
   // Der Beleg, dass wirklich gezeichnet wird und nicht nur der Store umfiel.
   await expect(
@@ -71,7 +74,9 @@ test("die Sprachwahl wechselt die Oberfläche und erreicht die Mail", async ({ p
   // ein bestätigtes Konto schickt der Endpunkt bewusst gar nichts.)
   const seit = Date.now();
 
-  const answer = await page.request.post("/auth/register", {
+  // Absolut aufs Gateway: `baseURL` ist die Oberflaeche, und die kennt keine
+  // API-Pfade.
+  const answer = await page.request.post(`${GATEWAY_URL}/auth/register`, {
     data: { email, password: "geheim-und-lang-genug", display_name: "Doppelt" },
   });
   expect(answer.status()).toBe(201);
@@ -86,8 +91,9 @@ test("die Sprachwahl wechselt die Oberfläche und erreicht die Mail", async ({ p
   // einem Zustand steht, den niemand erwartet. Die Sprache heisst jetzt
   // „Langue" — die Oberfläche ist ja französisch.
   await page.goto("/market");
-  // Das Zahnrad heisst jetzt französisch — die Oberfläche ist es ja.
-  await page.getByRole("button", { name: "Affichage et langue" }).click();
-  await page.getByRole("menuitemradio", { name: "Deutsch" }).click();
+  // Die Einträge heissen jetzt französisch — die Oberfläche ist es ja.
+  await page.getByRole("button", { name: "Mon compte" }).click();
+  await page.getByRole("menuitem", { name: /Langue/ }).click();
+  await page.getByRole("menuitemradio", { name: /Deutsch/ }).click();
   await expect(page.getByRole("heading", { name: "Mein Marktstatus" })).toBeVisible();
 });

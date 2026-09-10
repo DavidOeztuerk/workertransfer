@@ -19,29 +19,15 @@ export function PageShell({
   title: string;
   lead?: string;
   actions?: React.ReactNode;
-  /**
-   * Eine Seite mit Formular oder Karten statt mit Liste oder Tabelle.
-   *
-   * Sie wird schmaler, aber NICHT halb so breit: der Unterschied soll ordnen,
-   * nicht auffallen. Wer eine Tabelle zeigt, lässt es weg.
-   */
+  /** Formular- oder Kartenseite statt Liste/Tabelle: etwas schmaler. */
   narrow?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <Container
-      // AUSDRÜCKLICHE Breiten statt MUIs Rasterpunkten, und der Grund ist
-      // gemessen: `sm` sind 600px, `lg` sind 1200px — auf einem 1280er Fenster
-      // also 47% gegen 94%. Beim Blättern sprang der Rahmen dadurch auf die
-      // doppelte Breite, und das liest sich wie zwei verschiedene Anwendungen.
-      // Diese beiden Werte liegen ein Fünftel auseinander statt um das
-      // Doppelte: der Rahmen bleibt beim Wechsel im Wesentlichen stehen.
-      //
-      // 960px ist kein runder Zufallswert, sondern die Breite, bei der ein
-      // Formular zwei Spalten trägt, ohne dass eine Zeile Fliesstext länger
-      // wird, als man sie noch lesen mag. Die Textspalte selbst ist unten
-      // ohnehin auf 62ch begrenzt — 50 bis 75 Zeichen ist der Bereich, den die
-      // Lesbarkeitsforschung nennt, und den hält keine Rahmenbreite allein ein.
+      // Eigene Breiten statt MUIs `sm`/`lg` (600/1200): die lagen um das
+      // Doppelte auseinander, und der Rahmen sprang beim Blättern. Diese
+      // beiden trennt ein Fünftel. Die Textspalte ist unten auf 62ch begrenzt.
       maxWidth={false}
       // Unten weniger als oben, und das ist Absicht: über dem Titel schafft
       // Luft den Anfang, unter dem letzten Element ist sie nur Leere vor der

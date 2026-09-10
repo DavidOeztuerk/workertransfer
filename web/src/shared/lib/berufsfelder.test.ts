@@ -24,11 +24,7 @@ function katalogHat(schluessel: string): boolean {
 
 describe("Berufsfelder und ihre Belege (ADR-0039)", () => {
   it("führt genau die elf Etiketten des Servers", () => {
-    // Eine MENGE, kein Enthaltensein: ein zwölftes Feld soll auffallen und
-    // nicht mitlaufen. Die Wahrheit steht in `Berufsfeldwahl` in
-    // identity-service; hier steht sie, weil der Browser entscheidet, was er
-    // zeigt — und zwei Listen, die auseinanderlaufen, zeigen einem Konto eine
-    // Ansicht, die es nicht geben sollte.
+    // Eine Menge, kein Enthaltensein: ein zwölftes Feld soll auffallen.
     expect([...BERUFSFELDER]).toEqual([
       "handwerk",
       "industrie_technik",
@@ -45,15 +41,12 @@ describe("Berufsfelder und ihre Belege (ADR-0039)", () => {
   });
 
   it("liest ein unbekanntes Etikett als „keins“ statt zu scheitern", () => {
-    // Eine ältere Oberfläche gegen einen neueren Server soll WENIGER anbieten,
-    // nicht abstürzen.
     expect(leseBerufsfeld("metallbauer")).toBeNull();
     expect(leseBerufsfeld(null)).toBeNull();
     expect(leseBerufsfeld("handwerk")).toBe("handwerk");
   });
 
   it("bietet GitHub bei it_software und ohne Feld an, sonst nicht", () => {
-    // Der mittlere Fall ist der Beleg dafür, dass hier nichts abgewertet wird.
     expect(zeigtGitHub(null)).toBe(true);
     expect(zeigtGitHub("it_software")).toBe(true);
     expect(zeigtGitHub("handwerk")).toBe(false);
@@ -61,9 +54,7 @@ describe("Berufsfelder und ihre Belege (ADR-0039)", () => {
   });
 
   it("gibt jedem Feld die allgemeinen Belege mit", () => {
-    // Die wichtigste Zeile der Tabelle im ADR: die feldeigenen Belege kommen
-    // DAZU, sie ersetzen nichts. Ein Feld, das nur seine eigenen trüge, böte
-    // einem Metallbauer kein Arbeitszeugnis an.
+    // Die feldeigenen Belege kommen dazu, sie ersetzen nichts.
     for (const feld of BERUFSFELDER) {
       const schluessel = belegartenFuer(feld).map((art) => art.schluessel);
 
@@ -90,10 +81,7 @@ describe("Berufsfelder und ihre Belege (ADR-0039)", () => {
   });
 
   it("lässt Führungs- und Gesundheitszeugnis nennen, nie hochladen", () => {
-    // Ein Führungszeugnis ist ein Auszug aus einem Register über Straftaten.
-    // Es muss GENANNT werden können, weil Arbeitgeber danach fragen — und es
-    // gehört auf keinen Server dieser Plattform. Eine Datei, die nie angeboten
-    // wird, muss nicht gelöscht werden.
+    // Nennbar, weil Arbeitgeber danach fragen — und nie hochladbar.
     expect(
       belegartenFuer("gesundheit_pflege").map((art) => art.schluessel),
     ).toContain("beleg.fuehrungszeugnis");
@@ -110,8 +98,7 @@ describe("Berufsfelder und ihre Belege (ADR-0039)", () => {
   });
 
   it("hat für jeden Beleg einen Text im Katalog", () => {
-    // Ohne diese Prüfung erschiene bei einem neuen Beleg der SCHLÜSSEL auf der
-    // Seite — sichtbar erst, wenn jemand genau dieses Berufsfeld gewählt hat.
+    // Sonst erschiene bei einem neuen Beleg der Schlüssel auf der Seite.
     for (const feld of [...BERUFSFELDER, null]) {
       for (const art of belegartenFuer(feld)) {
         expect(katalogHat(art.schluessel), art.schluessel).toBe(true);

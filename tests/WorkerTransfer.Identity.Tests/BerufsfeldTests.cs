@@ -15,12 +15,6 @@ using WorkerTransfer.Identity.Infrastructure.Post;
 namespace WorkerTransfer.Identity.Tests;
 
 /// <summary>Das Berufsfeld ordnet, was angeboten wird — und sonst nichts (ADR-0039).</summary>
-/// <remarks>
-/// Die Reihe hält vier Zusagen fest: die Liste ist geschlossen und vollständig,
-/// wer nichts wählt bekommt <c>null</c> und damit die heutige Ansicht, ein
-/// unbekanntes Etikett wird abgesagt statt weggeworfen, und eine Wahl lässt
-/// sich zurücknehmen.
-/// </remarks>
 [Collection(PostgresCollection.Name)]
 public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
 {
@@ -55,15 +49,7 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    /// <summary>
-    /// Die elf Etiketten, als MENGE — nicht als Enthaltensein.
-    /// </summary>
-    /// <remarks>
-    /// Ein Mengenvergleich, damit ein zwölftes Feld auffällt und nicht
-    /// mitläuft. Dieselbe Lehre wie bei <c>TokenformTests</c>: eine Prüfung, die
-    /// nur einzelne Namen verbietet, hätte den neunten Anspruch nie bemerkt.
-    /// Ein Feld, das die Oberfläche nicht kennt, bekommt dort keine Ansicht.
-    /// </remarks>
+    /// <summary>Die elf Etiketten als MENGE, damit ein zwölftes auffällt.</summary>
     [Fact]
     public void Die_Liste_ist_geschlossen_und_vollstaendig() =>
         Berufsfeldwahl.Etiketten.Should().BeEquivalentTo(
@@ -73,14 +59,10 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
             "buero_verwaltung", "it_software", "bildung_soziales", "sonstiges"
         ]);
 
-    /// <summary>Jedes Etikett kommt als es selbst zurück.</summary>
-    /// <remarks>
-    /// Hin und zurück, weil die beiden Richtungen von Hand geschrieben sind:
-    /// <c>ToLower()</c> über den Namen der Aufzählung ergäbe
-    /// <c>industrietechnik</c> und nicht <c>industrie_technik</c>, und der
-    /// Unterschied fiele erst auf, wenn eine gespeicherte Zeile nicht mehr
-    /// gelesen werden kann.
-    /// </remarks>
+    /// <summary>
+    /// Jedes Etikett kommt als es selbst zurück — beide Richtungen sind von
+    /// Hand geschrieben.
+    /// </summary>
     [Fact]
     public void Jedes_Etikett_ueberlebt_den_Hin_und_Rueckweg()
     {
@@ -90,10 +72,7 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
         }
     }
 
-    /// <summary>
-    /// „Sonstiges" ist eine Wahl, „nichts" ist keine — und beide sind
-    /// unterscheidbar.
-    /// </summary>
+    /// <summary>„Sonstiges" ist eine Wahl, „nichts" ist keine.</summary>
     [Fact]
     public void Sonstiges_ist_nicht_dasselbe_wie_nichts()
     {
@@ -102,14 +81,7 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
         Berufsfeldwahl.Aus("  ").Should().BeNull();
     }
 
-    /// <summary>
-    /// Leer ist ein zulässiger Wert, Unsinn nicht.
-    /// </summary>
-    /// <remarks>
-    /// <c>Kennen</c> steht neben <c>Aus</c>, weil <c>Aus</c> Unbekanntes zu
-    /// <c>null</c> macht — richtig, wenn eine alte Zeile gelesen wird, falsch,
-    /// wenn jemand gerade gewählt hat.
-    /// </remarks>
+    /// <summary>Leer ist ein zulässiger Wert, Unsinn nicht.</summary>
     [Theory]
     [InlineData(null, true)]
     [InlineData("", true)]
@@ -121,14 +93,9 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
         Berufsfeldwahl.Kennen(etikett).Should().Be(erwartet);
 
     /// <summary>
-    /// Wer nichts wählt, bekommt <c>null</c> — und damit die heutige Ansicht.
+    /// Wer nichts wählt, bekommt <c>null</c>. Nichts wird geraten — eine
+    /// GitHub-Verbindung macht niemanden zu <c>it_software</c> (ADR-0022 §2).
     /// </summary>
-    /// <remarks>
-    /// <strong>Die Zusage, an der diese Arbeit gemessen wird.</strong> Nichts
-    /// wird geraten: dass jemand ein GitHub-Konto verbunden hat, macht ihn nicht
-    /// zu <c>it_software</c>. Eine solche Ableitung wäre unsichtbar und damit
-    /// unwiderlegbar (ADR-0022 §2).
-    /// </remarks>
     [Fact]
     public async Task Ohne_Wahl_steht_nichts_da()
     {
@@ -150,12 +117,10 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
         sitzung!.User!.OccupationalField.Should().Be("handwerk");
     }
 
-    /// <summary>Die Wahl lässt sich nachholen und wieder zurücknehmen.</summary>
-    /// <remarks>
-    /// Die zweite Hälfte ist die wichtigere: ohne sie wäre eine einmal
-    /// getroffene Wahl endgültig, und wer sich vertan hat, bliebe für immer
-    /// Metallbauer. <c>null</c> heisst entfernen, nicht „unverändert".
-    /// </remarks>
+    /// <summary>
+    /// Die Wahl lässt sich nachholen und zurücknehmen — <c>null</c> heisst
+    /// entfernen, nicht „unverändert".
+    /// </summary>
     [Fact]
     public async Task Nachtragen_und_zuruecknehmen_wirken_beide()
     {
@@ -176,15 +141,7 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
         zurueck!.User!.OccupationalField.Should().BeNull();
     }
 
-    /// <summary>
-    /// Ein unbekanntes Etikett wird abgesagt, nicht stillschweigend zu „keins".
-    /// </summary>
-    /// <remarks>
-    /// Der stille Weg wäre hier besonders teuer: die Spalte bliebe leer, die
-    /// Oberfläche zeigte weiter die neutrale Ansicht, und niemand könnte
-    /// erklären, warum die Wahl nicht hielt. Dieselbe Regel wie bei
-    /// <c>PUT /account/language</c>.
-    /// </remarks>
+    /// <summary>Ein unbekanntes Etikett wird abgesagt, nicht still verworfen.</summary>
     [Fact]
     public async Task Ein_unbekanntes_Feld_wird_abgesagt()
     {
@@ -195,20 +152,12 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
 
         antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        // Und die alte Wahl steht noch: eine abgesagte Änderung darf nichts
-        // angerichtet haben.
+        // Eine abgesagte Änderung darf nichts angerichtet haben.
         var sitzung = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
         sitzung!.User!.OccupationalField.Should().Be("handwerk");
     }
 
-    /// <summary>
-    /// Auch die Registrierung sagt ab, statt die Angabe wegzuwerfen.
-    /// </summary>
-    /// <remarks>
-    /// Hier wiegt der stille Weg am schwersten: das Konto entstünde, die
-    /// Bestätigungsmail ginge hinaus, und die Wahl wäre fort — sichtbar erst
-    /// Tage später.
-    /// </remarks>
+    /// <summary>Auch die Registrierung sagt ab, statt die Angabe wegzuwerfen.</summary>
     [Fact]
     public async Task Eine_Registrierung_mit_Unsinn_wird_abgesagt()
     {

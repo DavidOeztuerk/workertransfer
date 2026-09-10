@@ -38,6 +38,7 @@ const de = {
   },
 
   kopf: {
+    besucherMenue: "Einstellungen und Anmeldung",
     registrieren: "Registrieren",
     anmelden: "Anmelden",
     unternehmen: "Unternehmen",

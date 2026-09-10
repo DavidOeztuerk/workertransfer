@@ -126,11 +126,9 @@ public sealed class User
 
     /// <summary>In welcher Arbeitswelt diese Person steht, oder <c>null</c>.</summary>
     /// <remarks>
-    /// <c>null</c> heisst „nicht angegeben" und ist der Normalfall: die
-    /// Registrierung fragt, verlangt aber nicht (ADR-0039). Daraus folgt
-    /// ausschliesslich, was die Oberfläche anbietet — kein Recht, keine
-    /// Sichtbarkeit, keine Aussage über die Person. Es wird niemals abgeleitet:
-    /// wer eine GitHub-Verbindung hat, ist damit nicht <c>it_software</c>.
+    /// <c>null</c> heisst „nicht angegeben" und ist der Normalfall (ADR-0039).
+    /// Wird nie abgeleitet: eine GitHub-Verbindung macht niemanden zu
+    /// <c>it_software</c>.
     /// </remarks>
     public Berufsfeld? Berufsfeld { get; private set; }
 
@@ -220,14 +218,8 @@ public sealed class User
 
     /// <summary>Die Person nennt ihr Berufsfeld — oder nimmt die Angabe zurück.</summary>
     /// <remarks>
-    /// <c>null</c> heisst ENTFERNEN, nicht „unverändert": sonst gäbe es keinen
-    /// Weg zurück zu „nicht angegeben", und eine einmal getroffene Wahl wäre
-    /// endgültig. Dieselbe Regel wie bei <see cref="SetzeKlarname"/>.
-    /// <para>
-    /// Eine Methode und kein Setzer, den jede Anfrage füttert: was die Person
-    /// über ihre eigene Arbeit sagt, darf nur sie sagen. Abgeleitet wird es
-    /// nie (ADR-0039).
-    /// </para>
+    /// <c>null</c> heisst entfernen, nicht „unverändert" — wie bei
+    /// <see cref="SetzeKlarname"/>.
     /// </remarks>
     /// <param name="berufsfeld">Was sie gewählt hat, oder <c>null</c>.</param>
     public void BerufsfeldWaehlen(Berufsfeld? berufsfeld) => Berufsfeld = berufsfeld;

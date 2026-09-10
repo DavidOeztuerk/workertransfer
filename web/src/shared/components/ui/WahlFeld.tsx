@@ -15,22 +15,7 @@ export interface Wahlmoeglichkeit<T extends string> {
   symbol: ReactNode;
 }
 
-/**
- * Eine benannte Wahl: Überschrift, ein Satz dazu, ein Auswahlfeld.
- *
- * <strong>Ein Auswahlfeld und keine Liste von Einträgen.</strong> Bei drei
- * Möglichkeiten sind beide vertretbar; ab vier nimmt eine offene Liste den
- * Platz von allem anderen, und die Wahl, die gerade gilt, steht dann nirgends
- * — man muss sie am Häkchen suchen. Das Auswahlfeld zeigt sie zugeklappt.
- *
- * <strong>Die Überschrift trägt einen Satz.</strong> „Darstellung" allein sagt
- * nicht, ob es um Schriftgrösse oder Farben geht. Ein Wort als Überschrift ist
- * eine Vermutung darüber, dass alle dasselbe darunter verstehen.
- *
- * <strong>Das Häkchen steht rechts, nicht links.</strong> Links steht das
- * Symbol der Möglichkeit; ein zweites Zeichen davor verschöbe alle Zeilen
- * gegeneinander, je nachdem, welche gerade gilt.
- */
+/** Eine benannte Wahl: Überschrift, erklärender Satz, Auswahlfeld. */
 export function WahlFeld<T extends string>({
   ueberschrift,
   beschreibung,
@@ -44,7 +29,7 @@ export function WahlFeld<T extends string>({
   wert: T;
   moeglichkeiten: readonly Wahlmoeglichkeit<T>[];
   onWahl: (gewaehlt: T) => void;
-  /** Für Vorleser und Tests — die Überschrift ist ein Text, kein Label. */
+  /** Für Vorleser: die Überschrift ist ein Text, kein Label. */
   etikett: string;
 }) {
   const aktuell = moeglichkeiten.find((moeglich) => moeglich.wert === wert);
@@ -66,9 +51,8 @@ export function WahlFeld<T extends string>({
         fullWidth
         inputProps={{ "aria-label": etikett }}
         onChange={(event) => onWahl(event.target.value as T)}
-        // Zugeklappt steht dort, was GILT — mit demselben Symbol wie in der
-        // Liste. Ohne `renderValue` zeigte MUI nur den Text, und das Symbol
-        // erschiene erst beim Aufklappen: dann sucht das Auge beim Öffnen neu.
+        // Zugeklappt mit Symbol, wie in der Liste — `renderValue`, weil MUI
+        // sonst nur den Text zeigt.
         renderValue={() => (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
             <Box sx={{ display: "flex", color: "text.secondary" }}>

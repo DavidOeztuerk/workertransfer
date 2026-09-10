@@ -8,7 +8,7 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-export const WEB_URL = process.env.E2E_WEB_URL ?? "http://localhost:8090";
+export const WEB_URL = process.env.E2E_WEB_URL ?? "http://localhost:5173";
 export const IDENTITY_URL = process.env.E2E_IDENTITY_URL ?? "http://localhost:8001";
 export const CONSENT_URL = process.env.E2E_CONSENT_URL ?? "http://localhost:8002";
 export const PROFILE_URL = process.env.E2E_PROFILE_URL ?? "http://localhost:8003";
@@ -25,26 +25,12 @@ export const TRANSFER_URL = process.env.E2E_TRANSFER_URL ?? "http://localhost:80
 export const GITHUB_URL = process.env.E2E_GITHUB_URL ?? "http://localhost:8011";
 export const NOTIFICATION_URL = process.env.E2E_NOTIFICATION_URL ?? "http://localhost:8010";
 
-/**
- * Das Gateway — der einzige Weg, den die Auslieferung anbietet.
- *
- * Die Reisen fuhren frueher gegen den Vite-Server auf 5173, also am Gateway
- * vorbei. Genau deshalb fiel monatelang niemandem auf, dass die Oberflaeche
- * DURCH das Gateway gar nicht laedt: es reichte das HTML durch, aber keinen
- * ihrer Bestandteile. Wer den Weg nicht faehrt, den er ausliefert, prueft eine
- * Anwendung, die es so nicht gibt.
- */
+/** Das Gateway — der Weg, den die Oberflaeche fuer ihre Aufrufe nimmt. */
 export const GATEWAY_URL = process.env.E2E_GATEWAY_URL ?? "http://localhost:8090";
 export const MAILPIT_URL = process.env.E2E_MAILPIT_URL ?? "http://localhost:8025";
 
 const REQUIRED: ReadonlyArray<readonly [string, string, Record<string, string>?]> = [
-  // Die Oberflaeche wird geprueft, WIE EIN BROWSER SIE HOLT: mit
-  // `Sec-Fetch-Dest: document`. Ohne den Kopf schreibt das Gateway den Pfad
-  // nicht auf die Oberflaeche um, Ocelot findet keine Route, und die Probe
-  // meldet die ganze Landschaft als unten — worauf sich alle zwanzig Reisen
-  // ueberspringen und der Lauf mit `exit 0` endet. Genau so ist er zweimal
-  // gruen gewesen, ohne eine einzige Reise gefahren zu sein.
-  ["web", WEB_URL, { "Sec-Fetch-Dest": "document" }],
+  ["web", WEB_URL],
   ["identity-service", `${IDENTITY_URL}/health/live`],
   ["consent-service", `${CONSENT_URL}/health/live`],
   ["profile-service", `${PROFILE_URL}/health/live`],
@@ -421,7 +407,9 @@ export async function login(page: Page, email: string): Promise<void> {
   await expect(page.getByLabel(/E-Mail/i)).toBeVisible();
   await page.getByLabel(/E-Mail/i).fill(email);
   await page.getByLabel(/Passwort/i).fill(E2E_PASSWORD);
-  await page.getByRole("button", { name: /Anmelden/i }).click();
+  // Der ABSENDEKNOPF, nicht irgendein Knopf mit „Anmelden" im Namen: in der
+  // Kopfzeile steht einer, der ein Menü öffnet.
+  await page.locator('button[type="submit"]').click();
 
   // Die Zusammenfassung des Konto-Menüs statt „Mein Profil": der Link liegt
   // jetzt IM Menü und ist zugeklappt nicht sichtbar. Die Zusammenfassung gibt

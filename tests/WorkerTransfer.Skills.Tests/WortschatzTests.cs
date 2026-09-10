@@ -32,29 +32,17 @@ public class WortschatzTests
         Wortschatz.KanonischAlle(["React"]).Should().Equal("React");
 
     /// <summary>
-    /// Dieselbe Prüfung wie <see cref="Aus_React_folgt_kein_JavaScript"/>, an
-    /// dem Ort, an dem sie schwerer zu halten ist (ADR-0039).
+    /// Wie <see cref="Aus_React_folgt_kein_JavaScript"/>, an dem Ort, an dem
+    /// die Regel schwerer zu halten ist: „MIG/MAG" ist kein „Schweißen".
     /// </summary>
-    /// <remarks>
-    /// Die Verlockung ist im Handwerk größer als in der IT, weil die
-    /// Fachbegriffe eine sichtbare Ordnung haben: jeder weiß, dass MIG/MAG ein
-    /// Schweißverfahren ist. Genau deshalb steht dieser Test hier. Wer MIG/MAG
-    /// genannt hat, hat NICHT „Schweißen" genannt — und eine Suche nach
-    /// „Schweißen" findet ihn nicht. Wer beides nennen will, nennt beides.
-    /// </remarks>
     [Fact]
     public void Aus_MIG_MAG_folgt_kein_Schweissen() =>
         Wortschatz.KanonischAlle(["MIG/MAG"]).Should().Equal("MIG/MAG");
 
     /// <summary>
-    /// Ein Staplerschein ist ein Papier, kein Gabelstapler — und umgekehrt.
+    /// Ein Staplerschein ist ein Papier, kein Gabelstapler. Der Wortschatz
+    /// führt beide Wörter und verbindet sie nicht.
     /// </summary>
-    /// <remarks>
-    /// Die zweite Hälfte derselben Grenze: der Wortschatz führt beide Wörter,
-    /// und er verbindet sie nicht. Wer den Schein hat, hat damit nicht gesagt,
-    /// dass er fährt, und wer fährt, hat nicht gesagt, dass er den Schein hat.
-    /// Das zu verbinden wäre bequem und wäre eine Aussage über einen Menschen.
-    /// </remarks>
     [Fact]
     public void Ein_Schein_ist_keine_Maschine() =>
         Wortschatz.KanonischAlle(["Staplerschein", "Gabelstapler"])
@@ -75,10 +63,6 @@ public class WortschatzTests
     public void Handwerksbegriffe_bekommen_dasselbe_Wort(string getippt, string erwartet) =>
         Wortschatz.Kanonisch(getippt).Should().Be(erwartet);
 
-    /// <summary>
-    /// Ein Beruf außerhalb der IT bleibt stehen, wenn der Wortschatz ihn nicht
-    /// kennt — er wird nicht abgelehnt und nicht ersetzt.
-    /// </summary>
     [Fact]
     public void Unbekanntes_bleibt_stehen_wie_getippt() =>
         Wortschatz.Kanonisch("Hufbeschlag").Should().Be("Hufbeschlag");
@@ -123,14 +107,9 @@ public class WortschatzTests
     }
 
     /// <summary>
-    /// Kein Name ist zugleich Schreibweise eines anderen.
+    /// Kein Name ist zugleich Schreibweise eines anderen (ADR-0023) — sonst
+    /// hinge das Ergebnis an der Reihenfolge des Nachschlagens.
     /// </summary>
-    /// <remarks>
-    /// Die zweite Hälfte der Widerspruchsfreiheit aus ADR-0023 — bis dahin
-    /// stand sie nur im Text. Sonst hinge das Ergebnis an der Reihenfolge des
-    /// Nachschlagens: unsichtbar, und je nach Laufreihenfolge anders. Mit dem
-    /// Handwerk wächst die Tabelle, und mit ihr die Gelegenheit.
-    /// </remarks>
     [Fact]
     public void Kein_Name_ist_die_Schreibweise_eines_anderen()
     {

@@ -2,9 +2,12 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Identity.Infrastructure.Persistence;
+using WorkerTransfer.Identity.Infrastructure.Post;
 
 namespace WorkerTransfer.Identity.Tests;
 
@@ -47,6 +50,14 @@ public class DrahtnamenTests(Postgres postgres) : IAsyncLifetime
 
     private WebApplicationFactory<Program> _dienst = null!;
 
+    /// <summary>Der Versand geht in eine Liste, nicht in ein echtes Postfach.</summary>
+    /// <remarks>
+    /// Ohne Ersatz läuft der echte <c>SmtpVersender</c> gegen die Vorgabe
+    /// <c>localhost:1025</c> — also gegen das Mailpit des Entwicklers. Eine
+    /// Testreihe darf nichts in eine Umgebung schreiben, die ein Mensch ansieht.
+    /// </remarks>
+    private readonly Postmitschrift _post = new();
+
     public async Task InitializeAsync()
     {
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
@@ -57,6 +68,8 @@ public class DrahtnamenTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
             host.UseSetting("environment", "Development");
+            host.ConfigureTestServices(dienste =>
+                dienste.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
         });
 
         using var bereich = _dienst.Services.CreateScope();

@@ -10,14 +10,11 @@ import {
 } from "./formpruefung";
 
 /**
- * Der Anlass ist gemessen: am 10.09.2026 kam die Adresse `bus` durch das
- * Formular, weil `noValidate` die Browserprüfung abschaltet und keine eigene
- * danebenstand. Der Server legte ein Konto an, die Mail scheiterte im
- * Hintergrund, und zurück blieb ein Konto auf `pending`, das niemand je
- * bestätigen kann.
+ * Das Formular trägt `noValidate`, also blockt `type="email"` nichts. Ohne
+ * eigene Prüfung kommen Zeichenketten ohne `@` durch.
  */
 describe("die Formprüfung des Anmeldeformulars", () => {
-  it("erkennt den Fall, der wirklich passiert ist", () => {
+  it("weist eine Zeichenkette ohne @ ab", () => {
     expect(siehtNachAdresseAus("bus")).toBe(false);
     expect(emailFehler("bus")).toBe("registrierung.emailUngueltig");
   });
@@ -41,23 +38,18 @@ describe("die Formprüfung des Anmeldeformulars", () => {
     "a@b.de",
     "jörg@example.org",
   ])("lässt %s durch", (adresse) => {
-    // Grosszügig ist Absicht: diese Prüfung darf niemanden aussperren, dessen
-    // Adresse ungewöhnlich aussieht und trotzdem gilt. Die Absage spricht der
-    // Server.
+    // Grosszügig: die Absage spricht der Server.
     expect(siehtNachAdresseAus(adresse)).toBe(true);
   });
 
   it("zeigt bei einem leeren Feld noch keinen Fehler", () => {
-    // Wer gerade erst anfängt zu tippen, bekäme sonst Rot, bevor er etwas
-    // falsch gemacht hat.
     expect(emailFehler("")).toBeNull();
     expect(emailFehler("   ")).toBeNull();
     expect(passwortFehler("")).toBeNull();
   });
 
   it("misst das Passwort in Bytes, weil bcrypt Bytes zählt", () => {
-    // „ä" ist zwei Bytes. Wer ein langes Passwort mit Umlauten wählt, liefe
-    // sonst in eine Absage, die er sich nicht erklären kann.
+    // „ä" ist zwei Bytes.
     expect(passwortBytes("ä")).toBe(2);
 
     const knapp = "ä".repeat(PASSWORT_HOECHSTBYTES / 2);
