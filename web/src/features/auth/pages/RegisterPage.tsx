@@ -27,6 +27,11 @@ import {
   registriere,
   sendeBestaetigungErneut,
 } from "../api/registrierung";
+import {
+  PASSWORT_MINDESTLAENGE,
+  emailFehler,
+  passwortFehler,
+} from "../lib/formpruefung";
 
 type Art = "person" | "company";
 
@@ -60,10 +65,13 @@ export function RegisterPage() {
   const [vorname, setVorname] = useState("");
   const [nachname, setNachname] = useState("");
 
-  // Kein Pflichtfeld, und die Vorauswahl ist leer (ADR-0039). Wer nichts
-  // wählt, bekommt die heutige, neutrale Ansicht — es wird niemandem etwas
-  // weggenommen, der sich hier nicht festlegen will.
+  // Kein Pflichtfeld, Vorauswahl leer (ADR-0039).
   const [berufsfeld, setBerufsfeld] = useState<BerufsfeldWahl>(null);
+
+  // Geurteilt wird erst, wenn ein Feld verlassen wurde: während des Tippens
+  // ist jede Adresse unfertig.
+  const [emailBeruehrt, setEmailBeruehrt] = useState(false);
+  const [passwortBeruehrt, setPasswortBeruehrt] = useState(false);
 
   const [fehler, setFehler] = useState<string | null>(null);
   const [running, setLaeuft] = useState(false);
@@ -79,6 +87,12 @@ export function RegisterPage() {
       art === "company" && email.includes("@") && isPublicEmailDomain(email),
     [art, email],
   );
+
+  // Sichtbar vor dem Abschicken; die Absage spricht weiterhin der Server (422).
+  const emailProblem = emailBeruehrt ? emailFehler(email) : null;
+  const passwortProblem = passwortBeruehrt ? passwortFehler(passwort) : null;
+  const unvollstaendig =
+    email.trim() === "" || passwort === "" || anzeigename.trim() === "";
 
   if (status === "authenticated") return <Navigate to="/overview" replace />;
 
@@ -172,13 +186,17 @@ export function RegisterPage() {
           label={t("registrierung.email")}
           type="email"
           autoComplete="username"
+          error={emailProblem !== null}
           helperText={
-            art === "company"
-              ? t("registrierung.emailHinweisFirma")
-              : t("registrierung.emailHinweisPerson")
+            emailProblem !== null
+              ? t(emailProblem)
+              : art === "company"
+                ? t("registrierung.emailHinweisFirma")
+                : t("registrierung.emailHinweisPerson")
           }
           value={email}
           onChange={(event) => setEmail(event.target.value)}
+          onBlur={() => setEmailBeruehrt(true)}
           required
         />
 
@@ -207,9 +225,15 @@ export function RegisterPage() {
           label={t("registrierung.passwort")}
           type="password"
           autoComplete="new-password"
-          helperText={t("registrierung.passwortHinweis")}
+          error={passwortProblem !== null}
+          helperText={
+            passwortProblem !== null
+              ? t(passwortProblem, { mindestens: PASSWORT_MINDESTLAENGE })
+              : t("registrierung.passwortHinweis")
+          }
           value={passwort}
           onChange={(event) => setPasswort(event.target.value)}
+          onBlur={() => setPasswortBeruehrt(true)}
           required
         />
         <TextField
@@ -238,8 +262,6 @@ export function RegisterPage() {
           {t("zivil.klarnameHinweis")}
         </Typography>
 
-        {/* Am Ende und nicht oben: die Angabe ist freiwillig, und was freiwillig
-            ist, gehört nicht vor die Felder, ohne die es nicht weitergeht. */}
         <BerufsfeldSelect wert={berufsfeld} onChange={setBerufsfeld} />
 
         {fehler !== null ? <Alert severity="error">{fehler}</Alert> : null}
@@ -248,7 +270,14 @@ export function RegisterPage() {
           type="submit"
           variant="contained"
           size="large"
-          disabled={running || freemail}
+          // Der Knopf urteilt immer; rot gefärbt wird erst nach dem Verlassen.
+          disabled={
+            running
+            || freemail
+            || unvollstaendig
+            || emailFehler(email) !== null
+            || passwortFehler(passwort) !== null
+          }
         >
           {running ? t("registrierung.laeuft") : t("registrierung.knopf")}
         </Button>

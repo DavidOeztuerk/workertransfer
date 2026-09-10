@@ -3,13 +3,8 @@ import { API_BASE_URL } from "../../../env";
 import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
 
 /**
- * Das Berufsfeld des eigenen Kontos setzen — oder die Angabe zurücknehmen.
- *
- * `null` heisst ENTFERNEN, nicht „unverändert". Ohne diesen Weg wäre eine
- * einmal getroffene Wahl endgültig (ADR-0039).
- *
- * Es gibt keine Kennung im Rumpf, und das ist der eigentliche Schutz: der
- * Server schreibt immer nur in das Konto, das gerade angemeldet ist.
+ * Das Berufsfeld des eigenen Kontos setzen. `null` heisst entfernen. Keine
+ * Kennung im Rumpf — der Server schreibt nur in das angemeldete Konto.
  */
 export async function speichereBerufsfeld(
   feld: BerufsfeldWahl,

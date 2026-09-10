@@ -149,7 +149,6 @@ public class Landschaft : IAsyncLifetime
         gateway.UseGesundheit();
         gateway.UseMiddleware<CorrelationIdMiddleware>();
         gateway.UseMiddleware<DistributedRateLimitingMiddleware>();
-        gateway.UseNavigation();
         gateway.UseOcelot().GetAwaiter().GetResult();
 
         return gateway;

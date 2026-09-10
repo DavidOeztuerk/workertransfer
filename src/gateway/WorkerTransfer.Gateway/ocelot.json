@@ -25,55 +25,6 @@
 // entfernt, weil sie seltsam aussieht.
 {
   "Routes": [
-    // --- 200: der Browser NAVIGIERT, er ruft keine API auf ------------------
-    //
-    // `/jobs` heisst zwei verschiedene Dinge: die API-Ressource UND die Seite
-    // der Oberflaeche. Dasselbe gilt fuer `/applications`, `/transfers` und
-    // `/github`. Nach Pfad allein ist das nicht zu unterscheiden.
-    //
-    // Auffaellig wird es erst hinter EINEM Ursprung. Ein Klick IM Programm
-    // funktioniert, weil der Router im Browser umschaltet und gar keine
-    // Anfrage stellt - die Haelfte, die durchfaellt, ist der Direktlink und
-    // das Neuladen. Also genau das, was man teilt und was nach einem Absturz
-    // passiert.
-    //
-    // `Sec-Fetch-Dest: document` schickt der Browser AUSSCHLIESSLICH bei einer
-    // Navigation der obersten Ebene; `fetch`/XHR schicken `empty`, und curl,
-    // CLI und Dienst-zu-Dienst schicken den Kopf gar nicht. Die Regel trennt
-    // "ein Mensch geht auf eine Seite" von "ein Programm holt Daten" - und
-    // nicht zwei Pfadlisten, die auseinanderlaufen koennten.
-    //
-    // Geprueft, bevor diese Regel entstand: kein Dienst antwortet je mit einer
-    // Weiterleitung, es gibt keinen OAuth-Ruecksprung, und der Datenexport
-    // laedt ueber einen Blob statt ueber eine Navigation. Es gibt also keine
-    // Adresse, zu der ein Browser navigieren MUSS und die kein Teil der
-    // Oberflaeche ist. Entsteht eine, gehoert sie hier ausgenommen.
-    //
-    // DIE PRUEFUNG SELBST STEHT IN `Navigation.cs`, NICHT HIER. Gemessen an
-    // Ocelot 25: eine woertliche Route gewinnt immer gegen einen Platzhalter,
-    // `Priority` hin oder her - eine Auffangregel `/{alles}` mit
-    // Kopfbedingung wird von `/jobs` also nie erreicht. Die Regel je
-    // kollidierendem Pfad zu wiederholen waere moeglich und waere genau das,
-    // was sie vermeiden soll: zwei Pfadlisten, die auseinanderlaufen. Also
-    // setzt eine Zwischenschicht EIN Praefix, und hier steht EINE Zeile dafuer.
-    // Der `DownstreamPathTemplate` streift es wieder ab; die Oberflaeche sieht
-    // den Pfad, den der Mensch getippt hat.
-    //
-    // Der letzte Platzhalter ist gierig - `/__ui/{alles}` trifft auch
-    // `/careers/muster` und `/assets/x/y.js`. Ebenfalls gemessen.
-    {
-      "UpstreamPathTemplate": "/__ui/{alles}",
-      "DownstreamPathTemplate": "/{alles}",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [
-        {
-          "Host": "web",
-          "Port": 5173
-        }
-      ],
-      "Priority": 200
-    },
-
     // --- 100/90: die Ausnahmen ----------------------------------------------
     //
     // Die Pfade der Dienste sind NICHT disjunkt: `/companies/{id}/members`

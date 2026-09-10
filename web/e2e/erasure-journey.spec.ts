@@ -173,7 +173,7 @@ test("eine Löschung wird verlangt, läuft durch — und der Nachweis bleibt", a
   await expect(done).toContainText(/läuft/i);
 
   // Sofort abgemeldet: ab hier passiert nichts mehr unter diesem Namen.
-  await expect(page.getByRole("link", { name: /Anmelden/i }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /Einstellungen und Anmeldung/i })).toBeVisible();
 
   // ---- Die Kaskade läuft ----------------------------------------------------
 

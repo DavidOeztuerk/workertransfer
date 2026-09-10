@@ -63,6 +63,10 @@ describe("die Kataloge", () => {
       "en:firmentransfers.start",
       "en:firmentransfers.titel",
       "en:mannschaft.rolleAdmin",
+      // „System" ist im Englischen dasselbe Wort. Franzoesisch steht nicht
+      // daneben — dort heisst es „Systeme", und eine Ausnahme je Schluessel
+      // liesse genau diese Zeile stillschweigend mit durch.
+      "en:darstellung.system",
       "en:kopf.github",
       "en:kopf.team",
       "en:kopf.navigation",

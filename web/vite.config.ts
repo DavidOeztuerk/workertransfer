@@ -4,17 +4,6 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [react()],
-  server: {
-    // Der Entwicklungsserver wird durch das Gateway erreicht, und Ocelot
-    // schickt den Host des ZIELS mit — also `web`, den Compose-Namen. Vite
-    // weist seit 6.x jeden fremden Host ab (Schutz vor DNS-Rebinding), und die
-    // Antwort war `Blocked request. This host ("web") is not allowed.`
-    //
-    // Nur dieser eine Name, nicht `true`: die Abwehr bleibt für alles andere
-    // stehen. In Produktion stellt nginx die gebauten Dateien zu und die Frage
-    // stellt sich nicht.
-    allowedHosts: ["web"],
-  },
   test: {
     environment: "jsdom",
     globals: true,

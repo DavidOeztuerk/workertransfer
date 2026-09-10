@@ -49,17 +49,10 @@ public sealed class UserRow
 
     /// <summary>Die <c>berufsfeld</c>-Spalte: ein Etikett, oder <c>null</c>.</summary>
     /// <remarks>
-    /// Nullbar, und das ist die Zusage aus ADR-0039: wer nichts wählt, bekommt
-    /// die heutige Ansicht. Jede bestehende Zeile trägt nach der Wanderung
-    /// <c>null</c> und sieht, was sie vorher sah — es gibt kein
-    /// Datenwanderungs-Skript, weil jede Vermutung eine abgeleitete Eigenschaft
-    /// über einen Menschen wäre.
-    /// <para>
-    /// Eine Zeichenkette und nicht die Aufzählung, aus demselben Grund wie bei
-    /// <see cref="Language"/>: ein zwölftes Feld ist dann eine Ergänzung der
-    /// Liste und keine Wanderung des Spaltentyps. Die Domäne verengt es auf dem
-    /// Weg herein.
-    /// </para>
+    /// Nullbar ohne Vorgabe (ADR-0039): bestehende Zeilen behalten die neutrale
+    /// Ansicht. Eine Zeichenkette und nicht die Aufzählung, wie bei
+    /// <see cref="Language"/> — ein zwölftes Feld ist dann keine Wanderung des
+    /// Spaltentyps.
     /// </remarks>
     public string? Berufsfeld { get; set; }
 

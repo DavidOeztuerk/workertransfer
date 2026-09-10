@@ -48,12 +48,9 @@ var app = builder.Build();
 //   Korrelation vor der Bremse, damit auch ein 429 seine Kennung trägt: wer
 //               sich beschwert, ausgesperrt worden zu sein, soll eine nennen
 //               können.
-//   Bremse      vor Navigation, weil Navigation den Pfad auf `/__ui/...`
-//               umschreibt. Danach träfe keine Regel mehr zu.
 app.UseGesundheit();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<DistributedRateLimitingMiddleware>();
-app.UseNavigation();
 
 await app.UseOcelot();
 

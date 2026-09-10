@@ -139,13 +139,6 @@ public sealed class RoutenkarteTests
 
         foreach (var route in Routen())
         {
-            // Die Oberflaeche ist kein Dienst mit Antworten, sondern die Seite
-            // selbst — sie wird von den Navigationstests geprueft.
-            if (route.StartsWith("/__ui", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
             eintraege.Should().Contain(
                 e => Passt(route, e.Pfad),
                 $"die Route '{route}' steht in ocelot.json, aber in keiner Zeile "
