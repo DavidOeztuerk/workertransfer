@@ -303,7 +303,8 @@ export async function registerAndConfirm(
   page: Page,
   email: string,
   displayName: string,
-  companyName?: string
+  companyName?: string,
+  berufsfeld?: string
 ): Promise<void> {
   await page.goto("/register");
   // Ein Unternehmen entsteht seit E2.6 NUR hier: die Wahl fällt bei der
@@ -324,6 +325,13 @@ export async function registerAndConfirm(
   // lautlos — kein POST, keine Meldung, und der Test hängt an der Mail, die nie
   // kommt. Genau so ist die erste Reise beim ersten Lauf gescheitert.
   await page.getByLabel(/Anzeigename/i).fill(displayName);
+  // Freiwillig (ADR-0039) — deshalb nur, wenn eine Reise es ausdrücklich
+  // verlangt. Die Vorauswahl ist „Keine Angabe", und wer sie stehen lässt,
+  // bekommt die neutrale Ansicht.
+  if (berufsfeld !== undefined) {
+    await page.getByRole("combobox", { name: "Berufsfeld" }).click();
+    await page.getByRole("option", { name: berufsfeld, exact: true }).click();
+  }
   await page.getByRole("button", { name: /Registrieren/i }).click();
   // Die Antwort ist absichtlich dieselbe für bekannte und unbekannte Adressen —
   // deshalb wird hier nicht auf eine Erfolgsmeldung gewartet, sondern auf die

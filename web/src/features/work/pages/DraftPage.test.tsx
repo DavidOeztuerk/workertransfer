@@ -67,6 +67,7 @@ function zeichne() {
           displayName: "Anna Beispiel",
           givenName: "",
           familyName: "",
+          berufsfeld: null,
         },
         memberships: [],
         error: null,

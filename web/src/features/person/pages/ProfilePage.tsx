@@ -39,6 +39,9 @@ import { ladeMeines } from "../api/portfolio";
 import { useAsync } from "../lib/useAsync";
 import { usePerson } from "../lib/session";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
+import { Nachweise } from "../components/Nachweise";
+import { zeigtGitHub } from "../../../shared/lib/berufsfelder";
+import { useAppSelector } from "../../../core/store/hooks";
 import { DraftHelp } from "../components/DraftHelp";
 import { Zivilidentitaet } from "../components/Zivilidentitaet";
 
@@ -120,10 +123,26 @@ export function ProfilePage() {
    * ausgegrauter Kasten für jemanden ohne GitHub wäre die stillschweigende
    * Behauptung, dort fehle etwas (ADR-0022 §3).
    */
+  /*
+   * Das Berufsfeld entscheidet, WAS angeboten wird — nie, was erlaubt ist
+   * (ADR-0039). `null` heisst „nicht angegeben" und bekommt die heutige
+   * Ansicht: es wird niemandem etwas weggenommen, der nicht gewählt hat.
+   */
+  const berufsfeld = useAppSelector(
+    (state) => state.auth.session?.berufsfeld ?? null,
+  );
+  const github = zeigtGitHub(berufsfeld);
+
+  /*
+   * Für ein Konto, dem GitHub nicht angeboten wird, wird auch nicht danach
+   * GEFRAGT. Ein Abruf, dessen Ergebnis nirgends erscheint, wäre nicht nur
+   * überflüssig — er wäre die Plattform, die weiterhin bei jedem nach einem
+   * Repositorium sieht.
+   */
   const belege = useAsync(
     (signal) => ladeMeine(signal),
-    [subjectId],
-    subjectId !== null,
+    [subjectId, github],
+    subjectId !== null && github,
   );
 
   /*
@@ -365,15 +384,20 @@ export function ProfilePage() {
             */}
             {vorschlaege.length > 0 ? (
               <Box>
+                {/* Der Titel nennt die Quelle, die es hier wirklich gibt.
+                    „Aus deinen GitHub-Projekten" stand über Wörtern aus
+                    Lebenslauf und Arbeiten, sobald jemand kein GitHub hatte —
+                    eine Überschrift, die auf ein Konto zeigt, das es nicht
+                    gibt. */}
                 <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                  {t("profil.vorschlaegeTitel")}
+                  {t(github ? "profil.vorschlaegeTitel" : "profil.vorschlaegeTitelEigen")}
                 </Typography>
                 <Typography
                   variant="caption"
                   color="text.secondary"
                   sx={{ display: "block", mb: 1 }}
                 >
-                  {t("profil.vorschlaegeHinweis")}
+                  {t(github ? "profil.vorschlaegeHinweis" : "profil.vorschlaegeHinweisEigen")}
                 </Typography>
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
                   {vorschlaege.map((wort) => (
@@ -425,6 +449,7 @@ export function ProfilePage() {
         </CardContent>
       </Card>
 
+      <Nachweise feld={berufsfeld} />
       <Zivilidentitaet />
     </PageShell>
   );

@@ -24,6 +24,7 @@ import ListItemText from "@mui/material/ListItemText";
 import Tooltip from "@mui/material/Tooltip";
 import { SettingsMenu } from "./SettingsMenu";
 import { ProfilAvatar } from "../ui";
+import { zeigtGitHub } from "../../lib/berufsfelder";
 
 /**
  * Die Kopfzeile.
@@ -237,6 +238,23 @@ function AccountMenu() {
   const [anker, setAnker] = useState<null | HTMLElement>(null);
   const name = useAppSelector((state) => state.auth.session?.displayName ?? "");
 
+  /*
+   * Das Menü folgt dem Berufsfeld (ADR-0039).
+   *
+   * Bis hierher stand `/github` bedingungslos in jedem Kontomenü — ein
+   * Metallbauer bekam ihn angeboten wie ein Backend-Entwickler, und die
+   * Plattform war damit faktisch eine für Softwareentwickler, ohne dass das
+   * je entschieden worden wäre.
+   *
+   * ES VERBIRGT, ES SCHÜTZT NICHT. Die Route bleibt erreichbar; wer sie tippt,
+   * bekommt dieselbe Seite wie vorher. Und ohne Berufsfeld bleibt der Eintrag
+   * stehen: wer nichts gewählt hat, verliert nichts.
+   */
+  const berufsfeld = useAppSelector(
+    (state) => state.auth.session?.berufsfeld ?? null,
+  );
+  const github = zeigtGitHub(berufsfeld);
+
   return (
     <>
       {/* DAS BILD DER PERSON, nicht ein Knopf mit dem Wort „Mein Konto".
@@ -266,7 +284,7 @@ function AccountMenu() {
         <Eintrag to="/profile">{t("kopf.profil")}</Eintrag>
         <Eintrag to="/resume">{t("kopf.lebenslauf")}</Eintrag>
         <Eintrag to="/portfolio">{t("kopf.arbeiten")}</Eintrag>
-        <Eintrag to="/github">{t("kopf.github")}</Eintrag>
+        {github ? <Eintrag to="/github">{t("kopf.github")}</Eintrag> : null}
         <Eintrag to="/applications">{t("kopf.bewerbungen")}</Eintrag>
         <Eintrag to="/applications/drafts">{t("kopf.entwuerfe")}</Eintrag>
         <Divider />

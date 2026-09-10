@@ -47,6 +47,22 @@ public sealed class UserRow
     /// </remarks>
     public string Language { get; set; } = "de";
 
+    /// <summary>Die <c>berufsfeld</c>-Spalte: ein Etikett, oder <c>null</c>.</summary>
+    /// <remarks>
+    /// Nullbar, und das ist die Zusage aus ADR-0039: wer nichts wählt, bekommt
+    /// die heutige Ansicht. Jede bestehende Zeile trägt nach der Wanderung
+    /// <c>null</c> und sieht, was sie vorher sah — es gibt kein
+    /// Datenwanderungs-Skript, weil jede Vermutung eine abgeleitete Eigenschaft
+    /// über einen Menschen wäre.
+    /// <para>
+    /// Eine Zeichenkette und nicht die Aufzählung, aus demselben Grund wie bei
+    /// <see cref="Language"/>: ein zwölftes Feld ist dann eine Ergänzung der
+    /// Liste und keine Wanderung des Spaltentyps. Die Domäne verengt es auf dem
+    /// Weg herein.
+    /// </para>
+    /// </remarks>
+    public string? Berufsfeld { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
@@ -175,6 +191,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(row => row.Roles).HasColumnName("roles").HasColumnType("jsonb");
             entity.Property(row => row.PendingCompanyName).HasColumnName("pending_company_name");
             entity.Property(row => row.Language).HasColumnName("language");
+            entity.Property(row => row.Berufsfeld).HasColumnName("berufsfeld");
             entity.Property(row => row.CreatedAt).HasColumnName("created_at");
             entity.Property(row => row.UpdatedAt).HasColumnName("updated_at");
             entity.Property(row => row.Version).HasColumnName("version").IsConcurrencyToken();

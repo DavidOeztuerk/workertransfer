@@ -54,6 +54,7 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
             Roles = JsonSerializer.Serialize(user.Roles),
             PendingCompanyName = user.PendingCompanyName,
             Language = Sprachwahl.Etikett(user.Kontosprache),
+            Berufsfeld = Berufsfeldwahl.Etikett(user.Berufsfeld),
             CreatedAt = jetzt,
             UpdatedAt = jetzt,
             Version = 1
@@ -89,6 +90,7 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
         row.Status = user.Status;
         row.PendingCompanyName = user.PendingCompanyName;
         row.Language = Sprachwahl.Etikett(user.Kontosprache);
+        row.Berufsfeld = Berufsfeldwahl.Etikett(user.Berufsfeld);
         row.GivenName = user.GivenName;
         row.FamilyName = user.FamilyName;
         row.UpdatedAt = uhr.GetUtcNow().UtcDateTime;
@@ -105,5 +107,6 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
         row.PendingCompanyName,
         Sprachwahl.Aus(row.Language),
         row.GivenName,
-        row.FamilyName);
+        row.FamilyName,
+        Berufsfeldwahl.Aus(row.Berufsfeld));
 }

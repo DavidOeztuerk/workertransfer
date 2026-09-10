@@ -1,4 +1,7 @@
 import { createSlice } from "@reduxjs/toolkit";
+import type { PayloadAction } from "@reduxjs/toolkit";
+
+import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
 
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import type { Membership, Session, SessionStatus } from "../types/session";
@@ -40,6 +43,20 @@ const authSlice = createSlice({
      * Löschseite sagte „Du bist abgemeldet", während der Kopf weiter das
      * Konto-Menü zeigte.
      */
+    /**
+     * Das Berufsfeld hat sich geändert — der Kopf zieht sofort nach.
+     *
+     * Ohne diesen Griff bliebe die Navigation bis zum nächsten Laden auf dem
+     * alten Stand: wer in den Einstellungen „Handwerk" wählt, sähe GitHub
+     * weiter im Menü und hielte die Wahl für wirkungslos. Der Server ist
+     * bereits die Wahrheit — dies holt sie nur ohne zweite Runde ab.
+     */
+    berufsfeldGesetzt(state, action: PayloadAction<BerufsfeldWahl>) {
+      if (state.session !== null) {
+        state.session = { ...state.session, berufsfeld: action.payload };
+      }
+    },
+
     sitzungBeendet(state) {
       state.session = null;
       state.memberships = [];
@@ -94,5 +111,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { errorCleared, sitzungBeendet } = authSlice.actions;
+export const { berufsfeldGesetzt, errorCleared, sitzungBeendet } = authSlice.actions;
 export default authSlice.reducer;
