@@ -72,14 +72,11 @@ dotnet test tests/WorkerTransfer.Identity.Tests/WorkerTransfer.Identity.Tests.cs
 dotnet test tests/WorkerTransfer.Consent.Tests/... --no-build --filter "FullyQualifiedName~Widerruf"
 ```
 
-Restoring needs a NuGet login — Girder is in GitHub Packages:
+**Restoring needs no login any more.** Girder went to nuget.org on 10.09.2026 (MIT, source at [DavidOeztuerk/girder](https://github.com/DavidOeztuerk/girder)), so `dotnet restore`, `docker compose up` and CI all work in a fresh clone with no token. Measured against an empty package cache: every Girder assembly came back with `"source": "https://api.nuget.org/v3/index.json"`.
 
-```bash
-dotnet nuget add source https://nuget.pkg.github.com/DavidOeztuerk/index.json \
-  --name GitHub --username <you> --password <token> --store-password-in-clear-text
-```
+Before that it lived in GitHub Packages, and that cost a whole evening of CI — the notes are in the CI section, and the distinction worth keeping is **403 means authenticated and refused, 401 means never authenticated at all.**
 
-`NuGet.Config` also pins package source mapping: only `Girder.*` may come from GitHub, everything else from nuget.org. Without that, a public package of the same name could answer first.
+`NuGet.Config` still pins package source mapping, and the reason has only shifted. It used to keep a foreign `Girder.*` on nuget.org away from us; now it pins that exactly **one** source may answer those names. Without it, any additionally configured source — a company mirror, a local folder — is asked for every name, and whoever answers first wins. `<clear />` stays for the same reason: it discards the sources a developer machine carries in its user-level config.
 
 ### Configuration comes from the environment
 

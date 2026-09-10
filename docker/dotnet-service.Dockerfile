@@ -27,7 +27,11 @@ COPY tests ./tests
 #
 # --locked gibt es fuer NuGet nicht wie fuer uv; `restore` liest die zentralen
 # Fassungen aus Directory.Packages.props, und die stehen im Baum.
-RUN --mount=type=secret,id=nuget_config,target=/root/.nuget/NuGet/NuGet.Config \
+# OHNE GEHEIMNIS, seit Girder auf nuget.org liegt (10.09.2026). Hier stand ein
+# `--mount=type=secret,id=nuget_config` — als Geheimnis und nicht als COPY,
+# damit die Anmeldung nie eine Bildschicht wird. Der Grund ist weg: es gibt
+# nichts mehr anzumelden.
+RUN \
     dotnet restore WorkerTransfer.slnx
 
 # Jeder Einstiegspunkt in sein eigenes Verzeichnis. Der Schluessel ist der

@@ -42,8 +42,6 @@ x-dienst: &dienst
   build:
     context: .
     dockerfile: docker/dotnet-service.Dockerfile
-    secrets:
-      - nuget_config
   # EIN Bild fuer alle elf. Wer der Behaelter ist, sagt SERVICE_DIR aus der
   # Umgebung — nicht ein Bauargument (ADR-0028).
   image: workertransfer-dotnet:local
@@ -422,12 +420,6 @@ services:
       - /app/node_modules
     ports:
       - "5173:5173"
-
-secrets:
-  nuget_config:
-    # Die Anmeldung an GitHub Packages. Als BuildKit-Geheimnis, damit sie nie
-    # eine Schicht wird: ein Zugriff in einem Bild bleibt in jeder Sicherung.
-    file: ${HOME}/.nuget/NuGet/NuGet.Config
 
 volumes:
   postgres-data:
