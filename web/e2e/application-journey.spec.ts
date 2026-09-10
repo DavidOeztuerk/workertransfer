@@ -8,6 +8,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  GATEWAY_URL,
   login,
   registerAndConfirm,
   skipWithoutStack,
@@ -85,7 +86,7 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   // Schnittstelle geholt und die Adresse direkt angesteuert — dieselbe
   // Aussage, ohne einen Knopf zu prüfen, den es so nicht mehr gibt.
   const gefunden = await candidate.request.get(
-    `/jobs?q=${encodeURIComponent(jobTitle)}`);
+    `${GATEWAY_URL}/jobs?q=${encodeURIComponent(jobTitle)}`);
   const jobId = (await gefunden.json()).items[0].id as string;
 
   // `/jobs/{id}/apply` IST HEUTE EINE WEICHE, kein Formular mehr: für eine

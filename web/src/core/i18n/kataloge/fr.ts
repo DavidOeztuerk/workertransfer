@@ -35,6 +35,7 @@ const fr: Katalog = {
   },
 
   kopf: {
+    besucherMenue: "Réglages et connexion",
     registrieren: "S'inscrire",
     anmelden: "Se connecter",
     unternehmen: "Entreprise",

@@ -171,17 +171,8 @@ export function SettingsPage() {
 }
 
 /**
- * Darstellung und Sprache — die ausführliche Fassung.
- *
- * <strong>Im Kontomenü steht die knappe („Darstellung ▸ Dunkel"), hier die
- * ganze.</strong> Ein Menü ist eine Liste von Wegen; ein Abschnitt mit
- * Überschrift, erklärendem Satz und Auswahlfeld ist eine Seite. Beides in
- * dasselbe Menü zu legen stapelte zwei Bedienarten übereinander — Einträge, die
- * einen wegbringen, und Felder, die einen dabehalten — und liess die Vorlieben
- * ausgerechnet unter „Abmelden" landen.
- *
- * Beide Fassungen lesen dieselbe Quelle (`useVorlieben`), damit die eine nicht
- * beim nächsten Eintrag eine Möglichkeit kennt, die die andere nicht hat.
+ * Darstellung und Sprache, ausführlich. Das Kontomenü trägt die knappe Fassung;
+ * beide lesen `useVorlieben`.
  */
 function Darstellungsblock() {
   const { t } = useTranslation();
@@ -409,13 +400,8 @@ function Nachweisblock() {
           <Button component={RouterLink} to="/my-data" variant="outlined">
             {t("einstellungen.nachweiseDaten")}
           </Button>
-          {/* DIE LÖSCHUNG GEHÖRT IN DIE EINSTELLUNGEN, und das ist keine
-              Geschmacksfrage: es ist die Stelle, an der Menschen ihr Konto
-              verwalten und an der sie danach suchen. Sie stand einmal nur im
-              Kontomenü zwischen „Profil" und „Abmelden" — im Menü, das man
-              täglich öffnet, neben dem Weg, den man täglich geht.
-              Umrandet in der Warnfarbe: auffindbar, ohne die naheliegende
-              Handlung zu sein. */}
+          {/* Die Löschung gehört dorthin, wo Menschen ihr Konto verwalten.
+              Umrandet: auffindbar, ohne die naheliegende Handlung zu sein. */}
           <Button
             component={RouterLink}
             to="/delete-account"

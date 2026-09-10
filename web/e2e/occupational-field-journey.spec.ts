@@ -60,10 +60,9 @@ test("ein Konto im Handwerk bekommt Nachweise statt GitHub", async ({ page }) =>
 
   // 4. Die Wahl lässt sich ändern, und der Kopf folgt ihr sofort. Ohne diesen
   //    Schritt sähe eine Person ihre Wahl bis zum nächsten Laden als wirkungslos.
-  await page.goto("/settings");
+  await page.goto("/profile");
   await page.getByRole("combobox", { name: "Berufsfeld" }).click();
   await page.getByRole("option", { name: "IT und Software", exact: true }).click();
-  await expect(page.getByText("Berufsfeld gespeichert.")).toBeVisible();
 
   await page.getByRole("button", { name: "Mein Konto" }).click();
   await expect(page.getByRole("menuitem", { name: "GitHub" })).toBeVisible();

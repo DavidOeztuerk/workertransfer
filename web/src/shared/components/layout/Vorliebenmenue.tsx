@@ -13,15 +13,7 @@ import type { ColorPreference, Sprachvorliebe } from "../../../core/store/prefer
 /** Welche Ebene des Kontomenüs offen ist. */
 export type Menueebene = "haupt" | "darstellung" | "sprache";
 
-/**
- * Eine Vorliebe als EINE Zeile im Menü: „Darstellung ▸ Dunkel".
- *
- * <strong>Kein Auswahlfeld im Menü.</strong> Ein Menü ist eine Liste von
- * Einträgen, die man anklickt; ein Auswahlfeld darin öffnet ein zweites Overlay
- * über dem ersten und stapelt damit zwei Bedienarten übereinander. Diese Zeile
- * verhält sich wie jede andere — und zeigt nebenbei, was gerade gilt, ohne dass
- * man sie öffnen muss.
- */
+/** Eine Vorliebe als eine Menüzeile: „Darstellung ▸ Dunkel". */
 export function Vorliebenzeile<T extends string>({
   vorliebe,
   onOeffnen,
@@ -33,8 +25,6 @@ export function Vorliebenzeile<T extends string>({
     <MenuItem onClick={onOeffnen}>
       <ListItemIcon>{vorliebe.symbol}</ListItemIcon>
       <Box sx={{ flexGrow: 1 }}>{vorliebe.ueberschrift}</Box>
-      {/* Was gilt, steht rechts — grau, damit es die Zeile nicht mit dem
-          Eintragsnamen um die Aufmerksamkeit bringt. */}
       <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
         {vorliebe.name}
       </Typography>
@@ -44,19 +34,19 @@ export function Vorliebenzeile<T extends string>({
 }
 
 /**
- * Die aufgeklappte Vorliebe — dieselbe Fläche, ein Schritt tiefer.
- *
- * <strong>Hineingehen statt aufklappen.</strong> Ein zweites Menü neben dem
- * ersten muss positioniert werden, läuft an schmalen Fenstern über den Rand und
- * bringt die Tastatursteuerung durcheinander. Hier tauscht dieselbe Fläche
- * ihren Inhalt: das Menü bleibt, wo es war, und ein „Zurück" führt heraus.
+ * Die aufgeklappte Vorliebe — dieselbe Fläche, ein Schritt tiefer. Ein zweites
+ * Menü daneben müsste positioniert werden und liefe an schmalen Fenstern über
+ * den Rand.
  */
 export function Vorliebenauswahl<T extends string>({
   vorliebe,
   onZurueck,
+  onFertig,
 }: {
   vorliebe: Vorliebe<T>;
   onZurueck: () => void;
+  /** Nach einer Wahl schliesst das Menü — die Wirkung ist sofort zu sehen. */
+  onFertig: () => void;
 }) {
   return (
     <>
@@ -73,15 +63,14 @@ export function Vorliebenauswahl<T extends string>({
       {vorliebe.moeglichkeiten.map((moeglich) => (
         <MenuItem
           key={moeglich.wert}
-          // `menuitemradio` und `aria-checked`, weil es genau eine sein kann —
-          // ohne die Rolle hört ein Vorleser vier gleichwertige Befehle statt
-          // einer Auswahl.
+          // `menuitemradio`, weil genau eine gelten kann — sonst hört ein
+          // Vorleser gleichwertige Befehle statt einer Auswahl.
           role="menuitemradio"
           aria-checked={moeglich.wert === vorliebe.wert}
           selected={moeglich.wert === vorliebe.wert}
           onClick={() => {
             vorliebe.waehle(moeglich.wert);
-            onZurueck();
+            onFertig();
           }}
         >
           <ListItemIcon>{moeglich.symbol}</ListItemIcon>
@@ -93,9 +82,6 @@ export function Vorliebenauswahl<T extends string>({
               </Typography>
             ) : null}
           </Box>
-          {/* Das Häkchen steht rechts, nicht links: links steht das Symbol der
-              Möglichkeit, und ein zweites Zeichen davor verschöbe alle Zeilen
-              gegeneinander, je nachdem, welche gerade gilt. */}
           {moeglich.wert === vorliebe.wert ? (
             <CheckIcon fontSize="small" sx={{ ml: 1.5, color: "primary.main" }} />
           ) : null}
@@ -106,30 +92,30 @@ export function Vorliebenauswahl<T extends string>({
 }
 
 /**
- * Die offene Vorliebe — mit KONKRETEN Typen statt einer Vereinigung.
- *
- * `Vorliebe<ColorPreference> | Vorliebe<Sprachvorliebe>` lässt sich nicht an
- * eine generische Komponente reichen: `waehle` ist kontravariant, und die
- * Vereinigung hiesse „nimm eine Funktion, die JEDEN der sechs Werte annimmt".
- * Die gibt es nicht. Also wird hier verzweigt, wo beide Typen noch bekannt sind.
+ * Verzweigt mit konkreten Typen: `Vorliebe<A> | Vorliebe<B>` lässt sich nicht
+ * an eine generische Komponente reichen, weil `waehle` kontravariant ist.
  */
 export function Vorliebenebene({
   ebene,
   darstellung,
   sprache,
   onZurueck,
+  onFertig,
 }: {
   ebene: Menueebene;
   darstellung: Vorliebe<ColorPreference>;
   sprache: Vorliebe<Sprachvorliebe>;
   onZurueck: () => void;
+  onFertig: () => void;
 }) {
   if (ebene === "darstellung") {
-    return <Vorliebenauswahl vorliebe={darstellung} onZurueck={onZurueck} />;
+    return (
+      <Vorliebenauswahl vorliebe={darstellung} onZurueck={onZurueck} onFertig={onFertig} />
+    );
   }
 
   if (ebene === "sprache") {
-    return <Vorliebenauswahl vorliebe={sprache} onZurueck={onZurueck} />;
+    return <Vorliebenauswahl vorliebe={sprache} onZurueck={onZurueck} onFertig={onFertig} />;
   }
 
   return null;

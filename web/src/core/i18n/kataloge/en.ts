@@ -35,6 +35,7 @@ const en: Katalog = {
   },
 
   kopf: {
+    besucherMenue: "Settings and sign-in",
     registrieren: "Sign up",
     anmelden: "Sign in",
     unternehmen: "Company",

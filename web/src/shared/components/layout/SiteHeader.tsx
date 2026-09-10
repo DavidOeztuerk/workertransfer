@@ -146,12 +146,6 @@ export function SiteHeader() {
 
           <Box sx={{ flexGrow: 1 }} />
 
-          {/* KEIN ZAHNRAD MEHR — weder angemeldet noch abgemeldet.
-              Darstellung und Sprache liegen in BEIDEN Zuständen hinter dem
-              Nutzersymbol. Vorher stand abgemeldet ein Zahnrad daneben, und die
-              Stelle, an der man etwas einstellt, wanderte damit beim An- und
-              Abmelden — genau die Bewegung, die diese Kopfzeile sonst überall
-              vermeidet. */}
           {signedIn ? (
             <>
               <CompanySwitcher />
@@ -228,13 +222,7 @@ function NavLink({
   );
 }
 
-/**
- * Welche Ebene des Menüs gerade offen ist.
- *
- * <strong>Beim Schliessen zurück auf „haupt".</strong> Sonst stünde das Menü
- * beim nächsten Öffnen mitten in der Sprachauswahl — und wer es für „Profil"
- * aufmacht, sucht erst einmal den Weg heraus.
- */
+/** Welche Ebene des Menüs offen ist. Beim Schliessen zurück auf „haupt". */
 function useVorliebenansicht(setAnker: (wert: null) => void) {
   const [ebene, setEbene] = useState<Menueebene>("haupt");
   const vorlieben = useVorlieben();
@@ -265,18 +253,8 @@ function AccountMenu() {
   const [anker, setAnker] = useState<null | HTMLElement>(null);
   const name = useAppSelector((state) => state.auth.session?.displayName ?? "");
 
-  /*
-   * Das Menü folgt dem Berufsfeld (ADR-0039).
-   *
-   * Bis hierher stand `/github` bedingungslos in jedem Kontomenü — ein
-   * Metallbauer bekam ihn angeboten wie ein Backend-Entwickler, und die
-   * Plattform war damit faktisch eine für Softwareentwickler, ohne dass das
-   * je entschieden worden wäre.
-   *
-   * ES VERBIRGT, ES SCHÜTZT NICHT. Die Route bleibt erreichbar; wer sie tippt,
-   * bekommt dieselbe Seite wie vorher. Und ohne Berufsfeld bleibt der Eintrag
-   * stehen: wer nichts gewählt hat, verliert nichts.
-   */
+  // Das Menü folgt dem Berufsfeld (ADR-0039). Es verbirgt nur — die Route
+  // bleibt erreichbar, und ohne Berufsfeld bleibt der Eintrag stehen.
   const berufsfeld = useAppSelector(
     (state) => state.auth.session?.berufsfeld ?? null,
   );
@@ -304,12 +282,6 @@ function AccountMenu() {
           <ProfilAvatar name={name} size={32} />
         </IconButton>
       </Tooltip>
-      {/* EIN POPOVER, KEIN MENU — und das ist keine Kosmetik.
-          Ein Auswahlfeld in einem `Menu` ist ein Fremdkörper: es öffnet ein
-          zweites Overlay über dem ersten, und MUIs `MenuList` versucht
-          gleichzeitig, den Fokus zu führen. Die Wege bleiben eine `MenuList`
-          (die Tastatursteuerung soll dort weiterlaufen), die Abschnitte stehen
-          daneben in einem gewöhnlichen Kasten. */}
       <Popover
         anchorEl={anker}
         open={anker !== null}
@@ -318,10 +290,6 @@ function AccountMenu() {
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{ paper: { sx: { width: 312, mt: 1 } } }}
       >
-        {/* WER hier gerade angemeldet ist — als Erstes und ohne Klick.
-            Auf einer Plattform, die über Freigaben entscheidet, ist die Frage
-            „unter welchem Konto tue ich das eigentlich?" keine Kleinigkeit;
-            wer zwei Konten hat, sieht sonst am Avatar nur zwei Buchstaben. */}
         <Box sx={{ px: 2, py: 1.25 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 620 }} noWrap>
             {name}
@@ -334,7 +302,6 @@ function AccountMenu() {
         </Box>
         <Divider />
 
-        {/* Eine Ebene tiefer, dieselbe Fläche: das Menü bleibt, wo es war. */}
         {ebene !== "haupt" ? (
           <MenuList sx={{ py: 0.5 }}>
             <Vorliebenebene
@@ -342,6 +309,7 @@ function AccountMenu() {
               darstellung={ansicht.darstellung}
               sprache={ansicht.sprache}
               onZurueck={() => setzeAnsicht("haupt")}
+              onFertig={schliessen}
             />
           </MenuList>
         ) : (
@@ -378,9 +346,6 @@ function AccountMenu() {
           {t("kopf.einstellungen")}
         </Eintrag>
 
-        {/* Vorlieben ÜBER dem Abmelden. „Abmelden" ist der letzte Eintrag
-            eines Kontomenüs, in jeder Anwendung, die eines hat — was darunter
-            steht, sieht aus wie ein Nachtrag. */}
         <Divider />
         <Vorliebenzeile
           vorliebe={ansicht.darstellung}
@@ -391,12 +356,8 @@ function AccountMenu() {
           onOeffnen={() => setzeAnsicht("sprache")}
         />
 
-        {/* „Konto löschen" steht NICHT hier, und das ist eine Entscheidung.
-            Ein Menü, das man täglich für „Profil" und „Bewerbungen" öffnet, ist
-            der falsche Ort für den einen Weg, den man genau einmal geht — und
-            der Nachbar von „Abmelden" ist er erst recht nicht. Der Weg bleibt
-            offen: die Einstellungen und „Meine Daten" führen hin, dort steht er
-            neben Auskunft und Freigaben und damit bei seinesgleichen. */}
+        {/* „Konto löschen" steht in den Einstellungen und auf „Meine Daten",
+            nicht hier neben „Abmelden". */}
         <Divider />
         <Eintrag to="/logout" icon={<LogoutOutlinedIcon fontSize="small" />} onFertig={schliessen}>
           {t("kopf.abmelden")}
@@ -409,17 +370,8 @@ function AccountMenu() {
 }
 
 /**
- * Das Nutzersymbol für ABGEMELDETE Besucher.
- *
- * <strong>Es steht an genau der Stelle, an der angemeldet der Avatar steht,
- * und es tut dasselbe: es öffnet ein Menü.</strong> Vorher führte es direkt
- * nach <c>/login</c> und daneben stand ein Zahnrad — zwei Bedienelemente, von
- * denen eines beim Anmelden verschwand und das andere seine Bedeutung wechselte.
- *
- * <strong>Darstellung und Sprache stehen hier, weil sie hier gebraucht
- * werden.</strong> Wer die Sprache wechselt, WEIL er die Oberfläche nicht lesen
- * kann, muss das vor der Anmeldung tun können — und zwar an derselben Stelle,
- * an der er es danach wieder tut.
+ * Das Nutzersymbol für abgemeldete Besucher — an derselben Stelle wie der
+ * Avatar, mit Anmelden, Registrieren und den Vorlieben.
  */
 function BesucherMenu() {
   const { t } = useTranslation();
@@ -428,12 +380,12 @@ function BesucherMenu() {
 
   return (
     <>
-      <Tooltip title={t("kopf.meinKonto")}>
+      <Tooltip title={t("kopf.besucherMenue")}>
         <IconButton
           onClick={(event) => setAnker(event.currentTarget)}
           aria-haspopup="menu"
           aria-expanded={anker !== null}
-          aria-label={t("kopf.meinKonto")}
+          aria-label={t("kopf.besucherMenue")}
           size="small"
           sx={{ ml: 0.5, p: 0.25, color: "text.secondary" }}
         >
@@ -456,6 +408,7 @@ function BesucherMenu() {
               darstellung={ansicht.darstellung}
               sprache={ansicht.sprache}
               onZurueck={() => setzeAnsicht("haupt")}
+              onFertig={schliessen}
             />
           </MenuList>
         ) : (
@@ -534,13 +487,7 @@ function FirmenMenu() {
   );
 }
 
-/**
- * Eine Zeile im Kontomenü.
- *
- * Mit Symbol, weil zwölf gleich aussehende Textzeilen eine Liste sind und keine
- * Ordnung — das Auge findet ein Symbol schneller wieder als ein Wort, das es
- * lesen muss.
- */
+/** Eine Zeile im Kontomenü. */
 function Eintrag({
   to,
   icon,

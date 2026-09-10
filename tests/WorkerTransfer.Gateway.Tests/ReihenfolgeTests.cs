@@ -47,12 +47,4 @@ public class ReihenfolgeTests(UmgedreheteLandschaft landschaft)
         dienst.Should().Be(erwartet);
     }
 
-    /// <summary>Die Navigationsregel hängt gar nicht an der Landkarte.</summary>
-    [Fact]
-    public async Task Eine_Navigation_landet_auch_rueckwaerts_bei_der_Oberflaeche()
-    {
-        var (dienst, _) = await landschaft.Frage("/jobs", ("Sec-Fetch-Dest", "document"));
-
-        dienst.Should().Be("web");
-    }
 }

@@ -374,7 +374,7 @@ So the *operator* declares where a person may point, in `Draft__ErlaubteZiele__*
 | `Bremse.cs` | **GELÖSCHT (4.2.0)** | Drei Begründungen nacheinander, jede gemessen, jede anders falsch — zuletzt „Girders ist global, unsere selektiv". Das war schlicht unwahr: eine Grenze von `0` legt keinen Zähler an. Gehalten hat sie am Ende nur der Preis: `Girder.Infrastructure` zieht 44 Fremdpakete für ein Gateway, das routet. `Girder.Http` zieht null. |
 | `Korrelation.cs` (Gateway) | **GELÖSCHT (4.2.0)** | Girders Zwischenschicht schrieb die Kennung bis 4.0.2 nur in Antwortkopf, Gepäck und `Items`; ein Reverse Proxy reicht aber nur **Anfrage**köpfe weiter. Behoben in 4.1.0, und seit 4.2.0 kostet ihr Bezug nichts mehr. |
 | `Gesundheit.cs` (Gateway) | **ja** | Ocelot beendet die Kette, ein `MapGet` dahinter läuft nie — gemessen. Girders `AddHealthChecks()` registriert Endpunkte, keine Middleware. |
-| `Navigation.cs` | **ja** | Die `Sec-Fetch-Dest`-Regel hat in Girder keine Entsprechung. |
+| `Navigation.cs` | **GELÖSCHT (11.09.2026)** | Das Gateway liefert keine Oberflaeche mehr aus (ADR-0040). |
 | `ProblemDetailsMiddleware` | **zu prüfen** | Girder hat `GlobalExceptionHandlingMiddleware` mit eigener Fehlergestalt. Eine Gestalt über alle Dienste ist der Grund für unsere — zu belegen, dass Girders nicht dasselbe kann. |
 | `Outbox` | **ja** | Girder hat keine. |
 | `Wanderung`, `ZugriffsCookie`, `Skills`, `Contracts.*` | **ja** | Fachlichkeit, kein Nachbau. |
@@ -396,9 +396,11 @@ Building the map found three things a checklist would have blessed: five endpoin
 
 Ocelot 25. `ocelot.json` carries its own reasoning in `//` comments — measured: .NET's JSON configuration provider skips them.
 
-**One origin makes `/jobs` mean two things** — the API resource *and* the page; same for `/applications`, `/transfers`, `/github`. Compose hides this (the UI on `:5173`); through the gateway, typing `…:8090/jobs` returned raw JSON. What makes it easy to miss: **clicking inside the app works** — the router switches in the browser and never asks — so only the **deep link and the reload** break, which is exactly what people share and what happens after a crash.
+**The gateway serves the API and nothing else.** The UI is the Vite dev server on `:5173` in compose; the browser loads it from there and calls the gateway on `:8090` for every request. Two origins, and CORS names both (`CORS_ORIGINS`). Confirmation mails point at `WORKERTRANSFER_WEB_URL`, which is the UI — not the gateway.
 
-The fix is the header that actually answers the question. `Sec-Fetch-Dest: document` is sent only on a top-level navigation (`fetch` sends `empty`, curl sends nothing), so `Navigation` middleware rewrites such a request onto the UI prefix. It is **middleware, not a route**: in Ocelot a literal path beats a placeholder regardless of `Priority`, so a `/{all}` catch-all could never win against `/jobs`. Health probes are middleware for the same reason — Ocelot terminates the pipeline, so a `MapGet` behind it never runs.
+It was the other way round until 11.09.2026: a `Navigation` middleware rewrote any request carrying `Sec-Fetch-Dest: document` onto a `/__ui/{alles}` route that proxied to the `web` container, so `…:8090/jobs` answered with the page while `fetch` got the resource. That is gone, deliberately (ADR-0040): one address meaning two things is a rule nobody remembers at the next endpoint, and it made the dev server a proxy target, which broke HMR through the gateway.
+
+**The cost is real and was accepted:** the Helm chart exposes only the gateway (`publicUrl`, `gateway.nodePort`), so `make k8s-up` now brings up a cluster with no reachable UI. Whoever wants staging back gives `web` its own entry and splits `publicUrl` into a web origin and an API origin.
 
 Route order in `ocelot.json` is pinned by `ReihenfolgeTests` against a *reversed* fixture. A probe that merely set all priorities equal stayed green because file order happened to be right; only reversing the order exposed it, and eight routes fell.
 

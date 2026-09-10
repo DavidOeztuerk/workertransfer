@@ -65,14 +65,11 @@ export function RegisterPage() {
   const [vorname, setVorname] = useState("");
   const [nachname, setNachname] = useState("");
 
-  // Kein Pflichtfeld, und die Vorauswahl ist leer (ADR-0039). Wer nichts
-  // wählt, bekommt die heutige, neutrale Ansicht — es wird niemandem etwas
-  // weggenommen, der sich hier nicht festlegen will.
+  // Kein Pflichtfeld, Vorauswahl leer (ADR-0039).
   const [berufsfeld, setBerufsfeld] = useState<BerufsfeldWahl>(null);
 
-  // „Berührt" heisst: das Feld war einmal verlassen. Erst dann wird geurteilt.
-  // Während des Tippens ist jede Adresse unfertig — „m", „ma", „max@" — und
-  // rot zu färben, was noch entsteht, macht aus einer Hilfe eine Belehrung.
+  // Geurteilt wird erst, wenn ein Feld verlassen wurde: während des Tippens
+  // ist jede Adresse unfertig.
   const [emailBeruehrt, setEmailBeruehrt] = useState(false);
   const [passwortBeruehrt, setPasswortBeruehrt] = useState(false);
 
@@ -91,16 +88,7 @@ export function RegisterPage() {
     [art, email],
   );
 
-  /*
-   * SICHTBAR, BEVOR JEMAND ABSCHICKT — und trotzdem entscheidet der Server.
-   *
-   * Das Formular trägt `noValidate` (es zeigt seine Fehler selbst statt der
-   * Browser-Blase), und damit war `type="email"` wirkungslos. So kam am
-   * 10.09.2026 die Adresse `bus` durch: der Server legte ein Konto an, die Mail
-   * scheiterte im Hintergrund, und zurück blieb ein Konto auf `pending`, das
-   * niemand je bestätigen kann. Die Absage spricht weiterhin der Server (422);
-   * hier wird nur sichtbar, was ohnehin gilt.
-   */
+  // Sichtbar vor dem Abschicken; die Absage spricht weiterhin der Server (422).
   const emailProblem = emailBeruehrt ? emailFehler(email) : null;
   const passwortProblem = passwortBeruehrt ? passwortFehler(passwort) : null;
   const unvollstaendig =
@@ -274,8 +262,6 @@ export function RegisterPage() {
           {t("zivil.klarnameHinweis")}
         </Typography>
 
-        {/* Am Ende und nicht oben: die Angabe ist freiwillig, und was freiwillig
-            ist, gehört nicht vor die Felder, ohne die es nicht weitergeht. */}
         <BerufsfeldSelect wert={berufsfeld} onChange={setBerufsfeld} />
 
         {fehler !== null ? <Alert severity="error">{fehler}</Alert> : null}
@@ -284,14 +270,7 @@ export function RegisterPage() {
           type="submit"
           variant="contained"
           size="large"
-          // Gesperrt, solange etwas offensichtlich nicht stimmt. NICHT, weil
-          // der Browser entscheidet — sondern damit niemand auf eine Absage
-          // wartet, die schon sichtbar danebensteht.
-          // Der Knopf urteilt IMMER, nicht erst nach dem Verlassen: sonst
-          // stünde er offen, solange niemand ein Feld verlassen hat, und der
-          // Fehler käme doch erst vom Server. Rot GEFÄRBT wird trotzdem erst
-          // nach dem Verlassen — das eine ist eine Absage, das andere eine
-          // Belehrung beim Tippen.
+          // Der Knopf urteilt immer; rot gefärbt wird erst nach dem Verlassen.
           disabled={
             running
             || freemail

@@ -24,15 +24,11 @@ namespace WorkerTransfer.Identity.Application.Registrierung;
 /// <c>/auth/resend-verification</c> antworten längst 422. Ein kaputter Rumpf ist
 /// überall dieselbe Sache und heißt ab jetzt überall gleich.</para>
 ///
-/// <para><strong>Die Adresse wird auf ihre FORM geprüft, seit sie es nicht
-/// wurde.</strong> <c>NotEmpty()</c> allein liess am 10.09.2026 die Adresse
-/// <c>bus</c> durch: 201, Zeile in der Datenbank, und erst der Postversand
-/// scheiterte — in einem Hintergrundversand, der den Fehler protokolliert und
-/// verschluckt. Zurück blieb ein Konto auf <c>pending</c>, das niemand je
-/// bestätigen kann. Geprüft wird mit <see cref="Emailadresse.IstZustellbar"/>,
-/// also mit demselben Parser, der später versendet — ein eigener regulärer
-/// Ausdruck wäre eine zweite Grammatik, und deren Spalt ist genau die
-/// Lücke.</para>
+/// <para><strong>Die Adresse wird auf ihre Form geprüft.</strong>
+/// <c>NotEmpty()</c> allein liess Zeichenketten ohne <c>@</c> durch: das Konto
+/// entstand, und erst der Versand scheiterte — in einem Hintergrundlauf, der
+/// den Fehler verschluckt. <see cref="Emailadresse.IstZustellbar"/> prüft mit
+/// demselben Parser, der später versendet.</para>
 ///
 /// <para><strong>Kein Passwortmaß hier.</strong> Wie lang und wie
 /// zusammengesetzt ein Passwort sein muss, ist eine fachliche Regel und steht,
@@ -50,8 +46,8 @@ public sealed class RegistrierungPruefung : AbstractValidator<RegistrierenBefehl
     {
         RuleFor(befehl => befehl.Email)
             .NotEmpty().WithMessage("email is required")
-            // Die Meldung nennt die REGEL und nie den Wert: `ValidationBehavior`
-            // protokolliert die Meldungen, und eine Adresse gehört in kein Log.
+            // Die Meldung nennt die Regel, nie den Wert: `ValidationBehavior`
+            // protokolliert sie.
             .Must(Emailadresse.IstZustellbar).WithMessage("email is not a deliverable address")
             .OverridePropertyName("email");
 

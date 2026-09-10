@@ -94,16 +94,10 @@ public static class Wortschatz
             ["Elektroinstallation"] = ["elektrik", "elektroinstallateur"],
             ["Lohnbuchhaltung"] = ["entgeltabrechnung", "gehaltsabrechnung", "payroll"],
 
-            // Handwerk, Industrie, Bau (ADR-0039). Jede Zeile hier ist dieselbe
-            // Behauptung wie jede Zeile oben: zwei Wörter meinen DASSELBE. Die
-            // Verlockung ist hier größer, weil die Fachbegriffe eine sichtbare
-            // Ordnung haben — jeder weiß, dass MIG/MAG ein Schweißverfahren
-            // ist. Genau deshalb steht es hier: „MIG/MAG“ impliziert NICHT
-            // „Schweißen“. Wer beides nennen will, nennt beides.
-            //
-            // Die Schreibweisen ohne Umlaut stehen ausdrücklich mit dabei: der
-            // Vergleich ist zeichengetreu (nur Groß/Klein wird übersehen), und
-            // „geruestbau“ fände sonst nichts.
+            // Handwerk, Industrie, Bau (ADR-0039). Wie oben gilt: zwei Wörter
+            // meinen DASSELBE — „MIG/MAG“ impliziert nicht „Schweißen“.
+            // Schreibweisen ohne Umlaut stehen mit dabei, der Vergleich ist
+            // zeichengetreu.
             ["MIG/MAG"] = ["mig mag", "mig-mag", "migmag", "mig/mag-schweißen", "mig/mag-schweissen"],
             ["WIG"] = ["tig", "wolfram-inertgas", "wig-schweißen", "wig-schweissen"],
             ["Schweißerpass"] = ["schweisserpass", "schweißerpaß", "schweisserpaß"],
@@ -115,9 +109,8 @@ public static class Wortschatz
             ["Gerüstbau"] = ["geruestbau", "gerüstbauer", "geruestbauer", "gerüstmontage"],
             ["Trockenbau"] = ["trockenbauer", "trockenbaumontage"],
 
-            // Logistik und Verkehr. „Code 95“ ist keine Ableitung, sondern der
-            // Name derselben Sache: die Schlüsselzahl im Führerschein, mit der
-            // die Qualifikation nach BKrFQG eingetragen wird.
+            // Logistik und Verkehr. „Code 95“ ist die Schlüsselzahl, mit der
+            // dieselbe Qualifikation im Führerschein steht.
             ["Staplerschein"] = ["gabelstaplerschein", "flurförderschein", "flurförderzeugschein"],
             ["Gabelstapler"] = ["stapler", "frontstapler", "forklift"],
             ["Hubwagen"] = ["handhubwagen", "gabelhubwagen", "ameise"],
@@ -125,7 +118,7 @@ public static class Wortschatz
             ["Berufskraftfahrer-Qualifikation"] = ["bkrfqg", "code 95", "schlüsselzahl 95", "modul 95"],
 
             // Gesundheit und Pflege. „Pflegefachkraft“ ist die gesetzliche
-            // Umbenennung von 2020 — ein Umbenennen im buchstäblichsten Sinn.
+            // Umbenennung von 2020.
             ["Pflegefachkraft"] = [
                 "pflegefachmann", "pflegefachfrau", "examinierte pflegekraft",
                 "gesundheits- und krankenpfleger", "gesundheits- und krankenpflegerin"

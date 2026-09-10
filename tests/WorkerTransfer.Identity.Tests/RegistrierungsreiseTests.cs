@@ -230,21 +230,11 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
         antwort.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
-    /// <summary>
-    /// Eine Adresse, die keine ist, legt kein Konto an — gemessen am echten Fall.
-    /// </summary>
+    /// <summary>Eine Adresse, die keine ist, legt kein Konto an.</summary>
     /// <remarks>
-    /// Am 10.09.2026 kam <c>bus</c> durch: <c>201</c>, Zeile in der Datenbank,
-    /// und erst der Postversand scheiterte mit einer <c>FormatException</c> —
-    /// in einem Hintergrundlauf, der den Fehler protokolliert und verschluckt.
-    /// Zurück blieb ein Konto auf <c>pending</c>, das niemand je bestätigen
-    /// kann, während die Oberfläche „wir haben dir eine E-Mail geschickt"
-    /// versprach.
-    /// <para>
-    /// Die zweite Hälfte ist die wichtigere: es darf auch KEINE Zeile
-    /// entstehen. Ein 422 über einem angelegten Konto wäre die Sackgasse mit
-    /// besserer Fehlermeldung.
-    /// </para>
+    /// Die zweite Hälfte ist die wichtigere: es darf auch keine Zeile
+    /// entstehen. Ein 422 über einem angelegten Konto wäre dieselbe Sackgasse
+    /// mit besserer Meldung.
     /// </remarks>
     [Fact]
     public async Task Eine_Adresse_die_keine_ist_legt_kein_Konto_an()
@@ -262,10 +252,7 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
         ((long)(await befehl.ExecuteScalarAsync())!).Should().Be(0);
     }
 
-    /// <summary>
-    /// Auch „erneut senden" prüft die Form — sonst läuft es in denselben
-    /// verschluckten Versandfehler und antwortet weiterhin 202.
-    /// </summary>
+    /// <summary>Auch „erneut senden" prüft die Form.</summary>
     [Fact]
     public async Task Ein_erneutes_Senden_an_eine_kaputte_Adresse_wird_abgewiesen()
     {

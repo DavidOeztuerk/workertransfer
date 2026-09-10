@@ -27,10 +27,8 @@ namespace WorkerTransfer.Identity.Api;
 /// registrieren. <c>DrahtnamenTests</c> nagelt die vier Namen jetzt fest.</para>
 /// </remarks>
 /// <param name="OccupationalField">
-/// In welcher Arbeitswelt die Person steht. <strong>Optional, und das ist die
-/// Entscheidung</strong> (ADR-0039): eine Pflichtangabe an der Anmeldung wäre
-/// eine Hürde vor dem ersten Nutzen, und sie zwänge jemanden, der zwischen zwei
-/// Welten steht, sich zu entscheiden, bevor er gesehen hat, wofür.
+/// In welcher Arbeitswelt die Person steht. Optional (ADR-0039) — eine
+/// Pflichtangabe wäre eine Hürde vor dem ersten Nutzen.
 /// </param>
 /// <param name="CompanyName">
 /// Set means "a company is registering here". Optional, because the ordinary
@@ -76,10 +74,8 @@ public static class RegistrierungsEndpoints
             var vermutet = Sprachwahl.AusKopf(
                 context.Request.Headers.AcceptLanguage.ToString());
 
-            // Ein unbekanntes Etikett sagt die Registrierung AB, statt es
-            // wegzuwerfen. Der stille Weg wäre hier besonders teuer: ein Konto
-            // entstünde, die Bestätigungsmail ginge raus, und die Wahl wäre
-            // fort — sichtbar erst Tage später und für niemanden erklärbar.
+            // Absagen statt wegwerfen: sonst entstünde ein Konto, die Mail
+            // ginge hinaus, und die Wahl wäre still verloren.
             if (!Berufsfeldwahl.Kennen(body.OccupationalField))
             {
                 await ProblemDetailsMiddleware.Schreibe(

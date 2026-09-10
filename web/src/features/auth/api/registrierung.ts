@@ -27,12 +27,7 @@ export interface RegistrierEingabe {
    * einem anderen Gerät geöffnet.
    */
   unternehmensname?: string;
-  /**
-   * In welcher Arbeitswelt die Person steht — freiwillig (ADR-0039).
-   *
-   * Nicht gesetzt heisst „nicht angegeben", und das ist der Normalfall. Daraus
-   * folgt nur, was die Oberfläche anbietet, nie ein Recht.
-   */
+  /** Freiwillig (ADR-0039). Nicht gesetzt heisst „nicht angegeben". */
   berufsfeld?: Berufsfeld;
 }
 
@@ -114,8 +109,7 @@ export async function registriere(eingabe: RegistrierEingabe): Promise<Registrie
         ...(eingabe.unternehmensname !== undefined
           ? { company_name: eingabe.unternehmensname }
           : {}),
-        // Nur mitschicken, wenn gewählt wurde: ein `null` im Rumpf wäre eine
-        // Aussage, die niemand gemacht hat.
+        // Nur mitschicken, wenn gewählt wurde.
         ...(eingabe.berufsfeld !== undefined
           ? { occupational_field: eingabe.berufsfeld }
           : {}),

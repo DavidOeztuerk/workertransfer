@@ -1,17 +1,9 @@
 /**
- * Berufsfelder und die Belege, die zu ihnen gehören (ADR-0039).
+ * Berufsfelder und ihre Belege (ADR-0039).
  *
- * <strong>Aus dem Berufsfeld folgt genau eine Sache: was die Oberfläche
- * ANBIETET.</strong> Kein Recht, keine Sichtbarkeit, keine Sortierung, keine
- * Aussage über einen Menschen. Der Server antwortet auf jede Route dieselbe
- * Antwort wie vorher — was hier steht, entscheidet über Menüeinträge und
- * Vorschläge, nie über Zugriff. Verstecken ist keine Zugriffskontrolle.
- *
- * Die Liste ist GESCHLOSSEN, und das ist der Grund für die Liste: aus diesem
- * Feld folgt eine Navigation, und eine Navigation muss für jeden möglichen Wert
- * eine Antwort haben. Sie spiegelt `Berufsfeldwahl` in identity-service — die
- * elf Etiketten sind dort die Wahrheit, hier stehen sie, weil der Browser
- * entscheidet, was er zeigt.
+ * Aus dem Berufsfeld folgt nur, was die Oberfläche anbietet — kein Recht, keine
+ * Sichtbarkeit. Die Liste ist geschlossen und spiegelt `Berufsfeldwahl` in
+ * identity-service.
  */
 
 /** Die elf Etiketten, wie sie auf dem Draht und in der Spalte stehen. */
@@ -31,13 +23,7 @@ export const BERUFSFELDER = [
 
 export type Berufsfeld = (typeof BERUFSFELDER)[number];
 
-/**
- * `null` heisst „nicht angegeben" und ist der Normalfall.
- *
- * Es ist NICHT dasselbe wie `"sonstiges"`: wer „sonstiges" wählt, hat gewählt.
- * Beide bekommen heute dieselbe neutrale Ansicht — aber weil das für beide die
- * richtige ist, nicht weil sie dasselbe wären.
- */
+/** `null` heisst „nicht angegeben" — nicht dasselbe wie `"sonstiges"`. */
 export type BerufsfeldWahl = Berufsfeld | null;
 
 /** Ist das ein Etikett, das wir kennen? */
@@ -48,44 +34,25 @@ export function istBerufsfeld(wert: unknown): wert is Berufsfeld {
 }
 
 /**
- * Was vom Server kommt, als Wahl gelesen.
- *
- * Ein Etikett, das dieser Browser nicht kennt, wird zu `null` und damit zur
- * neutralen Ansicht — nicht zu einem Fehler. Eine ältere Oberfläche gegen einen
- * neueren Server soll weniger anbieten, nicht abstürzen.
+ * Was vom Server kommt, als Wahl gelesen. Unbekanntes wird `null`: eine ältere
+ * Oberfläche soll weniger anbieten, nicht abstürzen.
  */
 export function leseBerufsfeld(wert: unknown): BerufsfeldWahl {
   return istBerufsfeld(wert) ? wert : null;
 }
 
-/**
- * Ein Beleg, der einem Feld angeboten wird.
- *
- * `schluessel` ist der Katalogschlüssel für den Namen — hier stehen keine
- * Sätze, weil jeder Text, den ein Mensch liest, aus einem Katalog kommt
- * (ADR-0031).
- */
+/** Ein Beleg, der einem Feld angeboten wird. `schluessel` ist der Katalogschlüssel. */
 export interface Belegart {
   schluessel: string;
   /**
-   * Darf GENANNT, aber niemals HOCHGELADEN werden.
-   *
-   * Ein Führungszeugnis ist ein Auszug aus einem Register über Straftaten, ein
-   * Gesundheitszeugnis eine ärztliche Feststellung. Beides muss eine Person
-   * sagen können („liegt vor"), weil Arbeitgeber danach fragen — und beides
-   * gehört auf keinen Server dieser Plattform. Eine Datei, die nie angeboten
-   * wird, muss nicht gelöscht werden.
+   * Darf genannt, aber nie hochgeladen werden — Führungszeugnis,
+   * Gesundheitszeugnis. Eine Datei, die nie angeboten wird, muss nicht
+   * gelöscht werden.
    */
   nurGenannt?: true;
 }
 
-/**
- * Die Belege, die JEDES Feld erbt.
- *
- * Die wichtigste Zeile der Tabelle: die feldeigenen Belege kommen dazu, sie
- * ersetzen nichts. Ein Entwickler mit einem Meisterbrief kann ihn hochladen —
- * diese Tabelle entscheidet, was VORGESCHLAGEN wird, nie, was ERLAUBT ist.
- */
+/** Die Belege, die jedes Feld erbt. Die feldeigenen kommen dazu. */
 const ALLGEMEIN: readonly Belegart[] = [
   { schluessel: "beleg.arbeitszeugnis" },
   { schluessel: "beleg.zertifikat" },
@@ -144,12 +111,7 @@ const EIGEN: Record<Berufsfeld, readonly Belegart[]> = {
   sonstiges: [],
 };
 
-/**
- * Was diesem Feld angeboten wird — das Eigene zuerst, dann das Allgemeine.
- *
- * Ohne Feld: nur das Allgemeine. Wer nichts gewählt hat, sieht die heutige
- * Ansicht, und die kennt kein Berufsfeld.
- */
+/** Was diesem Feld angeboten wird — das Eigene zuerst, dann das Allgemeine. */
 export function belegartenFuer(feld: BerufsfeldWahl): readonly Belegart[] {
   const eigen = feld === null ? [] : EIGEN[feld];
   const gesehen = new Set(eigen.map((art) => art.schluessel));
@@ -157,23 +119,14 @@ export function belegartenFuer(feld: BerufsfeldWahl): readonly Belegart[] {
   return [...eigen, ...ALLGEMEIN.filter((art) => !gesehen.has(art.schluessel))];
 }
 
-/**
- * Die Belege, für die es einen Hochladeknopf gibt.
- *
- * Was `nurGenannt` trägt, fällt hier heraus — und zwar hier und nicht erst in
- * der Ansicht, damit es nicht an einer zweiten Stelle wieder auftauchen kann.
- */
+/** Die Belege mit Hochladeknopf. `nurGenannt` fällt hier heraus, nicht erst in der Ansicht. */
 export function hochladbareBelege(feld: BerufsfeldWahl): readonly Belegart[] {
   return belegartenFuer(feld).filter((art) => art.nurGenannt !== true);
 }
 
 /**
- * Bietet dieses Feld GitHub an?
- *
- * <strong>Die Route bleibt erreichbar.</strong> Wer `/github` tippt, bekommt
- * die Seite — hier wird nur entschieden, ob sie ANGEBOTEN wird. Ein Konto ohne
- * Berufsfeld bekommt sie weiterhin: es wird niemandem etwas weggenommen, der
- * nicht gewählt hat, und GitHub wird nicht abgewertet (ADR-0039).
+ * Bietet dieses Feld GitHub an? Die Route bleibt erreichbar — hier wird nur
+ * entschieden, ob sie angeboten wird. Ohne Berufsfeld: ja.
  */
 export function zeigtGitHub(feld: BerufsfeldWahl): boolean {
   return feld === null || feld === "it_software";
