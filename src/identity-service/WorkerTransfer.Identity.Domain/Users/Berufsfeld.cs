@@ -2,31 +2,14 @@ namespace WorkerTransfer.Identity.Domain.Users;
 
 /// <summary>In welcher Arbeitswelt eine Person steht (ADR-0039).</summary>
 /// <remarks>
-/// <strong>Eine Angabe der Person, aus der genau eine Sache folgt: was die
-/// Oberfläche anbietet.</strong> Keine Berechtigung, keine Sichtbarkeit, keine
-/// Sortierung, keine Aussage über einen Menschen. Es steht nicht im Token, und
-/// keine Berechtigungsprüfung liest es.
+/// Eine Angabe der Person, aus der genau eine Sache folgt: was die Oberfläche
+/// anbietet. Keine Berechtigung, keine Sichtbarkeit, keine Sortierung. Es steht
+/// nicht im Token.
 /// <para>
-/// <strong>Die Menge ist geschlossen, und das ist der Grund für die Menge.</strong>
-/// Aus diesem Feld folgt eine Navigation, und eine Navigation muss für jeden
-/// möglichen Wert eine Antwort haben. Bei Freitext hiesse die Antwort für alles
-/// ausser einer Handvoll Schreibweisen „ich weiss es nicht" — und der
-/// Unterschied zwischen „ich weiss es nicht" und „nicht angegeben" wäre für die
-/// Oberfläche unsichtbar. Sie zeigte demselben Menschen je nach Tippfehler zwei
-/// verschiedene Anwendungen. Dieselbe Begründung trägt schon
-/// <see cref="Kontosprache"/>.
-/// </para>
-/// <para>
-/// <strong><see cref="Sonstiges"/> ist nicht dasselbe wie <c>null</c>.</strong>
-/// Wer <c>sonstiges</c> wählt, hat gewählt: seine Arbeit passt in keine der
-/// zehn. Wer nichts wählt, hat nicht gewählt. Beide bekommen heute dieselbe
-/// neutrale Ansicht — aber weil das für beide die richtige ist, nicht weil sie
-/// dasselbe wären.
-/// </para>
-/// <para>
-/// Erweiterbar, und jede Erweiterung ist eine Entscheidung: ein Pull Request,
-/// wie beim Wortschatz. Sie darf nicht aus den Daten wachsen („diese Wörter
-/// tippen viele") — das wäre wieder eine Auswertung über Menschen (ADR-0022).
+/// Die Menge ist geschlossen, weil aus diesem Feld eine Navigation folgt und
+/// eine Navigation für jeden möglichen Wert eine Antwort haben muss — wie bei
+/// <see cref="Kontosprache"/>. <see cref="Sonstiges"/> ist eine Wahl und nicht
+/// dasselbe wie <c>null</c>.
 /// </para>
 /// </remarks>
 public enum Berufsfeld
@@ -67,13 +50,8 @@ public enum Berufsfeld
 
 /// <summary>Liest ein Berufsfeld aus einem Etikett und zurück.</summary>
 /// <remarks>
-/// Getrennt vom Aufzählungstyp, wie <see cref="Sprachwahl"/> von
-/// <see cref="Kontosprache"/>: das Etikett ist, was in der Spalte und auf dem
-/// Draht steht, und es ist snake_case, weil der Draht dieser Plattform das ist.
-/// Der Name der Aufzählung folgt C#, das Etikett folgt der Leitung, und keiner
-/// von beiden leitet sich automatisch aus dem anderen ab — eine Umwandlung
-/// über <c>ToLower()</c> ergäbe <c>industrietechnik</c> und nicht
-/// <c>industrie_technik</c>.
+/// Das Etikett ist snake_case, wie der ganze Draht. Es leitet sich nicht aus
+/// dem Aufzählungsnamen ab: <c>ToLower()</c> ergäbe <c>industrietechnik</c>.
 /// </remarks>
 public static class Berufsfeldwahl
 {
@@ -95,21 +73,14 @@ public static class Berufsfeldwahl
         };
 
     /// <summary>Alle Etiketten, in der Reihenfolge der Aufzählung.</summary>
-    /// <remarks>
-    /// Für die Prüfung, die die Menge festhält, und für jeden, der die Liste
-    /// ausgeben will, ohne sie ein zweites Mal zu tippen.
-    /// </remarks>
     public static IReadOnlyList<string> Etiketten { get; } =
         [.. NachEtikett.OrderBy(eintrag => eintrag.Value).Select(eintrag => eintrag.Key)];
 
-    /// <summary>Das Feld zu einem Etikett — oder <c>null</c>, wenn es keins gibt.</summary>
+    /// <summary>Das Feld zu einem Etikett — oder <c>null</c>.</summary>
     /// <remarks>
-    /// <strong>Unbekanntes wird <c>null</c> und niemals eine Vorgabe.</strong>
-    /// Hier gibt es keine, die richtig sein könnte: ein Berufsfeld zu raten
-    /// wäre genau die abgeleitete Eigenschaft, die ADR-0039 verworfen hat. Wer
-    /// entscheiden will, ob eine Eingabe taugte, fragt
-    /// <see cref="Kennen"/> — dort ist <c>null</c> eine Absage und keine stille
-    /// Ersetzung.
+    /// Unbekanntes wird <c>null</c> und nie eine Vorgabe: ein Berufsfeld zu
+    /// raten wäre die abgeleitete Eigenschaft, die ADR-0039 verwirft. Ob eine
+    /// Eingabe taugte, beantwortet <see cref="Kennen"/>.
     /// </remarks>
     /// <param name="etikett">Was hereinkam.</param>
     /// <returns>Das Feld, oder <c>null</c>.</returns>
@@ -125,15 +96,9 @@ public static class Berufsfeldwahl
 
     /// <summary>Kennen wir dieses Etikett?</summary>
     /// <remarks>
-    /// Getrennt von <see cref="Aus"/>, damit ein Endpunkt eine unbekannte
-    /// Eingabe absagen kann, statt sie stillschweigend zu <c>null</c> zu
-    /// machen. Eine Wahl, die nicht wirkt, muss das sagen — dieselbe Regel wie
-    /// bei <c>PUT /account/language</c>.
-    /// <para>
-    /// Ein leeres Etikett ist <em>bekannt</em>: es heisst „keins", und das ist
-    /// ein zulässiger Wert. Sonst gäbe es keinen Weg zurück zu „nicht
-    /// angegeben".
-    /// </para>
+    /// Getrennt von <see cref="Aus"/>, damit ein Endpunkt Unbekanntes absagen
+    /// kann statt es still zu <c>null</c> zu machen. Leer ist zulässig und
+    /// heisst „keins" — sonst gäbe es keinen Weg zurück.
     /// </remarks>
     /// <param name="etikett">Was hereinkam.</param>
     /// <returns><c>true</c>, wenn es gespeichert werden darf.</returns>

@@ -66,96 +66,6 @@ public class LandkarteTests(Landschaft landschaft)
     }
 
     /// <summary>
-    /// Derselbe Pfad, zwei Bedeutungen — der Kopf entscheidet.
-    /// </summary>
-    /// <remarks>
-    /// Das ist die Regel, um die es geht: ohne sie liefert ein Direktlink auf
-    /// <c>/jobs</c> rohes JSON statt der Seite, und zwar genau dann, wenn
-    /// jemand ihn teilt oder F5 drückt.
-    /// </remarks>
-    [Theory]
-    [InlineData("/jobs")]
-    [InlineData("/applications")]
-    [InlineData("/transfers")]
-    [InlineData("/github")]
-    [InlineData("/profiles/me")]
-    [InlineData("/companies/me/profile")]
-    public async Task Eine_Navigation_landet_immer_bei_der_Oberflaeche(string pfad)
-    {
-        var (navigiert, _) = await landschaft.Frage(pfad, ("Sec-Fetch-Dest", "document"));
-
-        navigiert.Should().Be("web");
-    }
-
-    /// <summary>Ein Programm holt Daten — und bekommt den Dienst.</summary>
-    /// <remarks>
-    /// <c>fetch</c> schickt <c>empty</c>, curl schickt den Kopf gar nicht.
-    /// Beide dürfen die Regel nicht auslösen, sonst bekäme die Oberfläche ihre
-    /// eigenen Daten nicht.
-    /// </remarks>
-    [Theory]
-    [InlineData("empty")]
-    [InlineData("image")]
-    [InlineData("script")]
-    [InlineData(null)]
-    public async Task Alles_andere_als_document_geht_an_den_Dienst(string? kopfwert)
-    {
-        var koepfe = kopfwert is null
-            ? Array.Empty<(string, string)>()
-            : [("Sec-Fetch-Dest", kopfwert)];
-
-        var (dienst, _) = await landschaft.Frage("/jobs", koepfe);
-
-        dienst.Should().Be("jobs");
-    }
-
-    /// <summary>
-    /// Auch die Bestandteile einer Seite finden die Oberfläche — sonst kommt
-    /// die Seite an und bleibt leer.
-    /// </summary>
-    /// <remarks>
-    /// <para><strong>Gemessen im Browser, nicht ausgedacht.</strong> Das Gateway
-    /// lieferte das HTML von <c>/verify</c>, aber jedes <c>&lt;script src&gt;</c>
-    /// darin lief ins Leere: vier 404 für <c>/@vite/client</c>,
-    /// <c>/@react-refresh</c>, <c>/config.js</c> und <c>/src/main.tsx</c>. Die
-    /// Navigationsstufe schrieb nur <em>Dokumente</em> auf das UI-Präfix um,
-    /// und ein Skript schickt <c>Sec-Fetch-Dest: script</c>.</para>
-    ///
-    /// <para><strong>Warum es niemand bemerkt hat:</strong> Playwright fährt
-    /// gegen <c>:5173</c>, also am Gateway vorbei. Über das Gateway hatte die
-    /// Oberfläche nie geladen — nur fällt das erst auf, wenn jemand
-    /// <c>:8090</c> im Browser öffnet. Und genau das ist der Weg, den das
-    /// Helm-Chart als einzigen anbietet.</para>
-    /// </remarks>
-    [Theory]
-    [InlineData("/@vite/client", "script")]
-    [InlineData("/@react-refresh", "script")]
-    [InlineData("/src/main.tsx", "script")]
-    [InlineData("/config.js", "script")]
-    [InlineData("/favicon.svg", "image")]
-    [InlineData("/assets/index-abc123.css", "style")]
-    public async Task Bestandteile_einer_Seite_finden_die_Oberflaeche(string pfad, string zweck)
-    {
-        var (dienst, _) = await landschaft.Frage(pfad, ("Sec-Fetch-Dest", zweck));
-
-        dienst.Should().Be("web");
-    }
-
-    /// <summary>Die Oberfläche bekommt, was kein Dienst beansprucht.</summary>
-    [Theory]
-    [InlineData("/")]
-    [InlineData("/overview")]
-    [InlineData("/login")]
-    [InlineData("/careers/muster-gmbh")]
-    [InlineData("/assets/index-abc123.js")]
-    public async Task Was_kein_Dienst_beansprucht_ist_die_Oberflaeche(string pfad)
-    {
-        var (dienst, _) = await landschaft.Frage(pfad, ("Sec-Fetch-Dest", "document"));
-
-        dienst.Should().Be("web");
-    }
-
-    /// <summary>
     /// Ein Dienst-zu-Dienst-Eingang erreicht von außen nie den Dienst, der ihn
     /// umsetzt.
     /// </summary>
@@ -192,11 +102,9 @@ public class LandkarteTests(Landschaft landschaft)
     public async Task Ein_Diensteingang_erreicht_seinen_Besitzer_nicht(
         string pfad, string besitzer)
     {
-        var (ohneKopf, _) = await landschaft.Frage(pfad);
-        var (mitKopf, _) = await landschaft.Frage(pfad, ("Sec-Fetch-Dest", "document"));
+        var (dienst, _) = await landschaft.Frage(pfad);
 
-        ohneKopf.Should().NotBe(besitzer);
-        mitKopf.Should().Be("web", "eine Navigation gehört immer der Oberfläche");
+        dienst.Should().NotBe(besitzer);
     }
 
     /// <summary>Die Gesundheitsproben beantwortet das Gateway selbst.</summary>

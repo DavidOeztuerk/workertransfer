@@ -32,12 +32,8 @@ export interface Session {
   /** Bürgerlicher Nachname, oder leer. */
   familyName: string;
   /**
-   * In welcher Arbeitswelt die Person steht, oder `null`.
-   *
-   * `null` heisst „nicht angegeben" und ist der Normalfall — es bekommt die
-   * heutige, neutrale Ansicht. Daraus folgt ausschliesslich, was die Oberfläche
-   * ANBIETET (ADR-0039): kein Recht, keine Sichtbarkeit, keine Aussage über die
-   * Person. Der Server antwortet auf jede Route unverändert.
+   * In welcher Arbeitswelt die Person steht, oder `null` für „nicht angegeben".
+   * Daraus folgt nur, was die Oberfläche anbietet (ADR-0039).
    */
   berufsfeld: BerufsfeldWahl;
 }

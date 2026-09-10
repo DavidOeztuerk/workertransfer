@@ -6,16 +6,8 @@ import { BERUFSFELDER, istBerufsfeld } from "../../lib/berufsfelder";
 import type { BerufsfeldWahl } from "../../lib/berufsfelder";
 
 /**
- * Die Auswahl des Berufsfelds — an der Registrierung und in den Einstellungen
- * dieselbe (ADR-0039).
- *
- * <strong>Nie ein Pflichtfeld.</strong> Der leere Eintrag steht ganz oben und
- * ist die Vorauswahl: eine Pflichtangabe an der Anmeldung wäre eine Hürde vor
- * dem ersten Nutzen, und sie zwänge jemanden, der zwischen zwei Welten steht,
- * sich zu entscheiden, bevor er gesehen hat, wofür.
- *
- * Ein Auswahlfeld und kein Freitext, weil aus dieser Angabe eine Navigation
- * folgt und eine Navigation für jeden möglichen Wert eine Antwort haben muss.
+ * Die Auswahl des Berufsfelds (ADR-0039). Nie ein Pflichtfeld — der leere
+ * Eintrag ist die Vorauswahl.
  */
 export function BerufsfeldSelect({
   wert,
@@ -41,8 +33,7 @@ export function BerufsfeldSelect({
       disabled={disabled}
       onChange={(event) => {
         const gewaehlt = event.target.value;
-        // Der leere Eintrag ist ein gültiger Wert und heisst „keins" — nicht
-        // „unverändert". Ohne ihn wäre eine einmal getroffene Wahl endgültig.
+        // Leer ist ein gültiger Wert und heisst „keins", nicht „unverändert".
         onChange(istBerufsfeld(gewaehlt) ? gewaehlt : null);
       }}
       slotProps={{ select: { displayEmpty: true } }}

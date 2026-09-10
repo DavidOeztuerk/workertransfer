@@ -34,9 +34,6 @@ const toSession = (body: SessionBody): Session => ({
   displayName: body.display_name ?? "",
   givenName: body.given_name ?? "",
   familyName: body.family_name ?? "",
-  // Ein Etikett, das dieser Browser nicht kennt, wird zur neutralen Ansicht
-  // statt zu einem Absturz: eine ältere Oberfläche gegen einen neueren Server
-  // soll weniger anbieten, nicht scheitern.
   berufsfeld: leseBerufsfeld(body.occupational_field),
 });
 

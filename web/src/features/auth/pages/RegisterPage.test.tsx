@@ -165,11 +165,42 @@ describe("RegisterPage — Person oder Unternehmen", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("färbt eine unfertige Adresse nicht rot, solange getippt wird", async () => {
+    // Geurteilt wird erst, wenn ein Feld verlassen wurde.
+    const user = userEvent.setup();
+    renderMitStore(<RegisterPage />, { route: "/register" });
+
+    await user.type(screen.getByLabelText(/E-Mail/i), "max@");
+
+    expect(
+      screen.queryByText(/sieht nicht nach einer E-Mail-Adresse aus/i),
+    ).toBeNull();
+  });
+
+  it("sagt nach dem Verlassen des Feldes, dass die Adresse keine ist", async () => {
+    const user = userEvent.setup();
+    renderMitStore(<RegisterPage />, { route: "/register" });
+
+    await user.type(screen.getByLabelText(/E-Mail/i), "bus");
+    await user.tab();
+
+    expect(
+      screen.getByText(/sieht nicht nach einer E-Mail-Adresse aus/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Registrieren/i }),
+    ).toBeDisabled();
+  });
+
   it("prüft Freemail nur beim Beanspruchen einer Domain, nicht bei einer Person", async () => {
     const user = userEvent.setup();
     renderMitStore(<RegisterPage />, { route: "/register" });
 
+    // Das ganze Formular: der Knopf ist auch gesperrt, solange Pflichtfelder
+    // leer sind, und dieser Test spricht über Freemail.
     await user.type(screen.getByLabelText(/E-Mail/i), "max@gmail.com");
+    await user.type(screen.getByLabelText(/Passwort/i), "ein-langes-passwort");
+    await user.type(screen.getByLabelText(/Anzeigename/i), "Max");
 
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByRole("button", { name: /Registrieren/i })).toBeEnabled();

@@ -19,16 +19,21 @@ export function PageShell({
   title: string;
   lead?: string;
   actions?: React.ReactNode;
+  /** Formular- oder Kartenseite statt Liste/Tabelle: etwas schmaler. */
   narrow?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <Container
-      maxWidth={narrow ? "sm" : "lg"}
+      // Eigene Breiten statt MUIs `sm`/`lg` (600/1200): die lagen um das
+      // Doppelte auseinander, und der Rahmen sprang beim Blättern. Diese
+      // beiden trennt ein Fünftel. Die Textspalte ist unten auf 62ch begrenzt.
+      maxWidth={false}
       // Unten weniger als oben, und das ist Absicht: über dem Titel schafft
       // Luft den Anfang, unter dem letzten Element ist sie nur Leere vor der
       // Fusszeile.
       sx={{
+        maxWidth: narrow ? 960 : 1160,
         pt: { xs: 4, md: 7 },
         pb: { xs: 3, md: 4 },
         px: { xs: 2, sm: 3, md: 4 },

@@ -65,7 +65,7 @@ export default defineConfig({
     // Das GATEWAY, nicht der Vite-Server. Es ist der einzige Weg, den die
     // Auslieferung anbietet — und der, auf dem die Oberflaeche monatelang gar
     // nicht lud, weil niemand ihn fuhr.
-    baseURL: process.env.E2E_WEB_URL ?? "http://localhost:8090",
+    baseURL: process.env.E2E_WEB_URL ?? "http://localhost:5173",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

@@ -17,20 +17,10 @@ import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
 /**
  * Welche Nachweise zu dieser Arbeit gehören (ADR-0039).
  *
- * <strong>Vorschläge, keine Vorschrift.</strong> Was hier steht, ordnet für den
- * Menschen, der die Seite liest — es entscheidet nicht, was hochgeladen werden
- * DARF. Ein Entwickler mit einem Meisterbrief kann ihn ablegen; ein
- * Metallbauer, der ein Repositorium hat, kann es verbinden. Eine Liste
- * erlaubter Nachweise wäre eine Behauptung darüber, welche Arbeit es gibt.
- *
- * <strong>Erscheint nur, wenn ein Berufsfeld genannt wurde.</strong> Wer nichts
- * gewählt hat, sieht die heutige Ansicht — ein leerer oder ausgegrauter Kasten
- * wäre die stillschweigende Behauptung, dort fehle etwas (ADR-0022 §3).
- *
- * Kein Beleg wird durch diesen Kasten zu einer Nennung: hochgeladene Unterlagen
- * bleiben „belegt" und sind für keine Suche sichtbar (ADR-0033). Die Chips sind
- * deshalb auch NICHT anklickbar — anders als die Fähigkeitsvorschläge darüber,
- * die ins Formular wandern.
+ * Vorschläge, keine Vorschrift — hochladen lässt sich alles. Erscheint nur mit
+ * genanntem Berufsfeld; ein leerer Kasten wäre die Behauptung, dort fehle etwas
+ * (ADR-0022 §3). Die Chips sind nicht anklickbar: ein Beleg wird dadurch keine
+ * Nennung (ADR-0033).
  */
 export function Nachweise({ feld }: { feld: BerufsfeldWahl }) {
   const { t } = useTranslation();
@@ -62,9 +52,6 @@ export function Nachweise({ feld }: { feld: BerufsfeldWahl }) {
           ))}
         </Box>
 
-        {/* Was NICHT hochgeladen werden kann, steht auch da — und mit Grund.
-            Eine Liste, die eine Lücke verschweigt, sieht vollständig aus und
-            ist es nicht. */}
         {nurGenannt.length > 0 ? (
           <Alert severity="info" sx={{ mb: 2.5 }}>
             {t("beleg.nurGenannt", {

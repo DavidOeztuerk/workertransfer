@@ -11,10 +11,8 @@ namespace WorkerTransfer.Identity.Application.Anmelden;
 /// </param>
 /// <param name="Firma">The company they currently act for, or <c>null</c> for themselves.</param>
 /// <param name="Berufsfeld">
-/// In welcher Arbeitswelt sie steht, oder <c>null</c> für „nicht angegeben".
-/// Es reist mit, damit die Oberfläche entscheiden kann, WAS sie anbietet — und
-/// nur dafür. Im Token steht es nicht, und keine Berechtigungsprüfung liest es
-/// (ADR-0039).
+/// In welcher Arbeitswelt sie steht, oder <c>null</c>. Reist mit, damit die
+/// Oberfläche entscheiden kann, was sie anbietet — nicht im Token (ADR-0039).
 /// </param>
 /// <remarks>
 /// Carries no roles. Nothing reads them — every permission decision in this

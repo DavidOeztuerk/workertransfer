@@ -5,7 +5,18 @@
  * Übersetzungen davon. Wer einen Text ändert, ändert ihn hier zuerst.
  */
 const de = {
+  darstellung: {
+    titel: "Darstellung",
+    lead: "Wähle dein bevorzugtes Erscheinungsbild.",
+    system: "System",
+    systemHinweis: "Folgt den Systemeinstellungen",
+    hell: "Hell",
+    dunkel: "Dunkel",
+  },
+
   sprache: {
+    titel: "Sprache",
+    lead: "Wähle die Sprache der Benutzeroberfläche.",
     label: "Sprache",
     system: "Wie mein Gerät",
     de: "Deutsch",
@@ -27,6 +38,8 @@ const de = {
   },
 
   kopf: {
+    besucherMenue: "Einstellungen und Anmeldung",
+    registrieren: "Registrieren",
     anmelden: "Anmelden",
     unternehmen: "Unternehmen",
     meinKonto: "Mein Konto",
@@ -245,9 +258,8 @@ const de = {
     enthalten: "enthalten",
     fehlt: "fehlt",
     herunterladen: "Als JSON herunterladen",
-    nichtHierTitel: "Was hier nicht steht",
-    nichtHierText: "Löschen ist ein eigener Weg und steht bewusst nicht als Knopf neben einem Herunterladen-Knopf: hier lässt sich nichts falsch anklicken, was sich nicht rückgängig machen ließe. Was dabei passiert, steht vollständig auf <1>Konto löschen</1> — vor dem Klick, nicht danach.",
-    keineReihenfolge: "Du musst hier nichts herunterladen, bevor du löschst. Der Verweis geht in beide Richtungen, damit niemand glaubt, es gäbe eine Pflichtreihenfolge.",
+    loeschenTitel: "Konto löschen",
+    loeschenText: "Löschen ist ein eigener Weg, und du musst vorher nichts herunterladen. Was dabei verschwindet, steht vollständig auf der Löschseite — vor dem Klick, nicht danach.",
   },
 
   profil: {
@@ -336,6 +348,7 @@ const de = {
     schluesselEntfernen: "Entfernen",
     kiProtokoll: "Festhalten, dass ich die Entwurfshilfe benutzt habe",
     kiProtokollHinweis: "Zeitpunkt und Art, nie der Text. Diese Plattform bewertet niemanden und fällt damit nicht unter die Pflichten für Hochrisiko-KI im Beschäftigungskontext — wer das Protokoll trotzdem für einen Nachweis braucht, bekommt es.",
+    darstellungTitel: "Darstellung und Sprache",
     nachweise: "Nachweise",
     nachweiseLead: "Was über dich festgehalten ist, kannst du jederzeit ansehen und mitnehmen.",
     nachweiseFreigaben: "Meine Freigaben ansehen",
@@ -1124,6 +1137,9 @@ const de = {
     firmennameHinweis: "Entsteht mit der Bestätigung deiner Adresse, nicht sofort.",
     freemail: "Ein Unternehmen braucht eine eigene Domain. Mit einer Adresse bei einem Massenanbieter geht das nicht — nimm deine Arbeitsadresse, oder registriere dich für dich selbst.",
     passwort: "Passwort",
+    emailUngueltig: "Das sieht nicht nach einer E-Mail-Adresse aus. Ohne eine, die es wirklich gibt, kommt der Bestätigungslink nirgends an.",
+    passwortZuKurz: "Mindestens {{mindestens}} Zeichen — lieber eine Wortfolge, die du dir merkst, als etwas Kurzes mit Sonderzeichen.",
+    passwortZuLang: "Das Passwort ist zu lang. Alles nach 72 Byte würde nichts mehr schützen, deshalb nehmen wir es nicht an.",
     passwortHinweis: "Mindestens 12 Zeichen.",
     anzeigename: "Anzeigename",
     anzeigenameHinweis: "So wirst du im Team und im Kopf der Seite genannt — nicht zwingend dein bürgerlicher Name.",

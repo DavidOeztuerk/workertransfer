@@ -13,22 +13,9 @@ public sealed record BerufsfeldWaehlenBefehl(SubjectId Wer, Berufsfeld? Berufsfe
 
 /// <inheritdoc cref="BerufsfeldWaehlenBefehl" />
 /// <remarks>
-/// <strong>Nur das eigene Konto, und deshalb steht keine Kennung im Rumpf.</strong>
-/// In das Konto eines anderen zu schreiben ist keine Fähigkeit, die dieser
-/// Dienst braucht, und eine Kennung wäre das Einzige, was zwischen einem
-/// Aufrufer und genau dem stünde.
-/// <para>
-/// <strong><c>null</c> heisst entfernen.</strong> Ohne diesen Weg wäre eine
-/// einmal getroffene Wahl endgültig, und wer sich beim Anmelden vertan hat,
-/// bliebe für immer Metallbauer. Ein Befehl, der nur setzen kann, sieht
-/// harmloser aus, als er ist.
-/// </para>
-/// <para>
-/// Ein Befehl und keine Ableitung: das Berufsfeld wird nie aus dem Verhalten
-/// geschlossen (ADR-0039). Wer eine GitHub-Verbindung hat, wird dadurch nicht
-/// <c>it_software</c> — das wäre eine abgeleitete Eigenschaft über einen
-/// Menschen, gebildet ohne ihn und unsichtbar für ihn.
-/// </para>
+/// Nur das eigene Konto — deshalb steht keine Kennung im Rumpf. <c>null</c>
+/// heisst entfernen, sonst wäre eine einmal getroffene Wahl endgültig. Das
+/// Berufsfeld wird nie aus dem Verhalten geschlossen (ADR-0039).
 /// </remarks>
 public sealed class BerufsfeldWaehlenHandler(IUserRepository benutzer)
     : IRequestHandler<BerufsfeldWaehlenBefehl, bool>
@@ -49,9 +36,8 @@ public sealed class BerufsfeldWaehlenHandler(IUserRepository benutzer)
 
         konto.BerufsfeldWaehlen(request.Berufsfeld);
 
-        // Aggregate kommen losgelöst aus dem Speicher zurück: ohne diesen Aufruf
-        // erreicht die Wahl die Datenbank nie. Im Test kostet das Vergessen
-        // nichts und in Betrieb die Eingabe.
+        // Aggregate kommen losgelöst zurück: ohne diesen Aufruf erreicht die
+        // Wahl die Datenbank nie.
         await benutzer.SaveAsync(konto, cancellationToken);
 
         return true;

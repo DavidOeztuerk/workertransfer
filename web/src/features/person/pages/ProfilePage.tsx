@@ -13,6 +13,7 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import TextField from "@mui/material/TextField";
 
 import {
+  BerufsfeldSelect,
   ConsentSwitch,
   ErrorBlock,
   LoadingBlock,
@@ -41,7 +42,10 @@ import { usePerson } from "../lib/session";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 import { Nachweise } from "../components/Nachweise";
 import { zeigtGitHub } from "../../../shared/lib/berufsfelder";
-import { useAppSelector } from "../../../core/store/hooks";
+import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
+import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
+import { berufsfeldGesetzt } from "../../auth/store/authSlice";
+import { speichereBerufsfeld } from "../api/berufsfeld";
 import { DraftHelp } from "../components/DraftHelp";
 import { Zivilidentitaet } from "../components/Zivilidentitaet";
 
@@ -123,22 +127,35 @@ export function ProfilePage() {
    * ausgegrauter Kasten für jemanden ohne GitHub wäre die stillschweigende
    * Behauptung, dort fehle etwas (ADR-0022 §3).
    */
-  /*
-   * Das Berufsfeld entscheidet, WAS angeboten wird — nie, was erlaubt ist
-   * (ADR-0039). `null` heisst „nicht angegeben" und bekommt die heutige
-   * Ansicht: es wird niemandem etwas weggenommen, der nicht gewählt hat.
-   */
+  // Das Berufsfeld entscheidet, was angeboten wird — nie, was erlaubt ist
+  // (ADR-0039).
   const berufsfeld = useAppSelector(
     (state) => state.auth.session?.berufsfeld ?? null,
   );
   const github = zeigtGitHub(berufsfeld);
+  const dispatch = useAppDispatch();
 
-  /*
-   * Für ein Konto, dem GitHub nicht angeboten wird, wird auch nicht danach
-   * GEFRAGT. Ein Abruf, dessen Ergebnis nirgends erscheint, wäre nicht nur
-   * überflüssig — er wäre die Plattform, die weiterhin bei jedem nach einem
-   * Repositorium sieht.
+  /**
+   * Das Berufsfeld steht auf dem Profil, wo alles steht, was jemand über seine
+   * Arbeit sagt — nicht in den Einstellungen, die das Konto tragen.
+   *
+   * Es gilt sofort, nicht erst mit „Speichern": Nachweiskasten und Navigation
+   * folgen ihm unmittelbar.
    */
+  async function waehleBerufsfeld(feld: BerufsfeldWahl) {
+    if (feld === berufsfeld) return;
+
+    const result = await speichereBerufsfeld(feld);
+
+    if (result.ok) {
+      dispatch(berufsfeldGesetzt(feld));
+    } else {
+      // Die Anzeige darf keine Wahl behaupten, die der Server abgelehnt hat.
+      setzeFehler({ status: 0, title: "", detail: result.detail });
+    }
+  }
+
+  // Wem GitHub nicht angeboten wird, wird auch nicht danach gefragt.
   const belege = useAsync(
     (signal) => ladeMeine(signal),
     [subjectId, github],
@@ -358,6 +375,11 @@ export function ProfilePage() {
               slotProps={{ htmlInput: { maxLength: 120 } }}
               fullWidth
             />
+            <BerufsfeldSelect
+              wert={berufsfeld}
+              onChange={(feld) => void waehleBerufsfeld(feld)}
+            />
+
             <TextField
               label={t("profil.faehigkeiten")}
               // Der Hinweis erklärt, warum aus „postgres" nach dem Speichern
@@ -384,11 +406,6 @@ export function ProfilePage() {
             */}
             {vorschlaege.length > 0 ? (
               <Box>
-                {/* Der Titel nennt die Quelle, die es hier wirklich gibt.
-                    „Aus deinen GitHub-Projekten" stand über Wörtern aus
-                    Lebenslauf und Arbeiten, sobald jemand kein GitHub hatte —
-                    eine Überschrift, die auf ein Konto zeigt, das es nicht
-                    gibt. */}
                 <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
                   {t(github ? "profil.vorschlaegeTitel" : "profil.vorschlaegeTitelEigen")}
                 </Typography>
