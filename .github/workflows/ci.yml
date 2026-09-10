@@ -11,22 +11,18 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# NOETIG, ABER NICHT HINREICHEND — und das ist nachgemessen.
+# NUR LESEN, und `packages` ist seit dem 10.09.2026 nicht mehr dabei.
 #
-# Der Lauftoken bekommt seine Rechte aus der Vorgabe des Kontos, und `packages`
-# steht dort nicht darin. Mit dem Block ist der Bereich da; der Zugriff ist es
-# nicht: gemessen am 09.09.2026 antwortet `dotnet restore` weiterhin mit
-# `403 (Forbidden)` fuer jedes Girder-Paket. Die 403 ist die Auskunft — der
-# Token wurde ANGENOMMEN und ABGEWIESEN. Girder ist ein privates Paket, dieses
-# Repository ist oeffentlich, und ein Paket gewaehrt Zugriff je Repository.
-# Das loest nur eins von beidem: `workertransfer` in den Paketeinstellungen
-# freigeben, oder ein `GIRDER_TOKEN` hinterlegen (siehe unten).
+# Girder kam bis dahin aus GitHub Packages und verlangte eine Anmeldung; hier
+# stand deshalb `packages: read`, und an VIER Stellen im Lauf eine
+# NuGet-Anmeldung — zwei davon schrieben eine ganze NuGet.Config in eine Datei.
+# Seit Girder auf nuget.org liegt, braucht der Lauf nichts davon, und was ein
+# Lauf nicht braucht, bekommt er auch nicht.
 #
-# `contents: read` steht dabei, weil ein ausgeschriebener Block die Vorgabe
-# ERSETZT: nur `packages` zu nennen naehme dem Lauf das Auschecken.
+# `contents: read` steht ausgeschrieben, weil ein Block die Vorgabe ERSETZT
+# statt sie zu ergaenzen: ein leerer Block naehme dem Lauf das Auschecken.
 permissions:
   contents: read
-  packages: read
 
 env:
   # Eine Zahl fuer alle drei Orte: `docker/web.Dockerfile`,
@@ -48,23 +44,6 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      # Girder liegt in GitHub Packages und verlangt eine Anmeldung.
-      #
-      # Hier stand „der `GITHUB_TOKEN` reicht dafuer" — das war eine Annahme und
-      # nie gemessen. Er reicht nur, wenn das Paket DIESEM Repository Zugriff
-      # gewaehrt (Paketeinstellungen → Manage Actions access). Ist das nicht
-      # eingerichtet, antwortet die Quelle mit 403, und zwar fuer jedes Paket
-      # einzeln.
-      #
-      # Deshalb geht `GIRDER_TOKEN` vor, wenn es hinterlegt ist: ein PAT mit
-      # `read:packages` haengt an keiner Repository-Freigabe. Ohne das Geheimnis
-      # bleibt es beim Lauftoken, und dann muss die Freigabe stehen.
-      - name: NuGet-Anmeldung
-        run: |
-          dotnet nuget update source GitHub \
-            --username "${{ github.actor }}" \
-            --password "${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}" \
-            --store-password-in-clear-text
 
       - run: dotnet restore WorkerTransfer.slnx
 
@@ -147,44 +126,6 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      # Der Pfad steht als `runner.temp` an BEIDEN Enden, und das ist der Fix.
-      #
-      # Hier stand `$HOME` (Shell, richtig) und beim Bau `${{ env.HOME }}`
-      # (Ausdruckskontext) — und der `env`-Kontext kennt `HOME` NICHT, er
-      # enthaelt nur, was ein `env:`-Block deklariert. Der Ausdruck wurde zu
-      # einer leeren Zeichenkette, die Datei hiess `/.nuget/NuGet/NuGet.Config`,
-      # und BuildKit sagte dazu `##[warning]secret file not found` — eine
-      # WARNUNG. Der Bau lief weiter, ohne jede Anmeldung, und starb zweihundert
-      # Zeilen spaeter an `401 (Unauthorized)`. Genau daran sind die zwei zu
-      # unterscheiden: 403 heisst angemeldet und abgewiesen, 401 heisst gar
-      # nicht angemeldet.
-      - name: NuGet-Anmeldung
-        run: |
-          cat > "${{ runner.temp }}/NuGet.Config" <<'XML'
-          <?xml version="1.0" encoding="utf-8"?>
-          <configuration>
-            <packageSources>
-              <clear />
-              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-              <add key="GitHub" value="https://nuget.pkg.github.com/DavidOeztuerk/index.json" />
-            </packageSources>
-            <packageSourceCredentials>
-              <GitHub>
-                <add key="Username" value="${{ github.actor }}" />
-                <add key="ClearTextPassword" value="${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}" />
-              </GitHub>
-            </packageSourceCredentials>
-          </configuration>
-          XML
-
-          # Eine fehlende Anmeldung darf nicht als Warnung durchgehen. Sie hier
-          # zu benennen kostet eine Zeile und spart die Suche nach einem 401,
-          # das nach einem kaputten Feed aussieht. Geprueft wird die GESTALT —
-          # dass ueberhaupt ein Wert drinsteht —, nie der Wert selbst.
-          if grep -q 'ClearTextPassword" value=""' "${{ runner.temp }}/NuGet.Config"; then
-            echo "::error::Kein Token: weder GIRDER_TOKEN noch GITHUB_TOKEN lieferte einen Wert."
-            exit 1
-          fi
 
       - name: Dienstbild bauen
         uses: docker/build-push-action@v6
@@ -193,7 +134,6 @@ jobs:
           file: docker/dotnet-service.Dockerfile
           load: true
           tags: workertransfer-dotnet:local
-          secret-files: nuget_config=${{ runner.temp }}/NuGet.Config
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -296,50 +236,6 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      # Die NuGet-Anmeldung als BuildKit-Geheimnis, nicht als Bauargument: ein
-      # Zugriff in einem Bauargument steht im Bauverlauf und in jeder Schicht.
-      #
-      # Sie liegt unter $HOME/.nuget/NuGet/ — genau dort, wo `secrets:` in
-      # docker-compose.yml sie sucht und wo ein Mensch sie hat. Ein zweiter Ort
-      # allein fuer die CI waere ein zweiter Ort, an dem sie fehlen kann.
-      # Der Pfad steht als `runner.temp` an BEIDEN Enden, und das ist der Fix.
-      #
-      # Hier stand `$HOME` (Shell, richtig) und beim Bau `${{ env.HOME }}`
-      # (Ausdruckskontext) — und der `env`-Kontext kennt `HOME` NICHT, er
-      # enthaelt nur, was ein `env:`-Block deklariert. Der Ausdruck wurde zu
-      # einer leeren Zeichenkette, die Datei hiess `/.nuget/NuGet/NuGet.Config`,
-      # und BuildKit sagte dazu `##[warning]secret file not found` — eine
-      # WARNUNG. Der Bau lief weiter, ohne jede Anmeldung, und starb zweihundert
-      # Zeilen spaeter an `401 (Unauthorized)`. Genau daran sind die zwei zu
-      # unterscheiden: 403 heisst angemeldet und abgewiesen, 401 heisst gar
-      # nicht angemeldet.
-      - name: NuGet-Anmeldung
-        run: |
-          cat > "${{ runner.temp }}/NuGet.Config" <<'XML'
-          <?xml version="1.0" encoding="utf-8"?>
-          <configuration>
-            <packageSources>
-              <clear />
-              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-              <add key="GitHub" value="https://nuget.pkg.github.com/DavidOeztuerk/index.json" />
-            </packageSources>
-            <packageSourceCredentials>
-              <GitHub>
-                <add key="Username" value="${{ github.actor }}" />
-                <add key="ClearTextPassword" value="${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}" />
-              </GitHub>
-            </packageSourceCredentials>
-          </configuration>
-          XML
-
-          # Eine fehlende Anmeldung darf nicht als Warnung durchgehen. Sie hier
-          # zu benennen kostet eine Zeile und spart die Suche nach einem 401,
-          # das nach einem kaputten Feed aussieht. Geprueft wird die GESTALT —
-          # dass ueberhaupt ein Wert drinsteht —, nie der Wert selbst.
-          if grep -q 'ClearTextPassword" value=""' "${{ runner.temp }}/NuGet.Config"; then
-            echo "::error::Kein Token: weder GIRDER_TOKEN noch GITHUB_TOKEN lieferte einen Wert."
-            exit 1
-          fi
 
       # EIN Bild fuer alle elf Dienste und das Gateway (ADR-0028). Ohne
       # `build-arg`: sie unterscheiden sich nur in SERVICE_DIR, und das setzt
@@ -354,7 +250,6 @@ jobs:
           file: docker/dotnet-service.Dockerfile
           load: true
           tags: workertransfer-dotnet:local
-          secret-files: nuget_config=${{ runner.temp }}/NuGet.Config
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -535,12 +430,6 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: NuGet-Anmeldung
-        run: |
-          dotnet nuget update source GitHub \
-            --username "${{ github.actor }}" \
-            --password "${{ secrets.GIRDER_TOKEN || secrets.GITHUB_TOKEN }}" \
-            --store-password-in-clear-text
 
       - run: dotnet restore WorkerTransfer.slnx
 
