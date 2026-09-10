@@ -10,6 +10,11 @@ using WorkerTransfer.Identity.Domain.Verification;
 namespace WorkerTransfer.Identity.Application.Registrierung;
 
 /// <summary>Register an account.</summary>
+/// <param name="Berufsfeld">
+/// In welcher Arbeitswelt die Person steht — <c>null</c>, und das ist der
+/// Normalfall. Die Registrierung fragt, verlangt aber nicht: eine Pflichtangabe
+/// hier wäre eine Hürde vor dem ersten Nutzen (ADR-0039).
+/// </param>
 /// <param name="Firmenname">
 /// Set means "a company is registering here". It becomes a company only when
 /// the address is confirmed — until then it is an intention (E2.6).
@@ -21,7 +26,8 @@ public sealed record RegistrierenBefehl(
     string? Firmenname = null,
     Kontosprache Kontosprache = Sprachwahl.Vorgabe,
     string? Vorname = null,
-    string? Nachname = null) : IBefehl<Registrierergebnis>;
+    string? Nachname = null,
+    Berufsfeld? Berufsfeld = null) : IBefehl<Registrierergebnis>;
 
 /// <summary>What registering produced.</summary>
 public abstract record Registrierergebnis
@@ -121,7 +127,8 @@ public sealed class RegistrierenHandler(
 
         var konto = User.Register(
             request.Email, eintrag, request.Anzeigename, request.Firmenname,
-            request.Kontosprache, request.Vorname, request.Nachname);
+            request.Kontosprache, request.Vorname, request.Nachname,
+            request.Berufsfeld);
 
         await benutzer.AddAsync(konto, cancellationToken);
 

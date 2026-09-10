@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "../../../env";
 import { request } from "../../../core/api/client";
 import { createAppThunk } from "../../../core/store/thunkHelpers";
+import { leseBerufsfeld } from "../../../shared/lib/berufsfelder";
 import type { Membership, Session, SessionWireState } from "../types/session";
 
 interface SessionBody {
@@ -11,6 +12,7 @@ interface SessionBody {
   display_name: string;
   given_name?: string | null;
   family_name?: string | null;
+  occupational_field?: string | null;
 }
 
 interface SessionAntwort {
@@ -32,6 +34,10 @@ const toSession = (body: SessionBody): Session => ({
   displayName: body.display_name ?? "",
   givenName: body.given_name ?? "",
   familyName: body.family_name ?? "",
+  // Ein Etikett, das dieser Browser nicht kennt, wird zur neutralen Ansicht
+  // statt zu einem Absturz: eine ältere Oberfläche gegen einen neueren Server
+  // soll weniger anbieten, nicht scheitern.
+  berufsfeld: leseBerufsfeld(body.occupational_field),
 });
 
 /**

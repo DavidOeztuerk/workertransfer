@@ -13,6 +13,7 @@ describe("briefkopf", () => {
         displayName: "Anna",
         givenName: "Anna",
         familyName: "Beispiel",
+        berufsfeld: null,
       },
       {
         line1: "Weg 2",

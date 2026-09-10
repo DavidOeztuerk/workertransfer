@@ -46,19 +46,21 @@ GitHub heißt, sucht der Scout an drei Vierteln der Arbeitswelt vorbei.
 
 ### Aufgaben
 
-- [ ] **ADR-0039: Belege sind berufsabhängig.** Was ein Berufsfeld ist, welche
+- [x] **ADR-0039: Belege sind berufsabhängig.** Was ein Berufsfeld ist, welche
       Belegarten es zulässt, und warum GitHub dadurch *nicht* abgewertet wird.
       Die drei Herkunftsklassen aus ADR-0033 (genannt / belegt / vorgeschlagen)
       gelten unverändert — es kommen nur Quellen dazu.
-- [ ] `berufsfeld` auf `users` (nullable, aus einer **geschlossenen** Liste),
-      gesetzt bei der Registrierung, änderbar in den Einstellungen.
-- [ ] Die Liste selbst: **kein Freitext.** Ein Feld, aus dem eine Navigation
+- [x] `berufsfeld` auf `users` (nullable, aus einer **geschlossenen** Liste),
+      gesetzt bei der Registrierung, änderbar in den Einstellungen
+      (`PUT /account/occupational-field`, leer heisst entfernen).
+- [x] Die Liste selbst: **kein Freitext.** Ein Feld, aus dem eine Navigation
       folgt, muss endlich sein. Vorschlag als Startpunkt (erweiterbar, jede
       Erweiterung ist eine Entscheidung):
       `handwerk` · `industrie_technik` · `bau` · `gesundheit_pflege` ·
       `logistik_verkehr` · `gastronomie_hotel` · `handel_verkauf` ·
       `buero_verwaltung` · `it_software` · `bildung_soziales` · `sonstiges`
-- [ ] **Belegarten je Feld**, als Tabelle im ADR und als Wert im Code:
+- [x] **Belegarten je Feld**, als Tabelle im ADR und als Wert im Code
+      (`web/src/shared/lib/berufsfelder.ts`; jedes Feld erbt die allgemeinen):
       | Feld | Belege, die zählen |
       |---|---|
       | `it_software` | GitHub, Portfolio, Zertifikate |
@@ -66,24 +68,34 @@ GitHub heißt, sucht der Scout an drei Vierteln der Arbeitswelt vorbei.
       | `gesundheit_pflege` | Berufsurkunde, Fortbildungen, Führungszeugnis (**nie hochgeladen**, nur genannt) |
       | `logistik_verkehr` | Führerscheinklassen, ADR-Schein, Fahrerkarte |
       | alle | Arbeitszeugnisse, Zertifikate, Referenzen |
-- [ ] **Navigation folgt dem Feld**: `/github` erscheint nur bei `it_software`.
+- [x] **Navigation folgt dem Feld**: `/github` erscheint nur bei `it_software`.
       Die Route bleibt erreichbar (wer sie kennt, darf sie nutzen) — sie wird
       nur nicht angeboten. Verstecken ist keine Zugriffskontrolle.
-- [ ] Registrierung: ein Auswahlfeld, **kein Pflichtfeld**. Wer nichts wählt,
+- [x] Registrierung: ein Auswahlfeld, **kein Pflichtfeld**. Wer nichts wählt,
       bekommt die neutrale Ansicht. Ein Pflichtfeld an der Anmeldung ist eine
       Hürde vor dem ersten Nutzen.
-- [ ] Der Wortschatz (`WorkerTransfer.Skills`) bekommt die Handwerksbegriffe:
+- [x] Der Wortschatz (`WorkerTransfer.Skills`) bekommt die Handwerksbegriffe:
       `MIG/MAG`, `WIG`, `CNC`, `SPS`, `Hubwagen`, `Gerüstbau`, … Die Regel aus
       ADR-0023 gilt unverändert: **benennt um, folgert nie.**
 
-### Abnahme
+### Abnahme — erfüllt (10.09.2026)
 
 - Ein Konto mit `handwerk` sieht **kein** GitHub in der Navigation, und die
-  Profilseite bietet stattdessen Nachweise an.
+  Profilseite bietet stattdessen Nachweise an. — `SiteHeader.test.tsx` fährt
+  die drei Fälle, `e2e/occupational-field-journey.spec.ts` die ganze Naht.
 - Ein Konto ohne Berufsfeld sieht die heutige Ansicht — nichts wird schlechter.
+  Die Spalte ist nullbar ohne Vorgabe, es gibt **kein** Wanderungsskript, und
+  nichts wird geraten: eine GitHub-Verbindung macht niemanden zu `it_software`.
 - `Skills`-Test: ein Handwerksbegriff wird kanonisiert, **keiner** wird
-  gefolgert (`MIG/MAG` impliziert nicht `Schweißen`).
+  gefolgert — `Aus_MIG_MAG_folgt_kein_Schweissen` und
+  `Ein_Schein_ist_keine_Maschine` stehen neben `Aus_React_folgt_kein_JavaScript`.
 - Drei Kataloge, drei Sprachen.
+
+**Gegenproben gefahren**, alle vier fielen und keine war ein Übersetzungsfehler:
+`zeigtGitHub` auf „immer" → die Handwerk-Reihe fällt; `nurGenannt` vom
+Führungszeugnis genommen → die Belegreihe fällt; die 422-Prüfung am Endpunkt
+entfernt → `Ein_unbekanntes_Feld_wird_abgesagt` fällt; `SaveAsync` im Befehl
+weggelassen → `Nachtragen_und_zuruecknehmen_wirken_beide` fällt.
 
 ---
 

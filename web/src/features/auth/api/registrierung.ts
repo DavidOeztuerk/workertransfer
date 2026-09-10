@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "../../../env";
 import { request } from "../../../core/api/client";
 import { i18n } from "../../../core/i18n/i18n";
+import type { Berufsfeld } from "../../../shared/lib/berufsfelder";
 
 /**
  * Registrieren, bestätigen, erneut senden — die drei Wege in ein Konto.
@@ -26,6 +27,13 @@ export interface RegistrierEingabe {
    * einem anderen Gerät geöffnet.
    */
   unternehmensname?: string;
+  /**
+   * In welcher Arbeitswelt die Person steht — freiwillig (ADR-0039).
+   *
+   * Nicht gesetzt heisst „nicht angegeben", und das ist der Normalfall. Daraus
+   * folgt nur, was die Oberfläche anbietet, nie ein Recht.
+   */
+  berufsfeld?: Berufsfeld;
 }
 
 export type RegistrierErgebnis = { ok: true } | { ok: false; meldung: string };
@@ -105,6 +113,11 @@ export async function registriere(eingabe: RegistrierEingabe): Promise<Registrie
         // niemand gemacht hat.
         ...(eingabe.unternehmensname !== undefined
           ? { company_name: eingabe.unternehmensname }
+          : {}),
+        // Nur mitschicken, wenn gewählt wurde: ein `null` im Rumpf wäre eine
+        // Aussage, die niemand gemacht hat.
+        ...(eingabe.berufsfeld !== undefined
+          ? { occupational_field: eingabe.berufsfeld }
           : {}),
       },
     },
