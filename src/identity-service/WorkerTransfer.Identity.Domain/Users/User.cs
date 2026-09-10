@@ -48,7 +48,8 @@ public sealed class User
         string? pendingCompanyName,
         Kontosprache sprache,
         string? givenName,
-        string? familyName)
+        string? familyName,
+        Berufsfeld? berufsfeld)
     {
         Id = id;
         Email = email;
@@ -60,6 +61,7 @@ public sealed class User
         Kontosprache = sprache;
         GivenName = LeerAlsNull(givenName);
         FamilyName = LeerAlsNull(familyName);
+        Berufsfeld = berufsfeld;
     }
 
     /// <summary>Who this is.</summary>
@@ -122,6 +124,16 @@ public sealed class User
     /// </remarks>
     public Kontosprache Kontosprache { get; private set; }
 
+    /// <summary>In welcher Arbeitswelt diese Person steht, oder <c>null</c>.</summary>
+    /// <remarks>
+    /// <c>null</c> heisst „nicht angegeben" und ist der Normalfall: die
+    /// Registrierung fragt, verlangt aber nicht (ADR-0039). Daraus folgt
+    /// ausschliesslich, was die Oberfläche anbietet — kein Recht, keine
+    /// Sichtbarkeit, keine Aussage über die Person. Es wird niemals abgeleitet:
+    /// wer eine GitHub-Verbindung hat, ist damit nicht <c>it_software</c>.
+    /// </remarks>
+    public Berufsfeld? Berufsfeld { get; private set; }
+
     /// <summary>A new account, unconfirmed.</summary>
     /// <remarks>
     /// Registering is an act of a natural person (ADR-0017); membership in a
@@ -145,10 +157,11 @@ public sealed class User
         string? pendingCompanyName = null,
         Kontosprache sprache = Sprachwahl.Vorgabe,
         string? givenName = null,
-        string? familyName = null) =>
+        string? familyName = null,
+        Berufsfeld? berufsfeld = null) =>
         new(SubjectId.New(), email, passwordHash, displayName,
             AccountStatus.Pending, ["user"], pendingCompanyName, sprache,
-            givenName, familyName);
+            givenName, familyName, berufsfeld);
 
     /// <summary>The account as a row holds it.</summary>
     /// <remarks>For repositories. Everything here is already true.</remarks>
@@ -162,9 +175,10 @@ public sealed class User
         string? pendingCompanyName,
         Kontosprache sprache = Sprachwahl.Vorgabe,
         string? givenName = null,
-        string? familyName = null) =>
+        string? familyName = null,
+        Berufsfeld? berufsfeld = null) =>
         new(id, email, passwordHash, displayName, status, roles,
-            pendingCompanyName, sprache, givenName, familyName);
+            pendingCompanyName, sprache, givenName, familyName, berufsfeld);
 
     /// <summary>The address was confirmed.</summary>
     /// <remarks>
@@ -203,6 +217,20 @@ public sealed class User
     /// </remarks>
     /// <param name="sprache">What they picked.</param>
     public void SpracheWaehlen(Kontosprache sprache) => Kontosprache = sprache;
+
+    /// <summary>Die Person nennt ihr Berufsfeld — oder nimmt die Angabe zurück.</summary>
+    /// <remarks>
+    /// <c>null</c> heisst ENTFERNEN, nicht „unverändert": sonst gäbe es keinen
+    /// Weg zurück zu „nicht angegeben", und eine einmal getroffene Wahl wäre
+    /// endgültig. Dieselbe Regel wie bei <see cref="SetzeKlarname"/>.
+    /// <para>
+    /// Eine Methode und kein Setzer, den jede Anfrage füttert: was die Person
+    /// über ihre eigene Arbeit sagt, darf nur sie sagen. Abgeleitet wird es
+    /// nie (ADR-0039).
+    /// </para>
+    /// </remarks>
+    /// <param name="berufsfeld">Was sie gewählt hat, oder <c>null</c>.</param>
+    public void BerufsfeldWaehlen(Berufsfeld? berufsfeld) => Berufsfeld = berufsfeld;
 
     /// <summary>Bürgerlichen Namen setzen oder leeren.</summary>
     /// <remarks>

@@ -26,6 +26,12 @@ namespace WorkerTransfer.Identity.Api;
 /// als <c>422</c>. Beides heisst: über die Oberfläche konnte sich niemand
 /// registrieren. <c>DrahtnamenTests</c> nagelt die vier Namen jetzt fest.</para>
 /// </remarks>
+/// <param name="OccupationalField">
+/// In welcher Arbeitswelt die Person steht. <strong>Optional, und das ist die
+/// Entscheidung</strong> (ADR-0039): eine Pflichtangabe an der Anmeldung wäre
+/// eine Hürde vor dem ersten Nutzen, und sie zwänge jemanden, der zwischen zwei
+/// Welten steht, sich zu entscheiden, bevor er gesehen hat, wofür.
+/// </param>
 /// <param name="CompanyName">
 /// Set means "a company is registering here". Optional, because the ordinary
 /// user of a transfer market is a person with no company at all.
@@ -36,7 +42,8 @@ public sealed record RegisterBody(
     [property: JsonPropertyName("display_name")] string DisplayName,
     [property: JsonPropertyName("company_name")] string? CompanyName = null,
     [property: JsonPropertyName("given_name")] string? GivenName = null,
-    [property: JsonPropertyName("family_name")] string? FamilyName = null);
+    [property: JsonPropertyName("family_name")] string? FamilyName = null,
+    [property: JsonPropertyName("occupational_field")] string? OccupationalField = null);
 
 /// <summary>What a caller sends to confirm.</summary>
 public sealed record VerifyEmailBody(string Token);
@@ -69,10 +76,23 @@ public static class RegistrierungsEndpoints
             var vermutet = Sprachwahl.AusKopf(
                 context.Request.Headers.AcceptLanguage.ToString());
 
+            // Ein unbekanntes Etikett sagt die Registrierung AB, statt es
+            // wegzuwerfen. Der stille Weg wäre hier besonders teuer: ein Konto
+            // entstünde, die Bestätigungsmail ginge raus, und die Wahl wäre
+            // fort — sichtbar erst Tage später und für niemanden erklärbar.
+            if (!Berufsfeldwahl.Kennen(body.OccupationalField))
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", "invalid: occupational_field");
+                return;
+            }
+
             var ergebnis = await mediator.Send(
                 new RegistrierenBefehl(
                     body.Email, body.Password, body.DisplayName, body.CompanyName,
-                    vermutet, body.GivenName, body.FamilyName),
+                    vermutet, body.GivenName, body.FamilyName,
+                    Berufsfeldwahl.Aus(body.OccupationalField)),
                 cancellationToken);
 
             switch (ergebnis)

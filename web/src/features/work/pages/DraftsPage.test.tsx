@@ -29,6 +29,7 @@ const SITZUNG = {
     displayName: "Anna Beispiel",
     givenName: "",
     familyName: "",
+    berufsfeld: null,
   },
 };
 

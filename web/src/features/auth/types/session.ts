@@ -1,3 +1,5 @@
+import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
+
 /**
  * Wer gerade handelt.
  *
@@ -29,6 +31,15 @@ export interface Session {
   givenName: string;
   /** Bürgerlicher Nachname, oder leer. */
   familyName: string;
+  /**
+   * In welcher Arbeitswelt die Person steht, oder `null`.
+   *
+   * `null` heisst „nicht angegeben" und ist der Normalfall — es bekommt die
+   * heutige, neutrale Ansicht. Daraus folgt ausschliesslich, was die Oberfläche
+   * ANBIETET (ADR-0039): kein Recht, keine Sichtbarkeit, keine Aussage über die
+   * Person. Der Server antwortet auf jede Route unverändert.
+   */
+  berufsfeld: BerufsfeldWahl;
 }
 
 /**

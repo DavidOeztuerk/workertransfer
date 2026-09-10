@@ -18,6 +18,8 @@ import Link from "@mui/material/Link";
 import { Trans, useTranslation } from "react-i18next";
 
 import { useAppSelector } from "../../../core/store/hooks";
+import { BerufsfeldSelect } from "../../../shared/components/ui";
+import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
 import { AuthCard } from "../components/AuthCard";
 import { AuthModeTabs } from "../components/AuthModeTabs";
 import {
@@ -58,6 +60,11 @@ export function RegisterPage() {
   const [vorname, setVorname] = useState("");
   const [nachname, setNachname] = useState("");
 
+  // Kein Pflichtfeld, und die Vorauswahl ist leer (ADR-0039). Wer nichts
+  // wählt, bekommt die heutige, neutrale Ansicht — es wird niemandem etwas
+  // weggenommen, der sich hier nicht festlegen will.
+  const [berufsfeld, setBerufsfeld] = useState<BerufsfeldWahl>(null);
+
   const [fehler, setFehler] = useState<string | null>(null);
   const [running, setLaeuft] = useState(false);
   const [abgeschickt, setAbgeschickt] = useState(false);
@@ -86,6 +93,7 @@ export function RegisterPage() {
       ...(vorname.trim() ? { vorname: vorname.trim() } : {}),
       ...(nachname.trim() ? { nachname: nachname.trim() } : {}),
       ...(art === "company" ? { unternehmensname } : {}),
+      ...(berufsfeld !== null ? { berufsfeld } : {}),
     });
     setLaeuft(false);
     if (result.ok) setAbgeschickt(true);
@@ -229,6 +237,10 @@ export function RegisterPage() {
         <Typography variant="body2" color="text.secondary">
           {t("zivil.klarnameHinweis")}
         </Typography>
+
+        {/* Am Ende und nicht oben: die Angabe ist freiwillig, und was freiwillig
+            ist, gehört nicht vor die Felder, ohne die es nicht weitergeht. */}
+        <BerufsfeldSelect wert={berufsfeld} onChange={setBerufsfeld} />
 
         {fehler !== null ? <Alert severity="error">{fehler}</Alert> : null}
 

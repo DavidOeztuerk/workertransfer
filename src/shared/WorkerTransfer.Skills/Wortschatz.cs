@@ -91,7 +91,50 @@ public static class Wortschatz
             ["Kundenbetreuung"] = ["kundenservice", "kundendienst", "customer support"],
             ["Projektleitung"] = ["projektmanagement", "project management"],
             ["Altenpflege"] = ["seniorenpflege", "altenpflegerin", "altenpfleger"],
-            ["Elektroinstallation"] = ["elektrik", "elektroinstallateur"]
+            ["Elektroinstallation"] = ["elektrik", "elektroinstallateur"],
+            ["Lohnbuchhaltung"] = ["entgeltabrechnung", "gehaltsabrechnung", "payroll"],
+
+            // Handwerk, Industrie, Bau (ADR-0039). Jede Zeile hier ist dieselbe
+            // Behauptung wie jede Zeile oben: zwei Wörter meinen DASSELBE. Die
+            // Verlockung ist hier größer, weil die Fachbegriffe eine sichtbare
+            // Ordnung haben — jeder weiß, dass MIG/MAG ein Schweißverfahren
+            // ist. Genau deshalb steht es hier: „MIG/MAG“ impliziert NICHT
+            // „Schweißen“. Wer beides nennen will, nennt beides.
+            //
+            // Die Schreibweisen ohne Umlaut stehen ausdrücklich mit dabei: der
+            // Vergleich ist zeichengetreu (nur Groß/Klein wird übersehen), und
+            // „geruestbau“ fände sonst nichts.
+            ["MIG/MAG"] = ["mig mag", "mig-mag", "migmag", "mig/mag-schweißen", "mig/mag-schweissen"],
+            ["WIG"] = ["tig", "wolfram-inertgas", "wig-schweißen", "wig-schweissen"],
+            ["Schweißerpass"] = ["schweisserpass", "schweißerpaß", "schweisserpaß"],
+            ["Schweißfachmann"] = ["schweissfachmann", "schweißfachfrau", "schweissfachfrau"],
+            ["CNC"] = ["c n c", "computerized numerical control", "computerised numerical control"],
+            ["SPS"] = ["plc", "speicherprogrammierbare steuerung"],
+            ["Zerspanungsmechanik"] = ["zerspanung", "zerspanungsmechaniker", "zerspanungsmechanikerin"],
+            ["Kfz-Mechatronik"] = ["kfz-mechatroniker", "kfz mechatroniker", "kfz-mechaniker", "automechaniker"],
+            ["Gerüstbau"] = ["geruestbau", "gerüstbauer", "geruestbauer", "gerüstmontage"],
+            ["Trockenbau"] = ["trockenbauer", "trockenbaumontage"],
+
+            // Logistik und Verkehr. „Code 95“ ist keine Ableitung, sondern der
+            // Name derselben Sache: die Schlüsselzahl im Führerschein, mit der
+            // die Qualifikation nach BKrFQG eingetragen wird.
+            ["Staplerschein"] = ["gabelstaplerschein", "flurförderschein", "flurförderzeugschein"],
+            ["Gabelstapler"] = ["stapler", "frontstapler", "forklift"],
+            ["Hubwagen"] = ["handhubwagen", "gabelhubwagen", "ameise"],
+            ["ADR-Schein"] = ["adr schein", "gefahrgutschein", "gefahrgutführerschein"],
+            ["Berufskraftfahrer-Qualifikation"] = ["bkrfqg", "code 95", "schlüsselzahl 95", "modul 95"],
+
+            // Gesundheit und Pflege. „Pflegefachkraft“ ist die gesetzliche
+            // Umbenennung von 2020 — ein Umbenennen im buchstäblichsten Sinn.
+            ["Pflegefachkraft"] = [
+                "pflegefachmann", "pflegefachfrau", "examinierte pflegekraft",
+                "gesundheits- und krankenpfleger", "gesundheits- und krankenpflegerin"
+            ],
+            ["Erste Hilfe"] = ["ersthelfer", "erste-hilfe-kurs", "first aid"],
+
+            // Gastronomie, Handel, Verwaltung.
+            ["HACCP"] = ["haccp-konzept", "haccp konzept"],
+            ["Warenwirtschaft"] = ["wawi", "warenwirtschaftssystem"]
         };
 
     /// <summary>Die kanonischen Namen selbst.</summary>
