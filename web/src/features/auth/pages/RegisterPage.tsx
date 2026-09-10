@@ -27,6 +27,11 @@ import {
   registriere,
   sendeBestaetigungErneut,
 } from "../api/registrierung";
+import {
+  PASSWORT_MINDESTLAENGE,
+  emailFehler,
+  passwortFehler,
+} from "../lib/formpruefung";
 
 type Art = "person" | "company";
 
@@ -65,6 +70,12 @@ export function RegisterPage() {
   // weggenommen, der sich hier nicht festlegen will.
   const [berufsfeld, setBerufsfeld] = useState<BerufsfeldWahl>(null);
 
+  // „Berührt" heisst: das Feld war einmal verlassen. Erst dann wird geurteilt.
+  // Während des Tippens ist jede Adresse unfertig — „m", „ma", „max@" — und
+  // rot zu färben, was noch entsteht, macht aus einer Hilfe eine Belehrung.
+  const [emailBeruehrt, setEmailBeruehrt] = useState(false);
+  const [passwortBeruehrt, setPasswortBeruehrt] = useState(false);
+
   const [fehler, setFehler] = useState<string | null>(null);
   const [running, setLaeuft] = useState(false);
   const [abgeschickt, setAbgeschickt] = useState(false);
@@ -79,6 +90,21 @@ export function RegisterPage() {
       art === "company" && email.includes("@") && isPublicEmailDomain(email),
     [art, email],
   );
+
+  /*
+   * SICHTBAR, BEVOR JEMAND ABSCHICKT — und trotzdem entscheidet der Server.
+   *
+   * Das Formular trägt `noValidate` (es zeigt seine Fehler selbst statt der
+   * Browser-Blase), und damit war `type="email"` wirkungslos. So kam am
+   * 10.09.2026 die Adresse `bus` durch: der Server legte ein Konto an, die Mail
+   * scheiterte im Hintergrund, und zurück blieb ein Konto auf `pending`, das
+   * niemand je bestätigen kann. Die Absage spricht weiterhin der Server (422);
+   * hier wird nur sichtbar, was ohnehin gilt.
+   */
+  const emailProblem = emailBeruehrt ? emailFehler(email) : null;
+  const passwortProblem = passwortBeruehrt ? passwortFehler(passwort) : null;
+  const unvollstaendig =
+    email.trim() === "" || passwort === "" || anzeigename.trim() === "";
 
   if (status === "authenticated") return <Navigate to="/overview" replace />;
 
@@ -172,13 +198,17 @@ export function RegisterPage() {
           label={t("registrierung.email")}
           type="email"
           autoComplete="username"
+          error={emailProblem !== null}
           helperText={
-            art === "company"
-              ? t("registrierung.emailHinweisFirma")
-              : t("registrierung.emailHinweisPerson")
+            emailProblem !== null
+              ? t(emailProblem)
+              : art === "company"
+                ? t("registrierung.emailHinweisFirma")
+                : t("registrierung.emailHinweisPerson")
           }
           value={email}
           onChange={(event) => setEmail(event.target.value)}
+          onBlur={() => setEmailBeruehrt(true)}
           required
         />
 
@@ -207,9 +237,15 @@ export function RegisterPage() {
           label={t("registrierung.passwort")}
           type="password"
           autoComplete="new-password"
-          helperText={t("registrierung.passwortHinweis")}
+          error={passwortProblem !== null}
+          helperText={
+            passwortProblem !== null
+              ? t(passwortProblem, { mindestens: PASSWORT_MINDESTLAENGE })
+              : t("registrierung.passwortHinweis")
+          }
           value={passwort}
           onChange={(event) => setPasswort(event.target.value)}
+          onBlur={() => setPasswortBeruehrt(true)}
           required
         />
         <TextField
@@ -248,7 +284,21 @@ export function RegisterPage() {
           type="submit"
           variant="contained"
           size="large"
-          disabled={running || freemail}
+          // Gesperrt, solange etwas offensichtlich nicht stimmt. NICHT, weil
+          // der Browser entscheidet — sondern damit niemand auf eine Absage
+          // wartet, die schon sichtbar danebensteht.
+          // Der Knopf urteilt IMMER, nicht erst nach dem Verlassen: sonst
+          // stünde er offen, solange niemand ein Feld verlassen hat, und der
+          // Fehler käme doch erst vom Server. Rot GEFÄRBT wird trotzdem erst
+          // nach dem Verlassen — das eine ist eine Absage, das andere eine
+          // Belehrung beim Tippen.
+          disabled={
+            running
+            || freemail
+            || unvollstaendig
+            || emailFehler(email) !== null
+            || passwortFehler(passwort) !== null
+          }
         >
           {running ? t("registrierung.laeuft") : t("registrierung.knopf")}
         </Button>

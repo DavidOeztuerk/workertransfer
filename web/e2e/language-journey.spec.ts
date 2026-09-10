@@ -38,12 +38,12 @@ test("die Sprachwahl wechselt die Oberfläche und erreicht die Mail", async ({ p
   await page.goto("/market");
   await expect(page.getByRole("heading", { name: "Mein Marktstatus" })).toBeVisible();
 
-  // Umschalten auf Französisch. Die Wahl steht im ZAHNRAD der Kopfzeile — sie
-  // stand einmal als Auswahlfeld im Fuss, und der Gedanke „das stellt man
-  // einmal ein, also gehört es nach unten" war praktisch falsch: wer die
-  // Sprache wechselt, WEIL er die Oberfläche nicht lesen kann, scrollt nicht
-  // erst an das Seitenende.
-  await page.getByRole("button", { name: "Darstellung und Sprache" }).click();
+  // Umschalten auf Französisch. ANGEMELDET liegt die Wahl im Kontomenü unter
+  // dem Nutzersymbol — abgemeldet hinter einem Zahnrad, weil es dann kein
+  // Nutzersymbol gibt. Beides steht oben und nicht im Fuss: wer die Sprache
+  // wechselt, WEIL er die Oberfläche nicht lesen kann, scrollt nicht erst an
+  // das Seitenende.
+  await page.getByRole("button", { name: "Mein Konto" }).click();
   await page.getByRole("menuitemradio", { name: "Français" }).click();
 
   // Der Beleg, dass wirklich gezeichnet wird und nicht nur der Store umfiel.

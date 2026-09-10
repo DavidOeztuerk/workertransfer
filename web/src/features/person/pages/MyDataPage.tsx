@@ -1,10 +1,9 @@
 import Alert from "@mui/material/Alert";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
-import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
@@ -234,22 +233,31 @@ export function MyDataPage() {
         </CardContent>
       </Card>
 
+      {/* DER WEG ZUM LÖSCHEN IST EIN KNOPF, KEIN NEBENSATZ.
+          Hier stand ein Abschnitt „Was hier nicht steht" mit zwei Absätzen
+          Begründung, und der einzige Weg zur Löschung war ein Wort mitten im
+          Fliesstext. Das Recht auf Löschung gehört auffindbar an die Stelle, an
+          der jemand seine Daten verwaltet — nicht in eine Erklärung darüber,
+          warum es woanders steht. Die Begründung selbst war richtig und steht
+          jetzt dort, wo sie wirkt: auf der Löschseite, vor dem Klick. */}
       <Card>
         <CardContent>
-          <Typography variant="h2" sx={{ mb: 1.5 }}>
-            {t("meineDaten.nichtHierTitel")}
+          <Typography variant="h2" sx={{ mb: 1 }}>
+            {t("meineDaten.loeschenTitel")}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            <Trans
-              i18nKey="meineDaten.nichtHierText"
-              components={{
-                1: <Link component={RouterLink} to="/delete-account" />,
-              }}
-            />
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {t("meineDaten.loeschenText")}
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {t("meineDaten.keineReihenfolge")}
-          </Typography>
+          {/* Umrandet und nicht gefüllt: auffindbar, ohne neben dem
+              Herunterladen-Knopf wie die naheliegende Handlung auszusehen. */}
+          <Button
+            component={RouterLink}
+            to="/delete-account"
+            variant="outlined"
+            color="error"
+          >
+            {t("kopf.kontoLoeschen")}
+          </Button>
         </CardContent>
       </Card>
     </PageShell>

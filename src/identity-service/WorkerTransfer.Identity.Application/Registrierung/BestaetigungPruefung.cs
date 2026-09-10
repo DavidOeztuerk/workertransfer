@@ -1,4 +1,5 @@
 using FluentValidation;
+using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Application.Registrierung;
 
@@ -22,18 +23,26 @@ public sealed class BestaetigungPruefung : AbstractValidator<AdresseBestaetigenB
             .OverridePropertyName("token");
 }
 
-/// <summary>Eine Adresse muss dasein, damit die Mail irgendwohin geht.</summary>
+/// <summary>Eine Adresse muss zustellbar sein, damit die Mail irgendwohin geht.</summary>
 /// <remarks>
-/// Geprüft wird nur, DASS etwas dasteht. Ob die Adresse bekannt ist, beantwortet
-/// dieser Endpunkt bewusst nicht — er antwortet für bekannte und unbekannte
-/// gleich, sonst verriete er die Mitgliedschaft auf dieser Plattform, ohne den
-/// Ledger zu fragen.
+/// Geprüft wird die FORM. Ob die Adresse bekannt ist, beantwortet dieser
+/// Endpunkt bewusst nicht — er antwortet für bekannte und unbekannte gleich,
+/// sonst verriete er die Mitgliedschaft auf dieser Plattform, ohne den Ledger zu
+/// fragen. Eine Formprüfung sieht nur die Zeichenkette und kann diese Zusage
+/// deshalb gar nicht brechen.
+/// <para>
+/// Dieselbe Prüfung wie bei der Registrierung, und aus demselben Grund: dieser
+/// Weg baut ebenfalls eine <c>MailMessage</c>. Ohne sie liefe „erneut senden"
+/// an eine kaputte Adresse in denselben verschluckten Versandfehler — nur dass
+/// die Antwort weiterhin 202 lautet.
+/// </para>
 /// </remarks>
 public sealed class ErneutSendenPruefung : AbstractValidator<BestaetigungErneutSendenBefehl>
 {
-    /// <summary>Setzt die eine Regel.</summary>
+    /// <summary>Setzt die Regel.</summary>
     public ErneutSendenPruefung() =>
         RuleFor(befehl => befehl.Email)
             .NotEmpty().WithMessage("email is required")
+            .Must(Emailadresse.IstZustellbar).WithMessage("email is not a deliverable address")
             .OverridePropertyName("email");
 }

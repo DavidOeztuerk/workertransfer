@@ -22,7 +22,25 @@ import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import Tooltip from "@mui/material/Tooltip";
-import { SettingsMenu } from "./SettingsMenu";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import CollectionsOutlinedIcon from "@mui/icons-material/CollectionsOutlined";
+import GitHubIcon from "@mui/icons-material/GitHub";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
+import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
+import FolderSharedOutlinedIcon from "@mui/icons-material/FolderSharedOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
+
+import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
+import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
+import MenuList from "@mui/material/MenuList";
+import Popover from "@mui/material/Popover";
+
+import { useVorlieben } from "./darstellung";
+import { Vorliebenebene, Vorliebenzeile, type Menueebene } from "./Vorliebenmenue";
 import { ProfilAvatar } from "../ui";
 import { zeigtGitHub } from "../../lib/berufsfelder";
 
@@ -128,8 +146,12 @@ export function SiteHeader() {
 
           <Box sx={{ flexGrow: 1 }} />
 
-          <SettingsMenu />
-
+          {/* KEIN ZAHNRAD MEHR — weder angemeldet noch abgemeldet.
+              Darstellung und Sprache liegen in BEIDEN Zuständen hinter dem
+              Nutzersymbol. Vorher stand abgemeldet ein Zahnrad daneben, und die
+              Stelle, an der man etwas einstellt, wanderte damit beim An- und
+              Abmelden — genau die Bewegung, die diese Kopfzeile sonst überall
+              vermeidet. */}
           {signedIn ? (
             <>
               <CompanySwitcher />
@@ -137,24 +159,7 @@ export function SiteHeader() {
               <AccountMenu />
             </>
           ) : (
-            // EIN Zugang, immer sichtbar — auch auf /login und /register.
-            /* EIN NUTZERSYMBOL, auf JEDER Breite, und kein Knopf daneben.
-               Vorher stand schmal ein Symbol und breit zusätzlich ein Knopf mit
-               Text — zwei Bedienelemente für dieselbe Handlung, und beim Ziehen
-               des Fensters erschien und verschwand eines davon. An genau der
-               Stelle steht angemeldet der Avatar; ob ein Konto offen ist oder
-               nicht, darf die Stelle nicht wandern. */
-            <Tooltip title={t("kopf.anmelden")}>
-              <IconButton
-                component={RouterLink}
-                to="/login"
-                aria-label={t("kopf.anmelden")}
-                size="small"
-                sx={{ ml: 0.5, p: 0.25, color: "text.secondary" }}
-              >
-                <AccountCircleIcon sx={{ fontSize: 32 }} />
-              </IconButton>
-            </Tooltip>
+            <BesucherMenu />
           )}
         </Toolbar>
       </Container>
@@ -224,6 +229,28 @@ function NavLink({
 }
 
 /**
+ * Welche Ebene des Menüs gerade offen ist.
+ *
+ * <strong>Beim Schliessen zurück auf „haupt".</strong> Sonst stünde das Menü
+ * beim nächsten Öffnen mitten in der Sprachauswahl — und wer es für „Profil"
+ * aufmacht, sucht erst einmal den Weg heraus.
+ */
+function useVorliebenansicht(setAnker: (wert: null) => void) {
+  const [ebene, setEbene] = useState<Menueebene>("haupt");
+  const vorlieben = useVorlieben();
+
+  return {
+    ansicht: vorlieben,
+    ebene,
+    setzeAnsicht: setEbene,
+    schliessen: () => {
+      setAnker(null);
+      setEbene("haupt");
+    },
+  };
+}
+
+/**
  * Das eigene Konto.
  *
  * <strong>Getrennt vom Firmenmenü, und das ist keine Ordnungsliebe.</strong>
@@ -255,6 +282,9 @@ function AccountMenu() {
   );
   const github = zeigtGitHub(berufsfeld);
 
+  const email = useAppSelector((state) => state.auth.session?.email ?? "");
+  const { ansicht, ebene, setzeAnsicht, schliessen } = useVorliebenansicht(setAnker);
+
   return (
     <>
       {/* DAS BILD DER PERSON, nicht ein Knopf mit dem Wort „Mein Konto".
@@ -274,28 +304,189 @@ function AccountMenu() {
           <ProfilAvatar name={name} size={32} />
         </IconButton>
       </Tooltip>
-      <Menu
+      {/* EIN POPOVER, KEIN MENU — und das ist keine Kosmetik.
+          Ein Auswahlfeld in einem `Menu` ist ein Fremdkörper: es öffnet ein
+          zweites Overlay über dem ersten, und MUIs `MenuList` versucht
+          gleichzeitig, den Fokus zu führen. Die Wege bleiben eine `MenuList`
+          (die Tastatursteuerung soll dort weiterlaufen), die Abschnitte stehen
+          daneben in einem gewöhnlichen Kasten. */}
+      <Popover
         anchorEl={anker}
         open={anker !== null}
-        onClose={() => setAnker(null)}
-        onClick={() => setAnker(null)}
-        slotProps={{ paper: { sx: { minWidth: 232, mt: 1 } } }}
+        onClose={schliessen}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        slotProps={{ paper: { sx: { width: 312, mt: 1 } } }}
       >
-        <Eintrag to="/profile">{t("kopf.profil")}</Eintrag>
-        <Eintrag to="/resume">{t("kopf.lebenslauf")}</Eintrag>
-        <Eintrag to="/portfolio">{t("kopf.arbeiten")}</Eintrag>
-        {github ? <Eintrag to="/github">{t("kopf.github")}</Eintrag> : null}
-        <Eintrag to="/applications">{t("kopf.bewerbungen")}</Eintrag>
-        <Eintrag to="/applications/drafts">{t("kopf.entwuerfe")}</Eintrag>
+        {/* WER hier gerade angemeldet ist — als Erstes und ohne Klick.
+            Auf einer Plattform, die über Freigaben entscheidet, ist die Frage
+            „unter welchem Konto tue ich das eigentlich?" keine Kleinigkeit;
+            wer zwei Konten hat, sieht sonst am Avatar nur zwei Buchstaben. */}
+        <Box sx={{ px: 2, py: 1.25 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 620 }} noWrap>
+            {name}
+          </Typography>
+          {email ? (
+            <Typography variant="caption" color="text.secondary" noWrap component="div">
+              {email}
+            </Typography>
+          ) : null}
+        </Box>
         <Divider />
-        <Eintrag to="/consents">{t("kopf.freigaben")}</Eintrag>
-        <Eintrag to="/my-data">{t("kopf.meineDaten")}</Eintrag>
-        <Eintrag to="/settings">{t("kopf.einstellungen")}</Eintrag>
+
+        {/* Eine Ebene tiefer, dieselbe Fläche: das Menü bleibt, wo es war. */}
+        {ebene !== "haupt" ? (
+          <MenuList sx={{ py: 0.5 }}>
+            <Vorliebenebene
+              ebene={ebene}
+              darstellung={ansicht.darstellung}
+              sprache={ansicht.sprache}
+              onZurueck={() => setzeAnsicht("haupt")}
+            />
+          </MenuList>
+        ) : (
+        <MenuList sx={{ py: 0.5 }}>
+        <Eintrag to="/profile" icon={<PersonOutlineIcon fontSize="small" />} onFertig={schliessen}>
+          {t("kopf.profil")}
+        </Eintrag>
+        <Eintrag to="/resume" icon={<DescriptionOutlinedIcon fontSize="small" />} onFertig={schliessen}>
+          {t("kopf.lebenslauf")}
+        </Eintrag>
+        <Eintrag to="/portfolio" icon={<CollectionsOutlinedIcon fontSize="small" />} onFertig={schliessen}>
+          {t("kopf.arbeiten")}
+        </Eintrag>
+        {github ? (
+          <Eintrag to="/github" icon={<GitHubIcon fontSize="small" />} onFertig={schliessen}>
+            {t("kopf.github")}
+          </Eintrag>
+        ) : null}
+        <Eintrag to="/applications" icon={<SendOutlinedIcon fontSize="small" />} onFertig={schliessen}>
+          {t("kopf.bewerbungen")}
+        </Eintrag>
+        <Eintrag to="/applications/drafts" icon={<EditNoteOutlinedIcon fontSize="small" />} onFertig={schliessen}>
+          {t("kopf.entwuerfe")}
+        </Eintrag>
 
         <Divider />
-        <Eintrag to="/delete-account">{t("kopf.kontoLoeschen")}</Eintrag>
-        <Eintrag to="/logout">{t("kopf.abmelden")}</Eintrag>
-      </Menu>
+        <Eintrag to="/consents" icon={<VerifiedUserOutlinedIcon fontSize="small" />} onFertig={schliessen}>
+          {t("kopf.freigaben")}
+        </Eintrag>
+        <Eintrag to="/my-data" icon={<FolderSharedOutlinedIcon fontSize="small" />} onFertig={schliessen}>
+          {t("kopf.meineDaten")}
+        </Eintrag>
+        <Eintrag to="/settings" icon={<SettingsOutlinedIcon fontSize="small" />} onFertig={schliessen}>
+          {t("kopf.einstellungen")}
+        </Eintrag>
+
+        {/* Vorlieben ÜBER dem Abmelden. „Abmelden" ist der letzte Eintrag
+            eines Kontomenüs, in jeder Anwendung, die eines hat — was darunter
+            steht, sieht aus wie ein Nachtrag. */}
+        <Divider />
+        <Vorliebenzeile
+          vorliebe={ansicht.darstellung}
+          onOeffnen={() => setzeAnsicht("darstellung")}
+        />
+        <Vorliebenzeile
+          vorliebe={ansicht.sprache}
+          onOeffnen={() => setzeAnsicht("sprache")}
+        />
+
+        {/* „Konto löschen" steht NICHT hier, und das ist eine Entscheidung.
+            Ein Menü, das man täglich für „Profil" und „Bewerbungen" öffnet, ist
+            der falsche Ort für den einen Weg, den man genau einmal geht — und
+            der Nachbar von „Abmelden" ist er erst recht nicht. Der Weg bleibt
+            offen: die Einstellungen und „Meine Daten" führen hin, dort steht er
+            neben Auskunft und Freigaben und damit bei seinesgleichen. */}
+        <Divider />
+        <Eintrag to="/logout" icon={<LogoutOutlinedIcon fontSize="small" />} onFertig={schliessen}>
+          {t("kopf.abmelden")}
+        </Eintrag>
+        </MenuList>
+        )}
+      </Popover>
+    </>
+  );
+}
+
+/**
+ * Das Nutzersymbol für ABGEMELDETE Besucher.
+ *
+ * <strong>Es steht an genau der Stelle, an der angemeldet der Avatar steht,
+ * und es tut dasselbe: es öffnet ein Menü.</strong> Vorher führte es direkt
+ * nach <c>/login</c> und daneben stand ein Zahnrad — zwei Bedienelemente, von
+ * denen eines beim Anmelden verschwand und das andere seine Bedeutung wechselte.
+ *
+ * <strong>Darstellung und Sprache stehen hier, weil sie hier gebraucht
+ * werden.</strong> Wer die Sprache wechselt, WEIL er die Oberfläche nicht lesen
+ * kann, muss das vor der Anmeldung tun können — und zwar an derselben Stelle,
+ * an der er es danach wieder tut.
+ */
+function BesucherMenu() {
+  const { t } = useTranslation();
+  const [anker, setAnker] = useState<null | HTMLElement>(null);
+  const { ansicht, ebene, setzeAnsicht, schliessen } = useVorliebenansicht(setAnker);
+
+  return (
+    <>
+      <Tooltip title={t("kopf.meinKonto")}>
+        <IconButton
+          onClick={(event) => setAnker(event.currentTarget)}
+          aria-haspopup="menu"
+          aria-expanded={anker !== null}
+          aria-label={t("kopf.meinKonto")}
+          size="small"
+          sx={{ ml: 0.5, p: 0.25, color: "text.secondary" }}
+        >
+          <AccountCircleIcon sx={{ fontSize: 32 }} />
+        </IconButton>
+      </Tooltip>
+
+      <Popover
+        anchorEl={anker}
+        open={anker !== null}
+        onClose={schliessen}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        slotProps={{ paper: { sx: { width: 288, mt: 1 } } }}
+      >
+        {ebene !== "haupt" ? (
+          <MenuList sx={{ py: 0.5 }}>
+            <Vorliebenebene
+              ebene={ebene}
+              darstellung={ansicht.darstellung}
+              sprache={ansicht.sprache}
+              onZurueck={() => setzeAnsicht("haupt")}
+            />
+          </MenuList>
+        ) : (
+          <MenuList sx={{ py: 0.5 }}>
+            <Eintrag
+              to="/login"
+              icon={<LoginOutlinedIcon fontSize="small" />}
+              onFertig={schliessen}
+            >
+              {t("kopf.anmelden")}
+            </Eintrag>
+            <Eintrag
+              to="/register"
+              icon={<PersonAddOutlinedIcon fontSize="small" />}
+              onFertig={schliessen}
+            >
+              {t("kopf.registrieren")}
+            </Eintrag>
+
+            <Divider />
+            <Vorliebenzeile
+              vorliebe={ansicht.darstellung}
+              onOeffnen={() => setzeAnsicht("darstellung")}
+            />
+            <Vorliebenzeile
+              vorliebe={ansicht.sprache}
+              onOeffnen={() => setzeAnsicht("sprache")}
+            />
+          </MenuList>
+        )}
+      </Popover>
     </>
   );
 }
@@ -343,9 +534,31 @@ function FirmenMenu() {
   );
 }
 
-function Eintrag({ to, children }: { to: string; children: React.ReactNode }) {
+/**
+ * Eine Zeile im Kontomenü.
+ *
+ * Mit Symbol, weil zwölf gleich aussehende Textzeilen eine Liste sind und keine
+ * Ordnung — das Auge findet ein Symbol schneller wieder als ein Wort, das es
+ * lesen muss.
+ */
+function Eintrag({
+  to,
+  icon,
+  onFertig,
+  children,
+}: {
+  to: string;
+  icon?: React.ReactNode;
+  onFertig?: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <MenuItem component={RouterLink} to={to}>
+    <MenuItem
+      component={RouterLink}
+      to={to}
+      onClick={onFertig}
+    >
+      {icon ? <ListItemIcon>{icon}</ListItemIcon> : null}
       {children}
     </MenuItem>
   );

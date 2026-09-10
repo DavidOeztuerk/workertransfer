@@ -165,11 +165,50 @@ describe("RegisterPage — Person oder Unternehmen", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("färbt eine unfertige Adresse nicht rot, solange getippt wird", async () => {
+    // Die Regel dieses Formulars: geurteilt wird erst, wenn ein Feld VERLASSEN
+    // wurde. Während des Tippens ist jede Adresse unfertig, und rot zu färben,
+    // was gerade entsteht, macht aus einer Hilfe eine Belehrung.
+    const user = userEvent.setup();
+    renderMitStore(<RegisterPage />, { route: "/register" });
+
+    await user.type(screen.getByLabelText(/E-Mail/i), "max@");
+
+    expect(
+      screen.queryByText(/sieht nicht nach einer E-Mail-Adresse aus/i),
+    ).toBeNull();
+  });
+
+  it("sagt nach dem Verlassen des Feldes, dass die Adresse keine ist", async () => {
+    // Der gemessene Fall: `bus` kam durch, weil `noValidate` die Browserprüfung
+    // abschaltet und keine eigene danebenstand. Der Server legte ein Konto an,
+    // die Mail scheiterte im Hintergrund, und zurück blieb ein Konto auf
+    // `pending`, das niemand je bestätigen kann.
+    const user = userEvent.setup();
+    renderMitStore(<RegisterPage />, { route: "/register" });
+
+    await user.type(screen.getByLabelText(/E-Mail/i), "bus");
+    await user.tab();
+
+    expect(
+      screen.getByText(/sieht nicht nach einer E-Mail-Adresse aus/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Registrieren/i }),
+    ).toBeDisabled();
+  });
+
   it("prüft Freemail nur beim Beanspruchen einer Domain, nicht bei einer Person", async () => {
     const user = userEvent.setup();
     renderMitStore(<RegisterPage />, { route: "/register" });
 
+    // Das ganze Formular, nicht nur die Adresse: der Knopf ist auch gesperrt,
+    // solange Pflichtfelder leer sind, und dieser Test spricht über FREEMAIL.
+    // Ohne den Rest prüfte er, dass ein unvollständiges Formular nicht
+    // abschickbar ist — richtig, aber nicht seine Frage.
     await user.type(screen.getByLabelText(/E-Mail/i), "max@gmail.com");
+    await user.type(screen.getByLabelText(/Passwort/i), "ein-langes-passwort");
+    await user.type(screen.getByLabelText(/Anzeigename/i), "Max");
 
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByRole("button", { name: /Registrieren/i })).toBeEnabled();

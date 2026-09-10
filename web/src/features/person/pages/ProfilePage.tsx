@@ -13,6 +13,7 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import TextField from "@mui/material/TextField";
 
 import {
+  BerufsfeldSelect,
   ConsentSwitch,
   ErrorBlock,
   LoadingBlock,
@@ -41,7 +42,10 @@ import { usePerson } from "../lib/session";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 import { Nachweise } from "../components/Nachweise";
 import { zeigtGitHub } from "../../../shared/lib/berufsfelder";
-import { useAppSelector } from "../../../core/store/hooks";
+import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
+import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
+import { berufsfeldGesetzt } from "../../auth/store/authSlice";
+import { speichereBerufsfeld } from "../api/berufsfeld";
 import { DraftHelp } from "../components/DraftHelp";
 import { Zivilidentitaet } from "../components/Zivilidentitaet";
 
@@ -132,6 +136,36 @@ export function ProfilePage() {
     (state) => state.auth.session?.berufsfeld ?? null,
   );
   const github = zeigtGitHub(berufsfeld);
+  const dispatch = useAppDispatch();
+
+  /*
+   * Das Berufsfeld steht HIER und nicht in den Einstellungen.
+   *
+   * Der Plan sah die Einstellungen vor; gemessen an einem echten Menschen war
+   * das falsch — er suchte es auf dem Profil, und zwar zu Recht: hier steht
+   * alles, was jemand über SEINE ARBEIT sagt (Überschrift, Text, Fähigkeiten).
+   * Die Einstellungen tragen, was jemand über sein KONTO entscheidet. Es steht
+   * an genau einer Stelle; zwei Bedienelemente für dieselbe Wahl gehen beim
+   * ersten Umschalten auseinander.
+   *
+   * Es gilt SOFORT und nicht erst mit „Speichern": es ist kein Profilfeld,
+   * sondern eine Angabe am Konto — der Nachweiskasten darunter und die
+   * Navigation oben folgen ihm unmittelbar, und ein Feld, dessen Wirkung man
+   * sieht, darf nicht auf einen Knopf am Seitenende warten.
+   */
+  async function waehleBerufsfeld(feld: BerufsfeldWahl) {
+    if (feld === berufsfeld) return;
+
+    const result = await speichereBerufsfeld(feld);
+
+    if (result.ok) {
+      dispatch(berufsfeldGesetzt(feld));
+    } else {
+      // Nichts im Speicher ändern: die Anzeige darf keine Wahl behaupten, die
+      // der Server nicht angenommen hat.
+      setzeFehler({ status: 0, title: "", detail: result.detail });
+    }
+  }
 
   /*
    * Für ein Konto, dem GitHub nicht angeboten wird, wird auch nicht danach
@@ -358,6 +392,14 @@ export function ProfilePage() {
               slotProps={{ htmlInput: { maxLength: 120 } }}
               fullWidth
             />
+            {/* Vor den Fähigkeiten: das Berufsfeld ordnet, WELCHE Wörter hier
+                überhaupt naheliegen — und welche Nachweise unten angeboten
+                werden. */}
+            <BerufsfeldSelect
+              wert={berufsfeld}
+              onChange={(feld) => void waehleBerufsfeld(feld)}
+            />
+
             <TextField
               label={t("profil.faehigkeiten")}
               // Der Hinweis erklärt, warum aus „postgres" nach dem Speichern

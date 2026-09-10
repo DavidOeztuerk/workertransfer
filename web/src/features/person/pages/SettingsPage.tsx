@@ -11,15 +11,12 @@ import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
 
 import {
-  BerufsfeldSelect,
   ConsentSwitch,
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
-import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
-import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
-import { berufsfeldGesetzt } from "../../auth/store/authSlice";
-import { speichereBerufsfeld } from "../api/berufsfeld";
+import { useAppSelector } from "../../../core/store/hooks";
+import { DarstellungsAbschnitte } from "../../../shared/components/layout/darstellung";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 import { Zivilidentitaet } from "../components/Zivilidentitaet";
 import { useAsync } from "../lib/useAsync";
@@ -164,7 +161,7 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Berufsfeldblock />
+      <Darstellungsblock />
       <Zivilidentitaet />
       <Datenschutzblock />
       <KiBlock />
@@ -174,76 +171,28 @@ export function SettingsPage() {
 }
 
 /**
- * Das Berufsfeld — nachtragbar und zurücknehmbar (ADR-0039).
+ * Darstellung und Sprache — die ausführliche Fassung.
  *
- * <strong>Die Rücknahme ist die wichtigere Hälfte.</strong> Ohne sie wäre eine
- * bei der Anmeldung getroffene Wahl endgültig, und wer sich vertan hat, bliebe
- * für immer Metallbauer. Der leere Eintrag steht deshalb in der Liste und
- * heisst „keins", nicht „unverändert".
+ * <strong>Im Kontomenü steht die knappe („Darstellung ▸ Dunkel"), hier die
+ * ganze.</strong> Ein Menü ist eine Liste von Wegen; ein Abschnitt mit
+ * Überschrift, erklärendem Satz und Auswahlfeld ist eine Seite. Beides in
+ * dasselbe Menü zu legen stapelte zwei Bedienarten übereinander — Einträge, die
+ * einen wegbringen, und Felder, die einen dabehalten — und liess die Vorlieben
+ * ausgerechnet unter „Abmelden" landen.
  *
- * Der Speicher wird sofort nachgezogen, damit der Kopf der Seite der Wahl
- * folgt: sonst stünde GitHub weiter im Menü und die Wahl sähe wirkungslos aus.
+ * Beide Fassungen lesen dieselbe Quelle (`useVorlieben`), damit die eine nicht
+ * beim nächsten Eintrag eine Möglichkeit kennt, die die andere nicht hat.
  */
-function Berufsfeldblock() {
+function Darstellungsblock() {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const gespeichert = useAppSelector(
-    (state) => state.auth.session?.berufsfeld ?? null,
-  );
-
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [saving, setSpeichert] = useState(false);
-  const [ok, setOk] = useState(false);
-
-  async function waehle(feld: BerufsfeldWahl) {
-    if (feld === gespeichert) return;
-
-    setSpeichert(true);
-    setOk(false);
-    const result = await speichereBerufsfeld(feld);
-    setSpeichert(false);
-
-    if (result.ok) {
-      setFehler(null);
-      setOk(true);
-      dispatch(berufsfeldGesetzt(feld));
-    } else {
-      // Nichts im Speicher ändern: die Anzeige darf keine Wahl behaupten, die
-      // der Server nicht angenommen hat.
-      setFehler(result.detail);
-    }
-  }
 
   return (
     <Card sx={{ mt: 3 }}>
       <CardContent>
-        <Typography variant="h2" sx={{ mb: 1 }}>
-          {t("beruf.titel")}
+        <Typography variant="h2" sx={{ mb: 2.5 }}>
+          {t("einstellungen.darstellungTitel")}
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-          {t("beruf.lead")}
-        </Typography>
-
-        {fehler !== null ? (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {fehler}
-          </Alert>
-        ) : null}
-
-        <Box sx={{ maxWidth: 420 }}>
-          <BerufsfeldSelect
-            wert={gespeichert}
-            disabled={saving}
-            onChange={(feld) => void waehle(feld)}
-          />
-        </Box>
-
-        {/* `role="status"` und nicht „alert": eine Bestätigung unterbricht nicht. */}
-        {ok ? (
-          <Alert role="status" severity="success" sx={{ mt: 2 }}>
-            {t("beruf.gespeichert")}
-          </Alert>
-        ) : null}
+        <DarstellungsAbschnitte />
       </CardContent>
     </Card>
   );
@@ -459,6 +408,21 @@ function Nachweisblock() {
           </Button>
           <Button component={RouterLink} to="/my-data" variant="outlined">
             {t("einstellungen.nachweiseDaten")}
+          </Button>
+          {/* DIE LÖSCHUNG GEHÖRT IN DIE EINSTELLUNGEN, und das ist keine
+              Geschmacksfrage: es ist die Stelle, an der Menschen ihr Konto
+              verwalten und an der sie danach suchen. Sie stand einmal nur im
+              Kontomenü zwischen „Profil" und „Abmelden" — im Menü, das man
+              täglich öffnet, neben dem Weg, den man täglich geht.
+              Umrandet in der Warnfarbe: auffindbar, ohne die naheliegende
+              Handlung zu sein. */}
+          <Button
+            component={RouterLink}
+            to="/delete-account"
+            variant="outlined"
+            color="error"
+          >
+            {t("kopf.kontoLoeschen")}
           </Button>
         </Box>
 
