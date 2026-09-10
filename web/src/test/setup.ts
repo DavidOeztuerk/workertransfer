@@ -15,19 +15,17 @@ import { configure } from "@testing-library/react";
  * höhere Grenze verlangsamt keinen grünen Lauf: sie greift nur dort, wo vorher
  * abgebrochen wurde.
  *
- * VON 5 AUF 10 SEKUNDEN, gemessen am 09.09.2026 auf dem Läufer: `DraftPage`
- * fiel dort an `findByRole("button", { name: /Lebenslauf bearbeiten/i })`,
- * lokal fünfmal hintereinander grün. Der Grund ist keine Langsamkeit, sondern
- * eine KETTE: der Knopf heißt „Lebenslauf bearbeiten" erst, wenn `/resumes/me`
- * geantwortet hat, und der wird erst nach dem Entwurf geholt — Entwurf →
- * Render → Effekt → Lebenslauf → Render. Eine einzelne Wartezeit muss die
- * ganze Kette überdauern, nicht nur einen Abruf.
+ * WIEDER 5 SEKUNDEN. Am 09.09.2026 standen hier 10, mit der Begründung,
+ * `DraftPage` scheitere auf dem Läufer an einer zu langen Abrufkette. Das war
+ * falsch: die Erhöhung änderte nichts, der Test fiel im nächsten Lauf genauso.
+ * Die Ursache lag in `features/work/lib/kontext.ts` — eine Antwort, die nach
+ * dem Verwerfen ankam, füllte den Zwischenspeicher wieder. Es war nie zu
+ * langsam, es war der falsche Wert.
  *
- * Die Schwelle abzusenken heißt, diese Tests wieder von der Tagesform des
- * Läufers abhängig zu machen — und ein Lauf, der mal rot und mal grün ist,
- * wird nach der zweiten Woche ignoriert.
+ * Die Lehre ist die Zahl selbst: eine Wartegrenze hochzusetzen sieht immer
+ * nach einer Lösung aus und verbirgt genauso oft eine.
  */
-configure({ asyncUtilTimeout: 10_000 });
+configure({ asyncUtilTimeout: 5_000 });
 
 /**
  * Ein eigener, berechenbarer `localStorage` für die Testreihe.
