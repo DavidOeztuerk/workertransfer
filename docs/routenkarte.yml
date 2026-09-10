@@ -521,6 +521,26 @@ gruppen:
     eintraege:
       - { methode: PUT, pfad: '/account/language', ohne: 401, person: 200, firma: 200, rumpf: '{"language":"de"}' }
 
+  - name: 'Das Berufsfeld des Kontos'
+    warum: |
+      `PUT /account/occupational-field` schreibt, in welcher Arbeitswelt jemand
+      steht (ADR-0039). Daraus folgt GENAU EINE Sache: was die Oberflaeche
+      anbietet. Kein Recht, keine Sichtbarkeit, keine Sortierung, keine Aussage
+      ueber einen Menschen — es steht nicht im Token, und keine
+      Berechtigungspruefung liest es. Deshalb antwortet keine Route wegen des
+      Berufsfelds anders, `/github` eingeschlossen: der Eintrag verschwindet aus
+      dem Menue, die Seite bleibt erreichbar. Verstecken ist keine
+      Zugriffskontrolle.
+
+      Keine Kennung im Rumpf. Nur der Aufrufer selbst, wie bei der Sprache.
+
+      Ein leerer Wert ist ZULAESSIG und heisst „nicht angegeben" — ohne ihn
+      waere eine einmal getroffene Wahl endgueltig. Ein unbekanntes Etikett gibt
+      dagegen 422 und speichert nichts: eine Wahl, die stillschweigend zu „keins"
+      wird, sieht wie ein Fehler der Oberflaeche aus.
+    eintraege:
+      - { methode: PUT, pfad: '/account/occupational-field', ohne: 401, person: 200, firma: 200, rumpf: '{"occupational_field":null}' }
+
   - name: 'Die Einstellungen des Kontos'
     warum: |
       `GET/PUT /account/settings` traegt, was eine Person UEBER SICH entschieden

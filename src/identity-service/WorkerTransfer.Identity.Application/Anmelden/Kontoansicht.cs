@@ -10,6 +10,12 @@ namespace WorkerTransfer.Identity.Application.Anmelden;
 /// travels with every single request and is no place for an address.
 /// </param>
 /// <param name="Firma">The company they currently act for, or <c>null</c> for themselves.</param>
+/// <param name="Berufsfeld">
+/// In welcher Arbeitswelt sie steht, oder <c>null</c> für „nicht angegeben".
+/// Es reist mit, damit die Oberfläche entscheiden kann, WAS sie anbietet — und
+/// nur dafür. Im Token steht es nicht, und keine Berechtigungsprüfung liest es
+/// (ADR-0039).
+/// </param>
 /// <remarks>
 /// Carries no roles. Nothing reads them — every permission decision in this
 /// system reads <c>user_tenant_memberships</c> per operation — and a field
@@ -22,4 +28,5 @@ public sealed record Kontoansicht(
     Kontosprache Sprache,
     string Anzeigename,
     string? Vorname = null,
-    string? Nachname = null);
+    string? Nachname = null,
+    Berufsfeld? Berufsfeld = null);

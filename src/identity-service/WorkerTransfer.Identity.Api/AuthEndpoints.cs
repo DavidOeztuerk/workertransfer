@@ -37,6 +37,15 @@ public sealed record SchluesselBody(
 /// <param name="Language">A tag this platform has texts for: de, en or fr.</param>
 public sealed record SprachwahlBody(string Language);
 
+/// <summary>Was ein Aufrufer schickt, um sein Berufsfeld zu wählen.</summary>
+/// <param name="OccupationalField">
+/// Eines der elf Etiketten aus <see cref="Berufsfeldwahl"/>. <c>null</c> oder
+/// leer heisst ENTFERNEN — ohne diesen Weg wäre eine einmal getroffene Wahl
+/// endgültig (ADR-0039).
+/// </param>
+public sealed record BerufsfeldBody(
+    [property: JsonPropertyName("occupational_field")] string? OccupationalField);
+
 /// <summary>Bürgerlicher Vor- und Nachname. Leer heisst entfernen.</summary>
 public sealed record KlarnameBody(
     [property: JsonPropertyName("given_name")] string? GivenName,
@@ -275,6 +284,53 @@ public static class AuthEndpoints
             await SchreibeOk(context, cancellationToken);
         });
 
+        // Das Berufsfeld liegt neben der Sprache und aus demselben Grund: es ist
+        // eine Entscheidung über das eigene Konto und hat mit dem Anmelden
+        // nichts zu tun. Es steht NICHT im Token — aus ihm folgt kein Recht,
+        // sondern nur, was die Oberfläche anbietet (ADR-0039).
+        app.MapPut("/account/occupational-field", async (
+            BerufsfeldBody body,
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status401Unauthorized,
+                    "Request failed", "not authenticated");
+                return;
+            }
+
+            // Unbekanntes wird ABGESAGT und nicht stillschweigend zu „keins".
+            // Sonst verschwände ein Tippfehler in der Spalte, die Oberfläche
+            // zeigte weiter die neutrale Ansicht, und niemand wüsste warum.
+            // Dieselbe Regel wie bei `PUT /account/language`.
+            if (!Berufsfeldwahl.Kennen(body.OccupationalField))
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", "invalid: occupational_field");
+                return;
+            }
+
+            var erledigt = await mediator.Send(
+                new BerufsfeldWaehlenBefehl(
+                    handelnder.Subject, Berufsfeldwahl.Aus(body.OccupationalField)),
+                cancellationToken);
+
+            if (!erledigt)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status404NotFound,
+                    "Request failed", "no such account");
+                return;
+            }
+
+            await SchreibeOk(context, cancellationToken);
+        });
+
         app.MapPut("/account/name", async (
             KlarnameBody body,
             IMediator mediator,
@@ -480,7 +536,11 @@ public static class AuthEndpoints
         // Klarname für Signatur und Briefkopf. Keine Anschrift hier: die
         // Bewerberauskunft liest die Session, und Anschrift darf nicht ins Modell.
         ["given_name"] = konto.Vorname,
-        ["family_name"] = konto.Nachname
+        ["family_name"] = konto.Nachname,
+        // Damit die Oberfläche weiss, WAS sie anbieten soll — und nur dafür.
+        // `null` heisst „nicht angegeben" und bekommt die neutrale Ansicht:
+        // wer nichts gewählt hat, sieht, was er vorher sah (ADR-0039).
+        ["occupational_field"] = Berufsfeldwahl.Etikett(konto.Berufsfeld)
     };
 
     private static Dictionary<string, string> AnschriftAntwort(Anschriftansicht stand) => new()

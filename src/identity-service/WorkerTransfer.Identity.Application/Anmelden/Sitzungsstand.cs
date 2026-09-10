@@ -64,7 +64,8 @@ public sealed class SitzungsstandHandler(ICurrentPrincipal akteur, IUserReposito
                 konto?.Kontosprache ?? Sprachwahl.Vorgabe,
                 konto?.DisplayName ?? string.Empty,
                 konto?.GivenName,
-                konto?.FamilyName));
+                konto?.FamilyName,
+                konto?.Berufsfeld));
         }
 
         // Without a sign-in the answer is the same whatever cookies came with

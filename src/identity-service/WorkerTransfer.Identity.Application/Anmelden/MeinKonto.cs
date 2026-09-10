@@ -35,6 +35,7 @@ public sealed class MeinKontoHandler(ICurrentPrincipal akteur, IUserRepository b
             konto?.Kontosprache ?? Sprachwahl.Vorgabe,
             konto?.DisplayName ?? string.Empty,
             konto?.GivenName,
-            konto?.FamilyName);
+            konto?.FamilyName,
+            konto?.Berufsfeld);
     }
 }
