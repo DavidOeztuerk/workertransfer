@@ -298,6 +298,32 @@ services:
       # Souveraenitaetsbericht sichtbar machen soll — und die Egress-Grenze
       # liest ihre erlaubten Hosts aus der Konfiguration (Dienstgrundlage.cs).
       Draft__Adresse: https://api.anthropic.com/v1/messages
+      # DIE ZIELE, DIE EINE PERSON FUER IHREN EIGENEN KI-ZUGANG WAEHLEN DARF.
+      #
+      # `Draft__Adresse` oben ist die Vorgabe des Betreibers. Ein Mensch kann
+      # aber einen EIGENEN Zugang einrichten (`KiZugang`: Anbieter, Adresse,
+      # Modell) — ein lokales Modell etwa, und genau dafuer steht in
+      # Anschreiber.cs „gemessen an Ollama".
+      #
+      # Diese Adresse steht in der DATENBANK, nicht in der Konfiguration, und
+      # war damit fuer die Egress-Grenze unsichtbar: gemessen am 10.09.2026
+      # antwortete jeder Anschreiben-Auftrag mit
+      # `EgressDeniedException: Outbound call to 'host.docker.internal' is not
+      # allowed` — der Auftrag lief an, schrieb nie, und in der Oberflaeche
+      # passierte schlicht nichts.
+      #
+      # Deshalb erklaert der BETREIBER hier, wohin ein Mensch zeigen darf, und
+      # die Person waehlt darin. Das ist kein Nachgeben gegenueber der Grenze,
+      # sondern ihr Sinn: ein Ziel, das niemand erklaert hat, bleibt zu — und
+      # ohne diese Angabe koennte jede Person die Anfragen an einen beliebigen
+      # fremden Server schicken.
+      #
+      # Gelesen wird der Wert von NIEMANDEM ausser der Ableitung in
+      # `Dienstgrundlage.GerufeneHosts` — sie nimmt aus jedem Konfigurationswert
+      # den Host, der sich als absolute http-Adresse lesen laesst. Der Port ist
+      # dabei egal, die Grenze prueft nur den Host.
+      Draft__ErlaubteZiele__0: ${WORKERTRANSFER_KI_ZIEL_1:-http://host.docker.internal}
+      Draft__ErlaubteZiele__1: ${WORKERTRANSFER_KI_ZIEL_2:-http://localhost}
       # Woher die EIGENEN Angaben der bewerbenden Person kommen. Serverseitig
       # geholt und nicht vom Browser geschickt: „nur die eigenen Daten" ist eine
       # Zusage, die allein der Server halten kann.
