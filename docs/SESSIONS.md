@@ -58,7 +58,23 @@ Prompt unten noch einmal, damit du nur einen Kasten kopieren musst.
 6. **E2E einmal am Ende.** Und der Selektor muss eindeutig sein: ein
    `getByRole("button", { name: /Speichern/i })` traf ab dem zweiten
    Speichern-Knopf zwei Elemente und legte vierzehn Reisen still lahm.
-7. **Dein `.env` ist nicht das `.env` der CI.** `make env` baut aus
+8. **Ein neuer Aufruf nach draußen wird ABGEWIESEN, wenn er nicht in der
+   Konfiguration steht.** Jeder Dienst fährt Girders Egress-Grenze
+   (`AddSovereignPlatform`), und sie weist ab statt zu protokollieren. Die
+   erlaubten Hosts leitet `Dienstgrundlage.GerufeneHosts` aus der
+   **Konfiguration** ab — jeder Wert, der eine absolute http-Adresse ist, gibt
+   seinen Host her. Wer in Sitzung 3, 4 oder 5 einen Dienst baut, der irgendwo
+   hinruft, trägt das Ziel also in `docker-compose.yml` ein, sonst läuft es
+   lokal nie.
+
+   **Und was in der DATENBANK steht, sieht sie nicht.** Genau daran starb am
+   10.09.2026 der Anschreiben-Agent: der KI-Zugang einer Person ist eine Zeile,
+   keine Konfiguration. Der Auftrag lief an, schrieb nie, und **in der
+   Oberfläche passierte nichts** — der Fehler starb in einem
+   Hintergrundarbeiter, wo niemand hinsieht. Ein vom Menschen wählbares Ziel
+   braucht deshalb eine Erklärung des Betreibers (`Draft__ErlaubteZiele__*`).
+
+9. **Dein `.env` ist nicht das `.env` der CI.** `make env` baut aus
    `.env.example`, und dort sind Zugangsdaten **leer** — leer heißt „nicht
    eingerichtet", und die Oberfläche zeigt dann bewusst etwas anderes. Eine
    Prüfung, die gegen deinen eingerichteten Stapel geschrieben ist, ist lokal
@@ -118,7 +134,9 @@ Kanonisierung ohne Folgerung.
 
 FALLEN: build und test nie zusammen; nie dotnet test ueber die Loesung, nur
 ./scripts/test-dotnet.sh; nach jeder Modelaenderung sofort dotnet ef migrations
-add; ein aenderndes SichereAsync braucht .AsTracking(); Warnungen sind Fehler;
+add; ein aenderndes SichereAsync braucht .AsTracking(); Warnungen sind Fehler; ein neuer Aufruf nach draussen muss in der
+Konfiguration stehen, sonst weist die Egress-Grenze ihn ab — und was in der
+DATENBANK steht, sieht sie nicht;
 dein .env ist NICHT das der CI — leere Zugangsdaten in .env.example heissen
 "nicht eingerichtet", und eine Pruefung dagegen ist lokal gruen und in der CI
 rot; E2E einmal am Ende, mit eindeutigen Selektoren.
@@ -177,7 +195,9 @@ Gegenprobe: RequirePermission an einer Route entfernen -> der Test faellt (und
 danach mit --no-incremental neu bauen).
 
 FALLEN: build und test nie zusammen; nie dotnet test ueber die Loesung;
-Warnungen sind Fehler; dein .env ist NICHT das der CI — leere Zugangsdaten in
+Warnungen sind Fehler; ein neuer Aufruf nach draussen muss in der
+Konfiguration stehen, sonst weist die Egress-Grenze ihn ab — und was in der
+DATENBANK steht, sieht sie nicht; dein .env ist NICHT das der CI — leere Zugangsdaten in
 .env.example heissen "nicht eingerichtet"; eine Gegenprobe muss KOMPILIEREN,
 sonst liest sich der Build-Fehler wie ein bestandener Test.
 
@@ -206,6 +226,9 @@ Massstab.
 ## Sitzung 3 — `scout-service`
 
 ```
+BEACHTE: dieser Dienst ruft nach draussen. Trage JEDES Ziel in
+docker-compose.yml ein — die Egress-Grenze liest ihre erlaubten Hosts aus
+der Konfiguration und weist alles andere ab, ohne es zu protokollieren.
 ZUERST, ohne zu fragen: git switch develop && git pull && git switch -c feature/scout-service
 Diese Sitzung arbeitet NIE direkt auf develop.
 
@@ -246,7 +269,9 @@ Benachrichtigungsart, nennt KEIN Unternehmen, ueber den Postausgang
 FALLEN: build und test nie zusammen; nie dotnet test ueber die Loesung; nach
 jeder Modelaenderung sofort dotnet ef migrations add; ein aenderndes
 SichereAsync braucht .AsTracking(); Dienst-zu-Dienst-Ruempfe sind TYPISIERTE
-Vertraege, nie anonyme Objekte; Warnungen sind Fehler; dein .env ist NICHT das
+Vertraege, nie anonyme Objekte; Warnungen sind Fehler; ein neuer Aufruf nach draussen muss in der
+Konfiguration stehen, sonst weist die Egress-Grenze ihn ab — und was in der
+DATENBANK steht, sieht sie nicht; dein .env ist NICHT das
 der CI — leere Zugangsdaten in .env.example heissen "nicht eingerichtet";
 E2E einmal am Ende.
 
@@ -275,6 +300,9 @@ Massstab.
 ## Sitzung 4 — `advisor-service`
 
 ```
+BEACHTE: dieser Dienst ruft nach draussen. Trage JEDES Ziel in
+docker-compose.yml ein — die Egress-Grenze liest ihre erlaubten Hosts aus
+der Konfiguration und weist alles andere ab, ohne es zu protokollieren.
 ZUERST, ohne zu fragen: git switch develop && git pull && git switch -c feature/advisor-service
 Diese Sitzung arbeitet NIE direkt auf develop.
 
@@ -333,6 +361,9 @@ Massstab.
 ## Sitzung 5 — `assessment-service`
 
 ```
+BEACHTE: dieser Dienst ruft nach draussen. Trage JEDES Ziel in
+docker-compose.yml ein — die Egress-Grenze liest ihre erlaubten Hosts aus
+der Konfiguration und weist alles andere ab, ohne es zu protokollieren.
 ZUERST, ohne zu fragen: git switch develop && git pull && git switch -c feature/assessment-service
 Diese Sitzung arbeitet NIE direkt auf develop.
 
