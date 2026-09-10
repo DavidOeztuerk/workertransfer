@@ -2,7 +2,18 @@ import type { Katalog } from "./de";
 
 /** English. Translated from `de.ts`, which is the source. */
 const en: Katalog = {
+  darstellung: {
+    titel: "Appearance",
+    lead: "Choose how the interface should look.",
+    system: "System",
+    systemHinweis: "Follows your system settings",
+    hell: "Light",
+    dunkel: "Dark",
+  },
+
   sprache: {
+    titel: "Language",
+    lead: "Choose the language of the interface.",
     label: "Language",
     system: "Match my device",
     de: "Deutsch",
@@ -24,6 +35,7 @@ const en: Katalog = {
   },
 
   kopf: {
+    registrieren: "Sign up",
     anmelden: "Sign in",
     unternehmen: "Company",
     meinKonto: "My account",
@@ -242,9 +254,8 @@ const en: Katalog = {
     enthalten: "included",
     fehlt: "missing",
     herunterladen: "Download as JSON",
-    nichtHierTitel: "What is not here",
-    nichtHierText: "Deleting is its own path, and deliberately not a button next to a download button: nothing here can be mis-clicked in a way that cannot be undone. What happens then is set out in full on <1>Delete account</1> — before the click, not after it.",
-    keineReihenfolge: "You do not have to download anything here before you delete. The link goes both ways, so that nobody believes there is a required order.",
+    loeschenTitel: "Delete account",
+    loeschenText: "Deleting is a path of its own, and you do not have to download anything first. What disappears is stated in full on the deletion page — before you click, not after.",
   },
 
   profil: {
@@ -333,6 +344,7 @@ const en: Katalog = {
     schluesselEntfernen: "Remove",
     kiProtokoll: "Record that I used the writing help",
     kiProtokollHinweis: "Time and kind, never the text. This platform evaluates nobody and therefore does not fall under the obligations for high-risk AI in employment — if you need the record for evidence anyway, you get it.",
+    darstellungTitel: "Appearance and language",
     nachweise: "Evidence",
     nachweiseLead: "Whatever is recorded about you, you can look at and take with you at any time.",
     nachweiseFreigaben: "See my releases",
@@ -1121,6 +1133,9 @@ const en: Katalog = {
     firmennameHinweis: "Comes into being when you confirm your address, not right away.",
     freemail: "A company needs its own domain. An address at a mass provider will not do — use your work address, or register for yourself.",
     passwort: "Password",
+    emailUngueltig: "That does not look like an email address. Without one that really exists, the confirmation link arrives nowhere.",
+    passwortZuKurz: "At least {{mindestens}} characters — a sequence of words you can remember beats something short with special characters.",
+    passwortZuLang: "That password is too long. Anything past 72 bytes would protect nothing, so we do not accept it.",
     passwortHinweis: "At least 12 characters.",
     anzeigename: "Display name",
     anzeigenameHinweis: "How you appear in the team and in the header — not necessarily your legal name.",

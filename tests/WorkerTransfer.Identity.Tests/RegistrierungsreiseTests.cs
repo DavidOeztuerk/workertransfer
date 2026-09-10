@@ -230,6 +230,51 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
         antwort.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    /// <summary>
+    /// Eine Adresse, die keine ist, legt kein Konto an — gemessen am echten Fall.
+    /// </summary>
+    /// <remarks>
+    /// Am 10.09.2026 kam <c>bus</c> durch: <c>201</c>, Zeile in der Datenbank,
+    /// und erst der Postversand scheiterte mit einer <c>FormatException</c> —
+    /// in einem Hintergrundlauf, der den Fehler protokolliert und verschluckt.
+    /// Zurück blieb ein Konto auf <c>pending</c>, das niemand je bestätigen
+    /// kann, während die Oberfläche „wir haben dir eine E-Mail geschickt"
+    /// versprach.
+    /// <para>
+    /// Die zweite Hälfte ist die wichtigere: es darf auch KEINE Zeile
+    /// entstehen. Ein 422 über einem angelegten Konto wäre die Sackgasse mit
+    /// besserer Fehlermeldung.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Eine_Adresse_die_keine_ist_legt_kein_Konto_an()
+    {
+        var antwort = await Registriere("bus");
+
+        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        await using var verbindung = new NpgsqlConnection(postgres.ConnectionString);
+        await verbindung.OpenAsync();
+        await using var befehl = verbindung.CreateCommand();
+        befehl.CommandText = "SELECT count(*) FROM users WHERE email = @email";
+        befehl.Parameters.AddWithValue("email", "bus");
+
+        ((long)(await befehl.ExecuteScalarAsync())!).Should().Be(0);
+    }
+
+    /// <summary>
+    /// Auch „erneut senden" prüft die Form — sonst läuft es in denselben
+    /// verschluckten Versandfehler und antwortet weiterhin 202.
+    /// </summary>
+    [Fact]
+    public async Task Ein_erneutes_Senden_an_eine_kaputte_Adresse_wird_abgewiesen()
+    {
+        var antwort = await _dienst.CreateClient().PostAsJsonAsync(
+            "/auth/resend-verification", new { email = "bus" });
+
+        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
     [Fact]
     public async Task Ein_Unternehmen_entsteht_bei_der_Bestaetigung_und_nicht_frueher()
     {

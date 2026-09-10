@@ -2,7 +2,18 @@ import type { Katalog } from "./de";
 
 /** Français. Traduit depuis `de.ts`, qui est la source. */
 const fr: Katalog = {
+  darstellung: {
+    titel: "Apparence",
+    lead: "Choisissez l'apparence de l'interface.",
+    system: "Système",
+    systemHinweis: "Suit les réglages du système",
+    hell: "Clair",
+    dunkel: "Sombre",
+  },
+
   sprache: {
+    titel: "Langue",
+    lead: "Choisissez la langue de l'interface.",
     label: "Langue",
     system: "Comme mon appareil",
     de: "Deutsch",
@@ -24,6 +35,7 @@ const fr: Katalog = {
   },
 
   kopf: {
+    registrieren: "S'inscrire",
     anmelden: "Se connecter",
     unternehmen: "Entreprise",
     meinKonto: "Mon compte",
@@ -242,9 +254,8 @@ const fr: Katalog = {
     enthalten: "inclus",
     fehlt: "manquant",
     herunterladen: "Télécharger en JSON",
-    nichtHierTitel: "Ce qui ne figure pas ici",
-    nichtHierText: "La suppression suit son propre chemin et n’est volontairement pas un bouton à côté d’un bouton de téléchargement : ici, rien ne peut être cliqué par erreur de façon irréversible. Ce qui se passe alors est expliqué en entier sur <1>Supprimer le compte</1> — avant le clic, pas après.",
-    keineReihenfolge: "Vous n’avez rien à télécharger ici avant de supprimer. Le lien va dans les deux sens, pour que personne ne croie à un ordre obligatoire.",
+    loeschenTitel: "Supprimer le compte",
+    loeschenText: "La suppression est une démarche à part, et vous n'avez rien à télécharger au préalable. Ce qui disparaît est indiqué en entier sur la page de suppression — avant le clic, pas après.",
   },
 
   profil: {
@@ -333,6 +344,7 @@ const fr: Katalog = {
     schluesselEntfernen: "Supprimer",
     kiProtokoll: "Consigner que j’ai utilisé l’aide à la rédaction",
     kiProtokollHinweis: "Le moment et le type, jamais le texte. Cette plateforme n’évalue personne et ne relève donc pas des obligations applicables à l’IA à haut risque dans l’emploi — si vous avez tout de même besoin de ce registre comme preuve, vous l’obtenez.",
+    darstellungTitel: "Apparence et langue",
     nachweise: "Preuves",
     nachweiseLead: "Ce qui est consigné à votre sujet, vous pouvez le consulter et l’emporter à tout moment.",
     nachweiseFreigaben: "Voir mes autorisations",
@@ -1121,6 +1133,9 @@ const fr: Katalog = {
     firmennameHinweis: "Créée à la confirmation de votre adresse, pas immédiatement.",
     freemail: "Une entreprise a besoin de son propre domaine. Une adresse chez un fournisseur grand public ne convient pas — utilisez votre adresse professionnelle, ou inscrivez-vous pour vous-même.",
     passwort: "Mot de passe",
+    emailUngueltig: "Cela ne ressemble pas à une adresse e-mail. Sans une adresse réelle, le lien de confirmation n'arrive nulle part.",
+    passwortZuKurz: "Au moins {{mindestens}} caractères — une suite de mots dont vous vous souvenez vaut mieux qu'un mot de passe court avec des caractères spéciaux.",
+    passwortZuLang: "Ce mot de passe est trop long. Tout ce qui dépasse 72 octets ne protégerait plus rien, nous ne l'acceptons donc pas.",
     passwortHinweis: "Au moins 12 caractères.",
     anzeigename: "Nom affiché",
     anzeigenameHinweis: "Sous quel nom vous apparaissez dans l’équipe et l’en-tête — pas forcément votre nom civil.",
