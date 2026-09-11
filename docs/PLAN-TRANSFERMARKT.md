@@ -213,11 +213,23 @@ ADR-0036 ist **angenommen**. **Gebaut am 11.09.2026.**
       `Domain`/`Infrastructure`/`Contracts`, eigene Datenbank, `AddGirder`).
       Hafen 8012, Route `/scout/{rest}` im Gateway, fünf Zeilen in der
       Routenkarte — gegen den laufenden Stapel gefahren.
-- [x] `Suche` (Aggregat): Fähigkeiten, Ort, Remote. **Gespeichert wird die
+- [ ] `Suche` (Aggregat): **fünf Filter genannt, drei gebaut.** Diese Zeile
+      stand einmal abgehakt hier, mit den beiden fehlenden in einem Klammersatz
+      und dem dritten gar nicht erwähnt. Das war zu großzügig, und so sieht sie
+      ehrlich aus:
+
+      | genannt | Stand |
+      |---|---|
+      | Fähigkeiten | **gebaut** (ODER, mit Häkchenliste) |
+      | Ort | **gebaut** (Teiltext) |
+      | Remote | **gebaut** — stand nicht in dieser Liste und ist trotzdem da |
+      | Umkreis | **entschieden, nicht als Filter** → ADR-0041 |
+      | Berufsfeld | **wird nie gebaut** → ADR-0036, Entscheidung 6 |
+      | Verfügbarkeit | **wird nicht gebaut** → ADR-0036, Entscheidung 7 |
+
+      Der Haken bleibt offen, bis ADR-0041 gebaut ist. **Gespeichert wird die
       Anfrage, nie das Ergebnis** — die Tabelle `searches` hat keine Spalte für
       einen Treffer, und eine Reihe misst das an der gespeicherten Zeile.
-      (Umkreis und Berufsfeld sind nicht dabei: beide brauchen eine eigene
-      Entscheidung, und ADR-0036 trifft sie nicht.)
 - [x] Die Treffer kommen aus profile-service, über eine interne Tür hinter dem
       gemeinsamen Geheimnis. Die harten Teile sind **mitgenommen**: Ledger je
       Zeile über `/check-batch`, keine Gesamtzahl, kein Auffüllen, Firmenzwang.
@@ -247,15 +259,27 @@ gemessen gefallen ist**:
 - [x] Die Ansprache ist ein **Entwurf**; der Dienst schreibt niemandem.
       Gegenprobe: ein `IVersand` in der Anwendungsschicht → rot.
 
+### Der Umzug der Oberfläche
+
+- [x] `/scout` statt `/candidates`: Seite, Karte, Navigation und sechs
+      E2E-Reisen. Die Häkchen und die Belege kommen aus dem Vertrag und werden
+      **nicht** im Browser gerechnet (ADR-0036 Entscheidung 3).
+- [x] `GET /candidates` ist **gefallen** — Endpunkt, Gateway-Route, Client. Die
+      Routenkarte hält den Pfad als tote Tür fest: 404 in allen vier Spalten,
+      und `LandkarteTests` misst nach, dass wirklich keine Route mehr
+      dahintersteht.
+- [x] Mit ihm fielen der UND-Zweig im Profilspeicher und die Sammelfrage in
+      profile-service' Einwilligungstor: beide hatten keinen Aufrufer mehr, und
+      ein Zweig ohne Aufrufer ist das, was später falsch wiederbelebt wird.
+- [x] Nebenbei behoben: die Liste las `next_cursor`, der Server schrieb `next`.
+      Der Zeiger war damit immer `null`, „mehr laden" erschien nie, und es gab
+      **keinen Weg auf Seite 2** — die Lücke, die
+      `SCOUT-UND-BERATER-BESTAND.md` notiert hat. Die Ursache war ein Feldname.
+
 ### Was offen bleibt
 
-- Die **Oberfläche** ist nicht umgezogen. `GET /candidates` bleibt deshalb
-  stehen (ADR-0036 sagt das ausdrücklich) und fällt erst danach — zwei Suchen
-  nebeneinander wären zwei Wahrheiten, eine fehlende Route wäre eine Lücke.
-- **Umkreis und Berufsfeld** als Filter. Beide sind eine eigene Entscheidung:
-  ein Umkreis braucht Koordinaten (ADR-0032 nennt, worüber er nichts weiss),
-  ein Berufsfeld ist ein Etikett am Konto und heute ausdrücklich ohne Wirkung
-  auf Sichtbarkeit (ADR-0039).
+- **ADR-0041 bauen**: Pendelbereitschaft am Profil, Anwesenheit an der Anzeige,
+  daraus ein Häkchen. Entschieden, geschrieben, noch nicht gebaut.
 
 ---
 

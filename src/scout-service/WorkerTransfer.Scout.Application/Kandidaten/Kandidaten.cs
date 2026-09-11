@@ -118,6 +118,7 @@ public sealed class KandidatenHandler(
             treffer.Add(new Treffer(
                 fund.Wer,
                 fund.Ueberschrift,
+                fund.Text,
                 fund.Ort,
                 fund.RemoteMoeglich,
                 fund.Genannt,

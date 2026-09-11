@@ -103,8 +103,24 @@ public sealed class HttpProfilsuche(
         var seite = await Hole<FremdprofilseiteV1>(
             $"/internal/profiles/search?{string.Join('&', abfrage)}", cancellationToken);
 
+        // EIN 404 IST HIER KEIN LEERES ERGEBNIS, und das war ein echter Fehler.
+        //
+        // Die Suchtuer hat keinen „nicht gefunden"-Fall: sie antwortet mit einer
+        // Seite, oder sie laesst uns nicht herein — ohne das geteilte Geheimnis
+        // antwortet sie 404 statt 401, damit sie sich nicht verraet. Genau das
+        // traf zu, als `Notify__Geheimnis` bei profile-service fehlte: die Tuer
+        // sagte 404, diese Stelle machte daraus `items: []`, der Endpunkt
+        // antwortete 200 — und die Oberflaeche behauptete, es gebe niemanden.
+        //
+        // Gemessen am laufenden Stapel: zwoelf E2E-Reisen rot, und die
+        // Routenkarte blieb gruen, weil sie Statuscodes prueft und keine
+        // Ruempfe. „Nicht eingerichtet" darf nicht aussehen wie „es gibt
+        // niemanden" — dieselbe Regel, die weiter unten fuer das leere
+        // Geheimnis schon stand, nur an der Stelle, an der sie fehlte.
         return seite is null
-            ? new Profilfundseite([], null)
+            ? throw new ProfilsucheSchweigt(
+                "profile-service answered 404 to the search — the shared secret "
+                + "is refused or the door is closed")
             : new Profilfundseite([.. seite.Items.Select(Zur)], seite.Next);
     }
 
@@ -122,11 +138,17 @@ public sealed class HttpProfilsuche(
         new(
             new SubjectId(profil.SubjectId),
             profil.Headline,
+            profil.Bio ?? string.Empty,
             profil.Location,
             profil.RemoteOk,
             profil.Skills ?? []);
 
     /// <summary>Ein Aufruf. <c>null</c> heisst 404, alles andere wirft.</summary>
+    /// <remarks>
+    /// Was ein 404 BEDEUTET, entscheidet der Aufrufer: fuer ein einzelnes Profil
+    /// „gibt es nicht", fuer die Suche „wir kommen nicht herein". Diese Methode
+    /// reicht die Tatsache durch und deutet sie nicht.
+    /// </remarks>
     private async Task<T?> Hole<T>(string pfad, CancellationToken cancellationToken)
         where T : class
     {

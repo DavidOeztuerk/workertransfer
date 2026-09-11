@@ -53,7 +53,7 @@ test("eine Anfrage erreicht die Person per Mail — und die Mail verrät nicht, 
   // Bestätigungsmail von vorhin ginge sonst als Treffer durch.
   const since = Date.now();
 
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   const card = recruiter.locator("li").filter({ hasText: headline });
   await expect(card).toBeVisible();
   await card.getByRole("button", { name: /Marktstatus anfragen/i }).click();
@@ -134,10 +134,33 @@ test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser })
   await expect(marketSwitch).not.toBeChecked();
   await gespeichert;
 
+  // UND „dein Profil wurde entdeckt" gleich mit — sonst prueft diese Reise
+  // nicht mehr, was sie behauptet.
+  //
+  // Der Grund liegt eine Seite weiter: der Personalsuchende oeffnet unten den
+  // Scout, die Person taucht in seiner Trefferliste auf, und DAS ist eine
+  // eigene Benachrichtigung (ADR-0033). Sie kaeme zu Recht — nur traegt jede
+  // Mail dieser Plattform denselben Satz, ohne zu sagen, worum es geht
+  // (genau das prueft die Reise weiter unten). „Keine Mail" liesse sich also
+  // von „die falsche Mail" nicht unterscheiden, und die Reise waere ab hier
+  // eine Behauptung ueber etwas anderes.
+  const entdeckung = candidate.getByRole("switch", { name: /entdeckt wird/ });
+  const auchGespeichert = candidate.waitForResponse(
+    (antwort) =>
+      antwort.url().includes("/me/notification-preferences") &&
+      antwort.request().method() === "PUT",
+  );
+  await entdeckung.click();
+  await expect(entdeckung).not.toBeChecked();
+  await auchGespeichert;
+
   // Neu laden: gespeichert ist nur, was den Server erreicht hat.
   await candidate.goto("/settings");
   await expect(
     candidate.getByRole("switch", { name: /Marktstatus sehen möchte/ })
+  ).not.toBeChecked();
+  await expect(
+    candidate.getByRole("switch", { name: /entdeckt wird/ })
   ).not.toBeChecked();
 
   const recruiterContext = await browser.newContext();
@@ -149,7 +172,7 @@ test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser })
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   const since = Date.now();
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   const card = recruiter.locator("li").filter({ hasText: headline });
   await expect(card).toBeVisible();
   await card.getByRole("button", { name: /Marktstatus anfragen/i }).click();

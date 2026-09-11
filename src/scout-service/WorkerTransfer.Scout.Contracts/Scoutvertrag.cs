@@ -50,6 +50,7 @@ public sealed record BelegV1(
 public sealed record TrefferV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("headline")] string Headline,
+    [property: JsonPropertyName("bio")] string Bio,
     [property: JsonPropertyName("location")] string Location,
     [property: JsonPropertyName("remote_ok")] bool RemoteOk,
     [property: JsonPropertyName("named")] IReadOnlyList<string> Named,
@@ -146,6 +147,7 @@ public sealed record EntdeckungsmeldungV1(
 public sealed record FremdprofilV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("headline")] string Headline,
+    [property: JsonPropertyName("bio")] string Bio,
     [property: JsonPropertyName("location")] string Location,
     [property: JsonPropertyName("remote_ok")] bool RemoteOk,
     [property: JsonPropertyName("skills")] IReadOnlyList<string> Skills);

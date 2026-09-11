@@ -105,17 +105,18 @@ public static class InterneEndpoints
         new(
             profil.Wer.Value,
             profil.Ueberschrift,
+            profil.Text,
             profil.Ort,
             profil.RemoteMoeglich,
             profil.Faehigkeiten.Werte);
 
-    /// <summary>Dieselbe Obergrenze wie bei <c>/candidates</c>.</summary>
+    /// <summary>Wie viele Zeilen eine Seite traegt.</summary>
     private static int Anzahl(string? roh) =>
         int.TryParse(roh, out var wert)
         && wert > 0
-        && wert <= KandidatenHandler.Hoechstzahl
+        && wert <= InterneProfilsucheHandler.Hoechstzahl
             ? wert
-            : KandidatenHandler.Vorgabe;
+            : InterneProfilsucheHandler.Vorgabe;
 
     private static Task NichtGefunden(HttpContext context) =>
         ProblemDetailsMiddleware.Schreibe(

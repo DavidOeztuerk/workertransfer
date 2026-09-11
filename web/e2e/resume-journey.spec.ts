@@ -67,13 +67,13 @@ test("ein Lebenslauf erreicht nur das Unternehmen, dem er freigegeben wurde", as
   // Warten, bis der Wechsel wirklich gilt. Die Wahl stößt ihn nur an: der
   // Server stellt ein neues Token aus, das Cookie wird ersetzt, die Sitzung neu
   // geladen. Sofort weiterzuklicken gewinnt das Rennen etwa jedes zweite Mal —
-  // /candidates zeigt dann "Profile sehen nur Unternehmen", die Karte fehlt,
+  // /scout zeigt dann "Profile sehen nur Unternehmen", die Karte fehlt,
   // und der Test läuft in einen Timeout an einer Stelle, die mit der Ursache
   // nichts zu tun hat. Der Kandidatenlink erscheint erst mit aktivem
   // Unternehmen und ist damit das ehrliche Signal.
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   const card = recruiter.locator("li").filter({ hasText: headline });
   // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
   // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last

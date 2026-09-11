@@ -20,6 +20,13 @@ namespace WorkerTransfer.Profile.Contracts;
 public sealed record ProfilfundV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("headline")] string Headline,
+    /// <summary>Was die Person über sich geschrieben hat.</summary>
+    /// <remarks>
+    /// Sie steht hier, weil die Kandidatenkarte sie zeigte, bevor scout-service
+    /// sie ablöste. Ein Umzug, bei dem stillschweigend ein Feld verschwindet,
+    /// ist kein Umzug, sondern eine Verschlechterung mit anderem Namen.
+    /// </remarks>
+    [property: JsonPropertyName("bio")] string Bio,
     [property: JsonPropertyName("location")] string Location,
     [property: JsonPropertyName("remote_ok")] bool RemoteOk,
     [property: JsonPropertyName("skills")] IReadOnlyList<string> Skills);

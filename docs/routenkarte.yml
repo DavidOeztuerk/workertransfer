@@ -240,9 +240,6 @@ gruppen:
       sonst wird aus dem Unterschied eine Auskunft darueber, wer hier ein Profil
       hat.
 
-      `/candidates` ist dieselbe Regel eine Ebene hoeher: eine Kandidatenliste
-      sieht nur, wer fuer eine Firma handelt.
-
       `/profiles/me` ist 200 null, solange noch keins da ist — 404 waere der
       Normalfall in der Browserkonsole. Fremde Profile bleiben 404 (ADR-0020).
 
@@ -254,7 +251,6 @@ gruppen:
       - { methode: GET, pfad: '/profiles/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
       - { methode: POST, pfad: '/profiles/me/draft', ohne: 401, person: 503, mitglied: 503, firma: 503 }
       - { methode: GET, pfad: '/profiles/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 404, firma: 404 }
-      - { methode: GET, pfad: '/candidates', ohne: 401, person: 403, mitglied: 200, firma: 200 }
 
   - name: 'Lebenslauf — strenger als das Profil'
     warum: |
@@ -575,18 +571,28 @@ gruppen:
 
       202 und nicht 200: die Loeschung ist NICHT sofort fertig. Sie widerruft
       sofort jede Sitzung und legt das Konto still, kaskadiert dann aber ueber
-      die Outbox an acht Empfaenger, und erst danach faellt die Zeile in
+      die Outbox an neun Empfaenger, und erst danach faellt die Zeile in
       `users`. „Angenommen" ist die einzige ehrliche Antwort — `/delete-account`
       sagt dem Menschen deshalb „laeuft" und nie „erledigt" (ADR-0027).
 
       Es gibt KEIN Begruendungsfeld. Von jemandem, der gehen will, eine
       Rechtfertigung zu verlangen, ist ein Hebel gegen ihn.
 
-      `/candidates/{id}` gibt 404 in allen drei Spalten: es gibt dort keinen
-      Endpunkt. Eine Kandidatenansicht je Person gaebe es nur ueber
-      `/profiles/{id}`, und die haengt am Ledger.
+      `/candidates` und `/candidates/{id}` geben 404 in ALLEN VIER Spalten, und
+      diese zwei Zeilen sind die einzige Stelle, an der das noch steht. Bis zum
+      11.09.2026 war `/candidates` die Kandidatenliste; scout-service hat sie
+      abgeloest, die Oberflaeche ist umgezogen, und die Route ist aus
+      `ocelot.json` verschwunden. Ocelot antwortet auf einen Pfad ohne Route
+      mit einem leeren 404 — genau dem, den eine Route auf einen toten Dienst
+      NICHT gaebe.
+
+      Sie stehen hier aus demselben Grund wie `/erasure` und
+      `/internal/notify`: damit „von aussen nicht mehr erreichbar" eine
+      gefahrene Zusage ist und keine Behauptung. Wer die Route
+      versehentlich wiederbelebt, macht diese Zeilen rot.
     eintraege:
       - { methode: POST, pfad: '/account/erasure', ohne: 401, person: 202, mitglied: 202, firma: 202 }
+      - { methode: GET, pfad: '/candidates', ohne: 404, person: 404, mitglied: 404, firma: 404 }
       - { methode: GET, pfad: '/candidates/00000000-0000-0000-0000-000000000001', ohne: 404, person: 404, mitglied: 404, firma: 404 }
 
   - name: 'Die Sprache des Kontos'
@@ -667,10 +673,9 @@ gruppen:
 
   - name: 'Der Scout — suchen, ablegen, ansprechen'
     warum: |
-      `scout-service` loest `GET /candidates` ab (ADR-0036). Die alte Route steht
-      weiter oben und bleibt, bis die Oberflaeche umgezogen ist; zwei Suchen
-      nebeneinander waeren zwei Wahrheiten, aber eine Route wegzunehmen, bevor
-      jemand die neue benutzt, waere eine Luecke.
+      `scout-service` hat `GET /candidates` abgeloest (ADR-0036). Die alte Route
+      ist am 11.09.2026 gefallen, zusammen mit dem Umzug der Oberflaeche — sie
+      steht nur noch als tote Tuer weiter oben, mit 404 in allen vier Spalten.
 
       FIRMENZWANG UEBERALL, und die zweite Spalte ist die, die ihn sichtbar
       macht: als Person ohne Firma gibt jede dieser Routen 403 „no active

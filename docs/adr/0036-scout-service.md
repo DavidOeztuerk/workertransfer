@@ -57,8 +57,13 @@ nicht neu erfunden:
 - Seite höchstens 50, Filter höchstens 10
 - 503, wenn der Ledger schweigt
 
-`GET /candidates` bleibt, bis die Oberfläche umgezogen ist, und fällt dann.
-Zwei Suchen nebeneinander wären zwei Wahrheiten.
+`GET /candidates` ist am 11.09.2026 **gefallen**, zusammen mit dem Umzug der
+Oberfläche auf `/scout` — zwei Suchen nebeneinander wären zwei Wahrheiten
+gewesen. Mit ihm fielen der UND-Zweig im Profilspeicher und die Sammelfrage im
+Einwilligungstor von profile-service: beide hatten danach keinen Aufrufer mehr.
+`docs/routenkarte.yml` hält den alten Pfad als **tote Tür** fest (404 in allen
+vier Spalten), und `LandkarteTests` misst nach, dass wirklich keine Route mehr
+dahintersteht.
 
 ## Entscheidung 2: vier Auflagen, als Tests
 
@@ -104,11 +109,49 @@ stündliche über alle Arten, und keine Tabelle, wer wen angesehen hat.
 
 Es entsteht **kein** `/me/scouting`.
 
+## Entscheidung 6: das Berufsfeld wird NIE ein Filter
+
+**Nicht „später", nicht „offen" — nie.** Zwei Gründe, und der zweite ist der
+praktische.
+
+**Es widerspricht ADR-0039 wörtlich.** Dort steht über das Berufsfeld: *„Aus ihm
+folgt genau EINE Sache: was die Oberfläche anbietet. Es folgt daraus keine
+Berechtigung, keine Sichtbarkeit, keine Sortierung und keine Aussage über einen
+Menschen."* Ein Suchfilter macht daraus eine Sichtbarkeitsachse. Wer ihn will,
+ändert zuerst ADR-0039 — und muss dann begründen, warum ein Etikett am Konto
+darüber entscheidet, wer gefunden wird.
+
+**Und er fände WENIGER, nicht mehr.** Der Scout sucht genannte Fähigkeiten, und
+der Wortschatz trägt MIG, WIG, CNC, SPS, Stapler, Gerüst. Wer „MIG" sucht,
+findet jeden, der es genannt hat — unabhängig davon, welches Etikett an seinem
+Konto hängt oder ob er überhaupt eines gesetzt hat (es ist nullbar und bleibt
+es). Ein Berufsfeldfilter davor schnitte genau die weg, die sich nicht
+einsortiert haben. Ein Filter, der die Menge kleiner macht, ohne sie genauer zu
+machen, ist kein Filter, sondern ein Hindernis.
+
+## Entscheidung 7: die Verfügbarkeit wird NICHT gefiltert
+
+Der Marktstatus liegt in transfer-service und hat seine **eigene Freigabe**: ein
+Unternehmen fragt, die Person antwortet (`market_request`). Danach zu filtern
+hiesse, „diese Person ist ansprechbar" zu erfahren, **ohne gefragt zu haben** —
+über die blosse Länge einer Trefferliste. Genau das schützt der Dreieckskonsens.
+
+Die Zusage bleibt, wie sie ist: wer ansprechbar ist, erfährt man, indem man
+fragt. Der Knopf dafür steht auf der Trefferkarte.
+
+## Entscheidung 8: der Umkreis kommt — aber nicht als Radiusfilter
+
+Entfernung ist keine Eigenschaft eines Menschen, sondern das Verhältnis zweier
+Aussagen: was jemand zu pendeln bereit ist, und was eine Stelle an Anwesenheit
+verlangt. Daraus wird ein **Häkchen**, keine Zahl und kein Wegfiltern — und es
+wird nichts Neues gespeichert.
+
+Das ist [ADR-0041](0041-entfernung-ist-eine-frage-zwischen-zwei-aussagen.md).
+
 ## Was dieses ADR nicht entscheidet
 
 - Die Stufen des Beraters (ADR-0037).
 - Assessment.
-- Ob `GET /candidates` in demselben Schritt fällt oder einen Sprint später.
 
 ## Löschung
 
