@@ -1,4 +1,4 @@
-# Der ganze Stapel: Datenbank, Mailfaenger, zwoelf Dienste, das Gateway und die
+# Der ganze Stapel: Datenbank, Mailfaenger, dreizehn Dienste, das Gateway und die
 # Oberflaeche.
 #
 #   docker compose up --build     # alles starten
@@ -48,7 +48,7 @@ x-dienst: &dienst
   depends_on:
     postgres:
       condition: service_healthy
-  # EINE Probe fuer alle zwoelf, und sie fragt das, was zaehlt: /health/live,
+  # EINE Probe fuer alle dreizehn, und sie fragt das, was zaehlt: /health/live,
   # dieselbe Adresse, die auch Kubernetes abfragt.
   #
   # Der Hafen kommt aus ASPNETCORE_URLS, damit er nicht ein zweites Mal
@@ -172,6 +172,7 @@ services:
       Erasure__Adressen__notification: http://notification-service:8010
       Erasure__Adressen__github: http://github-service:8011
       Erasure__Adressen__scout: http://scout-service:8012
+      Erasure__Adressen__advisor: http://advisor-service:8013
     depends_on:
       postgres:
         condition: service_healthy
@@ -479,6 +480,41 @@ services:
       Draft__Adresse: https://api.anthropic.com/v1/messages
     ports:
       - "8012:8012"
+
+  advisor-service:
+    <<: *dienst
+    container_name: workertransfer-advisor
+    environment:
+      <<: *umgebung
+      SERVICE_DIR: advisor
+      ASPNETCORE_URLS: "http://0.0.0.0:8013"
+      ConnectionStrings__advisor: Host=postgres;Port=5432;Database=advisor;Username=worker;Password=worker
+      # JEDES ZIEL DIESES DIENSTES STEHT HIER, UND ZWAR WEIL ES HIER STEHEN MUSS:
+      # die Egress-Grenze leitet ihre erlaubten Hosts aus der Konfiguration ab
+      # (Dienstgrundlage.GerufeneHosts). Ein Ziel, das nur im Quelltext steht,
+      # wird abgewiesen — ohne Protokollzeile, und der Ausfall sieht dann aus
+      # wie ein Ausfall des anderen Dienstes.
+      #
+      # Der Ledger. Er traegt die STUFE eines Gespraechs (ADR-0037): gelesen bei
+      # jeder Anfrage, geschrieben bei jeder Freigabe. OHNE diese Zeile
+      # antwortet jede Route 503 — richtig, und sichtbar.
+      Consent__Adresse: http://consent-service:8002
+      # Die internen Tueren von identity-service, hinter dem geteilten
+      # Geheimnis: die Domain eines Unternehmens (damit ein Ausschluss greifen
+      # kann) und der Klarname eines Menschen (erst ab Stufe 3, und erst
+      # NACHDEM der Ledger sie bestaetigt hat).
+      Identity__Adresse: http://identity-service:8001
+      Identity__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      # Die Uebergabe der Einigung. Der Dreieckskonsens steht DORT und wird hier
+      # nicht nachgebaut: transfer-service prueft selbst, ob der Marktstatus
+      # freigegeben und die Person ansprechbar ist.
+      Transfer__Adresse: http://transfer-service:8009
+      # „Ein Unternehmen hat ein Gespraech eroeffnet" — ueber den Postausgang,
+      # inhaltsfrei, und die Nachricht nennt kein Unternehmen (ADR-0025).
+      Notifications__Adresse: http://notification-service:8010
+      Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+    ports:
+      - "8013:8013"
 
   gateway:
     <<: *dienst

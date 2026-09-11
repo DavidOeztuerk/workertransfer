@@ -39,11 +39,11 @@ public sealed class LoeschungVerlangenHandler(
     : IRequestHandler<LoeschungVerlangenBefehl, Loeschergebnis>
 {
     /// <summary>
-    /// The nine rows, in the order they fall due.
+    /// The twelve rows, in the order they fall due.
     /// </summary>
     /// <remarks>
     /// The order is <em>enforced by the dispatcher</em>, not by this list — all
-    /// nine come into being in the same instant and in the same transaction.
+    /// twelve come into being in the same instant and in the same transaction.
     /// </remarks>
     public static IReadOnlyList<string> Absichten { get; } =
     [

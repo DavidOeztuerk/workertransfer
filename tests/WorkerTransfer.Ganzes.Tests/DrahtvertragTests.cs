@@ -61,6 +61,7 @@ public class DrahtvertragTests
         { "github", typeof(GitHub.Api.LoeschEndpoints) },
         { "notification", typeof(Notification.Api.LoeschEndpoints) },
         { "scout", typeof(Scout.Api.LoeschEndpoints) },
+        { "advisor", typeof(Advisor.Api.LoeschEndpoints) },
 
         // Die gemeinsamen Vertraege gehoeren dazu, und zwar dringend: hier hat
         // sich der Fehler zuletzt versteckt. `EinwilligungsfrageV1` reist
@@ -90,7 +91,8 @@ public class DrahtvertragTests
         // camelCase heisst, kommt nie an. `profile.contracts` war bis dahin
         // leer — sie steht hier ab ihrem ersten Typ.
         { "profile.contracts", typeof(Profile.Contracts.ProfilfundV1) },
-        { "scout.contracts", typeof(Scout.Contracts.TrefferV1) }
+        { "scout.contracts", typeof(Scout.Contracts.TrefferV1) },
+        { "advisor.contracts", typeof(Advisor.Contracts.GespraechV1) }
     };
 
     /// <summary>Ob camelCase und snake_case bei diesem Namen auseinandergehen.</summary>
@@ -137,13 +139,13 @@ public class DrahtvertragTests
             + "schickt snake_case, und der Wert kommt nie an", dienst);
     }
 
-    /// <summary>Die Liste deckt alle zwoelf Api-Schichten und die geteilten Vertraege ab.</summary>
+    /// <summary>Die Liste deckt alle dreizehn Api-Schichten und die geteilten Vertraege ab.</summary>
     [Fact]
     public void Die_Liste_deckt_alle_Dienste_ab()
     {
         var dienste = ApiSchichten.Select(zeile => (string)zeile[0]!).ToArray();
 
-        dienste.Should().HaveCount(25);
+        dienste.Should().HaveCount(27);
         dienste.Should().OnlyHaveUniqueItems();
     }
 
