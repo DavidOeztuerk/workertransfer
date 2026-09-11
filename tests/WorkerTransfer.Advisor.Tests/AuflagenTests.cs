@@ -474,7 +474,7 @@ public class AuflagenTests
         await zuFrueh.Should().ThrowAsync<UebergangNichtErlaubt>();
         uebergabe.Uebergeben.Should().BeEmpty();
 
-        await new ZustimmenHandler(gespraeche, TimeProvider.System).Handle(
+        await new ZustimmenHandler(gespraeche, tor, TimeProvider.System).Handle(
             new ZustimmenBefehl(gespraech.Id, new SubjectId(Anna)), default);
 
         var vorgang = await handler.Handle(
@@ -496,7 +496,7 @@ public class AuflagenTests
         var (gespraeche, _, tor, _) = Aufbau();
         var gespraech = await Eroeffne(gespraeche, tor);
 
-        await new ZustimmenHandler(gespraeche, TimeProvider.System).Handle(
+        await new ZustimmenHandler(gespraeche, tor, TimeProvider.System).Handle(
             new ZustimmenBefehl(gespraech.Id, new SubjectId(Anna)), default);
 
         var uebergabe = new Probeuebergabe { LehntAb = true };
