@@ -38,18 +38,6 @@ public sealed class Probetor : IEinwilligungstor
             ? throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht")
             : Task.FromResult(Frei.Contains((wer.Value, firma.Value)));
     }
-
-    public Task<IReadOnlyList<bool>> DarfSehenAlleAsync(
-        IReadOnlyList<SubjectId> wer,
-        TenantId firma,
-        CancellationToken cancellationToken = default)
-    {
-        Fragen++;
-        return Schweigt
-            ? throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht")
-            : Task.FromResult<IReadOnlyList<bool>>(
-                [.. wer.Select(einer => Frei.Contains((einer.Value, firma.Value)))]);
-    }
 }
 
 /// <summary>Ein Entwerfer, der zählt statt zu fragen.</summary>
@@ -253,53 +241,6 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Eine Seite kostete vierzig einzelne Aufrufe. Jetzt einer — bei gleichem
-    /// Ergebnis und ohne dass irgendetwas vorgehalten würde.
-    /// </summary>
-    [Fact]
-    public async Task Eine_Kandidatenseite_fragt_den_Ledger_genau_einmal()
-    {
-        var firma = Guid.CreateVersion7();
-
-        foreach (var _ in Enumerable.Range(0, 5))
-        {
-            var wer = Guid.CreateVersion7();
-            await Schreibe(AlsPerson(wer));
-            _tor.Frei.Add((wer, firma));
-        }
-
-        var vorher = _tor.Fragen;
-        var seite = await AlsFirma(Guid.CreateVersion7(), firma).GetAsync("/candidates");
-
-        seite.StatusCode.Should().Be(HttpStatusCode.OK);
-        _tor.Fragen.Should().Be(vorher + 1, "eine Runde, nicht eine je Zeile");
-    }
-
-    /// <summary>
-    /// Die Seite zeigt nur Freigegebene — und nennt keine Gesamtzahl, weil die
-    /// über die Differenz verriete, wie viele nicht freigegeben sind.
-    /// </summary>
-    [Fact]
-    public async Task Die_Kandidatenseite_zeigt_nur_Freigegebene_und_keine_Gesamtzahl()
-    {
-        var firma = Guid.CreateVersion7();
-        var sichtbar = Guid.CreateVersion7();
-        var verborgen = Guid.CreateVersion7();
-
-        await Schreibe(AlsPerson(sichtbar));
-        await Schreibe(AlsPerson(verborgen));
-        _tor.Frei.Add((sichtbar, firma));
-
-        var antwort = await AlsFirma(Guid.CreateVersion7(), firma).GetAsync("/candidates");
-        var rumpf = await antwort.Content.ReadAsStringAsync();
-
-        rumpf.Should().Contain(sichtbar.ToString());
-        rumpf.Should().NotContain(verborgen.ToString());
-        rumpf.Should().NotContain("total");
-        rumpf.Should().NotContain("count");
-    }
-
-    /// <summary>
     /// Kein Punktwert, kein Rang, kein Prozentwert — über niemanden (ADR-0022).
     /// </summary>
     [Fact]
@@ -311,13 +252,13 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
         _tor.Frei.Add((anna, firma));
 
         var browser = AlsFirma(Guid.CreateVersion7(), firma);
-        var seite = await (await browser.GetAsync("/candidates")).Content.ReadAsStringAsync();
         var einzeln = await (await browser.GetAsync($"/profiles/{anna}")).Content.ReadAsStringAsync();
+        var eigen = await (await AlsPerson(anna).GetAsync("/profiles/me")).Content.ReadAsStringAsync();
 
         foreach (var verboten in new[] { "score", "rank", "match", "percent", "weight" })
         {
-            seite.Should().NotContain(verboten);
             einzeln.Should().NotContain(verboten);
+            eigen.Should().NotContain(verboten);
         }
     }
 

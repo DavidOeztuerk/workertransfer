@@ -102,6 +102,7 @@ public enum Belegstand
 public sealed record Treffer(
     SubjectId Wer,
     string Ueberschrift,
+    string Text,
     string Ort,
     bool RemoteMoeglich,
     IReadOnlyList<string> Genannt,

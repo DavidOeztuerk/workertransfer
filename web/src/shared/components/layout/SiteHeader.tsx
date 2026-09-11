@@ -475,7 +475,7 @@ function FirmenMenu() {
         onClick={() => setAnker(null)}
         slotProps={{ paper: { sx: { minWidth: 232, mt: 1 } } }}
       >
-        <Eintrag to="/candidates">{t("kopf.kandidaten")}</Eintrag>
+        <Eintrag to="/scout">{t("kopf.kandidaten")}</Eintrag>
         <Eintrag to="/company/jobs">{t("kopf.unsereStellen")}</Eintrag>
         <Eintrag to="/company/applications">{t("kopf.unsereBewerbungen")}</Eintrag>
         <Eintrag to="/company/transfers">{t("kopf.unsereGespraeche")}</Eintrag>

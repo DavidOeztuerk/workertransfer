@@ -49,28 +49,16 @@ public static class Sichtbarkeiten
 public interface IEinwilligungstor
 {
     /// <summary>Die Frage für einen Menschen.</summary>
+    /// <remarks>
+    /// <strong>Nur noch die einzelne Frage.</strong> Daneben stand eine
+    /// Sammelfrage, und sie stand dort für <c>GET /candidates</c>: eine Seite
+    /// von zwanzig Profilen kostete sonst bis zu vierzig einzelne Aufrufe.
+    /// Diese Route ist am 11.09.2026 gefallen, und die Sammelfrage mit ihr —
+    /// gesammelt fragt jetzt scout-service, für seine eigene Seite. Zwei
+    /// Sammelfragen an denselben Ledger wären zwei Stellen, an denen über
+    /// Sichtbarkeit entschieden wird.
+    /// </remarks>
     /// <exception cref="EinwilligungSchweigt">Der Ledger antwortet nicht.</exception>
     Task<bool> DarfSehenAsync(
         SubjectId wer, TenantId firma, CancellationToken cancellationToken = default);
-
-    /// <summary>Dieselbe Frage für viele — eine Antwort je Eingabe, in deren Reihenfolge.</summary>
-    /// <remarks>
-    /// Eine eigene Methode und nicht <see cref="DarfSehenAsync(SubjectId,TenantId,CancellationToken)"/>
-    /// mit einer Liste: die einzelne Frage hat einen anderen Aufrufer und darf
-    /// nicht teurer werden, weil die Liste billiger geworden ist.
-    /// <para>
-    /// Gemessen war das der Grund für die Sammelfrage: eine Seite von zwanzig
-    /// Profilen kostete bis zu vierzig einzelne Aufrufe, jeder mit eigenem
-    /// Verbindungsaufbau — 1,7 bis 8,8 Sekunden je Seite, und unter Last mehr,
-    /// als die Oberfläche abwartet. Danach 0,015 bis 0,083 Sekunden, bei
-    /// gleichem Ergebnis.
-    /// </para>
-    /// </remarks>
-    /// <exception cref="EinwilligungSchweigt">
-    /// Der Ledger antwortet nicht — oder er antwortet in anderer Zahl als
-    /// gefragt wurde. Ein <c>false</c> wäre auch hier eine Aussage über einen
-    /// Menschen, die niemand treffen kann.
-    /// </exception>
-    Task<IReadOnlyList<bool>> DarfSehenAlleAsync(
-        IReadOnlyList<SubjectId> wer, TenantId firma, CancellationToken cancellationToken = default);
 }

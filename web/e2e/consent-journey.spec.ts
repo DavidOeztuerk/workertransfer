@@ -64,7 +64,7 @@ test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort",
   await waehleImFeld(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   await expect(recruiter.getByText(headline)).toBeVisible();
 
   // Der eigentliche Beweis: Widerruf im einen Browser, Neuladen im anderen.
@@ -85,7 +85,7 @@ test("ohne aktives Unternehmen führt die Kandidatenliste ins Leere, nicht zu Da
   await registerAndConfirm(page, email, "E2E Privatperson");
   await login(page, email);
 
-  await page.goto("/candidates");
+  await page.goto("/scout");
 
   await expect(page.getByText(/Profile sehen nur Unternehmen/i)).toBeVisible();
   await expect(page.getByRole("list")).toHaveCount(0);

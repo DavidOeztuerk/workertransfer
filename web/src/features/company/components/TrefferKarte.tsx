@@ -6,12 +6,10 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
-import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 
 import { useAsync } from "../lib/useAsync";
-import type { Profile } from "../api/candidates";
-import { getGitHub } from "../api/github";
+import type { Beleg, Haken, Treffer } from "../api/scout";
 import { requestResume } from "../api/resumeRequests";
 import {
   type MarketRequest,
@@ -28,23 +26,27 @@ const ANSPRECHBARKEIT: Record<string, string> = {
 };
 
 /**
- * Eine Kandidatin, wie ein Unternehmen sie sieht.
+ * Ein Treffer, wie ein Unternehmen ihn sieht.
  *
  * <strong>Es steht keine Zahl auf dieser Karte, und es darf keine geben.</strong>
- * Kein Punktwert, keine Passung in Prozent, keine Rangfolge. Was hier steht,
- * hat die Person selbst geschrieben oder ausdrücklich freigegeben: Überschrift,
- * Ort, Text, Fähigkeiten — und Belege mit Herkunft, wo sie GitHub verbunden hat.
+ * Kein Punktwert, keine Passung in Prozent, keine Rangfolge — und ausdrücklich
+ * auch kein „2 von 3". Die Häkchenliste nennt, <em>welches</em> Wort fehlt; eine
+ * Summe darüber verbärge genau das (ADR-0022, ADR-0036 Auflage 2).
+ *
+ * <strong>Häkchen und Belege kommen vom Server</strong>, aus `checks` und
+ * `evidence` des Vertrags. Das ist Entscheidung 3 des ADR: läge die Liste nur
+ * hier, rechnete der Browser sich aus den Rohdaten eine Zahl aus.
  *
  * <strong>Drei getrennte Türen, und keine öffnet die andere.</strong> Der
  * Lebenslauf wird angefragt, der Marktstatus wird angefragt, das Interesse wird
  * hinterlegt. Jede Anfrage beantwortet die Person einzeln.
  */
-export function CandidateCard({
-  profile,
+export function TrefferKarte({
+  treffer,
   marketRequest,
   onGeaendert,
 }: {
-  profile: Profile;
+  treffer: Treffer;
   marketRequest: MarketRequest | undefined;
   onGeaendert: () => void;
 }) {
@@ -54,36 +56,147 @@ export function CandidateCard({
     <Card component="li">
       <CardContent>
         <Typography variant="h3" sx={{ mb: 0.5 }}>
-          {profile.headline}
+          {treffer.headline}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          {profile.location !== ""
-            ? profile.location
+          {treffer.location !== ""
+            ? treffer.location
             : t("kandidaten.ortFehlt")}
-          {profile.remote_ok ? t("kandidaten.remoteMoeglich") : null}
+          {treffer.remote_ok ? t("kandidaten.remoteMoeglich") : null}
         </Typography>
 
-        {profile.bio !== "" ? (
-          <Typography sx={{ mb: 1.5 }}>{profile.bio}</Typography>
+        {treffer.bio !== "" ? (
+          <Typography sx={{ mb: 1.5 }}>{treffer.bio}</Typography>
         ) : null}
 
-        {profile.skills.length > 0 ? (
+        <Haekchenliste haken={treffer.checks} />
+
+        {treffer.named.length > 0 ? (
           <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap", mb: 2 }}>
-            {profile.skills.map((faehigkeit) => (
+            {treffer.named.map((faehigkeit) => (
               <Chip key={faehigkeit} label={faehigkeit} size="small" />
             ))}
           </Box>
         ) : null}
 
-        <Lebenslaufanfrage subjectId={profile.subject_id} />
+        <Lebenslaufanfrage subjectId={treffer.subject_id} />
         <Marktzugang
-          subjectId={profile.subject_id}
+          subjectId={treffer.subject_id}
           anfrage={marketRequest}
           onGeaendert={onGeaendert}
         />
-        <GitHubBelege subjectId={profile.subject_id} />
+        <Belegliste belege={treffer.evidence} stand={treffer.evidence_state} />
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Die Häkchenliste: ein Ja oder Nein je gesuchtem Wort.
+ *
+ * <strong>Und daneben keine Summe.</strong> Wer nichts gesucht hat, sieht hier
+ * nichts — und ausdrücklich kein „0 von 0": nichts gesucht ist keine Aussage
+ * über den Menschen auf dieser Karte.
+ *
+ * Die Reihenfolge ist die der Suche, nicht „erfüllt zuerst". Das wäre eine
+ * Sortierung nach Passung im Kleinen — und der Anfang derselben im Grossen.
+ */
+function Haekchenliste({ haken }: { haken: Haken[] }) {
+  const { t } = useTranslation();
+
+  if (haken.length === 0) return null;
+
+  return (
+    <Box
+      component="ul"
+      // „Abgleich mit der Suche" und NICHT „Gesuchte Faehigkeiten": das Wort
+      // „Faehigkeiten" steht schon am Suchfeld dieser Seite, und ein zweites
+      // Element mit demselben Namensbestandteil macht `getByLabel` mehrdeutig.
+      // Gemessen: sechs E2E-Reisen fielen an genau dieser Zeile.
+      aria-label={t("kandidaten.haken")}
+      sx={{ display: "flex", gap: 0.75, flexWrap: "wrap", listStyle: "none", p: 0, mb: 1.5 }}
+    >
+      {haken.map((eintrag) => (
+        <Chip
+          component="li"
+          key={eintrag.word}
+          size="small"
+          variant={eintrag.named ? "filled" : "outlined"}
+          color={eintrag.named ? "success" : "default"}
+          // Das Zeichen steht NEBEN dem Wort, nicht statt seiner: wer die Farbe
+          // nicht sieht, liest trotzdem, was gesucht war und was fehlt.
+          label={`${eintrag.word} ${eintrag.named ? "✓" : "✗"}`}
+          aria-label={
+            eintrag.named
+              ? t("kandidaten.hakenGenannt", { wort: eintrag.word })
+              : t("kandidaten.hakenFehlt", { wort: eintrag.word })
+          }
+        />
+      ))}
+    </Box>
+  );
+}
+
+/**
+ * Belege mit Herkunft und Link — und ein Satz, wo keine sind.
+ *
+ * <strong>Wer nichts auf GitHub hat, ist nicht schlechter, sondern woanders</strong>
+ * (ADR-0022 §3). Deshalb steht hier in jedem Fall ein Satz und nie eine leere
+ * Box oder eine ausgegraute Karte. „Nichts freigegeben" und „gerade nicht
+ * erreichbar" sind dabei zwei verschiedene Sätze: der zweite ist überhaupt
+ * keine Aussage über die Person, sondern über uns.
+ */
+function Belegliste({ belege, stand }: { belege: Beleg[]; stand: Treffer["evidence_state"] }) {
+  const { t } = useTranslation();
+
+  const hinweis: Record<Treffer["evidence_state"], string | null> = {
+    complete: null,
+    partial: t("kandidaten.belegeUnvollstaendig"),
+    none_released: t("kandidaten.belegeKeine"),
+    unavailable: t("kandidaten.belegeUnerreichbar"),
+  };
+
+  const satz = hinweis[stand];
+
+  return (
+    <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: "divider" }}>
+      <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+        {t("kandidaten.belege")}
+      </Typography>
+
+      {belege.length > 0 ? (
+        <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap", mb: satz === null ? 0 : 1 }}>
+          {belege.map((beleg) => (
+            <Chip
+              key={`${beleg.origin}:${beleg.project}:${beleg.word}`}
+              size="small"
+              variant="outlined"
+              clickable
+              component="a"
+              href={beleg.url}
+              target="_blank"
+              rel="noreferrer noopener"
+              label={beleg.word}
+              // Die Herkunft steht dabei: ein Topic hat ein Mensch geschrieben,
+              // einen Sprachnamen hat GitHub erkannt. Ohne sie laese sich
+              // beides wie eine Aussage ueber die Person.
+              title={t(
+                beleg.origin === "topic"
+                  ? "kandidaten.belegTopic"
+                  : "kandidaten.belegSprache",
+                { projekt: beleg.project },
+              )}
+            />
+          ))}
+        </Box>
+      ) : null}
+
+      {satz !== null ? (
+        <Typography variant="body2" color="text.secondary">
+          {satz}
+        </Typography>
+      ) : null}
+    </Box>
   );
 }
 
@@ -251,65 +364,6 @@ function Marktzugang({
             </Button>
           ) : null}
         </>
-      ) : null}
-    </Box>
-  );
-}
-
-/**
- * Belege aus GitHub, wenn die Person sie freigegeben hat.
- *
- * <strong>Die ersten fünf, nach letzter Änderung.</strong> Keine Auswahl nach
- * „Qualität" — die gibt es hier nicht, und eine Reihung wäre bereits eine
- * Wertung. Keine Repositories sind kein Mangel, sondern eine Auskunft.
- */
-function GitHubBelege({ subjectId }: { subjectId: string }) {
-  const { t, i18n } = useTranslation();
-  const connection = useAsync(
-    (signal) => getGitHub(subjectId, signal),
-    [subjectId],
-  );
-  const current =
-    connection.data?.ok === true ? connection.data.connection : null;
-
-  if (current === null) return null;
-
-  return (
-    <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: "divider" }}>
-      <Link
-        href={`https://github.com/${current.login}`}
-        target="_blank"
-        rel="noreferrer noopener"
-        variant="body2"
-      >
-        github.com/{current.login}
-      </Link>
-
-      {current.repositories.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          {t("kandidaten.keineRepos")}
-        </Typography>
-      ) : (
-        <Box component="ul" sx={{ pl: 2.5, my: 1 }}>
-          {current.repositories.slice(0, 5).map((repo) => (
-            <Typography component="li" variant="body2" key={repo.name}>
-              <Link href={repo.url} target="_blank" rel="noreferrer noopener">
-                {repo.name}
-              </Link>
-              {repo.language !== null ? ` · ${repo.language}` : null}
-            </Typography>
-          ))}
-        </Box>
-      )}
-
-      {current.fetched_at !== null ? (
-        <Typography variant="caption" color="text.secondary">
-          {t("kandidaten.standVom", {
-            zeitpunkt: new Date(current.fetched_at).toLocaleDateString(
-              i18n.language,
-            ),
-          })}
-        </Typography>
       ) : null}
     </Box>
   );

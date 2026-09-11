@@ -47,15 +47,32 @@ public sealed record InterneProfilsucheAbfrage(
     bool NurRemote = false) : IAbfrage<Profilseite>;
 
 /// <summary>Reicht die Seite durch, in stabiler Reihenfolge.</summary>
-/// <remarks>
-/// Dieselbe Obergrenze wie <see cref="KandidatenHandler.Hoechstzahl"/> und aus
-/// demselben Grund: die Sammelfrage des Ledgers trägt höchstens hundert Paare,
-/// also fünfzig Menschen — wer hier mehr herausgäbe, baute eine Seite, deren
-/// Freigabe niemand am Stück prüfen kann.
-/// </remarks>
 public sealed class InterneProfilsucheHandler(IProfilspeicher speicher)
     : IRequestHandler<InterneProfilsucheAbfrage, Profilseite>
 {
+    /// <summary>Obergrenze je Seite.</summary>
+    /// <remarks>
+    /// Die Sammelfrage des Ledgers trägt höchstens hundert Paare, also fünfzig
+    /// Menschen — wer hier mehr herausgäbe, baute eine Seite, deren Freigabe
+    /// der Aufrufer nicht am Stück prüfen kann.
+    /// <para>
+    /// Die Zahlen standen bis zum 11.09.2026 an <c>KandidatenHandler</c>. Der
+    /// ist mit <c>GET /candidates</c> gefallen; die Grenzen sind geblieben,
+    /// weil der Grund für sie geblieben ist.
+    /// </para>
+    /// </remarks>
+    public const int Hoechstzahl = 50;
+
+    /// <summary>Was eine Seite trägt, wenn niemand etwas anderes sagt.</summary>
+    public const int Vorgabe = 20;
+
+    /// <summary>Wie viele Fähigkeiten gefiltert werden dürfen.</summary>
+    /// <remarks>
+    /// Dieselbe Überlegung wie beim Seitendeckel: ohne Grenze baut ein Aufrufer
+    /// mit einer einzigen Adresszeile eine beliebig teure Abfrage.
+    /// </remarks>
+    public const int HoechstzahlFilter = 10;
+
     /// <inheritdoc />
     public Task<Profilseite> Handle(
         InterneProfilsucheAbfrage request, CancellationToken cancellationToken)
@@ -63,20 +80,18 @@ public sealed class InterneProfilsucheHandler(IProfilspeicher speicher)
         ArgumentNullException.ThrowIfNull(request);
 
         var anzahl = Math.Clamp(
-            request.Anzahl <= 0 ? KandidatenHandler.Vorgabe : request.Anzahl,
-            1,
-            KandidatenHandler.Hoechstzahl);
+            request.Anzahl <= 0 ? Vorgabe : request.Anzahl, 1, Hoechstzahl);
 
         var faehigkeiten = (request.Faehigkeiten ?? [])
             .Select(eintrag => eintrag.Trim())
             .Where(eintrag => eintrag.Length > 0)
-            .Take(KandidatenHandler.HoechstzahlFilter)
+            .Take(HoechstzahlFilter)
             .ToArray();
 
         return speicher.SeiteAsync(
             new Seitenanfrage(
                 anzahl, Seitenzeiger.Lies(request.Zeiger), faehigkeiten,
-                request.Ort, request.NurRemote, Irgendeine: true),
+                request.Ort, request.NurRemote),
             cancellationToken);
     }
 }

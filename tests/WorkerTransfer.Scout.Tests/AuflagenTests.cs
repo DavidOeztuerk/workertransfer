@@ -189,7 +189,7 @@ public class AuflagenTests
     public void Ein_Treffer_traegt_genau_diese_Felder()
     {
         Felder(typeof(TrefferV1)).Should().BeEquivalentTo(
-            "SubjectId", "Headline", "Location", "RemoteOk",
+            "SubjectId", "Headline", "Bio", "Location", "RemoteOk",
             "Named", "Checks", "Evidence", "EvidenceState");
 
         Felder(typeof(HakenV1)).Should().BeEquivalentTo("Word", "Named");
@@ -405,7 +405,7 @@ public class AuflagenTests
             nummer => Guid.Parse($"cccccccc-0000-0000-0000-{nummer:D12}"))];
 
     private static Profilfund Profil(Guid wer, string[] genannt) =>
-        new(new SubjectId(wer), "Entwicklerin", "Berlin", true, genannt);
+        new(new SubjectId(wer), "Entwicklerin", "", "Berlin", true, genannt);
 
     private static void Frei(Probetor tor, IEnumerable<Guid> wer)
     {

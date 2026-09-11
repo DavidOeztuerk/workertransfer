@@ -25,7 +25,8 @@ public class LandkarteTests(Landschaft landschaft)
     [InlineData("/consent/check", "consent")]
     [InlineData("/consent/check-batch", "consent")]
     [InlineData("/profiles/me", "profile")]
-    [InlineData("/candidates", "profile")]
+    [InlineData("/scout/candidates", "scout")]
+    [InlineData("/scout/searches", "scout")]
     [InlineData("/resumes/me", "resume")]
     [InlineData("/portfolios/me", "portfolio")]
     [InlineData("/jobs", "jobs")]
@@ -42,6 +43,24 @@ public class LandkarteTests(Landschaft landschaft)
 
         dienst.Should().Be(erwartet);
         angekommen.Should().Be(pfad, "der Pfad wird durchgereicht, nicht umgeschrieben");
+    }
+
+    /// <summary>Der abgeloeste Pfad trifft keinen Dienst mehr.</summary>
+    /// <remarks>
+    /// <c>/candidates</c> war bis zum 11.09.2026 die Kandidatenliste und ist mit
+    /// dem Umzug der Oberflaeche gefallen (ADR-0036). Diese Reihe ist die
+    /// Gegenprobe zur Zeile in <c>docs/routenkarte.yml</c>: dort steht 404 in
+    /// allen vier Spalten, und hier steht, dass wirklich keine Route mehr
+    /// dahintersteht — nicht etwa eine, die nur gerade nichts antwortet.
+    /// </remarks>
+    [Theory]
+    [InlineData("/candidates")]
+    [InlineData("/candidates/7f000001-0000-0000-0000-000000000000")]
+    public async Task Der_abgeloeste_Pfad_trifft_keinen_Dienst_mehr(string pfad)
+    {
+        var (dienst, _) = await landschaft.Frage(pfad);
+
+        dienst.Should().Be("<keine Route>");
     }
 
     /// <summary>

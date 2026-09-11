@@ -101,3 +101,8 @@ export const GITHUB_BASE_URL = resolve(
   // schickte sein Konto an den falschen Dienst.
   8011
 );
+export const SCOUT_BASE_URL = resolve(
+  "SCOUT_BASE_URL",
+  import.meta.env.VITE_SCOUT_BASE_URL,
+  8012
+);

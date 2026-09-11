@@ -154,6 +154,34 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
         antwort.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
+    /// <summary>
+    /// Eine verschlossene Suchtuer gibt 503 — und ausdrücklich keine leere Liste.
+    /// </summary>
+    /// <remarks>
+    /// <para><strong>Das ist der Test zu einem gemessenen Fehler.</strong> Die
+    /// interne Suchtür von profile-service antwortet ohne das geteilte Geheimnis
+    /// mit <c>404</c> statt <c>401</c>, damit sie sich nicht verrät. Der Adapter
+    /// las das als „nicht gefunden" und gab eine leere Seite zurück; der
+    /// Endpunkt antwortete <c>200</c> mit <c>items: []</c>, und die Oberfläche
+    /// behauptete, es gebe niemanden.</para>
+    ///
+    /// <para>Am laufenden Stapel fielen daraufhin zwölf E2E-Reisen — während
+    /// die Routenkarte grün blieb, weil sie Statuscodes prüft und keine Rümpfe.
+    /// „Nicht eingerichtet" darf nicht aussehen wie „es gibt niemanden".</para>
+    /// </remarks>
+    [Fact]
+    public async Task Eine_verschlossene_Suchtuer_gibt_503_und_keine_leere_Liste()
+    {
+        _suche.Verschlossen = true;
+
+        var antwort = await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
+
+        antwort.StatusCode.Should().Be(
+            HttpStatusCode.ServiceUnavailable,
+            "eine leere Trefferliste waere eine Aussage ueber Menschen, die aus "
+            + "einer fehlenden Umgebungsvariablen stammt");
+    }
+
     /// <summary>Eine schweigende Profilsuche gibt 503 — keine leere Liste.</summary>
     /// <remarks>
     /// Eine leere Trefferliste sähe aus wie „es gibt niemanden", und das wäre
@@ -497,7 +525,7 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     private static Profilfund Profil(Guid wer, string[]? genannt = null) =>
-        new(new SubjectId(wer), "Entwicklerin", "Berlin", true, genannt ?? ["Go"]);
+        new(new SubjectId(wer), "Entwicklerin", "Ich schweisse.", "Berlin", true, genannt ?? ["Go"]);
 
     private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
         JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
