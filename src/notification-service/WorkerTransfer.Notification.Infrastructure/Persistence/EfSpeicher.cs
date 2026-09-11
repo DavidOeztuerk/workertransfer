@@ -112,6 +112,30 @@ public sealed class EfEingangsspeicher(NotificationDbContext kontext) : IEingang
                     zeile => zeile.ReadAt, (DateTime?)jetzt.UtcDateTime),
                 cancellationToken);
 
+    /// <inheritdoc />
+    public Task<bool> GabEsSeitAsync(
+        SubjectId wer,
+        Benachrichtigungsart art,
+        DateTimeOffset seit,
+        CancellationToken cancellationToken = default)
+    {
+        var wort = Benachrichtigungsarten.Wort(art);
+        var ab = seit.UtcDateTime;
+
+        // Genau die Spalten, auf denen der Index liegt (user_id, created_at) —
+        // plus die Art, die auf dieser kurzen Menge nichts mehr kostet.
+        //
+        // ECHT GROESSER, nicht „groesser gleich": genau einen Tag spaeter geht
+        // wieder etwas hinaus. Dieselbe Grenze wie bei der stuendlichen Drossel
+        // (`jetzt - zuletzt >= Drossel`) — zwei Kappen, die an der Grenze
+        // verschieden entscheiden, sind zwei Regeln, die aussehen wie eine.
+        return kontext.Eingaenge.AnyAsync(
+            zeile => zeile.UserId == wer.Value
+                     && zeile.Kind == wort
+                     && zeile.CreatedAt > ab,
+            cancellationToken);
+    }
+
     private static Eingang ZumAggregat(EingangsZeile zeile) =>
         Eingang.Stelle_her(
             zeile.Id,

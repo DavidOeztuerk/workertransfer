@@ -82,8 +82,8 @@ Gelegenheiten, sie auseinanderlaufen zu lassen.
 {{/*
 Die drei geteilten Geheimnisse. Einzeln aufgeführt statt als `envFrom` über das
 ganze Secret: sonst bekäme JEDER Dienst auch den Schlüssel der
-Formulierungshilfe, und einer, den neun von elf nicht brauchen, gehört nicht in
-ihre Umgebung.
+Formulierungshilfe, und einer, den neun von zwölf nicht brauchen, gehört nicht
+in ihre Umgebung.
 */}}
 - name: JwtSettings__Secret
   valueFrom:
@@ -120,6 +120,19 @@ Adressen und braucht BEIDE Namen für dasselbe Geheimnis.
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_NOTIFY_SECRET
 {{- end }}
+{{- if hasKey ($svc.env | default dict) "Profile__Adresse" }}
+{{/*
+Dieselbe Kennung noch einmal unter einem vierten Namen: scout-service sucht
+durch die interne Tuer von profile-service. LEER hiesse dort nicht „alles",
+sondern „es wird nicht gesucht" — und zwar als Fehlschlag, damit „nicht
+eingerichtet" nicht wie „es gibt niemanden" aussieht.
+*/}}
+- name: Profile__Geheimnis
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "workertransfer.secretName" $root }}
+      key: WORKER_NOTIFY_SECRET
+{{- end }}
 {{- if hasKey ($svc.env | default dict) "Notifications__Adresse" }}
 - name: Notifications__Geheimnis
   valueFrom:
@@ -139,6 +152,8 @@ Oberfläche sagt das — es wird dann kein fremder Dienst angerufen.
       key: WORKER_ANTHROPIC_API_KEY
 - name: Draft__Modell
   value: {{ $root.Values.draftingModel | quote }}
+- name: Draft__Adresse
+  value: {{ $root.Values.draftingUrl | quote }}
 {{- end }}
 {{- range $key, $value := ($svc.env | default dict) }}
 - name: {{ $key }}

@@ -73,6 +73,13 @@ public static class Loeschempfaenger
     /// agreed on.
     /// </para>
     /// <para>
+    /// <c>scout</c> joined with its first table (ADR-0036). It holds saved
+    /// <em>searches</em> — the filters, never a result — and each belongs to
+    /// the person who saved it. Its outbox rows carry a user id as well. A
+    /// service that holds a row per person is a recipient; that is the whole
+    /// rule.
+    /// </para>
+    /// <para>
     /// A test goes red the moment any service grows a table with
     /// <c>subject_id</c> or <c>user_id</c> and is not on this list.
     /// </para>
@@ -80,7 +87,7 @@ public static class Loeschempfaenger
     public static IReadOnlyList<string> Fremde { get; } =
     [
         "consent", "profile", "resume", "portfolio",
-        "applications", "transfer", "github", "notification"
+        "applications", "transfer", "github", "notification", "scout"
     ];
 
     /// <summary>The final notice to the person. Itself an outbox row.</summary>

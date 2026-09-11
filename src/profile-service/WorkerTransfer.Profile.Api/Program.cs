@@ -31,6 +31,7 @@ await app.WandereAsync<ProfileDbContext>();
 app.UseWorkerTransferDefaults(builder.Environment, dienstname);
 
 app.MapProfilEndpoints();
+app.MapInterneEndpoints();
 app.MapLoeschEndpunkt();
 
 await app.RunAsync();

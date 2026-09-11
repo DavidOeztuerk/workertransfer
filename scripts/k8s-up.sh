@@ -60,7 +60,7 @@ kubectl get nodes >/dev/null 2>&1 || { rot "Der Cluster antwortet nicht."; exit 
 schritt "Images bauen"
 # EIN Image für alle zehn Dienste: sie unterscheiden sich nur in SERVICE_DIR,
 # und das setzt der Pod. Der Build-Arg bleibt deshalb hier ungesetzt.
-# EIN Bild fuer alle elf Dienste UND das Gateway. Das Geheimnis traegt die
+# EIN Bild fuer alle zwoelf Dienste UND das Gateway. Das Geheimnis traegt die
 # NuGet-Anmeldung fuer GitHub Packages herein und wird nie eine Schicht.
 docker build -f docker/dotnet-service.Dockerfile \
   --secret "id=nuget_config,src=${HOME}/.nuget/NuGet/NuGet.Config" \

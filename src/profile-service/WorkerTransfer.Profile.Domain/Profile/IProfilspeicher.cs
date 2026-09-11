@@ -5,20 +5,33 @@ namespace WorkerTransfer.Profile.Domain.Profile;
 /// <summary>Wonach eine Seite eingeschränkt wird.</summary>
 /// <param name="Anzahl">Wie viele Zeilen höchstens.</param>
 /// <param name="Ab">Wo es weitergeht, oder <c>null</c> für den Anfang.</param>
-/// <param name="Faehigkeiten">Alle davon muss jemand nennen — UND, nicht ODER.</param>
+/// <param name="Faehigkeiten">Die gesuchten Worte, kanonisch.</param>
 /// <param name="Ort">Teiltext, ohne Rücksicht auf Groß-/Kleinschreibung.</param>
 /// <param name="NurRemote">Nur, wer Remote ausdrücklich angekreuzt hat.</param>
+/// <param name="Irgendeine">
+/// <c>false</c>: alle Worte muss jemand nennen (UND). <c>true</c>: mindestens
+/// eines genügt (ODER).
+/// </param>
 /// <remarks>
-/// Die Filter verengen eine Menge, die es schon gibt: sichtbar wird dadurch
-/// nichts, was ohne sie verborgen wäre. Die Einwilligung wird danach geprüft,
-/// nicht hier — der Speicher kennt keine Sichtbarkeit (ADR-0020).
+/// <para><strong>Und warum es die Wahl zwischen UND und ODER gibt.</strong>
+/// <c>GET /candidates</c> sucht mit UND: es zeigt nur, wer alles nennt. Die
+/// Suche des scout-service sucht mit ODER, und das ist keine Lockerung,
+/// sondern die Voraussetzung für ihre Häkchenliste — unter UND erfüllt jeder
+/// Treffer alle Bedingungen, jedes Häkchen wäre gesetzt, und „welche Fähigkeit
+/// fehlt" hätte keine Antwort (ADR-0036 Entscheidung 2). Unter UND wäre auch
+/// die erste Auflage leer: es gäbe nichts, wonach man sortieren könnte.</para>
+///
+/// <para>Sichtbar wird durch keines von beiden etwas, was ohne den Filter
+/// verborgen wäre: die Einwilligung wird danach geprüft, nicht hier — der
+/// Speicher kennt keine Sichtbarkeit (ADR-0020).</para>
 /// </remarks>
 public sealed record Seitenanfrage(
     int Anzahl,
     Seitenzeiger? Ab = null,
     IReadOnlyList<string>? Faehigkeiten = null,
     string Ort = "",
-    bool NurRemote = false);
+    bool NurRemote = false,
+    bool Irgendeine = false);
 
 /// <summary>Eine Seite Profile.</summary>
 /// <param name="Eintraege">Die Zeilen, zuletzt geänderte zuerst.</param>

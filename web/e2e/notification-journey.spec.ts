@@ -115,8 +115,25 @@ test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser })
   await candidate.goto("/settings");
   const marketSwitch = candidate.getByRole("switch", { name: /Marktstatus sehen möchte/ });
   await expect(marketSwitch).toBeChecked();
+
+  // Auf die ANTWORT warten, nicht auf den Schalter. Der Schalter steht sofort
+  // um — die Seite schreibt die neue Stellung hin, bevor der Server sie hat —
+  // und das `goto` darunter bricht eine noch laufende Anfrage ab. Dann ist der
+  // Haken nach dem Neuladen wieder da, und die Reise faellt an einer Stelle,
+  // die mit ihrer Aussage nichts zu tun hat. Gemessen: genau so, einmal in
+  // einem Lauf von 25.
+  //
+  // Kein hoeheres Zeitlimit: das saehe aus wie eine Reparatur und verschoebe
+  // das Rennen nur.
+  const gespeichert = candidate.waitForResponse(
+    (antwort) =>
+      antwort.url().includes("/me/notification-preferences") &&
+      antwort.request().method() === "PUT",
+  );
   await marketSwitch.click();
   await expect(marketSwitch).not.toBeChecked();
+  await gespeichert;
+
   // Neu laden: gespeichert ist nur, was den Server erreicht hat.
   await candidate.goto("/settings");
   await expect(

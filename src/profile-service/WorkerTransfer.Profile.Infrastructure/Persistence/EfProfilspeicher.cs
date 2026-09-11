@@ -64,21 +64,39 @@ public sealed class EfProfilspeicher(ProfileDbContext context) : IProfilspeicher
             .ThenByDescending(spalte => spalte.Id)
             .AsQueryable();
 
-        foreach (var faehigkeit in anfrage.Faehigkeiten ?? [])
-        {
-            // Groß-/Kleinschreibung egal, weil die Fähigkeitenliste beim
-            // Speichern schon so entdoppelt: „Python“ und „python“ sind dort
-            // dieselbe Fähigkeit, und eine Suche, die sie unterschiede,
-            // widerspräche der eigenen Datenhaltung.
-            //
-            // Verglichen wird zur Abfragezeit statt über eine gespiegelte
-            // kleingeschriebene Spalte: die wäre eine zweite Kopie derselben
-            // Daten. Wird es eng, ist ein GIN-Index über genau diesen Ausdruck
-            // die Antwort — keine zweite Spalte.
-            var gesucht = Wortschatz.Kanonisch(faehigkeit).ToUpperInvariant();
+        // Groß-/Kleinschreibung egal, weil die Fähigkeitenliste beim Speichern
+        // schon so entdoppelt: „Python“ und „python“ sind dort dieselbe
+        // Fähigkeit, und eine Suche, die sie unterschiede, widerspräche der
+        // eigenen Datenhaltung.
+        //
+        // Verglichen wird zur Abfragezeit statt über eine gespiegelte
+        // kleingeschriebene Spalte: die wäre eine zweite Kopie derselben Daten.
+        // Wird es eng, ist ein GIN-Index über genau diesen Ausdruck die
+        // Antwort — keine zweite Spalte.
+        var gesuchte = (anfrage.Faehigkeiten ?? [])
+            .Select(faehigkeit => Wortschatz.Kanonisch(faehigkeit).ToUpperInvariant())
+            .ToArray();
 
-            abfrage = abfrage.Where(spalte =>
-                spalte.Faehigkeiten.Any(eintrag => eintrag.ToUpper() == gesucht));
+        if (anfrage.Irgendeine)
+        {
+            // ODER: mindestens eines der Worte genügt. Ein Treffer darf also
+            // etwas NICHT nennen — und genau das macht die Häkchenliste des
+            // scout-service erst zu einer Auskunft (ADR-0036).
+            if (gesuchte.Length > 0)
+            {
+                abfrage = abfrage.Where(spalte =>
+                    spalte.Faehigkeiten.Any(eintrag => gesuchte.Contains(eintrag.ToUpper())));
+            }
+        }
+        else
+        {
+            // UND: alles muss genannt sein. Die Bedingung von `/candidates`,
+            // unverändert.
+            foreach (var gesucht in gesuchte)
+            {
+                abfrage = abfrage.Where(spalte =>
+                    spalte.Faehigkeiten.Any(eintrag => eintrag.ToUpper() == gesucht));
+            }
         }
 
         if (anfrage.Ort.Length > 0)

@@ -46,7 +46,8 @@ public class Landschaft : IAsyncLifetime
     private static readonly string[] Namen =
     [
         "identity", "consent", "profile", "resume", "portfolio", "jobs",
-        "applications", "companies", "transfer", "notification", "github", "web"
+        "applications", "companies", "transfer", "notification", "github",
+        "scout", "web"
     ];
 
     private readonly List<WebApplication> _attrappen = [];

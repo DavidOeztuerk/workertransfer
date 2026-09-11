@@ -3,10 +3,17 @@ import type { ApiError } from "../../../core/store/thunkHelpers";
 import { API_BASE_URL } from "../../../env";
 
 /**
- * Die Benachrichtigungs-Einstellungen bei identity-service.
+ * Die Benachrichtigungs-Einstellungen bei notification-service.
  *
- * Fünf Schalter, alle voreingestellt AN: wer nicht erfährt, dass gefragt wurde,
+ * Sechs Schalter, alle voreingestellt AN: wer nicht erfährt, dass gefragt wurde,
  * hat keine Wahl, sondern nur den Anschein einer.
+ *
+ * `profile_discovered` ist der jüngste (ADR-0033) und der einzige, der von
+ * einer Suche handelt statt von einem Vorgang: „dein Profil wurde von einem
+ * Unternehmen entdeckt". Er ist EINZELN abbestellbar, und das ist der Grund für
+ * die eigene Art — es ist die einzige Auskunft, die jemand über seine eigene
+ * Sichtbarkeit bekommt, und wer sie nicht will, soll nicht alles andere mit
+ * abstellen müssen.
  *
  * Die Feldnamen sind der Draht und deshalb snake_case — nicht der Geschmack
  * dieser Datei.
@@ -17,6 +24,7 @@ export interface Benachrichtigungswahl {
   application_update: boolean;
   transfer_update: boolean;
   application_received: boolean;
+  profile_discovered: boolean;
 }
 
 /** Was gilt, solange niemand etwas eingestellt hat. */
@@ -26,6 +34,7 @@ export const ALLES_AN: Benachrichtigungswahl = {
   application_update: true,
   transfer_update: true,
   application_received: true,
+  profile_discovered: true,
 };
 
 const PFAD = "/me/notification-preferences";
@@ -53,7 +62,7 @@ export type Speicherergebnis =
   | { ok: true; choice: Benachrichtigungswahl }
   | { ok: false; error: ApiError };
 
-/** Speichert alle fünf auf einmal — der Endpunkt kennt keine Teiländerung. */
+/** Speichert alle sechs auf einmal — der Endpunkt kennt keine Teiländerung. */
 export async function speichereWahl(
   choice: Benachrichtigungswahl,
   signal?: AbortSignal
