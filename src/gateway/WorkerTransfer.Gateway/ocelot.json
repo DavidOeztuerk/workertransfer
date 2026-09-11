@@ -542,6 +542,41 @@
         }
       ],
       "Priority": 10
+    },
+
+    // Die Arbeitsprobe (ADR-0042). Der Dienst mit dem groessten
+    // Missbrauchspotenzial, und deshalb der mit den engsten Zusagen: der Umfang
+    // in Stunden steht vorne, die Bewertung gehoert dem VORGANG und verlaesst
+    // ihn nie, und die Person liest sie immer — auch nach einem Widerruf.
+    //
+    // HIER ZWEI ROUTEN, anders als bei Scout und Berater: unter `/assessments`
+    // selbst liegen zwei Endpunkte (die Firma stellt, die Firma liest ihre
+    // Liste). Ocelot fuehrt `{rest}` nicht ins Leere weiter, also braucht der
+    // blanke Pfad eine eigene Zeile — sonst antwortet er 404, und zwar Ocelots
+    // leeres, das wie ein toter Dienst aussieht.
+    {
+      "UpstreamPathTemplate": "/assessments",
+      "DownstreamPathTemplate": "/assessments",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "assessment-service",
+          "Port": 8014
+        }
+      ],
+      "Priority": 10
+    },
+    {
+      "UpstreamPathTemplate": "/assessments/{rest}",
+      "DownstreamPathTemplate": "/assessments/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "assessment-service",
+          "Port": 8014
+        }
+      ],
+      "Priority": 10
     }
   ],
 

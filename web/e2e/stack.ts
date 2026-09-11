@@ -24,6 +24,7 @@ export const TRANSFER_URL = process.env.E2E_TRANSFER_URL ?? "http://localhost:80
 // notification-service ueberhaupt nie geprueft.
 export const GITHUB_URL = process.env.E2E_GITHUB_URL ?? "http://localhost:8011";
 export const ADVISOR_URL = process.env.E2E_ADVISOR_URL ?? "http://localhost:8013";
+export const ASSESSMENT_URL = process.env.E2E_ASSESSMENT_URL ?? "http://localhost:8014";
 export const NOTIFICATION_URL = process.env.E2E_NOTIFICATION_URL ?? "http://localhost:8010";
 
 /** Das Gateway — der Weg, den die Oberflaeche fuer ihre Aufrufe nimmt. */
@@ -44,6 +45,7 @@ const REQUIRED: ReadonlyArray<readonly [string, string, Record<string, string>?]
   ["github-service", `${GITHUB_URL}/health/live`],
   ["notification-service", `${NOTIFICATION_URL}/health/live`],
   ["advisor-service", `${ADVISOR_URL}/health/live`],
+  ["assessment-service", `${ASSESSMENT_URL}/health/live`],
   ["gateway", `${GATEWAY_URL}/health/live`],
   ["mailpit", `${MAILPIT_URL}/api/v1/messages?limit=1`],
 ];

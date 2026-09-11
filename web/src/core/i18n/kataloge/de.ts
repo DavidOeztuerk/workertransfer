@@ -73,6 +73,8 @@ const de = {
     gespraeche: "Gespräche",
     berater: "Berater",
     unsereBerater: "Berater",
+    arbeitsproben: "Arbeitsproben",
+    unsereProben: "Arbeitsproben",
   },
 
   nichtGefunden: {
@@ -341,6 +343,10 @@ const de = {
     eingangHinweis: "Eine Firma hat kein Postfach. Die Nachricht geht an dich.",
     entdecktLabel: "Wenn dein Profil von einem Unternehmen entdeckt wird",
     entdecktHinweis: "Welches, steht nicht darin — und höchstens eine solche Nachricht am Tag, egal wie oft es passiert. Eine Zeile je Fund wäre ein Zähler über deine eigene Sichtbarkeit.",
+    beraterLabel: "Wenn ein Unternehmen ein Gespräch eröffnet",
+    beraterHinweis: "Welches, steht nicht darin — das siehst du hinter der Anmeldung in deiner Liste.",
+    probeLabel: "Wenn sich bei einer Arbeitsprobe etwas tut",
+    probeHinweis: "Eine gestellte Aufgabe und eine Rückmeldung darauf. Abbestellen nimmt dir die Mail, nicht den Eintrag — die Rückmeldung steht immer in deiner Liste.",
     datenschutz: "Datenschutz",
     verfall: "Konto verfällt nach",
     verfallNie: "Nie von selbst",
@@ -544,6 +550,11 @@ const de = {
 
   fehler: {
     keineVerbindung: "Keine Verbindung zum Server.",
+    vorgangNichtGeladen: "Die Arbeitsprobe ließ sich nicht laden.",
+    vorgangFort: "Diese Arbeitsprobe gibt es hier nicht.",
+    aufgabeNichtGestellt: "Die Aufgabe ließ sich nicht stellen.",
+    nichtEingereicht: "Die Lösung ließ sich nicht abgeben.",
+    nichtBewertet: "Die Rückmeldung ließ sich nicht senden.",
     keineVerbindungKurz: "Keine Verbindung",
     ledgerSchweigt: "Der Consent-Ledger antwortet gerade nicht.",
     ledgerSchweigtOhneAenderung: "Der Consent-Ledger antwortet gerade nicht — es wurde nichts geändert.",
@@ -1165,6 +1176,57 @@ const de = {
     spanne: "{{von}}–{{bis}} € / Monat",
   },
 
+  /**
+   * Die Arbeitsprobe (ADR-0042).
+   *
+   * Die drei Zusagen stehen hier als TEXT und nicht nur im Code: der Umfang in
+   * Stunden, dass die Bewertung zum Vorgang gehört, und dass Ablehnen nirgends
+   * vermerkt wird. Wo sie nur im Server stünden, wären sie bei der nächsten
+   * Überarbeitung der Oberfläche weg.
+   */
+  probe: {
+    titel: "Arbeitsproben",
+    lead: "Ein Unternehmen kann dich bitten, etwas Kleines zu bauen. Was das kostet, steht vorher da — in Stunden, nicht in Andeutungen.",
+    keinAblehnen: "Du musst nichts annehmen, und es gibt keinen Absageknopf: wer nicht will, tut nichts. Die Frist läuft ab, und nirgends wird vermerkt, dass du abgelehnt hast.",
+    laden: "Arbeitsproben werden geladen…",
+    leer: "Keine Arbeitsprobe offen",
+    leerHinweis: "Hier steht nur, worum ein Unternehmen dich wirklich gebeten hat.",
+    stand_set: "Offen",
+    stand_submitted: "Abgegeben",
+    stand_evaluated: "Beantwortet",
+    stand_expired: "Frist vorbei",
+    umfang: "{{stunden}} Stunden",
+    frist: "Bis {{datum}}",
+    deineLoesung: "Was du abgegeben hast",
+    rueckmeldung: "Die Rückmeldung",
+    ausgang_accepted: "Es geht weiter.",
+    ausgang_rejected: "Es geht nicht weiter.",
+    loesungText: "Deine Lösung",
+    loesungHinweis: "Was du geschrieben hast, geht nur an dieses eine Unternehmen.",
+    loesungAdresse: "Link (optional)",
+    loesungAdresseHinweis: "Ein Verweis auf dein Ergebnis. Er wird gespeichert und angezeigt, nie abgerufen.",
+    abgeben: "Abgeben",
+    firmaTitel: "Arbeitsproben",
+    firmaLead: "Eine Aufgabe stellen heißt: den Umfang nennen, bevor jemand anfängt — und antworten, wenn etwas kommt. Auch bei einer Absage.",
+    firmaNurFirma: "Das machen nur Unternehmen. Wechsle oben auf eines.",
+    firmaLeer: "Noch keine Arbeitsprobe gestellt",
+    firmaLeerHinweis: "Menschen, die ihre Sicht zurückgenommen haben, stehen hier nicht mehr.",
+    stellen: "Aufgabe stellen",
+    stellenKnopf: "Aufgabe stellen",
+    wer: "Wem",
+    werHinweis: "Die Kennung aus der Suche oder aus einem Gespräch.",
+    ueberschrift: "Überschrift",
+    aufgabe: "Die Aufgabe",
+    umfangFeld: "Umfang in Stunden",
+    umfangHinweis: "Höchstens {{max}}. Mehr als ein Arbeitstag ist keine Probe mehr, sondern Arbeit — dafür gibt es einen Vertrag und kein Formular.",
+    fristFeld: "Bis wann",
+    fristHinweis: "Mindestens {{tage}} Tage. Eine Aufgabe für morgen früh misst nicht, wie jemand arbeitet.",
+    eingereicht: "Was abgegeben wurde",
+    ausgangFrage: "Geht es weiter?",
+    rueckmeldungFeld: "Deine Rückmeldung",
+    rueckmeldungHinweis: "Die Person liest genau diesen Text — auch bei einer Absage. Es gibt kein zweites Feld daneben und keine Note.",
+    bewerten: "Rückmeldung senden",
+  },
   karriere: {
     titel: "Karriere",
     laden: "Unternehmen wird geladen…",

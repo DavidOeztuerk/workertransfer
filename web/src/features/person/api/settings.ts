@@ -5,7 +5,7 @@ import { API_BASE_URL } from "../../../env";
 /**
  * Die Benachrichtigungs-Einstellungen bei notification-service.
  *
- * Sechs Schalter, alle voreingestellt AN: wer nicht erfährt, dass gefragt wurde,
+ * Acht Schalter, alle voreingestellt AN: wer nicht erfährt, dass gefragt wurde,
  * hat keine Wahl, sondern nur den Anschein einer.
  *
  * `profile_discovered` ist der jüngste (ADR-0033) und der einzige, der von
@@ -25,6 +25,19 @@ export interface Benachrichtigungswahl {
   transfer_update: boolean;
   application_received: boolean;
   profile_discovered: boolean;
+  /**
+   * „Ein Unternehmen hat ein Gespräch eröffnet" (ADR-0037).
+   *
+   * <strong>Die beiden letzten standen hier nicht</strong> — der Server kennt
+   * sie seit advisor-service, diese Schnittstelle nicht. Das war folgenlos,
+   * solange niemand sie abstellen konnte; sobald aber ein achter Schalter
+   * dazukommt, schriebe ein `PUT` ohne diese Felder sie stillschweigend
+   * wieder auf `true` zurück, weil der Vertrag sie so vorbelegt. Zwei Zeilen,
+   * und der Schalter tut wieder, was er sagt.
+   */
+  advisor_conversation: boolean;
+  /** „An deiner Arbeitsprobe hat sich etwas bewegt" (ADR-0042). */
+  assessment_update: boolean;
 }
 
 /** Was gilt, solange niemand etwas eingestellt hat. */
@@ -35,6 +48,8 @@ export const ALLES_AN: Benachrichtigungswahl = {
   transfer_update: true,
   application_received: true,
   profile_discovered: true,
+  advisor_conversation: true,
+  assessment_update: true,
 };
 
 const PFAD = "/me/notification-preferences";

@@ -52,6 +52,8 @@ const SCHALTER: {
   { key: "application_update", name: "bewerbung" },
   { key: "application_received", name: "eingang" },
   { key: "profile_discovered", name: "entdeckt" },
+  { key: "advisor_conversation", name: "berater" },
+  { key: "assessment_update", name: "probe" },
 ];
 
 /**

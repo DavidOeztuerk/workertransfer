@@ -50,7 +50,8 @@ public class LoeschempfaengerTests
         { "github", typeof(GitHub.Infrastructure.Persistence.GitHubDbContext) },
         { "notification", typeof(Notification.Infrastructure.Persistence.NotificationDbContext) },
         { "scout", typeof(Scout.Infrastructure.Persistence.ScoutDbContext) },
-        { "advisor", typeof(Advisor.Infrastructure.Persistence.AdvisorDbContext) }
+        { "advisor", typeof(Advisor.Infrastructure.Persistence.AdvisorDbContext) },
+        { "assessment", typeof(Assessment.Infrastructure.Persistence.AssessmentDbContext) }
     };
 
     /// <summary>

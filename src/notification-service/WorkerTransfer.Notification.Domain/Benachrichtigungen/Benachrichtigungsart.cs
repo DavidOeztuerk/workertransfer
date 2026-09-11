@@ -66,7 +66,28 @@ public enum Benachrichtigungsart
     /// Benachrichtigung trägt nur eine Art. Wer es war, steht hinter der
     /// Anmeldung in ihrer eigenen Liste.</para>
     /// </remarks>
-    AdvisorConversation
+    AdvisorConversation,
+
+    /// <summary>An einer Arbeitsprobe dieser Person hat sich etwas bewegt.</summary>
+    /// <remarks>
+    /// <para>Die Art aus ADR-0042, und sie trägt <em>zwei</em> Bewegungen: „dir
+    /// wurde eine Aufgabe gestellt" und „deine Bewertung liegt vor". Eine Art
+    /// für beide, wie bei <see cref="ApplicationUpdate"/> und
+    /// <see cref="TransferUpdate"/> — zwei wären zwei Schalter in den
+    /// Einstellungen für dieselbe Sache.</para>
+    ///
+    /// <para><strong>Die zweite Bewegung ist der Grund, dass es diese Art
+    /// gibt.</strong> ADR-0042 verspricht: die Person <em>sieht</em> die
+    /// Bewertung, immer, auch bei einer Absage. Ohne diese Nachricht erführe sie
+    /// davon erst beim nächsten Vorbeischauen — und eine Beurteilung, die der
+    /// Beurteilte nicht liest, ist genau das, was dort nicht gebaut wird.</para>
+    ///
+    /// <para>Und auch sie nennt <strong>kein Unternehmen</strong> und trägt
+    /// weder Aufgabentext noch Bewertung: eine Benachrichtigung trägt nur eine
+    /// Art. Eine Zeile „Ihre Arbeitsprobe wurde abgelehnt" landete sonst
+    /// womöglich im Postfach beim jetzigen Arbeitgeber.</para>
+    /// </remarks>
+    AssessmentUpdate
 }
 
 /// <summary>Die Worte, mit denen eine Art auf der Leitung steht.</summary>
@@ -74,13 +95,13 @@ public enum Benachrichtigungsart
 /// Dieselben Worte, die die absendenden Dienste in ihre Outbox schreiben —
 /// <c>resume_request</c>, <c>market_request</c>, <c>application_update</c>,
 /// <c>transfer_update</c>, <c>application_received</c>, <c>profile_discovered</c>,
-/// <c>advisor_conversation</c>.
+/// <c>advisor_conversation</c>, <c>assessment_update</c>.
 /// Zwei Schreibweisen für dieselbe Art wären zwei
 /// Gelegenheiten, eine Nachricht stillschweigend fallen zu lassen.
 /// </remarks>
 public static class Benachrichtigungsarten
 {
-    /// <summary>Alle sieben, für die Einstellungen.</summary>
+    /// <summary>Alle acht, für die Einstellungen.</summary>
     public static readonly IReadOnlyList<Benachrichtigungsart> Alle =
     [
         Benachrichtigungsart.ResumeRequest,
@@ -89,7 +110,8 @@ public static class Benachrichtigungsarten
         Benachrichtigungsart.TransferUpdate,
         Benachrichtigungsart.ApplicationReceived,
         Benachrichtigungsart.ProfileDiscovered,
-        Benachrichtigungsart.AdvisorConversation
+        Benachrichtigungsart.AdvisorConversation,
+        Benachrichtigungsart.AssessmentUpdate
     ];
 
     /// <summary>Das Wort zur Art.</summary>
@@ -102,6 +124,7 @@ public static class Benachrichtigungsarten
         Benachrichtigungsart.ApplicationReceived => "application_received",
         Benachrichtigungsart.ProfileDiscovered => "profile_discovered",
         Benachrichtigungsart.AdvisorConversation => "advisor_conversation",
+        Benachrichtigungsart.AssessmentUpdate => "assessment_update",
         _ => throw new ArgumentOutOfRangeException(nameof(art))
     };
 
@@ -115,6 +138,7 @@ public static class Benachrichtigungsarten
         "application_received" => Benachrichtigungsart.ApplicationReceived,
         "profile_discovered" => Benachrichtigungsart.ProfileDiscovered,
         "advisor_conversation" => Benachrichtigungsart.AdvisorConversation,
+        "assessment_update" => Benachrichtigungsart.AssessmentUpdate,
         _ => null
     };
 
