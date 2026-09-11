@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 #
-# EIN Bild fuer alle vierzehn Dienste — die dreizehn fachlichen und das Gateway.
+# EIN Bild fuer alle fuenfzehn Dienste — die vierzehn fachlichen und das Gateway.
 #
 # Sie unterscheiden sich in genau einer Umgebungsvariablen, `SERVICE_DIR`, die
-# der Behaelter setzt. Vierzehn Bilder, die sich in einer Variablen unterscheiden,
-# waeren nicht vierzehnmal die Software (ADR-0028) — und sie waeren vierzehn
+# der Behaelter setzt. Fuenfzehn Bilder, die sich in einer Variablen unterscheiden,
+# waeren nicht fuenfzehnmal die Software (ADR-0028) — und sie waeren fuenfzehn
 # Gelegenheiten, eines davon zu vergessen.
 #
 # Deshalb steht `SERVICE_DIR` hier NICHT als Bauargument: das Bild wird einmal
@@ -50,6 +50,7 @@ RUN set -eu; \
         "github:src/github-service/WorkerTransfer.GitHub.Api" \
         "scout:src/scout-service/WorkerTransfer.Scout.Api" \
         "advisor:src/advisor-service/WorkerTransfer.Advisor.Api" \
+        "assessment:src/assessment-service/WorkerTransfer.Assessment.Api" \
         "notification:src/notification-service/WorkerTransfer.Notification.Api" \
         "gateway:src/gateway/WorkerTransfer.Gateway" \
     ; do \

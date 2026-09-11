@@ -34,7 +34,7 @@ Sitzung misst — wer sie rot hinterlässt, nimmt ihn der nächsten weg.
 | 2 | Rollen erzwingen | — | mittel |
 | 3 | `scout-service` | 1 | groß |
 | 4 | `advisor-service` | 1 | groß |
-| 5 | `assessment-service` | 3, 4 | mittel |
+| 5 | ~~`assessment-service`~~ ✅ erledigt 11.09.2026 (ADR-0042) | 3, 4 | mittel |
 | 6 | Aufräumen | — | klein |
 | 7 | ~~Girder auf nuget.org~~ ✅ erledigt 10.09.2026 | — | — |
 
@@ -358,7 +358,11 @@ Massstab.
 
 ---
 
-## Sitzung 5 — `assessment-service`
+## Sitzung 5 — `assessment-service` ✅ erledigt 11.09.2026
+
+Gebaut unter **ADR-0042**, nicht 0040: der Kasten unten nennt die Nummer, die
+beim Schreiben des Plans frei war, und 0040/0041 waren es beim Bauen nicht
+mehr. Wer den Kasten noch einmal kopiert, bekommt einen fertigen Dienst.
 
 ```
 BEACHTE: dieser Dienst ruft nach draussen. Trage JEDES Ziel in

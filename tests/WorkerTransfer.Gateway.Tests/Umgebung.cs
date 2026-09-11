@@ -47,7 +47,7 @@ public class Landschaft : IAsyncLifetime
     [
         "identity", "consent", "profile", "resume", "portfolio", "jobs",
         "applications", "companies", "transfer", "notification", "github",
-        "scout", "advisor", "web"
+        "scout", "advisor", "assessment", "web"
     ];
 
     private readonly List<WebApplication> _attrappen = [];
