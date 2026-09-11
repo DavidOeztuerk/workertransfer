@@ -29,7 +29,15 @@ public sealed record ProfilfundV1(
     [property: JsonPropertyName("bio")] string Bio,
     [property: JsonPropertyName("location")] string Location,
     [property: JsonPropertyName("remote_ok")] bool RemoteOk,
-    [property: JsonPropertyName("skills")] IReadOnlyList<string> Skills);
+    [property: JsonPropertyName("skills")] IReadOnlyList<string> Skills,
+    /// <summary>Die Pendelstufe, oder <c>null</c> für „nichts gesagt".</summary>
+    /// <remarks>
+    /// <strong>Die Stufe reist, nicht eine Kilometerzahl</strong> (ADR-0041).
+    /// Was der Empfänger daraus macht, ist ein Häkchen — und <c>null</c> ist
+    /// dort der dritte Zustand, nicht ein Nein.
+    /// </remarks>
+    [property: JsonPropertyName("commute_km")] string? CommuteKm = null,
+    [property: JsonPropertyName("relocation")] string? Relocation = null);
 
 /// <summary>Eine Seite der internen Suche.</summary>
 /// <remarks>

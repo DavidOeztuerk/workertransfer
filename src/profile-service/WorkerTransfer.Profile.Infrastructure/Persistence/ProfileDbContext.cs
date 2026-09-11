@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.Profile.Domain.Profile;
 using WorkerTransfer.Profile.Domain.Pruefspur;
 
 namespace WorkerTransfer.Profile.Infrastructure.Persistence;
@@ -41,6 +42,20 @@ public sealed class ProfilZeile
     /// derselben Wörter pflegt.
     /// </remarks>
     public string[] Faehigkeiten { get; set; } = [];
+
+    /// <summary>
+    /// Die Spalte <c>commute_km</c> — eine Stufe, <c>null</c> für „nichts gesagt".
+    /// </summary>
+    /// <remarks>
+    /// <strong>Als Text und nicht als Zahl</strong>, obwohl der Name eine Zahl
+    /// nahelegt. Eine Zahl in der Spalte wäre die Einladung, sie zu vergleichen
+    /// („WHERE commute_km >= 37") und irgendwann danach zu sortieren — genau
+    /// das, was ADR-0041 nicht will. Die Stufe ist eine Aussage, kein Messwert.
+    /// </remarks>
+    public Pendelbereitschaft? Pendelbereitschaft { get; set; }
+
+    /// <summary>Die Spalte <c>relocation</c>, <c>null</c> für „nichts gesagt".</summary>
+    public Umzugsbereitschaft? Umzugsbereitschaft { get; set; }
 
     /// <summary>Die Spalte <c>created_at</c>.</summary>
     public DateTimeOffset AngelegtAm { get; set; }
@@ -154,6 +169,14 @@ public sealed class ProfileDbContext(DbContextOptions<ProfileDbContext> options)
             zeile.Property(spalte => spalte.Ort).HasColumnName("location");
             zeile.Property(spalte => spalte.RemoteMoeglich).HasColumnName("remote_ok");
             zeile.Property(spalte => spalte.Faehigkeiten).HasColumnName("skills");
+            // Als Zeichenkette und nicht als Postgres-Aufzaehlung: die beiden
+            // sind freiwillig und nullbar, und eine Aufzaehlung braechte je
+            // Erweiterung eine Typwanderung — fuer eine Angabe, die niemand
+            // abfragt, sondern die zur Suchzeit in ein Haekchen wandert.
+            zeile.Property(spalte => spalte.Pendelbereitschaft)
+                .HasColumnName("commute_km").HasMaxLength(16).HasConversion<string>();
+            zeile.Property(spalte => spalte.Umzugsbereitschaft)
+                .HasColumnName("relocation").HasMaxLength(16).HasConversion<string>();
             zeile.Property(spalte => spalte.AngelegtAm).HasColumnName("created_at");
             zeile.Property(spalte => spalte.GeaendertAm).HasColumnName("updated_at");
 

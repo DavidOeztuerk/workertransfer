@@ -213,23 +213,24 @@ ADR-0036 ist **angenommen**. **Gebaut am 11.09.2026.**
       `Domain`/`Infrastructure`/`Contracts`, eigene Datenbank, `AddGirder`).
       Hafen 8012, Route `/scout/{rest}` im Gateway, fünf Zeilen in der
       Routenkarte — gegen den laufenden Stapel gefahren.
-- [ ] `Suche` (Aggregat): **fünf Filter genannt, drei gebaut.** Diese Zeile
-      stand einmal abgehakt hier, mit den beiden fehlenden in einem Klammersatz
-      und dem dritten gar nicht erwähnt. Das war zu großzügig, und so sieht sie
-      ehrlich aus:
+- [x] `Suche` (Aggregat): **fünf Filter genannt, fünf beantwortet** — drei
+      gebaut, zwei als Entscheidung. Diese Zeile stand einmal abgehakt hier,
+      mit zwei Fehlenden in einem Klammersatz und der Verfügbarkeit gar nicht
+      erwähnt. So sieht sie ehrlich aus:
 
       | genannt | Stand |
       |---|---|
       | Fähigkeiten | **gebaut** (ODER, mit Häkchenliste) |
       | Ort | **gebaut** (Teiltext) |
       | Remote | **gebaut** — stand nicht in dieser Liste und ist trotzdem da |
-      | Umkreis | **entschieden, nicht als Filter** → ADR-0041 |
-      | Berufsfeld | **wird nie gebaut** → ADR-0036, Entscheidung 6 |
-      | Verfügbarkeit | **wird nicht gebaut** → ADR-0036, Entscheidung 7 |
+      | Umkreis | **gebaut, aber nicht als Filter** — ADR-0041: Stufe am Profil, Anwesenheit an der Anzeige, daraus ein Häkchen |
+      | Berufsfeld | **wird nie gebaut** — ADR-0036 §6 |
+      | Verfügbarkeit | **wird nicht gebaut** — ADR-0036 §7 |
 
-      Der Haken bleibt offen, bis ADR-0041 gebaut ist. **Gespeichert wird die
-      Anfrage, nie das Ergebnis** — die Tabelle `searches` hat keine Spalte für
-      einen Treffer, und eine Reihe misst das an der gespeicherten Zeile.
+      **Gespeichert wird die Anfrage, nie das Ergebnis** — die Tabelle
+      `searches` hat keine Spalte für einen Treffer, und eine Reihe misst das
+      an der gespeicherten Zeile. Und für ADR-0041 entstand **keine
+      Koordinatenspalte**: der Ort wird zur Suchzeit aufgelöst.
 - [x] Die Treffer kommen aus profile-service, über eine interne Tür hinter dem
       gemeinsamen Geheimnis. Die harten Teile sind **mitgenommen**: Ledger je
       Zeile über `/check-batch`, keine Gesamtzahl, kein Auffüllen, Firmenzwang.
@@ -276,10 +277,30 @@ gemessen gefallen ist**:
       **keinen Weg auf Seite 2** — die Lücke, die
       `SCOUT-UND-BERATER-BESTAND.md` notiert hat. Die Ursache war ein Feldname.
 
+### ADR-0041 — Entfernung als Häkchen
+
+- [x] **Pendelbereitschaft** und **Umzugsbereitschaft** am Profil: zwei Stufen,
+      beide freiwillig, beide nullbar. Eine Wanderung mit zwei nullbaren
+      Spalten — kein Nachtragen an bestehenden Zeilen, weil ein Profil ohne
+      diese Angabe vollständig ist.
+- [x] **Die Anwesenheit an der Anzeige gab es schon.** ADR-0041 §2 verlangte ein
+      Feld `remote / hybrid / vor_ort`; jobs-service führt es seit jeher als
+      `Remotegrad` (`none` / `hybrid` / `full`) — mit derselben Begründung im
+      Quelltext: *„hybrid ist der häufigste Fall und keine Zwischenstufe von
+      wahr."* Es entstand deshalb **kein zweites Feld**: das wäre eine zweite
+      Wahrheit über dieselbe Frage gewesen.
+- [x] **Das Häkchen im Scout**, drei Zustände, **keine Kilometerzahl** — sie
+      steht in keinem Feld und auf keinem Draht. `?stelle=<id>` **filtert
+      nicht**: wer weiter weg wohnt, bleibt in der Liste und trägt ein Kreuz.
+- [x] **Nichts Neues gespeichert**: `Ortskunde` löst den vorhandenen
+      Freitext-Ort zur Suchzeit auf, im Arbeitsspeicher, für die Dauer einer
+      Antwort.
+- [x] Die Oberfläche: zwei Auswahlfelder am Profil, eine Stellenauswahl im
+      Scout, ein Häkchen auf der Karte — in drei Sprachen.
+
 ### Was offen bleibt
 
-- **ADR-0041 bauen**: Pendelbereitschaft am Profil, Anwesenheit an der Anzeige,
-  daraus ein Häkchen. Entschieden, geschrieben, noch nicht gebaut.
+Nichts an PBI-3.
 
 ---
 

@@ -36,6 +36,7 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
     private readonly Probetor _tor = new();
     private readonly Probebelege _belege = new();
     private readonly Probeentwerfer _entwerfer = new();
+    private readonly Probestellen _stellen = new();
 
     public async Task InitializeAsync()
     {
@@ -63,6 +64,7 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
                 dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _tor));
                 dienste.Replace(ServiceDescriptor.Scoped<IBelege>(_ => _belege));
                 dienste.Replace(ServiceDescriptor.Scoped<IEntwerfer>(_ => _entwerfer));
+                dienste.Replace(ServiceDescriptor.Scoped<IStellen>(_ => _stellen));
             });
         });
     }
@@ -284,6 +286,123 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
         await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
 
         (await Postausgang()).Count(zeile => zeile.UserId == wer).Should().Be(1);
+    }
+
+    // ---------------------------------------------------------------------
+    // Die Erreichbarkeit (ADR-0041)
+    // ---------------------------------------------------------------------
+
+    /// <summary>
+    /// Wer weiter weg wohnt, BLEIBT in der Liste — und trägt ein Kreuz.
+    /// </summary>
+    /// <remarks>
+    /// <para>Die Kernauflage von ADR-0041, und sie ist eine Aussage über die
+    /// <em>Länge</em> der Liste: die Stelle filtert nicht. Beide Menschen kommen
+    /// zurück, einer mit Haken, einer mit Kreuz. Das Unternehmen entscheidet,
+    /// nicht die Suche — und es sieht, warum.</para>
+    ///
+    /// <para>Nebenbei die zweite Zusage: neben dem Häkchen steht keine
+    /// Kilometerzahl, sondern stehen die beiden <em>Aussagen</em>.</para>
+    /// </remarks>
+    [Fact]
+    public async Task Wer_weiter_weg_wohnt_bleibt_in_der_Liste()
+    {
+        var nah = Guid.NewGuid();
+        var fern = Guid.NewGuid();
+        var stelle = Guid.NewGuid();
+
+        _suche.Bestand.Add(Profil(nah) with { Ort = "Potsdam", Pendelstufe = Pendelstufe.Bis50 });
+        _suche.Bestand.Add(Profil(fern) with { Ort = "München", Pendelstufe = Pendelstufe.Bis10 });
+        _tor.Frei.Add((nah, Firma));
+        _tor.Frei.Add((fern, Firma));
+        _stellen.Bestand[stelle] = new Stellenaussage("Berlin", "", Anwesenheit.VorOrt);
+
+        var rumpf = await Json(await AlsFirma().GetAsync(
+            new Uri($"/scout/candidates?stelle={stelle}", UriKind.Relative)));
+
+        var eintraege = rumpf.GetProperty("items").EnumerateArray()
+            .ToDictionary(e => e.GetProperty("subject_id").GetGuid());
+
+        eintraege.Should().HaveCount(2, "die Stelle filtert nicht, sie erklaert");
+        eintraege[nah].GetProperty("reach").GetString().Should().Be("reachable");
+        eintraege[fern].GetProperty("reach").GetString().Should().Be("further");
+
+        // Die Aussagen stehen daneben, die Entfernung nicht.
+        eintraege[fern].GetProperty("reach_commute").GetString().Should().Be("bis_10");
+        eintraege[fern].GetProperty("reach_attendance").GetString().Should().Be("vor_ort");
+
+        var text = rumpf.ToString();
+        foreach (var verboten in new[] { "km", "distance", "entfernung", "505" })
+        {
+            text.Should().NotContain(verboten, "keine Kilometerzahl auf dem Draht");
+        }
+    }
+
+    /// <summary>Ohne Stelle trägt jeder Treffer einen Strich — und keinen Fehler.</summary>
+    [Fact]
+    public async Task Ohne_Stelle_traegt_jeder_Treffer_einen_Strich()
+    {
+        var wer = Guid.NewGuid();
+        _suche.Bestand.Add(Profil(wer) with { Pendelstufe = Pendelstufe.Bis10 });
+        _tor.Frei.Add((wer, Firma));
+
+        var rumpf = await Json(await AlsFirma().GetAsync(
+            new Uri("/scout/candidates", UriKind.Relative)));
+
+        rumpf.GetProperty("items").EnumerateArray().Should().ContainSingle()
+            .Which.GetProperty("reach").GetString().Should().Be("unsaid");
+
+        _stellen.Fragen.Should().Be(0, "ohne Stelle wird jobs-service gar nicht gefragt");
+    }
+
+    /// <summary>
+    /// Eine schweigende Stelle kostet das Häkchen, nicht die Trefferseite.
+    /// </summary>
+    /// <remarks>
+    /// Der Unterschied zum Ledger und zur Profilsuche, und er ist bewusst: dort
+    /// heisst Schweigen 503, weil eine leere Liste eine Aussage über Menschen
+    /// wäre. Hier fehlt nur eine Auskunft ÜBER die Liste — die Treffer selbst
+    /// sind vollständig, und ein 503 nähme sie alle weg (ADR-0041).
+    /// </remarks>
+    [Fact]
+    public async Task Eine_schweigende_Stelle_kostet_nur_das_Haekchen()
+    {
+        var wer = Guid.NewGuid();
+        _suche.Bestand.Add(Profil(wer) with { Pendelstufe = Pendelstufe.Bis50 });
+        _tor.Frei.Add((wer, Firma));
+        _stellen.Schweigt = true;
+
+        var antwort = await AlsFirma().GetAsync(
+            new Uri($"/scout/candidates?stelle={Guid.NewGuid()}", UriKind.Relative));
+
+        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(antwort)).GetProperty("items").EnumerateArray().Should().ContainSingle()
+            .Which.GetProperty("reach").GetString().Should().Be("unsaid");
+    }
+
+    /// <summary>Die Stelle wird EINMAL je Seite gefragt, nicht je Zeile.</summary>
+    /// <remarks>
+    /// Sie ist für alle Treffer dieselbe. Einmal je Zeile zu fragen wäre
+    /// derselbe Fehler, den die Sammelfrage an den Ledger behoben hat — nur
+    /// gegenüber einem anderen Dienst.
+    /// </remarks>
+    [Fact]
+    public async Task Die_Stelle_wird_einmal_je_Seite_gefragt()
+    {
+        var stelle = Guid.NewGuid();
+        _stellen.Bestand[stelle] = new Stellenaussage("Berlin", "", Anwesenheit.VorOrt);
+
+        foreach (var _ in Enumerable.Range(0, 5))
+        {
+            var wer = Guid.NewGuid();
+            _suche.Bestand.Add(Profil(wer));
+            _tor.Frei.Add((wer, Firma));
+        }
+
+        await AlsFirma().GetAsync(
+            new Uri($"/scout/candidates?stelle={stelle}", UriKind.Relative));
+
+        _stellen.Fragen.Should().Be(1);
     }
 
     // ---------------------------------------------------------------------

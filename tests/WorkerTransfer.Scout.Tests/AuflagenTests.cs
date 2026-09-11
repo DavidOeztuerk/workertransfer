@@ -190,7 +190,10 @@ public class AuflagenTests
     {
         Felder(typeof(TrefferV1)).Should().BeEquivalentTo(
             "SubjectId", "Headline", "Bio", "Location", "RemoteOk",
-            "Named", "Checks", "Evidence", "EvidenceState");
+            "Named", "Checks", "Evidence", "EvidenceState",
+            // ADR-0041: drei Worte, keine Zahl. `Reach` ist der Stand,
+            // die beiden anderen sind die AUSSAGEN, aus denen er entstand.
+            "Reach", "ReachCommute", "ReachAttendance");
 
         Felder(typeof(HakenV1)).Should().BeEquivalentTo("Word", "Named");
     }
@@ -394,7 +397,7 @@ public class AuflagenTests
         var tor = new Probetor();
         var belege = new Probebelege();
 
-        return (new KandidatenHandler(suche, tor, belege), suche, tor, belege);
+        return (new KandidatenHandler(suche, tor, belege, new Probestellen()), suche, tor, belege);
     }
 
     private static KandidatenAbfrage Frage(params string[] worte) =>
@@ -406,6 +409,28 @@ public class AuflagenTests
 
     private static Profilfund Profil(Guid wer, string[] genannt) =>
         new(new SubjectId(wer), "Entwicklerin", "", "Berlin", true, genannt);
+
+    /// <summary>Die Feldmenge des Treffers wächst um das Häkchen — bewusst.</summary>
+    /// <remarks>
+    /// Sie steht weiter oben schon einmal; diese Zeile hier ist der Grund, warum
+    /// sie zweimal dasteht: wer ein Feld ergänzt, schreibt es hin. Drei Felder
+    /// kamen mit ADR-0041 dazu, und keines davon ist eine Zahl.
+    /// </remarks>
+    [Fact]
+    public void Das_Erreichbarkeits_Haekchen_traegt_keine_Kilometerzahl()
+    {
+        var felder = Felder(typeof(Erreichbarkeit));
+
+        felder.Should().BeEquivalentTo(
+            ["Stand", "Stufe", "Anwesenheit"],
+            "die Entfernung wird gerechnet und sofort auf einen Stand reduziert — "
+            + "sie gehoert in kein Feld (ADR-0041)");
+
+        felder.Should().NotContain(feld =>
+            feld.Contains("Km", StringComparison.OrdinalIgnoreCase)
+            || feld.Contains("Entfernung", StringComparison.OrdinalIgnoreCase)
+            || feld.Contains("Distanz", StringComparison.OrdinalIgnoreCase));
+    }
 
     private static void Frei(Probetor tor, IEnumerable<Guid> wer)
     {

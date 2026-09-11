@@ -322,6 +322,8 @@ services:
       # Die Belege — github-service, NICHT github.com: dieser Dienst fragt nie
       # bei GitHub selbst.
       GitHub__Adresse: http://github-service:8011
+      # Die Anzeige fuer das Erreichbarkeits-Haekchen (ADR-0041).
+      Jobs__Adresse: http://jobs-service:8006
       # „Dein Profil wurde entdeckt" (ADR-0033), ueber den Postausgang.
       Notifications__Adresse: http://notification-service:8010
 

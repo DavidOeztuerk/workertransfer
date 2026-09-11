@@ -130,7 +130,10 @@ public class InterneSucheTests(Postgres postgres) : IAsyncLifetime
         var fund = await Intern($"/internal/profiles/{wer}");
 
         fund.EnumerateObject().Select(feld => feld.Name).Should().BeEquivalentTo(
-            "subject_id", "headline", "bio", "location", "remote_ok", "skills");
+            "subject_id", "headline", "bio", "location", "remote_ok", "skills",
+            // ADR-0041: die STUFE reist, nicht eine Kilometerzahl. Beide sind
+            // nullbar und heissen dann „nichts gesagt".
+            "commute_km", "relocation");
 
         fund.GetProperty("skills").EnumerateArray()
             .Select(eintrag => eintrag.GetString()).Should().Equal("Reepschlagen");

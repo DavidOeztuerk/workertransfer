@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using WorkerTransfer.Scout.Application.Ports;
 using WorkerTransfer.Scout.Contracts;
 using WorkerTransfer.Scout.Domain.Suchen;
+using WorkerTransfer.Scout.Domain.Treffer;
 
 namespace WorkerTransfer.Scout.Infrastructure.Profile;
 
@@ -141,7 +142,8 @@ public sealed class HttpProfilsuche(
             profil.Bio ?? string.Empty,
             profil.Location,
             profil.RemoteOk,
-            profil.Skills ?? []);
+            profil.Skills ?? [],
+            Erreichbarkeitsworte.Stufe(profil.CommuteKm));
 
     /// <summary>Ein Aufruf. <c>null</c> heisst 404, alles andere wirft.</summary>
     /// <remarks>

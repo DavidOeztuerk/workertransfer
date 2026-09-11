@@ -70,6 +70,7 @@ export function TrefferKarte({
         ) : null}
 
         <Haekchenliste haken={treffer.checks} />
+        <Erreichbarkeitshaken treffer={treffer} />
 
         {treffer.named.length > 0 ? (
           <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap", mb: 2 }}>
@@ -133,6 +134,56 @@ function Haekchenliste({ haken }: { haken: Haken[] }) {
           }
         />
       ))}
+    </Box>
+  );
+}
+
+/**
+ * Das Häkchen zur Entfernung — drei Zustände, keine Zahl (ADR-0041).
+ *
+ * <strong>Der Strich ist kein Nein.</strong> Er steht, wenn die Person nichts
+ * gesagt hat, wenn keine Stelle gewählt wurde oder wenn ein Ort unbekannt ist —
+ * und er sagt das auch, statt so auszusehen wie ein Kreuz. „Nichts gesagt" ist
+ * nicht „passt nicht" (ADR-0022 §3).
+ *
+ * <strong>Daneben stehen die beiden Aussagen</strong>, nicht die Entfernung:
+ * „bis 50 km" hat die Person getroffen, „hybrid" das Unternehmen. Beiden kann
+ * man widersprechen — einer Kilometerzahl nicht.
+ */
+function Erreichbarkeitshaken({ treffer }: { treffer: Treffer }) {
+  const { t } = useTranslation();
+
+  // Ohne Stelle gäbe es nichts zu sagen — und ein Strich ohne Anlass wäre nur
+  // eine leere Zeile auf jeder Karte.
+  if (treffer.reach === "unsaid" && treffer.reach_attendance === null) return null;
+
+  const zeichen = { reachable: "✓", further: "✗", unsaid: "—" }[treffer.reach];
+
+  const gesagt = [
+    treffer.reach_commute === null
+      ? null
+      : t("kandidaten.reachSagt", { stufe: t(`profil.pendeln_${treffer.reach_commute}`) }),
+    treffer.reach_attendance === null
+      ? null
+      : t("kandidaten.reachStelle", {
+          anwesenheit: t(`kandidaten.anwesenheit_${treffer.reach_attendance}`),
+        }),
+  ].filter((teil) => teil !== null);
+
+  return (
+    <Box sx={{ mb: 1.5 }}>
+      <Chip
+        size="small"
+        variant={treffer.reach === "reachable" ? "filled" : "outlined"}
+        color={treffer.reach === "reachable" ? "success" : "default"}
+        label={`${t("kandidaten.reach")} ${zeichen}`}
+        aria-label={t(`kandidaten.reach_${treffer.reach}`)}
+      />
+      {gesagt.length > 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          {gesagt.join(" · ")}
+        </Typography>
+      ) : null}
     </Box>
   );
 }

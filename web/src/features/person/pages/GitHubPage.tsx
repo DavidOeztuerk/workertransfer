@@ -481,6 +481,15 @@ export function GitHubPage() {
                       location: profil.profile.location,
                       remote_ok: profil.profile.remote_ok,
                       skills: [...profil.profile.skills, ...extra].slice(0, 30),
+                      // MITSCHREIBEN, nicht weglassen. Dieser Aufruf schreibt
+                      // das GANZE Profil zurueck, und `null` nimmt eine Angabe
+                      // zurueck (ADR-0041): ohne diese zwei Zeilen loeschte ein
+                      // Klick auf „Vorschlaege uebernehmen" die
+                      // Pendelbereitschaft, ohne dass jemand danach gefragt
+                      // haette. Der Compiler hat es bemerkt — deshalb sind die
+                      // Felder Pflicht und nicht optional.
+                      commute_km: profil.profile.commute_km,
+                      relocation: profil.profile.relocation,
                     });
                     return result;
                   })

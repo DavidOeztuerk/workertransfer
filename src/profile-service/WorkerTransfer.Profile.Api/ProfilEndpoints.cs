@@ -35,7 +35,16 @@ public sealed record ProfilKoerper(
     [property: JsonPropertyName("bio")] string Bio,
     [property: JsonPropertyName("location")] string Location,
     [property: JsonPropertyName("remote_ok")] bool RemoteOk,
-    [property: JsonPropertyName("skills")] IReadOnlyList<string> Skills);
+    [property: JsonPropertyName("skills")] IReadOnlyList<string> Skills,
+    /// <summary>Eine Stufe, oder <c>null</c> für „nichts gesagt" (ADR-0041).</summary>
+    /// <remarks>
+    /// <c>null</c> ist ein gültiger Wert und bedeutet etwas: die Angabe wird
+    /// damit <em>zurückgenommen</em>. Ein „fehlt heisst: lass wie es war" machte
+    /// die Rücknahme unmöglich — und eine Aussage, die man nicht zurücknehmen
+    /// kann, ist keine freiwillige.
+    /// </remarks>
+    [property: JsonPropertyName("commute_km")] string? CommuteKm = null,
+    [property: JsonPropertyName("relocation")] string? Relocation = null);
 
 /// <summary>Was jemand schickt, um sich beim Formulieren helfen zu lassen.</summary>
 public sealed record EntwurfKoerper(string Wish);
@@ -83,7 +92,9 @@ public static class ProfilEndpoints
                 var profil = await mediator.Send(
                     new ProfilSpeichernBefehl(
                         handelnder.Subject, koerper.Headline, koerper.Bio,
-                        koerper.Location, koerper.RemoteOk, koerper.Skills ?? []),
+                        koerper.Location, koerper.RemoteOk, koerper.Skills ?? [],
+                        Pendelstufen.Lies(koerper.CommuteKm),
+                        Umzugsworte.Lies(koerper.Relocation)),
                     cancellationToken);
 
                 await context.Response.WriteAsJsonAsync(Antwort(profil), cancellationToken);
@@ -247,6 +258,10 @@ public static class ProfilEndpoints
         ["location"] = profil.Ort,
         ["remote_ok"] = profil.RemoteMoeglich,
         ["skills"] = profil.Faehigkeiten.Werte,
+        // `null` reist mit und wird nicht weggelassen: die Oberflaeche muss
+        // „nichts gesagt" von „Feld gibt es nicht" unterscheiden koennen.
+        ["commute_km"] = Pendelstufen.Wort(profil.Pendelbereitschaft),
+        ["relocation"] = Umzugsworte.Wort(profil.Umzugsbereitschaft),
         ["updated_at"] = profil.GeaendertAm
     };
 

@@ -16,6 +16,7 @@ using WorkerTransfer.Scout.Infrastructure.Entwurf;
 using WorkerTransfer.Scout.Infrastructure.Loeschung;
 using WorkerTransfer.Scout.Infrastructure.Persistence;
 using WorkerTransfer.Scout.Infrastructure.Profile;
+using WorkerTransfer.Scout.Infrastructure.Stellen;
 
 namespace WorkerTransfer.Scout.Infrastructure;
 
@@ -58,6 +59,8 @@ public static class ScoutInfrastructure
             configuration.GetSection(Profileinstellungen.Abschnitt));
         services.Configure<Belegeinstellungen>(
             configuration.GetSection(Belegeinstellungen.Abschnitt));
+        services.Configure<Stelleneinstellungen>(
+            configuration.GetSection(Stelleneinstellungen.Abschnitt));
         services.Configure<Benachrichtigungseinstellungen>(
             configuration.GetSection(Benachrichtigungseinstellungen.Abschnitt));
         services.Configure<Loescheinstellungen>(
@@ -76,6 +79,7 @@ public static class ScoutInfrastructure
         services.AddScoped<IEinwilligungstor, HttpEinwilligungstor>();
         services.AddScoped<IProfilsuche, HttpProfilsuche>();
         services.AddScoped<IBelege, HttpBelege>();
+        services.AddScoped<IStellen, HttpStellen>();
 
         // Der Nullentwerfer ist die Voreinstellung, nicht der Rückfall: ohne
         // hinterlegten Schlüssel wird kein Fremddienst gerufen, und der Dienst
