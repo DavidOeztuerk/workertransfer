@@ -209,6 +209,7 @@ services:
       Erasure__Adressen__notification: http://notification-service:8010
       Erasure__Adressen__github: http://github-service:8011
       Erasure__Adressen__scout: http://scout-service:8012
+      Erasure__Adressen__advisor: http://advisor-service:8013
 
   - name: consent-service
     dir: consent
@@ -325,6 +326,30 @@ services:
       # Die Anzeige fuer das Erreichbarkeits-Haekchen (ADR-0041).
       Jobs__Adresse: http://jobs-service:8006
       # „Dein Profil wurde entdeckt" (ADR-0033), ueber den Postausgang.
+      Notifications__Adresse: http://notification-service:8010
+
+  - name: advisor-service
+    dir: advisor
+    port: 8013
+    database: advisor
+    env:
+      # Jedes Ziel dieses Dienstes steht hier, und zwar weil es hier stehen
+      # MUSS: die Egress-Grenze leitet ihre erlaubten Hosts aus der
+      # Konfiguration ab. Ein Ziel, das nur im Quelltext steht, wird
+      # abgewiesen — ohne Protokollzeile.
+      #
+      # Der Ledger traegt die STUFE eines Gespraechs (ADR-0037): gelesen bei
+      # jeder Anfrage, geschrieben bei jeder Freigabe. Eine eigene Stufenspalte
+      # gibt es nicht, also ist diese Zeile nicht optional.
+      Consent__Adresse: http://consent-service:8002
+      # Die internen Tueren von identity-service: die Domain eines Unternehmens
+      # (damit ein Ausschluss greifen kann) und der Klarname eines Menschen
+      # (erst ab Stufe 3, und erst NACHDEM der Ledger sie bestaetigt hat).
+      # `Identity__Geheimnis` haengt in _helpers.tpl an dieser Zeile.
+      Identity__Adresse: http://identity-service:8001
+      # Die Uebergabe der Einigung. Der Dreieckskonsens steht DORT.
+      Transfer__Adresse: http://transfer-service:8009
+      # „Ein Unternehmen hat ein Gespraech eroeffnet", ueber den Postausgang.
       Notifications__Adresse: http://notification-service:8010
 
 resources:

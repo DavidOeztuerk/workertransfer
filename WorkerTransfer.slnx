@@ -9,6 +9,13 @@
     <Project Path="src/shared/WorkerTransfer.ServiceDefaults/WorkerTransfer.ServiceDefaults.csproj" />
     <Project Path="src/shared/WorkerTransfer.Skills/WorkerTransfer.Skills.csproj" />
   </Folder>
+  <Folder Name="/src/advisor-service/">
+    <Project Path="src/advisor-service/WorkerTransfer.Advisor.Api/WorkerTransfer.Advisor.Api.csproj" />
+    <Project Path="src/advisor-service/WorkerTransfer.Advisor.Application/WorkerTransfer.Advisor.Application.csproj" />
+    <Project Path="src/advisor-service/WorkerTransfer.Advisor.Contracts/WorkerTransfer.Advisor.Contracts.csproj" />
+    <Project Path="src/advisor-service/WorkerTransfer.Advisor.Domain/WorkerTransfer.Advisor.Domain.csproj" />
+    <Project Path="src/advisor-service/WorkerTransfer.Advisor.Infrastructure/WorkerTransfer.Advisor.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/applications-service/">
     <Project Path="src/applications-service/WorkerTransfer.Applications.Api/WorkerTransfer.Applications.Api.csproj" />
     <Project Path="src/applications-service/WorkerTransfer.Applications.Application/WorkerTransfer.Applications.Application.csproj" />
@@ -97,6 +104,7 @@
     <Project Path="src/transfer-service/WorkerTransfer.Transfer.Infrastructure/WorkerTransfer.Transfer.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/WorkerTransfer.Advisor.Tests/WorkerTransfer.Advisor.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Applications.Tests/WorkerTransfer.Applications.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Companies.Tests/WorkerTransfer.Companies.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Consent.Tests/WorkerTransfer.Consent.Tests.csproj" />

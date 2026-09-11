@@ -16,5 +16,6 @@ export const workRoutes: RouteObject[] = [
   { path: "/applications/drafts/:id", element: lazyRoute(() => import("./pages/DraftPage"), "DraftPage") },
   { path: "/market", element: lazyRoute(() => import("./pages/MarketPage"), "MarketPage") },
   { path: "/transfers", element: lazyRoute(() => import("./pages/TransfersPage"), "TransfersPage") },
+  { path: "/advisor", element: lazyRoute(() => import("./pages/AdvisorPage"), "AdvisorPage") },
   { path: "/jobs/:jobId/apply", element: lazyRoute(() => import("./pages/JobApplyPage"), "JobApplyPage") },
 ];

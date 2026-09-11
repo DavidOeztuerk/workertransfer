@@ -17,6 +17,7 @@ import {
   requestMarketStatus,
 } from "../../work/api/market";
 import { expressInterest } from "../../work/api/transfers";
+import { eroeffne } from "../../work/api/advisor";
 
 /** Als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
 const ANSPRECHBARKEIT: Record<string, string> = {
@@ -80,6 +81,7 @@ export function TrefferKarte({
           </Box>
         ) : null}
 
+        <Gespraechseroeffnung subjectId={treffer.subject_id} />
         <Lebenslaufanfrage subjectId={treffer.subject_id} />
         <Marktzugang
           subjectId={treffer.subject_id}
@@ -247,6 +249,66 @@ function Belegliste({ belege, stand }: { belege: Beleg[]; stand: Treffer["eviden
           {satz}
         </Typography>
       ) : null}
+    </Box>
+  );
+}
+
+/**
+ * Ein Gespräch eröffnen (ADR-0037).
+ *
+ * <strong>Die sanftere der beiden Türen, und der Unterschied ist der Punkt.</strong>
+ * „Interesse zeigen" legt sofort einen Transfer-Vorgang an und verlangt dafür,
+ * dass die Person ihren Marktstatus freigegeben hat <em>und</em> gerade
+ * ansprechbar ist. Ein Gespräch verlangt nur, was diese Karte ohnehin beweist:
+ * eine Profil-Freigabe. Erst darin gibt die Person Stufe für Stufe mehr frei —
+ * und die erste Stufe schliesst den Marktstatus ein. Der Weg führt also zur
+ * anderen Tür, statt an ihr vorbei.
+ *
+ * <strong>Ein `404` sagt hier nichts über die Person.</strong> Sie hat nichts
+ * freigegeben, sie hat dieses Unternehmen ausgeschlossen, oder es gibt sie
+ * nicht — die drei sind ununterscheidbar, und diese Karte bastelt daraus keine
+ * Auskunft, die der Server gerade verweigert hat.
+ */
+function Gespraechseroeffnung({ subjectId }: { subjectId: string }) {
+  const { t } = useTranslation();
+  const [meldung, setMeldung] = useState<string | null>(null);
+  const [fertig, setFertig] = useState(false);
+  const [running, setLaeuft] = useState(false);
+
+  if (fertig) {
+    return (
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        {t("berater.eroeffnet")}
+      </Typography>
+    );
+  }
+
+  return (
+    <Box sx={{ mb: 1 }}>
+      {meldung !== null ? (
+        <Alert severity="warning" sx={{ mb: 1 }}>
+          {meldung}
+        </Alert>
+      ) : null}
+      <Button
+        variant="text"
+        size="small"
+        disabled={running}
+        onClick={() => {
+          setLaeuft(true);
+          void eroeffne(subjectId, t("kandidaten.interesseText")).then((result) => {
+            setLaeuft(false);
+            if (result.ok) {
+              setMeldung(null);
+              setFertig(true);
+            } else {
+              setMeldung(result.error.detail ?? result.error.title);
+            }
+          });
+        }}
+      >
+        {running ? t("kandidaten.wirdGefragt") : t("berater.eroeffnen")}
+      </Button>
     </Box>
   );
 }

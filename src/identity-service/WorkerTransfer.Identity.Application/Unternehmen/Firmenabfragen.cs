@@ -131,3 +131,35 @@ public sealed class InterneRolleHandler(IMembershipRepository mitgliedschaften)
         return mitgliedschaften.RoleOfAsync(request.Wer, request.Firma, cancellationToken);
     }
 }
+
+/// <summary>Wer ein Unternehmen ist — Name und bewiesene Domain.</summary>
+/// <remarks>
+/// <para>Für Dienst-zu-Dienst, ohne Aufrufer: das Geheimnis am internen
+/// Endpunkt IST die Autorisierung.</para>
+///
+/// <para><strong>Warum advisor-service das braucht.</strong> Eine Person darf
+/// Unternehmen ausschliessen, und sie benennt sie durch ihre Domain (ADR-0037).
+/// Ohne diese Abfrage müsste advisor-service eine zweite Domaintabelle halten —
+/// und die wäre die, die als Erste veraltet, mit einem Ausschluss, der dann
+/// stillschweigend nicht mehr greift.</para>
+///
+/// <para>Die Domain eines Unternehmens ist <strong>keine Auskunft über einen
+/// Menschen</strong>: sie steht auf jeder Karriereseite. Was hier nicht
+/// herausgeht, ist die Belegschaft — dafür gibt es die Mitgliederabfrage, und
+/// sie ist eine eigene Tür.</para>
+/// </remarks>
+public sealed record InterneFirmaAbfrage(TenantId Firma) : IAbfrage<Company?>;
+
+/// <inheritdoc cref="InterneFirmaAbfrage" />
+public sealed class InterneFirmaHandler(ICompanyRepository unternehmen)
+    : IRequestHandler<InterneFirmaAbfrage, Company?>
+{
+    /// <inheritdoc />
+    public Task<Company?> Handle(
+        InterneFirmaAbfrage request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return unternehmen.FindByIdAsync(request.Firma, cancellationToken);
+    }
+}

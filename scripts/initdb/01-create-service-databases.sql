@@ -18,3 +18,4 @@ CREATE DATABASE transfer OWNER worker;
 CREATE DATABASE notification OWNER worker;
 CREATE DATABASE github OWNER worker;
 CREATE DATABASE scout OWNER worker;
+CREATE DATABASE advisor OWNER worker;

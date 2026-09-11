@@ -21,7 +21,7 @@ metadata:
     {{- include "workertransfer.labels" . | nindent 4 }}
 data:
   config.js: |
-    // Erzeugt vom Helm-Chart. Im Cluster zeigen alle elf Basis-URLs auf
+    // Erzeugt vom Helm-Chart. Im Cluster zeigen alle zwoelf Basis-URLs auf
     // DENSELBEN Ursprung: den des Gateways. Das ist nicht nur bequem, es
     // beseitigt zwei Fehlerquellen — kein CORS (gleicher Origin) und keine
     // Cookie-Verwirrung zwischen Ports.
@@ -36,5 +36,6 @@ data:
       COMPANIES_BASE_URL: {{ $origin | quote }},
       TRANSFER_BASE_URL: {{ $origin | quote }},
       GITHUB_BASE_URL: {{ $origin | quote }},
-      SCOUT_BASE_URL: {{ $origin | quote }}
+      SCOUT_BASE_URL: {{ $origin | quote }},
+      ADVISOR_BASE_URL: {{ $origin | quote }}
     };

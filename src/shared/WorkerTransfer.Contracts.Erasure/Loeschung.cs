@@ -80,6 +80,13 @@ public static class Loeschempfaenger
     /// rule.
     /// </para>
     /// <para>
+    /// <c>advisor</c> joined with its first table (ADR-0037). It holds a
+    /// <em>mandate</em> keyed by the person and the conversations they are in —
+    /// and nothing about visibility, which lives in the ledger. Its outbox rows
+    /// carry a user id as well. A service that holds a row per person is a
+    /// recipient; that is the whole rule.
+    /// </para>
+    /// <para>
     /// A test goes red the moment any service grows a table with
     /// <c>subject_id</c> or <c>user_id</c> and is not on this list.
     /// </para>
@@ -87,7 +94,7 @@ public static class Loeschempfaenger
     public static IReadOnlyList<string> Fremde { get; } =
     [
         "consent", "profile", "resume", "portfolio",
-        "applications", "transfer", "github", "notification", "scout"
+        "applications", "transfer", "github", "notification", "scout", "advisor"
     ];
 
     /// <summary>The final notice to the person. Itself an outbox row.</summary>

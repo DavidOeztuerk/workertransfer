@@ -209,10 +209,10 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         (await Postfach(anna)).GetArrayLength().Should().Be(1);
     }
 
-    /// <summary>Die Art ist eine von sechs, und alle sechs sind einstellbar.</summary>
+    /// <summary>Die Art ist eine von sieben, und alle sieben sind einstellbar.</summary>
     [Fact]
-    public void Es_sind_sechs_Arten() =>
-        Benachrichtigungsarten.Alle.Should().HaveCount(6)
+    public void Es_sind_sieben_Arten() =>
+        Benachrichtigungsarten.Alle.Should().HaveCount(7)
             .And.Contain(Benachrichtigungsart.ProfileDiscovered);
 
     /// <summary>Nur diese eine Art trägt eine Tageskappe.</summary>

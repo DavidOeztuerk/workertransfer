@@ -75,6 +75,9 @@ const WEGE: { pfad: string; schluessel: string; immer: boolean }[] = [
   { pfad: "/overview", schluessel: "kopf.uebersicht", immer: false },
   { pfad: "/market", schluessel: "kopf.marktstatus", immer: false },
   { pfad: "/transfers", schluessel: "kopf.gespraeche", immer: false },
+  // Der Berater (ADR-0037). Er steht bei den Wegen der PERSON: das Mandat
+  // gehoert ihr, nicht dem Unternehmen, fuer das sie gerade handelt.
+  { pfad: "/advisor", schluessel: "kopf.berater", immer: false },
 ];
 
 export function SiteHeader() {
@@ -479,6 +482,7 @@ function FirmenMenu() {
         <Eintrag to="/company/jobs">{t("kopf.unsereStellen")}</Eintrag>
         <Eintrag to="/company/applications">{t("kopf.unsereBewerbungen")}</Eintrag>
         <Eintrag to="/company/transfers">{t("kopf.unsereGespraeche")}</Eintrag>
+        <Eintrag to="/company/advisor">{t("kopf.unsereBerater")}</Eintrag>
         <Divider />
         <Eintrag to="/company/profile">{t("kopf.firmenprofil")}</Eintrag>
         <Eintrag to="/company/team">{t("kopf.team")}</Eintrag>
