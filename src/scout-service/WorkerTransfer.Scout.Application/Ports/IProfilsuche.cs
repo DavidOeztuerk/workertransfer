@@ -1,5 +1,6 @@
 using Girder.Core.Identity;
 using WorkerTransfer.Scout.Domain.Suchen;
+using WorkerTransfer.Scout.Domain.Treffer;
 
 namespace WorkerTransfer.Scout.Application.Ports;
 
@@ -28,7 +29,9 @@ public sealed record Profilfund(
     string Text,
     string Ort,
     bool RemoteMoeglich,
-    IReadOnlyList<string> Genannt);
+    IReadOnlyList<string> Genannt,
+    /// <summary>Was sie über ihren Weg gesagt hat, oder <c>null</c> (ADR-0041).</summary>
+    Pendelstufe? Pendelstufe = null);
 
 /// <summary>Eine Seite Profile, in der Reihenfolge, die profile-service hält.</summary>
 /// <remarks>

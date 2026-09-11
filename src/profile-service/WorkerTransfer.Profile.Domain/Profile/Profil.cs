@@ -19,6 +19,57 @@ namespace WorkerTransfer.Profile.Domain.Profile;
 /// unterscheiden könnte.
 /// </para>
 /// </remarks>
+/// <summary>Wie weit jemand zu pendeln bereit ist — eine Stufe, keine Zahl.</summary>
+/// <remarks>
+/// <para><strong>Stufen und keine Kilometerzahl</strong> (ADR-0041). Eine Zahl
+/// lädt zum Rechnen ein — „37 ≤ 50, also 74 % passend" —, eine Stufe ist eine
+/// Aussage, die jemand getroffen hat. Aus ihr wird ein Häkchen und nie ein
+/// Wert.</para>
+///
+/// <para>Die Stufen sind gemessen, nicht gegriffen: der mittlere Arbeitsweg
+/// liegt bei 17,2 km, über 30 km pendeln 7,2 Mio Menschen, über 50 km 4,1 Mio,
+/// über 100 km 2,4 Mio. <see cref="Egal"/> muss es deshalb geben — damit
+/// niemand sich kleiner machen muss, als er ist.</para>
+///
+/// <para>Herkunftsklasse <em>genannt</em> (ADR-0033): die Person hat es
+/// getippt, niemand hat es abgeleitet.</para>
+/// </remarks>
+public enum Pendelbereitschaft
+{
+    /// <summary>Bis zehn Kilometer — unter dem Mittelwert.</summary>
+    Bis10,
+
+    /// <summary>Bis fünfundzwanzig.</summary>
+    Bis25,
+
+    /// <summary>Bis fünfzig.</summary>
+    Bis50,
+
+    /// <summary>Bis hundert.</summary>
+    Bis100,
+
+    /// <summary>Entfernung spielt keine Rolle.</summary>
+    Egal
+}
+
+/// <summary>Ob jemand für eine Stelle umziehen würde.</summary>
+/// <remarks>
+/// Drei Werte, und <see cref="Offen"/> ist keiner davon zu viel: „kommt darauf
+/// an" ist die ehrlichste Antwort auf diese Frage und darf nicht als „nein"
+/// gespeichert werden müssen.
+/// </remarks>
+public enum Umzugsbereitschaft
+{
+    /// <summary>Ja.</summary>
+    Ja,
+
+    /// <summary>Nein.</summary>
+    Nein,
+
+    /// <summary>Kommt darauf an.</summary>
+    Offen
+}
+
 public sealed class Profil
 {
     /// <summary>Wie lang eine Überschrift sein darf.</summary>
@@ -45,6 +96,8 @@ public sealed class Profil
         string ort,
         bool remoteMoeglich,
         Faehigkeitenliste faehigkeiten,
+        Pendelbereitschaft? pendelbereitschaft,
+        Umzugsbereitschaft? umzugsbereitschaft,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm)
     {
@@ -54,6 +107,8 @@ public sealed class Profil
         Ort = ort;
         RemoteMoeglich = remoteMoeglich;
         Faehigkeiten = faehigkeiten;
+        Pendelbereitschaft = pendelbereitschaft;
+        Umzugsbereitschaft = umzugsbereitschaft;
         AngelegtAm = angelegtAm;
         GeaendertAm = geaendertAm;
     }
@@ -82,6 +137,20 @@ public sealed class Profil
     /// <summary>Was sie kann — in ihrer Reihenfolge, ohne Bewertung.</summary>
     public Faehigkeitenliste Faehigkeiten { get; private set; }
 
+    /// <summary>
+    /// Wie weit sie pendeln würde, oder <c>null</c> für „nichts gesagt".
+    /// </summary>
+    /// <remarks>
+    /// <strong>Nullbar, und das bleibt es.</strong> Ein Profil ohne diese
+    /// Angabe ist vollständig — „nichts gesagt" ist nicht „passt nicht"
+    /// (ADR-0041, ADR-0022 §3). Wer nichts sagt, bekommt im Scout kein Kreuz,
+    /// sondern einen Strich.
+    /// </remarks>
+    public Pendelbereitschaft? Pendelbereitschaft { get; private set; }
+
+    /// <summary>Ob sie umziehen würde, oder <c>null</c>.</summary>
+    public Umzugsbereitschaft? Umzugsbereitschaft { get; private set; }
+
     /// <summary>Wann das Profil entstand.</summary>
     public DateTimeOffset AngelegtAm { get; }
 
@@ -99,13 +168,16 @@ public sealed class Profil
         string ort,
         bool remoteMoeglich,
         Faehigkeitenliste faehigkeiten,
-        DateTimeOffset jetzt)
+        DateTimeOffset jetzt,
+        Pendelbereitschaft? pendelbereitschaft = null,
+        Umzugsbereitschaft? umzugsbereitschaft = null)
     {
         var (geprueft, gepruefterText, geprueterOrt) = Pruefe(ueberschrift, text, ort);
 
         return new Profil(
             wer, geprueft, gepruefterText, geprueterOrt, remoteMoeglich,
-            faehigkeiten ?? Faehigkeitenliste.Leer, jetzt, jetzt);
+            faehigkeiten ?? Faehigkeitenliste.Leer,
+            pendelbereitschaft, umzugsbereitschaft, jetzt, jetzt);
     }
 
     /// <summary>Baut ein gespeichertes Profil wieder auf.</summary>
@@ -123,9 +195,12 @@ public sealed class Profil
         bool remoteMoeglich,
         Faehigkeitenliste faehigkeiten,
         DateTimeOffset angelegtAm,
-        DateTimeOffset geaendertAm) =>
+        DateTimeOffset geaendertAm,
+        Pendelbereitschaft? pendelbereitschaft = null,
+        Umzugsbereitschaft? umzugsbereitschaft = null) =>
         new(wer, ueberschrift, text, ort, remoteMoeglich,
-            faehigkeiten ?? Faehigkeitenliste.Leer, angelegtAm, geaendertAm);
+            faehigkeiten ?? Faehigkeitenliste.Leer,
+            pendelbereitschaft, umzugsbereitschaft, angelegtAm, geaendertAm);
 
     /// <summary>Ändert alle Felder auf einmal.</summary>
     /// <remarks>
@@ -141,7 +216,9 @@ public sealed class Profil
         string ort,
         bool remoteMoeglich,
         Faehigkeitenliste faehigkeiten,
-        DateTimeOffset jetzt)
+        DateTimeOffset jetzt,
+        Pendelbereitschaft? pendelbereitschaft = null,
+        Umzugsbereitschaft? umzugsbereitschaft = null)
     {
         var (geprueft, gepruefterText, geprueterOrt) = Pruefe(ueberschrift, text, ort);
 
@@ -150,6 +227,11 @@ public sealed class Profil
         Ort = geprueterOrt;
         RemoteMoeglich = remoteMoeglich;
         Faehigkeiten = faehigkeiten ?? Faehigkeitenliste.Leer;
+        // Ohne Angabe wird die Angabe GELOESCHT und nicht beibehalten: das
+        // Formular schickt immer alle Felder, und ein „null heisst: lass wie es
+        // war" machte die Ruecknahme einer Aussage unmoeglich.
+        Pendelbereitschaft = pendelbereitschaft;
+        Umzugsbereitschaft = umzugsbereitschaft;
         GeaendertAm = jetzt;
     }
 

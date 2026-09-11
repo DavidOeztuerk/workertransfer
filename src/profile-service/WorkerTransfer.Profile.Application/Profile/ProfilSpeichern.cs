@@ -23,7 +23,10 @@ public sealed record ProfilSpeichernBefehl(
     string Text,
     string Ort,
     bool RemoteMoeglich,
-    IReadOnlyList<string> Faehigkeiten) : IBefehl<Profil>;
+    IReadOnlyList<string> Faehigkeiten,
+    /// <summary>Eine Stufe, oder <c>null</c> für „nichts gesagt" (ADR-0041).</summary>
+    Pendelbereitschaft? Pendelbereitschaft = null,
+    Umzugsbereitschaft? Umzugsbereitschaft = null) : IBefehl<Profil>;
 
 /// <summary>Schreibt das Profil und hält den Schreibvorgang in der Spur fest.</summary>
 public sealed class ProfilSpeichernHandler(
@@ -51,13 +54,15 @@ public sealed class ProfilSpeichernHandler(
         {
             profil = Profil.Lege_an(
                 request.Wer, request.Ueberschrift, request.Text, request.Ort,
-                request.RemoteMoeglich, faehigkeiten, jetzt);
+                request.RemoteMoeglich, faehigkeiten, jetzt,
+                request.Pendelbereitschaft, request.Umzugsbereitschaft);
         }
         else
         {
             bestehend.Aendere(
                 request.Ueberschrift, request.Text, request.Ort,
-                request.RemoteMoeglich, faehigkeiten, jetzt);
+                request.RemoteMoeglich, faehigkeiten, jetzt,
+                request.Pendelbereitschaft, request.Umzugsbereitschaft);
             profil = bestehend;
         }
 

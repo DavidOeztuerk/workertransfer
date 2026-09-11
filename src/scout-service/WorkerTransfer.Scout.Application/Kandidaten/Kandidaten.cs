@@ -4,6 +4,7 @@ using WorkerTransfer.Scout.Application.Nachrichten;
 using WorkerTransfer.Scout.Application.Ports;
 using WorkerTransfer.Scout.Domain.Suchen;
 using WorkerTransfer.Scout.Domain.Treffer;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Scout.Application.Kandidaten;
 
@@ -12,11 +13,21 @@ namespace WorkerTransfer.Scout.Application.Kandidaten;
 /// <param name="Filter">Wonach gesucht wird. Nur Genanntes.</param>
 /// <param name="Seitenlaenge">Wie viele Zeilen die Seite höchstens trägt.</param>
 /// <param name="Zeiger">Wo es weitergeht, als Text aus der Anfrage.</param>
+/// <param name="Stelle">
+/// Die Anzeige, gegen die das Erreichbarkeits-Häkchen gebildet wird, oder
+/// <c>null</c>.
+/// </param>
+/// <remarks>
+/// <para><strong>Die Stelle filtert nicht.</strong> Sie ändert an der Menge der
+/// Treffer nichts — sie fügt jedem Treffer eine Auskunft hinzu. Ohne sie tragen
+/// alle einen Strich, und das ist eine vollständige Antwort (ADR-0041).</para>
+/// </remarks>
 public sealed record KandidatenAbfrage(
     TenantId Firma,
     Suchfilter Filter,
     int Seitenlaenge,
-    string? Zeiger) : IAbfrage<Trefferseite>;
+    string? Zeiger,
+    Guid? Stelle = null) : IAbfrage<Trefferseite>;
 
 /// <summary>
 /// Sucht über Genanntes, prüft den Ledger je Zeile, holt die Belege dazu.
@@ -50,7 +61,8 @@ public sealed record KandidatenAbfrage(
 public sealed class KandidatenHandler(
     IProfilsuche suche,
     IEinwilligungstor tor,
-    IBelege belege) : IRequestHandler<KandidatenAbfrage, Trefferseite>
+    IBelege belege,
+    IStellen stellen) : IRequestHandler<KandidatenAbfrage, Trefferseite>
 {
     /// <summary>Obergrenze je Seite.</summary>
     /// <remarks>
@@ -104,7 +116,20 @@ public sealed class KandidatenHandler(
             .Where((_, stelle) => urteile[stelle])
             .ToArray();
 
-        // 4. Erst jetzt die Belege — und je Treffer einzeln, weil jeder eine
+        // 4a. Die Stelle, EINMAL fuer die ganze Seite — sie ist fuer alle
+        //     Treffer dieselbe, und einmal je Zeile zu fragen waere derselbe
+        //     Fehler, den die Sammelfrage an den Ledger behoben hat.
+        //
+        //     Ein Fehlschlag wird GESCHLUCKT: eine Stelle, die gerade nicht
+        //     abrufbar ist, macht aus jedem Haekchen einen Strich und aus
+        //     keinem ein Kreuz. Die Suche faellt deswegen nicht aus — sie
+        //     verliert eine Auskunft, und das sagt der Strich.
+        var stellenaussage = await Aussage(request.Stelle, cancellationToken);
+        var beiDerStelle = stellenaussage is null
+            ? null
+            : Ortskunde.Finde(stellenaussage.Postleitzahl, stellenaussage.Ort);
+
+        // 4b. Erst jetzt die Belege — und je Treffer einzeln, weil jeder eine
         //    eigene Freigabe hat. Nacheinander und nicht parallel: gegenueber
         //    einem fremden Dienst ist eine Seite mit fuenfzig gleichzeitigen
         //    Anfragen ein kleiner Angriff, und die Obergrenze oben haelt die
@@ -124,10 +149,43 @@ public sealed class KandidatenHandler(
                 fund.Genannt,
                 Haken(request.Filter, fund.Genannt),
                 bogen.Belege,
-                bogen.Stand));
+                bogen.Stand,
+                Erreichbarkeit.Bilde(
+                    fund.Pendelstufe,
+                    stellenaussage?.Anwesenheit,
+                    // Der Ort der Person wird JE TREFFER aufgeloest und nirgends
+                    // abgelegt: es entsteht keine Koordinatenspalte an einem
+                    // Menschen (ADR-0041 §4).
+                    Ortskunde.Finde(fund.Ort),
+                    beiDerStelle)));
         }
 
         return new Trefferseite(treffer, seite.Weiter);
+    }
+
+    /// <summary>Die Aussage der Anzeige — oder nichts, wenn sie schweigt.</summary>
+    /// <remarks>
+    /// Der Fehlschlag wird hier geschluckt und nicht weitergereicht: ohne
+    /// Anzeige gibt es keinen Grund, die ganze Trefferseite zu verlieren. Der
+    /// Preis ist ein Strich statt eines Haekchens, und der Strich sagt genau
+    /// das Richtige — „hierzu ist nichts gesagt".
+    /// </remarks>
+    private async Task<Stellenaussage?> Aussage(
+        Guid? stelle, CancellationToken cancellationToken)
+    {
+        if (stelle is not { } welche)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await stellen.HoleAsync(welche, cancellationToken);
+        }
+        catch (StelleSchweigt)
+        {
+            return null;
+        }
     }
 
     /// <summary>Die Häkchenliste: ein Ja oder Nein je gesuchtem Wort.</summary>

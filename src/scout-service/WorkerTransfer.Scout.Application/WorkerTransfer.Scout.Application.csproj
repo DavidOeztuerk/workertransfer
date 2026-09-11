@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="..\WorkerTransfer.Scout.Domain\WorkerTransfer.Scout.Domain.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.Outbox\WorkerTransfer.Outbox.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Girder.Abstractions" />

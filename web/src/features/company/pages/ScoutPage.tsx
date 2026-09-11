@@ -7,6 +7,7 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
+import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
@@ -28,6 +29,7 @@ import {
   type MarketRequest,
   listCompanyMarketRequests,
 } from "../../work/api/market";
+import { listOwnJobs } from "../../work/api/jobs";
 
 /**
  * <c>/scout</c> — wer sein Profil freigegeben hat, mit Häkchen und Belegen.
@@ -64,12 +66,26 @@ export function ScoutPage() {
   });
   const [filter, setFilter] = useState<Suchfilter>(OHNE_FILTER);
 
+  // Die Stelle steht NEBEN den Filtern, nicht unter ihnen: sie nimmt keinen
+  // Treffer weg, sie erklaert jeden (ADR-0041). Deshalb wirkt sie auch sofort
+  // und wartet nicht auf „Suchen" — sie aendert die Menge ja nicht.
+  const [stelle, setStelle] = useState("");
+
   const hatFilter =
     filter.skills.length > 0 || filter.location !== "" || filter.remoteOnly;
 
+  const eigeneStellen = useAsync(
+    (signal) => listOwnJobs(signal),
+    [fuerFirma],
+    fuerFirma,
+  );
+
+  const stellen =
+    eigeneStellen.data?.ok === true ? eigeneStellen.data.jobs : [];
+
   const seiten = useSeiten<Treffer, string>(
     (cursor, signal) =>
-      sucheKandidaten(cursor, filter, signal).then((result) =>
+      sucheKandidaten(cursor, filter, signal, stelle).then((result) =>
         result.ok
           ? {
               ok: true as const,
@@ -78,7 +94,7 @@ export function ScoutPage() {
             }
           : { ok: false as const, fehler: result.error.detail },
       ),
-    JSON.stringify(filter),
+    JSON.stringify({ filter, stelle }),
     fuerFirma,
   );
 
@@ -187,6 +203,26 @@ export function ScoutPage() {
                 {t("kandidaten.nurRemoteHinweis")}
               </Typography>
             </Box>
+
+            {/* ADR-0041: Anwesenheit und Ort der Stelle treffen auf die
+                Pendelbereitschaft der Person — daraus wird ein Häkchen je
+                Treffer. KEIN Filter: die Liste wird dadurch nicht kürzer. */}
+            {stellen.length > 0 ? (
+              <TextField
+                select
+                label={t("kandidaten.gegenStelle")}
+                helperText={t("kandidaten.gegenStelleHinweis")}
+                value={stelle}
+                onChange={(event) => setStelle(event.target.value)}
+                >
+                <MenuItem value="">{t("kandidaten.ohneStelle")}</MenuItem>
+                {stellen.map((anzeige) => (
+                  <MenuItem key={anzeige.id} value={anzeige.id}>
+                    {anzeige.title}
+                  </MenuItem>
+                ))}
+              </TextField>
+            ) : null}
 
             <Box sx={{ display: "flex", gap: 1.5 }}>
               <Button type="submit" variant="contained">

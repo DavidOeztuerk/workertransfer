@@ -108,7 +108,9 @@ public static class InterneEndpoints
             profil.Text,
             profil.Ort,
             profil.RemoteMoeglich,
-            profil.Faehigkeiten.Werte);
+            profil.Faehigkeiten.Werte,
+            Pendelstufen.Wort(profil.Pendelbereitschaft),
+            Umzugsworte.Wort(profil.Umzugsbereitschaft));
 
     /// <summary>Wie viele Zeilen eine Seite traegt.</summary>
     private static int Anzahl(string? roh) =>

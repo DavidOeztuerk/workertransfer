@@ -1,6 +1,6 @@
 # ADR-0041: Entfernung ist eine Frage zwischen zwei Aussagen — nicht ein Radius um einen Menschen
 
-**Status:** angenommen (11.09.2026). **Entwurf des Codes steht aus.**
+**Status:** angenommen (11.09.2026), **gebaut (11.09.2026)**
 **Betrifft:** profile-service, jobs-service, scout-service, `ServiceDefaults`, `web/`
 **Verwandt:** ADR-0032 (Umkreissuche ohne fremden Geokoder), ADR-0036 (scout-service), ADR-0022 (keine Zahl über einen Menschen), ADR-0033 (genannt / belegt / vorgeschlagen), ADR-0020 (Sichtbarkeit lebt im Ledger), ADR-0039 (das Berufsfeld folgert nichts)
 
@@ -79,6 +79,24 @@ Nicht „Homeoffice möglich" als Häkchen, weil das den häufigsten Fall (3+2) 
 ausdrücken kann und ihn deshalb als „remote" verkauft. Drei Worte, und das
 mittlere ist das ehrliche.
 
+> **Beim Bauen stellte sich heraus: es gibt dieses Feld schon.** jobs-service
+> führt seit jeher `Remotegrad` mit `None` / `Hybrid` / `Full`, und der
+> Kommentar daneben sagt dasselbe wie der Absatz darüber: *„Eine Aufzählung,
+> kein Wahrheitswert. ‚Remote möglich?' ist die Frage, die alle stellen, und
+> ‚ja/nein' beantwortet sie falsch: hybrid ist der häufigste Fall und keine
+> Zwischenstufe von wahr."*
+>
+> **Es entsteht deshalb kein zweites Feld.** Ein `anwesenheit` neben dem
+> `Remotegrad` wären zwei Wahrheiten über dieselbe Frage — genau das, wogegen
+> dieses Repository sonst überall argumentiert. Gelesen wird der vorhandene
+> Wert, mit seinen eigenen Worten (`none`/`hybrid`/`full`), und nicht
+> umbenannt: ein zweiter Wortschatz für dieselbe Sache ginge beim ersten neuen
+> Wert auseinander.
+>
+> Die Lehre ist älter als dieses ADR und steht in CLAUDE.md: **erst suchen,
+> dann entscheiden.** Ein ADR, das ein Feld verlangt, hat zuerst
+> nachzusehen, ob es schon dasteht.
+
 ### 3. Daraus wird ein HÄKCHEN — keine Zahl, kein Wegfiltern
 
 Auf der Trefferkarte steht, wie überall in diesem Dienst, ein Ja oder ein Nein
@@ -131,17 +149,36 @@ Wer sie umkehren will, beantwortet zuerst diese drei:
 3. Wer entscheidet, dass 60 km zu weit sind: die Person, das Unternehmen, oder
    der Standardwert eines Filters?
 
-## Was festzuhalten ist, wenn es gebaut wird
+## Wie es festgehalten ist
 
-- `pendelbereitschaft_km` und `umzugsbereit` sind nullbar und bleiben es; ein
-  Profil ohne sie ist vollständig.
-- Ein Test, der die Feldmenge von `TrefferV1` pinnt, geht rot, wenn dort eine
-  Kilometerzahl auftaucht — das ist der bestehende `AuflagenTests`.
-- Ein Test über den dritten Zustand: keine Angabe → kein `✗`.
-- Ein Test, dass ein Treffer ausserhalb der Stufe **in der Liste bleibt**.
-- Kein Feld, keine Spalte, keine Migration für Koordinaten — und eine Reihe, die
-  das am EF-Modell nachmisst, wie `LoeschempfaengerTests` es für Personenzeilen
-  tut.
+Gebaut am 11.09.2026. Was oben als Auflage stand, hängt jetzt an Reihen:
+
+- `ErreichbarkeitTests` — die drei Zustände und **vier Wege zum Strich**, von
+  denen keiner ein Kreuz werden darf: keine Stufe genannt, keine Stelle
+  genannt, Ort der Person unbekannt, Ort der Stelle unbekannt. Dazu „remote ist
+  ein Ja" und „hybrid zählt wie vor Ort".
+- `ScoutreiseTests.Wer_weiter_weg_wohnt_bleibt_in_der_Liste` — die Kernauflage
+  als Aussage über die **Länge** der Liste: zwei Menschen, ein Haken, ein Kreuz,
+  **zwei Zeilen**. Und der Rumpf enthält kein `km`.
+- `AuflagenTests.Das_Erreichbarkeits_Haekchen_traegt_keine_Kilometerzahl` —
+  die Feldmenge von `Erreichbarkeit` und die von `TrefferV1`. Wer eine Zahl
+  ergänzt, schreibt sie dort hin.
+- `Die_Stelle_wird_einmal_je_Seite_gefragt` — sie ist für alle Treffer
+  dieselbe.
+- `Eine_schweigende_Stelle_kostet_nur_das_Haekchen` — und **nicht** die
+  Trefferseite. Der Unterschied zum Ledger ist bewusst: dort ist Schweigen ein
+  503, weil eine leere Liste eine Aussage über Menschen wäre; hier fehlt nur
+  eine Auskunft *über* die Liste.
+
+**Die Entfernungen in den Reihen sind an der Ortstabelle gemessen, nicht
+geschätzt.** Der erste Entwurf nahm Berlin–Leipzig für „zwischen 50 und 100" —
+es sind 150 km, und der Test fiel zu Recht. Jetzt steht Berlin–Wittenberg (90)
+dort, und eine eigene Reihe prüft die drei benutzten Entfernungen, damit kein
+Fall unten auf einer Annahme über die Tabelle steht.
+
+**Keine Koordinatenspalte, nachgemessen:** die Wanderung `Pendelbereitschaft`
+legt genau zwei nullbare Textspalten an (`commute_km`, `relocation`) und sonst
+nichts.
 
 ## Was dieses ADR nicht entscheidet
 
