@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Testcontainers.PostgreSql;
+using WorkerTransfer.ServiceDefaults.Rollen;
 using WorkerTransfer.Transfer.Infrastructure.Persistence;
 
 namespace WorkerTransfer.Transfer.Tests;
@@ -73,5 +74,39 @@ public static class Tokenform
                 SecurityAlgorithms.HmacSha256));
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+}
+
+/// <summary>Eine Rollenauskunft, die nicht fragt, sondern antwortet.</summary>
+/// <remarks>
+/// <para>Sie ersetzt den Draht zu identity-service. Ohne sie müsste jede Reihe,
+/// die eine Firmenhandlung anfasst, einen zweiten Dienst mitstarten.</para>
+///
+/// <para><strong>Sie MERKT SICH, wonach gefragt wurde.</strong> Eine Attrappe,
+/// die ihre Eingaben wegwirft, hat in diesem Baum schon dreimal einen echten
+/// Fehler verdeckt: sie antwortet richtig, auch wenn der Aufrufer die falsche
+/// Firma übergibt. Hier ist genau das die Frage — der Mandant muss aus dem
+/// TOKEN kommen.</para>
+/// </remarks>
+public sealed class Rollenprobe : IFirmenrollen
+{
+    /// <summary>Was sie antwortet.</summary>
+    public Firmenrolle Antwort { get; set; } = Firmenrolle.Admin;
+
+    /// <summary>Ob sie stattdessen schweigt — der Ausfall von identity-service.</summary>
+    public bool Schweigt { get; set; }
+
+    /// <summary>Wonach zuletzt gefragt wurde.</summary>
+    public (Guid Wer, Guid Firma)? Zuletzt { get; private set; }
+
+    /// <inheritdoc />
+    public Task<Firmenrolle> RolleAsync(
+        Guid wer, Guid firma, CancellationToken cancellationToken = default)
+    {
+        Zuletzt = (wer, firma);
+
+        return Schweigt
+            ? throw new RolleSchweigt("Die Probe schweigt.")
+            : Task.FromResult(Antwort);
     }
 }

@@ -1,7 +1,9 @@
 using WorkerTransfer.Jobs.Api;
+using WorkerTransfer.Jobs.Api.Berechtigung;
 using WorkerTransfer.Jobs.Infrastructure;
 using WorkerTransfer.Jobs.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.ServiceDefaults.Rollen;
 
 // Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
 // Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
@@ -13,6 +15,19 @@ const string dienstname = "jobs-service";
 
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, dienstname);
+
+// Zwei Handlungen binden dieses Unternehmen nach aussen — eine Anzeige
+// hinstellen und sie wegnehmen. Wer das darf, entscheidet die
+// MITGLIEDSCHAFTSTABELLE von identity-service, je Anfrage und nicht das Token:
+// ein Token lebt weiter, nachdem jemand aus einer Firma entfernt wurde, und die
+// Entfernung wirkte dann erst beim Ablauf.
+//
+// Die Liste steht HIER und nicht in `AddWorkerTransferDefaults`: der Mechanismus
+// darf nicht elfmal beantwortet werden, die Liste ist eine Entscheidung.
+builder.Services.AddAdminrechte(
+    builder.Configuration,
+    Stellenrechte.Veroeffentlichen,
+    Stellenrechte.Schliessen);
 
 builder.Services.AddJobsInfrastructure(
     builder.Configuration,

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using WorkerTransfer.Contracts.Identity;
 using WorkerTransfer.Identity.Application.Konto;
 using WorkerTransfer.Identity.Application.Unternehmen;
+using WorkerTransfer.Identity.Domain.Companies;
 using WorkerTransfer.Identity.Infrastructure.Post;
 using WorkerTransfer.ServiceDefaults;
 
@@ -47,6 +48,46 @@ public static class InterneEndpoints
                 [.. mitglieder.Select(m => new UnternehmensmitgliedV1(m.Subject.Value))]);
 
             await context.Response.WriteAsJsonAsync(antwort, cancellationToken);
+        });
+
+        // Die Rolle eines Menschen in einem Unternehmen — der Draht, ueber den
+        // die anderen zehn Dienste ein Firmenrecht beantworten.
+        //
+        // Sie steht ABSICHTLICH nicht im Token: ein Token lebt weiter, nachdem
+        // jemand aus einer Firma entfernt wurde, und die Entfernung wirkte dann
+        // erst beim Ablauf. Hier wird je Anfrage gefragt, und ein Widerruf
+        // wirkt bei der naechsten.
+        //
+        // EINE Frage, EINE Antwort: die Mitgliederliste daneben gaebe fuer jede
+        // Rechtepruefung die ganze Belegschaft heraus, um eine Zeile daraus zu
+        // lesen.
+        app.MapGet("/internal/companies/{tenantId:guid}/members/{subjectId:guid}/role", async (
+            Guid tenantId,
+            Guid subjectId,
+            IMediator mediator,
+            IOptions<Meldeeinstellungen> einstellungen,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (!DarfMelden(context, einstellungen.Value))
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
+                return;
+            }
+
+            var rolle = await mediator.Send(
+                new InterneRolleAbfrage(new TenantId(tenantId), new SubjectId(subjectId)),
+                cancellationToken);
+
+            // 200 mit `null` und nicht 404: „kein Mitglied" ist eine Antwort auf
+            // die gestellte Frage. Ein 404 waere von „Geheimnis falsch" nicht zu
+            // unterscheiden — und der Aufrufer koennte die beiden nicht
+            // auseinanderhalten, wo genau das den Unterschied zwischen „darf
+            // nicht" und „wir wissen es nicht" ausmacht.
+            await context.Response.WriteAsJsonAsync(
+                new FirmenrolleV1(rolle is { } r ? MembershipRoleNames.ToDatabase(r) : null),
+                cancellationToken);
         });
 
         app.MapGet("/internal/account/{subjectId:guid}/ai", async (

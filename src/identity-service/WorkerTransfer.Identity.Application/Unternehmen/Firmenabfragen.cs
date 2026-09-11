@@ -98,3 +98,36 @@ public sealed class OffeneEinladungenHandler(
         return await einladungen.ListOpenAsync(request.Firma, cancellationToken);
     }
 }
+
+/// <summary>Welche Rolle hat dieser Mensch in diesem Unternehmen?</summary>
+/// <remarks>
+/// <para>Für Dienst-zu-Dienst, ohne Aufrufer: das Geheimnis am internen
+/// Endpunkt IST die Autorisierung. Die öffentlichen Abfragen prüfen zuerst die
+/// Mitgliedschaft des Fragenden, weil sie einem Menschen antworten — hier
+/// antwortet ein Dienst einem Dienst.</para>
+///
+/// <para><strong>Warum die anderen zehn Dienste überhaupt fragen müssen.</strong>
+/// Die Mitgliedschaftstabelle liegt hier und nirgends sonst (ADR-0004: keine
+/// gemeinsame Datenbank). Und ins Token gehört die Rolle nicht: ein Token lebt
+/// weiter, nachdem jemand aus einer Firma entfernt wurde, und die Entfernung
+/// wirkte dann erst beim Ablauf. Der Preis ist eine Abfrage je geschützter
+/// Anfrage — sie trifft einen Primärschlüssel und betrifft nur die Handlungen,
+/// die ein Unternehmen binden.</para>
+/// </remarks>
+public sealed record InterneRolleAbfrage(TenantId Firma, SubjectId Wer)
+    : IAbfrage<MembershipRole?>;
+
+/// <inheritdoc cref="InterneRolleAbfrage" />
+public sealed class InterneRolleHandler(IMembershipRepository mitgliedschaften)
+    : IRequestHandler<InterneRolleAbfrage, MembershipRole?>
+{
+    /// <inheritdoc />
+    public Task<MembershipRole?> Handle(
+        InterneRolleAbfrage request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return mitgliedschaften.RoleOfAsync(request.Wer, request.Firma, cancellationToken);
+    }
+}
