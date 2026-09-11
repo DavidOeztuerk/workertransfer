@@ -463,6 +463,11 @@ services:
       # Die Belege. github-service, NICHT github.com: dieser Dienst fragt nie
       # bei GitHub selbst.
       GitHub__Adresse: http://github-service:8011
+      # Die Stellenanzeige, gegen die das Erreichbarkeits-Haekchen gebildet wird
+      # (ADR-0041). Gelesen werden drei Felder: Ort, Postleitzahl, Remotegrad.
+      # Ohne diese Zeile traegt jeder Treffer einen Strich — und das ist eine
+      # vollstaendige Antwort, kein Ausfall.
+      Jobs__Adresse: http://jobs-service:8006
       # „Dein Profil wurde entdeckt" (ADR-0033) — ueber den Postausgang,
       # inhaltsfrei, und die Nachricht nennt kein Unternehmen.
       Notifications__Adresse: http://notification-service:8010

@@ -108,7 +108,9 @@ public sealed record Treffer(
     IReadOnlyList<string> Genannt,
     IReadOnlyList<Haken> Haken,
     IReadOnlyList<Beleg> Belege,
-    Belegstand Belegstand);
+    Belegstand Belegstand,
+    /// <summary>Das Häkchen zur Entfernung (ADR-0041) — nie eine Zahl.</summary>
+    Erreichbarkeit Erreichbarkeit);
 
 /// <summary>Eine Seite Treffer.</summary>
 /// <remarks>

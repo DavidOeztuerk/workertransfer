@@ -44,6 +44,15 @@ export interface Beleg {
  */
 export type Belegstand = "complete" | "none_released" | "partial" | "unavailable";
 
+/**
+ * Das Häkchen zur Entfernung (ADR-0041).
+ *
+ * `unsaid` ist KEIN Nein. Es heisst: die Person hat nichts gesagt, oder es
+ * wurde keine Stelle gewählt, oder ein Ort ist dem Server unbekannt. Wer nichts
+ * gesagt hat, bekommt kein Kreuz.
+ */
+export type Erreichbarkeit = "reachable" | "further" | "unsaid";
+
 /** Ein Mensch, der gefunden wurde. Ohne Punktwert, ohne Rang, ohne Prozent. */
 export interface Treffer {
   subject_id: string;
@@ -57,6 +66,12 @@ export interface Treffer {
   checks: Haken[];
   evidence: Beleg[];
   evidence_state: Belegstand;
+  /** Drei Worte, nie eine Kilometerzahl — die reist gar nicht erst mit. */
+  reach: Erreichbarkeit;
+  /** Was die Person gesagt hat, oder `null`. */
+  reach_commute: string | null;
+  /** Was die Stelle verlangt, oder `null`. */
+  reach_attendance: string | null;
 }
 
 export interface Suchfilter {
@@ -86,9 +101,17 @@ export type Trefferseite =
  * Abfrage steht — und beim ersten Mal, wenn beide auseinanderlaufen, blättert
  * jemand still durch die falsche Menge.
  */
-export function scoutQuery(cursor?: string, filter: Suchfilter = OHNE_FILTER): string {
+export function scoutQuery(
+  cursor?: string,
+  filter: Suchfilter = OHNE_FILTER,
+  stelle?: string
+): string {
   const params = new URLSearchParams();
   if (cursor !== undefined && cursor !== "") params.set("cursor", cursor);
+  // Die Stelle FILTERT NICHT (ADR-0041): sie fuegt jedem Treffer eine Auskunft
+  // hinzu und nimmt keinen weg. Sie steht deshalb neben den Filtern und nicht
+  // unter ihnen.
+  if (stelle !== undefined && stelle !== "") params.set("stelle", stelle);
   for (const skill of filter.skills) {
     const trimmed = skill.trim();
     if (trimmed !== "") params.append("skill", trimmed);
@@ -117,11 +140,12 @@ export function scoutQuery(cursor?: string, filter: Suchfilter = OHNE_FILTER): s
 export async function sucheKandidaten(
   cursor?: string,
   filter: Suchfilter = OHNE_FILTER,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  stelle?: string
 ): Promise<Trefferseite> {
   const answer = await request<{ items?: Treffer[]; next?: string | null }>(
     SCOUT_BASE_URL,
-    `/scout/candidates${scoutQuery(cursor, filter)}`,
+    `/scout/candidates${scoutQuery(cursor, filter, stelle)}`,
     { signal },
     "fehler.listeNichtGeladen2"
   );

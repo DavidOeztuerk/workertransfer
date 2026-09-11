@@ -227,6 +227,30 @@ public sealed class Probebelege : IBelege
     }
 }
 
+/// <summary>Stellenaussagen, die der Test steuert.</summary>
+public sealed class Probestellen : IStellen
+{
+    /// <summary>Was zu welcher Anzeige vorliegt.</summary>
+    public Dictionary<Guid, Stellenaussage> Bestand { get; } = [];
+
+    /// <summary>Wie oft gefragt wurde — EINMAL je Seite, nicht je Zeile.</summary>
+    public int Fragen { get; private set; }
+
+    /// <summary>Wenn wahr, antwortet jobs-service gar nicht.</summary>
+    public bool Schweigt { get; set; }
+
+    /// <inheritdoc />
+    public Task<Stellenaussage?> HoleAsync(
+        Guid stelle, CancellationToken cancellationToken = default)
+    {
+        Fragen++;
+
+        return Schweigt
+            ? throw new StelleSchweigt("jobs-service antwortet im Test nicht")
+            : Task.FromResult(Bestand.GetValueOrDefault(stelle));
+    }
+}
+
 /// <summary>Ein Entwerfer, der mitschreibt statt zu fragen.</summary>
 public sealed class Probeentwerfer : IEntwerfer
 {

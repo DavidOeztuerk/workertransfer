@@ -56,7 +56,24 @@ public sealed record TrefferV1(
     [property: JsonPropertyName("named")] IReadOnlyList<string> Named,
     [property: JsonPropertyName("checks")] IReadOnlyList<HakenV1> Checks,
     [property: JsonPropertyName("evidence")] IReadOnlyList<BelegV1> Evidence,
-    [property: JsonPropertyName("evidence_state")] string EvidenceState);
+    [property: JsonPropertyName("evidence_state")] string EvidenceState,
+    /// <summary>Das Häkchen zur Entfernung — <c>reachable</c>, <c>further</c>, <c>unsaid</c>.</summary>
+    /// <remarks>
+    /// <para><strong>Und daneben KEINE Kilometerzahl.</strong> Die Entfernung
+    /// wird gerechnet und sofort auf eines dieser drei Worte reduziert; sie
+    /// steht in keinem Feld dieses Vertrags (ADR-0041). Eine Zahl sähe aus wie
+    /// eine Messung, wäre aber der Abstand zweier Stadtmittelpunkte — und
+    /// sobald zwei davon untereinanderstehen, ordnet sie Menschen.</para>
+    ///
+    /// <para><c>unsaid</c> ist kein Nein. Es heisst: die Person hat nichts
+    /// gesagt, oder es wurde keine Stelle genannt, oder ein Ort ist uns
+    /// unbekannt. Wer nichts gesagt hat, bekommt kein Kreuz (ADR-0022 §3).</para>
+    /// </remarks>
+    [property: JsonPropertyName("reach")] string Reach,
+    /// <summary>Was die Person gesagt hat — als Wort, oder <c>null</c>.</summary>
+    [property: JsonPropertyName("reach_commute")] string? ReachCommute,
+    /// <summary>Was die Stelle verlangt — als Wort, oder <c>null</c>.</summary>
+    [property: JsonPropertyName("reach_attendance")] string? ReachAttendance);
 
 /// <summary>Eine Seite Treffer.</summary>
 /// <remarks>
@@ -150,7 +167,10 @@ public sealed record FremdprofilV1(
     [property: JsonPropertyName("bio")] string Bio,
     [property: JsonPropertyName("location")] string Location,
     [property: JsonPropertyName("remote_ok")] bool RemoteOk,
-    [property: JsonPropertyName("skills")] IReadOnlyList<string> Skills);
+    [property: JsonPropertyName("skills")] IReadOnlyList<string> Skills,
+    /// <summary>Die Pendelstufe als WORT, nie als Zahl (ADR-0041).</summary>
+    [property: JsonPropertyName("commute_km")] string? CommuteKm = null,
+    [property: JsonPropertyName("relocation")] string? Relocation = null);
 
 /// <summary>Eine Seite der internen Profilsuche.</summary>
 public sealed record FremdprofilseiteV1(
@@ -180,3 +200,20 @@ public sealed record FremdrepositoryV1(
 public sealed record FremdverbindungV1(
     [property: JsonPropertyName("repositories")] IReadOnlyList<FremdrepositoryV1>? Repositories,
     [property: JsonPropertyName("languages_complete")] bool LanguagesComplete);
+
+/// <summary>Eine Stellenanzeige, wie dieser Dienst sie von jobs-service liest.</summary>
+/// <remarks>
+/// <para><strong>Drei Felder, und mehr wird nicht gelesen.</strong> Kein Titel,
+/// keine Beschreibung, keine Fähigkeiten: was dieser Dienst von einer Anzeige
+/// braucht, um ein Häkchen zu bilden, ist wo sie liegt und ob jemand hinkommen
+/// muss. Was nicht ankommt, kann nicht weitergereicht werden (ADR-0004).</para>
+///
+/// <para><c>remote_mode</c> trägt <c>none</c>, <c>hybrid</c> oder <c>full</c> —
+/// der <c>Remotegrad</c> von jobs-service, unverändert gelesen. Er IST die
+/// Anwesenheit aus ADR-0041 §2; ein zweites Feld dafür wäre eine zweite
+/// Wahrheit über dieselbe Frage.</para>
+/// </remarks>
+public sealed record FremdstelleV1(
+    [property: JsonPropertyName("location")] string? Location,
+    [property: JsonPropertyName("postal_code")] string? PostalCode,
+    [property: JsonPropertyName("remote_mode")] string? RemoteMode);

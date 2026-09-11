@@ -70,8 +70,14 @@ public static class ScoutEndpoints
                 return;
             }
 
+            // `stelle` FILTERT NICHT. Sie fuegt jedem Treffer eine Auskunft
+            // hinzu und nimmt keinen weg (ADR-0041): wer weiter weg wohnt,
+            // bleibt in der Liste und traegt ein Kreuz. Das Unternehmen
+            // entscheidet, nicht die Suche — und es sieht, warum.
             var seite = await mediator.Send(
-                new KandidatenAbfrage(firma, filter, Laenge(anfrage["limit"]), anfrage["cursor"]),
+                new KandidatenAbfrage(
+                    firma, filter, Laenge(anfrage["limit"]), anfrage["cursor"],
+                    Guid.TryParse(anfrage["stelle"], out var welche) ? welche : null),
                 cancellationToken);
 
             // DIE EINE STELLE, AN DER EIN LESEN ETWAS SCHREIBT — und sie steht
@@ -331,7 +337,10 @@ public static class ScoutEndpoints
                 .. treffer.Belege.Select(beleg => new BelegV1(
                     beleg.Wort, Wort(beleg.Art), beleg.Projekt, beleg.Adresse))
             ],
-            Wort(treffer.Belegstand));
+            Wort(treffer.Belegstand),
+            Erreichbarkeitsworte.Wort(treffer.Erreichbarkeit.Stand),
+            Erreichbarkeitsworte.Wort(treffer.Erreichbarkeit.Stufe),
+            Erreichbarkeitsworte.Wort(treffer.Erreichbarkeit.Anwesenheit));
 
     private static SucheV1 Antwort(Suche suche) =>
         new(
