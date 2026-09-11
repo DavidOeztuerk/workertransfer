@@ -1,12 +1,14 @@
 using System.Globalization;
 using Girder.Core.Identity;
 using MediatR;
+using WorkerTransfer.Jobs.Api.Berechtigung;
 using WorkerTransfer.Jobs.Application.Entwurf;
 using WorkerTransfer.Jobs.Application.Ports;
 using WorkerTransfer.Jobs.Application.Stellen;
 using WorkerTransfer.Jobs.Contracts;
 using WorkerTransfer.Jobs.Domain.Stellen;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.ServiceDefaults.Rollen;
 
 namespace WorkerTransfer.Jobs.Api;
 
@@ -118,15 +120,27 @@ public static class StellenEndpoints
             });
         });
 
+        // Die beiden Zustandswechsel sind die einzigen Stellen hier, an denen
+        // die Anzeige das Unternehmen nach aussen vertritt — und deshalb die
+        // einzigen, die einen `admin` verlangen. Schreiben und Aendern bleiben
+        // jedem Mitglied: ein Entwurf steht niemandem gegenueber.
+        //
+        // Aufgeloest wird die Richtlinie von `Adminrecht` aus der
+        // Mitgliedschaftstabelle von identity-service, nicht aus dem Token —
+        // wer entfernt wird, ist bei der naechsten Anfrage draussen.
         stellen.MapPost("/{id:guid}/publish", (
             Guid id, IMediator mediator, ICurrentPrincipal akteur,
             HttpContext context, CancellationToken cancellationToken) =>
-            Wechsle(id, Stellenstand.Published, mediator, akteur, context, cancellationToken));
+            Wechsle(id, Stellenstand.Published, mediator, akteur, context, cancellationToken))
+            .RequireAuthorization(
+                AdminrechteErweiterungen.Richtlinie(Stellenrechte.Veroeffentlichen));
 
         stellen.MapPost("/{id:guid}/close", (
             Guid id, IMediator mediator, ICurrentPrincipal akteur,
             HttpContext context, CancellationToken cancellationToken) =>
-            Wechsle(id, Stellenstand.Closed, mediator, akteur, context, cancellationToken));
+            Wechsle(id, Stellenstand.Closed, mediator, akteur, context, cancellationToken))
+            .RequireAuthorization(
+                AdminrechteErweiterungen.Richtlinie(Stellenrechte.Schliessen));
 
         // Öffentlich für jeden Angemeldeten — und ohne jede Sortierung nach
         // Passung. Wie gut jemand zu einer Stelle passt, rechnet der Browser

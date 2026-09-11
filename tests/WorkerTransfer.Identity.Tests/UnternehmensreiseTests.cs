@@ -308,6 +308,49 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
+    /// Eine Einladung zurueckzunehmen ist die Kehrseite des Einladens — und
+    /// verlangt darum dasselbe Recht.
+    /// </summary>
+    /// <remarks>
+    /// Bis PBI-2 fragte an diesem Endpunkt keine Richtlinie: der Befehl selbst
+    /// prüfte zwar die Rolle, aber erst hinter der Eingabe, und ein Fremder las
+    /// aus dem Unterschied 400/403 ab, dass sein Rumpf in Ordnung war. Jetzt
+    /// entscheidet die Richtlinie, bevor irgendetwas den Rumpf ansieht.
+    /// </remarks>
+    [Fact]
+    public async Task Nur_ein_Administrator_darf_eine_Einladung_zuruecknehmen()
+    {
+        var chefin = await Person(Adresse("chefin", NeueDomain()), firma: "Beispiel GmbH");
+        var firma = await ErsteFirma(chefin);
+
+        var kollege = Adresse("kollege", "andere.example");
+        await chefin.PostAsJsonAsync(
+            $"/companies/{firma}/invitations", new { email = kollege, role = "member" });
+
+        var browser = await Person(kollege);
+        await browser.PostAsJsonAsync(
+            "/invitations/accept", new { token = LetzterLink("eingeladen") });
+
+        // Eine zweite, offene Einladung — das Ziel des Versuchs.
+        var offen = await chefin.PostAsJsonAsync(
+            $"/companies/{firma}/invitations",
+            new { email = Adresse("dritte", "andere.example"), role = "member" });
+        var id = (await Json(offen)).GetProperty("id").GetString();
+
+        var alsMitglied = await browser.DeleteAsync($"/companies/{firma}/invitations/{id}");
+
+        alsMitglied.StatusCode.Should().Be(
+            HttpStatusCode.Forbidden,
+            "ein `member` darf die Einladung einer Kollegin nicht wegnehmen");
+
+        // Die Gegenprobe in derselben Reihe: sonst wäre ein Endpunkt, der IMMER
+        // 403 antwortet, von einem richtig geschützten nicht zu unterscheiden.
+        var alsAdmin = await chefin.DeleteAsync($"/companies/{firma}/invitations/{id}");
+
+        alsAdmin.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    /// <summary>
     /// An id alone would let an administrator of one company act on another
     /// company's invitation.
     /// </summary>

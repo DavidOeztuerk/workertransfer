@@ -1,7 +1,9 @@
 using Girder.Core.Identity;
 using MediatR;
+using WorkerTransfer.Transfer.Api.Berechtigung;
 using WorkerTransfer.Transfer.Application.Vorgaenge;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.ServiceDefaults.Rollen;
 using WorkerTransfer.Transfer.Contracts;
 
 namespace WorkerTransfer.Transfer.Api;
@@ -144,13 +146,22 @@ public static class VorgangsEndpoints
                 cancellationToken);
 
             await Antworten.Schreibe(context, ergebnis, cancellationToken);
-        });
+        })
+        // Ein Angebot nennt Eintrittstermin und Gebuehr — es bindet das
+        // Unternehmen, und darum verlangt es einen `admin`. Aufgeloest aus der
+        // Mitgliedschaftstabelle von identity-service, nie aus dem Token.
+        .RequireAuthorization(AdminrechteErweiterungen.Richtlinie(Vorgangsrechte.Anbieten));
 
         vorgaenge.MapPost("/{id:guid}/complete", (
                 Guid id, IMediator mediator, ICurrentPrincipal akteur,
                 HttpContext context, CancellationToken cancellationToken) =>
-            Firma(id, Firmenzug.Abschliessen, mediator, akteur, context, cancellationToken));
+            Firma(id, Firmenzug.Abschliessen, mediator, akteur, context, cancellationToken))
+            .RequireAuthorization(
+                AdminrechteErweiterungen.Richtlinie(Vorgangsrechte.Abschliessen));
 
+        // KEIN Firmenrecht: wer einen Vorgang anfangen darf, muss ihn beenden
+        // duerfen. Sonst waere die Einladung eine Falle — derselbe Satz, den
+        // `/decline` fuer die Person schon traegt.
         vorgaenge.MapPost("/{id:guid}/withdraw", (
                 Guid id, IMediator mediator, ICurrentPrincipal akteur,
                 HttpContext context, CancellationToken cancellationToken) =>

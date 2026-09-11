@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Outbox;
+using WorkerTransfer.ServiceDefaults.Rollen;
 using WorkerTransfer.Transfer.Application.Ports;
 
 namespace WorkerTransfer.Transfer.Tests;
@@ -34,6 +35,11 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
             {
                 dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _ledger));
                 dienste.Replace(ServiceDescriptor.Scoped<IZustellung, Probezustellung>());
+                // Angebot und Abschluss verlangen seit PBI-2 einen `admin`.
+                // Diese Reihen messen den Vorgang und nicht die Rolle — also
+                // antwortet die Probe wie eine Inhaberin. `RollenTests` dreht
+                // sie auf `member`.
+                dienste.Replace(ServiceDescriptor.Scoped<IFirmenrollen>(_ => new Rollenprobe()));
             });
         });
 

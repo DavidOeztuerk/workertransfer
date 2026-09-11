@@ -57,7 +57,7 @@ make fix            # dotnet format
 make validate       # like check, but runs through and reports every red step
 make up / make down # the whole stack in docker compose
 make images         # both shipped images — the local twin of the CI job
-make routenkarte    # every endpoint × three principals, against the running stack
+make routenkarte    # every endpoint × four principals, against the running stack
 make k8s-up / k8s-down / k8s-lint
 ```
 
@@ -267,7 +267,32 @@ The lesson is the test, not the claim: `TokenformTests` forbade two *names* and 
 
 Two checks sit in two places on purpose. **Freemail is rejected at registration**, and **before** the existence check — otherwise a *known* freemail address would get the silent "ok" and an unknown one a 422, and that difference is exactly the enumeration channel `/auth/register` closes. **"Domain already claimed" is checked only at confirmation**: earlier it would answer *"is firma.de on this platform?"* for anyone who guesses a domain. That creates a state which did not exist before — **account confirmed, company refused** — and `/verify` says so; the confirmation itself must never fail because a name was taken.
 
-**There is no "create a company" button and no `/company/new` route.** Someone already registered as a person joins a company by **invitation**, which is also the right answer when their domain is already claimed — they have colleagues there. `admin` vs `member` is **not enforced anywhere** yet, and no route checks the tenant: the header only *hides* company entries; the server answers 403. Do not mistake the navigation for access control.
+**There is no "create a company" button and no `/company/new` route.** Someone already registered as a person joins a company by **invitation**, which is also the right answer when their domain is already claimed — they have colleagues there.
+
+**`admin` vs `member` is enforced since PBI-2, and until then it was not — anywhere.** The tree held **zero** `RequirePermission` outside identity-service: the navigation *hid* company entries and the server answered 403 only where somebody had thought of it. `Mitgliedschaftsrecht` read the role per request from the membership table — and nobody asked. **Hiding is not access control**, and that sentence is the whole reason this was the largest real gap in the tree.
+
+Eight routes now demand an `admin`, and the line behind them is written down once so the next route does not reinvent it: **`admin` is whoever binds or changes the company, or who belongs to it; `member` is the daily work in the company's name** — reading, drafting, writing, approaching, processing applications. **In doubt, `member`:** a right that is too narrow turns an invitation into a spectator seat, and then somebody creates a second admin in order to work — and "admin" is a word in a table again.
+
+| route | why `admin` |
+|---|---|
+| `POST /companies/{id}/invitations` | who belongs to the company |
+| `DELETE /companies/{id}/invitations/{id}` | the reverse side of inviting |
+| `DELETE /companies/{id}/members/{id}` | who belongs to the company |
+| `POST /jobs/{id}/publish` | the advert starts representing the company |
+| `POST /jobs/{id}/close` | it stops — and with it the chance to apply |
+| `PUT /companies/me/profile` | the shop window, public and for everyone |
+| `POST /transfers/{id}/offer` | start date and placement fee |
+| `POST /transfers/{id}/complete` | states that both hold |
+
+Three of those already had the check in the *handler*; moving it to the endpoint moved it **before** the body is looked at — otherwise a stranger learns from the difference 400/403 that their body was fine.
+
+**Where the role comes from is the part that carries the design.** Not the token: a token outlives the removal, and the removal would then take effect on expiry — at exactly the operation where *immediately* is the only thing that counts. identity-service answers `GET /internal/companies/{id}/members/{sub}/role` behind the shared secret; `ServiceDefaults.Rollen.Adminrecht` asks it per protected request, with no cache, for the same reason a consent must take effect on the next read (ADR-0013). The price is one lookup per protected request, and it touches only the operations that bind a company — never the reads people use all day.
+
+**Two things that are easy to get wrong here.** The tenant comes from the **token** in the ten services (`/jobs/{id}/publish` names no company) and from the **path** in identity (`/companies/{id}/…`) — that is why there are two handlers and not one. And **a silent role lookup answers 503, never 403**: the handler can only say "yes", so it leaves a note on the `HttpContext` and `Ablehnungsgestalt` turns the refusal into 503. A 403 would read as "your right was taken away", and nobody would go looking for an outage.
+
+**`Identity__Adresse` and `Identity__Geheimnis` are therefore load-bearing configuration** in jobs, companies and transfer (applications and notification already had them). Without them every protected route answers 503 — correctly, and visibly.
+
+Do not mistake the navigation for access control.
 
 **Registration is open to any email address, private ones very much included** — the transfer market's normal user is a person with no company. The freemail blocklist applies at exactly one place: claiming a domain. Accounts start pending and are activated by a mailed token; register and resend answer identically whether or not the address is known, because a differing answer would reveal platform membership without asking the ledger.
 
@@ -381,12 +406,14 @@ So the *operator* declares where a person may point, in `Draft__ErlaubteZiele__*
 
 ## The route map is a test, not a checklist
 
-[`docs/routenkarte.yml`](docs/routenkarte.yml) records, for every endpoint reachable through the gateway, what it answers in the **three** principals ADR-0017 distinguishes: no token, a person with no company (`tenant_id` null), and someone acting for a company. The middle one is the one people forget — on a transfer market a person without a company is the *normal* case, and the rows where the middle and right columns differ are exactly where ADR-0017 is doing work.
+[`docs/routenkarte.yml`](docs/routenkarte.yml) records, for every endpoint reachable through the gateway, what it answers in **four** principals: no token, a person with no company (`tenant_id` null), someone acting for a company as `member`, and the same as `admin`. The second one is the one people forget — on a transfer market a person without a company is the *normal* case, and the rows where it differs from the two on the right are exactly where ADR-0017 is doing work.
+
+**The fourth column is what made PBI-2 checkable at all.** Before it the map could not express "admin, not member", so nothing measured it — and nothing was enforced. Five rows show the difference; the three identity routes cannot, because the company id in their path does not exist and *both* company principals get 403 there, for two different reasons. `UnternehmensreiseTests` covers those three against a company that exists, and `Die_vierte_Spalte_unterscheidet_admin_von_member` pins the five by name: opening one of them is then a deliberate edit, not a silent one.
 
 Two things drive it, and they answer different questions:
 
 - **`RoutenkarteTests`** (in the gateway suite, no stack needed) asserts the map is **complete**: every route in `ocelot.json` has at least one entry. Add a route without an entry and it goes red. Without this, the map would be correct exactly until the next endpoint.
-- **`scripts/routenkarte.sh`** (`make routenkarte`, needs `make up`) drives all 414 answers against the running stack. It is a script rather than a test suite on purpose: a suite that needs a stack skips itself without one, and a skipped test looks exactly like a passing one.
+- **`scripts/routenkarte.sh`** (`make routenkarte`, needs `make up`) drives every answer against the running stack — four columns since PBI-2, and the fourth principal is built the way a person is: registered, invited with `role: "member"`, joined. The script refuses to measure unless that account really carries the company's tenant *and* the role `member` — without that check a failed join would quietly measure a person without a company, and all eight protected rows would still look green, because 403 is the right answer there for a person too. It is a script rather than a test suite on purpose: a suite that needs a stack skips itself without one, and a skipped test looks exactly like a passing one.
 
 The reason it is a test at all: `scripts/k8s-up.sh` claimed `GET /jobs` answers 200 at a time when it answered **401**, and the script had never run, so nobody found out. (It answers 200 again today, but for a reason that was decided rather than assumed — see the map's own note.) A list nobody drives is wrong the day after it is written.
 

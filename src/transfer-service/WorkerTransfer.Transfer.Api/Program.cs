@@ -1,5 +1,7 @@
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.ServiceDefaults.Rollen;
 using WorkerTransfer.Transfer.Api;
+using WorkerTransfer.Transfer.Api.Berechtigung;
 using WorkerTransfer.Transfer.Infrastructure;
 using WorkerTransfer.Transfer.Infrastructure.Persistence;
 
@@ -14,6 +16,18 @@ const string serviceName = "transfer-service";
 // Kein AlsAussteller(): nur identity-service hält die private Hälfte.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName);
+
+// Zwei Handlungen binden das Unternehmen: ein Angebot (Termin und Gebuehr) und
+// der Abschluss. Wer sie darf, entscheidet die MITGLIEDSCHAFTSTABELLE von
+// identity-service, je Anfrage — eine Rolle im Token wirkte nach einer
+// Entfernung erst beim Ablauf.
+//
+// `withdraw` steht absichtlich nicht dabei: wer anfangen darf, muss aufhoeren
+// duerfen.
+builder.Services.AddAdminrechte(
+    builder.Configuration,
+    Vorgangsrechte.Anbieten,
+    Vorgangsrechte.Abschliessen);
 
 builder.Services.AddTransferInfrastructure(
     builder.Configuration,

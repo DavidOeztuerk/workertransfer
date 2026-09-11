@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Jobs.Application.Ports;
+using WorkerTransfer.ServiceDefaults.Rollen;
 
 namespace WorkerTransfer.Jobs.Tests;
 
@@ -41,7 +42,13 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Erasure:Geheimnis", "rueckzug-geheimnis");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Scoped<IEntwerfer>(_ => new Probeentwerfer())));
+            {
+                dienste.Replace(ServiceDescriptor.Scoped<IEntwerfer>(_ => new Probeentwerfer()));
+                // Veroeffentlichen verlangt seit PBI-2 einen `admin`. Diese
+                // Reihe misst das Blaettern und nicht die Rolle — also
+                // antwortet die Probe wie eine Inhaberin.
+                dienste.Replace(ServiceDescriptor.Scoped<IFirmenrollen>(_ => new Rollenprobe()));
+            });
         });
 
         return Task.CompletedTask;

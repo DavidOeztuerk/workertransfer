@@ -1,9 +1,11 @@
 using Girder.Core.Identity;
 using MediatR;
+using WorkerTransfer.Companies.Api.Berechtigung;
 using WorkerTransfer.Companies.Application.Profile;
 using WorkerTransfer.Companies.Contracts;
 using WorkerTransfer.Companies.Domain.Arbeitgeberprofile;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.ServiceDefaults.Rollen;
 
 namespace WorkerTransfer.Companies.Api;
 
@@ -53,7 +55,12 @@ public static class ArbeitgeberEndpoints
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", fehler.Message);
             }
-        });
+        })
+        // Das Schaufenster steht oeffentlich und spricht fuer alle Mitglieder —
+        // es zu schreiben verlangt deshalb einen `admin`. Aufgeloest aus der
+        // Mitgliedschaftstabelle von identity-service, nie aus dem Token.
+        .RequireAuthorization(
+            AdminrechteErweiterungen.Richtlinie(Schaufensterrechte.Schreiben));
 
         // `null` statt 404: „noch keins" ist ein Zustand, kein Fehler. Die
         // Oberfläche zeigt darauf ein leeres Formular.
