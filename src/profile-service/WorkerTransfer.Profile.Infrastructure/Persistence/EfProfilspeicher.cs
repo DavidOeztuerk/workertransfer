@@ -38,6 +38,8 @@ public sealed class EfProfilspeicher(ProfileDbContext context) : IProfilspeicher
                 Ort = profil.Ort,
                 RemoteMoeglich = profil.RemoteMoeglich,
                 Faehigkeiten = [.. profil.Faehigkeiten.Werte],
+                Pendelbereitschaft = profil.Pendelbereitschaft,
+                Umzugsbereitschaft = profil.Umzugsbereitschaft,
                 AngelegtAm = profil.AngelegtAm,
                 GeaendertAm = profil.GeaendertAm
             });
@@ -50,6 +52,8 @@ public sealed class EfProfilspeicher(ProfileDbContext context) : IProfilspeicher
         zeile.Ort = profil.Ort;
         zeile.RemoteMoeglich = profil.RemoteMoeglich;
         zeile.Faehigkeiten = [.. profil.Faehigkeiten.Werte];
+        zeile.Pendelbereitschaft = profil.Pendelbereitschaft;
+        zeile.Umzugsbereitschaft = profil.Umzugsbereitschaft;
         zeile.GeaendertAm = profil.GeaendertAm;
     }
 
@@ -170,5 +174,7 @@ public sealed class EfProfilspeicher(ProfileDbContext context) : IProfilspeicher
             zeile.RemoteMoeglich,
             Faehigkeitenliste.Stelle_her(zeile.Faehigkeiten),
             zeile.AngelegtAm,
-            zeile.GeaendertAm);
+            zeile.GeaendertAm,
+            zeile.Pendelbereitschaft,
+            zeile.Umzugsbereitschaft);
 }

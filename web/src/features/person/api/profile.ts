@@ -14,6 +14,17 @@ import { i18n } from "../../../core/i18n/i18n";
  * genau richtig so. Es gibt <strong>kein</strong> Sichtbarkeitsfeld im Profil
  * (ADR-0020); eines wäre eine zweite Wahrheit, und der Client setzte sie.
  */
+/**
+ * Wie weit jemand zu pendeln bereit ist — eine STUFE, keine Zahl (ADR-0041).
+ *
+ * `null` heisst „nichts gesagt" und ist ein gültiger Zustand: ein Profil ohne
+ * diese Angabe ist vollständig. Im Scout wird daraus ein Strich, nie ein Kreuz.
+ */
+export type Pendelstufe = "bis_10" | "bis_25" | "bis_50" | "bis_100" | "egal";
+
+/** Ob jemand umziehen würde. `offen` ist die ehrlichste Antwort und kein Mangel. */
+export type Umzugsbereitschaft = "ja" | "nein" | "offen";
+
 export interface Profile {
   subject_id: string;
   headline: string;
@@ -21,6 +32,9 @@ export interface Profile {
   location: string;
   remote_ok: boolean;
   skills: string[];
+  /** `null` heisst „nichts gesagt" — ein Zustand, kein Versäumnis (ADR-0041). */
+  commute_km: Pendelstufe | null;
+  relocation: Umzugsbereitschaft | null;
   updated_at: string;
 }
 
@@ -30,6 +44,8 @@ export interface ProfileInput {
   location: string;
   remote_ok: boolean;
   skills: string[];
+  commute_km: Pendelstufe | null;
+  relocation: Umzugsbereitschaft | null;
 }
 
 /**
@@ -76,6 +92,12 @@ export async function saveMyProfile(input: ProfileInput): Promise<SaveResult> {
         location: input.location,
         remote_ok: input.remote_ok,
         skills: input.skills,
+        // `null` wird MITGESCHICKT und nicht weggelassen: es nimmt die Angabe
+        // zurueck. Ein „fehlt heisst: lass wie es war" machte die Ruecknahme
+        // unmoeglich — und eine Aussage, die man nicht zurueckziehen kann, ist
+        // keine freiwillige (ADR-0041).
+        commute_km: input.commute_km,
+        relocation: input.relocation,
       },
     },
     "fehler.profilNichtGespeichert"

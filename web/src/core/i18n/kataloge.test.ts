@@ -57,6 +57,12 @@ describe("die Kataloge", () => {
       "en:markt.status",
       "en:freigaben.bereichGithub",
       "en:stelle.remoteHybrid",
+      // „remote" und „hybrid" sind im Englischen dieselben Woerter — sie sind
+      // dort entlehnt worden, nicht hier uebersetzt. Franzoesisch steht NICHT
+      // daneben: dort heissen sie „à distance" und „hybride", und eine
+      // Ausnahme je Schluessel liesse genau das stillschweigend mit durch.
+      "en:kandidaten.anwesenheit_remote",
+      "en:kandidaten.anwesenheit_hybrid",
       "en:stellen.website",
       "en:firmenprofil.website",
       "en:gespraeche.start",

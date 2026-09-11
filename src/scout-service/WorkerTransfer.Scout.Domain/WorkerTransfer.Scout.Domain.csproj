@@ -12,5 +12,9 @@
          „postgres" sucht, sucht nach „PostgreSQL". Zwei Schreibweisen waeren
          zwei Suchen mit zwei Ergebnissen (ADR-0023). -->
     <ProjectReference Include="..\..\shared\WorkerTransfer.Skills\WorkerTransfer.Skills.csproj" />
+    <!-- Fuer `Ortskunde`: die Ortstabelle samt Entfernungsrechnung steht dort
+         seit ADR-0032 und wird hier GELESEN, nicht nachgebaut. Eine zweite
+         Tabelle waere die, die als Erste veraltet. -->
+    <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
   </ItemGroup>
 </Project>

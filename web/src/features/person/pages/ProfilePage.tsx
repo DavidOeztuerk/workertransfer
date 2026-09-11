@@ -10,6 +10,7 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
+import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 
 import {
@@ -21,7 +22,9 @@ import {
 } from "../../../shared/components/ui";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import {
+  type Pendelstufe,
   type Profile,
+  type Umzugsbereitschaft,
   getMyProfile,
   getVisibility,
   saveMyProfile,
@@ -55,6 +58,9 @@ interface FormState {
   location: string;
   remote_ok: boolean;
   skills: string;
+  /** Leerer Text heisst „nichts gesagt" — im Formular, nicht auf dem Draht. */
+  commute_km: string;
+  relocation: string;
 }
 
 const LEER: FormState = {
@@ -63,7 +69,21 @@ const LEER: FormState = {
   location: "",
   remote_ok: false,
   skills: "",
+  commute_km: "",
+  relocation: "",
 };
+
+/**
+ * Die fünf Stufen — als Werte, nicht als Zahlen (ADR-0041).
+ *
+ * Die Schwellen sind gemessen: der mittlere Arbeitsweg liegt bei 17,2 km, über
+ * 50 km pendeln 4,1 Mio Menschen, über 100 km noch 2,4 Mio. „Egal" muss es
+ * deshalb geben — damit niemand sich kleiner machen muss, als er ist.
+ */
+const PENDELSTUFEN = ["bis_10", "bis_25", "bis_50", "bis_100", "egal"] as const;
+
+/** Drei Werte, und „offen" ist keiner davon zu viel. */
+const UMZUGSWERTE = ["ja", "nein", "offen"] as const;
 
 function zuFormular(profile: Profile | null): FormState {
   if (profile === null) return LEER;
@@ -73,6 +93,8 @@ function zuFormular(profile: Profile | null): FormState {
     location: profile.location,
     remote_ok: profile.remote_ok,
     skills: profile.skills.join(", "),
+    commute_km: profile.commute_km ?? "",
+    relocation: profile.relocation ?? "",
   };
 }
 
@@ -225,6 +247,13 @@ export function ProfilePage() {
       bio: form.bio,
       location: form.location,
       remote_ok: form.remote_ok,
+      // Leer heisst `null` und damit „nichts gesagt": die Angabe wird
+      // zurueckgenommen, nicht beibehalten.
+      commute_km: (form.commute_km as Pendelstufe | "") === "" ? null : (form.commute_km as Pendelstufe),
+      relocation:
+        (form.relocation as Umzugsbereitschaft | "") === ""
+          ? null
+          : (form.relocation as Umzugsbereitschaft),
       skills: parseSkills(form.skills),
     });
     setzeSpeichert(false);
@@ -445,6 +474,43 @@ export function ProfilePage() {
               }
               label={t("profil.remote")}
             />
+
+            {/* ADR-0041: eine STUFE und keine Kilometerzahl. Ein Zahlenfeld
+                lüde zum Rechnen ein — „37 ≤ 50, also 74 % passend" —, eine
+                Stufe ist eine Aussage, die jemand getroffen hat.
+
+                Beide sind freiwillig, und die leere Wahl steht ausdrücklich
+                oben: „nichts gesagt" ist ein Zustand, kein Versäumnis, und es
+                muss sich zurücknehmen lassen. */}
+            <TextField
+              select
+              label={t("profil.pendeln")}
+              helperText={t("profil.pendelnHinweis")}
+              value={form.commute_km}
+              onChange={(event) => change("commute_km", event.target.value)}
+            >
+              <MenuItem value="">{t("profil.nichtsGesagt")}</MenuItem>
+              {PENDELSTUFEN.map((stufe) => (
+                <MenuItem key={stufe} value={stufe}>
+                  {t(`profil.pendeln_${stufe}`)}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select
+              label={t("profil.umzug")}
+              helperText={t("profil.umzugHinweis")}
+              value={form.relocation}
+              onChange={(event) => change("relocation", event.target.value)}
+            >
+              <MenuItem value="">{t("profil.nichtsGesagt")}</MenuItem>
+              {UMZUGSWERTE.map((wert) => (
+                <MenuItem key={wert} value={wert}>
+                  {t(`profil.umzug_${wert}`)}
+                </MenuItem>
+              ))}
+            </TextField>
 
             {fehler !== null ? <ErrorBlock error={fehler} /> : null}
             {/* `role="status"` und nicht `alert`: eine Bestätigung, die den

@@ -616,13 +616,21 @@ the **occupational field** never becomes a filter — it contradicts ADR-0039
 ("no visibility follows from it") and would find *less*, since the vocabulary
 already carries MIG/WIG/CNC/SPS; **availability** is not filtered, because the
 market status has its own release and filtering by it would reveal
-approachability without asking; and the **radius** comes as
+approachability without asking; and the **radius** is built as
 [ADR-0041](docs/adr/0041-entfernung-ist-eine-frage-zwischen-zwei-aussagen.md) —
 a person states how far they will commute (10/25/50/100/egal), an advert states
-its attendance (remote/hybrid/vor_ort), and the two make a **tick**, never a
-kilometre figure and never a filter that removes somebody. Nothing new is
-stored: `Ortskunde` resolves the existing free-text location at search time.
-That ADR is written and **not yet built**.
+its attendance, and the two make a **tick**, never a kilometre figure and never
+a filter that removes somebody. `?stelle=<id>` on the search adds the tick and
+takes no hit away. Nothing new is stored: `Ortskunde` resolves the existing
+free-text location at search time, so **no coordinate column on a person** was
+created.
+
+**That ADR asked for a field that already existed**, and the build found it:
+jobs-service has carried `Remotegrad` (`none`/`hybrid`/`full`) since forever,
+with the same argument in its own comment — *"hybrid is the commonest case and
+not an intermediate step of true"*. No second field was added; the existing
+value is read under its own words. The lesson is the older one: **search for
+the purpose before deciding to build it.**
 
 ### Planned, not built: advisor and assessment
 
