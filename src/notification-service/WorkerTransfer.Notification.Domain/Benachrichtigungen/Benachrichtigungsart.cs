@@ -46,20 +46,41 @@ public enum Benachrichtigungsart
     /// <para>Und sie ist die einzige Art mit einer <em>eigenen Tageskappe</em> —
     /// siehe <see cref="Benachrichtigungsarten.Tageskappe"/>.</para>
     /// </remarks>
-    ProfileDiscovered
+    ProfileDiscovered,
+
+    /// <summary>Ein Unternehmen hat ein Gespräch eröffnet.</summary>
+    /// <remarks>
+    /// <para>Die Art aus ADR-0037, und sie ist etwas anderes als
+    /// <see cref="ProfileDiscovered"/>. Dort heisst es „jemand hat dich
+    /// gefunden", und genau deshalb darf sie kein Unternehmen nennen: wer
+    /// sucht, ist eine Aussage über das Unternehmen, und die Person kann damit
+    /// nichts anfangen, <em>solange niemand sie angesprochen hat</em>.</para>
+    ///
+    /// <para>Hier ist genau das passiert. Ein Gespräch entsteht nur mit einem
+    /// Unternehmen, dem die Person schon Stufe 1 erteilt hat — der Anlass ist
+    /// also ihre eigene frühere Handlung, und was jetzt geschieht, will sie
+    /// wissen. Ohne diese Nachricht liefe ein Gespräch, von dem sie erst beim
+    /// nächsten Vorbeischauen erfährt.</para>
+    ///
+    /// <para>Und auch sie nennt <strong>kein Unternehmen</strong>: eine
+    /// Benachrichtigung trägt nur eine Art. Wer es war, steht hinter der
+    /// Anmeldung in ihrer eigenen Liste.</para>
+    /// </remarks>
+    AdvisorConversation
 }
 
 /// <summary>Die Worte, mit denen eine Art auf der Leitung steht.</summary>
 /// <remarks>
 /// Dieselben Worte, die die absendenden Dienste in ihre Outbox schreiben —
 /// <c>resume_request</c>, <c>market_request</c>, <c>application_update</c>,
-/// <c>transfer_update</c>, <c>application_received</c>, <c>profile_discovered</c>.
+/// <c>transfer_update</c>, <c>application_received</c>, <c>profile_discovered</c>,
+/// <c>advisor_conversation</c>.
 /// Zwei Schreibweisen für dieselbe Art wären zwei
 /// Gelegenheiten, eine Nachricht stillschweigend fallen zu lassen.
 /// </remarks>
 public static class Benachrichtigungsarten
 {
-    /// <summary>Alle sechs, für die Einstellungen.</summary>
+    /// <summary>Alle sieben, für die Einstellungen.</summary>
     public static readonly IReadOnlyList<Benachrichtigungsart> Alle =
     [
         Benachrichtigungsart.ResumeRequest,
@@ -67,7 +88,8 @@ public static class Benachrichtigungsarten
         Benachrichtigungsart.ApplicationUpdate,
         Benachrichtigungsart.TransferUpdate,
         Benachrichtigungsart.ApplicationReceived,
-        Benachrichtigungsart.ProfileDiscovered
+        Benachrichtigungsart.ProfileDiscovered,
+        Benachrichtigungsart.AdvisorConversation
     ];
 
     /// <summary>Das Wort zur Art.</summary>
@@ -79,6 +101,7 @@ public static class Benachrichtigungsarten
         Benachrichtigungsart.TransferUpdate => "transfer_update",
         Benachrichtigungsart.ApplicationReceived => "application_received",
         Benachrichtigungsart.ProfileDiscovered => "profile_discovered",
+        Benachrichtigungsart.AdvisorConversation => "advisor_conversation",
         _ => throw new ArgumentOutOfRangeException(nameof(art))
     };
 
@@ -91,6 +114,7 @@ public static class Benachrichtigungsarten
         "transfer_update" => Benachrichtigungsart.TransferUpdate,
         "application_received" => Benachrichtigungsart.ApplicationReceived,
         "profile_discovered" => Benachrichtigungsart.ProfileDiscovered,
+        "advisor_conversation" => Benachrichtigungsart.AdvisorConversation,
         _ => null
     };
 

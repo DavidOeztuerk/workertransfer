@@ -310,24 +310,72 @@ Nichts an PBI-3.
 > Mandat kennt, **damit** ich meinen Eintrittstermin nicht dreimal sagen muss
 > und mein jetziger Arbeitgeber nichts erfährt.
 
-ADR-0037 ist **angenommen**. Der Code fehlt.
+ADR-0037 ist **angenommen**. **Gebaut am 11.09.2026.**
 
 ### Aufgaben
 
-- [ ] **Das Mandat ist eine Sicht**, kein zweiter Speicher: Sichtbarkeit lebt
+- [x] Neuer Dienst nach dem Muster der zwölf anderen (`Api`/`Application`/
+      `Domain`/`Infrastructure`/`Contracts`, eigene Datenbank, `AddGirder`).
+      Hafen 8013, Route `/advisor/{rest}` im Gateway, **zwölf** Zeilen in der
+      Routenkarte — gegen den laufenden Stapel gefahren (624 Antworten, alle
+      wie aufgeschrieben).
+- [x] **Das Mandat ist eine Sicht**, kein zweiter Speicher: Sichtbarkeit lebt
       im Ledger, Verfügbarkeit im Marktstatus (ADR-0020 verbietet die Kopie).
       Eigen sind nur: Eintrittstermin, Gehaltsspanne, Pensum, ausgeschlossene
-      Unternehmen.
-- [ ] Gespräche in drei Stufen, jede Stufe eine Freigabe der Person.
-- [ ] Was in Stufe 1 nicht frei ist, **existiert für die Gegenseite nicht** —
-      kein „gesperrt"-Hinweis, der die Existenz verrät.
-- [ ] Einigung → Übergabe an `transfer-service` (Dreieckskonsens steht dort
-      bereits).
+      Unternehmen. `AuflagenTests` liest das **EF-Modell** und geht rot, sobald
+      eine Spalte `sichtbar`, `visible`, `public`, `freigabe`, `stage` oder
+      `stufe` im Namen trägt — die letzten zwei Worte sind die schärfere
+      Hälfte: eine Stufenspalte wäre die Sichtbarkeit als zweite Tür.
+- [x] Gespräche in drei Stufen, jede Stufe eine Freigabe der Person. Es sind
+      die **bestehenden** Fähigkeiten und keine drei neuen; neu ist genau eine,
+      `advisor.identity:tenant:<uuid>`, und sie trägt **keine Ziffer** —
+      `advisor.stage1` würde der Parser ablehnen.
+- [x] Was in einer Stufe nicht frei ist, **existiert für die Gegenseite nicht**:
+      das Feld fehlt im JSON, es ist nicht `null`. Und es fehlt **genauso**,
+      wenn die Stufe frei ist und die Person nichts eingetragen hat. Ein
+      Gespräch auf Stufe 0 fällt ganz aus der Firmenliste.
+- [x] Einigung → Übergabe an `transfer-service`. Der Dreieckskonsens wird
+      **nicht** nachgebaut: `hand-over` ruft dessen `POST /transfers` mit dem
+      Token des Unternehmens, und ein `AuflagenTests`-Wächter geht rot, sobald
+      ein Wort wie `ansprechbar`, `marktstatus` oder `brauchtfreigabe` in
+      Domäne oder Anwendungsschicht auftaucht.
+- [x] Löschempfänger ab der ersten Tabelle: `"advisor"` steht in
+      `Loeschempfaenger.Fremde` und in `LoeschempfaengerTests.Dienste`. Die
+      Kaskade schreibt jetzt **zwölf** Absichten statt elf.
+- [x] Die Oberfläche: `/advisor` für die Person (Mandat und Stufen),
+      `/company/advisor` für das Unternehmen, ein „Gespräch eröffnen" auf der
+      Scout-Karte — in drei Sprachen.
 
-### Abnahme
+### Abnahme — erfüllt (11.09.2026)
 
-- Der jetzige Arbeitgeber sieht die eigene Belegschaft **nicht** im Scout.
-- Eine Stufenfreigabe wirkt sofort; ein Widerruf ebenso.
+- **Der jetzige Arbeitgeber sieht die eigene Belegschaft nicht im Scout** — und
+  zwar über den Ledger, nicht über ein zweites Tor im Scout. Der Ledger kennt
+  keine Verneinung, also gibt es den Modus „alle" nicht mehr, sobald jemand ein
+  Unternehmen ausschliesst: `MandatSchreibenHandler` widerruft
+  `profile.visibility:public` im selben Schritt. Gemessen am laufenden Stapel:
+  die Reise `advisor-journey` trägt eine Domain ein und findet den Schalter auf
+  der Profilseite danach **aus**.
+- **Eine Stufenfreigabe wirkt sofort, eine Rücknahme ebenso.** Dieselbe Reise
+  fährt 1 → 2 → 3 und liest jedes Mal auf der Firmenseite nach; dann zurück auf
+  2 (Klarname weg, Spanne bleibt) und ganz zurück (das Gespräch fällt aus der
+  Liste).
+
+**Gegenproben gefahren**, alle drei fielen und keine war ein Übersetzungsfehler:
+den Widerruf von `profile.visibility:public` abgeschaltet → zwei Reihen fielen;
+die Stufengrenzen in `Gespraechsansicht.Baue` entfernt → drei; eine
+`stage`-Spalte ins EF-Modell gelegt → `Keine_Spalte_haelt_eine_Sichtbarkeit`.
+Danach zurückgenommen und mit `--no-incremental` neu gebaut.
+
+### Was die Reise gefunden hat, und was kein Test gefunden hätte
+
+„Alles zurückziehen" stand als Beschriftung am Rücknahme-Knopf, und es war
+**zu viel versprochen**: wer sein Profil auf „für alle Unternehmen" gestellt
+hat, bleibt darüber sichtbar, und die Stufe fällt dann nicht auf 0. Das
+Verhalten ist richtig — ein Knopf in *einem* Gespräch darf keinen
+plattformweiten Schalter umlegen —, aber die Beschriftung log. Sie heisst jetzt
+„Freigabe zurücknehmen" bzw. „Auf Stufe N zurück", und der Hinweis darunter
+sagt, wo der andere Schalter steht. Gefunden hat das die E2E-Reise, weil nur sie
+beide Seiten zugleich fährt.
 
 ---
 
@@ -341,7 +389,8 @@ größten Missbrauchspotenzial: unbezahlte Arbeit als Aufgabe getarnt.
 
 ### Aufgaben
 
-- [ ] **ADR-0040 zuerst.** Drei Regeln, die den Unterschied zwischen einer
+- [ ] **Ein eigenes ADR zuerst** (ADR-0040 ist vergeben — das Gateway liefert
+      keine Oberflaeche). Drei Regeln, die den Unterschied zwischen einer
       Aufgabe und einer Prüfung mit Note ausmachen:
       1. Die Bewertung gehört dem **Vorgang**, nicht dem Menschen — in keiner
          Suche, in keinem Profil, für kein anderes Unternehmen, ohne Zahl.

@@ -59,7 +59,13 @@ public class ZwischenspeicherTests
         // Menschen, und ein zwischengespeichertes Ergebnis ueberlebte einen
         // Widerruf. Deshalb speichert er die ANFRAGE und nie das Ergebnis
         // (ADR-0036 Entscheidung 4) — und auch die Anfrage ist kein Cache.
-        { "scout", typeof(Scout.Application.Kandidaten.KandidatenAbfrage) }
+        { "scout", typeof(Scout.Application.Kandidaten.KandidatenAbfrage) },
+
+        // advisor-service haelt sie in derselben Schaerfe: die STUFE eines
+        // Gespraechs steht nur im Ledger und wird bei jedem Lesen dort erfragt
+        // (ADR-0037 Entscheidung 2). Eine zwischengespeicherte Antwort waere
+        // hier dasselbe wie eine Stufenspalte, nur fluechtig.
+        { "advisor", typeof(Advisor.Application.Gespraeche.FirmengespraecheAbfrage) }
     };
 
     /// <summary>Kein Typ eines Dienstes implementiert <c>ICacheableQuery</c>.</summary>
@@ -80,7 +86,7 @@ public class ZwischenspeicherTests
     }
 
     /// <summary>
-    /// Alle zwoelf Dienste sind wirklich dabei — und die Assemblies sind nicht leer.
+    /// Alle dreizehn Dienste sind wirklich dabei — und die Assemblies sind nicht leer.
     /// </summary>
     /// <remarks>
     /// Ohne das wäre die Reihe grün, wenn jemand einen Dienst aus der Liste
@@ -92,7 +98,7 @@ public class ZwischenspeicherTests
     {
         var dienste = Dienste.Select(zeile => (string)zeile[0]!).ToArray();
 
-        dienste.Should().HaveCount(12);
+        dienste.Should().HaveCount(13);
         dienste.Should().OnlyHaveUniqueItems();
 
         foreach (var zeile in Dienste)

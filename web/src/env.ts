@@ -106,3 +106,8 @@ export const SCOUT_BASE_URL = resolve(
   import.meta.env.VITE_SCOUT_BASE_URL,
   8012
 );
+export const ADVISOR_BASE_URL = resolve(
+  "ADVISOR_BASE_URL",
+  import.meta.env.VITE_ADVISOR_BASE_URL,
+  8013
+);

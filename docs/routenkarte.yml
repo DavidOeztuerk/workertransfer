@@ -709,3 +709,54 @@ gruppen:
       - { methode: GET, pfad: '/scout/searches', ohne: 401, person: 403, mitglied: 200, firma: 200 }
       - { methode: POST, pfad: '/scout/searches', ohne: 401, person: 403, mitglied: 422, firma: 422 }
       - { methode: DELETE, pfad: '/scout/searches/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+
+  - name: 'Der Berater — das Mandat und die drei Stufen'
+    warum: |
+      `advisor-service` (ADR-0037). Das Mandat ist eine SICHT und kein zweiter
+      Speicher: Sichtbarkeit lebt im Ledger, Verfuegbarkeit im Marktstatus, und
+      eigen sind nur vier Werte — Eintrittstermin, Gehaltsspanne, Pensum,
+      ausgeschlossene Unternehmen.
+
+      ZWEI SEITEN, GETRENNT IM PFAD. Unter `/advisor/me/...` handelt ein Mensch
+      fuer sich selbst; die drei Spalten rechts sind dort GLEICH, und das ist
+      die Aussage: das eigene Mandat gehoert der Person, nicht dem Unternehmen,
+      fuer das sie gerade handelt (ADR-0017). Unter `/advisor/conversations`
+      handelt jemand fuer eine Firma — als Person ohne Firma gibt es dort 403
+      „no active company", eine Aussage ueber den AUFRUFER.
+
+      `member` genuegt ueberall, `admin` verlangt keine Route: ein Gespraech zu
+      fuehren ist die taegliche Arbeit im Namen der Firma. Der eine Schritt,
+      der das Unternehmen wirklich bindet, landet bei transfer-service — und
+      `POST /transfers/{id}/offer` verlangt dort seit PBI-2 einen `admin`.
+
+      `GET /advisor/me/mandate` gibt IMMER 200, auch wenn nie etwas gesagt
+      wurde: „nichts gesagt" IST ein Zustand, und ein 404 zwaenge die
+      Oberflaeche, sich eine Vorgabe auszudenken.
+
+      `PUT /advisor/me/mandate` gibt hier 200, weil der Durchlauf `{}` schickt
+      und ein leeres Mandat vollstaendig ist. Alle vier Werte sind freiwillig.
+
+      DIE VIER GESPRAECHSROUTEN GEBEN 404 in beiden Firmenspalten, und zwar aus
+      dem Grund, um dessentwillen dieser Dienst so gebaut ist: der Ledger wird
+      ZUERST gefragt, eine Kennung, die es nicht gibt, steht auf keiner Stufe,
+      und „verborgen", „nicht vorhanden" und „ausgeschlossen" muessen
+      ununterscheidbar bleiben (ADR-0020 §1, ADR-0037). Ein eigener Code fuer
+      den dritten Fall saehe aus wie ein „gesperrt"-Hinweis — und verriete
+      damit, dass es etwas gibt.
+
+      `POST /advisor/conversations` gibt 422, weil der Durchlauf `{}` schickt
+      und ohne `subject_id` niemand gemeint ist. Mit einer Kennung waere es
+      404, solange diese Person nichts freigegeben hat.
+    eintraege:
+      - { methode: GET, pfad: '/advisor/me/mandate', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: PUT, pfad: '/advisor/me/mandate', ohne: 401, person: 200, mitglied: 200, firma: 200, rumpf: '{}' }
+      - { methode: GET, pfad: '/advisor/me/conversations', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/advisor/me/conversations/00000000-0000-0000-0000-000000000001/advance', ohne: 401, person: 404, mitglied: 404, firma: 404, rumpf: '{"stage":1}' }
+      - { methode: POST, pfad: '/advisor/me/conversations/00000000-0000-0000-0000-000000000001/withdraw', ohne: 401, person: 404, mitglied: 404, firma: 404, rumpf: '{"stage":1}' }
+      - { methode: POST, pfad: '/advisor/me/conversations/00000000-0000-0000-0000-000000000001/agree', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/advisor/me/conversations/00000000-0000-0000-0000-000000000001/end', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/advisor/conversations', ohne: 401, person: 403, mitglied: 422, firma: 422, rumpf: '{}' }
+      - { methode: GET, pfad: '/advisor/conversations', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/advisor/conversations/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/advisor/conversations/00000000-0000-0000-0000-000000000001/hand-over', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/advisor/conversations/00000000-0000-0000-0000-000000000001/end', ohne: 401, person: 403, mitglied: 404, firma: 404 }
