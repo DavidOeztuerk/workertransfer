@@ -324,6 +324,8 @@ const de = {
     bewerbungHinweis: "Nur Züge des Unternehmens — deine eigenen kennst du.",
     eingangLabel: "Wenn eine Bewerbung bei deinem Unternehmen eingeht",
     eingangHinweis: "Eine Firma hat kein Postfach. Die Nachricht geht an dich.",
+    entdecktLabel: "Wenn dein Profil von einem Unternehmen entdeckt wird",
+    entdecktHinweis: "Welches, steht nicht darin — und höchstens eine solche Nachricht am Tag, egal wie oft es passiert. Eine Zeile je Fund wäre ein Zähler über deine eigene Sichtbarkeit.",
     datenschutz: "Datenschutz",
     verfall: "Konto verfällt nach",
     verfallNie: "Nie von selbst",

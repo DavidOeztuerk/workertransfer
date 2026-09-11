@@ -321,6 +321,8 @@ const en: Katalog = {
     bewerbungHinweis: "Only the company's moves — you know your own.",
     eingangLabel: "When an application arrives at your company",
     eingangHinweis: "A company has no mailbox. The message goes to you.",
+    entdecktLabel: "When a company discovers your profile",
+    entdecktHinweis: "Which one is not in it — and at most one such message a day, however often it happens. A line per find would be a counter over your own visibility.",
     datenschutz: "Privacy",
     verfall: "Account expires after",
     verfallNie: "Never by itself",

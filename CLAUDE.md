@@ -6,15 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Girder](https://github.com/DavidOeztuerk) 4.4.0** — a shared foundation library of this author's, pulled from GitHub Packages — plus a React app.
 
-Eleven services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
+Twelve services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
 
 The repository was a Python (`uv`) monorepo until August 2026 and was translated by hand, service by service. **Everything Python is gone**: no `pyproject.toml`, no `uv.lock`, no `apps/<service>`, no `packages/worker-*`, no alembic, ruff, mypy or pytest. `docs/MIGRATION-STAND.md` records what was decided along the way and, more usefully, what was *measured* — read it before assuming a shape is arbitrary. The ADRs in [`docs/adr/`](docs/adr/) predate the migration and **still govern**: they hold the reasons, and reasons do not change language. Where an ADR names a Python path, read it as naming the decision, not the file.
 
 ### The layout, so nobody guesses
 
 ```
-src/            eleven services, gateway/, shared/
-tests/          sixteen test projects
+src/            twelve services, gateway/, shared/
+tests/          seventeen test projects
 web/            the React app — deliberately not under src/
 docs/  bugs/  deploy/  docker/  scripts/  .github/
 WorkerTransfer.slnx  Directory.Build.props  Directory.Packages.props  NuGet.Config
@@ -38,6 +38,7 @@ package.json  pnpm-lock.yaml  pnpm-workspace.yaml  turbo.json  tsconfig.base.jso
 | `transfer-service` | 8009 | market status, market requests, transfers |
 | `notification-service` | 8010 | notification preferences and an inbox |
 | `github-service` | 8011 | a person's own, verified GitHub connection |
+| `scout-service` | 8012 | the search for people — ticks and evidence, never a number |
 
 The gateway (`src/gateway`, port 8090) is the single entrance. `src/shared/` holds seven things and no more: `ServiceDefaults` (the one call every service makes), `Outbox`, `Skills`, `Ablage` (bytes for certificates, never a PDF the server rendered), and three `Contracts.*` packages (`Identity`, `Consent`, `Erasure`) that carry versioned boundary DTOs — never a shared domain model.
 
@@ -84,7 +85,7 @@ Before that it lived in GitHub Packages, and that cost a whole evening of CI —
 
 That emptiness is the point. A built-in default *is* the secret, and it then lives in git. `docker-compose.yml` therefore uses `${WORKERTRANSFER_JWT_SECRET:?…}`, not `${…:-dev-only-secret}`: without a value, compose aborts and **names the missing variable**. Girder does the same at its own most important place — `JWT_SECRET` beats `JwtSettings:Secret`, and if both are absent it throws a `ConfigurationException` naming the key.
 
-`Umgebung.Laden()` (`ServiceDefaults`) is the **first line of every one of the twelve `Program.cs`**, before `CreateBuilder` — the configuration builder reads environment variables exactly once, when it builds, so loading afterwards means loading and nobody reading. A test pins that order in all twelve. It never overwrites an already-set variable: in compose and in the cluster the environment comes from there, and a file left in the image must never override it.
+`Umgebung.Laden()` (`ServiceDefaults`) is the **first line of every one of the thirteen `Program.cs`**, before `CreateBuilder` — the configuration builder reads environment variables exactly once, when it builds, so loading afterwards means loading and nobody reading. A test pins that order in all thirteen. It never overwrites an already-set variable: in compose and in the cluster the environment comes from there, and a file left in the image must never override it.
 
 Infisical will later fill the environment. It feeds `.env`; it does not replace the mechanism, so no code changes for it.
 
@@ -92,11 +93,11 @@ Infisical will later fill the environment. It feeds `.env`; it does not replace 
 
 `docker compose up` is the whole local environment; there is no companion script. Each service migrates its own schema on start (`ServiceDefaults.Wanderung`), so a fresh clone needs no manual step. Source is not bind-mounted — a code change needs `docker compose up -d --build <service>`.
 
-**One image serves all twelve entry points** (ADR-0028). They differ only in `SERVICE_DIR`, which `docker/dotnet-entrypoint.sh` reads from the *environment*, not from a build arg — so the image is built once, without the arg, and the container says who it is. The entrypoint finds the entry assembly as the only `*.runtimeconfig.json` under `/app/$SERVICE_DIR` (no name table to keep in sync) and **`cd`s into that directory** before starting: ASP.NET's content root is the working directory, and from `/app` no service reads its own `appsettings.json`. Measured at the first `compose up`, where only the gateway died visibly, on its missing `ocelot.json`.
+**One image serves all thirteen entry points** (ADR-0028). They differ only in `SERVICE_DIR`, which `docker/dotnet-entrypoint.sh` reads from the *environment*, not from a build arg — so the image is built once, without the arg, and the container says who it is. The entrypoint finds the entry assembly as the only `*.runtimeconfig.json` under `/app/$SERVICE_DIR` (no name table to keep in sync) and **`cd`s into that directory** before starting: ASP.NET's content root is the working directory, and from `/app` no service reads its own `appsettings.json`. Measured at the first `compose up`, where only the gateway died visibly, on its missing `ocelot.json`.
 
 Adding a service is three steps and no new Dockerfile: its database in `scripts/initdb/`, its entry point in `docker/dotnet-service.Dockerfile`, a copied block in `docker-compose.yml` with three values changed — plus its route in `src/gateway/WorkerTransfer.Gateway/ocelot.json`.
 
-**`curl` is in the runtime image on purpose.** Docker's healthcheck asks from *inside* the container, and the aspnet runtime image ships no curl, no wget, no nc; `sh` is dash and cannot do `/dev/tcp`. The probe used to be `dotnet --version`, which can *never* succeed on a runtime image (no SDK, exit 155) — every service reported `unhealthy` for months while answering perfectly, and a probe that is always red is worse than none. One probe now lives in the `x-dienst` anchor, covers all eleven services *and* the gateway, asks `/health/live`, and derives the port from `ASPNETCORE_URLS` so no second list of ports can drift. Kubernetes does not need any of this — there the kubelet asks over HTTP from outside.
+**`curl` is in the runtime image on purpose.** Docker's healthcheck asks from *inside* the container, and the aspnet runtime image ships no curl, no wget, no nc; `sh` is dash and cannot do `/dev/tcp`. The probe used to be `dotnet --version`, which can *never* succeed on a runtime image (no SDK, exit 155) — every service reported `unhealthy` for months while answering perfectly, and a probe that is always red is worse than none. One probe now lives in the `x-dienst` anchor, covers all twelve services *and* the gateway, asks `/health/live`, and derives the port from `ASPNETCORE_URLS` so no second list of ports can drift. Kubernetes does not need any of this — there the kubelet asks over HTTP from outside.
 
 ### Kubernetes — a staging environment on your own machine
 
@@ -111,7 +112,7 @@ The app answers on **`http://localhost:8090`** — not 8080, which belongs to th
 Load-bearing, and easy to undo by tidying up (ADR-0028):
 
 - **The route map stays one file.** The k8s `Service` objects are named exactly like the compose services, so `ocelot.json` travels in the image and the same map serves both. Re-expressing those non-disjoint paths and their priorities as Ingress rules would duplicate the map, and the copy would be wrong at the first new path.
-- **`replicaCount: 1` is a decision, not a starting value.** For the eleven services one reason remains: **every service migrates its schema at startup**, so two pods are two pilgrims on one schema. (The outbox dispatcher's missing `SKIP LOCKED` is fixed.) The **gateway** is pinned separately, and for its own reason: the auth brake counts in-process — see below.
+- **`replicaCount: 1` is a decision, not a starting value.** For the twelve services one reason remains: **every service migrates its schema at startup**, so two pods are two pilgrims on one schema. (The outbox dispatcher's missing `SKIP LOCKED` is fixed.) The **gateway** is pinned separately, and for its own reason: the auth brake counts in-process — see below.
 - **The web image is a built artifact, and that forces a runtime config.** `vite build` bakes `import.meta.env.VITE_*` into the bundle, so an image with baked URLs cannot be the same in two environments. `web/src/env.ts` resolves in three steps — `window.__WT_CONFIG__` → `VITE_*` → port fallback — and `web/public/config.js` is an empty object that changes nothing locally. Only the chart lays a real one over it. Do not "simplify" that back to a build arg.
 
 **`make k8s-up` has never been run on this machine.** The chart lints and renders; only a run proves it works.
@@ -153,7 +154,7 @@ What actually kept it was the price: `Girder.Infrastructure` drags **44** transi
 
 The lesson is worth more than the code: **a hand-written replacement outlives its reason.** Each time the stated reason was fixed, a new one was found rather than the code deleted — and every one of them held up until somebody measured it.
 
-**In the eleven services the module stays out for a reason that has nothing to do with Girder and will not change:** a service behind the gateway sees the gateway as the origin — every caller as one. The brake belongs at the entrance, and there it is.
+**In the twelve services the module stays out for a reason that has nothing to do with Girder and will not change:** a service behind the gateway sees the gateway as the origin — every caller as one. The brake belongs at the entrance, and there it is.
 
 ### github-service: the header that made it never work
 
@@ -231,7 +232,7 @@ One project per layer, per service, without exception:
 
 Repository *interfaces* live in Domain, implementations in Infrastructure. Commands, queries and handlers live in Application. **All wiring is behind one `Add<Service>Infrastructure()`** per service — its composition root (ADR-0003, and deliberately not a fluent `PlatformBuilder`).
 
-`ServiceDefaults.AddWorkerTransferDefaults()` is the one call every service makes. What is in it is there because eleven services answering it eleven ways would be eleven chances to answer it wrong: how a token is verified, what a failure looks like on the wire, the order of the pipeline. What is *not* in it is everything that is a decision — which database, which repositories, whether there is a cache, whether there is an outbox. Those stay in each service's own composition root, where a reader can see them.
+`ServiceDefaults.AddWorkerTransferDefaults()` is the one call every service makes. What is in it is there because twelve services answering it twelve ways would be twelve chances to answer it wrong: how a token is verified, what a failure looks like on the wire, the order of the pipeline. What is *not* in it is everything that is a decision — which database, which repositories, whether there is a cache, whether there is an outbox. Those stay in each service's own composition root, where a reader can see them.
 
 ### CQRS
 
@@ -447,7 +448,7 @@ The former stack (TanStack Query + TanStack Router, `packages/ui` with hand-writ
 
 **The language lives on the account, not on the request** — `users.language`, set once at registration from `Accept-Language` and never read from a header again. The reason is the mail: a deletion confirmation is written when the last of eight services acknowledges, days later, by a dispatcher with no browser and no header. The outbox stays content-free (ADR-0025); the language is read from the row at delivery. `PUT /account/language` refuses an unsupported tag with 422 instead of quietly storing German.
 
-**A problem document stays English on the wire** and describes a *shape* (`"malformed request body"`, `"invalid: email, password"`). The UI translates by status, so a person reads their own language in every language the UI knows — including ones the backend never heard of. Threading `Accept-Language` through twelve services would mean twelve copies of one catalogue, which is exactly the divergence this codebase defends against everywhere else. Measured 03.09.2026: every answer on the wire is English, Girder's own refusals included.
+**A problem document stays English on the wire** and describes a *shape* (`"malformed request body"`, `"invalid: email, password"`). The UI translates by status, so a person reads their own language in every language the UI knows — including ones the backend never heard of. Threading `Accept-Language` through thirteen services would mean thirteen copies of one catalogue, which is exactly the divergence this codebase defends against everywhere else. Measured 03.09.2026: every answer on the wire is English, Girder's own refusals included.
 
 **Tests run with the language pinned** (`locale: "de-DE"` in `playwright.config.ts`, `lng: "de"` in the component wrapper) and assert the German literals. That is deliberate: a test whose result depends on the machine's locale is green on one person's laptop and red on the next, and nobody sees why. Exactly **one** journey switches language and proves it works — `web/e2e/language-journey.spec.ts`, which also checks that the *mail* follows the choice while the browser still says `de-DE`.
 
@@ -487,7 +488,7 @@ Certificates ride a capability of their own: `documents.visibility:tenant:<id>` 
 
 ### Erasure: the default deletes completely (ADR-0027)
 
-`POST /account/erasure` at identity-service — self only, **no reason field**: demanding a justification from someone who wants to leave is a lever against them. It immediately revokes every session and disables the account, then cascades over the **outbox** to eight recipients (`consent`, `profile`, `resume`, `portfolio`, `applications`, `transfer`, `github`, `notification`) and identity itself, last. `jobs-service` and `companies-service` are **not** recipients — they hold nothing about a natural person, and `LoeschempfaengerTests` goes red the moment any service grows a personal table and is not on the list. That guard reads the **EF model**, not the source, and uses two signals: personal column names *and* the `Personenzeile` annotation.
+`POST /account/erasure` at identity-service — self only, **no reason field**: demanding a justification from someone who wants to leave is a lever against them. It immediately revokes every session and disables the account, then cascades over the **outbox** to nine recipients (`consent`, `profile`, `resume`, `portfolio`, `applications`, `transfer`, `github`, `notification`, `scout`) and identity itself, last. `jobs-service` and `companies-service` are **not** recipients — they hold nothing about a natural person, and `LoeschempfaengerTests` goes red the moment any service grows a personal table and is not on the list. That guard reads the **EF model**, not the source, and uses two signals: personal column names *and* the `Personenzeile` annotation.
 
 Three things are load-bearing:
 
@@ -537,9 +538,76 @@ The same ADR has a section called *"what may come back in Phase 6"*, and it is e
 
 So the line is not "no analysis". It is the **direction of the question**: requirement in, evidence out — never person in, number out. A tick says *which* skill is missing and can be contradicted; a number hides exactly that. `github-service` exists and was built *under* this ADR, not condemned by it — its domain module says so in its first paragraph, and `Adr0022Tests` scans its domain and contract assemblies for the forbidden vocabulary.
 
-### Planned, not built: scout, advisor, assessment
+### scout-service: ticks and evidence, never a number
 
-[`docs/SCOUT-UND-BERATER.md`](docs/SCOUT-UND-BERATER.md) is a **draft**. The inventory in [`docs/SCOUT-UND-BERATER-BESTAND.md`](docs/SCOUT-UND-BERATER-BESTAND.md) measured what already exists and **refutes parts of that draft**. ADR-0036 (`scout-service`) and ADR-0037 (`advisor-service`) are the decisions; they are not built. ADR-0034 is the cover-letter agent, ADR-0035 the application folder. **No agent builds scout, advisor or assessment.**
+Built 11.09.2026 under ADR-0036, and it is the successor to `GET /candidates` in
+profile-service. **Both live for now**: `/candidates` falls when the UI has
+moved, and until then two searches side by side are two truths — which is why
+the new one answers under `/scout/` and not under the old path.
+
+The hard parts of `/candidates` were **carried over, not reinvented**: the
+company requirement (a person acting for themselves gets 403), the ledger asked
+**per row over `/check-batch`** (ADR-0030, synchronous, no cache), **no total
+count** (ADR-0026 — the difference to the page length would say how many
+profiles are *not* released), no filling up a short page, and the stable order
+`updated_at DESC, id DESC`.
+
+**Four conditions, each a test** (`AuflagenTests`), and each with a counter-probe
+that was measured to fall:
+
+1. **No ordering by fit.** Two identical searches give the same order, and
+   whoever matches more of the searched words does *not* move up. There is
+   nothing to sort by either: a rank out of a tick list needs an invented number
+   first.
+2. **No number about a person.** A twin of `Adr0022Tests` over Domain and
+   Contracts, forbidding `fit`, `score`, `rank`, `percent`, `passung`, `anzahl`
+   and their siblings — which is why the page size in this service is called
+   `Seitenlaenge`.
+3. **Only what was *named* is searchable.** Evidence (GitHub topics, language
+   names) is **fetched to the hit, never used to find it**: a topic is a
+   statement about an *artefact*, and searching by it would quietly make it one
+   about the person (ADR-0033). `Suchfilter` has no field for one, and evidence
+   is fetched only *after* the ledger has answered — so nothing is looked up
+   about someone who released nothing.
+4. **The approach is a draft.** The service has no postman, no address and no
+   send path; `AuflagenTests` scans the application assembly for one. The text
+   goes to the browser of whoever asked and lies in a form.
+
+**The search is an OR, and that is what makes the tick list an answer.**
+`/candidates` searches with AND — every hit then satisfies every condition,
+every tick would be set, and "which skill is missing" would have no answer. The
+internal door in profile-service (`GET /internal/profiles/search`, behind the
+shared secret, no gateway route) therefore searches with OR, and `/candidates`
+keeps its AND unchanged.
+
+**That door deliberately does not ask the ledger.** The check stands one line
+higher, in scout-service, for the whole page at once: exactly *one* place decides
+about visibility, and two would be two truths. Whoever uses that door for
+something else fetches the check along with it.
+
+**Stored is the request, never the result** (`searches`): filters and a name. A
+stored result about people goes stale against a withdrawal, and a withdrawal has
+to take effect on the next call (ADR-0013). For the same reason there is no
+nightly run that searches and mails "new hits" to the company — that would be the
+same cache with an alarm clock in front of it.
+
+**"Your profile was discovered"** is its own notification kind
+(`profile_discovered`, ADR-0033). It names **no company**, travels over the
+content-free outbox (ADR-0025), and is capped at **one per person per day** —
+and that cap takes the *inbox entry* with it, not just the mail. One entry per
+hit would be a counter over one's own visibility, and on a detour exactly the
+register of who looked at whom that this design refuses to build. The cap lives
+in notification-service and is answered from the person's own inbox, so no new
+row is needed anywhere; delivery stays at-least-once and a second delivery is
+harmless.
+
+There is no `/me/scouting` and no table of who looked at whom.
+
+### Planned, not built: advisor and assessment
+
+[`docs/SCOUT-UND-BERATER.md`](docs/SCOUT-UND-BERATER.md) is a **draft**. The inventory in [`docs/SCOUT-UND-BERATER-BESTAND.md`](docs/SCOUT-UND-BERATER-BESTAND.md) measured what already exists and **refutes parts of that draft**. ADR-0034 is the cover-letter agent, ADR-0035 the application folder.
+
+**`scout-service` is built** (ADR-0036, 11.09.2026) — see its own section below. ADR-0037 (`advisor-service`) is a decision and is **not** built; assessment has no ADR at all. **No agent builds advisor or assessment** without being asked for it by name.
 
 When an application arrives, company **members** get a mail of kind `application_received`. A company has no mailbox. The outbox stays content-free (ADR-0025): id and kind, never a name.
 

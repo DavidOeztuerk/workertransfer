@@ -1,4 +1,4 @@
-# Der ganze Stapel: Datenbank, Mailfaenger, elf Dienste, das Gateway und die
+# Der ganze Stapel: Datenbank, Mailfaenger, zwoelf Dienste, das Gateway und die
 # Oberflaeche.
 #
 #   docker compose up --build     # alles starten
@@ -171,6 +171,7 @@ services:
       Erasure__Adressen__transfer: http://transfer-service:8009
       Erasure__Adressen__notification: http://notification-service:8010
       Erasure__Adressen__github: http://github-service:8011
+      Erasure__Adressen__scout: http://scout-service:8012
     depends_on:
       postgres:
         condition: service_healthy
@@ -430,6 +431,41 @@ services:
       GitHub__Adresse: https://api.github.com
     ports:
       - "8011:8011"
+  scout-service:
+    <<: *dienst
+    container_name: workertransfer-scout
+    environment:
+      <<: *umgebung
+      SERVICE_DIR: scout
+      ASPNETCORE_URLS: "http://0.0.0.0:8012"
+      ConnectionStrings__scout: Host=postgres;Port=5432;Database=scout;Username=worker;Password=worker
+      # JEDES ZIEL DIESES DIENSTES STEHT HIER, UND ZWAR WEIL ES HIER STEHEN MUSS:
+      # die Egress-Grenze leitet ihre erlaubten Hosts aus der Konfiguration ab
+      # (Dienstgrundlage.GerufeneHosts). Ein Ziel, das nur im Quelltext steht,
+      # wird abgewiesen — ohne Protokollzeile, und der Ausfall sieht dann aus
+      # wie ein Ausfall des anderen Dienstes.
+      Consent__Adresse: http://consent-service:8002
+      # Die interne Tuer, durch die gesucht wird. Dasselbe geteilte Geheimnis wie
+      # jede andere interne Tuer — und ausdruecklich nicht das der Loeschung.
+      # OHNE diese zwei Zeilen antwortet /scout/candidates mit 503: „nicht
+      # eingerichtet" darf nicht aussehen wie „es gibt niemanden".
+      Profile__Adresse: http://profile-service:8003
+      Profile__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      # Die Belege. github-service, NICHT github.com: dieser Dienst fragt nie
+      # bei GitHub selbst.
+      GitHub__Adresse: http://github-service:8011
+      # „Dein Profil wurde entdeckt" (ADR-0033) — ueber den Postausgang,
+      # inhaltsfrei, und die Nachricht nennt kein Unternehmen.
+      Notifications__Adresse: http://notification-service:8010
+      Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      # Der Entwurf einer Ansprache. Leer heisst: es wird NICHTS gerufen, und die
+      # Oberflaeche sagt es — statt einen leeren Entwurf zu zeigen, den jemand
+      # versehentlich an einen Menschen schickt (ADR-0024).
+      Draft__Schluessel: ${ANTHROPIC_API_KEY:-}
+      Draft__Adresse: https://api.anthropic.com/v1/messages
+    ports:
+      - "8012:8012"
+
   gateway:
     <<: *dienst
     container_name: workertransfer-gateway

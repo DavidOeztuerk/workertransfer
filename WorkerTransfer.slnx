@@ -82,6 +82,13 @@
     <Project Path="src/resume-service/WorkerTransfer.Resume.Domain/WorkerTransfer.Resume.Domain.csproj" />
     <Project Path="src/resume-service/WorkerTransfer.Resume.Infrastructure/WorkerTransfer.Resume.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/scout-service/">
+    <Project Path="src/scout-service/WorkerTransfer.Scout.Api/WorkerTransfer.Scout.Api.csproj" />
+    <Project Path="src/scout-service/WorkerTransfer.Scout.Application/WorkerTransfer.Scout.Application.csproj" />
+    <Project Path="src/scout-service/WorkerTransfer.Scout.Contracts/WorkerTransfer.Scout.Contracts.csproj" />
+    <Project Path="src/scout-service/WorkerTransfer.Scout.Domain/WorkerTransfer.Scout.Domain.csproj" />
+    <Project Path="src/scout-service/WorkerTransfer.Scout.Infrastructure/WorkerTransfer.Scout.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/transfer-service/">
     <Project Path="src/transfer-service/WorkerTransfer.Transfer.Api/WorkerTransfer.Transfer.Api.csproj" />
     <Project Path="src/transfer-service/WorkerTransfer.Transfer.Application/WorkerTransfer.Transfer.Application.csproj" />
@@ -103,6 +110,7 @@
     <Project Path="tests/WorkerTransfer.Portfolio.Tests/WorkerTransfer.Portfolio.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Profile.Tests/WorkerTransfer.Profile.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Resume.Tests/WorkerTransfer.Resume.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Scout.Tests/WorkerTransfer.Scout.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Ablage.Tests/WorkerTransfer.Ablage.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Skills.Tests/WorkerTransfer.Skills.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Transfer.Tests/WorkerTransfer.Transfer.Tests.csproj" />
