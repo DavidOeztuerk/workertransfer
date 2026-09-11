@@ -1,5 +1,21 @@
 # Auftrag an Girder: die fehlende Mitte
 
+> **ERFÜLLT — und zwar nicht von uns.** Dies ist der einzige Auftrag in diesem
+> Ordner, der an ein **fremdes Projekt** ging: an Girder, nicht an
+> WorkerTransfer. Er ist geliefert. `AddGirder(configuration, environment,
+> name, builder => builder.UseDefaults().Without(modul, grund))` gibt es seit
+> Girder 4.0.0, `GirderBuilder` weist einen leeren Grund ab, und die
+> Paketaufteilung kam mit 4.2.0: `Girder.Http` trägt Korrelation und Bremse
+> und zieht **null** Fremdpakete, wo `Girder.Infrastructure` 44 zieht.
+>
+> **Was offen blieb:** nichts, was hier zu tun wäre. Was daraus für uns folgte
+> — dass zwei Eigenbauten (`Bremse.cs`, `Korrelation.cs`) ersatzlos fallen
+> konnten — steht in `AUFTRAG-ENTLASTUNG.md` Phase 2 und in `CLAUDE.md`.
+>
+> **Wo das Ergebnis heute steht:** in Girder selbst
+> ([DavidOeztuerk/girder](https://github.com/DavidOeztuerk/girder), MIT, seit
+> 10.09.2026 auf nuget.org) und bei uns in `Dienstgrundlage.cs`.
+
 Girder hat heute zwei Wege, sich zu registrieren, und beide sind falsch für
 jemanden, der weiß, was er tut.
 

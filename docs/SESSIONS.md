@@ -412,7 +412,29 @@ Massstab.
 
 ---
 
-## Sitzung 6 — Aufräumen
+## Sitzung 6 — Aufräumen ✅ erledigt 11.09.2026
+
+**Der Kasten unten war selbst der Fund.** Er nennt vier Arbeiten; **zwei waren
+längst erledigt** (`GET /notifications` antwortet seit H4 auf jede Methode 404,
+und Punkt 4 ist keine Codeaufgabe, sondern eine Entscheidung), und **der
+größte Posten fehlte ganz**: acht Auftragsdokumente mit **59 offenen
+Kästchen**, von denen **58 gebaut waren**. Ein offenes Kästchen liest sich wie
+ein Auftrag — die nächste Sitzung hätte angefangen, Dinge zum zweiten Mal zu
+bauen.
+
+Was wirklich getan wurde, steht in [PBI-6](PLAN-TRANSFERMARKT.md). Kurz:
+
+- Alle acht Auftragsdokumente tragen eine Statuszeile, jedes Kästchen ist
+  gegen den Baum geprüft. **Nichts gelöscht** — die Begründungen sind der Wert.
+- **Fund 7** ist weg: `JobApplyPage` (300 Zeilen), die Route
+  `/jobs/:jobId/apply` und siebzehn verwaiste Katalogschlüssel in drei
+  Sprachen. Das Anlegen eines Entwurfs steht jetzt an *einer* Stelle.
+- **`make k8s-up` ist zum ersten Mal gefahren.** Das Chart trug auf Anhieb
+  (19 Pods, null Neustarts); die **Beweise** logen an vier Stellen und stehen
+  jetzt auf dem Gemessenen.
+- Die offene Arbeit, die dabei herausfiel, steht als **PBI-8** im Plan.
+
+Der Kasten bleibt als Geschichte stehen:
 
 ```
 ZUERST, ohne zu fragen: git switch develop && git pull && git switch -c feature/aufraeumen

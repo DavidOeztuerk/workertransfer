@@ -1,5 +1,26 @@
 # Auftrag: auf Girder 4.4.0 — und nachmessen, dass es stimmt
 
+> **ABGESCHLOSSEN am 09.09.2026. Dieses Dokument ist Geschichte.**
+> Der Sprung ist gefahren (`GirderVersion` steht auf `4.4.0`), und der
+> eigentliche Auftrag — **nachmessen statt glauben** — auch. Alle fünf
+> Messungen aus Abschnitt C sind gegen den laufenden Stapel gefahren und in
+> `CLAUDE.md` eingearbeitet:
+>
+> | | gemessen |
+> |---|---|
+> | C1 Korrelationskennung auf stdout | ja, über einen echten Dienstsprung — `bugs/korrelationskennung-…md` ist damit geschlossen |
+> | C2 Was geschwärzt wird | `[REDACTED]` kommt am laufenden Stapel **null**-mal vor; `MaskierungTests` liefert die andere Hälfte |
+> | C3 Die Zusammensetzung | 19 Module **mit Namen**, 6 ausgelassen — und dass sie Namen nennt statt einer Zahl, war selbst eine Messung |
+> | C4 Grenzköpfe auf der Abweisung | `X-RateLimit-*` und `Retry-After` stehen auf der 429 |
+> | C5 Die Prüfspur | **nicht übernommen** — `VerweigerndePruefspur` weist Girders Senke ab, weil sie ADR-0012 nicht erfüllt |
+>
+> **Was offen blieb:** nichts. B2 endete mit einer Entscheidung *gegen* die
+> Übernahme, und das ist ein Ergebnis, keine Lücke.
+>
+> **Wo das Ergebnis heute steht:** `Dienstgrundlage.cs`, `VerweigerndePruefspur`,
+> `MaskierungTests` (in `WorkerTransfer.Ganzes.Tests`) und die Modultabelle in
+> `CLAUDE.md`.
+
 WorkerTransfer steht auf **4.2.3**. Es überspringt 4.3.0 mit Absicht: dort war
 die Maskierung kaputt, und 4.4.0 behebt sie. Ziehe direkt auf **4.4.0**.
 

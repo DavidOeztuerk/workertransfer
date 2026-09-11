@@ -852,25 +852,6 @@ const de = {
     unbekannt: "Der Standort konnte nicht bestimmt werden.",
   },
 
-  bewerbung: {
-    titel: "Bewerben",
-    stelleFehltTitel: "Diese Stelle gibt es nicht",
-    adresseUngueltig: "Die Adresse nennt keine gültige Stelle.",
-    stelleZurueckgezogen: "Sie wurde zurückgezogen, oder es gab sie nie.",
-    laden: "Stelle wird geladen…",
-    zurueck: "Zurück zu den offenen Stellen",
-    abgeschickt: "Bewerbung abgeschickt",
-    abgeschicktText: "Zurückziehen kannst du sie jederzeit unter <1>Meine Bewerbungen</1> — dann sieht das Unternehmen deine Daten nicht mehr.",
-    kontoNoetig: "Zum Bewerben brauchst du ein Konto — danach geht es hierher zurück.",
-    anmeldenUndBewerben: "Anmelden und bewerben",
-    anschreiben: "Anschreiben",
-    anschreibenHinweis: "Optional. Was dich mit dieser Stelle verbindet.",
-    profilImmerDabei: "Dein Profil geht immer mit — ohne es wäre es keine Bewerbung. Was du zusätzlich freigibst, entscheidest du:",
-    lebenslauf: "Lebenslauf",
-    meineArbeiten: "Meine Arbeiten",
-    absenden: "Bewerbung abschicken",
-    absendenLaeuft: "Wird gesendet…",
-  },
 
   bewerbungen: {
     titel: "Meine Bewerbungen",
