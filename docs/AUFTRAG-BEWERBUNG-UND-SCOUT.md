@@ -1,13 +1,35 @@
 # Auftrag: Bewerbungsmappe, Anschreiben-Agent, Scout und Berater
 
+> **ABGESCHLOSSEN am 11.09.2026. Dieses Dokument ist Geschichte, keine
+> Aufgabenliste.** Es stand bis dahin mit **20 offenen Kästchen** da — Phase 5,
+> 6, 7 und 8 —, und **keines** davon war noch offen. Wer die Kästchen liest und
+> sonst nichts (so steht es zwei Absätze weiter unten), fing hier an, Dinge ein
+> zweites Mal zu bauen. Am 11.09.2026 sind sie einzeln gegen den Baum geprüft
+> und stehen jetzt auf dem Gemessenen.
+>
+> **Was offen blieb:** eine halbe Zeile. Unter „Was aus JobPilot übernommen
+> wird" steht **die begrenzte Parallelität beim Erzeugen** — und genau die ist
+> nicht gebaut: `JobsPage.tsx` ruft `Promise.all` über alle gewählten Stellen,
+> und die Fortschrittsanzeige daneben wird nie gefüllt. Das ist die einzige
+> offene Arbeit aus beiden Auftragsdokumenten und steht als Aufgabe im
+> [PLAN](PLAN-TRANSFERMARKT.md).
+>
+> **Wo das Ergebnis heute steht:** die Ablage in
+> `src/shared/WorkerTransfer.Ablage`, die Unterlagen in resume-service, der
+> Entwurf samt Zustandsmaschine in applications-service
+> (`Application/Entwuerfe/Entwuerfe.cs`), die Oberfläche in
+> `web/src/features/{work,company,person}`, Scout und Berater als eigene
+> Dienste (ADR-0036 / ADR-0037). Der Fließtext unten ist der Wert dieses
+> Dokuments und gilt unverändert — nur die Kästchen logen.
+
 **Stand:** 05.09.2026 · **Zweck:** ein Plan, der einen Abbruch übersteht.
 
-> **Wo es steht:** Phase 0–4 sind fertig und grün — **875 .NET-Tests, 0 rot**.
-> Der ganze Rückweg (Domäne, Ablage, Unterlagen, Entwurf, Zustandsmaschine,
-> Anschreiben-Agent, Endpunkte, Wanderungen) liegt. **Offen sind Phase 5
-> (Benachrichtigung ans Unternehmen), Phase 6 (Oberfläche) und Phase 7
-> (Scout/Berater).** Ohne Phase 6 ist nichts davon anklickbar — das ist der
-> nächste Schritt.
+> **Wo es stand (05.09.2026):** Phase 0–4 sind fertig und grün — **875
+> .NET-Tests, 0 rot**. Der ganze Rückweg (Domäne, Ablage, Unterlagen, Entwurf,
+> Zustandsmaschine, Anschreiben-Agent, Endpunkte, Wanderungen) liegt. **Offen
+> sind Phase 5 (Benachrichtigung ans Unternehmen), Phase 6 (Oberfläche) und
+> Phase 7 (Scout/Berater).** Ohne Phase 6 ist nichts davon anklickbar — das ist
+> der nächste Schritt.
 
 Jeder Punkt trägt ein Kästchen. Wer hier weitermacht, liest die Kästchen und
 sonst nichts — der Fließtext erklärt nur, *warum* etwas so gebaut wird.
@@ -60,7 +82,7 @@ heißen ab jetzt verschieden und werden verschieden erklärt.
       bewirbst, schickst du deine Unterlagen mit — das ist deine Handlung und
       braucht keine Freigabe."*
 
-## Phase 1 — ADRs, bevor Code entsteht
+## Phase 1 — ADRs, bevor Code entsteht ✅
 
 - [x] **1.1 ADR-0034: Das Anschreiben.** Der dritte KI-Verbraucher, und der
       erste, der **speichert** und **überarbeitet**. ADR-0024 verbietet beides —
@@ -79,9 +101,9 @@ heißen ab jetzt verschieden und werden verschieden erklärt.
 - [x] **1.2 ADR-0035: Die Bewerbungsmappe.** Ablage-Port zurück (ADR-0021 in
       .NET), die zwei Wege zum Lebenslauf, `unterlagen.granted`, und warum die
       Mappe im Browser gesetzt wird statt als PDF.
-- [ ] **1.3 ADR-0036: `scout-service`.** Löst `/candidates` ab. Vier Auflagen
+- [x] **1.3 ADR-0036: `scout-service`.** Löst `/candidates` ab. Vier Auflagen
       aus `SCOUT-UND-BERATER.md` als Tests, plus die Nachricht aus ADR-0033.
-- [ ] **1.4 ADR-0037: `advisor-service`.** Mandat als *Sicht* auf Ledger und
+- [x] **1.4 ADR-0037: `advisor-service`.** Mandat als *Sicht* auf Ledger und
       Marktstatus, nicht als zweiter Speicher (ADR-0020 verbietet das).
 
 ## Phase 2 — Die Ablage (ADR-0021, zurück in .NET) ✅
@@ -99,7 +121,7 @@ heißen ab jetzt verschieden und werden verschieden erklärt.
 - [x] **2.5 Test:** eine gefälschte Endung (`.png` auf einer EXE) wird
       abgewiesen; Gegenprobe, dass die Prüfung wirklich greift.
 
-## Phase 3 — resume-service: Unterlagen und Vorlage
+## Phase 3 — resume-service: Unterlagen und Vorlage ✅
 
 - [x] **3.1 `Unterlage`** (Aggregat): Wer, Name, Art (`zeugnis|zertifikat|
       sonstiges`), Inhaltstyp, Größe, Ablageschlüssel, Zeitpunkt.
@@ -139,47 +161,47 @@ heißen ab jetzt verschieden und werden verschieden erklärt.
       widerruft `Einwilligungsschluessel.Alles(...)` bedingungslos — und
       `Alles` trägt jetzt auch `documents.visibility:tenant:<firma>`.
 
-## Phase 5 — Die Benachrichtigung an das Unternehmen
+## Phase 5 — Die Benachrichtigung an das Unternehmen ✅
 
-- [ ] **5.1 Neue Art `ApplicationReceived`.** Einzeln abbestellbar wie die
+- [x] **5.1 Neue Art `ApplicationReceived`.** Einzeln abbestellbar wie die
       anderen vier.
-- [ ] **5.2 Empfänger sind die Mitglieder des Unternehmens** — eine Firma hat
+- [x] **5.2 Empfänger sind die Mitglieder des Unternehmens** — eine Firma hat
       kein Postfach, Menschen haben eines. Die Mitgliedsliste kommt über einen
       **typisierten Vertrag** von identity-service, nie über ein anonymes
       Objekt (der Draht, der viermal nie ankam).
-- [ ] **5.3 Der Postausgang bleibt inhaltsfrei** (ADR-0025): Kennung und Art,
+- [x] **5.3 Der Postausgang bleibt inhaltsfrei** (ADR-0025): Kennung und Art,
       nie ein Name und nie eine Stelle.
 
-## Phase 6 — Oberfläche
+## Phase 6 — Oberfläche ✅
 
-- [ ] **6.1 `/jobs`: Mehrfachauswahl.** Kästchen an der Stellenkarte, eine
+- [x] **6.1 `/jobs`: Mehrfachauswahl.** Kästchen an der Stellenkarte, eine
       Leiste „N ausgewählt · Für alle bewerben".
-- [ ] **6.2 `/applications/drafts`:** die Liste mit Zuständen.
-- [ ] **6.3 Die Prüfansicht.** Das Anschreiben **wie ein Brief gesetzt** —
+- [x] **6.2 `/applications/drafts`:** die Liste mit Zuständen.
+- [x] **6.3 Die Prüfansicht.** Das Anschreiben **wie ein Brief gesetzt** —
       Seitenspiegel, Serifen, Ränder. Text markieren → kommentieren, das Zitat
       reist mit. Knöpfe: Überarbeiten · Freigeben · Senden.
-- [ ] **6.4 Die Mappe für das Unternehmen** unter `/company/applications/:id`:
+- [x] **6.4 Die Mappe für das Unternehmen** unter `/company/applications/:id`:
       **scrollbare Reiter** — Anschreiben · Lebenslauf · je ein Reiter pro
       Zertifikat. Bilder werden gezeigt, PDF als eingebettetes Dokument.
-- [ ] **6.5 Lebenslauf-Vorlagen als CSS**, dieselbe Darstellung für die Person
+- [x] **6.5 Lebenslauf-Vorlagen als CSS**, dieselbe Darstellung für die Person
       und für das Unternehmen. Aus `src/styles/tokens/`, keine Farbliterale.
-- [ ] **6.6 `/resume`: Hochladen** mit Fortschritt, Art und Löschen.
-- [ ] **6.7 Alle Texte in drei Katalogen** (ADR-0031).
+- [x] **6.6 `/resume`: Hochladen** mit Fortschritt, Art und Löschen.
+- [x] **6.7 Alle Texte in drei Katalogen** (ADR-0031).
 
-## Phase 7 — Scout und Berater
+## Phase 7 — Scout und Berater ✅
 
-- [ ] **7.1 `scout-service`** nach ADR-0036.
-- [ ] **7.2 Die Nachricht „dein Profil wurde entdeckt"** (ADR-0033): eigene
+- [x] **7.1 `scout-service`** nach ADR-0036.
+- [x] **7.2 Die Nachricht „dein Profil wurde entdeckt"** (ADR-0033): eigene
       Art, nennt kein Unternehmen, höchstens eine je Person und Tag.
-- [ ] **7.3 `advisor-service`** nach ADR-0037.
+- [x] **7.3 `advisor-service`** nach ADR-0037.
 
-## Phase 8 — Abnahme
+## Phase 8 — Abnahme ✅
 
-- [ ] **8.1** `dotnet build`, dann `scripts/test-dotnet.sh` — **getrennt**.
-- [ ] **8.2** `pnpm check`, `pnpm test`, `pnpm build`.
-- [ ] **8.3** `make routenkarte` gegen den laufenden Stapel.
-- [ ] **8.4** E2E **einmal am Ende**, nicht zwischendurch.
-- [ ] **8.5** CLAUDE.md nachziehen: siebtes Paket in `src/shared/`, die neue
+- [x] **8.1** `dotnet build`, dann `scripts/test-dotnet.sh` — **getrennt**.
+- [x] **8.2** `pnpm check`, `pnpm test`, `pnpm build`.
+- [x] **8.3** `make routenkarte` gegen den laufenden Stapel.
+- [x] **8.4** E2E **einmal am Ende**, nicht zwischendurch.
+- [x] **8.5** CLAUDE.md nachziehen: siebtes Paket in `src/shared/`, die neue
       Fähigkeit, die neue Benachrichtigungsart, die drei neuen ADRs.
 
 ---
@@ -187,9 +209,13 @@ heißen ab jetzt verschieden und werden verschieden erklärt.
 ## Was aus JobPilot übernommen wird — und was nicht
 
 **Übernommen:** die Zustandsmaschine, das Zitat am Kommentar, „Freigabe nur
-ohne offene Kommentare", „Versand nur aus freigegeben", die begrenzte
-Parallelität beim Erzeugen, das Ausgabeformat `BETREFF: … --- …` samt
-robustem Parser.
+ohne offene Kommentare", „Versand nur aus freigegeben", das Ausgabeformat
+`BETREFF: … --- …` samt robustem Parser.
+
+**Übernommen werden sollte auch die begrenzte Parallelität beim Erzeugen — sie
+ist es nicht** (gemessen 11.09.2026). Das ist der einzige Posten aus diesem
+Auftrag, der wirklich offen ist, und er steht deshalb im
+[PLAN](PLAN-TRANSFERMARKT.md).
 
 **Nicht übernommen:** SMTP-Versand nach außen (wir bleiben plattformintern),
 externe Stellenquellen (Arbeitsagentur/Adzuna/Jooble), MCP-Connectoren,

@@ -1,5 +1,21 @@
 # Auftrag: auf Girder 4.0.0
 
+> **ABGESCHLOSSEN und überholt. Dieses Dokument ist Geschichte.**
+> Der Baum steht auf **Girder 4.4.0** (`Directory.Packages.props`), also weit
+> hinter dem Ziel dieses Auftrags. Sein Kern — `AddGirder(...)` mit
+> `UseDefaults()` statt `AddSharedInfrastructure`, und ein `Without(modul,
+> grund)` je Ausnahme — ist gebaut und steht in
+> `src/shared/WorkerTransfer.ServiceDefaults/Dienstgrundlage.cs`.
+>
+> **Was offen blieb:** nichts aus diesem Auftrag. Die vier Entscheidungen aus
+> H2, die „neu gemessen werden müssen", sind nachgemessen; das Ergebnis steht
+> in [`erkenntnisse-girder.md`](erkenntnisse-girder.md) und in der Modultabelle
+> von `CLAUDE.md`. Die Nachfolge trägt `AUFTRAG-GIRDER-4.4.md`.
+>
+> **Wo das Ergebnis heute steht:** `Dienstgrundlage.cs` — ein Aufruf, sechs
+> begründete Ausnahmen, und ein Bericht beim Start, der die Zusammensetzung
+> **mit Namen** ausgibt statt mit einer Zahl.
+
 Girder hat die fehlende Mitte bekommen. Dieser Auftrag zieht WorkerTransfer
 nach — und hebt dabei mehrere Entscheidungen auf, die nur galten, weil Girder
 sie erzwang.

@@ -1,5 +1,21 @@
 # Der Auftrag: WorkerTransfer vollständig nach .NET
 
+> **ABGESCHLOSSEN. Dieses Dokument ist Geschichte, keine Aufgabenliste.**
+> Die Migration ist durch: es gibt kein `pyproject.toml`, kein `uv.lock`, kein
+> `apps/<dienst>`, kein alembic, ruff, mypy oder pytest mehr. Phase A bis D
+> sind gefahren, D1 (Bremse) und D2 (Routenkarte) gebaut — die Bremse ist
+> seither wieder **gefallen**, weil Girder 4.2.0 sie liefert, und das ist der
+> lehrreichere Teil ihrer Geschichte.
+>
+> **Was offen blieb:** nichts aus diesem Auftrag. Was ihm folgte, steht in
+> `AUFTRAG-HAERTUNG.md` (H1–H5) und danach im
+> [PLAN](PLAN-TRANSFERMARKT.md).
+>
+> **Wo das Ergebnis heute steht:** `src/` (vierzehn Dienste, Gateway,
+> `shared/`), `tests/`, und — wichtiger als dieses Dokument —
+> [`MIGRATION-STAND.md`](MIGRATION-STAND.md), wo steht, was dabei *gemessen*
+> wurde. Dieses Dokument sagt, was zu tun war; jenes, was daraus wurde.
+
 Dies ist der Sitzungsauftrag. `docs/MIGRATION-PROMPT.md` daneben ist das
 Nachschlagewerk — Schichten, Girder je Paket, Fallen, Zweigstrategie. Lies beide,
 dann fang an. **Ohne Rückfragen.** Alle Entscheidungen, die getroffen werden

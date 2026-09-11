@@ -1,5 +1,20 @@
 # Auftrag: Girder trägt es, wir konfigurieren — und die Plattform spricht die Sprache der Person
 
+> **ABGESCHLOSSEN bis auf EINE ENTSCHEIDUNG, und die ist meine, nicht die eines
+> Agenten** — sie steht als PBI-6 im [PLAN](PLAN-TRANSFERMARKT.md) und wird
+> unten in Phase 4 gestellt.
+>
+> | | Stand am 11.09.2026 |
+> |---|---|
+> | **Phase 1** Girder 4.2.0 | **fertig**, und es wurden drei Fassungen (4.2.0/.1/.2). Der Baum steht heute auf 4.4.0. |
+> | **Phase 2** Die Eigenbauten löschen | **fertig.** `Bremse.cs` und `Korrelation.cs` sind weg, `AddHttpContextAccessor()` aus acht Diensten, die Cookie-Zeile aus elf Diensten in die Grundlage. |
+> | **Phase 3** Lokalisierung | **fertig.** ADR-0031, drei Kataloge (de/en/fr) mit drei Wächtertests, die Sprache liegt am Konto und nicht am Kopf, und **eine** E2E-Reise schaltet um. |
+> | **Phase 4** Aufräumen — Bezeichner | **fertig** im Frontend; die Fachsprache bleibt deutsch. |
+> | **Phase 4** Aufräumen — **Kommentardichte** | **OFFEN, und es ist keine Codeaufgabe, sondern eine Entscheidung.** Der mechanische Schnitt wurde gebaut, dreimal verschieden scharf gemessen und **zurückgenommen**: er entfernte unter anderem die Sätze, die erklären, *warum 503 und nicht 404*. Was bleibt, sind die zwei Wege unten — und welcher gegangen wird, entscheidet ein Mensch. |
+>
+> **Wo das Ergebnis heute steht:** `Dienstgrundlage.cs` und `ocelot.json`
+> (Phase 1/2), `web/src/core/i18n/kataloge/` und ADR-0031 (Phase 3).
+
 Stand 03.09.2026. Vier Phasen. Die Reihenfolge ist begründet und nicht beliebig:
 Phase 4 fasst dieselben Dateien an wie Phase 3, also kommt sie zuletzt.
 
@@ -207,13 +222,59 @@ Zuletzt, weil Phase 3 dieselben Dateien anfasst.
   die Begründung.** Ein Filter kann Zierrat und Grund hier nicht trennen. Der
   Schnitt wurde zurückgenommen.
 
-  Was ohne Verlust ginge und eine Entscheidung braucht:
-  1. **Doppelte Begründungen an Aufrufstellen.** `Umgebung.Laden()` erklärt sich
-     in zwölf `Program.cs` noch einmal; der kanonische Satz steht an der Methode.
-     Solche Kopien sind sicher zu löschen — sie einzeln zu finden ist Handarbeit.
-  2. **`<remarks>` ganz aufgeben und die Gründe in die ADRs ziehen.** Dann liegt
-     der Grund an EINER Stelle statt an der, wo man ihn braucht. Das ist die
-     Entscheidung, die zu treffen ist — nicht eine Formatierungsfrage.
+  ### Die Entscheidung, neu vermessen am 11.09.2026
+
+  Der Bestand ist seit dem 03.09.2026 um drei Dienste gewachsen. Gemessen über
+  `src/`, ohne `obj/`, `bin/` und Wanderungen:
+
+  | | |
+  |---|---|
+  | Dateien | 539 |
+  | Zeilen gesamt | 51.996 |
+  | **Kommentarzeilen** | **16.157 — 31 %** |
+  | davon `///` (XML) | 13.697 |
+  | davon `//` | 2.373 (und eine gute Hälfte davon sind Begründungen im Rumpf) |
+  | `<summary>`-Blöcke | 2.967 |
+  | `<remarks>`-Blöcke | 1.108 |
+  | **Zeilen INNERHALB von `<remarks>`** | **8.748 — 17 % des Baums, 54 % aller Kommentarzeilen** |
+
+  Die Zahl 31 % ist gestiegen, nicht gefallen. Sie ist aber nicht der
+  Gegenstand: der Befund von damals steht, und jede Nachmessung bestätigt ihn —
+  **in dieser Codebasis sind die Kommentare überwiegend die Begründung**, und
+  ein Filter kann Zierrat und Grund hier nicht trennen. Wer die Dichte auf eine
+  Zahl senkt, senkt sie, indem er Gründe löscht.
+
+  Deshalb liegt die Entscheidung nicht bei „wie viel Prozent", sondern bei
+  **zwei Wegen, die sich gegenseitig nicht brauchen**:
+
+  **Weg 1 — die Kopien an Aufrufstellen löschen. Klein, sicher, kein Verlust.**
+  Derselbe Begründungssatz steht mehrfach wortgleich im Baum, obwohl der
+  kanonische an der Sache selbst hängt. Gezählt:
+
+  | Kopie | Stellen | Zeilen |
+  |---|---|---|
+  | „Konfiguration aus der Umgebung. VOR CreateBuilder…" | 15 `Program.cs` | 45 |
+  | „Der Schluessel IST der Mensch…" (`Personenzeile`) | 7 Kontexte | ~35 |
+  | „Kein AlsAussteller(): …" | 12 `Program.cs` | ~24 |
+  | „Erst wandern, dann bedienen (ADR-0010)." | 15 `Program.cs` | 15 |
+
+  Rund **120 Zeilen**, alle ersetzbar durch einen Verweis oder gar nichts, denn
+  der Satz steht an `Umgebung.Laden`, an `Personenzeile` und in ADR-0010.
+  **Die letzte Zeile ist der Grenzfall und gehört ausdrücklich entschieden:**
+  „Erst wandern, dann bedienen (ADR-0010)" ist keine Kopie einer Begründung,
+  sondern ein *Zeiger* auf eine — und ein Zeiger an der Stelle, wo man ihn
+  braucht, ist billig.
+
+  **Weg 2 — `<remarks>` aufgeben und die Gründe in die ADRs ziehen.** 8.748
+  Zeilen. Dann liegt der Grund an EINER Stelle — aber nicht mehr dort, wo
+  jemand ihn braucht, sondern dort, wo er ihn suchen muss. Das ist der Tausch,
+  und er ist nicht umkehrbar: was einmal in ein ADR gewandert ist, wandert
+  nicht zurück an die Zeile.
+
+  **Was zu entscheiden ist, in einem Satz:** wo genau verläuft die Grenze
+  zwischen einem Kommentar, der eine *Messung, ein Verbot oder eine Falle*
+  festhält — der Wert dieses Baums — und einem, der den Code *nacherzählt*.
+  Der mechanische Filter hat dreimal bewiesen, dass er sie nicht findet.
 
 ---
 

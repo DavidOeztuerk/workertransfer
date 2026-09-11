@@ -1,5 +1,21 @@
 # Auftrag: Härtung
 
+> **GRÖSSTENTEILS ABGESCHLOSSEN. Zwei Punkte sind wirklich offen, und beide
+> stehen im [PLAN](PLAN-TRANSFERMARKT.md)** — hier stehen sie nur noch als
+> Geschichte.
+>
+> | | Stand am 11.09.2026 |
+> |---|---|
+> | **H1** Modulabgleich | **fertig.** Die Tabelle steht in `CLAUDE.md`, jede Zeile begründet; der Baum meldet seine Zusammensetzung beim Start selbst. |
+> | **H2** Konfiguration über die Umgebung | **halb.** `.env`/`.env.example`/`make env` stehen, `Umgebung.Laden()` ist erste Zeile in allen fünfzehn `Program.cs` und ein Test hält das fest. **Offen ist die Geheimnisfrage**: `AddSecretManagement` und `AddEncryption` sind ungemessen, und ob Infisical daneben oder an ihre Stelle tritt, ist nicht entschieden. |
+> | **H3** Was aus D offen war | **fertig.** `GET /notifications` antwortet nicht mehr 405, sondern auf **jede** Methode 404 (der Diensteingang zog nach `/internal/notifications`); ein kaputter JSON-Rumpf gibt 400 statt 500 (`ProblemDetailsMiddleware`, mit Gegenprobe); Validatoren gibt es — acht `AbstractValidator` in identity, github und applications. |
+> | **H4** Der Prüfer von fremder Hand | **fertig**, und sein Ergebnis liegt in [`REVIEW-09-09.md`](REVIEW-09-09.md). |
+> | **H5** Externe Durchsicht | **offen, und ein Mensch startet sie** — `/code-review ultra` ist nichts, was ein Agent auslösen kann oder darf. |
+>
+> **Wo das Ergebnis heute steht:** `Dienstgrundlage.cs` (H1),
+> `.env.example` + `scripts/env.sh` (H2), `ProblemDetailsMiddleware` und
+> `BenachrichtigungsEndpoints.cs` (H3), `REVIEW-09-09.md` (H4).
+
 Die Migration ist durch. Dieser Auftrag löst sie ein: **Girder vollständig
 einsetzen, Konfiguration über Umgebung, und alles, was von Hand gebaut wurde,
 gegen das prüfen, was die Bibliothek liefert.**

@@ -1,5 +1,19 @@
 # Review des Zweigs `dotnet-migration`, 09.09.2026
 
+> **Ein Review ist ein Datum, und die Zahlen darin altern.** Sie bleiben hier
+> stehen — ein Review, das man nachträglich fortschreibt, ist keine Messung
+> mehr. Was seither dazukam, steht daneben, gemessen am 11.09.2026:
+>
+> | | 09.09.2026 | 11.09.2026 |
+> |---|---|---|
+> | .NET-Tests | 966 in 16 Reihen | **1236 in 19 Reihen**, 0 rot, 0 übersprungen |
+> | Frontend-Tests | 150 in 20 Dateien | **198 in 25 Dateien** |
+> | E2E-Reisen | 23 | **30** in 16 Dateien (gezählt, nicht gefahren — sie brauchen den Stapel) |
+> | Dienste | elf | **vierzehn** (scout, advisor, assessment kamen am 11.09. dazu) |
+>
+> **Fund 7 (das tote Bewerbungsformular) ist erledigt** — PBI-6 im
+> [PLAN](PLAN-TRANSFERMARKT.md).
+
 Was seit `d3cf4f8` entstanden ist — **119 geänderte, 62 neue Dateien, +5.584
 Zeilen** —, gemessen statt gelesen. Drei Sitzungen haben daran gearbeitet:
 Grok (`~/.grok/sessions/…/01a0783d-…`, 33 Nutzernachrichten über drei Tage),

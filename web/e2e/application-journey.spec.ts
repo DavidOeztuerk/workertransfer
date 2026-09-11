@@ -8,7 +8,6 @@
 import { expect, test } from "@playwright/test";
 
 import {
-  GATEWAY_URL,
   login,
   registerAndConfirm,
   skipWithoutStack,
@@ -72,37 +71,24 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
   await expect(jobCard).toBeVisible();
 
-  // DER WEG ZUR BEWERBUNGSSEITE HAT SICH GEÄNDERT, ihre Prüfung nicht.
+  // DER WEG ZUR BEWERBUNG IST EIN KNOPF, und seit PBI-6 gibt es keinen zweiten
+  // mehr. `/jobs/{id}/apply` war zuletzt nur eine Weiche — sie legte einen
+  // Entwurf an und leitete weiter —, und darunter lag ein unerreichbares
+  // Formular mit zwei Freigabekästchen. Adresse und Formular sind gefallen;
+  // was sie tat, tut jetzt `lib/entwuerfe`, gerufen von der Stellenliste UND
+  // von der Karriereseite.
   //
-  // „Bewerben" auf der Karte war einmal ein Link auf `/jobs/{id}/apply`; heute
-  // ist es ein Knopf, der einen ENTWURF anlegt und dorthin führt — so gewollt.
-  // Die Seite `/jobs/{id}/apply` gibt es weiterhin, und sie ist von der
-  // Karriereseite aus erreichbar.
-  //
-  // Was diese Reise als Einzige beweist, hängt aber nicht am Klick, sondern an
-  // der ADRESSE: dass ein Deep-Link durch Router UND Gateway ankommt. Im
-  // Browsertest ist die Route gemockt, und ein `Sec-Fetch-Dest`-Fehler zeigt
-  // sich ausschließlich hier. Also wird die Kennung über die öffentliche
-  // Schnittstelle geholt und die Adresse direkt angesteuert — dieselbe
-  // Aussage, ohne einen Knopf zu prüfen, den es so nicht mehr gibt.
-  const gefunden = await candidate.request.get(
-    `${GATEWAY_URL}/jobs?q=${encodeURIComponent(jobTitle)}`);
-  const jobId = (await gefunden.json()).items[0].id as string;
-
-  // `/jobs/{id}/apply` IST HEUTE EINE WEICHE, kein Formular mehr: für eine
-  // angemeldete Person legt die Seite einen Entwurf an und führt dorthin. Das
-  // war ausdrücklich gewollt — wer sich bewirbt, soll beim Anschreiben landen
-  // und nicht bei einem leeren Textfeld.
-  //
-  // Der Deep-Link bleibt trotzdem das, was NUR diese Reise beweist: dass die
-  // Adresse durch Router UND Gateway ankommt. Im Browsertest ist die Route
-  // gemockt, und ein `Sec-Fetch-Dest`-Fehler zeigt sich ausschliesslich hier.
-  await candidate.goto(`/jobs/${jobId}/apply`);
+  // Geklickt wird deshalb der Knopf auf der Karte. Das Ziel bleibt dasselbe:
+  // wer sich bewirbt, landet beim Anschreiben und nicht bei einem leeren
+  // Textfeld.
+  await jobCard.getByRole("button", { name: /Bewerben/i }).click();
   await expect(candidate).toHaveURL(
     /\/applications\/drafts\/[0-9a-f-]{36}$/, { timeout: 30_000 });
 
-  // Und derselbe Zustand nach F5 — jetzt unter `/applications/…`, wo dieselbe
-  // Dokumentregel greifen muss.
+  // Und derselbe Zustand nach F5. DAS ist, was nur diese Reise beweist: ein
+  // Deep-Link auf `/applications/drafts/{id}` kommt durch Router UND Gateway
+  // an. Im Browsertest ist die Route gemockt; ein Fehler in der Auslieferung
+  // der Oberfläche zeigt sich ausschliesslich hier.
   await candidate.reload();
   await expect(candidate.getByRole("heading", { level: 1 })).toBeVisible();
 
