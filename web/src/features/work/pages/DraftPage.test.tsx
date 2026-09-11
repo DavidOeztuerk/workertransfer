@@ -1,11 +1,11 @@
-import { screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { ThemeProvider } from "@mui/material/styles";
 import { configureStore } from "@reduxjs/toolkit";
 import { render } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import preferences from "../../../core/store/preferencesSlice";
 import { i18n } from "../../../core/i18n/i18n";
@@ -47,7 +47,26 @@ function stubFetch(routen: (url: string) => Antwort) {
   );
 }
 
+/**
+ * VOR jedem Fall leeren, nicht nur danach.
+ *
+ * `vi.unstubAllGlobals()` im `afterEach` laeuft, bevor die Komponente
+ * ausgehaengt ist. Was die sterbende Seite danach noch anstoesst, trifft den
+ * ECHTEN Server — im Entwicklungsrechner den laufenden Stapel, der mit 401
+ * antwortet — und schreibt das in den gerade geleerten Zwischenspeicher. Der
+ * naechste Fall liest es dann statt seines eigenen Stubs.
+ */
+beforeEach(() => {
+  vergissKontext();
+});
+
 afterEach(() => {
+  // ERST AUSHAENGEN, DANN DEN STUB ZIEHEN. Andersherum bleibt ein Fenster:
+  // die noch montierte Seite stoesst nach `unstubAllGlobals` einen Abruf an,
+  // der trifft den ECHTEN Server (auf einem Entwicklungsrechner den laufenden
+  // Stapel) und schreibt dessen 401 in den Zwischenspeicher, den der naechste
+  // Fall dann liest statt seines eigenen Stubs.
+  cleanup();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   vergissKontext();

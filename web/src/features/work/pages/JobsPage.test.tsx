@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { vergissKontext } from "../lib/kontext";
@@ -82,7 +82,26 @@ beforeEach(() => {
   window.localStorage.clear();
 });
 
+/**
+ * VOR jedem Fall leeren, nicht nur danach.
+ *
+ * `vi.unstubAllGlobals()` im `afterEach` laeuft, bevor die Komponente
+ * ausgehaengt ist. Was die sterbende Seite danach noch anstoesst, trifft den
+ * ECHTEN Server — im Entwicklungsrechner den laufenden Stapel, der mit 401
+ * antwortet — und schreibt das in den gerade geleerten Zwischenspeicher. Der
+ * naechste Fall liest es dann statt seines eigenen Stubs.
+ */
+beforeEach(() => {
+  vergissKontext();
+});
+
 afterEach(() => {
+  // ERST AUSHAENGEN, DANN DEN STUB ZIEHEN. Andersherum bleibt ein Fenster:
+  // die noch montierte Seite stoesst nach `unstubAllGlobals` einen Abruf an,
+  // der trifft den ECHTEN Server (auf einem Entwicklungsrechner den laufenden
+  // Stapel) und schreibt dessen 401 in den Zwischenspeicher, den der naechste
+  // Fall dann liest statt seines eigenen Stubs.
+  cleanup();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   vergissKontext();
