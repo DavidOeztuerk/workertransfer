@@ -15,7 +15,7 @@ import { empfaengerAusFirma, kopfAusKontakt } from "../../work/lib/briefkopf";
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
 import { Lebenslaufblatt } from "../../person/components/lebenslauf/Lebenslaufblatt";
 import { holeFremdenInhalt, ladeSichtbaren } from "../../person/api/resume";
-import { getCandidateProfile } from "../api/candidates";
+import { getCandidateProfile } from "../api/fremdprofil";
 import { getCompanyApplication } from "../api/applications";
 import { useHandelnder } from "../lib/session";
 import { useAsync } from "../lib/useAsync";

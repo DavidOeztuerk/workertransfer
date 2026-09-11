@@ -8,30 +8,28 @@ namespace WorkerTransfer.Profile.Domain.Profile;
 /// <param name="Faehigkeiten">Die gesuchten Worte, kanonisch.</param>
 /// <param name="Ort">Teiltext, ohne Rücksicht auf Groß-/Kleinschreibung.</param>
 /// <param name="NurRemote">Nur, wer Remote ausdrücklich angekreuzt hat.</param>
-/// <param name="Irgendeine">
-/// <c>false</c>: alle Worte muss jemand nennen (UND). <c>true</c>: mindestens
-/// eines genügt (ODER).
-/// </param>
 /// <remarks>
-/// <para><strong>Und warum es die Wahl zwischen UND und ODER gibt.</strong>
-/// <c>GET /candidates</c> sucht mit UND: es zeigt nur, wer alles nennt. Die
-/// Suche des scout-service sucht mit ODER, und das ist keine Lockerung,
-/// sondern die Voraussetzung für ihre Häkchenliste — unter UND erfüllt jeder
-/// Treffer alle Bedingungen, jedes Häkchen wäre gesetzt, und „welche Fähigkeit
-/// fehlt" hätte keine Antwort (ADR-0036 Entscheidung 2). Unter UND wäre auch
-/// die erste Auflage leer: es gäbe nichts, wonach man sortieren könnte.</para>
+/// <para><strong>Die Worte sind ein ODER, und es gibt kein UND mehr.</strong>
+/// <c>GET /candidates</c> suchte mit UND und ist am 11.09.2026 gefallen; die
+/// Wahl zwischen beidem fiel mit ihm. Ein Zweig ohne Aufrufer ist kein Vorrat,
+/// sondern das, was später falsch wiederbelebt wird.</para>
 ///
-/// <para>Sichtbar wird durch keines von beiden etwas, was ohne den Filter
-/// verborgen wäre: die Einwilligung wird danach geprüft, nicht hier — der
-/// Speicher kennt keine Sichtbarkeit (ADR-0020).</para>
+/// <para>Das ODER ist auch keine Lockerung, sondern die Voraussetzung für die
+/// Häkchenliste des Scouts: unter UND erfüllt jeder Treffer alle Bedingungen,
+/// jedes Häkchen wäre gesetzt, und „welche Fähigkeit fehlt" hätte keine
+/// Antwort (ADR-0036 Entscheidung 2). Auch die erste Auflage wäre dann leer —
+/// es gäbe nichts, wonach man sortieren könnte.</para>
+///
+/// <para>Sichtbar wird dadurch nichts, was ohne den Filter verborgen wäre: die
+/// Einwilligung wird danach geprüft, nicht hier — der Speicher kennt keine
+/// Sichtbarkeit (ADR-0020).</para>
 /// </remarks>
 public sealed record Seitenanfrage(
     int Anzahl,
     Seitenzeiger? Ab = null,
     IReadOnlyList<string>? Faehigkeiten = null,
     string Ort = "",
-    bool NurRemote = false,
-    bool Irgendeine = false);
+    bool NurRemote = false);
 
 /// <summary>Eine Seite Profile.</summary>
 /// <param name="Eintraege">Die Zeilen, zuletzt geänderte zuerst.</param>

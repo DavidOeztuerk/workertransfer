@@ -12,14 +12,15 @@ import { lazyRoute } from "../../shared/components/routing/lazyRoute";
  * Unternehmensprofil samt seiner Stellen und gehoert sachlich hierher.
  *
  * Zwei Dinge, die man beim Bauen sonst falsch macht und die deshalb
- * stehenbleiben: die Kandidatenliste liegt auf `GET /candidates` und nicht
- * `/profiles` (ein absichtlich toter Praefix), und `/company/jobs` und
+ * stehenbleiben: die Suche nach Menschen liegt auf `GET /scout/candidates` bei
+ * scout-service und nicht mehr auf `/candidates` bei profile-service (dieser
+ * Pfad ist am 11.09.2026 gefallen, ADR-0036), und `/company/jobs` und
  * `/company/jobs/new` sind zwei Seiten — eine E2E-Reise sucht das Formular
  * heute noch auf der Liste.
  */
 export const companyRoutes: RouteObject[] = [
   { path: "/careers/:slug", element: lazyRoute(() => import("./pages/CareerPage"), "CareerPage") },
-  { path: "/candidates", element: lazyRoute(() => import("./pages/CandidatesPage"), "CandidatesPage") },
+  { path: "/scout", element: lazyRoute(() => import("./pages/ScoutPage"), "ScoutPage") },
   { path: "/company/jobs", element: lazyRoute(() => import("./pages/CompanyJobsPage"), "CompanyJobsPage") },
   { path: "/company/jobs/new", element: lazyRoute(() => import("./pages/CompanyJobNewPage"), "CompanyJobNewPage") },
   { path: "/company/team", element: lazyRoute(() => import("./pages/CompanyTeamPage"), "CompanyTeamPage") },

@@ -81,13 +81,16 @@ public class InterneSucheTests(Postgres postgres) : IAsyncLifetime
     /// Gesucht wird mit ODER: wer EINES der Worte nennt, ist dabei.
     /// </summary>
     /// <remarks>
-    /// <para>Der Unterschied zu <c>GET /candidates</c>, das mit UND sucht — und
-    /// er ist die Voraussetzung für die Häkchenliste des Scouts. Unter UND
-    /// erfüllte jeder Treffer alle Bedingungen, jedes Häkchen wäre gesetzt, und
-    /// „welche Fähigkeit fehlt" hätte keine Antwort (ADR-0036 Entscheidung 2).</para>
+    /// <para><c>GET /candidates</c> suchte mit UND und ist am 11.09.2026
+    /// gefallen; mit ihm der UND-Zweig im Speicher. Das ODER ist keine
+    /// Lockerung, sondern die Voraussetzung für die Häkchenliste des Scouts:
+    /// unter UND erfüllte jeder Treffer alle Bedingungen, jedes Häkchen wäre
+    /// gesetzt, und „welche Fähigkeit fehlt" hätte keine Antwort
+    /// (ADR-0036 Entscheidung 2).</para>
     ///
-    /// <para>Die Gegenprobe steht daneben: dieselben Daten über
-    /// <c>/candidates</c> gefragt liefern nur den, der beide nennt.</para>
+    /// <para><strong>Die Gegenprobe steckt in der Zusage selbst:</strong> wer
+    /// nur EINES der beiden Worte nennt, muss dabei sein. Waere es ein UND,
+    /// kaeme nur der zurueck, der beide nennt — und diese Zeile faellt.</para>
     /// </remarks>
     [Fact]
     public async Task Die_interne_Suche_sucht_mit_ODER()
@@ -106,18 +109,10 @@ public class InterneSucheTests(Postgres postgres) : IAsyncLifetime
 
         gefunden.GetProperty("items").EnumerateArray()
             .Select(eintrag => eintrag.GetProperty("subject_id").GetGuid())
-            .Should().BeEquivalentTo([eines, beide]);
-
-        // Und die Gegenprobe: `/candidates` sucht weiterhin mit UND.
-        _tor.Frei.Add((eines, Firma));
-        _tor.Frei.Add((beide, Firma));
-
-        var kandidaten = await Json(await AlsFirma().GetAsync(
-            new Uri("/candidates?skill=Buchbinderei&skill=Reetdach", UriKind.Relative)));
-
-        kandidaten.GetProperty("items").EnumerateArray()
-            .Select(eintrag => eintrag.GetProperty("subject_id").GetGuid())
-            .Should().Equal(beide);
+            .Should().BeEquivalentTo(
+                [eines, beide],
+                "wer nur eines der beiden Worte nennt, gehoert dazu — sonst waere "
+                + "es ein UND und jedes Haekchen des Scouts gesetzt");
     }
 
     /// <summary>Sie liefert genannte Fähigkeiten — und nichts über Sichtbarkeit.</summary>
@@ -135,7 +130,7 @@ public class InterneSucheTests(Postgres postgres) : IAsyncLifetime
         var fund = await Intern($"/internal/profiles/{wer}");
 
         fund.EnumerateObject().Select(feld => feld.Name).Should().BeEquivalentTo(
-            "subject_id", "headline", "location", "remote_ok", "skills");
+            "subject_id", "headline", "bio", "location", "remote_ok", "skills");
 
         fund.GetProperty("skills").EnumerateArray()
             .Select(eintrag => eintrag.GetString()).Should().Equal("Reepschlagen");
@@ -182,17 +177,6 @@ public class InterneSucheTests(Postgres postgres) : IAsyncLifetime
     }
 
     // ---------------------------------------------------------------------
-
-    private static readonly Guid Firma = Guid.Parse("99999999-9999-9999-9999-999999999999");
-
-    private HttpClient AlsFirma()
-    {
-        var browser = _dienst.CreateClient();
-        browser.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue(
-                "Bearer", Tokenform.Firma(Guid.CreateVersion7(), Firma));
-        return browser;
-    }
 
     private async Task Schreibe(Guid wer, string[] faehigkeiten)
     {

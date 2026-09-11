@@ -58,7 +58,7 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
   // Warten, bis der Wechsel wirklich gilt: Die Wahl stößt ihn nur an.
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   const card = recruiter.locator("li").filter({ hasText: headline });
   // Erst warten, dann klicken: `click()` hat nur das actionTimeout.
   await expect(card).toBeVisible();
@@ -92,7 +92,7 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
   ).toHaveCount(0);
 
   // Jetzt erst sieht das Unternehmen den Status — und darf zugehen.
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   const openCard = recruiter.locator("li").filter({ hasText: headline });
   // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
   // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
@@ -183,7 +183,7 @@ test("ohne Freigabe des Marktstatus gibt es nichts zu sehen und nichts zu tun", 
   await waehleImFeld(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   const card = recruiter.locator("li").filter({ hasText: headline });
   // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
   // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
@@ -203,7 +203,7 @@ test("ohne Freigabe des Marktstatus gibt es nichts zu sehen und nichts zu tun", 
   await row.getByRole("button", { name: /Ablehnen/i }).click();
   await expect(row.getByText(/Abgelehnt/i)).toBeVisible();
 
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   const shut = recruiter.locator("li").filter({ hasText: headline });
   // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
   // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last

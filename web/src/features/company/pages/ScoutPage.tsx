@@ -15,22 +15,30 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
-import { CandidateCard } from "../components/CandidateCard";
+import { TrefferKarte } from "../components/TrefferKarte";
 import { useHandelnder } from "../lib/session";
 import { useAsync, useSeiten } from "../lib/useAsync";
 import {
-  type CandidateFilters,
-  NO_FILTERS,
-  type Profile,
-  listCandidates,
-} from "../api/candidates";
+  OHNE_FILTER,
+  type Suchfilter,
+  type Treffer,
+  sucheKandidaten,
+} from "../api/scout";
 import {
   type MarketRequest,
   listCompanyMarketRequests,
 } from "../../work/api/market";
 
 /**
- * <c>/candidates</c> — wer sein Profil freigegeben hat.
+ * <c>/scout</c> — wer sein Profil freigegeben hat, mit Häkchen und Belegen.
+ *
+ * <strong>Nachfolger von <c>/candidates</c></strong> (ADR-0036). Der alte Pfad
+ * ist am 11.09.2026 gefallen; zwei Suchen nebeneinander wären zwei Wahrheiten
+ * gewesen.
+ *
+ * <strong>Die Worte sind ein ODER.</strong> Wer drei eingibt, sucht nicht
+ * jemanden, der alle drei kann — sondern sieht an den Häkchen, wer welches
+ * genannt hat. Unter UND wäre jedes Häkchen gesetzt und die Liste nutzlos.
  *
  * <strong>Hier steht ausschliesslich, wer freigegeben hat.</strong> Wer die
  * Freigabe zurückzieht, verschwindet beim nächsten Laden — ohne Umweg über uns,
@@ -45,7 +53,7 @@ import {
  * wäre die Behauptung, niemand habe freigegeben, und das weiss in dem Moment
  * niemand.
  */
-export function CandidatesPage() {
+export function ScoutPage() {
   const { t } = useTranslation();
   const { fuerFirma } = useHandelnder();
 
@@ -54,14 +62,14 @@ export function CandidatesPage() {
     location: "",
     remoteOnly: false,
   });
-  const [filter, setFilter] = useState<CandidateFilters>(NO_FILTERS);
+  const [filter, setFilter] = useState<Suchfilter>(OHNE_FILTER);
 
   const hatFilter =
     filter.skills.length > 0 || filter.location !== "" || filter.remoteOnly;
 
-  const seiten = useSeiten<Profile, string>(
+  const seiten = useSeiten<Treffer, string>(
     (cursor, signal) =>
-      listCandidates(cursor, filter, signal).then((result) =>
+      sucheKandidaten(cursor, filter, signal).then((result) =>
         result.ok
           ? {
               ok: true as const,
@@ -189,7 +197,7 @@ export function CandidatesPage() {
                   variant="text"
                   onClick={() => {
                     setEntwurf({ skills: "", location: "", remoteOnly: false });
-                    setFilter(NO_FILTERS);
+                    setFilter(OHNE_FILTER);
                   }}
                 >
                   {t("kandidaten.filterZuruecksetzen")}
@@ -220,11 +228,11 @@ export function CandidatesPage() {
             m: 0,
           }}
         >
-          {seiten.items.map((profile: Profile) => (
-            <CandidateCard
-              key={profile.subject_id}
-              profile={profile}
-              marketRequest={marktanfragen.get(profile.subject_id)}
+          {seiten.items.map((treffer: Treffer) => (
+            <TrefferKarte
+              key={treffer.subject_id}
+              treffer={treffer}
+              marketRequest={marktanfragen.get(treffer.subject_id)}
               onGeaendert={() => anfragen.reload()}
             />
           ))}
