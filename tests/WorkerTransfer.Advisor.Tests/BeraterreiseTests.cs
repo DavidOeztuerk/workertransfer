@@ -388,7 +388,17 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
         var zustimmung = await AlsPerson(Anna).PostAsync(
             Ziel($"/advisor/me/conversations/{gespraech}/agree"), null);
         zustimmung.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(zustimmung)).GetProperty("state").GetString().Should().Be("agreed");
+
+        var nachDerZustimmung = await Json(zustimmung);
+        nachDerZustimmung.GetProperty("state").GetString().Should().Be("agreed");
+
+        // UND DIE STUFE STEHT RICHTIG DARIN. Hier stand einmal 0 — der Endpunkt
+        // baute die Antwort mit `Stufe.Keine`, weil dieser Schritt die Stufe
+        // nicht aendert. Die Antwort behauptete damit „nichts freigegeben",
+        // unmittelbar nachdem jemand zugestimmt hatte. Sichtbar war es nicht,
+        // weil die Seite danach ohnehin neu laedt — eine Antwort, die luegt und
+        // die niemand liest, ist die, der spaeter jemand glaubt.
+        nachDerZustimmung.GetProperty("stage").GetInt32().Should().Be(3);
 
         var uebergabe = await AlsFirma().PostAsync(
             Ziel($"/advisor/conversations/{gespraech}/hand-over"), null);
@@ -436,7 +446,14 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
             Ziel($"/advisor/me/conversations/{gespraech}/end"), null);
 
         beendet.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(beendet)).GetProperty("state").GetString().Should().Be("ended");
+
+        var nachDemEnde = await Json(beendet);
+        nachDemEnde.GetProperty("state").GetString().Should().Be("ended");
+
+        // Ein Ende ist keine Ruecknahme: die Stufe steht, wo sie stand. Wer
+        // auch die Sichtbarkeit zurueckhaben will, widerruft sie — und das ist
+        // ein zweiter, bewusster Schritt.
+        nachDemEnde.GetProperty("stage").GetInt32().Should().Be(1);
 
         var nochmal = await AlsFirma().PostAsync(
             Ziel($"/advisor/conversations/{gespraech}/end"), null);

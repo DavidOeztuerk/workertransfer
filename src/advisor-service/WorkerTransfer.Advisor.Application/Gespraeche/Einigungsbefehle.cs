@@ -7,7 +7,7 @@ using WorkerTransfer.Advisor.Domain.Gespraeche;
 namespace WorkerTransfer.Advisor.Application.Gespraeche;
 
 /// <summary>„Ich bin einverstanden."</summary>
-public sealed record ZustimmenBefehl(Guid Id, SubjectId Wer) : IBefehl<Gespraech>;
+public sealed record ZustimmenBefehl(Guid Id, SubjectId Wer) : IBefehl<Gespraechsansicht>;
 
 /// <summary>
 /// Die Zustimmung der Person — und nur sie macht eine Übergabe möglich.
@@ -17,13 +17,22 @@ public sealed record ZustimmenBefehl(Guid Id, SubjectId Wer) : IBefehl<Gespraech
 /// Ein Gespräch, das ein Unternehmen allein in einen Transfer heben könnte,
 /// wäre eine Einladung, die man nicht ausschlagen kann.
 /// </remarks>
-public sealed class ZustimmenHandler(IGespraechsspeicher speicher, TimeProvider uhr)
-    : IRequestHandler<ZustimmenBefehl, Gespraech>
+public sealed class ZustimmenHandler(
+    IGespraechsspeicher speicher, IEinwilligungstor tor, TimeProvider uhr)
+    : IRequestHandler<ZustimmenBefehl, Gespraechsansicht>
 {
     /// <inheritdoc />
+    /// <remarks>
+    /// <strong>Die Stufe kommt auch hier aus dem Ledger.</strong> Sie hier
+    /// auszulassen — etwa als <c>Stufe.Keine</c>, weil dieser Schritt sie nicht
+    /// ändert — hiesse, in der Antwort „nichts freigegeben" zu behaupten,
+    /// unmittelbar nachdem jemand zugestimmt hat. Eine Antwort, die lügt, ist
+    /// das, was später geglaubt wird.
+    /// </remarks>
     /// <exception cref="KeinGespraech">Gibt es nicht, oder gehört einem anderen Menschen.</exception>
     /// <exception cref="UebergangNichtErlaubt">Von diesem Stand aus nicht.</exception>
-    public async Task<Gespraech> Handle(ZustimmenBefehl request, CancellationToken cancellationToken)
+    public async Task<Gespraechsansicht> Handle(
+        ZustimmenBefehl request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -34,7 +43,9 @@ public sealed class ZustimmenHandler(IGespraechsspeicher speicher, TimeProvider 
 
         await speicher.SichereAsync(gespraech, cancellationToken);
 
-        return gespraech;
+        var stufen = await tor.StufenAsync([(gespraech.Wer, gespraech.Firma)], cancellationToken);
+
+        return new Gespraechsansicht(gespraech, stufen[0]);
     }
 }
 
@@ -100,7 +111,8 @@ public sealed class UebergebenHandler(
 /// <summary>„Schluss."</summary>
 /// <param name="Wer">Gesetzt, wenn die Person beendet.</param>
 /// <param name="Firma">Gesetzt, wenn das Unternehmen beendet.</param>
-public sealed record BeendenBefehl(Guid Id, SubjectId? Wer, TenantId? Firma) : IBefehl<Gespraech>;
+public sealed record BeendenBefehl(Guid Id, SubjectId? Wer, TenantId? Firma)
+    : IBefehl<Gespraechsansicht>;
 
 /// <summary>Beide Seiten dürfen aufhören, aus jedem laufenden Stand.</summary>
 /// <remarks>
@@ -113,13 +125,19 @@ public sealed record BeendenBefehl(Guid Id, SubjectId? Wer, TenantId? Firma) : I
 /// bewusster Schritt, keine Nebenwirkung.
 /// </para>
 /// </remarks>
-public sealed class BeendenHandler(IGespraechsspeicher speicher, TimeProvider uhr)
-    : IRequestHandler<BeendenBefehl, Gespraech>
+public sealed class BeendenHandler(
+    IGespraechsspeicher speicher, IEinwilligungstor tor, TimeProvider uhr)
+    : IRequestHandler<BeendenBefehl, Gespraechsansicht>
 {
     /// <inheritdoc />
+    /// <remarks>
+    /// Die Stufe kommt aus dem Ledger — siehe <see cref="ZustimmenHandler"/>.
+    /// Ein Ende ist keine Rücknahme, und die Antwort darf nicht so tun.
+    /// </remarks>
     /// <exception cref="KeinGespraech">Gibt es nicht, oder gehört jemand anderem.</exception>
     /// <exception cref="UebergangNichtErlaubt">Es läuft nicht mehr.</exception>
-    public async Task<Gespraech> Handle(BeendenBefehl request, CancellationToken cancellationToken)
+    public async Task<Gespraechsansicht> Handle(
+        BeendenBefehl request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -138,6 +156,8 @@ public sealed class BeendenHandler(IGespraechsspeicher speicher, TimeProvider uh
 
         await speicher.SichereAsync(gespraech, cancellationToken);
 
-        return gespraech;
+        var stufen = await tor.StufenAsync([(gespraech.Wer, gespraech.Firma)], cancellationToken);
+
+        return new Gespraechsansicht(gespraech, stufen[0]);
     }
 }

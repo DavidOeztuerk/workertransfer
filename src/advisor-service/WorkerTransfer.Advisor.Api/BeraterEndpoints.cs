@@ -183,11 +183,10 @@ public static class BeraterEndpoints
 
             try
             {
-                var gespraech = await mediator.Send(
+                var ansicht = await mediator.Send(
                     new ZustimmenBefehl(id, handelnder.Subject), cancellationToken);
 
-                await context.Response.WriteAsJsonAsync(
-                    Meines(new Gespraechsansicht(gespraech, Stufe.Keine)), cancellationToken);
+                await context.Response.WriteAsJsonAsync(Meines(ansicht), cancellationToken);
             }
             catch (UebergangNichtErlaubt fehler)
             {
@@ -210,11 +209,10 @@ public static class BeraterEndpoints
 
             try
             {
-                var gespraech = await mediator.Send(
+                var ansicht = await mediator.Send(
                     new BeendenBefehl(id, handelnder.Subject, null), cancellationToken);
 
-                await context.Response.WriteAsJsonAsync(
-                    Meines(new Gespraechsansicht(gespraech, Stufe.Keine)), cancellationToken);
+                await context.Response.WriteAsJsonAsync(Meines(ansicht), cancellationToken);
             }
             catch (UebergangNichtErlaubt fehler)
             {
@@ -358,11 +356,12 @@ public static class BeraterEndpoints
 
             try
             {
-                var gespraech = await mediator.Send(
+                var ansicht = await mediator.Send(
                     new BeendenBefehl(id, null, firma), cancellationToken);
 
-                await context.Response.WriteAsJsonAsync(
-                    Ihres(new Gespraechsansicht(gespraech, Stufe.Profil)), cancellationToken);
+                // Ohne Mandat und ohne Klarnamen: ein beendetes Gespraech ist
+                // kein Anlass, noch einmal etwas ueber einen Menschen zu holen.
+                await context.Response.WriteAsJsonAsync(Ihres(ansicht), cancellationToken);
             }
             catch (UebergangNichtErlaubt fehler)
             {
