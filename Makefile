@@ -76,7 +76,7 @@ env:  # .env aus der Vorlage anlegen und die drei Geheimnisse wuerfeln.
 		echo "Sie ist ignoriert und gehoert nicht in git."; \
 	fi
 
-up:  # Der ganze Stapel lokal: Postgres, Mailpit, elf Dienste, Gateway, Oberflaeche.
+up:  # Der ganze Stapel lokal: Postgres, Mailpit, zwoelf Dienste, Gateway, Oberflaeche.
 	docker compose up -d --build
 
 down:  # Anhalten. `make down ARGS=-v` wirft auch die Datenbanken weg.

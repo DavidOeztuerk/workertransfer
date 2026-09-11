@@ -35,7 +35,8 @@ import {
 } from "../api/settings";
 
 /**
- * Die fünf Schalter. Der fünfte ist der Eingang einer Bewerbung beim Unternehmen.
+ * Die sechs Schalter. Der fünfte ist der Eingang einer Bewerbung beim
+ * Unternehmen, der sechste die Entdeckung des eigenen Profils in einer Suche.
  *
  * Der Hinweis unter jedem sagt, was das Abschalten <em>kostet</em>, nicht was
  * der Schalter tut. Wer „Marktstatus-Anfragen" abschaltet, soll wissen, dass er
@@ -50,6 +51,7 @@ const SCHALTER: {
   { key: "transfer_update", name: "transfer" },
   { key: "application_update", name: "bewerbung" },
   { key: "application_received", name: "eingang" },
+  { key: "profile_discovered", name: "entdeckt" },
 ];
 
 /**

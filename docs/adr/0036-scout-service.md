@@ -1,12 +1,31 @@
 # ADR-0036: scout-service — die Ablösung von `/candidates`
 
-**Status:** angenommen (06.09.2026)
+**Status:** angenommen (06.09.2026), **gebaut (11.09.2026)**
 **Betrifft:** scout-service, profile-service, consent-service, notification-service, `web/`
 **Verwandt:** ADR-0033 (Beleg und Sichtbarkeit), ADR-0020 (Sichtbarkeit im Ledger), ADR-0013 (Einwilligung wirkt sofort), ADR-0030 (Sammelprüfung), ADR-0022 (keine Zahl über einen Menschen), ADR-0024 (die KI-Naht), ADR-0025 (Postausgang inhaltsfrei), ADR-0026 (Ereignisse zählen), ADR-0027 (Löschung)
 
-**Nicht gebaut.** Dieses ADR entscheidet. Code folgt erst, wenn jemand ihn
-ausdrücklich beauftragt. `CLAUDE.md` verbietet Agenten, scout-service zu
-bauen.
+**Gebaut am 11.09.2026.** Dieses ADR entschied; der Dienst steht jetzt unter
+`src/scout-service` und antwortet auf `/scout/*`. Was hier steht, ist deshalb
+nicht mehr Vorhaben, sondern Begründung — und die vier Auflagen aus
+Entscheidung 2 hängen als `AuflagenTests` an ihr, jede mit einer gemessenen
+Gegenprobe.
+
+**Eine Entscheidung kam beim Bauen dazu und steht nicht oben:** die Suche ist
+ein **ODER** über die genannten Worte, nicht ein UND wie `GET /candidates`.
+Unter UND erfüllt jeder Treffer alle Bedingungen — jedes Häkchen wäre gesetzt,
+„welche Fähigkeit fehlt" hätte keine Antwort, und auch die erste Auflage wäre
+leer, weil es nichts zu sortieren gäbe. Die Häkchenliste aus Entscheidung 2
+setzt das ODER voraus; `/candidates` behält sein UND unverändert.
+
+**Und eine Benennung weicht ab, mit Absicht:** Entscheidung 3 nennt den Hinweis
+am Treffer `hinweis`; auf dem Draht heisst er `evidence_state` und trägt ein
+WORT (`complete`, `none_released`, `partial`, `unavailable`) statt eines Satzes.
+Der Grund ist ADR-0031: die Oberfläche formuliert in der Sprache der lesenden
+Person, und ein deutscher Satz auf dem Draht wäre eine Sprache, die der Server
+für alle festlegt. Die Zusage selbst ist unverändert — das Feld steht **immer**
+da, auch wenn es nichts zu sagen gäbe, damit eine Überarbeitung es nicht
+weglassen kann. Und `unavailable` ist ausdrücklich etwas anderes als
+`none_released`: „wir wissen es gerade nicht" ist keine Aussage über die Person.
 
 ## Der Fund, der dieses ADR ausgelöst hat
 

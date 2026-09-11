@@ -106,6 +106,14 @@ secrets:
 # reicht ANTHROPIC_API_KEY=... make k8s-up.
 anthropicApiKey: ""
 draftingModel: claude-sonnet-5
+# WOHIN die Formulierungshilfe ruft, und warum das hier steht und nicht nur als
+# Vorgabe im Quelltext: die Egress-Grenze leitet ihre erlaubten Hosts aus der
+# KONFIGURATION ab (`Dienstgrundlage.GerufeneHosts`). Ein eingebautes Ziel nach
+# draussen ist genau das, was ein Souveraenitaetsbericht sichtbar machen soll —
+# und ohne diese Zeile weist die Grenze den Aufruf im Cluster ab, ohne ihn zu
+# protokollieren. docker-compose.yml sagt dasselbe seit dem Umstieg auf
+# `SovereignPlatform`; im Chart fehlte es.
+draftingUrl: https://api.anthropic.com/v1/messages
 
 # --- Postgres ---------------------------------------------------------------
 # enabled: false in Staging/Produktion, dann zeigt `host` auf die verwaltete
@@ -200,6 +208,7 @@ services:
       Erasure__Adressen__transfer: http://transfer-service:8009
       Erasure__Adressen__notification: http://notification-service:8010
       Erasure__Adressen__github: http://github-service:8011
+      Erasure__Adressen__scout: http://scout-service:8012
 
   - name: consent-service
     dir: consent
@@ -295,6 +304,26 @@ services:
     database: github
     env:
       Consent__Adresse: http://consent-service:8002
+
+  - name: scout-service
+    dir: scout
+    port: 8012
+    database: scout
+    drafting: true
+    env:
+      # Jedes Ziel dieses Dienstes steht hier, und zwar weil es hier stehen
+      # MUSS: die Egress-Grenze leitet ihre erlaubten Hosts aus der
+      # Konfiguration ab. Ein Ziel, das nur im Quelltext steht, wird
+      # abgewiesen — ohne Protokollzeile.
+      Consent__Adresse: http://consent-service:8002
+      # Die interne Tuer, durch die gesucht wird. `Profile__Geheimnis` haengt
+      # in _helpers.tpl an dieser Zeile.
+      Profile__Adresse: http://profile-service:8003
+      # Die Belege — github-service, NICHT github.com: dieser Dienst fragt nie
+      # bei GitHub selbst.
+      GitHub__Adresse: http://github-service:8011
+      # „Dein Profil wurde entdeckt" (ADR-0033), ueber den Postausgang.
+      Notifications__Adresse: http://notification-service:8010
 
 resources:
   requests:

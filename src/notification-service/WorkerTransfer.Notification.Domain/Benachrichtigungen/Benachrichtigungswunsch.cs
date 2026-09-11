@@ -169,4 +169,21 @@ public interface IEingangsspeicher
     /// <returns>Wie viele Einträge das betraf.</returns>
     Task<int> LiesAllesAsync(
         SubjectId wer, DateTimeOffset jetzt, CancellationToken cancellationToken = default);
+
+    /// <summary>Gab es seit <paramref name="seit"/> schon einen Eintrag dieser Art?</summary>
+    /// <remarks>
+    /// <para>Die Tageskappe aus ADR-0033, und sie wird aus dem <em>Postfach</em>
+    /// beantwortet statt aus einer eigenen Spalte. Das ist der Punkt: eine
+    /// Spalte „zuletzt entdeckt am" wäre eine zweite Zeile über die
+    /// Sichtbarkeit eines Menschen, und das Postfach hält dieselbe Auskunft
+    /// bereits — es gehört ihm.</para>
+    ///
+    /// <para>Sie trägt nebenbei auch die Mindestens-einmal-Zustellung: eine
+    /// zweite Ausgangszeile derselben Art am selben Tag legt nichts Neues an.</para>
+    /// </remarks>
+    Task<bool> GabEsSeitAsync(
+        SubjectId wer,
+        Benachrichtigungsart art,
+        DateTimeOffset seit,
+        CancellationToken cancellationToken = default);
 }

@@ -205,30 +205,57 @@ aber niemand fragt.
 > **Als Unternehmen** will ich eine Anforderung stellen und Menschen sehen, die
 > sie erfüllen — **mit Häkchen und Belegen, nie mit einer Zahl.**
 
-ADR-0036 ist **angenommen**. Der Code fehlt.
+ADR-0036 ist **angenommen**. **Gebaut am 11.09.2026.**
 
 ### Aufgaben
 
-- [ ] Neuer Dienst nach dem Muster der elf anderen (`Api`/`Application`/
+- [x] Neuer Dienst nach dem Muster der elf anderen (`Api`/`Application`/
       `Domain`/`Infrastructure`/`Contracts`, eigene Datenbank, `AddGirder`).
-- [ ] `Suche` (Aggregat): Fähigkeiten, Ort, Umkreis, Berufsfeld, Verfügbarkeit.
-      **Gespeichert wird die Anfrage, nie das Ergebnis** — ein gespeichertes
-      Ergebnis über Menschen veraltet gegen einen Widerruf.
-- [ ] Die Treffer kommen aus profile-service (`/candidates` wird abgelöst, die
-      harten Teile — Ledger je Zeile über `/check-batch`, **keine Gesamtzahl**,
-      Firmenzwang — werden **mitgenommen, nicht neu erfunden**).
-- [ ] Belege werden zum Treffer **dazugeholt**, nie zum **Finden** benutzt.
-- [ ] Die Nachricht „dein Profil wurde entdeckt" (ADR-0033): eigene Art,
-      **nennt kein Unternehmen**, über den Postausgang, **höchstens eine je
-      Person und Tag**.
-- [ ] Löschempfänger ab der ersten Tabelle.
+      Hafen 8012, Route `/scout/{rest}` im Gateway, fünf Zeilen in der
+      Routenkarte — gegen den laufenden Stapel gefahren.
+- [x] `Suche` (Aggregat): Fähigkeiten, Ort, Remote. **Gespeichert wird die
+      Anfrage, nie das Ergebnis** — die Tabelle `searches` hat keine Spalte für
+      einen Treffer, und eine Reihe misst das an der gespeicherten Zeile.
+      (Umkreis und Berufsfeld sind nicht dabei: beide brauchen eine eigene
+      Entscheidung, und ADR-0036 trifft sie nicht.)
+- [x] Die Treffer kommen aus profile-service, über eine interne Tür hinter dem
+      gemeinsamen Geheimnis. Die harten Teile sind **mitgenommen**: Ledger je
+      Zeile über `/check-batch`, keine Gesamtzahl, kein Auffüllen, Firmenzwang.
+- [x] Belege werden zum Treffer **dazugeholt**, nie zum **Finden** benutzt —
+      und erst NACH der Freigabe: über wen nichts freigegeben ist, wird auch
+      nichts nachgeschlagen.
+- [x] Die Nachricht „dein Profil wurde entdeckt" (ADR-0033): eigene Art,
+      nennt kein Unternehmen, über den Postausgang, höchstens eine je Person
+      und Tag — und die Kappe nimmt den **Postfacheintrag** mit, nicht nur die
+      Mail.
+- [x] Löschempfänger ab der ersten Tabelle: `"scout"` steht in
+      `Loeschempfaenger.Fremde` und in `LoeschempfaengerTests.Dienste`.
 
 ### Abnahme — die vier Auflagen als Tests
 
-- Keine Sortierung nach Passung (zweimal laden → gleiche Reihenfolge).
-- Keine Zahl: `Adr0022Tests`-Muster über Domäne und Verträge.
-- Nur Genanntes ist durchsuchbar (ein nur *belegtes* Wort findet niemanden).
-- Die Ansprache ist ein **Entwurf**; der Dienst schreibt niemandem.
+Alle vier stehen in `AuflagenTests`, und **jede hat eine Gegenprobe, die
+gemessen gefallen ist**:
+
+- [x] Keine Sortierung nach Passung. Gegenprobe: ein `OrderByDescending` über
+      die gesetzten Häkchen → rot.
+- [x] Keine Zahl: `Adr0022Tests`-Muster über Domäne und Verträge, plus die
+      geschlossene Feldmenge von `TrefferV1`. Gegenprobe: ein Feld `fit` → rot.
+- [x] Nur Genanntes ist durchsuchbar — ein nur *belegtes* Wort findet
+      niemanden, dieselbe Person ist über ihr genanntes Wort sehr wohl zu
+      finden, und der Beleg taucht dann am Treffer auf. Gegenprobe: Belege vor
+      der Freigabe holen → rot.
+- [x] Die Ansprache ist ein **Entwurf**; der Dienst schreibt niemandem.
+      Gegenprobe: ein `IVersand` in der Anwendungsschicht → rot.
+
+### Was offen bleibt
+
+- Die **Oberfläche** ist nicht umgezogen. `GET /candidates` bleibt deshalb
+  stehen (ADR-0036 sagt das ausdrücklich) und fällt erst danach — zwei Suchen
+  nebeneinander wären zwei Wahrheiten, eine fehlende Route wäre eine Lücke.
+- **Umkreis und Berufsfeld** als Filter. Beide sind eine eigene Entscheidung:
+  ein Umkreis braucht Koordinaten (ADR-0032 nennt, worüber er nichts weiss),
+  ein Berufsfeld ist ein Etikett am Konto und heute ausdrücklich ohne Wirkung
+  auf Sichtbarkeit (ADR-0039).
 
 ---
 

@@ -53,7 +53,13 @@ public class ZwischenspeicherTests
         { "companies", typeof(Companies.Application.Profile.MeinProfilAbfrage) },
         { "transfer", typeof(Transfer.Application.Markt.MeinMarktstatusAbfrage) },
         { "github", typeof(GitHub.Application.Verbindungen.MeineVerbindungAbfrage) },
-        { "notification", typeof(Notification.Application.Benachrichtigungen.MeinPostfachAbfrage) }
+        { "notification", typeof(Notification.Application.Benachrichtigungen.MeinPostfachAbfrage) },
+
+        // scout-service haelt die schaerfste Fassung dieser Regel: er sucht
+        // Menschen, und ein zwischengespeichertes Ergebnis ueberlebte einen
+        // Widerruf. Deshalb speichert er die ANFRAGE und nie das Ergebnis
+        // (ADR-0036 Entscheidung 4) — und auch die Anfrage ist kein Cache.
+        { "scout", typeof(Scout.Application.Kandidaten.KandidatenAbfrage) }
     };
 
     /// <summary>Kein Typ eines Dienstes implementiert <c>ICacheableQuery</c>.</summary>
@@ -74,7 +80,7 @@ public class ZwischenspeicherTests
     }
 
     /// <summary>
-    /// Alle elf Dienste sind wirklich dabei — und die Assemblies sind nicht leer.
+    /// Alle zwoelf Dienste sind wirklich dabei — und die Assemblies sind nicht leer.
     /// </summary>
     /// <remarks>
     /// Ohne das wäre die Reihe grün, wenn jemand einen Dienst aus der Liste
@@ -86,7 +92,7 @@ public class ZwischenspeicherTests
     {
         var dienste = Dienste.Select(zeile => (string)zeile[0]!).ToArray();
 
-        dienste.Should().HaveCount(11);
+        dienste.Should().HaveCount(12);
         dienste.Should().OnlyHaveUniqueItems();
 
         foreach (var zeile in Dienste)
