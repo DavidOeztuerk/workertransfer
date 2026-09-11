@@ -12,6 +12,7 @@ using WorkerTransfer.Profile.Domain.Profile;
 using WorkerTransfer.Profile.Domain.Pruefspur;
 using WorkerTransfer.Profile.Infrastructure.Einwilligung;
 using WorkerTransfer.Profile.Infrastructure.Entwurf;
+using WorkerTransfer.Profile.Infrastructure.Intern;
 using WorkerTransfer.Profile.Infrastructure.Loeschung;
 using WorkerTransfer.Profile.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
@@ -51,6 +52,9 @@ public static class ProfileInfrastructure
             configuration.GetSection(Entwurfseinstellungen.Abschnitt));
         services.Configure<Loescheinstellungen>(
             configuration.GetSection(Loescheinstellungen.Abschnitt));
+        // Die interne Tuer, durch die scout-service sucht. Leer heisst: zu.
+        services.Configure<Meldeeinstellungen>(
+            configuration.GetSection(Meldeeinstellungen.Abschnitt));
 
 
         services.AddSingleton(_ => ProfileDbContextFactory.Datenquelle(connectionString));

@@ -60,6 +60,7 @@ public class DrahtvertragTests
         { "transfer", typeof(Transfer.Api.VorgangsEndpoints) },
         { "github", typeof(GitHub.Api.LoeschEndpoints) },
         { "notification", typeof(Notification.Api.LoeschEndpoints) },
+        { "scout", typeof(Scout.Api.LoeschEndpoints) },
 
         // Die gemeinsamen Vertraege gehoeren dazu, und zwar dringend: hier hat
         // sich der Fehler zuletzt versteckt. `EinwilligungsfrageV1` reist
@@ -82,7 +83,14 @@ public class DrahtvertragTests
         { "notification.contracts", typeof(Notification.Contracts.BenachrichtigenV1) },
         { "portfolio.contracts", typeof(Portfolio.Contracts.EintragV1) },
         { "resume.contracts", typeof(Resume.Contracts.StationV1) },
-        { "transfer.contracts", typeof(Transfer.Contracts.MarktstatusV1) }
+        { "transfer.contracts", typeof(Transfer.Contracts.MarktstatusV1) },
+
+        // Die Vertragsschicht des Scouts UND die von profile-service: die beiden
+        // teilen eine Naht (die interne Profilsuche), und ein Feld, das dort
+        // camelCase heisst, kommt nie an. `profile.contracts` war bis dahin
+        // leer — sie steht hier ab ihrem ersten Typ.
+        { "profile.contracts", typeof(Profile.Contracts.ProfilfundV1) },
+        { "scout.contracts", typeof(Scout.Contracts.TrefferV1) }
     };
 
     /// <summary>Ob camelCase und snake_case bei diesem Namen auseinandergehen.</summary>
@@ -129,13 +137,13 @@ public class DrahtvertragTests
             + "schickt snake_case, und der Wert kommt nie an", dienst);
     }
 
-    /// <summary>Die Liste deckt alle elf Api-Schichten und die drei geteilten Vertraege ab.</summary>
+    /// <summary>Die Liste deckt alle zwoelf Api-Schichten und die geteilten Vertraege ab.</summary>
     [Fact]
     public void Die_Liste_deckt_alle_Dienste_ab()
     {
         var dienste = ApiSchichten.Select(zeile => (string)zeile[0]!).ToArray();
 
-        dienste.Should().HaveCount(22);
+        dienste.Should().HaveCount(25);
         dienste.Should().OnlyHaveUniqueItems();
     }
 

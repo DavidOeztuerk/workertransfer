@@ -664,3 +664,43 @@ gruppen:
       - { methode: PUT, pfad: '/account/name', ohne: 401, person: 200, mitglied: 200, firma: 200, rumpf: '{"given_name":"Anna","family_name":"Beispiel"}' }
       - { methode: GET, pfad: '/account/address', ohne: 401, person: 200, mitglied: 200, firma: 200 }
       - { methode: PUT, pfad: '/account/address', ohne: 401, person: 200, mitglied: 200, firma: 200, rumpf: '{"line1":"","line2":"","postal_code":"","city":"","country":"DE","phone":""}' }
+
+  - name: 'Der Scout — suchen, ablegen, ansprechen'
+    warum: |
+      `scout-service` loest `GET /candidates` ab (ADR-0036). Die alte Route steht
+      weiter oben und bleibt, bis die Oberflaeche umgezogen ist; zwei Suchen
+      nebeneinander waeren zwei Wahrheiten, aber eine Route wegzunehmen, bevor
+      jemand die neue benutzt, waere eine Luecke.
+
+      FIRMENZWANG UEBERALL, und die zweite Spalte ist die, die ihn sichtbar
+      macht: als Person ohne Firma gibt jede dieser Routen 403 „no active
+      company" — eine Aussage ueber den AUFRUFER, die ueber die Gesuchten
+      nichts verraet. `member` genuegt, `admin` verlangt keine davon: suchen,
+      entwerfen und ansprechen ist die taegliche Arbeit im Namen der Firma.
+
+      `GET /scout/candidates` gibt 200 mit `items`/`next` und OHNE Gesamtzahl
+      (ADR-0026): sie verriete ueber die Differenz zur Seitenlaenge, wie viele
+      Profile NICHT freigegeben sind. Auf einer leeren Datenbank ist die Liste
+      leer — das ist eine richtige Antwort und keine ausweichende.
+
+      `POST /scout/searches` gibt hier 422, weil der Durchlauf `{}` schickt und
+      eine gespeicherte Suche einen Namen braucht. Das ist die ehrliche Zeile:
+      gespeichert wird die ANFRAGE, und eine namenlose Anfrage findet niemand
+      wieder. Mit Namen waere es 201.
+
+      `DELETE /scout/searches/{id}` gibt 404 fuer eine Kennung, die es nicht
+      gibt — und dieselbe 404 fuer die Suche eines Kollegen. Ein Unterschied
+      verriete, dass sie existiert.
+
+      `POST /scout/candidates/{id}/draft` gibt 404 fuer beide Firmenspalten: der
+      Ledger wird ZUERST gefragt, ein nicht existierendes Subjekt hat keine
+      Freigabe, und „verborgen" und „nicht vorhanden" muessen ununterscheidbar
+      bleiben (ADR-0020). Das Modell sieht in diesem Fall gar nichts — und mit
+      Freigabe kaeme ein ENTWURF zurueck, den dieser Dienst niemandem schickt
+      (ADR-0036 Auflage 4).
+    eintraege:
+      - { methode: GET, pfad: '/scout/candidates', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/scout/candidates/00000000-0000-0000-0000-000000000001/draft', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/scout/searches', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/scout/searches', ohne: 401, person: 403, mitglied: 422, firma: 422 }
+      - { methode: DELETE, pfad: '/scout/searches/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 404, firma: 404 }

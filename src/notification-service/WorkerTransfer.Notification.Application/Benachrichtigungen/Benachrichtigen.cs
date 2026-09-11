@@ -16,7 +16,11 @@ public sealed record BenachrichtigenBefehl(SubjectId Wer, Benachrichtigungsart A
 /// <list type="bullet">
 /// <item>Der <strong>Eintrag im Postfach entsteht immer</strong>. Er liegt
 /// hinter der Anmeldung, wo geprüft wird, wer liest; ihn zu drosseln hieße,
-/// jemandem zu verschweigen, dass etwas passiert ist.</item>
+/// jemandem zu verschweigen, dass etwas passiert ist. <em>Eine</em> Art bildet
+/// die Ausnahme, und aus dem umgekehrten Grund: bei
+/// <c>profile_discovered</c> wäre ein Eintrag je Treffer selbst die Auskunft,
+/// die niemand haben soll — ein Zähler über die eigene Sichtbarkeit
+/// (ADR-0033). Dort gilt eine Tageskappe, und sie nimmt den Eintrag mit.</item>
 /// <item>Die <strong>Mail wird gedrosselt und abbestellbar</strong>. Sie landet
 /// in einem Postfach, das nicht nur der Person gehören muss.</item>
 /// </list>
@@ -39,6 +43,18 @@ public sealed class BenachrichtigenHandler(
         ArgumentNullException.ThrowIfNull(request);
 
         var jetzt = uhr.GetUtcNow();
+
+        // DIE EIGENE KAPPE JE ART, und sie trifft den EINTRAG, nicht nur die
+        // Mail. Fuer `profile_discovered` waere ein Eintrag je Treffer ein
+        // Zaehler ueber die eigene Sichtbarkeit — auf Umwegen genau das
+        // Verzeichnis, das ADR-0033 nicht entstehen laesst. Deshalb faellt hier
+        // beides weg, und zwar still: der Aufrufer erfaehrt nichts darueber.
+        if (Benachrichtigungsarten.Tageskappe(request.Art) is { } kappe
+            && await eingaenge.GabEsSeitAsync(
+                request.Wer, request.Art, jetzt - kappe, cancellationToken))
+        {
+            return false;
+        }
 
         await eingaenge.FuegeHinzuAsync(
             Eingang.Lege_an(request.Wer, request.Art, jetzt), cancellationToken);

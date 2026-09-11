@@ -8,6 +8,7 @@ using WorkerTransfer.Notification.Contracts;
 using WorkerTransfer.Notification.Infrastructure.Post;
 using AnwendungenPost = WorkerTransfer.Applications.Infrastructure.Benachrichtigung;
 using LebenslaufPost = WorkerTransfer.Resume.Infrastructure.Benachrichtigung;
+using SpaeherPost = WorkerTransfer.Scout.Infrastructure.Benachrichtigung;
 using WechselPost = WorkerTransfer.Transfer.Infrastructure.Benachrichtigung;
 
 namespace WorkerTransfer.Ganzes.Tests;
@@ -81,6 +82,26 @@ public class BenachrichtigungsdrahtTests
                     Geheimnis = "probe"
                 }))
                 .ZustelleAsync(new SubjectId(Empfaenger), "resume_request"));
+
+    /// <summary>Der Rumpf von scout-service.</summary>
+    /// <remarks>
+    /// Der einzige der vier, der von Anfang an einen <em>typisierten</em> Vertrag
+    /// schickt (<c>EntdeckungsmeldungV1</c>) statt eines anonymen Objekts — und
+    /// er wird trotzdem hier geprüft. Eine Typangabe sagt nur, dass der Absender
+    /// sich etwas gedacht hat; ob es beim Empfänger ankommt, sagt allein dieser
+    /// Durchlauf.
+    /// </remarks>
+    [Fact]
+    public Task Scout_schickt_eine_Kennung_die_ankommt() =>
+        Pruefe(async (fabrik, einstellungen) =>
+            await new SpaeherPost.HttpBenachrichtigung(
+                fabrik,
+                Options.Create(new SpaeherPost.Benachrichtigungseinstellungen
+                {
+                    Adresse = einstellungen,
+                    Geheimnis = "probe"
+                }))
+                .ZustelleAsync(new SubjectId(Empfaenger), "profile_discovered"));
 
     /// <summary>
     /// Und der vierte Sprung: <c>notification-service</c> bittet

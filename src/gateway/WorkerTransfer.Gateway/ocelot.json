@@ -523,6 +523,29 @@
         }
       ],
       "Priority": 10
+    },
+    // Der Scout (ADR-0036). Er loest `/candidates` ab; die alte Route bleibt
+    // stehen, bis die Oberflaeche umgezogen ist, und faellt dann — zwei Suchen
+    // nebeneinander waeren zwei Wahrheiten.
+    //
+    // `/scout/...` und nicht `/candidates/...`: solange beide leben, muss sich
+    // die eine von der anderen unterscheiden lassen.
+    //
+    // NUR `/scout/{rest}` und kein blankes `/scout`: unter diesem Pfad selbst
+    // liegt kein Endpunkt. Eine Route dorthin waere eine Zeile in der
+    // Routenkarte, die nichts beschreibt — und die Karte ist ein Test, keine
+    // Abhakliste.
+    {
+      "UpstreamPathTemplate": "/scout/{rest}",
+      "DownstreamPathTemplate": "/scout/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "scout-service",
+          "Port": 8012
+        }
+      ],
+      "Priority": 10
     }
   ],
 

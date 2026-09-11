@@ -321,6 +321,8 @@ const fr: Katalog = {
     bewerbungHinweis: "Uniquement les décisions de l’entreprise — les vôtres, vous les connaissez.",
     eingangLabel: "Lorsqu’une candidature arrive dans votre entreprise",
     eingangHinweis: "Une entreprise n’a pas de boîte aux lettres. Le message vous est adressé.",
+    entdecktLabel: "Lorsqu’une entreprise découvre votre profil",
+    entdecktHinweis: "Laquelle n’y figure pas — et au plus un message de ce type par jour, quelle que soit la fréquence. Une ligne par découverte serait un compteur de votre propre visibilité.",
     datenschutz: "Confidentialité",
     verfall: "Le compte expire après",
     verfallNie: "Jamais de lui-même",
