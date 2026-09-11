@@ -760,3 +760,50 @@ gruppen:
       - { methode: GET, pfad: '/advisor/conversations/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/advisor/conversations/00000000-0000-0000-0000-000000000001/hand-over', ohne: 401, person: 403, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/advisor/conversations/00000000-0000-0000-0000-000000000001/end', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+
+  - name: 'Die Arbeitsprobe — Aufgabe, Loesung, Rueckmeldung'
+    warum: |
+      `assessment-service` (ADR-0042). Der Dienst mit dem groessten
+      Missbrauchspotenzial — unbezahlte Arbeit, als Aufgabe getarnt — und
+      deshalb der mit den engsten Zusagen: der Umfang in Stunden steht in der
+      Ausschreibung, die Bewertung gehoert dem VORGANG und verlaesst ihn nie,
+      und die Person liest sie immer, auch bei einer Absage.
+
+      ZWEI SEITEN, GETRENNT IM PFAD — mit EINER Ausnahme, und die ist die
+      Zusage selbst. Unter `/assessments` handelt eine Firma (als Person 403
+      „no active company", eine Aussage ueber den AUFRUFER); `/assessments/me`
+      gehoert der Person. `GET /assessments/{id}` aber gehoert BEIDEN und
+      antwortet beiden byte-gleich dasselbe Dokument: es gibt keine Firmensicht
+      neben einer Personensicht, weil es nur einen Endpunkt gibt. Zwei waeren
+      die Stelle, an der die beiden auseinanderlaufen — erst Monate spaeter,
+      beim naechsten Feld.
+
+      `member` genuegt ueberall, `admin` verlangt keine Route: eine
+      Arbeitsprobe zu stellen und zu beantworten ist die taegliche Arbeit im
+      Namen der Firma, und sie bindet das Unternehmen nicht.
+
+      WAS HIER FEHLT, FEHLT ABSICHTLICH: es gibt keine Route zum ABLEHNEN.
+      Wer eine Aufgabe nicht will, tut nichts; die Frist laeuft ab, und der
+      Vorgang steht auf `expired` — ununterscheidbar von „hat es nicht
+      geschafft". Ein hoeflicher Absageknopf waere freundlicher zum Unternehmen
+      und erzeugte genau den Vermerk, den ADR-0042 §3 verbietet.
+
+      `POST /assessments` gibt 422 in beiden Firmenspalten, weil der Durchlauf
+      `{}` schickt und ohne `subject_id` niemand gemeint ist. Mit einer Kennung
+      waere es 404, solange diese Person nichts freigegeben hat — und der
+      Ledger wird VOR der inhaltlichen Pruefung gefragt, damit ein Fremder aus
+      dem Unterschied 422/404 nicht lernt, dass es diesen Menschen gibt.
+
+      DIE DREI VORGANGSROUTEN GEBEN 404 in allen drei angemeldeten Spalten,
+      und zwar aus vier Gruenden, die ununterscheidbar bleiben muessen: den
+      Vorgang gibt es nicht, er gehoert jemand anderem, er gehoert einer
+      anderen Firma, oder die Person hat nichts (mehr) freigegeben (ADR-0020
+      §1). `POST /.../evaluation` traegt hier einen gueltigen Rumpf, damit die
+      Zeile genau diese 404 misst und nicht das 422 einer leeren Anfrage.
+    eintraege:
+      - { methode: POST, pfad: '/assessments', ohne: 401, person: 403, mitglied: 422, firma: 422, rumpf: '{}' }
+      - { methode: GET, pfad: '/assessments', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/assessments/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/assessments/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/assessments/00000000-0000-0000-0000-000000000001/submission', ohne: 401, person: 404, mitglied: 404, firma: 404, rumpf: '{"text":"x"}' }
+      - { methode: POST, pfad: '/assessments/00000000-0000-0000-0000-000000000001/evaluation', ohne: 401, person: 403, mitglied: 404, firma: 404, rumpf: '{"outcome":"rejected","text":"x"}' }

@@ -6,15 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Girder](https://github.com/DavidOeztuerk) 4.4.0** — a shared foundation library of this author's, pulled from GitHub Packages — plus a React app.
 
-Thirteen services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
+Fourteen services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
 
 The repository was a Python (`uv`) monorepo until August 2026 and was translated by hand, service by service. **Everything Python is gone**: no `pyproject.toml`, no `uv.lock`, no `apps/<service>`, no `packages/worker-*`, no alembic, ruff, mypy or pytest. `docs/MIGRATION-STAND.md` records what was decided along the way and, more usefully, what was *measured* — read it before assuming a shape is arbitrary. The ADRs in [`docs/adr/`](docs/adr/) predate the migration and **still govern**: they hold the reasons, and reasons do not change language. Where an ADR names a Python path, read it as naming the decision, not the file.
 
 ### The layout, so nobody guesses
 
 ```
-src/            thirteen services, gateway/, shared/
-tests/          seventeen test projects
+src/            fourteen services, gateway/, shared/
+tests/          eighteen test projects
 web/            the React app — deliberately not under src/
 docs/  bugs/  deploy/  docker/  scripts/  .github/
 WorkerTransfer.slnx  Directory.Build.props  Directory.Packages.props  NuGet.Config
@@ -40,6 +40,7 @@ package.json  pnpm-lock.yaml  pnpm-workspace.yaml  turbo.json  tsconfig.base.jso
 | `github-service` | 8011 | a person's own, verified GitHub connection |
 | `scout-service` | 8012 | the search for people — ticks and evidence, never a number |
 | `advisor-service` | 8013 | the mandate — four values; the stages live in the ledger |
+| `assessment-service` | 8014 | the work sample — the effort in hours, and one evaluation the person always reads |
 
 The gateway (`src/gateway`, port 8090) is the single entrance. `src/shared/` holds seven things and no more: `ServiceDefaults` (the one call every service makes), `Outbox`, `Skills`, `Ablage` (bytes for certificates, never a PDF the server rendered), and three `Contracts.*` packages (`Identity`, `Consent`, `Erasure`) that carry versioned boundary DTOs — never a shared domain model.
 
@@ -86,7 +87,7 @@ Before that it lived in GitHub Packages, and that cost a whole evening of CI —
 
 That emptiness is the point. A built-in default *is* the secret, and it then lives in git. `docker-compose.yml` therefore uses `${WORKERTRANSFER_JWT_SECRET:?…}`, not `${…:-dev-only-secret}`: without a value, compose aborts and **names the missing variable**. Girder does the same at its own most important place — `JWT_SECRET` beats `JwtSettings:Secret`, and if both are absent it throws a `ConfigurationException` naming the key.
 
-`Umgebung.Laden()` (`ServiceDefaults`) is the **first line of every one of the fourteen `Program.cs`**, before `CreateBuilder` — the configuration builder reads environment variables exactly once, when it builds, so loading afterwards means loading and nobody reading. A test pins that order in all fourteen. It never overwrites an already-set variable: in compose and in the cluster the environment comes from there, and a file left in the image must never override it.
+`Umgebung.Laden()` (`ServiceDefaults`) is the **first line of every one of the fifteen `Program.cs`**, before `CreateBuilder` — the configuration builder reads environment variables exactly once, when it builds, so loading afterwards means loading and nobody reading. A test pins that order in all fifteen. It never overwrites an already-set variable: in compose and in the cluster the environment comes from there, and a file left in the image must never override it.
 
 Infisical will later fill the environment. It feeds `.env`; it does not replace the mechanism, so no code changes for it.
 
@@ -94,11 +95,11 @@ Infisical will later fill the environment. It feeds `.env`; it does not replace 
 
 `docker compose up` is the whole local environment; there is no companion script. Each service migrates its own schema on start (`ServiceDefaults.Wanderung`), so a fresh clone needs no manual step. Source is not bind-mounted — a code change needs `docker compose up -d --build <service>`.
 
-**One image serves all fourteen entry points** (ADR-0028). They differ only in `SERVICE_DIR`, which `docker/dotnet-entrypoint.sh` reads from the *environment*, not from a build arg — so the image is built once, without the arg, and the container says who it is. The entrypoint finds the entry assembly as the only `*.runtimeconfig.json` under `/app/$SERVICE_DIR` (no name table to keep in sync) and **`cd`s into that directory** before starting: ASP.NET's content root is the working directory, and from `/app` no service reads its own `appsettings.json`. Measured at the first `compose up`, where only the gateway died visibly, on its missing `ocelot.json`.
+**One image serves all fifteen entry points** (ADR-0028). They differ only in `SERVICE_DIR`, which `docker/dotnet-entrypoint.sh` reads from the *environment*, not from a build arg — so the image is built once, without the arg, and the container says who it is. The entrypoint finds the entry assembly as the only `*.runtimeconfig.json` under `/app/$SERVICE_DIR` (no name table to keep in sync) and **`cd`s into that directory** before starting: ASP.NET's content root is the working directory, and from `/app` no service reads its own `appsettings.json`. Measured at the first `compose up`, where only the gateway died visibly, on its missing `ocelot.json`.
 
 Adding a service is three steps and no new Dockerfile: its database in `scripts/initdb/`, its entry point in `docker/dotnet-service.Dockerfile`, a copied block in `docker-compose.yml` with three values changed — plus its route in `src/gateway/WorkerTransfer.Gateway/ocelot.json`.
 
-**`curl` is in the runtime image on purpose.** Docker's healthcheck asks from *inside* the container, and the aspnet runtime image ships no curl, no wget, no nc; `sh` is dash and cannot do `/dev/tcp`. The probe used to be `dotnet --version`, which can *never* succeed on a runtime image (no SDK, exit 155) — every service reported `unhealthy` for months while answering perfectly, and a probe that is always red is worse than none. One probe now lives in the `x-dienst` anchor, covers all thirteen services *and* the gateway, asks `/health/live`, and derives the port from `ASPNETCORE_URLS` so no second list of ports can drift. Kubernetes does not need any of this — there the kubelet asks over HTTP from outside.
+**`curl` is in the runtime image on purpose.** Docker's healthcheck asks from *inside* the container, and the aspnet runtime image ships no curl, no wget, no nc; `sh` is dash and cannot do `/dev/tcp`. The probe used to be `dotnet --version`, which can *never* succeed on a runtime image (no SDK, exit 155) — every service reported `unhealthy` for months while answering perfectly, and a probe that is always red is worse than none. One probe now lives in the `x-dienst` anchor, covers all fourteen services *and* the gateway, asks `/health/live`, and derives the port from `ASPNETCORE_URLS` so no second list of ports can drift. Kubernetes does not need any of this — there the kubelet asks over HTTP from outside.
 
 ### Kubernetes — a staging environment on your own machine
 
@@ -113,7 +114,7 @@ The app answers on **`http://localhost:8090`** — not 8080, which belongs to th
 Load-bearing, and easy to undo by tidying up (ADR-0028):
 
 - **The route map stays one file.** The k8s `Service` objects are named exactly like the compose services, so `ocelot.json` travels in the image and the same map serves both. Re-expressing those non-disjoint paths and their priorities as Ingress rules would duplicate the map, and the copy would be wrong at the first new path.
-- **`replicaCount: 1` is a decision, not a starting value.** For the thirteen services one reason remains: **every service migrates its schema at startup**, so two pods are two pilgrims on one schema. (The outbox dispatcher's missing `SKIP LOCKED` is fixed.) The **gateway** is pinned separately, and for its own reason: the auth brake counts in-process — see below.
+- **`replicaCount: 1` is a decision, not a starting value.** For the fourteen services one reason remains: **every service migrates its schema at startup**, so two pods are two pilgrims on one schema. (The outbox dispatcher's missing `SKIP LOCKED` is fixed.) The **gateway** is pinned separately, and for its own reason: the auth brake counts in-process — see below.
 - **The web image is a built artifact, and that forces a runtime config.** `vite build` bakes `import.meta.env.VITE_*` into the bundle, so an image with baked URLs cannot be the same in two environments. `web/src/env.ts` resolves in three steps — `window.__WT_CONFIG__` → `VITE_*` → port fallback — and `web/public/config.js` is an empty object that changes nothing locally. Only the chart lays a real one over it. Do not "simplify" that back to a build arg.
 
 **`make k8s-up` has never been run on this machine.** The chart lints and renders; only a run proves it works.
@@ -155,7 +156,7 @@ What actually kept it was the price: `Girder.Infrastructure` drags **44** transi
 
 The lesson is worth more than the code: **a hand-written replacement outlives its reason.** Each time the stated reason was fixed, a new one was found rather than the code deleted — and every one of them held up until somebody measured it.
 
-**In the thirteen services the module stays out for a reason that has nothing to do with Girder and will not change:** a service behind the gateway sees the gateway as the origin — every caller as one. The brake belongs at the entrance, and there it is.
+**In the fourteen services the module stays out for a reason that has nothing to do with Girder and will not change:** a service behind the gateway sees the gateway as the origin — every caller as one. The brake belongs at the entrance, and there it is.
 
 ### github-service: the header that made it never work
 
@@ -233,7 +234,7 @@ One project per layer, per service, without exception:
 
 Repository *interfaces* live in Domain, implementations in Infrastructure. Commands, queries and handlers live in Application. **All wiring is behind one `Add<Service>Infrastructure()`** per service — its composition root (ADR-0003, and deliberately not a fluent `PlatformBuilder`).
 
-`ServiceDefaults.AddWorkerTransferDefaults()` is the one call every service makes. What is in it is there because thirteen services answering it thirteen ways would be thirteen chances to answer it wrong: how a token is verified, what a failure looks like on the wire, the order of the pipeline. What is *not* in it is everything that is a decision — which database, which repositories, whether there is a cache, whether there is an outbox. Those stay in each service's own composition root, where a reader can see them.
+`ServiceDefaults.AddWorkerTransferDefaults()` is the one call every service makes. What is in it is there because fourteen services answering it fourteen ways would be fourteen chances to answer it wrong: how a token is verified, what a failure looks like on the wire, the order of the pipeline. What is *not* in it is everything that is a decision — which database, which repositories, whether there is a cache, whether there is an outbox. Those stay in each service's own composition root, where a reader can see them.
 
 ### CQRS
 
@@ -710,7 +711,8 @@ higher, in the ledger, and it is fetched **before** this call. Whoever uses
 that door for something else fetches the check along with it.
 
 `"advisor"` is in `Loeschempfaenger.Fremde` from its first table, so the
-cascade is twelve rows now, not eleven.
+cascade is twelve rows now, not eleven — and thirteen since assessment-service
+(ADR-0042).
 
 **One notification kind came with it**, `advisor_conversation` — the seventh,
 and the counterpart to `profile_discovered`. There somebody *searched*, which
@@ -719,11 +721,75 @@ nobody has approached them"); here somebody *has* approached, and with a
 company the person had already released something to. It names no company
 either: a notification carries only a kind.
 
-### Planned, not built: assessment
+### assessment-service: the effort in hours, and one evaluation the person reads
+
+Built 11.09.2026 under ADR-0042 — **the ADR is 0042 and not 0040**, which PBI-5
+asks for: 0040 (the gateway serves no UI) and 0041 (distance) were already taken.
+
+The service exists because a work sample invites **two** abuses that are easy to
+mistake for one. The first is **unpaid work**: a task without a stated size is
+one whose price you learn after paying it. The second is **the mark**: a
+company's judgement of a person's work is exactly what ADR-0022 removed from
+this tree — the moment it leaves the process. It only has to leave once.
+
+**The measurement that set the shape:** `Bewerbungsstand` has five values and
+neither `Bewerbung` nor `BewerbungV1` carries **one field in which a company
+writes anything back to the person**. For an application that is defensible — a
+company forced to justify writes boilerplate. For a work sample it is exactly
+backwards, because there the person *worked*, and an outright rejection is the
+trade this service must not broker: work for silence.
+
+Three rules, each a mechanism rather than a paragraph:
+
+1. **The evaluation belongs to the process.** No number — no mark, no stars, no
+   percentage. And no way out of the process: the store knows two questions
+   ("this company's cases" and "my cases"), the closed endpoint set in
+   `AuflagenTests` is six, and there is no third question a company could ask
+   about a person. The alternative — a ledger capability "my evaluations are
+   visible to company Y" — was rejected because the switch would exist, and then
+   the pressure to flip it would: a switch you press under pressure is not a
+   consent, and a reference letter with consent paint is still a reference letter.
+2. **The person sees it, always.** There is exactly **one** evaluation field and
+   it is the one the person reads; `GET /assessments/{id}` answers both sides
+   **byte-identically**, and a test compares them byte for byte. The ledger
+   guards the company side and **never** the person's — whoever revokes
+   disappears for the company (404, as everywhere) and goes on reading what was
+   written about their work. An evaluation you can be locked out of by
+   withdrawing visibility is a judgement the judged never reads. And an outcome
+   without text is **422**: rejecting and giving a reason are one step.
+   Evaluated **once**; a second time is 409.
+3. **The effort is stated up front, and declining is recorded nowhere.**
+   `hours` is required, 1 to 8 — beyond one working day it is not a sample but
+   work, and work has a contract, not a form. The deadline lies at least 48
+   hours out. **There is no decline route, state or field**: whoever does not
+   want to does nothing, the deadline passes, and `expired` is indistinguishable
+   from "meant to and didn't". A polite decline button is kinder to the company
+   and creates the record — "declined three times" is a fact about a person,
+   assembled from individually reasonable clicks.
+
+It stands on `profile.visibility:*` — **the existing capability**, the same one
+stage 1 of a conversation stands on, and deliberately no `assessment.*`: a
+second capability for the same question is a second truth. There is no call to
+advisor-service either; both ask the ledger, and the ledger is the one place.
+
+The submission is **text and at most one link, never bytes** — a third file
+store would be a third place an erasure must reach. **The link is never
+fetched**: it is stored and shown, a person clicks it. `AuflagenTests` pins that
+exactly two types take an `IHttpClientFactory` (the ledger and notification).
+
+Erasure recipient from its first table, and **no retention case, not even for
+the evaluation** — it is not a record belonging to somebody else. The cascade is
+thirteen rows now.
+
+The eighth notification kind came with it: `assessment_update`, for both
+movements ("a task was set for you", "your evaluation is in"). The second is why
+the kind exists — without it a person learns of a reply at their next visit.
+
+### Still not built: nothing from that draft
 
 [`docs/SCOUT-UND-BERATER.md`](docs/SCOUT-UND-BERATER.md) is a **draft**. The inventory in [`docs/SCOUT-UND-BERATER-BESTAND.md`](docs/SCOUT-UND-BERATER-BESTAND.md) measured what already exists and **refutes parts of that draft**. ADR-0034 is the cover-letter agent, ADR-0035 the application folder.
 
-**`scout-service` (ADR-0036) and `advisor-service` (ADR-0037) are both built**, 11.09.2026 — each has its own section above. Assessment has no ADR at all. **No agent builds assessment** without being asked for it by name.
+**All three services of that draft are now built**: `scout-service` (ADR-0036), `advisor-service` (ADR-0037) and `assessment-service` (ADR-0042), 11.09.2026 — each has its own section above.
 
 When an application arrives, company **members** get a mail of kind `application_received`. A company has no mailbox. The outbox stays content-free (ADR-0025): id and kind, never a name.
 

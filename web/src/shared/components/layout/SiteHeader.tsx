@@ -78,6 +78,9 @@ const WEGE: { pfad: string; schluessel: string; immer: boolean }[] = [
   // Der Berater (ADR-0037). Er steht bei den Wegen der PERSON: das Mandat
   // gehoert ihr, nicht dem Unternehmen, fuer das sie gerade handelt.
   { pfad: "/advisor", schluessel: "kopf.berater", immer: false },
+  // Die Arbeitsprobe (ADR-0042). Auch sie steht bei den Wegen der PERSON:
+  // die Bewertung gehoert dem Vorgang, und lesen darf sie, um wen es geht.
+  { pfad: "/assessments", schluessel: "kopf.arbeitsproben", immer: false },
 ];
 
 export function SiteHeader() {
@@ -483,6 +486,7 @@ function FirmenMenu() {
         <Eintrag to="/company/applications">{t("kopf.unsereBewerbungen")}</Eintrag>
         <Eintrag to="/company/transfers">{t("kopf.unsereGespraeche")}</Eintrag>
         <Eintrag to="/company/advisor">{t("kopf.unsereBerater")}</Eintrag>
+        <Eintrag to="/company/assessments">{t("kopf.unsereProben")}</Eintrag>
         <Divider />
         <Eintrag to="/company/profile">{t("kopf.firmenprofil")}</Eintrag>
         <Eintrag to="/company/team">{t("kopf.team")}</Eintrag>

@@ -37,6 +37,8 @@ public class LandkarteTests(Landschaft landschaft)
     [InlineData("/github/me", "github")]
     [InlineData("/notifications", "notification")]
     [InlineData("/notifications/me", "notification")]
+    [InlineData("/assessments", "assessment")]
+    [InlineData("/assessments/me", "assessment")]
     public async Task Eine_Adresse_landet_bei_ihrem_Dienst(string pfad, string erwartet)
     {
         var (dienst, angekommen) = await landschaft.Frage(pfad);

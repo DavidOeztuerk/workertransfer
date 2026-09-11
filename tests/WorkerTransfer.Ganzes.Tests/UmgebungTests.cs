@@ -123,7 +123,7 @@ public sealed class UmgebungTests
                         && !pfad.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .ToList();
 
-        einstiege.Should().HaveCount(14, "dreizehn Dienste und das Gateway");
+        einstiege.Should().HaveCount(15, "vierzehn Dienste und das Gateway");
 
         foreach (var pfad in einstiege)
         {

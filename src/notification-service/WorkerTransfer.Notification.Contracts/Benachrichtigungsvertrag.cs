@@ -20,7 +20,7 @@ public sealed record EingangV1(
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
     [property: JsonPropertyName("read_at")] DateTimeOffset? ReadAt);
 
-/// <summary>Die sieben Schalter.</summary>
+/// <summary>Die acht Schalter.</summary>
 /// <remarks>
 /// Ohne die Drossel: sie ist keine Einstellung, sondern eine Eigenschaft des
 /// Dienstes, und ein Feld dafür wäre eine Einladung, sie abzuschalten.
@@ -43,6 +43,13 @@ public sealed record EingangV1(
 /// <em>angesprochen</em>, und zwar ein Unternehmen, dem die Person schon selbst
 /// etwas freigegeben hat.
 /// </para>
+/// <para>
+/// <c>assessment_update</c> — „an deiner Arbeitsprobe hat sich etwas bewegt"
+/// (ADR-0042) — steht ebenfalls auf <c>true</c>. Sie trägt zwei Bewegungen, und
+/// die zweite ist eine Zusage: die Person <em>sieht</em> ihre Bewertung, immer.
+/// Wer den Schalter abstellt, verliert die Mail und nicht den Eintrag — der
+/// steht hinter der Anmeldung in ihrer eigenen Liste.
+/// </para>
 /// </remarks>
 public sealed record BenachrichtigungswuenscheV1(
     [property: JsonPropertyName("resume_request")] bool ResumeRequest,
@@ -51,4 +58,5 @@ public sealed record BenachrichtigungswuenscheV1(
     [property: JsonPropertyName("transfer_update")] bool TransferUpdate,
     [property: JsonPropertyName("application_received")] bool ApplicationReceived = true,
     [property: JsonPropertyName("profile_discovered")] bool ProfileDiscovered = true,
-    [property: JsonPropertyName("advisor_conversation")] bool AdvisorConversation = true);
+    [property: JsonPropertyName("advisor_conversation")] bool AdvisorConversation = true,
+    [property: JsonPropertyName("assessment_update")] bool AssessmentUpdate = true);

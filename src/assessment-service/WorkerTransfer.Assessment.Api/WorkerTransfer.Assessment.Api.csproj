@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\WorkerTransfer.Assessment.Application\WorkerTransfer.Assessment.Application.csproj" />
+    <ProjectReference Include="..\WorkerTransfer.Assessment.Contracts\WorkerTransfer.Assessment.Contracts.csproj" />
+    <ProjectReference Include="..\WorkerTransfer.Assessment.Infrastructure\WorkerTransfer.Assessment.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Erasure\WorkerTransfer.Contracts.Erasure.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Girder.Infrastructure" />
+  </ItemGroup>
+</Project>

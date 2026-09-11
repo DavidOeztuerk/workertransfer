@@ -1,4 +1,4 @@
-# Der ganze Stapel: Datenbank, Mailfaenger, dreizehn Dienste, das Gateway und die
+# Der ganze Stapel: Datenbank, Mailfaenger, vierzehn Dienste, das Gateway und die
 # Oberflaeche.
 #
 #   docker compose up --build     # alles starten
@@ -48,7 +48,7 @@ x-dienst: &dienst
   depends_on:
     postgres:
       condition: service_healthy
-  # EINE Probe fuer alle dreizehn, und sie fragt das, was zaehlt: /health/live,
+  # EINE Probe fuer alle vierzehn, und sie fragt das, was zaehlt: /health/live,
   # dieselbe Adresse, die auch Kubernetes abfragt.
   #
   # Der Hafen kommt aus ASPNETCORE_URLS, damit er nicht ein zweites Mal
@@ -173,6 +173,7 @@ services:
       Erasure__Adressen__github: http://github-service:8011
       Erasure__Adressen__scout: http://scout-service:8012
       Erasure__Adressen__advisor: http://advisor-service:8013
+      Erasure__Adressen__assessment: http://assessment-service:8014
     depends_on:
       postgres:
         condition: service_healthy
@@ -515,6 +516,38 @@ services:
       Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
     ports:
       - "8013:8013"
+
+  assessment-service:
+    <<: *dienst
+    container_name: workertransfer-assessment
+    environment:
+      <<: *umgebung
+      SERVICE_DIR: assessment
+      ASPNETCORE_URLS: "http://0.0.0.0:8014"
+      ConnectionStrings__assessment: Host=postgres;Port=5432;Database=assessment;Username=worker;Password=worker
+      # JEDES ZIEL DIESES DIENSTES STEHT HIER, UND ZWAR WEIL ES HIER STEHEN MUSS:
+      # die Egress-Grenze leitet ihre erlaubten Hosts aus der Konfiguration ab
+      # (Dienstgrundlage.GerufeneHosts). Ein Ziel, das nur im Quelltext steht,
+      # wird abgewiesen — ohne Protokollzeile, und der Ausfall sieht dann aus
+      # wie ein Ausfall des anderen Dienstes.
+      #
+      # Der Ledger, und er ist der EINZIGE Waechter dieses Dienstes: eine
+      # Arbeitsprobe steht an `profile.visibility:*` und an keiner eigenen
+      # Faehigkeit (ADR-0042). OHNE diese Zeile antwortet die Firmenseite 503 —
+      # richtig, und sichtbar. Die Personenseite antwortet weiter, und das ist
+      # Absicht: wer seine Bewertung lesen will, braucht dafuer keinen Ledger.
+      Consent__Adresse: http://consent-service:8002
+      # „An deiner Arbeitsprobe hat sich etwas bewegt" — ueber den Postausgang,
+      # inhaltsfrei (ADR-0025). Kein Aufgabentext und keine Bewertung reisen
+      # mit: die Mail kann im Postfach des jetzigen Arbeitgebers landen.
+      Notifications__Adresse: http://notification-service:8010
+      Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      # AUSDRUECKLICH NICHT EINGETRAGEN: die Adresse, die eine Person
+      # einreicht. Sie wird gespeichert und angezeigt, nie abgerufen — ein
+      # Dienst, der sie holte, fuehrte eine von einem Fremden gewaehlte Adresse
+      # in eine Serveranfrage.
+    ports:
+      - "8014:8014"
 
   gateway:
     <<: *dienst
