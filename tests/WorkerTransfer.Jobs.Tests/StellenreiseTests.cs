@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Jobs.Application.Ports;
+using WorkerTransfer.ServiceDefaults.Rollen;
 
 namespace WorkerTransfer.Jobs.Tests;
 
@@ -33,6 +34,7 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
 
     private WebApplicationFactory<Program> _dienst = null!;
     private readonly Probeentwerfer _entwerfer = new();
+    private readonly Rollenprobe _rollen = new();
 
     public Task InitializeAsync()
     {
@@ -45,7 +47,13 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Erasure:Geheimnis", Rueckzugsgeheimnis);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Scoped<IEntwerfer>(_ => _entwerfer)));
+            {
+                dienste.Replace(ServiceDescriptor.Scoped<IEntwerfer>(_ => _entwerfer));
+                // Der Draht zu identity-service. Die Vorgabe ist `admin`, damit
+                // die bestehenden Reisen weiter das messen, wofuer sie da sind;
+                // `Rollenreise` dreht ihn auf `member` und prueft die Rolle.
+                dienste.Replace(ServiceDescriptor.Scoped<IFirmenrollen>(_ => _rollen));
+            });
         });
 
         return Task.CompletedTask;

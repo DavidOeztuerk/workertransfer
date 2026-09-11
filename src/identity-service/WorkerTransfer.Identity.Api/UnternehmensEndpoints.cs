@@ -181,7 +181,11 @@ public static class UnternehmensEndpoints
 
                 context.Response.StatusCode = StatusCodes.Status204NoContent;
             });
-        });
+        })
+        // Die Kehrseite des Einladens, und darum dasselbe Recht: bis heute
+        // konnte ein `member` die Einladung einer Kollegin zuruecknehmen, weil
+        // hier niemand fragte.
+        .RequireAuthorization(Firmenrechte.Richtlinie(Firmenrechte.EinladungZuruecknehmen));
 
         firma.MapGet("/members", async (
             Guid tenantId,

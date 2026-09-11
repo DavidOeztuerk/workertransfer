@@ -112,18 +112,91 @@ aber niemand fragt.
 
 ### Aufgaben
 
-- [ ] Jede Firmen-Route durchgehen und entscheiden: `admin` oder `member`?
-      Die Liste ist `docs/routenkarte.yml` — sie ist bereits vollständig.
-- [ ] `[RequirePermission(...)]` an den Endpunkten, die es brauchen.
-- [ ] `docs/routenkarte.yml` bekommt eine **vierte Spalte**: `mitglied`. Heute
-      unterscheidet die Karte drei Handlungsformen; die vierte ist genau die,
-      die diese Arbeit prüfbar macht.
-- [ ] Ein Test je Route: `member` bekommt 403, `admin` 200.
+- [x] Jede Firmen-Route durchgegangen. Die **Linie**, einmal aufgeschrieben,
+      damit die nächste Route sie nicht neu erfindet: `admin` ist, wer das
+      Unternehmen **bindet oder ändert**, wer dazugehört. `member` ist die
+      tägliche Arbeit im Namen der Firma — lesen, entwerfen, schreiben,
+      ansprechen, Bewerbungen bearbeiten. **Im Zweifel `member`:** ein zu enges
+      Recht macht aus einer Einladung eine Zuschauerkarte, und dann legt jemand
+      einen zweiten Admin an, um arbeiten zu können — dann ist „admin" wieder
+      ein Wort in einer Tabelle.
 
-### Abnahme
+      | Route | Recht |
+      |---|---|
+      | `POST /companies/{id}/invitations` | `company.invite` |
+      | `DELETE /companies/{id}/invitations/{id}` | `company.invitations.withdraw` |
+      | `DELETE /companies/{id}/members/{id}` | `company.members.remove` |
+      | `POST /jobs/{id}/publish` | `jobs.publish` |
+      | `POST /jobs/{id}/close` | `jobs.close` |
+      | `PUT /companies/me/profile` | `company.profile.write` |
+      | `POST /transfers/{id}/offer` | `transfer.offer` |
+      | `POST /transfers/{id}/complete` | `transfer.complete` |
 
-- `make routenkarte` fährt vier Spalten statt drei, alle wie aufgeschrieben.
-- Eine Gegenprobe: `RequirePermission` an einer Route entfernt → der Test fällt.
+      Drei Entscheidungen, die auch anders hätten ausfallen können, und warum
+      nicht: `POST /jobs` und `PUT /jobs/{id}` bleiben beim Mitglied (ein
+      Entwurf steht niemandem gegenüber — die Linie liegt am Aushang, nicht am
+      Text); `POST /transfers/{id}/withdraw` ebenso (wer anfangen darf, muss
+      aufhören dürfen, sonst ist die Einladung eine Falle); `GET
+      /companies/{id}/members` und `GET .../invitations` ebenso (eine Firma muss
+      ihrer eigenen Belegschaft nicht verschweigen, wer dazugehört und wen sie
+      sucht).
+- [x] Die Richtlinien hängen an den Endpunkten (`Permission:*`, aufgelöst von
+      Girders `PermissionPolicyProvider` — derselbe Name, den
+      `[RequirePermission]` setzt; geschrieben als `RequireAuthorization`, wie
+      die zwei, die es schon gab).
+- [x] **Die Rolle kommt aus der Mitgliedschaftstabelle, je Anfrage.** Sie liegt
+      in identity-service und nirgends sonst (ADR-0004), also fragen die anderen
+      Dienste über `GET /internal/companies/{id}/members/{sub}/role` hinter dem
+      gemeinsamen Geheimnis. `ServiceDefaults.Rollen` trägt den Mechanismus, die
+      **Liste** steht je Dienst im eigenen `Program.cs` — der Mechanismus darf
+      nicht elfmal beantwortet werden, die Liste ist eine Entscheidung.
+      **Kein Zwischenspeicher**, aus demselben Grund wie beim Ledger (ADR-0013):
+      wer entfernt wird, ist bei der nächsten Anfrage draußen.
+- [x] **Ein Schweigen der Rollenauskunft ist 503, nie 403.** Ein
+      Autorisierungshandler kann nur „ja" sagen; er hinterlässt deshalb eine
+      Notiz am `HttpContext`, und `Ablehnungsgestalt` macht daraus 503. Ein 403
+      läse sich als „dir wurde das Recht genommen", und niemand suchte nach
+      einem Ausfall.
+- [x] `docs/routenkarte.yml` hat die vierte Spalte `mitglied`, und
+      `scripts/routenkarte.sh` fährt sie. Das vierte Konto entsteht wie ein
+      Mensch: registriert, mit `role: "member"` eingeladen, beigetreten. Das
+      Skript **weigert sich zu messen**, wenn es nicht denselben Mandanten und
+      die Rolle `member` trägt — ohne diese Prüfung mäße ein misslungener
+      Beitritt still eine Person ohne Firma, und alle acht Zeilen sähen trotzdem
+      grün aus, weil 403 dort auch für eine Person richtig ist.
+- [x] Ein Test je geschützter Route: `member` 403, `admin` 200 — in derselben
+      Reihe, denn ein Endpunkt, der IMMER 403 antwortet, ist von einem richtig
+      geschützten nicht zu unterscheiden. `RollenTests` in jobs, companies und
+      transfer; `UnternehmensreiseTests` in identity.
+
+### Abnahme — erfüllt (11.09.2026)
+
+- `make routenkarte` fährt **vier** Spalten, alle wie aufgeschrieben.
+- **Gegenprobe gefahren:** `RequireAuthorization` an `POST /jobs/{id}/publish`
+  entfernt → **drei** Reihen fielen
+  (`Nur_ein_Administrator_veroeffentlicht`, `Gefragt_wird_nach_dem_Mandanten…`,
+  `Eine_schweigende_Rollenauskunft…`). Sie **kompilierte** — ein Build-Fehler
+  läse sich in der Ausgabe wie ein bestandener Test. Danach zurückgenommen und
+  mit `--no-incremental` neu gebaut.
+- Eine zweite Gegenprobe fiel nebenbei an und ist wertvoller als die erste:
+  `ZeitlimitTests` suchte wörtlich nach `client.Timeout` und wurde rot an
+  `HttpFirmenrollen`, das sein Zeitlimit an `klient` setzt — also an
+  **richtigem** Code. Gesucht wird jetzt die Zuweisung `.Timeout =` statt eines
+  Variablennamens. Ein Wächter, der bei richtigem Code rot wird, wird beim
+  nächsten Mal weggeschaltet statt gelesen.
+
+### Was PBI-2 NICHT getan hat
+
+- **Die Rolle steht weiterhin nicht im Token.** Das wäre der kürzere Weg und
+  der schlechtere: eine Entfernung wirkte dann erst beim Ablauf.
+- **`GET`-Routen haben keine Richtlinie bekommen.** Was nicht in der Liste
+  steht, darf jedes Mitglied — die Prüfung „handelst du für eine Firma?" steht
+  schon am Endpunkt, und eine zweite Richtlinie daneben wäre eine zweite Stelle
+  für dieselbe Frage.
+- **Die Oberfläche versteckt weiterhin, und das ist jetzt nur noch Bequemlich-
+  keit.** Niemand hat die Navigation angefasst; ein `member` sieht heute
+  Firmeneinträge, die 403 antworten. Das ist die richtige Reihenfolge (erst der
+  Server, dann die Anzeige), aber es ist Arbeit, die noch aussteht.
 
 ---
 

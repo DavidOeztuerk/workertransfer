@@ -4,7 +4,11 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using WorkerTransfer.ServiceDefaults.Rollen;
 
 namespace WorkerTransfer.Companies.Tests;
 
@@ -23,6 +27,12 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("environment", "Development");
+            // Das Schaufenster zu schreiben verlangt seit PBI-2 einen `admin`.
+            // Diese Reihe misst das Profil und nicht die Rolle — also antwortet
+            // die Probe wie eine Inhaberin. `RollenTests` dreht sie auf
+            // `member`.
+            host.ConfigureTestServices(dienste =>
+                dienste.Replace(ServiceDescriptor.Scoped<IFirmenrollen>(_ => new Rollenprobe())));
         });
 
         return Task.CompletedTask;

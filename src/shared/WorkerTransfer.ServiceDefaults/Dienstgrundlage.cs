@@ -6,6 +6,7 @@ using Girder.Infrastructure.Extensions;
 using Girder.Infrastructure.Security.Identity;
 using Girder.Infrastructure.Security.InputSanitization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -107,6 +108,21 @@ public static class Dienstgrundlage
         services.PostConfigure<JwtBearerOptions>(
             JwtBearerDefaults.AuthenticationScheme,
             optionen => optionen.AuchAusDemCookie());
+
+        // Eine Ablehnung durch eine Richtlinie schliesst die Antwort KURZ und
+        // wirft nicht — `ProblemDetailsMiddleware` sieht sie nie. Ohne diese
+        // Zeile faellt sie als nackter 401/403 mit leerem Rumpf heraus, ohne
+        // Korrelationskennung, und die Oberflaeche bekaeme fuer dieselbe Sache
+        // zwei Gestalten.
+        //
+        // Sie stand in identity-service, solange der der einzige Dienst mit
+        // Richtlinien war. Seit die Firmenrechte in vier Diensten haengen,
+        // gehoert sie hierher: eine Gestalt ueber alle Dienste.
+        //
+        // In einem Dienst OHNE Richtlinien kostet sie nichts: die
+        // Autorisierungs-Zwischenschicht ruft diesen Handler nur fuer
+        // Endpunkte, die Autorisierungsdaten tragen.
+        services.AddSingleton<IAuthorizationMiddlewareResultHandler, Ablehnungsgestalt>();
 
         return services.AddGirder(configuration, environment, dienstname, girder =>
         {

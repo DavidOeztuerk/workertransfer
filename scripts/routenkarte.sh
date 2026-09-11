@@ -3,8 +3,9 @@
 #
 #   make up && ./scripts/routenkarte.sh
 #
-# `docs/routenkarte.yml` haelt fuer jeden Endpunkt fest, was er in den drei
-# Handlungsformen aus ADR-0017 antwortet. Hier wird gefragt, ob das noch stimmt.
+# `docs/routenkarte.yml` haelt fuer jeden Endpunkt fest, was er in den VIER
+# Handlungsformen aus ADR-0017/0018 antwortet. Hier wird gefragt, ob das noch
+# stimmt.
 #
 # Die Vollstaendigkeit der Karte prueft ein anderer Test (RoutenkarteTests in
 # WorkerTransfer.Gateway.Tests) — der braucht keinen Stapel und laeuft in jeder
@@ -43,7 +44,7 @@ curl -sf -o /dev/null "${BASE}/health/live" || {
 }
 
 # ---------------------------------------------------------------------------
-# Die drei Handlungsformen besorgen.
+# Die vier Handlungsformen besorgen.
 #
 # EIGENE DOMAENE JE LAUF fuer die Firma: eine Domaene laesst sich nur einmal
 # beanspruchen (ADR-0019). Beim zweiten Lauf gegen dieselbe wird die Firma bei
@@ -64,6 +65,14 @@ stempel="$(date +%s)-$$"
 # Mit einer eigenen Domaene je Lauf ist sie eindeutig: 400.
 PERSON="mensch@rk-p-${stempel}.example"
 FIRMA="chef@rk-f-${stempel}.example"
+# Die VIERTE Handlungsform: dieselbe Firma, Rolle `member`.
+#
+# Sie gruendet NICHTS. Wer gruendet, ist Administrator (ADR-0019) — ein zweites
+# Firmenkonto waere also ein zweiter Admin und mithin dieselbe Spalte noch
+# einmal. Das Mitglied kommt darum ueber eine Einladung mit `role: "member"` in
+# die Firma des Chefkontos, und genau das ist der Weg, den ein Mensch auch
+# nimmt: es gibt keinen „Firma anlegen"-Knopf.
+MITGLIED="kollege@rk-m-${stempel}.example"
 
 token_aus_mail() {
   for _ in $(seq 1 40); do
@@ -77,6 +86,32 @@ print(m[0]['ID'] if m else '')" 2>/dev/null || echo "")
 import json,sys
 d=json.load(sys.stdin); print((d.get('Text') or '')+(d.get('HTML') or ''))" \
       | grep -oE 'token=[A-Za-z0-9_-]+' | head -1 | cut -d= -f2)
+    [ -n "$t" ] && { echo "$t"; return 0; }
+  done
+  return 1
+}
+
+# Der Token aus der EINLADUNGSMAIL, an ihrem Link erkannt.
+#
+# `token_aus_mail` nimmt die erste Nachricht und den ersten `token=`-Treffer.
+# Das Mitgliedskonto bekommt aber ZWEI Mails: erst die Bestaetigung, dann die
+# Einladung. Sich auf die Reihenfolge in Mailpit zu verlassen hiesse, die
+# Messung von einer Sortierung abhaengig zu machen, die niemand zugesagt hat —
+# und ein falscher Token faellt hier nicht auf, er macht nur aus dem Mitglied
+# still eine Person ohne Firma. Also wird der LINK gesucht, den nur die
+# Einladung traegt.
+einladungstoken_aus_mail() {
+  for _ in $(seq 1 40); do
+    sleep 0.5
+    t=$(curl -sf "${MAIL}/api/v1/search?query=to:$1" 2>/dev/null | python3 -c "
+import json,sys
+print(' '.join(m['ID'] for m in (json.load(sys.stdin).get('messages') or [])))" 2>/dev/null \
+      | tr ' ' '\n' | while read -r id; do
+          [ -n "$id" ] || continue
+          curl -sf "${MAIL}/api/v1/message/${id}" | python3 -c "
+import json,sys
+d=json.load(sys.stdin); print((d.get('Text') or '')+(d.get('HTML') or ''))"
+        done | grep -oE 'invitation\?token=[A-Za-z0-9_-]+' | head -1 | cut -d= -f2)
     [ -n "$t" ] && { echo "$t"; return 0; }
   done
   return 1
@@ -100,6 +135,7 @@ anlegen() {
 grau "Handlungsformen anlegen ..."
 anlegen "$PERSON" "" person
 anlegen "$FIRMA" "Routenkarte ${stempel}" firma
+anlegen "$MITGLIED" "" mitglied
 
 TENANT=$(curl -sf -b "${ARBEIT}/firma.cookie" "${BASE}/me/companies" | python3 -c "
 import json,sys
@@ -117,7 +153,46 @@ curl -sf -o /dev/null -b "${ARBEIT}/firma.cookie" -c "${ARBEIT}/firma.cookie" \
 traegt=$(curl -sf -b "${ARBEIT}/firma.cookie" "${BASE}/me" | python3 -c "
 import json,sys; print(json.load(sys.stdin).get('tenant_id') or '')")
 [ -n "$traegt" ] || { rot "Das Firmentoken traegt keinen Mandanten."; exit 1; }
-grau "  Person ohne Firma, Firma mit Mandant ${traegt:0:8}…"
+
+# ---------------------------------------------------------------------------
+# Das MITGLIED in dieselbe Firma holen — ueber eine Einladung, wie ein Mensch.
+eingeladen=$(curl -s -o /dev/null -w '%{http_code}' -b "${ARBEIT}/firma.cookie" \
+  -X POST "${BASE}/companies/${TENANT}/invitations" \
+  -H 'Content-Type: application/json' \
+  -d "{\"email\":\"${MITGLIED}\",\"role\":\"member\"}")
+[ "$eingeladen" = "201" ] || { rot "Die Einladung wurde nicht angelegt (${eingeladen})."; exit 1; }
+
+einladung="$(einladungstoken_aus_mail "$MITGLIED")" \
+  || { rot "Keine Einladungsmail fuer ${MITGLIED}."; exit 1; }
+
+curl -sf -o /dev/null -b "${ARBEIT}/mitglied.cookie" \
+  -X POST "${BASE}/invitations/accept" \
+  -H 'Content-Type: application/json' -d "{\"token\":\"${einladung}\"}"
+
+# Der Beitritt wechselt die laufende Sitzung NICHT (Absicht, siehe
+# UnternehmensreiseTests) — das Mitglied muss die Firma selbst waehlen.
+curl -sf -o /dev/null -b "${ARBEIT}/mitglied.cookie" -c "${ARBEIT}/mitglied.cookie" \
+  -X POST "${BASE}/auth/company/${TENANT}"
+
+# Und der Beleg, dass die VIERTE Spalte wirklich eine vierte ist: derselbe
+# Mandant wie die Firmenspalte, aber die Rolle `member`. Ohne diese Pruefung
+# maesse ein fehlgeschlagener Beitritt still eine Person ohne Firma — und jede
+# der acht geschuetzten Zeilen saehe trotzdem gruen aus, weil 403 dort auch die
+# richtige Antwort fuer eine Person ist.
+mitgliedstenant=$(curl -sf -b "${ARBEIT}/mitglied.cookie" "${BASE}/me" | python3 -c "
+import json,sys; print(json.load(sys.stdin).get('tenant_id') or '')")
+[ "$mitgliedstenant" = "$traegt" ] \
+  || { rot "Das Mitgliedstoken traegt nicht denselben Mandanten wie die Firma."; exit 1; }
+
+rolle=$(curl -sf -b "${ARBEIT}/mitglied.cookie" "${BASE}/me/companies" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+d=d if isinstance(d,list) else (d.get('companies') or d.get('items') or [])
+print(d[0]['role'] if d else '')")
+[ "$rolle" = "member" ] \
+  || { rot "Das vierte Konto ist kein 'member', sondern '${rolle}'."; exit 1; }
+
+grau "  Person ohne Firma, Firma und Mitglied am Mandanten ${traegt:0:8}…"
 
 # ---------------------------------------------------------------------------
 # `/account/erasure` loescht den Aufrufer. Ein Durchlauf, der stumpf jeden
@@ -188,7 +263,12 @@ def keks_aus(datei):
         zeilen.append(zeile.split("\t"))
     return "; ".join(f"{t[5]}={t[6]}" for t in zeilen if len(t) >= 7)
 
-spalten = {"ohne": None, "person": keks_aus("person"), "firma": keks_aus("firma")}
+spalten = {
+    "ohne": None,
+    "person": keks_aus("person"),
+    "mitglied": keks_aus("mitglied"),
+    "firma": keks_aus("firma"),
+}
 
 abweichungen, geprueft, uebersprungen_n = [], 0, 0
 

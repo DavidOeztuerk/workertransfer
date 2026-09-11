@@ -248,6 +248,11 @@ services:
     port: 8006
     database: jobs
     drafting: true
+    env:
+      # Die Rollenauskunft: wer `admin` ist, steht in der
+      # Mitgliedschaftstabelle von identity-service und nicht im Token.
+      # `Identity__Geheimnis` haengt in _helpers.tpl an dieser Zeile.
+      Identity__Adresse: http://identity-service:8001
 
   - name: applications-service
     dir: applications
@@ -263,6 +268,8 @@ services:
     dir: companies
     port: 8008
     database: companies
+    env:
+      Identity__Adresse: http://identity-service:8001
 
   - name: transfer-service
     dir: transfer
@@ -271,6 +278,7 @@ services:
     env:
       Consent__Adresse: http://consent-service:8002
       Notifications__Adresse: http://notification-service:8010
+      Identity__Adresse: http://identity-service:8001
 
   - name: notification-service
     dir: notification

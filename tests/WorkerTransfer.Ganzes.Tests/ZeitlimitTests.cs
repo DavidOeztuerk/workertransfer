@@ -24,6 +24,13 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// sind für eine Einwilligungsprüfung großzügig und für einen Entwurf über ein
 /// Sprachmodell zu wenig. Eine Zahl für beides wäre für eine der beiden
 /// falsch.</para>
+///
+/// <para><strong>Gesucht wird die ZUWEISUNG, nicht der Variablenname.</strong>
+/// Hier stand <c>client.Timeout</c>, und damit hing die Zusage daran, wie
+/// jemand seine lokale Variable nennt: <c>HttpFirmenrollen</c> setzt sein
+/// Zeitlimit an <c>klient</c> und fiel als „ohne Zeitlimit" durch, obwohl es
+/// eines hat. Ein Waechter, der bei richtigem Code rot wird, wird beim nächsten
+/// Mal weggeschaltet statt gelesen.</para>
 /// </remarks>
 public sealed class ZeitlimitTests
 {
@@ -50,7 +57,7 @@ public sealed class ZeitlimitTests
         foreach (var pfad in stellen)
         {
             File.ReadAllText(pfad).Should().Contain(
-                "client.Timeout",
+                ".Timeout =",
                 $"'{Path.GetFileName(pfad)}' ruft einen anderen Dienst, setzt aber kein "
                 + "Zeitlimit — dann gilt die Vorgabe von hundert Sekunden");
         }

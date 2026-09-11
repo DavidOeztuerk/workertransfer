@@ -7,17 +7,67 @@
 # niemand faehrt, ist am Tag nach ihrer Erstellung falsch.
 #
 # ---------------------------------------------------------------------------
-# DREI SPALTEN, WEIL ES DREI HANDLUNGSFORMEN GIBT (ADR-0017)
+# VIER SPALTEN, WEIL ES VIER HANDLUNGSFORMEN GIBT (ADR-0017, ADR-0018)
 #
-#   ohne    kein Token
-#   person  angemeldet, KEINE Firma — `tenant_id` ist null
-#   firma   angemeldet und fuer eine Firma handelnd
+#   ohne      kein Token
+#   person    angemeldet, KEINE Firma — `tenant_id` ist null
+#   mitglied  angemeldet, fuer eine Firma handelnd, Rolle `member`
+#   firma     dasselbe, Rolle `admin`
 #
-# Die mittlere ist die, die man vergisst. Ein Mensch ohne Firma ist auf einem
+# Die ZWEITE ist die, die man vergisst. Ein Mensch ohne Firma ist auf einem
 # Transfermarkt der NORMALFALL, nicht der Sonderfall — und die Zeilen, in denen
-# sie sich von der rechten unterscheidet, sind genau die Stellen, an denen
-# ADR-0017 wirklich etwas tut. Wo `person` und `firma` gleich sind, sagt die
-# Zeile: hier spielt die Firma keine Rolle.
+# sie sich von den beiden rechten unterscheidet, sind genau die Stellen, an
+# denen ADR-0017 wirklich etwas tut. Wo `person` und `firma` gleich sind, sagt
+# die Zeile: hier spielt die Firma keine Rolle.
+#
+# Die DRITTE ist seit PBI-2 da, und sie macht eine Arbeit ueberhaupt erst
+# pruefbar. Bis dahin gab es im ganzen Baum ausserhalb von identity-service
+# KEINE einzige Rechtepruefung: die Navigation versteckte Firmeneintraege, und
+# der Server antwortete 403 nur dort, wo jemand daran gedacht hatte.
+# `Mitgliedschaftsrecht` las die Rolle je Anfrage aus der Tabelle — aber
+# niemand fragte. Verstecken ist keine Zugriffskontrolle.
+#
+# `firma` heisst deshalb ab jetzt genauer: fuer eine Firma handelnd ALS ADMIN.
+# Die Konten sind in `scripts/routenkarte.sh` so gebaut: wer gruendet, ist
+# Administrator (ADR-0019); das Mitglied kommt ueber eine Einladung mit
+# `role: "member"` herein.
+#
+# ACHT Routen verlangen seit PBI-2 einen `admin`, und sie sind die ganze
+# Arbeit dieses Schritts:
+#
+#   POST   /companies/{id}/invitations        einladen
+#   DELETE /companies/{id}/invitations/{id}   eine Einladung zuruecknehmen
+#   DELETE /companies/{id}/members/{id}       ein Mitglied entfernen
+#   POST   /jobs/{id}/publish                 eine Anzeige hinstellen
+#   POST   /jobs/{id}/close                   sie wegnehmen
+#   PUT    /companies/me/profile              das oeffentliche Schaufenster
+#   POST   /transfers/{id}/offer              Termin und Gebuehr
+#   POST   /transfers/{id}/complete           den Abschluss feststellen
+#
+# SICHTBAR wird der Unterschied hier nur in FUENF Zeilen, und der Grund ist
+# lehrreich genug, um ihn aufzuschreiben: die drei Verwaltungsrouten nennen die
+# Firma im PFAD, und die Kennung dort EXISTIERT NICHT (wie ueberall in dieser
+# Karte). Auch das Chefkonto ist in dieser erfundenen Firma kein Administrator
+# und bekommt 403 — beide Spalten zeigen dieselbe Zahl aus zwei verschiedenen
+# Gruenden. Dass die Richtlinie dort wirklich zwischen den Rollen
+# unterscheidet, belegt `UnternehmensreiseTests` an einer Firma, die es gibt.
+# `RoutenkarteTests.Die_vierte_Spalte_unterscheidet_admin_von_member` nennt die
+# fuenf beim Namen: eine davon zu oeffnen ist dann eine bewusste Aenderung und
+# keine stille.
+#
+# Die LINIE dahinter, einmal aufgeschrieben, damit die naechste Route sie nicht
+# neu erfinden muss: `admin` ist, wer das Unternehmen BINDET oder aendert, wer
+# dazugehoert. `member` ist die taegliche Arbeit im Namen der Firma — lesen,
+# entwerfen, schreiben, ansprechen, Bewerbungen bearbeiten. Im Zweifel
+# `member`: ein zu enges Recht macht aus einer Einladung eine Zuschauerkarte,
+# und dann legt jemand einen zweiten Admin an, um arbeiten zu koennen — dann
+# ist „admin" wieder ein Wort in einer Tabelle.
+#
+# Zwei Faelle, die aus dieser Linie folgen und leicht anders ausfielen:
+# `POST /jobs` und `PUT /jobs/{id}` bleiben beim Mitglied (ein Entwurf steht
+# niemandem gegenueber), und `POST /transfers/{id}/withdraw` auch — wer einen
+# Vorgang anfangen darf, muss ihn beenden duerfen, sonst ist die Einladung eine
+# Falle.
 #
 # ---------------------------------------------------------------------------
 # WIE DIESE ZAHLEN ENTSTANDEN SIND
@@ -77,13 +127,13 @@ gruppen:
       Rumpf ueberall dieselbe Sache ist. Der Prueferklasse fehlte genau diese
       eine Tuer.
     eintraege:
-      - { methode: POST, pfad: '/auth/register', ohne: 422, person: 422, firma: 422 }
-      - { methode: POST, pfad: '/auth/login', ohne: 422, person: 422, firma: 422 }
-      - { methode: POST, pfad: '/auth/verify-email', ohne: 422, person: 422, firma: 422 }
-      - { methode: POST, pfad: '/auth/resend-verification', ohne: 422, person: 422, firma: 422 }
-      - { methode: POST, pfad: '/auth/refresh', ohne: 401, person: 200, firma: 200 }
-      - { methode: POST, pfad: '/auth/company/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 403 }
-      - { methode: GET, pfad: '/auth/session', ohne: 200, person: 200, firma: 200 }
+      - { methode: POST, pfad: '/auth/register', ohne: 422, person: 422, mitglied: 422, firma: 422 }
+      - { methode: POST, pfad: '/auth/login', ohne: 422, person: 422, mitglied: 422, firma: 422 }
+      - { methode: POST, pfad: '/auth/verify-email', ohne: 422, person: 422, mitglied: 422, firma: 422 }
+      - { methode: POST, pfad: '/auth/resend-verification', ohne: 422, person: 422, mitglied: 422, firma: 422 }
+      - { methode: POST, pfad: '/auth/refresh', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/auth/company/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 403, firma: 403 }
+      - { methode: GET, pfad: '/auth/session', ohne: 200, person: 200, mitglied: 200, firma: 200 }
 
   - name: 'Das eigene Konto'
     warum: |
@@ -116,9 +166,9 @@ gruppen:
       `scripts/routenkarte.sh` gibt jetzt auch der Person eine eigene Domaene je
       Lauf. Seitdem stehen beide Werte durch Konstruktion fest.
     eintraege:
-      - { methode: GET, pfad: '/me', ohne: 401, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/me/companies', ohne: 401, person: 200, firma: 200 }
-      - { methode: POST, pfad: '/companies', ohne: 401, person: 422, firma: 422 }
+      - { methode: GET, pfad: '/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/me/companies', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/companies', ohne: 401, person: 422, mitglied: 422, firma: 422 }
 
   - name: 'Firmenverwaltung — 404 fuer eine fremde Firma'
     warum: |
@@ -128,10 +178,23 @@ gruppen:
       Firma gibt; die Kennung hier existiert nicht, und die Antwort ist
       dieselbe wie fuer eine, die es gibt und zu der man nicht gehoert.
 
-      SCHREIBEN gibt 403 — `POST /invitations` und `DELETE /members/{id}`
-      haengen an einer Richtlinie (`Permission:company.*`), und die entscheidet,
-      BEVOR der Rumpf ueberhaupt angesehen wird. Zuvor gaben sie 400 (Rumpf
-      kaputt) beziehungsweise 404 (kein Mitglied).
+      SCHREIBEN gibt 403 — `POST /invitations`, `DELETE /invitations/{id}` und
+      `DELETE /members/{id}` haengen an einer Richtlinie (`Permission:company.*`),
+      und die entscheidet, BEVOR der Rumpf ueberhaupt angesehen wird. Zuvor
+      gaben sie 400 (Rumpf kaputt) beziehungsweise 404 (kein Mitglied).
+
+      `DELETE /invitations/{id}` ist mit PBI-2 dazugekommen und stand vorher mit
+      404 hier. Die Rolle wurde dort schon geprueft — aber im BEFEHL, also hinter
+      der Eingabepruefung, und damit lernte ein Fremder aus dem Unterschied
+      400/403, dass sein Rumpf in Ordnung war. Jetzt entscheidet die Richtlinie
+      zuerst, und die drei Schreibwege antworten gleich.
+
+      Die vierte Spalte steht hier dreimal auf 403, und das ist die Aussage von
+      PBI-2: einladen, eine Einladung zuruecknehmen und jemanden entfernen sind
+      Handlungen ueber die Zusammensetzung des Unternehmens. `GET /members`
+      bleibt jedem Mitglied offen — eine Firma muss ihrer eigenen Belegschaft
+      nicht verschweigen, wer dazugehoert. `GET /invitations` ebenso: wen die
+      Firma gerade sucht, ist keine Verschlusssache vor den Kolleginnen.
 
       Der Wechsel war eine FOLGE, keine Absicht — er fiel beim Fahren dieser
       Karte auf. Nachgeprueft traegt er trotzdem: die Richtlinie antwortet 403
@@ -143,12 +206,12 @@ gruppen:
       lernte ein Fremder aus dem Unterschied 400/403, dass sein Rumpf in Ordnung
       war.
     eintraege:
-      - { methode: POST, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations', ohne: 401, person: 403, firma: 403 }
-      - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations', ohne: 401, person: 404, firma: 404 }
-      - { methode: DELETE, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations/00000000-0000-0000-0000-000000000002', ohne: 401, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/members', ohne: 401, person: 404, firma: 404 }
-      - { methode: DELETE, pfad: '/companies/00000000-0000-0000-0000-000000000001/members/00000000-0000-0000-0000-000000000002', ohne: 401, person: 403, firma: 403 }
-      - { methode: POST, pfad: '/invitations/accept', ohne: 401, person: 422, firma: 422 }
+      - { methode: POST, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations', ohne: 401, person: 403, mitglied: 403, firma: 403 }
+      - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: DELETE, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations/00000000-0000-0000-0000-000000000002', ohne: 401, person: 403, mitglied: 403, firma: 403 }
+      - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/members', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: DELETE, pfad: '/companies/00000000-0000-0000-0000-000000000001/members/00000000-0000-0000-0000-000000000002', ohne: 401, person: 403, mitglied: 403, firma: 403 }
+      - { methode: POST, pfad: '/invitations/accept', ohne: 401, person: 422, mitglied: 422, firma: 422 }
 
   - name: 'Einwilligung — der Ledger'
     warum: |
@@ -158,12 +221,12 @@ gruppen:
       weder im Pfad noch in der Abfrage — eine fremde Liste sagte, welche anderen
       Firmen Zugriff halten (ADR-0013).
     eintraege:
-      - { methode: POST, pfad: '/consent/grant', ohne: 401, person: 403, firma: 403 }
-      - { methode: POST, pfad: '/consent/revoke', ohne: 401, person: 403, firma: 403 }
-      - { methode: GET, pfad: '/consent/me', ohne: 401, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/consent/me/history', ohne: 401, person: 200, firma: 200 }
-      - { methode: POST, pfad: '/consent/check', ohne: 401, person: 422, firma: 422 }
-      - { methode: POST, pfad: '/consent/check-batch', ohne: 401, person: 422, firma: 422 }
+      - { methode: POST, pfad: '/consent/grant', ohne: 401, person: 403, mitglied: 403, firma: 403 }
+      - { methode: POST, pfad: '/consent/revoke', ohne: 401, person: 403, mitglied: 403, firma: 403 }
+      - { methode: GET, pfad: '/consent/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/consent/me/history', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/consent/check', ohne: 401, person: 422, mitglied: 422, firma: 422 }
+      - { methode: POST, pfad: '/consent/check-batch', ohne: 401, person: 422, mitglied: 422, firma: 422 }
 
   - name: 'Profil und Kandidaten — hier sitzt ADR-0020'
     warum: |
@@ -187,11 +250,11 @@ gruppen:
       gesetzt ist. Der Entwurf sagt das, statt so zu tun, als koenne er es
       (ADR-0024).
     eintraege:
-      - { methode: PUT, pfad: '/profiles/me', ohne: 401, person: 422, firma: 422 }
-      - { methode: GET, pfad: '/profiles/me', ohne: 401, person: 200, firma: 200 }
-      - { methode: POST, pfad: '/profiles/me/draft', ohne: 401, person: 503, firma: 503 }
-      - { methode: GET, pfad: '/profiles/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 404 }
-      - { methode: GET, pfad: '/candidates', ohne: 401, person: 403, firma: 200 }
+      - { methode: PUT, pfad: '/profiles/me', ohne: 401, person: 422, mitglied: 422, firma: 422 }
+      - { methode: GET, pfad: '/profiles/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/profiles/me/draft', ohne: 401, person: 503, mitglied: 503, firma: 503 }
+      - { methode: GET, pfad: '/profiles/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/candidates', ohne: 401, person: 403, mitglied: 200, firma: 200 }
 
   - name: 'Lebenslauf — strenger als das Profil'
     warum: |
@@ -214,34 +277,34 @@ gruppen:
       einen Grund dafuer geschrieben. Das ist die unangenehmste Art, falsch zu
       liegen: mit Begruendung.
     eintraege:
-      - { methode: PUT, pfad: '/resumes/me', ohne: 401, person: 422, firma: 422 }
-      - { methode: GET, pfad: '/resumes/me', ohne: 401, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/resumes/me/requests', ohne: 401, person: 200, firma: 200 }
-      - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/grant', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/revoke', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/resumes/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, firma: 404 }
-      - { methode: GET, pfad: '/resumes/requests', ohne: 401, person: 403, firma: 200 }
-      - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 404 }
-      - { methode: POST, pfad: '/resumes/me/documents', ohne: 401, person: 415, firma: 415 }
-      - { methode: GET, pfad: '/resumes/me/documents', ohne: 401, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001/content', ohne: 401, person: 404, firma: 404 }
-      - { methode: DELETE, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
-      - { methode: PUT, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001/as-cv', ohne: 401, person: 404, firma: 404 }
-      - { methode: PUT, pfad: '/resumes/me/template', ohne: 401, person: 422, firma: 422 }
-      - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001/documents', ohne: 401, person: 403, firma: 200 }
-      - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001/documents/00000000-0000-0000-0000-000000000002/content', ohne: 401, person: 403, firma: 404 }
+      - { methode: PUT, pfad: '/resumes/me', ohne: 401, person: 422, mitglied: 422, firma: 422 }
+      - { methode: GET, pfad: '/resumes/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/resumes/me/requests', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/grant', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/revoke', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/resumes/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/resumes/requests', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/resumes/me/documents', ohne: 401, person: 415, mitglied: 415, firma: 415 }
+      - { methode: GET, pfad: '/resumes/me/documents', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001/content', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: DELETE, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: PUT, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001/as-cv', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: PUT, pfad: '/resumes/me/template', ohne: 401, person: 422, mitglied: 422, firma: 422 }
+      - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001/documents', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001/documents/00000000-0000-0000-0000-000000000002/content', ohne: 401, person: 403, mitglied: 404, firma: 404 }
 
   - name: 'Portfolio'
     warum: |
       `POST /me/attachments` gibt 415, weil der Rumpf kein `multipart/form-data`
       ist — die Pruefung der Form kommt vor allem anderen.
     eintraege:
-      - { methode: PUT, pfad: '/portfolios/me', ohne: 401, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/portfolios/me', ohne: 401, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/portfolios/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/portfolios/me/attachments', ohne: 401, person: 415, firma: 415 }
-      - { methode: GET, pfad: '/portfolios/00000000-0000-0000-0000-000000000001/attachments/x.pdf', ohne: 401, person: 404, firma: 404 }
+      - { methode: PUT, pfad: '/portfolios/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/portfolios/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/portfolios/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/portfolios/me/attachments', ohne: 401, person: 415, mitglied: 415, firma: 415 }
+      - { methode: GET, pfad: '/portfolios/00000000-0000-0000-0000-000000000001/attachments/x.pdf', ohne: 401, person: 404, mitglied: 404, firma: 404 }
 
   - name: 'Stellen — die mittlere Spalte ist hier die wichtige'
     warum: |
@@ -274,16 +337,25 @@ gruppen:
 
       Alles Schreibende gibt **403 fuer die Person**: wer fuer keine Firma
       handelt, schreibt keine Anzeige. Das ist ADR-0017 in einer Spalte.
+
+      Und `publish`/`close` geben **403 fuer das Mitglied**: das ist ADR-0018 in
+      der naechsten. Die Linie liegt am Aushang, nicht am Text — eine Anzeige zu
+      SCHREIBEN und zu aendern ist die Arbeit, fuer die jemand eingeladen wird,
+      und solange sie ein Entwurf ist, steht sie niemandem gegenueber.
+      Veroeffentlichen stellt sie hin, Schliessen nimmt sie weg, und mit ihr die
+      Moeglichkeit, sich zu bewerben. „Ein `member` kann meine Stellen nicht
+      loeschen" heisst in dieser Domaene genau `close`: geloescht wird eine
+      Anzeige nie.
     eintraege:
-      - { methode: POST, pfad: '/jobs/draft', ohne: 401, person: 403, firma: 503 }
-      - { methode: POST, pfad: '/jobs', ohne: 401, person: 403, firma: 422 }
-      - { methode: PUT, pfad: '/jobs/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 404 }
-      - { methode: POST, pfad: '/jobs/00000000-0000-0000-0000-000000000001/publish', ohne: 401, person: 403, firma: 404 }
-      - { methode: POST, pfad: '/jobs/00000000-0000-0000-0000-000000000001/close', ohne: 401, person: 403, firma: 404 }
-      - { methode: GET, pfad: '/jobs', ohne: 200, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/jobs?page=2&page_size=5', ohne: 200, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/jobs/00000000-0000-0000-0000-000000000001', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/companies/me/jobs', ohne: 401, person: 403, firma: 200 }
+      - { methode: POST, pfad: '/jobs/draft', ohne: 401, person: 403, mitglied: 503, firma: 503 }
+      - { methode: POST, pfad: '/jobs', ohne: 401, person: 403, mitglied: 422, firma: 422 }
+      - { methode: PUT, pfad: '/jobs/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/jobs/00000000-0000-0000-0000-000000000001/publish', ohne: 401, person: 403, mitglied: 403, firma: 404 }
+      - { methode: POST, pfad: '/jobs/00000000-0000-0000-0000-000000000001/close', ohne: 401, person: 403, mitglied: 403, firma: 404 }
+      - { methode: GET, pfad: '/jobs', ohne: 200, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/jobs?page=2&page_size=5', ohne: 200, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/jobs/00000000-0000-0000-0000-000000000001', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/companies/me/jobs', ohne: 401, person: 403, mitglied: 200, firma: 200 }
 
   - name: 'Bewerbungen'
     warum: |
@@ -318,24 +390,24 @@ gruppen:
       mit `{}` ist 422, weil `job_ids` fehlt — das Schreiben ist ein eigener
       Aufruf je Entwurf.
     eintraege:
-      - { methode: POST, pfad: '/applications', ohne: 401, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/applications/me', ohne: 401, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/applications/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/applications/00000000-0000-0000-0000-000000000001/withdraw', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/applications/00000000-0000-0000-0000-000000000001/status', ohne: 401, person: 403, firma: 422 }
-      - { methode: GET, pfad: '/jobs/00000000-0000-0000-0000-000000000001/applications', ohne: 401, person: 403, firma: 200 }
-      - { methode: GET, pfad: '/companies/me/application-stats', ohne: 401, person: 403, firma: 200 }
-      - { methode: POST, pfad: '/applications/drafts', ohne: 401, person: 422, firma: 422 }
-      - { methode: GET, pfad: '/applications/drafts', ohne: 401, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
-      - { methode: PATCH, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
-      - { methode: PUT, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/attachments', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/comments', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/write', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/revise', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/approve', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/send', ohne: 401, person: 404, firma: 404 }
-      - { methode: DELETE, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/applications/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/applications/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/00000000-0000-0000-0000-000000000001/withdraw', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/00000000-0000-0000-0000-000000000001/status', ohne: 401, person: 403, mitglied: 422, firma: 422 }
+      - { methode: GET, pfad: '/jobs/00000000-0000-0000-0000-000000000001/applications', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/companies/me/application-stats', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/applications/drafts', ohne: 401, person: 422, mitglied: 422, firma: 422 }
+      - { methode: GET, pfad: '/applications/drafts', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: PATCH, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: PUT, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/attachments', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/comments', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/write', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/revise', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/approve', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001/send', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: DELETE, pfad: '/applications/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
 
   - name: 'Arbeitgeberprofil — das oeffentliche Schaufenster'
     warum: |
@@ -343,37 +415,55 @@ gruppen:
       OHNE Token, weil die Karriereseite oeffentlich ist. Ein unbekanntes
       Kuerzel ist 404. Eine Tenant-Id ohne Schaufenster ist 200 null — sonst
       loggt jede Stellenkarte einen Fehler.
+
+      SCHREIBEN verlangt seit PBI-2 einen `admin`, und genau weil die Seite
+      oeffentlich ist: das Schaufenster traegt Name, Beschreibung, Anschrift und
+      das Kuerzel, unter dem die Karriereseite ohne Anmeldung steht. Wer es
+      aendert, aendert fuer alle anderen mit, wie das Unternehmen in der Welt
+      erscheint. LESEN bleibt jedem Mitglied — es steht ohnehin im Netz.
     eintraege:
-      - { methode: PUT, pfad: '/companies/me/profile', ohne: 401, person: 403, firma: 422 }
-      - { methode: GET, pfad: '/companies/me/profile', ohne: 401, person: 403, firma: 200 }
-      - { methode: GET, pfad: '/companies/by-slug/gibt-es-nicht', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/profile', ohne: 200, person: 200, firma: 200 }
+      - { methode: PUT, pfad: '/companies/me/profile', ohne: 401, person: 403, mitglied: 403, firma: 422 }
+      - { methode: GET, pfad: '/companies/me/profile', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/companies/by-slug/gibt-es-nicht', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/profile', ohne: 200, person: 200, mitglied: 200, firma: 200 }
 
   - name: 'Markt und Transfers'
     warum: |
       `/market/me` gehoert der Person: ob sie im Markt steht, entscheidet sie.
-      Die Listen und alles Anbahnende gehoeren der Firma — 403 in der mittleren
-      Spalte.
+      Die Listen und alles Anbahnende gehoeren der Firma — 403 in der
+      Personenspalte.
+
+      Innerhalb der Firma liegt die Linie seit PBI-2 am GELD, nicht am
+      Gespraech. Interesse zeigen, jemanden nach dem Marktstatus fragen, die
+      eigenen Vorgaenge lesen: Anbahnung, und damit die Arbeit, fuer die jemand
+      eingeladen wird. `offer` nennt Eintrittstermin und Vermittlungsgebuehr,
+      `complete` stellt fest, dass beides gilt — beides bindet das Unternehmen,
+      beides verlangt einen `admin`.
+
+      `withdraw` steht ABSICHTLICH nicht dabei und bleibt beim Mitglied: wer
+      einen Vorgang anfangen darf, muss ihn beenden duerfen. Sonst ist die
+      Einladung eine Falle — derselbe Satz, den `/decline` fuer die Person schon
+      traegt.
     eintraege:
-      - { methode: PUT, pfad: '/market/me', ohne: 401, person: 422, firma: 422 }
-      - { methode: GET, pfad: '/market/me', ohne: 401, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/market/me/requests', ohne: 401, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/market/requests', ohne: 401, person: 403, firma: 200 }
-      - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/grant', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/revoke', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/market/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, firma: 404 }
-      - { methode: GET, pfad: '/market/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, firma: 404 }
-      - { methode: POST, pfad: '/transfers', ohne: 401, person: 403, firma: 422 }
-      - { methode: GET, pfad: '/transfers/me', ohne: 401, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/transfers', ohne: 401, person: 403, firma: 200 }
-      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/accept-talk', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/accept-offer', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/confirm-release', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/offer', ohne: 401, person: 403, firma: 404 }
-      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/complete', ohne: 401, person: 403, firma: 404 }
-      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/withdraw', ohne: 401, person: 403, firma: 404 }
+      - { methode: PUT, pfad: '/market/me', ohne: 401, person: 422, mitglied: 422, firma: 422 }
+      - { methode: GET, pfad: '/market/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/market/me/requests', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/market/requests', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/grant', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/revoke', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/market/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/market/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/transfers', ohne: 401, person: 403, mitglied: 422, firma: 422 }
+      - { methode: GET, pfad: '/transfers/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/transfers', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/accept-talk', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/accept-offer', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/confirm-release', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/offer', ohne: 401, person: 403, mitglied: 403, firma: 404 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/complete', ohne: 401, person: 403, mitglied: 403, firma: 404 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/withdraw', ohne: 401, person: 403, mitglied: 404, firma: 404 }
 
   - name: 'GitHub — die eigene, bewiesene Verbindung'
     warum: |
@@ -381,23 +471,23 @@ gruppen:
       haelt, ist die selbst verknuepfte und per Challenge bewiesene Verbindung
       einer Person — keine Zahl ueber einen Menschen.
     eintraege:
-      - { methode: POST, pfad: '/github/me', ohne: 401, person: 422, firma: 422 }
-      - { methode: POST, pfad: '/github/me/verify', ohne: 401, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/github/me/refresh', ohne: 401, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/github/me', ohne: 401, person: 200, firma: 200 }
-      - { methode: DELETE, pfad: '/github/me', ohne: 401, person: 204, firma: 204 }
-      - { methode: GET, pfad: '/github/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/github/me', ohne: 401, person: 422, mitglied: 422, firma: 422 }
+      - { methode: POST, pfad: '/github/me/verify', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/github/me/refresh', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/github/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: DELETE, pfad: '/github/me', ohne: 401, person: 204, mitglied: 204, firma: 204 }
+      - { methode: GET, pfad: '/github/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       # Die Anmeldung ueber GitHub. `/github/oauth` traegt nichts Persoenliches
       # — es sagt, ob DIESER SERVER sie eingerichtet hat — und legt nichts an;
       # `/me/oauth/start` legt an und wird darum erst auf Knopfdruck gerufen.
-      - { methode: GET, pfad: '/github/oauth', ohne: 401, person: 200, firma: 200 }
-      - { methode: POST, pfad: '/github/me/oauth/start', ohne: 401, person: 200, firma: 200 }
+      - { methode: GET, pfad: '/github/oauth', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/github/me/oauth/start', ohne: 401, person: 200, mitglied: 200, firma: 200 }
       # 422 und nicht 404, und die Zeile darueber ist der Grund: `start` hat
       # gerade eine Verbindung angelegt (ohne genanntes Konto — den Namen
       # meldet GitHub). Es gibt hier also etwas, nur passt der `state` nicht —
       # „nicht bewiesen" statt „nichts da". Vor der Umstellung legte `start`
       # nichts an und dieselbe Anfrage bekam 404.
-      - { methode: POST, pfad: '/github/me/oauth/finish', ohne: 401, person: 422, firma: 422 }
+      - { methode: POST, pfad: '/github/me/oauth/finish', ohne: 401, person: 422, mitglied: 422, firma: 422 }
 
   - name: 'Benachrichtigungen'
     warum: |
@@ -408,11 +498,11 @@ gruppen:
       Er antwortet auch INNEN mit 404 statt 401, wenn das gemeinsame Geheimnis
       fehlt: ein 401 bestaetigte, dass es den Endpunkt gibt.
     eintraege:
-      - { methode: POST, pfad: '/notifications', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/notifications/me', ohne: 401, person: 200, firma: 200 }
-      - { methode: POST, pfad: '/notifications/me/read', ohne: 401, person: 200, firma: 200 }
-      - { methode: GET, pfad: '/me/notification-preferences', ohne: 401, person: 200, firma: 200 }
-      - { methode: PUT, pfad: '/me/notification-preferences', ohne: 401, person: 200, firma: 200 }
+      - { methode: POST, pfad: '/notifications', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/notifications/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/notifications/me/read', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/me/notification-preferences', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: PUT, pfad: '/me/notification-preferences', ohne: 401, person: 200, mitglied: 200, firma: 200 }
 
   - name: 'Die Tueren, die es von aussen nicht gibt'
     warum: |
@@ -426,11 +516,11 @@ gruppen:
       wurde. Gebraucht wurde die Route nie: identity-service ruft jobs-service
       direkt an.
     eintraege:
-      - { methode: POST, pfad: '/erasure', ohne: 404, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/internal/notify', ohne: 404, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/internal/notifications', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/internal/companies/00000000-0000-0000-0000-000000000001/members', ohne: 404, person: 404, firma: 404 }
-      - { methode: POST, pfad: '/companies/withdrawal', ohne: 404, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/erasure', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/internal/notify', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/internal/notifications', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/internal/companies/00000000-0000-0000-0000-000000000001/members', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/companies/withdrawal', ohne: 404, person: 404, mitglied: 404, firma: 404 }
 
   - name: 'Die nackten Praefixe — was ein Prefix ohne Rest antwortet'
     warum: |
@@ -461,18 +551,18 @@ gruppen:
       antwortet jetzt auf JEDE Methode 404, nicht unterscheidbar von einem
       Pfad, den es nicht gibt (gemessen ueber GET, POST, PUT, DELETE, PATCH).
     eintraege:
-      - { methode: GET, pfad: '/auth', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/invitations', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/account', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/consent', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/profiles', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/resumes', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/portfolios', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/market', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/github', ohne: 404, person: 404, firma: 404 }
-      - { methode: GET, pfad: '/companies', ohne: 405, person: 405, firma: 405 }
-      - { methode: GET, pfad: '/applications', ohne: 405, person: 405, firma: 405 }
-      - { methode: GET, pfad: '/notifications', ohne: 404, person: 404, firma: 404 }
+      - { methode: GET, pfad: '/auth', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/invitations', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/account', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/consent', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/profiles', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/resumes', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/portfolios', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/market', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/github', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/companies', ohne: 405, person: 405, mitglied: 405, firma: 405 }
+      - { methode: GET, pfad: '/applications', ohne: 405, person: 405, mitglied: 405, firma: 405 }
+      - { methode: GET, pfad: '/notifications', ohne: 404, person: 404, mitglied: 404, firma: 404 }
 
   - name: 'Kontoloeschung und die Kandidatensuche im Einzelnen'
     warum: |
@@ -496,8 +586,8 @@ gruppen:
       Endpunkt. Eine Kandidatenansicht je Person gaebe es nur ueber
       `/profiles/{id}`, und die haengt am Ledger.
     eintraege:
-      - { methode: POST, pfad: '/account/erasure', ohne: 401, person: 202, firma: 202 }
-      - { methode: GET, pfad: '/candidates/00000000-0000-0000-0000-000000000001', ohne: 404, person: 404, firma: 404 }
+      - { methode: POST, pfad: '/account/erasure', ohne: 401, person: 202, mitglied: 202, firma: 202 }
+      - { methode: GET, pfad: '/candidates/00000000-0000-0000-0000-000000000001', ohne: 404, person: 404, mitglied: 404, firma: 404 }
 
   - name: 'Die Sprache des Kontos'
     warum: |
@@ -519,7 +609,7 @@ gruppen:
       Wahl, die nicht wirkt und nichts sagt, sieht wie ein Fehler der
       Oberflaeche aus.
     eintraege:
-      - { methode: PUT, pfad: '/account/language', ohne: 401, person: 200, firma: 200, rumpf: '{"language":"de"}' }
+      - { methode: PUT, pfad: '/account/language', ohne: 401, person: 200, mitglied: 200, firma: 200, rumpf: '{"language":"de"}' }
 
   - name: 'Das Berufsfeld des Kontos'
     warum: |
@@ -539,7 +629,7 @@ gruppen:
       dagegen 422 und speichert nichts: eine Wahl, die stillschweigend zu „keins"
       wird, sieht wie ein Fehler der Oberflaeche aus.
     eintraege:
-      - { methode: PUT, pfad: '/account/occupational-field', ohne: 401, person: 200, firma: 200, rumpf: '{"occupational_field":null}' }
+      - { methode: PUT, pfad: '/account/occupational-field', ohne: 401, person: 200, mitglied: 200, firma: 200, rumpf: '{"occupational_field":null}' }
 
   - name: 'Die Einstellungen des Kontos'
     warum: |
@@ -559,9 +649,9 @@ gruppen:
       Beide angemeldeten Spalten antworten gleich: die Einstellungen gehoeren
       der PERSON, nicht dem Unternehmen, fuer das sie gerade handelt (ADR-0017).
     eintraege:
-      - { methode: GET, pfad: '/account/settings', ohne: 401, person: 200, firma: 200 }
-      - { methode: PUT, pfad: '/account/settings', ohne: 401, person: 200, firma: 200, rumpf: '{"delete_after_months":null,"ai_provider":"none","ai_base_url":"","ai_model":"","ai_audit_log":false}' }
-      - { methode: PUT, pfad: '/account/ai-key', ohne: 401, person: 200, firma: 200, rumpf: '{"key":""}' }
+      - { methode: GET, pfad: '/account/settings', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: PUT, pfad: '/account/settings', ohne: 401, person: 200, mitglied: 200, firma: 200, rumpf: '{"delete_after_months":null,"ai_provider":"none","ai_base_url":"","ai_model":"","ai_audit_log":false}' }
+      - { methode: PUT, pfad: '/account/ai-key', ohne: 401, person: 200, mitglied: 200, firma: 200, rumpf: '{"key":""}' }
 
   - name: 'Klarname und Bewerbungsanschrift'
     warum: |
@@ -571,6 +661,6 @@ gruppen:
       Klarnamen, nie die Anschrift — sonst zöge die Bewerberauskunft sie in
       den Prompt.
     eintraege:
-      - { methode: PUT, pfad: '/account/name', ohne: 401, person: 200, firma: 200, rumpf: '{"given_name":"Anna","family_name":"Beispiel"}' }
-      - { methode: GET, pfad: '/account/address', ohne: 401, person: 200, firma: 200 }
-      - { methode: PUT, pfad: '/account/address', ohne: 401, person: 200, firma: 200, rumpf: '{"line1":"","line2":"","postal_code":"","city":"","country":"DE","phone":""}' }
+      - { methode: PUT, pfad: '/account/name', ohne: 401, person: 200, mitglied: 200, firma: 200, rumpf: '{"given_name":"Anna","family_name":"Beispiel"}' }
+      - { methode: GET, pfad: '/account/address', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: PUT, pfad: '/account/address', ohne: 401, person: 200, mitglied: 200, firma: 200, rumpf: '{"line1":"","line2":"","postal_code":"","city":"","country":"DE","phone":""}' }

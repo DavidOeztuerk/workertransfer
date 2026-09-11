@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Authorization.Policy;
 using WorkerTransfer.Identity.Api;
 using WorkerTransfer.Identity.Api.Berechtigung;
 using WorkerTransfer.Identity.Infrastructure;
@@ -35,11 +34,6 @@ builder.Services.AddWorkerTransferDefaults(
 // Rechte ins Token zu legen waere der kuerzere Weg und der schlechtere: ein
 // Token lebt weiter, nachdem jemand aus einer Firma entfernt wurde.
 builder.Services.AddScoped<IAuthorizationHandler, Mitgliedschaftsrecht>();
-
-// Eine Ablehnung durch eine Richtlinie schliesst die Antwort kurz und wirft
-// nicht — ProblemDetailsMiddleware sieht sie also nie. Ohne das hier faellt sie
-// als nackter 403 ohne Korrelationskennung heraus.
-builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, Ablehnungsgestalt>();
 
 builder.Services.AddIdentityInfrastructure(
     builder.Configuration,

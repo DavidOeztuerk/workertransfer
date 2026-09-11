@@ -68,7 +68,14 @@ fi
 
 # --- Was blieb ungeprüft? ----------------------------------------------------
 # Skips sind keine Erfolge. Diese Zahl ist die ehrlichste Kennzahl im Bericht.
-dotnet_log="$log_dir/dotnet-test.log"
+# Der Dateiname kommt aus `step`: es ersetzt jedes Nicht-Wortzeichen durch `_`,
+# aus "dotnet test" wird also `dotnet_test.log`. Hier stand `dotnet-test.log`,
+# mit einem BINDESTRICH — die Datei gab es nie, `grep` fand nichts, und beide
+# Zahlen daran fielen still aus: die Uebersprungenen blieben immer 0 und die
+# Testzahl blieb immer `?`. Genau der Fehler, gegen den dieser Bericht gebaut
+# ist — ein gruener Haken ohne Zahl daneben. Wieder eine Stelle, an der zwei
+# Seiten dieselbe Sache verschieden buchstabierten.
+dotnet_log="$log_dir/dotnet_test.log"
 playwright_log="$log_dir/playwright.log"
 skipped=0
 if [[ -f "$dotnet_log" ]]; then
