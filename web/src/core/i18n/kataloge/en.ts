@@ -849,25 +849,6 @@ const en: Katalog = {
     unbekannt: "Your location could not be determined.",
   },
 
-  bewerbung: {
-    titel: "Apply",
-    stelleFehltTitel: "This position does not exist",
-    adresseUngueltig: "The address does not name a valid position.",
-    stelleZurueckgezogen: "It was withdrawn, or it never existed.",
-    laden: "Loading position…",
-    zurueck: "Back to the open positions",
-    abgeschickt: "Application sent",
-    abgeschicktText: "You can withdraw it at any time under <1>My applications</1> — then the company no longer sees your data.",
-    kontoNoetig: "You need an account to apply — afterwards you come back here.",
-    anmeldenUndBewerben: "Sign in and apply",
-    anschreiben: "Cover letter",
-    anschreibenHinweis: "Optional. What connects you with this position.",
-    profilImmerDabei: "Your profile always goes with it — without it, it would not be an application. What else you release is up to you:",
-    lebenslauf: "CV",
-    meineArbeiten: "My work",
-    absenden: "Send application",
-    absendenLaeuft: "Sending…",
-  },
 
   bewerbungen: {
     titel: "My applications",

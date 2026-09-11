@@ -28,10 +28,11 @@ import {
   ortZuPunkt,
   searchJobs,
 } from "../api/jobs";
-import { createDrafts, getDrafts, listMyApplications, writeDraft } from "../api/applications";
+import { getDrafts, listMyApplications } from "../api/applications";
 import { getMyProfile } from "../api/profile";
 import { merke } from "../lib/kontext";
 import { Requirements } from "../components/Requirements";
+import { starteEntwuerfe } from "../lib/entwuerfe";
 import { merkeStelle } from "../lib/intent";
 import { useHandelnder } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
@@ -240,26 +241,20 @@ export function JobsPage() {
     });
   }, []);
 
-  async function starteEntwuerfe(jobIds: string[]) {
-    const result = await createDrafts(jobIds);
-    if (!result.ok) {
-      setBulkFehler(result.error.detail);
+  async function anlegen(jobIds: string[]) {
+    const start = await starteEntwuerfe(jobIds);
+    if (!start.ok) {
+      setBulkFehler(start.fehler);
       return null;
     }
-    const drafts = result.drafts;
-    await Promise.all(
-      drafts
-        .filter((draft) => draft.status === "generating" || draft.status === "failed")
-        .map((draft) => writeDraft(draft.id)),
-    );
-    return drafts;
+    return start.drafts;
   }
 
   async function bewerbenAufEine(jobId: string) {
     setLaeuftJob(jobId);
     setBulkFehler(null);
     try {
-      const drafts = await starteEntwuerfe([jobId]);
+      const drafts = await anlegen([jobId]);
       const erster = drafts?.[0];
       if (erster) navigate(`/applications/drafts/${erster.id}`);
     } finally {
@@ -282,7 +277,7 @@ export function JobsPage() {
         clearSelection();
         return;
       }
-      const drafts = await starteEntwuerfe(jobIds);
+      const drafts = await anlegen(jobIds);
       if (drafts === null) return;
 
       clearSelection();

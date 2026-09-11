@@ -849,25 +849,6 @@ const fr: Katalog = {
     unbekannt: "La position n'a pas pu être déterminée.",
   },
 
-  bewerbung: {
-    titel: "Postuler",
-    stelleFehltTitel: "Ce poste n’existe pas",
-    adresseUngueltig: "L’adresse ne désigne aucun poste valide.",
-    stelleZurueckgezogen: "Il a été retiré, ou il n’a jamais existé.",
-    laden: "Chargement du poste…",
-    zurueck: "Retour aux postes ouverts",
-    abgeschickt: "Candidature envoyée",
-    abgeschicktText: "Vous pouvez la retirer à tout moment sous <1>Mes candidatures</1> — l’entreprise ne verra alors plus vos données.",
-    kontoNoetig: "Il vous faut un compte pour postuler — ensuite, vous revenez ici.",
-    anmeldenUndBewerben: "Se connecter et postuler",
-    anschreiben: "Lettre de motivation",
-    anschreibenHinweis: "Facultatif. Ce qui vous relie à ce poste.",
-    profilImmerDabei: "Votre profil est toujours joint — sans lui, ce ne serait pas une candidature. Ce que vous autorisez en plus, c’est vous qui le décidez :",
-    lebenslauf: "CV",
-    meineArbeiten: "Mes réalisations",
-    absenden: "Envoyer la candidature",
-    absendenLaeuft: "Envoi…",
-  },
 
   bewerbungen: {
     titel: "Mes candidatures",

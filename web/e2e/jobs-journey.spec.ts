@@ -81,6 +81,16 @@ test("eine veröffentlichte Stelle findet auch, wer kein Konto hat", async ({ br
   await expect(anonymous.getByRole("heading", { name: companyName })).toBeVisible();
   await expect(anonymous.getByText(title)).toBeVisible();
 
+  // „Bewerben" OHNE KONTO — der Weg, den bis PBI-6 die Seite `/jobs/{id}/apply`
+  // trug. Sie ist gefallen (sie war eine Weiche mit einem unerreichbaren
+  // Formular darunter), und ihr abgemeldeter Zweig ist hierher gewandert: erst
+  // die Stelle merken, dann zur Anmeldung. Geprüft wird er hier, weil die
+  // Karriereseite die EINZIGE öffentliche Stelle mit diesem Knopf ist und der
+  // Umzug ihn sonst ungeprüft ließe — genau die Art Naht, die still reißt.
+  await anonymous.getByRole("button", { name: /Bewerben/i }).first().click();
+  await expect(anonymous).toHaveURL(/\/login$/);
+  await anonymous.goBack();
+
   // Geschlossen heißt: für die Öffentlichkeit wieder weg.
   await row.getByRole("button", { name: /Schließen/i }).click();
   await expect(row.getByText("Geschlossen")).toBeVisible();
@@ -171,9 +181,10 @@ test("die Passung sieht die Person — und niemand rechnet sie auf dem Server", 
   await expect(candidate.getByText(/%/)).toHaveCount(0);
 
   // Hier stand dieselbe Prüfung ein zweites Mal, auf `/jobs/{id}/apply`. Diese
-  // Seite ist heute eine Weiche auf den Entwurf und zeigt die Häkchenliste
-  // nicht mehr — die Prüfung oben deckt die Zusage vollständig ab, und eine,
-  // die eine verschwundene Ansicht prüft, deckt gar nichts ab.
+  // Adresse gibt es nicht mehr (PBI-6): sie war zuletzt eine Weiche auf den
+  // Entwurf und zeigte die Häkchenliste ohnehin nicht. Die Prüfung oben deckt
+  // die Zusage vollständig ab, und eine, die eine verschwundene Ansicht prüft,
+  // deckt gar nichts ab.
 
   await recruiterContext.close();
   await anonymousContext.close();

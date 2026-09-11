@@ -1,11 +1,14 @@
+import { useState } from "react";
+
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
+import CircularProgress from "@mui/material/CircularProgress";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
-import { Link as RouterLink, useParams } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 
 import {
   EmptyBlock,
@@ -15,6 +18,9 @@ import {
 import { useAsync } from "../lib/useAsync";
 import { getCompanyBySlug } from "../api/companies";
 import { remoteLabel, searchJobs } from "../../work/api/jobs";
+import { starteEntwuerfe } from "../../work/lib/entwuerfe";
+import { merkeStelle } from "../../work/lib/intent";
+import { useHandelnder } from "../lib/session";
 import { Trans, useTranslation } from "react-i18next";
 
 /**
@@ -27,12 +33,49 @@ import { Trans, useTranslation } from "react-i18next";
  * <strong>„Gerade nicht abrufbar" ist nicht „gibt es nicht".</strong> Beide
  * Fälle stehen hier getrennt und mit eigenem Satz — sonst liest jemand, sein
  * Unternehmen existiere nicht, weil ein Dienst gerade schweigt.
+ *
+ * <strong>„Bewerben" ist ein Knopf und kein Verweis.</strong> Er zeigte auf
+ * <c>/jobs/:id/apply</c>, und diese Adresse war zuletzt nur noch eine Weiche:
+ * sie legte einen Entwurf an und leitete weiter. Eine Adresse, die keine
+ * Ansicht hat, ist ein Zwischenhalt, den niemand sehen soll — und sie trug ein
+ * totes Formular mit Freigabekästchen mit sich, das nach ihr niemand mehr
+ * erreichte. Der Vorgang steht jetzt in <c>lib/entwuerfe</c>, an EINER Stelle,
+ * und dieser Knopf ruft genau denselben wie der auf der Stellenliste.
  */
 export function CareerPage() {
   const { slug } = useParams();
   const gesucht = slug ?? "";
 
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { signedIn } = useHandelnder();
+  const [laeuftStelle, setLaeuftStelle] = useState<string | null>(null);
+  const [bewerbungsfehler, setBewerbungsfehler] = useState<string | null>(null);
+
+  async function bewerben(stellenId: string, titel: string) {
+    // Ohne Konto: erst merken, dann wechseln. Dieselbe Reihenfolge wie auf der
+    // Stellenliste — wer über die Kopfzeile zur Anmeldung geht, hat keine
+    // Absicht geäussert und wird auch nicht zurückgeworfen.
+    if (!signedIn) {
+      merkeStelle(stellenId, titel);
+      void navigate("/login");
+      return;
+    }
+    setLaeuftStelle(stellenId);
+    setBewerbungsfehler(null);
+    try {
+      const start = await starteEntwuerfe([stellenId]);
+      if (!start.ok) {
+        setBewerbungsfehler(start.fehler);
+        return;
+      }
+      const erster = start.drafts[0];
+      if (erster) void navigate(`/applications/drafts/${erster.id}`);
+    } finally {
+      setLaeuftStelle(null);
+    }
+  }
+
   const unternehmen = useAsync(
     (signal) => getCompanyBySlug(gesucht, signal),
     [gesucht],
@@ -146,6 +189,12 @@ export function CareerPage() {
             {t("karriere.offeneStellen")}
           </Typography>
 
+          {bewerbungsfehler !== null ? (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {bewerbungsfehler}
+            </Alert>
+          ) : null}
+
           {/* Reihenfolge: lädt, dann Fehler, dann leer, dann Inhalt. */}
           {stellen.pending ? (
             <LoadingBlock label={t("karriere.stellenLaden")} />
@@ -194,11 +243,17 @@ export function CareerPage() {
                       </Typography>
                     </Box>
                     <Button
-                      component={RouterLink}
-                      to={`/jobs/${stelle.id}/apply`}
+                      type="button"
                       variant="contained"
                       size="small"
                       sx={{ flexShrink: 0 }}
+                      disabled={laeuftStelle !== null}
+                      onClick={() => void bewerben(stelle.id, stelle.title)}
+                      startIcon={
+                        laeuftStelle === stelle.id ? (
+                          <CircularProgress color="inherit" size={16} />
+                        ) : null
+                      }
                     >
                       {t("karriere.bewerben")}
                     </Button>
