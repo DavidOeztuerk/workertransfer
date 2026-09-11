@@ -1,11 +1,25 @@
 # ADR-0037: advisor-service — Mandat als Sicht, nicht als zweite Wahrheit
 
-**Status:** angenommen (06.09.2026)
+**Status:** angenommen (06.09.2026) · **gebaut am 11.09.2026**
 **Betrifft:** advisor-service, transfer-service, consent-service, profile-service, resume-service, github-service, notification-service, `web/`
 **Verwandt:** ADR-0033 (Beleg und Sichtbarkeit), ADR-0020 (Sichtbarkeit im Ledger), ADR-0013 (Einwilligung wirkt sofort), ADR-0036 (scout-service), ADR-0024 (die KI-Naht), ADR-0027 (Löschung)
 
-**Nicht gebaut.** Dieses ADR entscheidet. Code folgt erst, wenn jemand ihn
-ausdrücklich beauftragt.
+**Gebaut am 11.09.2026.** Was dabei über dieses Dokument hinaus entschieden
+werden musste, steht in CLAUDE.md unter „advisor-service: the mandate is a
+view, not a second store" — vor allem drei Dinge:
+
+1. **Welche Fähigkeit eine Stufe TRÄGT und welche eine Freigabe SCHREIBT, ist
+   nicht dasselbe.** Stufe 1 steht an `profile.visibility:*`, schreibt aber
+   auch `market.visibility:tenant:<id>` — sie verspricht „Verfügbarkeit", und
+   die Verfügbarkeit *ist* der Marktstatus.
+2. **`github.visibility:public` wird nie geschrieben.** Sie ist plattformweit
+   und kennt keine Firmenfassung; sie in einer Stufenfreigabe mitzuschreiben
+   machte aus einer Freigabe an *ein* Unternehmen eine an alle. Belege reisen
+   zu Stufe 2 mit, wenn sie ohnehin öffentlich stehen.
+3. **Die Gehaltsspanne steht in Stufe 2, nicht in Stufe 3.** §2 dieses Dokuments
+   sagte „Klarname plus Mandatsfelder"; gebaut ist die feinere Einteilung —
+   Eintritt und Pensum ab Stufe 1, Spanne ab Stufe 2, Klarname und Kontakt ab
+   Stufe 3. Ein Eintrittstermin ist der Anlass eines Gesprächs, kein Ergebnis.
 
 ## Der Fund, der dieses ADR ausgelöst hat
 

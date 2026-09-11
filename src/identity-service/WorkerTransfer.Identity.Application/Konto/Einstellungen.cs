@@ -189,3 +189,52 @@ public sealed class InterneKiZugangHandler(
             geheimnisse.Entschluessele(stand.SchluesselVerschluesselt) ?? string.Empty);
     }
 }
+
+/// <summary>
+/// Klarname und Kontakt einer Person — intern, und ausdrücklich ohne Anschrift.
+/// </summary>
+/// <remarks>
+/// <para><strong>Zwei Felder, und mehr dürfen es nie werden.</strong> Der
+/// bürgerliche Name und die Adresse, unter der man antworten kann. Keine
+/// Postanschrift, kein Telefon: ADR-0038 legt die Anschrift als
+/// <em>Vorlage</em> für einen Briefkopf ab, und sie gehört zu einer Bewerbung,
+/// die die Person selbst sendet — nicht in die Ansicht eines Unternehmens.</para>
+/// </remarks>
+public sealed record InternePerson(string Name, string Email);
+
+/// <summary>
+/// Wie ein Mensch heisst — für advisor-service, hinter dem Geheimnis.
+/// </summary>
+/// <remarks>
+/// <para><strong>Das Geheimnis ist hier nicht die ganze Erlaubnis.</strong> Es
+/// beweist, dass ein Dienst fragt, und nicht, dass er fragen darf. Die
+/// Erlaubnis steht im Ledger, und advisor-service holt sie <em>vor</em> diesem
+/// Aufruf: Stufe 3 ist die Fähigkeit <c>advisor.identity:tenant:&lt;id&gt;</c>
+/// (ADR-0037 Entscheidung 2). Wer diese Tür für etwas anderes benutzt, holt
+/// sich die Prüfung dazu — sonst gibt er den Klarnamen eines Menschen heraus,
+/// der ihn niemandem gezeigt hat.</para>
+///
+/// <para>Deshalb ist die Tür so eng: sie antwortet auf genau eine Kennung, mit
+/// genau zwei Feldern, und sie kennt keine Liste.</para>
+/// </remarks>
+public sealed record InternePersonAbfrage(SubjectId Wer) : IAbfrage<InternePerson?>;
+
+/// <inheritdoc cref="InternePersonAbfrage" />
+public sealed class InternePersonHandler(IUserRepository konten)
+    : IRequestHandler<InternePersonAbfrage, InternePerson?>
+{
+    /// <inheritdoc />
+    public async Task<InternePerson?> Handle(
+        InternePersonAbfrage request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var konto = await konten.FindByIdAsync(request.Wer, cancellationToken);
+
+        // `Klarname` faellt auf den Anzeigenamen zurueck, wenn kein
+        // buergerlicher hinterlegt ist — dasselbe, was unter einem Anschreiben
+        // steht. Leer bleibt leer, und der Aufrufer laesst das Feld dann ganz
+        // weg: nicht freigegeben und nicht vorhanden sehen gleich aus.
+        return konto is null ? null : new InternePerson(konto.Klarname, konto.Email);
+    }
+}

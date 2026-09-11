@@ -179,7 +179,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Das_Verlangen_sperrt_sofort_und_schreibt_elf_Absichten()
+    public async Task Das_Verlangen_sperrt_sofort_und_schreibt_zwoelf_Absichten()
     {
         var (browser, wer, _) = await Person();
 
@@ -189,7 +189,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
         (await Kontostand(wer)).Should().Be("disabled", "ab jetzt passiert nichts mehr unter diesem Namen");
 
         var zeilen = await Zeilen(wer);
-        zeilen.Should().HaveCount(11, "neun Empfaenger, die Schlussnachricht und identity selbst");
+        zeilen.Should().HaveCount(12, "zehn Empfaenger, die Schlussnachricht und identity selbst");
         zeilen.Select(z => z.Kind).Should().Contain(LoeschungVerlangenHandler.Absichten);
     }
 
@@ -205,7 +205,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
         Loeschempfaenger.Fremde.Should().BeEquivalentTo(
         [
             "consent", "profile", "resume", "portfolio",
-            "applications", "transfer", "github", "notification", "scout"
+            "applications", "transfer", "github", "notification", "scout", "advisor"
         ]);
 
         // `github` gehoert dazu: der Dienst haelt eine Zeile je Mensch — die
@@ -221,6 +221,14 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
         // einem Menschen handeln. Wer eine Zeile je Mensch haelt, ist
         // Empfaenger: das ist die ganze Regel.
         Loeschempfaenger.Fremde.Should().Contain("scout");
+
+        // `advisor` kam mit seiner ersten Tabelle dazu (ADR-0037). Er haelt ein
+        // MANDAT, dessen Schluessel die Person IST — Eintrittstermin,
+        // Gehaltsspanne, Pensum, ausgeschlossene Unternehmen — und die
+        // Gespraeche, in denen sie steht. Sichtbarkeit haelt er ausdruecklich
+        // nicht; die faellt bei consent-service. Wer eine Zeile je Mensch
+        // haelt, ist Empfaenger: das ist die ganze Regel.
+        Loeschempfaenger.Fremde.Should().Contain("advisor");
 
         Loeschempfaenger.Fremde.Should().NotContain("jobs", "haelt nichts Personenbezogenes");
         Loeschempfaenger.Fremde.Should().NotContain("companies");
@@ -253,7 +261,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
         var zweite = await browser.PostAsync("/account/erasure", null);
 
         zweite.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        (await Zeilen(wer)).Should().HaveCount(11);
+        (await Zeilen(wer)).Should().HaveCount(12);
     }
 
     /// <summary>
@@ -319,7 +327,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
         await Durchlauf(3);
 
         var zeilen = await Zeilen(wer);
-        zeilen.Should().OnlyContain(z => z.Delivered != null, "alle elf sind durch");
+        zeilen.Should().OnlyContain(z => z.Delivered != null, "alle zwoelf sind durch");
 
         (await Kontostand(wer)).Should().BeNull("die Zeile ist weg");
 
@@ -342,7 +350,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
         using var bereich = _dienst.Services.CreateScope();
         var bestand = bereich.ServiceProvider.GetRequiredService<ILoeschbestand>();
 
-        (await bestand.OffeneAbsichtenAsync(new SubjectId(wer))).Should().HaveCount(11);
+        (await bestand.OffeneAbsichtenAsync(new SubjectId(wer))).Should().HaveCount(12);
 
         await Durchlauf(3);
 

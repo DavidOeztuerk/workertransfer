@@ -521,6 +521,27 @@
         }
       ],
       "Priority": 10
+    },
+
+    // Der Berater (ADR-0037). Das Mandat sind vier Werte; die STUFE eines
+    // Gespraechs steht im Ledger und nirgends sonst — dieser Dienst haelt
+    // keine Sichtbarkeit, er erteilt sie im Namen der Person.
+    //
+    // NUR `/advisor/{rest}` und kein blankes `/advisor`: unter diesem Pfad
+    // selbst liegt kein Endpunkt. Eine Route dorthin waere eine Zeile in der
+    // Routenkarte, die nichts beschreibt — und die Karte ist ein Test, keine
+    // Abhakliste.
+    {
+      "UpstreamPathTemplate": "/advisor/{rest}",
+      "DownstreamPathTemplate": "/advisor/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "advisor-service",
+          "Port": 8013
+        }
+      ],
+      "Priority": 10
     }
   ],
 

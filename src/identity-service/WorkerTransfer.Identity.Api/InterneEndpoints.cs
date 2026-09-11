@@ -90,6 +90,80 @@ public static class InterneEndpoints
                 cancellationToken);
         });
 
+        // Wer ein Unternehmen IST — Name und bewiesene Domain, nicht seine
+        // Belegschaft. advisor-service braucht die Domain, damit ein Ausschluss
+        // greifen kann (ADR-0037): eine Person nennt die Unternehmen, mit denen
+        // kein Gespraech zustande kommt, und sie nennt sie durch ihre Domain.
+        //
+        // Eine zweite Domaintabelle in advisor-service waere die, die als Erste
+        // veraltet — mit einem Ausschluss, der dann stillschweigend nicht mehr
+        // greift, und das ist der eine Fall, in dem Stille am teuersten ist.
+        app.MapGet("/internal/companies/{tenantId:guid}", async (
+            Guid tenantId,
+            IMediator mediator,
+            IOptions<Meldeeinstellungen> einstellungen,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (!DarfMelden(context, einstellungen.Value))
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
+                return;
+            }
+
+            var firma = await mediator.Send(
+                new InterneFirmaAbfrage(new TenantId(tenantId)), cancellationToken);
+
+            if (firma is null)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(
+                new UnternehmensauskunftV1(firma.Name, firma.Domain.Value), cancellationToken);
+        });
+
+        // Klarname und Kontakt — die empfindlichste dieser Tueren.
+        //
+        // DAS GEHEIMNIS IST HIER NICHT DIE GANZE ERLAUBNIS. Es beweist, dass ein
+        // Dienst fragt, nicht dass er fragen darf. Die Erlaubnis steht im
+        // Ledger, und advisor-service holt sie VOR diesem Aufruf: Stufe 3 ist
+        // `advisor.identity:tenant:<id>` (ADR-0037). Wer diese Tuer fuer etwas
+        // anderes benutzt, holt sich die Pruefung dazu.
+        //
+        // Zwei Felder, keine Anschrift, kein Telefon (ADR-0038) — und keine
+        // Liste: sie antwortet auf genau eine Kennung.
+        app.MapGet("/internal/account/{subjectId:guid}/identity", async (
+            Guid subjectId,
+            IMediator mediator,
+            IOptions<Meldeeinstellungen> einstellungen,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (!DarfMelden(context, einstellungen.Value))
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
+                return;
+            }
+
+            var person = await mediator.Send(
+                new InternePersonAbfrage(new SubjectId(subjectId)), cancellationToken);
+
+            if (person is null)
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(
+                new PersonenauskunftV1(person.Name, person.Email), cancellationToken);
+        });
+
         app.MapGet("/internal/account/{subjectId:guid}/ai", async (
             Guid subjectId,
             IMediator mediator,
