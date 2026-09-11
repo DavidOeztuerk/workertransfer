@@ -58,10 +58,14 @@ kubectl get nodes >/dev/null 2>&1 || { rot "Der Cluster antwortet nicht."; exit 
 
 # ---------------------------------------------------------------------------
 schritt "Images bauen"
-# EIN Image für alle zehn Dienste: sie unterscheiden sich nur in SERVICE_DIR,
-# und das setzt der Pod. Der Build-Arg bleibt deshalb hier ungesetzt.
-# EIN Bild fuer alle zwoelf Dienste UND das Gateway. Das Geheimnis traegt die
-# NuGet-Anmeldung fuer GitHub Packages herein und wird nie eine Schicht.
+# EIN Image für alle vierzehn Dienste UND das Gateway: sie unterscheiden sich
+# nur in SERVICE_DIR, und das setzt der Pod. Der Build-Arg bleibt deshalb hier
+# ungesetzt.
+#
+# Das Geheimnis traegt die NuGet-Anmeldung herein und wird nie eine Schicht.
+# Noetig ist es seit dem 10.09.2026 nicht mehr — Girder liegt auf nuget.org —,
+# und es steht hier, damit eine Maschine mit einer eigenen Quellenzuordnung
+# weiterhin baut.
 docker build -f docker/dotnet-service.Dockerfile \
   --secret "id=nuget_config,src=${HOME}/.nuget/NuGet/NuGet.Config" \
   -t workertransfer/service:dev .
@@ -96,64 +100,61 @@ if ! kubectl wait --for=condition=Ready pod --all --timeout=180s; then
 fi
 gruen "Alle Pods bereit."
 
-schritt "Beweis 2 — lesend durch das Gateway"
-# /jobs gehört jobs-service, / gehört der Oberfläche. Zwei verschiedene Ziele,
-# also wird wirklich geroutet und nicht bloß irgendwas beantwortet.
+schritt "Beweis 2 — lesend durch das Gateway, auf ZWEI verschiedene Dienste"
+# Zwei Ziele, damit wirklich geroutet wird und nicht bloß irgendwas antwortet —
+# und die zwei Antworten haben verschiedene GESTALTEN, was der eigentliche
+# Beleg ist: eine fehlende Route wäre Ocelots leeres 404, ein toter Dienst ein
+# 502, und beides sähe an einem einzelnen Statuscode gleich aus.
 #
-# 401 und nicht 200: eine Stellenliste steht hinter der Anmeldung, so ist der
-# Dienst gebaut (`StellenEndpoints`, `akteur.Current is null` -> NichtAngemeldet).
-# Der Beleg fürs Routen ist die ANTWORT, nicht ihr Erfolg — ein
-# RFC-9457-Dokument mit correlationId kann nur jobs-service geschrieben haben;
-# eine fehlende Route wäre ein leerer 404 von Traefik.
+# HIER STAND BIS ZUM 11.09.2026 ETWAS ANDERES, und es konnte nicht mehr
+# stimmen. Zwei Zusagen waren überholt, beide beim ersten echten Lauf gemessen:
+#
+#   * `GET /jobs` wurde mit 401 erwartet. Die Stellenliste ist öffentlich
+#     geworden; sie antwortet 200. Damit war auch der Beleg weg, der an ihr
+#     hing — das RFC-9457-Dokument mit `correlationId`. Er hängt jetzt an
+#     `/consent/me`, genau wie im `images`-Auftrag der CI und aus demselben
+#     Grund.
+#   * `GET /` wurde mit der ausgelieferten Oberfläche erwartet. Seit ADR-0040
+#     liefert das Gateway KEINE Oberfläche mehr: der `web`-Pod ist ClusterIP
+#     und von außen nicht erreichbar, das Chart veröffentlicht allein das
+#     Gateway. `/` antwortet 404, und das ist richtig. Wer die Oberfläche in
+#     der Staging-Umgebung zurückwill, gibt `web` einen eigenen Eingang und
+#     teilt `publicUrl` in einen Web- und einen API-Ursprung — das ist die
+#     Arbeit, die ADR-0040 ausdrücklich offengelassen hat.
+#
+# Mit ihnen fiel „Beweis 2b — Direktlink und Neuladen": er prüfte die
+# `Sec-Fetch-Dest`-Weiche der `Navigation`-Zwischenschicht, und die ist mit
+# ADR-0040 gelöscht. Ein Beweis für eine Zwischenschicht, die es nicht gibt,
+# kann nur rot werden.
 jobs_status=$(curl -s -o /tmp/wt-jobs.json -w '%{http_code}' "${BASE}/jobs" || true)
-web_status=$(curl -s -o /tmp/wt-web.html -w '%{http_code}' "${BASE}/" || true)
-echo "GET /jobs -> ${jobs_status}"
-echo "GET /     -> ${web_status}"
-[ "$jobs_status" = "401" ] || { rot "GET /jobs lieferte ${jobs_status}, erwartet 401."; cat /tmp/wt-jobs.json; exit 1; }
-grep -q '"correlationId"' /tmp/wt-jobs.json || { rot "GET /jobs kam nicht von jobs-service."; cat /tmp/wt-jobs.json; exit 1; }
-[ "$web_status"  = "200" ] || { rot "GET / lieferte ${web_status}, erwartet 200."; exit 1; }
-grep -q "<div id=\"root\">" /tmp/wt-web.html || { rot "GET / lieferte kein ausgeliefertes index.html."; exit 1; }
-# Ohne diese Zeile wäre nicht belegt, dass die Laufzeitkonfiguration wirklich
-# ersetzt wurde — die Voreinstellung aus dem Image ist ein leeres Objekt.
-config_status=$(curl -s -o /tmp/wt-config.js -w '%{http_code}' "${BASE}/config.js" || true)
-grep -q "$BASE" /tmp/wt-config.js || {
-  rot "/config.js enthält ${BASE} nicht (Status ${config_status}) — die ConfigMap greift nicht."
-  cat /tmp/wt-config.js; exit 1
-}
-gruen "Gateway routet auf zwei verschiedene Ziele, Laufzeitkonfiguration sitzt."
+einwilligung_status=$(curl -s -o /tmp/wt-consent.json -w '%{http_code}' "${BASE}/consent/me" || true)
+echo "GET /jobs       -> ${jobs_status}"
+echo "GET /consent/me -> ${einwilligung_status}"
 
-schritt "Beweis 2b — Direktlink und Neuladen, nicht nur Klicken"
-# `/jobs` ist zugleich API-Präfix und Seite. Ein Klick IM Programm beweist
-# nichts darüber: da schaltet der Router im Browser um, ohne zu fragen. Nur der
-# Direktlink und F5 gehen wirklich durchs Gateway — und genau die fielen vorher
-# durch, mit rohem JSON statt der Seite.
-for pfad in /jobs /applications /transfers /github; do
-  navi=$(curl -s -o /tmp/wt-navi.html -w '%{http_code}' \
-    -H 'Sec-Fetch-Dest: document' -H 'Accept: text/html' "${BASE}${pfad}")
-  grep -q '<div id="root">' /tmp/wt-navi.html || {
-    rot "${pfad} als Direktlink lieferte nicht die Oberfläche (Status ${navi}):"
-    head -c 200 /tmp/wt-navi.html; echo
-    rot "Fehlt Navigation.UseNavigation() im Gateway (Sec-Fetch-Dest)?"
-    exit 1
-  }
-  # Und dieselbe Adresse als Datenabruf muss weiterhin die API treffen.
-  api=$(curl -s -o /tmp/wt-api.json -w '%{http_code}' -H 'Sec-Fetch-Dest: empty' "${BASE}${pfad}")
-  grep -q '<div id="root">' /tmp/wt-api.json && {
-    rot "${pfad} liefert der Anwendung die Oberfläche statt Daten (Status ${api})."
-    exit 1
-  }
-  echo "  ${pfad}: Navigation -> Oberfläche, fetch -> API (${api})"
-done
-gruen "Direktlink und Datenabruf sind sauber getrennt."
+# jobs-service, öffentlich. Der Beleg ist die SEITENGESTALT, nicht der Erfolg.
+[ "$jobs_status" = "200" ] || { rot "GET /jobs lieferte ${jobs_status}, erwartet 200."; cat /tmp/wt-jobs.json; exit 1; }
+grep -q '"items"' /tmp/wt-jobs.json || { rot "GET /jobs kam nicht von jobs-service."; cat /tmp/wt-jobs.json; exit 1; }
+
+# consent-service, hinter der Anmeldung. Ein Problemdokument mit Kennung kann
+# nur ein Dienst geschrieben haben, der die Anfrage wirklich gesehen hat.
+[ "$einwilligung_status" = "401" ] || { rot "GET /consent/me lieferte ${einwilligung_status}, erwartet 401."; cat /tmp/wt-consent.json; exit 1; }
+grep -q '"correlationId"' /tmp/wt-consent.json || { rot "GET /consent/me kam nicht von consent-service."; cat /tmp/wt-consent.json; exit 1; }
+gruen "Gateway routet auf zwei verschiedene Dienste, beide antworten in ihrer eigenen Gestalt."
 
 schritt "Beweis 3 — schreibend, und die Mail kommt an"
 # Erst DAS beweist, dass die Migrationen wirklich liefen: die beiden Lesepfade
 # oben antworten auch, wenn keine einzige Tabelle existiert.
+# `display_name`, NICHT `displayName`. Der Vertrag schreibt snake_case, und
+# camelCase kommt nicht etwa falsch an — es kommt gar nicht an: der Wert ist
+# beim Empfaenger leer, und die Antwort ist ein 422 auf ein Feld, das man
+# geschickt zu haben glaubt. Genau diese Naht hat den Benachrichtigungsweg
+# einmal viermal still fallen lassen. Gemessen am 11.09.2026, beim ersten
+# echten Lauf dieses Skripts.
 mail="k8s-beweis-$(date +%s)@example.org"
 reg_status=$(curl -s -o /tmp/wt-reg.json -w '%{http_code}' \
   -X POST "${BASE}/auth/register" \
   -H 'Content-Type: application/json' \
-  -d "{\"email\":\"${mail}\",\"password\":\"ein-ausreichend-langes-passwort\",\"displayName\":\"K8s Beweis\"}" || true)
+  -d "{\"email\":\"${mail}\",\"password\":\"ein-ausreichend-langes-passwort\",\"display_name\":\"K8s Beweis\"}" || true)
 echo "POST /auth/register -> ${reg_status}"
 [ "$reg_status" = "201" ] || { rot "Registrierung lieferte ${reg_status}, erwartet 201."; cat /tmp/wt-reg.json; exit 1; }
 
@@ -180,7 +181,10 @@ printf '\n'
 gruen "Die lokale Staging-Umgebung läuft."
 cat <<TEXT
 
-  Anwendung          ${BASE}
+  API (Gateway)      ${BASE}
+  Oberfläche         KEINE — das Gateway liefert seit ADR-0040 nur die API,
+                     und das Chart veröffentlicht nur das Gateway. Wer sie
+                     hier braucht, gibt dem web-Pod einen eigenen Eingang.
   Mailpit            http://localhost:8025   (hier liegt der Bestätigungslink
                      aus der Registrierung — ohne ihn kommt man nicht hinein)
   Traefik-Übersicht  kubectl port-forward deploy/gateway 8081:8080  -> http://localhost:8081

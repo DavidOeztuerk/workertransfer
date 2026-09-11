@@ -1,6 +1,12 @@
 # Plan: der Transfermarkt für **alle** Arbeiter
 
-**Stand:** 09.09.2026 · Nach dem Review in [`REVIEW-09-09.md`](REVIEW-09-09.md).
+**Stand:** 11.09.2026 · Begonnen nach dem Review in
+[`REVIEW-09-09.md`](REVIEW-09-09.md); PBI-1 bis PBI-6 sind gefahren.
+
+**Dies ist die Aufgabenliste.** Die acht Dokumente `AUFTRAG-*.md` und
+`MIGRATION-AUFTRAG.md` daneben sind **Geschichte** — sie tragen seit dem
+11.09.2026 oben eine Statuszeile, die das sagt. Wer offene Arbeit sucht, sucht
+sie hier: PBI-6 §6.5 (eine Entscheidung), PBI-7 und PBI-8. Sonst nirgends.
 
 Dies ist der Plan bis zum Produkt, das der Name verspricht: ein Transfermarkt
 wie im Fußball, **aber für Arbeiter** — und zwar für alle, nicht für
@@ -411,14 +417,249 @@ vergeben (Entfernung). Dieselbe Entscheidung, die nächste freie Nummer.
 
 ## PBI-6 — Aufräumen, was das Review offen ließ
 
-- [ ] **Fund 7:** das tote Bewerbungsformular in `JobApplyPage` (~120 Zeilen
-      samt Freigabeschaltern). Entscheidung: löschen. Toter Code mit
-      Einwilligungsschaltern ist das, was später falsch wiederbelebt wird.
-- [ ] `make k8s-up` **einmal wirklich fahren**. Das Diagramm lintet und
-      rendert; nur ein Lauf beweist es.
-- [ ] `GET /notifications` → 405 (in der Karte festgehalten, nie behoben).
-- [ ] Kommentardichte: `docs/AUFTRAG-ENTLASTUNG.md` wartet auf eine
-      Entscheidung.
+> **Der Abschnitt stimmte selbst nicht**, und das war der größte Posten daran.
+> Er nannte vier Punkte; zwei waren längst erledigt, einer ist keine Codeaufgabe
+> und der wichtigste fehlte ganz. So sieht er nach der Nachmessung vom
+> 11.09.2026 aus.
+
+### 6.1 Die Auftragsdokumente logen — der größte Posten, und er fehlte hier
+
+`docs/AUFTRAG-OPENCODE.md` stand mit **39 offenen Kästchen** da,
+`docs/AUFTRAG-BEWERBUNG-UND-SCOUT.md` mit **20**. Gemessen am 11.09.2026 gegen
+den Baum: **58 der 59 waren gebaut.** Eine Stichprobe von sechs traf sechsmal
+daneben — scout-service, advisor-service, `ApplicationReceived`, die
+Mehrfachauswahl auf `/jobs`, die Entwurfsliste, die Prüfansicht: alles da.
+
+Das ist schlimmer als eine veraltete Notiz. Eine veraltete Prosa liest sich wie
+Geschichte; **ein offenes Kästchen liest sich wie ein Auftrag**, und die nächste
+Sitzung fängt an, etwas zum zweiten Mal zu bauen. Genau das ist die Verwechslung,
+die ein Auftragsdokument von einem Plan trennt: **ein Auftrag ist Geschichte, der
+Plan ist die Aufgabenliste.**
+
+- [x] Alle **acht** Auftragsdokumente (`docs/AUFTRAG-*.md` und
+      `docs/MIGRATION-AUFTRAG.md`) tragen oben eine Statuszeile: abgeschlossen
+      am X · was offen blieb · wo das Ergebnis heute steht.
+- [x] Jedes Kästchen einzeln gegen den Baum geprüft — abgehakt, was gebaut ist;
+      offen gelassen, was wirklich offen ist. **Nichts gelöscht:** die
+      Begründungen darin sind der Wert, nur die Kästchen logen.
+- [x] Was wirklich offen ist, steht jetzt **hier** und nicht dort. Es war
+      wenig, und es war genau dieses:
+
+      | aus | offen | wohin |
+      |---|---|---|
+      | OPENCODE 6.1 / BEWERBUNG „aus JobPilot übernommen" | **begrenzte Parallelität und sichtbarer Fortschritt beim Erzeugen von Entwürfen** | PBI-8 unten |
+      | HAERTUNG H2 | die Geheimnisfrage (`AddSecretManagement`, `AddEncryption`, Infisical daneben oder an ihrer Stelle) | PBI-8 unten |
+      | HAERTUNG H5 | `/code-review ultra` über WorkerTransfer, Girder und Skillswap | **startet ein Mensch**, kein Agent |
+      | ENTLASTUNG Phase 4 | die Kommentardichte | 6.5 unten — eine Entscheidung, keine Aufgabe |
+
+### 6.2 Fund 7 — das tote Bewerbungsformular
+
+- [x] **Gelöscht.** `web/src/features/work/pages/JobApplyPage.tsx` waren 300
+      Zeilen, und der Grund, warum das Formular tot war, ist lehrreicher als
+      seine Länge: der Umleitungszweig stand **davor**. Für eine angemeldete
+      Person mit gültiger Stellenkennung legte ein `useEffect` einen Entwurf an
+      und leitete nach `/applications/drafts/{id}`; die Seite gab danach nur
+      noch eine Ladekarte zurück. Alles darunter — Anschreibenfeld, die zwei
+      Freigabekästchen, `submit()`, `apply()` — war ab dieser Zeile
+      unerreichbar. Es sah aus wie ein Formular und war ein Grabstein.
+- [x] **Die Route ist mitgefallen.** `/jobs/:jobId/apply` war zuletzt eine
+      *Weiche*: eine Adresse, die niemand sehen soll, mit einer Ansicht, die
+      niemand sieht. Ihre zwei Aufrufer — die Stellenliste und die
+      Karriereseite — rufen jetzt `features/work/lib/entwuerfe.ts`, und das
+      Anlegen steht damit an **einer** Stelle statt an zweien.
+- [x] **Die verwaisten Katalogschlüssel sind weg**: der ganze Block
+      `bewerbung.*`, siebzehn Schlüssel in drei Sprachen. Kein einziger hatte
+      nach der Löschung noch einen Leser.
+- [x] `karriere.bewerben` ist jetzt ein **Knopf** statt eines Verweises, und er
+      trägt beide Wege, die die Weiche trug: angemeldet legt er den Entwurf an,
+      abgemeldet merkt er die Stelle und schickt zur Anmeldung.
+
+**Was dabei auffiel und NICHT angefasst wurde** (es ist eine eigene
+Entscheidung, siehe PBI-8): `merkeStelle` schreibt die gemerkte Stelle nach
+`localStorage`, und **niemand liest sie zurück**. `gemerkteStelle()` hat außer
+in der eigenen Datei keinen Aufrufer; `LoginPage.tsx:66` hat den Rückweg
+ausdrücklich stillgelegt und den Satz hinterlassen, wie man ihn zurückholt. Das
+ist kein toter Code aus Versehen, sondern ein halb geparkter Mechanismus — aber
+der Kommentar in `JobsPage.tsx` behauptet dabei, sein Knopf sei „die EINZIGE
+Stelle, an der die Absicht entsteht", und das stimmte schon vorher nicht.
+
+### 6.3 `GET /notifications` → 405
+
+- [x] **War schon behoben, in H4** — dieser Punkt stand hier, ohne dass jemand
+      nachgesehen hatte. Der Diensteingang ist nach `/internal/notifications`
+      umgezogen, wo es keine Gateway-Route gibt; damit verhalten sich alle drei
+      Dienst-zu-Dienst-Türen gleich (`/erasure`, `/internal/notify`,
+      `/internal/notifications`). `/notifications` antwortet jetzt auf **jede**
+      Methode 404, nicht unterscheidbar von einem Pfad, den es nicht gibt.
+      `docs/routenkarte.yml:536` erklärt es bereits im Imperfekt („**STAND**
+      hier mit 405"), und die Zeilen 497 und 561 messen 404 in allen vier
+      Spalten. Nichts zu tun — nur nachzusehen.
+
+### 6.4 `make k8s-up` einmal wirklich fahren
+
+- [x] **Gefahren, am 11.09.2026, zum ersten Mal auf dieser Maschine.** Und der
+      Befund ist der bestmögliche: **das Chart trägt, das Skript log.**
+
+**Was sofort funktionierte**, ohne eine einzige Änderung: kind-Cluster,
+beide Images, `helm upgrade --install --wait`, und danach **19 Pods bereit, null
+Neustarts**. Postgres, Mailpit, Jaeger, das Gateway, alle vierzehn Dienste und
+`web`. Die Migrationen liefen; die Registrierung legte ein Konto an und die
+Bestätigungsmail lag in Mailpit.
+
+**Was fiel, waren die BEWEISE — dreimal, und jedes Mal, weil das Skript gegen
+einen Baum geschrieben war, den es nicht mehr gibt.** Das ist genau der Fall,
+den `CLAUDE.md` über die Routenkarte festhält: *eine Liste, die niemand fährt,
+ist am Tag nach ihrer Entstehung falsch.* Ein Beweis, den niemand fährt, auch.
+
+| fiel bei | behauptet | gemessen | warum |
+|---|---|---|---|
+| Beweis 2 | `GET /jobs` → **401** | **200** | die Stellenliste ist öffentlich geworden. Mit ihr fiel der Beleg, der an ihr hing: das RFC-9457-Dokument mit `correlationId`. |
+| Beweis 2 | `GET /` → die Oberfläche | **404** | ADR-0040: das Gateway liefert keine Oberfläche mehr, `web` ist `ClusterIP`. Das ist richtig so, und das ADR sagt es selbst. |
+| Beweis 2b | Direktlink mit `Sec-Fetch-Dest: document` | — | prüfte die `Navigation`-Zwischenschicht, die mit ADR-0040 **gelöscht** wurde. Ein Beweis für etwas, das es nicht gibt, kann nur rot werden. |
+| Beweis 3 | `POST /auth/register` → **201** | **422 `invalid: display_name`** | das Skript schickte `displayName`, der Vertrag liest `display_name`. |
+
+**Der vierte ist der lehrreichste, und er ist ein alter Bekannter.** camelCase
+gegen snake_case kommt nicht *falsch* an — es kommt **gar nicht** an: der Wert
+ist beim Empfänger leer, und die Antwort beanstandet ein Feld, das man
+geschickt zu haben glaubt. Dieselbe Naht hat den Benachrichtigungsweg schon
+einmal viermal still fallen lassen (`CLAUDE.md`, „Konventionen, die beißen").
+Hier fand sie ein Skript, weil es endlich jemand fuhr.
+
+- [x] **`scripts/k8s-up.sh` steht jetzt auf dem Gemessenen**, und die drei
+      Beweise sagen wieder etwas:
+      - **Beweis 2** fragt **zwei verschiedene Dienste** statt Dienst und
+        Oberfläche: `GET /jobs` → 200 mit der Seitengestalt (`items`) von
+        jobs-service, `GET /consent/me` → 401 mit einem Problemdokument samt
+        `correlationId` von consent-service. Zwei Ziele, zwei **Gestalten** —
+        und das ist der eigentliche Beleg: eine fehlende Route wäre Ocelots
+        leeres 404, ein toter Dienst ein 502, und beides sähe an einem
+        einzelnen Statuscode gleich aus. Dieselbe Wahl wie im `images`-Auftrag
+        der CI, aus demselben Grund.
+      - **Beweis 2b** ist gefallen, mit dem Grund im Quelltext.
+      - **Beweis 3** schickt `display_name`, und darüber steht, warum.
+      - Der Schlusstext sagt jetzt geradeheraus, dass es **keine Oberfläche**
+        gibt und wer sie will, `web` einen eigenen Eingang gibt.
+- [x] **Danach grün, Ende zu Ende** — und dreimal hintereinander gefahren, denn
+      ein Skript, das nur beim ersten Mal durchläuft, ist kein Beweis.
+
+**Und ein Widerspruch, der dabei auffiel:**
+`docs/prompts-naechste-schritte.md` meldet `make k8s-up` seit dem 08.08.2026
+als eingelöst — *„15 Pods bereit, null Neustarts, `GET /jobs` → 200,
+`POST /auth/register` → 201 samt Mail"* —, während `CLAUDE.md` sagt, es sei nie
+gelaufen. **Beides stimmt:** der Lauf war in der Python-Ära, und das Skript
+wurde seither neu geschrieben. Wer die Zeile liest und nicht das Datum, hält
+den Punkt für erledigt. Genau dafür steht sie jetzt in der Liste unten.
+
+### 6.5 Kommentardichte — eine Entscheidung, keine Codeaufgabe
+
+Dieser Punkt stand hier als Aufgabe und ist keine. Er ist eine **offene
+Entscheidung** in [`AUFTRAG-ENTLASTUNG.md`](AUFTRAG-ENTLASTUNG.md) Phase 4, und
+sie gehört einem Menschen. Neu vermessen am 11.09.2026 über `src/`, ohne
+`obj/`, `bin/` und Wanderungen:
+
+| | |
+|---|---|
+| Dateien / Zeilen | 539 / 51.996 |
+| **Kommentarzeilen** | **16.157 — 31 %** |
+| davon `///` (XML) · `//` | 13.697 · 2.373 |
+| `<summary>` · `<remarks>` | 2.967 · 1.108 |
+| **Zeilen innerhalb `<remarks>`** | **8.748 — 17 % des Baums, 54 % aller Kommentare** |
+
+Die Dichte ist seit dem 03.09.2026 **gestiegen** (drei Dienste kamen dazu). Sie
+ist aber nicht der Gegenstand. Der Befund von damals hält jeder Nachmessung
+stand: **in dieser Codebasis sind die Kommentare überwiegend die Begründung.**
+Der mechanische Schnitt wurde dreimal verschieden scharf gefahren, und der
+schärfste entfernte unter anderem die Sätze, die erklären, *warum 503 und nicht
+404* — die Kernregel aus ADR-0020. Sie tragen keines der Merkmale, weil sie als
+**Argument** geschrieben sind („404 hieße zu behaupten…") und nicht als Befehl.
+
+**Was zu entscheiden ist, in einem Satz:** wo genau verläuft die Grenze
+zwischen einem Kommentar, der eine *Messung, ein Verbot oder eine Falle*
+festhält — der Wert dieses Baums —, und einem, der den Code *nacherzählt*.
+
+Die zwei Wege, die dranhängen, brauchen einander nicht:
+
+- **Weg 1 — die Kopien an Aufrufstellen löschen.** Klein, sicher, kein Verlust:
+  derselbe Begründungssatz steht mehrfach wortgleich im Baum, obwohl der
+  kanonische an der Sache selbst hängt. Gezählt: „Konfiguration aus der
+  Umgebung. VOR CreateBuilder…" in **15** `Program.cs` (45 Zeilen), „Der
+  Schluessel IST der Mensch…" in **7** Kontexten (~35), „Kein AlsAussteller()"
+  in **12** (~24), „Erst wandern, dann bedienen (ADR-0010)" in **15** (15).
+  Rund **120 Zeilen**. Die letzte ist der Grenzfall und gehört ausdrücklich
+  entschieden: sie ist keine Kopie einer Begründung, sondern ein *Zeiger* auf
+  eine — und ein Zeiger dort, wo man ihn braucht, ist billig.
+- **Weg 2 — `<remarks>` aufgeben und die Gründe in die ADRs ziehen.** 8.748
+  Zeilen. Dann liegt der Grund an EINER Stelle — aber nicht mehr dort, wo
+  jemand ihn braucht, sondern dort, wo er ihn suchen muss. Und es ist nicht
+  umkehrbar: was einmal in ein ADR gewandert ist, wandert nicht zurück an die
+  Zeile.
+
+- [ ] **Die Entscheidung liegt vor und wird nicht von einem Agenten getroffen.**
+
+### 6.6 Was sonst veraltet ist
+
+- [x] **`REVIEW-09-09.md` nannte 966 .NET-Tests** (und 150 Frontend-Tests in 20
+      Dateien). Nachgemessen am 11.09.2026 stehen daneben die heutigen Zahlen —
+      die alten bleiben stehen, denn ein Review ist ein Datum.
+- [x] **`bugs/` ist sauber**, und das ist bestätigt statt angenommen: ein
+      Eintrag (`korrelationskennung-steht-nicht-auf-der-konsole.md`),
+      geschlossen am 09.09.2026 und auf Girder 4.4.0 nachgemessen. Nichts zu
+      tun.
+- [x] **Die 37 Dateien in `docs/` durchgesehen.** Die Liste dessen, was einen
+      Zustand beschreibt, den es nicht mehr gibt, steht unten in
+      [„Was in `docs/` einen verschwundenen Zustand beschreibt"](#was-in-docs-einen-verschwundenen-zustand-beschreibt).
+      **Nichts gelöscht** — das ist eine Entscheidung, keine Aufräumarbeit.
+
+---
+
+## Was in `docs/` einen verschwundenen Zustand beschreibt
+
+Durchgesehen am 11.09.2026, alle 37 Dateien in `docs/` (ohne `adr/`, `vision/`,
+`uebergabe/`, `skills/`, `superpowers/`). **Gelöscht wurde nichts.** Die Spalte
+rechts sagt, was die Datei über einen Zustand behauptet, den es nicht mehr gibt.
+
+### Beschreiben einen Baum, den es nicht mehr gibt
+
+| Datei | was nicht mehr stimmt |
+|---|---|
+| `dotnet-README.md` | *„Python liegt in `../apps` und `../packages`, das Frontend in `../apps/web`"* — alle drei sind weg. Auch die Pfade (`../docs/…`) stammen aus einem `dotnet/`-Unterordner, den es nicht mehr gibt. Die Datei beschreibt die Zeit, in der .NET und Python nebeneinander lagen. |
+| `phase-2-prep.md` | 16.07.2026, Python, Zweig `phase-2-identity-tenancy` @ `aa805e2`. Der früheste Zustand im Ordner. |
+| `oberflaeche-erwartete-ansichten.md` | *„Gelesen aus `apps/web/src/app.tsx`"*, 29 Routen der **alten** Oberfläche (TanStack Query/Router, `packages/ui`). `web/` wurde neu gebaut; die Routen heißen heute anders und sind mehr. |
+| `oberflaeche-routenkarte.md` | dieselbe Ära, Schnitt E2.5 derselben Spezifikation. |
+| `befund-e3a-bewerbung.md`, `-e3b-eigene-daten.md`, `-e3c-konto.md`, `-e3d-unternehmen.md`, `-e3e-markt-geruest.md` | fünf Befunde vom 12./13.08.2026 an der alten Oberfläche. |
+| `befund-kandidatenliste-haengt.md` | ein Befund über `/candidates` — den Endpunkt **gibt es nicht mehr** (ADR-0036, gefallen am 11.09.2026). |
+
+### Beschreiben einen Plan, den ein anderer abgelöst hat
+
+| Datei | was nicht mehr stimmt |
+|---|---|
+| `ULTRAPLAN.md` | der Masterplan vor der Migration, auf `vision/kon.txt`. Seine Phasen sind nicht die Phasen dieses Baums. Abgelöst durch diesen Plan. |
+| `ROADMAP.md` | der Pull-Through-Index zu `ULTRAPLAN.md`, 1.519 Zeilen. Hängt mit ihm. |
+| `MIGRATION-PROMPT.md` | *„Einstieg für jede Sitzung, die an der Migration arbeitet"* — die Migration ist durch. |
+| `prompts-naechste-schritte.md` | 08.08.2026. **Und hier liegt ein echter Widerspruch:** die Datei meldet `make k8s-up` als eingelöst (*„15 Pods bereit, null Neustarts, `GET /jobs` → 200, `POST /auth/register` → 201 samt Mail"*), während `CLAUDE.md` sagt, es sei auf dieser Maschine nie gelaufen. Beides kann stimmen — der Lauf war in der **Python**-Ära, und das Skript wurde seither neu geschrieben. Wer die Zeile liest und nicht das Datum, hält den Punkt für erledigt. |
+
+### Sind Momentaufnahmen und altern deshalb von selbst
+
+| Datei | |
+|---|---|
+| `UEBERGABE.md` | *„Branch `dotnet-migration` · nichts gepusht (kein Upstream)"*, 02.09.2026. |
+| `KI-EINSATZ-PRUEFUNG.md` | eine Prüfung vom 02.09.2026, ausdrücklich **lesend** gemacht. |
+| `ANALYSE-STAND-UND-LUECKEN.md` | eine Bestandsaufnahme vom 03.09.2026. |
+| `REVIEW-09-09.md` | das Review vom 09.09.2026. |
+| `GIRDER-ANPASSUNGEN.md` | 03.09.2026; sagt *„Alle sieben Tickets aus `bugs/` sind behoben und die Dateien deshalb gelöscht"* — seither kam eines dazu und wurde ebenfalls geschlossen. |
+
+**Diese fünf sind kein Aufräumfall.** Eine Momentaufnahme mit Datum davor ist
+kein veraltetes Dokument, sondern ein datiertes. Der Unterschied zu den beiden
+Gruppen darüber ist, dass jene sich als **Gegenwart** lesen.
+
+### Tragen und bleiben
+
+`MIGRATION-STAND.md` · `architecture.md` · `product-scope.md` · `glossary.md` ·
+`frontend.md` · `erkenntnisse-girder.md` · `routenkarte.yml` · `SESSIONS.md` ·
+`PLAN-TRANSFERMARKT.md` · `SCOUT-UND-BERATER.md` (ausdrücklich als **Entwurf**
+gekennzeichnet) · `SCOUT-UND-BERATER-BESTAND.md` · die acht Auftragsdokumente
+(jetzt mit Statuszeile).
+
 
 ---
 
@@ -494,3 +735,72 @@ Menschen. Das ist der Teil, den kaum jemand baut.
 - [ ] Zwei Handlungen bis zur Nennung — Klick füllt das Feld, **Speichern**
       macht daraus eine Aussage.
 - [ ] Nichts davon ist durchsuchbar, bevor die Person gespeichert hat.
+
+---
+
+## PBI-8 — Was aus den Auftragsdokumenten wirklich offen war
+
+> **Als nächste Sitzung** will ich die offene Arbeit an **einer** Stelle finden,
+> **damit** ich sie nicht aus acht Dokumenten mit lügenden Kästchen
+> zusammensuche.
+
+Aus 59 offenen Kästchen in acht Auftragsdokumenten blieb nach der Nachmessung
+vom 11.09.2026 genau das hier übrig. Es steht jetzt hier, weil ein
+Auftragsdokument Geschichte ist und der Plan die Aufgabenliste.
+
+### 8.1 Begrenzte Parallelität und sichtbarer Fortschritt beim Erzeugen
+
+`AUFTRAG-OPENCODE.md` 6.1 verlangt *„parallel mit Begrenzung (max. 3
+gleichzeitig), mit sichtbarem Fortschritt"*, und
+`AUFTRAG-BEWERBUNG-UND-SCOUT.md` führt die begrenzte Parallelität unter dem,
+was **aus JobPilot übernommen wurde**. Gemessen: sie ist nicht übernommen.
+
+- [ ] `web/src/features/work/lib/entwuerfe.ts` fährt `Promise.all` über **alle**
+      gewählten Stellen. Wer zwölf Stellen ankreuzt, schickt zwölf
+      Schreibaufträge gleichzeitig an jobs-service und von dort an den
+      KI-Anbieter. Eine Begrenzung auf drei ist das, was der Auftrag zusagt.
+- [ ] **Der Fortschritt ist gebaut und wird nie erreicht.** `JobsPage.tsx` hält
+      `const [fortschritt, setFortschritt] = useState<{fertig, gesamt} | null>`,
+      die Leiste unten liest ihn — und `setFortschritt` wird an genau einer
+      Stelle gerufen, im `finally`, mit `null`. Der Katalogschlüssel
+      `stellen.fortschritt` („{{fertig}} von {{gesamt}} geschrieben") steht in
+      drei Sprachen und hat keinen Leser. Entweder er wird gefüllt, oder er und
+      seine drei Übersetzungen fallen.
+
+**Das eine hängt am anderen:** ohne Begrenzung gibt es keinen Fortschritt zu
+zeigen, weil alles gleichzeitig läuft und gleichzeitig fertig wird.
+
+### 8.2 Die Geheimnisfrage (H2 aus `AUFTRAG-HAERTUNG.md`)
+
+- [ ] `AddSecretManagement` ist **ungemessen** — CLAUDE.md führt es als „offen,
+      gehört zu H2". Die Frage lautet nicht „einschalten oder nicht", sondern:
+      nimmt dieses Modul den Platz von Infisical ein, oder steht es daneben?
+- [ ] `AddEncryption` verlangt `IDataEncryptionService` **und**
+      `IMasterKeyProvider`. Wir verschlüsseln heute auf Feldebene nichts; wer
+      damit anfängt, entscheidet **zuerst**, wo der Hauptschlüssel liegt.
+- [ ] `AddResourceAuthorization` ist ebenfalls ungemessen. Die Richtlinien
+      stehen seit PBI-2; ob dieses Modul darüber hinaus etwas trägt, weiß
+      niemand.
+
+### 8.3 Die gemerkte Stelle wird geschrieben und nie gelesen
+
+- [ ] `merkeStelle()` schreibt nach `localStorage`; `gemerkteStelle()` hat
+      außerhalb von `features/work/lib/intent.ts` **keinen Aufrufer**.
+      `LoginPage.tsx:66` hat den Rückweg ausdrücklich stillgelegt und einen
+      Satz hinterlassen, wie man ihn zurückholt. Das ist eine Entscheidung:
+      entweder der Rückweg kommt (dann liest die Anmeldung die Absicht wieder),
+      oder `intent.ts` fällt samt seiner zwei Schreibstellen. Beides ist
+      vertretbar; **was nicht vertretbar ist, ist der Zustand dazwischen**, in
+      dem eine Absicht 24 Stunden lang im Browser einer Person liegt, ohne dass
+      irgendetwas sie je einlöst.
+- [ ] Nebenbei: der Kommentar in `JobsPage.tsx` behauptet, sein Knopf sei „die
+      EINZIGE Stelle, an der die Absicht entsteht". Seit PBI-6 stimmt das
+      wieder — vorher tat `JobApplyPage` dasselbe. Wer den Rückweg baut, prüft
+      den Satz noch einmal.
+
+### 8.4 `/code-review ultra` (H5) — startet ein Mensch
+
+- [ ] Über WorkerTransfer, Girder und Skillswap. **Kein Agent kann das
+      auslösen**, und keiner sollte es. Steht hier, damit es nicht in einem
+      abgeschlossenen Auftragsdokument verschwindet.
+
