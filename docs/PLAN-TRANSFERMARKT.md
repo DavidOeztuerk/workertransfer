@@ -384,20 +384,28 @@ beide Seiten zugleich fährt.
 > **Als Unternehmen** will ich eine Arbeitsprobe stellen, **damit** ich sehe,
 > wie jemand arbeitet — ohne daraus eine Note über einen Menschen zu machen.
 
-**Kein ADR, kein Code.** Der dritte aus `SCOUT-UND-BERATER.md` und der mit dem
-größten Missbrauchspotenzial: unbezahlte Arbeit als Aufgabe getarnt.
+**Gebaut am 11.09.2026** — [ADR-0042](adr/0042-die-arbeitsprobe.md). Der dritte
+aus `SCOUT-UND-BERATER.md` und der mit dem größten Missbrauchspotenzial:
+unbezahlte Arbeit als Aufgabe getarnt.
+
+**Die Nummer ist 0042 und nicht 0040.** Dieser Abschnitt sagte „ADR-0040 ist
+vergeben" und meinte damit die *nächste* freie; beim Schreiben war auch 0041
+vergeben (Entfernung). Dieselbe Entscheidung, die nächste freie Nummer.
 
 ### Aufgaben
 
-- [ ] **Ein eigenes ADR zuerst** (ADR-0040 ist vergeben — das Gateway liefert
-      keine Oberflaeche). Drei Regeln, die den Unterschied zwischen einer
+- [x] **Ein eigenes ADR zuerst.** Drei Regeln, die den Unterschied zwischen einer
       Aufgabe und einer Prüfung mit Note ausmachen:
       1. Die Bewertung gehört dem **Vorgang**, nicht dem Menschen — in keiner
          Suche, in keinem Profil, für kein anderes Unternehmen, ohne Zahl.
       2. Die Person **sieht** die Bewertung. Immer, auch bei Absage.
       3. Der **Umfang in Stunden steht in der Ausschreibung**, und Ablehnen
          wird nirgends vermerkt.
-- [ ] Danach der Dienst.
+- [x] Danach der Dienst. Jede der drei Regeln ist ein Mechanismus und kein
+      Absatz: EIN Bewertungsfeld, eine byte-gleiche Antwort an beide Seiten,
+      ein Ledger, der nur die Firmenseite bewacht, Pflichtangabe 1–8 Stunden,
+      und keine Route zum Ablehnen — die Endpunktmenge ist geschlossen und
+      steht als Test.
 
 ---
 

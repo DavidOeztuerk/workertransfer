@@ -54,6 +54,9 @@ describe("die Kataloge", () => {
       // Gleiches Wort in beiden Sprachen. Jede Zeile ist ein Einzelfall und
       // kein Freibrief — Französisch steht auf keiner davon.
       "en:arbeiten.feldLink",
+      // „Link" heisst auf Englisch genauso, und ein erfundener Unterschied
+      // waere falsch. Franzoesisch steht NICHT daneben: dort ist es „Lien".
+      "en:probe.loesungAdresse",
       "en:markt.status",
       "en:freigaben.bereichGithub",
       "en:stelle.remoteHybrid",

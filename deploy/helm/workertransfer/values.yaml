@@ -210,6 +210,7 @@ services:
       Erasure__Adressen__github: http://github-service:8011
       Erasure__Adressen__scout: http://scout-service:8012
       Erasure__Adressen__advisor: http://advisor-service:8013
+      Erasure__Adressen__assessment: http://assessment-service:8014
 
   - name: consent-service
     dir: consent
@@ -351,6 +352,28 @@ services:
       Transfer__Adresse: http://transfer-service:8009
       # „Ein Unternehmen hat ein Gespraech eroeffnet", ueber den Postausgang.
       Notifications__Adresse: http://notification-service:8010
+
+  - name: assessment-service
+    dir: assessment
+    port: 8014
+    database: assessment
+    env:
+      # Jedes Ziel dieses Dienstes steht hier, und zwar weil es hier stehen
+      # MUSS: die Egress-Grenze leitet ihre erlaubten Hosts aus der
+      # Konfiguration ab. Ein Ziel, das nur im Quelltext steht, wird
+      # abgewiesen — ohne Protokollzeile.
+      #
+      # Der Ledger, und er ist der EINZIGE Waechter dieses Dienstes: eine
+      # Arbeitsprobe steht an `profile.visibility:*` und an keiner eigenen
+      # Faehigkeit (ADR-0042). Ohne diese Zeile antwortet die Firmenseite 503;
+      # die Personenseite antwortet weiter, denn wer seine Bewertung lesen
+      # will, braucht dafuer keinen Ledger.
+      Consent__Adresse: http://consent-service:8002
+      # „An deiner Arbeitsprobe hat sich etwas bewegt", ueber den Postausgang,
+      # inhaltsfrei (ADR-0025).
+      Notifications__Adresse: http://notification-service:8010
+      # NICHT eingetragen: die Adresse, die eine Person einreicht. Sie wird
+      # gespeichert und angezeigt, nie abgerufen.
 
 resources:
   requests:

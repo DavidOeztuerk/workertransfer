@@ -18,7 +18,7 @@
   </ItemGroup>
   <ItemGroup>
     <!--
-      Alle elf Infrastrukturen. Das ist der Punkt: diese Reihe prueft, was
+      Alle vierzehn Infrastrukturen. Das ist der Punkt: diese Reihe prueft, was
       ueber die Dienstgrenzen hinweg gilt, und kann das nur, wenn sie alle
       sieht. Jeder neue Dienst gehoert hier hinein — und faellt sonst genau
       durch die Luecke, die der Loeschwaechter schliesst.
@@ -36,6 +36,7 @@
     <ProjectReference Include="..\..\src\notification-service\WorkerTransfer.Notification.Infrastructure\WorkerTransfer.Notification.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\scout-service\WorkerTransfer.Scout.Infrastructure\WorkerTransfer.Scout.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\advisor-service\WorkerTransfer.Advisor.Infrastructure\WorkerTransfer.Advisor.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\assessment-service\WorkerTransfer.Assessment.Infrastructure\WorkerTransfer.Assessment.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\shared\WorkerTransfer.Contracts.Erasure\WorkerTransfer.Contracts.Erasure.csproj" />
     <ProjectReference Include="..\..\src\shared\WorkerTransfer.Contracts.Identity\WorkerTransfer.Contracts.Identity.csproj" />
     <ProjectReference Include="..\..\src\identity-service\WorkerTransfer.Identity.Api\WorkerTransfer.Identity.Api.csproj" />
@@ -51,5 +52,6 @@
     <ProjectReference Include="..\..\src\notification-service\WorkerTransfer.Notification.Api\WorkerTransfer.Notification.Api.csproj" />
     <ProjectReference Include="..\..\src\scout-service\WorkerTransfer.Scout.Api\WorkerTransfer.Scout.Api.csproj" />
     <ProjectReference Include="..\..\src\advisor-service\WorkerTransfer.Advisor.Api\WorkerTransfer.Advisor.Api.csproj" />
+    <ProjectReference Include="..\..\src\assessment-service\WorkerTransfer.Assessment.Api\WorkerTransfer.Assessment.Api.csproj" />
   </ItemGroup>
 </Project>

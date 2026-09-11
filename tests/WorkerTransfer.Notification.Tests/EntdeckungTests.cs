@@ -209,11 +209,19 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         (await Postfach(anna)).GetArrayLength().Should().Be(1);
     }
 
-    /// <summary>Die Art ist eine von sieben, und alle sieben sind einstellbar.</summary>
+    /// <summary>Die Art ist eine von acht, und alle acht sind einstellbar.</summary>
+    /// <remarks>
+    /// Die achte kam mit assessment-service (ADR-0042):
+    /// <c>assessment_update</c>. Diese Zahl steht hier, damit eine neue Art
+    /// nicht stillschweigend dazukommt — jede ist ein Schalter, den ein Mensch
+    /// zu sehen bekommt, und eine unbemerkt hinzugefügte Art wäre eine Mail,
+    /// die niemand bestellt hat.
+    /// </remarks>
     [Fact]
-    public void Es_sind_sieben_Arten() =>
-        Benachrichtigungsarten.Alle.Should().HaveCount(7)
-            .And.Contain(Benachrichtigungsart.ProfileDiscovered);
+    public void Es_sind_acht_Arten() =>
+        Benachrichtigungsarten.Alle.Should().HaveCount(8)
+            .And.Contain(Benachrichtigungsart.ProfileDiscovered)
+            .And.Contain(Benachrichtigungsart.AssessmentUpdate);
 
     /// <summary>Nur diese eine Art trägt eine Tageskappe.</summary>
     /// <remarks>

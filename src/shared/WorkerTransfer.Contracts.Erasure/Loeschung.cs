@@ -87,6 +87,14 @@ public static class Loeschempfaenger
     /// recipient; that is the whole rule.
     /// </para>
     /// <para>
+    /// <c>assessment</c> joined with its first table (ADR-0042). It holds the
+    /// work samples a company asked a person for, what the person handed in and
+    /// the one evaluation that came back — all keyed by the person. There is no
+    /// retention case, not even for the evaluation: an evaluation that survived
+    /// an erasure would be exactly the reference letter ADR-0042 rules out,
+    /// only at a particularly bad moment.
+    /// </para>
+    /// <para>
     /// A test goes red the moment any service grows a table with
     /// <c>subject_id</c> or <c>user_id</c> and is not on this list.
     /// </para>
@@ -94,7 +102,8 @@ public static class Loeschempfaenger
     public static IReadOnlyList<string> Fremde { get; } =
     [
         "consent", "profile", "resume", "portfolio",
-        "applications", "transfer", "github", "notification", "scout", "advisor"
+        "applications", "transfer", "github", "notification", "scout", "advisor",
+        "assessment"
     ];
 
     /// <summary>The final notice to the person. Itself an outbox row.</summary>

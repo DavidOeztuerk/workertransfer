@@ -32,7 +32,7 @@ cd "$(dirname "$0")/.."
 export DOTNET_CLI_UI_LANGUAGE=en
 
 reihen=(Ablage Outbox Skills Ganzes Gateway Identity Consent Profile Resume Portfolio
-        Jobs Applications Companies Transfer GitHub Notification Scout Advisor)
+        Jobs Applications Companies Transfer GitHub Notification Scout Advisor Assessment)
 
 rot=0
 gesamt=0
