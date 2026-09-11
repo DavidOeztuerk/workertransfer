@@ -24,6 +24,17 @@ public static class Firmenrechte
     /// <summary>Jemanden in die eigene Firma einladen.</summary>
     public const string Einladen = "company.invite";
 
+    /// <summary>Eine offene Einladung zuruecknehmen.</summary>
+    /// <remarks>
+    /// Die Kehrseite von <see cref="Einladen"/>, und deshalb dasselbe Recht
+    /// wert: wer nicht einladen darf, darf auch nicht die Einladung einer
+    /// Kollegin wegnehmen. Dass sie <em>gelesen</em> werden darf, ist eine
+    /// andere Frage — <c>GET /invitations</c> bleibt jedem Mitglied offen, weil
+    /// eine Firma ihrer eigenen Belegschaft nicht verschweigen muss, wen sie
+    /// gerade sucht.
+    /// </remarks>
+    public const string EinladungZuruecknehmen = "company.invitations.withdraw";
+
     /// <summary>Ein Mitglied aus der eigenen Firma entfernen.</summary>
     public const string Entfernen = "company.members.remove";
 

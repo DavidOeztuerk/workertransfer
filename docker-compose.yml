@@ -260,6 +260,18 @@ services:
       SERVICE_DIR: jobs
       ASPNETCORE_URLS: "http://0.0.0.0:8006"
       ConnectionStrings__jobs: Host=postgres;Port=5432;Database=jobs;Username=worker;Password=worker
+      # Die Rollenauskunft. Wer `admin` ist, entscheidet die
+      # Mitgliedschaftstabelle von identity-service — je Anfrage und nicht das
+      # Token: eine Rolle im Token wirkte nach einer Entfernung erst beim
+      # Ablauf. Dieselbe Adresse und dasselbe Geheimnis wie jede andere interne
+      # Tuer.
+      #
+      # OHNE diese zwei Zeilen antwortet jede geschuetzte Route mit 503 (nicht
+      # 403): „hat nicht geantwortet" ist nicht dasselbe wie „nein". Und die
+      # Adresse steht hier auch deshalb, weil die Egress-Grenze ihre erlaubten
+      # Hosts aus der Konfiguration ableitet (Dienstgrundlage.cs).
+      Identity__Adresse: http://identity-service:8001
+      Identity__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
       # Die KI-Naht. LEER ist gueltig und die Vorgabe: ohne Schluessel wird kein
       # externer Dienst gerufen, und die Oberflaeche sagt das (ADR-0024).
       # Deshalb `:-` und nicht `:?` — ein fehlender Schluessel darf den Stapel
@@ -344,6 +356,18 @@ services:
       SERVICE_DIR: companies
       ASPNETCORE_URLS: "http://0.0.0.0:8008"
       ConnectionStrings__companies: Host=postgres;Port=5432;Database=companies;Username=worker;Password=worker
+      # Die Rollenauskunft. Wer `admin` ist, entscheidet die
+      # Mitgliedschaftstabelle von identity-service — je Anfrage und nicht das
+      # Token: eine Rolle im Token wirkte nach einer Entfernung erst beim
+      # Ablauf. Dieselbe Adresse und dasselbe Geheimnis wie jede andere interne
+      # Tuer.
+      #
+      # OHNE diese zwei Zeilen antwortet jede geschuetzte Route mit 503 (nicht
+      # 403): „hat nicht geantwortet" ist nicht dasselbe wie „nein". Und die
+      # Adresse steht hier auch deshalb, weil die Egress-Grenze ihre erlaubten
+      # Hosts aus der Konfiguration ableitet (Dienstgrundlage.cs).
+      Identity__Adresse: http://identity-service:8001
+      Identity__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
     ports:
       - "8008:8008"
 
@@ -355,6 +379,18 @@ services:
       SERVICE_DIR: transfer
       ASPNETCORE_URLS: "http://0.0.0.0:8009"
       ConnectionStrings__transfer: Host=postgres;Port=5432;Database=transfer;Username=worker;Password=worker
+      # Die Rollenauskunft. Wer `admin` ist, entscheidet die
+      # Mitgliedschaftstabelle von identity-service — je Anfrage und nicht das
+      # Token: eine Rolle im Token wirkte nach einer Entfernung erst beim
+      # Ablauf. Dieselbe Adresse und dasselbe Geheimnis wie jede andere interne
+      # Tuer.
+      #
+      # OHNE diese zwei Zeilen antwortet jede geschuetzte Route mit 503 (nicht
+      # 403): „hat nicht geantwortet" ist nicht dasselbe wie „nein". Und die
+      # Adresse steht hier auch deshalb, weil die Egress-Grenze ihre erlaubten
+      # Hosts aus der Konfiguration ableitet (Dienstgrundlage.cs).
+      Identity__Adresse: http://identity-service:8001
+      Identity__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
       Consent__Adresse: http://consent-service:8002
       Notifications__Adresse: http://notification-service:8010
       Notifications__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}

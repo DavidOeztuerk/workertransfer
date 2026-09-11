@@ -46,6 +46,7 @@ public sealed class Mitgliedschaftsrecht(
     private static readonly string[] NurAdmin =
     [
         Firmenrechte.Einladen,
+        Firmenrechte.EinladungZuruecknehmen,
         Firmenrechte.Entfernen
     ];
 

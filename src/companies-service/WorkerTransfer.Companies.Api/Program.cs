@@ -1,7 +1,9 @@
 using WorkerTransfer.Companies.Api;
+using WorkerTransfer.Companies.Api.Berechtigung;
 using WorkerTransfer.Companies.Infrastructure;
 using WorkerTransfer.Companies.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.ServiceDefaults.Rollen;
 
 // Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
 // Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
@@ -14,6 +16,12 @@ const string serviceName = "companies-service";
 // Kein AlsAussteller(): nur identity-service hält die private Hälfte.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName);
+
+// Das Arbeitgeberprofil ist die Selbstdarstellung des Unternehmens und steht
+// oeffentlich — es zu schreiben verlangt einen `admin`. Wer das ist, entscheidet
+// die MITGLIEDSCHAFTSTABELLE von identity-service, je Anfrage: eine Rolle im
+// Token wirkte nach einer Entfernung erst beim Ablauf.
+builder.Services.AddAdminrechte(builder.Configuration, Schaufensterrechte.Schreiben);
 
 builder.Services.AddCompaniesInfrastructure(
     builder.Configuration,

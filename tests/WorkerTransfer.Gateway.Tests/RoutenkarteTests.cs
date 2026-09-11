@@ -29,6 +29,20 @@ public sealed class RoutenkarteTests
         public string Pfad { get; init; } = "";
         public int Ohne { get; init; }
         public int Person { get; init; }
+
+        /// <summary>
+        /// Fuer eine Firma handelnd, Rolle <c>member</c>.
+        /// </summary>
+        /// <remarks>
+        /// Die vierte Spalte, seit PBI-2. Sie ist die einzige, die von
+        /// <see cref="Firma"/> ueberhaupt abweichen KANN, ohne dass sich der
+        /// Mandant aendert — und damit die einzige, die „admin gegen member"
+        /// ueberhaupt pruefbar macht. Vorher stand das Wort nur in einer
+        /// Tabellenspalte.
+        /// </remarks>
+        public int Mitglied { get; init; }
+
+        /// <summary>Fuer eine Firma handelnd, Rolle <c>admin</c>.</summary>
         public int Firma { get; init; }
 
         /// <summary>
@@ -175,7 +189,39 @@ public sealed class RoutenkarteTests
                 $"'{eintrag.Pfad}' hat keine Route — dann ist 404 die einzige "
                 + "Antwort, die dort stehen darf");
             eintrag.Person.Should().Be(404);
+            eintrag.Mitglied.Should().Be(404);
             eintrag.Firma.Should().Be(404);
+        }
+    }
+
+    /// <summary>
+    /// Jede Zeile nennt in ALLEN VIER Spalten einen Statuscode.
+    /// </summary>
+    /// <remarks>
+    /// Der Test, der eine vergessene vierte Spalte rot macht. YAML beantwortet
+    /// ein fehlendes Feld mit dem Vorgabewert des Typs — hier also <c>0</c>, und
+    /// das Skript maesse dann „erwartet 0" gegen eine echte Antwort. Ohne diese
+    /// Reihe waere die Karte genau so lange vollstaendig, bis jemand eine Zeile
+    /// hinzufuegt und die neue Spalte uebersieht.
+    /// </remarks>
+    [Fact]
+    public void Jede_Zeile_nennt_alle_vier_Spalten()
+    {
+        foreach (var eintrag in Eintraege())
+        {
+            foreach (var (spalte, wert) in new (string, int)[]
+                     {
+                         ("ohne", eintrag.Ohne),
+                         ("person", eintrag.Person),
+                         ("mitglied", eintrag.Mitglied),
+                         ("firma", eintrag.Firma)
+                     })
+            {
+                wert.Should().BeInRange(
+                    100, 599,
+                    $"'{eintrag.Methode} {eintrag.Pfad}' nennt fuer '{spalte}' keinen "
+                    + "Statuscode — eine fehlende Spalte liest YAML als 0");
+            }
         }
     }
 
@@ -239,10 +285,11 @@ public sealed class RoutenkarteTests
     }
 
     /// <summary>
-    /// Die Karte beschreibt wirklich drei Faelle und nicht zweimal denselben.
+    /// Die Karte beschreibt wirklich verschiedene Faelle und nicht viermal
+    /// denselben.
     /// </summary>
     /// <remarks>
-    /// Waeren `person` und `firma` ueberall gleich, waere die dritte Spalte
+    /// Waeren `person` und `firma` ueberall gleich, waere die Firmenspalte
     /// Zierde und ADR-0017 in dieser Karte nicht geprueft. Gemessen sind es
     /// heute ueber zwanzig Zeilen, in denen sie auseinandergehen.
     /// </remarks>
@@ -253,6 +300,92 @@ public sealed class RoutenkarteTests
 
         eintraege.Count(e => e.Person != e.Firma).Should().BeGreaterThan(
             15, "sonst beschreibt die Karte zweimal denselben Fall");
+    }
+
+    /// <summary>
+    /// Und die vierte unterscheidet sich von der dritten — das ist PBI-2.
+    /// </summary>
+    /// <remarks>
+    /// <para>Waeren `mitglied` und `firma` ueberall gleich, hiesse das: keine
+    /// einzige Route unterscheidet `admin` von `member`, und genau das war der
+    /// Zustand vor PBI-2 — im ganzen Baum stand NULL <c>RequirePermission</c>
+    /// ausserhalb von identity-service. Die Navigation versteckte
+    /// Firmeneintraege; der Server antwortete 403 nur dort, wo jemand daran
+    /// gedacht hatte. Verstecken ist keine Zugriffskontrolle.</para>
+    ///
+    /// <para><strong>Fuenf und nicht acht, und der Unterschied ist lehrreich.</strong>
+    /// Geschuetzt sind acht Routen; sichtbar werden hier nur fuenf. Die drei
+    /// aus identity-service (<c>/companies/{id}/invitations</c>,
+    /// <c>…/invitations/{id}</c>, <c>…/members/{id}</c>) nennen die Firma im
+    /// PFAD, und die Kennung dort EXISTIERT NICHT — auch das Chefkonto ist in
+    /// dieser erfundenen Firma kein Administrator und bekommt 403. Beide Spalten
+    /// zeigen also dieselbe Zahl aus zwei verschiedenen Gruenden. Dass die
+    /// Richtlinie dort wirklich zwischen den Rollen unterscheidet, belegt
+    /// <c>UnternehmensreiseTests</c> an einer Firma, die es gibt.</para>
+    ///
+    /// <para>Die Zahl ist ABSICHTLICH die genaue: wer eine sechste Route so
+    /// schuetzt oder eine der fuenf wieder oeffnet, soll hier vorbeikommen und
+    /// es aufschreiben. Ein „groesser als null" liesse eine still
+    /// zurueckgenommene Pruefung durchgehen.</para>
+    /// </remarks>
+    [Fact]
+    public void Die_vierte_Spalte_unterscheidet_admin_von_member()
+    {
+        var eintraege = Eintraege();
+
+        var abweichend = eintraege
+            .Where(e => e.Mitglied != e.Firma)
+            .ToList();
+
+        abweichend.Select(e => $"{e.Methode} {e.Pfad}").Should().BeEquivalentTo(
+            [
+                "POST /jobs/00000000-0000-0000-0000-000000000001/publish",
+                "POST /jobs/00000000-0000-0000-0000-000000000001/close",
+                "PUT /companies/me/profile",
+                "POST /transfers/00000000-0000-0000-0000-000000000001/offer",
+                "POST /transfers/00000000-0000-0000-0000-000000000001/complete"
+            ],
+            "genau diese fuenf zeigen den Unterschied in der Karte; wer eine "
+            + "sechste so schuetzt oder eine oeffnet, aendert diese Liste bewusst mit");
+
+        abweichend.Should().OnlyContain(
+            e => e.Mitglied == 403,
+            "ein Mitglied bekommt 403 — eine Aussage ueber den Aufrufer, keine "
+            + "ueber die Sache");
+    }
+
+    /// <summary>
+    /// Die drei Verwaltungsrouten von identity-service antworten in ALLEN drei
+    /// angemeldeten Spalten 403.
+    /// </summary>
+    /// <remarks>
+    /// Die andere Haelfte der Reihe darueber. Hier faellt der Unterschied
+    /// zwischen den Spalten nicht auf, weil die Kennung im Pfad nicht existiert
+    /// — und das ist die Zusage, die dabei herauskommt: die Richtlinie
+    /// antwortet 403 unabhaengig davon, ob es die Firma gibt, verraet also
+    /// nichts. Ein 404 daneben waere die Auskunft „diese Firma gibt es".
+    /// </remarks>
+    [Fact]
+    public void Die_Firmenverwaltung_verraet_die_Firma_in_keiner_Spalte()
+    {
+        string[] verwaltung =
+        [
+            "POST /companies/00000000-0000-0000-0000-000000000001/invitations",
+            "DELETE /companies/00000000-0000-0000-0000-000000000001/invitations"
+            + "/00000000-0000-0000-0000-000000000002",
+            "DELETE /companies/00000000-0000-0000-0000-000000000001/members"
+            + "/00000000-0000-0000-0000-000000000002"
+        ];
+
+        foreach (var name in verwaltung)
+        {
+            var eintrag = Eintraege().Single(e => $"{e.Methode} {e.Pfad}" == name);
+
+            eintrag.Ohne.Should().Be(401);
+            eintrag.Person.Should().Be(403, $"'{name}' haengt an einer Richtlinie");
+            eintrag.Mitglied.Should().Be(403);
+            eintrag.Firma.Should().Be(403);
+        }
     }
 }
 

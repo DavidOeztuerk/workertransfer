@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
-using WorkerTransfer.ServiceDefaults;
+using Microsoft.AspNetCore.Http;
 
-namespace WorkerTransfer.Identity.Api.Berechtigung;
+namespace WorkerTransfer.ServiceDefaults;
 
 /// <summary>
 /// Gibt einer Ablehnung durch eine Richtlinie dieselbe Gestalt wie jedem
@@ -16,9 +16,11 @@ namespace WorkerTransfer.Identity.Api.Berechtigung;
 /// eine Handprüfung oder eine Richtlinie abgelehnt hat, und der Bericht eines
 /// Menschen hätte keine Korrelationskennung.</para>
 ///
-/// <para>Der Grund, es überhaupt zu bemerken: derselbe wie bei allem hier —
-/// eine Gestalt über alle Dienste, damit ein Aufrufer nicht wissen muss, wer
-/// geantwortet hat, um den Fehler zu lesen.</para>
+/// <para><strong>Hier und nicht in identity-service.</strong> Sie stand dort,
+/// solange identity der einzige Dienst mit Richtlinien war. Seit die
+/// Firmenrechte in vier Diensten hängen, ist sie genau das, was
+/// <c>ServiceDefaults</c> trägt: eine Gestalt über alle Dienste, damit ein
+/// Aufrufer nicht wissen muss, wer geantwortet hat, um den Fehler zu lesen.</para>
 ///
 /// <para>Die Meldung sagt nur, dass es nicht erlaubt war. <em>Welche</em>
 /// Richtlinie fehlte, steht bewusst nicht darin: das wäre eine Landkarte der
@@ -26,6 +28,18 @@ namespace WorkerTransfer.Identity.Api.Berechtigung;
 /// </remarks>
 public sealed class Ablehnungsgestalt : IAuthorizationMiddlewareResultHandler
 {
+    /// <summary>
+    /// Die Notiz, mit der ein Handler sagt: es lag nicht am Recht, sondern
+    /// daran, dass niemand geantwortet hat.
+    /// </summary>
+    /// <remarks>
+    /// Ein Autorisierungshandler kann nur „ja" sagen — ein Schweigen der
+    /// Rollenauskunft sähe von einem entzogenen Recht sonst nicht zu
+    /// unterscheiden aus. 503 heisst „hat nicht geantwortet", 403 heisst „nein";
+    /// dieselbe Unterscheidung trifft dieser Baum beim Einwilligungs-Ledger.
+    /// </remarks>
+    public const string Schweigt = "workertransfer.rollenauskunft.schweigt";
+
     private readonly AuthorizationMiddlewareResultHandler _weiter = new();
 
     /// <inheritdoc />
@@ -48,6 +62,14 @@ public sealed class Ablehnungsgestalt : IAuthorizationMiddlewareResultHandler
 
         if (authorizeResult.Forbidden)
         {
+            if (context.Items.ContainsKey(Schweigt))
+            {
+                await ProblemDetailsMiddleware.Schreibe(
+                    context, StatusCodes.Status503ServiceUnavailable,
+                    "Request failed", "the role lookup did not answer");
+                return;
+            }
+
             await ProblemDetailsMiddleware.Schreibe(
                 context, StatusCodes.Status403Forbidden,
                 "Request failed", "not permitted");
