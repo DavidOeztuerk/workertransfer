@@ -200,6 +200,15 @@ services:
       ASPNETCORE_URLS: "http://0.0.0.0:8003"
       ConnectionStrings__profile: Host=postgres;Port=5432;Database=profile;Username=worker;Password=worker
       Consent__Adresse: http://consent-service:8002
+      # Die interne Tuer, durch die scout-service sucht (ADR-0036). LEER heisst
+      # dort: die Tuer ist ZU — und sie antwortet dann 404 statt 401, damit sie
+      # sich nicht ueber eine Methode verraet.
+      #
+      # OHNE DIESE ZEILE SUCHT DER SCOUT INS LEERE, und zwar lautlos: die Tuer
+      # sagt 404, und eine leere Trefferliste sieht aus wie „es gibt niemanden".
+      # Genau so gemessen am 11.09.2026 — zwoelf E2E-Reisen rot, Routenkarte
+      # gruen, weil die Statuscodes stimmten.
+      Notify__Geheimnis: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
       # Die KI-Naht. LEER ist gueltig und die Vorgabe: ohne Schluessel wird kein
       # externer Dienst gerufen, und die Oberflaeche sagt das (ADR-0024).
       # Deshalb `:-` und nicht `:?` — ein fehlender Schluessel darf den Stapel

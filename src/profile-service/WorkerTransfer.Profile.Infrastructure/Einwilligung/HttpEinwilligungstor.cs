@@ -39,20 +39,13 @@ public sealed class HttpEinwilligungstor(
         // Zwei Fragen in einer Runde, obwohl es nur um einen Menschen geht: die
         // öffentliche Freigabe ist der häufige Fall, aber ein zweiter Umlauf
         // für die andere kostet mehr als die zweite Zeile im selben Rumpf.
+        //
+        // `Frage` traegt weiterhin eine Liste, obwohl nur noch EIN Aufrufer
+        // kommt: sie beantwortet die Paarbildung und die Laengenpruefung, und
+        // die sind fuer einen Menschen dieselben wie fuer zwanzig.
         var urteile = await Frage([wer], firma, cancellationToken);
 
         return urteile[0];
-    }
-
-    /// <inheritdoc />
-    public async Task<IReadOnlyList<bool>> DarfSehenAlleAsync(
-        IReadOnlyList<SubjectId> wer,
-        TenantId firma,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(wer);
-
-        return wer.Count == 0 ? [] : await Frage(wer, firma, cancellationToken);
     }
 
     /// <summary>Eine Sammelfrage, zwei Paare je Person, in deren Reihenfolge.</summary>

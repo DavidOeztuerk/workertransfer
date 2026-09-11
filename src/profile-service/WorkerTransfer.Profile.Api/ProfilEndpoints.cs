@@ -40,7 +40,14 @@ public sealed record ProfilKoerper(
 /// <summary>Was jemand schickt, um sich beim Formulieren helfen zu lassen.</summary>
 public sealed record EntwurfKoerper(string Wish);
 
-/// <summary><c>/profiles</c> und <c>/candidates</c>.</summary>
+/// <summary><c>/profiles</c> — und seit dem 11.09.2026 nichts mehr daneben.</summary>
+/// <remarks>
+/// <c>GET /candidates</c> stand hier und ist gefallen: scout-service ist sein
+/// Nachfolger, und zwei Suchen nebeneinander waeren zwei Wahrheiten
+/// (ADR-0036 Entscheidung 1). Was von ihm gebraucht wird, liegt jetzt hinter
+/// <c>/internal/profiles/search</c> — hinter dem geteilten Geheimnis, ohne
+/// Gateway-Route, und ohne Ledgerpruefung, weil die eine Ebene hoeher steht.
+/// </remarks>
 public static class ProfilEndpoints
 {
     /// <summary>Bindet die Profilrouten ein.</summary>
@@ -57,7 +64,6 @@ public static class ProfilEndpoints
         // die ihn vergisst, wie eine funktionierende aussieht, bis der Ledger
         // ausfällt.
         var profile = app.MapGroup("/profiles").AddEndpointFilter(SchweigenAbfangen);
-        var kandidaten = app.MapGroup("/candidates").AddEndpointFilter(SchweigenAbfangen);
 
         profile.MapPut("/me", async (
             ProfilKoerper koerper,
@@ -195,50 +201,6 @@ public static class ProfilEndpoints
             await context.Response.WriteAsJsonAsync(Antwort(profil), cancellationToken);
         });
 
-        kandidaten.MapGet("/", async (
-            IMediator mediator,
-            ICurrentPrincipal akteur,
-            HttpContext context,
-            CancellationToken cancellationToken) =>
-        {
-            if (akteur.Current is not { } handelnder)
-            {
-                await NichtAngemeldet(context);
-                return;
-            }
-
-            if (handelnder.Acting is not Capacity.ForCompany firma)
-            {
-                await ProblemDetailsMiddleware.Schreibe(
-                    context, StatusCodes.Status403Forbidden,
-                    "Request failed", "no active company");
-                return;
-            }
-
-            var anfrage = context.Request.Query;
-
-            var seite = await mediator.Send(
-                new KandidatenAbfrage(
-                    Anzahl(anfrage["limit"]),
-                    anfrage["cursor"],
-                    firma.Tenant,
-                    anfrage["skill"].Count > 0 ? [.. anfrage["skill"]!] : null,
-                    anfrage["location"].ToString(),
-                    anfrage["remote"] == "true"),
-                cancellationToken);
-
-            // Keine Gesamtzahl. Sie verriete über die Differenz zur Seitenlänge,
-            // wie viele Profile NICHT freigegeben sind — genau die Auskunft, die
-            // der Ledger schützt.
-            await context.Response.WriteAsJsonAsync(
-                new Dictionary<string, object?>
-                {
-                    ["items"] = seite.Eintraege.Select(Antwort).ToArray(),
-                    ["next"] = seite.Weiter?.ToString()
-                },
-                cancellationToken);
-        });
-
         return app;
     }
 
@@ -272,13 +234,6 @@ public static class ProfilEndpoints
             return Geschrieben;
         }
     }
-
-    /// <summary>
-    /// Wie viele Zeilen eine Seite trägt — mit derselben Obergrenze, aus der
-    /// die Sammelgrenze des Ledgers hergeleitet ist.
-    /// </summary>
-    private static int Anzahl(string? roh) =>
-        int.TryParse(roh, out var wert) && wert is > 0 and <= 50 ? wert : 20;
 
     /// <remarks>
     /// Trägt kein Sichtbarkeitsfeld, keinen Punktwert, keinen Rang und keinen

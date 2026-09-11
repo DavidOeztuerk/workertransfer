@@ -59,7 +59,7 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   await expect(candidate.getByRole("switch")).not.toBeChecked();
 
   // Das Unternehmen sieht sie nicht: nichts ist freigegeben.
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   await expect(recruiter.getByText(headline)).toHaveCount(0);
 
   // Bewerben.
@@ -124,7 +124,7 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   await expect(candidate.getByRole("button", { name: /Senden/i })).toHaveCount(0);
 
   // Jetzt sieht das Unternehmen das Profil — allein wegen der Bewerbung.
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   await expect(recruiter.getByText(headline)).toBeVisible();
 
   // Zurückziehen.
@@ -138,7 +138,7 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   await expect(candidate.getByText(/sieht deine Daten nicht mehr/i)).toBeVisible();
 
   // Und weg.
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   await expect(recruiter.getByText(headline)).toHaveCount(0);
 
   await candidateContext.close();

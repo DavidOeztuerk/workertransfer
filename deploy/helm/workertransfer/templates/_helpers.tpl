@@ -106,7 +106,12 @@ anstossen" und "darf alles über einen Menschen löschen" dürfen nicht dasselbe
 Papier sein. Die Bedingungen sind unabhängig: applications-service hat BEIDE
 Adressen und braucht BEIDE Namen für dasselbe Geheimnis.
 */}}
-{{- if eq $svc.name "identity-service" }}
+{{- if or (eq $svc.name "identity-service") (eq $svc.name "profile-service") }}
+{{/*
+profile-service prueft es an seiner internen Suchtuer (ADR-0036). LEER hiesse
+dort: die Tuer ist zu — sie antwortet 404, und der Scout suchte lautlos ins
+Leere.
+*/}}
 - name: Notify__Geheimnis
   valueFrom:
     secretKeyRef:

@@ -100,6 +100,17 @@ public sealed class Probesuche : IProfilsuche
     /// <summary>Wenn wahr, antwortet profile-service gar nicht.</summary>
     public bool Schweigt { get; set; }
 
+    /// <summary>
+    /// Wenn wahr, ist die interne Tür zu — sie antwortet 404 statt 401.
+    /// </summary>
+    /// <remarks>
+    /// Der echte Adapter macht daraus ein <see cref="ProfilsucheSchweigt"/> und
+    /// ausdrücklich keine leere Seite. Diese Probe bildet die Entscheidung des
+    /// Adapters nach, nicht seinen HTTP-Verkehr — geprüft wird, was der Dienst
+    /// mit einem solchen Fehlschlag macht.
+    /// </remarks>
+    public bool Verschlossen { get; set; }
+
     /// <inheritdoc />
     public Task<Profilfundseite> SucheAsync(
         Suchfilter filter,
@@ -113,6 +124,13 @@ public sealed class Probesuche : IProfilsuche
         if (Schweigt)
         {
             throw new ProfilsucheSchweigt("profile-service antwortet im Test nicht");
+        }
+
+        if (Verschlossen)
+        {
+            throw new ProfilsucheSchweigt(
+                "profile-service answered 404 to the search — the shared secret "
+                + "is refused or the door is closed");
         }
 
         // Genau wie der echte Dienst: gefiltert wird ueber GENANNTE Worte, und

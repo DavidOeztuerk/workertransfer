@@ -78,7 +78,7 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   // `company_profiles` stand keine Zeile.
   await expect(recruiter.getByText(/Profil gespeichert/i)).toBeVisible();
 
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   const card = recruiter.locator("li").filter({ hasText: headline });
   // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
   // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
@@ -118,7 +118,7 @@ test("eine Seite zeigt alle Freigaben — auch die, die anderswo nicht auftauche
   await marketEntry.getByRole("button", { name: /Zurückziehen/i }).click();
   await expect(candidate.getByText(new RegExp(`Marktstatus · ${companyName}`))).toHaveCount(0);
 
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   const afterCard = recruiter.locator("li").filter({ hasText: headline });
   // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
   // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
@@ -182,7 +182,7 @@ test("die Suche findet nur, was freigegeben ist", async ({ browser }) => {
   await waehleImFeld(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
-  await recruiter.goto("/candidates");
+  await recruiter.goto("/scout");
   await recruiter.getByLabel("Fähigkeiten").fill(skill);
   await recruiter.getByRole("button", { name: "Suchen" }).click();
 

@@ -322,6 +322,7 @@ public static class ScoutEndpoints
         new(
             treffer.Wer.Value,
             treffer.Ueberschrift,
+            treffer.Text,
             treffer.Ort,
             treffer.RemoteMoeglich,
             treffer.Genannt,

@@ -25,6 +25,7 @@ public sealed class ProfilsucheSchweigt(string grund) : Exception(grund);
 public sealed record Profilfund(
     SubjectId Wer,
     string Ueberschrift,
+    string Text,
     string Ort,
     bool RemoteMoeglich,
     IReadOnlyList<string> Genannt);

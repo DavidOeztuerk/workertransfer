@@ -77,26 +77,14 @@ public sealed class EfProfilspeicher(ProfileDbContext context) : IProfilspeicher
             .Select(faehigkeit => Wortschatz.Kanonisch(faehigkeit).ToUpperInvariant())
             .ToArray();
 
-        if (anfrage.Irgendeine)
+        // ODER: mindestens eines der Worte genügt. Ein Treffer darf also etwas
+        // NICHT nennen — und genau das macht die Häkchenliste des scout-service
+        // erst zu einer Auskunft (ADR-0036). Das UND von `/candidates` ist mit
+        // dieser Route gefallen.
+        if (gesuchte.Length > 0)
         {
-            // ODER: mindestens eines der Worte genügt. Ein Treffer darf also
-            // etwas NICHT nennen — und genau das macht die Häkchenliste des
-            // scout-service erst zu einer Auskunft (ADR-0036).
-            if (gesuchte.Length > 0)
-            {
-                abfrage = abfrage.Where(spalte =>
-                    spalte.Faehigkeiten.Any(eintrag => gesuchte.Contains(eintrag.ToUpper())));
-            }
-        }
-        else
-        {
-            // UND: alles muss genannt sein. Die Bedingung von `/candidates`,
-            // unverändert.
-            foreach (var gesucht in gesuchte)
-            {
-                abfrage = abfrage.Where(spalte =>
-                    spalte.Faehigkeiten.Any(eintrag => eintrag.ToUpper() == gesucht));
-            }
+            abfrage = abfrage.Where(spalte =>
+                spalte.Faehigkeiten.Any(eintrag => gesuchte.Contains(eintrag.ToUpper())));
         }
 
         if (anfrage.Ort.Length > 0)

@@ -39,13 +39,14 @@ public class ProfilsuchedrahtTests
     public void Ein_Profil_kommt_vollstaendig_an()
     {
         var geschrieben = JsonSerializer.Serialize(
-            new ProfilfundV1(Wer, "Entwicklerin", "Berlin", true, ["Go", "PostgreSQL"]));
+            new ProfilfundV1(Wer, "Entwicklerin", "Ich baue verteilte Systeme.", "Berlin", true, ["Go", "PostgreSQL"]));
 
         var gelesen = JsonSerializer.Deserialize<FremdprofilV1>(geschrieben);
 
         gelesen.Should().NotBeNull();
         gelesen!.SubjectId.Should().Be(Wer, "ohne die Kennung ist ein Treffer niemand");
         gelesen.Headline.Should().Be("Entwicklerin");
+        gelesen.Bio.Should().Be("Ich baue verteilte Systeme.");
         gelesen.Location.Should().Be("Berlin");
         gelesen.RemoteOk.Should().BeTrue(
             "ein bool hat keine Not-Null-Sperre: er fiele still auf false zurück");
@@ -62,7 +63,7 @@ public class ProfilsuchedrahtTests
     {
         var geschrieben = JsonSerializer.Serialize(
             new ProfilfundseiteV1(
-                [new ProfilfundV1(Wer, "Entwicklerin", "Berlin", false, ["Go"])],
+                [new ProfilfundV1(Wer, "Entwicklerin", "", "Berlin", false, ["Go"])],
                 "ZWVpbg=="));
 
         var gelesen = JsonSerializer.Deserialize<FremdprofilseiteV1>(geschrieben);
@@ -86,7 +87,7 @@ public class ProfilsuchedrahtTests
     {
         var camelCase = """
             {"subjectId":"3f2504e0-4f89-11d3-9a0c-0305e82c3301","headline":"x",
-             "location":"y","remoteOk":true,"skills":[]}
+             "bio":"z","location":"y","remoteOk":true,"skills":[]}
             """;
 
         var gelesen = JsonSerializer.Deserialize<FremdprofilV1>(camelCase);

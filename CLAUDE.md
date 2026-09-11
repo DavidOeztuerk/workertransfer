@@ -440,7 +440,7 @@ Route order in `ocelot.json` is pinned by `ReihenfolgeTests` against a *reversed
 
 The former stack (TanStack Query + TanStack Router, `packages/ui` with hand-written CSS) is **gone** — all thirty routes moved, and the old `src/routes/` tree with its sixteen feature folders went with it. One rule survived the rebuild verbatim: **a consent toggle is a switch, never a checkbox** — a checkbox promises the change applies on submit, and for a consent toggle that difference is not cosmetic. `shared/components/ui/ConsentSwitch` is the one place that renders it.
 
-**Every route path is English — no German, no mix**: `/`, `/overview`, `/login`, `/register`, `/verify`, `/invitation`, `/profile`, `/portfolio`, `/resume`, `/consents`, `/settings`, `/delete-account`, `/market`, `/transfers`, `/candidates`, `/jobs`, `/careers/<slug>`, `/applications`, `/my-data`, `/github`, `/company/team`, `/company/jobs`, `/company/profile`, `/company/transfers`. `/` is the marketing page and redirects a signed-in visitor to `/overview`; before that split one address served both, which left the overview unlinkable and made a screenshot of `/` depend on the session.
+**Every route path is English — no German, no mix**: `/`, `/overview`, `/login`, `/register`, `/verify`, `/invitation`, `/profile`, `/portfolio`, `/resume`, `/consents`, `/settings`, `/delete-account`, `/market`, `/transfers`, `/scout`, `/jobs`, `/careers/<slug>`, `/applications`, `/my-data`, `/github`, `/company/team`, `/company/jobs`, `/company/profile`, `/company/transfers`. `/` is the marketing page and redirects a signed-in visitor to `/overview`; before that split one address served both, which left the overview unlinkable and made a screenshot of `/` depend on the session.
 
 **Every text a person reads comes from a catalogue** (ADR-0031). Three languages — German, English, French — in `web/src/core/i18n/kataloge/{de,en,fr}.ts`; German is the source and the other two are translations of it. Three guard tests hold them together: same keys, actually translated rather than copied, no empty string. The per-language exemption list for genuine cognates ("Status", "Website", "Administrator") is short and each line is an individual case — a French entry never rides along on an English one.
 
@@ -540,10 +540,17 @@ So the line is not "no analysis". It is the **direction of the question**: requi
 
 ### scout-service: ticks and evidence, never a number
 
-Built 11.09.2026 under ADR-0036, and it is the successor to `GET /candidates` in
-profile-service. **Both live for now**: `/candidates` falls when the UI has
-moved, and until then two searches side by side are two truths — which is why
-the new one answers under `/scout/` and not under the old path.
+Built 11.09.2026 under ADR-0036. It replaced `GET /candidates` in
+profile-service, and **`/candidates` is gone** — endpoint, gateway route, client
+and the UI, all in the same step. `docs/routenkarte.yml` keeps the old path as a
+**dead door** (404 in all four columns) and `LandkarteTests` measures that no
+route stands behind it any more. Two searches side by side would have been two
+truths.
+
+Three things fell with it, because they had no caller left: the AND branch in
+the profile store, the batch question in profile-service's consent gate, and the
+per-card GitHub fetch in the browser. A branch without a caller is what later
+gets revived wrongly.
 
 The hard parts of `/candidates` were **carried over, not reinvented**: the
 company requirement (a person acting for themselves gets 403), the ledger asked
@@ -574,11 +581,12 @@ that was measured to fall:
    goes to the browser of whoever asked and lies in a form.
 
 **The search is an OR, and that is what makes the tick list an answer.**
-`/candidates` searches with AND — every hit then satisfies every condition,
-every tick would be set, and "which skill is missing" would have no answer. The
+`/candidates` searched with AND — every hit then satisfies every condition,
+every tick would be set, and "which skill is missing" would have no answer;
+condition 1 would be empty too, since there would be nothing to sort. The
 internal door in profile-service (`GET /internal/profiles/search`, behind the
-shared secret, no gateway route) therefore searches with OR, and `/candidates`
-keeps its AND unchanged.
+shared secret, no gateway route) therefore searches with OR, and it is the only
+mode left.
 
 **That door deliberately does not ask the ledger.** The check stands one line
 higher, in scout-service, for the whole page at once: exactly *one* place decides
@@ -602,6 +610,19 @@ row is needed anywhere; delivery stays at-least-once and a second delivery is
 harmless.
 
 There is no `/me/scouting` and no table of who looked at whom.
+
+**Three filters PBI-3 names are decided against, not pending** (ADR-0036 §6–8):
+the **occupational field** never becomes a filter — it contradicts ADR-0039
+("no visibility follows from it") and would find *less*, since the vocabulary
+already carries MIG/WIG/CNC/SPS; **availability** is not filtered, because the
+market status has its own release and filtering by it would reveal
+approachability without asking; and the **radius** comes as
+[ADR-0041](docs/adr/0041-entfernung-ist-eine-frage-zwischen-zwei-aussagen.md) —
+a person states how far they will commute (10/25/50/100/egal), an advert states
+its attendance (remote/hybrid/vor_ort), and the two make a **tick**, never a
+kilometre figure and never a filter that removes somebody. Nothing new is
+stored: `Ortskunde` resolves the existing free-text location at search time.
+That ADR is written and **not yet built**.
 
 ### Planned, not built: advisor and assessment
 

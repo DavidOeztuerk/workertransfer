@@ -154,4 +154,4 @@ Five paths, per origin, per minute, configured in `ocelot.json` beside the route
 
 [`docs/SCOUT-UND-BERATER.md`](docs/SCOUT-UND-BERATER.md) sketches `scout-service`, `advisor-service` and `assessment-service` with their conditions, interface rules and four Playwright journeys. It is intent, like [`docs/vision/`](docs/vision/). **Each needs its own ADR first.**
 
-`scout-service` **is built** (ADR-0036, 11.09.2026) and supersedes `GET /candidates`; the old route stays until the UI has moved. The other two are not: `advisor-service` has a decision (ADR-0037) and no code, assessment has neither. **No agent builds advisor or assessment** without being asked for it by name.
+`scout-service` **is built** (ADR-0036, 11.09.2026) and replaced `GET /candidates`, which is gone — endpoint, route, client and UI. The search lives at `/scout`. The other two are not: `advisor-service` has a decision (ADR-0037) and no code, assessment has neither. **No agent builds advisor or assessment** without being asked for it by name.
