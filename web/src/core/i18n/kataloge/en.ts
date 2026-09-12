@@ -805,7 +805,6 @@ const en: Katalog = {
     leerHinweis: "Other terms may take you further.",
     ortFehlt: "Location not given",
     bewerben: "Apply",
-    kontoNoetig: "You need an account for that — afterwards you go straight to the application.",
     mehrLaden: "Load more",
     website: "Website",
     duHast: "You have {{treffer}} of {{gesamt}} listed skills:",

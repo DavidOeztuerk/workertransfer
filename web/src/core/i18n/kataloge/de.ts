@@ -808,7 +808,6 @@ const de = {
     leerHinweis: "Andere Begriffe führen vielleicht weiter.",
     ortFehlt: "Ort nicht angegeben",
     bewerben: "Bewerben",
-    kontoNoetig: "Dafür brauchst du ein Konto — danach geht es direkt zur Bewerbung.",
     mehrLaden: "Mehr laden",
     website: "Website",
     duHast: "Du hast {{treffer}} von {{gesamt}} genannten Fähigkeiten:",

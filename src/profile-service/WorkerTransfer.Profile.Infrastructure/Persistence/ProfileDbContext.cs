@@ -155,12 +155,6 @@ public sealed class ProfileDbContext(DbContextOptions<ProfileDbContext> options)
         modelBuilder.Entity<ProfilZeile>(zeile =>
         {
             zeile.ToTable("profiles");
-            // Der Schluessel IST der Mensch: diese Zeile heisst ihre
-            // `subject_id` schlicht `id`. Ausgesprochen, weil der
-            // Loeschwaechter (`LoeschempfaengerTests`) sonst nur nach den
-            // Spaltennamen `subject_id`/`user_id` sucht und diese Tabelle
-            // uebersaehe — und damit die Zusage aus ADR-0027 fuer einen ganzen
-            // Dienst.
             zeile.HasAnnotation(Personenzeile.Anmerkung, true);
             zeile.HasKey(spalte => spalte.Id);
             zeile.Property(spalte => spalte.Id).HasColumnName("id");

@@ -2,7 +2,7 @@
 
 Date: 2026-08-03
 Status: Entwurf (selbst geprüft)
-Related: **ADR-0022** (`worker-github` gelöscht), ADR-0004 (kein Scraping, consent-first), ADR-0013 (Consent-Ledger), ADR-0020 (Consent als Enabler), [ULTRAPLAN](../../ULTRAPLAN.md) Phase 6
+Related: **ADR-0022** (`worker-github` gelöscht), ADR-0004 (kein Scraping, consent-first), ADR-0013 (Consent-Ledger), ADR-0020 (Consent als Enabler), ULTRAPLAN Phase 6
 
 ## Wo dieser Schnitt anfängt
 
