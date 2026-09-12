@@ -35,15 +35,22 @@ import {
   ausArbeiten,
   ausRepositories,
   ausStationen,
+  ausUnterlagen,
   vorschlaegeAus,
 } from "../lib/vorschlaege";
 import { ladeMeine } from "../api/github";
-import { ladeMeinen } from "../api/resume";
+import {
+  type Unterlagenfund,
+  ladeMeinen,
+  ladeUnterlagenfunde,
+  leseUnterlagen,
+} from "../api/resume";
 import { ladeMeines } from "../api/portfolio";
 import { useAsync } from "../lib/useAsync";
 import { usePerson } from "../lib/session";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 import { Nachweise } from "../components/Nachweise";
+import { AusUnterlagen } from "../components/AusUnterlagen";
 import { zeigtGitHub } from "../../../shared/lib/berufsfelder";
 import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
 import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
@@ -216,6 +223,41 @@ export function ProfilePage() {
     subjectId !== null,
   );
 
+  /*
+   * DIE VIERTE QUELLE: die eigenen hochgeladenen Unterlagen (PBI-7).
+   *
+   * Diese Abfrage LIEST KEINE DATEI. Sie holt, was ein früherer Klick ergeben
+   * hat — der Dienst öffnet ein Zeugnis erst, wenn jemand unten auf den Knopf
+   * drückt. Beim Laden einer Seite zu lesen wäre genau der Hintergrundlauf, den
+   * ADR-0004 ausschliesst.
+   */
+  const funde = useAsync(
+    (signal) => ladeUnterlagenfunde(signal),
+    [subjectId],
+    subjectId !== null,
+  );
+
+  const [liest, setzeLiest] = useState(false);
+  const [lesefehler, setzeLesefehler] = useState<string | null>(null);
+
+  const gefunden: Unterlagenfund[] =
+    funde.value?.ok === true ? funde.value.value : [];
+
+  async function leseUnterlagenJetzt() {
+    setzeLiest(true);
+    setzeLesefehler(null);
+    const result = await leseUnterlagen();
+    setzeLiest(false);
+
+    if (result.ok) {
+      funde.setze({ ok: true, value: result.value });
+    } else {
+      // Die Anzeige darf keinen Fund behaupten, den es nicht gibt — sie behält
+      // den alten Stand und sagt daneben, dass der Versuch scheiterte.
+      setzeLesefehler(result.error.detail);
+    }
+  }
+
   const quellen = [
     ...(belege.value?.ok === true && belege.value.value !== null
       ? ausRepositories(belege.value.value.repositories)
@@ -226,6 +268,7 @@ export function ProfilePage() {
     ...(arbeiten.value?.ok === true
       ? ausArbeiten(arbeiten.value.value?.items ?? [])
       : []),
+    ...ausUnterlagen(gefunden),
   ];
 
   const vorschlaege = vorschlaegeAus(quellen, bereitsGenannt);
@@ -433,31 +476,43 @@ export function ProfilePage() {
               Und genau darauf kommt es später an: eine Suche kennt nur
               Genanntes. Belege stehen daneben, sie finden nie.
             */}
-            {vorschlaege.length > 0 ? (
+            {vorschlaege.length > 0 || gefunden.length > 0 ? (
               <Box>
-                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                  {t(github ? "profil.vorschlaegeTitel" : "profil.vorschlaegeTitelEigen")}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: "block", mb: 1 }}
-                >
-                  {t(github ? "profil.vorschlaegeHinweis" : "profil.vorschlaegeHinweisEigen")}
-                </Typography>
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
-                  {vorschlaege.map((wort) => (
-                    <Chip
-                      key={wort}
-                      label={wort}
-                      size="small"
-                      variant="outlined"
-                      icon={<AddIcon />}
-                      onClick={() => uebernimm(wort)}
-                      aria-label={t("profil.vorschlagUebernehmen", { wort })}
-                    />
-                  ))}
-                </Box>
+                {vorschlaege.length > 0 ? (
+                  <>
+                    <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                      {t(github ? "profil.vorschlaegeTitel" : "profil.vorschlaegeTitelEigen")}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: "block", mb: 1 }}
+                    >
+                      {t(github ? "profil.vorschlaegeHinweis" : "profil.vorschlaegeHinweisEigen")}
+                    </Typography>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+                      {vorschlaege.map((wort) => (
+                        <Chip
+                          key={wort}
+                          label={wort}
+                          size="small"
+                          variant="outlined"
+                          icon={<AddIcon />}
+                          onClick={() => uebernimm(wort)}
+                          aria-label={t("profil.vorschlagUebernehmen", { wort })}
+                        />
+                      ))}
+                    </Box>
+                  </>
+                ) : null}
+                {/* Der Knopf steht UNTER den Wörtern, nicht daneben: was schon
+                    gefunden wurde, liest man zuerst. */}
+                <AusUnterlagen
+                  funde={gefunden}
+                  laeuft={liest}
+                  fehler={lesefehler}
+                  onLesen={() => void leseUnterlagenJetzt()}
+                />
               </Box>
             ) : null}
             {/* Eine Ankreuzbox und KEIN Schalter: dies ist ein Profilfeld, und

@@ -23,6 +23,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <!-- Der Texterkenner. Im Prozess, ohne Fremdpakete, ohne Netz (ADR-0043). -->
+    <PackageReference Include="PdfPig" />
   </ItemGroup>
 
 </Project>

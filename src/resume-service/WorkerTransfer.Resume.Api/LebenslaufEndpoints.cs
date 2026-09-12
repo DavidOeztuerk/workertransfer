@@ -474,6 +474,68 @@ public static class LebenslaufEndpoints
                 alle.Select(Antwort).ToArray(), cancellationToken);
         });
 
+        /*
+         * DER KNOPF — und er ist der ganze Unterschied zu einem Hintergrundlauf.
+         *
+         * ADR-0004 verbietet Scraping; ein Nachtlauf ueber die Ablage hielte
+         * seinen Buchstaben und verfehlte seinen Sinn — eine Plattform, die
+         * einem Menschen dauerhaft hinterhersieht, tut etwas anderes als eine,
+         * die einmal auf seine Bitte hinsieht. Deshalb gibt es genau hier eine
+         * Adresse, sie wird von einem Klick gerufen, und im Hochladepfad steht
+         * kein Aufruf des Erkenners. Gemessen in `ErkennungsreiseTests`, nicht
+         * behauptet: nach einem Upload steht der Zaehler des Erkenners auf null.
+         *
+         * POST und nicht GET, weil es SCHREIBT: der Fund wird abgelegt. Eine
+         * Abfrage liefe an `TransaktionsBehavior` vorbei und die Zeile wuerde
+         * nie festgeschrieben — dieselbe Falle wie `POST /me/oauth/start`.
+         */
+        unterlagen.MapPost("/read", async (
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await NichtAngemeldet(context);
+                return;
+            }
+
+            var stand = await mediator.Send(
+                new UnterlagenLesenBefehl(handelnder.Subject), cancellationToken);
+
+            await context.Response.WriteAsJsonAsync(
+                stand.Select(Antwort).ToArray(), cancellationToken);
+        });
+
+        /*
+         * Was zuletzt gelesen wurde — OHNE zu lesen.
+         *
+         * Die Profilseite fragt das beim Laden, und sie darf das, weil hier
+         * nichts geschieht: keine Datei wird geoeffnet, kein Erkenner gerufen,
+         * keine Zeile geschrieben. Wer diese Trennung aufhebt und den
+         * Lesevorgang hier anhaengt, macht aus dem Oeffnen einer Seite genau
+         * den Hintergrundlauf, den der Knopf daneben vermeidet.
+         */
+        unterlagen.MapGet("/terms", async (
+            IMediator mediator,
+            ICurrentPrincipal akteur,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (akteur.Current is not { } handelnder)
+            {
+                await NichtAngemeldet(context);
+                return;
+            }
+
+            var stand = await mediator.Send(
+                new MeineFundeAbfrage(handelnder.Subject), cancellationToken);
+
+            await context.Response.WriteAsJsonAsync(
+                stand.Select(Antwort).ToArray(), cancellationToken);
+        });
+
         unterlagen.MapGet("/{id:guid}/content", async (
             Guid id,
             IMediator mediator,
@@ -734,6 +796,21 @@ public static class LebenslaufEndpoints
         unterlage.Inhaltstyp,
         unterlage.Groesse,
         unterlage.Hochgeladen);
+
+    /// <summary>Der Stand einer Unterlage — gelesen oder nicht, und was drin stand.</summary>
+    /// <remarks>
+    /// <c>read_at: null</c> heisst „noch nie gelesen" und ist etwas anderes als
+    /// eine leere Wortliste. Der Name reist mit, damit die Oberflaeche sagen
+    /// kann, aus WELCHER Datei nichts zu lesen war — „nichts gefunden" ohne die
+    /// Datei dazu waere wieder die stillschweigende Behauptung, es stehe nichts
+    /// darin (ADR-0022 §3).
+    /// </remarks>
+    private static UnterlagenfundV1 Antwort(Unterlagenstand stand) => new(
+        stand.Unterlage.Id,
+        stand.Unterlage.Name,
+        stand.Fund?.Gelesen,
+        stand.Fund?.TextGefunden ?? false,
+        stand.Fund?.Begriffe ?? []);
 
     private static AnfrageV1 Antwort(Anfrage anfrage, bool? aktiv) => new(
         anfrage.Id,

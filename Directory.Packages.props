@@ -37,6 +37,18 @@
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>
 
+  <ItemGroup Label="Texterkennung">
+    <!--
+      PdfPig liest den Text aus einem PDF, im eigenen Prozess und mit NULL
+      Fremdpaketen. Gemessen mit `dotnet list package` samt transitiven: die
+      Liste nennt nur PdfPig selbst. Das ist derselbe Massstab, an dem
+      `Girder.Http` den Vorzug vor `Girder.Infrastructure` bekam, und hier
+      zaehlt er doppelt: der Erkenner sieht Zeugnisse, und was nicht mitkommt,
+      kann auch nicht mitlesen. Begruendet in ADR-0043.
+    -->
+    <PackageVersion Include="PdfPig" Version="0.1.16" />
+  </ItemGroup>
+
   <ItemGroup Label="Gateway">
     <PackageVersion Include="Ocelot" Version="25.0.0" />
   </ItemGroup>

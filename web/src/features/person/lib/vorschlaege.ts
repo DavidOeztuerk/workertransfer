@@ -150,3 +150,27 @@ export function ausStationen(
     selbstGetippt: true,
   }));
 }
+
+/**
+ * Die eigenen Unterlagen als Quellen — die vierte.
+ *
+ * <c>selbstGetippt: false</c>, und das ist eine Entscheidung: ein Arbeitszeugnis
+ * hat der Arbeitgeber geschrieben, nicht die Person. Es steht damit auf
+ * derselben Stufe wie ein GitHub-Topic — ein Beleg an einem <em>Artefakt</em>,
+ * hinter dem, was jemand über seine eigene Arbeit gesagt hat. Dass ein
+ * Meisterbrief auf Papier mehr wiegt als ein Repositorium, ist wahr und geht
+ * diese Plattform nichts an: sobald sie anfinge, Belege gegeneinander zu wiegen,
+ * wäre sie bei der Zahl aus ADR-0022 angekommen (ADR-0039).
+ *
+ * Die Wörter sind kanonische Namen aus dem Wortschatz — er benennt um und
+ * folgert nie. Und auch von hier führt kein Weg an den zwei Handlungen vorbei:
+ * ein Klick füllt das Feld, erst „Speichern" macht daraus eine Nennung.
+ */
+export function ausUnterlagen(
+  funde: readonly { terms: string[] }[]
+): Quelle[] {
+  return funde.map((fund) => ({
+    woerter: fund.terms,
+    selbstGetippt: false,
+  }));
+}
