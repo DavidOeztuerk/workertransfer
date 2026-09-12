@@ -68,6 +68,45 @@ public sealed class UnterlageZeile
     public DateTime CreatedAt { get; set; }
 }
 
+/// <summary>Eine Zeile von <c>resume_document_terms</c>.</summary>
+/// <remarks>
+/// <strong>Der Index aus PBI-7 — Namen, nie der Wortlaut.</strong> Was in einer
+/// Unterlage gelesen wurde, steht hier als Liste kanonischer Namen; der
+/// gefundene Volltext wird nirgends abgelegt. Eine Spalte mit dem Wortlaut
+/// eines Zeugnisses waere eine zweite Kopie der Unterlage, diesmal in der
+/// Datenbank — und damit in jeder Sicherung (ADR-0043).
+/// <para>
+/// Die Zeile traegt <c>subject_id</c>, damit die Loeschung sie findet, und
+/// <c>document_id</c>, damit sie mit ihrer Datei faellt. Beide Wege sind
+/// gemessen, nicht behauptet.
+/// </para>
+/// </remarks>
+public sealed class FundZeile
+{
+    public Guid Id { get; set; }
+
+    /// <summary>Wessen Unterlage gelesen wurde.</summary>
+    public Guid SubjectId { get; set; }
+
+    /// <summary>Welche Unterlage.</summary>
+    public Guid DocumentId { get; set; }
+
+    /// <summary>War ueberhaupt Text zu lesen?</summary>
+    public bool HasText { get; set; }
+
+    /// <summary>Die gefundenen Namen, als <c>jsonb</c>-Feld.</summary>
+    /// <remarks>
+    /// Eine eigene Tabelle je Wort waere die naheliegende Normalform und hier
+    /// die falsche: sie liesse sich nach dem Wort durchsuchen, und genau das
+    /// darf dieser Index nie koennen (ADR-0033). Als Feld in der Zeile des
+    /// Dokuments ist die einzige sinnvolle Frage die nach dem Dokument.
+    /// </remarks>
+    public string Terms { get; set; } = "[]";
+
+    /// <summary>Wann gelesen wurde.</summary>
+    public DateTime ReadAt { get; set; }
+}
+
 /// <summary>One row of <c>resume_requests</c>.</summary>
 public sealed class AnfrageZeile
 {
@@ -140,6 +179,9 @@ public sealed class ResumeDbContext(DbContextOptions<ResumeDbContext> options) :
     /// <summary>Die beigelegten Unterlagen.</summary>
     public DbSet<UnterlageZeile> Unterlagen => Set<UnterlageZeile>();
 
+    /// <summary>Was auf Ausloesung darin gelesen wurde.</summary>
+    public DbSet<FundZeile> Funde => Set<FundZeile>();
+
     /// <summary>The trail.</summary>
     public DbSet<PruefZeile> Pruefspur => Set<PruefZeile>();
 
@@ -193,6 +235,30 @@ public sealed class ResumeDbContext(DbContextOptions<ResumeDbContext> options) :
             entity.Property(zeile => zeile.StorageKey)
                 .HasColumnName("storage_key").HasMaxLength(128).IsRequired();
             entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
+        });
+
+        modelBuilder.Entity<FundZeile>(entity =>
+        {
+            entity.ToTable("resume_document_terms");
+            entity.HasKey(zeile => zeile.Id);
+            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(zeile => zeile.SubjectId).HasColumnName("subject_id").IsRequired();
+            entity.Property(zeile => zeile.DocumentId).HasColumnName("document_id").IsRequired();
+            entity.Property(zeile => zeile.HasText).HasColumnName("has_text").IsRequired();
+            entity.Property(zeile => zeile.Terms)
+                .HasColumnName("terms").HasColumnType("jsonb").IsRequired();
+            entity.Property(zeile => zeile.ReadAt).HasColumnName("read_at").IsRequired();
+
+            entity.HasIndex(zeile => zeile.SubjectId);
+
+            // EINE ZEILE JE UNTERLAGE. Der Knopf liest jedes Mal alles neu, und
+            // ohne diese Zusage in der DATENBANK haeuften zwei gleichzeitige
+            // Klicks zwei Funde zur selben Datei an — die Oberfläche zeigte
+            // dann denselben Vorschlag doppelt, und welcher der aeltere ist,
+            // wuesste niemand.
+            entity.HasIndex(zeile => new { zeile.SubjectId, zeile.DocumentId })
+                .IsUnique()
+                .HasDatabaseName("uq_terms_subject_document");
         });
 
         modelBuilder.Entity<AnfrageZeile>(entity =>

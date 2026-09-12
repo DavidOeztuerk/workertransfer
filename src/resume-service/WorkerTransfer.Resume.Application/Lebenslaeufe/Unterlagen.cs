@@ -52,6 +52,7 @@ public sealed record VorlageWaehlenBefehl(SubjectId Wer, Vorlage Vorlage) : IBef
 public sealed class Unterlagenbefehle(
     IUnterlagenSpeicher speicher,
     ILebenslaufSpeicher lebenslaeufe,
+    IFundSpeicher funde,
     IAblage ablage,
     TimeProvider uhr) :
     IRequestHandler<UnterlageHinzufuegenBefehl, Unterlagenergebnis>,
@@ -85,6 +86,7 @@ public sealed class Unterlagenbefehle(
             foreach (var alt in vorhandene.Where(u => u.Art == Unterlagenart.Lebenslauf))
             {
                 await speicher.LoescheAsync(request.Wer, alt.Id, cancellationToken);
+                await funde.LoescheAsync(request.Wer, alt.Id, cancellationToken);
                 await ablage.LoescheAsync(alt.Ablageschluessel, cancellationToken);
             }
 
@@ -167,6 +169,12 @@ public sealed class Unterlagenbefehle(
         // und aufraeumbar. Andersherum bliebe eine Zeile ohne Datei stehen und
         // sähe fuer die Person aus wie eine Unterlage, die es noch gibt.
         await speicher.LoescheAsync(request.Wer, request.Id, cancellationToken);
+
+        // UND DER FUND DAZU. Was aus dieser Datei gelesen wurde, ist eine
+        // Aussage ueber sie — ohne sie hat es keinen Gegenstand mehr. Bliebe er
+        // stehen, boete die Profilseite weiter Woerter aus einem Zeugnis an,
+        // das die Person eben weggenommen hat (ADR-0043).
+        await funde.LoescheAsync(request.Wer, request.Id, cancellationToken);
         await ablage.LoescheAsync(unterlage.Ablageschluessel, cancellationToken);
 
         return true;

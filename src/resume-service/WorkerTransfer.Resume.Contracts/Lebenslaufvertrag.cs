@@ -75,6 +75,35 @@ public sealed record UnterlageV1(
     [property: JsonPropertyName("size_bytes")] int SizeBytes,
     [property: JsonPropertyName("uploaded_at")] DateTimeOffset UploadedAt);
 
+/// <summary>Was in einer Unterlage gelesen wurde — oder dass noch nie gelesen wurde.</summary>
+/// <param name="ReadAt">
+/// <c>null</c> heisst <strong>noch nie gelesen</strong>. Der Zustand ist nicht
+/// dasselbe wie „gelesen und nichts gefunden", und die beiden dürfen nie
+/// zusammenfallen: sonst sagte die Oberfläche jemandem stillschweigend, in
+/// seinem Meisterbrief stehe nichts (ADR-0022 §3).
+/// </param>
+/// <param name="HasText">
+/// Ob überhaupt Text zu lesen war. Ein abfotografierter Gesellenbrief ist ein
+/// Bild — darin steht nichts, was ohne Texterkennung auf Bildern zu finden
+/// wäre, und die Antwort sagt das, statt zu schweigen.
+/// </param>
+/// <param name="Terms">
+/// Die kanonischen Namen, die der Wortschatz im Text wiedererkannt hat. Ein
+/// <strong>Beleg</strong> und keine Nennung: eine Aussage über dieses Dokument,
+/// nirgends durchsuchbar, und erst ein Klick und ein Speichern im Profil machen
+/// daraus eine Aussage über den Menschen (ADR-0033).
+/// <para>
+/// <strong>Kein Wortlaut.</strong> Der gefundene Text geht weder hinaus noch in
+/// die Datenbank; hinaus gehen allein die Namen.
+/// </para>
+/// </param>
+public sealed record UnterlagenfundV1(
+    [property: JsonPropertyName("document_id")] Guid DocumentId,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("read_at")] DateTimeOffset? ReadAt,
+    [property: JsonPropertyName("has_text")] bool HasText,
+    [property: JsonPropertyName("terms")] IReadOnlyList<string> Terms);
+
 /// <summary>Welche Vorlage gewählt wird.</summary>
 public sealed record VorlageWaehlenV1(
     [property: JsonPropertyName("template")] string Template);
