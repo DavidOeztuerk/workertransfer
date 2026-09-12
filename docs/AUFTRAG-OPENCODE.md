@@ -171,14 +171,17 @@ API-Aufrufe in `features/<name>/api/`. Muster zum Abschauen:
 - [x] Klick → `POST /applications/drafts {job_ids}` → dann **je Entwurf**
       `POST /applications/drafts/{id}/write` → danach nach
       `/applications/drafts`.
-- [ ] **…parallel mit Begrenzung (max. 3 gleichzeitig), mit sichtbarem
-      Fortschritt.** DIE EINZIGE ZEILE DIESES AUFTRAGS, DIE WIRKLICH OFFEN IST
-      (gemessen 11.09.2026). Gebaut ist `Promise.all` über **alle** gewählten
-      Stellen, ohne Begrenzung; und `setFortschritt` wird in `JobsPage.tsx` nur
-      mit `null` gerufen, sodass die Anzeige und ihr Katalogschlüssel
-      `stellen.fortschritt` da sind und nie erreicht werden. Beides zusammen
-      ist der Fall, den `AUFTRAG-BEWERBUNG-UND-SCOUT.md` unter „Übernommen aus
-      JobPilot" als *begrenzte Parallelität* führt. → steht als Aufgabe im
+- [x] **…parallel mit Begrenzung (max. 3 gleichzeitig), mit sichtbarem
+      Fortschritt** — eingelöst am 12.09.2026 als PBI-8.1, und damit ist auch
+      die letzte offene Zeile dieses Auftrags zu. Sie war bis dahin die
+      einzige: gebaut war `Promise.all` über **alle** gewählten Stellen, und
+      `setFortschritt` wurde in `JobsPage.tsx` nur mit `null` gerufen, sodass
+      die Anzeige und ihr Katalogschlüssel `stellen.fortschritt` da waren und
+      nie erreicht wurden. Jetzt: eine Schlange und drei Arbeiter in
+      `features/work/lib/entwuerfe.ts`, ein `Fortschrittsmelder` durch
+      `JobsPage`. Das ist der Fall, den `AUFTRAG-BEWERBUNG-UND-SCOUT.md` unter
+      „Übernommen aus JobPilot" als *begrenzte Parallelität* führt — jetzt
+      wirklich übernommen. Gegenproben und Messung stehen im
       [PLAN](PLAN-TRANSFERMARKT.md).
 - [x] Nur für Angemeldete. Ohne Anmeldung: Kästchen gar nicht zeigen.
 
