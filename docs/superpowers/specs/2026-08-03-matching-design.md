@@ -2,7 +2,7 @@
 
 Date: 2026-08-03
 Status: Entwurf (selbst geprüft)
-Related: **ADR-0022** (kein Gesamtscore), [GitHub als Beleg](2026-08-03-github-evidence-design.md), [Kandidatensuche](2026-08-02-candidate-search-design.md), [ULTRAPLAN](../../ULTRAPLAN.md) Phase 6
+Related: **ADR-0022** (kein Gesamtscore), [GitHub als Beleg](2026-08-03-github-evidence-design.md), [Kandidatensuche](2026-08-02-candidate-search-design.md), ULTRAPLAN Phase 6
 
 ## Die Frage, die vor allem anderen steht
 

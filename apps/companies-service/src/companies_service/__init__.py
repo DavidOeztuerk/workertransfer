@@ -1,1 +1,0 @@
-"""companies_service package."""

@@ -19,7 +19,8 @@ prescribe tools that are not installed:
 Where a skill and an ADR disagree, **the ADR wins** — it records a decision that
 was actually taken, with its consequences.
 
-For the current state, read [`docs/ROADMAP.md`](../../docs/ROADMAP.md).
+For the current state, read [`docs/PLAN-TRANSFERMARKT.md`](../../docs/PLAN-TRANSFERMARKT.md).
+(`docs/ROADMAP.md` was deleted on 2026-09-12 — it described the Python tree.)
 Domain skills that match reality live in [`docs/skills/`](../../docs/skills/).
 
 `database.md` was deleted on 2026-07-31: it was a shorter near-duplicate of

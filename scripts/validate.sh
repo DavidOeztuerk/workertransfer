@@ -42,28 +42,44 @@ step() {
   fi
 }
 
-# --- Python ------------------------------------------------------------------
-step "ruff format" uv run ruff format --check .
-step "ruff lint" uv run ruff check .
-step "mypy" uv run mypy packages apps
-step "pytest" uv run pytest -q
+# --- .NET --------------------------------------------------------------------
+# Bauen und Testen in GETRENNTEN Schritten. Verkettet scheitern die
+# Testcontainers-Reihen und sehen dabei aus wie echte Testfehler.
+step "dotnet build" dotnet build WorkerTransfer.slnx
+step "dotnet test" ./scripts/test-dotnet.sh
 
 # --- Frontend ----------------------------------------------------------------
-step "tsc" pnpm -r run check
-step "vitest" pnpm -r run test
+# `cd web` und nicht `pnpm -r`: seit die Wurzel kein Paket mehr ist, gibt es
+# keinen Workspace, ueber den `-r` laufen koennte — der Aufruf endete mit
+# ERR_PNPM_NO_PKG_MANIFEST, und damit waren alle drei Frontend-Schritte tot,
+# ausgerechnet in dem Werkzeug, das jeden roten Schritt melden soll.
+#
+# `pnpm build` gehoert dazu: tsc und Vitest laufen beide NICHT ueber den
+# Bauweg, ein Fehler, der erst beim Buendeln auftritt, faellt sonst erst im
+# Bild auf.
+step "tsc" sh -c "cd web && pnpm check"
+step "vitest" sh -c "cd web && pnpm test"
+step "vite build" sh -c "cd web && pnpm build"
 
 # --- E2E (nur auf Wunsch, braucht den laufenden Stack) ------------------------
 if [[ $WITH_E2E -eq 1 ]]; then
-  step "playwright" pnpm --filter @workertransfer/web run e2e
+  step "playwright" sh -c "cd web && pnpm e2e"
 fi
 
 # --- Was blieb ungeprüft? ----------------------------------------------------
 # Skips sind keine Erfolge. Diese Zahl ist die ehrlichste Kennzahl im Bericht.
-pytest_log="$log_dir/pytest.log"
+# Der Dateiname kommt aus `step`: es ersetzt jedes Nicht-Wortzeichen durch `_`,
+# aus "dotnet test" wird also `dotnet_test.log`. Hier stand `dotnet-test.log`,
+# mit einem BINDESTRICH — die Datei gab es nie, `grep` fand nichts, und beide
+# Zahlen daran fielen still aus: die Uebersprungenen blieben immer 0 und die
+# Testzahl blieb immer `?`. Genau der Fehler, gegen den dieser Bericht gebaut
+# ist — ein gruener Haken ohne Zahl daneben. Wieder eine Stelle, an der zwei
+# Seiten dieselbe Sache verschieden buchstabierten.
+dotnet_log="$log_dir/dotnet_test.log"
 playwright_log="$log_dir/playwright.log"
 skipped=0
-if [[ -f "$pytest_log" ]]; then
-  skipped=$(grep -oE '[0-9]+ skipped' "$pytest_log" | tail -1 | grep -oE '[0-9]+' || true)
+if [[ -f "$dotnet_log" ]]; then
+  skipped=$(grep -oE '[0-9]+ uebersprungen' "$dotnet_log" | tail -1 | grep -oE '[0-9]+' || true)
   skipped=${skipped:-0}
 fi
 
@@ -83,9 +99,9 @@ curl -sf --max-time 2 http://localhost:8003/health/live >/dev/null 2>&1 && docke
 #      Zahl und zerreißen jedes Muster. Deshalb erst entfärben.
 #   2. vitest meldet zwei Zeilen mit „passed" — „Test Files 41 passed" und
 #      „Tests 336 passed". Ohne das genauere Muster käme die Dateizahl heraus.
-#   3. `pnpm -r` läuft über zwei Pakete, also gibt es zwei „Tests"-Zeilen. Die
-#      letzte zu nehmen hieße, das zuletzt fertige Paket zu melden — hier wird
-#      summiert.
+#   3. Summiert statt „die letzte Zeile": früher lief `pnpm -r` über zwei
+#      Pakete und lieferte zwei „Tests"-Zeilen. Heute ist es eines, aber die
+#      Summe bleibt richtig — und bleibt richtig, wenn wieder eines dazukommt.
 count_from() {
   local log="$1" pattern="$2" mode="${3:-last}" nums
   [[ -f "$log" ]] || return 0
@@ -100,7 +116,7 @@ count_from() {
 }
 
 vitest_log="$log_dir/vitest.log"
-pytest_passed=$(count_from "$pytest_log" '[0-9]+ passed')
+dotnet_passed=$(count_from "$dotnet_log" '[0-9]+ Tests gruen')
 vitest_passed=$(count_from "$vitest_log" 'Tests +[0-9]+ passed' sum)
 e2e_ran=$(count_from "$playwright_log" '[0-9]+ passed')
 
@@ -108,7 +124,7 @@ printf '\n%s── Stand ──────────────────�
 for entry in "${RESULTS[@]}"; do
   IFS='|' read -r status name log <<<"$entry"
   case "$name" in
-    pytest) tally="${pytest_passed:-?} bestanden" ;;
+    "dotnet test") tally="${dotnet_passed:-?} bestanden" ;;
     vitest) tally="${vitest_passed:-?} bestanden" ;;
     playwright) tally="${e2e_ran:-?} Reisen" ;;
     *) tally="" ;;
@@ -134,7 +150,7 @@ if [[ "$flaky" -gt 0 ]]; then
 fi
 
 if [[ "$skipped" -gt 0 ]]; then
-  printf '\n  %s!%s %s Python-Tests übersprungen.' "$YELLOW" "$OFF" "$skipped"
+  printf '\n  %s!%s %s .NET-Tests übersprungen.' "$YELLOW" "$OFF" "$skipped"
   if [[ $docker_up -eq 0 ]]; then
     printf ' Der Stack läuft nicht — mit "docker compose up -d"\n    laufen die Integrationstests wirklich statt sich zu überspringen.\n'
   else

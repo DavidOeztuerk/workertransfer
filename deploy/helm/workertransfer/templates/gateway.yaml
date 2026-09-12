@@ -1,0 +1,96 @@
+{{/*
+Das Gateway — derselbe Dienst wie die elf anderen, nur mit SERVICE_DIR=gateway.
+
+Zur Python-Zeit stand hier Traefik mit einer ConfigMap, die
+`docker/traefik/dynamic.yml` ins Cluster trug. Beides ist weg: die Landkarte
+reist jetzt IM BILD (`ocelot.json`), und damit fährt hier, was Compose fährt.
+Eine Kopie, die beim ersten neuen Pfad falsch wird, gibt es nicht mehr.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels:
+    {{- include "workertransfer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  # EINS, und seit der Bremse ist das kein Beiwerk mehr.
+  #
+  # Der Zaehler der Auth-Bremse (Bremse.cs) laeuft IM PROZESS. Bei zwei
+  # Gateways hat jedes sein eigenes Fenster, die wirksame Grenze verdoppelt
+  # sich, und niemand sieht es — jede Instanz rechnet fuer sich korrekt.
+  #
+  # Wer hier hochzaehlt, muss vorher den Zaehler teilen: der Speicher haengt
+  # hinter IDistributedRateLimitStore, und RedisDistributedRateLimitStore
+  # erfuellt dieselbe Schnittstelle. Das ist ein Registrierungswechsel in
+  # Program.cs, kein Umbau — aber er muss passiert sein, bevor diese Zahl
+  # steigt.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "workertransfer.labels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: SERVICE_DIR
+              value: gateway
+            - name: ASPNETCORE_URLS
+              value: {{ printf "http://0.0.0.0:%v" .Values.gateway.port | quote }}
+            - name: ASPNETCORE_ENVIRONMENT
+              value: {{ .Values.env.ASPNETCORE_ENVIRONMENT | quote }}
+          ports:
+            - name: web
+              containerPort: {{ .Values.gateway.port }}
+          {{/*
+          Das Gateway beantwortet seine Proben SELBST und reicht sie nicht
+          weiter. Sonst kippte ein einzelner kranker Dienst es aus dem
+          Lastverteiler und nähme die anderen elf mit.
+          */}}
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: web
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: web
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  labels:
+    {{- include "workertransfer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  {{/*
+  NodePort, damit deploy/kind/cluster.yaml ihn auf den Host-Port 8090 legt.
+  8090 und nicht 8080: zwei Umgebungen, die sich um einen Hafen streiten,
+  ergeben genau die Fehlersuche, in der niemand sagen kann, wer geantwortet hat.
+  */}}
+  type: NodePort
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: web
+      port: {{ .Values.gateway.port }}
+      targetPort: web
+      nodePort: {{ .Values.gateway.nodePort }}

@@ -2,7 +2,7 @@
 
 Date: 2026-08-02
 Status: Entwurf (selbst geprüft)
-Related: ADR-0013 (Consent-Ledger), ADR-0020 (Consent als Enabler), [Applications-Design](2026-08-02-applications-service-design.md), [ULTRAPLAN](../../ULTRAPLAN.md) Phase 5
+Related: ADR-0013 (Consent-Ledger), ADR-0020 (Consent als Enabler), [Applications-Design](2026-08-02-applications-service-design.md), ULTRAPLAN Phase 5
 
 ## Die Zustandsliste im Plan mischt zwei Dinge
 

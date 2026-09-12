@@ -1,0 +1,182 @@
+{{/*
+Deployment + Service je Dienst, erzeugt aus der Liste in values.yaml.
+
+Der Name des Service-Objekts ist NICHT frei wählbar: die Landkarte des
+Gateways spricht `http://identity-service:8001` an, und sie reist im Bild mit.
+Heisst das Objekt hier anders, zeigt die Landkarte ins Leere — und zwar
+lautlos, denn Ocelot meldet einen unerreichbaren Nachbarn erst beim ersten
+Aufruf.
+*/}}
+{{- $root := . }}
+{{- range $svc := .Values.services }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $svc.name }}
+  labels:
+    {{- include "workertransfer.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $svc.name }}
+spec:
+  replicas: {{ $root.Values.replicaCount }}
+  {{/*
+  Recreate, nicht RollingUpdate. Zwei Gründe, und beide hängen an replicas=1:
+  ein rollendes Update stellte kurzzeitig eine ZWEITE Instanz daneben — genau
+  das, was die Auth-Bremse und der Outbox-Zusteller nicht vertragen (siehe
+  values.yaml) — und bei portfolio-service könnte das zweite Pod das
+  ReadWriteOnce-Volume gar nicht bekommen und bliebe hängen.
+  */}}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $root.Release.Name }}
+      app.kubernetes.io/component: {{ $svc.name }}
+  template:
+    metadata:
+      labels:
+        {{- include "workertransfer.labels" $root | nindent 8 }}
+        app.kubernetes.io/component: {{ $svc.name }}
+      annotations:
+        {{/*
+        Ohne diese Prüfsumme bliebe ein Pod nach einer Änderung an der
+        gemeinsamen Umgebung mit den ALTEN Werten stehen — `helm upgrade`
+        meldete Erfolg, und nichts hätte sich geändert.
+        */}}
+        checksum/env: {{ include (print $root.Template.BasePath "/configmap-env.yaml") $root | sha256sum }}
+    spec:
+      {{/*
+      KEIN initContainer mehr, und das ist der sichtbare Unterschied zur
+      Python-Zeit: dort wanderte ein eigener Behälter das Schema und rief dafür
+      `docker/entrypoint.sh` mit `true` auf.
+
+      Jetzt wandert der Dienst beim Start selbst (ServiceDefaults.Wanderung).
+      Der Grund ist kein Geschmack: `dotnet ef` braucht das SDK, und ein
+      Laufzeitbild hat keins. Ein Migrationsbündel wäre der andere Weg gewesen
+      und hätte ein zweites Artefakt eingeführt, das mit dem Bild altert.
+
+      Das Warten steht damit ebenfalls im Dienst — was ohnehin richtig ist:
+      hier gibt es kein `depends_on`, der Behälter startet, wann er will. Der
+      alte initContainer wartete mit einer Schleife auf Postgres; dieselbe
+      Geduld liegt nun in `Wanderung.Geduld`.
+
+      ACHTUNG bei replicas > 1: dann wandern zwei Pods dasselbe Schema. Siehe
+      values.yaml — die Zahl steht dort nicht zufällig auf 1.
+      */}}
+      {{- if $svc.persistence }}
+      {{/*
+      Named volumes and PVCs come in as root. fsGroup makes the mount
+      writable for uid 10001 without the process staying root. Compose
+      has no fsGroup — there the entrypoint chowns and drops.
+      */}}
+      securityContext:
+        fsGroup: 10001
+        runAsUser: 10001
+        runAsNonRoot: true
+      {{- end }}
+      containers:
+        - name: service
+          image: "{{ $root.Values.image.repository }}:{{ $root.Values.image.tag }}"
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          {{/*
+          KEIN `command`: der ENTRYPOINT des Bildes bleibt stehen und liest
+          `SERVICE_DIR` aus der Umgebung. Zur Python-Zeit stand hier ein
+          uvicorn-Aufruf, der den Entrypoint umging — weil der sonst ein
+          zweites Mal gewandert wäre. Beides ist weg, und damit auch die Frage,
+          ob die beiden Beschreibungen desselben Starts noch übereinstimmen.
+          */}}
+          envFrom:
+            - configMapRef:
+                name: {{ $root.Release.Name }}-env
+          env:
+            {{- include "workertransfer.serviceEnv" (dict "root" $root "svc" $svc) | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ $svc.port }}
+          {{/*
+          live sagt "der Prozess lebt", ready sagt "die Datenbank antwortet
+          auch". Sie zu vertauschen
+          hiesse: bei einer kurzen Datenbankstörung wird der Dienst NEU
+          GESTARTET statt aus dem Verkehr genommen — und startet in dieselbe
+          Störung hinein.
+          */}}
+          {{/*
+          timeoutSeconds steht ÜBERALL, weil die Voreinstellung 1 Sekunde ist —
+          und die ist hier falsch. Gemessen, nicht vermutet: beim ersten
+          Ausrollen starteten fünfzehn Pods gleichzeitig auf einem Knoten, und
+          jede einzelne Fehlermeldung lautete "timed out after 1s". Drei
+          Dienste wurden deshalb neu gestartet, obwohl sie liefen.
+
+          Eine Bereitschaftsprüfung, die die Datenbank fragt, hat in einer
+          Sekunde nicht sicher geantwortet — nicht weil etwas kaputt ist,
+          sondern weil elf Prozesse gleichzeitig hochfahren. Wer das
+          über die Zeitgrenze "löst", schreibt einen Fehler als normales
+          Verhalten fest; wer es zu knapp lässt, startet gesunde Dienste neu.
+          */}}
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 40
+          resources:
+            {{- toYaml $root.Values.resources | nindent 12 }}
+          {{- if $svc.persistence }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ $svc.persistence.mountPath }}
+          {{- end }}
+      {{- if $svc.persistence }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ $svc.name }}-data
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svc.name }}
+  labels:
+    {{- include "workertransfer.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $svc.name }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ $root.Release.Name }}
+    app.kubernetes.io/component: {{ $svc.name }}
+  ports:
+    - name: http
+      port: {{ $svc.port }}
+      targetPort: http
+{{- if $svc.persistence }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $svc.name }}-data
+  labels:
+    {{- include "workertransfer.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $svc.name }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ $svc.persistence.size }}
+{{- end }}
+{{- end }}

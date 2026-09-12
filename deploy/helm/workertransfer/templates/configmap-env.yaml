@@ -1,0 +1,22 @@
+{{/*
+Was alle elf Dienste gleich haben — das Gegenstück zum x-umgebung-Anker in
+docker-compose.yml. Geheimnisse stehen NICHT hier, sondern im Secret.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-env
+  labels:
+    {{- include "workertransfer.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.env }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  Mail__Host: {{ .Values.smtp.host | quote }}
+  Mail__Port: {{ .Values.smtp.port | quote }}
+  {{/*
+  Die Basis für Bestätigungslinks — das muss sein, was der BROWSER erreicht,
+  nicht ein clusterinterner Servicename. Eine Mail mit http://identity-service
+  darin führt niemanden irgendwohin.
+  */}}
+  Mail__WebAdresse: {{ .Values.publicUrl | quote }}

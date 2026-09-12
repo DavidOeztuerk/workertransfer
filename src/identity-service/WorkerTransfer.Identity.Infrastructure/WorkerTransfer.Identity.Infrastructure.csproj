@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\WorkerTransfer.Identity.Application\WorkerTransfer.Identity.Application.csproj" />
+    <ProjectReference Include="..\WorkerTransfer.Identity.Domain\WorkerTransfer.Identity.Domain.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Erasure\WorkerTransfer.Contracts.Erasure.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Outbox\WorkerTransfer.Outbox.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Girder.Data.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Girder.Infrastructure" />
+    <PackageReference Include="Girder.Passwords.BCrypt" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

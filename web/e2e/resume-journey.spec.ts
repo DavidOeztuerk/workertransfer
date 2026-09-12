@@ -1,0 +1,111 @@
+// Der Lebenslauf durch den Browser: anfragen, freigeben, zurückziehen.
+//
+// Was der Integrationstest auf HTTP-Ebene belegt, prüft dieser Test dort, wo es
+// ankommt — ein Knopf, der die Anfrage nicht stellt, wäre auf beiden Ebenen
+// darunter unsichtbar.
+
+import { expect, test } from "@playwright/test";
+
+import {
+  login,
+  registerAndConfirm,
+  skipWithoutStack,
+  uniqueCompanyDomain,
+  uniqueEmail,
+  waehleImFeld,
+} from "./stack";
+
+skipWithoutStack();
+
+test("ein Lebenslauf erreicht nur das Unternehmen, dem er freigegeben wurde", async ({
+  browser,
+}) => {
+  const candidateEmail = uniqueEmail("kandidat.example");
+  const companyDomain = uniqueCompanyDomain();
+  const recruiterEmail = uniqueEmail(companyDomain);
+  const companyName = `E2E Arbeitgeber ${Date.now()}`;
+  const headline = `E2E CV-Kandidat ${Date.now()}`;
+  const employer = `Frühere Firma ${Date.now()}`;
+
+  const candidateContext = await browser.newContext();
+  const candidate = await candidateContext.newPage();
+  await registerAndConfirm(candidate, candidateEmail, "E2E Kandidat");
+  await login(candidate, candidateEmail);
+
+  // Profil anlegen und freigeben — ohne das darf niemand nach dem Lebenslauf
+  // fragen, sonst wäre die Anfrage ein Kanal, um die Existenz zu erfahren.
+  await candidate.goto("/profile");
+  await candidate.getByLabel(/Überschrift/i).fill(headline);
+  await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
+  await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
+  await candidate.getByRole("switch").click();
+  await expect(candidate.getByRole("switch")).toBeChecked();
+
+  await candidate.goto("/resume");
+  // Die Seite fragt zuerst, WIE der Lebenslauf vorliegen soll — selbst
+  // geschrieben oder als Datei. Diese Reise schreibt ihn selbst.
+  const wegManuell = candidate.getByRole("button", { name: /Selbst schreiben/i });
+  await expect(wegManuell).toBeVisible();
+  await wegManuell.click();
+  // KEIN Klick auf „hinzufügen": die Wahl „selbst schreiben" legt bereits eine
+  // leere Zeile an. Ein zusätzlicher Klick erzeugte eine zweite, und
+  // `getByLabel(/Arbeitgeber/i)` träfe dann beide. (Der Knopf heisst inzwischen
+  // ohnehin „Stelle hinzufügen" — Beruf, Ausbildung und Schule sind getrennt.)
+  await expect(candidate.getByLabel(/Arbeitgeber/i)).toBeVisible();
+  await candidate.getByLabel(/Arbeitgeber/i).fill(employer);
+  await candidate.getByLabel(/Tätigkeit/i).fill("Backend-Entwicklerin");
+  await candidate.getByLabel("Von").fill("2020-01");
+  await candidate.getByRole("button", { name: /^Speichern$/ }).click();
+  await expect(candidate.getByText(/Lebenslauf gespeichert/i)).toBeVisible();
+
+  const recruiterContext = await browser.newContext();
+  const recruiter = await recruiterContext.newPage();
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
+  await login(recruiter, recruiterEmail);
+  await recruiter.goto("/");
+  await waehleImFeld(recruiter, /Handeln als/i, companyName);
+  // Warten, bis der Wechsel wirklich gilt. Die Wahl stößt ihn nur an: der
+  // Server stellt ein neues Token aus, das Cookie wird ersetzt, die Sitzung neu
+  // geladen. Sofort weiterzuklicken gewinnt das Rennen etwa jedes zweite Mal —
+  // /scout zeigt dann "Profile sehen nur Unternehmen", die Karte fehlt,
+  // und der Test läuft in einen Timeout an einer Stelle, die mit der Ursache
+  // nichts zu tun hat. Der Kandidatenlink erscheint erst mit aktivem
+  // Unternehmen und ist damit das ehrliche Signal.
+  await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
+
+  await recruiter.goto("/scout");
+  const card = recruiter.locator("li").filter({ hasText: headline });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(card).toBeVisible();
+  await card.getByRole("button", { name: /Lebenslauf anfragen/i }).click();
+  await expect(card.getByText(/Anfrage gestellt/i)).toBeVisible();
+
+  // Die Anfrage muss die Person erreichen, ohne dass sie danach sucht.
+  await candidate.goto("/");
+  // Die Uebersicht sagt seit dem Umbau, WORUM es geht, statt nur "1 offene
+  // Anfrage" an einem Abzeichen. Die Zusage dieser Reise ist unveraendert: die
+  // Anfrage muss die Person erreichen, ohne dass sie danach sucht.
+  await expect(
+    candidate.getByText("1 Anfrage nach deinem Lebenslauf")
+  ).toBeVisible();
+
+  // Die Person entscheidet — vorher gibt es nichts zu sehen.
+  await candidate.goto("/resume");
+  const row = candidate.locator("li").filter({ hasText: /fragt nach deinem Lebenslauf/i });
+  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
+  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: /Freigeben/i }).click();
+  await expect(row.getByText(/Freigegeben/i)).toBeVisible();
+
+  // Zurückziehen wirkt sofort; die Anfrage selbst bleibt als Vorgang stehen.
+  await row.getByRole("button", { name: /Zurückziehen/i }).click();
+  await expect(row.getByText(/zurückgezogen/i)).toBeVisible();
+  await expect(row.getByRole("button", { name: /Zurückziehen/i })).toHaveCount(0);
+
+  await candidateContext.close();
+  await recruiterContext.close();
+});

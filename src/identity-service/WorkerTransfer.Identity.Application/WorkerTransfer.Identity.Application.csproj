@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\WorkerTransfer.Identity.Domain\WorkerTransfer.Identity.Domain.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Erasure\WorkerTransfer.Contracts.Erasure.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Outbox\WorkerTransfer.Outbox.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Girder.Abstractions" />
+    <PackageReference Include="Girder.Application" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

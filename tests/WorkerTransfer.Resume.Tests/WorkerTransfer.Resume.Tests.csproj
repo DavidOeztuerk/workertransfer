@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+    <!--
+      Nicht um zu lesen, sondern um zu SCHREIBEN: `ErkennungsreiseTests` setzt
+      seine Zeugnisse als echte PDFs, statt eine Binaerdatei einzuchecken.
+      Dieselbe Bibliothek in die andere Richtung.
+    -->
+    <PackageReference Include="PdfPig" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\resume-service\WorkerTransfer.Resume.Api\WorkerTransfer.Resume.Api.csproj" />
+    <ProjectReference Include="..\..\src\resume-service\WorkerTransfer.Resume.Application\WorkerTransfer.Resume.Application.csproj" />
+    <ProjectReference Include="..\..\src\resume-service\WorkerTransfer.Resume.Domain\WorkerTransfer.Resume.Domain.csproj" />
+    <ProjectReference Include="..\..\src\resume-service\WorkerTransfer.Resume.Infrastructure\WorkerTransfer.Resume.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

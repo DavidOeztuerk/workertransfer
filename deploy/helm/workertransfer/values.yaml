@@ -1,0 +1,386 @@
+# Die Voreinstellung ist die LOKALE Staging-Umgebung (kind).
+#
+# Für Staging und Produktion wird nichts an dieser Struktur geändert, nur an den
+# Werten: `postgres.enabled: false` und ein echter Host, `mailpit.enabled:
+# false` und ein echter SMTP-Server, `secrets.existingSecret` statt der
+# Entwicklungswerte weiter unten, ein Registry-Präfix beim Image. Genau dieselbe
+# Trennung wie beim Gateway (docker/traefik/): was überall gleich ist, ist eine
+# Datei; was sich unterscheidet, ist ein Wert.
+
+# --- Das eine Image ---------------------------------------------------------
+# Alle elf Dienste UND das Gateway laufen aus DEMSELBEN Image. Sie
+# unterscheiden sich in genau einer Umgebungsvariablen, SERVICE_DIR, und die
+# steht unten in der Dienstliste. Zwölf Images, die sich in einer Variablen
+# unterscheiden, wären kein Zwölffaches an Software — nur zwölffacher Platz.
+image:
+  repository: workertransfer/service
+  tag: dev
+  # IfNotPresent, weil `kind load docker-image` das Image in den Knoten legt und
+  # es keine Registry gibt, aus der nachgeladen werden könnte. Always liesse
+  # jeden Pod in ImagePullBackOff laufen.
+  pullPolicy: IfNotPresent
+
+webImage:
+  repository: workertransfer/web
+  tag: dev
+  pullPolicy: IfNotPresent
+
+# --- Repliken: eins, und das ist eine ENTSCHEIDUNG --------------------------
+# Nicht "noch nicht skaliert", sondern "darf noch nicht skaliert werden".
+#
+# Hier standen drei Gründe. Beim Prüfen nach der Migration blieb EINER übrig,
+# einer ist gelöst, und einer hat sich als etwas anderes herausgestellt als
+# ein Skalierungshindernis. Der Reihe nach, weil die Unterschiede zählen:
+#
+#   1. GELÖST. Der Outbox-Zusteller nimmt seine Zeilen mit
+#      "FOR UPDATE SKIP LOCKED" (OutboxZusteller.cs, rohes SQL — LINQ kann es
+#      nicht ausdrücken). Zwei Zusteller greifen NICHT mehr dieselben Zeilen.
+#      Zur Python-Zeit war das der Grund, warum jede Mail zweimal rausging.
+#
+#   2. GILT WEITER. Jeder Dienst WANDERT SEIN SCHEMA BEIM START
+#      (ServiceDefaults.Wanderung). Zwei Pods sind zwei Pilger auf demselben
+#      Schema — ein Rennen, das niemand gewinnt. Zur Python-Zeit stand die
+#      Wanderung in einem initContainer und war damit ebenfalls je Pod; besser
+#      wurde es dadurch nicht, nur unsichtbarer.
+#
+#   3. WIEDER DA — aber am GATEWAY, nicht hier. Die Auth-Bremse fehlte nach
+#      der Migration ganz. Sie steht seit D1 wieder, und zwar im Gateway,
+#      weil nur dort die Herkunft des Aufrufers sichtbar ist: hinter dem
+#      Gateway sieht jeder Dienst nur das Gateway, und eine Bremse dort hätte
+#      alle Menschen in einen Topf geworfen. Ihr Zähler läuft im Prozess, also
+#      hängt die 1 des GATEWAYS daran — siehe templates/gateway.yaml. Diese
+#      Zahl hier gilt für die elf Dienste und wird davon nicht berührt.
+#
+# Wer diese Zahl erhöht, muss Punkt 2 vorher lösen: die Wanderung aus dem
+# Start heraus. Punkt 1 ist erledigt, Punkt 3 gilt für ein anderes Deployment.
+replicaCount: 1
+
+# --- Gemeinsame Umgebung ----------------------------------------------------
+# Entspricht dem x-service-env-Anker in docker-compose.yml.
+env:
+  ASPNETCORE_ENVIRONMENT: Staging
+  JwtSettings__Issuer: workertransfer
+  JwtSettings__Audience: workertransfer
+  Mail__Absender: noreply@workertransfer.local
+  # Traces nach Jaeger. LEER hiesse AUS.
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+
+# Der Ursprung, unter dem der BROWSER die Anwendung erreicht. Im kind-Cluster
+# ist das der Host-Port aus deploy/kind/cluster.yaml. In Staging und Produktion
+# steht hier der echte Name.
+#
+# Er wird an drei Stellen gebraucht, und alle drei müssen dasselbe sagen:
+#   - WORKER_PUBLIC_WEB_URL  (Bestätigungslinks in Mails)
+#   - WORKER_CORS_ALLOW_ORIGINS
+#   - die Laufzeitkonfiguration der Oberfläche (web.runtimeConfig)
+publicUrl: http://localhost:8090
+
+# --- Geheimnisse ------------------------------------------------------------
+# LEER heisst: das Chart würfelt eines und BEHÄLT es über Upgrades (es liest
+# das bestehende Secret zurück, bevor es ein neues erzeugt — sonst wäre jedes
+# `helm upgrade` eine Abmeldung aller Sitzungen).
+#
+# Das ist hier kein Komfort, sondern nötig: WORKER_ENVIRONMENT ist `staging`,
+# und `assert_deployable_jwt_secret` (worker-auth) VERWEIGERT dort genau das
+# eingecheckte Entwicklungs-Geheimnis aus docker-compose.yml — zu Recht, es
+# steht öffentlich in git. Ein Chart, das diesen Wert setzt, brächte alle zehn
+# Dienste in CrashLoopBackOff.
+#
+# In Produktion gehört hier `existingSecret` hin: ein Secret, das jemand
+# anders verwaltet, und das Chart fasst es nur an, um es zu lesen.
+secrets:
+  existingSecret: ""
+  jwtSecret: ""
+  # Zwei getrennte Geheimnisse, ausdrücklich (ADR-0027 §4.4): "darf eine Mail
+  # anstossen" und "darf alles über einen Menschen löschen" dürfen nicht
+  # dasselbe Papier sein.
+  notifySecret: ""
+  erasureSecret: ""
+  # Die Datenbank ist nur clusterintern erreichbar und hat keinen NodePort.
+  # Ein fester Wert hält `kubectl exec ... psql` einfach; wer das ändern will,
+  # setzt hier etwas anderes.
+  postgresPassword: worker
+
+# Der Schlüssel für die Formulierungshilfe (ADR-0024). LEER heisst: sie ist aus,
+# und die Oberfläche sagt das. Steht nie im Repository — beim lokalen Lauf
+# reicht ANTHROPIC_API_KEY=... make k8s-up.
+anthropicApiKey: ""
+draftingModel: claude-sonnet-5
+# WOHIN die Formulierungshilfe ruft, und warum das hier steht und nicht nur als
+# Vorgabe im Quelltext: die Egress-Grenze leitet ihre erlaubten Hosts aus der
+# KONFIGURATION ab (`Dienstgrundlage.GerufeneHosts`). Ein eingebautes Ziel nach
+# draussen ist genau das, was ein Souveraenitaetsbericht sichtbar machen soll —
+# und ohne diese Zeile weist die Grenze den Aufruf im Cluster ab, ohne ihn zu
+# protokollieren. docker-compose.yml sagt dasselbe seit dem Umstieg auf
+# `SovereignPlatform`; im Chart fehlte es.
+draftingUrl: https://api.anthropic.com/v1/messages
+
+# --- Postgres ---------------------------------------------------------------
+# enabled: false in Staging/Produktion, dann zeigt `host` auf die verwaltete
+# Datenbank. Die Dienste merken davon nichts: sie kennen nur ihre
+# WORKER_DATABASE_URL, und die wird aus host/user/passwort zusammengesetzt.
+postgres:
+  enabled: true
+  image: postgres:17-alpine
+  host: postgres
+  port: 5432
+  user: worker
+  storage: 4Gi
+  # Nur der Vollständigkeit halber: der Entrypoint legt allein diese eine an,
+  # jede weitere Dienstdatenbank kommt aus scripts/initdb (ADR-0004 verbietet
+  # eine gemeinsame Datenbank).
+  bootstrapDatabase: identity
+
+# --- Mailpit ----------------------------------------------------------------
+# Fängt jede Mail ab. In Produktion aus, und smtp.host zeigt nach draussen.
+mailpit:
+  enabled: true
+  image: axllent/mailpit:latest
+  # Die Oberfläche auf einem Host-Port, wie bei docker compose (:8025).
+  #
+  # Ohne das wäre der Bestätigungslink aus der Registrierung nur über
+  # `kubectl port-forward` zu erreichen — und eine Umgebung, in der man sich
+  # nicht anmelden kann, ohne vorher ein zweites Fenster aufzumachen, wird
+  # nicht benutzt.
+  #
+  # Hängt an `enabled`: ist Mailpit aus, gibt es auch keinen Port. In
+  # Produktion ist damit nichts zu vergessen.
+  nodePort: 30825
+
+smtp:
+  host: mailpit
+  port: 1025
+
+# --- Jaeger -----------------------------------------------------------------
+# All-in-one statt Collector + Jaeger: der Collector lohnt sich bei mehreren
+# Zielen. Hier gibt es eines, und ein Glied weniger in der Kette ist eines
+# weniger, das schweigt.
+jaeger:
+  enabled: true
+  image: jaegertracing/all-in-one:1.60.0
+
+# --- Gateway ----------------------------------------------------------------
+# Kein Traefik mehr: das Gateway ist ein eigener Dienst aus demselben Image
+# (SERVICE_DIR=gateway), und seine Landkarte reist MIT dem Bild.
+#
+# Damit fällt die ConfigMap weg, die die Traefik-Datei ins Cluster trug — und
+# mit ihr die Frage, ob die Kopie noch stimmt. Was Compose fährt, fährt hier.
+gateway:
+  # Der NodePort, den deploy/kind/cluster.yaml auf den Host-Port 8090 legt.
+  nodePort: 30080
+  port: 8090
+
+# --- Oberfläche -------------------------------------------------------------
+web:
+  # Im Cluster zeigen alle zehn Basis-URLs auf DENSELBEN Ursprung: den des
+  # Gateways. Das ist nicht nur bequem, es beseitigt zwei Fehlerquellen —
+  # kein CORS (gleicher Origin) und keine Cookie-Verwirrung zwischen Ports.
+  #
+  # Leer heisst: publicUrl verwenden.
+  apiOrigin: ""
+
+# --- Die Dienste ------------------------------------------------------------
+# Eine Liste, über die zwei Templates laufen (Deployment, Service) — dasselbe
+# Prinzip wie der x-dienst-Anker in docker-compose.yml. Einen Dienst
+# hinzuzufügen ist ein Eintrag, keine Kopie.
+#
+#   name      — Name des K8s-Service. MUSS dem Compose-Dienstnamen entsprechen,
+#               weil ocelot.json genau diese Namen anspricht.
+#   dir       — der Schlüssel im Bild, wird als SERVICE_DIR gesetzt
+#   port      — Port, auf dem der Dienst lauscht
+#   database  — seine eigene Datenbank (ADR-0004: keine gemeinsame)
+#   env       — was nur dieser Dienst braucht
+services:
+  - name: identity-service
+    dir: identity
+    port: 8001
+    database: identity
+    env:
+      # Wohin die Löschbefehle gehen (ADR-0027 §4). jobs-service steht dabei,
+      # ist aber KEIN Empfänger der Kaskade — er bekommt nur die Absicht aus
+      # §7, wenn ein Unternehmen ohne Administrator zurückbleibt.
+      Erasure__Adressen__consent: http://consent-service:8002
+      Erasure__Adressen__profile: http://profile-service:8003
+      Erasure__Adressen__resume: http://resume-service:8004
+      Erasure__Adressen__portfolio: http://portfolio-service:8005
+      Erasure__Adressen__jobs: http://jobs-service:8006
+      Erasure__Adressen__applications: http://applications-service:8007
+      Erasure__Adressen__transfer: http://transfer-service:8009
+      Erasure__Adressen__notification: http://notification-service:8010
+      Erasure__Adressen__github: http://github-service:8011
+      Erasure__Adressen__scout: http://scout-service:8012
+      Erasure__Adressen__advisor: http://advisor-service:8013
+      Erasure__Adressen__assessment: http://assessment-service:8014
+
+  - name: consent-service
+    dir: consent
+    port: 8002
+    database: consent
+
+  - name: profile-service
+    dir: profile
+    port: 8003
+    database: profile
+    env:
+      # Fragt den Ledger, bevor er ein fremdes Profil zeigt (ADR-0013,
+      # synchron und ohne Zwischenspeicher).
+      Consent__Adresse: http://consent-service:8002
+    drafting: true
+
+  - name: resume-service
+    dir: resume
+    port: 8004
+    database: resume
+    env:
+      Consent__Adresse: http://consent-service:8002
+      Notifications__Adresse: http://notification-service:8010
+      Ablage__Verzeichnis: /daten/ablage
+    # Gleicher Grund wie portfolio: ohne Volume sind die Dateien beim
+    # naechsten Pod weg, die Zeilen in Postgres stehen noch (ADR-0035).
+    persistence:
+      size: 2Gi
+      mountPath: /daten/ablage
+
+  - name: portfolio-service
+    dir: portfolio
+    port: 8005
+    database: portfolio
+    env:
+      Consent__Adresse: http://consent-service:8002
+      Storage__Wurzel: /var/lib/workertransfer/portfolio-attachments
+    # Anhänge überleben den Pod. Ein Pfad im Image wäre beim nächsten Deploy
+    # weg — dieselbe Überlegung wie das Volume in docker-compose.yml.
+    persistence:
+      size: 2Gi
+      mountPath: /var/lib/workertransfer/portfolio-attachments
+
+  - name: jobs-service
+    dir: jobs
+    port: 8006
+    database: jobs
+    drafting: true
+    env:
+      # Die Rollenauskunft: wer `admin` ist, steht in der
+      # Mitgliedschaftstabelle von identity-service und nicht im Token.
+      # `Identity__Geheimnis` haengt in _helpers.tpl an dieser Zeile.
+      Identity__Adresse: http://identity-service:8001
+
+  - name: applications-service
+    dir: applications
+    port: 8007
+    database: applications
+    env:
+      Consent__Adresse: http://consent-service:8002
+      Jobs__Adresse: http://jobs-service:8006
+      Notifications__Adresse: http://notification-service:8010
+      Identity__Adresse: http://identity-service:8001
+
+  - name: companies-service
+    dir: companies
+    port: 8008
+    database: companies
+    env:
+      Identity__Adresse: http://identity-service:8001
+
+  - name: transfer-service
+    dir: transfer
+    port: 8009
+    database: transfer
+    env:
+      Consent__Adresse: http://consent-service:8002
+      Notifications__Adresse: http://notification-service:8010
+      Identity__Adresse: http://identity-service:8001
+
+  - name: notification-service
+    dir: notification
+    port: 8010
+    database: notification
+    env:
+      # Dieser Dienst entscheidet, OB etwas hinausgeht; AN WEN weiss allein
+      # identity-service. Ueber die Grenze geht nur eine userId.
+      Identity__Adresse: http://identity-service:8001
+
+  - name: github-service
+    dir: github
+    port: 8011
+    database: github
+    env:
+      Consent__Adresse: http://consent-service:8002
+
+  - name: scout-service
+    dir: scout
+    port: 8012
+    database: scout
+    drafting: true
+    env:
+      # Jedes Ziel dieses Dienstes steht hier, und zwar weil es hier stehen
+      # MUSS: die Egress-Grenze leitet ihre erlaubten Hosts aus der
+      # Konfiguration ab. Ein Ziel, das nur im Quelltext steht, wird
+      # abgewiesen — ohne Protokollzeile.
+      Consent__Adresse: http://consent-service:8002
+      # Die interne Tuer, durch die gesucht wird. `Profile__Geheimnis` haengt
+      # in _helpers.tpl an dieser Zeile.
+      Profile__Adresse: http://profile-service:8003
+      # Die Belege — github-service, NICHT github.com: dieser Dienst fragt nie
+      # bei GitHub selbst.
+      GitHub__Adresse: http://github-service:8011
+      # Die Anzeige fuer das Erreichbarkeits-Haekchen (ADR-0041).
+      Jobs__Adresse: http://jobs-service:8006
+      # „Dein Profil wurde entdeckt" (ADR-0033), ueber den Postausgang.
+      Notifications__Adresse: http://notification-service:8010
+
+  - name: advisor-service
+    dir: advisor
+    port: 8013
+    database: advisor
+    env:
+      # Jedes Ziel dieses Dienstes steht hier, und zwar weil es hier stehen
+      # MUSS: die Egress-Grenze leitet ihre erlaubten Hosts aus der
+      # Konfiguration ab. Ein Ziel, das nur im Quelltext steht, wird
+      # abgewiesen — ohne Protokollzeile.
+      #
+      # Der Ledger traegt die STUFE eines Gespraechs (ADR-0037): gelesen bei
+      # jeder Anfrage, geschrieben bei jeder Freigabe. Eine eigene Stufenspalte
+      # gibt es nicht, also ist diese Zeile nicht optional.
+      Consent__Adresse: http://consent-service:8002
+      # Die internen Tueren von identity-service: die Domain eines Unternehmens
+      # (damit ein Ausschluss greifen kann) und der Klarname eines Menschen
+      # (erst ab Stufe 3, und erst NACHDEM der Ledger sie bestaetigt hat).
+      # `Identity__Geheimnis` haengt in _helpers.tpl an dieser Zeile.
+      Identity__Adresse: http://identity-service:8001
+      # Die Uebergabe der Einigung. Der Dreieckskonsens steht DORT.
+      Transfer__Adresse: http://transfer-service:8009
+      # „Ein Unternehmen hat ein Gespraech eroeffnet", ueber den Postausgang.
+      Notifications__Adresse: http://notification-service:8010
+
+  - name: assessment-service
+    dir: assessment
+    port: 8014
+    database: assessment
+    env:
+      # Jedes Ziel dieses Dienstes steht hier, und zwar weil es hier stehen
+      # MUSS: die Egress-Grenze leitet ihre erlaubten Hosts aus der
+      # Konfiguration ab. Ein Ziel, das nur im Quelltext steht, wird
+      # abgewiesen — ohne Protokollzeile.
+      #
+      # Der Ledger, und er ist der EINZIGE Waechter dieses Dienstes: eine
+      # Arbeitsprobe steht an `profile.visibility:*` und an keiner eigenen
+      # Faehigkeit (ADR-0042). Ohne diese Zeile antwortet die Firmenseite 503;
+      # die Personenseite antwortet weiter, denn wer seine Bewertung lesen
+      # will, braucht dafuer keinen Ledger.
+      Consent__Adresse: http://consent-service:8002
+      # „An deiner Arbeitsprobe hat sich etwas bewegt", ueber den Postausgang,
+      # inhaltsfrei (ADR-0025).
+      Notifications__Adresse: http://notification-service:8010
+      # NICHT eingetragen: die Adresse, die eine Person einreicht. Sie wird
+      # gespeichert und angezeigt, nie abgerufen.
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 128Mi
+  # Kein CPU-Limit: ein gedrosselter Prozess antwortet langsamer, statt zu
+  # scheitern, und das sieht in einer Bereitschaftsprüfung wie ein kaputter
+  # Dienst aus. Speicher wird begrenzt, weil ein Leck sonst den Knoten mitnimmt.
+  limits:
+    memory: 768Mi

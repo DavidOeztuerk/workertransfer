@@ -1,0 +1,478 @@
+// Hilfen für die E2E-Reise: Erreichbarkeit prüfen, Konten anlegen, Mails lesen.
+//
+// Ist der Stack nicht da, überspringen sich die Tests selbst — dasselbe Muster
+// wie ADR-0011 für die Python-Integrationstests. Ein rotes `make check` auf
+// einer Maschine ohne Docker sagt nichts über den Code; ein grünes, das eine
+// Lücke verschweigt, wäre schlimmer. Deshalb überspringen statt bestehen.
+
+import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+export const WEB_URL = process.env.E2E_WEB_URL ?? "http://localhost:5173";
+export const IDENTITY_URL = process.env.E2E_IDENTITY_URL ?? "http://localhost:8001";
+export const CONSENT_URL = process.env.E2E_CONSENT_URL ?? "http://localhost:8002";
+export const PROFILE_URL = process.env.E2E_PROFILE_URL ?? "http://localhost:8003";
+export const RESUME_URL = process.env.E2E_RESUME_URL ?? "http://localhost:8004";
+export const PORTFOLIO_URL = process.env.E2E_PORTFOLIO_URL ?? "http://localhost:8005";
+export const JOBS_URL = process.env.E2E_JOBS_URL ?? "http://localhost:8006";
+export const APPLICATIONS_URL = process.env.E2E_APPLICATIONS_URL ?? "http://localhost:8007";
+export const COMPANIES_URL = process.env.E2E_COMPANIES_URL ?? "http://localhost:8008";
+export const TRANSFER_URL = process.env.E2E_TRANSFER_URL ?? "http://localhost:8009";
+// 8011, nicht 8010: dort hoert notification-service. Die Verwechslung stand
+// hier monatelang — die Probe fuer "github-service" fragte damit einen anderen
+// Dienst, und eine tote github-service sah gesund aus. Umgekehrt wurde
+// notification-service ueberhaupt nie geprueft.
+export const GITHUB_URL = process.env.E2E_GITHUB_URL ?? "http://localhost:8011";
+export const ADVISOR_URL = process.env.E2E_ADVISOR_URL ?? "http://localhost:8013";
+export const ASSESSMENT_URL = process.env.E2E_ASSESSMENT_URL ?? "http://localhost:8014";
+export const NOTIFICATION_URL = process.env.E2E_NOTIFICATION_URL ?? "http://localhost:8010";
+
+/** Das Gateway — der Weg, den die Oberflaeche fuer ihre Aufrufe nimmt. */
+export const GATEWAY_URL = process.env.E2E_GATEWAY_URL ?? "http://localhost:8090";
+export const MAILPIT_URL = process.env.E2E_MAILPIT_URL ?? "http://localhost:8025";
+
+const REQUIRED: ReadonlyArray<readonly [string, string, Record<string, string>?]> = [
+  ["web", WEB_URL],
+  ["identity-service", `${IDENTITY_URL}/health/live`],
+  ["consent-service", `${CONSENT_URL}/health/live`],
+  ["profile-service", `${PROFILE_URL}/health/live`],
+  ["resume-service", `${RESUME_URL}/health/live`],
+  ["portfolio-service", `${PORTFOLIO_URL}/health/live`],
+  ["jobs-service", `${JOBS_URL}/health/live`],
+  ["applications-service", `${APPLICATIONS_URL}/health/live`],
+  ["companies-service", `${COMPANIES_URL}/health/live`],
+  ["transfer-service", `${TRANSFER_URL}/health/live`],
+  ["github-service", `${GITHUB_URL}/health/live`],
+  ["notification-service", `${NOTIFICATION_URL}/health/live`],
+  ["advisor-service", `${ADVISOR_URL}/health/live`],
+  ["assessment-service", `${ASSESSMENT_URL}/health/live`],
+  ["gateway", `${GATEWAY_URL}/health/live`],
+  ["mailpit", `${MAILPIT_URL}/api/v1/messages?limit=1`],
+];
+
+//: Nur der positive Befund wird gemerkt — siehe `missingService`.
+let stackIsUp = false;
+
+//: Geduldig, und das ist der Punkt. Vorher stand hier EIN Versuch mit 2
+//: Sekunden — und weil das Ergebnis unten zwischengespeichert wird, schaltete
+//: ein einziger Aussetzer die GESAMTE restliche Reihe ab: 12 von 18 Dateien
+//: übersprangen sich, obwohl der Stapel lief (dieselben Dateien liefen einzeln
+//: durch). Der Vite-Dev-Server übersetzt beim ersten Zugriff und braucht unter
+//: Last leicht länger als zwei Sekunden.
+//:
+//: Ein Dienst, der nach drei Sekunden antwortet, LÄUFT. Die Frage hier ist
+//: „steht der Stapel?" und nicht „ist er schnell?" — und die falsche Antwort
+//: ist teuer: sie erzeugt einen Bericht über einen Lauf, der nie stattgefunden
+//: hat.
+const PROBE_TIMEOUT_MS = 10_000;
+const PROBE_ATTEMPTS = 3;
+
+//: Wie lange auf eine Mail gewartet wird.
+//:
+//: Seit ADR-0025 geht eine Benachrichtigung NICHT mehr synchron im Request
+//: raus, sondern über die Outbox: Zeile schreiben → Zusteller (Takt 5 s) →
+//: HTTP an identity-service → SMTP. Die Zusage lautet seither „innerhalb des
+//: Taktes", nicht „sofort" — und 20 Sekunden waren dafür zu knapp bemessen.
+//: Unter Last ist genau das passiert: der Lauf brauchte statt 4,6 ganze 48,6
+//: Minuten, und die Reise fiel um, obwohl die Mail nur später kam.
+//:
+//: Die Reisen prüfen „die Mail kommt an", nicht „die Mail kommt in 20 Sekunden
+//: an". Ein zu knapper Zeitrahmen macht daraus eine Aussage über die
+//: Geschwindigkeit der Maschine.
+const MAIL_TIMEOUT_MS = 60_000;
+
+/**
+ * Zeitlimit für EINE Anfrage an Mailpit — nicht für das Warten insgesamt.
+ *
+ * `fetch` hat von sich aus keines, und in einer Schleife, die auf eine Frist
+ * prüft, macht das die Frist unwirksam: hängt eine einzelne Anfrage, wird
+ * `Date.now()` nie wieder erreicht. Gemessen wurde daraus eine Reise, die bei
+ * 150 s Budget **15 Minuten** lief und am Ende nur „Test timeout" meldete — ohne
+ * Stelle, weil kein Playwright-Kommando offen war und der Bericht deshalb nichts
+ * zu zeigen hatte. Die eigentliche Prüfung (`expect(mail).toBeNull()`) kam nie
+ * dran, die Reise hat also weder bewiesen noch widerlegt, was sie soll.
+ *
+ * Fünf Sekunden sind reichlich: Mailpit antwortet gemessen in 2 ms. Die Zahl ist
+ * ein Limit gegen Hängen, keine Erwartung an die Geschwindigkeit.
+ */
+const MAILPIT_REQUEST_TIMEOUT_MS = 5_000;
+
+/**
+ * Eine Anfrage an Mailpit. `null` heißt „diese eine Anfrage hat nicht
+ * geantwortet" — die aufrufende Schleife versucht es erneut, bis IHRE Frist
+ * abläuft. Ein Fehlschlag hier darf nichts umwerfen: er ist eine Aussage über
+ * einen HTTP-Aufruf, nicht über die Mail.
+ */
+async function mailpit<T>(path: string): Promise<T | null> {
+  try {
+    const res = await fetch(`${MAILPIT_URL}${path}`, {
+      signal: AbortSignal.timeout(MAILPIT_REQUEST_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function reachable(url: string, koepfe?: Record<string, string>): Promise<boolean> {
+  for (let attempt = 1; attempt <= PROBE_ATTEMPTS; attempt += 1) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+      const res = await fetch(url, { signal: controller.signal, headers: koepfe });
+      clearTimeout(timer);
+      if (res.ok) return true;
+    } catch {
+      // Nächster Versuch — ein abgebrochener Aufruf ist kein Beweis.
+    }
+    if (attempt < PROBE_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+    }
+  }
+  return false;
+}
+
+/** `null`, wenn alles läuft — sonst der Grund fürs Überspringen.
+ *
+ * Zwischengespeichert wird nur ein **positives** Ergebnis. Ein negatives ist
+ * die teure Antwort: es überspringt eine Datei, und über die Reihe hinweg
+ * womöglich alle. Fehlt der Stapel wirklich, kostet die Wiederholung je Datei
+ * einen Anlauf gegen den erstbesten nicht erreichbaren Dienst — bezahlbar.
+ * Blieb er dagegen nur einmal hängen, laufen die restlichen Dateien.
+ */
+export async function missingService(): Promise<string | null> {
+  if (stackIsUp) return null;
+  for (const [name, url, koepfe] of REQUIRED) {
+    if (!(await reachable(url, koepfe))) {
+      return name;
+    }
+  }
+  stackIsUp = true;
+  return null;
+}
+
+/** In einer Datei einmal aufrufen; überspringt sie, wenn der Stack fehlt. */
+export function skipWithoutStack(): void {
+  test.beforeAll(async () => {
+    const missing = await missingService();
+    test.skip(
+      missing !== null,
+      `${missing} ist nicht erreichbar — starte den Stack mit "docker compose up"`
+    );
+  });
+}
+
+function nonce(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Eindeutig je Lauf: der Stack wird zwischen Läufen nicht zurückgesetzt. */
+export function uniqueEmail(domain: string): string {
+  return `e2e-${nonce()}@${domain}`;
+}
+
+/**
+ * Eine Domain, die es in diesem Stack noch nie gab.
+ *
+ * Nötig für alles, was ein Unternehmen anlegt: die Domain wird beansprucht und
+ * ist danach vergeben (ADR-0019). Mit einer festen Domain besteht der Test
+ * genau einmal und scheitert ab dem zweiten Lauf an einem Konflikt, der nichts
+ * mit dem Prüfgegenstand zu tun hat.
+ */
+export function uniqueCompanyDomain(): string {
+  return `arbeitgeber-${nonce()}.example`;
+}
+
+interface MailpitMessage {
+  ID: string;
+  Subject: string;
+  To: Array<{ Address: string }>;
+}
+
+/**
+ * Ein Token aus der zuletzt an `address` zugestellten Mail dieser Art.
+ *
+ * Der Betreff ist Teil der Suche, nicht nur die Adresse. Vorher wurde die
+ * neueste Mail an die Adresse genommen und daraus irgendein `token=`
+ * herausgelesen — seit es zwei Sorten Links gibt (Bestätigung und Einladung),
+ * greift das mal die eine und mal die andere, je nachdem welche Mail beim
+ * Nachsehen schon da war. Der Test schlug dann an einer Stelle fehl, die mit
+ * der Ursache nichts zu tun hatte.
+ *
+ * Gewartet wird, statt einmal zu schauen: der Versand läuft nach dem Commit
+ * und damit nach der HTTP-Antwort, auf die der Browser reagiert hat.
+ */
+async function tokenFromMail(
+  address: string,
+  subjectPart: string,
+  linkPath: string
+): Promise<string> {
+  const pattern = new RegExp(`${linkPath}\\?token=([A-Za-z0-9_-]+)`);
+  const deadline = Date.now() + MAIL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    // GEZIELT nach der Adresse fragen, nicht in den neuesten 50 blättern.
+    //
+    // Mailpit sammelt über einen ganzen Lauf hunderte Nachrichten. Wer nur die
+    // neuesten 50 ansieht, findet eine Mail nicht mehr, sobald zwischen ihrem
+    // Versand und dem Nachsehen fünfzig andere eingingen — und das passiert bei
+    // jeder Reise, die auf etwas Langsames wartet. Der Test meldete dann „keine
+    // Mail" und beschuldigte damit das Produkt für ein Fenster, das zu klein
+    // war.
+    const list = await mailpit<{ messages?: MailpitMessage[] }>(
+      `/api/v1/search?query=${encodeURIComponent(`to:${address}`)}&limit=50`
+    );
+    const hit = (list?.messages ?? []).find((message) =>
+      message.Subject.includes(subjectPart)
+    );
+    if (hit !== undefined) {
+      const body = await mailpit<{ Text?: string; HTML?: string }>(`/api/v1/message/${hit.ID}`);
+      const token = pattern.exec(`${body?.Text ?? ""}${body?.HTML ?? ""}`)?.[1];
+      if (token !== undefined) return token;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`Keine ${subjectPart}-Mail für ${address} in Mailpit gefunden`);
+}
+
+export function verificationTokenFor(address: string): Promise<string> {
+  return tokenFromMail(address, "bestätige deine E-Mail-Adresse", "/verify");
+}
+
+export function invitationTokenFor(address: string): Promise<string> {
+  return tokenFromMail(address, "eingeladen", "/invitation");
+}
+
+interface MailpitDetail {
+  Text?: string;
+  HTML?: string;
+  Subject?: string;
+}
+
+
+/**
+ * Die zuletzt an `address` zugestellte Mail — ohne Filter auf den Betreff.
+ *
+ * Anders als `tokenFromMail`: dort wird eine bestimmte Sorte gesucht, hier soll
+ * gerade geprüft werden, WAS überhaupt ankommt. Ein Filter würde die Frage
+ * beantworten, bevor sie gestellt ist.
+ */
+export async function lastMailFor(
+  address: string,
+  { after = 0 }: { after?: number } = {}
+): Promise<{ subject: string; text: string } | null> {
+  const deadline = Date.now() + MAIL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    // Siehe `tokenFromMail`: gezielt nach der Adresse, nicht in den neuesten 50.
+    // Hier wiegt es schwerer — die Abschlussmail der Löschkaskade kommt Minuten
+    // nach dem Auslöser, und in dieser Zeit laufen leicht fünfzig andere ein.
+    // Der Test meldete dann „die Kaskade wurde nie fertig", obwohl sie es war.
+    const list = await mailpit<{ messages?: (MailpitMessage & { Created?: string })[] }>(
+      `/api/v1/search?query=${encodeURIComponent(`to:${address}`)}&limit=50`
+    );
+    const hit = (list?.messages ?? []).find(
+      (message) => new Date(message.Created ?? 0).getTime() >= after
+    );
+    if (hit !== undefined) {
+      const body = await mailpit<MailpitDetail>(`/api/v1/message/${hit.ID}`);
+      return { subject: hit.Subject, text: `${body?.Text ?? ""}${body?.HTML ?? ""}` };
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return null;
+}
+
+
+/**
+ * Das Passwort aller Testkonten. Eines für alle: es prüft nichts, es muss nur
+ * die Regeln erfüllen.
+ */
+export const E2E_PASSWORD = "e2e-Passwort-mit-Laenge-1!";
+
+export async function registerAndConfirm(
+  page: Page,
+  email: string,
+  displayName: string,
+  companyName?: string,
+  berufsfeld?: string
+): Promise<void> {
+  await page.goto("/register");
+  // Ein Unternehmen entsteht seit E2.6 NUR hier: die Wahl fällt bei der
+  // Registrierung, angelegt wird es bei der Bestätigung. Es gibt keine Seite
+  // „Unternehmen anlegen" mehr, über die diese Reisen früher gingen.
+  if (companyName !== undefined) {
+    await page.getByRole("radio", { name: "Für ein Unternehmen" }).check();
+    await page.getByLabel("Name des Unternehmens").fill(companyName);
+  }
+  // Erst warten, dann tippen: `fill()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das groessere expect-Budget. Unter Last
+  // scheiterte die Reise sonst am Feld statt am Pruefgegenstand — dieselbe
+  // Lehre, die weiter unten schon fuer das Klicken steht.
+  await expect(page.getByLabel(/E-Mail/i)).toBeVisible();
+  await page.getByLabel(/E-Mail/i).fill(email);
+  await page.getByLabel(/Passwort/i).first().fill(E2E_PASSWORD);
+  // Pflichtfeld. Fehlt es, blockt die native Formularvalidierung das Absenden
+  // lautlos — kein POST, keine Meldung, und der Test hängt an der Mail, die nie
+  // kommt. Genau so ist die erste Reise beim ersten Lauf gescheitert.
+  await page.getByLabel(/Anzeigename/i).fill(displayName);
+  // Freiwillig (ADR-0039) — deshalb nur, wenn eine Reise es ausdrücklich
+  // verlangt. Die Vorauswahl ist „Keine Angabe", und wer sie stehen lässt,
+  // bekommt die neutrale Ansicht.
+  if (berufsfeld !== undefined) {
+    await page.getByRole("combobox", { name: "Berufsfeld" }).click();
+    await page.getByRole("option", { name: berufsfeld, exact: true }).click();
+  }
+  await page.getByRole("button", { name: /Registrieren/i }).click();
+  // Die Antwort ist absichtlich dieselbe für bekannte und unbekannte Adressen —
+  // deshalb wird hier nicht auf eine Erfolgsmeldung gewartet, sondern auf die
+  // Mail, die es nur bei einer echten Neuanlage gibt.
+  const token = await verificationTokenFor(email);
+  await page.goto(`/verify?token=${token}`);
+  // GENAU die Erfolgsüberschrift, buchstabengetreu.
+  //
+  // Die Seite hat drei: „Wird bestätigt…" (lädt), „E-Mail bestätigt" (fertig)
+  // und „Bestätigung fehlgeschlagen". Ein weiches /bestätigt/i trifft AUCH die
+  // erste — die Hilfe war also zufrieden, während die Bestätigung noch lief
+  // oder gerade scheiterte, und der Test lief weiter. Beim Anmelden kam dann
+  // „email not confirmed", und zwar an einer Stelle, die mit der Ursache nichts
+  // zu tun hatte.
+  //
+  // Der Vorgänger dieses Kommentars warnte vor genau diesem Fehler in einer
+  // anderen Ausprägung (/anmelden/i traf den Link in der Kopfzeile). Die Lehre
+  // ist dieselbe und hier zweimal bezahlt: eine Erfolgsmeldung prüft man
+  // buchstabengetreu, nicht mit einem Teilstring.
+  //
+  // Und wie beim Anmelden wird auf BEIDE Ausgänge gewartet. Nur auf den
+  // erhofften zu warten hieß: 30 Sekunden, dann „element(s) not found" — eine
+  // Meldung, die nicht unterscheidet, ob die Bestätigung fehlgeschlagen ist
+  // oder ob die Seite noch lud. Genau so ist dieser Schritt zuletzt umgefallen.
+  const confirmed = page.getByRole("heading", { name: "E-Mail bestätigt", exact: true });
+  const failed = page.getByRole("heading", { name: /Bestätigung fehlgeschlagen/i });
+  try {
+    await expect(confirmed.or(failed).first()).toBeVisible();
+  } catch {
+    const seen = await page
+      .locator("main")
+      .first()
+      .innerText()
+      .catch(() => "(keine Seite lesbar)");
+    throw new Error(
+      `Bestätigung für ${email}: weder Erfolg noch Fehlschlag erschienen.\n` +
+        `URL: ${page.url()}\nSeite:\n${seen.slice(0, 500)}`
+    );
+  }
+  if (await failed.isVisible()) {
+    const detail = await page
+      .locator("main")
+      .first()
+      .innerText()
+      .catch(() => "");
+    throw new Error(`Bestätigung für ${email} fehlgeschlagen: ${detail.slice(0, 300)}`);
+  }
+  // Ein Unternehmen kann bestätigt werden UND trotzdem nicht entstehen: ist die
+  // Domain schon beansprucht, bleibt das Konto aktiv und die Seite zeigt einen
+  // Hinweis. Ohne diese Prüfung liefe die Reise weiter und fiele Schritte später
+  // an einer Stelle um, die mit der Ursache nichts zu tun hat — derselbe Fehler,
+  // den der lange Kommentar über der Erfolgsüberschrift beschreibt.
+  if (companyName !== undefined) {
+    const angelegt = page.getByText(`${companyName} ist angelegt`);
+    const abgelehnt = page.getByRole("alert");
+    await expect(angelegt.or(abgelehnt).first()).toBeVisible();
+    if (await abgelehnt.isVisible()) {
+      throw new Error(
+        `Unternehmen "${companyName}" für ${email} wurde NICHT angelegt: ` +
+          (await abgelehnt.innerText().catch(() => "(kein Text)")).slice(0, 300)
+      );
+    }
+  }
+  await expect(confirmed).toBeVisible();
+}
+
+/**
+ * Anmelden — und bei einem Fehlschlag sagen, woran es lag.
+ *
+ * Vorher wartete diese Hilfe stumpf auf den Link „Mein Profil" und lief nach
+ * 30 Sekunden in eine Zeitüberschreitung, die nichts verriet: nicht, ob die
+ * Anmeldung abgelehnt wurde, nicht, ob die Seite überhaupt geladen hat. Genau
+ * dieser Fehlschlag ist mehrfach im Suite-Lauf aufgetreten und war jedes Mal
+ * gleich aussagelos.
+ *
+ * Jetzt wird auf BEIDE Ausgänge gewartet — Erfolg oder Fehlermeldung — und wenn
+ * keiner eintritt, steht in der Ausnahme, was stattdessen auf der Seite stand.
+ * Das behebt den Wackelkandidaten nicht; es sorgt dafür, dass der nächste
+ * Fehlschlag ihn erklärt.
+ */
+export async function login(page: Page, email: string): Promise<void> {
+  await page.goto("/login");
+  // Erst warten, dann tippen: `fill()` hat nur das actionTimeout (15 s),
+  // `expect(...).toBeVisible()` das groessere expect-Budget. Unter Last
+  // scheiterte die Reise sonst am Feld statt am Pruefgegenstand — dieselbe
+  // Lehre, die weiter unten schon fuer das Klicken steht.
+  await expect(page.getByLabel(/E-Mail/i)).toBeVisible();
+  await page.getByLabel(/E-Mail/i).fill(email);
+  await page.getByLabel(/Passwort/i).fill(E2E_PASSWORD);
+  // Der ABSENDEKNOPF, nicht irgendein Knopf mit „Anmelden" im Namen: in der
+  // Kopfzeile steht einer, der ein Menü öffnet.
+  await page.locator('button[type="submit"]').click();
+
+  // Die Zusammenfassung des Konto-Menüs statt „Mein Profil": der Link liegt
+  // jetzt IM Menü und ist zugeklappt nicht sichtbar. Die Zusammenfassung gibt
+  // es nur angemeldet und sie ist immer sichtbar — ein besseres Signal als ein
+  // Eintrag, der hinter einem Aufklapper liegt.
+  const signedIn = page.getByRole("button", { name: "Mein Konto" });
+  const failure = page.getByRole("alert");
+  try {
+    await expect(signedIn.or(failure).first()).toBeVisible();
+  } catch {
+    const seen = await page
+      .locator("main")
+      .first()
+      .innerText()
+      .catch(() => "(keine Seite lesbar)");
+    throw new Error(
+      `Anmeldung als ${email}: weder Profil-Link noch Fehlermeldung erschienen.\n` +
+        `URL: ${page.url()}\nSeite:\n${seen.slice(0, 500)}`
+    );
+  }
+  if (await failure.isVisible()) {
+    throw new Error(`Anmeldung als ${email} abgelehnt: ${await failure.innerText()}`);
+  }
+  await expect(signedIn).toBeVisible();
+}
+
+
+/**
+ * Ein Eintrag in einem Auswahlfeld — für MUIs eigenes, nicht für ein natives.
+ *
+ * <strong>`selectOption` greift hier nicht.</strong> Es setzt den Wert eines
+ * echten `<select>`; MUI zeichnet stattdessen ein `role="combobox"` und öffnet
+ * ein `role="listbox"`. Der Weg dorthin ist deshalb der eines Menschen:
+ * aufklappen, den Eintrag anklicken.
+ *
+ * Nativ waren die Felder bis zum 03.09.2026 — und das kostete die Gestalt: macOS
+ * legt sein eigenes Fenster über das Feld und schiebt es nach links, damit der
+ * gewählte Eintrag über dem Feld liegt. Auf jedem System anders, und nirgends
+ * wie der Rest der Oberfläche.
+ */
+export async function waehleImFeld(
+  page: Page,
+  beschriftung: RegExp | string,
+  eintrag: string
+): Promise<void> {
+  await page.getByLabel(beschriftung).click();
+  await page.getByRole("option", { name: eintrag, exact: true }).click();
+}
+
+/**
+ * Warten, bis der Wechsel auf ein Unternehmen wirklich gilt.
+ *
+ * Die Wahl stößt ihn nur an: der Server stellt ein neues Token aus, das Cookie
+ * wird ersetzt, die Sitzung neu geladen. Sofort weiterzuklicken gewinnt das
+ * Rennen etwa jedes zweite Mal. Das Unternehmens-Menü erscheint erst mit aktivem
+ * Tenant und ist damit das ehrliche Signal.
+ */
+export async function switchToCompany(page: Page, companyName: string): Promise<void> {
+  await page.goto("/");
+  await waehleImFeld(page, /Handeln als/i, companyName);
+  await expect(page.getByRole("button", { name: "Unternehmen" })).toBeVisible();
+}
