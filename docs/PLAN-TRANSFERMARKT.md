@@ -843,15 +843,38 @@ sagt".
 
 ### 8.2 Die Geheimnisfrage (H2 aus `AUFTRAG-HAERTUNG.md`)
 
-- [ ] `AddSecretManagement` ist **ungemessen** — CLAUDE.md führt es als „offen,
-      gehört zu H2". Die Frage lautet nicht „einschalten oder nicht", sondern:
-      nimmt dieses Modul den Platz von Infisical ein, oder steht es daneben?
-- [ ] `AddEncryption` verlangt `IDataEncryptionService` **und**
-      `IMasterKeyProvider`. Wir verschlüsseln heute auf Feldebene nichts; wer
-      damit anfängt, entscheidet **zuerst**, wo der Hauptschlüssel liegt.
-- [ ] `AddResourceAuthorization` ist ebenfalls ungemessen. Die Richtlinien
-      stehen seit PBI-2; ob dieses Modul darüber hinaus etwas trägt, weiß
-      niemand.
+**Gemessen am 12.09.2026 an Girder 4.4.0.** Alles steht in
+[`MESSUNG-GEHEIMNISFRAGE.md`](MESSUNG-GEHEIMNISFRAGE.md); die drei Zeilen in
+`CLAUDE.md` sagen jetzt das Gemessene. Eingeschaltet wurde nichts — die Messung
+war der Auftrag, die Entscheidung gehört einem Menschen.
+
+- [x] **Die Frage war falsch gestellt, und das ist der erste Befund.** Sie
+      lautete „wo liegt der Hauptschlüssel" — er liegt seit den
+      Kontoeinstellungen in `WORKERTRANSFER_SECRETS_KEY`, `Geheimnisspeicher.cs`
+      verschlüsselt damit AES-256-GCM, und **einen Schlüsselwechsel gibt es
+      nicht**: er macht jedes hinterlegte Geheimnis unlesbar, ausgesprochen in
+      `.env.example` („ROLLEN HEISST VERLIEREN") und abgefangen durch ein `null`
+      statt einer Ausnahme. Es stand nur nirgends zusammen.
+- [x] `AddSecretManagement` — **läuft längst** (es steht in Girders
+      Vorgabesatz) und registriert eine Optionsbindung ohne Leser. Es kann den
+      Platz von Infisical nicht einnehmen: `ISecretManager` hat in ganz Girder
+      keinen Verbraucher, und es gibt keinen Konfigurationsanbieter, der aus
+      einem Geheimnisspeicher liest. **Nicht nehmen** (= nichts tun).
+- [x] `AddEncryption` — **nicht nehmen**, und aus einem härteren Grund als dem
+      alten: die einzige ausgelieferte Umsetzung legt den **Klartext** ab und
+      meldet `AES256GCM`; ein fremder Schlüssel entschlüsselt sie. Ticket:
+      [`bugs/verschluesselung-verschluesselt-nicht.md`](../bugs/verschluesselung-verschluesselt-nicht.md).
+- [x] `AddResourceAuthorization` — **nicht nehmen**. Es nimmt nichts weg und
+      kostet wenig, aber sein Speicher ist eine Erlaubnistabelle: eine zweite
+      Stelle für eine Erlaubnis, die sofort wirken muss.
+- [ ] **Offen und eine Entscheidung, keine Messung:** betreiben wir einen
+      Geheimnisspeicher als eigenen Dienst (OpenBao/Infisical), oder bleibt die
+      Umgebung der Mechanismus und ein Speicher füllt sie nur?
+- [ ] **Echte Lücke, dabei gefunden:** das Helm-Chart trägt
+      `WORKERTRANSFER_SECRETS_KEY` nicht (gerendert: null Treffer, `.env` ist in
+      `.dockerignore`). Im Cluster fährt identity-service hoch und die erste
+      Person, die einen KI-Schlüssel speichert, bekommt einen 500 — der
+      Speicher ist ein Singleton und entsteht erst beim Auflösen.
 
 ### 8.3 Die gemerkte Stelle wird geschrieben und nie gelesen
 
