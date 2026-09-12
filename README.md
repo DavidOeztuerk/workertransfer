@@ -77,9 +77,11 @@ Two rules that save an hour each:
 - **Build and test in separate invocations.** Chained, the Testcontainers suites fail *and look like real test failures*.
 - **Never `dotnet test` over the solution.** Fifteen suites start fifteen Postgres containers at once; the ResourceReaper times out and every suite fails within a millisecond, looking exactly like a broken build.
 
-The frontend workspace is `pnpm` + turbo:
+The frontend is `pnpm` in `web/`, which carries its own lockfile — the pnpm
+workspace, turbo and the root `package.json` are gone:
 
 ```bash
+cd web
 pnpm install
 pnpm check    # tsc --noEmit
 pnpm test     # Vitest
@@ -87,7 +89,7 @@ pnpm build
 pnpm dev
 ```
 
-Playwright journeys in `apps/web/e2e/` run against the **real** compose stack; without it they skip themselves. `make validate-e2e` runs them and names the skips.
+Playwright journeys in `web/e2e/` run against the **real** compose stack; without it they skip themselves. `make validate-e2e` runs them and names the skips.
 
 ## Architecture and product guardrails
 

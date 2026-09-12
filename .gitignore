@@ -9,9 +9,20 @@ coverage.xml
 htmlcov/
 
 node_modules/
+# Turbos Bauzwischenspeicher. Turbo selbst ist mit dem pnpm-Workspace
+# gegangen (keine turbo.json, keine Wurzel-package.json) — die Regel bleibt
+# trotzdem: 531 Dateien und 1,2 MB .tar.zst lagen verfolgt im Repository,
+# weil nie eine da war. Ein Zwischenspeicher gehoert nie ins Repository,
+# auch nicht der eines Werkzeugs, das wir gerade nicht benutzen.
+.turbo/
 # Playwright-Artefakte: Traces und Screenshots eines Laufs, keine Quellen.
 test-results/
 playwright-report/
+# Und dieselben Bilder im Wurzelverzeichnis: die Regel darueber greift nur
+# innerhalb von test-results/, ein Screenshot landet aber neben den Quellen,
+# wenn der Pfad beim Aufnehmen fehlt. Genau so lagen breit-1440.png,
+# zahnrad.png und login-before.png im Repository.
+/*.png
 
 dist/
 build/
