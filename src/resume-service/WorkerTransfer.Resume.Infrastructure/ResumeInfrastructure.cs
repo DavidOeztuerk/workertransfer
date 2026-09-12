@@ -18,6 +18,7 @@ using WorkerTransfer.Resume.Infrastructure.Einwilligung;
 using WorkerTransfer.Resume.Infrastructure.Loeschung;
 using WorkerTransfer.Resume.Infrastructure.Persistence;
 using WorkerTransfer.Resume.Infrastructure.Security;
+using WorkerTransfer.Resume.Infrastructure.Texterkennung;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Resume.Infrastructure;
@@ -63,6 +64,15 @@ public static class ResumeInfrastructure
         services.AddScoped<ILebenslaufSpeicher, EfLebenslaufSpeicher>();
         services.AddScoped<IAnfragenSpeicher, EfAnfragenSpeicher>();
         services.AddScoped<IUnterlagenSpeicher, EfUnterlagenSpeicher>();
+        services.AddScoped<IFundSpeicher, EfFundSpeicher>();
+
+        // DER TEXTERKENNER — eine Bibliothek im Prozess, kein Dienst im Netz
+        // (ADR-0043). Hier steht die Entscheidung, und hier waere sie zu
+        // aendern: wer jemals einen fremden Erkenner einsetzt, schreibt dessen
+        // Adresse in dieselbe Zeile in die Konfiguration — sonst weist die
+        // Souveraenitaetsgrenze den Aufruf ab, ohne eine Zeile zu
+        // protokollieren, und der Knopf tut einfach nichts.
+        services.AddSingleton<ITexterkennung, PdfTexterkennung>();
 
         // Die Ablage aus ADR-0021, zurueck in .NET (ADR-0035). Sie steht hier
         // und nicht in `ServiceDefaults`: ob ein Dienst Dateien haelt, ist eine

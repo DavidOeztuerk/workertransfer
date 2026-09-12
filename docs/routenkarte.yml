@@ -284,6 +284,14 @@ gruppen:
       - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/resumes/me/documents', ohne: 401, person: 415, mitglied: 415, firma: 415 }
       - { methode: GET, pfad: '/resumes/me/documents', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      # Was auf Ausloesung in den eigenen Unterlagen gelesen wurde (PBI-7,
+      # ADR-0043). Beide antworten in allen drei angemeldeten Spalten gleich:
+      # wessen Unterlagen gelesen werden, kommt aus dem TOKEN, nicht aus dem
+      # Pfad — eine Kennung darin waere die Einladung, sie zu aendern. Und der
+      # Lesevorgang haengt am POST: ein GET, der Dateien oeffnet, waere genau
+      # der Hintergrundlauf, den ADR-0004 ausschliesst.
+      - { methode: GET, pfad: '/resumes/me/documents/terms', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/resumes/me/documents/read', ohne: 401, person: 200, mitglied: 200, firma: 200 }
       - { methode: GET, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001/content', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: DELETE, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: PUT, pfad: '/resumes/me/documents/00000000-0000-0000-0000-000000000001/as-cv', ohne: 401, person: 404, mitglied: 404, firma: 404 }

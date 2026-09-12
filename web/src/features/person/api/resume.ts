@@ -62,6 +62,74 @@ export interface UnterlageV1 {
   uploaded_at: string;
 }
 
+/**
+ * Was in einer eigenen Unterlage gelesen wurde — oder dass noch nie gelesen
+ * wurde.
+ *
+ * <strong>Drei Zustände, und sie dürfen nie zu zweien werden.</strong>
+ * `read_at === null` heisst „noch nie gelesen"; `has_text === false` heisst
+ * „gelesen, aber es war kein Text darin" (ein abfotografierter Meisterbrief ist
+ * ein Bild); eine leere `terms` bei `has_text === true` heisst „gelesen, kein
+ * bekanntes Wort gefunden". Die drei zusammenzuziehen hiesse, jemandem
+ * stillschweigend zu sagen, in seinem Meisterbrief stehe nichts — ADR-0022 §3.
+ *
+ * `terms` ist ein <strong>Beleg</strong> und keine Nennung: eine Aussage über
+ * dieses Dokument. Suchbar wird ein Wort erst, wenn die Person es ins Profil
+ * tippt und <em>speichert</em> (ADR-0033).
+ */
+export interface Unterlagenfund {
+  document_id: string;
+  name: string;
+  read_at: string | null;
+  has_text: boolean;
+  terms: string[];
+}
+
+/**
+ * Was zuletzt gelesen wurde — <strong>ohne zu lesen</strong>.
+ *
+ * Die Profilseite fragt das beim Laden, und sie darf das, weil dabei nichts
+ * geschieht: keine Datei wird geöffnet, kein Erkenner gerufen, keine Zeile
+ * geschrieben. Wer hier das Lesen anhängt, macht aus dem Öffnen einer Seite den
+ * Hintergrundlauf, den ADR-0004 ausschliesst.
+ */
+export async function ladeUnterlagenfunde(
+  signal?: AbortSignal
+): Promise<Antwort<Unterlagenfund[]>> {
+  const answer = await request<Unterlagenfund[]>(
+    RESUME_BASE_URL,
+    "/resumes/me/documents/terms",
+    { signal },
+    "fehler.unterlagenNichtGeladen"
+  );
+
+  return answer.ok
+    ? { ok: true, value: answer.value ?? [] }
+    : { ok: false, error: answer.error };
+}
+
+/**
+ * <strong>Der Knopf.</strong> Erst hier wird gelesen.
+ *
+ * Ein Mensch drückt ihn, und nur dann öffnet der Dienst die Dateien. Kein
+ * Auslesen beim Hochladen, kein Nachtlauf über die Ablage: einmal auf Bitte
+ * hinsehen ist etwas anderes als dauerhaft hinterhersehen (ADR-0004).
+ */
+export async function leseUnterlagen(
+  signal?: AbortSignal
+): Promise<Antwort<Unterlagenfund[]>> {
+  const answer = await request<Unterlagenfund[]>(
+    RESUME_BASE_URL,
+    "/resumes/me/documents/read",
+    { method: "POST", signal },
+    "fehler.unterlagenNichtGelesen"
+  );
+
+  return answer.ok
+    ? { ok: true, value: answer.value ?? [] }
+    : { ok: false, error: answer.error };
+}
+
 export type Anfragestand = "PENDING" | "GRANTED" | "DECLINED";
 
 /**
