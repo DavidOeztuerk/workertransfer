@@ -38,6 +38,7 @@ beforeEach(() => {
     "POST /consent/check": { body: { granted: false } },
     "GET /github/me": { status: 404 },
     "GET /resumes/me": { status: 404 },
+    "GET /resumes/me/documents/terms": { body: [] },
     "GET /portfolios/me": { status: 404 },
     "GET /account/address": {
       body: {
@@ -253,5 +254,154 @@ describe("ProfilePage — Vorschläge aus Belegen", () => {
     await screen.findByLabelText(/Fähigkeiten/);
 
     expect(screen.queryByText(/Aus deinen GitHub-Projekten/)).toBeNull();
+  });
+});
+
+/**
+ * <strong>Die vierte Quelle: die eigenen hochgeladenen Unterlagen</strong>
+ * (PBI-7, ADR-0043).
+ *
+ * Sie hängt an derselben Naht wie die drei anderen und macht daraus keine
+ * Ausnahme: aus einem Zeugnis wird ein Vorschlag, aus einem Vorschlag eine
+ * Nennung erst durch zwei Handlungen. Was hier hinzukommt, ist die Auslösung —
+ * ein Zeugnis wird nur gelesen, wenn jemand darum bittet.
+ */
+describe("ProfilePage — Vorschläge aus den eigenen Unterlagen", () => {
+  const EIN_ZEUGNIS = {
+    document_id: "d1",
+    name: "Arbeitszeugnis Nord",
+    read_at: null,
+    has_text: false,
+    terms: [] as string[],
+  };
+
+  const GELESEN = {
+    ...EIN_ZEUGNIS,
+    read_at: "2026-09-12T10:00:00Z",
+    has_text: true,
+    terms: ["Schweißfachmann", "CNC"],
+  };
+
+  /**
+   * <strong>Ohne Auslösung wird kein Dokument gelesen</strong> (ADR-0004).
+   *
+   * Das Öffnen einer Seite darf kein Zeugnis öffnen. „Auf Auslösung" wäre sonst
+   * eine Formulierung statt einer Regel — ein Lesevorgang beim Seitenaufruf
+   * wäre formal auch ausgelöst, nämlich durch das Aufrufen.
+   */
+  it("liest beim Laden der Seite keine Unterlage", async () => {
+    draht.setze("GET /resumes/me/documents/terms", { body: [EIN_ZEUGNIS] });
+
+    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+
+    await screen.findByRole("button", { name: /Meine Unterlagen lesen/ });
+
+    expect(draht.letzter("POST /resumes/me/documents/read")).toBeUndefined();
+  });
+
+  /**
+   * <strong>Ein Klick, und im Zeugnis steht „Schweißfachmann".</strong>
+   *
+   * Die Abnahme aus PBI-7: ein hochgeladenes PDF führt nach EINEM Klick zu
+   * einem Vorschlag im Profil — und zu keiner Nennung.
+   */
+  it("liest auf Klick und schlägt die gefundenen Wörter vor", async () => {
+    draht.setze("GET /resumes/me/documents/terms", { body: [EIN_ZEUGNIS] });
+    draht.setze("POST /resumes/me/documents/read", { body: [GELESEN] });
+
+    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+    const user = userEvent.setup();
+
+    await user.click(
+      await screen.findByRole("button", { name: /Meine Unterlagen lesen/ }),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: /Schweißfachmann/ }),
+    ).toBeTruthy();
+
+    // Ein Vorschlag, keine Nennung: das Feld trägt weiterhin nur, was die
+    // Person selbst gesagt hat.
+    expect(screen.getByLabelText(/Fähigkeiten/)).toHaveValue("C#");
+    expect(draht.letzter("PUT /profiles/me")).toBeUndefined();
+  });
+
+  /**
+   * <strong>Nichts davon ist durchsuchbar, bevor die Person gespeichert hat.</strong>
+   *
+   * Der Suchindex dieser Plattform ist das PROFIL — der Scout findet Menschen
+   * über die Wörter, die sie selbst genannt haben, nie über einen erkannten
+   * Text (ADR-0033). Hinein kommt ein Wort ausschliesslich über
+   * <c>PUT /profiles/me</c>, und dieser Test hält den ganzen Weg fest: nach dem
+   * Lesen nicht, nach dem Klick nicht, erst nach dem Speichern.
+   *
+   * <strong>Die Gegenprobe fiel.</strong> Ein <c>uebernimm</c>, das nebenbei
+   * speichert, macht die mittlere Erwartung rot — und genau das wäre „ein
+   * erkanntes Wort landet ohne Speichern im Suchindex".
+   */
+  it("macht aus einem erkannten Wort erst mit dem Speichern eine Nennung", async () => {
+    draht.setze("GET /resumes/me/documents/terms", { body: [GELESEN] });
+
+    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+    const user = userEvent.setup();
+
+    // Gelesen ist schon — und trotzdem steht nichts im Index.
+    await screen.findByRole("button", { name: /Schweißfachmann/ });
+    expect(draht.letzter("PUT /profiles/me")).toBeUndefined();
+
+    await user.click(screen.getByRole("button", { name: /Schweißfachmann/ }));
+
+    // Der Klick füllt das Feld — und schickt nichts.
+    expect(screen.getByLabelText(/Fähigkeiten/)).toHaveValue("C#, Schweißfachmann");
+    expect(draht.letzter("PUT /profiles/me")).toBeUndefined();
+
+    await user.click(screen.getByRole("button", { name: /Speichern/ }));
+
+    await waitFor(() => expect(draht.letzter("PUT /profiles/me")).toBeDefined());
+    expect(draht.letzter("PUT /profiles/me")?.body).toMatchObject({
+      skills: ["C#", "Schweißfachmann"],
+    });
+  });
+
+  /**
+   * <strong>„Kein Text zu lesen" wird gesagt, nicht verschwiegen.</strong>
+   *
+   * Ein abfotografierter Meisterbrief ist ein Bild. Das als „keine Vorschläge"
+   * zu zeigen wäre die stillschweigende Behauptung, darin stehe nichts —
+   * ADR-0022 §3, Lüge durch Auslassung.
+   */
+  it("sagt, aus welcher Datei kein Text zu lesen war", async () => {
+    draht.setze("GET /resumes/me/documents/terms", {
+      body: [
+        {
+          document_id: "d2",
+          name: "Meisterbrief",
+          read_at: "2026-09-12T10:00:00Z",
+          has_text: false,
+          terms: [],
+        },
+      ],
+    });
+
+    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+
+    expect(await screen.findByText(/Meisterbrief/)).toBeTruthy();
+    expect(screen.getByText(/die Datei ist ein Bild/)).toBeTruthy();
+  });
+
+  /**
+   * Wer nichts hochgeladen hat, sieht den Abschnitt gar nicht.
+   *
+   * Kein leerer Kasten, kein ausgegrauter Knopf — dieselbe Regel wie beim
+   * fehlenden GitHub-Konto. Das ist die Zusage „nichts wird schlechter": ein
+   * Konto ohne Unterlagen sieht genau dieselbe Seite wie vorher.
+   */
+  it("zeigt ohne Unterlagen keinen Knopf", async () => {
+    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+
+    await screen.findByLabelText(/Fähigkeiten/);
+
+    expect(screen.queryByRole("button", { name: /Meine Unterlagen lesen/ })).toBeNull();
+    expect(screen.queryByText(/Aus deinen Unterlagen/)).toBeNull();
   });
 });

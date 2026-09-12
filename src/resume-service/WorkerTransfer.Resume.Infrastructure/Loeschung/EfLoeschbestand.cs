@@ -9,9 +9,9 @@ namespace WorkerTransfer.Resume.Infrastructure.Loeschung;
 
 /// <summary>What an erasure really touches in this service.</summary>
 /// <remarks>
-/// Five statements, and the pairing of the middle two is the whole design:
-/// a row <em>about</em> the person falls, a row where the person merely
-/// <em>acted</em> keeps standing without their name. The same distinction holds
+/// One pairing carries the whole design: a row <em>about</em> the person falls,
+/// a row where the person merely <em>acted</em> keeps standing without their
+/// name. The same distinction holds
 /// for the requests and for the trail, and it has to, or a recruiter deleting
 /// their private account would erase proceedings that belong to their employer
 /// and concern somebody else entirely.
@@ -50,6 +50,17 @@ public sealed class EfLoeschbestand(ResumeDbContext kontext, IAblage ablage) : I
             .ToListAsync(cancellationToken);
 
         await kontext.Unterlagen
+            .Where(zeile => zeile.SubjectId == wer.Value)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        // DER INDEX FAELLT MIT (ADR-0043). Er haelt, was auf Ausloesung in den
+        // Unterlagen gelesen wurde — kanonische Namen aus einem Zeugnis, also
+        // personenbezogen. Ein Index ueber die Texte eines Menschen darf
+        // ueberhaupt nur bestehen, solange er im selben Dienst liegt wie die
+        // Dateien UND von derselben Loeschung getroffen wird; ohne diese Zeile
+        // waere die Bedingung gebrochen, unter der er gebaut werden durfte.
+        // Gemessen wird das an der Reihe (`ErkennungsreiseTests`), nicht hier.
+        await kontext.Funde
             .Where(zeile => zeile.SubjectId == wer.Value)
             .ExecuteDeleteAsync(cancellationToken);
 

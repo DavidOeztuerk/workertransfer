@@ -758,11 +758,41 @@ Menschen. Das ist der Teil, den kaum jemand baut.
 > Zertifikat vorschlägt, was ich in mein Profil schreiben könnte, **damit** ich
 > nicht raten muss, wonach Unternehmen suchen.
 
-- [ ] Texterkennung nur auf Auslösung, nie im Hintergrund (ADR-0004).
-- [ ] Der Index lebt in resume-service und fällt mit der Löschung.
-- [ ] Zwei Handlungen bis zur Nennung — Klick füllt das Feld, **Speichern**
-      macht daraus eine Aussage.
-- [ ] Nichts davon ist durchsuchbar, bevor die Person gespeichert hat.
+**Gebaut am 12.09.2026 unter [ADR-0043](adr/0043-vorschlaege-aus-den-eigenen-unterlagen.md).**
+
+- [x] **Texterkennung nur auf Auslösung, nie im Hintergrund** (ADR-0004).
+      `PdfPig` im eigenen Prozess — kein Aufruf nach draussen, also auch nichts,
+      was die Egress-Grenze stumm abwiese. Der Erkenner wird ausschliesslich von
+      `POST /resumes/me/documents/read` gerufen; `ErkennungsreiseTests` hängt
+      einen Zähler um den echten Erkenner und misst nach dem Hochladen **null**
+      Aufrufe. Gegenprobe „beim Hochladen lesen" gebaut, kompiliert, gefallen.
+- [x] **Der Index lebt in resume-service und fällt mit der Löschung.**
+      `resume_document_terms`, neben den Unterlagen, aus denen er stammt.
+      Gemessen **in der Datenbank**, nicht an der Antwort: nach der Löschung sind
+      auch die Unterlagen weg, eine Antwortprüfung wäre grün geblieben, während
+      die Tabelle die Wörter noch hielte. Dasselbe für den kleineren Weg — wer
+      eine Unterlage wegnimmt, nimmt ihren Fund mit.
+- [x] **Zwei Handlungen bis zur Nennung.** Schon erfüllt, und deshalb nicht ein
+      zweites Mal gebaut: der Vorschlagsbereich samt beider Handlungen steht seit
+      ADR-0033 in `ProfilePage`, festgehalten von sieben Reihen in
+      `ProfilePage.test.tsx` (*„übernimmt von allein nichts ins Profil"*,
+      *„setzt einen Vorschlag ins Feld — und speichert dabei nicht"*, *„macht
+      erst mit dem Speichern eine Nennung daraus"* und vier weitere). Die
+      Unterlagen sind die **vierte Quelle** an derselben Naht.
+- [x] **Nichts davon ist durchsuchbar, bevor die Person gespeichert hat.** Der
+      Suchindex ist das Profil; hinein kommt ein Wort nur über
+      `PUT /profiles/me`. Eine neue Reihe hält den ganzen Weg fest — nach dem
+      Lesen nicht, nach dem Klick nicht, erst nach dem Speichern. Die Gegenprobe
+      (ein `uebernimm`, das nebenbei speichert) kompilierte und fiel genau an der
+      mittleren Erwartung. Dazu, eine Ebene tiefer: `IFundSpeicher` kennt drei
+      Methoden und keine Frage nach dem *Wort* — als Mengenvergleich festgehalten,
+      damit eine vierte auffällt statt mitzulaufen.
+
+**Was ein Zeugnis hergibt, das keine Fähigkeit nennt**, ist dabei die Frage, an
+der die Anzeige hängt: die Antwort unterscheidet **drei** Zustände — nie gelesen,
+gelesen ohne Text (ein abfotografierter Meisterbrief ist ein Bild), gelesen ohne
+bekanntes Wort. Zwei davon zusammenzulegen wäre ADR-0022 §3, Lüge durch
+Auslassung.
 
 ---
 
