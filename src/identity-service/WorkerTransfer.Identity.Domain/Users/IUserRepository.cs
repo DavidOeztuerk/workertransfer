@@ -5,9 +5,11 @@ namespace WorkerTransfer.Identity.Domain.Users;
 /// <summary>Finds accounts.</summary>
 /// <remarks>
 /// Returns detached aggregates. A change to one reaches the database only
-/// through an explicit save, which is the semantics the Python service has and
-/// the reason tracking is off — see "Change Tracking" in
-/// <c>docs/MIGRATION-PROMPT.md</c>.
+/// through an explicit save — every context runs
+/// <c>QueryTrackingBehavior.NoTracking</c>, so a read-assign-SaveChanges writes
+/// nothing and the caller still gets its 204. A <c>SichereAsync</c> that mutates
+/// therefore reads with <c>.AsTracking()</c>. See "Persistence" in
+/// <c>CLAUDE.md</c>.
 /// </remarks>
 public interface IUserRepository
 {

@@ -2,7 +2,7 @@
 
 Date: 2026-08-02
 Status: Entwurf (selbst geprüft)
-Related: [Marktstatus-Design](2026-08-02-transfer-service-design.md), ADR-0013 (Consent-Ledger), ADR-0017 (Tenant = Unternehmen), [ULTRAPLAN](../../ULTRAPLAN.md) Phase 5
+Related: [Marktstatus-Design](2026-08-02-transfer-service-design.md), ADR-0013 (Consent-Ledger), ADR-0017 (Tenant = Unternehmen), ULTRAPLAN Phase 5
 
 ## Der Fund, der den Entwurf verändert
 

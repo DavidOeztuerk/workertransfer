@@ -2,7 +2,7 @@
 
 Date: 2026-08-05
 Status: Entwurf (selbst geprüft), gebaut
-Related: **ADR-0022** (kein Gesamtscore), **ADR-0023** (worker-skills), [Passung](2026-08-03-matching-design.md), [GitHub als Beleg](2026-08-03-github-evidence-design.md), [ULTRAPLAN](../../ULTRAPLAN.md) Phase 6
+Related: **ADR-0022** (kein Gesamtscore), **ADR-0023** (worker-skills), [Passung](2026-08-03-matching-design.md), [GitHub als Beleg](2026-08-03-github-evidence-design.md), ULTRAPLAN Phase 6
 
 ## Was der ULTRAPLAN wollte
 

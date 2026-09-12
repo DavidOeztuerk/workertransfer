@@ -4,9 +4,11 @@
 aufnimmt, liest sie zuerst und weiß dann, wo es weitergeht — ohne den Verlauf zu
 durchsuchen oder sich den Zustand aus dem Repository zusammenzureimen.
 
-Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md), das
-Nachschlagewerk in [`MIGRATION-PROMPT.md`](MIGRATION-PROMPT.md). Hier steht nur,
-was davon getan ist.
+Der Auftrag steht in [`MIGRATION-AUFTRAG.md`](MIGRATION-AUFTRAG.md). Hier steht
+nur, was davon getan ist. Das Nachschlagewerk daneben hiess
+`MIGRATION-PROMPT.md` und ist am 12.09.2026 gefallen — es war der Einstieg fuer
+Sitzungen an einer Migration, die durch ist; was davon gilt, steht in
+`CLAUDE.md`.
 
 **Zuletzt fortgeschrieben:** 2026-08-27, nach dem **Übergangsgerüst** — Phase C, 4 von 6.
 **Zweig:** `dotnet-migration`. **Girder:** 3.0.1.

@@ -2,7 +2,7 @@
 
 Date: 2026-08-03
 Status: Angenommen
-Related: ADR-0021 (`worker-files` gelöscht, `worker-storage` eingedampft), ADR-0004 (kein Scraping, consent-first), [ULTRAPLAN](../ULTRAPLAN.md) Phase 6
+Related: ADR-0021 (`worker-files` gelöscht, `worker-storage` eingedampft), ADR-0004 (kein Scraping, consent-first), ULTRAPLAN Phase 6 (`docs/ULTRAPLAN.md`, gefallen am 12.09.2026)
 
 ## Kontext
 

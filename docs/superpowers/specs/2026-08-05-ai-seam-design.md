@@ -2,7 +2,7 @@
 
 Date: 2026-08-05
 Status: Entwurf (selbst geprüft)
-Related: **ADR-0024** (`worker-ai` schlank), ADR-0021 (schlank statt vorrätig), ADR-0022 (keine Zahl über einen Menschen), ADR-0013 (Consent-Ledger), [product-scope](../../product-scope.md), [ULTRAPLAN](../../ULTRAPLAN.md) Phase 7
+Related: **ADR-0024** (`worker-ai` schlank), ADR-0021 (schlank statt vorrätig), ADR-0022 (keine Zahl über einen Menschen), ADR-0013 (Consent-Ledger), [product-scope](../../product-scope.md), ULTRAPLAN Phase 7
 
 ## Der Zustand, auf dem das hier aufsetzt
 

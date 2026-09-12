@@ -12,9 +12,11 @@ zeigten als einzigen Inhalt der Seite `status: Profile werden geladen…`.
 
 Gefunden beim Einlösen der Gateway-Beweise. Der ausführliche Befund samt der
 irreführenden Trace-Spur (`GET /profiles` → **200**, während das DOM weiter „lädt"
-zeigte — die Antwort kam, nachdem die Behauptung aufgegeben hatte) steht in
+zeigte — die Antwort kam, nachdem die Behauptung aufgegeben hatte) stand in
 `docs/befund-kandidatenliste-haengt.md`, eingebracht mit dem Zweig
-`e2e-mailpit-zeitlimit`.
+`e2e-mailpit-zeitlimit` und gelöscht am 12.09.2026 — der Endpunkt
+`/candidates`, über den er befand, ist mit ADR-0036 gefallen. Die Messung, auf
+die es hier ankommt, steht unten in diesem ADR.
 
 Die Ursache war keine Langsamkeit der Datenbank, sondern die **Anzahl der
 Runden**. `profile-service` filtert eine Seite Kandidaten, indem es für jede

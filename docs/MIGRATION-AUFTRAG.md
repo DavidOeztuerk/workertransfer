@@ -16,9 +16,11 @@
 > [`MIGRATION-STAND.md`](MIGRATION-STAND.md), wo steht, was dabei *gemessen*
 > wurde. Dieses Dokument sagt, was zu tun war; jenes, was daraus wurde.
 
-Dies ist der Sitzungsauftrag. `docs/MIGRATION-PROMPT.md` daneben ist das
-Nachschlagewerk — Schichten, Girder je Paket, Fallen, Zweigstrategie. Lies beide,
-dann fang an. **Ohne Rückfragen.** Alle Entscheidungen, die getroffen werden
+Dies ist der Sitzungsauftrag. Daneben stand ein Nachschlagewerk,
+`docs/MIGRATION-PROMPT.md` — Schichten, Girder je Paket, Fallen,
+Zweigstrategie —, das am 12.09.2026 gefallen ist; was davon gilt, steht in
+`CLAUDE.md`. Wo es unten noch genannt wird, steht es im woertlichen Zitat des
+damaligen Prompts und bleibt dort stehen. **Ohne Rückfragen.** Alle Entscheidungen, die getroffen werden
 mussten, stehen hier.
 
 **Wo die Arbeit gerade steht, sagt `docs/MIGRATION-STAND.md`.** Diese Datei hier

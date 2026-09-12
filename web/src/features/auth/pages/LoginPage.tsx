@@ -62,13 +62,15 @@ export function LoginPage() {
 
     if (login.fulfilled.match(result)) {
       if (result.payload !== null) {
-        // Hier hing früher der Rückweg zur gemerkten Stelle:
-        // `const stelle = gemerkteStelle(); vergissStelle();`
-        // `window.location.href = stelle === null ? "/" : "/jobs/" + stelle + "/apply"`.
-        // `src/jobs/intent.ts` gehört `features/work`; denselben
-        // localStorage-Schlüssel samt UUID-Prüfung und 24-Stunden-Verfall hier
-        // ein zweites Mal zu pflegen wäre zwei Wahrheiten über eine Absicht.
-        // Wer ihn zurückholt, ersetzt genau die nächste Zeile.
+        // Hier hing früher der Rückweg zur gemerkten Stelle, und er war
+        // stillgelegt. Am 12.09.2026 ist die andere Hälfte gefallen:
+        // `features/work/lib/intent.ts` schrieb eine Absicht nach
+        // localStorage, die niemand je las — ein Eintrag mit 24 Stunden
+        // Lebensdauer im Browser einer Person, ohne Einlösung (PBI-8.3).
+        //
+        // Wer den Rückweg will, baut BEIDE Hälften in einem Zug: das Merken
+        // beim Bewerben-Knopf und das Einlösen hier. Nur eine davon ist genau
+        // der Zustand, der gerade beseitigt wurde.
         void navigate("/overview", { replace: true });
         return;
       }

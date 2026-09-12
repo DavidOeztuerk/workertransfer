@@ -1,16 +1,16 @@
 # Auftrag: Girder trägt es, wir konfigurieren — und die Plattform spricht die Sprache der Person
 
-> **ABGESCHLOSSEN bis auf EINE ENTSCHEIDUNG, und die ist meine, nicht die eines
-> Agenten** — sie steht als PBI-6 im [PLAN](PLAN-TRANSFERMARKT.md) und wird
-> unten in Phase 4 gestellt.
+> **ABGESCHLOSSEN.** Die eine Entscheidung, die hier offen stand — wo die Grenze
+> zwischen einem begründenden und einem nacherzählenden Kommentar verläuft —
+> ist am 12.09.2026 getroffen worden und steht unten in Phase 4.
 >
-> | | Stand am 11.09.2026 |
+> | | Stand am 12.09.2026 |
 > |---|---|
 > | **Phase 1** Girder 4.2.0 | **fertig**, und es wurden drei Fassungen (4.2.0/.1/.2). Der Baum steht heute auf 4.4.0. |
 > | **Phase 2** Die Eigenbauten löschen | **fertig.** `Bremse.cs` und `Korrelation.cs` sind weg, `AddHttpContextAccessor()` aus acht Diensten, die Cookie-Zeile aus elf Diensten in die Grundlage. |
 > | **Phase 3** Lokalisierung | **fertig.** ADR-0031, drei Kataloge (de/en/fr) mit drei Wächtertests, die Sprache liegt am Konto und nicht am Kopf, und **eine** E2E-Reise schaltet um. |
 > | **Phase 4** Aufräumen — Bezeichner | **fertig** im Frontend; die Fachsprache bleibt deutsch. |
-> | **Phase 4** Aufräumen — **Kommentardichte** | **OFFEN, und es ist keine Codeaufgabe, sondern eine Entscheidung.** Der mechanische Schnitt wurde gebaut, dreimal verschieden scharf gemessen und **zurückgenommen**: er entfernte unter anderem die Sätze, die erklären, *warum 503 und nicht 404*. Was bleibt, sind die zwei Wege unten — und welcher gegangen wird, entscheidet ein Mensch. |
+> | **Phase 4** Aufräumen — **Kommentardichte** | **GESCHLOSSEN am 12.09.2026.** Die Grenze steht unten und wortgleich in `CLAUDE.md`: *ein Kommentar verdient seinen Platz, wenn sein Fehlen jemanden einen Defekt neu einbauen ließe.* Weg 2 (`<remarks>` in ADRs) ist **abgesagt**, nicht vertagt; Weg 1 wurde selektiv gefahren — von sieben wortgleichen Kopien fielen **drei**, je Stelle entschieden. Der mechanische Schnitt bleibt zurückgenommen: er löschte die Sätze, die erklären, *warum 503 und nicht 404*. |
 >
 > **Wo das Ergebnis heute steht:** `Dienstgrundlage.cs` und `ocelot.json`
 > (Phase 1/2), `web/src/core/i18n/kataloge/` und ADR-0031 (Phase 3).
@@ -275,6 +275,77 @@ Zuletzt, weil Phase 3 dieselben Dateien anfasst.
   zwischen einem Kommentar, der eine *Messung, ein Verbot oder eine Falle*
   festhält — der Wert dieses Baums — und einem, der den Code *nacherzählt*.
   Der mechanische Filter hat dreimal bewiesen, dass er sie nicht findet.
+
+  ### Die Entscheidung, getroffen am 12.09.2026
+
+  > **Ein Kommentar verdient seinen Platz, wenn sein Fehlen jemanden einen
+  > Defekt NEU EINBAUEN ließe. Alles andere erzählt den Code nach.**
+
+  Das ist die Grenze, nach der oben gefragt wurde, und sie steht wortgleich in
+  `CLAUDE.md` unter den Konventionen — dort, wo sie jemand liest, der gerade
+  einen Kommentar schreibt.
+
+  **Weg 2 wird nie gefahren.** `<remarks>` in ADRs zu verschieben ist der
+  teuerste denkbare Fehler in diesem Baum, und er ist unumkehrbar. Der Grund
+  dafür ist nicht Geschmack, sondern die letzte Woche: **jeder** Defekt daraus
+  entstand, weil eine Regel nicht dort stand, wo jemand sie brauchte —
+  `secrets` im Schritt-`if`, die Egress-Grenze gegen einen Wert aus der
+  Datenbank, das fehlende `.AsTracking()`, die 404-statt-401-Tür, deren Regel
+  zwei Zeilen tiefer in derselben Datei schon aufgeschrieben war. Ein Grund in
+  einer ADR ist ein Grund, den man **suchen** muss — und niemand sucht, was er
+  nicht vermisst.
+
+  **31 % Dichte ist deshalb kein Problem, das gelöst werden muss.** Dieser
+  Baum lebt davon. Die Zahl steht hier als Messung und nicht als Ziel.
+
+  **Der mechanische Filter wird nicht wieder benutzt.** Er hat dreimal
+  bewiesen, dass er die Grenze nicht findet: er löschte unter anderem „warum
+  503 und nicht 404" — einen Satz, der den Test oben glänzend besteht, denn
+  ohne ihn baut der Nächste genau diesen Defekt neu ein. Wer ihn wieder bauen
+  will, hat dieselbe Stichprobe vor sich.
+
+  ### Weg 1, selektiv gefahren — was wirklich fiel
+
+  Nicht pauschal, sondern je Stelle gegen den Test oben:
+
+  | Kopie | Stellen | Entscheidung |
+  |---|---|---|
+  | „Konfiguration aus der Umgebung. VOR CreateBuilder…" | 15 `Program.cs` | **bleibt** — genau dort verschiebt jemand die Zeile, und dann liest die Konfiguration niemand mehr. |
+  | „Kein AlsAussteller(): …" | 12 `Program.cs` | **bleibt** — verhindert eine falsche *Ergänzung*, nicht eine falsche Löschung. |
+  | „Erst wandern, dann bedienen (ADR-0010)." | 15 `Program.cs` | **bleibt** — ein Zeiger ist kein Nacherzählen, und ein Zeiger an der Stelle, wo man ihn braucht, ist billig. |
+  | „Der Schluessel IST der Mensch…" (`Personenzeile`) | 7 Kontexte | **drei weg, vier bleiben** — je Stelle entschieden, siehe unten. |
+
+  **Es waren drei, nicht sieben, und das Kriterium ist gemessen.** Die sieben
+  Kopien standen wortgleich, die Stellen sind es nicht:
+
+  - **Weg (3):** `github_connections`, `portfolios`, `profiles`. In diesen
+    Dateien steht **keine** Schwestertabelle mit einer eigenen
+    `subject_id`/`user_id` — es gibt also keine Unstimmigkeit zu bemerken, und
+    der Satz sagt nur noch einmal, was `HasKey(Id)` und `HasColumnName("id")`
+    zwei Zeilen darunter zeigen. Dazu kommt die Gegenprobe aus dem Kanon:
+    `Personenzeile` **nennt genau diese drei Tabellen beim Namen**. Der
+    kanonische Ort deckt sie ab, die Kopie fügt nichts hinzu.
+  - **Bleibt (4):** `mandates`, `notification_preferences`, `resumes`,
+    `market_status`. Neben jeder dieser Tabellen steht in **derselben Datei**
+    eine Schwester, die die Person als Spalte führt (`conversations`,
+    `notifications`, `resume_documents`/`resume_requests`,
+    `market_requests`/`transfers`). Wer die beiden vergleicht, hält die
+    fehlende Spalte für vergessen und trägt sie nach — und dann stehen zwei
+    Angaben über denselben Menschen nebeneinander, von denen die Löschung nur
+    eine trifft. Das ist ein Defekt, den der Kommentar verhindert.
+
+  **Die vier, die bleiben, sagen jetzt auch das.** Vorher trugen sie den Satz
+  *„und damit die Zusage aus ADR-0027 für einen ganzen Dienst"* — und der war
+  an genau diesen vier Stellen **falsch**: der Löschwächter findet diese
+  Dienste über die Schwestertabellen ohnehin. Wahr war er nur an den drei
+  Einzeltisch-Kontexten, also an denen, die jetzt weg sind. Eine Kopie altert
+  eben nicht überall gleich.
+
+  Gefallen sind damit rund **35** Zeilen statt der ~120, die Weg 1 pauschal
+  versprochen hätte. Das ist die Differenz zwischen „Kopien zählen" und
+  „Stellen entscheiden".
+
+  **Phase 4 ist damit geschlossen.**
 
 ---
 
