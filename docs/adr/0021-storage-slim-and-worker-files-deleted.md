@@ -2,7 +2,7 @@
 
 Date: 2026-08-02
 Status: Accepted
-Related: ADR-0005 (`worker-cqrs` gelöscht), ADR-0014 (`worker-security`/`worker-exceptions` gelöscht), ADR-0004 (versionierte Verträge, kein Scraping), [ROADMAP](../ROADMAP.md) Sub-step 3.5
+Related: ADR-0005 (`worker-cqrs` gelöscht), ADR-0014 (`worker-security`/`worker-exceptions` gelöscht), ADR-0004 (versionierte Verträge, kein Scraping), ROADMAP Sub-step 3.5 (`docs/ROADMAP.md`, gefallen am 12.09.2026)
 
 ## Kontext
 

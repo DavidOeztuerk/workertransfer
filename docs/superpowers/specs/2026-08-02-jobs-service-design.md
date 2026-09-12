@@ -2,7 +2,7 @@
 
 Date: 2026-08-02
 Status: Entwurf (selbst geprüft)
-Related: ADR-0017 (Tenant ist ein Unternehmensbegriff), ADR-0018 (Mitgliedschaft), ADR-0020 (Consent als Enabler), [ULTRAPLAN](../../ULTRAPLAN.md) Phase 4
+Related: ADR-0017 (Tenant ist ein Unternehmensbegriff), ADR-0018 (Mitgliedschaft), ADR-0020 (Consent als Enabler), ULTRAPLAN Phase 4
 
 ## Was hier anders ist als in Phase 3
 

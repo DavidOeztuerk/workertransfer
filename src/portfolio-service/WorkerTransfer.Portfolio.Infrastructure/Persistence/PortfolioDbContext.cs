@@ -44,12 +44,6 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
         modelBuilder.Entity<PortfolioZeile>(zeile =>
         {
             zeile.ToTable("portfolios");
-            // Der Schluessel IST der Mensch: diese Zeile heisst ihre
-            // `subject_id` schlicht `id`. Ausgesprochen, weil der
-            // Loeschwaechter (`LoeschempfaengerTests`) sonst nur nach den
-            // Spaltennamen `subject_id`/`user_id` sucht und diese Tabelle
-            // uebersaehe — und damit die Zusage aus ADR-0027 fuer einen ganzen
-            // Dienst.
             zeile.HasAnnotation(Personenzeile.Anmerkung, true);
             zeile.HasKey(eintrag => eintrag.Id);
             zeile.Property(eintrag => eintrag.Id).HasColumnName("id");

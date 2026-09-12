@@ -6,7 +6,9 @@
 **Dies ist die Aufgabenliste.** Die acht Dokumente `AUFTRAG-*.md` und
 `MIGRATION-AUFTRAG.md` daneben sind **Geschichte** — sie tragen seit dem
 11.09.2026 oben eine Statuszeile, die das sagt. Wer offene Arbeit sucht, sucht
-sie hier: PBI-6 §6.5 (eine Entscheidung), PBI-7 und PBI-8. Sonst nirgends.
+sie hier: PBI-7. Sonst nirgends — PBI-6 §6.5 ist am 12.09.2026 entschieden,
+PBI-8 abgearbeitet bis auf die zwei Zeilen, die keine Codeaufgabe sind (8.2 ist
+eine Entscheidung, 8.4 startet ein Mensch).
 
 Dies ist der Plan bis zum Produkt, das der Name verspricht: ein Transfermarkt
 wie im Fußball, **aber für Arbeiter** — und zwar für alle, nicht für
@@ -450,7 +452,7 @@ Plan ist die Aufgabenliste.**
       | OPENCODE 6.1 / BEWERBUNG „aus JobPilot übernommen" | **begrenzte Parallelität und sichtbarer Fortschritt beim Erzeugen von Entwürfen** | PBI-8 unten |
       | HAERTUNG H2 | die Geheimnisfrage (`AddSecretManagement`, `AddEncryption`, Infisical daneben oder an ihrer Stelle) | PBI-8 unten |
       | HAERTUNG H5 | `/code-review ultra` über WorkerTransfer, Girder und Skillswap | **startet ein Mensch**, kein Agent |
-      | ENTLASTUNG Phase 4 | die Kommentardichte | 6.5 unten — eine Entscheidung, keine Aufgabe |
+      | ENTLASTUNG Phase 4 | die Kommentardichte | 6.5 unten — entschieden am 12.09.2026 |
 
 ### 6.2 Fund 7 — das tote Bewerbungsformular
 
@@ -543,18 +545,29 @@ Hier fand sie ein Skript, weil es endlich jemand fuhr.
       ein Skript, das nur beim ersten Mal durchläuft, ist kein Beweis.
 
 **Und ein Widerspruch, der dabei auffiel:**
-`docs/prompts-naechste-schritte.md` meldet `make k8s-up` seit dem 08.08.2026
-als eingelöst — *„15 Pods bereit, null Neustarts, `GET /jobs` → 200,
+`docs/prompts-naechste-schritte.md` (gelöscht am 12.09.2026) meldete
+`make k8s-up` seit dem 08.08.2026 als eingelöst — *„15 Pods bereit, null Neustarts, `GET /jobs` → 200,
 `POST /auth/register` → 201 samt Mail"* —, während `CLAUDE.md` sagt, es sei nie
 gelaufen. **Beides stimmt:** der Lauf war in der Python-Ära, und das Skript
 wurde seither neu geschrieben. Wer die Zeile liest und nicht das Datum, hält
 den Punkt für erledigt. Genau dafür steht sie jetzt in der Liste unten.
 
-### 6.5 Kommentardichte — eine Entscheidung, keine Codeaufgabe
+### 6.5 Kommentardichte — die Entscheidung ist getroffen (12.09.2026)
 
-Dieser Punkt stand hier als Aufgabe und ist keine. Er ist eine **offene
-Entscheidung** in [`AUFTRAG-ENTLASTUNG.md`](AUFTRAG-ENTLASTUNG.md) Phase 4, und
-sie gehört einem Menschen. Neu vermessen am 11.09.2026 über `src/`, ohne
+> **Ein Kommentar verdient seinen Platz, wenn sein Fehlen jemanden einen Defekt
+> NEU EINBAUEN ließe. Alles andere erzählt den Code nach.**
+>
+> Das ist die Grenze. Sie steht wortgleich in `CLAUDE.md` bei den Konventionen
+> und ausführlich in [`AUFTRAG-ENTLASTUNG.md`](AUFTRAG-ENTLASTUNG.md) Phase 4,
+> die damit **geschlossen** ist. **Weg 2 ist abgesagt, nicht vertagt.** Weg 1
+> wurde selektiv gefahren: von den sieben wortgleichen `Personenzeile`-Kopien
+> fielen **drei** — die drei, die `Personenzeile` selbst beim Namen nennt und
+> neben denen keine Schwestertabelle mit eigener `subject_id` steht. Die
+> anderen vier bleiben und sagen jetzt auch, wovor sie warnen.
+
+Dieser Punkt stand hier als Aufgabe und war keine. Er war eine
+**Entscheidung**, und sie gehörte einem Menschen. Die Messung, die sie getragen
+hat: Neu vermessen am 11.09.2026 über `src/`, ohne
 `obj/`, `bin/` und Wanderungen:
 
 | | |
@@ -594,7 +607,9 @@ Die zwei Wege, die dranhängen, brauchen einander nicht:
   umkehrbar: was einmal in ein ADR gewandert ist, wandert nicht zurück an die
   Zeile.
 
-- [ ] **Die Entscheidung liegt vor und wird nicht von einem Agenten getroffen.**
+- [x] **Die Entscheidung ist getroffen** (12.09.2026) und steht oben. Ein Agent
+      hat sie nicht getroffen, sondern festgeschrieben — in `CLAUDE.md`, in
+      `AUFTRAG-ENTLASTUNG.md` und, je Stelle entschieden, im Code.
 
 ### 6.6 Was sonst veraltet ist
 
@@ -605,20 +620,33 @@ Die zwei Wege, die dranhängen, brauchen einander nicht:
       Eintrag (`korrelationskennung-steht-nicht-auf-der-konsole.md`),
       geschlossen am 09.09.2026 und auf Girder 4.4.0 nachgemessen. Nichts zu
       tun.
-- [x] **Die 37 Dateien in `docs/` durchgesehen.** Die Liste dessen, was einen
-      Zustand beschreibt, den es nicht mehr gibt, steht unten in
-      [„Was in `docs/` einen verschwundenen Zustand beschreibt"](#was-in-docs-einen-verschwundenen-zustand-beschreibt).
-      **Nichts gelöscht** — das ist eine Entscheidung, keine Aufräumarbeit.
+- [x] **Die 37 Dateien in `docs/` durchgesehen**, und am 12.09.2026 sind die
+      **vierzehn** aus den beiden ersten Gruppen gelöscht. Die Liste steht unten
+      in [„Was in `docs/` einen verschwundenen Zustand beschrieb"](#was-in-docs-einen-verschwundenen-zustand-beschrieb)
+      und ist damit ein Grabstein statt einer Bestandsliste. Git behält die
+      Dateien, das Löschen ist umkehrbar; das Stehenlassen war es nicht, denn
+      jede von ihnen behauptete **Gegenwart**.
 
 ---
 
-## Was in `docs/` einen verschwundenen Zustand beschreibt
+## Was in `docs/` einen verschwundenen Zustand beschrieb
 
 Durchgesehen am 11.09.2026, alle 37 Dateien in `docs/` (ohne `adr/`, `vision/`,
-`uebergabe/`, `skills/`, `superpowers/`). **Gelöscht wurde nichts.** Die Spalte
-rechts sagt, was die Datei über einen Zustand behauptet, den es nicht mehr gibt.
+`uebergabe/`, `skills/`, `superpowers/`). **Am 12.09.2026 sind die vierzehn aus
+den beiden ersten Gruppen gelöscht**; die Spalte rechts sagt, weshalb. Sie steht
+weiter hier, weil sonst niemand mehr wüsste, was in der Geschichte liegt und
+warum es dort liegt.
 
-### Beschreiben einen Baum, den es nicht mehr gibt
+Mitgelöscht wurden die **Verweise** darauf: ein toter Link ist schlimmer als
+eine veraltete Datei, weil er beim Lesen erst am Ziel scheitert. Betroffen waren
+zwei ADRs (0021, 0022), `MIGRATION-STAND.md`, `MIGRATION-AUFTRAG.md`,
+`vision/README.md`, `.opencode/skill/README.md`, elf Spezifikationen unter
+`docs/superpowers/` und **zwei Quelldateien** in identity-service, deren
+`<remarks>` auf `docs/MIGRATION-PROMPT.md` zeigten. Die letzten beiden zeigen
+jetzt auf das, was wirklich trägt — die Regel in `CLAUDE.md` und die beiden
+Tokenform-Reihen.
+
+### Beschrieben einen Baum, den es nicht mehr gibt
 
 | Datei | was nicht mehr stimmt |
 |---|---|
@@ -629,7 +657,7 @@ rechts sagt, was die Datei über einen Zustand behauptet, den es nicht mehr gibt
 | `befund-e3a-bewerbung.md`, `-e3b-eigene-daten.md`, `-e3c-konto.md`, `-e3d-unternehmen.md`, `-e3e-markt-geruest.md` | fünf Befunde vom 12./13.08.2026 an der alten Oberfläche. |
 | `befund-kandidatenliste-haengt.md` | ein Befund über `/candidates` — den Endpunkt **gibt es nicht mehr** (ADR-0036, gefallen am 11.09.2026). |
 
-### Beschreiben einen Plan, den ein anderer abgelöst hat
+### Beschrieben einen Plan, den ein anderer abgelöst hat
 
 | Datei | was nicht mehr stimmt |
 |---|---|
@@ -755,20 +783,33 @@ gleichzeitig), mit sichtbarem Fortschritt"*, und
 `AUFTRAG-BEWERBUNG-UND-SCOUT.md` führt die begrenzte Parallelität unter dem,
 was **aus JobPilot übernommen wurde**. Gemessen: sie ist nicht übernommen.
 
-- [ ] `web/src/features/work/lib/entwuerfe.ts` fährt `Promise.all` über **alle**
-      gewählten Stellen. Wer zwölf Stellen ankreuzt, schickt zwölf
-      Schreibaufträge gleichzeitig an jobs-service und von dort an den
-      KI-Anbieter. Eine Begrenzung auf drei ist das, was der Auftrag zusagt.
-- [ ] **Der Fortschritt ist gebaut und wird nie erreicht.** `JobsPage.tsx` hält
-      `const [fortschritt, setFortschritt] = useState<{fertig, gesamt} | null>`,
-      die Leiste unten liest ihn — und `setFortschritt` wird an genau einer
-      Stelle gerufen, im `finally`, mit `null`. Der Katalogschlüssel
-      `stellen.fortschritt` („{{fertig}} von {{gesamt}} geschrieben") steht in
-      drei Sprachen und hat keinen Leser. Entweder er wird gefüllt, oder er und
-      seine drei Übersetzungen fallen.
+- [x] **Begrenzt auf drei** (12.09.2026). `entwuerfe.ts` fuhr `Promise.all` über
+      **alle** gewählten Stellen — wer zwölf ankreuzte, schickte zwölf
+      Schreibaufträge gleichzeitig an applications-service und von dort an den
+      KI-Anbieter. Jetzt: eine Schlange und drei Arbeiter (`GLEICHZEITIG = 3`).
+- [x] **Der Fortschritt ist angeschlossen** — nicht entfernt, denn mit der
+      Begrenzung gibt es endlich einen zu zeigen. `starteEntwuerfe` nimmt einen
+      `Fortschrittsmelder` entgegen und ruft ihn einmal vorab mit `0` und dann
+      nach jedem fertigen Entwurf; `JobsPage` reicht ihn auf dem Sammelweg
+      durch. Der Katalogschlüssel `stellen.fortschritt` hat damit einen Leser.
 
-**Das eine hängt am anderen:** ohne Begrenzung gibt es keinen Fortschritt zu
-zeigen, weil alles gleichzeitig läuft und gleichzeitig fertig wird.
+**Das eine hing am anderen**, und in der Umsetzung zeigte es sich noch einmal:
+ohne Begrenzung gibt es keinen Fortschritt zu zeigen, weil alles gleichzeitig
+läuft und gleichzeitig fertig wird.
+
+**Eine Schlange, kein `chunk(3)`.** Blockweise wäre kürzer und langsamer: ein
+Block wartet auf seinen langsamsten Entwurf, und bei einem Anbieter mit
+schwankenden Antwortzeiten stünden zwei von drei Plätzen einen grossen Teil der
+Zeit leer. `entwuerfe.test.ts` pinnt beides getrennt — die Grenze *und* das
+Nachziehen —, und die `chunk(3)`-Gegenprobe fällt genau an der zweiten.
+
+**Drei Gegenproben, alle gefallen, alle kompilierten:** `GLEICHZEITIG = 12`
+(die Grenze fällt), `chunk(3)` statt Schlange (Nachziehen und Fortschritt
+fallen), `anlegen(jobIds)` ohne Melder (die Leiste fällt). Die erste deckte
+eine **schwache Zusage** auf: der Test verglich zuerst nur gegen `GLEICHZEITIG`
+und blieb deshalb grün, als die Konstante stieg. Die Drei steht jetzt als Zahl
+im Test, weil der Auftrag „max. 3" zusagt und nicht „so viel wie die Konstante
+sagt".
 
 ### 8.2 Die Geheimnisfrage (H2 aus `AUFTRAG-HAERTUNG.md`)
 
@@ -784,19 +825,22 @@ zeigen, weil alles gleichzeitig läuft und gleichzeitig fertig wird.
 
 ### 8.3 Die gemerkte Stelle wird geschrieben und nie gelesen
 
-- [ ] `merkeStelle()` schreibt nach `localStorage`; `gemerkteStelle()` hat
-      außerhalb von `features/work/lib/intent.ts` **keinen Aufrufer**.
-      `LoginPage.tsx:66` hat den Rückweg ausdrücklich stillgelegt und einen
-      Satz hinterlassen, wie man ihn zurückholt. Das ist eine Entscheidung:
-      entweder der Rückweg kommt (dann liest die Anmeldung die Absicht wieder),
-      oder `intent.ts` fällt samt seiner zwei Schreibstellen. Beides ist
-      vertretbar; **was nicht vertretbar ist, ist der Zustand dazwischen**, in
-      dem eine Absicht 24 Stunden lang im Browser einer Person liegt, ohne dass
-      irgendetwas sie je einlöst.
-- [ ] Nebenbei: der Kommentar in `JobsPage.tsx` behauptet, sein Knopf sei „die
-      EINZIGE Stelle, an der die Absicht entsteht". Seit PBI-6 stimmt das
-      wieder — vorher tat `JobApplyPage` dasselbe. Wer den Rückweg baut, prüft
-      den Satz noch einmal.
+- [x] **`intent.ts` ist gefallen** (12.09.2026), samt seinen zwei
+      Schreibstellen (`JobsPage`, `CareerPage`) und dem Katalogschlüssel
+      `stellen.kontoNoetig` in drei Sprachen, der *„danach geht es direkt zur
+      Bewerbung"* versprach und ebenfalls keinen Leser hatte. Von den zwei
+      vertretbaren Auswegen ist der kleinere gefahren: der Zustand dazwischen —
+      eine Absicht, die 24 Stunden im Browser einer Person liegt, ohne dass
+      irgendetwas sie je einlöst — ist damit weg, und zwar ganz.
+- [x] Der Kommentar in `JobsPage.tsx` über „die EINZIGE Stelle, an der die
+      Absicht entsteht" ist mit ihr gefallen. An seiner Stelle steht in
+      `LoginPage.tsx` der Satz, der für die Rückkehr zählt: **wer den Rückweg
+      will, baut beide Hälften in einem Zug.** Nur eine davon ist genau der
+      Zustand, der hier beseitigt wurde.
+- [x] `JobsPage.test.tsx` pinnt die neue Zusage statt der alten: der
+      Bewerben-Knopf ohne Konto legt **nichts** im Browser ab
+      (`localStorage.length === 0`). Eine Rückkehr ist damit eine Entscheidung
+      und kein Versehen — sie muss diesen Test zuerst umschreiben.
 
 ### 8.4 `/code-review ultra` (H5) — startet ein Mensch
 

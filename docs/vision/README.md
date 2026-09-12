@@ -1,7 +1,9 @@
 # Vision documents
 
 **These describe the destination, not the current state.** Read them for intent;
-read [`docs/ROADMAP.md`](../ROADMAP.md) for what actually exists today.
+read [`docs/PLAN-TRANSFERMARKT.md`](../PLAN-TRANSFERMARKT.md) for what actually
+exists today. (`docs/ROADMAP.md` was deleted on 2026-09-12 — it reported the
+Python tree as the present.)
 
 | File | What it is |
 |---|---|

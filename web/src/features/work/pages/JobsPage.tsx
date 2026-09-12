@@ -32,8 +32,7 @@ import { getDrafts, listMyApplications } from "../api/applications";
 import { getMyProfile } from "../api/profile";
 import { merke } from "../lib/kontext";
 import { Requirements } from "../components/Requirements";
-import { starteEntwuerfe } from "../lib/entwuerfe";
-import { merkeStelle } from "../lib/intent";
+import { type Fortschrittsmelder, starteEntwuerfe } from "../lib/entwuerfe";
 import { useHandelnder } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import { useFirmenprofile } from "../lib/useFirmenprofile";
@@ -142,6 +141,14 @@ export function JobsPage() {
   const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
   const [creatingDrafts, setCreatingDrafts] = useState(false);
   const [laeuftJob, setLaeuftJob] = useState<string | null>(null);
+  /*
+   * Wie weit das Schreiben ist — `null`, solange nichts laeuft.
+   *
+   * Er wird nur beim Sammelweg gesetzt: dort dauert es lange genug, dass
+   * jemand wissen will, ob noch etwas passiert. Fuer eine einzelne Stelle
+   * genuegt der Kreisel im Knopf, und die Leiste unten steht ohnehin nur bei
+   * einer Auswahl da.
+   */
   const [fortschritt, setFortschritt] = useState<{ fertig: number; gesamt: number } | null>(
     null,
   );
@@ -241,8 +248,8 @@ export function JobsPage() {
     });
   }, []);
 
-  async function anlegen(jobIds: string[]) {
-    const start = await starteEntwuerfe(jobIds);
+  async function anlegen(jobIds: string[], melde?: Fortschrittsmelder) {
+    const start = await starteEntwuerfe(jobIds, melde);
     if (!start.ok) {
       setBulkFehler(start.fehler);
       return null;
@@ -277,7 +284,9 @@ export function JobsPage() {
         clearSelection();
         return;
       }
-      const drafts = await anlegen(jobIds);
+      const drafts = await anlegen(jobIds, (fertig, gesamt) =>
+        setFortschritt({ fertig, gesamt }),
+      );
       if (drafts === null) return;
 
       clearSelection();
@@ -448,14 +457,7 @@ export function JobsPage() {
                         type="button"
                         variant="contained"
                         sx={{ mt: 2 }}
-                        onClick={() => {
-                          // Erst merken, dann wechseln. Dieser Knopf ist die
-                          // EINZIGE Stelle, an der die Absicht entsteht — wer über
-                          // die Kopfzeile zur Anmeldung geht, hat keine geäussert,
-                          // und dann darf ihn auch nichts irgendwohin zurückwerfen.
-                          merkeStelle(job.id, job.title);
-                          void navigate("/login");
-                        }}
+                        onClick={() => void navigate("/login")}
                       >
                         {t("stellen.bewerben")}
                       </Button>

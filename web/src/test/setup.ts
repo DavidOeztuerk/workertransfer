@@ -43,8 +43,10 @@ configure({ asyncUtilTimeout: 5_000 });
  * Produktivcode einen unbrauchbaren Speicher still überspringt und jeder Test
  * trivial grün würde. Ein Ersatz für alle ist ehrlicher.
  *
- * Der Produktivcode schützt sich unabhängig davon selbst (`intent.ts`): er
- * prüft, ob der Speicher seine Methoden wirklich hat, und verzichtet sonst.
+ * Der Produktivcode schützt sich unabhängig davon selbst
+ * (`core/store/preferencesSlice.ts`): er fängt jeden Zugriff ab und verzichtet
+ * sonst. Hier stand `intent.ts` — die gemerkte Stelle —, und die ist mit PBI-8
+ * gefallen, weil sie geschrieben und nie gelesen wurde.
  */
 function inMemoryStorage(): Storage {
   const daten = new Map<string, string>();

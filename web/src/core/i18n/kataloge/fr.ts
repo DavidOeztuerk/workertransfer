@@ -805,7 +805,6 @@ const fr: Katalog = {
     leerHinweis: "D’autres termes vous mèneront peut-être plus loin.",
     ortFehlt: "Lieu non indiqué",
     bewerben: "Postuler",
-    kontoNoetig: "Il vous faut un compte pour cela — ensuite, vous accédez directement à la candidature.",
     mehrLaden: "Charger plus",
     website: "Site web",
     duHast: "Vous avez {{treffer}} des {{gesamt}} compétences demandées :",

@@ -5,7 +5,7 @@ Status: **Vorgemerkt.** Nicht implementiert. Die rechtliche Prüfung steht aus
 und ist ausdrücklich verschoben — dieses Dokument trifft **keine** rechtliche
 Aussage, es hält den fachlichen Entwurf fest und sammelt die Fragen, die vor
 dem Bauen beantwortet sein müssen.
-Related: [Transfer-Vorgang (5.2)](2026-08-02-transfer-deals-design.md), [Ablage (ADR-0021)](../../adr/0021-storage-slim.md), [ULTRAPLAN](../../ULTRAPLAN.md) Phase 5 + Phase 8
+Related: [Transfer-Vorgang (5.2)](2026-08-02-transfer-deals-design.md), [Ablage (ADR-0021)](../../adr/0021-storage-slim.md), ULTRAPLAN Phase 5 + Phase 8
 
 ## Die Festlegung
 
