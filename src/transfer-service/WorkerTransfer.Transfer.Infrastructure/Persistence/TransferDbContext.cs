@@ -104,12 +104,14 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
         modelBuilder.Entity<MarktZeile>(entity =>
         {
             entity.ToTable("market_status");
-            // Der Schluessel IST der Mensch: diese Zeile heisst ihre
-            // `subject_id` schlicht `id`. Ausgesprochen, weil der
-            // Loeschwaechter (`LoeschempfaengerTests`) sonst nur nach den
-            // Spaltennamen `subject_id`/`user_id` sucht und diese Tabelle
-            // uebersaehe — und damit die Zusage aus ADR-0027 fuer einen ganzen
-            // Dienst.
+            // KEINE zweite Spalte fuer die Person. Der Schluessel IST sie, und
+            // `market_requests` und `transfers` fuehren daneben eine eigene
+            // `subject_id` — wer die beiden vergleicht, haelt das hier fuer
+            // vergessen und traegt die Spalte nach. Dann stuenden zwei Angaben
+            // ueber denselben Menschen nebeneinander, und die Loeschung (ADR-0027)
+            // traefe die eine und liesse die andere stehen. Die Anmerkung sagt es
+            // stattdessen aus: sie ist das, was `LoeschempfaengerTests` liest, wo
+            // kein Spaltenname zu finden ist.
             entity.HasAnnotation(Personenzeile.Anmerkung, true);
             entity.HasKey(zeile => zeile.Id);
             entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();

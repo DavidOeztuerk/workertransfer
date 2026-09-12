@@ -545,6 +545,146 @@ Massstab.
 
 Nichts mehr zu tun — hier steht nur noch, was daraus wurde.
 
+==========================================================================
+Lies docs/AUFTRAG-ENTLASTUNG.md (Phase 4), docs/PLAN-TRANSFERMARKT.md (PBI-8)
+und CLAUDE.md.
+
+ZUERST, ohne zu fragen:
+  git switch develop && git pull && git switch -c feature/pbi-8-und-entlastung
+Diese Sitzung arbeitet NIE direkt auf develop.
+
+==========================================================================
+1. DIE KOMMENTAR-ENTSCHEIDUNG IST GETROFFEN — schreib sie fest
+
+Du hast gefragt: „wo verläuft die Grenze zwischen einem Kommentar, der eine
+Messung/ein Verbot/eine Falle festhält, und einem, der den Code nacherzählt?"
+
+DIE ANTWORT, und sie gehört wörtlich nach docs/AUFTRAG-ENTLASTUNG.md
+(Phase 4 schließen) und als Absatz nach CLAUDE.md zu den Konventionen:
+
+  > Ein Kommentar verdient seinen Platz, wenn sein Fehlen jemanden einen
+  > Defekt NEU EINBAUEN ließe. Alles andere erzählt den Code nach.
+
+WEG 2 WIRD NIE GEFAHREN. <remarks> in ADRs zu verschieben ist der teuerste
+denkbare Fehler in diesem Baum, und er ist unumkehrbar. Jeder Defekt der
+letzten Woche entstand, weil eine Regel NICHT DORT stand, wo jemand sie
+brauchte: `secrets` im Schritt-`if`, die Egress-Grenze gegen einen Wert aus
+der Datenbank, das fehlende .AsTracking(), die 404-statt-401-Tür, deren Regel
+zwei Zeilen tiefer in derselben Datei schon aufgeschrieben war. Ein Grund in
+einer ADR ist ein Grund, den man SUCHEN muss — und niemand sucht, was er
+nicht vermisst. Schreib diesen Grund mit auf, nicht nur das Verbot.
+
+31 % Dichte ist kein Problem, das gelöst werden muss. Dieser Baum lebt davon.
+
+WEG 1 wird SELEKTIV gefahren, nicht pauschal. Von deinen vier Kopien:
+  - „VOR CreateBuilder" 15×        → BLEIBT. Genau dort verschiebt jemand die Zeile.
+  - „Kein AlsAussteller()" 12×     → BLEIBT. Verhindert eine falsche Ergänzung.
+  - „Erst wandern (ADR-0010)" 15×  → BLEIBT. Ein Zeiger ist kein Nacherzählen.
+  - „Der Schlüssel IST der Mensch" 7× → WEG, wo er nur beschreibt.
+                                       BLEIBT, wo er vor einer zweiten Spalte warnt.
+    Entscheide je Stelle, nicht pauschal, und sag mir danach, wie viele es
+    wirklich waren.
+
+Der mechanische Filter wird NICHT wieder benutzt. Er hat dreimal bewiesen,
+dass er die Grenze nicht findet — er löschte „warum 503 und nicht 404", und
+genau das besteht den Test oben glänzend. Halte das als Warnung fest.
+
+==========================================================================
+2. DOCS LÖSCHEN — alle fünfzehn, freigegeben
+
+Git behält sie, das Löschen ist umkehrbar; das Stehenlassen nicht, denn jede
+Datei behauptet GEGENWART. Nachgemessen: ROADMAP.md trägt 28 veraltete
+Verweise, ULTRAPLAN.md 18.
+
+Weg (beschreiben einen Baum, den es nicht gibt):
+  dotnet-README.md · phase-2-prep.md · oberflaeche-erwartete-ansichten.md ·
+  oberflaeche-routenkarte.md · befund-e3a…e3e · befund-kandidatenliste-haengt.md
+
+Weg (abgelöste Pläne — gefährlicher, weil sie ERLEDIGT melden, was nie lief):
+  ULTRAPLAN.md · ROADMAP.md · MIGRATION-PROMPT.md · prompts-naechste-schritte.md
+
+BLEIBEN (datierte Momentaufnahmen, keine Gegenwartsbehauptungen):
+  UEBERGABE.md · KI-EINSATZ-PRUEFUNG.md · ANALYSE-STAND-UND-LUECKEN.md ·
+  REVIEW-09-09.md · GIRDER-ANPASSUNGEN.md
+
+Prüf vor jedem Löschen, ob eine andere Datei darauf verlinkt — ein toter Link
+ist schlimmer als eine veraltete Datei.
+
+==========================================================================
+3. PBI-8 ABARBEITEN
+
+- [ ] Begrenzte Parallelität (max. 3) in entwuerfe.ts statt Promise.all über
+      alle gewählten Stellen.
+- [ ] Der Fortschritt ist gebaut und wird nie erreicht: setFortschritt wird in
+      JobsPage.tsx nur mit null gerufen, die Leiste liest einen Wert, den
+      niemand setzt, und stellen.fortschritt steht in DREI Sprachen ohne
+      Leser. Entweder anschließen oder restlos entfernen — ein halber Weg ist
+      schlimmer als keiner.
+- [ ] merkeStelle LÖSCHEN (freigegeben): schreibt, niemand liest,
+      gemerkteStelle() hat außerhalb von intent.ts keinen Aufrufer, und
+      LoginPage.tsx:66 hat den Rückweg stillgelegt. Dieselbe Klasse wie
+      Fund 7. Mit den Katalogschlüsseln, die danach niemand mehr liest.
+
+NICHT anfassen: H2 (Geheimnisfrage) und H5 (/code-review ultra) — das erste
+ist eine Entscheidung, das zweite startet ein Mensch. Beide bleiben als
+offene Zeilen im Plan stehen.
+
+==========================================================================
+4. CLAUDE.md KORRIGIEREN — sie lügt an zwei Stellen, beide nachgemessen
+
+  - „eighteen test projects" → es sind NEUNZEHN (find tests -name '*.csproj')
+  - Die Validator-Zeile sagt, wir hätten NULL AbstractValidator geschrieben.
+    Es sind SECHS Dateien in identity, github und applications. Schreib hin,
+    was wirklich da ist — und ob die Aussage darunter („es fehlt nicht die
+    Verdrahtung, sondern der Inhalt") noch stimmt.
+
+==========================================================================
+5. DER FLAKE IST GEKLÄRT — aber die Lehre fehlt im Baum
+
+jobs-journey war der KALTE STAPEL, nicht deine Änderung: 4/4 grün auf beiden
+Bäumen bei warmem Stapel, kontrolliert gegengeprüft. Nichts offen.
+
+Aber das ist das DRITTE Mal in drei Sitzungen, dass eine E2E-Reise rot war und
+die Ursache nicht im Code lag. CLAUDE.md warnt nur vor KONKURRENZ („never
+build images and run tests at the same time") — der kalte Stapel ist eine
+ANDERE Ursache mit demselben Symptom, und er steht nirgends.
+
+Schreib ihn auf, zu der Konkurrenz-Warnung dazu:
+
+  Ein frisch hochgefahrener Stapel ist langsam, bevor er warm ist — JIT,
+  Verbindungspools, die erste Migration. Die erste E2E-Reise dagegen misst
+  das Aufwärmen mit und fällt an Stellen, die mit ihrer Behauptung nichts zu
+  tun haben. Gemessen am 12.09.2026: jobs-journey rot auf kaltem Stapel,
+  4/4 grün auf warmem — auf BEIDEN Bäumen, also unabhängig von der Änderung.
+
+  Die Gegenprobe, die das entscheidet, ist nicht „nochmal laufen lassen",
+  sondern: dieselbe Reihe auf dem UNVERÄNDERTEN Baum fahren. Fällt sie dort
+  auch, war es nie deine Änderung. Ohne diesen Schritt sucht man Stunden in
+  Code, der in Ordnung ist.
+
+  Und NICHT das Zeitlimit hochsetzen. Am 10.09.2026 hat genau das eine echte
+  Ursache verdeckt (Zwischenspeicher-Verschränkung in kontext.ts): 5 → 10 s
+  half nicht, weil es nie zu langsam war. Eine Wartegrenze hochzusetzen sieht
+  immer nach einer Lösung aus und verbirgt genauso oft eine.
+
+==========================================================================
+FALLEN: build und test nie zusammen; nie dotnet test über die Lösung, nur
+./scripts/test-dotnet.sh; nach jeder Modeländerung sofort dotnet ef migrations
+add; ein änderndes SichereAsync braucht .AsTracking(); Warnungen sind Fehler;
+eine Gegenprobe muss KOMPILIEREN; ein neuer Aufruf nach draußen muss in der
+Konfiguration stehen; dein .env ist NICHT das der CI.
+
+ZUM SCHLUSS — selber erledigen, nicht zurückfragen:
+1. dotnet build WorkerTransfer.slnx
+2. ./scripts/test-dotnet.sh
+3. cd web && pnpm check && pnpm test && pnpm build && cd ..
+4. Committen, pushen, gh pr create --base develop --fill
+5. gh pr checks --watch
+6. ERST DANN: gh pr merge --merge --delete-branch
+7. UND DANN den develop-Lauf ansehen.
+
+Ein roter Lauf wird nicht gemergt. Kein --admin.
+
 Das Girder-Repo ist **öffentlich** (MIT), `LICENSE` und `SECURITY.md` liegen,
 die README trägt eine Versionspolitik, und `publish.yml` schiebt nach GitHub
 Packages **und** nach nuget.org.
@@ -576,3 +716,4 @@ nichts mehr**, weder lokal noch in Docker:
 Der Lohn: ein Fork-PR kann bauen, und ein frischer Klon braucht keinen Token —
 heute scheitert daran schon `docker compose up`. Das ist eine eigene, kleine
 Sitzung.
+

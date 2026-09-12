@@ -2,7 +2,7 @@
 
 Date: 2026-08-02
 Status: Entwurf (selbst geprüft)
-Related: [Companies-Design](2026-08-02-companies-service-design.md), [Jobs-Design](2026-08-02-jobs-service-design.md), ADR-0004 (kein Scraping, eigene Datenbank je Dienst), [ULTRAPLAN](../../ULTRAPLAN.md) Phase 4
+Related: [Companies-Design](2026-08-02-companies-service-design.md), [Jobs-Design](2026-08-02-jobs-service-design.md), ADR-0004 (kein Scraping, eigene Datenbank je Dienst), ULTRAPLAN Phase 4
 
 ## Die offene Frage: Subdomain oder Pfad?
 

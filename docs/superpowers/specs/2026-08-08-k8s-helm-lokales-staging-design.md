@@ -1,7 +1,7 @@
 # K8s und Helm — eine Staging-Umgebung auf dem eigenen Rechner
 
 **Stand 08.08.2026.** Letzter offener Block von Phase 10
-([ULTRAPLAN](../../ULTRAPLAN.md) Phase 10, [ROADMAP](../../ROADMAP.md) Phase 10).
+(ULTRAPLAN Phase 10, ROADMAP Phase 10).
 
 Ziel ist nicht „Manifeste existieren". Ziel ist eine Umgebung, die **wirklich
 läuft** — auf `kind`, ohne Cloud-Anbieter, ohne Domain, ohne Kosten — und die

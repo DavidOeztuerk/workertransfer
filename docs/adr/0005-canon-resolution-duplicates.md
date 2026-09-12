@@ -7,7 +7,7 @@ Related: ADR-0002 (worker-platform = Kernel, worker-* = Bausteine)
 
 ## Kontext
 
-Phase 1.4 (`docs/ULTRAPLAN.md`) verlangt, die in der Foundation
+Phase 1.4 (`docs/ULTRAPLAN.md`, gelöscht am 12.09.2026) verlangte, die in der Foundation
 entstandenen architektonischen Duplikate aufzulösen. ADR-0002 hat festgelegt,
 dass `worker-platform` der Kanon für laufzeit-übergreifende Konzepte ist
 (Context-Propagation, CQRS-Mediator, Settings) und `worker-*`-Geschwister

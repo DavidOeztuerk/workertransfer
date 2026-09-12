@@ -19,7 +19,6 @@ import { useAsync } from "../lib/useAsync";
 import { getCompanyBySlug } from "../api/companies";
 import { remoteLabel, searchJobs } from "../../work/api/jobs";
 import { starteEntwuerfe } from "../../work/lib/entwuerfe";
-import { merkeStelle } from "../../work/lib/intent";
 import { useHandelnder } from "../lib/session";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -52,12 +51,8 @@ export function CareerPage() {
   const [laeuftStelle, setLaeuftStelle] = useState<string | null>(null);
   const [bewerbungsfehler, setBewerbungsfehler] = useState<string | null>(null);
 
-  async function bewerben(stellenId: string, titel: string) {
-    // Ohne Konto: erst merken, dann wechseln. Dieselbe Reihenfolge wie auf der
-    // Stellenliste — wer über die Kopfzeile zur Anmeldung geht, hat keine
-    // Absicht geäussert und wird auch nicht zurückgeworfen.
+  async function bewerben(stellenId: string) {
     if (!signedIn) {
-      merkeStelle(stellenId, titel);
       void navigate("/login");
       return;
     }
@@ -248,7 +243,7 @@ export function CareerPage() {
                       size="small"
                       sx={{ flexShrink: 0 }}
                       disabled={laeuftStelle !== null}
-                      onClick={() => void bewerben(stelle.id, stelle.title)}
+                      onClick={() => void bewerben(stelle.id)}
                       startIcon={
                         laeuftStelle === stelle.id ? (
                           <CircularProgress color="inherit" size={16} />

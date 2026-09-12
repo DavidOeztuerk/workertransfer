@@ -1,5 +1,12 @@
 # Prüfung des KI-Einsatzes
 
+> **Die Zitate `ROADMAP.md:NNNN` zeigen ins Leere.** `docs/ROADMAP.md` ist am
+> 12.09.2026 gelöscht worden, weil es den Python-Baum als Gegenwart beschrieb.
+> Die Zeilennummern stehen hier unverändert: diese Prüfung ist eine
+> Momentaufnahme vom 02.09.2026, und ein Zitat umzuschreiben hiesse, sie zu
+> fälschen. Wer nachschlagen will, findet die Datei in der Geschichte
+> (`git log --diff-filter=D -- docs/ROADMAP.md`).
+
 Stand 02.09.2026, Zweig `dotnet-migration`. Geprüft wurde **lesend**: Quelltext,
 Tests, ADRs, Konfiguration. `docker`, `dotnet build` und `dotnet test` waren für
 diese Prüfung gesperrt (ein anderer Agent fuhr den Stapel), deshalb steht hinter

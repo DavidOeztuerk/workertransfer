@@ -322,7 +322,20 @@ describe("JobsPage", () => {
     expect(screen.queryByText(/0 von 3/)).not.toBeInTheDocument();
   });
 
-  it("merkt sich beim Bewerben ohne Konto nur die UUID, nie einen Pfad", async () => {
+  /*
+   * Der Vorgaenger dieses Tests hiess „merkt sich beim Bewerben ohne Konto nur
+   * die UUID, nie einen Pfad" und pinnte `merkeStelle`. Die Absicht wurde
+   * geschrieben und NIE gelesen: `gemerkteStelle()` hatte ausserhalb von
+   * `intent.ts` keinen Aufrufer, und die Anmeldung hatte den Rueckweg
+   * ausdruecklich stillgelegt. Eine Absicht, die 24 Stunden im Browser einer
+   * Person liegt, ohne dass irgendetwas sie einloest, ist kein halber Komfort,
+   * sondern nur der Eintrag. `intent.ts` ist deshalb gefallen (PBI-8.3).
+   *
+   * Dieser Test haelt fest, was danach gilt — und er ist der Grund, dass eine
+   * Rueckkehr eine ENTSCHEIDUNG waere und kein Versehen: wer den Rueckweg
+   * bauen will, muss ihn hier zuerst umschreiben.
+   */
+  it("legt beim Bewerben ohne Konto nichts im Browser ab", async () => {
     stubFetch((url) =>
       url.includes("/jobs")
         ? { body: seite([STELLE]) }
@@ -333,11 +346,8 @@ describe("JobsPage", () => {
     await screen.findByText("Backend-Entwicklung");
     await userEvent.click(screen.getByRole("button", { name: "Bewerben" }));
 
-    const gemerkt = JSON.parse(
-      window.localStorage.getItem("wt.gemerkte-stelle") ?? "{}",
-    ) as Record<string, unknown>;
-    expect(gemerkt.jobId).toBe(STELLE.id);
-    expect(JSON.stringify(gemerkt)).not.toContain("/");
+    expect(window.localStorage.getItem("wt.gemerkte-stelle")).toBeNull();
+    expect(window.localStorage.length).toBe(0);
   });
 
   it("zeigt die Auswahlkästchen nur nach der Anmeldung", async () => {
@@ -348,6 +358,88 @@ describe("JobsPage", () => {
     renderMitStore(<JobsPage />);
     await screen.findByText("Backend-Entwicklung");
     expect(screen.queryByRole("checkbox", { name: /Stelle auswählen/i })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Die Fortschrittsleiste war GEBAUT und wurde nie erreicht.
+   *
+   * `setFortschritt` wurde an genau einer Stelle gerufen — im `finally`, mit
+   * `null` —, die Leiste las einen Wert, den niemand setzte, und der
+   * Katalogschlüssel `stellen.fortschritt` stand in drei Sprachen ohne Leser
+   * (PBI-8.1). Dieser Test ist der Grund, dass das nicht wieder unbemerkt
+   * abreisst: er verlangt die Zwischenzahl, nicht nur das Ende.
+   *
+   * Die zweite Stelle HÄNGT mit Absicht. Ohne sie wären beide Entwürfe im
+   * selben Augenblick fertig, und „1 von 2" stünde nie auf dem Bildschirm —
+   * der Test wäre grün, ohne je einen Fortschritt gesehen zu haben.
+   */
+  it("zeigt beim Sammelschreiben, wie viele Entwürfe fertig sind", async () => {
+    const zweite = {
+      ...STELLE,
+      id: "55555555-5555-4555-8555-555555555555",
+      title: "Zweite Stelle",
+    };
+    const entwurf = (id: string, jobId: string) => ({
+      id,
+      job_id: jobId,
+      subject: "",
+      body: "",
+      status: "generating",
+      shares_resume: false,
+      documents: [],
+      comments: [],
+      error: null,
+      writing_started_at: null,
+    });
+
+    let zweitenFreigeben: () => void = () => {};
+    const haengt = new Promise<void>((fertig) => {
+      zweitenFreigeben = fertig;
+    });
+
+    const antwort = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "content-type": "application/json" },
+      });
+
+    vi.stubGlobal(
+      "fetch",
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.includes("/drafts/zwei/write")) {
+          await haengt;
+          return antwort(entwurf("zwei", zweite.id));
+        }
+        if (url.includes("/drafts/eins/write")) {
+          return antwort(entwurf("eins", STELLE.id));
+        }
+        if (url.includes("/applications/drafts")) {
+          return init?.method === "POST"
+            ? antwort([entwurf("eins", STELLE.id), entwurf("zwei", zweite.id)])
+            : antwort([]);
+        }
+        if (url.includes("/applications/me")) return antwort([]);
+        if (url.includes("/jobs")) return antwort(seite([STELLE, zweite]));
+        return antwort(null, 404);
+      },
+    );
+
+    renderMitStore(<JobsPage />, { auth: SITZUNG });
+    await screen.findByText("Backend-Entwicklung");
+
+    for (const kasten of await screen.findAllByRole("checkbox", {
+      name: /Stelle auswählen/i,
+    })) {
+      await userEvent.click(kasten);
+    }
+    await userEvent.click(
+      screen.getByRole("button", { name: /Für alle bewerben/i }),
+    );
+
+    expect(await screen.findByText("1 von 2 geschrieben")).toBeInTheDocument();
+
+    zweitenFreigeben();
   });
 
   it("lässt angemeldet mehrere Stellen auswählen", async () => {

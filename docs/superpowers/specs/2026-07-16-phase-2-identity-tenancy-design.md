@@ -3,7 +3,7 @@
 - **Status:** Draft (Brainstorming abgeschlossen, Freigabe pro Abschnitt erteilt)
 - **Date:** 2026-07-16
 - **Branch:** `phase-2-identity-tenancy` @ `f96df08` (geforkt von `develop`/`aa805e2`)
-- **Quellen:** [`docs/ULTRAPLAN.md`](../../ULTRAPLAN.md) §Phase 2, [`docs/phase-2-prep.md`](../../phase-2-prep.md), [`docs/product-scope.md`](../../product-scope.md), [`docs/adr/`](../../adr/) (ADR-0002, ADR-0004, ADR-0005)
+- **Quellen:** `docs/ULTRAPLAN.md` §Phase 2, `docs/phase-2-prep.md`, [`docs/product-scope.md`](../../product-scope.md), [`docs/adr/`](../../adr/) (ADR-0002, ADR-0004, ADR-0005)
 - **Vorgänger-ADRs:** ADR-0002 (worker-platform = Kernel, worker-* = Bausteine), ADR-0003 (Composition-Root, kein fluent Builder), ADR-0004 (Versionierte Contracts, kein Scraping, Consent-First), ADR-0005 (Kanon-Auflösung Duplikate; Tenant-Context-Konsolidierung nach Phase 2 verschoben)
 - **Phase-2-ADRs (in diesem Slice entstehend):** ADR-0006 Passwort-Hashing-Backend, ADR-0007 JWT-Signing, ADR-0008 Auth-Flow (Eigenbau Password-Flow vs. OIDC), ADR-0009 Tenant-Context-Konsolidierung, ADR-0010 Alembic-Migrations-Workflow, ADR-0011 Integration-Test-Substrat (Testcontainers), ADR-0012 Audit-Event-Modell
 
