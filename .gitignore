@@ -51,3 +51,10 @@ var/
 # Das Gespraechsprotokoll, das beim Umstieg auf Girder 4 als Vorlage diente.
 # Gehoert nicht ins Projekt.
 kon.txt
+
+# Der Signaturschluessel des Nachweises (ADR-0044) und die erzeugten Dokumente.
+# Der private Schluessel in git waere kein privater Schluessel mehr; die
+# Dokumente sind eine MOMENTAUFNAHME eines Stapels und gehoeren dorthin, wo
+# jemand sie braucht — nicht in den Baum, wo sie am naechsten Tag falsch sind.
+.nachweis/
+nachweis/

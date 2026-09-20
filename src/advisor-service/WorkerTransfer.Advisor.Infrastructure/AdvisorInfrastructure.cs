@@ -17,6 +17,9 @@ using WorkerTransfer.Advisor.Infrastructure.Persistence;
 using WorkerTransfer.Advisor.Infrastructure.Sicherheit;
 using WorkerTransfer.Advisor.Infrastructure.Uebergabe;
 using WorkerTransfer.Outbox;
+using WorkerTransfer.Nachweis;
+using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.Advisor.Contracts;
 
 namespace WorkerTransfer.Advisor.Infrastructure;
 
@@ -91,6 +94,92 @@ public static class AdvisorInfrastructure
         services.AddCQRS(typeof(GespraechEroeffnenBefehl).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
+        Nachweis(services, configuration);
+
         return services;
+    }
+
+    /// <summary>
+    /// Sieben Namen, bei denen ein Wort der Verbotsliste ein echtes Homonym ist.
+    /// </summary>
+    /// <remarks>
+    /// <para><strong>Öffentlich, weil sie zwei Leser hat.</strong>
+    /// <c>wt.ki.keine-zahl</c> liest sie zur Laufzeit, <c>WortschatzTests</c>
+    /// zur Bauzeit. Zwei Listen über dieselbe Frage laufen auseinander, und
+    /// die stillere von beiden wüchse — hier wächst keine: jede Zeile steht im
+    /// Befund, den ein Betriebsrat liest.</para>
+    ///
+    /// <para><c>WorkloadPercent</c> ist das Pensum, das die Person selbst für
+    /// ihre nächste Stelle nennt — eine Angabe über eine <em>Stelle</em>.
+    /// <c>Note</c> ist englisch und heißt Anmerkung: der erste Satz eines
+    /// Unternehmens an einen Menschen. Das deutsche Wort wäre eine Bewertung,
+    /// und genau deshalb steht es auf der Liste — hier ist es nicht gemeint.</para>
+    ///
+    /// <para>Dieselbe Form halten die drei Sprachkataloge der Oberfläche für
+    /// echte Kognaten („Status", „Website", „Administrator"): kurz, und jede
+    /// Zeile ein Einzelfall.</para>
+    /// </remarks>
+    public static IReadOnlyList<Wortausnahme> Wortausnahmen { get; } =
+    [
+        new("MandatV1.WorkloadPercent", Pensum),
+        new("MandatSchreibenV1.WorkloadPercent", Pensum),
+        new("GespraechV1.WorkloadPercent", Pensum),
+        new("Mandat.PensumProzent", Pensum),
+        new("GespraechEroeffnenV1.Note", Anmerkung),
+        new("GespraechV1.Note", Anmerkung),
+        new("MeinGespraechV1.Note", Anmerkung)
+    ];
+
+    private const string Pensum =
+        "das Pensum, das die Person SELBST fuer ihre naechste Stelle nennt — "
+        + "eine Angabe ueber eine Stelle, keine ueber einen Menschen";
+
+    private const string Anmerkung =
+        "englisch note = Anmerkung, der erste Satz eines Unternehmens an einen "
+        + "Menschen; deutsch Note waere eine Bewertung, und genau deshalb steht "
+        + "das Wort auf der Liste — hier ist es nicht gemeint";
+
+    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <remarks>
+    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
+    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    ///
+    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
+    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
+    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// vergessen kann.</para>
+    /// </remarks>
+    private static void Nachweis(
+        IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+            [typeof(UebergangNichtErlaubt).Assembly, typeof(MandatV1).Assembly],
+            Wortausnahmen));
+
+        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
+        // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
+        // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
+        // durchschneiden soll.
+        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+            anbieter.GetServices<IAnbieterquelle>()));
+
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, null));
+
+        // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
+        // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
+        // Zwischenspeicher davor faellt niemandem auf, weil alles
+        // weiterfunktioniert, nur eben mit dem Stand von vorhin.
+        services.AddScoped<IPruefung>(anbieter =>
+            new Widerrufspruefung<IEinwilligungstor>(
+                anbieter, typeof(HttpEinwilligungstor)));
+
+        var loeschung = new Loescheinstellungen();
+        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+
+        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+            "advisor",
+            !string.IsNullOrEmpty(loeschung.Geheimnis),
+            pruefspurVorhanden: false));
     }
 }

@@ -16,6 +16,9 @@ using WorkerTransfer.Portfolio.Infrastructure.Loeschung;
 using WorkerTransfer.Portfolio.Infrastructure.Persistence;
 using WorkerTransfer.Portfolio.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.Nachweis;
+using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.Portfolio.Contracts;
 
 namespace WorkerTransfer.Portfolio.Infrastructure;
 
@@ -63,6 +66,51 @@ public static class PortfolioInfrastructure
         services.AddCQRS(typeof(PortfolioSichernBefehl).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
+        Nachweis(services, configuration);
+
         return services;
+    }
+
+    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <remarks>
+    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
+    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    ///
+    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
+    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
+    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// vergessen kann.</para>
+    /// </remarks>
+    private static void Nachweis(
+        IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+            [typeof(Abgelegtes).Assembly, typeof(EintragV1).Assembly]));
+
+        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
+        // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
+        // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
+        // durchschneiden soll.
+        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+            anbieter.GetServices<IAnbieterquelle>()));
+
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, null));
+
+        // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
+        // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
+        // Zwischenspeicher davor faellt niemandem auf, weil alles
+        // weiterfunktioniert, nur eben mit dem Stand von vorhin.
+        services.AddScoped<IPruefung>(anbieter =>
+            new Widerrufspruefung<IEinwilligungstor>(
+                anbieter, typeof(HttpEinwilligungstor)));
+
+        var loeschung = new Loescheinstellungen();
+        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+
+        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+            "portfolio",
+            !string.IsNullOrEmpty(loeschung.Geheimnis),
+            pruefspurVorhanden: false));
     }
 }

@@ -96,6 +96,11 @@ secrets:
   # dasselbe Papier sein.
   notifySecret: ""
   erasureSecret: ""
+  # Und ein DRITTES: die Tuer vor dem Nachweis (ADR-0044). Wer eine Mail
+  # anstossen darf, muss nicht erfahren, welche KI-Anbieter diese Instanz
+  # benutzt. LEER heisst hier: die Tuer ist zu, /nachweis antwortet 404 — was
+  # in einem Cluster ohne Bedarf die richtige Vorgabe ist.
+  nachweisSecret: ""
   # Die Datenbank ist nur clusterintern erreichbar und hat keinen NodePort.
   # Ein fester Wert hält `kubectl exec ... psql` einfach; wer das ändern will,
   # setzt hier etwas anderes.

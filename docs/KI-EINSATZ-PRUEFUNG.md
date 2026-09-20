@@ -1,5 +1,24 @@
 # Prüfung des KI-Einsatzes
 
+> **Diese Datei wird nicht umgeschrieben.** Sie ist eine Momentaufnahme vom
+> 02.09.2026; eine Momentaufnahme zu ändern hieße, sie zu fälschen. Seit dem
+> 20.09.2026 werden mehrere ihrer Urteile **laufend** geprüft, und zwar dort, wo
+> sie sich ändern können — im laufenden Behälter statt im Baum (ADR-0044,
+> `make nachweis`):
+>
+> | hier beurteilt | läuft jetzt als |
+> |---|---|
+> | „die Feldmenge ist nirgends festgenagelt" (1.1) | `wt.ki.naht`, je Verbraucher, plus `EntwurfsgrenzeTests` zur Bauzeit |
+> | „kein Test auf `HttpEntwerfer`", Zeitüberlauf → 500 (1.5) | der Zweig ist behoben; die Naht meldet ihre Feldmenge im Nachweis |
+> | „`/candidates` sortiert nach `GeaendertAm`" (4.2) | `/candidates` ist gefallen (ADR-0036); `wt.ki.keine-zahl` sucht den Wortschatz je Dienst ab |
+> | „der Schlüssel ist im lokalen Stapel nicht angeschlossen" (Fund 6) | `wt.ki.anbieter` nennt, was in **dieser** Instanz eingetragen ist |
+> | „die Naht steht zweimal im Baum" (Fund 8) | sie steht heute **viermal** — profile, jobs, scout, applications; jede mit eigener Feldmenge und eigenem Befund |
+>
+> **Zwei Zahlen dieser Prüfung stimmen nicht mehr**, und das ist genau ihr
+> Wesen als Momentaufnahme: sie zählt *zwei* KI-Verbraucher (1.), heute sind es
+> **vier**; und sie nennt die elf Löschempfänger, heute sind es **elf plus
+> identity**, mit scout, advisor und assessment darunter.
+
 > **Die Zitate `ROADMAP.md:NNNN` zeigen ins Leere.** `docs/ROADMAP.md` ist am
 > 12.09.2026 gelöscht worden, weil es den Python-Baum als Gegenwart beschrieb.
 > Die Zeilennummern stehen hier unverändert: diese Prüfung ist eine

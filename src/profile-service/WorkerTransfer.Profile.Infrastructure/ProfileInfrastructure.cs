@@ -15,6 +15,9 @@ using WorkerTransfer.Profile.Infrastructure.Entwurf;
 using WorkerTransfer.Profile.Infrastructure.Intern;
 using WorkerTransfer.Profile.Infrastructure.Loeschung;
 using WorkerTransfer.Profile.Infrastructure.Persistence;
+using WorkerTransfer.Nachweis;
+using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.Profile.Contracts;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Profile.Infrastructure;
@@ -89,6 +92,77 @@ public static class ProfileInfrastructure
         services.AddCQRS(typeof(ProfilSpeichernBefehl).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
+        Nachweis(services, configuration, entwurf);
+
         return services;
+    }
+
+    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <remarks>
+    /// <para><strong>Sie stehen hier und nicht in der Dienstgrundlage</strong>,
+    /// aus demselben Grund, aus dem der Ledger, die Prüfspur und der Entwerfer
+    /// hier stehen: es sind Entscheidungen dieses Dienstes. <em>Welche</em>
+    /// vier Felder zum Modell hinausgehen dürfen, ist ADR-0024 §3 für genau
+    /// diesen Verbraucher; eine gemeinsame Menge wäre der erste Schritt zu
+    /// einem gemeinsamen Prompt mit einem <c>if</c>.</para>
+    ///
+    /// <para><strong><c>wt.grenze.ziele</c> fehlt hier absichtlich.</strong> Sie
+    /// liest nur die Konfiguration, ist damit für jeden Dienst dieselbe, und
+    /// steht deshalb in <c>AddNachweis</c> — sie ist die eine, die ein neuer
+    /// Dienst nicht vergessen kann.</para>
+    /// </remarks>
+    private static void Nachweis(
+        IServiceCollection services,
+        IConfiguration configuration,
+        Entwurfseinstellungen entwurf)
+    {
+        var naht = !string.IsNullOrEmpty(entwurf.Schluessel);
+
+        // DIE FELDMENGE, festgenagelt — und zwar an dem, was laeuft.
+        //
+        // `EntwurfsgrenzeTests` nagelt dieselbe Menge am BAUM fest und ist
+        // damit der schaerfere Waechter: er faellt, bevor etwas ausgeliefert
+        // wird. Was er nicht kann, ist im Nachweis STEHEN. Der Mensch, der die
+        // Anhang-III-Frage beantworten muss, bekommt hier aufgeschrieben, was
+        // dieses System zum Modell hinausschickt — datiert, statt in einem
+        // Testprojekt gesucht.
+        services.AddScoped<IPruefung>(_ => new Nahtpruefung(
+            typeof(Entwurfslage),
+            ["Ueberschrift", "Text", "Faehigkeiten", "Wunsch", "Prompt"],
+            "für einen Profiltext"));
+
+        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+            [typeof(Profil).Assembly, typeof(ProfilfundV1).Assembly]));
+
+        // Der KI-Anbieter dieses Dienstes ist der des BETREIBERS: `Draft__*`
+        // aus der Umgebung, einer fuer alle. Der Zugang je Person steht in
+        // identity-service, und dort wird gezaehlt statt genannt.
+        services.AddScoped<IAnbieterquelle>(_ => new Betreiberquelle(
+            "anthropic", entwurf.Adresse, naht));
+
+        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+            anbieter.GetServices<IAnbieterquelle>()));
+
+        // KEINE AUFZEICHNUNG, und das ist eine Entscheidung (ADR-0024): weder
+        // Prompt noch Antwort noch ein Ledger-Eintrag. `null` ist hier also die
+        // richtige Antwort und keine fehlende Verdrahtung — wer aufzeichnen
+        // muss, setzt `IModellaufzeichnung` um und meldet es an dieser Zeile an.
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(naht, null));
+
+        // Zwischen der Frage und dem Ledger steht kein weiterer Typ. Das ist
+        // die Vorbedingung, an der ADR-0013 in der Praxis scheitert — ein
+        // Zwischenspeicher davor faellt niemandem auf, weil alles
+        // weiterfunktioniert, nur eben mit dem Stand von vorhin.
+        services.AddScoped<IPruefung>(anbieter =>
+            new Widerrufspruefung<IEinwilligungstor>(
+                anbieter, typeof(HttpEinwilligungstor)));
+
+        var loeschung = new Loescheinstellungen();
+        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+
+        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+            "profile",
+            !string.IsNullOrEmpty(loeschung.Geheimnis),
+            pruefspurVorhanden: true));
     }
 }

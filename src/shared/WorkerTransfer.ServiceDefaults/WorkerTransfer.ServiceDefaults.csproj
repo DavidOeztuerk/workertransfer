@@ -24,6 +24,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WorkerTransfer.Contracts.Identity\WorkerTransfer.Contracts.Identity.csproj" />
+    <!--
+      Die Form, in der jeder Dienst ueber sich selbst Auskunft gibt (ADR-0044).
+      Sie haengt an DIESER Datei, weil `AddWorkerTransferDefaults` der eine
+      Aufruf ist, den jeder Dienst macht — und weil dieselbe Datei den Fehler
+      dokumentiert, den das hier verhindert: "Wir listeten fuenf Module auf und
+      bekamen fuenf — und merkten nicht, was dadurch fehlte."
+    -->
+    <ProjectReference Include="..\WorkerTransfer.Nachweis\WorkerTransfer.Nachweis.csproj" />
   </ItemGroup>
 
   <ItemGroup>

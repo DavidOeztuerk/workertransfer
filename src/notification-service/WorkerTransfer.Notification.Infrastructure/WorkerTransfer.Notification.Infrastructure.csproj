@@ -10,6 +10,13 @@
     <ProjectReference Include="..\WorkerTransfer.Notification.Application\WorkerTransfer.Notification.Application.csproj" />
     <ProjectReference Include="..\WorkerTransfer.Notification.Domain\WorkerTransfer.Notification.Domain.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
+    <!--
+      Die Vertraege stehen an der Grenze, und `wt.ki.keine-zahl` sieht sie sich
+      an: eine Zahl ueber einen Menschen entstuende in der Domaene und ginge
+      HIER hinaus (ADR-0022 §1). Beide Flaechen oder keine — eine halbe Absuche
+      meldet gruen ueber der Haelfte, die sie nicht gelesen hat.
+    -->
+    <ProjectReference Include="..\WorkerTransfer.Notification.Contracts\WorkerTransfer.Notification.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

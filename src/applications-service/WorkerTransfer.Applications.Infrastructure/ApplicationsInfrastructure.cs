@@ -20,6 +20,9 @@ using WorkerTransfer.Applications.Infrastructure.Stellen;
 using WorkerTransfer.Applications.Infrastructure.Unternehmen;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.Nachweis;
+using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.Applications.Contracts;
 
 namespace WorkerTransfer.Applications.Infrastructure;
 
@@ -115,6 +118,86 @@ public static class ApplicationsInfrastructure
         services.AddCQRS(typeof(BewerbungAbschickenBefehl).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
+        Nachweis(services, configuration);
+
         return services;
+    }
+
+    /// <summary>Zwei Namen, bei denen <c>quote</c> ein echtes Homonym ist.</summary>
+    /// <remarks>
+    /// <strong>Öffentlich, weil sie zwei Leser hat</strong>: <c>wt.ki.keine-zahl</c>
+    /// zur Laufzeit und <c>WortschatzTests</c> zur Bauzeit. Zwei Listen über
+    /// dieselbe Frage laufen auseinander, und die stillere von beiden wüchse.
+    /// <para>
+    /// <c>Quote</c> ist hier das <em>Zitat</em>: die Stelle im Anschreiben, auf
+    /// die sich eine Anmerkung bezieht — wörtlich, damit die Überarbeitung
+    /// weiß, wovon die Rede ist. Das deutsche Wort wäre ein Verhältnis und
+    /// gehört zu Recht auf die Liste.
+    /// </para>
+    /// </remarks>
+    public static IReadOnlyList<Wortausnahme> Wortausnahmen { get; } =
+    [
+        new("AnmerkenV1.Quote", Zitat),
+        new("AnmerkungV1.Quote", Zitat)
+    ];
+
+    private const string Zitat =
+        "englisch quote = Zitat, die woertliche Stelle im eigenen Anschreiben, "
+        + "auf die sich die Anmerkung bezieht; deutsch Quote waere ein "
+        + "Verhaeltnis und gehoert auf die Liste";
+
+    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <remarks>
+    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
+    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    ///
+    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
+    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
+    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// vergessen kann.</para>
+    /// </remarks>
+    private static void Nachweis(
+        IServiceCollection services, IConfiguration configuration)
+    {
+        var anschreiben = new Anschreibeneinstellungen();
+        configuration.GetSection(Anschreibeneinstellungen.Abschnitt).Bind(anschreiben);
+
+        // Der Schluessel des BETREIBERS ist hier nur der Rueckfall: den Zugang
+        // waehlt die Person in ihren Kontoeinstellungen, und ihn kennt allein
+        // identity-service. Was dieser Dienst ueber Anbieter sagen kann, ist
+        // deshalb die Haelfte — die andere steht in `identity-service`, gezaehlt.
+        var naht = !string.IsNullOrEmpty(anschreiben.Schluessel);
+
+        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+            [typeof(Bewerbungsstand).Assembly, typeof(BewerbungV1).Assembly],
+            Wortausnahmen));
+
+        services.AddScoped<IPruefung>(_ => new Nahtpruefung(
+            typeof(Anschreibenkontext),
+            ["StellenTitel", "Unternehmen", "StellenOrt", "StellenBeschreibung", "GesuchteFaehigkeiten", "EigenerName", "EigeneUeberschrift", "EigenerText", "EigeneFaehigkeiten", "EigenerWerdegang", "Sprache"],
+            "für ein Anschreiben"));
+
+        // Der Anbieter dieses Dienstes ist der des BETREIBERS: `Draft__*` aus
+        // der Umgebung, einer fuer alle. Den Zugang je Person haelt
+        // identity-service, und dort wird gezaehlt statt genannt.
+        services.AddScoped<IAnbieterquelle>(_ => new Betreiberquelle(
+            "anthropic", anschreiben.Adresse, naht));
+
+        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+            anbieter.GetServices<IAnbieterquelle>()));
+
+        // KEINE AUFZEICHNUNG, und das ist eine Entscheidung (ADR-0024): weder
+        // Prompt noch Antwort noch ein Ledger-Eintrag. `null` ist hier die
+        // richtige Antwort und keine fehlende Verdrahtung.
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(naht, null));
+
+        var loeschung = new Loescheinstellungen();
+        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+
+        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+            "applications",
+            !string.IsNullOrEmpty(loeschung.Geheimnis),
+            pruefspurVorhanden: false));
     }
 }

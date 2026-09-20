@@ -13,6 +13,9 @@ using WorkerTransfer.Notification.Infrastructure.Loeschung;
 using WorkerTransfer.Notification.Infrastructure.Persistence;
 using WorkerTransfer.Notification.Infrastructure.Post;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.Nachweis;
+using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.Notification.Contracts;
 
 namespace WorkerTransfer.Notification.Infrastructure;
 
@@ -59,6 +62,43 @@ public static class NotificationInfrastructure
         services.AddCQRS(typeof(BenachrichtigenBefehl).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
+        Nachweis(services, configuration);
+
         return services;
+    }
+
+    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <remarks>
+    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
+    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    ///
+    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
+    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
+    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// vergessen kann.</para>
+    /// </remarks>
+    private static void Nachweis(
+        IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+            [typeof(Benachrichtigungsart).Assembly, typeof(BenachrichtigenV1).Assembly]));
+
+        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
+        // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
+        // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
+        // durchschneiden soll.
+        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+            anbieter.GetServices<IAnbieterquelle>()));
+
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, null));
+
+        var loeschung = new Loescheinstellungen();
+        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+
+        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+            "notification",
+            !string.IsNullOrEmpty(loeschung.Geheimnis),
+            pruefspurVorhanden: false));
     }
 }

@@ -106,6 +106,11 @@ x-umgebung: &umgebung
   # Der Hauptschluessel fuer hinterlegte Geheimnisse (heute: der KI-Schluessel
   # einer Person). ROLLEN HEISST VERLIEREN — es gibt keine Versionierung.
   WORKERTRANSFER_SECRETS_KEY: ${WORKERTRANSFER_SECRETS_KEY:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+  # Die Tuer vor dem Nachweis jedes Dienstes (ADR-0044). AUSDRUECKLICH EIN
+  # DRITTES PAPIER, neben dem der Benachrichtigung und dem der Loeschung: wer
+  # eine Mail anstossen darf, muss nicht erfahren, welche KI-Anbieter diese
+  # Instanz benutzt. LEER hiesse: die Tuer ist zu, und /nachweis antwortet 404.
+  Nachweis__Geheimnis: ${WORKERTRANSFER_NACHWEIS_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
 
 services:
   postgres:

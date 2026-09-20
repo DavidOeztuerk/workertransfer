@@ -91,6 +91,27 @@ pnpm dev
 
 Playwright journeys in `web/e2e/` run against the **real** compose stack; without it they skip themselves. `make validate-e2e` runs them and names the skips.
 
+## The evidence report
+
+```bash
+make nachweis          # three dated, signed documents against the running stack
+make nachweis-pruefen  # every check in every service; red as soon as a promise is unkept
+```
+
+Every service answers seven addresses about itself — `/nachweis`, four section
+pages, `/nachweis/pflichten` and `/nachweis/bericht.json` — behind their own
+secret (`Nachweis__Geheimnis`; empty means the door is shut, and it answers
+**404**, not 403). `make nachweis` collects all fourteen and writes three
+separate documents for three readers: **Datenschutz**, **KI** and
+**Mitbestimmung**, each signed with ECDSA P-256 over its canonical form.
+
+**Belege, keine Konformität.** No artefact says "compliant", "certified" or
+"fulfils Art. X" — a program can show that something exists, when it came about
+and that it is unchanged; it cannot show that it is *adequate*. Every citation
+carries a field naming what a human still has to decide, and that field is never
+empty (ADR-0044). `make nachweis-pruefen` runs inside `make validate` whenever
+the stack answers, and says so by name when it does not.
+
 ## Architecture and product guardrails
 
 The technical design and delivery sequence live in [docs/architecture.md](docs/architecture.md). Product, consent, AI and integration guardrails live in [docs/product-scope.md](docs/product-scope.md) — read that one before touching anything consent- or AI-related. [CLAUDE.md](CLAUDE.md) collects the rules that carry the design together with the reason for each.

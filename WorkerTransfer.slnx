@@ -5,6 +5,7 @@
     <Project Path="src/shared/WorkerTransfer.Contracts.Consent/WorkerTransfer.Contracts.Consent.csproj" />
     <Project Path="src/shared/WorkerTransfer.Contracts.Erasure/WorkerTransfer.Contracts.Erasure.csproj" />
     <Project Path="src/shared/WorkerTransfer.Contracts.Identity/WorkerTransfer.Contracts.Identity.csproj" />
+    <Project Path="src/shared/WorkerTransfer.Nachweis/WorkerTransfer.Nachweis.csproj" />
     <Project Path="src/shared/WorkerTransfer.Outbox/WorkerTransfer.Outbox.csproj" />
     <Project Path="src/shared/WorkerTransfer.ServiceDefaults/WorkerTransfer.ServiceDefaults.csproj" />
     <Project Path="src/shared/WorkerTransfer.Skills/WorkerTransfer.Skills.csproj" />

@@ -106,6 +106,17 @@ anstossen" und "darf alles über einen Menschen löschen" dürfen nicht dasselbe
 Papier sein. Die Bedingungen sind unabhängig: applications-service hat BEIDE
 Adressen und braucht BEIDE Namen für dasselbe Geheimnis.
 */}}
+{{/*
+Die Tuer vor dem Nachweis, und sie steht an JEDEM Dienst: jeder beantwortet
+`/nachweis` ueber sich selbst (ADR-0044). Ein drittes Papier, ausdruecklich —
+wer eine Mail anstossen darf, muss nicht erfahren, welche KI-Anbieter diese
+Instanz benutzt. LEER heisst: die Tuer ist zu und die Seite antwortet 404.
+*/}}
+- name: Nachweis__Geheimnis
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "workertransfer.secretName" $root }}
+      key: WORKER_NACHWEIS_SECRET
 {{- if or (eq $svc.name "identity-service") (eq $svc.name "profile-service") }}
 {{/*
 profile-service prueft es an seiner internen Suchtuer (ADR-0036). LEER hiesse

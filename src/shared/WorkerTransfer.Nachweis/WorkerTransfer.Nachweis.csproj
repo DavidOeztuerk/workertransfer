@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Konfiguration und Container, sonst nichts. Kein EF, kein HttpClient, kein
+      Girder: was eine Pruefung an ihrem Gegenstand ablesen muss, liest der
+      Dienst und reicht es herein. Eine Bibliothek, die selbst in Datenbanken
+      sieht, waere die achte Sache unter shared/ mit vierzehn Gruenden, sie zu
+      erweitern.
+    -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+</Project>

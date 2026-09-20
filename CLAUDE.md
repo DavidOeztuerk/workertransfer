@@ -42,9 +42,27 @@ package.json  pnpm-lock.yaml  pnpm-workspace.yaml  turbo.json  tsconfig.base.jso
 | `advisor-service` | 8013 | the mandate — four values; the stages live in the ledger |
 | `assessment-service` | 8014 | the work sample — the effort in hours, and one evaluation the person always reads |
 
-The gateway (`src/gateway`, port 8090) is the single entrance. `src/shared/` holds seven things and no more: `ServiceDefaults` (the one call every service makes), `Outbox`, `Skills`, `Ablage` (bytes for certificates, never a PDF the server rendered), and three `Contracts.*` packages (`Identity`, `Consent`, `Erasure`) that carry versioned boundary DTOs — never a shared domain model.
+The gateway (`src/gateway`, port 8090) is the single entrance. `src/shared/` holds eight things and no more: `ServiceDefaults` (the one call every service makes), `Outbox`, `Skills`, `Ablage` (bytes for certificates, never a PDF the server rendered), `Nachweis` (the form in which every service reports about itself — ADR-0044, and no domain model either), and three `Contracts.*` packages (`Identity`, `Consent`, `Erasure`) that carry versioned boundary DTOs — never a shared domain model.
 
 The vision documents in [`docs/vision/`](docs/vision/) describe a much larger future state. **Treat them as intent, not description.**
+
+## Nachweis und KI-Pflichten
+
+`docs/AUFTRAG-NACHWEIS-UND-KI-PFLICHTEN.md` ist offen: die Prinzipien dieses
+Repositoriums stehen in ADRs und in einer Momentaufnahme vom 02.09.2026, aber
+keines davon läuft. Der Auftrag macht sie zu Prüfungen, die rot werden können,
+zu einem Bericht, den eine Maschine liest, und zu drei datierten Dokumenten für
+drei verschiedene Leser.
+
+Die Linie, in einem Satz: **Belege, keine Konformität.** Ein Programm zeigt
+Vorhandensein, Zeitpunkt und Unversehrtheit — nie Angemessenheit. Die Fertigkeit
+`wt-nachweis` hält die Wortliste und die Grenze; sie gilt für jeden Satz, der in
+ein Dokument oder auf eine Seite gerät.
+
+```
+/nachweis alles       # den ganzen Auftrag, Phase für Phase, mit Toren dazwischen
+/nachweis 1           # nur eine Phase
+```
 
 ## Commands
 
@@ -61,6 +79,8 @@ make validate       # like check, but runs through and reports every red step
 make up / make down # the whole stack in docker compose
 make images         # both shipped images — the local twin of the CI job
 make routenkarte    # every endpoint × four principals, against the running stack
+make nachweis          # three dated, signed evidence documents (ADR-0044)
+make nachweis-pruefen  # every check in every service; red on an unkept promise
 make k8s-up / k8s-down / k8s-lint
 ```
 
@@ -869,6 +889,98 @@ the store; an `uebernimm` that saves on the side; and the capitals rule removed
 
 When an application arrives, company **members** get a mail of kind `application_received`. A company has no mailbox. The outbox stays content-free (ADR-0025): id and kind, never a name.
 
+### The evidence report: Belege, keine Konformität (ADR-0044)
+
+Every service answers seven addresses about **itself** — `/nachweis`, four
+section pages (`ki`, `einwilligung`, `loeschung`, `grenze`),
+`/nachweis/pflichten` and `/nachweis/bericht.json`. `make nachweis` collects all
+fourteen against the running stack and writes three separate signed documents:
+**Datenschutz**, **KI**, **Mitbestimmung**. `make nachweis-pruefen` is the gate
+and goes red on an unkept promise. Measured 20.09.2026: **83 findings across 14
+services**, none unkept.
+
+**Why it exists at all: the principles were written down and not executable.**
+`Adr0022Tests` and `EntwurfsgrenzeTests` check the *tree* — but the AI access is
+`KiZugangV1`, which means provider, `base_url`, model and key come **per person
+at runtime** from the account settings. No test in the world sees where this
+tree actually speaks tonight. `docs/KI-EINSATZ-PRUEFUNG.md` is a snapshot from
+02.09.2026 and says so; it counts *two* AI consumers where there are now **four**
+(profile, jobs, scout, applications).
+
+**The line, and it is a test and not a review.** Nothing says "konform",
+"zertifiziert" or "erfüllt Art. X". Under Art. 42/43 DSGVO only a supervisory
+authority or a body accredited to EN ISO/IEC 17065 may certify; "certified"
+without accreditation is a misleading commercial practice in the EU
+(RL 2005/29/EG, RL 2006/114/EG). `DokumentwortTests` reads the scope sentences
+out of the generator and runs without a stack; `scripts/nachweis_worte.py`
+checks what actually came out. **The disclaimer is exempt from the word list on
+purpose** — it *denies* those words ("Es ist KEIN Zertifikat"), and a search that
+reads it flags the one sentence that makes the document honest. Measured on the
+first run; its wording is pinned from the other side instead.
+
+**Every citation carries `Leser` — what a human still decides — and it is never
+empty, as a test.** A citation that settled its own article would be exactly the
+presumption the vocabulary exists against. On the page `Leser` stands in the
+**same row** as the citation, never as a footnote: a footnote survives neither a
+screenshot nor a paste into somebody else's table.
+
+**`Hinweis` is not a defect, and that distinction is the whole gate.** That
+model calls are not recorded is ADR-0024 and a decision; a gate that goes red on
+deliberate restraint gets switched off by the next person. Red is only `Fehlt`.
+And a check whose subject is absent reports `NichtAnwendbar`, never `Erfuellt` —
+fourteen services without an AI seam would otherwise be fourteen green ticks
+over a seam that does not exist.
+
+**The AI directory counts people and names none.** It reports provider label and
+host and *counts* — "three people on `api.anthropic.com`". `EfAnbieterquelle`
+groups in SQL and does not even fetch the encrypted key: what is not fetched
+cannot end up in a finding. ADR-0026 says the same for events.
+
+**The door is its own piece of paper.** `Nachweis__Geheimnis`, deliberately
+neither the notification secret nor the erasure one: "may trigger a mail", "may
+delete everything about a person" and "may see which providers this instance
+uses" are three different rights. **Empty means shut**, and shut answers
+**404**, not 403 — an operations surface whose existence you can guess is itself
+a disclosure. A path below that names no section is 404 too.
+
+**Page and `bericht.json` come from ONE reading.** Two query paths to one
+statement drift apart, and the first time nobody notices — and which of the two
+went into the signed document nobody can say afterwards.
+
+**The word list matches per syllable, at the syllable start — and that was
+measured, not chosen.** A substring search over this tree reported `Capability`
+(the ledger's core type) for `ability`, `Benefits` for `fit` and `Availability`
+for `ability`: three false alarms over perfectly correct code. Exactly the bug
+Girder 4.3.0 had in its masking. What the syllable rule does *not* find is
+pinned as its own test: a German compound carrying the word at the **end**
+(`Trefferanzahl`) escapes it. **The name is the signal, not the rule** — the
+closed field sets (`wt.ki.naht`) stand beside it for that reason.
+
+`bewert` is deliberately **not** in the platform vocabulary: assessment-service
+holds exactly one evaluation per case, as text, and the person always reads it
+(ADR-0042). Forbidding the word platform-wide would mean excusing thirty
+correctly named things, and after the third excuse nobody reads the list.
+scout-service still forbids it locally, where a judgement beside a search hit
+*would* be the forbidden number.
+
+**Thirteen exemptions exist in the whole tree**, in three services, for three
+homonyms: `Note` (English: remark), `Quote` (English: citation) and
+`WorkloadPercent`/`PensumProzent` (the workload a person states about the job
+they want). Each carries its reason, and **the reason appears in the finding** —
+whoever adds an exemption writes it into a document a works council reads. A
+silent list in a test project grows; one that gets read does not. The count is
+pinned so a fourteenth stands out.
+
+**`Seitenanfrage.Anzahl` in profile-service is now `Seitenlaenge`**, exactly like
+scout-service and for the same reason. The vocabulary forced the naming, and
+that is its job.
+
+**The gate needs the stack, and says so instead of hiding it.**
+`make nachweis-pruefen` runs inside `make validate` whenever the stack answers;
+when it does not, the report names it — the same treatment `validate.sh` gives
+the E2E journeys. A tick over a run that never happened is the kind of green
+that script was built against.
+
 ## Conventions that bite
 
 - **Package managers are `dotnet`/NuGet and `pnpm`.** Never `npm`, never `yarn`. There is no Python here any more; if a command in an old document says `uv`, `ruff`, `mypy`, `pytest` or `alembic`, that document is describing the predecessor.
@@ -896,4 +1008,5 @@ When an application arrives, company **members** get a mail of kind `application
 - `docs/glossary.md` — the terms.
 - `docs/MESSUNG-GEHEIMNISFRAGE.md` — where the master key lies, what a key change costs (everything), and the measurement behind the three table rows above. 12.09.2026.
 - `bugs/` — Girder debts, each with a reproduction. The correlation id one is closed (it reaches stdout since 4.3.0, measured across a real service hop on 09.09.2026). One open since 12.09.2026: `verschluesselung-verschluesselt-nicht.md` — the only shipping `IDataEncryptionService` stores the plaintext and reports `AES256GCM`. It blocks nothing here, because `AddEncryption` is out.
+- `docs/adr/0044-nachweis-belege-statt-konformitaet.md` — der Nachweis: was ein Programm zeigen kann, was nicht, und wer die Anhang-III-Frage beantwortet. 20.09.2026.
 - `AGENTS.md` — concise command + convention reference.

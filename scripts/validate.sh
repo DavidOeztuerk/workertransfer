@@ -61,6 +61,21 @@ step "tsc" sh -c "cd web && pnpm check"
 step "vitest" sh -c "cd web && pnpm test"
 step "vite build" sh -c "cd web && pnpm build"
 
+# --- Der Nachweis (braucht den laufenden Stack) -------------------------------
+# „Ein Tor, das man aufrufen muss, um es zu haben, hat man nicht." Deshalb steht
+# es hier und nicht nur im Makefile.
+#
+# Es braucht den Stapel, weil es GENAU DAS misst, was kein Test messen kann: was
+# dieser Behaelter heute Abend wirklich tut — welche Anbieter eingetragen sind,
+# welche Tueren offen stehen, wohin gesprochen wird. Laeuft er nicht, wird das
+# unten NAMENTLICH gemeldet und nicht verschwiegen; ein Haken ueber einem Lauf,
+# der nicht stattfand, ist die Sorte gruen, gegen die dieses Skript gebaut ist.
+NACHWEIS_LIEF=0
+if curl -sf --max-time 2 http://localhost:8003/health/live >/dev/null 2>&1; then
+  NACHWEIS_LIEF=1
+  step "nachweis" ./scripts/nachweis-pruefen.sh
+fi
+
 # --- E2E (nur auf Wunsch, braucht den laufenden Stack) ------------------------
 if [[ $WITH_E2E -eq 1 ]]; then
   step "playwright" sh -c "cd web && pnpm e2e"
@@ -119,12 +134,16 @@ vitest_log="$log_dir/vitest.log"
 dotnet_passed=$(count_from "$dotnet_log" '[0-9]+ Tests gruen')
 vitest_passed=$(count_from "$vitest_log" 'Tests +[0-9]+ passed' sum)
 e2e_ran=$(count_from "$playwright_log" '[0-9]+ passed')
+# Auch hier die Zahl auf dem Schirm: ein gruener Nachweis ueber vierzehn Dienste
+# sieht sonst genauso aus wie einer ueber null.
+nachweis_befunde=$(count_from "$log_dir/nachweis.log" '[0-9]+ Befunde gefahren')
 
 printf '\n%s── Stand ─────────────────────────────────────────%s\n' "$BOLD" "$OFF"
 for entry in "${RESULTS[@]}"; do
   IFS='|' read -r status name log <<<"$entry"
   case "$name" in
     "dotnet test") tally="${dotnet_passed:-?} bestanden" ;;
+    nachweis) tally="${nachweis_befunde:-?} Befunde" ;;
     vitest) tally="${vitest_passed:-?} bestanden" ;;
     playwright) tally="${e2e_ran:-?} Reisen" ;;
     *) tally="" ;;
@@ -187,6 +206,10 @@ if [[ "$e2e_skipped" -gt 0 ]]; then
   else
     printf '\n'
   fi
+fi
+
+if [[ $NACHWEIS_LIEF -eq 0 ]]; then
+  printf '  %s!%s Der Nachweis ist NICHT gelaufen (kein Stapel). Er ist die einzige\n    Ebene, auf der geprueft wird, was dieser Behaelter wirklich tut —\n    welche Anbieter eingetragen sind und welche Tueren offen stehen.\n    Mit "docker compose up -d" laeuft er mit.\n' "$YELLOW" "$OFF"
 fi
 
 if [[ $WITH_E2E -eq 0 ]]; then
