@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Girder](https://github.com/DavidOeztuerk) 4.4.0** — a shared foundation library of this author's, pulled from GitHub Packages — plus a React app.
+WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Noelia](https://github.com/DavidOeztuerk) 6.4.0** — a shared foundation library of this author's, from nuget.org — plus a React app.
 
 Fourteen services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
 
@@ -46,20 +46,40 @@ The gateway (`src/gateway`, port 8090) is the single entrance. `src/shared/` hol
 
 The vision documents in [`docs/vision/`](docs/vision/) describe a much larger future state. **Treat them as intent, not description.**
 
-## Umstieg auf Noelia — offen, und er kommt zuerst
+## Der Umstieg auf Noelia ist gefahren (ADR-0045)
 
-**Girder und Noelia sind dieselbe Codelinie.** `MIGRATION.md:781` im Noelia-Baum
-heißt *„4.4.3 code line → Noelia 5.0.0"*. Dieses Repositorium steht auf
-**Girder 4.4.0** und ist damit zwölf dokumentierte Sprünge hinter Noelia 6.4.0.
+**Girder und Noelia sind dieselbe Codelinie.** `MIGRATION.md:781` im
+Noelia-Baum heißt *„4.4.3 code line → Noelia 5.0.0"*, und das ist die einzige
+Tür zwischen den beiden Identitäten.
 
-`docs/AUFTRAG-NOELIA-UMSTIEG.md` führt sie. **5.0 ist eine Datenwanderung, kein
-Umbenennen** — Sitzungen, Widerrufe, der Passwort-Pfeffer, die Prüfspur. Die
-schärfste Kante ist der Einwilligungsledger: ein Widerruf, der still nicht
-mitkommt, sieht danach aus wie eine erteilte Einwilligung.
+Der Auftrag sah zwölf Sprünge vor, weil **5.0 eine Datenwanderung ist** —
+Sitzungen, Widerrufe, der Passwort-Pfeffer, die Prüfspur. **Gefahren wurde ein
+Schnitt**, und die Bedingung dafür steht in ADR-0045: diese Plattform ist nicht
+in Betrieb, also hat die Wanderung keinen Gegenstand. Datenträger geleert, keine
+Kompatibilitätsschicht, kein `[Obsolete]`, kein zweiter Pfad daneben.
 
-```
-/noelia alles         # ab Phase 0 — erst am Demo, Daten vor Grün
-/noelia 1             # nur die zwölf Sprünge
+**Diese Entscheidung hat ein Verfallsdatum.** Am Tag, an dem das erste echte
+Konto hier liegt, gilt wieder, was `MIGRATION.md` §*„Before the first Noelia
+process starts"* sagt — `docs/AUFTRAG-NOELIA-UMSTIEG.md` bleibt genau dafür im
+Baum stehen.
+
+**Der Umstieg kostete drei API-Änderungen über zwölf Versionen**, jede
+dokumentiert: `ISovereignAuditSink` nach `Noelia.Abstractions.Audit` (5.2.0),
+`ITokenSessionService` nach `Noelia.Abstractions.Security.Sessions` (5.0.0),
+und `SessionObservations` als fünfter Konstruktorparameter von
+`TokenSessionService` (5.1.0) — letzteres, weil die beobachteten Subjekte ein
+Instanzfeld an einem `AddScoped`-Dienst waren und die Sitzungsübersicht deshalb
+dauerhaft „0 active sessions" meldete. **Registriert, vorhanden, ohne Wirkung**
+— dieselbe Fehlerklasse, für die ADR-0044 hier gebaut wurde.
+
+**Eine Versionsnummer hinter „Girder" ist Geschichte, kein Verweis.** „Girder
+4.3.0 hatte einen Substring-Fehler in seiner Maskierung" bleibt stehen: eine
+Messung an einer veröffentlichten Version umzubenennen hieße, sie zu fälschen.
+Wo unten eine Messung „Girder 4.4.0" nennt, ist sie vor dem 20.09.2026
+entstanden.
+
+```bash
+make analyze          # noelia analyze über die Zusammensetzung; steht in `make validate`
 ```
 
 ## Nachweis und KI-Pflichten
@@ -116,17 +136,17 @@ dotnet test tests/WorkerTransfer.Identity.Tests/WorkerTransfer.Identity.Tests.cs
 dotnet test tests/WorkerTransfer.Consent.Tests/... --no-build --filter "FullyQualifiedName~Widerruf"
 ```
 
-**Restoring needs no login any more.** Girder went to nuget.org on 10.09.2026 (MIT, source at [DavidOeztuerk/girder](https://github.com/DavidOeztuerk/girder)), so `dotnet restore`, `docker compose up` and CI all work in a fresh clone with no token. Measured against an empty package cache: every Girder assembly came back with `"source": "https://api.nuget.org/v3/index.json"`.
+**Restoring needs no login any more.** Noelia went to nuget.org on 10.09.2026 (MIT, source at [DavidOeztuerk/girder](https://github.com/DavidOeztuerk/girder)), so `dotnet restore`, `docker compose up` and CI all work in a fresh clone with no token. Measured against an empty package cache: every Noelia assembly came back with `"source": "https://api.nuget.org/v3/index.json"`.
 
 Before that it lived in GitHub Packages, and that cost a whole evening of CI — the notes are in the CI section, and the distinction worth keeping is **403 means authenticated and refused, 401 means never authenticated at all.**
 
-`NuGet.Config` still pins package source mapping, and the reason has only shifted. It used to keep a foreign `Girder.*` on nuget.org away from us; now it pins that exactly **one** source may answer those names. Without it, any additionally configured source — a company mirror, a local folder — is asked for every name, and whoever answers first wins. `<clear />` stays for the same reason: it discards the sources a developer machine carries in its user-level config.
+`NuGet.Config` still pins package source mapping, and the reason has only shifted. It used to keep a foreign `Noelia.*` on nuget.org away from us; now it pins that exactly **one** source may answer those names. Without it, any additionally configured source — a company mirror, a local folder — is asked for every name, and whoever answers first wins. `<clear />` stays for the same reason: it discards the sources a developer machine carries in its user-level config.
 
 ### Configuration comes from the environment
 
 `make env` is the first command in a fresh clone. It copies `.env.example` — which is complete, one comment per key — and **rolls the three secrets** with `openssl rand -base64 32`. `.env` is git-ignored; `.env.example` ships with the secrets **empty**.
 
-That emptiness is the point. A built-in default *is* the secret, and it then lives in git. `docker-compose.yml` therefore uses `${WORKERTRANSFER_JWT_SECRET:?…}`, not `${…:-dev-only-secret}`: without a value, compose aborts and **names the missing variable**. Girder does the same at its own most important place — `JWT_SECRET` beats `JwtSettings:Secret`, and if both are absent it throws a `ConfigurationException` naming the key.
+That emptiness is the point. A built-in default *is* the secret, and it then lives in git. `docker-compose.yml` therefore uses `${WORKERTRANSFER_JWT_SECRET:?…}`, not `${…:-dev-only-secret}`: without a value, compose aborts and **names the missing variable**. Noelia does the same at its own most important place — `JWT_SECRET` beats `JwtSettings:Secret`, and if both are absent it throws a `ConfigurationException` naming the key.
 
 `Umgebung.Laden()` (`ServiceDefaults`) is the **first line of every one of the fifteen `Program.cs`**, before `CreateBuilder` — the configuration builder reads environment variables exactly once, when it builds, so loading afterwards means loading and nobody reading. A test pins that order in all fifteen. It never overwrites an already-set variable: in compose and in the cluster the environment comes from there, and a file left in the image must never override it.
 
@@ -162,13 +182,13 @@ Load-bearing, and easy to undo by tidying up (ADR-0028):
 
 ### The brake on the auth endpoints, and why it lives in the gateway
 
-Five paths are braked — `/auth/login` (20/min), `/auth/register` (5), `/auth/resend-verification` (3), `/auth/verify-email` (20), `/auth/refresh` (60) — per origin, per minute. The rules live in `ocelot.json` next to the routes they select from, as Girder's own `DistributedRateLimiting` section; the middleware is **Girder's**, and there is no hand-written brake here any more.
+Five paths are braked — `/auth/login` (20/min), `/auth/register` (5), `/auth/resend-verification` (3), `/auth/verify-email` (20), `/auth/refresh` (60) — per origin, per minute. The rules live in `ocelot.json` next to the routes they select from, as Noelia's own `DistributedRateLimiting` section; the middleware is **Noelia's**, and there is no hand-written brake here any more.
 
 **The three defaults are `0`, and that is the whole trick.** A limit of zero writes no counter, so only the five named paths count. Without it a default would apply to every path — and the whole UI travels through this gateway, so each asset fetch would count. `BremsenkarteTests` pins both: the five paths, and that the defaults stay at zero.
 
 **`WORKERTRANSFER_BREMSE_FAKTOR` multiplies every limit, and it is why a measurement can look broken.** Measured 09.09.2026: six calls to `/auth/register` (limit 5) all came back `201`, and the answer carried `X-RateLimit-Limit: 200` — a number that appears nowhere in `ocelot.json`. It is `5 × 40`: `.env` sets the factor to 40 so an E2E run does not brake itself. **A factor and not a switch, deliberately** — the limiter still counts, still keys per origin, still answers with its own headers, so what is measured is the real path and not a disabled one. With the factor at `1` the promise holds exactly: three through, the fourth `429` with `X-RateLimit-Limit: 3`, `X-RateLimit-Remaining: 0`, `Retry-After: 60`, an RFC 9457 body, and the supplied correlation id in **both** header and body.
 
-Two suites, because one could not have found this: `BremsenkarteTests` asserts each braked path has a route — a statement about the *selection*. `BremsenbindungTests` binds the real `ocelot.json` to Girder's options type and asserts what arrives — the *binding*. A configuration that never lands still has perfectly valid paths.
+Two suites, because one could not have found this: `BremsenkarteTests` asserts each braked path has a route — a statement about the *selection*. `BremsenbindungTests` binds the real `ocelot.json` to Noelia's options type and asserts what arrives — the *binding*. A configuration that never lands still has perfectly valid paths.
 
 **Per origin, never per email address.** Keying on the address would build exactly the enumeration channel `/auth/register` closes: a braked answer would confirm the address exists. It would also let a stranger lock out anyone whose address they know. The key is path plus origin, and the brake never reads the body — a test sends five *different* addresses from one origin and requires them to share one bucket.
 
@@ -178,7 +198,7 @@ It sits **outside authentication** in the strongest sense available: no token ha
 
 **The counter runs in-process**, so the gateway is pinned to one replica. The way out is a registration change, not a rewrite: `RedisDistributedRateLimitStore` satisfies the same interface.
 
-**Girder's own rate limiter works, and the brake stays anyway — for a smaller reason than before.** Under 3.0.1 there were *three* limiters: two did not brake, the third had no caller, and all three trusted `X-Forwarded-For` unconditionally with no trusted-proxy list anywhere. All of that is fixed. Measured against 4.0.2, same probes the brake is held to:
+**Noelia's own rate limiter works, and the brake stays anyway — for a smaller reason than before.** Under 3.0.1 there were *three* limiters: two did not brake, the third had no caller, and all three trusted `X-Forwarded-For` unconditionally with no trusted-proxy list anywhere. All of that is fixed. Measured against 4.0.2, same probes the brake is held to:
 
 ```
 limit 3/min, per origin
@@ -191,13 +211,13 @@ limit 3/min, per origin
 
 The third line is the one that mattered: the header that used to lift the brake without any configuration now changes nothing. `ClientAddress.Of` reads only `Connection.RemoteIpAddress`; a forwarded header works solely behind a named trust list (`TrustForwardedHeadersFrom`). `WhitelistedIps` still defaults to loopback, but that is no longer reachable by forging — only by genuinely coming from there.
 
-**`Bremse.cs` is gone, and the reason it stood is worth keeping.** It survived three rounds of justification, each one measured and each one wrong in a different way: first "Girder's limiters don't brake" (fixed in 4.0.0), then "its rejection is not a problem document" (fixed in 4.1.0), then "it is a global brake and ours is selective". The last one was mine and it was simply false — a limit of `0` writes no counter, so Girder brakes exactly the paths you name. Always could.
+**`Bremse.cs` is gone, and the reason it stood is worth keeping.** It survived three rounds of justification, each one measured and each one wrong in a different way: first "Noelia's limiters don't brake" (fixed in 4.0.0), then "its rejection is not a problem document" (fixed in 4.1.0), then "it is a global brake and ours is selective". The last one was mine and it was simply false — a limit of `0` writes no counter, so Noelia brakes exactly the paths you name. Always could.
 
-What actually kept it was the price: `Girder.Infrastructure` drags **44** transitive packages, and this gateway only routes. `Girder.Http` (4.2.0) carries **none**, and the reason evaporated with it.
+What actually kept it was the price: `Noelia.Infrastructure` drags **44** transitive packages, and this gateway only routes. `Noelia.Http` (4.2.0) carries **none**, and the reason evaporated with it.
 
 The lesson is worth more than the code: **a hand-written replacement outlives its reason.** Each time the stated reason was fixed, a new one was found rather than the code deleted — and every one of them held up until somebody measured it.
 
-**In the fourteen services the module stays out for a reason that has nothing to do with Girder and will not change:** a service behind the gateway sees the gateway as the origin — every caller as one. The brake belongs at the entrance, and there it is.
+**In the fourteen services the module stays out for a reason that has nothing to do with Noelia and will not change:** a service behind the gateway sees the gateway as the origin — every caller as one. The brake belongs at the entrance, and there it is.
 
 ### github-service: the header that made it never work
 
@@ -233,12 +253,12 @@ Getting there took four fixes, and **not one of them was in the product code**. 
 
 **Two lines were missing, and between them they took every job down.** All five jobs red:
 
-- **No `permissions:` block at all**, so the run token carried the account default, which does not include `packages`. Every `dotnet restore` answered `NU1301 … 403 (Forbidden)` for each Girder package in turn — that reads like a broken feed and is a missing line in the workflow. The block now names `contents: read` as well, because an explicit block *replaces* the default rather than adding to it: `packages` alone would take checkout away.
+- **No `permissions:` block at all**, so the run token carried the account default, which does not include `packages`. Every `dotnet restore` answered `NU1301 … 403 (Forbidden)` for each Noelia package in turn — that reads like a broken feed and is a missing line in the workflow. The block now names `contents: read` as well, because an explicit block *replaces* the default rather than adding to it: `packages` alone would take checkout away.
 - **`pnpm/action-setup@v4` with no `with:`**, on all three Node jobs. It looks for `packageManager` in the **root** `package.json`, and that file went away when the workspace collapsed into `web/`. Five seconds in: `Error: No pnpm version is specified.` The fix is a pointer (`package_json_file: web/package.json`), never a `version:` here — a second number is the one that stays behind at the next bump.
 
 The pnpm half is **proved**: `frontend-quality` went green on the next run — and with it the open question about **node 25**, which this machine (24) could not answer.
 
-**The `permissions:` block is necessary and not sufficient, and that too is now measured rather than reasoned.** With the block in place the run token still answers `403 (Forbidden)` on every Girder package. `403` is the informative part: the token authenticated and was *refused*, so the missing thing is not a scope but an **entitlement**. **Girder is a private package and this repository is public**, and a package grants access per repository — the run token of `workertransfer` has no claim on a package published from `girder` until somebody says so.
+**The `permissions:` block is necessary and not sufficient, and that too is now measured rather than reasoned.** With the block in place the run token still answers `403 (Forbidden)` on every Noelia package. `403` is the informative part: the token authenticated and was *refused*, so the missing thing is not a scope but an **entitlement**. **Noelia is a private package and this repository is public**, and a package grants access per repository — the run token of `workertransfer` has no claim on a package published from `girder` until somebody says so.
 
 There are exactly two ways to say so, and both are account-level actions no workflow can perform:
 
@@ -279,13 +299,13 @@ Repository *interfaces* live in Domain, implementations in Infrastructure. Comma
 
 ### CQRS
 
-Mediator via Girder's `AddCQRS`, but with **our own `IBefehl` / `IAbfrage` markers** over MediatR's `IRequest`, defined per service in `Application/Nachrichten/`. This is deliberate: Girder's `ICommand<T>` carries its own error envelope, which would be a second one beside RFC 9457, and two shapes for "what went wrong" is exactly the divergence that later gets papered over in the UI. `TransaktionsBehavior` wraps **commands only** — a query has nothing to commit.
+Mediator via Noelia's `AddCQRS`, but with **our own `IBefehl` / `IAbfrage` markers** over MediatR's `IRequest`, defined per service in `Application/Nachrichten/`. This is deliberate: Noelia's `ICommand<T>` carries its own error envelope, which would be a second one beside RFC 9457, and two shapes for "what went wrong" is exactly the divergence that later gets papered over in the UI. `TransaktionsBehavior` wraps **commands only** — a query has nothing to commit.
 
 ### Errors
 
-RFC 9457 problem documents, everywhere, from `ServiceDefaults.ProblemDetailsMiddleware`. Every response carries a `correlationId`. **No values in logs** — shapes, not contents. Girder logs no values either, neither redacted nor scrubbed; do not build that back.
+RFC 9457 problem documents, everywhere, from `ServiceDefaults.ProblemDetailsMiddleware`. Every response carries a `correlationId`. **No values in logs** — shapes, not contents. Noelia logs no values either, neither redacted nor scrubbed; do not build that back.
 
-**Girder 4.4.0 masks log properties by exact name, and here it has nothing to do — measured, not hoped.** The running stack shows `[REDACTED]` zero times. That reading would be ambiguous on its own, so `MaskierungTests` supplies the other half: `Username`, `Email` and `City` *are* redacted, `SecretName` and `TokenId` are visible again (the 4.3.0 substring bug), the comparison is exact (`Emailvorlage` survives), and our own German property names stay readable. The reason nothing goes dark is twofold — our templates are German against an English list, and Girder's `LoggingBehavior` writes shapes anyway: `Shape of RegistrierenBefehl: {Email: string(34), …}` is a length, never an address. **Naming a log property `Email` would make it unreadable**, and that test says so.
+**Girder 4.4.0 masks log properties by exact name, and here it has nothing to do — measured, not hoped.** The running stack shows `[REDACTED]` zero times. That reading would be ambiguous on its own, so `MaskierungTests` supplies the other half: `Username`, `Email` and `City` *are* redacted, `SecretName` and `TokenId` are visible again (the 4.3.0 substring bug), the comparison is exact (`Emailvorlage` survives), and our own German property names stay readable. The reason nothing goes dark is twofold — our templates are German against an English list, and Noelia's `LoggingBehavior` writes shapes anyway: `Shape of RegistrierenBefehl: {Email: string(34), …}` is a length, never an address. **Naming a log property `Email` would make it unreadable**, and that test says so.
 
 An endpoint filter that has already written a response must return `Results.Empty`, never `null`: with headers sent, the framework writes a JSON null after them, which tears the connection on a POST-with-body and is invisible on a GET except in the log.
 
@@ -299,11 +319,11 @@ Company membership is a relation, not a column on the user — one person may ac
 
 The access token carries `sub`, `email`, `jti`, `iat`, `exp`, `iss`, `aud`, `session_id`, the long-form `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier` (a duplicate of `sub`), and — only while acting for a company — `tenant`. **Nothing else.** During the migration it also carried `tenant_id` and `type`; both are gone.
 
-That ninth claim was undocumented until it was **measured against the running stack on 03.09.2026** — this file said "eight, nothing else", the wire said nine. It stays, and the reason is Girder's: `MapInboundClaims = false` switches off the framework's own derivation, and seventeen readers resolve the caller through that name, two of them in provider packages that cannot see Girder's assembly. Dropping it saves seventy bytes and turns every one of those into a silent `null`.
+That ninth claim was undocumented until it was **measured against the running stack on 03.09.2026** — this file said "eight, nothing else", the wire said nine. It stays, and the reason is Noelia's: `MapInboundClaims = false` switches off the framework's own derivation, and seventeen readers resolve the caller through that name, two of them in provider packages that cannot see Noelia's assembly. Dropping it saves seventy bytes and turns every one of those into a silent `null`.
 
 The lesson is the test, not the claim: `TokenformTests` forbade two *names* and would never have noticed a ninth. It now pins the **complete set** in both capacities — a set comparison, not a membership check. Roles and permissions are not in the token: they are read from the membership table per operation, so the token was never authoritative.
 
-**Two suites, because one of them could not have caught it.** `TokenformTests` calls Girder's issuer directly; `TokenformAmDrahtTests` goes the whole way — register, confirm, sign in, switch to a company — and reads the token where a browser gets it, out of the `Set-Cookie`. Between the issuer and the wire sit the service's settings, its wiring and the cookie, and a claim added by *that* layer would be invisible to the first suite. The endpoint suite also pins something the unit suite cannot: **the token never appears in a response body.** It leaves only as the `httpOnly` cookie, so no script in the browser can read it, and there is no second path to the same string for someone to log by accident. Re-measured at the running stack on 04.09.2026: nine as a person, ten for a company, both matching.
+**Two suites, because one of them could not have caught it.** `TokenformTests` calls Noelia's issuer directly; `TokenformAmDrahtTests` goes the whole way — register, confirm, sign in, switch to a company — and reads the token where a browser gets it, out of the `Set-Cookie`. Between the issuer and the wire sit the service's settings, its wiring and the cookie, and a claim added by *that* layer would be invisible to the first suite. The endpoint suite also pins something the unit suite cannot: **the token never appears in a response body.** It leaves only as the `httpOnly` cookie, so no script in the browser can read it, and there is no second path to the same string for someone to log by accident. Re-measured at the running stack on 04.09.2026: nine as a person, ten for a company, both matching.
 
 `AuthMiddleware` resolves the principal from an `Authorization: Bearer` header **or** the `access` cookie, in that order. Both carriers are needed: service-to-service and CLI callers send the header; the browser never sees the `httpOnly` token and can only replay it as a cookie. Any new service verifying identity tokens must accept both.
 
@@ -358,12 +378,12 @@ EF Core, one `DbContext` per service, one database per service — **no shared d
 
 The table deliberately holds **no content**, only a user id and a kind. An outbox is durable storage and ends up in every backup, so a payload column would be an invitation to write message text into it. **Never carry an email address into it.** Giving up means leaving the row, never deleting it. Delivery is **at-least-once**. There is no broker, and none is planned.
 
-### The Girder modules
+### The Noelia modules
 
 **Every service reports its own composition at startup, by name**, and that report is the only thing that catches a drift between intent and default. Measured 09.09.2026 on 4.4.0, consent-service:
 
 ```
-Girder für consent-service: 19 Module in Betrieb (Logging, HttpContextAccess,
+Noelia für consent-service: 19 Module in Betrieb (Logging, HttpContextAccess,
 JsonOptions, Jwt, SecurityMonitoring, Resilience, SecretManagement, Audit,
 InputSanitization, HealthChecks, Caching, Observability, SecurityHeaders,
 Authorization, CorrelationPropagation, ApiDocumentation, Cors, Principal,
@@ -376,17 +396,17 @@ SovereignPlatform), 6 ausgelassen
 
 Our composition root takes `UseDefaults()`, adds `Principal` and `SovereignPlatform` (plus `PasswordHashing` and `TokenSessions` for identity only), and declares **six** exclusions with a reason each: `RateLimiting`, `HttpResponseCaching`, `Communication`, `Encryption`, `ResourceAuthorization`, `PermissionEnforcement`.
 
-**The chain now honours those exclusions too**, which it did not before 4.1.0. `UseWorkerTransferDefaults` used to carry a thirteen-line copy of Girder's default chain with three lines left out — not a design, a workaround: the chain called every step unconditionally and `UseRateLimiting()` aborted startup. It reads `GirderComposition` now, so `app.UseGirder(environment, dienstname)` is the whole thing and a `Without(...)` takes effect once instead of twice. The two exclusions that are real decisions are `RateLimiting` and `PermissionEnforcement`, both topology; the other four record decisions about modules that are not in the defaults anyway.
+**The chain now honours those exclusions too**, which it did not before 4.1.0. `UseWorkerTransferDefaults` used to carry a thirteen-line copy of Noelia's default chain with three lines left out — not a design, a workaround: the chain called every step unconditionally and `UseRateLimiting()` aborted startup. It reads `NoeliaComposition` now, so `app.UseNoelia(environment, dienstname)` is the whole thing and a `Without(...)` takes effect once instead of twice. The two exclusions that are real decisions are `RateLimiting` and `PermissionEnforcement`, both topology; the other four record decisions about modules that are not in the defaults anyway.
 
 `PermissionEnforcement` is new in 4.1.0 and exists because of us: `Authorization` used to be one module for two things — the policy provider that answers `[RequirePermission]`, and the middleware that refuses *everything else*. A service with a public surface had to choose between an authorization system that answers nothing and a blanket 401. We keep the provider (the company permissions hang off it) and leave the middleware out.
 
-The rule behind the table is inverted from what it used to be: **a module is called unless there is a measured reason against it**, and the reason lives in `.Without(module, reason)` in the code — `GirderBuilder` refuses an empty one.
+The rule behind the table is inverted from what it used to be: **a module is called unless there is a measured reason against it**, and the reason lives in `.Without(module, reason)` in the code — `NoeliaBuilder` refuses an empty one.
 
 *(The table below is from the 3.0.1 era and names `InfrastructureBuilder` methods, not the module enum. It still records why each area was rejected, but the wiring it describes is gone: the migration to `AddGirder(...)` with `UseDefaults()` is H1 in `docs/AUFTRAG-UMSTIEG-4.md`, and the four measurements that revisited those decisions are H2 — written up in `docs/erkenntnisse-girder.md`. Where the two disagree, the measurements win.)*
 
 Two rules that produced most of the corrections here:
 
-- **Search for the purpose, not the part.** Twice a conclusion was drawn from one implementation when Girder had several. `grep -ril <purpose>` over Girder's `src/` first, look at *every* hit, then decide. A broken path proves nothing about the others.
+- **Search for the purpose, not the part.** Twice a conclusion was drawn from one implementation when Noelia had several. `grep -ril <purpose>` over Noelia's `src/` first, look at *every* hit, then decide. A broken path proves nothing about the others.
 - **Read the source, not the name.** Three of the lines below say something different from what the method is called.
 
 | Modul | Stand | gemessen |
@@ -402,16 +422,16 @@ Two rules that produced most of the corrections here:
 | `AddInputSanitization` | **Modul UND Middleware laufen — seit 4.1.0, und ohne die Rumpfpruefung** | Bis 4.0.2 war das die schlimmste Zeile der Tabelle: die Middleware traf das *bloesse* SQL-Wort an einer Wortgrenze, und ein Bindestrich ist eine. Gemessen **400** auf `Union-Investment` (eine echte Fondsgesellschaft), `Select-Kundenberater`, `Drop-In-Zentrum`; und weil jede Anfrage der Loeschseite `Referer: …/delete-account` trug, war **`/delete-account` vollstaendig tot** bis hin zu ihrem `/auth/session` — die Seite erfuhr nicht, wer angemeldet ist, und bat eine angemeldete Person, sich anzumelden. In JSON-Ruempfe sah sie dabei gar nicht hinein. **4.1.0 behebt beides**: erkannt wird Injektionssyntax statt Woertern, der `Referer` ist keine Eingabe, und JSON-Zeichenketten werden geprueft. `StellenreiseTests.Ein_Suchbegriff_mit_einem_SQL_Wort_wird_beantwortet` ist gruen. **Die Rumpfpruefung stellen wir trotzdem ab** (`InspectJsonBodies = false`, begruendet in `Dienstgrundlage.cs`): sie laeuft vor allem anderen und kann kein Feld benennen, also wird aus einem 422 mit Feldnamen ein blankes 400 — gemessen an fuenf Faellen in drei Diensten. Abgewiesen werden sie weiterhin, nur sagt die Antwort dem Menschen im Formular weniger. Query-String und die zwei Adresskoepfe bleiben geprueft. |
 | *(Validierung, kein Modul)* | **läuft, und seit D2 hat sie auch etwas zu tun** | `AddCQRS` hängt `ValidationBehavior` **bereits** in jede Pipeline und ruft **bereits** `AddValidatorsFromAssemblies`. Das Verhalten steigt sofort aus, wenn es keine Validatoren findet — und lange fand es keinen. **Der Satz „wir haben null `AbstractValidator` geschrieben" stimmt seit D2 nicht mehr: es sind acht Klassen in sechs Dateien** (nachgemessen am 12.09.2026) — identity sechs (`AnmeldenPruefung`, `RegistrierungPruefung`, `BestaetigungPruefung`, `ErneutSendenPruefung`, `EinladungPruefung`, `GruendungPruefung`), github eine (`VerbindenPruefung`), applications eine (`StandPruefung`). **Der Satz darunter stimmt weiterhin und ist der eigentliche Punkt:** es fehlt keine Verdrahtung, sondern der Inhalt — **elf der vierzehn Dienste haben bis heute keinen einzigen Validator**, und ihre Pipeline-Stufe steigt bei jeder Anfrage sofort wieder aus. Wer dort validiert, schreibt eine Klasse und verdrahtet nichts. Achtung beim Schreiben: `ValidationBehavior` **protokolliert die Fehlermeldungen**, eine Meldung muss deshalb die Regel nennen und nie den Wert — FluentValidations Vorgabemeldungen setzen `{PropertyValue}` ein und wären damit ein Wert im Log. |
 | `AddResilience` | **bewusst nicht** | Registriert nur `ICircuitBreakerFactory` und `IRetryPolicyFactory` — es umhuellt **keinen** HttpClient. Der alte Grund gegen `AddResilientHttpClient<T>` ist weg: seit 4.0.0 ist ein Nicht-2xx keine Ausnahme mehr, und `ResilientHttpPolicyHandler` wiederholt nur noch, was ein zweiter Versuch anders beantworten koennte (Transportfehler, Zeitueberschreitung, 408/429/5xx) — gemessen, jeder Status kam als er selbst an und **einmal**. Es bleibt draussen, weil es nichts mehr zu holen gibt: das echte Risiko lag woanders und ist behoben — **alle fuenfzehn Aufrufstellen setzen ein eigenes Zeitlimit**, sieben taten es nicht und liefen in die 100-Sekunden-Vorgabe von `HttpClient`. `ZeitlimitTests` haelt das fest. |
-| `AddCommunication` | **bewusst nicht — und der Umstieg ist abgesagt, nicht vertagt** | Drei gemessene Gruende, alle an 4.0.2 ohne Fremdcode. **1.** `CommunicationModule` deklariert `RequiresProvider<IEventBus>`, und `IEventBus` registriert in ganz Girder genau eine Stelle (`Girder.Messaging.MassTransit`) — ohne Broker stirbt der Container beim Aufloesen des Managers. **2.** `UseGateway` steht per Vorgabe auf `true`: dann geht *jeder* Aufruf an den Dienst namens `gateway`, der uebergebene `serviceName` wird fuer die Adresse nicht gelesen — Dienst-zu-Dienst-Verkehr liefe durch Ocelot und durch unsere eigene Bremse. **3.** `EnableResponseCaching` steht per Vorgabe auf `true`, Vorgabepolitik „jede GET-Antwort, fuenf Minuten"; unsere Einwilligungspruefung entkaeme dem nur durch ihre **Form** (POST), nicht durch eine Entscheidung — und ein Ledger-Ergebnis, das fuenf Minuten liegen bleibt, waere ADR-0013 ins Gesicht. **Und der Grund, der den Umstieg attraktiv machte, ist weg:** die Korrelationskennung reist seit 4.0.0 an jedem `HttpClient` der Fabrik (ueber einen echten Sprung nachgewiesen). Wir bekommen die Kette, ohne die Antwort aufzugeben. |
-| `AddDistributedRateLimiting` | **bewusst nicht — aus Topologie, nicht aus Misstrauen** | Sie ist seit 4.0.0 in Ordnung, und das ist ohne Fremdcode nachgemessen: `ClientAddress.Of` liest allein `Connection.RemoteIpAddress`, ein gefaelschtes `X-Forwarded-For: 127.0.0.1` hebt sie **nicht** mehr auf (weitergereichte Koepfe wirken nur ueber `TrustForwardedHeadersFrom`), sie zaehlt je Herkunft, kann Je-Pfad-Grenzen und setzt `X-RateLimit-*` und `Retry-After`. Draussen bleibt sie trotzdem, und der Grund ist endgueltig: **ein Dienst hinter dem Gateway sieht als Herkunft nur das Gateway** und damit alle Aufrufer als einen. Gebremst wird am Eingang — und dort ist es seit 4.2.0 genau dieses Modul, aus `Girder.Http` statt aus einem Eigenbau. |
+| `AddCommunication` | **bewusst nicht — und der Umstieg ist abgesagt, nicht vertagt** | Drei gemessene Gruende, alle an 4.0.2 ohne Fremdcode. **1.** `CommunicationModule` deklariert `RequiresProvider<IEventBus>`, und `IEventBus` registriert in ganz Noelia genau eine Stelle (`Noelia.Messaging.MassTransit`) — ohne Broker stirbt der Container beim Aufloesen des Managers. **2.** `UseGateway` steht per Vorgabe auf `true`: dann geht *jeder* Aufruf an den Dienst namens `gateway`, der uebergebene `serviceName` wird fuer die Adresse nicht gelesen — Dienst-zu-Dienst-Verkehr liefe durch Ocelot und durch unsere eigene Bremse. **3.** `EnableResponseCaching` steht per Vorgabe auf `true`, Vorgabepolitik „jede GET-Antwort, fuenf Minuten"; unsere Einwilligungspruefung entkaeme dem nur durch ihre **Form** (POST), nicht durch eine Entscheidung — und ein Ledger-Ergebnis, das fuenf Minuten liegen bleibt, waere ADR-0013 ins Gesicht. **Und der Grund, der den Umstieg attraktiv machte, ist weg:** die Korrelationskennung reist seit 4.0.0 an jedem `HttpClient` der Fabrik (ueber einen echten Sprung nachgewiesen). Wir bekommen die Kette, ohne die Antwort aufzugeben. |
+| `AddDistributedRateLimiting` | **bewusst nicht — aus Topologie, nicht aus Misstrauen** | Sie ist seit 4.0.0 in Ordnung, und das ist ohne Fremdcode nachgemessen: `ClientAddress.Of` liest allein `Connection.RemoteIpAddress`, ein gefaelschtes `X-Forwarded-For: 127.0.0.1` hebt sie **nicht** mehr auf (weitergereichte Koepfe wirken nur ueber `TrustForwardedHeadersFrom`), sie zaehlt je Herkunft, kann Je-Pfad-Grenzen und setzt `X-RateLimit-*` und `Retry-After`. Draussen bleibt sie trotzdem, und der Grund ist endgueltig: **ein Dienst hinter dem Gateway sieht als Herkunft nur das Gateway** und damit alle Aufrufer als einen. Gebremst wird am Eingang — und dort ist es seit 4.2.0 genau dieses Modul, aus `Noelia.Http` statt aus einem Eigenbau. |
 | `AddCaching` | **bewusst nicht** | HTTP-Antwort-Caching plus `CacheInvalidationService`, und es verlangt einen `IDistributedCacheService`. Eine Einwilligung muss sofort wirken (das gilt, weil es richtig ist, nicht weil ein ADR es sagt) — was zwischengespeichert wird, muss deshalb einzeln entschieden werden, nicht global eingeschaltet. |
-| `AddAuditLogging` | **bewusst nicht** | Registriert `ISecurityAuditLogger`, der ins **Protokoll** schreibt; `AuditBehavior` in der Pipeline wirkt auf `IAuditableCommand`, das wir nicht umsetzen. Unsere Prüfspur ist eine **Tabelle** (`EfPruefspur`) in derselben Transaktion wie die Änderung: sie ist Beleg, Girders ist Telemetrie. Beides kann nebeneinander stehen — nur ersetzt keins das andere. |
-| `AddEncryption` | **bewusst nicht — gemessen 12.09.2026, und der Grund ist ein anderer als der alte** | Der alte Grund („wir verschlüsseln auf Feldebene nichts; wer damit anfängt, entscheidet zuerst, wo der Hauptschlüssel liegt") war **schon bei der Niederschrift überholt**: `Geheimnisspeicher.cs` verschlüsselt den KI-Schlüssel einer Person seit den Kontoeinstellungen, und der Hauptschlüssel liegt in `WORKERTRANSFER_SECRETS_KEY`. Der neue Grund ist gemessen und ändert sich nicht: **die einzige ausgelieferte Umsetzung von `IDataEncryptionService` verschlüsselt nicht.** `Girder.Redis` legt den Klartext base64-kodiert in eine JSON-Hülle, setzt eine Prüfsumme aus Nullbytes, meldet `Algorithm = AES256GCM, Success = true` — und ein **fremder** Schlüssel entschlüsselt dieselbe Hülle mit `IntegrityVerified = true`. Dafür verlangt es Redis (+6 Fremdpakete); einen zweiten Anbieter gibt es nicht. Girders eigene Tests merken es nicht, weil ein Hin-und-Rückweg trivial grün ist, wenn nichts passiert. Ticket: [`bugs/verschluesselung-verschluesselt-nicht.md`](bugs/verschluesselung-verschluesselt-nicht.md), Messung: [`docs/MESSUNG-GEHEIMNISFRAGE.md`](docs/MESSUNG-GEHEIMNISFRAGE.md). |
-| `AddSecretManagement` | **läuft — und tut nichts (gemessen 12.09.2026)** | Nicht „offen": es steht in `GirderModuleCatalogue.Defaults`, `UseDefaults()` holt es, und der Startbericht führt es auf. Was es registriert, ist **eine Optionsbindung** (`SecretRotationOptions` aus dem Abschnitt `SecretRotation`) — und die hat in ganz Girder **keinen Leser**; der Hintergrunddienst, den der Kommentar ankündigt, existiert nicht. **Die H2-Frage beantwortet es nicht, sie berührt es nicht einmal:** `ISecretManager` hat in ganz Girder **keinen Verbraucher**, und es gibt **keinen** Konfigurationsanbieter, der aus einem Geheimnisspeicher liest — gemessen: mit registriertem `ISecretManager` ändert sich an `IConfiguration` nichts, und `JWT_SECRET` liest Girder weiter direkt aus der Umgebung. Die Zusage „Infisical füttert `.env`, es ersetzt den Mechanismus nicht" gilt also an 4.4.0 unverändert. |
+| `AddAuditLogging` | **bewusst nicht** | Registriert `ISecurityAuditLogger`, der ins **Protokoll** schreibt; `AuditBehavior` in der Pipeline wirkt auf `IAuditableCommand`, das wir nicht umsetzen. Unsere Prüfspur ist eine **Tabelle** (`EfPruefspur`) in derselben Transaktion wie die Änderung: sie ist Beleg, Noelias ist Telemetrie. Beides kann nebeneinander stehen — nur ersetzt keins das andere. |
+| `AddEncryption` | **bewusst nicht — gemessen 12.09.2026, und der Grund ist ein anderer als der alte** | Der alte Grund („wir verschlüsseln auf Feldebene nichts; wer damit anfängt, entscheidet zuerst, wo der Hauptschlüssel liegt") war **schon bei der Niederschrift überholt**: `Geheimnisspeicher.cs` verschlüsselt den KI-Schlüssel einer Person seit den Kontoeinstellungen, und der Hauptschlüssel liegt in `WORKERTRANSFER_SECRETS_KEY`. Der neue Grund ist gemessen und ändert sich nicht: **die einzige ausgelieferte Umsetzung von `IDataEncryptionService` verschlüsselt nicht.** `Noelia.Redis` legt den Klartext base64-kodiert in eine JSON-Hülle, setzt eine Prüfsumme aus Nullbytes, meldet `Algorithm = AES256GCM, Success = true` — und ein **fremder** Schlüssel entschlüsselt dieselbe Hülle mit `IntegrityVerified = true`. Dafür verlangt es Redis (+6 Fremdpakete); einen zweiten Anbieter gibt es nicht. Noelias eigene Tests merken es nicht, weil ein Hin-und-Rückweg trivial grün ist, wenn nichts passiert. Ticket: [`bugs/verschluesselung-verschluesselt-nicht.md`](bugs/verschluesselung-verschluesselt-nicht.md), Messung: [`docs/MESSUNG-GEHEIMNISFRAGE.md`](docs/MESSUNG-GEHEIMNISFRAGE.md). |
+| `AddSecretManagement` | **läuft — und tut nichts (gemessen 12.09.2026)** | Nicht „offen": es steht in `NoeliaModuleCatalogue.Defaults`, `UseDefaults()` holt es, und der Startbericht führt es auf. Was es registriert, ist **eine Optionsbindung** (`SecretRotationOptions` aus dem Abschnitt `SecretRotation`) — und die hat in ganz Noelia **keinen Leser**; der Hintergrunddienst, den der Kommentar ankündigt, existiert nicht. **Die H2-Frage beantwortet es nicht, sie berührt es nicht einmal:** `ISecretManager` hat in ganz Noelia **keinen Verbraucher**, und es gibt **keinen** Konfigurationsanbieter, der aus einem Geheimnisspeicher liest — gemessen: mit registriertem `ISecretManager` ändert sich an `IConfiguration` nichts, und `JWT_SECRET` liest Noelia weiter direkt aus der Umgebung. Die Zusage „Infisical füttert `.env`, es ersetzt den Mechanismus nicht" gilt also an 4.4.0 unverändert. |
 | `AddSecurityMonitoring` | **bewusst nicht** | Alarme und Bedrohungssignale, verlangt einen `IDistributedCache`. Ein Alarmweg ohne Empfänger ist ein Protokolleintrag mehr; das lohnt erst, wenn jemand ihn liest. |
-| `AddResourceAuthorization` | **bewusst nicht — gemessen 12.09.2026: es trägt nichts darüber hinaus** | Es nimmt nichts weg (der `PermissionPolicyProvider` bleibt, die Firmenrechte antworten unverändert — mit Gegenprobe), es kostet auch wenig (`Girder.InMemory`: 2 Fremdpakete). Es trägt nur nichts: **erstens** leiten seine Handler die Ressourcenart aus einer `IResourceMap` her, und ohne registrierte Karte ist das `ResourceMap.Empty` → jede Prüfung `Fail()`; eine Karte zu schreiben wäre eine **dritte** Liste über unsere öffentliche Fläche, neben den Endpunkten und `docs/routenkarte.yml`. **Zweitens, und das trägt:** sein Speicher ist eine **Erlaubnistabelle** (`GrantPermissionAsync`/`RevokePermissionAsync` samt `expiresAt`) — eine zweite Stelle, an der eine Erlaubnis steht, während `Mitgliedschaftsrecht` die Rolle **je Anfrage ohne Zwischenspeicher** aus der Mitgliedschaftstabelle liest, damit eine Entfernung sofort wirkt. **Drittens** lesen `AdminOnly`/`SuperAdminOnly` Rollen aus Ansprüchen, und unser Token trägt keine. Nebenbei gefunden: Eigentumsprüfung gibt es in Girder **zweimal** — `ResourceOwnerHandler` läuft über `Authorization` bei uns längst mit und ist untätig, weil keine Richtlinie seine Anforderung stellt. |
+| `AddResourceAuthorization` | **bewusst nicht — gemessen 12.09.2026: es trägt nichts darüber hinaus** | Es nimmt nichts weg (der `PermissionPolicyProvider` bleibt, die Firmenrechte antworten unverändert — mit Gegenprobe), es kostet auch wenig (`Noelia.InMemory`: 2 Fremdpakete). Es trägt nur nichts: **erstens** leiten seine Handler die Ressourcenart aus einer `IResourceMap` her, und ohne registrierte Karte ist das `ResourceMap.Empty` → jede Prüfung `Fail()`; eine Karte zu schreiben wäre eine **dritte** Liste über unsere öffentliche Fläche, neben den Endpunkten und `docs/routenkarte.yml`. **Zweitens, und das trägt:** sein Speicher ist eine **Erlaubnistabelle** (`GrantPermissionAsync`/`RevokePermissionAsync` samt `expiresAt`) — eine zweite Stelle, an der eine Erlaubnis steht, während `Mitgliedschaftsrecht` die Rolle **je Anfrage ohne Zwischenspeicher** aus der Mitgliedschaftstabelle liest, damit eine Entfernung sofort wirkt. **Drittens** lesen `AdminOnly`/`SuperAdminOnly` Rollen aus Ansprüchen, und unser Token trägt keine. Nebenbei gefunden: Eigentumsprüfung gibt es in Noelia **zweimal** — `ResourceOwnerHandler` läuft über `Authorization` bei uns längst mit und ist untätig, weil keine Richtlinie seine Anforderung stellt. |
 
-**Nicht in dieser Tabelle, weil kein Modul:** `AddCQRS` (aus `Girder.Application`) ruft jeder Dienst selbst, und `worker`-eigene Pipeline-Glieder (`TransaktionsBehavior`, identity zusätzlich `VersandBehavior`) hängen daneben.
+**Nicht in dieser Tabelle, weil kein Modul:** `AddCQRS` (aus `Noelia.Application`) ruft jeder Dienst selbst, und `worker`-eigene Pipeline-Glieder (`TransaktionsBehavior`, identity zusätzlich `VersandBehavior`) hängen daneben.
 
 ### `SovereignPlatform` — angenommen, und die Hosts kommen aus der Konfiguration
 
@@ -434,18 +454,18 @@ So the *operator* declares where a person may point, in `Draft__ErlaubteZiele__*
 
 **The gateway is exempt** — it never calls `AddWorkerTransferDefaults`, so no guard runs there and Ocelot's routing is untouched. Measured rather than assumed; otherwise the `Host`/`Port` pairs from `ocelot.json` would have had to be covered too.
 
-**Girder's audit trail comes along and is refused, as a mechanism rather than a comment.** There is no `WithoutAuditTrail()`; the bundle is one module. Girder's fallback sink writes to a list in the process — it survives no rollback and sits *beside* our transaction instead of inside it, so it does not satisfy ADR-0012, which `EfPruefspur` does. `VerweigerndePruefspur` is registered as the sink: never called, and whoever does call it gets a sentence saying where to go instead. A silent store that looks like an audit trail would only be noticed when somebody needs the trail and finds it empty.
+**Noelia's audit trail comes along and is refused, as a mechanism rather than a comment.** There is no `WithoutAuditTrail()`; the bundle is one module. Noelia's fallback sink writes to a list in the process — it survives no rollback and sits *beside* our transaction instead of inside it, so it does not satisfy ADR-0012, which `EfPruefspur` does. `VerweigerndePruefspur` is registered as the sink: never called, and whoever does call it gets a sentence saying where to go instead. A silent store that looks like an audit trail would only be noticed when somebody needs the trail and finds it empty.
 
 ### Und dieselbe Frage an unseren Eigenbau
 
 | Eigenbau | bleibt? | gemessen |
 |---|---|---|
-| `Bremse.cs` | **GELÖSCHT (4.2.0)** | Drei Begründungen nacheinander, jede gemessen, jede anders falsch — zuletzt „Girders ist global, unsere selektiv". Das war schlicht unwahr: eine Grenze von `0` legt keinen Zähler an. Gehalten hat sie am Ende nur der Preis: `Girder.Infrastructure` zieht 44 Fremdpakete für ein Gateway, das routet. `Girder.Http` zieht null. |
-| `Korrelation.cs` (Gateway) | **GELÖSCHT (4.2.0)** | Girders Zwischenschicht schrieb die Kennung bis 4.0.2 nur in Antwortkopf, Gepäck und `Items`; ein Reverse Proxy reicht aber nur **Anfrage**köpfe weiter. Behoben in 4.1.0, und seit 4.2.0 kostet ihr Bezug nichts mehr. |
-| `Gesundheit.cs` (Gateway) | **ja** | Ocelot beendet die Kette, ein `MapGet` dahinter läuft nie — gemessen. Girders `AddHealthChecks()` registriert Endpunkte, keine Middleware. |
+| `Bremse.cs` | **GELÖSCHT (4.2.0)** | Drei Begründungen nacheinander, jede gemessen, jede anders falsch — zuletzt „Noelias ist global, unsere selektiv". Das war schlicht unwahr: eine Grenze von `0` legt keinen Zähler an. Gehalten hat sie am Ende nur der Preis: `Noelia.Infrastructure` zieht 44 Fremdpakete für ein Gateway, das routet. `Noelia.Http` zieht null. |
+| `Korrelation.cs` (Gateway) | **GELÖSCHT (4.2.0)** | Noelias Zwischenschicht schrieb die Kennung bis 4.0.2 nur in Antwortkopf, Gepäck und `Items`; ein Reverse Proxy reicht aber nur **Anfrage**köpfe weiter. Behoben in 4.1.0, und seit 4.2.0 kostet ihr Bezug nichts mehr. |
+| `Gesundheit.cs` (Gateway) | **ja** | Ocelot beendet die Kette, ein `MapGet` dahinter läuft nie — gemessen. Noelias `AddHealthChecks()` registriert Endpunkte, keine Middleware. |
 | `Navigation.cs` | **GELÖSCHT (11.09.2026)** | Das Gateway liefert keine Oberflaeche mehr aus (ADR-0040). |
-| `ProblemDetailsMiddleware` | **zu prüfen** | Girder hat `GlobalExceptionHandlingMiddleware` mit eigener Fehlergestalt. Eine Gestalt über alle Dienste ist der Grund für unsere — zu belegen, dass Girders nicht dasselbe kann. |
-| `Outbox` | **ja** | Girder hat keine. |
+| `ProblemDetailsMiddleware` | **zu prüfen** | Noelia hat `GlobalExceptionHandlingMiddleware` mit eigener Fehlergestalt. Eine Gestalt über alle Dienste ist der Grund für unsere — zu belegen, dass Noelias nicht dasselbe kann. |
+| `Outbox` | **ja** | Noelia hat keine. |
 | `Wanderung`, `ZugriffsCookie`, `Skills`, `Contracts.*` | **ja** | Fachlichkeit, kein Nachbau. |
 
 ## The route map is a test, not a checklist
@@ -491,7 +511,7 @@ The former stack (TanStack Query + TanStack Router, `packages/ui` with hand-writ
 
 **The language lives on the account, not on the request** — `users.language`, set once at registration from `Accept-Language` and never read from a header again. The reason is the mail: a deletion confirmation is written when the last of eight services acknowledges, days later, by a dispatcher with no browser and no header. The outbox stays content-free (ADR-0025); the language is read from the row at delivery. `PUT /account/language` refuses an unsupported tag with 422 instead of quietly storing German.
 
-**A problem document stays English on the wire** and describes a *shape* (`"malformed request body"`, `"invalid: email, password"`). The UI translates by status, so a person reads their own language in every language the UI knows — including ones the backend never heard of. Threading `Accept-Language` through fourteen services would mean fourteen copies of one catalogue, which is exactly the divergence this codebase defends against everywhere else. Measured 03.09.2026: every answer on the wire is English, Girder's own refusals included.
+**A problem document stays English on the wire** and describes a *shape* (`"malformed request body"`, `"invalid: email, password"`). The UI translates by status, so a person reads their own language in every language the UI knows — including ones the backend never heard of. Threading `Accept-Language` through fourteen services would mean fourteen copies of one catalogue, which is exactly the divergence this codebase defends against everywhere else. Measured 03.09.2026: every answer on the wire is English, Noelia's own refusals included.
 
 **Tests run with the language pinned** (`locale: "de-DE"` in `playwright.config.ts`, `lng: "de"` in the component wrapper) and assert the German literals. That is deliberate: a test whose result depends on the machine's locale is green on one person's laptop and red on the next, and nobody sees why. Exactly **one** journey switches language and proves it works — `web/e2e/language-journey.spec.ts`, which also checks that the *mail* follows the choice while the browser still says `de-DE`.
 
@@ -841,7 +861,7 @@ precedence.
 
 **The recogniser is a library in the process, and that is the decision the ADR
 exists for.** `PdfPig` (MIT) pulls **zero** transitive packages — the same
-measure that gave `Girder.Http` the edge over `Girder.Infrastructure`, and here
+measure that gave `Noelia.Http` the edge over `Noelia.Infrastructure`, and here
 it counts twice: a reference names the employer, the dates, often the grade. A
 recogniser on the network would mean that document leaving the platform so a
 stranger can look for words in it, and the gain would be a suggestion in a form
@@ -1009,7 +1029,7 @@ that script was built against.
 - **Sharing rule**: only domain-neutral, transport-independent, non-business code goes in `src/shared/`. Profile, company, job, transfer, contract, application and matching models stay inside the owning service. `Contracts.*` holds versioned boundary DTOs, never a shared domain model.
 - **A service-to-service body is a typed contract, never an anonymous object.** `new { userId = … }` compiles, serialises, and arrives as `Guid.Empty` at a receiver that declares `[JsonPropertyName("user_id")]`. Measured: all **four** notification hops did exactly this, and the whole notification path had never once delivered — 18 outbox rows given up after ten attempts, and the mailbox held nothing but confirmation mails. The erasure cascade was immune because sender and receiver share `LoeschungV1`. Where a shared type is genuinely not available, `BenachrichtigungsdrahtTests` is the pattern: capture what the sender writes, deserialise it with the *receiver's* type, and assert the value survives — never compare the two names, which is one string checked twice.
 - **No secrets, tokens, CVs, contracts or raw source code in the repo or in logs.**
-- **No detour around a Girder bug.** Write the code correctly, leave the test red, file a ticket in `bugs/` with a reproduction free of WorkerTransfer code, move on. Everything in `bugs/` must go green once the bug is fixed, without anyone reverting code.
+- **No detour around a Noelia bug.** Write the code correctly, leave the test red, file a ticket in `bugs/` with a reproduction free of WorkerTransfer code, move on. Everything in `bugs/` must go green once the bug is fixed, without anyone reverting code.
 - **Run counter-probes, and make sure the break actually compiles** — a build error reads in the output like a passing test.
 - **After a counter-probe, build with `--no-incremental`** — and after the *revert*, not only after the patch. The incremental build has failed to notice a revert three times: twice a test fell over code that was already correct, and once a counter-probe *passed* while the rule was genuinely missing. The second case is the dangerous one, because it looks like a licence.
 - **A counter-probe that does not fall reveals a weak test, not correct code.** This has happened for the URL scheme check, "validate before write", the unverified-connection guard, the fork filter, the route priorities and the database-creation guard. Every time the answer was to strengthen the test, not to drop the claim.
@@ -1028,6 +1048,6 @@ that script was built against.
 - `docs/SCOUT-UND-BERATER.md` — planned, not built. See above.
 - `docs/glossary.md` — the terms.
 - `docs/MESSUNG-GEHEIMNISFRAGE.md` — where the master key lies, what a key change costs (everything), and the measurement behind the three table rows above. 12.09.2026.
-- `bugs/` — Girder debts, each with a reproduction. The correlation id one is closed (it reaches stdout since 4.3.0, measured across a real service hop on 09.09.2026). One open since 12.09.2026: `verschluesselung-verschluesselt-nicht.md` — the only shipping `IDataEncryptionService` stores the plaintext and reports `AES256GCM`. It blocks nothing here, because `AddEncryption` is out.
+- `bugs/` — Noelia debts, each with a reproduction. The correlation id one is closed (it reaches stdout since 4.3.0, measured across a real service hop on 09.09.2026). One open since 12.09.2026: `verschluesselung-verschluesselt-nicht.md` — the only shipping `IDataEncryptionService` stores the plaintext and reports `AES256GCM`. It blocks nothing here, because `AddEncryption` is out.
 - `docs/adr/0044-nachweis-belege-statt-konformitaet.md` — der Nachweis: was ein Programm zeigen kann, was nicht, und wer die Anhang-III-Frage beantwortet. 20.09.2026.
 - `AGENTS.md` — concise command + convention reference.

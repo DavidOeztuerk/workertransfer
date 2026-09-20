@@ -1,5 +1,25 @@
 # Auftrag: Nachweis und KI-Pflichten
 
+> **Ausgeführt am 20.09.2026 (PR #87), und der Baum steht seit demselben Tag auf
+> Noelia 6.4.0 (ADR-0045).** Dieser Auftrag wird **nicht umgeschrieben** — er ist
+> gefahren worden und ist Geschichte.
+>
+> Sein zweiter Satz entschied, *keinen Quelltext* aus Noelia zu übertragen, weil
+> „WorkerTransfer auf Girder steht, nicht auf Noelia". Das war falsch: Girder und
+> Noelia sind dieselbe Codelinie. Wäre der Umstieg zuerst gelaufen, wären seine
+> **Phasen 3 bis 5** *„Noelias Dashboard komponieren und vier eigene Prüfungen
+> schreiben"* gewesen.
+>
+> **Was er hervorgebracht hat, bleibt bezahlt:** die vier eigenen Prüfungen
+> (`wt.ki.naht`, `wt.ki.keine-zahl`, `wt.einwilligung.wirkt`,
+> `wt.loeschung.nachweis`) haben in Noelia keine Entsprechung, und die drei Funde
+> — die Teilzeichenketten-Fehlalarme, die Zwei-Tabellen-Regel der Prüfspur, der
+> Gegenversuch, der nicht fiel — gelten unverändert.
+>
+> **Was kollabiert, ist die Oberfläche**, und das steht noch aus: `ISecurityCheck`
+> statt eigenem Läufer, `Noelia.Dashboard` statt der sieben `/nachweis/…`-Adressen,
+> `OperatorReport` statt `bericht.json`, `RegulatoryReference` statt `Rechtsbezug`.
+
 **Stand:** 20.09.2026 · **Zweig:** ab `develop` · **Nächstes ADR:** 0044
 
 Dieser Auftrag überträgt ein Verfahren, das im Schwesterprojekt `Noelia` gebaut

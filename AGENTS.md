@@ -63,7 +63,7 @@ make k8s-up / k8s-down / k8s-lint
 Single suite: `dotnet test tests/WorkerTransfer.<X>.Tests/WorkerTransfer.<X>.Tests.csproj --no-build`
 Single frontend test: `cd web && pnpm exec vitest run src/app.test.tsx`. There is no workspace and no root `package.json` any more — `pnpm -r` and `--filter` fail with `ERR_PNPM_NO_PKG_MANIFEST`.
 
-Restore needs a NuGet login for `Girder.*` (GitHub Packages); `NuGet.Config` pins source mapping so only Girder may come from there.
+Restore needs a NuGet login for `Noelia.*` (GitHub Packages); `NuGet.Config` pins source mapping so only Noelia may come from there.
 
 ## Toolchain
 
@@ -77,13 +77,13 @@ Restore needs a NuGet login for `Girder.*` (GitHub Packages); `NuGet.Config` pin
 - One project per layer per service: `Domain` ← `Application` ← `Api`, with `Infrastructure` pointing inward; `Contracts` at the boundary.
 - Repository interfaces in Domain, implementations in Infrastructure. All wiring behind one `Add<Service>Infrastructure()` (ADR-0003).
 - `ServiceDefaults.AddWorkerTransferDefaults()` decides only what must not differ between services; everything that is a decision stays in the service.
-- CQRS through Girder's `AddCQRS`, but with **our own `IBefehl`/`IAbfrage`** over MediatR's `IRequest` — Girder's `ICommand<T>` carries a second error envelope beside RFC 9457. `TransaktionsBehavior` wraps commands only.
+- CQRS through Noelia's `AddCQRS`, but with **our own `IBefehl`/`IAbfrage`** over MediatR's `IRequest` — Noelia's `ICommand<T>` carries a second error envelope beside RFC 9457. `TransaktionsBehavior` wraps commands only.
 - EF Core, one context and one database per service; **no shared database** (ADR-0004). Migrations run at startup via `ServiceDefaults.Wanderung`, retrying **only transient** failures.
 - RFC 9457 everywhere, `correlationId` on every response. An endpoint filter that already wrote a response returns `Results.Empty`, never `null`.
 
 ## Key conventions
 
-- **No secrets, tokens, CVs, contracts or raw source in the repo or in logs.** Girder logs no values either — do not build that back.
+- **No secrets, tokens, CVs, contracts or raw source in the repo or in logs.** Noelia logs no values either — do not build that back.
 - **Sharing rule**: only domain-neutral, transport-independent code goes in `src/shared/`. Business models stay in the owning service. `Contracts.*` is DTOs, never a shared domain model.
 - **A tenant is a company; a natural person has none** (ADR-0017). Modelled as `Capacity`: `AsSelf` or `ForCompany`. The consent ledger has no tenant column by design.
 - **The token carries no tenant unless acting for a company**, and never carries roles — those are read from the membership table per operation (ADR-0018). `tenant_id` and `type` are gone; `TokenformTests` pins their absence.
@@ -109,7 +109,7 @@ Restore needs a NuGet login for `Girder.*` (GitHub Packages); `NuGet.Config` pin
 - **No default for a secret.** `${X:?…}` in compose, never `${X:-wert}` — a built-in default *is* the secret and it lives in git. Without a value compose aborts and names the variable.
 - **`Umgebung.Laden()` is the first line of all fourteen `Program.cs`**, before `CreateBuilder`: the configuration builder reads the environment once, when it builds.
 - **A set variable wins.** In compose and in the cluster the environment comes from there; a file in the image must never override it.
-- Precedence: set environment > `.env` > `appsettings.json`. Girder does the same for `JWT_SECRET` over `JwtSettings:Secret`.
+- Precedence: set environment > `.env` > `appsettings.json`. Noelia does the same for `JWT_SECRET` over `JwtSettings:Secret`.
 
 ## The route map
 
@@ -139,15 +139,15 @@ Restore needs a NuGet login for `Girder.*` (GitHub Packages); `NuGet.Config` pin
 
 ## The auth brake
 
-Five paths, per origin, per minute, configured in `ocelot.json` beside the routes as Girder's `DistributedRateLimiting` section: `/auth/login` 20, `/auth/register` 5, `/auth/resend-verification` 3, `/auth/verify-email` 20, `/auth/refresh` 60. **The three defaults are `0`** — a limit of zero writes no counter, so only the named paths count. The middleware is Girder's; there is no hand-written brake any more.
+Five paths, per origin, per minute, configured in `ocelot.json` beside the routes as Noelia's `DistributedRateLimiting` section: `/auth/login` 20, `/auth/register` 5, `/auth/resend-verification` 3, `/auth/verify-email` 20, `/auth/refresh` 60. **The three defaults are `0`** — a limit of zero writes no counter, so only the named paths count. The middleware is Noelia's; there is no hand-written brake any more.
 
 - **Per origin, never per email address.** A per-address limit would confirm the address exists — the enumeration channel `/auth/register` closes — and let a stranger lock a person out. The key is path plus origin; the body is never read.
 - **In the gateway, because only there is the origin visible.** Behind it every service sees the gateway's address, so a brake in identity-service would put all people in one bucket and let the first mistyped password lock out everyone.
 - **`X-Forwarded-For` is deliberately not read.** The caller sets it, so trusting it hands the attacker the counter's key. A test pins that a forged one changes nothing.
 - **After the health probes, before authentication.** A braked liveness probe would be the outage; a brake behind bcrypt would cost a hash per attempt.
 - **The counter is in-process** → the gateway stays at one replica. The way out is a registration change to `RedisDistributedRateLimitStore`, same interface.
-- **Girder's input sanitization middleware runs, since 4.1.0 — but not over JSON bodies.** Until 4.0.2 it matched a *bare* SQL keyword on a word boundary (a hyphen is one), so `/jobs?q=Union-Investment` answered **400**, and because every request from the deletion page carried `Referer: …/delete-account` that whole page was dead down to its `/auth/session`. Fixed: it matches injection *syntax*, the `Referer` is not input, and JSON string values are inspected. We set `InspectJsonBodies = false` anyway (reason in `Dienstgrundlage.cs`): the filter runs first and cannot name a field, so a 422 saying *which* field is wrong becomes a blunt 400 — measured on five cases across three services. They are still refused; the person filling in the form is just told less. Query string and the two address headers stay inspected.
-- **Girder's rate limiter is what runs, and `Bremse.cs` is gone (4.2.0).** It survived three rounds of justification, each measured and each wrong differently — last of them "Girder's is global, ours is selective", which was simply false: a limit of `0` writes no counter. What actually kept it was price: `Girder.Infrastructure` drags 44 transitive packages and this gateway only routes. `Girder.Http` carries none. **In the eleven services the limiter stays out for topology** — a service behind the gateway sees only the gateway as the origin, so every caller would share one bucket.
+- **Noelia's input sanitization middleware runs, since 4.1.0 — but not over JSON bodies.** Until 4.0.2 it matched a *bare* SQL keyword on a word boundary (a hyphen is one), so `/jobs?q=Union-Investment` answered **400**, and because every request from the deletion page carried `Referer: …/delete-account` that whole page was dead down to its `/auth/session`. Fixed: it matches injection *syntax*, the `Referer` is not input, and JSON string values are inspected. We set `InspectJsonBodies = false` anyway (reason in `Dienstgrundlage.cs`): the filter runs first and cannot name a field, so a 422 saying *which* field is wrong becomes a blunt 400 — measured on five cases across three services. They are still refused; the person filling in the form is just told less. Query string and the two address headers stay inspected.
+- **Noelia's rate limiter is what runs, and `Bremse.cs` is gone (4.2.0).** It survived three rounds of justification, each measured and each wrong differently — last of them "Noelia's is global, ours is selective", which was simply false: a limit of `0` writes no counter. What actually kept it was price: `Noelia.Infrastructure` drags 44 transitive packages and this gateway only routes. `Noelia.Http` carries none. **In the eleven services the limiter stays out for topology** — a service behind the gateway sees only the gateway as the origin, so every caller would share one bucket.
 
 ## Branches
 

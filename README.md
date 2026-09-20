@@ -2,7 +2,7 @@
 
 WorkerTransfer is a consent-first talent platform for applications, direct recruiting, employment transfers, and AI-assisted career workflows.
 
-It is **.NET 10 on [Girder](https://github.com/DavidOeztuerk) 3.0.1** — a shared foundation library carrying settings, logging, correlation, CQRS, health probes and password hashing — plus a React frontend. Eleven services and a gateway, each with its own database, its own migrations and its own composition root.
+It is **.NET 10 on [Noelia](https://github.com/DavidOeztuerk) 3.0.1** — a shared foundation library carrying settings, logging, correlation, CQRS, health probes and password hashing — plus a React frontend. Eleven services and a gateway, each with its own database, its own migrations and its own composition root.
 
 The repository was a Python (`uv`) monorepo until August 2026 and was translated by hand, service by service. The architecture decision records in [`docs/adr/`](docs/adr/) predate that and still govern: they hold the reasons, and reasons do not change language. [`docs/MIGRATION-STAND.md`](docs/MIGRATION-STAND.md) records what was decided and, more usefully, what was measured.
 
@@ -40,7 +40,7 @@ docker compose down           # add -v to drop the databases
 | Web app (Vite dev server) | http://localhost:5173 |
 | Mailpit — the confirmation link lands here | http://localhost:8025 |
 
-Building needs a NuGet login: Girder lives in GitHub Packages, and `docker-compose.yml` passes `~/.nuget/NuGet/NuGet.Config` in as a BuildKit secret, so it never becomes a layer. If you do not have one yet:
+Building needs a NuGet login: Noelia lives in GitHub Packages, and `docker-compose.yml` passes `~/.nuget/NuGet/NuGet.Config` in as a BuildKit secret, so it never becomes a layer. If you do not have one yet:
 
 ```bash
 dotnet nuget add source https://nuget.pkg.github.com/DavidOeztuerk/index.json \

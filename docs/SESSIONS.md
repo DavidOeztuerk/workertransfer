@@ -38,6 +38,7 @@ Sitzung misst — wer sie rot hinterlässt, nimmt ihn der nächsten weg.
 | 6 | Aufräumen | — | klein |
 | 7 | ~~Girder auf nuget.org~~ ✅ erledigt 10.09.2026 | — | — |
 | 8 | ~~Nachweis und KI-Pflichten~~ ✅ erledigt 20.09.2026 (ADR-0044) | — | groß |
+| 9 | ~~Umstieg auf Noelia 6.4.0~~ ✅ Kern erledigt 20.09.2026 (ADR-0045) | 8 | groß |
 
 ---
 
@@ -762,3 +763,57 @@ sichtbar, und das ist der Zustand, in dem sie entschieden werden kann.
 dem unveränderten Baum** (Gegenprobe gefahren: gestasht, dieselbe Reihe, dieselben
 Fehlschläge). Das ist eine eigene Sitzung wert; es hat mit ADR-0044 nichts zu
 tun.
+
+---
+
+## Sitzung 9 — Umstieg auf Noelia 6.4.0 ✅ Kern erledigt 20.09.2026
+
+Gebaut unter **ADR-0045**, nach `docs/AUFTRAG-NOELIA-UMSTIEG.md` — aber
+**als Schnitt statt als zwölf Sprünge**, und das ist die Entscheidung, die man
+kennen muss, bevor man den Auftrag noch einmal kopiert.
+
+**Warum der Schnitt richtig war.** Der Auftrag verlangt zwölf Sprünge und eine
+Phase 0 am Demo, weil `4.4.3 → 5.0.0` eine **Datenwanderung** ist: Sitzungen,
+Widerrufe, der Passwort-Pfeffer, die Prüfspur. Diese Plattform ist **nicht in
+Betrieb** — also hat die Wanderung keinen Gegenstand. Datenträger geleert,
+direkt auf 6.4.0.
+
+**Am Tag, an dem das erste echte Konto hier liegt, ist das keine Option mehr.**
+Der Auftrag bleibt genau dafür unverändert im Baum.
+
+**Was der Umstieg wirklich gekostet hat:** über zwölf Versionen hinweg nannte
+der Übersetzer **drei** Änderungen, jede in `MIGRATION.md` dokumentiert —
+`ISovereignAuditSink` (5.2.0, `:482`), `ITokenSessionService` (5.0.0, `:843`)
+und `SessionObservations` (5.1.0, `:451`). Die dritte ist die lehrreiche: die
+Menge der beobachteten Subjekte war ein Instanzfeld an einem `AddScoped`-Dienst,
+je Anfrage ein neues leeres Wörterbuch — die Sitzungsübersicht meldete deshalb
+dauerhaft „0 active sessions observed by this instance". **Registriert,
+vorhanden, ohne Wirkung**, und die Formulierung ließ die Leere wie eine Antwort
+klingen. Dieselbe Fehlerklasse, für die Sitzung 8 gebaut wurde.
+
+**Drei Fallen, die diese Sitzung wirklich gekostet haben:**
+
+1. **Das transitive Pinning schlug zu, und zwar zu Recht.** Noelia 6.4.0 hängt
+   an `Microsoft.Extensions.*` 10.0.12, die zentralen Pins standen auf 10.0.11.
+   Angehoben wurde der Pin — nicht das Pinning abgeschaltet.
+2. **`PendingModelChangesWarning`, 148 rote Identity-Tests in zwei Sekunden.**
+   Falle Nr. 3 aus `wt-tore`, und sie sah aus wie ein kaputter Umstieg. Es war
+   die Sitzungstabelle: `noelia_refresh_tokens` statt `girder_refresh_tokens`,
+   eine Wanderung mit `RenameTable` (`MIGRATION.md` Punkt 6).
+3. **Eine Testreihe baute `TokenSessionService` selbst** und musste das neue
+   Singleton nachziehen. Der Abschnitt in `MIGRATION.md` sagt das wörtlich
+   voraus: *„Brechend, wenn du `TokenSessionService` selbst baust — in eigenen
+   Tests etwa."*
+
+**Gemessen:** `dotnet build` 0 Warnungen · **1381 Tests grün, 0 rot, 0
+übersprungen** (dieselbe Zahl wie vorher) · 17 Dienste gesund auf geleerten
+Datenträgern · `POST /auth/register` 201, `GET /jobs` 200, `GET /consent/me`
+401 · `make nachweis-pruefen` 14 von 14, 83 Befunde · `noelia analyze` keine
+Befunde.
+
+**Was aussteht** — Phase 2, 3 und 5 des Auftrags: das Zusammenlegen der
+Nachweis-Oberfläche auf `ISecurityCheck`, `Noelia.Dashboard` und
+`OperatorReport`, und die Control Plane über die vierzehn Dienste. Die **vier
+eigenen Prüfungen** bleiben dabei, weil sie in Noelia keine Entsprechung haben.
+**Was gelöscht wird, wird gelöscht** — zwei Wege zu einer Aussage laufen
+auseinander, und beim ersten Mal merkt es niemand.

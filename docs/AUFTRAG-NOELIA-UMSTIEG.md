@@ -1,5 +1,22 @@
 # Auftrag: Umstieg von Girder 4.4.0 auf Noelia 6.4.0
 
+> **Gefahren am 20.09.2026 — als SCHNITT, nicht als zwölf Sprünge (ADR-0045).**
+>
+> Die Bedingung dafür ist eine einzige: **diese Plattform ist nicht in Betrieb.**
+> Damit hat die Datenwanderung aus Abschnitt 3 keinen Gegenstand — es gibt keinen
+> gespeicherten Widerruf, keine Sitzung und keinen Passwort-Pfeffer, den jemand
+> verlieren könnte. Datenträger geleert, direkt auf 6.4.0.
+>
+> **Dieser Auftrag bleibt trotzdem im Baum**, und zwar unverändert: am Tag, an
+> dem das erste echte Konto hier liegt, ist der Schnitt keine Option mehr, und
+> dann gilt wieder Abschnitt 3 Wort für Wort — samt Phase 0.
+>
+> **Was gefahren ist:** Phase 1 (die Umbenennung, 363 Quelldateien in einem
+> Commit) und Phase 4 (`noelia analyze` in `make validate`).
+> **Was aussteht:** Phase 2, 3 und 5 — das Zusammenlegen auf `ISecurityCheck`,
+> `Noelia.Dashboard` und `OperatorReport`, und die Control Plane über die
+> vierzehn Dienste.
+
 **Stand:** 20.09.2026 · **Zweig:** ab `develop`, **nach** dem Zusammenführen von PR #87
 **Nächstes ADR:** 0045 · **Vorgänger:** `AUFTRAG-NACHWEIS-UND-KI-PFLICHTEN.md`
 
