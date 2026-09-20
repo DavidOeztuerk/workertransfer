@@ -73,7 +73,7 @@ for eintrag in "${DIENSTE[@]}"; do
 
   if curl -fsS --max-time 10 \
        -H "X-Nachweis-Secret: ${GEHEIMNIS}" \
-       "http://localhost:${hafen}/nachweis/bericht.json" \
+       "http://localhost:${hafen}/noelia/report.json" \
        -o "${ARBEIT}/${name}.json" 2>/dev/null; then
     ERREICHT=$((ERREICHT + 1))
     printf '  %s✓%s %-14s\n' "$GREEN" "$AUS" "$name"

@@ -63,7 +63,7 @@ for eintrag in "${DIENSTE[@]}"; do
 
   if ! curl -fsS --max-time 15 \
        -H "X-Nachweis-Secret: ${GEHEIMNIS}" \
-       "http://localhost:${hafen}/nachweis/bericht.json" \
+       "http://localhost:${hafen}/noelia/report.json" \
        -o "${ARBEIT}/${name}.json" 2>/dev/null; then
     STUMM+=("$name")
     printf '  %s✗%s %-14s antwortet nicht\n' "$RED" "$AUS" "$name"
@@ -80,14 +80,16 @@ for eintrag in "${DIENSTE[@]}"; do
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
     bericht = json.load(f)
-befunde = bericht["findings"]
+# Noelias Operator-Bericht, Schema 2: die Pruefungen liegen unter
+# securityChecks.results, und ihr Zustand heisst Pass/Warning/Fail/NotApplicable.
+befunde = bericht["securityChecks"]["results"]
 zaehl = {}
 for b in befunde:
-    zaehl[b["state"]] = zaehl.get(b["state"], 0) + 1
-fehlt = [b for b in befunde if b["state"] == "fehlt"]
+    zaehl[b["status"]] = zaehl.get(b["status"], 0) + 1
+fehlt = [b for b in befunde if b["status"] == "Fail"]
 print(len(befunde))
-print(zaehl.get("erfuellt", 0), zaehl.get("hinweis", 0),
-      zaehl.get("fehlt", 0), zaehl.get("nichtanwendbar", 0))
+print(zaehl.get("Pass", 0), zaehl.get("Warning", 0),
+      zaehl.get("Fail", 0), zaehl.get("NotApplicable", 0))
 for b in fehlt:
     print(f"{b['id']}\t{b['summary']}")
 PY

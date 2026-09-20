@@ -15,10 +15,10 @@ using WorkerTransfer.Profile.Infrastructure.Entwurf;
 using WorkerTransfer.Profile.Infrastructure.Intern;
 using WorkerTransfer.Profile.Infrastructure.Loeschung;
 using WorkerTransfer.Profile.Infrastructure.Persistence;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 using WorkerTransfer.Profile.Contracts;
 using WorkerTransfer.ServiceDefaults;
+using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Profile.Infrastructure;
 
@@ -126,42 +126,36 @@ public static class ProfileInfrastructure
         // Anhang-III-Frage beantworten muss, bekommt hier aufgeschrieben, was
         // dieses System zum Modell hinausschickt — datiert, statt in einem
         // Testprojekt gesucht.
-        services.AddScoped<IPruefung>(_ => new Nahtpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Nahtpruefung(
             typeof(Entwurfslage),
             ["Ueberschrift", "Text", "Faehigkeiten", "Wunsch", "Prompt"],
             "für einen Profiltext"));
 
-        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
             [typeof(Profil).Assembly, typeof(ProfilfundV1).Assembly]));
 
         // Der KI-Anbieter dieses Dienstes ist der des BETREIBERS: `Draft__*`
         // aus der Umgebung, einer fuer alle. Der Zugang je Person steht in
         // identity-service, und dort wird gezaehlt statt genannt.
-        services.AddScoped<IAnbieterquelle>(_ => new Betreiberquelle(
+        services.AddSingleton<IAnbieterquelle>(_ => new Betreiberquelle(
             "anthropic", entwurf.Adresse, naht));
 
-        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
-        // KEINE AUFZEICHNUNG, und das ist eine Entscheidung (ADR-0024): weder
-        // Prompt noch Antwort noch ein Ledger-Eintrag. `null` ist hier also die
-        // richtige Antwort und keine fehlende Verdrahtung — wer aufzeichnen
-        // muss, setzt `IModellaufzeichnung` um und meldet es an dieser Zeile an.
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(
-            nahtVorhanden: true, anbieterEingerichtet: naht, null));
 
         // Zwischen der Frage und dem Ledger steht kein weiterer Typ. Das ist
         // die Vorbedingung, an der ADR-0013 in der Praxis scheitert — ein
         // Zwischenspeicher davor faellt niemandem auf, weil alles
         // weiterfunktioniert, nur eben mit dem Stand von vorhin.
-        services.AddScoped<IPruefung>(anbieter =>
+        services.AddSingleton<ISecurityCheck>(anbieter =>
             new Widerrufspruefung<IEinwilligungstor>(
                 anbieter, typeof(HttpEinwilligungstor)));
 
         var loeschung = new Loescheinstellungen();
         configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
 
-        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
             "profile",
             !string.IsNullOrEmpty(loeschung.Geheimnis),
             pruefspurVorhanden: true));

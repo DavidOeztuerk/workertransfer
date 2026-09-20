@@ -50,8 +50,14 @@ DOKUMENTE = {
             "Auftragsverarbeitungsvertrag traegt und ob eine "
             "Uebermittlungsgarantie greift."
         ),
-        "areas": ["grenze", "loeschung", "einwilligung", "ledger"],
-        "ids": ["wt.ki.anbieter"],
+        # Nach KENNUNGSPRAEFIX statt nach eigenem Bereich: seit ADR-0045
+        # kommen die Befunde aus Noelias Laeufer und tragen keine `area` mehr.
+        "prefixes": [
+            "noelia.egress.", "noelia.destination.", "noelia.audit.",
+            "noelia.dataprotection.", "wt.loeschung.", "wt.einwilligung.",
+            "wt.ledger.",
+        ],
+        "ids": ["wt.ki.anbieter", "noelia.ai.transfer"],
     },
     "ki": {
         "title": "Nachweis KI-Einsatz",
@@ -65,7 +71,7 @@ DOKUMENTE = {
             "und legt die Belege daneben; beantwortet wird sie von einem "
             "Menschen mit juristischer Ausbildung."
         ),
-        "areas": ["ki"],
+        "prefixes": ["wt.ki.", "noelia.ai."],
         "ids": [],
     },
     "mitbestimmung": {
@@ -79,13 +85,13 @@ DOKUMENTE = {
             "NICHT enthalten: ob eine Betriebsvereinbarung noetig ist und was "
             "in ihr stehen muss — das entscheiden die Betriebsparteien."
         ),
-        "areas": [],
+        "prefixes": [],
         "ids": [
             "wt.ki.keine-zahl",
             "wt.ki.naht",
-            "wt.ki.protokoll",
             "wt.ki.anbieter",
             "wt.einwilligung.wirkt",
+            "noelia.ai.record-keeping",
         ],
     },
 }
@@ -104,8 +110,9 @@ def passend(bericht: dict, muster: dict) -> list[dict]:
     """Die Befunde eines Berichts, die in dieses Dokument gehoeren."""
     return [
         befund
-        for befund in bericht["findings"]
-        if befund["area"] in muster["areas"] or befund["id"] in muster["ids"]
+        for befund in bericht["securityChecks"]["results"]
+        if befund["id"] in muster["ids"]
+        or (muster["prefixes"] and befund["id"].startswith(tuple(muster["prefixes"])))
     ]
 
 
@@ -134,13 +141,13 @@ def vorbehalte(dienste: list[dict], stumm: list[str]) -> list[str]:
         for befund in dienst["findings"]
     ]
 
-    fehlt = [(name, befund) for name, befund in alle if befund["state"] == "fehlt"]
-    hinweis = [(name, befund) for name, befund in alle if befund["state"] == "hinweis"]
+    fehlt = [(name, befund) for name, befund in alle if befund["status"] == "Fail"]
+    hinweis = [(name, befund) for name, befund in alle if befund["status"] == "Warning"]
 
     for name, befund in fehlt:
         satz.append(
             f"NICHT EINGELOEST — {name}, {befund['id']}: {befund['summary']} "
-            f"{befund['remedy']}"
+            f"{befund['remediation']}"
         )
 
     for name, befund in hinweis:
@@ -149,7 +156,7 @@ def vorbehalte(dienste: list[dict], stumm: list[str]) -> list[str]:
     nicht = [
         (name, befund)
         for name, befund in alle
-        if befund["state"] == "nichtanwendbar"
+        if befund["status"] == "NotApplicable"
     ]
     if nicht:
         satz.append(
@@ -181,7 +188,7 @@ def zitate(dienste: list[dict]) -> list[dict]:
     for dienst in dienste:
         for befund in dienst["findings"]:
             for bezug in befund["references"]:
-                schluessel = f"{bezug['regime']} {bezug['article']}"
+                schluessel = bezug["citation"]
                 gesehen.setdefault(schluessel, bezug)
     return [gesehen[schluessel] for schluessel in sorted(gesehen)]
 
@@ -207,7 +214,7 @@ def main() -> int:
                 dienste.append(
                     {
                         "service": bericht["service"],
-                        "read_at": bericht["read_at"],
+                        "read_at": bericht["generatedAt"],
                         "findings": befunde,
                     }
                 )

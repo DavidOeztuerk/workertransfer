@@ -11,8 +11,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using Noelia.Dashboard;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 
 namespace WorkerTransfer.ServiceDefaults;
 
@@ -141,7 +141,7 @@ public static class Dienstgrundlage
         // Person zur Laufzeit —, und die Ziele der Egress-Grenze stehen in der
         // Umgebung. Wohin dieser Behaelter heute Abend spricht, weiss nur er
         // selbst.
-        services.AddNachweis(configuration, dienstname);
+        services.AddNachweis(configuration);
 
         return services.AddNoelia(configuration, environment, dienstname, girder =>
         {
@@ -165,9 +165,23 @@ public static class Dienstgrundlage
                 //
                 // `AddSovereignPlatform` buendelt vier Dinge: die Egress-Grenze,
                 // die Maskierung im Protokoll, den Souveraenitaetsbericht und
-                // eine Pruefspur. Die ersten drei sind der Grund; die vierte
-                // laesst sich nicht abwaehlen und bekommt deshalb unten eine
-                // Senke, die sagt, dass sie nicht benutzt wird.
+                // eine Pruefspur.
+                //
+                // DIE VIERTE HATTE HIER EINE VERWEIGERNDE SENKE, UND SIE IST
+                // GEFALLEN (ADR-0045). Der Grund von ADR-0044 war richtig und
+                // galt der falschen Sache: Noelias Pruefspur erfuellt ADR-0012
+                // nicht, weil sie NEBEN unserer Transaktion steht statt darin —
+                // fuer eine FACHLICHE Pruefzeile ist das disqualifizierend, und
+                // dafuer gibt es weiterhin `EfPruefspur`.
+                //
+                // Der Dashboard-Zugriff ist aber keine fachliche Zeile. Er hat
+                // keine Transaktion, in der er stehen koennte; er haelt fest,
+                // WER die Betriebsoberflaeche angesehen hat. Gemessen: mit der
+                // verweigernden Senke antwortete jede `/noelia`-Adresse mit 503,
+                // weil das Dashboard den Zugriff aufzeichnet, BEVOR es
+                // ausliefert — und das zu Recht: eine Betriebsoberflaeche, die
+                // nicht festhalten kann, wer sie gelesen hat, soll nicht
+                // ausliefern.
                 //
                 // GEMESSEN, BEVOR DAS HIER STAND (`EgressTests`): der Waechter
                 // WEIST AB statt zu protokollieren, und ein Containername faellt
@@ -188,8 +202,31 @@ public static class Dienstgrundlage
                 // hinaus. Genau das ist der Zweck: ein Telemetriezug mit einer
                 // eingebauten Vorgabeadresse, ein SDK, das nach Hause telefoniert.
                 .AddSovereignPlatform(souveraen => souveraen
-                    .Allow([.. GerufeneHosts(configuration)])
-                    .WithAuditSink<VerweigerndePruefspur>())
+                    .Allow([.. GerufeneHosts(configuration)]))
+
+                // DIE BETRIEBSOBERFLAECHE, und sie ersetzt sieben eigene
+                // Adressen (ADR-0045).
+                //
+                // `/noelia` traegt Uebersicht, Zusammensetzung, Konfiguration,
+                // Sicherheitspruefungen, Souveraenitaet, KI, PFLICHTEN, Pruefspur,
+                // Sitzungen, Bremsen und Gesundheit — samt `report.json` aus
+                // DERSELBEN Lesung. `WorkerTransfer.Nachweis` hat das selbst
+                // gebaut, bevor dieser Baum auf Noelia stand; es ist geloescht
+                // und steht nicht daneben. Zwei Wege zu einer Aussage laufen
+                // auseinander, und beim ersten Mal merkt es niemand.
+                //
+                // OHNE BERECHTIGUNG 404, nicht 403 — dieselbe Zusage wie vorher.
+                // Eine Betriebsoberflaeche, deren Existenz man erraten kann, ist
+                // selbst schon eine Auskunft. Das Geheimnis bleibt ein EIGENES
+                // Papier: wer eine Mail anstossen darf, muss nicht erfahren,
+                // welche KI-Anbieter diese Instanz benutzt.
+                .UseDashboard(dashboard => dashboard
+                    .At("/noelia")
+                    .VisibleTo(Nachweisaufbau.Eingelassen)
+                    .InProduction(
+                        "Der Betriebsnachweis dieser Instanz — Empfaenger, "
+                        + "Naht, Loeschkaskade — steht hinter einem eigenen "
+                        + "Geheimnis und traegt keinen Wert und keinen Namen."))
 
                 // Noelias Bremse steht in der Vorgabe, und sie ist in 4.0.2
                 // nachgemessen in Ordnung (H2, Messung 1): sie bremst, sie zaehlt
@@ -380,14 +417,6 @@ public static class Dienstgrundlage
         app.UseNoeliaPrincipal();
         app.UseMiddleware<ProblemDetailsMiddleware>();
 
-        // Die sieben Adressen des Nachweises, hier und nicht in vierzehn
-        // Program.cs (ADR-0044). „Ein Tor, das man aufrufen muss, um es zu
-        // haben, hat man nicht" — dasselbe Argument, aus dem
-        // `make nachweis-pruefen` in `make validate` steht. Ein Dienst, der
-        // seinen eigenen Nachweis zu verdrahten vergisst, antwortet 404 und
-        // sieht damit aus wie einer, der ihn absichtlich zuhat.
-        app.MapNachweisEndpunkte();
-
         BerichteZusammensetzung(app, dienstname);
 
         return app;
@@ -395,12 +424,18 @@ public static class Dienstgrundlage
 
     /// <summary>Jeder Host, den dieser Dienst laut Konfiguration ruft.</summary>
     /// <remarks>
-    /// <para><strong>Eine Ableitung, keine Liste</strong> — und sie steht seit
-    /// ADR-0044 in <see cref="Zielkunde"/>, weil sie zwei Leser hat: die
-    /// Egress-Grenze erlaubt genau diese Hosts, und <c>wt.grenze.ziele</c>
-    /// berichtet genau diese Hosts. Zwei Ableitungen über dieselbe Frage wären
-    /// zwei Wahrheiten, und die schlechtere Hälfte davon wäre eine Grenze, die
-    /// mehr durchlässt, als der Nachweis nennt.</para>
+    /// <para><strong>Eine Ableitung, keine Liste.</strong> Gelesen wird die ganze
+    /// Konfiguration; jeder Wert, der sich als absolute http- oder https-Adresse
+    /// lesen lässt, gibt seinen Host her. Eine zweite Liste wäre die, die als
+    /// Erste veraltet — und ihr Veralten fiele niemandem auf, weil ein nicht
+    /// erfasster Aufruf von der Egress-Grenze einfach abgewiesen wird.</para>
+    ///
+    /// <para><strong>Sie stand zwischenzeitlich woanders, und der Grund ist
+    /// weggefallen.</strong> ADR-0044 zog sie in ein eigenes <c>Zielkunde</c>,
+    /// weil sie zwei Leser hatte: die Egress-Grenze und <c>wt.grenze.ziele</c>.
+    /// Mit ADR-0045 berichtet Noelias Souveränitätsabschnitt die Ziele selbst,
+    /// der zweite Leser ist fort — und eine Ableitung mit einem Leser gehört
+    /// dorthin, wo sie gelesen wird.</para>
     ///
     /// <para><strong>Zwei Ziele stehen deshalb in der Umgebung, die früher nur
     /// im Quelltext standen</strong> — <c>Draft__Adresse</c> und
@@ -409,7 +444,21 @@ public static class Dienstgrundlage
     /// Code zu lassen hieße, sie vor ihm zu verstecken.</para>
     /// </remarks>
     private static IReadOnlyList<string> GerufeneHosts(IConfiguration configuration) =>
-        Zielkunde.Hosts(configuration);
+    [
+        .. configuration.AsEnumerable()
+            .Select(eintrag => eintrag.Value)
+            .Where(wert => !string.IsNullOrWhiteSpace(wert))
+            .Select(wert =>
+                Uri.TryCreate(wert, UriKind.Absolute, out var adresse)
+                && (adresse.Scheme == Uri.UriSchemeHttp
+                    || adresse.Scheme == Uri.UriSchemeHttps)
+                    ? adresse.Host
+                    : null)
+            .Where(host => host is { Length: > 0 })
+            .Select(host => host!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(host => host, StringComparer.OrdinalIgnoreCase)
+    ];
 
     /// <summary>Sagt beim Start, was dieser Dienst fährt — und was er warum nicht.</summary>
     /// <remarks>

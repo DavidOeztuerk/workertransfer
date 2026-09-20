@@ -13,9 +13,9 @@ using WorkerTransfer.Notification.Infrastructure.Loeschung;
 using WorkerTransfer.Notification.Infrastructure.Persistence;
 using WorkerTransfer.Notification.Infrastructure.Post;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 using WorkerTransfer.Notification.Contracts;
+using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Notification.Infrastructure;
 
@@ -81,22 +81,21 @@ public static class NotificationInfrastructure
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
             [typeof(Benachrichtigungsart).Assembly, typeof(BenachrichtigenV1).Assembly]));
 
         // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
         // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
         // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
         // durchschneiden soll.
-        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, false, null));
 
         var loeschung = new Loescheinstellungen();
         configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
 
-        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
             "notification",
             !string.IsNullOrEmpty(loeschung.Geheimnis),
             pruefspurVorhanden: false));

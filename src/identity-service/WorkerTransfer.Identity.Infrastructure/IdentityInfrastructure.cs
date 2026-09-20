@@ -28,8 +28,8 @@ using WorkerTransfer.Identity.Infrastructure.Sicherheit;
 using WorkerTransfer.Contracts.Erasure;
 using WorkerTransfer.Contracts.Identity;
 using WorkerTransfer.Identity.Infrastructure.Nachweis;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
+using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Identity.Infrastructure;
 
@@ -147,7 +147,7 @@ public static class IdentityInfrastructure
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
             [typeof(AuditAction).Assembly, typeof(KiZugangV1).Assembly]));
 
         // DIE EINE ZEILE, DIE KEIN TEST SCHREIBEN KANN.
@@ -157,9 +157,9 @@ public static class IdentityInfrastructure
         // wohin dieser Baum heute Abend spricht, steht allein hier. Gezaehlt
         // wird, genannt wird niemand (ADR-0026), und der verschluesselte
         // Schluessel wird nicht einmal aus der Datenbank geholt.
-        services.AddScoped<IAnbieterquelle, EfAnbieterquelle>();
+        services.AddSingleton<IAnbieterquelle, EfAnbieterquelle>();
 
-        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
         // Dieser Dienst fragt selbst kein Modell — aber er haelt den Schalter
@@ -167,11 +167,6 @@ public static class IdentityInfrastructure
         // ist genau der Befund, den ein Bildschirmfoto der Kontoseite
         // andersherum erzaehlt, und deshalb steht `gegenstandVorhanden` hier
         // auf wahr.
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(
-            nahtVorhanden: false,
-            anbieterEingerichtet: false,
-            null,
-            schalterVorhanden: true));
 
         var loeschung = new Loescheinstellungen();
         configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
@@ -181,7 +176,7 @@ public static class IdentityInfrastructure
         // eine andere — kennt es fuer jeden Empfaenger eine Adresse? Ohne
         // Adresse bekommt der Empfaenger keinen Auftrag, und die Kaskade wartet
         // auf eine Quittung, die niemand angefordert hat.
-        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsUrsprung(
+        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsUrsprung(
             "identity",
             Loeschempfaenger.Fremde,
             [.. loeschung.Adressen

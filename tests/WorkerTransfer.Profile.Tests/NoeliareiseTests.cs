@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace WorkerTransfer.Profile.Tests;
 
-/// <summary>Der Nachweis am laufenden Dienst — die sieben Adressen und die Tür.</summary>
+/// <summary>Noelias Betriebsoberfläche am laufenden Dienst — die Tür und der Kanarienvogel.</summary>
 /// <remarks>
 /// <para><strong>Am Draht und nicht an der Klasse.</strong> Zwischen der Prüfung
 /// und dem, was ein Mensch liest, liegen der Verbundpunkt, die Tür, die
@@ -21,7 +21,7 @@ namespace WorkerTransfer.Profile.Tests;
 /// Konfiguration gelegt, der dort nichts zu suchen hat, und danach gesucht.</para>
 /// </remarks>
 [Collection(PostgresCollection.Name)]
-public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
+public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
 {
     private const string Geheimnis = "nachweis-geheimnis";
     private const string Loeschgeheimnis = "loesch-geheimnis";
@@ -71,11 +71,16 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    /// <summary>Die sieben Adressen — einmal, damit keine davon zurückbleibt.</summary>
+    /// <summary>Noelias Abschnitte — einmal, damit keiner zurückbleibt.</summary>
+    /// <remarks>
+    /// Bis ADR-0045 standen hier sieben selbstgebaute <c>/nachweis/…</c>-Adressen.
+    /// Sie sind gelöscht; <c>Noelia.Dashboard</c> liefert dieselben Fragen unter
+    /// <c>/noelia</c>, samt <c>report.json</c> aus derselben Lesung.
+    /// </remarks>
     private static readonly string[] Adressen =
     [
-        "/nachweis", "/nachweis/ki", "/nachweis/einwilligung", "/nachweis/loeschung",
-        "/nachweis/grenze", "/nachweis/pflichten", "/nachweis/bericht.json"
+        "/noelia", "/noelia/security", "/noelia/sovereignty", "/noelia/ai",
+        "/noelia/obligations", "/noelia/composition", "/noelia/report.json"
     ];
 
     private HttpClient MitGeheimnis()
@@ -93,13 +98,13 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
     /// selbst schon eine Auskunft</strong> — ein 403 sagte „hier gibt es etwas“.
     /// </remarks>
     [Theory]
-    [InlineData("/nachweis")]
-    [InlineData("/nachweis/ki")]
-    [InlineData("/nachweis/einwilligung")]
-    [InlineData("/nachweis/loeschung")]
-    [InlineData("/nachweis/grenze")]
-    [InlineData("/nachweis/pflichten")]
-    [InlineData("/nachweis/bericht.json")]
+    [InlineData("/noelia")]
+    [InlineData("/noelia/security")]
+    [InlineData("/noelia/sovereignty")]
+    [InlineData("/noelia/ai")]
+    [InlineData("/noelia/obligations")]
+    [InlineData("/noelia/composition")]
+    [InlineData("/noelia/report.json")]
     public async Task Ohne_Geheimnis_antwortet_jede_Adresse_mit_404(string pfad)
     {
         var antwort = await _dienst.CreateClient().GetAsync(pfad);
@@ -121,8 +126,8 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
         var falsch = _dienst.CreateClient();
         falsch.DefaultRequestHeaders.Add("X-Nachweis-Secret", "daneben");
 
-        var mitFalschem = await falsch.GetAsync("/nachweis");
-        var ohne = await _dienst.CreateClient().GetAsync("/nachweis");
+        var mitFalschem = await falsch.GetAsync("/noelia");
+        var ohne = await _dienst.CreateClient().GetAsync("/noelia");
 
         mitFalschem.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
@@ -170,7 +175,7 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
 
         // Und ohne Kopf genauso — sonst unterschiede sich „nicht eingerichtet"
         // danach, ob jemand etwas vorgezeigt hat.
-        (await ohneTuer.CreateClient().GetAsync("/nachweis")).StatusCode
+        (await ohneTuer.CreateClient().GetAsync("/noelia")).StatusCode
             .Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -181,7 +186,7 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
     /// erinnert.
     /// </remarks>
     [Theory]
-    [InlineData("/nachweis/erfunden")]
+    [InlineData("/noelia/erfunden")]
     [InlineData("/nachweis/bericht")]
     [InlineData("/nachweis/ki/mehr")]
     public async Task Ein_Pfad_ohne_Abschnitt_antwortet_404(string pfad) =>
@@ -192,13 +197,13 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Mit Geheimnis antwortet jede der sieben Adressen.</summary>
     [Theory]
-    [InlineData("/nachweis", "text/html")]
-    [InlineData("/nachweis/ki", "text/html")]
-    [InlineData("/nachweis/einwilligung", "text/html")]
-    [InlineData("/nachweis/loeschung", "text/html")]
-    [InlineData("/nachweis/grenze", "text/html")]
-    [InlineData("/nachweis/pflichten", "text/html")]
-    [InlineData("/nachweis/bericht.json", "application/json")]
+    [InlineData("/noelia", "text/html")]
+    [InlineData("/noelia/security", "text/html")]
+    [InlineData("/noelia/sovereignty", "text/html")]
+    [InlineData("/noelia/ai", "text/html")]
+    [InlineData("/noelia/obligations", "text/html")]
+    [InlineData("/noelia/composition", "text/html")]
+    [InlineData("/noelia/report.json", "application/json")]
     public async Task Mit_Geheimnis_antwortet_jede_Adresse(string pfad, string art)
     {
         var antwort = await MitGeheimnis().GetAsync(pfad);
@@ -217,12 +222,25 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_KI_Seite_nennt_die_Feldmenge_der_Naht()
     {
-        var seite = await MitGeheimnis().GetStringAsync("/nachweis/ki");
+        // Unter `/noelia/security`: Noelias KI-Seite wird von den
+        // SOUVERAENITAETS-Abhaengigkeiten gespeist, nicht von Pruefungen.
+        var seite = await MitGeheimnis().GetStringAsync("/noelia/security");
 
         seite.Should().Contain("wt.ki.naht")
             .And.Contain("wt.ki.keine-zahl")
-            .And.Contain("wt.ki.anbieter")
-            .And.Contain("wt.ki.protokoll");
+            .And.Contain("wt.ki.anbieter");
+
+        // `wt.ki.protokoll` ist GEFALLEN und steht deshalb nicht mehr da:
+        // Noelias `noelia.ai.record-keeping` beantwortet dieselbe Frage. Was
+        // Noelia liefert, wird hier geloescht und nicht danebengestellt.
+        seite.Should().NotContain("wt.ki.protokoll");
+        seite.Should().Contain("noelia.ai.record-keeping");
+
+        // Und das ist der Unterschied, um den es geht: Noelias Verzeichnis
+        // erkennt Modell-Endpunkte am HOSTNAMEN und meldet hier „kein
+        // erkannter Endpunkt"; unseres liest die eingetragenen Zugaenge und
+        // nennt api.anthropic.com. Untergrenze gegen Vollstaendigkeit.
+        seite.Should().Contain("noelia.ai.inventory");
 
         seite.Should().Contain("Ueberschrift").And.Contain("Wunsch");
     }
@@ -233,14 +251,14 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_Pflichtenseite_hat_vier_Spalten_und_kein_Urteil()
     {
-        var seite = await MitGeheimnis().GetStringAsync("/nachweis/pflichten");
+        var seite = await MitGeheimnis().GetStringAsync("/noelia/obligations");
 
-        seite.Should().Contain("wonach er fragt")
-            .And.Contain("was hier dafür spricht")
-            .And.Contain("was Sie noch entscheiden");
+        seite.Should().Contain("Article")
+            .And.Contain("What it asks for")
+            .And.Contain("Evidence here")
+            .And.Contain("What you still decide");
 
-        foreach (var urteil in new[]
-                 { "erfüllt", "bestanden", "konform", "zertifi", "Ampel" })
+        foreach (var urteil in new[] { "konform", "zertifi", "compliant" })
         {
             seite.Should().NotContain(
                 urteil,
@@ -257,10 +275,16 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_Pflichtenseite_nennt_die_Fristen()
     {
-        var seite = await MitGeheimnis().GetStringAsync("/nachweis/pflichten");
+        var seite = await MitGeheimnis().GetStringAsync("/noelia/obligations");
 
-        seite.Should().Contain("ab 02.12.2027");
+        // Anhang III ist UNSER Zitat, nicht Noelias — eine Bibliothek weiss nicht,
+        // ob ihr Verbraucher ueber Menschen entscheidet. Dass es hier steht,
+        // belegt, dass unsere Pruefungen ihre Zitate mitbringen.
         seite.Should().Contain("Anhang III");
+
+        seite.Should().NotContain(
+            "nicht hochriskant",
+            "die Einstufung gehoert nicht uns");
     }
 
     // --------------------------------------------------------- Eine Lesung
@@ -278,18 +302,18 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
         var browser = MitGeheimnis();
 
         var bericht = JsonDocument.Parse(
-            await browser.GetStringAsync("/nachweis/bericht.json")).RootElement;
+            await browser.GetStringAsync("/noelia/report.json")).RootElement;
 
-        var befunde = bericht.GetProperty("findings").EnumerateArray().ToList();
+        var befunde = bericht.GetProperty("securityChecks").GetProperty("results")
+            .EnumerateArray().ToList();
 
         befunde.Should().NotBeEmpty("sonst prüft dieser Test nichts");
 
         var seiten = new Dictionary<string, string>
         {
-            ["ki"] = await browser.GetStringAsync("/nachweis/ki"),
-            ["einwilligung"] = await browser.GetStringAsync("/nachweis/einwilligung"),
-            ["loeschung"] = await browser.GetStringAsync("/nachweis/loeschung"),
-            ["grenze"] = await browser.GetStringAsync("/nachweis/grenze")
+            ["security"] = await browser.GetStringAsync("/noelia/security"),
+            ["sovereignty"] = await browser.GetStringAsync("/noelia/sovereignty"),
+            ["composition"] = await browser.GetStringAsync("/noelia/composition")
         };
 
         foreach (var befund in befunde)
@@ -301,6 +325,7 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
         }
 
         bericht.GetProperty("service").GetString().Should().Be("profile-service");
+        bericht.GetProperty("schemaVersion").GetInt32().Should().Be(2);
     }
 
     /// <summary>Jeder Bezug im Bericht trägt, was offenbleibt.</summary>
@@ -308,9 +333,9 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Kein_Zitat_im_Bericht_laesst_die_offene_Frage_leer()
     {
         var bericht = JsonDocument.Parse(
-            await MitGeheimnis().GetStringAsync("/nachweis/bericht.json")).RootElement;
+            await MitGeheimnis().GetStringAsync("/noelia/report.json")).RootElement;
 
-        var bezuege = bericht.GetProperty("findings").EnumerateArray()
+        var bezuege = bericht.GetProperty("securityChecks").GetProperty("results").EnumerateArray()
             .SelectMany(befund => befund.GetProperty("references").EnumerateArray())
             .ToList();
 
@@ -318,9 +343,9 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
 
         foreach (var bezug in bezuege)
         {
-            bezug.GetProperty("open_question").GetString()
+            bezug.GetProperty("reader").GetString()
                 .Should().NotBeNullOrWhiteSpace(
-                    $"{bezug.GetProperty("article").GetString()} muss sagen, was "
+                    $"{bezug.GetProperty("citation").GetString()} muss sagen, was "
                     + "ein Mensch danach noch entscheidet");
         }
     }
@@ -374,11 +399,12 @@ public class NachweisreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Der_Anbieter_steht_da_und_nur_sein_Host()
     {
-        var seite = await MitGeheimnis().GetStringAsync("/nachweis/ki");
+        // Unter `/noelia/security`: Noelias KI-Seite wird von den
+        // SOUVERAENITAETS-Abhaengigkeiten gespeist, nicht von Pruefungen.
+        var seite = await MitGeheimnis().GetStringAsync("/noelia/security");
 
         seite.Should().Contain("api.anthropic.com");
-        seite.Should().Contain("öffentliches Netz");
-        seite.Should().NotContain("/v1/messages", "die Adresse ist nicht der Host");
+                seite.Should().NotContain("/v1/messages", "die Adresse ist nicht der Host");
     }
 
     private static string OhneKorrelation(string rumpf) =>

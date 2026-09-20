@@ -20,9 +20,9 @@ using WorkerTransfer.Applications.Infrastructure.Stellen;
 using WorkerTransfer.Applications.Infrastructure.Unternehmen;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 using WorkerTransfer.Applications.Contracts;
+using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Applications.Infrastructure;
 
@@ -169,11 +169,11 @@ public static class ApplicationsInfrastructure
         // deshalb die Haelfte — die andere steht in `identity-service`, gezaehlt.
         var naht = !string.IsNullOrEmpty(anschreiben.Schluessel);
 
-        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
             [typeof(Bewerbungsstand).Assembly, typeof(BewerbungV1).Assembly],
             Wortausnahmen));
 
-        services.AddScoped<IPruefung>(_ => new Nahtpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Nahtpruefung(
             typeof(Anschreibenkontext),
             ["StellenTitel", "Unternehmen", "StellenOrt", "StellenBeschreibung", "GesuchteFaehigkeiten", "EigenerName", "EigeneUeberschrift", "EigenerText", "EigeneFaehigkeiten", "EigenerWerdegang", "Sprache"],
             "für ein Anschreiben"));
@@ -181,22 +181,17 @@ public static class ApplicationsInfrastructure
         // Der Anbieter dieses Dienstes ist der des BETREIBERS: `Draft__*` aus
         // der Umgebung, einer fuer alle. Den Zugang je Person haelt
         // identity-service, und dort wird gezaehlt statt genannt.
-        services.AddScoped<IAnbieterquelle>(_ => new Betreiberquelle(
+        services.AddSingleton<IAnbieterquelle>(_ => new Betreiberquelle(
             "anthropic", anschreiben.Adresse, naht));
 
-        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
-        // KEINE AUFZEICHNUNG, und das ist eine Entscheidung (ADR-0024): weder
-        // Prompt noch Antwort noch ein Ledger-Eintrag. `null` ist hier die
-        // richtige Antwort und keine fehlende Verdrahtung.
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(
-            nahtVorhanden: true, anbieterEingerichtet: naht, null));
 
         var loeschung = new Loescheinstellungen();
         configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
 
-        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
             "applications",
             !string.IsNullOrEmpty(loeschung.Geheimnis),
             pruefspurVorhanden: false));

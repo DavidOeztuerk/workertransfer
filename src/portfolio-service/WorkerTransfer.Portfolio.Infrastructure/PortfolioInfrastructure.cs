@@ -16,9 +16,9 @@ using WorkerTransfer.Portfolio.Infrastructure.Loeschung;
 using WorkerTransfer.Portfolio.Infrastructure.Persistence;
 using WorkerTransfer.Portfolio.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 using WorkerTransfer.Portfolio.Contracts;
+using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Portfolio.Infrastructure;
 
@@ -85,30 +85,29 @@ public static class PortfolioInfrastructure
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
             [typeof(Abgelegtes).Assembly, typeof(EintragV1).Assembly]));
 
         // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
         // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
         // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
         // durchschneiden soll.
-        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, false, null));
 
         // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
         // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
         // Zwischenspeicher davor faellt niemandem auf, weil alles
         // weiterfunktioniert, nur eben mit dem Stand von vorhin.
-        services.AddScoped<IPruefung>(anbieter =>
+        services.AddSingleton<ISecurityCheck>(anbieter =>
             new Widerrufspruefung<IEinwilligungstor>(
                 anbieter, typeof(HttpEinwilligungstor)));
 
         var loeschung = new Loescheinstellungen();
         configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
 
-        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
             "portfolio",
             !string.IsNullOrEmpty(loeschung.Geheimnis),
             pruefspurVorhanden: false));
