@@ -130,8 +130,16 @@ public class DokumentwortTests
         [
             .. Regex.Matches(
                     quelle,
+                    // NUR bis zum Ende des Geltungssatzes, ohne den Nachbarn
+                    // zu nennen. Zweimal gemessen: erst hiess der Nachbar
+                    // `areas` und wurde zu `prefixes` — das Muster fiel still
+                    // auf null Treffer, und CI fand es, weil der lokale Lauf
+                    // aelter war als die Aenderung. Dann stand ein KOMMENTAR
+                    // zwischen beiden, und es fand zwei statt drei. Ein Muster,
+                    // das seine Nachbarschaft kennt, kennt sie beim naechsten
+                    // Mal falsch.
                     "\"(?<name>datenschutz|ki|mitbestimmung)\":\\s*\\{.*?"
-                    + "\"scope\":\\s*\\((?<satz>.*?)\\),\\s*\"areas\"",
+                    + "\"scope\":\\s*\\((?<satz>.*?)\\),\\n",
                     RegexOptions.Singleline,
                     TimeSpan.FromSeconds(5))
                 .Select(treffer => (
