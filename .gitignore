@@ -56,5 +56,14 @@ kon.txt
 # Der private Schluessel in git waere kein privater Schluessel mehr; die
 # Dokumente sind eine MOMENTAUFNAHME eines Stapels und gehoeren dorthin, wo
 # jemand sie braucht — nicht in den Baum, wo sie am naechsten Tag falsch sind.
-.nachweis/
-nachweis/
+#
+# MIT FUEHRENDEM SCHRAEGSTRICH, und das ist gemessen: ohne ihn gilt das Muster
+# in JEDEM Verzeichnis, und `git` vergleicht auf einem Dateisystem, das
+# Gross- und Kleinschreibung nicht unterscheidet (macOS, core.ignorecase=true),
+# ebenfalls ohne Ruecksicht darauf. `nachweis/` verschluckte damit
+# `src/*/…Infrastructure/Nachweis/` — zwei Quelldateien fehlten im Commit, der
+# Baum baute lokal weiter, und CI fiel mit „namespace 'Nachweis' does not
+# exist". Wieder eine Stelle, an der zwei Seiten dieselbe Sache verschieden
+# buchstabierten.
+/.nachweis/
+/nachweis/
