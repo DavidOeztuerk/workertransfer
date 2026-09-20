@@ -81,7 +81,7 @@ public static class CompaniesInfrastructure
         services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, null));
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, false, null));
 
         // Kein Empfaenger: ein Arbeitgeberprofil gehoert einem Unternehmen, nicht einem Menschen (ADR-0027 §2).
         services.AddScoped<IPruefung>(_ => Loeschpruefung.OhneZeilen("companies"));

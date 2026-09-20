@@ -147,7 +147,8 @@ public static class ProfileInfrastructure
         // Prompt noch Antwort noch ein Ledger-Eintrag. `null` ist hier also die
         // richtige Antwort und keine fehlende Verdrahtung — wer aufzeichnen
         // muss, setzt `IModellaufzeichnung` um und meldet es an dieser Zeile an.
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(naht, null));
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(
+            nahtVorhanden: true, anbieterEingerichtet: naht, null));
 
         // Zwischen der Frage und dem Ledger steht kein weiterer Typ. Das ist
         // die Vorbedingung, an der ADR-0013 in der Praxis scheitert — ein

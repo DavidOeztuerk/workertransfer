@@ -185,7 +185,7 @@ public class RechtsbezugTests
     {
         var lesung = await new Nachweislauf(
             "probe",
-            [new Aufzeichnungspruefung(gegenstandVorhanden: true, null)],
+            [new Aufzeichnungspruefung(nahtVorhanden: true, anbieterEingerichtet: true, null)],
             TimeProvider.System).LeseAsync();
 
         lesung.Befunde.Single().Bezuege.Should()
@@ -217,7 +217,7 @@ public class RechtsbezugTests
         new Nahtpruefung(typeof(object), [], "probe"),
         new Zahlpruefung([]),
         new Anbieterpruefung([]),
-        new Aufzeichnungspruefung(false, null),
+        new Aufzeichnungspruefung(false, false, null),
         new Widerrufspruefung<object>(
             new Microsoft.Extensions.DependencyInjection.ServiceCollection()
                 .BuildServiceProvider(),

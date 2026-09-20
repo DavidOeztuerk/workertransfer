@@ -99,7 +99,7 @@ public static class ConsentInfrastructure
         services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, null));
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, false, null));
 
         // Der Ledger selbst — die eine Pruefung im Bereich `Ledger`, und der
         // Grund, dass es diesen Bereich gibt. Sie misst ein NICHT-Vorhandensein

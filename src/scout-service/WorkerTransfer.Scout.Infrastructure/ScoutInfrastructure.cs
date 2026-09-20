@@ -151,7 +151,8 @@ public static class ScoutInfrastructure
         // KEINE AUFZEICHNUNG, und das ist eine Entscheidung (ADR-0024): weder
         // Prompt noch Antwort noch ein Ledger-Eintrag. `null` ist hier die
         // richtige Antwort und keine fehlende Verdrahtung.
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(naht, null));
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(
+            nahtVorhanden: true, anbieterEingerichtet: naht, null));
 
         // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
         // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein

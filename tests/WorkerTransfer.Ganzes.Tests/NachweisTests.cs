@@ -228,7 +228,7 @@ public class NachweisTests
     [Fact]
     public async Task Die_Aufzeichnungspruefung_meldet_ohne_Naht_NichtAnwendbar()
     {
-        var befund = await new Aufzeichnungspruefung(gegenstandVorhanden: false, null)
+        var befund = await new Aufzeichnungspruefung(nahtVorhanden: false, anbieterEingerichtet: false, null)
             .LaufenAsync();
 
         befund.Stand.Should().Be(Stand.NichtAnwendbar);
@@ -245,7 +245,7 @@ public class NachweisTests
     [Fact]
     public async Task Ohne_Aufzeichnung_steht_ein_Hinweis_mit_dem_Datum_der_Pflicht()
     {
-        var befund = await new Aufzeichnungspruefung(gegenstandVorhanden: true, null)
+        var befund = await new Aufzeichnungspruefung(nahtVorhanden: true, anbieterEingerichtet: true, null)
             .LaufenAsync();
 
         befund.Stand.Should().Be(Stand.Hinweis);
@@ -256,12 +256,36 @@ public class NachweisTests
         befund.Abhilfe.Should().Contain("02.12.2027");
     }
 
+    /// <summary>
+    /// Eine Naht ohne eingetragenen Anbieter ist nicht dasselbe wie keine Naht.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Am erzeugten Dokument gemessen, nicht vorher bedacht.</strong>
+    /// scout-service meldete „Dieser Dienst fragt kein Modell", während
+    /// <c>wt.ki.naht</c> zwei Zeilen darüber die Feldmenge seiner Ansprache
+    /// auflistete — zwei Befunde auf einer Seite, die sich widersprechen. Wer
+    /// das liest, glaubt einem von beiden und weiß nicht, welchem.
+    /// </remarks>
+    [Fact]
+    public async Task Eine_Naht_ohne_Anbieter_sagt_das_und_leugnet_die_Naht_nicht()
+    {
+        var befund = await new Aufzeichnungspruefung(
+            nahtVorhanden: true, anbieterEingerichtet: false, null).LaufenAsync();
+
+        befund.Stand.Should().Be(Stand.NichtAnwendbar);
+        befund.Zusammenfassung.Should().Contain("hat eine KI-Naht");
+        befund.Zusammenfassung.Should().NotContain(
+            "fragt kein Modell",
+            "die Naht ist baulich da — nur ruft sie in dieser Instanz niemanden");
+    }
+
     /// <summary>Und der Schalter, den niemand liest, wird benannt.</summary>
     [Fact]
     public async Task Ein_Schalter_ohne_Leser_steht_im_Befund()
     {
         var befund = await new Aufzeichnungspruefung(
-            gegenstandVorhanden: true, null, schalterVorhanden: true).LaufenAsync();
+            nahtVorhanden: true, anbieterEingerichtet: true, null,
+            schalterVorhanden: true).LaufenAsync();
 
         befund.Zusammenfassung.Should().Contain("Anfragen protokollieren");
     }
@@ -416,7 +440,7 @@ public class NachweisTests
             [
                 new Zielpruefung(Konfiguration([])),
                 new Anbieterpruefung([]),
-                new Aufzeichnungspruefung(false, null)
+                new Aufzeichnungspruefung(false, false, null)
             ],
             TimeProvider.System).LeseAsync();
 
@@ -430,7 +454,7 @@ public class NachweisTests
     {
         var lesung = await new Nachweislauf(
             "probe",
-            [new Aufzeichnungspruefung(gegenstandVorhanden: true, null)],
+            [new Aufzeichnungspruefung(nahtVorhanden: true, anbieterEingerichtet: true, null)],
             TimeProvider.System).LeseAsync();
 
         lesung.Befunde.Single().Stand.Should().Be(Stand.Hinweis);

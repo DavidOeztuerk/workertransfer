@@ -113,7 +113,8 @@ public static class JobsInfrastructure
         // KEINE AUFZEICHNUNG, und das ist eine Entscheidung (ADR-0024): weder
         // Prompt noch Antwort noch ein Ledger-Eintrag. `null` ist hier die
         // richtige Antwort und keine fehlende Verdrahtung.
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(naht, null));
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(
+            nahtVorhanden: true, anbieterEingerichtet: naht, null));
 
         // Kein Empfaenger: eine Anzeige gehoert einem Unternehmen, nicht einem Menschen (ADR-0027 §2). Der Firmenrueckzug ist ein eigener Vertrag und zaehlt ausdruecklich nicht zur Vollstaendigkeit einer Loeschung.
         services.AddScoped<IPruefung>(_ => Loeschpruefung.OhneZeilen("jobs"));

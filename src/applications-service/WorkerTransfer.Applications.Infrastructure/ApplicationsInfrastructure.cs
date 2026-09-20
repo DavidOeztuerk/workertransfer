@@ -190,7 +190,8 @@ public static class ApplicationsInfrastructure
         // KEINE AUFZEICHNUNG, und das ist eine Entscheidung (ADR-0024): weder
         // Prompt noch Antwort noch ein Ledger-Eintrag. `null` ist hier die
         // richtige Antwort und keine fehlende Verdrahtung.
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(naht, null));
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(
+            nahtVorhanden: true, anbieterEingerichtet: naht, null));
 
         var loeschung = new Loescheinstellungen();
         configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);

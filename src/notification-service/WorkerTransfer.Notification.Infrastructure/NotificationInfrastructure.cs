@@ -91,7 +91,7 @@ public static class NotificationInfrastructure
         services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, null));
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, false, null));
 
         var loeschung = new Loescheinstellungen();
         configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);

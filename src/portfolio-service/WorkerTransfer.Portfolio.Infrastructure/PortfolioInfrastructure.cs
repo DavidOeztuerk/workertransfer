@@ -95,7 +95,7 @@ public static class PortfolioInfrastructure
         services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, null));
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, false, null));
 
         // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
         // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein

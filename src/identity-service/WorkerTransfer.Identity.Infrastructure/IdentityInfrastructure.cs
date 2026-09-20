@@ -168,7 +168,10 @@ public static class IdentityInfrastructure
         // andersherum erzaehlt, und deshalb steht `gegenstandVorhanden` hier
         // auf wahr.
         services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(
-            gegenstandVorhanden: true, null, schalterVorhanden: true));
+            nahtVorhanden: false,
+            anbieterEingerichtet: false,
+            null,
+            schalterVorhanden: true));
 
         var loeschung = new Loescheinstellungen();
         configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
