@@ -1,5 +1,5 @@
 using FluentAssertions;
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 
 namespace WorkerTransfer.Identity.Tests;
 
@@ -59,12 +59,12 @@ public class TokenformTests
     /// <remarks>
     /// <strong>Der Anlass ist gemessen.</strong> `CLAUDE.md` sagte, das Token
     /// trage acht Ansprueche „und nichts sonst". Am laufenden Stapel gemessen
-    /// waren es NEUN: Girder legt zusaetzlich
+    /// waren es NEUN: Noelia legt zusaetzlich
     /// <c>http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier</c>
     /// hinein, eine Verdopplung von <c>sub</c> in der langen WS-Schreibweise.
     ///
     /// <para>
-    /// Sie ist in Girder BEGRUENDET und bleibt: <c>MapInboundClaims = false</c>
+    /// Sie ist in Noelia BEGRUENDET und bleibt: <c>MapInboundClaims = false</c>
     /// schaltet die Ableitung aus, und siebzehn Leser holen den Aufrufer ueber
     /// diesen Namen — zwei davon in Fremdpaketen, die diese Assembly nicht
     /// sehen. Sie fallenzulassen spart siebzig Byte und macht aus jedem dieser
@@ -174,7 +174,7 @@ public class TokenformTests
     }
 
     [Fact]
-    public async Task Aussteller_und_Zielgruppe_kommen_von_Girder()
+    public async Task Aussteller_und_Zielgruppe_kommen_von_Noelia()
     {
         var payload = await IssueAsync(Capacity.AsSelf.Instance);
 
@@ -189,7 +189,7 @@ public class TokenformTests
     /// <para>Jeder Test darueber prueft einen Namen, den jemand aufgeschrieben
     /// hat. Was dabei durchrutscht, ist der Anspruch, an den niemand gedacht
     /// hat — und genau das ist passiert: das Token trug drei Ansprueche mehr,
-    /// als der Kommentar am Aussteller aufzaehlte, weil Girder sie
+    /// als der Kommentar am Aussteller aufzaehlte, weil Noelia sie
     /// unaufgefordert dazulegte. Zwei davon
     /// (<c>email_verified</c>, <c>account_status</c>) sagten IMMER dasselbe,
     /// weil sie in <c>UserClaims</c> vorbelegt waren und niemand hier sie
@@ -201,9 +201,9 @@ public class TokenformTests
     /// Test, und jemand muss entscheiden, ob der neue Anspruch hier hingehoert.</para>
     ///
     /// <para><c>nameidentifier</c> ist die lange WS-Federation-URI und
-    /// verdoppelt <c>sub</c>. Sie steht mit Absicht drin und bleibt: Girder
+    /// verdoppelt <c>sub</c>. Sie steht mit Absicht drin und bleibt: Noelia
     /// prueft Token mit <c>MapInboundClaims = false</c>, leitet sie also nicht
-    /// aus <c>sub</c> ab, und siebzehn Leser in Girder loesen den Aufrufer
+    /// aus <c>sub</c> ab, und siebzehn Leser in Noelia loesen den Aufrufer
     /// darueber auf.</para>
     /// </remarks>
     [Fact]

@@ -1,4 +1,4 @@
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Tests;

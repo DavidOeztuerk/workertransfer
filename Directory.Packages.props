@@ -9,32 +9,32 @@
     -->
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
 
-    <GirderVersion>4.4.0</GirderVersion>
+    <NoeliaVersion>6.4.0</NoeliaVersion>
   </PropertyGroup>
 
-  <ItemGroup Label="Girder">
+  <ItemGroup Label="Noelia">
     <PackageVersion Include="DotNetEnv" Version="3.1.1" />
-    <PackageVersion Include="Girder.Abstractions" Version="$(GirderVersion)" />
-    <PackageVersion Include="Girder.Application" Version="$(GirderVersion)" />
-    <PackageVersion Include="Girder.Contracts" Version="$(GirderVersion)" />
-    <PackageVersion Include="Girder.Core" Version="$(GirderVersion)" />
-    <PackageVersion Include="Girder.Data.EntityFrameworkCore" Version="$(GirderVersion)" />
-    <PackageVersion Include="Girder.Http" Version="$(GirderVersion)" />
-    <PackageVersion Include="Girder.InMemory" Version="$(GirderVersion)" />
-    <PackageVersion Include="Girder.Infrastructure" Version="$(GirderVersion)" />
-    <PackageVersion Include="Girder.Passwords.BCrypt" Version="$(GirderVersion)" />
+    <PackageVersion Include="Noelia.Abstractions" Version="$(NoeliaVersion)" />
+    <PackageVersion Include="Noelia.Application" Version="$(NoeliaVersion)" />
+    <PackageVersion Include="Noelia.Contracts" Version="$(NoeliaVersion)" />
+    <PackageVersion Include="Noelia.Core" Version="$(NoeliaVersion)" />
+    <PackageVersion Include="Noelia.Data.EntityFrameworkCore" Version="$(NoeliaVersion)" />
+    <PackageVersion Include="Noelia.Http" Version="$(NoeliaVersion)" />
+    <PackageVersion Include="Noelia.InMemory" Version="$(NoeliaVersion)" />
+    <PackageVersion Include="Noelia.Infrastructure" Version="$(NoeliaVersion)" />
+    <PackageVersion Include="Noelia.Passwords.BCrypt" Version="$(NoeliaVersion)" />
   </ItemGroup>
 
   <ItemGroup Label="Persistenz">
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>
 
@@ -43,7 +43,7 @@
       PdfPig liest den Text aus einem PDF, im eigenen Prozess und mit NULL
       Fremdpaketen. Gemessen mit `dotnet list package` samt transitiven: die
       Liste nennt nur PdfPig selbst. Das ist derselbe Massstab, an dem
-      `Girder.Http` den Vorzug vor `Girder.Infrastructure` bekam, und hier
+      `Noelia.Http` den Vorzug vor `Noelia.Infrastructure` bekam, und hier
       zaehlt er doppelt: der Erkenner sieht Zeugnisse, und was nicht mitkommt,
       kann auch nicht mitlesen. Begruendet in ADR-0043.
     -->

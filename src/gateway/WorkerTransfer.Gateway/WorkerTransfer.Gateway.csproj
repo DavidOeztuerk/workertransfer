@@ -9,13 +9,13 @@
   <ItemGroup>
     <PackageReference Include="Ocelot" />
     <!--
-      Girders Zwischenschichten fuer Bremse und Korrelation — und seit 4.2.0
-      kosten sie nichts weiter: `Girder.Http` bringt NULL Fremdpakete mit,
-      waehrend `Girder.Infrastructure` vierundvierzig zoege. Genau dieser Preis
+      Noelias Zwischenschichten fuer Bremse und Korrelation — und seit 4.2.0
+      kosten sie nichts weiter: `Noelia.Http` bringt NULL Fremdpakete mit,
+      waehrend `Noelia.Infrastructure` vierundvierzig zoege. Genau dieser Preis
       war der Grund, warum hier vorher beides von Hand stand.
     -->
-    <PackageReference Include="Girder.Abstractions" />
-    <PackageReference Include="Girder.Http" />
+    <PackageReference Include="Noelia.Abstractions" />
+    <PackageReference Include="Noelia.Http" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 
 namespace WorkerTransfer.GitHub.Domain.Verbindungen;
 

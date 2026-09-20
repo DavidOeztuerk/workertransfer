@@ -1,5 +1,5 @@
 using FluentAssertions;
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using WorkerTransfer.Profile.Domain.Profile;
 
 namespace WorkerTransfer.Profile.Tests;

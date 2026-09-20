@@ -2,7 +2,7 @@ namespace WorkerTransfer.Consent.Application.Ports;
 
 /// <summary>One transaction around one command.</summary>
 /// <remarks>
-/// Girder brings no transaction behaviour, and the reason this service needs
+/// Noelia brings no transaction behaviour, and the reason this service needs
 /// one is the audit trail: the consent fact and the row that records it land
 /// together or neither lands (ADR-0012). There is no state "consent recorded
 /// but audit lost", and no orphaned audit row for a write that failed.

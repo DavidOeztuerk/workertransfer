@@ -1,6 +1,6 @@
 using System.Security.Claims;
-using Girder.Core.Identity;
-using Girder.Infrastructure.Authorization;
+using Noelia.Core.Identity;
+using Noelia.Infrastructure.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using WorkerTransfer.Identity.Application.Unternehmen;
 using WorkerTransfer.Identity.Domain.Companies;
@@ -14,7 +14,7 @@ namespace WorkerTransfer.Identity.Api.Berechtigung;
 /// <remarks>
 /// <para><strong>Warum daneben und nicht statt.</strong> ASP.NET führt
 /// <em>alle</em> Handler zu einer Anforderung aus; ein <c>Succeed</c> genügt.
-/// Girders <c>PermissionAuthorizationHandler</c> bleibt also stehen und liest
+/// Noelias <c>PermissionAuthorizationHandler</c> bleibt also stehen und liest
 /// weiter Ansprüche — er findet bei uns nur keine, weil unser Token keine
 /// trägt. Dieser hier antwortet stattdessen aus der Datenbank.</para>
 ///
@@ -83,7 +83,7 @@ public sealed class Mitgliedschaftsrecht(
     /// </summary>
     /// <remarks>
     /// NICHT aus <c>ICurrentPrincipal</c>. Das war der erste Versuch und ergab
-    /// an jeder geschützten Anfrage einen 403: Girders <c>UseAuth()</c> ist
+    /// an jeder geschützten Anfrage einen 403: Noelias <c>UseAuth()</c> ist
     /// Authentifizierung <em>und</em> Autorisierung, und <c>UsePrincipal()</c>
     /// läuft danach — während die Richtlinie entscheidet, ist
     /// <c>ICurrentPrincipal.Current</c> also noch leer. Ein

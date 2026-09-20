@@ -1,10 +1,10 @@
-using Girder.Abstractions.Hosting;
+using Noelia.Abstractions.Hosting;
 using Microsoft.Extensions.Logging;
-using Girder.Infrastructure.Builder;
-using Girder.Infrastructure.Builder.Modules;
-using Girder.Infrastructure.Extensions;
-using Girder.Infrastructure.Security.Identity;
-using Girder.Infrastructure.Security.InputSanitization;
+using Noelia.Infrastructure.Builder;
+using Noelia.Infrastructure.Builder.Modules;
+using Noelia.Infrastructure.Extensions;
+using Noelia.Infrastructure.Security.Identity;
+using Noelia.Infrastructure.Security.InputSanitization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -48,11 +48,11 @@ namespace WorkerTransfer.ServiceDefaults;
 public static class Dienstgrundlage
 {
     /// <summary>
-    /// Girders Vorgabe, dazu der Handelnde — und kein Ausstellen.
+    /// Noelias Vorgabe, dazu der Handelnde — und kein Ausstellen.
     /// </summary>
     /// <remarks>
     /// <para><c>Principal</c> steht nicht in der Vorgabe, weil es eine
-    /// Entscheidung verlangt, die Girder nicht treffen darf. Wir treffen sie für
+    /// Entscheidung verlangt, die Noelia nicht treffen darf. Wir treffen sie für
     /// alle elf gleich: jeder Dienst liest den Handelnden aus dem geprüften
     /// Token, denn darauf steht <c>Capacity</c> (ADR-0017).</para>
     ///
@@ -71,7 +71,7 @@ public static class Dienstgrundlage
         IConfiguration configuration,
         IHostEnvironment environment,
         string dienstname,
-        Action<GirderBuilder>? weitere = null)
+        Action<NoeliaBuilder>? weitere = null)
     {
         // Die Eingabepruefung sieht NICHT in JSON-Ruempfe. Gemessen, nicht
         // vermutet.
@@ -143,14 +143,14 @@ public static class Dienstgrundlage
         // selbst.
         services.AddNachweis(configuration, dienstname);
 
-        return services.AddGirder(configuration, environment, dienstname, girder =>
+        return services.AddNoelia(configuration, environment, dienstname, girder =>
         {
             girder
                 .UseDefaults()
-                .Use(GirderModule.Principal)
+                .Use(NoeliaModule.Principal)
 
                 // WOHER DIE SCHLUESSEL KOMMEN, sagt Girder 4 nicht mehr selbst —
-                // `GirderModule.Jwt` registriert den Dienst, nicht den
+                // `NoeliaModule.Jwt` registriert den Dienst, nicht den
                 // Schluesselbund. Das ist richtig: ob ein Dienst ausstellt oder
                 // nur prueft, ist eine Aussage ueber seine Rolle im System.
                 //
@@ -191,11 +191,11 @@ public static class Dienstgrundlage
                     .Allow([.. GerufeneHosts(configuration)])
                     .WithAuditSink<VerweigerndePruefspur>())
 
-                // Girders Bremse steht in der Vorgabe, und sie ist in 4.0.2
+                // Noelias Bremse steht in der Vorgabe, und sie ist in 4.0.2
                 // nachgemessen in Ordnung (H2, Messung 1): sie bremst, sie zaehlt
                 // je Herkunft, sie liest X-Forwarded-For nicht mehr, und ein
                 // gefaelschtes "X-Forwarded-For: 127.0.0.1" hebt sie nicht auf.
-                // Der Grund, sie hier trotzdem nicht zu fahren, hat mit Girder
+                // Der Grund, sie hier trotzdem nicht zu fahren, hat mit Noelia
                 // nichts zu tun und aendert sich auch nicht mehr:
                 //
                 // Ein Dienst hinter dem Gateway sieht als Herkunft die Adresse
@@ -206,7 +206,7 @@ public static class Dienstgrundlage
                 // konfiguriert in `ocelot.json` — der frueher hier genannte
                 // Eigenbau `Bremse.cs` ist geloescht.
                 .Without(
-                    GirderModule.RateLimiting,
+                    NoeliaModule.RateLimiting,
                     "ein Dienst hinter dem Gateway sieht als Herkunft nur das "
                     + "Gateway, also alle Aufrufer als einen — gebremst wird am "
                     + "Eingang, in ocelot.json")
@@ -214,7 +214,7 @@ public static class Dienstgrundlage
                 // Steht ohnehin nicht in der Vorgabe. Hier genannt, damit die
                 // Entscheidung im Quelltext steht und nicht im Gedaechtnis.
                 .Without(
-                    GirderModule.HttpResponseCaching,
+                    NoeliaModule.HttpResponseCaching,
                     "ETag ist ein Zwischenspeicher beim Aufrufer, und fast alles "
                     + "hier steht hinter dem Einwilligungstor: ein 304 zeigte ein "
                     + "widerrufenes Profil weiter. Caching selbst bleibt AN — das "
@@ -224,13 +224,13 @@ public static class Dienstgrundlage
                 // Communication und Encryption stehen ohnehin nicht in der
                 // Vorgabe — hier genannt, weil ein Grund, der nur in einem
                 // Commit-Text steht, beim naechsten Leser nicht existiert.
-                // Girders eigener Kommentar sagt es: "Silence is not a
+                // Noelias eigener Kommentar sagt es: "Silence is not a
                 // decision."
                 //
                 // Communication: gemessen in H2. Die Statuscodes sind heil (ein
                 // 404 kommt als 404 an, EIN Aufruf am Ziel, keine drei). Es
                 // verlangt aber `IEventBus`, und den liefert allein
-                // Girder.Messaging.MassTransit — also einen Broker, den wir
+                // Noelia.Messaging.MassTransit — also einen Broker, den wir
                 // bewusst nicht betreiben. Dazu schickt `UseGateway = true` per
                 // Vorgabe JEDEN Aufruf an den Dienst "gateway", und
                 // `EnableResponseCaching = true` speichert jede GET-Antwort
@@ -238,19 +238,19 @@ public static class Dienstgrundlage
                 // machte, ist erledigt: die Korrelationskette haengt seit 4.0.0
                 // an jedem HttpClient der Fabrik.
                 .Without(
-                    GirderModule.Communication,
+                    NoeliaModule.Communication,
                     "verlangt IEventBus und damit einen Broker, den wir nicht "
                     + "betreiben; die Korrelationskette bekommen wir seit 4.0.0 "
                     + "ohne ihn")
 
                 // Encryption: verlangt `IDataEncryptionService` UND
-                // `IMasterKeyProvider`, beide aus Girder.Redis oder einem
+                // `IMasterKeyProvider`, beide aus Noelia.Redis oder einem
                 // Geheimnisspeicher. Wir verschluesseln heute auf Feldebene
                 // nichts. Wer damit anfaengt, entscheidet zuerst, WO der
                 // Hauptschluessel liegt — und das ist dieselbe Frage wie bei
                 // SecretManagement, nicht eine Zeile hier.
                 .Without(
-                    GirderModule.Encryption,
+                    NoeliaModule.Encryption,
                     "verschluesselt wird heute auf Feldebene nichts; wer damit "
                     + "anfaengt, entscheidet zuerst, wo der Hauptschluessel liegt")
 
@@ -260,7 +260,7 @@ public static class Dienstgrundlage
                 // Vorgabe und bringt den PermissionPolicyProvider mit — genau
                 // den, an dem die Firmenrechte in identity-service haengen.
                 .Without(
-                    GirderModule.ResourceAuthorization,
+                    NoeliaModule.ResourceAuthorization,
                     "ResourceRead und ResourceOwner ruft kein Endpunkt hier, und "
                     + "das Modul verlangt einen Speicher. Unsere Autorisierung "
                     + "sind die Permission-Richtlinien, und die entscheidet "
@@ -284,7 +284,7 @@ public static class Dienstgrundlage
                 // Token (`/notifications`, `/erasure`, `/internal/notify`).
                 //
                 // Gemessen, was sie kostet: mit ihr antwortet `POST
-                // /notifications` mit 401 in Girders Umschlag, obwohl der
+                // /notifications` mit 401 in Noelias Umschlag, obwohl der
                 // Geheimniskopf stimmt — die Ablehnung faellt vor unserem
                 // Fehlerdokument und vor dem Endpunkt.
                 //
@@ -299,7 +299,7 @@ public static class Dienstgrundlage
                 // `Authorization` bleibt und ist deshalb hier NICHT genannt: der
                 // PermissionPolicyProvider traegt die Firmenrechte.
                 .Without(
-                    GirderModule.PermissionEnforcement,
+                    NoeliaModule.PermissionEnforcement,
                     "unsere oeffentliche Flaeche steht an den Endpunkten und in "
                     + "docs/routenkarte.yml; sie hier ein zweites Mal zu erklaeren "
                     + "hiesse zwei Listen ueber dieselbe Frage. Der "
@@ -318,35 +318,35 @@ public static class Dienstgrundlage
     /// token here?" by grepping, not by reading eleven files.
     /// </remarks>
     /// <param name="girder">Der Baumeister dieses Dienstes.</param>
-    public static GirderBuilder AlsAussteller(this GirderBuilder girder)
+    public static NoeliaBuilder AlsAussteller(this NoeliaBuilder girder)
     {
         ArgumentNullException.ThrowIfNull(girder);
 
         return girder
-            .Use(GirderModule.PasswordHashing)
-            .Use(GirderModule.TokenSessions);
+            .Use(NoeliaModule.PasswordHashing)
+            .Use(NoeliaModule.TokenSessions);
     }
 
     /// <summary>Die Kette, und wer ihre Reihenfolge bestimmt.</summary>
     /// <remarks>
-    /// <para><strong>Die Reihenfolge gehört Girder.</strong> Hier stand zuletzt
-    /// Girders Vorgabekette abgeschrieben, dreizehn Glieder lang, mit drei
+    /// <para><strong>Die Reihenfolge gehört Noelia.</strong> Hier stand zuletzt
+    /// Noelias Vorgabekette abgeschrieben, dreizehn Glieder lang, mit drei
     /// ausgelassenen Zeilen — nicht aus Gestaltung, sondern aus Zwang: die Kette
     /// wusste bis 4.0.2 von der Modulauswahl nichts und brach ohne die
     /// Auslassung beim Start ab. Seit 4.1.0 liest sie
-    /// <c>GirderComposition</c>, also steht hier wieder der Aufruf ohne Lambda:
-    /// dieselbe Kette, die jeder andere Girder-Dienst fährt, und jede Abwahl
+    /// <c>NoeliaComposition</c>, also steht hier wieder der Aufruf ohne Lambda:
+    /// dieselbe Kette, die jeder andere Noelia-Dienst fährt, und jede Abwahl
     /// oben wirkt einmal statt zweimal.</para>
     ///
     /// <para>Zwei Glieder kommen danach, und beide aus einem Grund:</para>
     ///
-    /// <para><c>UseGirderPrincipal()</c>, weil <c>Principal</c> kein Teil der
+    /// <para><c>UseNoeliaPrincipal()</c>, weil <c>Principal</c> kein Teil der
     /// Vorgabekette ist — es hängt an einer Entscheidung, und die haben wir oben
     /// getroffen. Es steht hinter der Authentifizierung, weil der Handelnde aus
     /// dem <em>geprüften</em> Token gebaut wird.</para>
     ///
     /// <para><see cref="ProblemDetailsMiddleware"/> zuletzt, also am nächsten an
-    /// den Endpunkten. Girders eigene Fehlerbehandlung steht weiter außen und
+    /// den Endpunkten. Noelias eigene Fehlerbehandlung steht weiter außen und
     /// fängt damit nur, was diese hier durchreicht. Eine Gestalt über alle
     /// Dienste ist der Grund: ein Aufrufer soll nicht wissen müssen, wer
     /// geantwortet hat, um den Fehler zu lesen.</para>
@@ -361,23 +361,23 @@ public static class Dienstgrundlage
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        // Girders Vorgabekette, ohne Lambda.
+        // Noelias Vorgabekette, ohne Lambda.
         //
         // Hier standen dreizehn abgeschriebene Zeilen mit drei Auslassungen. Sie
         // standen da, weil die Kette bis 4.0.2 jedes Glied bedingungslos rief und
         // von `Without(...)` nichts wusste: `UseRateLimiting()` haette jeden
         // Dienst beim Start abgebrochen. Die Kopie war also kein Entwurf, sondern
         // ein Zwang — und genau die Sorte Duplikat, die beim naechsten
-        // Girder-Release still falsch wird: kommt ein Glied hinzu, fehlt es hier,
+        // Noelia-Release still falsch wird: kommt ein Glied hinzu, fehlt es hier,
         // kein Bau bricht, kein Test faellt, die Kette ist einfach kuerzer.
         //
-        // Seit 4.1.0 liest die Kette `GirderComposition`. Jede Abwahl oben wirkt
+        // Seit 4.1.0 liest die Kette `NoeliaComposition`. Jede Abwahl oben wirkt
         // damit auch hier — RateLimiting, HttpResponseCaching und
         // PermissionEnforcement fallen von selbst weg, und ihre Begruendung steht
         // an genau einer Stelle.
-        app.UseGirder(environment, dienstname);
+        app.UseNoelia(environment, dienstname);
 
-        app.UseGirderPrincipal();
+        app.UseNoeliaPrincipal();
         app.UseMiddleware<ProblemDetailsMiddleware>();
 
         // Die sieben Adressen des Nachweises, hier und nicht in vierzehn
@@ -418,7 +418,7 @@ public static class Dienstgrundlage
     /// auseinanderlaufen, ohne dass es jemand merkte: die Kette rief jedes Glied
     /// bedingungslos, ein <c>Without(...)</c> wirkte nur bei der Registrierung,
     /// und ob die Auslassung wirklich ankam, sah man erst am Absturz. Genau
-    /// dafür gibt es <c>GirderComposition</c>, und ein Bericht, den niemand
+    /// dafür gibt es <c>NoeliaComposition</c>, und ein Bericht, den niemand
     /// ausgibt, ist keiner.</para>
     ///
     /// <para><strong>Ausgegeben wird nur die Zahl der geführten Module und jede
@@ -426,14 +426,14 @@ public static class Dienstgrundlage
     /// neunzehn Einträgen zwölfmal dasselbe im Startprotokoll; die Auslassungen
     /// sind das, worüber jemand entschieden hat, und nur sie können von der
     /// Absicht abweichen. Wer alles sehen will, liest
-    /// <c>GirderComposition.Included</c> aus dem Container.</para>
+    /// <c>NoeliaComposition.Included</c> aus dem Container.</para>
     ///
     /// <para>Kein Wert wandert dabei ins Protokoll: ein Modulname ist eine
     /// Aufzählung, ein Grund ein Satz, den wir selbst geschrieben haben.</para>
     /// </remarks>
     private static void BerichteZusammensetzung(WebApplication app, string dienstname)
     {
-        var zusammensetzung = app.Services.GetService<GirderComposition>();
+        var zusammensetzung = app.Services.GetService<NoeliaComposition>();
 
         if (zusammensetzung is null)
         {
@@ -441,7 +441,7 @@ public static class Dienstgrundlage
             // der wegen einer fehlenden Auskunft nicht startet, tauscht ein
             // kleines Problem gegen ein grosses.
             app.Logger.LogWarning(
-                "Girder meldet keine Zusammensetzung für {Dienst} — der Bericht bleibt leer",
+                "Noelia meldet keine Zusammensetzung für {Dienst} — der Bericht bleibt leer",
                 dienstname);
 
             return;
@@ -453,7 +453,7 @@ public static class Dienstgrundlage
         // dieselbe 19 vor und nach einer neuen `AddSovereignPlatform`-Zeile —
         // die Zahl konnte den Unterschied nicht zeigen, den sie melden sollte.
         app.Logger.LogInformation(
-            "Girder für {Dienst}: {Gefuehrt} Module in Betrieb ({Module}), {Ausgelassen} ausgelassen",
+            "Noelia für {Dienst}: {Gefuehrt} Module in Betrieb ({Module}), {Ausgelassen} ausgelassen",
             dienstname,
             zusammensetzung.Included.Count,
             string.Join(", ", zusammensetzung.Included),
@@ -462,7 +462,7 @@ public static class Dienstgrundlage
         foreach (var (modul, grund) in zusammensetzung.Excluded)
         {
             app.Logger.LogInformation(
-                "Girder-Modul {Modul} nicht in Betrieb: {Grund}", modul, grund);
+                "Noelia-Modul {Modul} nicht in Betrieb: {Grund}", modul, grund);
         }
     }
 }

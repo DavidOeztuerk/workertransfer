@@ -1,5 +1,5 @@
-using Girder.Abstractions.Security.Passwords;
-using Girder.Core.Identity;
+using Noelia.Abstractions.Security.Passwords;
+using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Identity.Application.Nachrichten;
 using WorkerTransfer.Identity.Application.Ports;

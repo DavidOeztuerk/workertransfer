@@ -21,13 +21,14 @@ COPY Directory.Build.props Directory.Packages.props NuGet.Config \
 COPY src ./src
 COPY tests ./tests
 
-# Girder liegt in GitHub Packages und verlangt eine Anmeldung. Sie kommt als
+# Noelia liegt auf nuget.org und verlangt keine Anmeldung. Frueher kam sie als
 # BuildKit-Geheimnis herein und wird NIE eine Schicht: ein Zugriff in einem Bild
 # bleibt in jeder Sicherung und in jedem `docker history`.
 #
 # --locked gibt es fuer NuGet nicht wie fuer uv; `restore` liest die zentralen
 # Fassungen aus Directory.Packages.props, und die stehen im Baum.
-# OHNE GEHEIMNIS, seit Girder auf nuget.org liegt (10.09.2026). Hier stand ein
+# OHNE GEHEIMNIS, seit Girder auf nuget.org lag (10.09.2026) und erst recht
+# seit Noelia (ADR-0045). Hier stand ein
 # `--mount=type=secret,id=nuget_config` — als Geheimnis und nicht als COPY,
 # damit die Anmeldung nie eine Bildschicht wird. Der Grund ist weg: es gibt
 # nichts mehr anzumelden.

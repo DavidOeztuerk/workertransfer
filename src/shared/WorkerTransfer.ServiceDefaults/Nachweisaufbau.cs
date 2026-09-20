@@ -40,7 +40,7 @@ public sealed class Nachweisgeheimnis
 /// beantworten kann, weil sie nur seine Konfiguration liest
 /// (<c>wt.grenze.ziele</c>). Alles andere ist eine Entscheidung dieses Dienstes
 /// und steht in seinem Verbundpunkt, wo ein Leser sie sieht — dieselbe Linie,
-/// die <c>AddWorkerTransferDefaults</c> für die Girder-Module zieht.</para>
+/// die <c>AddWorkerTransferDefaults</c> für die Noelia-Module zieht.</para>
 ///
 /// <para><strong>Und es ist eine Registrierung und kein Baumeister.</strong>
 /// ADR-0003 hat den fluenten <c>PlatformBuilder</c> abgelehnt; eine Prüfung

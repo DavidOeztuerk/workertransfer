@@ -1,5 +1,5 @@
 using System.Net.Http.Json;
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Contracts.Erasure;
 using WorkerTransfer.Identity.Application.Loeschung;

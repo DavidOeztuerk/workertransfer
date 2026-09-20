@@ -1,4 +1,4 @@
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.GitHub.Application.Nachrichten;
 using WorkerTransfer.GitHub.Application.Ports;

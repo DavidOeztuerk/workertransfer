@@ -3,7 +3,7 @@ using WorkerTransfer.Portfolio.Application.Ports;
 
 namespace WorkerTransfer.Portfolio.Infrastructure.Security;
 
-/// <summary>Liest die Korrelations-Id, die Girders Middleware angehängt hat.</summary>
+/// <summary>Liest die Korrelations-Id, die Noelias Middleware angehängt hat.</summary>
 public sealed class HttpKorrelation(IHttpContextAccessor zugriff) : IKorrelation
 {
     /// <inheritdoc />

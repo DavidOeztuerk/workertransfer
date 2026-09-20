@@ -18,7 +18,7 @@ namespace WorkerTransfer.Identity.Tests;
 /// <para><strong>Der Fehler, den diese Reihe verhindert, war schon da und
 /// niemand sah ihn.</strong> <c>RegisterBody</c> trug als einziger Rumpf der
 /// Plattform keine <c>[JsonPropertyName]</c> und fiel damit auf camelCase aus
-/// <c>GirderModule.JsonOptions</c> zurück. Die Oberfläche schickt
+/// <c>NoeliaModule.JsonOptions</c> zurück. Die Oberfläche schickt
 /// <c>display_name</c>, gebunden wurde <c>displayName</c> — der Wert kam nie an,
 /// die Spalte ist <c>NOT NULL</c>, und über die Oberfläche konnte sich
 /// <strong>niemand registrieren</strong>.</para>

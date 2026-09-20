@@ -1,4 +1,4 @@
-using Girder.Abstractions.Observability;
+using Noelia.Abstractions.Observability;
 using FluentAssertions;
 
 namespace WorkerTransfer.Gateway.Tests;

@@ -1,4 +1,4 @@
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 
 namespace WorkerTransfer.Notification.Application.Ports;
 

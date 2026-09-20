@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Girder.Abstractions.Caching;
-using Girder.Infrastructure.Middleware;
-using Girder.Infrastructure.Models;
-using Girder.Infrastructure.RateLimiting;
+using Noelia.Abstractions.Caching;
+using Noelia.Infrastructure.Middleware;
+using Noelia.Infrastructure.Models;
+using Noelia.Infrastructure.RateLimiting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -137,7 +137,7 @@ public class Landschaft : IAsyncLifetime
             Landkarte(haefen, umgedreht), optional: false, reloadOnChange: false);
         bau.Services.AddOcelot(bau.Configuration);
 
-        // Wortgleich zu `Program.cs` — Girders Zaehler UND seine Zwischenschicht.
+        // Wortgleich zu `Program.cs` — Noelias Zaehler UND seine Zwischenschicht.
         bau.Services.AddMemoryCache();
         bau.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
         bau.Services.Configure<DistributedRateLimitingOptions>(

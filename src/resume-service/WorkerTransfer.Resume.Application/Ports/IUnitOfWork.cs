@@ -2,7 +2,7 @@ namespace WorkerTransfer.Resume.Application.Ports;
 
 /// <summary>One transaction around one command.</summary>
 /// <remarks>
-/// Girder brings no transaction behaviour, and this service needs one for two
+/// Noelia brings no transaction behaviour, and this service needs one for two
 /// reasons. The trail has to commit together with the change it records. And
 /// the outbox row has to commit together with the request that caused it — a
 /// notification written separately could exist while the request was rolled

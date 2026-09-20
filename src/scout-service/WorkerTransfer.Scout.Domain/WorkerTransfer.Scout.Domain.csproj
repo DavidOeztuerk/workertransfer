@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Girder.Core" />
+    <PackageReference Include="Noelia.Core" />
   </ItemGroup>
   <ItemGroup>
     <!-- Derselbe Wortschatz wie im Profil und in der Anzeige: wer nach

@@ -1,4 +1,4 @@
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Applications.Application.Nachrichten;
 using WorkerTransfer.Outbox;

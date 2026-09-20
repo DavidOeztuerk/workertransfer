@@ -11,7 +11,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// <para><strong>Der Draht dieser Plattform ist snake_case.</strong> Neun Dienste
 /// setzen ihn mit <c>[JsonPropertyName]</c> auf ihren Vertragstypen, und
 /// <c>apps/web</c> liest und schreibt danach. Ein Rumpf <em>ohne</em> die
-/// Angaben fällt aber auf camelCase aus <c>GirderModule.JsonOptions</c> zurück —
+/// Angaben fällt aber auf camelCase aus <c>NoeliaModule.JsonOptions</c> zurück —
 /// und dann heißt dasselbe Feld auf beiden Seiten anders.</para>
 ///
 /// <para><strong>Warum das über Jahre unsichtbar bleibt.</strong> Bei einwortigen

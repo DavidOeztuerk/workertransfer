@@ -2,7 +2,7 @@ namespace WorkerTransfer.Profile.Application.Ports;
 
 /// <summary>Eine Transaktion um einen Befehl.</summary>
 /// <remarks>
-/// Girder bringt keine Transaktionsklammer mit, und der Grund, warum dieser
+/// Noelia bringt keine Transaktionsklammer mit, und der Grund, warum dieser
 /// Dienst eine braucht, ist die Prüfspur: ein Eintrag, der getrennt abschließt
 /// von der Änderung, die er festhält, überlebt einen Rücklauf oder fehlt nach
 /// einem Abschluss — und behauptet in beiden Fällen etwas, das nicht geschehen

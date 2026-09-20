@@ -1,8 +1,8 @@
 using System.Text.Json;
-using Girder.Core.Identity;
-using Girder.Infrastructure.Models;
-using Girder.Infrastructure.Security;
-using Girder.Infrastructure.Security.Keys;
+using Noelia.Core.Identity;
+using Noelia.Infrastructure.Models;
+using Noelia.Infrastructure.Security;
+using Noelia.Infrastructure.Security.Keys;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Identity.Infrastructure.Security;
@@ -19,7 +19,7 @@ internal static class Tokenform
     internal const string Issuer = "workertransfer-identity";
     internal const string Audience = "workertransfer";
 
-    internal static GirderAccessTokenIssuer Issuer_()
+    internal static NoeliaAccessTokenIssuer Issuer_()
     {
         var settings = new JwtSettings
         {
@@ -30,7 +30,7 @@ internal static class Tokenform
         };
         var shared = SigningKey.FromSharedSecret(Secret, kid: null);
 
-        return new GirderAccessTokenIssuer(new JwtService(
+        return new NoeliaAccessTokenIssuer(new JwtService(
             Options.Create(settings),
             new KeyRing([shared], shared),
             NullLogger<JwtService>.Instance));

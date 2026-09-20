@@ -1,6 +1,6 @@
 using FluentAssertions;
-using Girder.Abstractions.Security.Passwords;
-using Girder.Core.Identity;
+using Noelia.Abstractions.Security.Passwords;
+using Noelia.Core.Identity;
 using NSubstitute;
 using WorkerTransfer.Identity.Application.Ports;
 using WorkerTransfer.Identity.Application.Registrierung;

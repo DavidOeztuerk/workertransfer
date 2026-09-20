@@ -19,7 +19,7 @@ namespace WorkerTransfer.Identity.Tests;
 /// </summary>
 /// <remarks>
 /// <strong>Der Unterschied ist genau die Lücke, durch die der neunte Anspruch
-/// gerutscht ist.</strong> <see cref="TokenformTests"/> ruft Girders Aussteller
+/// gerutscht ist.</strong> <see cref="TokenformTests"/> ruft Noelias Aussteller
 /// direkt und hält seinen Satz fest. Das ist richtig und reicht nicht: zwischen
 /// Aussteller und Draht liegen die Einstellungen des Dienstes, seine
 /// Verdrahtung und der Keks, in dem das Token schliesslich steht. Ein Anspruch,
@@ -46,7 +46,7 @@ public class TokenformAmDrahtTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Was eine Person trägt, die für niemanden handelt.</summary>
     /// <remarks>
-    /// Der neunte — die lange WS-Schreibweise von <c>sub</c> — ist Girders und
+    /// Der neunte — die lange WS-Schreibweise von <c>sub</c> — ist Noelias und
     /// bleibt: <c>MapInboundClaims = false</c> schaltet die Ableitung ab, und
     /// siebzehn Leser holen den Aufrufer über diesen Namen, zwei davon in
     /// Fremdpaketen. Ihn zu streichen spart siebzig Byte und macht aus jedem

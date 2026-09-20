@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Girder.Core" />
+    <PackageReference Include="Noelia.Core" />
   </ItemGroup>
 
   <ItemGroup>

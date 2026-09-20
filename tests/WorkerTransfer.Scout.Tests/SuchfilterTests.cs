@@ -78,7 +78,7 @@ public class SuchfilterTests
 
     /// <summary>Die Meldung nennt die Regel, nie den Wert.</summary>
     /// <remarks>
-    /// Girders <c>ValidationBehavior</c> protokolliert Fehlermeldungen. Ein
+    /// Noelias <c>ValidationBehavior</c> protokolliert Fehlermeldungen. Ein
     /// Suchbegriff ist die Eingabe eines Menschen über einen anderen und hat im
     /// Protokoll nichts zu suchen.
     /// </remarks>

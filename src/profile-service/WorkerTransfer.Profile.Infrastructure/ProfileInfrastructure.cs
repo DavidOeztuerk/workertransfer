@@ -1,4 +1,4 @@
-using Girder.Application.Extensions;
+using Noelia.Application.Extensions;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
@@ -26,7 +26,7 @@ namespace WorkerTransfer.Profile.Infrastructure;
 /// <remarks>
 /// Alles, was dieser Dienst für sich entscheidet, steht hier in einem Aufruf —
 /// und genauso laut, was <em>nicht</em> hier steht. Es gibt keinen Cache und
-/// keinen zu registrieren: nichts implementiert Girders
+/// keinen zu registrieren: nichts implementiert Noelias
 /// <c>ICacheableQuery</c>, also lässt <c>AddCQRS</c> beide Cache-Behaviors ganz
 /// aus der Pipeline. Das ist keine Sparsamkeit, das ist ADR-0013 — ein Widerruf
 /// muss beim nächsten Lesen wirken.

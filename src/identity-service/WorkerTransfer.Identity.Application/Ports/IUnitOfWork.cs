@@ -2,7 +2,7 @@ namespace WorkerTransfer.Identity.Application.Ports;
 
 /// <summary>One transaction around one command.</summary>
 /// <remarks>
-/// Girder brings no transaction behaviour, and the reason this service needs
+/// Noelia brings no transaction behaviour, and the reason this service needs
 /// one is the audit trail: an entry that commits separately from the change it
 /// records can survive a rollback or be missing after a commit, and either way
 /// it states something that did not happen. The erasure cascade needs it for a

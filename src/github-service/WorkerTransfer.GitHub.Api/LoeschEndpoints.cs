@@ -37,7 +37,7 @@ public static class LoeschEndpoints
             }
 
             var behalten = await mediator.Send(
-                new PersonLoeschenBefehl(new Girder.Core.Identity.SubjectId(body.UserId)),
+                new PersonLoeschenBefehl(new Noelia.Core.Identity.SubjectId(body.UserId)),
                 cancellationToken);
 
             // Eine Zahl, kein Merker — hier immer 0, weil es nichts gibt, was

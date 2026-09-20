@@ -8,7 +8,7 @@ namespace WorkerTransfer.Identity.Api.Berechtigung;
 /// sein will, und nicht, <em>wer</em> das ist — wer es ist, entscheidet
 /// <see cref="Mitgliedschaftsrecht"/> beim Lesen der Mitgliedschaft.
 /// <para>
-/// Der Präfix <c>Permission:</c> ist Girders: sein
+/// Der Präfix <c>Permission:</c> ist Noelias: sein
 /// <c>PermissionPolicyProvider</c> baut aus jedem so benannten Richtliniennamen
 /// zur Laufzeit eine Richtlinie. Deshalb muss keine davon vorher angemeldet
 /// werden — und deshalb ist es wichtig, dass der Anbieter überhaupt
@@ -18,7 +18,7 @@ namespace WorkerTransfer.Identity.Api.Berechtigung;
 /// </remarks>
 public static class Firmenrechte
 {
-    /// <summary>Girders Präfix für dynamisch aufgelöste Richtlinien.</summary>
+    /// <summary>Noelias Präfix für dynamisch aufgelöste Richtlinien.</summary>
     public const string Praefix = "Permission:";
 
     /// <summary>Jemanden in die eigene Firma einladen.</summary>

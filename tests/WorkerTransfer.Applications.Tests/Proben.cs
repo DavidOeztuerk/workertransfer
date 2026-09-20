@@ -1,4 +1,4 @@
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using WorkerTransfer.Applications.Application.Ports;
 
 namespace WorkerTransfer.Applications.Tests;
@@ -117,7 +117,7 @@ public sealed class ProbeKiZugang : IKiZugangAbfrage
 
     /// <inheritdoc />
     public Task<KiZugang> HoleAsync(
-        Girder.Core.Identity.SubjectId wer,
+        Noelia.Core.Identity.SubjectId wer,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Wert);
 }

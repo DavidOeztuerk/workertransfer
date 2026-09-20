@@ -1,7 +1,7 @@
-using Girder.Application.Extensions;
-using Girder.Data.EntityFrameworkCore.Sessions;
-using Girder.Infrastructure.Security.Identity;
-using Girder.Passwords.BCrypt;
+using Noelia.Application.Extensions;
+using Noelia.Data.EntityFrameworkCore.Sessions;
+using Noelia.Infrastructure.Security.Identity;
+using Noelia.Passwords.BCrypt;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
@@ -113,13 +113,13 @@ public static class IdentityInfrastructure
         services.AddScoped<IAuditTrail, EfAuditTrail>();
         services.AddScoped<ISessionCapacity, EfSessionCapacity>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-        services.AddScoped<IAccessTokenIssuer, GirderAccessTokenIssuer>();
-        services.AddScoped<ISessionService, GirderSessionService>();
+        services.AddScoped<IAccessTokenIssuer, NoeliaAccessTokenIssuer>();
+        services.AddScoped<ISessionService, NoeliaSessionService>();
         services.AddSingleton<IKorrelation, HttpKorrelation>();
 
-        // The mediator, and the one behaviour Girder does not bring. Registered
+        // The mediator, and the one behaviour Noelia does not bring. Registered
         // last so the transaction is the innermost wrapper around a handler:
-        // Girder's logging and validation run before anything is written, which
+        // Noelia's logging and validation run before anything is written, which
         // is where a rejected command costs nothing.
         services.AddCQRS(typeof(AnmeldenBefehl).Assembly);
 

@@ -1,4 +1,4 @@
-using Girder.Application.Extensions;
+using Noelia.Application.Extensions;
 using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,7 +26,7 @@ namespace WorkerTransfer.Assessment.Infrastructure;
 /// Aufruf (ADR-0003) — und genauso laut, was <em>nicht</em> hier steht.</para>
 ///
 /// <para><strong>Kein Cache</strong>, und keiner zu registrieren: nichts
-/// implementiert Girders <c>ICacheableQuery</c>, also lässt <c>AddCQRS</c> beide
+/// implementiert Noelias <c>ICacheableQuery</c>, also lässt <c>AddCQRS</c> beide
 /// Cache-Behaviors ganz aus der Pipeline. Das ist ADR-0013 — ein Widerruf muss
 /// beim nächsten Lesen wirken, und hier entscheidet er darüber, ob ein
 /// Unternehmen die Arbeit eines Menschen noch sieht.</para>

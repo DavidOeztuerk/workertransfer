@@ -46,6 +46,22 @@ The gateway (`src/gateway`, port 8090) is the single entrance. `src/shared/` hol
 
 The vision documents in [`docs/vision/`](docs/vision/) describe a much larger future state. **Treat them as intent, not description.**
 
+## Umstieg auf Noelia — offen, und er kommt zuerst
+
+**Girder und Noelia sind dieselbe Codelinie.** `MIGRATION.md:781` im Noelia-Baum
+heißt *„4.4.3 code line → Noelia 5.0.0"*. Dieses Repositorium steht auf
+**Girder 4.4.0** und ist damit zwölf dokumentierte Sprünge hinter Noelia 6.4.0.
+
+`docs/AUFTRAG-NOELIA-UMSTIEG.md` führt sie. **5.0 ist eine Datenwanderung, kein
+Umbenennen** — Sitzungen, Widerrufe, der Passwort-Pfeffer, die Prüfspur. Die
+schärfste Kante ist der Einwilligungsledger: ein Widerruf, der still nicht
+mitkommt, sieht danach aus wie eine erteilte Einwilligung.
+
+```
+/noelia alles         # ab Phase 0 — erst am Demo, Daten vor Grün
+/noelia 1             # nur die zwölf Sprünge
+```
+
 ## Nachweis und KI-Pflichten
 
 `docs/AUFTRAG-NACHWEIS-UND-KI-PFLICHTEN.md` ist offen: die Prinzipien dieses
@@ -63,6 +79,11 @@ ein Dokument oder auf eine Seite gerät.
 /nachweis alles       # den ganzen Auftrag, Phase für Phase, mit Toren dazwischen
 /nachweis 1           # nur eine Phase
 ```
+
+**Ausgeführt am 20.09.2026 (PR #87).** Seine Phasen 3–5 gehen im Noelia-Umstieg
+auf: `ISecurityCheck`, `Noelia.Dashboard` und `RegulatoryReference` liefern, was
+`WorkerTransfer.Nachweis` selbst gebaut hat. Vier Prüfungen bleiben, weil sie
+WorkerTransfers eigene sind.
 
 ## Commands
 

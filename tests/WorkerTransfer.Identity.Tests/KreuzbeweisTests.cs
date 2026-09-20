@@ -133,7 +133,7 @@ public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// The React app reads the message out of <c>detail</c>. Girder's own
+    /// The React app reads the message out of <c>detail</c>. Noelia's own
     /// handler writes a different envelope, which is why this service does not
     /// use it.
     /// </summary>

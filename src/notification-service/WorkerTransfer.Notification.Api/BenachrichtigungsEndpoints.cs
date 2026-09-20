@@ -1,4 +1,4 @@
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using MediatR;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Notification.Application.Benachrichtigungen;

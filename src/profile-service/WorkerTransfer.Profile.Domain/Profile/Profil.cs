@@ -1,4 +1,4 @@
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using WorkerTransfer.Profile.Domain.Faehigkeiten;
 
 namespace WorkerTransfer.Profile.Domain.Profile;

@@ -1,9 +1,9 @@
 using FluentAssertions;
-using Girder.Abstractions.Security.Sessions;
-using Girder.Core.Identity;
-using Girder.Data.EntityFrameworkCore;
-using Girder.Data.EntityFrameworkCore.Sessions;
-using Girder.Infrastructure.Security.Sessions;
+using Noelia.Abstractions.Security.Sessions;
+using Noelia.Core.Identity;
+using Noelia.Data.EntityFrameworkCore;
+using Noelia.Data.EntityFrameworkCore.Sessions;
+using Noelia.Infrastructure.Security.Sessions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -12,30 +12,30 @@ using Microsoft.Extensions.Options;
 
 namespace WorkerTransfer.Identity.Tests;
 
-/// <summary>A context that holds nothing but Girder's own table.</summary>
-public sealed class NurGirderKontext(DbContextOptions<NurGirderKontext> options) : DbContext(options)
+/// <summary>A context that holds nothing but Noelia's own table.</summary>
+public sealed class NurNoeliaKontext(DbContextOptions<NurNoeliaKontext> options) : DbContext(options)
 {
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
         // Its own name, so this probe cannot collide with the table the
         // service's own migration creates in the same database.
-        modelBuilder.ConfigureGirderRefreshTokens("probe_refresh_tokens");
+        modelBuilder.ConfigureNoeliaRefreshTokens("probe_refresh_tokens");
     }
 }
 
 /// <summary>
-/// Whether Girder's session store can run inside a transaction the application
+/// Whether Noelia's session store can run inside a transaction the application
 /// opened.
 /// </summary>
 /// <remarks>
 /// The audit trail has to commit together with the change it records, which
-/// means one transaction per command. Girder's refresh-token store manages its
+/// means one transaction per command. Noelia's refresh-token store manages its
 /// own atomicity and opens a transaction of its own while consuming a token —
 /// so whether the two compose decides how the sign-in commands are cut.
 /// <para>
-/// Deliberately built out of Girder alone. It began as the reproduction for a
-/// Girder bug — the store opened a second transaction and threw
+/// Deliberately built out of Noelia alone. It began as the reproduction for a
+/// Noelia bug — the store opened a second transaction and threw
 /// <c>"The connection is already in a transaction"</c> — fixed in 3.0.1. The
 /// ticket is gone; the test stays, because what it pins is ours: that the two
 /// sign-in routes really do commit their audit row together with the change.
@@ -52,15 +52,27 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
         services.AddLogging();
         services.AddSingleton(TimeProvider.System);
         services.Configure<TokenSessionOptions>(_ => { });
-        services.AddDbContext<NurGirderKontext>(
+        services.AddDbContext<NurNoeliaKontext>(
             options => options.UseNpgsql(postgres.ConnectionString));
-        services.AddEntityFrameworkRefreshTokens<NurGirderKontext>();
+        services.AddEntityFrameworkRefreshTokens<NurNoeliaKontext>();
+
+        // `SessionObservations` ist seit 5.1.0 ein Singleton und der fuenfte
+        // Konstruktorparameter von `TokenSessionService` (MIGRATION.md:451).
+        // Vorher war die Menge der beobachteten Subjekte ein Instanzfeld an
+        // einem `AddScoped`-Dienst — je Anfrage ein neues, leeres Woerterbuch,
+        // weshalb die Sitzungsuebersicht dauerhaft „0 active sessions" meldete.
+        //
+        // Diese Reihe baut den Dienst selbst, statt das Modul zu fahren; sie
+        // muss das Singleton deshalb selbst stellen. Eine Ueberladung mit vier
+        // Parametern gibt es bewusst nicht — sie legte sich ihre eigene Menge an
+        // und stellte damit genau den Defekt lautlos wieder her.
+        services.AddSingleton<SessionObservations>();
         services.AddScoped<ITokenSessionService, TokenSessionService>();
 
         _anbieter = services.BuildServiceProvider();
 
         using var bereich = _anbieter.CreateScope();
-        var kontext = bereich.ServiceProvider.GetRequiredService<NurGirderKontext>();
+        var kontext = bereich.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
 
         // Not EnsureCreated: the database already carries the Alembic schema,
         // so it would decide there is nothing to do. xunit builds one
@@ -86,7 +98,7 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
     public async Task Eine_Anmeldung_laeuft_in_einer_offenen_Transaktion()
     {
         using var bereich = _anbieter.CreateScope();
-        var kontext = bereich.ServiceProvider.GetRequiredService<NurGirderKontext>();
+        var kontext = bereich.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
         var sitzungen = bereich.ServiceProvider.GetRequiredService<ITokenSessionService>();
 
         await using var klammer = await kontext.Database.BeginTransactionAsync();
@@ -111,7 +123,7 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
     public async Task Eine_Erneuerung_laeuft_in_einer_offenen_Transaktion()
     {
         using var bereich = _anbieter.CreateScope();
-        var kontext = bereich.ServiceProvider.GetRequiredService<NurGirderKontext>();
+        var kontext = bereich.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
         var sitzungen = bereich.ServiceProvider.GetRequiredService<ITokenSessionService>();
 
         var angemeldet = await sitzungen.SignInAsync(SubjectId.New());
@@ -152,7 +164,7 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
     public async Task Eine_Abmeldung_laeuft_in_einer_offenen_Transaktion()
     {
         using var bereich = _anbieter.CreateScope();
-        var kontext = bereich.ServiceProvider.GetRequiredService<NurGirderKontext>();
+        var kontext = bereich.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
         var sitzungen = bereich.ServiceProvider.GetRequiredService<ITokenSessionService>();
 
         var angemeldet = await sitzungen.SignInAsync(SubjectId.New());

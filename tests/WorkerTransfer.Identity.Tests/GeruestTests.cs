@@ -1,11 +1,11 @@
 using FluentAssertions;
-using Girder.Core.Identity;
-using Girder.Infrastructure.Security.Keys;
+using Noelia.Core.Identity;
+using Noelia.Infrastructure.Security.Keys;
 
 namespace WorkerTransfer.Identity.Tests;
 
 /// <summary>
-/// The scaffold carries Girder, and the layers point inwards.
+/// The scaffold carries Noelia, and the layers point inwards.
 /// </summary>
 /// <remarks>
 /// Deleted as soon as the first real test exists. Until then it is the only
@@ -15,7 +15,7 @@ namespace WorkerTransfer.Identity.Tests;
 public class GeruestTests
 {
     [Fact]
-    public void Girders_identity_primitives_are_available()
+    public void Noelias_identity_primitives_are_available()
     {
         var subject = SubjectId.New();
         var tenant = TenantId.New();

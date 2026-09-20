@@ -1,5 +1,5 @@
 using FluentAssertions;
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using WorkerTransfer.Consent.Domain.Ledger;
 
 namespace WorkerTransfer.Consent.Tests;

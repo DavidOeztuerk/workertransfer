@@ -43,7 +43,7 @@ public sealed class Adminrechte
 /// <summary>Meldet die Firmenrechte eines Dienstes an.</summary>
 public static class AdminrechteErweiterungen
 {
-    /// <summary>Girders Präfix für dynamisch aufgelöste Richtlinien.</summary>
+    /// <summary>Noelias Präfix für dynamisch aufgelöste Richtlinien.</summary>
     /// <remarks>
     /// Sein <c>PermissionPolicyProvider</c> baut aus jedem so benannten
     /// Richtliniennamen zur Laufzeit eine Richtlinie. Deshalb muss keine vorher
