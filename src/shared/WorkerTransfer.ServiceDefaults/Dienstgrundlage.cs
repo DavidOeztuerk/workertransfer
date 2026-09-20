@@ -11,6 +11,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using WorkerTransfer.Nachweis;
+using WorkerTransfer.Nachweis.Pruefungen;
 
 namespace WorkerTransfer.ServiceDefaults;
 
@@ -123,6 +125,23 @@ public static class Dienstgrundlage
         // Autorisierungs-Zwischenschicht ruft diesen Handler nur fuer
         // Endpunkte, die Autorisierungsdaten tragen.
         services.AddSingleton<IAuthorizationMiddlewareResultHandler, Ablehnungsgestalt>();
+
+        // DER NACHWEIS HAENGT HIER, weil das der eine Aufruf ist, den jeder
+        // Dienst macht (ADR-0044).
+        //
+        // Der Grund steht schon in dieser Datei, eine Ueberschrift weiter oben:
+        // "Wir listeten fuenf Module auf und bekamen fuenf — und merkten nicht,
+        // was dadurch fehlte. Nichts davon war abgewaehlt; niemand hatte sie je
+        // gewaehlt." Genau diese Krankheit haben die Zusagen dieses Baumes an
+        // drei weiteren Stellen: sie sind aufgeschrieben und nicht ausfuehrbar.
+        //
+        // Und ein Test kann sie nicht heilen. `Adr0022Tests` und
+        // `EntwurfsgrenzeTests` pruefen den BAUM; der KI-Zugang einer Person
+        // steht in `KiZugangV1` — Anbieter, Adresse, Modell und Schluessel pro
+        // Person zur Laufzeit —, und die Ziele der Egress-Grenze stehen in der
+        // Umgebung. Wohin dieser Behaelter heute Abend spricht, weiss nur er
+        // selbst.
+        services.AddNachweis(configuration, dienstname);
 
         return services.AddGirder(configuration, environment, dienstname, girder =>
         {
@@ -361,6 +380,14 @@ public static class Dienstgrundlage
         app.UseGirderPrincipal();
         app.UseMiddleware<ProblemDetailsMiddleware>();
 
+        // Die sieben Adressen des Nachweises, hier und nicht in vierzehn
+        // Program.cs (ADR-0044). „Ein Tor, das man aufrufen muss, um es zu
+        // haben, hat man nicht" — dasselbe Argument, aus dem
+        // `make nachweis-pruefen` in `make validate` steht. Ein Dienst, der
+        // seinen eigenen Nachweis zu verdrahten vergisst, antwortet 404 und
+        // sieht damit aus wie einer, der ihn absichtlich zuhat.
+        app.MapNachweisEndpunkte();
+
         BerichteZusammensetzung(app, dienstname);
 
         return app;
@@ -368,15 +395,12 @@ public static class Dienstgrundlage
 
     /// <summary>Jeder Host, den dieser Dienst laut Konfiguration ruft.</summary>
     /// <remarks>
-    /// <para><strong>Eine Ableitung, keine Liste.</strong> Gelesen wird die
-    /// ganze Konfiguration; jeder Wert, der sich als absolute http- oder
-    /// https-Adresse lesen lässt, gibt seinen Host her. Damit deckt die
-    /// Egress-Grenze genau das ab, was in der Umgebung steht — und kann nicht
-    /// hinter ihr zurückbleiben, weil es dieselbe Quelle ist.</para>
-    ///
-    /// <para>Verbindungszeichenfolgen fallen dabei durch (<c>Host=postgres;…</c>
-    /// ist keine URL), und das ist richtig: Postgres wird nicht über einen
-    /// <c>HttpClient</c> gerufen, die Egress-Grenze sieht es nie.</para>
+    /// <para><strong>Eine Ableitung, keine Liste</strong> — und sie steht seit
+    /// ADR-0044 in <see cref="Zielkunde"/>, weil sie zwei Leser hat: die
+    /// Egress-Grenze erlaubt genau diese Hosts, und <c>wt.grenze.ziele</c>
+    /// berichtet genau diese Hosts. Zwei Ableitungen über dieselbe Frage wären
+    /// zwei Wahrheiten, und die schlechtere Hälfte davon wäre eine Grenze, die
+    /// mehr durchlässt, als der Nachweis nennt.</para>
     ///
     /// <para><strong>Zwei Ziele stehen deshalb in der Umgebung, die früher nur
     /// im Quelltext standen</strong> — <c>Draft__Adresse</c> und
@@ -385,20 +409,7 @@ public static class Dienstgrundlage
     /// Code zu lassen hieße, sie vor ihm zu verstecken.</para>
     /// </remarks>
     private static IReadOnlyList<string> GerufeneHosts(IConfiguration configuration) =>
-    [
-        .. configuration.AsEnumerable()
-            .Select(eintrag => eintrag.Value)
-            .Where(wert => !string.IsNullOrWhiteSpace(wert))
-            .Select(wert =>
-                Uri.TryCreate(wert, UriKind.Absolute, out var adresse)
-                && (adresse.Scheme == Uri.UriSchemeHttp || adresse.Scheme == Uri.UriSchemeHttps)
-                    ? adresse.Host
-                    : null)
-            .Where(host => host is { Length: > 0 })
-            .Select(host => host!)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(host => host, StringComparer.OrdinalIgnoreCase)
-    ];
+        Zielkunde.Hosts(configuration);
 
     /// <summary>Sagt beim Start, was dieser Dienst fährt — und was er warum nicht.</summary>
     /// <remarks>

@@ -14,6 +14,10 @@ using WorkerTransfer.Consent.Infrastructure.Loeschung;
 using WorkerTransfer.Consent.Infrastructure.Persistence;
 using WorkerTransfer.Consent.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.Consent.Infrastructure.Nachweis;
+using WorkerTransfer.Nachweis;
+using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.Contracts.Consent;
 
 namespace WorkerTransfer.Consent.Infrastructure;
 
@@ -66,6 +70,49 @@ public static class ConsentInfrastructure
         services.AddCQRS(typeof(EinwilligungErteilenBefehl).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
+        Nachweis(services, configuration);
+
         return services;
+    }
+
+    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <remarks>
+    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
+    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    ///
+    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
+    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
+    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// vergessen kann.</para>
+    /// </remarks>
+    private static void Nachweis(
+        IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+            [typeof(AuditAction).Assembly, typeof(EinwilligungsfrageV1).Assembly]));
+
+        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
+        // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
+        // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
+        // durchschneiden soll.
+        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+            anbieter.GetServices<IAnbieterquelle>()));
+
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, false, null));
+
+        // Der Ledger selbst — die eine Pruefung im Bereich `Ledger`, und der
+        // Grund, dass es diesen Bereich gibt. Sie misst ein NICHT-Vorhandensein
+        // (keine Mandantenspalte), und das sind die, die am leichtesten wieder
+        // verschwinden.
+        services.AddScoped<IPruefung, Ledgerpruefung>();
+
+        var loeschung = new Loescheinstellungen();
+        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+
+        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+            "consent",
+            !string.IsNullOrEmpty(loeschung.Geheimnis),
+            pruefspurVorhanden: false));
     }
 }

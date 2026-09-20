@@ -55,6 +55,8 @@ make fix            # dotnet format
 make up / down      # docker compose — the whole stack
 make images         # both shipped images, the local twin of the CI job
 make routenkarte    # every endpoint x four principals, needs the running stack
+make nachweis       # three dated, signed evidence documents, needs the running stack
+make nachweis-pruefen  # every check in every service; red on an unkept promise
 make k8s-up / k8s-down / k8s-lint
 ```
 

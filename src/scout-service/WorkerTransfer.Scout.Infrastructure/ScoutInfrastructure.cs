@@ -17,6 +17,9 @@ using WorkerTransfer.Scout.Infrastructure.Loeschung;
 using WorkerTransfer.Scout.Infrastructure.Persistence;
 using WorkerTransfer.Scout.Infrastructure.Profile;
 using WorkerTransfer.Scout.Infrastructure.Stellen;
+using WorkerTransfer.Nachweis;
+using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.Scout.Contracts;
 
 namespace WorkerTransfer.Scout.Infrastructure;
 
@@ -105,6 +108,66 @@ public static class ScoutInfrastructure
         services.AddCQRS(typeof(KandidatenAbfrage).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
+        Nachweis(services, configuration, entwurf);
+
         return services;
+    }
+
+    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <remarks>
+    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
+    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    ///
+    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
+    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
+    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// vergessen kann.</para>
+    /// </remarks>
+    private static void Nachweis(
+        IServiceCollection services,
+        IConfiguration configuration,
+        Entwurfseinstellungen entwurf)
+    {
+        var naht = !string.IsNullOrEmpty(entwurf.Schluessel);
+
+        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+            [typeof(Suche).Assembly, typeof(HakenV1).Assembly]));
+
+        services.AddScoped<IPruefung>(_ => new Nahtpruefung(
+            typeof(Ansprachelage),
+            ["Ueberschrift", "Genannt", "Gesucht", "Wunsch", "Prompt"],
+            "für eine Ansprache"));
+
+        // Der Anbieter dieses Dienstes ist der des BETREIBERS: `Draft__*` aus
+        // der Umgebung, einer fuer alle. Den Zugang je Person haelt
+        // identity-service, und dort wird gezaehlt statt genannt.
+        services.AddScoped<IAnbieterquelle>(_ => new Betreiberquelle(
+            "anthropic", entwurf.Adresse, naht));
+
+        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+            anbieter.GetServices<IAnbieterquelle>()));
+
+        // KEINE AUFZEICHNUNG, und das ist eine Entscheidung (ADR-0024): weder
+        // Prompt noch Antwort noch ein Ledger-Eintrag. `null` ist hier die
+        // richtige Antwort und keine fehlende Verdrahtung.
+        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(
+            nahtVorhanden: true, anbieterEingerichtet: naht, null));
+
+        // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
+        // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
+        // Zwischenspeicher davor faellt niemandem auf, weil alles
+        // weiterfunktioniert, nur eben mit dem Stand von vorhin.
+        services.AddScoped<IPruefung>(anbieter =>
+            new Widerrufspruefung<IEinwilligungstor>(
+                anbieter, typeof(HttpEinwilligungstor)));
+
+        var loeschung = new Loescheinstellungen();
+        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+
+        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+            "scout",
+            !string.IsNullOrEmpty(loeschung.Geheimnis),
+            pruefspurVorhanden: false));
     }
 }

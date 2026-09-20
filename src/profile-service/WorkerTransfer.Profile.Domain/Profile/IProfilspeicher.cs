@@ -3,7 +3,7 @@ using Girder.Core.Identity;
 namespace WorkerTransfer.Profile.Domain.Profile;
 
 /// <summary>Wonach eine Seite eingeschränkt wird.</summary>
-/// <param name="Anzahl">Wie viele Zeilen höchstens.</param>
+/// <param name="Seitenlaenge">Wie viele Zeilen höchstens.</param>
 /// <param name="Ab">Wo es weitergeht, oder <c>null</c> für den Anfang.</param>
 /// <param name="Faehigkeiten">Die gesuchten Worte, kanonisch.</param>
 /// <param name="Ort">Teiltext, ohne Rücksicht auf Groß-/Kleinschreibung.</param>
@@ -25,7 +25,12 @@ namespace WorkerTransfer.Profile.Domain.Profile;
 /// Sichtbarkeit (ADR-0020).</para>
 /// </remarks>
 public sealed record Seitenanfrage(
-    int Anzahl,
+    // `Seitenlaenge` und nicht `Anzahl`, und der Grund ist derselbe, aus dem
+    // scout-service seine Seitenlaenge so nennt: `anzahl` steht im Wortschatz,
+    // den `wt.ki.keine-zahl` ueber Domaene und Vertraege absucht (ADR-0022 §1).
+    // Hier waere es eine Seitenlaenge und harmlos — aber eine Ausnahmeliste je
+    // Dienst ist die Stelle, an der der naechste Eintrag nicht mehr harmlos ist.
+    int Seitenlaenge,
     Seitenzeiger? Ab = null,
     IReadOnlyList<string>? Faehigkeiten = null,
     string Ort = "",

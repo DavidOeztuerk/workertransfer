@@ -37,6 +37,7 @@ Sitzung misst — wer sie rot hinterlässt, nimmt ihn der nächsten weg.
 | 5 | ~~`assessment-service`~~ ✅ erledigt 11.09.2026 (ADR-0042) | 3, 4 | mittel |
 | 6 | Aufräumen | — | klein |
 | 7 | ~~Girder auf nuget.org~~ ✅ erledigt 10.09.2026 | — | — |
+| 8 | ~~Nachweis und KI-Pflichten~~ ✅ erledigt 20.09.2026 (ADR-0044) | — | groß |
 
 ---
 
@@ -717,3 +718,47 @@ Der Lohn: ein Fork-PR kann bauen, und ein frischer Klon braucht keinen Token —
 heute scheitert daran schon `docker compose up`. Das ist eine eigene, kleine
 Sitzung.
 
+---
+
+## Sitzung 8 — Nachweis und KI-Pflichten ✅ erledigt 20.09.2026
+
+Gebaut unter **ADR-0044**, nach `docs/AUFTRAG-NACHWEIS-UND-KI-PFLICHTEN.md`,
+in fünf Phasen mit Toren dazwischen. Der Auftrag steht unverändert; wer ihn noch
+einmal fährt, bekommt dasselbe.
+
+**Was daraus geworden ist**, gemessen am 20.09.2026 gegen den laufenden Stapel:
+`src/shared/WorkerTransfer.Nachweis/` (das achte Ding unter `shared/`), sieben
+Prüfungen, sieben Adressen je Dienst hinter einem eigenen Geheimnis, zwölf
+Rechtsbezüge mit je einem nie leeren `Leser`, und drei signierte Dokumente.
+**14 von 14 Diensten, 83 Befunde, keine Zusage unbelegt.** 1380 .NET-Tests
+grün, 0 rot, 0 übersprungen — 48 davon neu.
+
+**Drei Dinge hat diese Sitzung gefunden, die kein Test gesehen hätte.** Sie
+stehen hier, weil sie die Begründung der ganzen Sitzung sind — und weil zwei
+davon Fehler im Werkzeug selbst waren, gefunden beim ersten Lauf gegen echte
+Dienste:
+
+1. **Die Wortsuche über Teilzeichenketten meldete `Capability`, `Benefits` und
+   `Availability`** — drei Fehlalarme über vollkommen korrekten Code, darunter
+   der Kerntyp des Ledgers. Verglichen wird seitdem je Silbe und am
+   Silbenanfang; derselbe Fehler, den Girder 4.3.0 in seiner Maskierung hatte.
+2. **Die Ledger-Prüfung meldete `audit_events.TenantId`** — und lag falsch. Die
+   Prüfspur hält fest, WER gehandelt hat und in welcher Eigenschaft (ADR-0012);
+   der Ledger hält die Einwilligung, und die gehört der Person. Zwei Tabellen,
+   zwei Regeln.
+3. **Ein Gegenversuch fiel NICHT** — und das war der wertvollste Moment. Die
+   Reihe setzte das Nachweisgeheimnis in jedem Test, also lief der Zweig „nicht
+   gesetzt" nirgends: ein Patch, der bei leerem Geheimnis durchlässt, blieb
+   grün. Der Test dafür fehlte und steht jetzt da
+   (`Ohne_gesetztes_Geheimnis_ist_die_Tuer_zu`).
+
+**Was offenbleibt, und bewusst:** ob aus dem KI-Verzeichnis eine **Liste
+erlaubter Anbieter** folgen soll. Sie nähme der Person eine Wahl, die ihr das
+Produkt heute ausdrücklich lässt. ADR-0044 entscheidet sie nicht — es macht sie
+sichtbar, und das ist der Zustand, in dem sie entschieden werden kann.
+
+**Nicht von dieser Sitzung, aber auf ihrem Weg gemessen:**
+`web/src/features/auth/pages/RegisterPage.test.tsx` fällt — und zwar **auch auf
+dem unveränderten Baum** (Gegenprobe gefahren: gestasht, dieselbe Reihe, dieselben
+Fehlschläge). Das ist eine eigene Sitzung wert; es hat mit ADR-0044 nichts zu
+tun.

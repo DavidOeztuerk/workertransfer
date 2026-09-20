@@ -115,8 +115,8 @@ public sealed class EfProfilspeicher(ProfileDbContext context) : IProfilspeicher
         // Eine Zeile mehr holen, als gezeigt wird: so steht ohne zweite Abfrage
         // fest, ob es weitergeht — und ohne ein COUNT, das die Gesamtzahl
         // nennte, die hier niemand nennen darf.
-        var zeilen = await abfrage.Take(anfrage.Anzahl + 1).ToListAsync(cancellationToken);
-        var weiter = zeilen.Count > anfrage.Anzahl;
+        var zeilen = await abfrage.Take(anfrage.Seitenlaenge + 1).ToListAsync(cancellationToken);
+        var weiter = zeilen.Count > anfrage.Seitenlaenge;
 
         if (weiter)
         {

@@ -8,7 +8,8 @@
 DOTNET_SLN := WorkerTransfer.slnx
 
 .PHONY: help check check-dotnet check-web build test test-web validate validate-e2e \
-        fix dev env up down images routenkarte k8s-up k8s-down k8s-lint k8s-seed clean
+        fix dev env up down images routenkarte nachweis nachweis-pruefen \
+        k8s-up k8s-down k8s-lint k8s-seed clean
 
 help:  # Diese Liste.
 	@# `0-9` im Muster, sonst fehlen k8s-up/-down/-seed/-lint — vorhanden, aber
@@ -44,6 +45,18 @@ test-web:  # Nur die Frontend-Reihe.
 validate:  # Wie check, aber laeuft durch und berichtet jeden roten Schritt.
 	./scripts/validate.sh
 
+nachweis:  # Die drei signierten Dokumente gegen den laufenden Stapel (ADR-0044).
+	@# Datenschutz, KI, Mitbestimmung — drei Dokumente fuer drei Leser, weil
+	@# man aus einem gemischten den einen Teil zitieren kann, ohne den Teil zu
+	@# zitieren, der ihn einschraenkt. Braucht `make up`.
+	./scripts/nachweis.sh
+
+nachweis-pruefen:  # Jede Pruefung in jedem Dienst; rot, sobald eine Zusage offen ist.
+	@# Rot NUR bei `fehlt`. Ein Hinweis ist kein Mangel, sondern eine Frage an
+	@# einen Menschen — ein Tor, das auf eine gewollte Zurueckhaltung rot geht,
+	@# schaltet der naechste Mensch ab. Braucht `make up`.
+	./scripts/nachweis-pruefen.sh
+
 routenkarte:  # docs/routenkarte.yml gegen den laufenden Stapel fahren.
 	@# Die VOLLSTAENDIGKEIT der Karte prueft RoutenkarteTests und laeuft in
 	@# jeder Reihe mit. Hier werden die ANTWORTEN geprueft, und dafuer braucht
@@ -56,7 +69,7 @@ validate-e2e:  # Zusaetzlich die Browser-Reise; braucht den laufenden Stapel.
 fix:  # Formatieren.
 	dotnet format $(DOTNET_SLN)
 
-env:  # .env aus der Vorlage anlegen und die drei Geheimnisse wuerfeln.
+env:  # .env aus der Vorlage anlegen und die fuenf Geheimnisse wuerfeln.
 	@# Der erste Befehl in einem frischen Klon. Danach laeuft `make up`.
 	@#
 	@# Die Geheimnisse stehen in .env.example LEER — ein eingebauter Vorgabewert
@@ -67,12 +80,12 @@ env:  # .env aus der Vorlage anlegen und die drei Geheimnisse wuerfeln.
 		echo "Zum Neuwuerfeln: rm .env && make env"; \
 	else \
 		cp .env.example .env; \
-		for s in WORKERTRANSFER_JWT_SECRET WORKERTRANSFER_NOTIFY_SECRET WORKERTRANSFER_ERASURE_SECRET WORKERTRANSFER_SECRETS_KEY; do \
+		for s in WORKERTRANSFER_JWT_SECRET WORKERTRANSFER_NOTIFY_SECRET WORKERTRANSFER_ERASURE_SECRET WORKERTRANSFER_SECRETS_KEY WORKERTRANSFER_NACHWEIS_SECRET; do \
 			wert=$$(openssl rand -base64 32); \
 			tmp=$$(mktemp); \
 			awk -v k="$$s" -v v="$$wert" '$$0 == k "=" { print k "=" v; next } { print }' .env > "$$tmp" && mv "$$tmp" .env; \
 		done; \
-		echo ".env angelegt, drei Geheimnisse frisch gewuerfelt."; \
+		echo ".env angelegt, fuenf Geheimnisse frisch gewuerfelt."; \
 		echo "Sie ist ignoriert und gehoert nicht in git."; \
 	fi
 

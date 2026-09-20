@@ -5,7 +5,7 @@ using WorkerTransfer.Profile.Domain.Profile;
 namespace WorkerTransfer.Profile.Application.Profile;
 
 /// <summary>Eine Seite Profile für einen anderen Dienst — ohne Ledgerfrage.</summary>
-/// <param name="Anzahl">Wie viele Zeilen die Seite höchstens trägt.</param>
+/// <param name="Seitenlaenge">Wie viele Zeilen die Seite höchstens trägt.</param>
 /// <param name="Zeiger">Wo es weitergeht, als Text aus der Anfrage.</param>
 /// <param name="Faehigkeiten">
 /// Die gesuchten Worte. <strong>Mindestens eines</strong> muss jemand
@@ -40,7 +40,7 @@ namespace WorkerTransfer.Profile.Application.Profile;
 /// diese Abfrage ist der Grund, das so zu lassen.</para>
 /// </remarks>
 public sealed record InterneProfilsucheAbfrage(
-    int Anzahl,
+    int Seitenlaenge,
     string? Zeiger,
     IReadOnlyList<string>? Faehigkeiten = null,
     string Ort = "",
@@ -80,7 +80,7 @@ public sealed class InterneProfilsucheHandler(IProfilspeicher speicher)
         ArgumentNullException.ThrowIfNull(request);
 
         var anzahl = Math.Clamp(
-            request.Anzahl <= 0 ? Vorgabe : request.Anzahl, 1, Hoechstzahl);
+            request.Seitenlaenge <= 0 ? Vorgabe : request.Seitenlaenge, 1, Hoechstzahl);
 
         var faehigkeiten = (request.Faehigkeiten ?? [])
             .Select(eintrag => eintrag.Trim())
