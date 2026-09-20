@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Noelia.Infrastructure.Audit;
 
 namespace WorkerTransfer.ServiceDefaults;
 
@@ -34,7 +35,11 @@ public sealed class Nachweisgeheimnis
     public const string Abschnitt = "Nachweis";
 
     /// <summary>Der Kopf, in dem das Geheimnis vorgezeigt wird.</summary>
-    public const string Kopf = "X-Nachweis-Secret";
+    /// <remarks>
+    /// Der Name, den die Control Plane sendet. Ein eigener Name hier hiesse,
+    /// dass sie diese Flotte nicht einsammeln kann.
+    /// </remarks>
+    public const string Kopf = "X-Noelia-Operator";
 
     /// <summary>Das Geheimnis. Leer heißt: zu.</summary>
     public string Geheimnis { get; set; } = string.Empty;
@@ -69,6 +74,11 @@ public static class Nachweisaufbau
 
         services.Configure<Nachweisgeheimnis>(
             configuration.GetSection(Nachweisgeheimnis.Abschnitt));
+
+        // Das Dashboard haelt fest, wer es gelesen hat, und verweigert die
+        // Antwort, wenn es das nicht kann. Ohne diese Zeile meldet die
+        // Zugriffspruefung eine Warnung statt eines Passes.
+        services.AddSovereignAuditTrail();
 
         return services;
     }

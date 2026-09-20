@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Noelia.Dashboard;
+using Noelia.Infrastructure.Sovereignty;
 using WorkerTransfer.ServiceDefaults.Pruefungen;
 
 namespace WorkerTransfer.ServiceDefaults;
@@ -201,8 +202,9 @@ public static class Dienstgrundlage
                 // Was NICHT in der Konfiguration steht, darf auch nicht
                 // hinaus. Genau das ist der Zweck: ein Telemetriezug mit einer
                 // eingebauten Vorgabeadresse, ein SDK, das nach Hause telefoniert.
-                .AddSovereignPlatform(souveraen => souveraen
-                    .Allow([.. GerufeneHosts(configuration)]))
+                .AddSovereignPlatform(souveraen => Deklariere(
+                    souveraen.Allow([.. GerufeneHosts(configuration)]),
+                    configuration))
 
                 // DIE BETRIEBSOBERFLAECHE, und sie ersetzt sieben eigene
                 // Adressen (ADR-0045).
@@ -223,6 +225,7 @@ public static class Dienstgrundlage
                 .UseDashboard(dashboard => dashboard
                     .At("/noelia")
                     .VisibleTo(Nachweisaufbau.Eingelassen)
+                    .InspectConfiguration("Consent", "Draft", "Erasure")
                     .InProduction(
                         "Der Betriebsnachweis dieser Instanz — Empfaenger, "
                         + "Naht, Loeschkaskade — steht hinter einem eigenen "
@@ -421,6 +424,43 @@ public static class Dienstgrundlage
 
         return app;
     }
+
+    /// <summary>Trägt jedes Ziel ins Souveränitätsverzeichnis.</summary>
+    /// <remarks>
+    /// <c>Allow</c> verhindert den undeklarierten Aufruf; erst
+    /// <c>DeclareDependency</c> macht das Ziel im Bericht sichtbar. Ohne diese
+    /// Zeile ist das Egress-Register leer und die Flottensicht zeigt nichts.
+    /// Deklariert wird unter dem Konfigurationsschlüssel, damit im Bericht steht,
+    /// <em>wofür</em> ein Host gerufen wird.
+    /// </remarks>
+    private static SovereignPlatformBuilder Deklariere(
+        SovereignPlatformBuilder souveraen, IConfiguration configuration)
+    {
+        foreach (var (schluessel, adresse) in GerufeneZiele(configuration))
+        {
+            souveraen.DeclareDependency(schluessel, adresse);
+        }
+
+        return souveraen;
+    }
+
+    /// <summary>Konfigurationsschlüssel und Adresse jedes gerufenen Ziels.</summary>
+    private static IEnumerable<(string Schluessel, string Adresse)> GerufeneZiele(
+        IConfiguration configuration) =>
+        configuration.AsEnumerable()
+            .Where(eintrag => !Horchadresse(eintrag.Key)
+                              && !string.IsNullOrWhiteSpace(eintrag.Value)
+                              && Uri.TryCreate(eintrag.Value, UriKind.Absolute, out var ziel)
+                              && (ziel.Scheme == Uri.UriSchemeHttp
+                                  || ziel.Scheme == Uri.UriSchemeHttps))
+            .Select(eintrag => (eintrag.Key, eintrag.Value!))
+            .DistinctBy(eintrag => eintrag.Item2, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(eintrag => eintrag.Key, StringComparer.Ordinal);
+
+    /// <summary>Wo dieser Dienst horcht — kein Ziel, das er ruft.</summary>
+    private static bool Horchadresse(string schluessel) =>
+        schluessel.Contains("URLS", StringComparison.OrdinalIgnoreCase)
+        || schluessel.StartsWith("Kestrel", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Jeder Host, den dieser Dienst laut Konfiguration ruft.</summary>
     /// <remarks>

@@ -86,7 +86,7 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
     private HttpClient MitGeheimnis()
     {
         var browser = _dienst.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Nachweis-Secret", Geheimnis);
+        browser.DefaultRequestHeaders.Add("X-Noelia-Operator", Geheimnis);
         return browser;
     }
 
@@ -124,7 +124,7 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Ein_falsches_Geheimnis_antwortet_wie_gar_keins()
     {
         var falsch = _dienst.CreateClient();
-        falsch.DefaultRequestHeaders.Add("X-Nachweis-Secret", "daneben");
+        falsch.DefaultRequestHeaders.Add("X-Noelia-Operator", "daneben");
 
         var mitFalschem = await falsch.GetAsync("/noelia");
         var ohne = await _dienst.CreateClient().GetAsync("/noelia");
@@ -163,7 +163,7 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
         });
 
         var browser = ohneTuer.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Nachweis-Secret", Geheimnis);
+        browser.DefaultRequestHeaders.Add("X-Noelia-Operator", Geheimnis);
 
         foreach (var pfad in Adressen)
         {

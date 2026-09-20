@@ -62,7 +62,7 @@ for eintrag in "${DIENSTE[@]}"; do
   hafen="${eintrag##*:}"
 
   if ! curl -fsS --max-time 15 \
-       -H "X-Nachweis-Secret: ${GEHEIMNIS}" \
+       -H "X-Noelia-Operator: ${GEHEIMNIS}" \
        "http://localhost:${hafen}/noelia/report.json" \
        -o "${ARBEIT}/${name}.json" 2>/dev/null; then
     STUMM+=("$name")
