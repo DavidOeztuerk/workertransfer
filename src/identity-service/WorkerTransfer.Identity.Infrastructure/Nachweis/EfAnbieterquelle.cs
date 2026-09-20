@@ -28,17 +28,10 @@ namespace WorkerTransfer.Identity.Infrastructure.Nachweis;
 /// Zeile darüber wäre ein Eintrag über einen Empfänger, den es nicht gibt.</para>
 /// </remarks>
 /// <param name="anbieter">
-/// Der Container. Der Kontext wird in einem EIGENEN BEREICH aufgelöst, und das
-/// ist Pflicht, nicht Geschmack: Noelias Prüfungen und ihre Quellen sind
-/// <strong>Singletons</strong>, der <c>DbContext</c> ist bereichsgebunden.
-/// <para>
-/// <strong>Gemessen, nicht bedacht.</strong> Beim Umstieg stand hier zuerst der
-/// Kontext selbst, und der Container brach beim Start ab: <em>„Cannot consume
-/// scoped service IdentityDbContext from singleton IAnbieterquelle."</em>
-/// 114 Identity-Tests fielen auf einmal. Das ist die gute Variante — ein
-/// gefangener Kontext, der ewig lebt, fällt sonst Wochen später an einer ganz
-/// anderen Stelle auf.
-/// </para>
+/// Der Container. Der Kontext wird in einem eigenen Bereich aufgelöst: Noelias
+/// Prüfungen sind Singletons, der <c>DbContext</c> ist bereichsgebunden — ihn
+/// direkt zu nehmen wäre eine gefangene Abhängigkeit, und der Container bricht
+/// dann beim Start ab.
 /// </param>
 public sealed class EfAnbieterquelle(IServiceProvider anbieter) : IAnbieterquelle
 {

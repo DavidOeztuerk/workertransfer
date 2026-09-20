@@ -103,18 +103,10 @@ public sealed class Anbieterpruefung(IEnumerable<IAnbieterquelle> quellen) : ISe
 
     /// <inheritdoc />
     /// <remarks>
-    /// <strong><c>Composition</c> und nicht die inhaltlich passende Kategorie —
-    /// das ist eine AUSWAHLREGEL, keine Kosmetik.</strong> Noelias Läufer nimmt
-    /// eine Prüfung nur, wenn ihre Kategorie <c>Composition</c> ist ODER ihr
-    /// Modul wirklich komponiert wurde. Diese Prüfung hängt an keinem Modul: sie
-    /// gilt unabhängig davon, was dieser Dienst komponiert.
-    /// <para>
-    /// Gemessen: mit einer inhaltlichen Kategorie stand sie in keinem Bericht —
-    /// dreizehn Prüfungen liefen, unsere sechs nicht, und nichts sagte es. Ein
-    /// Modul zu wählen, das zufällig komponiert ist, wäre die schlechtere
-    /// Antwort: die Prüfung verschwände still, sobald jemand dieses Modul
-    /// abwählt.
-    /// </para>
+    /// <c>Composition</c> ist eine Auswahlregel, keine Kosmetik: Noelias Läufer
+    /// nimmt eine Prüfung nur bei dieser Kategorie oder einem komponierten
+    /// Modul. Ein zufällig komponiertes Modul zu wählen hiesse, dass die
+    /// Prüfung still verschwindet, sobald jemand es abwählt.
     /// </remarks>
     public SecurityCheckCategory Category => SecurityCheckCategory.Composition;
 

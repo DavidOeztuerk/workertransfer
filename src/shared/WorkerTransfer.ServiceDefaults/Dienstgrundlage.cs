@@ -168,21 +168,10 @@ public static class Dienstgrundlage
                 // die Maskierung im Protokoll, den Souveraenitaetsbericht und
                 // eine Pruefspur.
                 //
-                // DIE VIERTE HATTE HIER EINE VERWEIGERNDE SENKE, UND SIE IST
-                // GEFALLEN (ADR-0045). Der Grund von ADR-0044 war richtig und
-                // galt der falschen Sache: Noelias Pruefspur erfuellt ADR-0012
-                // nicht, weil sie NEBEN unserer Transaktion steht statt darin —
-                // fuer eine FACHLICHE Pruefzeile ist das disqualifizierend, und
-                // dafuer gibt es weiterhin `EfPruefspur`.
-                //
-                // Der Dashboard-Zugriff ist aber keine fachliche Zeile. Er hat
-                // keine Transaktion, in der er stehen koennte; er haelt fest,
-                // WER die Betriebsoberflaeche angesehen hat. Gemessen: mit der
-                // verweigernden Senke antwortete jede `/noelia`-Adresse mit 503,
-                // weil das Dashboard den Zugriff aufzeichnet, BEVOR es
-                // ausliefert — und das zu Recht: eine Betriebsoberflaeche, die
-                // nicht festhalten kann, wer sie gelesen hat, soll nicht
-                // ausliefern.
+                // Die Pruefspur bleibt AN. Fuer eine fachliche Zeile genuegt
+                // sie ADR-0012 nicht (dafuer `EfPruefspur`) — der
+                // Dashboard-Zugriff ist aber keine: er hat keine Transaktion,
+                // und ohne Senke verweigert das Dashboard mit 503.
                 //
                 // GEMESSEN, BEVOR DAS HIER STAND (`EgressTests`): der Waechter
                 // WEIST AB statt zu protokollieren, und ein Containername faellt

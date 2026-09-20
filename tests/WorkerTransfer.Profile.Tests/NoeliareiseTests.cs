@@ -137,17 +137,9 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Ohne gesetztes Geheimnis ist die Tür zu — auch mit Kopf.</summary>
     /// <remarks>
-    /// <para><strong>Dieser Test fehlte, und ein Gegenversuch hat es
-    /// gezeigt.</strong> Die Reihe setzte das Geheimnis immer, also lief der
-    /// Zweig „nicht gesetzt“ in keinem Test — ein Patch, der bei leerem
-    /// Geheimnis <em>durchlässt</em>, blieb grün. Genau das ist gemeint mit:
-    /// eine Gegenprobe, die nicht fällt, zeigt einen schwachen Test, nicht
-    /// richtigen Code.</para>
-    ///
-    /// <para><strong>Leer heißt zu, nicht offen.</strong> Eine nicht gesetzte
-    /// Variable ist der Zweifelsfall, und bei einer Seite, die sagt, welche
-    /// Anbieter diese Instanz benutzt, wäre eine Vorgabe, die im Zweifel
-    /// öffnet, die schlechteste.</para>
+    /// <strong>Leer heißt zu, nicht offen.</strong> Ohne diesen Test läuft der
+    /// Zweig „Geheimnis nicht gesetzt" in keiner Reihe, und ein Patch, der dann
+    /// durchlässt, bliebe grün.
     /// </remarks>
     [Fact]
     public async Task Ohne_gesetztes_Geheimnis_ist_die_Tuer_zu()
