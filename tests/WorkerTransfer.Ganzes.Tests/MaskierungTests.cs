@@ -1,12 +1,12 @@
 using FluentAssertions;
-using Girder.Core.Logging;
-using Girder.Infrastructure.Logging;
+using Noelia.Core.Logging;
+using Noelia.Infrastructure.Logging;
 using Serilog.Events;
 using Serilog.Parsing;
 
 namespace WorkerTransfer.Ganzes.Tests;
 
-/// <summary>Was Girders Maskierung in 4.4.0 schwärzt — und was sie wieder freigibt.</summary>
+/// <summary>Was Noelias Maskierung in 4.4.0 schwärzt — und was sie wieder freigibt.</summary>
 /// <remarks>
 /// <para><strong>Diese Reihe ist die Gegenprobe zu einer Nullmessung.</strong>
 /// Am laufenden Stapel steht nirgends <c>[REDACTED]</c>, und das hat zwei
@@ -22,7 +22,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// taten.</para>
 ///
 /// <para>Für WorkerTransfer ist beides folgenlos, und auch das ist gemessen:
-/// unsere Log-Vorlagen tragen deutsche Namen, und Girders
+/// unsere Log-Vorlagen tragen deutsche Namen, und Noelias
 /// <c>LoggingBehavior</c> schreibt ohnehin <em>Gestalten</em> —
 /// <c>Email: string(34)</c> ist eine Länge, nie eine Adresse. Es gibt hier
 /// nichts, das dunkel werden könnte.</para>
@@ -93,7 +93,7 @@ public sealed class MaskierungTests
     /// </summary>
     /// <remarks>
     /// Der Grund, warum die Umstellung hier folgenlos blieb: die Vorlagen
-    /// dieses Systems sind deutsch, und Girders Liste ist englisch. Das war
+    /// dieses Systems sind deutsch, und Noelias Liste ist englisch. Das war
     /// kein Plan, aber es ist jetzt eine Zusage — wer eine Log-Eigenschaft
     /// <c>Email</c> nennt, macht sie unlesbar, und dieser Test sagt ihm das.
     /// </remarks>

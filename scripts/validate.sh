@@ -61,6 +61,22 @@ step "tsc" sh -c "cd web && pnpm check"
 step "vitest" sh -c "cd web && pnpm test"
 step "vite build" sh -c "cd web && pnpm build"
 
+# --- Noelias eigener Blick auf die Zusammensetzung ----------------------------
+# Statisch, braucht keinen Stapel, und findet genau die Fehlerklasse, die dieses
+# Repositorium in `Dienstgrundlage.cs` selbst beschreibt: ein `AddX(...)` NEBEN
+# `AddNoelia(...)` statt `noelia.UseX(...)` darin. Die eingebauten Module
+# registrieren ihren eigenen Anbieter waehrend `Build()`, die fruehere
+# Registrierung wird ueberschrieben — und nichts sagt es.
+#
+# Exit 0 sauber, 1 Befunde, 2 das Werkzeug selbst kaputt. Ohne das Werkzeug wird
+# der Schritt NICHT stillschweigend uebersprungen, sondern unten benannt.
+if command -v noelia >/dev/null 2>&1 || [[ -x "$HOME/.dotnet/tools/noelia" ]]; then
+  NOELIA_LIEF=1
+  step "noelia analyze" env PATH="$PATH:$HOME/.dotnet/tools" noelia analyze .
+else
+  NOELIA_LIEF=0
+fi
+
 # --- Der Nachweis (braucht den laufenden Stack) -------------------------------
 # „Ein Tor, das man aufrufen muss, um es zu haben, hat man nicht." Deshalb steht
 # es hier und nicht nur im Makefile.
@@ -206,6 +222,10 @@ if [[ "$e2e_skipped" -gt 0 ]]; then
   else
     printf '\n'
   fi
+fi
+
+if [[ ${NOELIA_LIEF:-0} -eq 0 ]]; then
+  printf '  %s!%s `noelia analyze` ist NICHT gelaufen — das Werkzeug fehlt.\n    "dotnet tool install -g Noelia.Cli" holt es.\n' "$YELLOW" "$OFF"
 fi
 
 if [[ $NACHWEIS_LIEF -eq 0 ]]; then

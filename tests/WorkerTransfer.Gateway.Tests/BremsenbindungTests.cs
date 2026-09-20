@@ -1,10 +1,10 @@
 using FluentAssertions;
-using Girder.Infrastructure.Models;
+using Noelia.Infrastructure.Models;
 using Microsoft.Extensions.Configuration;
 
 namespace WorkerTransfer.Gateway.Tests;
 
-/// <summary>Bindet <c>ocelot.json</c> wirklich an Girders Bremsoptionen?</summary>
+/// <summary>Bindet <c>ocelot.json</c> wirklich an Noelias Bremsoptionen?</summary>
 /// <remarks>
 /// <para><strong>Der Grund für diese Reihe ist eine Messung, die
 /// widersprach.</strong> Am laufenden Stapel gingen sechs Aufrufe auf
@@ -51,7 +51,7 @@ public sealed class BremsenbindungTests
     /// <remarks>
     /// Eine Grenze von 0 legt keinen Zähler an — nur deshalb zählen
     /// ausschließlich die fünf benannten Pfade. Bindet der Abschnitt nicht, so
-    /// gelten Girders Vorgaben (100 je Minute), und dann zählt <em>jeder</em>
+    /// gelten Noelias Vorgaben (100 je Minute), und dann zählt <em>jeder</em>
     /// Bildabruf der Oberfläche mit, die durch dasselbe Gateway läuft.
     /// </remarks>
     [Fact]
@@ -66,7 +66,7 @@ public sealed class BremsenbindungTests
 
     /// <summary>Je Herkunft, nie je Benutzer.</summary>
     /// <remarks>
-    /// Girders Vorgabe ist <c>UserThenOrigin</c>. Käme die an, zählte ein
+    /// Noelias Vorgabe ist <c>UserThenOrigin</c>. Käme die an, zählte ein
     /// angemeldeter Mensch gegen sich selbst statt gegen seine Herkunft — und
     /// die Bremse verlöre genau die Eigenschaft, wegen der sie am Eingang steht.
     /// </remarks>
@@ -93,7 +93,7 @@ public sealed class BremsenbindungTests
     /// <summary>Und die Ausnahmelisten bleiben leer.</summary>
     /// <remarks>
     /// Der Binder <em>ergänzt</em> eine Sammlung und ersetzt sie nie. Stünde
-    /// Loopback in Girders Vorgabe, käme man mit einer leeren Liste in der Datei
+    /// Loopback in Noelias Vorgabe, käme man mit einer leeren Liste in der Datei
     /// nicht dagegen an — dann bremste lokal gar nichts, und man sähe es nicht.
     /// Seit 4.2.0 sind die Vorgaben leer; dieser Test hält fest, dass es so
     /// bleibt.

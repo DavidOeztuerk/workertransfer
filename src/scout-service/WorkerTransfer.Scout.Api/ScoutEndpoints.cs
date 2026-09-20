@@ -1,4 +1,4 @@
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Scout.Application.Ansprache;
 using WorkerTransfer.Scout.Application.Kandidaten;

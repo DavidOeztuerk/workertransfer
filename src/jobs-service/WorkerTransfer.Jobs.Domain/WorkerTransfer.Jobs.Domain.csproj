@@ -8,6 +8,6 @@
     <ProjectReference Include="..\..\shared\WorkerTransfer.Skills\WorkerTransfer.Skills.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Girder.Core" />
+    <PackageReference Include="Noelia.Core" />
   </ItemGroup>
 </Project>

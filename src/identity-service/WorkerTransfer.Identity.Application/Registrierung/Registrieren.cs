@@ -1,4 +1,4 @@
-using Girder.Abstractions.Security.Passwords;
+using Noelia.Abstractions.Security.Passwords;
 using MediatR;
 using WorkerTransfer.Identity.Application.Nachrichten;
 using WorkerTransfer.Identity.Application.Ports;

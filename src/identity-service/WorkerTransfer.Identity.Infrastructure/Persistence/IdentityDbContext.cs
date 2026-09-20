@@ -1,4 +1,4 @@
-using Girder.Data.EntityFrameworkCore.Sessions;
+using Noelia.Data.EntityFrameworkCore.Sessions;
 using WorkerTransfer.Outbox;
 using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.Identity.Domain.Audit;
@@ -160,7 +160,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
     public DbSet<SessionCapacityRow> SessionCapacities => Set<SessionCapacityRow>();
 
-    public DbSet<GirderRefreshToken> RefreshTokens => Set<GirderRefreshToken>();
+    public DbSet<NoeliaRefreshToken> RefreshTokens => Set<NoeliaRefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -321,7 +321,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         // distributed transaction — exactly what the pattern avoids.
         modelBuilder.ConfigureOutbox();
 
-        modelBuilder.ConfigureGirderRefreshTokens();
+        modelBuilder.ConfigureNoeliaRefreshTokens();
 
         base.OnModelCreating(modelBuilder);
     }

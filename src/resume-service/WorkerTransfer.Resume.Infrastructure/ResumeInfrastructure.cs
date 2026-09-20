@@ -1,4 +1,4 @@
-using Girder.Application.Extensions;
+using Noelia.Application.Extensions;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
@@ -32,7 +32,7 @@ namespace WorkerTransfer.Resume.Infrastructure;
 /// just as loudly, what is not here. There is no cache: the release a company
 /// holds is read from the ledger on every request, and a cache would mean a
 /// withdrawal takes effect whenever the cache feels like it (ADR-0013). Nothing
-/// implements Girder's <c>ICacheableQuery</c>, so <c>AddCQRS</c> leaves both
+/// implements Noelia's <c>ICacheableQuery</c>, so <c>AddCQRS</c> leaves both
 /// cache behaviours out of the pipeline entirely.
 /// </remarks>
 public static class ResumeInfrastructure

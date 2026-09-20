@@ -19,7 +19,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "account_status", new[] { "active", "disabled", "pending", "suspended" });
@@ -27,7 +27,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "citext");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Girder.Data.EntityFrameworkCore.Sessions.GirderRefreshToken", b =>
+            modelBuilder.Entity("Noelia.Data.EntityFrameworkCore.Sessions.NoeliaRefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -74,7 +74,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SubjectId", "RevokedAt");
 
-                    b.ToTable("girder_refresh_tokens", (string)null);
+                    b.ToTable("noelia_refresh_tokens", (string)null);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.AnschriftRow", b =>

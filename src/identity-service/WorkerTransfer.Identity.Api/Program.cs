@@ -21,14 +21,14 @@ builder.Services.AddWorkerTransferDefaults(
     girder => girder.AlsAussteller());
 
 // Die Richtlinienmaschinerie kommt seit Girder 4.0.2 aus der Vorgabe:
-// `GirderModule.Authorization` ruft `AddAuthorization()` und bringt damit den
+// `NoeliaModule.Authorization` ruft `AddAuthorization()` und bringt damit den
 // PermissionPolicyProvider mit — den, der `Permission:*`-Namen zur Laufzeit
 // aufloest. Bis 4.0.1 rief dasselbe Modul `AddResourceAuthorization()`, und die
 // Maschinerie fehlte still; sie stand hier von Hand. Jetzt nicht mehr noetig —
 // UnternehmensreiseTests belegt, dass sie trotzdem greift.
 
 // Wer ein Firmenrecht hat, entscheidet die MITGLIEDSCHAFTSTABELLE, nicht das
-// Token. Girders eigener Handler bleibt daneben stehen und liest Ansprueche —
+// Token. Noelias eigener Handler bleibt daneben stehen und liest Ansprueche —
 // er findet bei uns keine. Beide laufen; ein Succeed genuegt.
 //
 // Rechte ins Token zu legen waere der kuerzere Weg und der schlechtere: ein

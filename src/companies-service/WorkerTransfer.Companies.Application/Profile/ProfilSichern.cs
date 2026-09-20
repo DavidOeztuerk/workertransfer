@@ -1,4 +1,4 @@
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Companies.Application.Nachrichten;
 using WorkerTransfer.Companies.Domain.Arbeitgeberprofile;

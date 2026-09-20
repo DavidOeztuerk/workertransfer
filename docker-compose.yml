@@ -11,7 +11,7 @@
 # ---------------------------------------------------------------------------
 # DAS BAUEN BRAUCHT EIN GEHEIMNIS.
 #
-# Girder liegt in GitHub Packages, und das verlangt eine Anmeldung. Der Bau
+# Noelia liegt auf nuget.org und verlangt KEINE Anmeldung. Der Bau
 # bindet dafuer die NuGet-Konfiguration des Nutzers als BuildKit-Geheimnis ein
 # (`secrets:` unten) — sie wird nie eine Schicht des Bildes, und der Zugriff
 # steht nicht im Verlauf.
@@ -83,7 +83,7 @@ x-umgebung: &umgebung
   ASPNETCORE_ENVIRONMENT: Development
   # WER IM BROWSER RUFEN DARF.
   #
-  # Ohne diesen Schluessel faellt Girder in Development auf `localhost:3000`
+  # Ohne diesen Schluessel faellt Noelia in Development auf `localhost:3000`
   # zurueck — also auf einen Ursprung, den es hier nicht gibt, waehrend die
   # Oberflaeche auf 5173 liegt und durch das Gateway auf 8090. Gemessen: eine
   # Vorpruefung kam mit 204 zurueck und ohne einen einzigen

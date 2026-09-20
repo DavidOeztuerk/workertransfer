@@ -174,7 +174,7 @@ public interface IUnternehmensauskunft
     /// wäre Strenge zulasten der falschen Person.
     /// </remarks>
     Task<string> NameAsync(
-        Girder.Core.Identity.TenantId firma, CancellationToken cancellationToken = default);
+        Noelia.Core.Identity.TenantId firma, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Ein Dienst, der die eigenen Angaben hält, hat nicht geantwortet.</summary>

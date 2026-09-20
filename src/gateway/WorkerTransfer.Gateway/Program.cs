@@ -1,7 +1,7 @@
-using Girder.Abstractions.Caching;
-using Girder.Infrastructure.Middleware;
-using Girder.Infrastructure.Models;
-using Girder.Infrastructure.RateLimiting;
+using Noelia.Abstractions.Caching;
+using Noelia.Infrastructure.Middleware;
+using Noelia.Infrastructure.Models;
+using Noelia.Infrastructure.RateLimiting;
 using Ocelot.DependencyInjection;
 using Ocelot.Middleware;
 using WorkerTransfer.Gateway;
@@ -19,16 +19,16 @@ builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange
 
 builder.Services.AddOcelot(builder.Configuration);
 
-// Die Bremse — Girders, ganz. Hier standen bis Girder 4.2.0 rund hundertdreißig
+// Die Bremse — Noelias, ganz. Hier standen bis Girder 4.2.0 rund hundertdreißig
 // eigene Zeilen, und der Grund dafür war nie eine fehlende Fähigkeit:
 //
-//   * Selektiv bremsen (fünf benannte Pfade, sonst nichts) kann Girder, seit es
+//   * Selektiv bremsen (fünf benannte Pfade, sonst nichts) kann Noelia, seit es
 //     Grenzen gibt — eine Vorgabe von 0 legt keinen Zähler an. Es stand nur
 //     nirgends, und kein Test hielt es fest.
 //   * Die Abweisung war kein Problemdokument. Behoben in 4.1.0.
-//   * Und sie zu holen kostete `Girder.Infrastructure` mit vierundvierzig
+//   * Und sie zu holen kostete `Noelia.Infrastructure` mit vierundvierzig
 //     transitiven Paketen — Swagger, Telemetrie, neun Logging-Pakete — für ein
-//     Gateway, das nur routet. `Girder.Http` bringt NULL mit.
+//     Gateway, das nur routet. `Noelia.Http` bringt NULL mit.
 //
 // Die fünf Grenzen stehen weiter in `ocelot.json`, neben den Routen, aus denen
 // sie ausgewählt sind. `BremsenkarteTests` hält weiterhin fest, dass jeder

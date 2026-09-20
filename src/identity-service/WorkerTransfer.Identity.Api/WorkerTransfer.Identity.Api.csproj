@@ -9,8 +9,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Girder.Infrastructure" />
-    <PackageReference Include="Girder.InMemory" />
+    <PackageReference Include="Noelia.Infrastructure" />
+    <PackageReference Include="Noelia.InMemory" />
   </ItemGroup>
 
   <PropertyGroup>

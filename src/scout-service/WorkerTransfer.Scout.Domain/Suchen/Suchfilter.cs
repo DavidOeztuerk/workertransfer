@@ -5,7 +5,7 @@ namespace WorkerTransfer.Scout.Domain.Suchen;
 /// <summary>Eine Eingabe, die dieser Dienst nicht annehmen kann.</summary>
 /// <remarks>
 /// Die Meldung nennt die <em>Regel</em>, nie den Wert. Sie wird protokolliert
-/// (Girders <c>ValidationBehavior</c> tut das), und ein Suchbegriff ist die
+/// (Noelias <c>ValidationBehavior</c> tut das), und ein Suchbegriff ist die
 /// Eingabe eines Menschen über einen anderen.
 /// </remarks>
 /// <param name="grund">Welche Regel verletzt wurde.</param>

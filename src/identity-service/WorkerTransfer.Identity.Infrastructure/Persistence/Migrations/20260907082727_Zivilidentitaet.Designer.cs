@@ -30,7 +30,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "citext");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Girder.Data.EntityFrameworkCore.Sessions.GirderRefreshToken", b =>
+            modelBuilder.Entity("Noelia.Data.EntityFrameworkCore.Sessions.NoeliaRefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()

@@ -1,5 +1,5 @@
 using FluentAssertions;
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using Npgsql;
 using WorkerTransfer.Identity.Domain.Users;
 using WorkerTransfer.Identity.Infrastructure.Persistence;

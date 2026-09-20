@@ -14,7 +14,7 @@ namespace WorkerTransfer.ServiceDefaults;
 ///
 /// <para><strong>Die Rangfolge ist Umgebung vor <c>appsettings</c></strong>, und
 /// zwar von selbst: <c>Env.Load</c> setzt Prozessvariablen, und der
-/// Umgebungsanbieter steht in ASP.NET über dem JSON-Anbieter. Girder macht es an
+/// Umgebungsanbieter steht in ASP.NET über dem JSON-Anbieter. Noelia macht es an
 /// seiner wichtigsten Stelle ausdrücklich genauso — <c>JWT_SECRET</c> schlägt
 /// <c>JwtSettings:Secret</c>, und fehlt beides, bricht der Start mit einer
 /// Ausnahme ab, die den Schlüssel <em>benennt</em>.</para>

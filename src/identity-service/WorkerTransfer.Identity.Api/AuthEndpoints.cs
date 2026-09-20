@@ -1,4 +1,4 @@
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Identity.Application.Anmelden;
 
@@ -86,7 +86,7 @@ public static class AuthEndpoints
             CancellationToken cancellationToken) =>
         {
             // Die Pruefung steht NICHT mehr hier, sondern in `AnmeldenPruefung`
-            // — Girders ValidationBehavior fuehrt sie aus, bevor der Handler
+            // — Noelias ValidationBehavior fuehrt sie aus, bevor der Handler
             // laeuft. Bis D2 stand sie hier, weil die Pipeline-Stufe fuer tot
             // gehalten wurde; sie ist es nicht, sie war nur leer.
             //

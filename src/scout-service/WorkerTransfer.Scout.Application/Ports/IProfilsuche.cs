@@ -1,4 +1,4 @@
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using WorkerTransfer.Scout.Domain.Suchen;
 using WorkerTransfer.Scout.Domain.Treffer;
 

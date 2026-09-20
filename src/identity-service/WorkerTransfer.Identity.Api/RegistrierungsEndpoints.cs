@@ -13,7 +13,7 @@ namespace WorkerTransfer.Identity.Api;
 /// Der Draht dieser Plattform ist snake_case — neun Dienste setzen ihn mit
 /// <c>[JsonPropertyName]</c> auf ihren <c>Contracts</c>-Typen, und die
 /// Oberfläche schickt danach. Dieser Rumpf hatte als einziger keine, fiel damit
-/// auf camelCase aus <c>GirderModule.JsonOptions</c> zurück und band
+/// auf camelCase aus <c>NoeliaModule.JsonOptions</c> zurück und band
 /// <c>display_name</c> an nichts.</para>
 ///
 /// <para><strong>Warum es niemandem auffiel:</strong> jeder andere Rumpf in

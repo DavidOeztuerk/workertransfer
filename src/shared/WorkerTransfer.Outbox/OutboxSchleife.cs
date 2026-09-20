@@ -8,7 +8,7 @@ namespace WorkerTransfer.Outbox;
 /// <summary>The loop that keeps the table moving.</summary>
 /// <remarks>
 /// The library holds the table and "record the intent in the same transaction";
-/// the loop belongs to the service. Girder's own rule — it ships
+/// the loop belongs to the service. Noelia's own rule — it ships
 /// <c>PurgeAsync</c> and never calls it, because a background loop inside a
 /// library is a loop nobody can see.
 /// <para>

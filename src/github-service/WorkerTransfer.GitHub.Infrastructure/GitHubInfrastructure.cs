@@ -1,4 +1,4 @@
-using Girder.Application.Extensions;
+using Noelia.Application.Extensions;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;

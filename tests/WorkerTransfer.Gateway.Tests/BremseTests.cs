@@ -3,10 +3,10 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
-using Girder.Abstractions.Caching;
-using Girder.Infrastructure.Middleware;
-using Girder.Infrastructure.Models;
-using Girder.Infrastructure.RateLimiting;
+using Noelia.Abstractions.Caching;
+using Noelia.Infrastructure.Middleware;
+using Noelia.Infrastructure.Models;
+using Noelia.Infrastructure.RateLimiting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -222,7 +222,7 @@ public sealed class BremseTests
 
         var gelesen = JsonDocument.Parse(rumpf).RootElement;
         gelesen.GetProperty("status").GetInt32().Should().Be(429);
-        // Der Wortlaut ist Girders. Was hier zaehlt, ist die Zusage darueber:
+        // Der Wortlaut ist Noelias. Was hier zaehlt, ist die Zusage darueber:
         // er nennt kein Konto — und kann es nicht, weil die Bremse den Rumpf
         // nie liest.
         gelesen.GetProperty("detail").GetString().Should().NotBeNullOrWhiteSpace();
@@ -241,7 +241,7 @@ public sealed class BremseTests
         (await Anmelden(browser, "10.0.0.1")).Dispose();
         using var abgewiesen = await Anmelden(browser, "10.0.0.1");
 
-        // Eine Minute, und die ist nicht mehr verstellbar: Girder zaehlt in
+        // Eine Minute, und die ist nicht mehr verstellbar: Noelia zaehlt in
         // festen Fenstern (Minute, Stunde, Tag). Die ausgelieferte Karte stand
         // ohnehin auf einer Minute, also aendert sich im Betrieb nichts.
         abgewiesen.Headers.GetValues("Retry-After").Single().Should().Be("60");
@@ -250,11 +250,11 @@ public sealed class BremseTests
     }
 
     // `Das_Fenster_laeuft_ab_und_gibt_wieder_frei` stand hier und ist gegangen.
-    // Es fuhr ein Ein-Sekunden-Fenster und wartete 1,5 Sekunden; Girder zaehlt in
+    // Es fuhr ein Ein-Sekunden-Fenster und wartete 1,5 Sekunden; Noelia zaehlt in
     // festen Fenstern, also hiesse derselbe Test jetzt eine Minute warten.
     //
     // Die Zusage — eine Bremse ist keine Sperre, sie muss wieder loslassen —
-    // haelt Girders `RateLimitStoreConformance`, an einem kurzen Fenster und
+    // haelt Noelias `RateLimitStoreConformance`, an einem kurzen Fenster und
     // gegen JEDEN Speicher, auch den von Redis. Dort gehoert sie hin: sie ist
     // eine Eigenschaft des Zaehlers, nicht unserer Verdrahtung.
 
@@ -327,7 +327,7 @@ public sealed class BremseTests
     // Zählerschlüssels, die Zusammenführung von `::ffff:10.0.0.1`, und der
     // gemeinsame Topf ohne feststellbare Herkunft. Alle drei prüften eine
     // Umsetzung, die es hier nicht mehr gibt — sie gehören jetzt zu
-    // `ClientAddress` in Girder und werden dort geprüft.
+    // `ClientAddress` in Noelia und werden dort geprüft.
     //
     // Die ZUSAGE, die sie trugen, steht weiter oben und stärker: „verschiedene
     // Adressen aus einer Herkunft teilen einen Topf" fährt fünf echte Anmeldungen
@@ -430,7 +430,7 @@ internal static class Bremskarte
     }
 
     /// <summary>
-    /// Die gebremsten Pfade und ihre Grenzen, aus Girders Abschnitt.
+    /// Die gebremsten Pfade und ihre Grenzen, aus Noelias Abschnitt.
     /// </summary>
     /// <remarks>
     /// Gelesen statt gebaut: was hier steht, ist genau das, was der Behälter

@@ -259,7 +259,7 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
         using var bereich = _dienst.Services.CreateScope();
         var bestand = bereich.ServiceProvider
             .GetRequiredService<Application.Loeschung.ILoeschbestand>();
-        await bestand.SchliesseAbAsync(new Girder.Core.Identity.SubjectId(wer), DateTimeOffset.UtcNow);
+        await bestand.SchliesseAbAsync(new Noelia.Core.Identity.SubjectId(wer), DateTimeOffset.UtcNow);
 
         var danach = bereich.ServiceProvider.GetRequiredService<IdentityDbContext>();
         (await danach.AccountSettings.AnyAsync(e => e.SubjectId == wer)).Should().BeFalse();

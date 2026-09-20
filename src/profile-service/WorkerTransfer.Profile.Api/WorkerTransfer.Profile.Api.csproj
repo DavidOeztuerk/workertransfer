@@ -9,7 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Girder.Infrastructure" />
+    <PackageReference Include="Noelia.Infrastructure" />
   </ItemGroup>
 
   <PropertyGroup>

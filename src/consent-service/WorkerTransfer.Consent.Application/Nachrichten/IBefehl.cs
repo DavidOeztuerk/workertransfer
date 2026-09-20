@@ -9,7 +9,7 @@ namespace WorkerTransfer.Consent.Application.Nachrichten;
 /// <c>IBefehl&lt;TAntwort&gt;</c> without reflecting over its interfaces on
 /// every single dispatch.
 /// <para>
-/// Deliberately not Girder's <c>ICommand&lt;T&gt;</c>, which answers in an
+/// Deliberately not Noelia's <c>ICommand&lt;T&gt;</c>, which answers in an
 /// <c>ApiResponse</c> envelope carrying <c>Success</c>, <c>Errors</c> and a
 /// trace id — a second error model beside the RFC 9457 documents this service
 /// answers with, and two error models means every endpoint translates between
@@ -28,7 +28,7 @@ public interface IBefehl<out TAntwort> : IRequest<TAntwort>, IBefehl;
 /// <para>
 /// And no cache either, ever, for the ones that carry a check: a withdrawal has
 /// to take effect on the very next read (ADR-0013). That is why nothing in this
-/// service implements Girder's <c>ICacheableQuery</c>, and <c>AddCQRS</c> then
+/// service implements Noelia's <c>ICacheableQuery</c>, and <c>AddCQRS</c> then
 /// leaves both cache behaviours out of the pipeline entirely.
 /// </para>
 /// <para>

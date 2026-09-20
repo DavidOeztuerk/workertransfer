@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Girder.Infrastructure.Authorization;
+using Noelia.Infrastructure.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
@@ -12,7 +12,7 @@ namespace WorkerTransfer.ServiceDefaults.Rollen;
 /// <remarks>
 /// <para><strong>Warum daneben und nicht statt.</strong> ASP.NET führt
 /// <em>alle</em> Handler zu einer Anforderung aus; ein <c>Succeed</c> genügt.
-/// Girders <c>PermissionAuthorizationHandler</c> bleibt also stehen und liest
+/// Noelias <c>PermissionAuthorizationHandler</c> bleibt also stehen und liest
 /// weiter Ansprüche — er findet bei uns keine, weil unser Token keine trägt.
 /// Dieser hier antwortet stattdessen aus der Tabelle.</para>
 ///
@@ -84,7 +84,7 @@ public sealed class Adminrecht(
     /// Wer fragt — aus dem <c>ClaimsPrincipal</c>, den die Autorisierung hält.
     /// </summary>
     /// <remarks>
-    /// NICHT aus <c>ICurrentPrincipal</c>: Girders <c>UseAuth()</c> ist
+    /// NICHT aus <c>ICurrentPrincipal</c>: Noelias <c>UseAuth()</c> ist
     /// Authentifizierung <em>und</em> Autorisierung, und <c>UsePrincipal()</c>
     /// läuft danach — während die Richtlinie entscheidet, ist
     /// <c>ICurrentPrincipal.Current</c> also noch leer. Ein

@@ -9,7 +9,7 @@ namespace WorkerTransfer.Resume.Application.Nachrichten;
 /// <c>IBefehl&lt;TAntwort&gt;</c> without reflecting over its interfaces on
 /// every single dispatch.
 /// <para>
-/// Deliberately not Girder's <c>ICommand&lt;T&gt;</c>. That one is
+/// Deliberately not Noelia's <c>ICommand&lt;T&gt;</c>. That one is
 /// <c>IRequest&lt;ApiResponse&lt;T&gt;&gt;</c>, so every handler would answer in
 /// an envelope carrying <c>Success</c>, <c>Errors</c> and a trace id — a second
 /// error model beside the RFC 9457 documents this service answers with.

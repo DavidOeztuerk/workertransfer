@@ -1,10 +1,10 @@
 using FluentAssertions;
-using Girder.Infrastructure.Sovereignty;
+using Noelia.Infrastructure.Sovereignty;
 
 namespace WorkerTransfer.Ganzes.Tests;
 
 /// <summary>
-/// Was Girders Egress-Politik mit UNSEREN Adressen macht — gemessen, bevor sie
+/// Was Noelias Egress-Politik mit UNSEREN Adressen macht — gemessen, bevor sie
 /// irgendwo registriert wird.
 /// </summary>
 /// <remarks>
@@ -17,7 +17,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// entscheidet über die halbe Plattform und steht in keiner Zusammenfassung.
 /// </para>
 /// <para>Deshalb steht die Antwort hier als Messung und nicht als Annahme —
-/// und sie bleibt stehen, damit eine spätere Girder-Fassung sie nicht
+/// und sie bleibt stehen, damit eine spätere Noelia-Fassung sie nicht
 /// stillschweigend ändert.</para>
 /// </remarks>
 public sealed class EgressTests

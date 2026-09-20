@@ -13,7 +13,7 @@
   <ItemGroup>
     <!-- Nur fuer `Umgebung.Laden()`: eine .env-Datei in die Prozessumgebung. -->
     <PackageReference Include="DotNetEnv" />
-    <PackageReference Include="Girder.Infrastructure" />
+    <PackageReference Include="Noelia.Infrastructure" />
     <!--
       Nur fuer `Wanderung`: jeder der zehn Dienste besitzt ein eigenes Schema
       und wandert es selbst. Relational, nicht Npgsql — welche Datenbank es

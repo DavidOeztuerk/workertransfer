@@ -9,7 +9,7 @@ namespace WorkerTransfer.Profile.Application.Nachrichten;
 /// Schnittstellen eines Typs reflektieren, um <c>IBefehl&lt;TAntwort&gt;</c> zu
 /// finden.
 /// <para>
-/// Bewusst nicht Girders <c>ICommand&lt;T&gt;</c>: das ist
+/// Bewusst nicht Noelias <c>ICommand&lt;T&gt;</c>: das ist
 /// <c>IRequest&lt;ApiResponse&lt;T&gt;&gt;</c>, jede Antwort käme also in einem
 /// Umschlag mit <c>Success</c>, <c>Errors</c> und einer Ablaufkennung — ein
 /// zweites Fehlermodell neben den RFC-9457-Dokumenten, die dieser Dienst

@@ -1,11 +1,12 @@
-using Girder.Core.Identity;
-using Girder.Infrastructure.Security.Sessions;
+using Noelia.Core.Identity;
+using Noelia.Abstractions.Security.Sessions;
+using Noelia.Infrastructure.Security.Sessions;
 using WorkerTransfer.Identity.Application.Ports;
 
 namespace WorkerTransfer.Identity.Infrastructure.Security;
 
-/// <summary>Answers the session port with Girder's sign-in service.</summary>
-public sealed class GirderSessionService(ITokenSessionService sitzungen) : ISessionService
+/// <summary>Answers the session port with Noelia's sign-in service.</summary>
+public sealed class NoeliaSessionService(ITokenSessionService sitzungen) : ISessionService
 {
     /// <inheritdoc />
     public async Task<StartedSession> StartAsync(
@@ -42,7 +43,7 @@ public sealed class GirderSessionService(ITokenSessionService sitzungen) : ISess
 
     /// <inheritdoc />
     /// <remarks>
-    /// Two steps, because Girder's service ends a session by its id and the
+    /// Two steps, because Noelia's service ends a session by its id and the
     /// caller holds a token. Consuming the token first retires it and names the
     /// session; ending that session then closes every token in the chain.
     /// </remarks>

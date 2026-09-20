@@ -39,8 +39,8 @@ public sealed class GemerktesTor(IEinwilligungstor dahinter) : IEinwilligungstor
 
     /// <inheritdoc />
     public async Task<bool> DarfSehenAsync(
-        Girder.Core.Identity.SubjectId wer,
-        Girder.Core.Identity.TenantId firma,
+        Noelia.Core.Identity.SubjectId wer,
+        Noelia.Core.Identity.TenantId firma,
         CancellationToken cancellationToken = default) =>
         _gemerkt ??= await dahinter.DarfSehenAsync(wer, firma, cancellationToken);
 }

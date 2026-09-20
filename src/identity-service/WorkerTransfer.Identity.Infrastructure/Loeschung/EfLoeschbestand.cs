@@ -1,5 +1,6 @@
-using Girder.Core.Identity;
-using Girder.Infrastructure.Security.Sessions;
+using Noelia.Core.Identity;
+using Noelia.Abstractions.Security.Sessions;
+using Noelia.Infrastructure.Security.Sessions;
 using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.Contracts.Erasure;
 using WorkerTransfer.Identity.Application.Loeschung;

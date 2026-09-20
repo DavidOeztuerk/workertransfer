@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Girder.Contracts" />
+    <PackageReference Include="Noelia.Contracts" />
   </ItemGroup>
 
 </Project>

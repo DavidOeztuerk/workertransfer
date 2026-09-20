@@ -1,4 +1,4 @@
-using Girder.Application.Extensions;
+using Noelia.Application.Extensions;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
@@ -26,7 +26,7 @@ namespace WorkerTransfer.Consent.Infrastructure;
 /// Everything this service decides for itself stands here, in one call: which
 /// database, which repositories, which behaviours — and, just as loudly, what
 /// is <em>not</em> here. There is no cache of any kind, and there is no
-/// distributed cache to register: nothing in this service implements Girder's
+/// distributed cache to register: nothing in this service implements Noelia's
 /// <c>ICacheableQuery</c>, so <c>AddCQRS</c> leaves both cache behaviours out
 /// of the pipeline entirely. That is not thrift, it is ADR-0013 — a withdrawal
 /// has to take effect on the very next read, and a cache here is not a
@@ -64,7 +64,7 @@ public static class ConsentInfrastructure
         services.AddSingleton<IKorrelation, HttpKorrelation>();
 
         // Seven handlers, so the mediator earns its keep. Registered before the
-        // transaction behaviour so that one ends up innermost: Girder's logging
+        // transaction behaviour so that one ends up innermost: Noelia's logging
         // and validation run before anything is written, which is where a
         // rejected command costs nothing.
         services.AddCQRS(typeof(EinwilligungErteilenBefehl).Assembly);

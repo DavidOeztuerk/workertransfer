@@ -13,8 +13,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Girder.Abstractions" />
-    <PackageReference Include="Girder.Application" />
+    <PackageReference Include="Noelia.Abstractions" />
+    <PackageReference Include="Noelia.Application" />
   </ItemGroup>
 
 </Project>

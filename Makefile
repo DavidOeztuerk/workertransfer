@@ -8,7 +8,7 @@
 DOTNET_SLN := WorkerTransfer.slnx
 
 .PHONY: help check check-dotnet check-web build test test-web validate validate-e2e \
-        fix dev env up down images routenkarte nachweis nachweis-pruefen \
+        fix dev env up down images routenkarte analyze nachweis nachweis-pruefen \
         k8s-up k8s-down k8s-lint k8s-seed clean
 
 help:  # Diese Liste.
@@ -44,6 +44,16 @@ test-web:  # Nur die Frontend-Reihe.
 
 validate:  # Wie check, aber laeuft durch und berichtet jeden roten Schritt.
 	./scripts/validate.sh
+
+analyze:  # Noelias Werkzeug ueber die Zusammensetzung dieses Baumes (ADR-0045).
+	@# Statisch: es liest literale Aufrufe und Konfiguration. Was zur Laufzeit
+	@# entschieden wird, sieht es nicht — dafuer gibt es
+	@# `noelia analyze --url <dashboard>`.
+	@#
+	@# Exit 0 sauber, 1 Befunde, 2 das Werkzeug selbst kaputt. Die 2 ist der
+	@# Grund, warum hier nicht `|| true` steht: ein Werkzeug, das nicht laeuft,
+	@# ist kein sauberer Baum.
+	@PATH="$$PATH:$$HOME/.dotnet/tools" noelia analyze .
 
 nachweis:  # Die drei signierten Dokumente gegen den laufenden Stapel (ADR-0044).
 	@# Datenschutz, KI, Mitbestimmung — drei Dokumente fuer drei Leser, weil

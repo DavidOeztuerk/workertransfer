@@ -1,9 +1,9 @@
 using System.Net;
 using FluentAssertions;
-using Girder.Abstractions.Caching;
-using Girder.Infrastructure.Middleware;
-using Girder.Infrastructure.Models;
-using Girder.Infrastructure.RateLimiting;
+using Noelia.Abstractions.Caching;
+using Noelia.Infrastructure.Middleware;
+using Noelia.Infrastructure.Models;
+using Noelia.Infrastructure.RateLimiting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,7 +24,7 @@ namespace WorkerTransfer.Gateway.Tests;
 /// erreicht hat.</para>
 ///
 /// <para><strong>Der erste Versuch, das zu beheben, machte die Oberfläche
-/// kaputt.</strong> Girders <c>UseSecurityHeaders()</c> vor die ganze Kette
+/// kaputt.</strong> Noelias <c>UseSecurityHeaders()</c> vor die ganze Kette
 /// gehängt legt seine Köpfe auch über alles <em>Durchgereichte</em> — und
 /// bringt eine CSP mit <c>script-src 'self'</c> und
 /// <c>upgrade-insecure-requests</c> mit. Gemessen im Browser: weisse Seite.

@@ -1,4 +1,4 @@
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 
 namespace WorkerTransfer.Identity.Domain.Sessions;
 
@@ -15,9 +15,9 @@ namespace WorkerTransfer.Identity.Domain.Sessions;
 /// person's sign-in writes nothing here at all.
 /// </para>
 /// <para>
-/// <strong>Eine eigene Tabelle, weil Girders Erneuerungstoken keine
+/// <strong>Eine eigene Tabelle, weil Noelias Erneuerungstoken keine
 /// Mandantenspalte hat.</strong> Sie stand einmal als Übergangsschuld notiert;
-/// sie ist keine. Solange <c>GirderRefreshToken</c> die Spalte nicht bekommt,
+/// sie ist keine. Solange <c>NoeliaRefreshToken</c> die Spalte nicht bekommt,
 /// ist dies der Ort, an dem diese Frage beantwortet wird — und bekäme er sie,
 /// wäre das eine Entscheidung mit eigenem Commit, kein Aufräumen.
 /// </para>

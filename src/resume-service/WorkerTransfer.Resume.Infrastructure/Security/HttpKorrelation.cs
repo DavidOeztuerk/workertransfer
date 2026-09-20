@@ -1,11 +1,11 @@
-using Girder.Core.Identity;
+using Noelia.Core.Identity;
 using Microsoft.AspNetCore.Http;
 using WorkerTransfer.Resume.Application.Ports;
 using WorkerTransfer.Resume.Domain.Pruefspur;
 
 namespace WorkerTransfer.Resume.Infrastructure.Security;
 
-/// <summary>Reads the correlation id Girder's middleware put on the request.</summary>
+/// <summary>Reads the correlation id Noelia's middleware put on the request.</summary>
 public sealed class HttpKorrelation(IHttpContextAccessor zugriff) : IKorrelation, IKorrelationsanhang
 {
     /// <inheritdoc />

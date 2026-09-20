@@ -8,7 +8,7 @@ namespace WorkerTransfer.ServiceDefaults;
 /// Turns an unhandled failure into an RFC 9457 problem document.
 /// </summary>
 /// <remarks>
-/// Stands in for Girder's <c>UseExceptionHandling()</c>, which writes an
+/// Stands in for Noelia's <c>UseExceptionHandling()</c>, which writes an
 /// envelope of a different shape. One shape across every service, because a
 /// caller that has to know which service answered in order to read the error is
 /// a caller that will read the wrong field.
@@ -34,7 +34,7 @@ public sealed class ProblemDetailsMiddleware(
         {
             // DIE STUFE IST SCHARF, NUR LEER.
             //
-            // `AddCQRS` haengt Girders `ValidationBehavior` bereits in jede
+            // `AddCQRS` haengt Noelias `ValidationBehavior` bereits in jede
             // Pipeline und ruft bereits `AddValidatorsFromAssemblies`. Es steigt
             // sofort aus, solange es keinen Validator findet — und wir hatten
             // keinen. Wer den ersten schreibt, bekaeme ohne diesen Zweig eine

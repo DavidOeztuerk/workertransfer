@@ -23,7 +23,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// <para>
 /// Beide Zweige hier wurden im Betrieb gefunden, nicht im Entwurf: ein
 /// abgeschnittener JSON-Rumpf kam an <em>jedem</em> Endpunkt als 500 zurück,
-/// und Girders <c>ValidationBehavior</c> wirft eine
+/// und Noelias <c>ValidationBehavior</c> wirft eine
 /// <c>ValidationException</c>, die ohne eigenen Zweig ebenfalls 500 geworden
 /// wäre — beim ersten Validator, den jemand schreibt.
 /// </para>
