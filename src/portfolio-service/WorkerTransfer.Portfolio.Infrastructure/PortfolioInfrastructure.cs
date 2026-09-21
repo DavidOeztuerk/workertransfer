@@ -8,10 +8,10 @@ using Npgsql;
 using WorkerTransfer.Portfolio.Application.Behaviors;
 using WorkerTransfer.Portfolio.Application.Ports;
 using WorkerTransfer.Portfolio.Application.Portfolios;
-using WorkerTransfer.Portfolio.Domain.Ablage;
+using WorkerTransfer.Portfolio.Domain.Documents;
 using WorkerTransfer.Portfolio.Domain.Portfolios;
-using WorkerTransfer.Portfolio.Infrastructure.Ablage;
-using WorkerTransfer.Portfolio.Infrastructure.Einwilligung;
+using WorkerTransfer.Portfolio.Infrastructure.Documents;
+using WorkerTransfer.Portfolio.Infrastructure.Consent;
 using WorkerTransfer.Portfolio.Infrastructure.Erasure;
 using WorkerTransfer.Portfolio.Infrastructure.Persistence;
 using WorkerTransfer.Portfolio.Infrastructure.Security;
@@ -22,17 +22,17 @@ using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Portfolio.Infrastructure;
 
-/// <summary>Beantwortet die Ports der Anwendungsschicht.</summary>
+/// <summary>Answers the ports of the application layer.</summary>
 /// <remarks>
-/// Alles, was dieser Dienst für sich entscheidet, steht hier — und genauso
-/// laut, was nicht hier steht: kein Cache (ADR-0013) und <b>eine</b> Ablage mit
-/// <b>einem</b> Backend (ADR-0021).
+/// Everything this service decides for itself stands here — and just as loudly,
+/// what does not stand here: no cache (ADR-0013) and <b>one</b> document store
+/// with <b>one</b> backend (ADR-0021).
 /// </remarks>
 public static class PortfolioInfrastructure
 {
-    /// <param name="services">Der Container.</param>
-    /// <param name="configuration">Woher Ledger, Ablage und Geheimnis kommen.</param>
-    /// <param name="connectionString">Wo die Portfoliodatenbank liegt.</param>
+    /// <param name="services">The container.</param>
+    /// <param name="configuration">Where ledger, document store and secret come from.</param>
+    /// <param name="connectionString">Where the portfolio database lies.</param>
     public static IServiceCollection AddPortfolioInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -50,9 +50,9 @@ public static class PortfolioInfrastructure
 
 
         services.AddSingleton(_ => PortfolioDbContextFactory.DataSource(connectionString));
-        services.AddDbContext<PortfolioDbContext>((provider, optionen) =>
+        services.AddDbContext<PortfolioDbContext>((provider, options) =>
             PortfolioDbContextFactory.Configure(
-                optionen, provider.GetRequiredService<NpgsqlDataSource>()));
+                options, provider.GetRequiredService<NpgsqlDataSource>()));
         services.AddDatabaseReadiness<PortfolioDbContext>("portfolio");
         services.AddKeyRing<PortfolioDbContext>();
 
@@ -63,45 +63,45 @@ public static class PortfolioInfrastructure
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IConsentGate, HttpConsentGate>();
         services.AddSingleton<IDocumentStore, FileDocumentStore>();
-        services.AddSingleton<IKorrelation, HttpKorrelation>();
+        services.AddSingleton<ICorrelation, HttpCorrelation>();
 
-        services.AddCQRS(typeof(PortfolioSichernBefehl).Assembly);
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
+        services.AddCQRS(typeof(SavePortfolioCommand).Assembly);
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
-        Nachweis(services, configuration);
+        Evidence(services, configuration);
 
         return services;
     }
 
-    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <summary>What this service can answer about itself (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
-    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
-    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    /// <para>They stand here and not in ServiceFoundation, for the same reason
+    /// the ledger, the audit trail and the store stand here: they are
+    /// decisions of <em>this</em> service.</para>
     ///
-    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
-    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
-    /// vergessen kann.</para>
+    /// <para><c>wt.grenze.ziele</c> is deliberately missing here — it reads
+    /// only the configuration, is therefore the same for every service and
+    /// stands in <c>AddEvidence</c>. It is the one a new service cannot
+    /// forget.</para>
     /// </remarks>
-    private static void Nachweis(
+    private static void Evidence(
         IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
-            [typeof(Abgelegtes).Assembly, typeof(EintragV1).Assembly]));
+            [typeof(StoredFile).Assembly, typeof(EntryV1).Assembly]));
 
-        // None KI-Naht: `ProviderCheck` ohne Quelle meldet NichtAnwendbar,
-        // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
-        // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
-        // durchschneiden soll.
+        // No AI seam: a `ProviderCheck` without a source reports NotApplicable,
+        // and that is expressly NOT a green tick — a tick on something that
+        // does not apply here at all would be noise in the very document that
+        // exists to cut through noise.
         services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
             provider.GetServices<IProviderSource>()));
 
 
-        // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
-        // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
-        // Zwischenspeicher davor faellt niemandem auf, weil alles
-        // weiterfunktioniert, nur eben mit dem State von vorhin.
+        // Between the question and the ledger stands no further type — the
+        // precondition ADR-0013 fails on in practice. A cache in front of it
+        // occurs to nobody, because everything goes on working, only with the
+        // state from a moment ago.
         services.AddSingleton<ISecurityCheck>(provider =>
             new RevocationCheck<IConsentGate>(
                 provider, typeof(HttpConsentGate)));

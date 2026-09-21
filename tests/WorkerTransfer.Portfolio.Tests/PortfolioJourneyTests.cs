@@ -14,16 +14,16 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Portfolio.Tests;
 
-/// <summary>Ein Ledger, den der Test steuert.</summary>
-public sealed class Probetor : IConsentGate
+/// <summary>A ledger the test steers.</summary>
+public sealed class ProbeGate : IConsentGate
 {
-    /// <summary>Wer sein Portfolio freigegeben hat.</summary>
+    /// <summary>Who released their portfolio.</summary>
     public HashSet<Guid> Frei { get; } = [];
 
-    /// <summary>Wie oft gefragt wurde.</summary>
+    /// <summary>How often it was asked.</summary>
     public int Fragen { get; private set; }
 
-    /// <summary>Wenn wahr, sagt der Ledger gar nichts.</summary>
+    /// <summary>When true, the ledger says nothing at all.</summary>
     public bool Schweigt { get; set; }
 
     public Task<bool> MaySeeAsync(SubjectId subject, CancellationToken cancellationToken = default)
@@ -35,30 +35,30 @@ public sealed class Probetor : IConsentGate
     }
 }
 
-/// <summary>Schreiben, gesehen werden, WorkSamples, gelöscht werden.</summary>
+/// <summary>Writing, being seen, work samples, being erased.</summary>
 [Collection(PostgresCollection.Name)]
-public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
+public class PortfolioJourneyTests(Postgres postgres) : IAsyncLifetime
 {
     private const string Loeschgeheimnis = "loesch-geheimnis";
 
     private WebApplicationFactory<Program> _dienst = null!;
-    private readonly Probetor _tor = new();
+    private readonly ProbeGate _tor = new();
     private string _ablage = null!;
 
     public Task InitializeAsync()
     {
-        // Ein eigenes Verzeichnis je Lauf: die Löschung soll nachweisbar
-        // Dateien entfernen, und dafür muss man sie zählen können.
+        // A directory of its own per run: the erasure is meant to remove
+        // files verifiably, and for that one has to be able to count them.
         _ablage = Path.Combine(Path.GetTempPath(), $"wt-portfolio-{Guid.CreateVersion7():N}");
 
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:portfolio", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Storage:Wurzel", _ablage);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
             host.UseSetting("environment", "Development");
@@ -85,7 +85,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Person(subject));
+            new AuthenticationHeaderValue("Bearer", TokenShape.Person(subject));
         return browser;
     }
 
@@ -93,42 +93,44 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
         JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     private static Task<HttpResponseMessage> Write(
-        HttpClient browser, string? anhang = null, string titel = "Ein Projekt") =>
+        HttpClient browser, string? attachment = null, string title = "Ein Projekt") =>
         browser.PutAsJsonAsync("/portfolios/me", new
         {
             items = new[]
             {
                 new
                 {
-                    title = titel,
+                    title = title,
                     summary = "Was ich dabei gemacht habe.",
                     url = "https://beispiel.example/projekt",
                     role = "Entwicklerin",
                     year = 2024,
-                    attachment = anhang
+                    attachment = attachment
                 }
             }
         });
 
     /// <summary>
-    /// Technologien an einer Arbeit: <strong>vereinheitlicht und entdoppelt</strong>.
+    /// Technologies on a piece of work: <strong>canonicalised and
+    /// deduplicated</strong>.
     /// </summary>
     /// <remarks>
-    /// Derselbe Vocabulary wie im Profile und am Resume — „postgres" heisst
-    /// überall „PostgreSQL" (ADR-0023). Erst vereinheitlichen, dann entdoppeln:
-    /// anders herum stünden beide Schreibweisen als zwei Einträge da.
+    /// The same vocabulary as in the profile and on the CV — "postgres" is
+    /// called "PostgreSQL" everywhere (ADR-0023). Canonicalise first,
+    /// deduplicate second: the other way round both spellings would stand
+    /// there as two entries.
     /// <para>
-    /// Der Grund für das Feld: es ist ein Ort, an dem jemand NENNEN kann, was
-    /// er kann. Durchsuchbar wird die Arbeit dadurch nicht — suchbar ist nur
-    /// das Profile, und dorthin kommt eine Fähigkeit mit einem Klick.
+    /// The reason for the field: it is a place where somebody can NAME what
+    /// they can do. It does not make the work searchable — only the profile is
+    /// searchable, and a skill gets there with a click.
     /// </para>
     /// </remarks>
     [Fact]
-    public async Task Technologien_werden_vereinheitlicht_und_entdoppelt()
+    public async Task Technologies_are_canonicalised_and_deduplicated()
     {
         var browser = Als(Guid.CreateVersion7());
 
-        var geschrieben = await browser.PutAsJsonAsync("/portfolios/me", new
+        var written = await browser.PutAsJsonAsync("/portfolios/me", new
         {
             items = new[]
             {
@@ -145,45 +147,45 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
             }
         });
 
-        geschrieben.StatusCode.Should().Be(HttpStatusCode.OK);
+        written.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        (await Json(geschrieben)).GetProperty("items")[0]
+        (await Json(written)).GetProperty("items")[0]
             .GetProperty("technologies").EnumerateArray()
             .Select(entry => entry.GetString())
             .Should().Equal("PostgreSQL", "Go");
     }
 
-    /// <summary>Eine Arbeit ohne Technologien ist kein Fehler, sondern leer.</summary>
+    /// <summary>A piece of work without technologies is not an error, just empty.</summary>
     /// <remarks>
-    /// Ältere Zeilen tragen das Feld gar nicht — sie sollen weiterlesbar sein,
-    /// ohne dass jemand eine Nachwanderung fährt.
+    /// Older rows do not carry the field at all — they are meant to stay
+    /// readable without anybody running a follow-up migration.
     /// </remarks>
     [Fact]
-    public async Task Ohne_Technologien_bleibt_die_Liste_leer()
+    public async Task Without_technologies_the_list_stays_empty()
     {
         var browser = Als(Guid.CreateVersion7());
 
-        var geschrieben = await Write(browser);
+        var written = await Write(browser);
 
-        (await Json(geschrieben)).GetProperty("items")[0]
+        (await Json(written)).GetProperty("items")[0]
             .GetProperty("technologies").GetArrayLength().Should().Be(0);
     }
 
     private async Task<string> LadeHoch(HttpClient browser, string content = "Arbeitsprobe")
     {
-        using var formular = new MultipartFormDataContent();
+        using var form = new MultipartFormDataContent();
         var file = new ByteArrayContent(Encoding.UTF8.GetBytes(content));
         file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-        formular.Add(file, "file", "probe.pdf");
+        form.Add(file, "file", "probe.pdf");
 
-        var hochgeladen = await browser.PostAsync("/portfolios/me/attachments", formular);
+        var hochgeladen = await browser.PostAsync("/portfolios/me/attachments", form);
         hochgeladen.StatusCode.Should().Be(HttpStatusCode.Created);
 
         return (await Json(hochgeladen)).GetProperty("attachment").GetString()!;
     }
 
     [Fact]
-    public async Task Schreiben_und_das_eigene_wiederlesen()
+    public async Task Writing_and_reading_ones_own_back()
     {
         var anna = Guid.CreateVersion7();
         var browser = Als(anna);
@@ -196,11 +198,11 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Ob ein Portfolio gezeigt werden darf, steht nur im Ledger. Ein Feld hier
-    /// wäre eine zweite Wahrheit (ADR-0020 §6).
+    /// Whether a portfolio may be shown stands only in the ledger. A field here
+    /// would be a second truth (ADR-0020 §6).
     /// </summary>
     [Fact]
-    public async Task Das_Portfolio_traegt_keine_Sichtbarkeit()
+    public async Task The_portfolio_carries_no_visibility()
     {
         var anna = Guid.CreateVersion7();
         await Write(Als(anna));
@@ -213,7 +215,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Verborgen_und_nicht_vorhanden_antworten_gleich()
+    public async Task Hidden_and_non_existent_answer_the_same()
     {
         var anna = Guid.CreateVersion7();
         var erfunden = Guid.CreateVersion7();
@@ -229,19 +231,19 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mit_Freigabe_sieht_ein_Fremder_das_Portfolio()
+    public async Task With_a_release_a_stranger_sees_the_portfolio()
     {
         var anna = Guid.CreateVersion7();
         await Write(Als(anna));
         _tor.Frei.Add(anna);
 
-        var gelesen = await Als(Guid.CreateVersion7()).GetAsync($"/portfolios/{anna}");
+        var read = await Als(Guid.CreateVersion7()).GetAsync($"/portfolios/{anna}");
 
-        gelesen.StatusCode.Should().Be(HttpStatusCode.OK);
+        read.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
-    public async Task Schweigt_der_Ledger_wird_nichts_behauptet()
+    public async Task When_the_ledger_is_silent_nothing_is_asserted()
     {
         var anna = Guid.CreateVersion7();
         await Write(Als(anna));
@@ -254,7 +256,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Der_Ledger_wird_bei_jedem_Lesen_neu_gefragt()
+    public async Task The_ledger_is_asked_again_at_every_read()
     {
         var anna = Guid.CreateVersion7();
         await Write(Als(anna));
@@ -270,114 +272,114 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// <b>Dieselbe Einwilligung, kein zweites Tor</b> (ADR-0021). Ein zweites
-    /// wirkte auf die Beschreibung, aber nicht auf die Arbeitsprobe.
+    /// <b>The same consent, no second gate</b> (ADR-0021). A second one would
+    /// take effect on the description but not on the work sample.
     /// </summary>
     [Fact]
-    public async Task Der_Anhang_haengt_an_derselben_Freigabe_wie_das_Portfolio()
+    public async Task The_attachment_hangs_on_the_same_release_as_the_portfolio()
     {
         var anna = Guid.CreateVersion7();
         var ihr = Als(anna);
-        var anhang = await LadeHoch(ihr);
-        await Write(ihr, anhang);
+        var attachment = await LadeHoch(ihr);
+        await Write(ihr, attachment);
 
         var fremder = Als(Guid.CreateVersion7());
 
-        var verborgen = await fremder.GetAsync($"/portfolios/{anna}/attachments/{anhang}");
+        var verborgen = await fremder.GetAsync($"/portfolios/{anna}/attachments/{attachment}");
         verborgen.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         _tor.Frei.Add(anna);
 
-        var frei = await fremder.GetAsync($"/portfolios/{anna}/attachments/{anhang}");
+        var frei = await fremder.GetAsync($"/portfolios/{anna}/attachments/{attachment}");
         frei.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     /// <summary>
-    /// Sonst bliebe eine aus dem Portfolio entfernte Arbeitsprobe über ihren
-    /// Namen erreichbar, obwohl sie nicht mehr gezeigt wird.
+    /// Otherwise a work sample removed from the portfolio would stay reachable
+    /// through its name, although it is no longer shown.
     /// </summary>
     [Fact]
-    public async Task Ein_Anhang_den_kein_Eintrag_nennt_ist_nicht_erreichbar()
+    public async Task An_attachment_no_entry_names_is_not_reachable()
     {
         var anna = Guid.CreateVersion7();
         var ihr = Als(anna);
-        var anhang = await LadeHoch(ihr);
-        await Write(ihr, anhang);
+        var attachment = await LadeHoch(ihr);
+        await Write(ihr, attachment);
         _tor.Frei.Add(anna);
 
-        // Aus dem Portfolio nehmen, ohne die Datei anzufassen.
-        await Write(ihr, anhang: null);
+        // Take it out of the portfolio without touching the file.
+        await Write(ihr, attachment: null);
 
         var attempt = await Als(Guid.CreateVersion7())
-            .GetAsync($"/portfolios/{anna}/attachments/{anhang}");
+            .GetAsync($"/portfolios/{anna}/attachments/{attachment}");
 
         attempt.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>
-    /// Sonst könnte man seine eigene Arbeitsprobe nicht mehr ansehen, nachdem
-    /// man die Release zurückgenommen hat.
+    /// Otherwise one could no longer look at one's own work sample after taking
+    /// the release back.
     /// </summary>
     [Fact]
-    public async Task Das_eigene_liest_man_ohne_Freigabe()
+    public async Task Ones_own_is_read_without_a_release()
     {
         var anna = Guid.CreateVersion7();
         var ihr = Als(anna);
-        var anhang = await LadeHoch(ihr);
-        await Write(ihr, anhang);
+        var attachment = await LadeHoch(ihr);
+        await Write(ihr, attachment);
 
-        var gelesen = await ihr.GetAsync($"/portfolios/{anna}/attachments/{anhang}");
+        var read = await ihr.GetAsync($"/portfolios/{anna}/attachments/{attachment}");
 
-        gelesen.StatusCode.Should().Be(HttpStatusCode.OK);
+        read.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     /// <summary>
-    /// Eine hochgeladene Datei, die ein fremder Mensch öffnet, wird
-    /// heruntergeladen und nicht in unserem Ursprung ausgeführt.
+    /// An uploaded file a stranger opens is downloaded and not executed in our
+    /// origin.
     /// </summary>
     [Fact]
-    public async Task Ein_Anhang_wird_heruntergeladen_und_nicht_angezeigt()
+    public async Task An_attachment_is_downloaded_and_not_displayed()
     {
         var anna = Guid.CreateVersion7();
         var ihr = Als(anna);
-        var anhang = await LadeHoch(ihr);
-        await Write(ihr, anhang);
+        var attachment = await LadeHoch(ihr);
+        await Write(ihr, attachment);
 
-        var gelesen = await ihr.GetAsync($"/portfolios/{anna}/attachments/{anhang}");
+        var read = await ihr.GetAsync($"/portfolios/{anna}/attachments/{attachment}");
 
-        gelesen.Content.Headers.ContentDisposition!.DispositionType.Should().Be("attachment");
-        gelesen.Headers.GetValues("X-Content-Type-Options").Should().Contain("nosniff");
+        read.Content.Headers.ContentDisposition!.DispositionType.Should().Be("attachment");
+        read.Headers.GetValues("X-Content-Type-Options").Should().Contain("nosniff");
     }
 
     /// <summary>
-    /// Der Weg entsteht aus SubjectId und einem vom Server vergebenen Namen.
-    /// Ein Pfad im Namen kommt nie so weit.
+    /// The path is formed from SubjectId and a name assigned by the server. A
+    /// path inside the name never gets that far.
     /// </summary>
     [Theory]
     [InlineData("../../etc/passwd")]
     [InlineData("..%2F..%2Fetc%2Fpasswd")]
-    public async Task Ein_Pfad_statt_eines_Namens_fuehrt_nirgendwohin(string boesartig)
+    public async Task A_path_instead_of_a_name_leads_nowhere(string malicious)
     {
         var anna = Guid.CreateVersion7();
         await Write(Als(anna));
         _tor.Frei.Add(anna);
 
         var attempt = await Als(Guid.CreateVersion7())
-            .GetAsync($"/portfolios/{anna}/attachments/{boesartig}");
+            .GetAsync($"/portfolios/{anna}/attachments/{malicious}");
 
         attempt.StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.BadRequest);
     }
 
     /// <summary>
-    /// Ein Portfolio-Link wird von fremden Menschen angeklickt; javascript: in
-    /// einem Feld, das in einem Browser landet, ist der Normalfall eines
-    /// Angriffs und kein Randfall.
+    /// A portfolio link gets clicked by strangers; javascript: in a field that
+    /// ends up in a browser is the ordinary shape of an attack and not an edge
+    /// case.
     /// </summary>
     [Theory]
     [InlineData("javascript:alert(1)")]
     [InlineData("data:text/html,<script>")]
     [InlineData("file:///etc/passwd")]
-    public async Task Nur_http_und_https_sind_erlaubt(string link)
+    public async Task Only_http_and_https_are_allowed(string link)
     {
         var attempt = await Als(Guid.CreateVersion7()).PutAsJsonAsync("/portfolios/me", new
         {
@@ -388,21 +390,20 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Die Zeile ist weg, die Arbeitsprobe auch. Eine Datei, die danach noch
-    /// auf der Platte liegt, ist genau das stille Scheitern, gegen das ADR-0027
-    /// antritt — niemand sieht sie, weil die Oberfläche sie nicht mehr
-    /// verlinkt.
+    /// The row is gone, and so is the work sample. A file still on the disk
+    /// afterwards is exactly the silent failure ADR-0027 stands against —
+    /// nobody sees it, because the interface no longer links to it.
     /// </summary>
     [Fact]
-    public async Task Die_Loeschung_nimmt_die_Dateien_mit()
+    public async Task The_erasure_takes_the_files_with_it()
     {
         var anna = Guid.CreateVersion7();
         var ihr = Als(anna);
-        var anhang = await LadeHoch(ihr);
-        await Write(ihr, anhang);
+        var attachment = await LadeHoch(ihr);
+        await Write(ihr, attachment);
 
-        var ordner = Path.Combine(_ablage, anna.ToString("N"));
-        Directory.Exists(ordner).Should().BeTrue("sonst prüft der Test nichts");
+        var folder = Path.Combine(_ablage, anna.ToString("N"));
+        Directory.Exists(folder).Should().BeTrue("sonst prüft der Test nichts");
 
         var request = new HttpRequestMessage(HttpMethod.Post, "/erasure")
         {
@@ -418,20 +419,20 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
         var nachher = await ihr.GetAsync("/portfolios/me");
         nachher.StatusCode.Should().Be(HttpStatusCode.OK);
         (await nachher.Content.ReadAsStringAsync()).Trim().Should().Be("null");
-        Directory.Exists(ordner).Should().BeFalse("die Arbeitsproben sind mitgegangen");
+        Directory.Exists(folder).Should().BeFalse("die Arbeitsproben sind mitgegangen");
     }
 
     [Fact]
-    public async Task Ein_leeres_Loeschgeheimnis_schliesst_den_Endpunkt()
+    public async Task An_empty_erasure_secret_closes_the_endpoint()
     {
         using var ohne = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:portfolio", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Storage:Wurzel", _ablage);
             host.UseSetting("Erasure:Geheimnis", string.Empty);
             host.UseSetting("environment", "Development");
@@ -448,7 +449,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mehr_als_dreissig_Eintraege_werden_abgewiesen()
+    public async Task More_than_thirty_entries_are_refused()
     {
         var zuViele = Enumerable.Range(0, 31)
             .Select(nummer => new { title = $"Projekt {nummer}" })

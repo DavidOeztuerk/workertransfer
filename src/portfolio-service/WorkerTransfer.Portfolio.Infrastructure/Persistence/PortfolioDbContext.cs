@@ -3,20 +3,19 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Portfolio.Infrastructure.Persistence;
 
-/// <summary>Eine Zeile von <c>portfolios</c>.</summary>
+/// <summary>One row of <c>portfolios</c>.</summary>
 /// <remarks>
-/// Nicht das Aggregat. Die Einträge liegen als jsonb in einer Spalte und nicht
-/// in einer zweiten Tabelle: sie werden immer vollständig gelesen und
-/// vollständig ersetzt, es gibt keine Abfrage über einzelne Einträge, und eine
-/// eigene Tabelle brächte nur eine Verknüpfung und eine Reihenfolge, die
-/// niemand braucht.
+/// Not the aggregate. The entries lie as jsonb in one column and not in a
+/// second table: they are always read in full and replaced in full, there is
+/// no query over individual entries, and a table of their own would bring
+/// nothing but a join and an ordering nobody needs.
 /// </remarks>
 public sealed class PortfolioRow
 {
-    /// <summary>Die <c>SubjectId</c>. Sie <em>ist</em> der Schlüssel.</summary>
+    /// <summary>The <c>SubjectId</c>. It <em>is</em> the key.</summary>
     public Guid Id { get; set; }
 
-    /// <summary>Die Einträge, unverarbeitet.</summary>
+    /// <summary>The entries, unprocessed.</summary>
     public string Items { get; set; } = "[]";
 
     public DateTime CreatedAt { get; set; }
@@ -24,13 +23,13 @@ public sealed class PortfolioRow
     public DateTime UpdatedAt { get; set; }
 }
 
-/// <summary>Die eine Tabelle dieses Dienstes.</summary>
+/// <summary>The one table of this service.</summary>
 /// <remarks>
-/// Verfolgen ist aus, als Voreinstellung des Kontexts und nicht je Abfrage. Je
-/// Abfrage wäre es Disziplin, und die nächste hinzugefügte vergisst es — und
-/// die Abbildung führt gespeicherte Werte durch den Domänenkonstruktor, der
-/// normalisiert. Ein verfolgtes Lesen schriebe beim nächsten Speichern Zeilen
-/// um, die niemand anfassen wollte.
+/// Tracking is off, as a default of the context and not per query. Per query it
+/// would be discipline, and the next query somebody adds forgets it — and the
+/// mapping leads stored values through the domain constructor, which
+/// normalises. A tracked read would rewrite rows at the next save that nobody
+/// meant to touch.
 /// </remarks>
 public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options)
     : DbContext(options)

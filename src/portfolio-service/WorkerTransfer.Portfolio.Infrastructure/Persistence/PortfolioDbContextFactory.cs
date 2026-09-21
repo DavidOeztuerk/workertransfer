@@ -4,16 +4,16 @@ using Npgsql;
 
 namespace WorkerTransfer.Portfolio.Infrastructure.Persistence;
 
-/// <summary>Baut DataSource und Kontext.</summary>
+/// <summary>Builds the data source and the context.</summary>
 public static class PortfolioDbContextFactory
 {
-    /// <summary>Die DataSource.</summary>
+    /// <summary>The data source.</summary>
     public static NpgsqlDataSource DataSource(string connectionString) =>
         new NpgsqlDataSourceBuilder(connectionString).Build();
 
     /// <summary>
-    /// Die eine Job, an der Verfolgen abgeschaltet wird, damit Container und
-    /// Tests nicht mit verschiedenem Verhalten enden.
+    /// The one place where tracking is switched off, so that container and
+    /// tests do not end up with different behaviour.
     /// </summary>
     public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options, NpgsqlDataSource dataSource)
@@ -25,8 +25,8 @@ public static class PortfolioDbContextFactory
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
     }
 
-    /// <summary>Dasselbe Modell für <c>dotnet ef</c>, das keine Connection braucht.</summary>
-    public static DbContextOptionsBuilder ZurEntwurfszeit(
+    /// <summary>The same model for <c>dotnet ef</c>, which needs no connection.</summary>
+    public static DbContextOptionsBuilder AtDesignTime(
         DbContextOptionsBuilder options, string connectionString)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -35,13 +35,13 @@ public static class PortfolioDbContextFactory
     }
 }
 
-/// <summary>Der Kontext für <c>dotnet ef</c>.</summary>
+/// <summary>The context for <c>dotnet ef</c>.</summary>
 public sealed class PortfolioDesignTimeFactory : IDesignTimeDbContextFactory<PortfolioDbContext>
 {
     /// <inheritdoc />
     public PortfolioDbContext CreateDbContext(string[] args) =>
         new((DbContextOptions<PortfolioDbContext>)PortfolioDbContextFactory
-            .ZurEntwurfszeit(
+            .AtDesignTime(
                 new DbContextOptionsBuilder<PortfolioDbContext>(),
                 "Host=entwurfszeit;Database=portfolio")
             .Options);

@@ -8,26 +8,26 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Portfolio.Api;
 
-/// <summary><c>/portfolios/*</c> — schreiben, lesen, WorkSamples.</summary>
+/// <summary><c>/portfolios/*</c> — writing, reading, work samples.</summary>
 public static class PortfolioEndpoints
 {
-    /// <summary>Wie groß eine hochgeladene Datei sein darf.</summary>
-    private const long HoechsteGroesse = 10 * 1024 * 1024;
+    /// <summary>How large an uploaded file may be.</summary>
+    private const long MaxFileSize = 10 * 1024 * 1024;
 
-    /// <summary>Bindet die fünf Portfoliorouten ein.</summary>
+    /// <summary>Binds the five portfolio routes.</summary>
     public static IEndpointRouteBuilder MapPortfolioEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        // Ein schweigender Ledger ist weder ein Ja noch ein Nein. Als ein
-        // Filter für die ganze Gruppe, weil die Route, die es vergisst, wie
-        // eine funktionierende aussieht, bis der Ledger ausfällt.
+        // A silent ledger is neither a yes nor a no. As a filter over the
+        // whole group, because the route that forgets it looks like a working
+        // one until the ledger goes out.
         var portfolios = app.MapGroup("/portfolios").AddEndpointFilter(
-            async (call, weiter) =>
+            async (call, next) =>
             {
                 try
                 {
-                    return await weiter(call);
+                    return await next(call);
                 }
                 catch (ConsentGateSilent)
                 {
@@ -35,33 +35,33 @@ public static class PortfolioEndpoints
                         call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                         "Request failed", "the consent ledger did not answer");
 
-                    return Geschrieben;
+                    return AlreadyWritten;
                 }
             });
 
         portfolios.MapPut("/me", async (
-            PortfolioSchreibenV1 koerper,
+            WritePortfolioV1 body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
-            TimeProvider uhr,
+            ICurrentPrincipal principal,
+            TimeProvider clock,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
             try
             {
                 var portfolio = await mediator.Send(
-                    new PortfolioSichernBefehl(handelnder.Subject, Eintraege(koerper, uhr)),
+                    new SavePortfolioCommand(actor.Subject, Entries(body, clock)),
                     cancellationToken);
 
-                await context.Response.WriteAsJsonAsync(Antwort(portfolio), cancellationToken);
+                await context.Response.WriteAsJsonAsync(Response(portfolio), cancellationToken);
             }
-            catch (Eingabefehler error)
+            catch (InputError error)
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
@@ -71,64 +71,64 @@ public static class PortfolioEndpoints
 
         portfolios.MapGet("/me", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
-            // Ohne Ledgerfrage: die Release regelt, wer es von außen sieht,
-            // nicht ob jemand sein eigenes lesen darf.
+            // Without asking the ledger: the release governs who sees it from
+            // outside, not whether somebody may read their own.
             var portfolio = await mediator.Send(
-                new MyPortfolioQuery(handelnder.Subject), cancellationToken);
+                new MyPortfolioQuery(actor.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                portfolio is null ? null : Antwort(portfolio), cancellationToken);
+                portfolio is null ? null : Response(portfolio), cancellationToken);
         });
 
         portfolios.MapGet("/{subjectId:guid}", async (
             Guid subjectId,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is null)
+            if (principal.Current is null)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
             var portfolio = await mediator.Send(
-                new FremdesPortfolioAbfrage(new SubjectId(subjectId)), cancellationToken);
+                new OtherPortfolioQuery(new SubjectId(subjectId)), cancellationToken);
 
             if (portfolio is null)
             {
-                // Verborgen und nicht vorhanden antworten gleich, und das muss
-                // so bleiben: ein Unterschied sagte, ob dieser Mensch hier
-                // etwas gezeigt hat.
+                // Hidden and non-existent answer the same, and that must stay
+                // so: a difference would say whether this person has shown
+                // anything here.
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such portfolio");
                 return;
             }
 
-            await context.Response.WriteAsJsonAsync(Antwort(portfolio), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Response(portfolio), cancellationToken);
         });
 
         portfolios.MapPost("/me/attachments", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
@@ -140,8 +140,8 @@ public static class PortfolioEndpoints
                 return;
             }
 
-            var formular = await context.Request.ReadFormAsync(cancellationToken);
-            var file = formular.Files.GetFile("file");
+            var form = await context.Request.ReadFormAsync(cancellationToken);
+            var file = form.Files.GetFile("file");
 
             if (file is null || file.Length == 0)
             {
@@ -151,9 +151,9 @@ public static class PortfolioEndpoints
                 return;
             }
 
-            // Eine Grenze, weil ohne sie die erste Videodatei den Datenträger
-            // füllt — und weil ein Portfolio ein Schaufenster ist, kein Archiv.
-            if (file.Length > HoechsteGroesse)
+            // A limit, because without one the first video file fills the
+            // disk — and because a portfolio is a shop window, not an archive.
+            if (file.Length > MaxFileSize)
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status413PayloadTooLarge,
@@ -163,11 +163,11 @@ public static class PortfolioEndpoints
 
             await using var content = file.OpenReadStream();
 
-            // Der Name kommt von der Ablage zurück, nicht vom Client: ein vom
-            // Aufrufer gewählter Name wäre ein Pfad, den jemand formen kann.
+            // The name comes back from the store, not from the client: a name
+            // chosen by the caller would be a path somebody can shape.
             var name = await mediator.Send(
-                new AnhangAblegenBefehl(
-                    handelnder.Subject, file.FileName, file.ContentType, content),
+                new StoreAttachmentCommand(
+                    actor.Subject, file.FileName, file.ContentType, content),
                 cancellationToken);
 
             context.Response.StatusCode = StatusCodes.Status201Created;
@@ -179,41 +179,40 @@ public static class PortfolioEndpoints
             Guid subjectId,
             string name,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
-            var abgelegtes = await mediator.Send(
-                new AnhangAbfrage(new SubjectId(subjectId), name, handelnder.Subject),
+            var stored = await mediator.Send(
+                new AttachmentQuery(new SubjectId(subjectId), name, actor.Subject),
                 cancellationToken);
 
-            if (abgelegtes is null)
+            if (stored is null)
             {
-                // Dieselbe Antwort, ob die Datei fehlt, das Portfolio verborgen
-                // ist oder kein Eintrag sie nennt. Drei Gründe, eine Antwort.
+                // The same answer whether the file is missing, the portfolio
+                // is hidden or no entry names it. Three reasons, one answer.
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such attachment");
                 return;
             }
 
-            await using (abgelegtes)
+            await using (stored)
             {
-                context.Response.ContentType = abgelegtes.Medientyp;
+                context.Response.ContentType = stored.MediaType;
 
-                // Kein Anzeigen im Browser: eine hochgeladene Datei, die ein
-                // fremder Mensch öffnet, wird heruntergeladen und nicht in
-                // unserem Ursprung ausgeführt.
+                // No rendering in the browser: an uploaded file a stranger
+                // opens is downloaded and not executed in our origin.
                 context.Response.Headers.ContentDisposition = $"attachment; filename=\"{name}\"";
                 context.Response.Headers["X-Content-Type-Options"] = "nosniff";
 
-                await abgelegtes.Inhalt.CopyToAsync(context.Response.Body, cancellationToken);
+                await stored.Content.CopyToAsync(context.Response.Body, cancellationToken);
             }
         });
 
@@ -221,37 +220,37 @@ public static class PortfolioEndpoints
     }
 
     /// <summary>
-    /// Was ein Filter zurückgibt, der die Antwort selbst geschrieben hat.
+    /// What a filter returns when it has written the response itself.
     /// </summary>
     /// <remarks>
-    /// <strong>Nicht <c>null</c>.</strong> Ein Filter, der <c>null</c>
-    /// zurückgibt, lässt das Rahmenwerk noch einmal schreiben — JSON-<c>null</c>
-    /// samt Kopfzeilen, und die stehen zu diesem Zeitpunkt schon. Bei einer
-    /// ResumeRequest ohne Rumpf sieht der Aufrufer trotzdem sein 503 und nur das
-    /// Protokoll trägt eine unbehandelte Ausnahme; bei einer mit Rumpf reißt
-    /// die Connection, und er bekommt „Error while copying content to a
-    /// stream". Gemessen an <c>POST /applications</c>.
+    /// <strong>Not <c>null</c>.</strong> A filter that returns <c>null</c> lets
+    /// the framework write once more — a JSON <c>null</c> along with headers,
+    /// and those have already gone out by then. On a request without a body the
+    /// caller still sees its 503 and only the log carries an unhandled
+    /// exception; on one with a body the connection tears, and the caller gets
+    /// "Error while copying content to a stream". Measured at
+    /// <c>POST /applications</c>.
     /// </remarks>
-    private static readonly IResult Geschrieben = Results.Empty;
+    private static readonly IResult AlreadyWritten = Results.Empty;
 
-    private static IReadOnlyList<Eintrag> Eintraege(
-        PortfolioSchreibenV1 koerper, TimeProvider uhr)
+    private static IReadOnlyList<Entry> Entries(
+        WritePortfolioV1 body, TimeProvider clock)
     {
-        var now = uhr.GetUtcNow();
+        var now = clock.GetUtcNow();
 
-        return [.. (koerper.Items ?? []).Select(entry => Eintrag.Aus(
+        return [.. (body.Items ?? []).Select(entry => Entry.From(
             entry.Title, now, entry.Summary, entry.Url,
             entry.Role, entry.Year, entry.Attachment, entry.Technologies))];
     }
 
-    private static PortfolioV1 Antwort(Domain.Portfolios.Portfolio portfolio) => new(
-        portfolio.Wer.Value,
-        [.. portfolio.Eintraege.Select(entry => new EintragV1(
-            entry.Titel, entry.Zusammenfassung, entry.Link,
-            entry.Rolle, entry.Jahr, entry.Anhang, entry.Technologien))],
-        portfolio.GeaendertAm);
+    private static PortfolioV1 Response(Domain.Portfolios.Portfolio portfolio) => new(
+        portfolio.Subject.Value,
+        [.. portfolio.Entries.Select(entry => new EntryV1(
+            entry.Title, entry.Summary, entry.Link,
+            entry.Role, entry.Year, entry.Attachment, entry.Technologies))],
+        portfolio.ChangedAt);
 
-    private static Task NichtAngemeldet(HttpContext context) =>
+    private static Task NotAuthenticated(HttpContext context) =>
         ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
 }
