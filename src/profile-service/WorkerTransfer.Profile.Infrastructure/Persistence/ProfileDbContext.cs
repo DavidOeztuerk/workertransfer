@@ -122,7 +122,7 @@ public sealed class ProfileDbContext(DbContextOptions<ProfileDbContext> options)
     /// <summary>Die Namen der Postgres-Aufzählungen dieses Dienstes.</summary>
     /// <remarks>
     /// Als Konstante und nicht als Zeichenkette an der Aufrufstelle: der Name
-    /// steht in der Datenbank und in der SchemaMigration, und zwei Schreibweisen
+    /// steht in der Datenbank und in der SchemaMigration, und zwei Spellings
     /// desselben Namens fallen erst beim ersten Einfügen auf.
     /// </remarks>
     public static class Enumnamen

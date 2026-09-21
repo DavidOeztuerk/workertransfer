@@ -21,5 +21,5 @@ namespace WorkerTransfer.Skills;
 public static class SkillLimits
 {
     /// <summary>How long a single skill may be.</summary>
-    public const int Hoechstlaenge = 50;
+    public const int MaxLength = 50;
 }

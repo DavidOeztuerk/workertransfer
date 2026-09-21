@@ -106,14 +106,14 @@ public sealed record Station
         foreach (var einzeln in roh)
         {
             var geprueft = Text.Gepruegt(
-                "Technologie", einzeln, pflicht: false, SkillLimits.Hoechstlaenge);
+                "Technologie", einzeln, pflicht: false, SkillLimits.MaxLength);
 
             if (geprueft.Length == 0)
             {
                 continue;
             }
 
-            var kanonisch = Vocabulary.Kanonisch(geprueft);
+            var kanonisch = Vocabulary.Canonicalise(geprueft);
 
             if (gesehen.Add(kanonisch))
             {

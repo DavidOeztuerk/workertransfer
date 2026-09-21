@@ -28,8 +28,8 @@ public sealed class SkillList
     public const int Hoechstzahl = 30;
 
     /// <summary>Wie lang eine einzelne Fähigkeit sein darf.</summary>
-    /// <inheritdoc cref="Faehigkeitsgrenzen.Hoechstlaenge" />
-    public const int Hoechstlaenge = SkillLimits.Hoechstlaenge;
+    /// <inheritdoc cref="SkillLimits.MaxLength" />
+    public const int MaxLength = SkillLimits.MaxLength;
 
     /// <summary>Die leere Liste — jemand, der nichts eingetragen hat.</summary>
     /// <remarks>
@@ -75,12 +75,12 @@ public sealed class SkillList
         var gesehen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var sauber = new List<string>();
 
-        foreach (var entry in Vocabulary.KanonischAlle(roh))
+        foreach (var entry in Vocabulary.CanonicaliseAll(roh))
         {
-            if (pruefe && entry.Length > Hoechstlaenge)
+            if (pruefe && entry.Length > MaxLength)
             {
                 throw new SkillError(
-                    $"Eine Fähigkeit darf höchstens {Hoechstlaenge} Zeichen haben.");
+                    $"Eine Fähigkeit darf höchstens {MaxLength} Zeichen haben.");
             }
 
             // Groß-/Kleinschreibung ist keine zweite Fähigkeit. Die erste

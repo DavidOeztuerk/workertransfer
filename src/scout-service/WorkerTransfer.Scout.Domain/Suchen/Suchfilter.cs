@@ -42,7 +42,7 @@ public sealed class SearchFilter
     public const int HoechstzahlWorte = 10;
 
     /// <summary>Wie lang ein einzelnes Wort sein darf.</summary>
-    public const int HoechstlaengeWort = SkillLimits.Hoechstlaenge;
+    public const int HoechstlaengeWort = SkillLimits.MaxLength;
 
     /// <summary>Wie lang der Ort sein darf.</summary>
     public const int HoechstlaengeOrt = 120;
@@ -93,7 +93,7 @@ public sealed class SearchFilter
         }
 
         // Kanonisieren zuerst, entdoppeln danach (ADR-0023).
-        var kanonisch = Vocabulary.KanonischAlle(getippt)
+        var kanonisch = Vocabulary.CanonicaliseAll(getippt)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
@@ -121,7 +121,7 @@ public sealed class SearchFilter
     /// </remarks>
     public static SearchFilter Stelle_her(IEnumerable<string>? words, string? ort, bool nurRemote) =>
         new(
-            [.. Vocabulary.KanonischAlle(words ?? []).Distinct(StringComparer.OrdinalIgnoreCase)],
+            [.. Vocabulary.CanonicaliseAll(words ?? []).Distinct(StringComparer.OrdinalIgnoreCase)],
             (ort ?? string.Empty).Trim(),
             nurRemote);
 }

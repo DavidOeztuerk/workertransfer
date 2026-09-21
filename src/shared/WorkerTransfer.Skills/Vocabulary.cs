@@ -51,7 +51,7 @@ public static class Vocabulary
     /// and sales, and people mistype there just the same.
     /// </para>
     /// </remarks>
-    public static IReadOnlyDictionary<string, IReadOnlyList<string>> Schreibweisen { get; } =
+    public static IReadOnlyDictionary<string, IReadOnlyList<string>> Spellings { get; } =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
             // Languages and runtimes
@@ -131,7 +131,7 @@ public static class Vocabulary
         };
 
     /// <summary>The canonical names themselves.</summary>
-    public static IReadOnlyList<string> Namen { get; } = [.. Schreibweisen.Keys.Order(StringComparer.Ordinal)];
+    public static IReadOnlyList<string> Names { get; } = [.. Spellings.Keys.Order(StringComparer.Ordinal)];
 
     /// <summary>
     /// Lookup table: spelling → canonical name, regardless of upper and lower
@@ -145,36 +145,36 @@ public static class Vocabulary
 
     /// <summary>The known spelling — or unchanged, whatever came in.</summary>
     /// <param name="skill">What somebody typed.</param>
-    public static string Kanonisch(string skill)
+    public static string Canonicalise(string skill)
     {
         var geputzt = (skill ?? string.Empty).Trim();
 
         return NachSchreibweise.TryGetValue(geputzt, out var name) ? name : geputzt;
     }
 
-    /// <summary>Like <see cref="Kanonisch"/>, for a list. Empties fall away.</summary>
+    /// <summary>Like <see cref="Canonicalise"/>, for a list. Empties fall away.</summary>
     /// <remarks>
     /// <b>Not</b> deduplicated: that belongs in <see cref="SkillList"/>, and
     /// there AFTER the renaming. The other way round, "Postgres, PostgreSQL"
     /// would become the same entry twice.
     /// </remarks>
     /// <param name="skills">What somebody typed.</param>
-    public static IReadOnlyList<string> KanonischAlle(IEnumerable<string> skills)
+    public static IReadOnlyList<string> CanonicaliseAll(IEnumerable<string> skills)
     {
         ArgumentNullException.ThrowIfNull(skills);
 
-        return [.. skills.Select(Kanonisch).Where(name => name.Length > 0)];
+        return [.. skills.Select(Canonicalise).Where(name => name.Length > 0)];
     }
 
     private static FrozenDictionary<string, string> Build()
     {
         var tabelle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (name, schreibweisen) in Schreibweisen)
+        foreach (var (name, spellings) in Spellings)
         {
             tabelle[name] = name;
 
-            foreach (var schreibweise in schreibweisen)
+            foreach (var schreibweise in spellings)
             {
                 tabelle[schreibweise] = name;
             }

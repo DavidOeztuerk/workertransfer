@@ -17,7 +17,7 @@ public class SkillVocabularyTests
     [InlineData("dotnet", ".NET")]
     [InlineData("kundenservice", "Kundenbetreuung")]
     public void The_same_thing_gets_the_same_word(string getippt, string erwartet) =>
-        Vocabulary.Kanonisch(getippt).Should().Be(erwartet);
+        Vocabulary.Canonicalise(getippt).Should().Be(erwartet);
 
     /// <summary>
     /// The core of ADR-0023: "React" means React and nothing else.
@@ -29,7 +29,7 @@ public class SkillVocabularyTests
     /// </remarks>
     [Fact]
     public void From_React_no_JavaScript_follows() =>
-        Vocabulary.KanonischAlle(["React"]).Should().Equal("React");
+        Vocabulary.CanonicaliseAll(["React"]).Should().Equal("React");
 
     /// <summary>
     /// Like <see cref="From_React_no_JavaScript_follows"/>, in the place where
@@ -37,7 +37,7 @@ public class SkillVocabularyTests
     /// </summary>
     [Fact]
     public void From_MIG_MAG_no_welding_follows() =>
-        Vocabulary.KanonischAlle(["MIG/MAG"]).Should().Equal("MIG/MAG");
+        Vocabulary.CanonicaliseAll(["MIG/MAG"]).Should().Equal("MIG/MAG");
 
     /// <summary>
     /// A forklift licence is a piece of paper, not a forklift. The vocabulary
@@ -45,7 +45,7 @@ public class SkillVocabularyTests
     /// </summary>
     [Fact]
     public void A_certificate_is_not_a_machine() =>
-        Vocabulary.KanonischAlle(["Staplerschein", "Gabelstapler"])
+        Vocabulary.CanonicaliseAll(["Staplerschein", "Gabelstapler"])
             .Should().Equal("Staplerschein", "Gabelstapler");
 
     /// <summary>The trades are canonicalised like everything else.</summary>
@@ -61,15 +61,15 @@ public class SkillVocabularyTests
     [InlineData("gesundheits- und krankenpfleger", "Pflegefachkraft")]
     [InlineData("  Ameise  ", "Hubwagen")]
     public void Trade_terms_get_the_same_word(string getippt, string erwartet) =>
-        Vocabulary.Kanonisch(getippt).Should().Be(erwartet);
+        Vocabulary.Canonicalise(getippt).Should().Be(erwartet);
 
     [Fact]
     public void What_is_unknown_stays_as_it_was_typed() =>
-        Vocabulary.Kanonisch("Hufbeschlag").Should().Be("Hufbeschlag");
+        Vocabulary.Canonicalise("Hufbeschlag").Should().Be("Hufbeschlag");
 
     [Fact]
     public void What_is_empty_falls_out_of_the_list() =>
-        Vocabulary.KanonischAlle(["Go", "   ", "", "aws"])
+        Vocabulary.CanonicaliseAll(["Go", "   ", "", "aws"])
             .Should().Equal("Go", "Amazon Web Services");
 
     /// <summary>
@@ -81,13 +81,13 @@ public class SkillVocabularyTests
     /// </remarks>
     [Fact]
     public void The_vocabulary_does_not_deduplicate() =>
-        Vocabulary.KanonischAlle(["Postgres", "PostgreSQL"])
+        Vocabulary.CanonicaliseAll(["Postgres", "PostgreSQL"])
             .Should().Equal("PostgreSQL", "PostgreSQL");
 
     [Fact]
     public void A_name_never_stands_as_its_own_spelling()
     {
-        foreach (var (name, schreibweisen) in Vocabulary.Schreibweisen)
+        foreach (var (name, schreibweisen) in Vocabulary.Spellings)
         {
             schreibweisen.Should().NotContain(
                 schreibweise => string.Equals(schreibweise, name, StringComparison.OrdinalIgnoreCase),
@@ -98,7 +98,7 @@ public class SkillVocabularyTests
     [Fact]
     public void A_spelling_belongs_to_at_most_one_name()
     {
-        var alle = Vocabulary.Schreibweisen
+        var alle = Vocabulary.Spellings
             .SelectMany(entry => entry.Value)
             .Select(schreibweise => schreibweise.ToLowerInvariant())
             .ToList();
@@ -113,9 +113,9 @@ public class SkillVocabularyTests
     [Fact]
     public void No_name_is_the_spelling_of_another()
     {
-        var namen = Vocabulary.Schreibweisen.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var namen = Vocabulary.Spellings.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (name, schreibweisen) in Vocabulary.Schreibweisen)
+        foreach (var (name, schreibweisen) in Vocabulary.Spellings)
         {
             foreach (var schreibweise in schreibweisen)
             {

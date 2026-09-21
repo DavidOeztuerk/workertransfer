@@ -78,7 +78,7 @@ public sealed class EfProfileStore(ProfileDbContext context) : IProfileStore
         // Wird es eng, ist ein GIN-Index über genau diesen Ausdruck die
         // Antwort — keine zweite Spalte.
         var gesuchte = (request.Faehigkeiten ?? [])
-            .Select(skill => Vocabulary.Kanonisch(skill).ToUpperInvariant())
+            .Select(skill => Vocabulary.Canonicalise(skill).ToUpperInvariant())
             .ToArray();
 
         // ODER: mindestens eines der Worte genügt. Ein Hit darf also etwas

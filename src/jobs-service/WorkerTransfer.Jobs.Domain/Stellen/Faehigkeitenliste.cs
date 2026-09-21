@@ -21,12 +21,12 @@ public sealed class SkillList
     /// </summary>
     /// <remarks>
     /// Weniger als ein Profile hält, und das ist in Ordnung: kleiner darf die
-    /// Job sein, länger nicht — siehe <see cref="Hoechstlaenge"/>.
+    /// Job sein, länger nicht — siehe <see cref="MaxLength"/>.
     /// </remarks>
     public const int Hoechstzahl = 20;
 
-    /// <inheritdoc cref="Faehigkeitsgrenzen.Hoechstlaenge" />
-    public const int Hoechstlaenge = SkillLimits.Hoechstlaenge;
+    /// <inheritdoc cref="SkillLimits.MaxLength" />
+    public const int MaxLength = SkillLimits.MaxLength;
 
     private SkillList(IReadOnlyList<string> values) => Werte = values;
 
@@ -64,7 +64,7 @@ public sealed class SkillList
         // Erst umbenennen, DANN entdoppeln (ADR-0023). Andersherum würde aus
         // „Postgres, PostgreSQL" zweimal derselbe Eintrag, und die Anzeige
         // zählte eine Anforderung doppelt.
-        foreach (var entry in Vocabulary.KanonischAlle(roh))
+        foreach (var entry in Vocabulary.CanonicaliseAll(roh))
         {
             var value = entry.Trim();
 
@@ -73,10 +73,10 @@ public sealed class SkillList
                 continue;
             }
 
-            if (pruefe && value.Length > Hoechstlaenge)
+            if (pruefe && value.Length > MaxLength)
             {
                 throw new SkillError(
-                    $"Eine Fähigkeit darf höchstens {Hoechstlaenge} Zeichen haben.");
+                    $"Eine Fähigkeit darf höchstens {MaxLength} Zeichen haben.");
             }
 
             // Groß- und Kleinschreibung ist keine zweite Anforderung. Die erste

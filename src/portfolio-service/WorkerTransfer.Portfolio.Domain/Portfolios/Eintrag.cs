@@ -145,14 +145,14 @@ public sealed partial record Eintrag
         foreach (var einzeln in roh)
         {
             var geprueft = Text(
-                "Die Technologie", einzeln, pflicht: false, SkillLimits.Hoechstlaenge);
+                "Die Technologie", einzeln, pflicht: false, SkillLimits.MaxLength);
 
             if (geprueft.Length == 0)
             {
                 continue;
             }
 
-            var kanonisch = Vocabulary.Kanonisch(geprueft);
+            var kanonisch = Vocabulary.Canonicalise(geprueft);
 
             if (gesehen.Add(kanonisch))
             {

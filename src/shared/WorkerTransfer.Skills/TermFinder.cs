@@ -45,11 +45,11 @@ public static class TermFinder
     /// and are still recognised in any casing.
     /// </para>
     /// </remarks>
-    public const int UnterDieserLaengeNurVersal = 4;
+    public const int UpperCaseOnlyBelowLength = 4;
 
     /// <summary>Spelling → canonical name, looked up in lower case.</summary>
     /// <remarks>
-    /// Built from <see cref="Vocabulary.Schreibweisen"/> and not maintained
+    /// Built from <see cref="Vocabulary.Spellings"/> and not maintained
     /// beside it: a second list would be the one to go stale first — and nobody
     /// would notice, because a word that is not found looks like a document
     /// with no content.
@@ -108,7 +108,7 @@ public static class TermFinder
                     continue;
                 }
 
-                if (length < UnterDieserLaengeNurVersal
+                if (length < UpperCaseOnlyBelowLength
                     && fenster.All(char.IsLetter)
                     && !IstVersal(geputzt, start, length))
                 {
@@ -198,7 +198,7 @@ public static class TermFinder
     {
         var tabelle = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        foreach (var (name, schreibweisen) in Vocabulary.Schreibweisen)
+        foreach (var (name, schreibweisen) in Vocabulary.Spellings)
         {
             // The canonical name points at itself: whoever writes "Kubernetes"
             // has written Kubernetes.

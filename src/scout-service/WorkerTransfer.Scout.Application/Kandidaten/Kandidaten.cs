@@ -71,7 +71,7 @@ public sealed class KandidatenHandler(
     /// teure Abfrage. Und die Sammelfrage des Ledgers trägt höchstens hundert
     /// Paare — zwei je Person, also fünfzig Personen.
     /// </remarks>
-    public const int Hoechstlaenge = 50;
+    public const int MaxLength = 50;
 
     /// <summary>Was eine Seite trägt, wenn niemand etwas anderes sagt.</summary>
     public const int Vorgabe = 20;
@@ -85,7 +85,7 @@ public sealed class KandidatenHandler(
         ArgumentNullException.ThrowIfNull(request);
 
         var length = Math.Clamp(
-            request.Seitenlaenge <= 0 ? Vorgabe : request.Seitenlaenge, 1, Hoechstlaenge);
+            request.Seitenlaenge <= 0 ? Vorgabe : request.Seitenlaenge, 1, MaxLength);
 
         // 1. Gesucht wird ueber GENANNTES. Der Filter traegt gar nichts anderes
         //    — das steht als Typ in `SearchFilter`.

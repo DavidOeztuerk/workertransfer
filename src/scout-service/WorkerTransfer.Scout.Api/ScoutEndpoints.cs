@@ -315,7 +315,7 @@ public static class ScoutEndpoints
     private static int Laenge(string? roh) =>
         int.TryParse(roh, out var value)
         && value > 0
-        && value <= KandidatenHandler.Hoechstlaenge
+        && value <= KandidatenHandler.MaxLength
             ? value
             : KandidatenHandler.Vorgabe;
 
