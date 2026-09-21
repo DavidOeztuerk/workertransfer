@@ -14,55 +14,55 @@ namespace WorkerTransfer.Identity.Tests;
 /// Registering: who gets an account, who gets told, and what an address that
 /// already exists costs.
 /// </summary>
-public class RegistrierenTests
+public class RegisterTests
 {
     private readonly IUserRepository _benutzer = Substitute.For<IUserRepository>();
     private readonly IPasswordHasher _passwoerter = Substitute.For<IPasswordHasher>();
     private readonly IVerificationTokenRepository _tokens =
         Substitute.For<IVerificationTokenRepository>();
-    private readonly IEinmaltoken _einmaltoken = Substitute.For<IEinmaltoken>();
-    private readonly IPostkorb _postkorb = Substitute.For<IPostkorb>();
+    private readonly IOneTimeToken _einmaltoken = Substitute.For<IOneTimeToken>();
+    private readonly IMailTray _postkorb = Substitute.For<IMailTray>();
     private readonly IAuditTrail _protokoll = Substitute.For<IAuditTrail>();
 
-    private const string Passwort = "geheim-und-lang-genug";
+    private const string Password = "geheim-und-lang-genug";
 
-    public RegistrierenTests()
+    public RegisterTests()
     {
         _passwoerter.Hash(Arg.Any<string>()).Returns("$2b$12$neu");
-        _einmaltoken.Erzeuge().Returns(("klartext", "hash"));
+        _einmaltoken.Create().Returns(("klartext", "hash"));
     }
 
-    private Task<Registrierergebnis> Registriere(
+    private Task<RegistrationResult> Register(
         string email = "anna@example.com",
-        string passwort = Passwort,
+        string password = Password,
         string? company = null) =>
-        new RegistrierenHandler(
+        new RegisterHandler(
             _benutzer, _passwoerter, _tokens, _einmaltoken, _postkorb, _protokoll,
-            new FesteKorrelation("abc-123"), TimeProvider.System)
+            new FixedCorrelation("abc-123"), TimeProvider.System)
             .Handle(
-                new RegistrierenBefehl(email, passwort, "Anna", company), CancellationToken.None);
+                new RegisterCommand(email, password, "Anna", company), CancellationToken.None);
 
-    private void EsGibtBereits(string email)
+    private void ThereAlreadyIs(string email)
     {
-        var vorhanden = Konten.Bestehend(SubjectId.New(), email);
-        _benutzer.FindByEmailAsync(email, Arg.Any<CancellationToken>()).Returns(vorhanden);
+        var existing = Accounts.Existing(SubjectId.New(), email);
+        _benutzer.FindByEmailAsync(email, Arg.Any<CancellationToken>()).Returns(existing);
     }
 
     [Fact]
-    public async Task Eine_neue_Adresse_bekommt_ein_Konto_und_einen_Bestaetigungslink()
+    public async Task A_new_address_gets_an_account_and_a_confirmation_link()
     {
-        var result = await Registriere();
+        var result = await Register();
 
-        result.Should().BeOfType<Registrierergebnis.Angenommen>();
+        result.Should().BeOfType<RegistrationResult.Accepted>();
         await _benutzer.Received(1).AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
         await _tokens.Received(1).AddAsync(
             Arg.Is<VerificationToken>(t => t.TokenHash == "hash"
                                            && t.Purpose == TokenPurpose.EmailVerify
                                            && t.ConsumedAt == null),
             Arg.Any<CancellationToken>());
-        _postkorb.Received(1).Bestaetigungslink(
+        _postkorb.Received(1).ConfirmationLink(
             "anna@example.com", Arg.Any<SubjectId>(), "klartext",
-            Arg.Any<Kontosprache>());
+            Arg.Any<AccountLanguage>());
     }
 
     /// <summary>
@@ -71,15 +71,15 @@ public class RegistrierenTests
     /// without asking the consent ledger.
     /// </summary>
     [Fact]
-    public async Task Eine_vergebene_Adresse_bekommt_dieselbe_Antwort_wie_eine_freie()
+    public async Task A_taken_address_gets_the_same_answer_as_a_free_one()
     {
-        EsGibtBereits("besetzt@example.com");
+        ThereAlreadyIs("besetzt@example.com");
 
-        var frei = await Registriere("frei@example.com");
-        var besetzt = await Registriere("besetzt@example.com");
+        var free = await Register("frei@example.com");
+        var taken = await Register("besetzt@example.com");
 
-        frei.Should().BeOfType<Registrierergebnis.Angenommen>();
-        besetzt.Should().BeOfType<Registrierergebnis.Angenommen>();
+        free.Should().BeOfType<RegistrationResult.Accepted>();
+        taken.Should().BeOfType<RegistrationResult.Accepted>();
     }
 
     /// <summary>
@@ -87,20 +87,20 @@ public class RegistrierenTests
     /// which is the only thing that happens.
     /// </summary>
     [Fact]
-    public async Task Eine_vergebene_Adresse_warnt_den_echten_Besitzer()
+    public async Task A_taken_address_warns_the_real_owner()
     {
-        EsGibtBereits("besetzt@example.com");
+        ThereAlreadyIs("besetzt@example.com");
 
-        await Registriere("besetzt@example.com");
+        await Register("besetzt@example.com");
 
         await _benutzer.DidNotReceive().AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
         await _tokens.DidNotReceive().AddAsync(
             Arg.Any<VerificationToken>(), Arg.Any<CancellationToken>());
-        _postkorb.Received(1).Doppelanmeldung(
-            "besetzt@example.com", Arg.Any<SubjectId>(), Arg.Any<Kontosprache>());
-        _postkorb.DidNotReceive().Bestaetigungslink(
+        _postkorb.Received(1).DuplicateRegistration(
+            "besetzt@example.com", Arg.Any<SubjectId>(), Arg.Any<AccountLanguage>());
+        _postkorb.DidNotReceive().ConfirmationLink(
             Arg.Any<string>(), Arg.Any<SubjectId>(), Arg.Any<string>(),
-            Arg.Any<Kontosprache>());
+            Arg.Any<AccountLanguage>());
     }
 
     /// <summary>
@@ -109,13 +109,13 @@ public class RegistrierenTests
     /// identical answer is hiding.
     /// </summary>
     [Fact]
-    public async Task Eine_vergebene_Adresse_kostet_dieselbe_Rechenarbeit()
+    public async Task A_taken_address_costs_the_same_work()
     {
-        EsGibtBereits("besetzt@example.com");
+        ThereAlreadyIs("besetzt@example.com");
 
-        await Registriere("besetzt@example.com");
+        await Register("besetzt@example.com");
 
-        _passwoerter.Received(1).Hash(Passwort);
+        _passwoerter.Received(1).Hash(Password);
     }
 
     /// <summary>
@@ -125,15 +125,15 @@ public class RegistrierenTests
     /// endpoint exists to close.
     /// </summary>
     [Fact]
-    public async Task Freemail_wird_vor_der_Existenzpruefung_abgewiesen()
+    public async Task Freemail_is_refused_before_the_existence_check()
     {
-        EsGibtBereits("chef@gmail.com");
+        ThereAlreadyIs("chef@gmail.com");
 
-        var bekannt = await Registriere("chef@gmail.com", company: "Beispiel GmbH");
-        var unbekannt = await Registriere("neu@gmail.com", company: "Beispiel GmbH");
+        var known = await Register("chef@gmail.com", company: "Beispiel GmbH");
+        var unknown = await Register("neu@gmail.com", company: "Beispiel GmbH");
 
-        bekannt.Should().BeOfType<Registrierergebnis.OeffentlicheDomain>();
-        unbekannt.Should().BeOfType<Registrierergebnis.OeffentlicheDomain>();
+        known.Should().BeOfType<RegistrationResult.PublicDomain>();
+        unknown.Should().BeOfType<RegistrationResult.PublicDomain>();
         _passwoerter.DidNotReceive().Hash(Arg.Any<string>());
     }
 
@@ -142,11 +142,11 @@ public class RegistrierenTests
     /// blocklist applies at exactly one place: claiming a domain as a company.
     /// </summary>
     [Fact]
-    public async Task Ohne_Firmenwunsch_ist_eine_Freemail_Adresse_voellig_in_Ordnung()
+    public async Task Without_a_company_wish_a_freemail_address_is_perfectly_fine()
     {
-        var result = await Registriere("anna@gmail.com");
+        var result = await Register("anna@gmail.com");
 
-        result.Should().BeOfType<Registrierergebnis.Angenommen>();
+        result.Should().BeOfType<RegistrationResult.Accepted>();
         await _benutzer.Received(1).AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
     }
 
@@ -156,20 +156,20 @@ public class RegistrierenTests
     /// proven.
     /// </summary>
     [Fact]
-    public async Task Ob_die_Domain_vergeben_ist_wird_hier_nicht_gefragt()
+    public async Task Whether_the_domain_is_taken_is_not_asked_here()
     {
-        var result = await Registriere("chef@firma.example", company: "Beispiel GmbH");
+        var result = await Register("chef@firma.example", company: "Beispiel GmbH");
 
-        result.Should().BeOfType<Registrierergebnis.Angenommen>();
+        result.Should().BeOfType<RegistrationResult.Accepted>();
         await _benutzer.Received(1).AddAsync(
             Arg.Is<User>(u => u.PendingCompanyName == "Beispiel GmbH"),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Ein_neues_Konto_ist_unbestaetigt_und_traegt_keine_Firma()
+    public async Task A_new_account_is_unconfirmed_and_carries_no_company()
     {
-        await Registriere();
+        await Register();
 
         await _benutzer.Received(1).AddAsync(
             Arg.Is<User>(u => u.Status == AccountStatus.Pending
@@ -181,11 +181,11 @@ public class RegistrierenTests
     [InlineData("")]
     [InlineData("kurz")]
     [InlineData("elfzeichen")]
-    public async Task Ein_zu_kurzes_Passwort_wird_abgewiesen(string passwort)
+    public async Task A_password_that_is_too_short_is_refused(string password)
     {
-        var result = await Registriere(passwort: passwort);
+        var result = await Register(password: password);
 
-        result.Should().BeOfType<Registrierergebnis.WeakPassword>();
+        result.Should().BeOfType<RegistrationResult.WeakPassword>();
         await _benutzer.DidNotReceive().AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
     }
 
@@ -194,17 +194,17 @@ public class RegistrierenTests
     /// would let the tail protect nothing while the person believes it does.
     /// </summary>
     [Fact]
-    public async Task Ein_Passwort_ueber_72_Byte_wird_abgewiesen()
+    public async Task A_password_over_72_bytes_is_refused()
     {
-        var result = await Registriere(passwort: new string('ä', 40));
+        var result = await Register(password: new string('ä', 40));
 
-        result.Should().BeOfType<Registrierergebnis.WeakPassword>();
+        result.Should().BeOfType<RegistrationResult.WeakPassword>();
     }
 
     [Fact]
-    public async Task Die_Registrierung_steht_im_Protokoll_und_traegt_keine_Firma()
+    public async Task The_registration_stands_in_the_trail_and_carries_no_company()
     {
-        await Registriere("chef@firma.example", company: "Beispiel GmbH");
+        await Register("chef@firma.example", company: "Beispiel GmbH");
 
         await _protokoll.Received(1).AppendAsync(
             Arg.Is<AuditEvent>(e => e.Action == AuditAction.Register

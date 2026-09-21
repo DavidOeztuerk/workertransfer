@@ -13,13 +13,13 @@ namespace WorkerTransfer.Identity.Application.Erasure;
 /// from somebody who wants to leave is a lever against them — and the free text
 /// would be the one thing that afterwards had to be deleted again (ADR-0027).
 /// </remarks>
-public sealed record RequestErasureCommand(SubjectId Wer) : IBefehl<ErasureResult>;
+public sealed record RequestErasureCommand(SubjectId Subject) : ICommand<ErasureResult>;
 
 /// <summary>What asking produced.</summary>
 public enum ErasureResult
 {
     /// <summary>Accepted. The cascade is running.</summary>
-    Angenommen,
+    Accepted,
 
     /// <summary>
     /// It was already running. Not an error.
@@ -28,14 +28,14 @@ public enum ErasureResult
     /// Pressing twice must not start a second cascade: eight more rows would be
     /// eight more deliveries for a thing that happens once.
     /// </remarks>
-    LaeuftBereits
+    AlreadyRunning
 }
 
 /// <summary>Takes the request, and makes it visible at once.</summary>
 public sealed class RequestErasureHandler(
-    IErasureLedger bestand,
+    IErasureLedger erasureLedger,
     IOutbox outbox,
-    TimeProvider uhr)
+    TimeProvider clock)
     : IRequestHandler<RequestErasureCommand, ErasureResult>
 {
     /// <summary>
@@ -45,7 +45,7 @@ public sealed class RequestErasureHandler(
     /// The order is <em>enforced by the dispatcher</em>, not by this list — all
     /// twelve come into being in the same instant and in the same transaction.
     /// </remarks>
-    public static IReadOnlyList<string> Absichten { get; } =
+    public static IReadOnlyList<string> Intents { get; } =
     [
         .. ErasureRecipient.Fremde.Select(ErasureRecipient.Art),
         ErasureRecipient.Schlussnachricht,
@@ -59,24 +59,24 @@ public sealed class RequestErasureHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (await bestand.IsAlreadyRunningAsync(request.Wer, cancellationToken))
+        if (await erasureLedger.IsAlreadyRunningAsync(request.Subject, cancellationToken))
         {
-            return ErasureResult.LaeuftBereits;
+            return ErasureResult.AlreadyRunning;
         }
 
         // Immediately and visibly: every session revoked, the account disabled.
         // From this moment nothing happens under this name any more, even while
         // the cascade is still running (ADR-0027 §6).
-        await bestand.LockAsync(request.Wer, uhr.GetUtcNow(), cancellationToken);
+        await erasureLedger.LockAsync(request.Subject, clock.GetUtcNow(), cancellationToken);
 
         // In the SAME transaction as that change (ADR-0025): if it goes
         // through, the intents stand; if it is rolled back, they are gone too.
         // There is no state "locked out, but nobody was told".
-        foreach (var kind in Absichten)
+        foreach (var kind in Intents)
         {
-            await outbox.NoteAsync(request.Wer, kind, cancellationToken);
+            await outbox.NoteAsync(request.Subject, kind, cancellationToken);
         }
 
-        return ErasureResult.Angenommen;
+        return ErasureResult.Accepted;
     }
 }

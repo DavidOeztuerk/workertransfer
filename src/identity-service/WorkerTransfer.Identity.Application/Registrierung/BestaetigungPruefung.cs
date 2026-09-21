@@ -3,44 +3,44 @@ using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Application.Registrierung;
 
-/// <summary>Ein Bestätigungstoken muss dasein, bevor jemand ihn nachschlägt.</summary>
+/// <summary>A confirmation token has to be there before anybody looks it up.</summary>
 /// <remarks>
-/// <para>Vorher stand die Prüfung im Endpunkt, weil die Pipeline-Stufe für tot
-/// gehalten wurde. Sie ist es nicht — sie war leer. Am Befehl gilt sie auch für
-/// einen zweiten Aufrufer.</para>
+/// <para>Before, the check stood in the endpoint, because the pipeline stage
+/// was held to be dead. It is not — it was empty. At the command it also holds
+/// for a second caller.</para>
 ///
-/// <para><strong>Leer ist nicht ungültig.</strong> Ein fehlender Token ist eine
-/// kaputte ResumeRequest (422); ein Token, den es nicht gibt, ist eine Antwort und
-/// gehört in den Handler. Die beiden zu vermischen hieße, aus „du hast nichts
-/// geschickt" und „dieser Link ist verbraucht" dieselbe Auskunft zu machen.</para>
+/// <para><strong>Empty is not invalid.</strong> A missing token is a malformed
+/// request (422); a token that does not exist is an answer and belongs in the
+/// handler. Mixing the two would make „you sent nothing" and „this link is
+/// spent" the same piece of information.</para>
 /// </remarks>
-public sealed class ConfirmationValidator : AbstractValidator<AdresseBestaetigenBefehl>
+public sealed class ConfirmationValidator : AbstractValidator<ConfirmAddressCommand>
 {
-    /// <summary>Setzt die eine Regel.</summary>
+    /// <summary>Sets the one rule.</summary>
     public ConfirmationValidator() =>
-        RuleFor(befehl => befehl.Token)
+        RuleFor(command => command.Token)
             .NotEmpty().WithMessage("token is required")
             .OverridePropertyName("token");
 }
 
-/// <summary>Eine Adresse muss zustellbar sein, damit die Mail irgendwohin geht.</summary>
+/// <summary>An address has to be deliverable for the mail to go anywhere.</summary>
 /// <remarks>
-/// Geprüft wird die FORM. Ob die Adresse bekannt ist, beantwortet dieser
-/// Endpunkt bewusst nicht — er antwortet für bekannte und unbekannte gleich,
-/// sonst verriete er die Membership auf dieser Plattform, ohne den Ledger zu
-/// fragen. Eine Formprüfung sieht nur die Zeichenkette und kann diese Zusage
-/// deshalb gar nicht brechen.
+/// What is checked is the FORM. Whether the address is known is something this
+/// endpoint deliberately does not answer — it answers identically for known and
+/// unknown, or it would give away membership of this platform without asking
+/// the ledger. A form check sees nothing but the string and therefore cannot
+/// break that promise at all.
 /// <para>
-/// Dieselbe Formprüfung wie bei der Registrierung: auch dieser Weg baut eine
-/// <c>MailMessage</c>.
+/// The same form check as at registration: this path builds a
+/// <c>MailMessage</c> too.
 /// </para>
 /// </remarks>
-public sealed class ResendValidator : AbstractValidator<BestaetigungErneutSendenBefehl>
+public sealed class ResendValidator : AbstractValidator<ResendConfirmationCommand>
 {
-    /// <summary>Setzt die Regel.</summary>
+    /// <summary>Sets the rule.</summary>
     public ResendValidator() =>
-        RuleFor(befehl => befehl.Email)
+        RuleFor(command => command.Email)
             .NotEmpty().WithMessage("email is required")
-            .Must(Emailadresse.IstZustellbar).WithMessage("email is not a deliverable address")
+            .Must(EmailAddress.IsDeliverable).WithMessage("email is not a deliverable address")
             .OverridePropertyName("email");
 }

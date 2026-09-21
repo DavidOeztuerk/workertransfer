@@ -15,11 +15,11 @@ namespace WorkerTransfer.Identity.Tests;
 /// back through the repository this service uses.
 /// </remarks>
 [Collection(PostgresCollection.Name)]
-public class BenutzerAbbildungTests(Postgres postgres)
+public class UserMappingTests(Postgres postgres)
 {
-    private IdentityDbContext Kontext() => IdentityDbContextFactory.Fuer(postgres.ConnectionString);
+    private IdentityDbContext Context() => IdentityDbContextFactory.For(postgres.ConnectionString);
 
-    private async Task<Guid> SchreibeBenutzer(
+    private async Task<Guid> WriteUser(
         string email,
         string status = "active",
         string hash = "$2b$12$K7ZQe8YHRy9zJQx1uKcOxeVJ0N4tGZ0dQpXWq6yLNfHb3sRmCvA1a")
@@ -28,38 +28,38 @@ public class BenutzerAbbildungTests(Postgres postgres)
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
 
-        await using var befehl = connection.CreateCommand();
-        befehl.CommandText = """
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
             INSERT INTO users (id, email, password_hash, display_name, status, roles,
                                created_at, updated_at, version)
             VALUES (@id, @email, @hash, @name, @status::account_status, @roles::jsonb,
                     now(), now(), 1)
             """;
-        befehl.Parameters.AddWithValue("id", id);
-        befehl.Parameters.AddWithValue("email", email);
-        befehl.Parameters.AddWithValue("hash", hash);
-        befehl.Parameters.AddWithValue("name", "Anna");
-        befehl.Parameters.AddWithValue("status", status);
-        befehl.Parameters.AddWithValue("roles", """["user"]""");
-        await befehl.ExecuteNonQueryAsync();
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("email", email);
+        command.Parameters.AddWithValue("hash", hash);
+        command.Parameters.AddWithValue("name", "Anna");
+        command.Parameters.AddWithValue("status", status);
+        command.Parameters.AddWithValue("roles", """["user"]""");
+        await command.ExecuteNonQueryAsync();
 
         return id;
     }
 
     [Fact]
-    public async Task Eine_Zeile_die_Python_geschrieben_hat_wird_zum_Aggregat()
+    public async Task A_row_Python_wrote_becomes_the_aggregate()
     {
-        var id = await SchreibeBenutzer("anna@example.com");
+        var id = await WriteUser("anna@example.com");
 
-        var benutzer = await new EfUserRepository(Kontext(), TimeProvider.System).FindByEmailAsync("anna@example.com");
+        var users = await new EfUserRepository(Context(), TimeProvider.System).FindByEmailAsync("anna@example.com");
 
-        benutzer.Should().NotBeNull();
-        benutzer!.Id.Should().Be(new SubjectId(id));
-        benutzer.Email.Should().Be("anna@example.com");
-        benutzer.DisplayName.Should().Be("Anna");
-        benutzer.Status.Should().Be(AccountStatus.Active);
-        benutzer.Roles.Should().Equal("user");
-        benutzer.PasswordHash.Should().StartWith("$2b$12$");
+        users.Should().NotBeNull();
+        users!.Id.Should().Be(new SubjectId(id));
+        users.Email.Should().Be("anna@example.com");
+        users.DisplayName.Should().Be("Anna");
+        users.Status.Should().Be(AccountStatus.Active);
+        users.Roles.Should().Equal("user");
+        users.PasswordHash.Should().StartWith("$2b$12$");
     }
 
     /// <summary>
@@ -68,22 +68,22 @@ public class BenutzerAbbildungTests(Postgres postgres)
     /// into two.
     /// </summary>
     [Fact]
-    public async Task Die_Adresse_wird_ohne_Ruecksicht_auf_Gross_und_Kleinschreibung_gefunden()
+    public async Task The_address_is_found_regardless_of_casing()
     {
-        await SchreibeBenutzer("Berta@Example.COM");
+        await WriteUser("Berta@Example.COM");
 
-        var benutzer = await new EfUserRepository(Kontext(), TimeProvider.System).FindByEmailAsync("berta@example.com");
+        var users = await new EfUserRepository(Context(), TimeProvider.System).FindByEmailAsync("berta@example.com");
 
-        benutzer.Should().NotBeNull();
+        users.Should().NotBeNull();
     }
 
     [Fact]
-    public async Task Jeder_Kontozustand_wird_gelesen_wie_er_dasteht()
+    public async Task Every_account_status_is_read_as_it_stands()
     {
-        await SchreibeBenutzer("clara@example.com", status: "pending");
-        await SchreibeBenutzer("dora@example.com", status: "suspended");
+        await WriteUser("clara@example.com", status: "pending");
+        await WriteUser("dora@example.com", status: "suspended");
 
-        var repository = new EfUserRepository(Kontext(), TimeProvider.System);
+        var repository = new EfUserRepository(Context(), TimeProvider.System);
 
         (await repository.FindByEmailAsync("clara@example.com"))!.Status
             .Should().Be(AccountStatus.Pending);
@@ -92,12 +92,12 @@ public class BenutzerAbbildungTests(Postgres postgres)
     }
 
     [Fact]
-    public async Task Eine_unbekannte_Adresse_ergibt_null()
+    public async Task An_unknown_address_gives_null()
     {
-        var benutzer = await new EfUserRepository(Kontext(), TimeProvider.System)
+        var users = await new EfUserRepository(Context(), TimeProvider.System)
             .FindByEmailAsync("niemand@example.com");
 
-        benutzer.Should().BeNull();
+        users.Should().BeNull();
     }
 
     /// <summary>
@@ -105,10 +105,10 @@ public class BenutzerAbbildungTests(Postgres postgres)
     /// Nothing done to it can reach the database.
     /// </summary>
     [Fact]
-    public async Task Das_Aggregat_haengt_nicht_am_Aenderungsverfolger()
+    public async Task The_aggregate_does_not_hang_on_the_change_tracker()
     {
-        await SchreibeBenutzer("emil@example.com");
-        var context = Kontext();
+        await WriteUser("emil@example.com");
+        var context = Context();
 
         await new EfUserRepository(context, TimeProvider.System).FindByEmailAsync("emil@example.com");
 

@@ -5,11 +5,11 @@ namespace WorkerTransfer.Identity.Application.Ports;
 /// The plaintext goes into the mail, the hash into the database. Nothing here
 /// can turn a stored hash back into a link, which is the whole point.
 /// </remarks>
-public interface IEinmaltoken
+public interface IOneTimeToken
 {
     /// <summary>A fresh token and its hash.</summary>
-    (string Klartext, string Hash) Erzeuge();
+    (string PlainText, string Hash) Create();
 
     /// <summary>The hash of a token somebody presented.</summary>
-    string Hashe(string klartext);
+    string HashOf(string plainText);
 }

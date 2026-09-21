@@ -13,7 +13,7 @@ namespace WorkerTransfer.Identity.Tests;
 /// Signing in: who gets a token, who gets which refusal, and what is spent on
 /// an address that does not exist.
 /// </summary>
-public class AnmeldenTests
+public class SignInTests
 {
     private readonly IUserRepository _benutzer = Substitute.For<IUserRepository>();
     private readonly IPasswordHasher _passwoerter = Substitute.For<IPasswordHasher>();
@@ -22,25 +22,25 @@ public class AnmeldenTests
     private readonly IAuditTrail _protokoll = Substitute.For<IAuditTrail>();
 
     private static readonly SubjectId Anna = SubjectId.New();
-    private const string Eintrag = "$2b$12$abcdefghijklmnopqrstuv";
+    private const string Entry = "$2b$12$abcdefghijklmnopqrstuv";
 
-    private AnmeldenHandler Handler() => new(
+    private SignInHandler Handler() => new(
         _benutzer, _passwoerter, _sitzungen, _token, _protokoll,
-        new FesteKorrelation("abc-123"), TimeProvider.System);
+        new FixedCorrelation("abc-123"), TimeProvider.System);
 
-    private static Task<Anmeldeergebnis> Anmelden(
-        AnmeldenHandler handler, string email, string passwort) =>
-        handler.Handle(new AnmeldenBefehl(email, passwort), CancellationToken.None);
+    private static Task<SignInResult> SignIn(
+        SignInHandler handler, string email, string password) =>
+        handler.Handle(new SignInCommand(email, password), CancellationToken.None);
 
-    private void EsGibt(AccountStatus status = AccountStatus.Active) =>
+    private void ThereIs(AccountStatus status = AccountStatus.Active) =>
         _benutzer.FindByEmailAsync("anna@example.com", Arg.Any<CancellationToken>())
-            .Returns(Konten.Bestehend(Anna, "anna@example.com", Eintrag, status));
+            .Returns(Accounts.Existing(Anna, "anna@example.com", Entry, status));
 
-    private void DasPasswortStimmt(
+    private void ThePasswordIsRight(
         PasswordVerification result = PasswordVerification.Success) =>
-        _passwoerter.Verify("geheim", Eintrag).Returns(result);
+        _passwoerter.Verify("geheim", Entry).Returns(result);
 
-    private void EineSitzungEntsteht()
+    private void ASessionComesIntoBeing()
     {
         _sitzungen.StartAsync(Anna, Arg.Any<CancellationToken>())
             .Returns(new StartedSession(SessionId.New(), "erneuerungstoken", DateTimeOffset.UtcNow));
@@ -51,16 +51,16 @@ public class AnmeldenTests
     }
 
     [Fact]
-    public async Task Wer_das_Passwort_kennt_bekommt_ein_Tokenpaar()
+    public async Task Whoever_knows_the_password_gets_a_token_pair()
     {
-        EsGibt();
-        DasPasswortStimmt();
-        EineSitzungEntsteht();
+        ThereIs();
+        ThePasswordIsRight();
+        ASessionComesIntoBeing();
 
-        var result = await Anmelden(Handler(), "anna@example.com", "geheim");
+        var result = await SignIn(Handler(), "anna@example.com", "geheim");
 
-        result.Should().BeOfType<Anmeldeergebnis.Angemeldet>()
-            .Which.Zugriffstoken.Should().Be("zugriffstoken");
+        result.Should().BeOfType<SignInResult.SignedIn>()
+            .Which.AccessToken.Should().Be("zugriffstoken");
     }
 
     /// <summary>
@@ -68,13 +68,13 @@ public class AnmeldenTests
     /// second, explicit step that verifies membership first (ADR-0017).
     /// </summary>
     [Fact]
-    public async Task Eine_Anmeldung_macht_niemanden_zum_Unternehmen()
+    public async Task A_sign_in_makes_nobody_a_company()
     {
-        EsGibt();
-        DasPasswortStimmt();
-        EineSitzungEntsteht();
+        ThereIs();
+        ThePasswordIsRight();
+        ASessionComesIntoBeing();
 
-        await Anmelden(Handler(), "anna@example.com", "geheim");
+        await SignIn(Handler(), "anna@example.com", "geheim");
 
         await _token.Received().IssueAsync(
             Anna, "anna@example.com", Arg.Is<Capacity>(c => c is Capacity.AsSelf),
@@ -82,16 +82,16 @@ public class AnmeldenTests
     }
 
     [Fact]
-    public async Task Ein_falsches_Passwort_ergibt_dieselbe_Absage_wie_eine_unbekannte_Adresse()
+    public async Task A_wrong_password_gives_the_same_refusal_as_an_unknown_address()
     {
-        EsGibt();
-        DasPasswortStimmt(PasswordVerification.Failed);
+        ThereIs();
+        ThePasswordIsRight(PasswordVerification.Failed);
 
-        var falsch = await Anmelden(Handler(), "anna@example.com", "geheim");
-        var unbekannt = await Anmelden(Handler(), "niemand@example.com", "geheim");
+        var wrong = await SignIn(Handler(), "anna@example.com", "geheim");
+        var unknown = await SignIn(Handler(), "niemand@example.com", "geheim");
 
-        falsch.Should().BeOfType<Anmeldeergebnis.Abgelehnt>();
-        unbekannt.Should().BeOfType<Anmeldeergebnis.Abgelehnt>();
+        wrong.Should().BeOfType<SignInResult.Refused>();
+        unknown.Should().BeOfType<SignInResult.Refused>();
     }
 
     /// <summary>
@@ -100,31 +100,31 @@ public class AnmeldenTests
     /// milliseconds, and no entry at all costs none.
     /// </summary>
     [Fact]
-    public async Task Eine_unbekannte_Adresse_kostet_dieselbe_Rechenarbeit()
+    public async Task An_unknown_address_costs_the_same_work()
     {
-        await Anmelden(Handler(), "niemand@example.com", "geheim");
+        await SignIn(Handler(), "niemand@example.com", "geheim");
 
         _passwoerter.Received(1).Verify("geheim", null);
     }
 
     [Fact]
-    public async Task Eine_unbekannte_Adresse_beginnt_keine_Sitzung()
+    public async Task An_unknown_address_begins_no_session()
     {
-        await Anmelden(Handler(), "niemand@example.com", "geheim");
+        await SignIn(Handler(), "niemand@example.com", "geheim");
 
         await _sitzungen.DidNotReceive().StartAsync(
             Arg.Any<SubjectId>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Ein_unbestaetigtes_Konto_bekommt_eine_eigene_Absage()
+    public async Task An_unconfirmed_account_gets_a_refusal_of_its_own()
     {
-        EsGibt(AccountStatus.Pending);
-        DasPasswortStimmt();
+        ThereIs(AccountStatus.Pending);
+        ThePasswordIsRight();
 
-        var result = await Anmelden(Handler(), "anna@example.com", "geheim");
+        var result = await SignIn(Handler(), "anna@example.com", "geheim");
 
-        result.Should().BeOfType<Anmeldeergebnis.NichtBestaetigt>();
+        result.Should().BeOfType<SignInResult.NotConfirmed>();
     }
 
     /// <summary>
@@ -132,44 +132,44 @@ public class AnmeldenTests
     /// tells whoever guessed the password that the account exists.
     /// </summary>
     [Fact]
-    public async Task Ein_gesperrtes_Konto_bekommt_die_gewoehnliche_Absage()
+    public async Task A_disabled_account_gets_the_ordinary_refusal()
     {
-        EsGibt(AccountStatus.Disabled);
-        DasPasswortStimmt();
+        ThereIs(AccountStatus.Disabled);
+        ThePasswordIsRight();
 
-        var result = await Anmelden(Handler(), "anna@example.com", "geheim");
+        var result = await SignIn(Handler(), "anna@example.com", "geheim");
 
-        result.Should().BeOfType<Anmeldeergebnis.Abgelehnt>();
+        result.Should().BeOfType<SignInResult.Refused>();
     }
 
     [Fact]
-    public async Task Ein_gesperrtes_Konto_beginnt_keine_Sitzung()
+    public async Task A_disabled_account_begins_no_session()
     {
-        EsGibt(AccountStatus.Disabled);
-        DasPasswortStimmt();
+        ThereIs(AccountStatus.Disabled);
+        ThePasswordIsRight();
 
-        await Anmelden(Handler(), "anna@example.com", "geheim");
+        await SignIn(Handler(), "anna@example.com", "geheim");
 
         await _sitzungen.DidNotReceive().StartAsync(
             Arg.Any<SubjectId>(), Arg.Any<CancellationToken>());
     }
 
     /// <summary>
-    /// Der Eintrag stammt noch vom bcrypt-Hasher des Python-Dienstes. Er
-    /// verifiziert, die Anmeldung geht durch, und niemand wird gebeten, etwas
-    /// zurueckzusetzen — genau das ist der Sinn, mit dem bcrypt hier weiter
-    /// SCHREIBT (`AddBCryptPasswords`, nicht nur der Leser).
+    /// The entry still comes from the Python service's bcrypt hasher. It
+    /// verifies, the sign-in goes through, and nobody is asked to reset
+    /// anything — that is exactly the point of bcrypt going on WRITING here
+    /// (`AddBCryptPasswords`, not only the reader).
     /// </summary>
     [Fact]
-    public async Task Ein_Eintrag_der_neu_geschrieben_werden_duerfte_laesst_trotzdem_herein()
+    public async Task An_entry_that_could_be_rehashed_still_lets_one_in()
     {
-        EsGibt();
-        DasPasswortStimmt(PasswordVerification.SuccessRehashNeeded);
-        EineSitzungEntsteht();
+        ThereIs();
+        ThePasswordIsRight(PasswordVerification.SuccessRehashNeeded);
+        ASessionComesIntoBeing();
 
-        var result = await Anmelden(Handler(), "anna@example.com", "geheim");
+        var result = await SignIn(Handler(), "anna@example.com", "geheim");
 
-        result.Should().BeOfType<Anmeldeergebnis.Angemeldet>();
+        result.Should().BeOfType<SignInResult.SignedIn>();
     }
 
     /// <summary>
@@ -180,13 +180,13 @@ public class AnmeldenTests
     [InlineData(AccountStatus.Active, PasswordVerification.Failed, "bad_password")]
     [InlineData(AccountStatus.Pending, PasswordVerification.Success, "email_not_confirmed")]
     [InlineData(AccountStatus.Disabled, PasswordVerification.Success, "disabled")]
-    public async Task Jede_Absage_nennt_ihren_Grund_im_Protokoll(
-        AccountStatus status, PasswordVerification urteil, string reason)
+    public async Task Every_refusal_names_its_reason_in_the_trail(
+        AccountStatus status, PasswordVerification verdict, string reason)
     {
-        EsGibt(status);
-        DasPasswortStimmt(urteil);
+        ThereIs(status);
+        ThePasswordIsRight(verdict);
 
-        await Anmelden(Handler(), "anna@example.com", "geheim");
+        await SignIn(Handler(), "anna@example.com", "geheim");
 
         await _protokoll.Received(1).AppendAsync(
             Arg.Is<AuditEvent>(e => e.Action == AuditAction.LoginFailure
@@ -200,9 +200,9 @@ public class AnmeldenTests
     /// somebody.
     /// </summary>
     [Fact]
-    public async Task Eine_unbekannte_Adresse_wird_ohne_Handelnden_protokolliert()
+    public async Task An_unknown_address_is_recorded_without_an_actor()
     {
-        await Anmelden(Handler(), "niemand@example.com", "geheim");
+        await SignIn(Handler(), "niemand@example.com", "geheim");
 
         await _protokoll.Received(1).AppendAsync(
             Arg.Is<AuditEvent>(e => e.Action == AuditAction.LoginFailure
@@ -212,13 +212,13 @@ public class AnmeldenTests
     }
 
     [Fact]
-    public async Task Eine_gelungene_Anmeldung_steht_im_Protokoll()
+    public async Task A_successful_sign_in_stands_in_the_trail()
     {
-        EsGibt();
-        DasPasswortStimmt();
-        EineSitzungEntsteht();
+        ThereIs();
+        ThePasswordIsRight();
+        ASessionComesIntoBeing();
 
-        await Anmelden(Handler(), "anna@example.com", "geheim");
+        await SignIn(Handler(), "anna@example.com", "geheim");
 
         await _protokoll.Received(1).AppendAsync(
             Arg.Is<AuditEvent>(e => e.Action == AuditAction.LoginSuccess
@@ -229,7 +229,7 @@ public class AnmeldenTests
 }
 
 /// <summary>A correlation id that does not need a request.</summary>
-internal sealed class FesteKorrelation(string? value) : IKorrelation
+internal sealed class FixedCorrelation(string? value) : ICorrelation
 {
-    public string? Aktuell { get; } = value;
+    public string? Current { get; } = value;
 }

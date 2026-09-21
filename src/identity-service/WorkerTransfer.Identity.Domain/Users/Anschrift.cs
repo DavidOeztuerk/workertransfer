@@ -3,85 +3,85 @@ using Noelia.Core.Identity;
 namespace WorkerTransfer.Identity.Domain.Users;
 
 /// <summary>
-/// Die PostalAddress einer Person — ResumeTemplate für Briefkopf und Arbeitgebermappe.
+/// A person's postal address — the template for a letterhead and an employer folder.
 /// </summary>
 /// <remarks>
-/// <strong>Zweckbindung (ADR-0038).</strong> Straße und Telefon gehören auf den
-/// Brief, nicht in die Search, nicht ins Token, nicht an ein Modell. Wer nie
-/// eine PostalAddress hinterlegt, hat keine Zeile — Privacy by Default, Art. 25.
+/// <strong>Purpose limitation (ADR-0038).</strong> Street and telephone belong
+/// on the letter, not in the search, not in the token, not at a model. Whoever
+/// never stores an address has no row — privacy by default, Art. 25.
 /// <para>
-/// Eine SubjectKeyedTable: der Schlüssel IST die Person. Der Löschwächter findet
-/// die Tabelle über die Anmerkung, nicht über eine <c>subject_id</c>-Spalte
-/// daneben.
+/// A subject-keyed table: the key IS the person. The erasure guard finds the
+/// table through the annotation, not through a <c>subject_id</c> column beside
+/// it.
 /// </para>
 /// </remarks>
 public sealed class PostalAddress
 {
     private PostalAddress(SubjectId subject)
     {
-        Wer = subject;
+        Subject = subject;
     }
 
-    /// <summary>Wessen. Zugleich der Schlüssel.</summary>
-    public SubjectId Wer { get; }
+    /// <summary>Whose. And at the same time the key.</summary>
+    public SubjectId Subject { get; }
 
-    /// <summary>Straße und Hausnummer.</summary>
-    public string Zeile1 { get; private set; } = string.Empty;
+    /// <summary>Street and house number.</summary>
+    public string Line1 { get; private set; } = string.Empty;
 
-    /// <summary>Adresszusatz, oder leer.</summary>
-    public string Zeile2 { get; private set; } = string.Empty;
+    /// <summary>The second address line, or empty.</summary>
+    public string Line2 { get; private set; } = string.Empty;
 
-    /// <summary>Postleitzahl.</summary>
-    public string Postleitzahl { get; private set; } = string.Empty;
+    /// <summary>Postal code.</summary>
+    public string PostalCode { get; private set; } = string.Empty;
 
-    /// <summary>Ort.</summary>
-    public string Ort { get; private set; } = string.Empty;
+    /// <summary>Town.</summary>
+    public string City { get; private set; } = string.Empty;
 
-    /// <summary>ISO-3166-1 alpha-2, Vorgabe DE.</summary>
-    public string Land { get; private set; } = "DE";
+    /// <summary>ISO-3166-1 alpha-2, default DE.</summary>
+    public string Country { get; private set; } = "DE";
 
-    /// <summary>Telefon, optional.</summary>
-    public string Telefon { get; private set; } = string.Empty;
+    /// <summary>Telephone, optional.</summary>
+    public string Phone { get; private set; } = string.Empty;
 
-    /// <summary>Noch nichts hinterlegt.</summary>
-    public static PostalAddress Leer(SubjectId subject) => new(subject);
+    /// <summary>Nothing stored yet.</summary>
+    public static PostalAddress Empty(SubjectId subject) => new(subject);
 
-    /// <summary>Wie die Zeile sie hält.</summary>
-    public static PostalAddress Wiederherstellen(
+    /// <summary>As the row holds it.</summary>
+    public static PostalAddress Restore(
         SubjectId subject,
-        string zeile1,
-        string zeile2,
-        string postleitzahl,
-        string ort,
-        string land,
-        string telefon)
+        string line1,
+        string line2,
+        string postalCode,
+        string city,
+        string country,
+        string phone)
     {
-        var anschrift = new PostalAddress(subject);
-        anschrift.Set(zeile1, zeile2, postleitzahl, ort, land, telefon);
-        return anschrift;
+        var address = new PostalAddress(subject);
+        address.Set(line1, line2, postalCode, city, country, phone);
+        return address;
     }
 
-    /// <summary>Schreibt die ResumeTemplate. Leere Felder bleiben leer — kein Zwang.</summary>
+    /// <summary>Writes the template. Empty fields stay empty — nothing is compulsory.</summary>
     public void Set(
-        string? zeile1,
-        string? zeile2,
-        string? postleitzahl,
-        string? ort,
-        string? land,
-        string? telefon)
+        string? line1,
+        string? line2,
+        string? postalCode,
+        string? city,
+        string? country,
+        string? phone)
     {
-        Zeile1 = Kuerze(zeile1, 120);
-        Zeile2 = Kuerze(zeile2, 120);
-        Postleitzahl = Kuerze(postleitzahl, 16);
-        Ort = Kuerze(ort, 80);
-        var iso = Kuerze(land, 2).ToUpperInvariant();
-        Land = iso.Length == 2 ? iso : "DE";
-        Telefon = Kuerze(telefon, 40);
+        Line1 = Truncate(line1, 120);
+        Line2 = Truncate(line2, 120);
+        PostalCode = Truncate(postalCode, 16);
+        City = Truncate(city, 80);
+        var iso = Truncate(country, 2).ToUpperInvariant();
+        Country = iso.Length == 2 ? iso : "DE";
+        Phone = Truncate(phone, 40);
     }
 
-    private static string Kuerze(string? value, int hoechstens)
+    private static string Truncate(string? value, int max)
     {
-        var getrimmt = (value ?? string.Empty).Trim();
-        return getrimmt.Length <= hoechstens ? getrimmt : getrimmt[..hoechstens];
+        var trimmed = (value ?? string.Empty).Trim();
+        return trimmed.Length <= max ? trimmed : trimmed[..max];
     }
 }

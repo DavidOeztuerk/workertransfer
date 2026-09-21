@@ -35,7 +35,7 @@ public class FaehigkeitenlisteTests
     [Fact]
     public void Eine_zu_lange_Faehigkeit_wird_abgelehnt()
     {
-        var zuLang = new string('x', SkillList.Hoechstlaenge + 1);
+        var zuLang = new string('x', SkillList.MaxLength + 1);
 
         var action = () => SkillList.Aus([zuLang]);
 
@@ -45,7 +45,7 @@ public class FaehigkeitenlisteTests
     [Fact]
     public void Genau_die_Hoechstlaenge_geht_noch()
     {
-        var gerade_noch = new string('x', SkillList.Hoechstlaenge);
+        var gerade_noch = new string('x', SkillList.MaxLength);
 
         SkillList.Aus([gerade_noch]).Werte.Should().Equal(gerade_noch);
     }

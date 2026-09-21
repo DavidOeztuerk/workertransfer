@@ -13,9 +13,9 @@ public sealed class NoeliaSessionService(ITokenSessionService sessions) : ISessi
         SubjectId subject,
         CancellationToken cancellationToken = default)
     {
-        var begonnen = await sessions.SignInAsync(subject, cancellationToken: cancellationToken);
+        var started = await sessions.SignInAsync(subject, cancellationToken: cancellationToken);
 
-        return new StartedSession(begonnen.Session, begonnen.RefreshToken, begonnen.ExpiresAt);
+        return new StartedSession(started.Session, started.RefreshToken, started.ExpiresAt);
     }
 
     /// <inheritdoc />
@@ -31,9 +31,9 @@ public sealed class NoeliaSessionService(ITokenSessionService sessions) : ISessi
     {
         var result = await sessions.RefreshAsync(refreshToken, cancellationToken);
 
-        return result is { Succeeded: true, Session: { } session, Subject: { } subjekt,
-                             RefreshToken: { } nachfolger, ExpiresAt: { } laeuftAb }
-            ? new RenewedSession(session, subjekt, nachfolger, laeuftAb)
+        return result is { Succeeded: true, Session: { } session, Subject: { } subject,
+                             RefreshToken: { } successor, ExpiresAt: { } expiresAt }
+            ? new RenewedSession(session, subject, successor, expiresAt)
             : null;
     }
 
@@ -53,13 +53,13 @@ public sealed class NoeliaSessionService(ITokenSessionService sessions) : ISessi
     {
         var result = await sessions.RefreshAsync(refreshToken, cancellationToken);
 
-        if (result is not { Session: { } session, Subject: { } subjekt })
+        if (result is not { Session: { } session, Subject: { } subject })
         {
             return null;
         }
 
         await sessions.SignOutAsync(session, cancellationToken);
 
-        return new EndedSession(session, subjekt);
+        return new EndedSession(session, subject);
     }
 }

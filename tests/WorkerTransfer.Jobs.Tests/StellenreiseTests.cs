@@ -417,9 +417,9 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public void Eine_Stelle_darf_keine_Faehigkeit_verlangen_die_kein_Profil_haelt()
     {
-        Domain.Jobs.SkillList.Hoechstlaenge
+        Domain.Jobs.SkillList.MaxLength
             .Should().BeLessThanOrEqualTo(
-                Profile.Domain.Faehigkeiten.SkillList.Hoechstlaenge);
+                Profile.Domain.Faehigkeiten.SkillList.MaxLength);
     }
 
     [Fact]

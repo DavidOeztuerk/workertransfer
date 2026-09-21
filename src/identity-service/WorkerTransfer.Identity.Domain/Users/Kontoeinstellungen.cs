@@ -2,202 +2,199 @@ using Noelia.Core.Identity;
 
 namespace WorkerTransfer.Identity.Domain.Users;
 
-/// <summary>Welcher Anbieter für die Entwurfshilfe gefragt wird.</summary>
+/// <summary>Which provider is asked for the drafting help.</summary>
 /// <remarks>
-/// <strong>Zwei Werte für viele Anbieter.</strong> Ollama, OpenAI, vLLM,
-/// LM Studio und Mistral sprechen alle dieselbe Gestalt
-/// (<c>/v1/chat/completions</c>); Anthropic spricht eine eigene. Deshalb steht
-/// hier nicht eine Liste von Firmennamen, sondern die Frage, die den Code
-/// unterscheidet — eine Liste von Firmen wäre bei jedem neuen Anbieter eine
-/// Migration.
+/// <strong>Two values for many providers.</strong> Ollama, OpenAI, vLLM,
+/// LM Studio and Mistral all speak the same shape
+/// (<c>/v1/chat/completions</c>); Anthropic speaks one of its own. So what
+/// stands here is not a list of company names but the question that
+/// distinguishes the code — a list of companies would be a migration at every
+/// new provider.
 /// <para>
-/// <strong><see cref="Keiner"/> ist die Vorgabe und keine Verlegenheit.</strong>
-/// Wer nichts einstellt, fragt niemanden, und die Oberfläche sagt das. Eine
-/// Voreinstellung auf einen Fremdanbieter wäre eine Einwilligung, die niemand
-/// gegeben hat.
+/// <strong><see cref="None"/> is the default and no embarrassment.</strong>
+/// Whoever sets nothing asks nobody, and the interface says so. Defaulting to
+/// an outside provider would be a consent nobody gave.
 /// </para>
 /// </remarks>
 public enum AiProvider
 {
-    /// <summary>None. Es wird nichts nach draussen gegeben.</summary>
+    /// <summary>None. Nothing is given outwards.</summary>
     None,
 
-    /// <summary>Alles, was <c>/v1/chat/completions</c> spricht — Ollama eingeschlossen.</summary>
-    OpenAiKompatibel,
+    /// <summary>Everything that speaks <c>/v1/chat/completions</c> — Ollama included.</summary>
+    OpenAiCompatible,
 
-    /// <summary>Anthropics eigene Gestalt.</summary>
+    /// <summary>Anthropic's own shape.</summary>
     Anthropic
 }
 
 /// <summary>
-/// Was eine Person über sich und über die Verarbeitung ihrer Daten entschieden hat.
+/// What a person decided about themselves and about the processing of their data.
 /// </summary>
 /// <remarks>
-/// <strong>Alles hier ist eine Entscheidung, keine Ableitung.</strong> Kein Wert
-/// wird aus dem Verhalten geschlossen, keiner aus der Zugehörigkeit zu einem
-/// Unternehmen. Was nicht gesetzt wurde, steht auf der zurückhaltendsten
-/// Stellung — nicht auf der bequemsten.
+/// <strong>Everything here is a decision, not a derivation.</strong> No value is
+/// concluded from behaviour, none from belonging to a company. What was not set
+/// stands at the most reticent setting — not at the most convenient one.
 /// <para>
-/// <strong>Der Schlüssel liegt verschlüsselt und kommt nie zurück.</strong> Die
-/// Oberfläche erfährt, OB einer hinterlegt ist und wie seine letzten vier
-/// Zeichen lauten; mehr braucht niemand, um ihn wiederzuerkennen, und mehr
-/// darf über die Leitung nicht zurückgehen. Ein Geheimnis, das man abrufen
-/// kann, ist eines, das man abziehen kann.
+/// <strong>The key lies encrypted and never comes back.</strong> The interface
+/// learns WHETHER one is stored and what its last four characters are; nobody
+/// needs more to recognise it again, and more must not travel back over the
+/// wire. A secret you can retrieve is one you can siphon off.
 /// </para>
 /// </remarks>
 public sealed class AccountSettings
 {
     private AccountSettings(SubjectId subject)
     {
-        Wer = subject;
+        Subject = subject;
     }
 
-    /// <summary>Wessen Einstellungen.</summary>
-    public SubjectId Wer { get; }
+    /// <summary>Whose settings.</summary>
+    public SubjectId Subject { get; }
 
-    // ---------------------------------------------------------------- Daten
-
-    /// <summary>
-    /// Nach wie vielen Monaten ohne Anmeldung das Konto von selbst gelöscht wird.
-    /// </summary>
-    /// <remarks>
-    /// <c>null</c> heisst „nie von selbst". Das ist die Vorgabe, weil eine
-    /// automatische Löschung eine Entscheidung über fremde Daten ist, die
-    /// niemand getroffen hat — und weil ein Konto, das im Urlaub verfällt, das
-    /// Gegenteil von Kontrolle ist.
-    /// </remarks>
-    public int? LoeschungNachMonaten { get; private set; }
-
-    // ------------------------------------------------------------------- KI
-
-    /// <summary>Welcher Anbieter gefragt werden darf.</summary>
-    public AiProvider Anbieter { get; private set; } = AiProvider.None;
-
-    /// <summary>Die Adresse des Anbieters. Bei Ollama die eigene Maschine.</summary>
-    public string Adresse { get; private set; } = string.Empty;
-
-    /// <summary>Welches Modell.</summary>
-    public string Modell { get; private set; } = string.Empty;
-
-    /// <summary>Der Schlüssel, verschlüsselt. Leer heisst: keiner hinterlegt.</summary>
-    /// <remarks>
-    /// Verlässt diesen Dienst nie im Klartext und geht nie an den Browser
-    /// zurück. Bei einem lokalen Ollama bleibt er leer — dort gibt es keinen.
-    /// </remarks>
-    public string SchluesselVerschluesselt { get; private set; } = string.Empty;
-
-    /// <summary>Die letzten vier Zeichen, zum Wiedererkennen.</summary>
-    public string SchluesselEndung { get; private set; } = string.Empty;
+    // ----------------------------------------------------------------- Data
 
     /// <summary>
-    /// Wird festgehalten, DASS eine ResumeRequest hinausging — nie, was darin stand.
+    /// After how many months without a sign-in the account deletes itself.
     /// </summary>
     /// <remarks>
-    /// Der EU AI Act verlangt von Betreibern eines Systems im Beschäftigungs-
-    /// kontext ein Protokoll über die Tätigkeit des Systems. Diese Plattform
-    /// bewertet niemanden und fällt damit nicht unter die Pflichten für
-    /// Hochrisikosysteme (ADR-0022, ADR-0024) — wer das Protokoll trotzdem
-    /// will, bekommt es. Es hält Zeitpunkt und Art fest, nie den Text: sonst
-    /// entstünde beim Nachweisen genau die Sammlung, die der Entwurf vermeidet.
+    /// <c>null</c> means „never by itself". That is the default, because an
+    /// automatic deletion is a decision about somebody else's data that nobody
+    /// took — and because an account that lapses while you are on holiday is
+    /// the opposite of control.
     /// </remarks>
-    public bool KiProtokoll { get; private set; }
+    public int? DeleteAfterMonths { get; private set; }
 
-    // --------------------------------------------------------------- Ansicht
+    // ------------------------------------------------------------------- AI
 
-    /// <summary>Die Einstellungen, wie eine Zeile sie hält.</summary>
-    /// <param name="wer">Wessen.</param>
-    /// <param name="loeschungNachMonaten">Verfall, oder <c>null</c>.</param>
-    /// <param name="anbieter">Welcher KI-Anbieter.</param>
-    /// <param name="adresse">Dessen Adresse.</param>
-    /// <param name="modell">Dessen Modell.</param>
-    /// <param name="schluesselVerschluesselt">Der Schlüssel, verschlüsselt.</param>
-    /// <param name="schluesselEndung">Die letzten vier Zeichen.</param>
-    /// <param name="kiProtokoll">Ob Anfragen protokolliert werden.</param>
-    /// <returns>Die Einstellungen.</returns>
-    public static AccountSettings Wiederherstellen(
+    /// <summary>Which provider may be asked.</summary>
+    public AiProvider Provider { get; private set; } = AiProvider.None;
+
+    /// <summary>The provider's address. With Ollama, one's own machine.</summary>
+    public string Address { get; private set; } = string.Empty;
+
+    /// <summary>Which model.</summary>
+    public string Model { get; private set; } = string.Empty;
+
+    /// <summary>The key, encrypted. Empty means: none stored.</summary>
+    /// <remarks>
+    /// Never leaves this service in the clear and never goes back to the
+    /// browser. With a local Ollama it stays empty — there is none there.
+    /// </remarks>
+    public string EncryptedKey { get; private set; } = string.Empty;
+
+    /// <summary>The last four characters, for recognising it again.</summary>
+    public string KeyTail { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Whether it is recorded THAT a request went out — never what was in it.
+    /// </summary>
+    /// <remarks>
+    /// The EU AI Act demands of operators of a system in an employment context
+    /// a log of the system's activity. This platform evaluates nobody and thus
+    /// does not fall under the duties for high-risk systems (ADR-0022,
+    /// ADR-0024) — whoever wants the log anyway gets it. It records the time
+    /// and the kind, never the text: otherwise the very collection the draft
+    /// avoids would come into being while proving it.
+    /// </remarks>
+    public bool AiAuditLog { get; private set; }
+
+    // ------------------------------------------------------------------ View
+
+    /// <summary>The settings as a row holds them.</summary>
+    /// <param name="subject">Whose.</param>
+    /// <param name="deleteAfterMonths">The lapse, or <c>null</c>.</param>
+    /// <param name="provider">Which AI provider.</param>
+    /// <param name="address">Its address.</param>
+    /// <param name="model">Its model.</param>
+    /// <param name="encryptedKey">The key, encrypted.</param>
+    /// <param name="keyTail">The last four characters.</param>
+    /// <param name="aiAuditLog">Whether requests are logged.</param>
+    /// <returns>The settings.</returns>
+    public static AccountSettings Restore(
         SubjectId subject,
-        int? loeschungNachMonaten,
+        int? deleteAfterMonths,
         AiProvider provider,
         string address,
         string model,
-        string schluesselVerschluesselt,
-        string schluesselEndung,
-        bool kiProtokoll) =>
+        string encryptedKey,
+        string keyTail,
+        bool aiAuditLog) =>
         new(subject)
         {
-            LoeschungNachMonaten = loeschungNachMonaten,
-            Anbieter = provider,
-            Adresse = address,
-            Modell = model,
-            SchluesselVerschluesselt = schluesselVerschluesselt,
-            SchluesselEndung = schluesselEndung,
-            KiProtokoll = kiProtokoll
+            DeleteAfterMonths = deleteAfterMonths,
+            Provider = provider,
+            Address = address,
+            Model = model,
+            EncryptedKey = encryptedKey,
+            KeyTail = keyTail,
+            AiAuditLog = aiAuditLog
         };
 
-    /// <summary>Die zurückhaltendste Stellung — für ein Konto, das nie etwas gesetzt hat.</summary>
-    /// <param name="wer">Wessen.</param>
-    /// <returns>Einstellungen ohne Anbieter, ohne Verfall, ohne Protokoll.</returns>
-    public static AccountSettings Vorgabe(SubjectId subject) => new(subject);
+    /// <summary>The most reticent setting — for an account that never set anything.</summary>
+    /// <param name="subject">Whose.</param>
+    /// <returns>Settings with no provider, no lapse, no log.</returns>
+    public static AccountSettings Default(SubjectId subject) => new(subject);
 
-    /// <summary>Setzt die Datenschutz-Entscheidungen.</summary>
-    /// <param name="loeschungNachMonaten">
-    /// Verfall in Monaten, oder <c>null</c> für „nie von selbst". Werte unter
-    /// drei Monaten werden abgelehnt: ein Konto, das nach vier Wochen
-    /// verschwindet, verliert jemand im Urlaub.
+    /// <summary>Sets the data-protection decisions.</summary>
+    /// <param name="deleteAfterMonths">
+    /// The lapse in months, or <c>null</c> for „never by itself". Values under
+    /// three months are refused: an account that disappears after four weeks is
+    /// one somebody loses while on holiday.
     /// </param>
-    /// <exception cref="ArgumentOutOfRangeException">Der Verfall ist zu kurz.</exception>
-    public void SetzeDatenschutz(int? loeschungNachMonaten)
+    /// <exception cref="ArgumentOutOfRangeException">The lapse is too short.</exception>
+    public void SetPrivacy(int? deleteAfterMonths)
     {
-        if (loeschungNachMonaten is { } monate && monate is < 3 or > 120)
+        if (deleteAfterMonths is { } months && months is < 3 or > 120)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(loeschungNachMonaten), monate,
-                "Ein Verfall liegt zwischen 3 und 120 Monaten.");
+                nameof(deleteAfterMonths), months,
+                "A lapse lies between 3 and 120 months.");
         }
 
-        LoeschungNachMonaten = loeschungNachMonaten;
+        DeleteAfterMonths = deleteAfterMonths;
     }
 
-    /// <summary>Setzt den KI-Anbieter. Der Schlüssel wird davon nicht angefasst.</summary>
+    /// <summary>Sets the AI provider. The key is not touched by it.</summary>
     /// <remarks>
-    /// Getrennt vom Schlüssel, weil es zwei Vorgänge sind: den Anbieter wechselt
-    /// man oft, den Schlüssel selten. Wer beides in einem Aufruf setzte, müsste
-    /// den Schlüssel jedes Mal mitschicken — und ein Geheimnis, das bei jedem
-    /// Speichern über die Leitung geht, geht öfter über die Leitung, als es muss.
+    /// Separate from the key, because they are two cases: the provider is
+    /// changed often, the key rarely. Setting both in one call would mean
+    /// sending the key along every time — and a secret that travels over the
+    /// wire at every save travels over the wire more often than it has to.
     /// </remarks>
-    /// <param name="anbieter">Welcher.</param>
-    /// <param name="adresse">Dessen Adresse.</param>
-    /// <param name="modell">Dessen Modell.</param>
-    /// <param name="kiProtokoll">Ob Anfragen protokolliert werden.</param>
-    public void SetzeKi(AiProvider provider, string address, string model, bool kiProtokoll)
+    /// <param name="provider">Which one.</param>
+    /// <param name="address">Its address.</param>
+    /// <param name="model">Its model.</param>
+    /// <param name="aiAuditLog">Whether requests are logged.</param>
+    public void SetAi(AiProvider provider, string address, string model, bool aiAuditLog)
     {
-        Anbieter = provider;
-        Adresse = (address ?? string.Empty).Trim();
-        Modell = (model ?? string.Empty).Trim();
-        KiProtokoll = kiProtokoll;
+        Provider = provider;
+        Address = (address ?? string.Empty).Trim();
+        Model = (model ?? string.Empty).Trim();
+        AiAuditLog = aiAuditLog;
 
-        // Kein Anbieter heisst kein Schlüssel. Ihn stehen zu lassen wäre ein
-        // Geheimnis ohne Zweck — und das schlechteste, was man aufbewahren kann.
+        // No provider means no key. Leaving it standing would be a secret with
+        // no purpose — and that is the worst kind there is to keep.
         if (provider == AiProvider.None)
         {
-            SchluesselVerschluesselt = string.Empty;
-            SchluesselEndung = string.Empty;
+            EncryptedKey = string.Empty;
+            KeyTail = string.Empty;
         }
     }
 
-    /// <summary>Hinterlegt einen Schlüssel.</summary>
-    /// <param name="verschluesselt">Der Schlüssel, bereits verschlüsselt.</param>
-    /// <param name="endung">Seine letzten vier Zeichen.</param>
-    public void SetzeSchluessel(string verschluesselt, string endung)
+    /// <summary>Stores a key.</summary>
+    /// <param name="encrypted">The key, already encrypted.</param>
+    /// <param name="suffix">Its last four characters.</param>
+    public void SetKey(string encrypted, string suffix)
     {
-        SchluesselVerschluesselt = verschluesselt ?? string.Empty;
-        SchluesselEndung = endung ?? string.Empty;
+        EncryptedKey = encrypted ?? string.Empty;
+        KeyTail = suffix ?? string.Empty;
     }
 
-    /// <summary>Entfernt den Schlüssel.</summary>
-    public void LoescheSchluessel()
+    /// <summary>Removes the key.</summary>
+    public void ClearKey()
     {
-        SchluesselVerschluesselt = string.Empty;
-        SchluesselEndung = string.Empty;
+        EncryptedKey = string.Empty;
+        KeyTail = string.Empty;
     }
 }

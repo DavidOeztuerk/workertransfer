@@ -9,11 +9,11 @@ namespace WorkerTransfer.Identity.Infrastructure.Security;
 /// the header would answer with something a caller sent rather than with what
 /// this request was actually filed under.
 /// </remarks>
-public sealed class HttpKorrelation(IHttpContextAccessor zugriff) : IKorrelation
+public sealed class HttpCorrelation(IHttpContextAccessor accessor) : ICorrelation
 {
     /// <inheritdoc />
-    public string? Aktuell =>
-        zugriff.HttpContext?.Items.TryGetValue("CorrelationId", out var value) == true
+    public string? Current =>
+        accessor.HttpContext?.Items.TryGetValue("CorrelationId", out var value) == true
             ? value?.ToString()
             : null;
 }

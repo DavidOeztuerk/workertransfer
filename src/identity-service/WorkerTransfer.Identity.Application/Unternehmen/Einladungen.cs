@@ -15,19 +15,19 @@ namespace WorkerTransfer.Identity.Application.Unternehmen;
 /// platform membership without asking the consent ledger.
 /// </remarks>
 public sealed record InviteMemberCommand(
-    SubjectId Wer, TenantId Firma, string Email, MembershipRole Rolle) : IBefehl<Invitation>;
+    SubjectId Subject, TenantId Company, string Email, MembershipRole Role) : ICommand<Invitation>;
 
-/// <inheritdoc cref="MitgliedEinladenBefehl" />
+/// <inheritdoc cref="InviteMemberCommand" />
 public sealed class InviteMemberHandler(
-    CompanyAccess zugriff,
+    CompanyAccess access,
     IInvitationRepository invitations,
     ICompanyRepository companies,
-    IUserRepository benutzer,
-    IEinmaltoken einmaltoken,
-    IPostkorb postkorb,
-    IAuditTrail protokoll,
-    IKorrelation korrelation,
-    TimeProvider uhr)
+    IUserRepository users,
+    IOneTimeToken oneTimeToken,
+    IMailTray mailTray,
+    IAuditTrail auditTrail,
+    ICorrelation correlation,
+    TimeProvider clock)
     : IRequestHandler<InviteMemberCommand, Invitation>
 {
     /// <inheritdoc />
@@ -37,46 +37,46 @@ public sealed class InviteMemberHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var role = await zugriff.AsAdminAsync(
-            request.Wer, request.Firma, Verwaltungsakt.Einladen, cancellationToken);
+        var role = await access.AsAdminAsync(
+            request.Subject, request.Company, AdministrativeAct.Invite, cancellationToken);
 
         var invitation = Invitation.Issue(
-            request.Firma, request.Email.Trim().ToLowerInvariant(), request.Rolle,
-            role, request.Wer, uhr.GetUtcNow());
+            request.Company, request.Email.Trim().ToLowerInvariant(), request.Role,
+            role, request.Subject, clock.GetUtcNow());
 
-        var (klartext, hash) = einmaltoken.Erzeuge();
+        var (plainText, hash) = oneTimeToken.Create();
         await invitations.AddAsync(invitation, hash, cancellationToken);
 
-        var company = await companies.FindByIdAsync(request.Firma, cancellationToken);
+        var company = await companies.FindByIdAsync(request.Company, cancellationToken);
 
-        // Die Kontosprache der EINLADENDEN, und das ist eine bewusste Notlösung:
-        // die eingeladene Adresse hat hier womöglich gar kein Konto — genau
-        // dafür ist die Einladung da. Es gibt also keine Zeile von ihr, die man
-        // lesen könnte. Wer eine Kollegin einlädt, schreibt ihr am ehesten in
-        // der Kontosprache, in der er selbst arbeitet.
-        var einladenderKonto = await benutzer.FindByIdAsync(
-            request.Wer, cancellationToken);
+        // The INVITER's account language, and that is a deliberate makeshift:
+        // the invited address may well have no account here at all — that is
+        // exactly what the invitation is for. So there is no row of theirs to
+        // read. Whoever invites a colleague most likely writes to them in the
+        // language they work in themselves.
+        var inviterAccount = await users.FindByIdAsync(
+            request.Subject, cancellationToken);
 
-        postkorb.Einladung(
+        mailTray.InvitationMail(
             invitation.Email,
-            request.Wer,
+            request.Subject,
             company?.Name ?? string.Empty,
-            klartext,
-            einladenderKonto?.Kontosprache ?? Sprachwahl.Vorgabe);
+            plainText,
+            inviterAccount?.AccountLanguage ?? LanguageChoice.Default);
 
-        await protokoll.AppendAsync(
+        await auditTrail.AppendAsync(
             new AuditEvent(
                 AuditAction.MemberInvited,
-                uhr.GetUtcNow(),
-                actor: request.Wer,
-                tenant: request.Firma,
-                correlationId: korrelation.Aktuell,
+                clock.GetUtcNow(),
+                actor: request.Subject,
+                tenant: request.Company,
+                correlationId: correlation.Current,
                 metadata: new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     // The role is technical metadata about a permission, not a
                     // statement about the person — and the address is not on the
                     // allowlist for exactly that reason.
-                    ["role"] = MembershipRoleNames.ToDatabase(request.Rolle)
+                    ["role"] = MembershipRoleNames.ToDatabase(request.Role)
                 }),
             cancellationToken);
 
@@ -85,16 +85,16 @@ public sealed class InviteMemberHandler(
 }
 
 /// <summary>Take an open invitation back.</summary>
-public sealed record RevokeInvitationCommand(SubjectId Wer, TenantId Firma, Guid Einladung)
-    : IBefehl<Unit>;
+public sealed record RevokeInvitationCommand(SubjectId Subject, TenantId Company, Guid Invitation)
+    : ICommand<Unit>;
 
-/// <inheritdoc cref="EinladungZuruecknehmenBefehl" />
+/// <inheritdoc cref="RevokeInvitationCommand" />
 public sealed class RevokeInvitationHandler(
-    CompanyAccess zugriff,
+    CompanyAccess access,
     IInvitationRepository invitations,
-    IAuditTrail protokoll,
-    IKorrelation korrelation,
-    TimeProvider uhr)
+    IAuditTrail auditTrail,
+    ICorrelation correlation,
+    TimeProvider clock)
     : IRequestHandler<RevokeInvitationCommand, Unit>
 {
     /// <inheritdoc />
@@ -104,26 +104,26 @@ public sealed class RevokeInvitationHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var role = await zugriff.AsAdminAsync(
-            request.Wer, request.Firma, Verwaltungsakt.Einladen, cancellationToken);
+        var role = await access.AsAdminAsync(
+            request.Subject, request.Company, AdministrativeAct.Invite, cancellationToken);
 
         // Looked up inside the company, never by id alone: otherwise an
         // administrator of one company could act on another company's
         // invitation.
         var invitation = await invitations.FindAsync(
-            request.Firma, request.Einladung, cancellationToken)
+            request.Company, request.Invitation, cancellationToken)
             ?? throw new InvitationInvalidException();
 
         invitation.Withdraw(role);
         await invitations.SaveAsync(invitation, cancellationToken);
 
-        await protokoll.AppendAsync(
+        await auditTrail.AppendAsync(
             new AuditEvent(
                 AuditAction.InvitationWithdrawn,
-                uhr.GetUtcNow(),
-                actor: request.Wer,
-                tenant: request.Firma,
-                correlationId: korrelation.Aktuell),
+                clock.GetUtcNow(),
+                actor: request.Subject,
+                tenant: request.Company,
+                correlationId: correlation.Current),
             cancellationToken);
 
         return Unit.Value;
@@ -136,19 +136,19 @@ public sealed class RevokeInvitationHandler(
 /// link is not necessarily who was invited. The address comes from the account,
 /// not from the request.
 /// </remarks>
-public sealed record AcceptInvitationCommand(SubjectId Wer, string Token)
-    : IBefehl<Membership>;
+public sealed record AcceptInvitationCommand(SubjectId Subject, string Token)
+    : ICommand<Membership>;
 
-/// <inheritdoc cref="EinladungAnnehmenBefehl" />
+/// <inheritdoc cref="AcceptInvitationCommand" />
 public sealed class AcceptInvitationHandler(
     IInvitationRepository invitations,
-    IUserRepository benutzer,
-    IMembershipRepository mitgliedschaften,
+    IUserRepository users,
+    IMembershipRepository memberships,
     ICompanyRepository companies,
-    IEinmaltoken einmaltoken,
-    IAuditTrail protokoll,
-    IKorrelation korrelation,
-    TimeProvider uhr)
+    IOneTimeToken oneTimeToken,
+    IAuditTrail auditTrail,
+    ICorrelation correlation,
+    TimeProvider clock)
     : IRequestHandler<AcceptInvitationCommand, Membership>
 {
     /// <inheritdoc />
@@ -159,25 +159,25 @@ public sealed class AcceptInvitationHandler(
         ArgumentNullException.ThrowIfNull(request);
 
         var invitation = await invitations.FindByTokenHashAsync(
-            einmaltoken.Hashe(request.Token), cancellationToken)
+            oneTimeToken.HashOf(request.Token), cancellationToken)
             ?? throw new InvitationInvalidException();
 
-        var konto = await benutzer.FindByIdAsync(request.Wer, cancellationToken)
+        var account = await users.FindByIdAsync(request.Subject, cancellationToken)
             ?? throw new InvitationInvalidException();
 
-        invitation.Accept(konto.Email, uhr.GetUtcNow());
+        invitation.Accept(account.Email, clock.GetUtcNow());
         await invitations.SaveAsync(invitation, cancellationToken);
 
-        await mitgliedschaften.AddAsync(
-            request.Wer, invitation.Tenant, invitation.Role, cancellationToken);
+        await memberships.AddAsync(
+            request.Subject, invitation.Tenant, invitation.Role, cancellationToken);
 
-        await protokoll.AppendAsync(
+        await auditTrail.AppendAsync(
             new AuditEvent(
                 AuditAction.MemberJoined,
-                uhr.GetUtcNow(),
-                actor: request.Wer,
+                clock.GetUtcNow(),
+                actor: request.Subject,
                 tenant: invitation.Tenant,
-                correlationId: korrelation.Aktuell,
+                correlationId: correlation.Current,
                 metadata: new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     ["role"] = MembershipRoleNames.ToDatabase(invitation.Role)

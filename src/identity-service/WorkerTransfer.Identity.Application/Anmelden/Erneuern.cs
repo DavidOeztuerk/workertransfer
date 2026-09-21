@@ -10,18 +10,18 @@ using WorkerTransfer.Identity.Domain.Users;
 namespace WorkerTransfer.Identity.Application.Anmelden;
 
 /// <summary>Carry a sign-in forward with the refresh token presented.</summary>
-public sealed record ErneuernBefehl(string Erneuerungstoken) : IBefehl<Erneuerungsergebnis>;
+public sealed record RefreshCommand(string RefreshToken) : ICommand<RefreshResult>;
 
 /// <summary>What a refresh produced.</summary>
-public abstract record Erneuerungsergebnis
+public abstract record RefreshResult
 {
-    private Erneuerungsergebnis() { }
+    private RefreshResult() { }
 
     /// <summary>A fresh pair. The presented refresh token no longer counts.</summary>
-    public sealed record Erneuert(
-        string Zugriffstoken,
-        string Erneuerungstoken,
-        DateTimeOffset ErneuerungLaeuftAb) : Erneuerungsergebnis;
+    public sealed record Refreshed(
+        string AccessToken,
+        string RefreshToken,
+        DateTimeOffset RefreshExpiresAt) : RefreshResult;
 
     /// <summary>
     /// The presented token entitles the caller to nothing.
@@ -31,7 +31,7 @@ public abstract record Erneuerungsergebnis
     /// no longer sign in — one answer for all of them, and the caller is told to
     /// drop the cookie it presented.
     /// </remarks>
-    public sealed record Abgewiesen : Erneuerungsergebnis;
+    public sealed record Rejected : RefreshResult;
 }
 
 /// <summary>Carries a sign-in forward.</summary>
@@ -39,62 +39,62 @@ public abstract record Erneuerungsergebnis
 /// Rotation is the point: every refresh retires the token it was given, so a
 /// stolen one works once and the second use is visible.
 /// </remarks>
-public sealed class ErneuernHandler(
+public sealed class RefreshHandler(
     ISessionService sessions,
-    IUserRepository benutzer,
-    IMembershipRepository mitgliedschaften,
-    ISessionCapacity handlungsform,
+    IUserRepository users,
+    IMembershipRepository memberships,
+    ISessionCapacity sessionCapacity,
     IAccessTokenIssuer token,
-    IAuditTrail protokoll,
-    IKorrelation korrelation,
-    TimeProvider uhr)
-    : IRequestHandler<ErneuernBefehl, Erneuerungsergebnis>
+    IAuditTrail auditTrail,
+    ICorrelation correlation,
+    TimeProvider clock)
+    : IRequestHandler<RefreshCommand, RefreshResult>
 {
     /// <inheritdoc />
-    public async Task<Erneuerungsergebnis> Handle(
-        ErneuernBefehl request,
+    public async Task<RefreshResult> Handle(
+        RefreshCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var session = await sessions.RenewAsync(request.Erneuerungstoken, cancellationToken);
+        var session = await sessions.RenewAsync(request.RefreshToken, cancellationToken);
 
         if (session is null)
         {
-            return new Erneuerungsergebnis.Abgewiesen();
+            return new RefreshResult.Rejected();
         }
 
-        var konto = await benutzer.FindByIdAsync(session.Subject, cancellationToken);
+        var account = await users.FindByIdAsync(session.Subject, cancellationToken);
 
-        if (konto is null || !DarfNochAnmelden(konto))
+        if (account is null || !MayStillSignIn(account))
         {
             // A refresh mints a fresh access token, so it is an authorisation
             // decision and not a formality. Without this an account that was
             // disabled keeps working for as long as it keeps refreshing —
             // the Python service leaves that window open.
-            return new Erneuerungsergebnis.Abgewiesen();
+            return new RefreshResult.Rejected();
         }
 
-        var form = await ErneutGeprueft(session, cancellationToken);
+        var capacity = await ReChecked(session, cancellationToken);
 
-        var zugriff = await token.IssueAsync(
-            konto.Id, konto.Email, form, session.Session, cancellationToken);
+        var accessToken = await token.IssueAsync(
+            account.Id, account.Email, capacity, session.Session, cancellationToken);
 
-        await protokoll.AppendAsync(
+        await auditTrail.AppendAsync(
             new AuditEvent(
                 AuditAction.TokenRefresh,
-                uhr.GetUtcNow(),
-                actor: konto.Id,
-                tenant: (form as Capacity.ForCompany)?.Tenant,
-                correlationId: korrelation.Aktuell,
+                clock.GetUtcNow(),
+                actor: account.Id,
+                tenant: (capacity as Capacity.ForCompany)?.Tenant,
+                correlationId: correlation.Current,
                 metadata: new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     ["reason"] = "rotation"
                 }),
             cancellationToken);
 
-        return new Erneuerungsergebnis.Erneuert(
-            zugriff, session.RefreshToken, session.ExpiresAt);
+        return new RefreshResult.Refreshed(
+            accessToken, session.RefreshToken, session.ExpiresAt);
     }
 
     /// <summary>
@@ -112,33 +112,33 @@ public sealed class ErneuernHandler(
     /// personal account because a company relationship ended.
     /// </para>
     /// </remarks>
-    private async Task<Capacity> ErneutGeprueft(
+    private async Task<Capacity> ReChecked(
         RenewedSession session,
         CancellationToken cancellationToken)
     {
-        var form = await handlungsform.RecallAsync(session.Session, cancellationToken);
+        var capacity = await sessionCapacity.RecallAsync(session.Session, cancellationToken);
 
-        if (form is not Capacity.ForCompany company)
+        if (capacity is not Capacity.ForCompany company)
         {
-            return form;
+            return capacity;
         }
 
-        if (await mitgliedschaften.IsMemberAsync(session.Subject, company.Tenant, cancellationToken))
+        if (await memberships.IsMemberAsync(session.Subject, company.Tenant, cancellationToken))
         {
-            return form;
+            return capacity;
         }
 
-        await handlungsform.RememberAsync(
+        await sessionCapacity.RememberAsync(
             session.Session, Capacity.AsSelf.Instance, cancellationToken);
 
-        await protokoll.AppendAsync(
+        await auditTrail.AppendAsync(
             new AuditEvent(
                 AuditAction.TenantSwitchDenied,
-                uhr.GetUtcNow(),
+                clock.GetUtcNow(),
                 actor: session.Subject,
                 // The company that was dropped is the point of the record.
                 tenant: company.Tenant,
-                correlationId: korrelation.Aktuell,
+                correlationId: correlation.Current,
                 metadata: new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     ["reason"] = "membership_gone_on_refresh"
@@ -148,11 +148,11 @@ public sealed class ErneuernHandler(
         return Capacity.AsSelf.Instance;
     }
 
-    private static bool DarfNochAnmelden(User konto)
+    private static bool MayStillSignIn(User account)
     {
         try
         {
-            konto.AssertCanSignIn();
+            account.AssertCanSignIn();
             return true;
         }
         catch (EmailNotConfirmedException)

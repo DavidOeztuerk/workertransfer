@@ -6,19 +6,19 @@ using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Application.Konto;
 
-/// <summary>Die Bewerbungsanschrift zum Anzeigen — nie an ein Modell.</summary>
+/// <summary>The application address for showing — never to a model.</summary>
 public sealed record PostalAddressView(
-    string Zeile1,
-    string Zeile2,
-    string Postleitzahl,
-    string Ort,
-    string Land,
-    string Telefon);
+    string Line1,
+    string Line2,
+    string PostalCode,
+    string City,
+    string Country,
+    string Phone);
 
-/// <summary>Die eigene PostalAddress lesen.</summary>
-public sealed record PostalAddressQuery(SubjectId Wer) : IAbfrage<PostalAddressView>;
+/// <summary>Read one's own postal address.</summary>
+public sealed record PostalAddressQuery(SubjectId Subject) : IQuery<PostalAddressView>;
 
-/// <inheritdoc cref="AnschriftAbfrage" />
+/// <inheritdoc cref="PostalAddressQuery" />
 public sealed class PostalAddressHandler(IPostalAddresses store)
     : IRequestHandler<PostalAddressQuery, PostalAddressView>
 {
@@ -27,24 +27,24 @@ public sealed class PostalAddressHandler(IPostalAddresses store)
         PostalAddressQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return Ansicht(await store.GetAsync(request.Wer, cancellationToken));
+        return View(await store.GetAsync(request.Subject, cancellationToken));
     }
 
-    internal static PostalAddressView Ansicht(PostalAddress state) =>
-        new(state.Zeile1, state.Zeile2, state.Postleitzahl, state.Ort, state.Land, state.Telefon);
+    internal static PostalAddressView View(PostalAddress state) =>
+        new(state.Line1, state.Line2, state.PostalCode, state.City, state.Country, state.Phone);
 }
 
-/// <summary>Die eigene PostalAddress schreiben.</summary>
+/// <summary>Write one's own postal address.</summary>
 public sealed record SetPostalAddressCommand(
-    SubjectId Wer,
-    string? Zeile1,
-    string? Zeile2,
-    string? Postleitzahl,
-    string? Ort,
-    string? Land,
-    string? Telefon) : IBefehl<PostalAddressView>;
+    SubjectId Subject,
+    string? Line1,
+    string? Line2,
+    string? PostalCode,
+    string? City,
+    string? Country,
+    string? Phone) : ICommand<PostalAddressView>;
 
-/// <inheritdoc cref="AnschriftSetzenBefehl" />
+/// <inheritdoc cref="SetPostalAddressCommand" />
 public sealed class SetPostalAddressHandler(IPostalAddresses store)
     : IRequestHandler<SetPostalAddressCommand, PostalAddressView>
 {
@@ -54,15 +54,15 @@ public sealed class SetPostalAddressHandler(IPostalAddresses store)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var state = await store.GetAsync(request.Wer, cancellationToken);
+        var state = await store.GetAsync(request.Subject, cancellationToken);
         state.Set(
-            request.Zeile1,
-            request.Zeile2,
-            request.Postleitzahl,
-            request.Ort,
-            request.Land,
-            request.Telefon);
+            request.Line1,
+            request.Line2,
+            request.PostalCode,
+            request.City,
+            request.Country,
+            request.Phone);
         await store.SaveAsync(state, cancellationToken);
-        return PostalAddressHandler.Ansicht(state);
+        return PostalAddressHandler.View(state);
     }
 }

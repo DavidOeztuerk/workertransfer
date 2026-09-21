@@ -8,21 +8,21 @@ using WorkerTransfer.Identity.Domain.Companies;
 namespace WorkerTransfer.Identity.Application.Unternehmen;
 
 /// <summary>Remove a member — or oneself.</summary>
-public sealed record RemoveMemberCommand(SubjectId Wer, TenantId Firma, SubjectId Mitglied)
-    : IBefehl<Unit>;
+public sealed record RemoveMemberCommand(SubjectId Subject, TenantId Company, SubjectId Member)
+    : ICommand<Unit>;
 
-/// <inheritdoc cref="MitgliedEntfernenBefehl" />
+/// <inheritdoc cref="RemoveMemberCommand" />
 /// <remarks>
 /// Takes effect on the next refresh, which checks the membership again. An
 /// access token already issued stays valid until it expires — the same known
 /// remainder as signing out.
 /// </remarks>
 public sealed class RemoveMemberHandler(
-    CompanyAccess zugriff,
-    IMembershipRepository mitgliedschaften,
-    IAuditTrail protokoll,
-    IKorrelation korrelation,
-    TimeProvider uhr)
+    CompanyAccess access,
+    IMembershipRepository memberships,
+    IAuditTrail auditTrail,
+    ICorrelation correlation,
+    TimeProvider clock)
     : IRequestHandler<RemoveMemberCommand, Unit>
 {
     /// <inheritdoc />
@@ -32,36 +32,36 @@ public sealed class RemoveMemberHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var selbst = request.Wer == request.Mitglied;
+        var self = request.Subject == request.Member;
 
         // Leaving on your own needs no administrator. Requiring one would mean
         // somebody could be held in a company by the company.
-        if (!selbst)
+        if (!self)
         {
-            await zugriff.AsAdminAsync(
-                request.Wer, request.Firma, Verwaltungsakt.Entfernen, cancellationToken);
+            await access.AsAdminAsync(
+                request.Subject, request.Company, AdministrativeAct.Remove, cancellationToken);
         }
 
-        var role = await mitgliedschaften.RoleOfAsync(
-            request.Mitglied, request.Firma, cancellationToken)
+        var role = await memberships.RoleOfAsync(
+            request.Member, request.Company, cancellationToken)
             ?? throw new NotAMemberException();
 
         if (role == MembershipRole.Admin
-            && await mitgliedschaften.CountAdminsAsync(request.Firma, cancellationToken) <= 1)
+            && await memberships.CountAdminsAsync(request.Company, cancellationToken) <= 1)
         {
             throw new LastAdminMayNotLeaveException();
         }
 
-        await mitgliedschaften.RemoveAsync(request.Mitglied, request.Firma, cancellationToken);
+        await memberships.RemoveAsync(request.Member, request.Company, cancellationToken);
 
-        await protokoll.AppendAsync(
+        await auditTrail.AppendAsync(
             new AuditEvent(
                 AuditAction.MemberRemoved,
-                uhr.GetUtcNow(),
-                actor: request.Wer,
-                tenant: request.Firma,
-                target: request.Mitglied,
-                correlationId: korrelation.Aktuell),
+                clock.GetUtcNow(),
+                actor: request.Subject,
+                tenant: request.Company,
+                target: request.Member,
+                correlationId: correlation.Current),
             cancellationToken);
 
         return Unit.Value;

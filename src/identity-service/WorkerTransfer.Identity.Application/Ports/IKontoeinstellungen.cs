@@ -3,19 +3,19 @@ using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Application.Ports;
 
-/// <summary>Liest und schreibt, was eine Person über sich entschieden hat.</summary>
+/// <summary>Reads and writes what a person decided about themselves.</summary>
 public interface IAccountSettingsStore
 {
-    /// <summary>Die Einstellungen — oder die Vorgabe, wenn nie etwas gesetzt wurde.</summary>
-    /// <param name="wer">Wessen.</param>
-    /// <param name="cancellationToken">Abbruch.</param>
-    /// <returns>Nie <c>null</c>: „nichts gesetzt" ist ein Zustand, kein Fehlen.</returns>
+    /// <summary>The settings — or the default, when nothing was ever set.</summary>
+    /// <param name="subject">Whose.</param>
+    /// <param name="cancellationToken">Cancels the lookup.</param>
+    /// <returns>Never <c>null</c>: „nothing set" is a state, not an absence.</returns>
     Task<AccountSettings> GetAsync(
         SubjectId subject, CancellationToken cancellationToken = default);
 
-    /// <summary>Schreibt sie zurück.</summary>
-    /// <param name="einstellungen">Was gilt.</param>
-    /// <param name="cancellationToken">Abbruch.</param>
+    /// <summary>Writes them back.</summary>
+    /// <param name="settings">What holds.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
     Task SaveAsync(
-        AccountSettings einstellungen, CancellationToken cancellationToken = default);
+        AccountSettings settings, CancellationToken cancellationToken = default);
 }

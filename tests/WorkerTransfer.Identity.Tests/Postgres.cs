@@ -4,23 +4,20 @@ using WorkerTransfer.Identity.Infrastructure.Persistence;
 
 namespace WorkerTransfer.Identity.Tests;
 
-/// <summary>Ein echtes Postgres mit dem Schema dieses Dienstes.</summary>
+/// <summary>A real Postgres carrying this service's schema.</summary>
 /// <remarks>
-/// <strong>Bis zur Migration lief hier Alembic</strong> — der Python-Dienst
-/// besass das Grundschema, und diese Reihe fuhr seine Wanderungen wirklich
-/// aus, damit eine Abbildung nicht gegen eine handgeschriebene Tabelle
-/// geprueft wird, der sie ohnehin zustimmt.
+/// <strong>Until the migration Alembic ran here</strong> — the Python service
+/// owned the base schema, and this suite really drove its migrations, so a
+/// mapping is not checked against a hand-written table it agrees with anyway.
 /// <para>
-/// Mit dem Umzug besitzt identity-service sein Schema selbst, wie die zehn
-/// anderen: eine EF-SchemaMigration legt alle neun Tabellen an, beide
-/// Postgres-Aufzaehlungen und <c>citext</c>. Was die Reihe prueft, bleibt
-/// dasselbe — Spaltennamen, Etiketten, Typen —, nur die Quelle des Schemas
-/// hat gewechselt.
+/// With the move identity-service owns its schema itself, like the other ten:
+/// one EF migration creates all nine tables, both Postgres enumerations and
+/// <c>citext</c>. What the suite checks stays the same — column names, labels,
+/// types — only the source of the schema has changed.
 /// </para>
 /// <para>
-/// Faellt aus, statt sich zu ueberspringen, wenn keine Behaelterlaufzeit
-/// erreichbar ist. Eine still uebersprungene Integrationsreihe sieht genauso
-/// aus wie eine bestandene.
+/// Fails rather than skipping itself when no container runtime is reachable. A
+/// silently skipped integration suite looks exactly like a passing one.
 /// </para>
 /// </remarks>
 public sealed class Postgres : IAsyncLifetime
@@ -32,7 +29,7 @@ public sealed class Postgres : IAsyncLifetime
         .WithPassword("worker")
         .Build();
 
-    /// <summary>Npgsql-Verbindungszeichenfolge zur gewanderten Datenbank.</summary>
+    /// <summary>Npgsql connection string for the migrated database.</summary>
     public string ConnectionString => _container.GetConnectionString();
 
     public async Task InitializeAsync()
@@ -49,23 +46,23 @@ public sealed class Postgres : IAsyncLifetime
 
     public async Task DisposeAsync() => await _container.DisposeAsync();
 
-    /// <summary>Wo dieses Repository beginnt, durch Hochlaufen gefunden.</summary>
-    public static string Repowurzel()
+    /// <summary>Where this repository begins, found by walking up.</summary>
+    public static string RepositoryRoot()
     {
-        var verzeichnis = new DirectoryInfo(AppContext.BaseDirectory);
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
 
-        while (verzeichnis is not null
-               && !File.Exists(Path.Combine(verzeichnis.FullName, "CLAUDE.md")))
+        while (directory is not null
+               && !File.Exists(Path.Combine(directory.FullName, "CLAUDE.md")))
         {
-            verzeichnis = verzeichnis.Parent;
+            directory = directory.Parent;
         }
 
-        return verzeichnis?.FullName
-            ?? throw new InvalidOperationException("Die Repowurzel wurde nicht gefunden.");
+        return directory?.FullName
+            ?? throw new InvalidOperationException("The repository root was not found.");
     }
 }
 
-/// <summary>Ein Behaelter fuer jeden Test, der das Schema braucht.</summary>
+/// <summary>One container for every test that needs the schema.</summary>
 [CollectionDefinition(Name)]
 public sealed class PostgresCollection : ICollectionFixture<Postgres>
 {

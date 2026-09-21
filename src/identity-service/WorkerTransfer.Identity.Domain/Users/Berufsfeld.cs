@@ -1,125 +1,125 @@
 namespace WorkerTransfer.Identity.Domain.Users;
 
-/// <summary>In welcher Arbeitswelt eine Person steht (ADR-0039).</summary>
+/// <summary>Which working world a person stands in (ADR-0039).</summary>
 /// <remarks>
-/// Eine Angabe der Person, aus der genau eine Sache folgt: was die Oberfläche
-/// anbietet. None Berechtigung, keine Sichtbarkeit, keine Sortierung. Es steht
-/// nicht im Token.
+/// A statement by the person from which exactly one thing follows: what the
+/// interface offers. No permission, no visibility, no ordering. It is not in
+/// the token.
 /// <para>
-/// Die Menge ist geschlossen, weil aus diesem Feld eine Navigation folgt und
-/// eine Navigation für jeden möglichen Wert eine Antwort haben muss — wie bei
-/// <see cref="Kontosprache"/>. <see cref="Sonstiges"/> ist eine Wahl und nicht
-/// dasselbe wie <c>null</c>.
+/// The set is closed, because a navigation follows from this field and a
+/// navigation has to have an answer for every possible value — as with
+/// <see cref="AccountLanguage"/>. <see cref="Other"/> is a choice and not the
+/// same thing as <c>null</c>.
 /// </para>
 /// </remarks>
 public enum OccupationalField
 {
-    /// <summary>Handwerk — Metall, Holz, Sanitär, Kfz.</summary>
-    Handwerk,
+    /// <summary>Crafts — metal, wood, plumbing, motor vehicles.</summary>
+    Crafts,
 
-    /// <summary>Industrie und Technik — Fertigung, Instandhaltung, Automatisierung.</summary>
-    IndustrieTechnik,
+    /// <summary>Industry and technology — production, maintenance, automation.</summary>
+    IndustryTechnology,
 
-    /// <summary>Bau — Hoch- und Tiefbau, Ausbau.</summary>
-    Bau,
+    /// <summary>Construction — building, civil engineering, fit-out.</summary>
+    Construction,
 
-    /// <summary>Gesundheit und Pflege.</summary>
-    GesundheitPflege,
+    /// <summary>Health and care.</summary>
+    HealthCare,
 
-    /// <summary>Logistik und Verkehr — Lager, Fahren, Disposition.</summary>
-    LogistikVerkehr,
+    /// <summary>Logistics and transport — warehouse, driving, dispatch.</summary>
+    LogisticsTransport,
 
-    /// <summary>Gastronomie und Hotel.</summary>
-    GastronomieHotel,
+    /// <summary>Hospitality and hotels.</summary>
+    HospitalityHotel,
 
-    /// <summary>Handel und Verkauf.</summary>
-    HandelVerkauf,
+    /// <summary>Retail and sales.</summary>
+    RetailSales,
 
-    /// <summary>Büro und Verwaltung.</summary>
-    BueroVerwaltung,
+    /// <summary>Office and administration.</summary>
+    OfficeAdministration,
 
-    /// <summary>IT und Software.</summary>
+    /// <summary>IT and software.</summary>
     ItSoftware,
 
-    /// <summary>Bildung und Soziales.</summary>
-    BildungSoziales,
+    /// <summary>Education and social work.</summary>
+    EducationSocial,
 
-    /// <summary>Etwas anderes — eine Wahl, kein Fehlen.</summary>
+    /// <summary>Something else — a choice, not an absence.</summary>
     Other
 }
 
-/// <summary>Liest ein OccupationalField aus einem Etikett und zurück.</summary>
+/// <summary>Reads an OccupationalField out of a label, and back.</summary>
 /// <remarks>
-/// Das Etikett ist snake_case, wie der ganze Draht. Es leitet sich nicht aus
-/// dem Aufzählungsnamen ab: <c>ToLower()</c> ergäbe <c>industrietechnik</c>.
+/// The label is snake_case, like the whole wire. It is not derived from the
+/// enum member name: <c>ToLower()</c> would give <c>industrietechnik</c>.
 /// </remarks>
 public static class OccupationalFieldChoice
 {
-    /// <summary>Etikett → Feld. Die einzige Job, an der die Liste steht.</summary>
-    private static readonly IReadOnlyDictionary<string, OccupationalField> NachEtikett =
+    /// <summary>Label → field. The one place the list stands.</summary>
+    private static readonly IReadOnlyDictionary<string, OccupationalField> ByLabel =
         new Dictionary<string, OccupationalField>(StringComparer.OrdinalIgnoreCase)
         {
-            ["handwerk"] = OccupationalField.Handwerk,
-            ["industrie_technik"] = OccupationalField.IndustrieTechnik,
-            ["bau"] = OccupationalField.Bau,
-            ["gesundheit_pflege"] = OccupationalField.GesundheitPflege,
-            ["logistik_verkehr"] = OccupationalField.LogistikVerkehr,
-            ["gastronomie_hotel"] = OccupationalField.GastronomieHotel,
-            ["handel_verkauf"] = OccupationalField.HandelVerkauf,
-            ["buero_verwaltung"] = OccupationalField.BueroVerwaltung,
+            ["handwerk"] = OccupationalField.Crafts,
+            ["industrie_technik"] = OccupationalField.IndustryTechnology,
+            ["bau"] = OccupationalField.Construction,
+            ["gesundheit_pflege"] = OccupationalField.HealthCare,
+            ["logistik_verkehr"] = OccupationalField.LogisticsTransport,
+            ["gastronomie_hotel"] = OccupationalField.HospitalityHotel,
+            ["handel_verkauf"] = OccupationalField.RetailSales,
+            ["buero_verwaltung"] = OccupationalField.OfficeAdministration,
             ["it_software"] = OccupationalField.ItSoftware,
-            ["bildung_soziales"] = OccupationalField.BildungSoziales,
+            ["bildung_soziales"] = OccupationalField.EducationSocial,
             ["sonstiges"] = OccupationalField.Other
         };
 
-    /// <summary>Alle Etiketten, in der Reihenfolge der Aufzählung.</summary>
-    public static IReadOnlyList<string> Etiketten { get; } =
-        [.. NachEtikett.OrderBy(entry => entry.Value).Select(entry => entry.Key)];
+    /// <summary>Every label, in the order of the enumeration.</summary>
+    public static IReadOnlyList<string> Labels { get; } =
+        [.. ByLabel.OrderBy(entry => entry.Value).Select(entry => entry.Key)];
 
-    /// <summary>Das Feld zu einem Etikett — oder <c>null</c>.</summary>
+    /// <summary>The field for a label — or <c>null</c>.</summary>
     /// <remarks>
-    /// Unbekanntes wird <c>null</c> und nie eine Vorgabe: ein OccupationalField zu
-    /// raten wäre die abgeleitete Eigenschaft, die ADR-0039 verwirft. Ob eine
-    /// Eingabe taugte, beantwortet <see cref="Kennen"/>.
+    /// Anything unknown becomes <c>null</c> and never a default: guessing an
+    /// occupational field would be the derived attribute ADR-0039 rejects.
+    /// Whether an input was usable is answered by <see cref="Known"/>.
     /// </remarks>
-    /// <param name="etikett">Was hereinkam.</param>
-    /// <returns>Das Feld, oder <c>null</c>.</returns>
-    public static OccupationalField? Aus(string? label)
+    /// <param name="label">What came in.</param>
+    /// <returns>The field, or <c>null</c>.</returns>
+    public static OccupationalField? From(string? label)
     {
         if (string.IsNullOrWhiteSpace(label))
         {
             return null;
         }
 
-        return NachEtikett.TryGetValue(label.Trim(), out var field) ? field : null;
+        return ByLabel.TryGetValue(label.Trim(), out var field) ? field : null;
     }
 
-    /// <summary>Kennen wir dieses Etikett?</summary>
+    /// <summary>Do we know this label?</summary>
     /// <remarks>
-    /// Getrennt von <see cref="Aus"/>, damit ein Endpunkt Unbekanntes absagen
-    /// kann statt es still zu <c>null</c> zu machen. Leer ist zulässig und
-    /// heisst „keins" — sonst gäbe es keinen Weg zurück.
+    /// Separate from <see cref="From"/>, so an endpoint can refuse something
+    /// unknown instead of quietly turning it into <c>null</c>. Empty is
+    /// permitted and means „none" — otherwise there would be no way back.
     /// </remarks>
-    /// <param name="etikett">Was hereinkam.</param>
-    /// <returns><c>true</c>, wenn es gespeichert werden darf.</returns>
-    public static bool Kennen(string? label) =>
-        string.IsNullOrWhiteSpace(label) || NachEtikett.ContainsKey(label.Trim());
+    /// <param name="label">What came in.</param>
+    /// <returns><c>true</c> if it may be stored.</returns>
+    public static bool Known(string? label) =>
+        string.IsNullOrWhiteSpace(label) || ByLabel.ContainsKey(label.Trim());
 
-    /// <summary>Das Etikett, wie es in der Spalte und auf dem Draht steht.</summary>
-    /// <param name="feld">Das Feld, oder <c>null</c>.</param>
-    /// <returns>snake_case — oder <c>null</c>, wenn niemand gewählt hat.</returns>
-    public static string? Etikett(OccupationalField? field) => field switch
+    /// <summary>The label as it stands in the column and on the wire.</summary>
+    /// <param name="field">The field, or <c>null</c>.</param>
+    /// <returns>snake_case — or <c>null</c> when nobody chose.</returns>
+    public static string? Label(OccupationalField? field) => field switch
     {
-        OccupationalField.Handwerk => "handwerk",
-        OccupationalField.IndustrieTechnik => "industrie_technik",
-        OccupationalField.Bau => "bau",
-        OccupationalField.GesundheitPflege => "gesundheit_pflege",
-        OccupationalField.LogistikVerkehr => "logistik_verkehr",
-        OccupationalField.GastronomieHotel => "gastronomie_hotel",
-        OccupationalField.HandelVerkauf => "handel_verkauf",
-        OccupationalField.BueroVerwaltung => "buero_verwaltung",
+        OccupationalField.Crafts => "handwerk",
+        OccupationalField.IndustryTechnology => "industrie_technik",
+        OccupationalField.Construction => "bau",
+        OccupationalField.HealthCare => "gesundheit_pflege",
+        OccupationalField.LogisticsTransport => "logistik_verkehr",
+        OccupationalField.HospitalityHotel => "gastronomie_hotel",
+        OccupationalField.RetailSales => "handel_verkauf",
+        OccupationalField.OfficeAdministration => "buero_verwaltung",
         OccupationalField.ItSoftware => "it_software",
-        OccupationalField.BildungSoziales => "bildung_soziales",
+        OccupationalField.EducationSocial => "bildung_soziales",
         OccupationalField.Other => "sonstiges",
         _ => null
     };

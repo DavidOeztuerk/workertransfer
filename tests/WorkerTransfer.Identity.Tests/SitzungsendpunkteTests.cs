@@ -15,12 +15,12 @@ namespace WorkerTransfer.Identity.Tests;
 /// over HTTP against the real schema.
 /// </summary>
 [Collection(PostgresCollection.Name)]
-public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
+public class SessionEndpointTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Passwort = "geheim-und-lang-genug";
+    private const string Password = "geheim-und-lang-genug";
 
     /// <summary>Written by <c>worker_auth.BcryptPasswordHasher</c>, verbatim.</summary>
-    private const string PythonEintrag =
+    private const string PythonEntry =
         "$2b$12$DK/g90pKN70aYUJosVXXue7nxXxqQoBDevGWH/2zQSzfzqNLjn9eW";
 
     private WebApplicationFactory<Program> _dienst = null!;
@@ -32,12 +32,12 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:identity", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:PrivateKey", TokenShape.PrivateKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("environment", "Development");
         });
 
@@ -49,7 +49,7 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
 
         _anna = Guid.NewGuid();
         _email = $"anna-{Guid.NewGuid():N}@example.com";
-        await LegeKontoAn(_anna, _email);
+        await CreateAccount(_anna, _email);
     }
 
     public Task DisposeAsync()
@@ -58,76 +58,76 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private async Task LegeKontoAn(Guid id, string email)
+    private async Task CreateAccount(Guid id, string email)
     {
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
-        await using var befehl = connection.CreateCommand();
-        befehl.CommandText = """
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
             INSERT INTO users (id, email, password_hash, display_name, status, roles,
                                created_at, updated_at, version)
             VALUES (@id, @email, @hash, 'Anna', 'active'::account_status, '["user"]'::jsonb,
                     now(), now(), 1)
             """;
-        befehl.Parameters.AddWithValue("id", id);
-        befehl.Parameters.AddWithValue("email", email);
-        befehl.Parameters.AddWithValue("hash", PythonEintrag);
-        await befehl.ExecuteNonQueryAsync();
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("email", email);
+        command.Parameters.AddWithValue("hash", PythonEntry);
+        await command.ExecuteNonQueryAsync();
     }
 
     /// <summary>
     /// Granted out of band, the same seam the Python integration tests use: this
     /// suite is about the endpoints, not about how somebody joins a company.
     /// </summary>
-    private async Task<Guid> LegeFirmaAnMitMitglied(Guid benutzer)
+    private async Task<Guid> CreateCompanyWithMember(Guid users)
     {
         var company = Guid.NewGuid();
 
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
 
-        await using (var befehl = connection.CreateCommand())
+        await using (var command = connection.CreateCommand())
         {
-            befehl.CommandText = """
+            command.CommandText = """
                 INSERT INTO tenants (id, name, domain, status, created_at)
                 VALUES (@id, 'Beispiel GmbH', @domain, 'active', now())
                 """;
-            befehl.Parameters.AddWithValue("id", company);
-            befehl.Parameters.AddWithValue("domain", $"{company:N}.example.com");
-            await befehl.ExecuteNonQueryAsync();
+            command.Parameters.AddWithValue("id", company);
+            command.Parameters.AddWithValue("domain", $"{company:N}.example.com");
+            await command.ExecuteNonQueryAsync();
         }
 
-        await using (var befehl = connection.CreateCommand())
+        await using (var command = connection.CreateCommand())
         {
-            befehl.CommandText = """
+            command.CommandText = """
                 INSERT INTO user_tenant_memberships (id, user_id, tenant_id, role, granted_at)
                 VALUES (@id, @benutzer, @company, 'admin', now())
                 """;
-            befehl.Parameters.AddWithValue("id", Guid.NewGuid());
-            befehl.Parameters.AddWithValue("benutzer", benutzer);
-            befehl.Parameters.AddWithValue("company", company);
-            await befehl.ExecuteNonQueryAsync();
+            command.Parameters.AddWithValue("id", Guid.NewGuid());
+            command.Parameters.AddWithValue("benutzer", users);
+            command.Parameters.AddWithValue("company", company);
+            await command.ExecuteNonQueryAsync();
         }
 
         return company;
     }
 
     /// <summary>Somebody else, so the foreign membership has a real owner.</summary>
-    private async Task<Guid> FremdesKonto()
+    private async Task<Guid> ForeignAccount()
     {
         var subject = Guid.NewGuid();
-        await LegeKontoAn(subject, $"bea-{Guid.NewGuid():N}@example.com");
+        await CreateAccount(subject, $"bea-{Guid.NewGuid():N}@example.com");
         return subject;
     }
 
     private HttpClient Browser() =>
         _dienst.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
 
-    private async Task<HttpClient> AngemeldeterBrowser()
+    private async Task<HttpClient> SignedInBrowser()
     {
         var browser = Browser();
         var response = await browser.PostAsJsonAsync(
-            "/auth/login", new { email = _email, password = Passwort });
+            "/auth/login", new { email = _email, password = Password });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         return browser;
     }
@@ -141,7 +141,7 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
     /// normal state.
     /// </summary>
     [Fact]
-    public async Task Ohne_alles_meldet_die_Sitzung_anonymous_und_nicht_401()
+    public async Task With_nothing_at_all_the_session_reports_anonymous_and_not_401()
     {
         var response = await Browser().GetAsync("/auth/session");
 
@@ -150,17 +150,17 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Angemeldet_meldet_die_Sitzung_active_mit_der_Adresse()
+    public async Task Signed_in_the_session_reports_active_with_the_address()
     {
-        var response = await (await AngemeldeterBrowser()).GetAsync("/auth/session");
+        var response = await (await SignedInBrowser()).GetAsync("/auth/session");
 
-        var körper = await Json(response);
-        körper["state"]!.ToString().Should().Be("active");
-        körper["user"]!.ToString().Should().Contain(_email);
+        var köbody = await Json(response);
+        köbody["state"]!.ToString().Should().Be("active");
+        köbody["user"]!.ToString().Should().Contain(_email);
     }
 
     [Fact]
-    public async Task Ohne_Anmeldung_antwortet_me_mit_401()
+    public async Task Without_a_sign_in_me_answers_401()
     {
         var response = await Browser().GetAsync("/me");
 
@@ -168,29 +168,29 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Angemeldet_nennt_me_die_Person_und_keine_Firma()
+    public async Task Signed_in_me_names_the_person_and_no_company()
     {
-        var response = await (await AngemeldeterBrowser()).GetAsync("/me");
+        var response = await (await SignedInBrowser()).GetAsync("/me");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var körper = await Json(response);
-        körper["user_id"]!.ToString().Should().Be(_anna.ToString());
-        körper["email"]!.ToString().Should().Be(_email);
-        körper["tenant_id"].Should().BeNull("eine Anmeldung macht niemanden zum Unternehmen");
+        var köbody = await Json(response);
+        köbody["user_id"]!.ToString().Should().Be(_anna.ToString());
+        köbody["email"]!.ToString().Should().Be(_email);
+        köbody["tenant_id"].Should().BeNull("a sign-in makes nobody a company");
     }
 
     [Fact]
-    public async Task Ein_Mitglied_darf_fuer_seine_Firma_handeln()
+    public async Task A_member_may_act_for_their_company()
     {
-        var company = await LegeFirmaAnMitMitglied(_anna);
-        var browser = await AngemeldeterBrowser();
+        var company = await CreateCompanyWithMember(_anna);
+        var browser = await SignedInBrowser();
 
-        var gewechselt = await browser.PostAsync($"/auth/company/{company}", null);
+        var switched = await browser.PostAsync($"/auth/company/{company}", null);
 
-        gewechselt.StatusCode.Should().Be(HttpStatusCode.OK);
+        switched.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var körper = await Json(await browser.GetAsync("/me"));
-        körper["tenant_id"]!.ToString().Should().Be(company.ToString());
+        var köbody = await Json(await browser.GetAsync("/me"));
+        köbody["tenant_id"]!.ToString().Should().Be(company.ToString());
     }
 
     /// <summary>
@@ -198,23 +198,23 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
     /// anyone probe which companies are here.
     /// </summary>
     [Fact]
-    public async Task Wer_kein_Mitglied_ist_bekommt_403_egal_ob_es_die_Firma_gibt()
+    public async Task Whoever_is_not_a_member_gets_403_whether_or_not_the_company_exists()
     {
-        var fremde = await LegeFirmaAnMitMitglied(await FremdesKonto());
-        var erfunden = Guid.NewGuid();
-        var browser = await AngemeldeterBrowser();
+        var foreign = await CreateCompanyWithMember(await ForeignAccount());
+        var invented = Guid.NewGuid();
+        var browser = await SignedInBrowser();
 
-        var beiFremder = await browser.PostAsync($"/auth/company/{fremde}", null);
-        var beiErfundener = await browser.PostAsync($"/auth/company/{erfunden}", null);
+        var withForeign = await browser.PostAsync($"/auth/company/{foreign}", null);
+        var withInvented = await browser.PostAsync($"/auth/company/{invented}", null);
 
-        beiFremder.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        beiErfundener.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        withForeign.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        withInvented.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
-    public async Task Ohne_Anmeldung_wechselt_niemand_die_Firma()
+    public async Task Without_a_sign_in_nobody_switches_company()
     {
-        var company = await LegeFirmaAnMitMitglied(_anna);
+        var company = await CreateCompanyWithMember(_anna);
 
         var response = await Browser().PostAsync($"/auth/company/{company}", null);
 
@@ -226,33 +226,33 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
     /// the company somebody asked for and was not given.
     /// </summary>
     [Fact]
-    public async Task Der_Wechsel_und_seine_Abweisung_stehen_beide_im_Protokoll()
+    public async Task The_switch_and_its_refusal_both_stand_in_the_trail()
     {
-        var meine = await LegeFirmaAnMitMitglied(_anna);
-        var fremde = await LegeFirmaAnMitMitglied(await FremdesKonto());
-        var browser = await AngemeldeterBrowser();
+        var mine = await CreateCompanyWithMember(_anna);
+        var foreign = await CreateCompanyWithMember(await ForeignAccount());
+        var browser = await SignedInBrowser();
 
-        await browser.PostAsync($"/auth/company/{meine}", null);
-        await browser.PostAsync($"/auth/company/{fremde}", null);
+        await browser.PostAsync($"/auth/company/{mine}", null);
+        await browser.PostAsync($"/auth/company/{foreign}", null);
 
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
-        await using var befehl = connection.CreateCommand();
-        befehl.CommandText = """
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
             SELECT action::text, tenant_id FROM audit_events
             WHERE actor_id = @subject AND action IN ('tenant_switch', 'tenant_switch_denied')
             ORDER BY occurred_at
             """;
-        befehl.Parameters.AddWithValue("subject", _anna);
+        command.Parameters.AddWithValue("subject", _anna);
 
-        var found = new List<(string Handlung, Guid Firma)>();
-        await using var leser = await befehl.ExecuteReaderAsync();
-        while (await leser.ReadAsync())
+        var found = new List<(string Action, Guid Company)>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
         {
-            found.Add((leser.GetString(0), leser.GetGuid(1)));
+            found.Add((reader.GetString(0), reader.GetGuid(1)));
         }
 
-        found.Should().Contain(("tenant_switch", meine));
-        found.Should().Contain(("tenant_switch_denied", fremde));
+        found.Should().Contain(("tenant_switch", mine));
+        found.Should().Contain(("tenant_switch_denied", foreign));
     }
 }

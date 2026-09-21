@@ -15,10 +15,10 @@ namespace WorkerTransfer.Identity.Tests;
 /// written down in this repository.
 /// </remarks>
 [Collection(PostgresCollection.Name)]
-public class PruefspurTests(Postgres postgres)
+public class AuditTrailTests(Postgres postgres)
 {
-    private IdentityDbContext Kontext() =>
-        IdentityDbContextFactory.Fuer(postgres.ConnectionString);
+    private IdentityDbContext Context() =>
+        IdentityDbContextFactory.For(postgres.ConnectionString);
 
     /// <summary>
     /// All thirteen, one by one. A member whose label the column does not know
@@ -26,7 +26,7 @@ public class PruefspurTests(Postgres postgres)
     /// <c>invitation_withdrawn</c>, could be months after the mistake.
     /// </summary>
     [Fact]
-    public async Task Jede_Handlung_laesst_sich_schreiben_und_wiederlesen()
+    public async Task Every_action_can_be_written_and_read_back()
     {
         var alle = Enum.GetValues<AuditAction>();
         alle.Should().HaveCount(13);
@@ -35,18 +35,18 @@ public class PruefspurTests(Postgres postgres)
         {
             var subject = SubjectId.New();
 
-            await using (var context = Kontext())
+            await using (var context = Context())
             {
                 await new EfAuditTrail(context).AppendAsync(
                     new AuditEvent(action, DateTimeOffset.UtcNow, actor: subject));
                 await context.SaveChangesAsync();
             }
 
-            await using var gelesen = Kontext();
-            var row = await gelesen.AuditEvents
+            await using var read = Context();
+            var row = await read.AuditEvents
                 .FirstOrDefaultAsync(row => row.ActorId == subject.Value);
 
-            row.Should().NotBeNull($"{action} muss in audit_events passen");
+            row.Should().NotBeNull($"{action} has to fit into audit_events");
             row!.Action.Should().Be(action);
         }
     }
@@ -61,12 +61,12 @@ public class PruefspurTests(Postgres postgres)
     [InlineData(AuditAction.TokenRefresh, "token_refresh")]
     [InlineData(AuditAction.TenantSwitchDenied, "tenant_switch_denied")]
     [InlineData(AuditAction.InvitationWithdrawn, "invitation_withdrawn")]
-    public async Task Die_Handlung_steht_als_der_Name_da_den_Python_geschrieben_hat(
-        AuditAction action, string erwartet)
+    public async Task The_action_stands_there_under_the_name_Python_wrote(
+        AuditAction action, string expected)
     {
         var subject = SubjectId.New();
 
-        await using (var context = Kontext())
+        await using (var context = Context())
         {
             await new EfAuditTrail(context).AppendAsync(
                 new AuditEvent(action, DateTimeOffset.UtcNow, actor: subject));
@@ -75,19 +75,19 @@ public class PruefspurTests(Postgres postgres)
 
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
-        await using var befehl = connection.CreateCommand();
-        befehl.CommandText = "SELECT action::text FROM audit_events WHERE actor_id = @wer";
-        befehl.Parameters.AddWithValue("wer", subject.Value);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT action::text FROM audit_events WHERE actor_id = @wer";
+        command.Parameters.AddWithValue("wer", subject.Value);
 
-        (await befehl.ExecuteScalarAsync()).Should().Be(erwartet);
+        (await command.ExecuteScalarAsync()).Should().Be(expected);
     }
 
     [Fact]
-    public async Task Die_Metadaten_landen_als_jsonb_und_kommen_so_zurueck()
+    public async Task The_metadata_lands_as_jsonb_and_comes_back_that_way()
     {
         var subject = SubjectId.New();
 
-        await using (var context = Kontext())
+        await using (var context = Context())
         {
             await new EfAuditTrail(context).AppendAsync(
                 new AuditEvent(
@@ -104,15 +104,15 @@ public class PruefspurTests(Postgres postgres)
 
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
-        await using var befehl = connection.CreateCommand();
-        befehl.CommandText =
+        await using var command = connection.CreateCommand();
+        command.CommandText =
             "SELECT metadata->>'reason', correlation_id FROM audit_events WHERE actor_id = @wer";
-        befehl.Parameters.AddWithValue("wer", subject.Value);
+        command.Parameters.AddWithValue("wer", subject.Value);
 
-        await using var leser = await befehl.ExecuteReaderAsync();
-        (await leser.ReadAsync()).Should().BeTrue();
-        leser.GetString(0).Should().Be("bad_password");
-        leser.GetString(1).Should().Be("abc-123");
+        await using var reader = await command.ExecuteReaderAsync();
+        (await reader.ReadAsync()).Should().BeTrue();
+        reader.GetString(0).Should().Be("bad_password");
+        reader.GetString(1).Should().Be("abc-123");
     }
 
     /// <summary>
@@ -123,10 +123,10 @@ public class PruefspurTests(Postgres postgres)
     [InlineData("email")]
     [InlineData("password")]
     [InlineData("display_name")]
-    public void Ein_Schluessel_ausserhalb_der_Erlaubnisliste_kommt_gar_nicht_erst_hinein(
+    public void A_key_outside_the_allowlist_does_not_get_in_at_all(
         string key)
     {
-        var bauen = () => new AuditEvent(
+        var build = () => new AuditEvent(
             AuditAction.Register,
             DateTimeOffset.UtcNow,
             metadata: new Dictionary<string, string>(StringComparer.Ordinal)
@@ -134,7 +134,7 @@ public class PruefspurTests(Postgres postgres)
                 [key] = "egal"
             });
 
-        bauen.Should().Throw<AuditMetadataException>().Which.Key.Should().Be(key);
+        build.Should().Throw<AuditMetadataException>().Which.Key.Should().Be(key);
     }
 
     [Theory]
@@ -142,9 +142,9 @@ public class PruefspurTests(Postgres postgres)
     [InlineData("ip")]
     [InlineData("user_agent")]
     [InlineData("role")]
-    public void Die_vier_erlaubten_Schluessel_gehen_durch(string key)
+    public void The_four_allowed_keys_go_through(string key)
     {
-        var bauen = () => new AuditEvent(
+        var build = () => new AuditEvent(
             AuditAction.Register,
             DateTimeOffset.UtcNow,
             metadata: new Dictionary<string, string>(StringComparer.Ordinal)
@@ -152,6 +152,6 @@ public class PruefspurTests(Postgres postgres)
                 [key] = "egal"
             });
 
-        bauen.Should().NotThrow();
+        build.Should().NotThrow();
     }
 }

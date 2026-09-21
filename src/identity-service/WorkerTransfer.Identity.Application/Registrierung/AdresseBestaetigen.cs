@@ -8,12 +8,12 @@ using WorkerTransfer.Identity.Domain.Verification;
 namespace WorkerTransfer.Identity.Application.Registrierung;
 
 /// <summary>Confirm an address with the token from the mail.</summary>
-public sealed record AdresseBestaetigenBefehl(string Token) : IBefehl<Bestaetigungsergebnis>;
+public sealed record ConfirmAddressCommand(string Token) : ICommand<ConfirmationResult>;
 
 /// <summary>What confirming produced.</summary>
-public abstract record Bestaetigungsergebnis
+public abstract record ConfirmationResult
 {
-    private Bestaetigungsergebnis() { }
+    private ConfirmationResult() { }
 
     /// <summary>
     /// The account is active.
@@ -24,52 +24,52 @@ public abstract record Bestaetigungsergebnis
     /// interface otherwise shows as "all good" while half the intention has
     /// evaporated.
     /// </remarks>
-    /// <param name="Firmenname">The company that was created, if one was.</param>
-    /// <param name="Firmenfehler">Why none was, if the intention was refused.</param>
-    public sealed record Bestaetigt(string? Firmenname = null, string? Firmenfehler = null)
-        : Bestaetigungsergebnis;
+    /// <param name="CompanyName">The company that was created, if one was.</param>
+    /// <param name="CompanyError">Why none was, if the intention was refused.</param>
+    public sealed record Confirmed(string? CompanyName = null, string? CompanyError = null)
+        : ConfirmationResult;
 
     /// <summary>The link means nothing.</summary>
-    public sealed record Ungueltig : Bestaetigungsergebnis;
+    public sealed record Invalid : ConfirmationResult;
 
     /// <summary>The link is past its time.</summary>
-    public sealed record Abgelaufen : Bestaetigungsergebnis;
+    public sealed record Expired : ConfirmationResult;
 }
 
 /// <summary>Confirms an address, and redeems the company intention with it.</summary>
-public sealed class AdresseBestaetigenHandler(
-    IUserRepository benutzer,
+public sealed class ConfirmAddressHandler(
+    IUserRepository users,
     IVerificationTokenRepository tokens,
-    IEinmaltoken einmaltoken,
-    UnternehmenAnlegen unternehmen,
-    IAuditTrail protokoll,
-    IKorrelation korrelation,
-    TimeProvider uhr)
-    : IRequestHandler<AdresseBestaetigenBefehl, Bestaetigungsergebnis>
+    IOneTimeToken oneTimeToken,
+    CreateCompany createCompany,
+    IAuditTrail auditTrail,
+    ICorrelation correlation,
+    TimeProvider clock)
+    : IRequestHandler<ConfirmAddressCommand, ConfirmationResult>
 {
     /// <inheritdoc />
-    public async Task<Bestaetigungsergebnis> Handle(
-        AdresseBestaetigenBefehl request,
+    public async Task<ConfirmationResult> Handle(
+        ConfirmAddressCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var now = uhr.GetUtcNow();
+        var now = clock.GetUtcNow();
         var row = await tokens.FindByHashAsync(
-            einmaltoken.Hashe(request.Token), cancellationToken);
+            oneTimeToken.HashOf(request.Token), cancellationToken);
 
         if (row is not { Purpose: TokenPurpose.EmailVerify })
         {
             // An unknown token says nothing about why it is unknown, or the
             // endpoint becomes an oracle.
-            return new Bestaetigungsergebnis.Ungueltig();
+            return new ConfirmationResult.Invalid();
         }
 
-        var konto = await benutzer.FindByIdAsync(row.Subject, cancellationToken);
+        var account = await users.FindByIdAsync(row.Subject, cancellationToken);
 
-        if (konto is null)
+        if (account is null)
         {
-            return new Bestaetigungsergebnis.Ungueltig();
+            return new ConfirmationResult.Invalid();
         }
 
         if (row.IsConsumed)
@@ -80,34 +80,34 @@ public sealed class AdresseBestaetigenHandler(
             //
             // Still pending means the token was voided by a resend, and the old
             // link must not unlock anything any more.
-            return konto.Status == AccountStatus.Active
-                ? new Bestaetigungsergebnis.Bestaetigt()
-                : new Bestaetigungsergebnis.Ungueltig();
+            return account.Status == AccountStatus.Active
+                ? new ConfirmationResult.Confirmed()
+                : new ConfirmationResult.Invalid();
         }
 
         if (row.IsExpired(now))
         {
-            return new Bestaetigungsergebnis.Abgelaufen();
+            return new ConfirmationResult.Expired();
         }
 
-        konto.Activate();
+        account.Activate();
 
         // Without this the unlock stays in memory: the aggregate comes back
         // detached from the repository.
-        await benutzer.SaveAsync(konto, cancellationToken);
+        await users.SaveAsync(account, cancellationToken);
         await tokens.ConsumeAsync(row.Id, now, cancellationToken);
 
-        await protokoll.AppendAsync(
+        await auditTrail.AppendAsync(
             new AuditEvent(
                 AuditAction.EmailVerified,
                 now,
-                actor: konto.Id,
-                correlationId: korrelation.Aktuell),
+                actor: account.Id,
+                correlationId: correlation.Current),
             cancellationToken);
 
-        return konto.PendingCompanyName is { } gewollt
-            ? await LoeseAbsichtEin(konto, gewollt, cancellationToken)
-            : new Bestaetigungsergebnis.Bestaetigt();
+        return account.PendingCompanyName is { } intended
+            ? await RedeemIntent(account, intended, cancellationToken)
+            : new ConfirmationResult.Confirmed();
     }
 
     /// <summary>
@@ -120,30 +120,30 @@ public sealed class AdresseBestaetigenHandler(
     /// transaction, same repositories, no service-to-service call: companies
     /// live in this service.
     /// </remarks>
-    private async Task<Bestaetigungsergebnis> LoeseAbsichtEin(
-        User konto,
-        string gewollt,
+    private async Task<ConfirmationResult> RedeemIntent(
+        User account,
+        string intended,
         CancellationToken cancellationToken)
     {
-        var result = await unternehmen.ExecuteOneAsync(konto, gewollt, cancellationToken);
+        var result = await createCompany.ExecuteOneAsync(account, intended, cancellationToken);
 
-        // Spent in EVERY caseItem, including a refusal — see User.CompanyIntentSpent.
-        konto.CompanyIntentSpent();
-        await benutzer.SaveAsync(konto, cancellationToken);
+        // Spent in EVERY case, including a refusal — see User.CompanyIntentSpent.
+        account.CompanyIntentSpent();
+        await users.SaveAsync(account, cancellationToken);
 
         return result switch
         {
-            CompanyResult.Angelegt angelegt =>
-                new Bestaetigungsergebnis.Bestaetigt(Firmenname: angelegt.Firma.Name),
+            CompanyResult.Created created =>
+                new ConfirmationResult.Confirmed(CompanyName: created.Company.Name),
 
             // The CONFIRMATION does not fail over this. The account is
             // unlocked, and that is right and irreversible: locking somebody
             // out because a company name was taken would be the wrong answer to
             // the wrong question.
-            CompanyResult.Abgelehnt abgelehnt =>
-                new Bestaetigungsergebnis.Bestaetigt(Firmenfehler: abgelehnt.Code),
+            CompanyResult.Refused refused =>
+                new ConfirmationResult.Confirmed(CompanyError: refused.Code),
 
-            _ => new Bestaetigungsergebnis.Bestaetigt()
+            _ => new ConfirmationResult.Confirmed()
         };
     }
 }

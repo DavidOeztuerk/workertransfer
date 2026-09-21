@@ -20,17 +20,16 @@ public sealed class ErasureSettings
     /// <summary>One base address per recipient, keyed by the name in the kind.</summary>
     public Dictionary<string, string> Adressen { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>Wie lange auf einen Empfaenger gewartet wird.</summary>
+    /// <summary>How long a recipient is waited for.</summary>
     /// <remarks>
-    /// Fuenf Sekunden. Ohne diese Zeile gilt die Vorgabe von <c>HttpClient</c>
-    /// mit HUNDERT Sekunden — bei acht Empfaengern also ueber dreizehn Minuten
-    /// fuer einen Durchlauf, in dem einer haengt.
+    /// Five seconds. Without this line <c>HttpClient</c>'s default of a HUNDRED
+    /// seconds holds — with eight recipients that is over thirteen minutes for
+    /// one pass in which one of them hangs.
     /// <para>
-    /// Kurz zu sein kostet hier nichts: eine Zeitueberschreitung ist ein
-    /// Fehlschlag, und ein Fehlschlag laesst die Outbox-Zeile stehen. Sie wird
-    /// wiederholt, ohne Versuchsobergrenze (ADR-0027). Was NICHT passieren
-    /// darf, ist das Gegenteil — dass ein haengender Empfaenger als zugestellt
-    /// gilt.
+    /// Being short costs nothing here: a timeout is a failure, and a failure
+    /// leaves the outbox row standing. It is retried, with no attempt ceiling
+    /// (ADR-0027). What must NOT happen is the opposite — that a hanging
+    /// recipient counts as delivered.
     /// </para>
     /// </remarks>
     public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);

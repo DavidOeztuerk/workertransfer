@@ -22,14 +22,14 @@ namespace WorkerTransfer.Identity.Infrastructure.Erasure;
 /// data (ADR-0027 §6).
 /// </remarks>
 public sealed class HttpErasureDelivery(
-    IHttpClientFactory fabrik,
-    IErasureLedger bestand,
-    IPostkorb postkorb,
-    IPostkorbVersand versand,
-    IOptions<ErasureSettings> einstellungen,
-    TimeProvider uhr) : IDelivery
+    IHttpClientFactory factory,
+    IErasureLedger erasureLedger,
+    IMailTray mailTray,
+    IMailTrayDispatch dispatch,
+    IOptions<ErasureSettings> settings,
+    TimeProvider clock) : IDelivery
 {
-    private readonly ErasureSettings _einstellungen = einstellungen.Value;
+    private readonly ErasureSettings _settings = settings.Value;
 
     /// <inheritdoc />
     public async Task DeliverAsync(
@@ -39,24 +39,24 @@ public sealed class HttpErasureDelivery(
     {
         if (kind == ErasureRecipient.Unternehmensrueckzug)
         {
-            await ZiehAnzeigenZurueck(recipient, cancellationToken);
+            await WithdrawAdverts(recipient, cancellationToken);
             return;
         }
 
         if (kind == ErasureRecipient.Schlussnachricht)
         {
-            await SchickeSchlussnachricht(recipient, cancellationToken);
+            await SendClosingNotice(recipient, cancellationToken);
             return;
         }
 
         if (kind == ErasureRecipient.Identitaet)
         {
-            await SchliesseAb(recipient, cancellationToken);
+            await Finish(recipient, cancellationToken);
             return;
         }
 
         var service = kind[ErasureRecipient.Praefix.Length..];
-        await Frag(service, "/erasure", new ErasureV1(recipient.Value), cancellationToken);
+        await PostAsync(service, "/erasure", new ErasureV1(recipient.Value), cancellationToken);
     }
 
     /// <summary>
@@ -67,52 +67,52 @@ public sealed class HttpErasureDelivery(
     /// point: a message saying "everything is gone" while a service still holds
     /// data would be the one lie this whole cascade exists to prevent.
     /// </remarks>
-    private async Task SchickeSchlussnachricht(
+    private async Task SendClosingNotice(
         SubjectId subject,
         CancellationToken cancellationToken)
     {
-        var offen = await bestand.OpenIntentsAsync(subject, cancellationToken);
+        var open = await erasureLedger.OpenIntentsAsync(subject, cancellationToken);
 
-        if (offen.Any(kind => kind != ErasureRecipient.Schlussnachricht
+        if (open.Any(kind => kind != ErasureRecipient.Schlussnachricht
                              && kind != ErasureRecipient.Identitaet))
         {
-            throw new NochNichtException("noch nicht alle Empfänger haben quittiert");
+            throw new NochNichtException("not every recipient has acknowledged yet");
         }
 
         // Read now, not carried along: the address and the language live in the
         // row that is about to be deleted, and putting either in the outbox
         // would write it into every backup (ADR-0025 §5).
-        var anschrift = await bestand.AddressAsync(subject, cancellationToken);
+        var address = await erasureLedger.AddressAsync(subject, cancellationToken);
 
-        if (anschrift is not null)
+        if (address is not null)
         {
-            postkorb.Loeschbestaetigung(anschrift.Adresse, subject, anschrift.Sprache);
-            await versand.SendCollectedAsync(cancellationToken);
+            mailTray.ErasureConfirmation(address.Address, subject, address.Language);
+            await dispatch.SendCollectedAsync(cancellationToken);
         }
     }
 
     /// <summary>The account falls last, and only after the notice went out.</summary>
-    private async Task SchliesseAb(SubjectId subject, CancellationToken cancellationToken)
+    private async Task Finish(SubjectId subject, CancellationToken cancellationToken)
     {
-        var offen = await bestand.OpenIntentsAsync(subject, cancellationToken);
+        var open = await erasureLedger.OpenIntentsAsync(subject, cancellationToken);
 
-        if (offen.Any(kind => kind != ErasureRecipient.Identitaet))
+        if (open.Any(kind => kind != ErasureRecipient.Identitaet))
         {
-            throw new NochNichtException("die Schlussnachricht steht noch aus");
+            throw new NochNichtException("the closing notice is still outstanding");
         }
 
-        var stillgelegt = await bestand.CompleteAsync(subject, uhr.GetUtcNow(), cancellationToken);
+        var dormant = await erasureLedger.CompleteAsync(subject, clock.GetUtcNow(), cancellationToken);
 
-        foreach (var company in stillgelegt)
+        foreach (var company in dormant)
         {
-            await Frag(
+            await PostAsync(
                 "jobs", "/companies/withdrawal",
                 new UnternehmensrueckzugV1(company.Value), cancellationToken);
         }
     }
 
-    private Task ZiehAnzeigenZurueck(SubjectId company, CancellationToken cancellationToken) =>
-        Frag("jobs", "/companies/withdrawal",
+    private Task WithdrawAdverts(SubjectId company, CancellationToken cancellationToken) =>
+        PostAsync("jobs", "/companies/withdrawal",
             new UnternehmensrueckzugV1(company.Value), cancellationToken);
 
     /// <summary>
@@ -123,35 +123,35 @@ public sealed class HttpErasureDelivery(
     /// transport error and a bad status — right for a mail, and here it would
     /// make <c>delivered_at</c> a lie.
     /// </remarks>
-    private async Task Frag<T>(
+    private async Task PostAsync<T>(
         string service,
         string path,
         T body,
         CancellationToken cancellationToken)
     {
-        if (!_einstellungen.Adressen.TryGetValue(service, out var basis))
+        if (!_settings.Adressen.TryGetValue(service, out var baseUrl))
         {
-            throw new InvalidOperationException($"Keine Adresse für '{service}' konfiguriert.");
+            throw new InvalidOperationException($"No address configured for '{service}'.");
         }
 
         // Empty means nothing is delivered — and as a FAILURE, not as a silent
         // skip. A row that counted as delivered while nobody deleted anything
         // would be the worst case there is.
-        if (string.IsNullOrEmpty(_einstellungen.Geheimnis))
+        if (string.IsNullOrEmpty(_settings.Geheimnis))
         {
-            throw new InvalidOperationException("Erasure:Geheimnis ist nicht gesetzt.");
+            throw new InvalidOperationException("Erasure:Geheimnis is not set.");
         }
 
-        using var client = fabrik.CreateClient(nameof(HttpErasureDelivery));
+        using var client = factory.CreateClient(nameof(HttpErasureDelivery));
 
-        client.Timeout = _einstellungen.Zeitueberschreitung;
+        client.Timeout = _settings.Zeitueberschreitung;
         using var request = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(basis), path))
+            HttpMethod.Post, new Uri(new Uri(baseUrl), path))
         {
             Content = JsonContent.Create(body)
         };
 
-        request.Headers.Add("X-Erasure-Secret", _einstellungen.Geheimnis);
+        request.Headers.Add("X-Erasure-Secret", _settings.Geheimnis);
 
         using var response = await client.SendAsync(request, cancellationToken);
 

@@ -17,26 +17,26 @@ namespace WorkerTransfer.Identity.Application.Unternehmen;
 /// invitation presupposes colleagues who do not exist yet.
 /// </para>
 /// </remarks>
-public sealed record UnternehmenGruendenBefehl(SubjectId Wer, string Name)
-    : IBefehl<CompanyResult>;
+public sealed record FoundCompanyCommand(SubjectId Subject, string Name)
+    : ICommand<CompanyResult>;
 
-/// <inheritdoc cref="UnternehmenGruendenBefehl" />
-public sealed class UnternehmenGruendenHandler(
-    IUserRepository benutzer,
-    UnternehmenAnlegen unternehmen)
-    : IRequestHandler<UnternehmenGruendenBefehl, CompanyResult>
+/// <inheritdoc cref="FoundCompanyCommand" />
+public sealed class FoundCompanyHandler(
+    IUserRepository users,
+    CreateCompany companies)
+    : IRequestHandler<FoundCompanyCommand, CompanyResult>
 {
     /// <inheritdoc />
     public async Task<CompanyResult> Handle(
-        UnternehmenGruendenBefehl request,
+        FoundCompanyCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var konto = await benutzer.FindByIdAsync(request.Wer, cancellationToken);
+        var account = await users.FindByIdAsync(request.Subject, cancellationToken);
 
-        return konto is null
-            ? new CompanyResult.Abgelehnt("account_not_confirmed")
-            : await unternehmen.ExecuteOneAsync(konto, request.Name, cancellationToken);
+        return account is null
+            ? new CompanyResult.Refused("account_not_confirmed")
+            : await companies.ExecuteOneAsync(account, request.Name, cancellationToken);
     }
 }

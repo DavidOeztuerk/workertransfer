@@ -15,30 +15,30 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Identity.Tests;
 
-/// <summary>Das OccupationalField ordnet, was angeboten wird — und sonst nichts (ADR-0039).</summary>
+/// <summary>The occupational field orders what is offered — and nothing else (ADR-0039).</summary>
 [Collection(PostgresCollection.Name)]
-public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
+public class OccupationalFieldTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Passwort = "geheim-und-lang-genug";
+    private const string Password = "geheim-und-lang-genug";
 
     private WebApplicationFactory<Program> _dienst = null!;
-    private readonly Postmitschrift _post = new();
+    private readonly MailRecord _post = new();
 
     public async Task InitializeAsync()
     {
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:identity", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:PrivateKey", TokenShape.PrivateKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
-                services.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
+                services.Replace(ServiceDescriptor.Singleton<IMailSender>(_post)));
         });
 
         using var scope = _dienst.Services.CreateScope();
@@ -52,10 +52,10 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    /// <summary>Die elf Etiketten als MENGE, damit ein zwölftes auffällt.</summary>
+    /// <summary>The eleven labels as a SET, so a twelfth stands out.</summary>
     [Fact]
-    public void Die_Liste_ist_geschlossen_und_vollstaendig() =>
-        OccupationalFieldChoice.Etiketten.Should().BeEquivalentTo(
+    public void The_list_is_closed_and_complete() =>
+        OccupationalFieldChoice.Labels.Should().BeEquivalentTo(
         [
             "handwerk", "industrie_technik", "bau", "gesundheit_pflege",
             "logistik_verkehr", "gastronomie_hotel", "handel_verkauf",
@@ -63,28 +63,27 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
         ]);
 
     /// <summary>
-    /// Jedes Etikett kommt als es selbst zurück — beide Richtungen sind von
-    /// Hand geschrieben.
+    /// Every label comes back as itself — both directions are written by hand.
     /// </summary>
     [Fact]
-    public void Jedes_Etikett_ueberlebt_den_Hin_und_Rueckweg()
+    public void Every_label_survives_the_round_trip()
     {
-        foreach (var label in OccupationalFieldChoice.Etiketten)
+        foreach (var label in OccupationalFieldChoice.Labels)
         {
-            OccupationalFieldChoice.Etikett(OccupationalFieldChoice.Aus(label)).Should().Be(label);
+            OccupationalFieldChoice.Label(OccupationalFieldChoice.From(label)).Should().Be(label);
         }
     }
 
-    /// <summary>„Other" ist eine Wahl, „nichts" ist keine.</summary>
+    /// <summary>„Other" is a choice, „nothing" is none.</summary>
     [Fact]
-    public void Sonstiges_ist_nicht_dasselbe_wie_nichts()
+    public void Other_is_not_the_same_as_nothing()
     {
-        OccupationalFieldChoice.Aus("sonstiges").Should().Be(OccupationalField.Other);
-        OccupationalFieldChoice.Aus(null).Should().BeNull();
-        OccupationalFieldChoice.Aus("  ").Should().BeNull();
+        OccupationalFieldChoice.From("sonstiges").Should().Be(OccupationalField.Other);
+        OccupationalFieldChoice.From(null).Should().BeNull();
+        OccupationalFieldChoice.From("  ").Should().BeNull();
     }
 
-    /// <summary>Leer ist ein zulässiger Wert, Unsinn nicht.</summary>
+    /// <summary>Empty is a permitted value, nonsense is not.</summary>
     [Theory]
     [InlineData(null, true)]
     [InlineData("", true)]
@@ -92,82 +91,82 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
     [InlineData("HANDWERK", true)]
     [InlineData("industrietechnik", false)]
     [InlineData("metallbauer", false)]
-    public void Kennen_sagt_was_gespeichert_werden_darf(string? label, bool erwartet) =>
-        OccupationalFieldChoice.Kennen(label).Should().Be(erwartet);
+    public void Known_says_what_may_be_stored(string? label, bool expected) =>
+        OccupationalFieldChoice.Known(label).Should().Be(expected);
 
     /// <summary>
-    /// Wer nichts wählt, bekommt <c>null</c>. Nichts wird geraten — eine
-    /// GitHub-Connection macht niemanden zu <c>it_software</c> (ADR-0022 §2).
+    /// Whoever chooses nothing gets <c>null</c>. Nothing is guessed — a GitHub
+    /// connection makes nobody <c>it_software</c> (ADR-0022 §2).
     /// </summary>
     [Fact]
-    public async Task Ohne_Wahl_steht_nichts_da()
+    public async Task Without_a_choice_nothing_stands_there()
     {
-        var browser = await AngemeldetesKonto();
+        var browser = await SignedInAccount();
 
-        var session = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
+        var session = await browser.GetFromJsonAsync<SessionAnswer>("/auth/session");
 
         session!.User!.OccupationalField.Should().BeNull();
     }
 
-    /// <summary>Was bei der Registrierung gewählt wurde, steht danach da.</summary>
+    /// <summary>What was chosen at registration stands there afterwards.</summary>
     [Fact]
-    public async Task Die_Wahl_bei_der_Registrierung_haelt()
+    public async Task The_choice_made_at_registration_holds()
     {
-        var browser = await AngemeldetesKonto(field: "handwerk");
+        var browser = await SignedInAccount(field: "handwerk");
 
-        var session = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
+        var session = await browser.GetFromJsonAsync<SessionAnswer>("/auth/session");
 
         session!.User!.OccupationalField.Should().Be("handwerk");
     }
 
     /// <summary>
-    /// Die Wahl lässt sich nachholen und zurücknehmen — <c>null</c> heisst
-    /// entfernen, nicht „unverändert".
+    /// The choice can be made later and taken back — <c>null</c> means remove,
+    /// not „unchanged".
     /// </summary>
     [Fact]
-    public async Task Nachtragen_und_zuruecknehmen_wirken_beide()
+    public async Task Adding_and_taking_back_both_take_effect()
     {
-        var browser = await AngemeldetesKonto();
+        var browser = await SignedInAccount();
 
-        var gesetzt = await browser.PutAsJsonAsync(
+        var set = await browser.PutAsJsonAsync(
             "/account/occupational-field", new { occupational_field = "gesundheit_pflege" });
-        gesetzt.StatusCode.Should().Be(HttpStatusCode.OK);
+        set.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var nachher = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
-        nachher!.User!.OccupationalField.Should().Be("gesundheit_pflege");
+        var afterwards = await browser.GetFromJsonAsync<SessionAnswer>("/auth/session");
+        afterwards!.User!.OccupationalField.Should().Be("gesundheit_pflege");
 
         var geleert = await browser.PutAsJsonAsync(
             "/account/occupational-field", new { occupational_field = (string?)null });
         geleert.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var zurueck = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
-        zurueck!.User!.OccupationalField.Should().BeNull();
+        var back = await browser.GetFromJsonAsync<SessionAnswer>("/auth/session");
+        back!.User!.OccupationalField.Should().BeNull();
     }
 
-    /// <summary>Ein unbekanntes Etikett wird abgesagt, nicht still verworfen.</summary>
+    /// <summary>An unknown label is refused, not silently discarded.</summary>
     [Fact]
-    public async Task Ein_unbekanntes_Feld_wird_abgesagt()
+    public async Task An_unknown_field_is_refused()
     {
-        var browser = await AngemeldetesKonto(field: "handwerk");
+        var browser = await SignedInAccount(field: "handwerk");
 
         var response = await browser.PutAsJsonAsync(
             "/account/occupational-field", new { occupational_field = "metallbauer" });
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        // Eine abgesagte Änderung darf nichts angerichtet haben.
-        var session = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
+        // A refused change must have done nothing.
+        var session = await browser.GetFromJsonAsync<SessionAnswer>("/auth/session");
         session!.User!.OccupationalField.Should().Be("handwerk");
     }
 
-    /// <summary>Auch die Registrierung sagt ab, statt die Angabe wegzuwerfen.</summary>
+    /// <summary>Registration refuses too, instead of discarding the entry.</summary>
     [Fact]
-    public async Task Eine_Registrierung_mit_Unsinn_wird_abgesagt()
+    public async Task A_registration_with_nonsense_is_refused()
     {
         var response = await _dienst.CreateClient().PostAsJsonAsync("/auth/register", new
         {
-            email = NeueAdresse("unsinn"),
-            password = Passwort,
+            email = NewAddress("unsinn"),
+            password = Password,
             display_name = "Unsinn",
             occupational_field = "raumfahrt"
         });
@@ -175,9 +174,9 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
-    /// <summary>Ohne Anmeldung ändert niemand ein OccupationalField.</summary>
+    /// <summary>Without a sign-in nobody changes an occupational field.</summary>
     [Fact]
-    public async Task Ohne_Anmeldung_geht_es_nicht()
+    public async Task Without_a_sign_in_it_does_not_work()
     {
         var response = await _dienst.CreateClient().PutAsJsonAsync(
             "/account/occupational-field", new { occupational_field = "bau" });
@@ -185,20 +184,20 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    private static string NeueAdresse(string subject) =>
+    private static string NewAddress(string subject) =>
         $"{subject}-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
 
-    /// <summary>Registriert, bestätigt und meldet an.</summary>
-    private async Task<HttpClient> AngemeldetesKonto(string? field = null)
+    /// <summary>Registers, confirms and signs in.</summary>
+    private async Task<HttpClient> SignedInAccount(string? field = null)
     {
-        var address = NeueAdresse("anna");
+        var address = NewAddress("anna");
         var browser = _dienst.CreateClient(
             new WebApplicationFactoryClientOptions { HandleCookies = true });
 
         await browser.PostAsJsonAsync("/auth/register", new
         {
             email = address,
-            password = Passwort,
+            password = Password,
             display_name = "Anna",
             occupational_field = field
         });
@@ -208,15 +207,15 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
         await browser.PostAsJsonAsync("/auth/verify-email", new { token });
         await browser.PostAsJsonAsync("/auth/login", new
         {
-            email = address, password = Passwort
+            email = address, password = Password
         });
 
         return browser;
     }
 
-    private sealed record SitzungsAntwort(BenutzerAntwort? User);
+    private sealed record SessionAnswer(AccountAnswer? User);
 
-    private sealed record BenutzerAntwort(
+    private sealed record AccountAnswer(
         [property: JsonPropertyName("user_id")] string UserId,
         [property: JsonPropertyName("occupational_field")] string? OccupationalField);
 }

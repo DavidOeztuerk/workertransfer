@@ -5,7 +5,7 @@ using WorkerTransfer.Identity.Domain.Companies;
 namespace WorkerTransfer.Identity.Infrastructure.Persistence;
 
 /// <summary>Reads <c>user_tenant_memberships</c>.</summary>
-public sealed class EfMembershipRepository(IdentityDbContext context, TimeProvider uhr)
+public sealed class EfMembershipRepository(IdentityDbContext context, TimeProvider clock)
     : IMembershipRepository
 {
     /// <inheritdoc />
@@ -30,7 +30,7 @@ public sealed class EfMembershipRepository(IdentityDbContext context, TimeProvid
             UserId = subject.Value,
             TenantId = tenant.Value,
             Role = MembershipRoleNames.ToDatabase(role),
-            GrantedAt = uhr.GetUtcNow().UtcDateTime
+            GrantedAt = clock.GetUtcNow().UtcDateTime
         });
 
         return Task.CompletedTask;
@@ -42,12 +42,12 @@ public sealed class EfMembershipRepository(IdentityDbContext context, TimeProvid
         TenantId tenant,
         CancellationToken cancellationToken = default)
     {
-        var gespeichert = await context.Memberships
+        var stored = await context.Memberships
             .Where(row => row.UserId == subject.Value && row.TenantId == tenant.Value)
             .Select(row => row.Role)
             .FirstOrDefaultAsync(cancellationToken);
 
-        return gespeichert is null ? null : MembershipRoleNames.FromDatabase(gespeichert);
+        return stored is null ? null : MembershipRoleNames.FromDatabase(stored);
     }
 
     /// <inheritdoc />
@@ -80,8 +80,8 @@ public sealed class EfMembershipRepository(IdentityDbContext context, TimeProvid
             .Where(row => row.TenantId == tenant.Value)
             .Join(context.Users,
                 member => member.UserId,
-                benutzer => benutzer.Id,
-                (member, benutzer) => new { benutzer.Id, benutzer.DisplayName, member.Role })
+                users => users.Id,
+                (member, users) => new { users.Id, users.DisplayName, member.Role })
             .OrderBy(entry => entry.DisplayName)
             .ToListAsync(cancellationToken);
 

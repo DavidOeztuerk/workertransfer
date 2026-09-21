@@ -1,7 +1,7 @@
 namespace WorkerTransfer.Identity.Infrastructure.Post;
 
 /// <summary>Where mail goes and what the link in it points at.</summary>
-public sealed class Postsettings
+public sealed class MailSettings
 {
     /// <summary>The configuration section this binds to.</summary>
     public const string Section = "Mail";
@@ -16,10 +16,10 @@ public sealed class Postsettings
     public string Absender { get; set; } = "noreply@workertransfer.local";
 
     /// <summary>Set only where the server actually wants it.</summary>
-    public string? Benutzer { get; set; }
+    public string? Account { get; set; }
 
-    /// <inheritdoc cref="Benutzer" />
-    public string? Passwort { get; set; }
+    /// <inheritdoc cref="Account" />
+    public string? Password { get; set; }
 
     /// <summary>Whether to upgrade the connection.</summary>
     public bool Tls { get; set; }

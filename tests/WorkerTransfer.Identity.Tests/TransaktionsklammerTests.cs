@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 namespace WorkerTransfer.Identity.Tests;
 
 /// <summary>A context that holds nothing but Noelia's own table.</summary>
-public sealed class NurNoeliaKontext(DbContextOptions<NurNoeliaKontext> options) : DbContext(options)
+public sealed class NoeliaOnlyContext(DbContextOptions<NoeliaOnlyContext> options) : DbContext(options)
 {
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,7 +42,7 @@ public sealed class NurNoeliaKontext(DbContextOptions<NurNoeliaKontext> options)
 /// </para>
 /// </remarks>
 [Collection(PostgresCollection.Name)]
-public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
+public class TransactionScopeTests(Postgres postgres) : IAsyncLifetime
 {
     private ServiceProvider _anbieter = null!;
 
@@ -52,36 +52,36 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
         services.AddLogging();
         services.AddSingleton(TimeProvider.System);
         services.Configure<TokenSessionOptions>(_ => { });
-        services.AddDbContext<NurNoeliaKontext>(
+        services.AddDbContext<NoeliaOnlyContext>(
             options => options.UseNpgsql(postgres.ConnectionString));
-        services.AddEntityFrameworkRefreshTokens<NurNoeliaKontext>();
+        services.AddEntityFrameworkRefreshTokens<NoeliaOnlyContext>();
 
-        // `SessionObservations` ist seit 5.1.0 ein Singleton und der fuenfte
-        // Konstruktorparameter von `TokenSessionService` (MIGRATION.md:451).
-        // Vorher war die Menge der beobachteten Subjekte ein Instanzfeld an
-        // einem `AddScoped`-Dienst — je ResumeRequest ein neues, leeres Woerterbuch,
-        // weshalb die Sitzungsuebersicht dauerhaft „0 active sessions" meldete.
+        // Since 5.1.0 `SessionObservations` is a singleton and the fifth
+        // constructor parameter of `TokenSessionService` (MIGRATION.md:451).
+        // Before, the set of observed subjects was an instance field on an
+        // `AddScoped` service — a new, empty dictionary per request, which is
+        // why the session overview permanently reported „0 active sessions".
         //
-        // Diese Reihe baut den Dienst selbst, statt das Modul zu fahren; sie
-        // muss das Singleton deshalb selbst stellen. Eine Ueberladung mit vier
-        // Parametern gibt es bewusst nicht — sie legte sich ihre eigene Menge an
-        // und stellte damit genau den Defekt lautlos wieder her.
+        // This suite builds the service itself instead of running the module; it
+        // therefore has to supply the singleton itself. There is deliberately no
+        // overload with four parameters — it would create a set of its own and
+        // thereby silently restore exactly that defect.
         services.AddSingleton<SessionObservations>();
         services.AddScoped<ITokenSessionService, TokenSessionService>();
 
         _anbieter = services.BuildServiceProvider();
 
         using var scope = _anbieter.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
+        var context = scope.ServiceProvider.GetRequiredService<NoeliaOnlyContext>();
 
         // Not EnsureCreated: the database already carries the Alembic schema,
         // so it would decide there is nothing to do. xunit builds one
         // instance per test, hence the check.
-        var vorhanden = await context.Database
+        var existing = await context.Database
             .SqlQuery<int>($"SELECT 1 AS \"Value\" FROM pg_class WHERE relname = 'probe_refresh_tokens'")
             .AnyAsync();
 
-        if (!vorhanden)
+        if (!existing)
         {
             await ((RelationalDatabaseCreator)context.Database.GetService<IDatabaseCreator>())
                 .CreateTablesAsync();
@@ -95,98 +95,98 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
     /// joins whatever transaction is open.
     /// </summary>
     [Fact]
-    public async Task Eine_Anmeldung_laeuft_in_einer_offenen_Transaktion()
+    public async Task A_sign_in_runs_inside_an_open_transaction()
     {
         using var scope = _anbieter.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
+        var context = scope.ServiceProvider.GetRequiredService<NoeliaOnlyContext>();
         var sessions = scope.ServiceProvider.GetRequiredService<ITokenSessionService>();
 
-        await using var klammer = await context.Database.BeginTransactionAsync();
+        await using var transaction = await context.Database.BeginTransactionAsync();
 
-        var angemeldet = await sessions.SignInAsync(SubjectId.New());
-        await klammer.CommitAsync();
+        var signedIn = await sessions.SignInAsync(SubjectId.New());
+        await transaction.CommitAsync();
 
-        angemeldet.RefreshToken.Should().NotBeEmpty();
+        signedIn.RefreshToken.Should().NotBeEmpty();
     }
 
     /// <summary>
-    /// Und eine Erneuerung ebenso: sie tritt der offenen Klammer bei, statt eine
-    /// zweite zu öffnen, und die Rotation wird mit der Arbeit des Aufrufers
-    /// dauerhaft.
+    /// And a refresh likewise: it joins the open transaction instead of opening
+    /// a second one, and the rotation becomes permanent together with the
+    /// caller's work.
     /// </summary>
     /// <remarks>
-    /// Bis Girder 3.0.1 warf diese Job
-    /// <c>"The connection is already in a transaction"</c> — der Grund, warum
-    /// <c>POST /auth/refresh</c> und <c>/auth/logout</c> eine Weile rot standen.
+    /// Until Girder 3.0.1 this place threw
+    /// <c>"The connection is already in a transaction"</c> — the reason
+    /// <c>POST /auth/refresh</c> and <c>/auth/logout</c> stood red for a while.
     /// </remarks>
     [Fact]
-    public async Task Eine_Erneuerung_laeuft_in_einer_offenen_Transaktion()
+    public async Task A_refresh_runs_inside_an_open_transaction()
     {
         using var scope = _anbieter.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
+        var context = scope.ServiceProvider.GetRequiredService<NoeliaOnlyContext>();
         var sessions = scope.ServiceProvider.GetRequiredService<ITokenSessionService>();
 
-        var angemeldet = await sessions.SignInAsync(SubjectId.New());
+        var signedIn = await sessions.SignInAsync(SubjectId.New());
 
-        await using var klammer = await context.Database.BeginTransactionAsync();
-        var erneuert = await sessions.RefreshAsync(angemeldet.RefreshToken);
-        await klammer.CommitAsync();
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        var refreshed = await sessions.RefreshAsync(signedIn.RefreshToken);
+        await transaction.CommitAsync();
 
-        erneuert.Succeeded.Should().BeTrue();
-        erneuert.RefreshToken.Should().NotBeNullOrEmpty()
-            .And.NotBe(angemeldet.RefreshToken, "eine Erneuerung rotiert den Token");
+        refreshed.Succeeded.Should().BeTrue();
+        refreshed.RefreshToken.Should().NotBeNullOrEmpty()
+            .And.NotBe(signedIn.RefreshToken, "a refresh rotates the token");
 
-        // Nach dem Commit des Aufrufers: der alte Token ist wirklich verbraucht.
-        // Ihn erneut vorzulegen nimmt jetzt den Zweig für eine bereits gedrehte
-        // Zeile — innerhalb des Kulanzfensters also ein Geschwister, kein
-        // Diebstahl. Das beweist, dass die Rotation an der Klammer des Aufrufers
-        // hing und dessen Commit überlebt hat; ohne sie stünde hier Rotated.
-        var nochmal = await sessions.RefreshAsync(angemeldet.RefreshToken);
-        nochmal.Outcome.Should().Be(ConsumeOutcome.RotatedWithinGrace);
+        // After the caller's commit: the old token really is spent. Presenting
+        // it again now takes the branch for an already rotated row — inside the
+        // grace window a sibling, then, not a theft. That proves the rotation
+        // hung on the caller's transaction and survived its commit; without it
+        // Rotated would stand here.
+        var onceMore = await sessions.RefreshAsync(signedIn.RefreshToken);
+        onceMore.Outcome.Should().Be(ConsumeOutcome.RotatedWithinGrace);
     }
 
     /// <summary>
-    /// Und eine Abmeldung ebenso — die zweite Route aus demselben Ticket.
+    /// And a sign-out likewise — the second route out of the same ticket.
     /// </summary>
     /// <remarks>
-    /// <c>POST /auth/logout</c> ist zusammengesetzt: erst den Token verbrauchen,
-    /// um die Sitzung zu kennen, dann die Sitzung schliessen. Beide Schritte
-    /// liegen in der Klammer des Aufrufers, weil daneben die Pruefspurzeile
-    /// <c>token_revoke</c> faellt — und ein Eintrag, der ohne die Abmeldung
-    /// committet, behauptet etwas, das nicht geschehen ist.
+    /// <c>POST /auth/logout</c> is composite: first spend the token in order to
+    /// know the session, then close the session. Both steps lie in the caller's
+    /// transaction, because the audit-trail row <c>token_revoke</c> falls beside
+    /// them — and an entry that commits without the sign-out asserts something
+    /// that did not happen.
     /// <para>
-    /// Bis Girder 3.0.1 stand hier derselbe Fehler wie eine Zeile hoeher. Der
-    /// Test steht trotzdem eigens da: die Erneuerung deckt nur den ersten der
-    /// beiden Schritte ab, und <c>SignOutAsync</c> ist ein anderer Aufruf.
+    /// Until Girder 3.0.1 the same fault stood here as one line above. The test
+    /// stands here in its own right all the same: the refresh covers only the
+    /// first of the two steps, and <c>SignOutAsync</c> is a different call.
     /// </para>
     /// </remarks>
     [Fact]
-    public async Task Eine_Abmeldung_laeuft_in_einer_offenen_Transaktion()
+    public async Task A_sign_out_runs_inside_an_open_transaction()
     {
         using var scope = _anbieter.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
+        var context = scope.ServiceProvider.GetRequiredService<NoeliaOnlyContext>();
         var sessions = scope.ServiceProvider.GetRequiredService<ITokenSessionService>();
 
-        var angemeldet = await sessions.SignInAsync(SubjectId.New());
+        var signedIn = await sessions.SignInAsync(SubjectId.New());
 
-        await using var klammer = await context.Database.BeginTransactionAsync();
+        await using var transaction = await context.Database.BeginTransactionAsync();
 
-        var verbraucht = await sessions.RefreshAsync(angemeldet.RefreshToken);
+        var consumedAt = await sessions.RefreshAsync(signedIn.RefreshToken);
 
-        if (verbraucht is not { Session: { } session })
+        if (consumedAt is not { Session: { } session })
         {
             throw new InvalidOperationException(
-                "die Erneuerung nannte keine Sitzung — der Test prueft dann nichts");
+                "the refresh named no session — the test then checks nothing");
         }
 
         await sessions.SignOutAsync(session);
-        await klammer.CommitAsync();
+        await transaction.CommitAsync();
 
-        // Nach dem Commit des Aufrufers ist die Sitzung wirklich zu. Ohne die
-        // Abmeldung traege der eben gedrehte Token noch das Kulanzfenster und
-        // wuerde erneuern — deshalb ist genau er die Probe.
-        var danach = await sessions.RefreshAsync(verbraucht.RefreshToken!);
-        danach.Succeeded.Should().BeFalse(
-            "die Abmeldung lag in derselben Klammer und hat deren Commit ueberlebt");
+        // After the caller's commit the session really is closed. Without the
+        // sign-out the just-rotated token would still carry the grace window and
+        // would refresh — which is why it is exactly the probe.
+        var after = await sessions.RefreshAsync(consumedAt.RefreshToken!);
+        after.Succeeded.Should().BeFalse(
+            "the sign-out lay in the same transaction and survived its commit");
     }
 }

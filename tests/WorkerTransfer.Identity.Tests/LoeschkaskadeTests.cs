@@ -24,24 +24,24 @@ namespace WorkerTransfer.Identity.Tests;
 /// wrapper across passes is exactly that mistake, and it shows up as
 /// <c>ObjectDisposedException</c> in a warning nobody reads.
 /// </remarks>
-public sealed class Probesteuerung
+public sealed class TestControl
 {
     /// <summary>Recipients that refuse. Everything else goes through.</summary>
     public HashSet<string> Tot { get; } = new(StringComparer.Ordinal);
 
     /// <summary>What went out, in order.</summary>
-    public List<string> Zugestellt { get; } = [];
+    public List<string> Delivered { get; } = [];
 }
 
 /// <summary>A delivery that answers the way a test tells it to.</summary>
-public sealed class Probeempfaenger(Probesteuerung steuerung, IDelivery echt) : IDelivery
+public sealed class TestRecipient(TestControl control, IDelivery real) : IDelivery
 {
     public async Task DeliverAsync(
         SubjectId recipient, string kind, CancellationToken cancellationToken = default)
     {
-        if (steuerung.Tot.Contains(kind))
+        if (control.Tot.Contains(kind))
         {
-            throw new HttpRequestException($"{kind} antwortet nicht");
+            throw new HttpRequestException($"{kind} does not answer");
         }
 
         // The real one for the two local kinds — they carry the order and the
@@ -49,44 +49,44 @@ public sealed class Probeempfaenger(Probesteuerung steuerung, IDelivery echt) : 
         // foreign recipients are HTTP calls to services that do not run here.
         if (kind is ErasureRecipient.Schlussnachricht or ErasureRecipient.Identitaet)
         {
-            await echt.DeliverAsync(recipient, kind, cancellationToken);
+            await real.DeliverAsync(recipient, kind, cancellationToken);
         }
 
-        steuerung.Zugestellt.Add(kind);
+        control.Delivered.Add(kind);
     }
 }
 
 /// <summary>The cascade: order, completeness, and what a dead recipient does.</summary>
 [Collection(PostgresCollection.Name)]
-public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
+public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Passwort = "geheim-und-lang-genug";
+    private const string Password = "geheim-und-lang-genug";
 
     private WebApplicationFactory<Program> _dienst = null!;
-    private MitschreibenderVersender _versand = null!;
-    private readonly Probesteuerung _steuerung = new();
+    private RecordingMailSender _versand = null!;
+    private readonly TestControl _steuerung = new();
 
     public async Task InitializeAsync()
     {
-        _versand = new MitschreibenderVersender(postgres.ConnectionString);
+        _versand = new RecordingMailSender(postgres.ConnectionString);
 
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:identity", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:PrivateKey", TokenShape.PrivateKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Erasure:Geheimnis", "probe-geheimnis");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {
-                services.Replace(ServiceDescriptor.Singleton<IVersender>(_versand));
+                services.Replace(ServiceDescriptor.Singleton<IMailSender>(_versand));
                 services.AddSingleton(_steuerung);
                 services.Replace(ServiceDescriptor.Scoped<IDelivery>(provider =>
-                    new Probeempfaenger(
+                    new TestRecipient(
                         _steuerung,
                         ActivatorUtilities.CreateInstance<
                             WorkerTransfer.Identity.Infrastructure.Erasure
@@ -108,14 +108,14 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
     private HttpClient Browser() =>
         _dienst.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
 
-    private async Task<(HttpClient Browser, Guid Wer, string Email)> Person()
+    private async Task<(HttpClient Browser, Guid Subject, string Email)> Person()
     {
         var browser = Browser();
         var email = $"anna-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
 
         await browser.PostAsJsonAsync("/auth/register", new
         {
-            email, password = Passwort, display_name = "Anna"
+            email, password = Password, display_name = "Anna"
         });
 
         var token = System.Text.RegularExpressions.Regex.Match(
@@ -124,45 +124,45 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
             TimeSpan.FromSeconds(5)).Groups["t"].Value;
 
         await browser.PostAsJsonAsync("/auth/verify-email", new { token });
-        await browser.PostAsJsonAsync("/auth/login", new { email, password = Passwort });
+        await browser.PostAsJsonAsync("/auth/login", new { email, password = Password });
 
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
-        await using var befehl = connection.CreateCommand();
-        befehl.CommandText = "SELECT id FROM users WHERE email = @email";
-        befehl.Parameters.AddWithValue("email", email);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT id FROM users WHERE email = @email";
+        command.Parameters.AddWithValue("email", email);
 
-        return (browser, (Guid)(await befehl.ExecuteScalarAsync())!, email);
+        return (browser, (Guid)(await command.ExecuteScalarAsync())!, email);
     }
 
-    private async Task<List<(string Kind, DateTime? Delivered)>> Zeilen(Guid subject)
+    private async Task<List<(string Kind, DateTime? Delivered)>> Rows(Guid subject)
     {
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
-        await using var befehl = connection.CreateCommand();
-        befehl.CommandText =
+        await using var command = connection.CreateCommand();
+        command.CommandText =
             "SELECT kind, delivered_at FROM outbox WHERE user_id = @wer ORDER BY created_at";
-        befehl.Parameters.AddWithValue("wer", subject);
+        command.Parameters.AddWithValue("wer", subject);
 
         var rows = new List<(string, DateTime?)>();
-        await using var leser = await befehl.ExecuteReaderAsync();
-        while (await leser.ReadAsync())
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
         {
-            rows.Add((leser.GetString(0), leser.IsDBNull(1) ? null : leser.GetDateTime(1)));
+            rows.Add((reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetDateTime(1)));
         }
 
         return rows;
     }
 
-    private async Task<string?> Kontostand(Guid subject)
+    private async Task<string?> AccountStatusValue(Guid subject)
     {
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
-        await using var befehl = connection.CreateCommand();
-        befehl.CommandText = "SELECT status::text FROM users WHERE id = @wer";
-        befehl.Parameters.AddWithValue("wer", subject);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT status::text FROM users WHERE id = @wer";
+        command.Parameters.AddWithValue("wer", subject);
 
-        return (string?)await befehl.ExecuteScalarAsync();
+        return (string?)await command.ExecuteScalarAsync();
     }
 
     /// <summary>
@@ -170,7 +170,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
     /// order is enforced: the notice waits for the recipients, the account
     /// waits for the notice.
     /// </summary>
-    private async Task Durchlauf(int male = 1)
+    private async Task Pass(int male = 1)
     {
         for (var i = 0; i < male; i++)
         {
@@ -182,18 +182,18 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Das_Verlangen_sperrt_sofort_und_schreibt_dreizehn_Absichten()
+    public async Task The_request_locks_immediately_and_writes_thirteen_intents()
     {
         var (browser, subject, _) = await Person();
 
-        var verlangt = await browser.PostAsync("/account/erasure", null);
+        var requested = await browser.PostAsync("/account/erasure", null);
 
-        verlangt.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        (await Kontostand(subject)).Should().Be("disabled", "ab jetzt passiert nichts mehr unter diesem Namen");
+        requested.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        (await AccountStatusValue(subject)).Should().Be("disabled", "from now on nothing happens under this name");
 
-        var rows = await Zeilen(subject);
-        rows.Should().HaveCount(13, "elf Empfaenger, die Schlussnachricht und identity selbst");
-        rows.Select(z => z.Kind).Should().Contain(RequestErasureHandler.Absichten);
+        var rows = await Rows(subject);
+        rows.Should().HaveCount(13, "eleven recipients, the closing notice and identity itself");
+        rows.Select(z => z.Kind).Should().Contain(RequestErasureHandler.Intents);
     }
 
     /// <summary>
@@ -203,7 +203,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
     /// because it holds the preferences, keyed by the person.
     /// </summary>
     [Fact]
-    public void Empfaenger_ist_wer_eine_Zeile_je_Mensch_haelt()
+    public void A_recipient_is_whoever_holds_a_row_per_human_being()
     {
         ErasureRecipient.Fremde.Should().BeEquivalentTo(
         [
@@ -212,34 +212,34 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
             "assessment"
         ]);
 
-        // `github` gehoert dazu: der Dienst haelt eine Zeile je Mensch — die
-        // Verknuepfung „dieser Plattform-Mensch ist jener GitHub-Name". Er
-        // stand einmal nicht auf dieser Liste, weil das geloeschte PAKET
-        // `worker-github` (das Menschen bewertete) mit dem DIENST verwechselt
-        // wurde, der unter ADR-0022 gebaut ist und das Gegenteil tut.
+        // `github` belongs on it: the service holds one row per human being —
+        // the link „this platform person is that GitHub name". It once did not
+        // stand on this list, because the deleted PACKAGE `worker-github` (which
+        // evaluated people) was confused with the SERVICE built under ADR-0022,
+        // which does the opposite.
         ErasureRecipient.Fremde.Should().Contain("github");
 
-        // `scout` kam mit seiner ersten Tabelle dazu (ADR-0036). Er haelt
-        // gespeicherte SUCHEN — die Filter, nie ein Ergebnis — und jede gehoert
-        // dem Menschen, der sie abgelegt hat; dazu Ausgangszeilen, die von
-        // einem Menschen handeln. Wer eine Zeile je Mensch haelt, ist
-        // Empfaenger: das ist die ganze Regel.
+        // `scout` joined with its first table (ADR-0036). It holds stored
+        // SEARCHES — the filters, never a result — and each belongs to the human
+        // being who filed it; plus outgoing rows that are about a human being.
+        // Whoever holds one row per human being is a recipient: that is the
+        // whole rule.
         ErasureRecipient.Fremde.Should().Contain("scout");
 
-        // `advisor` kam mit seiner ersten Tabelle dazu (ADR-0037). Er haelt ein
-        // MANDAT, dessen Schluessel die Person IST — Eintrittstermin,
-        // Gehaltsspanne, Pensum, ausgeschlossene Unternehmen — und die
-        // Gespraeche, in denen sie steht. Sichtbarkeit haelt er ausdruecklich
-        // nicht; die faellt bei consent-service. Wer eine Zeile je Mensch
-        // haelt, ist Empfaenger: das ist die ganze Regel.
+        // `advisor` joined with its first table (ADR-0037). It holds a MANDATE
+        // whose key IS the person — entry month, salary range, workload,
+        // excluded companies — and the conversations they stand in. Visibility
+        // it expressly does not hold; that falls at consent-service. Whoever
+        // holds one row per human being is a recipient: that is the whole
+        // rule.
         ErasureRecipient.Fremde.Should().Contain("advisor");
 
-        // `assessment` kam mit seiner ersten Tabelle dazu (ADR-0042). Er haelt
-        // die Aufgaben, die einem Menschen gestellt wurden, was er abgegeben
-        // hat und die eine Rueckmeldung darauf — alles unter seiner Kennung.
-        // UND KEINEN AUFBEWAHRUNGSFALL, auch nicht fuer die Evaluation: sie ist
-        // kein Evidence, der jemand anderem gehoert, und eine, die eine Erasure
-        // ueberlebte, waere genau das Reference, das ADR-0042 ausschliesst.
+        // `assessment` joined with its first table (ADR-0042). It holds the
+        // tasks set to a human being, what they submitted and the one reply to
+        // it — all under their id. AND NO RETENTION CASE, not even for the
+        // evaluation: it is no record belonging to somebody else, and one that
+        // survived an erasure would be exactly the reference ADR-0042 rules
+        // out.
         ErasureRecipient.Fremde.Should().Contain("assessment");
 
         ErasureRecipient.Fremde.Should().NotContain("jobs", "haelt nichts Personenbezogenes");
@@ -247,16 +247,16 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Nach_dem_Verlangen_traegt_die_Anmeldung_nicht_mehr()
+    public async Task After_the_request_the_sign_in_no_longer_carries()
     {
         var (browser, _, email) = await Person();
 
         await browser.PostAsync("/account/erasure", null);
 
-        var erneut = await Browser().PostAsJsonAsync(
-            "/auth/login", new { email, password = Passwort });
+        var again = await Browser().PostAsJsonAsync(
+            "/auth/login", new { email, password = Password });
 
-        erneut.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        again.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     /// <summary>
@@ -265,15 +265,15 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
     /// thing that happens once.
     /// </summary>
     [Fact]
-    public async Task Zweimal_verlangen_erzeugt_keine_zweite_Kaskade()
+    public async Task Requesting_twice_produces_no_second_cascade()
     {
         var (browser, subject, _) = await Person();
 
         await browser.PostAsync("/account/erasure", null);
-        var zweite = await browser.PostAsync("/account/erasure", null);
+        var second = await browser.PostAsync("/account/erasure", null);
 
-        zweite.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        (await Zeilen(subject)).Should().HaveCount(13);
+        second.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        (await Rows(subject)).Should().HaveCount(13);
     }
 
     /// <summary>
@@ -281,25 +281,25 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
     /// is the one lie this whole cascade exists to prevent.
     /// </summary>
     [Fact]
-    public async Task Ein_toter_Empfaenger_blockiert_die_Schlussnachricht_und_das_Konto()
+    public async Task A_dead_recipient_blocks_the_closing_notice_and_the_account()
     {
         var (browser, subject, _) = await Person();
         await browser.PostAsync("/account/erasure", null);
 
         _steuerung.Tot.Add(ErasureRecipient.Art("resume"));
 
-        await Durchlauf(3);
+        await Pass(3);
 
-        var rows = await Zeilen(subject);
+        var rows = await Rows(subject);
 
         rows.Single(z => z.Kind == ErasureRecipient.Art("resume")).Delivered
-            .Should().BeNull("der Empfaenger antwortet nicht");
+            .Should().BeNull("the recipient does not answer");
         rows.Single(z => z.Kind == ErasureRecipient.Schlussnachricht).Delivered
-            .Should().BeNull("sie darf erst raus, wenn alle quittiert haben");
+            .Should().BeNull("it may go out only once everybody has acknowledged");
         rows.Single(z => z.Kind == ErasureRecipient.Identitaet).Delivered
-            .Should().BeNull("und das Konto faellt zuletzt");
+            .Should().BeNull("and the account falls last");
 
-        (await Kontostand(subject)).Should().Be("disabled", "es steht noch, aber gesperrt");
+        (await AccountStatusValue(subject)).Should().Be("disabled", "it still stands, but disabled");
     }
 
     /// <summary>
@@ -308,43 +308,43 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
     /// ceiling it would strangle the delivery.
     /// </summary>
     [Fact]
-    public async Task Geordnetes_Warten_verbraucht_keinen_Versuch()
+    public async Task Orderly_waiting_spends_no_attempt()
     {
         var (browser, subject, _) = await Person();
         await browser.PostAsync("/account/erasure", null);
 
         _steuerung.Tot.Add(ErasureRecipient.Art("consent"));
-        await Durchlauf(3);
+        await Pass(3);
 
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
-        await using var befehl = connection.CreateCommand();
-        befehl.CommandText =
+        await using var command = connection.CreateCommand();
+        command.CommandText =
             "SELECT attempts, last_error FROM outbox WHERE user_id = @wer AND kind = @art";
-        befehl.Parameters.AddWithValue("wer", subject);
-        befehl.Parameters.AddWithValue("art", ErasureRecipient.Schlussnachricht);
+        command.Parameters.AddWithValue("wer", subject);
+        command.Parameters.AddWithValue("art", ErasureRecipient.Schlussnachricht);
 
-        await using var leser = await befehl.ExecuteReaderAsync();
-        (await leser.ReadAsync()).Should().BeTrue();
-        leser.GetInt32(0).Should().Be(0, "warten ist kein Fehlschlag");
-        leser.GetString(1).Should().BeEmpty();
+        await using var reader = await command.ExecuteReaderAsync();
+        (await reader.ReadAsync()).Should().BeTrue();
+        reader.GetInt32(0).Should().Be(0, "waiting is no failure");
+        reader.GetString(1).Should().BeEmpty();
     }
 
     [Fact]
-    public async Task Wenn_alle_quittiert_haben_faellt_das_Konto_und_die_Mail_geht_raus()
+    public async Task When_everybody_has_acknowledged_the_account_falls_and_the_mail_goes_out()
     {
         var (browser, subject, email) = await Person();
         await browser.PostAsync("/account/erasure", null);
 
-        await Durchlauf(3);
+        await Pass(3);
 
-        var rows = await Zeilen(subject);
-        rows.Should().OnlyContain(z => z.Delivered != null, "alle dreizehn sind durch");
+        var rows = await Rows(subject);
+        rows.Should().OnlyContain(z => z.Delivered != null, "all thirteen are through");
 
-        (await Kontostand(subject)).Should().BeNull("die Zeile ist weg");
+        (await AccountStatusValue(subject)).Should().BeNull("the row is gone");
 
-        var schluss = _versand.Post.Last(p => p.An == email);
-        schluss.Betreff.Should().Contain("gelöscht");
+        var schluss = _versand.Post.Last(p => p.To == email);
+        schluss.Subject.Should().Contain("gelöscht");
         // Says only THAT it is done. Listing what was deleted would copy the
         // data into an inbox that may not be the person's alone.
         schluss.Text.Should().NotContain("profile").And.NotContain("resume");
@@ -354,19 +354,19 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
     /// The proof is the set of rows, and it is a query rather than a guess.
     /// </summary>
     [Fact]
-    public async Task Offen_heisst_offen_und_leer_heisst_fertig()
+    public async Task Open_means_open_and_empty_means_finished()
     {
         var (browser, subject, _) = await Person();
         await browser.PostAsync("/account/erasure", null);
 
         using var scope = _dienst.Services.CreateScope();
-        var bestand = scope.ServiceProvider.GetRequiredService<IErasureLedger>();
+        var erasureLedger = scope.ServiceProvider.GetRequiredService<IErasureLedger>();
 
-        (await bestand.OpenIntentsAsync(new SubjectId(subject))).Should().HaveCount(13);
+        (await erasureLedger.OpenIntentsAsync(new SubjectId(subject))).Should().HaveCount(13);
 
-        await Durchlauf(3);
+        await Pass(3);
 
-        (await bestand.OpenIntentsAsync(new SubjectId(subject))).Should().BeEmpty();
+        (await erasureLedger.OpenIntentsAsync(new SubjectId(subject))).Should().BeEmpty();
     }
 
     /// <summary>
@@ -376,7 +376,7 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
     /// hold a person's erasure open.
     /// </summary>
     [Fact]
-    public async Task Die_letzte_Administratorin_legt_ihr_Unternehmen_still()
+    public async Task The_last_administrator_puts_her_company_dormant()
     {
         var browser = Browser();
         var domain = $"firma-{Guid.NewGuid():N}.example";
@@ -384,24 +384,24 @@ public class LoeschkaskadeTests(Postgres postgres) : IAsyncLifetime
 
         await browser.PostAsJsonAsync("/auth/register", new
         {
-            email, password = Passwort, display_name = "Chefin", company_name = "Beispiel GmbH"
+            email, password = Password, display_name = "Chefin", company_name = "Beispiel GmbH"
         });
         var token = System.Text.RegularExpressions.Regex.Match(
             _versand.Post.Last().Text, @"token=(?<t>[A-Za-z0-9_-]+)",
             System.Text.RegularExpressions.RegexOptions.None,
             TimeSpan.FromSeconds(5)).Groups["t"].Value;
         await browser.PostAsJsonAsync("/auth/verify-email", new { token });
-        await browser.PostAsJsonAsync("/auth/login", new { email, password = Passwort });
+        await browser.PostAsJsonAsync("/auth/login", new { email, password = Password });
 
         await browser.PostAsync("/account/erasure", null);
-        await Durchlauf(3);
+        await Pass(3);
 
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
-        await using var befehl = connection.CreateCommand();
-        befehl.CommandText = "SELECT status FROM tenants WHERE domain = @domain";
-        befehl.Parameters.AddWithValue("domain", domain);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT status FROM tenants WHERE domain = @domain";
+        command.Parameters.AddWithValue("domain", domain);
 
-        (await befehl.ExecuteScalarAsync()).Should().Be("dormant");
+        (await command.ExecuteScalarAsync()).Should().Be("dormant");
     }
 }

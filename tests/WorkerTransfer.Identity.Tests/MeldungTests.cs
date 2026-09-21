@@ -13,53 +13,53 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Identity.Tests;
 
-/// <summary>Ein Versender, der nur mitschreibt.</summary>
-public sealed class Postmitschrift : IVersender
+/// <summary>A mail sender that only records.</summary>
+public sealed class MailRecord : IMailSender
 {
-    private readonly List<AusgehendePost> _post = [];
+    private readonly List<OutgoingMail> _post = [];
 
-    /// <summary>Was hinausgegangen wäre.</summary>
-    public IReadOnlyList<AusgehendePost> Post => _post;
+    /// <summary>What would have gone out.</summary>
+    public IReadOnlyList<OutgoingMail> Post => _post;
 
     /// <inheritdoc />
-    public Task SendeAsync(AusgehendePost post, CancellationToken cancellationToken = default)
+    public Task SendAsync(OutgoingMail mail, CancellationToken cancellationToken = default)
     {
-        _post.Add(post);
+        _post.Add(mail);
         return Task.CompletedTask;
     }
 }
 
-/// <summary><c>POST /internal/notify</c> — der einzige Weg zu einer Adresse.</summary>
+/// <summary><c>POST /internal/notify</c> — the only way to an address.</summary>
 /// <remarks>
-/// notification-service entscheidet, <em>ob</em> etwas hinausgeht; hier steht,
-/// <em>an wen</em>. Über die Grenze geht nur eine Kennung — diese Reihe hält
-/// fest, dass sich daraus kein Text und keine Auskunft ableiten lässt.
+/// notification-service decides <em>whether</em> anything goes out; here stands
+/// <em>to whom</em>. What crosses the boundary is nothing but an id — this suite
+/// pins that no text and no information can be derived from it.
 /// </remarks>
 [Collection(PostgresCollection.Name)]
-public class MeldungTests(Postgres postgres) : IAsyncLifetime
+public class NotificationTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Meldegeheimnis = "melde-geheimnis";
-    private const string Passwort = "geheim-und-lang-genug";
+    private const string NotifySecret = "melde-geheimnis";
+    private const string Password = "geheim-und-lang-genug";
 
     private WebApplicationFactory<Program> _dienst = null!;
-    private readonly Postmitschrift _post = new();
+    private readonly MailRecord _post = new();
 
     public async Task InitializeAsync()
     {
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:identity", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:PrivateKey", TokenShape.PrivateKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
-            host.UseSetting("Notify:Geheimnis", Meldegeheimnis);
+            host.UseSetting("Notify:Geheimnis", NotifySecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
-                services.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
+                services.Replace(ServiceDescriptor.Singleton<IMailSender>(_post)));
         });
 
         using var scope = _dienst.Services.CreateScope();
@@ -76,21 +76,21 @@ public class MeldungTests(Postgres postgres) : IAsyncLifetime
     private HttpClient Browser() =>
         _dienst.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
 
-    private Task<HttpResponseMessage> Melde(Guid subject, string secret = Meldegeheimnis)
+    private Task<HttpResponseMessage> Notify(Guid subject, string secret = NotifySecret)
     {
         var browser = Browser();
         browser.DefaultRequestHeaders.Add("X-Notify-Secret", secret);
         return browser.PostAsJsonAsync("/internal/notify", new { user_id = subject });
     }
 
-    /// <summary>Legt ein bestätigtes Konto an und gibt seine Kennung zurück.</summary>
-    private async Task<Guid> BestaetigtesKonto()
+    /// <summary>Creates a confirmed account and answers with its id.</summary>
+    private async Task<Guid> ConfirmedAccount()
     {
         var address = $"anna-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
 
         await Browser().PostAsJsonAsync("/auth/register", new
         {
-            email = address, password = Passwort, display_name = "Anna"
+            email = address, password = Password, display_name = "Anna"
         });
 
         var token = Regex.Match(
@@ -98,105 +98,105 @@ public class MeldungTests(Postgres postgres) : IAsyncLifetime
 
         await Browser().PostAsJsonAsync("/auth/verify-email", new { token });
 
-        return _post.Post[^1].Empfaenger.Value;
+        return _post.Post[^1].Recipient.Value;
     }
 
-    /// <summary>Ein unbestätigtes Konto, dessen Adresse noch nicht erwiesen ist.</summary>
-    private async Task<Guid> UnbestaetigtesKonto()
+    /// <summary>An unconfirmed account whose address is not proven yet.</summary>
+    private async Task<Guid> UnconfirmedAccount()
     {
         var address = $"bea-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
 
         await Browser().PostAsJsonAsync("/auth/register", new
         {
-            email = address, password = Passwort, display_name = "Bea"
+            email = address, password = Password, display_name = "Bea"
         });
 
-        return _post.Post[^1].Empfaenger.Value;
+        return _post.Post[^1].Recipient.Value;
     }
 
-    /// <summary>Der gewöhnliche Weg: eine Kennung hinein, eine Mail hinaus.</summary>
+    /// <summary>The ordinary path: an id in, a mail out.</summary>
     [Fact]
-    public async Task Eine_Kennung_genuegt_fuer_die_eine_Mail()
+    public async Task One_id_is_enough_for_the_one_mail()
     {
-        var anna = await BestaetigtesKonto();
-        var vorher = _post.Post.Count;
+        var anna = await ConfirmedAccount();
+        var before = _post.Post.Count;
 
-        var response = await Melde(anna);
+        var response = await Notify(anna);
 
         response.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        _post.Post.Should().HaveCount(vorher + 1);
-        _post.Post[^1].Empfaenger.Value.Should().Be(anna);
+        _post.Post.Should().HaveCount(before + 1);
+        _post.Post[^1].Recipient.Value.Should().Be(anna);
     }
 
     /// <summary>
-    /// Für jede Art derselbe Betreff — und die Art steht gar nicht im Rumpf.
+    /// The same subject for every kind — and the kind is not in the body at all.
     /// </summary>
     /// <remarks>
-    /// Eine Mail landet in einem Inbox, das das des Arbeitgebers sein kann.
-    /// Eine Zeile wie „Acme GmbH möchte deinen MarketStatus sehen" wäre genau die
-    /// Auskunft, gegen die diese Plattform gebaut ist.
+    /// A mail lands in a mailbox that may be the employer's. A line like „Acme
+    /// GmbH would like to see your market status" would be exactly the
+    /// disclosure this platform is built against.
     /// </remarks>
     [Fact]
-    public async Task Die_Mail_sagt_nicht_worum_es_geht()
+    public async Task The_mail_does_not_say_what_it_is_about()
     {
-        var anna = await BestaetigtesKonto();
+        var anna = await ConfirmedAccount();
 
-        await Melde(anna);
+        await Notify(anna);
 
         var mail = _post.Post[^1];
 
-        mail.Betreff.Should().Be("Neuigkeiten auf WorkerTransfer");
+        mail.Subject.Should().Be("Neuigkeiten auf WorkerTransfer");
         mail.Text.Should().NotContainAny(
             "Lebenslauf", "Marktstatus", "Bewerbung", "Transfer", "Unternehmen");
         mail.Text.Should().Contain("Melde dich an");
     }
 
     /// <summary>
-    /// Ein unbestätigtes Konto bekommt keine Post über Vorgänge — und der
-    /// Aufrufer erfährt davon nichts.
+    /// An unconfirmed account gets no mail about cases — and the caller learns
+    /// nothing of it.
     /// </summary>
     [Fact]
-    public async Task Ein_unbestaetigtes_Konto_bekommt_keine_Post()
+    public async Task An_unconfirmed_account_gets_no_mail()
     {
-        var bea = await UnbestaetigtesKonto();
-        var vorher = _post.Post.Count;
+        var bea = await UnconfirmedAccount();
+        var before = _post.Post.Count;
 
-        var response = await Melde(bea);
+        var response = await Notify(bea);
 
         response.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        _post.Post.Should().HaveCount(vorher);
+        _post.Post.Should().HaveCount(before);
     }
 
     /// <summary>
-    /// Immer 202 — sonst wäre der Endpunkt ein Orakel über die Membership
-    /// auf dieser Plattform.
+    /// Always 202 — otherwise the endpoint would be an oracle about membership
+    /// of this platform.
     /// </summary>
     [Fact]
-    public async Task Bekannt_und_unbekannt_antworten_gleich()
+    public async Task Known_and_unknown_answer_alike()
     {
-        var anna = await BestaetigtesKonto();
+        var anna = await ConfirmedAccount();
 
-        var bekannt = await Melde(anna);
-        var unbekannt = await Melde(Guid.CreateVersion7());
+        var known = await Notify(anna);
+        var unknown = await Notify(Guid.CreateVersion7());
 
-        unbekannt.StatusCode.Should().Be(bekannt.StatusCode);
-        (await unbekannt.Content.ReadAsStringAsync())
-            .Should().Be(await bekannt.Content.ReadAsStringAsync());
+        unknown.StatusCode.Should().Be(known.StatusCode);
+        (await unknown.Content.ReadAsStringAsync())
+            .Should().Be(await known.Content.ReadAsStringAsync());
     }
 
-    /// <summary>Ohne das Geheimnis ist es 404, nicht 401.</summary>
+    /// <summary>Without the secret it is 404, not 401.</summary>
     /// <remarks>
-    /// Ein 401 bestätigt, dass es den Endpunkt gibt.
+    /// A 401 confirms that the endpoint exists.
     /// </remarks>
     [Fact]
-    public async Task Ohne_das_richtige_Geheimnis_ist_es_404()
+    public async Task Without_the_right_secret_it_is_404()
     {
-        var anna = await BestaetigtesKonto();
-        var vorher = _post.Post.Count;
+        var anna = await ConfirmedAccount();
+        var before = _post.Post.Count;
 
-        var response = await Melde(anna, "geraten");
+        var response = await Notify(anna, "geraten");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        _post.Post.Should().HaveCount(vorher);
+        _post.Post.Should().HaveCount(before);
     }
 }

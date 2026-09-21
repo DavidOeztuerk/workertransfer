@@ -81,7 +81,7 @@ public class DrahtvertragTests
         { "github.contracts", typeof(GitHub.Contracts.RepositoryV1) },
         { "jobs.contracts", typeof(Jobs.Contracts.JobV1) },
         { "notification.contracts", typeof(Notification.Contracts.BenachrichtigenV1) },
-        { "portfolio.contracts", typeof(Portfolio.Contracts.EintragV1) },
+        { "portfolio.contracts", typeof(Portfolio.Contracts.EntryV1) },
         { "resume.contracts", typeof(Resume.Contracts.StationV1) },
         { "transfer.contracts", typeof(Transfer.Contracts.MarketStatusV1) },
 

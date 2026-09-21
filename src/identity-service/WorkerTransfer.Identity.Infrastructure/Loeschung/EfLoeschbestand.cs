@@ -30,15 +30,15 @@ public sealed class EfErasureLedger(IdentityDbContext context, ITokenSessionServ
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
-        var konto = await context.Users
+        var account = await context.Users
             .AsTracking()
             .FirstOrDefaultAsync(row => row.Id == subject.Value, cancellationToken);
 
-        if (konto is not null)
+        if (account is not null)
         {
-            konto.Status = AccountStatus.Disabled;
-            konto.UpdatedAt = now.UtcDateTime;
-            konto.Version += 1;
+            account.Status = AccountStatus.Disabled;
+            account.UpdatedAt = now.UtcDateTime;
+            account.Version += 1;
         }
 
         // Not only at the end: while the cascade runs, nobody may sign in under
@@ -52,7 +52,7 @@ public sealed class EfErasureLedger(IdentityDbContext context, ITokenSessionServ
         SubjectId subject,
         CancellationToken cancellationToken = default)
     {
-        var offene = await context.Set<OutboxRow>()
+        var open = await context.Set<OutboxRow>()
             .Where(row => row.UserId == subject.Value
                             && row.DeliveredAt == null
                             && row.Kind.StartsWith(ErasureRecipient.Praefix))
@@ -60,7 +60,7 @@ public sealed class EfErasureLedger(IdentityDbContext context, ITokenSessionServ
             .Select(row => row.Kind)
             .ToListAsync(cancellationToken);
 
-        return offene;
+        return open;
     }
 
     /// <inheritdoc />
@@ -75,7 +75,7 @@ public sealed class EfErasureLedger(IdentityDbContext context, ITokenSessionServ
 
         return row is null
             ? null
-            : new ClosingAddress(row.Email, Sprachwahl.Aus(row.Language));
+            : new ClosingAddress(row.Email, LanguageChoice.From(row.Language));
     }
 
     /// <inheritdoc />
@@ -84,22 +84,22 @@ public sealed class EfErasureLedger(IdentityDbContext context, ITokenSessionServ
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
-        var konto = await context.Users
+        var account = await context.Users
             .FirstOrDefaultAsync(row => row.Id == subject.Value, cancellationToken);
 
-        if (konto is null)
+        if (account is null)
         {
             return [];
         }
 
-        var betroffene = await context.Memberships
+        var affected = await context.Memberships
             .Where(row => row.UserId == subject.Value)
             .Select(row => row.TenantId)
             .ToListAsync(cancellationToken);
 
         // Invitations TO this address: they carry it in the clear.
         await context.Invitations
-            .Where(row => row.Email == konto.Email)
+            .Where(row => row.Email == account.Email)
             .ExecuteDeleteAsync(cancellationToken);
 
         // audit_events stays, its metadata is cleared — no cascade with users,
@@ -109,7 +109,7 @@ public sealed class EfErasureLedger(IdentityDbContext context, ITokenSessionServ
         await context.AuditEvents
             .Where(row => row.ActorId == subject.Value || row.TargetId == subject.Value)
             .ExecuteUpdateAsync(
-                setzen => setzen.SetProperty(row => row.Metadata, "{}"),
+                set => set.SetProperty(row => row.Metadata, "{}"),
                 cancellationToken);
 
         // The row one forgets. Nothing points at users from here, so a plain
@@ -124,12 +124,12 @@ public sealed class EfErasureLedger(IdentityDbContext context, ITokenSessionServ
             .Where(token => token.SubjectId == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
-        // Die Einstellungen — und mit ihnen der hinterlegte Schlüssel.
+        // The settings — and with them the stored key.
         //
-        // Ausdrücklich hier und nicht über einen Fremdschlüssel: `subject_id`
-        // ist der PRIMÄRSCHLÜSSEL dieser Tabelle und zeigt auf nichts, also
-        // räumt kein CASCADE sie mit weg. Genau die Sorte Zeile, die nach einer
-        // Löschung stehen bleibt — und diese hier hielte ein Geheimnis.
+        // Expressly here and not over a foreign key: `subject_id` is the PRIMARY
+        // KEY of this table and points at nothing, so no CASCADE clears it away.
+        // Exactly the sort of row that stays standing after an erasure — and
+        // this one would hold a secret.
         await context.AccountSettings
             .Where(row => row.SubjectId == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
@@ -143,14 +143,14 @@ public sealed class EfErasureLedger(IdentityDbContext context, ITokenSessionServ
             .ExecuteDeleteAsync(cancellationToken);
 
         var admin = MembershipRoleNames.ToDatabase(MembershipRole.Admin);
-        var stillgelegt = new List<TenantId>();
+        var dormant = new List<TenantId>();
 
-        foreach (var company in betroffene)
+        foreach (var company in affected)
         {
-            var hatNoch = await context.Memberships.AnyAsync(
+            var stillHasOne = await context.Memberships.AnyAsync(
                 row => row.TenantId == company && row.Role == admin, cancellationToken);
 
-            if (hatNoch)
+            if (stillHasOne)
             {
                 continue;
             }
@@ -158,12 +158,12 @@ public sealed class EfErasureLedger(IdentityDbContext context, ITokenSessionServ
             await context.Tenants
                 .Where(row => row.Id == company)
                 .ExecuteUpdateAsync(
-                    setzen => setzen.SetProperty(row => row.Status, "dormant"),
+                    set => set.SetProperty(row => row.Status, "dormant"),
                     cancellationToken);
 
-            stillgelegt.Add(new TenantId(company));
+            dormant.Add(new TenantId(company));
         }
 
-        return stillgelegt;
+        return dormant;
     }
 }

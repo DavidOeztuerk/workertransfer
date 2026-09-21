@@ -9,18 +9,18 @@ using WorkerTransfer.Identity.Domain.Users;
 namespace WorkerTransfer.Identity.Application.Anmelden;
 
 /// <summary>Sign in with an address and a password.</summary>
-public sealed record AnmeldenBefehl(string Email, string Passwort) : IBefehl<Anmeldeergebnis>;
+public sealed record SignInCommand(string Email, string Password) : ICommand<SignInResult>;
 
 /// <summary>What a sign-in attempt produced.</summary>
-public abstract record Anmeldeergebnis
+public abstract record SignInResult
 {
-    private Anmeldeergebnis() { }
+    private SignInResult() { }
 
     /// <summary>Signed in. Both tokens are here and nowhere else.</summary>
-    public sealed record Angemeldet(
-        string Zugriffstoken,
-        string Erneuerungstoken,
-        DateTimeOffset ErneuerungLaeuftAb) : Anmeldeergebnis;
+    public sealed record SignedIn(
+        string AccessToken,
+        string RefreshToken,
+        DateTimeOffset RefreshExpiresAt) : SignInResult;
 
     /// <summary>
     /// Wrong address, wrong password, or an account that may not sign in.
@@ -31,7 +31,7 @@ public abstract record Anmeldeergebnis
     /// question that costs someone their job. Which case it was is in the audit
     /// trail, where only an operator sees it.
     /// </remarks>
-    public sealed record Abgelehnt : Anmeldeergebnis;
+    public sealed record Refused : SignInResult;
 
     /// <summary>The password was right and the address is not confirmed yet.</summary>
     /// <remarks>
@@ -39,93 +39,93 @@ public abstract record Anmeldeergebnis
     /// Reached only after the password verified, so it states nothing the
     /// password did not already prove.
     /// </remarks>
-    public sealed record NichtBestaetigt : Anmeldeergebnis;
+    public sealed record NotConfirmed : SignInResult;
 }
 
 /// <summary>Signs a person in.</summary>
-public sealed class AnmeldenHandler(
-    IUserRepository benutzer,
-    IPasswordHasher passwoerter,
+public sealed class SignInHandler(
+    IUserRepository users,
+    IPasswordHasher passwords,
     ISessionService sessions,
     IAccessTokenIssuer token,
-    IAuditTrail protokoll,
-    IKorrelation korrelation,
-    TimeProvider uhr)
-    : IRequestHandler<AnmeldenBefehl, Anmeldeergebnis>
+    IAuditTrail auditTrail,
+    ICorrelation correlation,
+    TimeProvider clock)
+    : IRequestHandler<SignInCommand, SignInResult>
 {
     /// <inheritdoc />
-    public async Task<Anmeldeergebnis> Handle(
-        AnmeldenBefehl request,
+    public async Task<SignInResult> Handle(
+        SignInCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var konto = await benutzer.FindByEmailAsync(request.Email, cancellationToken);
+        var account = await users.FindByEmailAsync(request.Email, cancellationToken);
 
         // Null is a supported input: the implementation spends the same work
         // before answering Failed, so how long an answer takes says nothing
         // about whether the address is known. Reordering these two operands
         // brings the timing channel back.
-        if (passwoerter.Verify(request.Passwort, konto?.PasswordHash) == PasswordVerification.Failed
-            || konto is null)
+        if (passwords.Verify(request.Password, account?.PasswordHash) == PasswordVerification.Failed
+            || account is null)
         {
-            await NotiereAbweisung(
-                konto is null ? "unknown_user" : "bad_password", konto?.Id, cancellationToken);
-            return new Anmeldeergebnis.Abgelehnt();
+            await RecordRefusal(
+                account is null ? "unknown_user" : "bad_password", account?.Id, cancellationToken);
+            return new SignInResult.Refused();
         }
 
         try
         {
-            konto.AssertCanSignIn();
+            account.AssertCanSignIn();
         }
         catch (EmailNotConfirmedException)
         {
-            await NotiereAbweisung("email_not_confirmed", konto.Id, cancellationToken);
-            return new Anmeldeergebnis.NichtBestaetigt();
+            await RecordRefusal("email_not_confirmed", account.Id, cancellationToken);
+            return new SignInResult.NotConfirmed();
         }
         catch (AccountDisabledException)
         {
-            await NotiereAbweisung("disabled", konto.Id, cancellationToken);
-            return new Anmeldeergebnis.Abgelehnt();
+            await RecordRefusal("disabled", account.Id, cancellationToken);
+            return new SignInResult.Refused();
         }
 
-        var session = await sessions.StartAsync(konto.Id, cancellationToken);
+        var session = await sessions.StartAsync(account.Id, cancellationToken);
 
         // Signing in makes you yourself, never a company. Acting for one is a
         // second step that verifies membership before a tenant reaches a token.
-        var zugriff = await token.IssueAsync(
-            konto.Id,
-            konto.Email,
+        var accessToken = await token.IssueAsync(
+            account.Id,
+            account.Email,
             Capacity.AsSelf.Instance,
             session.Session,
             cancellationToken);
 
-        await protokoll.AppendAsync(
+        await auditTrail.AppendAsync(
             new AuditEvent(
                 AuditAction.LoginSuccess,
-                uhr.GetUtcNow(),
-                actor: konto.Id,
-                correlationId: korrelation.Aktuell),
+                clock.GetUtcNow(),
+                actor: account.Id,
+                correlationId: correlation.Current),
             cancellationToken);
 
-        return new Anmeldeergebnis.Angemeldet(
-            zugriff, session.RefreshToken, session.ExpiresAt);
+        return new SignInResult.SignedIn(
+            accessToken, session.RefreshToken, session.ExpiresAt);
     }
 
     /// <summary>
     /// Records why a sign-in was refused — the one place the four cases are
     /// told apart, and it is not the answer.
     /// </summary>
-    private Task NotiereAbweisung(
+    private Task RecordRefusal(
         string reason,
         SubjectId? subject,
         CancellationToken cancellationToken) =>
-        protokoll.AppendAsync(
+        auditTrail.AppendAsync(
             new AuditEvent(
                 AuditAction.LoginFailure,
-                uhr.GetUtcNow(),
+                clock.GetUtcNow(),
                 actor: subject,
-                correlationId: korrelation.Aktuell,
+                correlationId: correlation.Current,
                 metadata: new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     ["reason"] = reason

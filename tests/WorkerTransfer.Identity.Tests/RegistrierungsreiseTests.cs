@@ -22,57 +22,57 @@ namespace WorkerTransfer.Identity.Tests;
 /// visible. Inside the transaction it would not be, so a mail sent too early is
 /// caught here rather than in a comment.
 /// </remarks>
-public sealed class MitschreibenderVersender(string connection) : IVersender
+public sealed class RecordingMailSender(string connection) : IMailSender
 {
-    private readonly List<AusgehendePost> _post = [];
+    private readonly List<OutgoingMail> _post = [];
 
-    public IReadOnlyList<AusgehendePost> Post => _post;
+    public IReadOnlyList<OutgoingMail> Post => _post;
 
     /// <summary>Whether every mail found its row already committed.</summary>
-    public List<bool> ZeileWarSichtbar { get; } = [];
+    public List<bool> RowWasVisible { get; } = [];
 
-    public async Task SendeAsync(
-        AusgehendePost post, CancellationToken cancellationToken = default)
+    public async Task SendAsync(
+        OutgoingMail mail, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(post);
+        ArgumentNullException.ThrowIfNull(mail);
 
-        await using var eigene = new NpgsqlConnection(connection);
-        await eigene.OpenAsync(cancellationToken);
-        await using var befehl = eigene.CreateCommand();
-        befehl.CommandText = "SELECT count(*) FROM users WHERE id = @wer";
-        befehl.Parameters.AddWithValue("wer", post.Empfaenger.Value);
+        await using var own = new NpgsqlConnection(connection);
+        await own.OpenAsync(cancellationToken);
+        await using var command = own.CreateCommand();
+        command.CommandText = "SELECT count(*) FROM users WHERE id = @wer";
+        command.Parameters.AddWithValue("wer", mail.Recipient.Value);
 
-        ZeileWarSichtbar.Add((long)(await befehl.ExecuteScalarAsync(cancellationToken))! > 0);
-        _post.Add(post);
+        RowWasVisible.Add((long)(await command.ExecuteScalarAsync(cancellationToken))! > 0);
+        _post.Add(mail);
     }
 }
 
 /// <summary>The whole way in: register, confirm, sign in.</summary>
 [Collection(PostgresCollection.Name)]
-public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
+public class RegistrationJourneyTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Passwort = "geheim-und-lang-genug";
+    private const string Password = "geheim-und-lang-genug";
 
     private WebApplicationFactory<Program> _dienst = null!;
-    private MitschreibenderVersender _versand = null!;
+    private RecordingMailSender _versand = null!;
 
     public async Task InitializeAsync()
     {
-        _versand = new MitschreibenderVersender(postgres.ConnectionString);
+        _versand = new RecordingMailSender(postgres.ConnectionString);
 
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:identity", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:PrivateKey", TokenShape.PrivateKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
-                services.Replace(ServiceDescriptor.Singleton<IVersender>(_versand)));
+                services.Replace(ServiceDescriptor.Singleton<IMailSender>(_versand)));
         });
 
         using var scope = _dienst.Services.CreateScope();
@@ -89,45 +89,45 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     private HttpClient Browser() =>
         _dienst.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
 
-    private static string NeueAdresse(string vorname) =>
-        $"{vorname}-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
+    private static string NewAddress(string givenName) =>
+        $"{givenName}-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
 
-    private Task<HttpResponseMessage> Registriere(
-        string email, string? company = null, string passwort = Passwort) =>
+    private Task<HttpResponseMessage> Register(
+        string email, string? company = null, string password = Password) =>
         Browser().PostAsJsonAsync("/auth/register", new
         {
             email,
-            password = passwort,
+            password = password,
             display_name = "Anna",
             company_name = company
         });
 
-    private Task<HttpResponseMessage> Bestaetige(string token) =>
+    private Task<HttpResponseMessage> Confirm(string token) =>
         Browser().PostAsJsonAsync("/auth/verify-email", new { token });
 
-    private Task<HttpResponseMessage> Anmelden(string email) =>
-        Browser().PostAsJsonAsync("/auth/login", new { email, password = Passwort });
+    private Task<HttpResponseMessage> SignIn(string email) =>
+        Browser().PostAsJsonAsync("/auth/login", new { email, password = Password });
 
     /// <summary>The token out of the last confirmation mail.</summary>
-    private string LetzterLink() =>
+    private string LastLink() =>
         Regex.Match(
-            _versand.Post.Last(p => p.Betreff.Contains("bestätige", StringComparison.Ordinal)).Text,
+            _versand.Post.Last(p => p.Subject.Contains("bestätige", StringComparison.Ordinal)).Text,
             @"token=(?<token>[A-Za-z0-9_-]+)",
             RegexOptions.None, TimeSpan.FromSeconds(5)).Groups["token"].Value;
 
     [Fact]
-    public async Task Registrieren_bestaetigen_anmelden()
+    public async Task Register_confirm_sign_in()
     {
-        var email = NeueAdresse("anna");
+        var email = NewAddress("anna");
 
-        (await Registriere(email)).StatusCode.Should().Be(HttpStatusCode.Created);
+        (await Register(email)).StatusCode.Should().Be(HttpStatusCode.Created);
 
         // Unconfirmed is its own answer, so the interface can offer the mail
         // again instead of leaving somebody in a dead end.
-        (await Anmelden(email)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await SignIn(email)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        (await Bestaetige(LetzterLink())).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Anmelden(email)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Confirm(LastLink())).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await SignIn(email)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     /// <summary>
@@ -136,18 +136,18 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// link to nothing.
     /// </summary>
     [Fact]
-    public async Task Die_Mail_geht_erst_nach_dem_Commit_hinaus()
+    public async Task The_mail_goes_out_only_after_the_commit()
     {
-        await Registriere(NeueAdresse("berta"));
+        await Register(NewAddress("berta"));
 
         _versand.Post.Should().NotBeEmpty();
-        _versand.ZeileWarSichtbar.Should().AllBeEquivalentTo(true);
+        _versand.RowWasVisible.Should().AllBeEquivalentTo(true);
     }
 
     [Fact]
-    public async Task Der_Bestaetigungslink_zeigt_auf_die_Adresse_die_der_Browser_sieht()
+    public async Task The_confirmation_link_points_at_the_address_the_browser_sees()
     {
-        await Registriere(NeueAdresse("clara"));
+        await Register(NewAddress("clara"));
 
         _versand.Post.Last().Text.Should().Contain("http://localhost:5173/verify?token=");
     }
@@ -157,19 +157,19 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// the person asking.
     /// </summary>
     [Fact]
-    public async Task Eine_zweite_Registrierung_warnt_den_Besitzer_und_verraet_nichts()
+    public async Task A_second_registration_warns_the_owner_and_gives_nothing_away()
     {
-        var email = NeueAdresse("dora");
+        var email = NewAddress("dora");
 
-        var erste = await Registriere(email);
-        var zweite = await Registriere(email);
+        var firstEntry = await Register(email);
+        var second = await Register(email);
 
-        zweite.StatusCode.Should().Be(erste.StatusCode);
-        (await zweite.Content.ReadAsStringAsync())
-            .Should().Be(await erste.Content.ReadAsStringAsync());
+        second.StatusCode.Should().Be(firstEntry.StatusCode);
+        (await second.Content.ReadAsStringAsync())
+            .Should().Be(await firstEntry.Content.ReadAsStringAsync());
 
-        _versand.Post.Last().Betreff.Should().Contain("Registrierungsversuch");
-        _versand.Post.Last().An.Should().Be(email);
+        _versand.Post.Last().Subject.Should().Contain("Registrierungsversuch");
+        _versand.Post.Last().To.Should().Be(email);
     }
 
     /// <summary>
@@ -177,20 +177,20 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// possibly the one that went to the wrong mailbox — keeps working.
     /// </summary>
     [Fact]
-    public async Task Ein_erneut_gesendeter_Link_entwertet_den_alten()
+    public async Task A_resent_link_voids_the_old_one()
     {
-        var email = NeueAdresse("emil");
-        await Registriere(email);
-        var alter = LetzterLink();
+        var email = NewAddress("emil");
+        await Register(email);
+        var alter = LastLink();
 
-        var erneut = await Browser().PostAsJsonAsync("/auth/resend-verification", new { email });
-        erneut.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        var again = await Browser().PostAsJsonAsync("/auth/resend-verification", new { email });
+        again.StatusCode.Should().Be(HttpStatusCode.Accepted);
 
-        var neuer = LetzterLink();
-        neuer.Should().NotBe(alter);
+        var newer = LastLink();
+        newer.Should().NotBe(alter);
 
-        (await Bestaetige(alter)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await Bestaetige(neuer)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Confirm(alter)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Confirm(newer)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     /// <summary>
@@ -198,66 +198,66 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// enumeration channel /auth/register is built to close.
     /// </summary>
     [Fact]
-    public async Task Ein_erneutes_Senden_an_eine_unbekannte_Adresse_ist_auch_202()
+    public async Task A_resend_to_an_unknown_address_is_202_as_well()
     {
-        var vorher = _versand.Post.Count;
+        var before = _versand.Post.Count;
 
         var response = await Browser().PostAsJsonAsync(
-            "/auth/resend-verification", new { email = NeueAdresse("niemand") });
+            "/auth/resend-verification", new { email = NewAddress("niemand") });
 
         response.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        _versand.Post.Should().HaveCount(vorher);
+        _versand.Post.Should().HaveCount(before);
     }
 
     [Fact]
-    public async Task Zweimal_derselbe_Link_ist_kein_Fehler()
+    public async Task The_same_link_twice_is_no_error()
     {
-        await Registriere(NeueAdresse("frieda"));
-        var link = LetzterLink();
+        await Register(NewAddress("frieda"));
+        var link = LastLink();
 
-        (await Bestaetige(link)).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Bestaetige(link)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Confirm(link)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Confirm(link)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
-    public async Task Ein_erfundener_Link_ist_ungueltig()
+    public async Task An_invented_link_is_invalid()
     {
-        (await Bestaetige("gibtesnicht")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Confirm("gibtesnicht")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]
-    public async Task Ein_zu_kurzes_Passwort_wird_abgewiesen()
+    public async Task A_password_that_is_too_short_is_refused()
     {
-        var response = await Registriere(NeueAdresse("greta"), passwort: "kurz");
+        var response = await Register(NewAddress("greta"), password: "kurz");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
-    /// <summary>Eine Adresse, die keine ist, legt kein Konto an.</summary>
+    /// <summary>An address that is none creates no account.</summary>
     /// <remarks>
-    /// Die zweite Hälfte ist die wichtigere: es darf auch keine Zeile
-    /// entstehen. Ein 422 über einem angelegten Konto wäre dieselbe Sackgasse
-    /// mit besserer Meldung.
+    /// The second half is the more important one: no row may come into being
+    /// either. A 422 over a created account would be the same dead end with a
+    /// better message.
     /// </remarks>
     [Fact]
-    public async Task Eine_Adresse_die_keine_ist_legt_kein_Konto_an()
+    public async Task An_address_that_is_none_creates_no_account()
     {
-        var response = await Registriere("bus");
+        var response = await Register("bus");
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
-        await using var befehl = connection.CreateCommand();
-        befehl.CommandText = "SELECT count(*) FROM users WHERE email = @email";
-        befehl.Parameters.AddWithValue("email", "bus");
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT count(*) FROM users WHERE email = @email";
+        command.Parameters.AddWithValue("email", "bus");
 
-        ((long)(await befehl.ExecuteScalarAsync())!).Should().Be(0);
+        ((long)(await command.ExecuteScalarAsync())!).Should().Be(0);
     }
 
-    /// <summary>Auch „erneut senden" prüft die Form.</summary>
+    /// <summary>„Resend" checks the form too.</summary>
     [Fact]
-    public async Task Ein_erneutes_Senden_an_eine_kaputte_Adresse_wird_abgewiesen()
+    public async Task A_resend_to_a_malformed_address_is_refused()
     {
         var response = await _dienst.CreateClient().PostAsJsonAsync(
             "/auth/resend-verification", new { email = "bus" });
@@ -266,26 +266,26 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Ein_Unternehmen_entsteht_bei_der_Bestaetigung_und_nicht_frueher()
+    public async Task A_company_comes_into_being_at_the_confirmation_and_not_earlier()
     {
-        var email = NeueAdresse("chefin");
+        var email = NewAddress("chefin");
 
-        await Registriere(email, company: "Beispiel GmbH");
+        await Register(email, company: "Beispiel GmbH");
 
         await using (var connection = new NpgsqlConnection(postgres.ConnectionString))
         {
             await connection.OpenAsync();
-            await using var befehl = connection.CreateCommand();
-            befehl.CommandText = "SELECT count(*) FROM tenants WHERE domain = @domain";
-            befehl.Parameters.AddWithValue("domain", email.Split('@')[1]);
-            ((long)(await befehl.ExecuteScalarAsync())!).Should().Be(
-                0, "vor der Bestaetigung ist es nur eine Absicht");
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT count(*) FROM tenants WHERE domain = @domain";
+            command.Parameters.AddWithValue("domain", email.Split('@')[1]);
+            ((long)(await command.ExecuteScalarAsync())!).Should().Be(
+                0, "before the confirmation it is only an intent");
         }
 
-        var bestaetigt = await Bestaetige(LetzterLink());
+        var confirmed = await Confirm(LastLink());
 
-        bestaetigt.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await bestaetigt.Content.ReadAsStringAsync()).Should().Contain("Beispiel GmbH");
+        confirmed.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await confirmed.Content.ReadAsStringAsync()).Should().Contain("Beispiel GmbH");
     }
 
     /// <summary>
@@ -293,31 +293,31 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// company — and the answer says so instead of showing "all good".
     /// </summary>
     [Fact]
-    public async Task Eine_beanspruchte_Domain_bestaetigt_das_Konto_trotzdem()
+    public async Task A_claimed_domain_confirms_the_account_all_the_same()
     {
         var domain = $"firma-{Guid.NewGuid():N}.example";
-        var erste = $"chefin-{Guid.NewGuid():N}@{domain}";
-        var zweite = $"kollege-{Guid.NewGuid():N}@{domain}";
+        var firstEntry = $"chefin-{Guid.NewGuid():N}@{domain}";
+        var second = $"kollege-{Guid.NewGuid():N}@{domain}";
 
-        await Registriere(erste, company: "Beispiel GmbH");
-        await Bestaetige(LetzterLink());
+        await Register(firstEntry, company: "Beispiel GmbH");
+        await Confirm(LastLink());
 
-        await Registriere(zweite, company: "Zweite GmbH");
-        var response = await Bestaetige(LetzterLink());
+        await Register(second, company: "Zweite GmbH");
+        var response = await Confirm(LastLink());
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var koerper = await response.Content.ReadAsStringAsync();
         koerper.Should().Contain("domain_already_claimed");
         koerper.Should().NotContain("Zweite GmbH");
 
-        // Und das Konto traegt: die Bestaetigung ist unumkehrbar richtig.
-        (await Anmelden(zweite)).StatusCode.Should().Be(HttpStatusCode.OK);
+        // And the account carries: the confirmation is irreversibly right.
+        (await SignIn(second)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
-    public async Task Eine_Freemail_Adresse_kann_kein_Unternehmen_beanspruchen()
+    public async Task A_freemail_address_cannot_claim_a_company()
     {
-        var response = await Registriere(
+        var response = await Register(
             $"chefin-{Guid.NewGuid():N}@gmail.com", company: "Beispiel GmbH");
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
@@ -328,9 +328,9 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// at all. The blocklist applies at exactly one place.
     /// </summary>
     [Fact]
-    public async Task Als_Privatperson_ist_eine_Freemail_Adresse_willkommen()
+    public async Task As_a_private_person_a_freemail_address_is_welcome()
     {
-        var response = await Registriere($"anna-{Guid.NewGuid():N}@gmail.com");
+        var response = await Register($"anna-{Guid.NewGuid():N}@gmail.com");
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
     }

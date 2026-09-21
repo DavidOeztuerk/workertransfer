@@ -23,15 +23,15 @@ namespace WorkerTransfer.Identity.Domain.Users;
 /// the belief that it was localised.
 /// </para>
 /// <para>
-/// <strong>Called <c>Kontosprache</c> and not <c>Sprache</c>, and that is not
-/// a style choice.</strong> <c>Sprache</c> is a parser-combinator package that
-/// arrives here transitively and owns the top-level namespace of that name, so
-/// the plain name is a <c>CS0118</c> at every use site. The longer name also
-/// says the thing that matters: it is the language of the <em>account</em>, not
-/// of the request.
+/// <strong>Called <c>AccountLanguage</c> and not <c>Language</c>, and that is not
+/// a style choice.</strong> Under its German name the plain word was
+/// <c>Sprache</c> — a parser-combinator package that arrives here transitively
+/// and owns the top-level namespace of that name, so the plain name was a
+/// <c>CS0118</c> at every use site. The longer name also says the thing that
+/// matters: it is the language of the <em>account</em>, not of the request.
 /// </para>
 /// </remarks>
-public enum Kontosprache
+public enum AccountLanguage
 {
     /// <summary>German. The source the other two are translated from.</summary>
     De,
@@ -44,10 +44,10 @@ public enum Kontosprache
 }
 
 /// <summary>Reads a language out of what a caller offers.</summary>
-public static class Sprachwahl
+public static class LanguageChoice
 {
     /// <summary>What a person gets when nothing else is known.</summary>
-    public const Kontosprache Vorgabe = Kontosprache.De;
+    public const AccountLanguage Default = AccountLanguage.De;
 
     /// <summary>Turns a tag such as <c>fr-CA</c> into a language we have.</summary>
     /// <remarks>
@@ -55,27 +55,27 @@ public static class Sprachwahl
     /// texts, because there is one French catalogue and pretending otherwise
     /// would be a promise we do not keep.
     /// <para>
-    /// Anything unknown becomes <see cref="Vorgabe"/> rather than an error. A
+    /// Anything unknown becomes <see cref="Default"/> rather than an error. A
     /// registration must not fail because a browser announced Icelandic.
     /// </para>
     /// </remarks>
-    /// <param name="etikett">A BCP 47 tag, or anything at all.</param>
+    /// <param name="label">A BCP 47 tag, or anything at all.</param>
     /// <returns>The language to use.</returns>
-    public static Kontosprache Aus(string? label)
+    public static AccountLanguage From(string? label)
     {
         if (string.IsNullOrWhiteSpace(label))
         {
-            return Vorgabe;
+            return Default;
         }
 
-        var haupt = label.Trim().Split('-', ';', ',')[0].ToLowerInvariant();
+        var primary = label.Trim().Split('-', ';', ',')[0].ToLowerInvariant();
 
-        return haupt switch
+        return primary switch
         {
-            "de" => Kontosprache.De,
-            "en" => Kontosprache.En,
-            "fr" => Kontosprache.Fr,
-            _ => Vorgabe
+            "de" => AccountLanguage.De,
+            "en" => AccountLanguage.En,
+            "fr" => AccountLanguage.Fr,
+            _ => Default
         };
     }
 
@@ -88,63 +88,63 @@ public static class Sprachwahl
     /// header naming a language we do not have skips past it instead of falling
     /// straight to the default.
     /// </remarks>
-    /// <param name="kopf">The raw header value, or <c>null</c>.</param>
-    /// <returns>The first language we have, else <see cref="Vorgabe"/>.</returns>
-    public static Kontosprache AusKopf(string? header)
+    /// <param name="header">The raw header value, or <c>null</c>.</param>
+    /// <returns>The first language we have, else <see cref="Default"/>.</returns>
+    public static AccountLanguage FromHeader(string? header)
     {
         if (string.IsNullOrWhiteSpace(header))
         {
-            return Vorgabe;
+            return Default;
         }
 
-        foreach (var teil in header.Split(','))
+        foreach (var part in header.Split(','))
         {
-            var haupt = teil.Split(';')[0].Trim();
-            if (haupt.Length == 0 || haupt == "*")
+            var primary = part.Split(';')[0].Trim();
+            if (primary.Length == 0 || primary == "*")
             {
                 continue;
             }
 
-            var gewaehlt = Aus(haupt);
+            var chosen = From(primary);
 
             // `Aus` answers with the default for anything unknown, so an
             // unknown first entry would end the loop with German while French
             // stood second. Only an entry we actually recognise may stop it.
-            if (Erkannt(haupt))
+            if (Recognised(primary))
             {
-                return gewaehlt;
+                return chosen;
             }
         }
 
-        return Vorgabe;
+        return Default;
     }
 
     /// <summary>The tag as it is stored and sent.</summary>
-    /// <param name="sprache">The language.</param>
+    /// <param name="language">The language.</param>
     /// <returns>Two lowercase letters.</returns>
-    public static string Etikett(Kontosprache language) => language switch
+    public static string Label(AccountLanguage language) => language switch
     {
-        Kontosprache.En => "en",
-        Kontosprache.Fr => "fr",
+        AccountLanguage.En => "en",
+        AccountLanguage.Fr => "fr",
         _ => "de"
     };
 
     /// <summary>Do we have texts for this tag?</summary>
     /// <remarks>
-    /// Separate from <see cref="Aus"/> on purpose. <c>Aus</c> answers with the
+    /// Separate from <see cref="From"/> on purpose. <c>From</c> answers with the
     /// default for anything it does not know, which is right when a browser
     /// announces Icelandic and wrong when a person picked something: a choice
     /// that quietly becomes German is a choice that did not happen, and nobody
     /// is told.
     /// </remarks>
-    /// <param name="etikett">A BCP 47 tag.</param>
+    /// <param name="label">A BCP 47 tag.</param>
     /// <returns><c>true</c> if a catalogue exists for it.</returns>
-    public static bool Kennen(string? label) =>
-        !string.IsNullOrWhiteSpace(label) && Erkannt(label);
+    public static bool Known(string? label) =>
+        !string.IsNullOrWhiteSpace(label) && Recognised(label);
 
-    private static bool Erkannt(string label)
+    private static bool Recognised(string label)
     {
-        var haupt = label.Split('-')[0].ToLowerInvariant();
-        return haupt is "de" or "en" or "fr";
+        var primary = label.Split('-')[0].ToLowerInvariant();
+        return primary is "de" or "en" or "fr";
     }
 }

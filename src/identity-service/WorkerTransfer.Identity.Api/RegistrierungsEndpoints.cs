@@ -9,26 +9,26 @@ namespace WorkerTransfer.Identity.Api;
 
 /// <summary>What a caller sends to register.</summary>
 /// <remarks>
-/// <para><strong>Die Namen stehen ausdrücklich da, und das ist keine Zierde.</strong>
-/// Der Draht dieser Plattform ist snake_case — neun Dienste setzen ihn mit
-/// <c>[JsonPropertyName]</c> auf ihren <c>Contracts</c>-Typen, und die
-/// Oberfläche schickt danach. Dieser Rumpf hatte als einziger keine, fiel damit
-/// auf camelCase aus <c>NoeliaModule.JsonOptions</c> zurück und band
-/// <c>display_name</c> an nichts.</para>
+/// <para><strong>The names stand there expressly, and that is no ornament.</strong>
+/// This platform's wire is snake_case — nine services set it with
+/// <c>[JsonPropertyName]</c> on their <c>Contracts</c> types, and the interface
+/// sends accordingly. This body was the only one without them, fell back to
+/// camelCase out of <c>NoeliaModule.JsonOptions</c> and bound
+/// <c>display_name</c> to nothing.</para>
 ///
-/// <para><strong>Warum es niemandem auffiel:</strong> jeder andere Rumpf in
-/// identity hat nur einwortige Felder (<c>token</c>, <c>email</c>, <c>name</c>,
-/// <c>role</c>) — da sind camelCase und snake_case dasselbe Wort. Erst ein
-/// zusammengesetzter Name macht den Unterschied sichtbar, und
-/// <c>display_name</c> ist der einzige auf einem Pflichtfeld.</para>
+/// <para><strong>Why nobody noticed:</strong> every other body in identity has
+/// nothing but single-word fields (<c>token</c>, <c>email</c>, <c>name</c>,
+/// <c>role</c>) — there camelCase and snake_case are the same word. Only a
+/// compound name makes the difference visible, and <c>display_name</c> is the
+/// only one on a mandatory field.</para>
 ///
-/// <para>Es kam als <c>500</c> zurück (die Spalte ist <c>NOT NULL</c>), seit H4
-/// als <c>422</c>. Beides heisst: über die Oberfläche konnte sich niemand
-/// registrieren. <c>DrahtnamenTests</c> nagelt die vier Namen jetzt fest.</para>
+/// <para>It came back as a <c>500</c> (the column is <c>NOT NULL</c>), since H4
+/// as a <c>422</c>. Both mean: through the interface nobody could register.
+/// <c>DrahtnamenTests</c> pins the four names now.</para>
 /// </remarks>
 /// <param name="OccupationalField">
-/// In welcher Arbeitswelt die Person steht. Optional (ADR-0039) — eine
-/// Pflichtangabe wäre eine Hürde vor dem ersten Nutzen.
+/// Which working world the person stands in. Optional (ADR-0039) — making it
+/// compulsory would be a hurdle before the first use.
 /// </param>
 /// <param name="CompanyName">
 /// Set means "a company is registering here". Optional, because the ordinary
@@ -50,10 +50,10 @@ public sealed record VerifyEmailBody(string Token);
 public sealed record ResendBody(string Email);
 
 /// <summary><c>POST /auth/{register,verify-email,resend-verification}</c>.</summary>
-public static class RegistrierungsEndpoints
+public static class RegistrationEndpoints
 {
     /// <summary>Maps the three endpoints of registering.</summary>
-    public static IEndpointRouteBuilder MapRegistrierungsEndpoints(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapRegistrationEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
@@ -65,18 +65,19 @@ public static class RegistrierungsEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            // Der Header ist hier eine ERSTE VERMUTUNG und nirgends sonst. Die
-            // Bestätigungsmail ist das Erste, was dieses Konto je bekommt, und
-            // sie geht raus, bevor jemand eine Sprache wählen konnte — ohne
-            // diesen Griff wäre sie immer deutsch. Ab dann steht die Sprache in
-            // der Zeile, und der Header wird nie wieder gelesen: er ist eine
-            // Angabe des Geräts, keine Entscheidung der Person.
-            var vermutet = Sprachwahl.AusKopf(
+            // The header is a FIRST GUESS here and nowhere else. The
+            // confirmation mail is the first thing this account ever gets, and
+            // it goes out before anybody could choose a language — without this
+            // reach for it, it would always be German. From then on the language
+            // stands in the row and the header is never read again: it is a
+            // statement of the device, not a decision of the person.
+            var guessed = LanguageChoice.FromHeader(
                 context.Request.Headers.AcceptLanguage.ToString());
 
-            // Absagen statt wegwerfen: sonst entstünde ein Konto, die Mail
-            // ginge hinaus, und die Wahl wäre still verloren.
-            if (!OccupationalFieldChoice.Kennen(body.OccupationalField))
+            // Refuse rather than discard: otherwise an account would come into
+            // being, the mail would go out, and the choice would be silently
+            // lost.
+            if (!OccupationalFieldChoice.Known(body.OccupationalField))
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
@@ -85,15 +86,15 @@ public static class RegistrierungsEndpoints
             }
 
             var result = await mediator.Send(
-                new RegistrierenBefehl(
+                new RegisterCommand(
                     body.Email, body.Password, body.DisplayName, body.CompanyName,
-                    vermutet, body.GivenName, body.FamilyName,
-                    OccupationalFieldChoice.Aus(body.OccupationalField)),
+                    guessed, body.GivenName, body.FamilyName,
+                    OccupationalFieldChoice.From(body.OccupationalField)),
                 cancellationToken);
 
             switch (result)
             {
-                case Registrierergebnis.Angenommen:
+                case RegistrationResult.Accepted:
                     // The same answer whether or not the address was known. A
                     // 409 would answer "is this person here?" without asking
                     // the consent ledger; the real owner gets a mail instead.
@@ -103,19 +104,19 @@ public static class RegistrierungsEndpoints
                         cancellationToken);
                     return;
 
-                case Registrierergebnis.OeffentlicheDomain oeffentlich:
+                case RegistrationResult.PublicDomain publicDomain:
                     // The same code POST /companies answers with, so one
                     // refusal is not called two things depending on the door.
                     await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status422UnprocessableEntity, "Request failed",
-                        $"'{oeffentlich.Domain}' is a public email provider "
+                        $"'{publicDomain.Domain}' is a public email provider "
                         + "and cannot be claimed as a company");
                     return;
 
-                case Registrierergebnis.WeakPassword schwach:
+                case RegistrationResult.WeakPassword weak:
                     await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status400BadRequest, "Request failed",
-                        $"Password rejected: {schwach.Grund}");
+                        $"Password rejected: {weak.Reason}");
                     return;
 
                 default:
@@ -131,8 +132,8 @@ public static class RegistrierungsEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            // Ein fehlender Token ist eine kaputte ResumeRequest, kein ungueltiger
-            // Token. Ohne diese Zeilen kam `{}` als 500 zurueck (D2).
+            // A missing token is a malformed request, not an invalid token.
+            // Without these lines `{}` came back as a 500 (D2).
             if (string.IsNullOrWhiteSpace(body.Token))
             {
                 await ProblemDetailsMiddleware.Write(
@@ -142,21 +143,21 @@ public static class RegistrierungsEndpoints
             }
 
             var result = await mediator.Send(
-                new AdresseBestaetigenBefehl(body.Token), cancellationToken);
+                new ConfirmAddressCommand(body.Token), cancellationToken);
 
             switch (result)
             {
-                case Bestaetigungsergebnis.Bestaetigt bestaetigt:
+                case ConfirmationResult.Confirmed confirmed:
                     var response = new Dictionary<string, string> { ["status"] = "ok" };
 
                     // Three exits, not two. Without the third an interface
                     // shows "all good" while half the intention evaporated.
-                    if (bestaetigt.Firmenname is { } name)
+                    if (confirmed.CompanyName is { } name)
                     {
                         response["company"] = name;
                     }
 
-                    if (bestaetigt.Firmenfehler is { } error)
+                    if (confirmed.CompanyError is { } error)
                     {
                         response["company_error"] = error;
                     }
@@ -164,7 +165,7 @@ public static class RegistrierungsEndpoints
                     await context.Response.WriteAsJsonAsync(response, cancellationToken);
                     return;
 
-                case Bestaetigungsergebnis.Abgelaufen:
+                case ConfirmationResult.Expired:
                     // 410 rather than 400, so the interface can offer to send
                     // it again. Only the recipient ever had the token, so the
                     // distinction reveals nothing.
@@ -188,7 +189,7 @@ public static class RegistrierungsEndpoints
             CancellationToken cancellationToken) =>
         {
             await mediator.Send(
-                new BestaetigungErneutSendenBefehl(body.Email), cancellationToken);
+                new ResendConfirmationCommand(body.Email), cancellationToken);
 
             // Always 202 — for an unknown address and for an account confirmed
             // long ago. Anything else makes this the enumeration channel that

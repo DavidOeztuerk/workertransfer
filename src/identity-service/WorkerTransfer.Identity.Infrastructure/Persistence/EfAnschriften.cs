@@ -5,13 +5,12 @@ using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Infrastructure.Persistence;
 
-/// <summary>Die Bewerbungsanschrift in ihrer Zeile.</summary>
+/// <summary>The application address in its row.</summary>
 /// <remarks>
-/// Wer nie etwas gesetzt hat, hat keine Zeile und bekommt leer. Für jedes
-/// Konto eine Zeile zu schreiben hiesse, eine PostalAddress zu behaupten, die
-/// niemand hinterlegt hat.
+/// Whoever never set anything has no row and gets an empty one. Writing a row
+/// for every account would be asserting an address nobody stored.
 /// </remarks>
-public sealed class EfPostalAddresses(IdentityDbContext context, TimeProvider uhr) : IPostalAddresses
+public sealed class EfPostalAddresses(IdentityDbContext context, TimeProvider clock) : IPostalAddresses
 {
     /// <inheritdoc />
     public async Task<PostalAddress> GetAsync(
@@ -21,8 +20,8 @@ public sealed class EfPostalAddresses(IdentityDbContext context, TimeProvider uh
             .FirstOrDefaultAsync(entry => entry.SubjectId == subject.Value, cancellationToken);
 
         return row is null
-            ? PostalAddress.Leer(subject)
-            : PostalAddress.Wiederherstellen(
+            ? PostalAddress.Empty(subject)
+            : PostalAddress.Restore(
                 subject,
                 row.Line1,
                 row.Line2,
@@ -34,32 +33,32 @@ public sealed class EfPostalAddresses(IdentityDbContext context, TimeProvider uh
 
     /// <inheritdoc />
     public async Task SaveAsync(
-        PostalAddress anschrift, CancellationToken cancellationToken = default)
+        PostalAddress address, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(anschrift);
+        ArgumentNullException.ThrowIfNull(address);
 
-        var now = uhr.GetUtcNow().UtcDateTime;
+        var now = clock.GetUtcNow().UtcDateTime;
         var row = await context.Addresses
             .AsTracking()
             .FirstOrDefaultAsync(
-                entry => entry.SubjectId == anschrift.Wer.Value, cancellationToken);
+                entry => entry.SubjectId == address.Subject.Value, cancellationToken);
 
         if (row is null)
         {
             row = new PostalAddressRow
             {
-                SubjectId = anschrift.Wer.Value,
+                SubjectId = address.Subject.Value,
                 CreatedAt = now
             };
             context.Addresses.Add(row);
         }
 
-        row.Line1 = anschrift.Zeile1;
-        row.Line2 = anschrift.Zeile2;
-        row.PostalCode = anschrift.Postleitzahl;
-        row.City = anschrift.Ort;
-        row.Country = anschrift.Land;
-        row.Phone = anschrift.Telefon;
+        row.Line1 = address.Line1;
+        row.Line2 = address.Line2;
+        row.PostalCode = address.PostalCode;
+        row.City = address.City;
+        row.Country = address.Country;
+        row.Phone = address.Phone;
         row.UpdatedAt = now;
     }
 }

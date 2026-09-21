@@ -13,12 +13,12 @@ namespace WorkerTransfer.Identity.Tests;
 /// <summary>
 /// Confirming an address — and the company intention that rides along with it.
 /// </summary>
-public class AdresseBestaetigenTests
+public class ConfirmAddressTests
 {
     private readonly IUserRepository _benutzer = Substitute.For<IUserRepository>();
     private readonly IVerificationTokenRepository _tokens =
         Substitute.For<IVerificationTokenRepository>();
-    private readonly IEinmaltoken _einmaltoken = Substitute.For<IEinmaltoken>();
+    private readonly IOneTimeToken _einmaltoken = Substitute.For<IOneTimeToken>();
     private readonly ICompanyRepository _firmen = Substitute.For<ICompanyRepository>();
     private readonly IMembershipRepository _mitglieder = Substitute.For<IMembershipRepository>();
     private readonly IAuditTrail _protokoll = Substitute.For<IAuditTrail>();
@@ -26,45 +26,45 @@ public class AdresseBestaetigenTests
     private static readonly SubjectId Anna = SubjectId.New();
     private static readonly Guid TokenId = Guid.CreateVersion7();
 
-    public AdresseBestaetigenTests() => _einmaltoken.Hashe("link").Returns("hash");
+    public ConfirmAddressTests() => _einmaltoken.HashOf("link").Returns("hash");
 
-    private Task<Bestaetigungsergebnis> Bestaetige(string token = "link") =>
-        new AdresseBestaetigenHandler(
+    private Task<ConfirmationResult> Confirm(string token = "link") =>
+        new ConfirmAddressHandler(
             _benutzer, _tokens, _einmaltoken,
-            new UnternehmenAnlegen(
+            new CreateCompany(
                 _firmen, _mitglieder, _protokoll,
-                new FesteKorrelation("abc-123"), TimeProvider.System),
-            _protokoll, new FesteKorrelation("abc-123"), TimeProvider.System)
-            .Handle(new AdresseBestaetigenBefehl(token), CancellationToken.None);
+                new FixedCorrelation("abc-123"), TimeProvider.System),
+            _protokoll, new FixedCorrelation("abc-123"), TimeProvider.System)
+            .Handle(new ConfirmAddressCommand(token), CancellationToken.None);
 
-    private void EsGibtDenToken(
-        DateTimeOffset? verbrauchtAm = null, DateTimeOffset? laeuftAbAm = null) =>
+    private void TheTokenExists(
+        DateTimeOffset? consumedAt = null, DateTimeOffset? expiresAt = null) =>
         _tokens.FindByHashAsync("hash", Arg.Any<CancellationToken>())
             .Returns(new VerificationToken(
                 TokenId, Anna, "hash", TokenPurpose.EmailVerify,
-                laeuftAbAm ?? DateTimeOffset.UtcNow.AddHours(1), verbrauchtAm));
+                expiresAt ?? DateTimeOffset.UtcNow.AddHours(1), consumedAt));
 
-    private User EsGibtDasKonto(
+    private User TheAccountExists(
         AccountStatus status = AccountStatus.Pending,
-        string? offeneFirma = null,
+        string? openCompany = null,
         string email = "chef@firma.example")
     {
-        var konto = Konten.Bestehend(Anna, email, status: status, offeneFirma: offeneFirma);
-        _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>()).Returns(konto);
-        return konto;
+        var account = Accounts.Existing(Anna, email, status: status, openCompany: openCompany);
+        _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>()).Returns(account);
+        return account;
     }
 
     [Fact]
-    public async Task Ein_gueltiger_Link_schaltet_das_Konto_frei()
+    public async Task A_valid_link_unlocks_the_account()
     {
-        EsGibtDenToken();
-        var konto = EsGibtDasKonto();
+        TheTokenExists();
+        var account = TheAccountExists();
 
-        var result = await Bestaetige();
+        var result = await Confirm();
 
-        result.Should().BeOfType<Bestaetigungsergebnis.Bestaetigt>();
-        konto.Status.Should().Be(AccountStatus.Active);
-        await _benutzer.Received().SaveAsync(konto, Arg.Any<CancellationToken>());
+        result.Should().BeOfType<ConfirmationResult.Confirmed>();
+        account.Status.Should().Be(AccountStatus.Active);
+        await _benutzer.Received().SaveAsync(account, Arg.Any<CancellationToken>());
         await _tokens.Received(1).ConsumeAsync(
             TokenId, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
     }
@@ -75,33 +75,33 @@ public class AdresseBestaetigenTests
     /// substitute hands back the same instance — and silently loses the write.
     /// </summary>
     [Fact]
-    public async Task Die_Freischaltung_wird_ausdruecklich_gespeichert()
+    public async Task The_activation_is_saved_expressly()
     {
-        EsGibtDenToken();
-        EsGibtDasKonto();
+        TheTokenExists();
+        TheAccountExists();
 
-        await Bestaetige();
+        await Confirm();
 
         await _benutzer.Received().SaveAsync(
             Arg.Is<User>(u => u.Status == AccountStatus.Active), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Ein_unbekannter_Token_ist_ungueltig()
+    public async Task An_unknown_token_is_invalid()
     {
         _tokens.FindByHashAsync("hash", Arg.Any<CancellationToken>())
             .Returns((VerificationToken?)null);
 
-        (await Bestaetige()).Should().BeOfType<Bestaetigungsergebnis.Ungueltig>();
+        (await Confirm()).Should().BeOfType<ConfirmationResult.Invalid>();
     }
 
     [Fact]
-    public async Task Ein_abgelaufener_Link_bekommt_seine_eigene_Antwort()
+    public async Task An_expired_link_gets_an_answer_of_its_own()
     {
-        EsGibtDenToken(laeuftAbAm: DateTimeOffset.UtcNow.AddHours(-1));
-        EsGibtDasKonto();
+        TheTokenExists(expiresAt: DateTimeOffset.UtcNow.AddHours(-1));
+        TheAccountExists();
 
-        (await Bestaetige()).Should().BeOfType<Bestaetigungsergebnis.Abgelaufen>();
+        (await Confirm()).Should().BeOfType<ConfirmationResult.Expired>();
         await _benutzer.DidNotReceive().SaveAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
     }
 
@@ -110,12 +110,12 @@ public class AdresseBestaetigenTests
     /// the token had the mail, so nothing is revealed by saying so.
     /// </summary>
     [Fact]
-    public async Task Zweimal_auf_denselben_Link_zu_klicken_ist_kein_Fehler()
+    public async Task Clicking_the_same_link_twice_is_no_error()
     {
-        EsGibtDenToken(verbrauchtAm: DateTimeOffset.UtcNow.AddMinutes(-5));
-        EsGibtDasKonto(AccountStatus.Active);
+        TheTokenExists(consumedAt: DateTimeOffset.UtcNow.AddMinutes(-5));
+        TheAccountExists(AccountStatus.Active);
 
-        (await Bestaetige()).Should().BeOfType<Bestaetigungsergebnis.Bestaetigt>();
+        (await Confirm()).Should().BeOfType<ConfirmationResult.Confirmed>();
     }
 
     /// <summary>
@@ -123,59 +123,59 @@ public class AdresseBestaetigenTests
     /// by a resend. The old link must not unlock anything any more.
     /// </summary>
     [Fact]
-    public async Task Ein_durch_erneutes_Senden_entwerteter_Link_traegt_nicht_mehr()
+    public async Task A_link_voided_by_a_resend_no_longer_carries()
     {
-        EsGibtDenToken(verbrauchtAm: DateTimeOffset.UtcNow.AddMinutes(-5));
-        EsGibtDasKonto(AccountStatus.Pending);
+        TheTokenExists(consumedAt: DateTimeOffset.UtcNow.AddMinutes(-5));
+        TheAccountExists(AccountStatus.Pending);
 
-        (await Bestaetige()).Should().BeOfType<Bestaetigungsergebnis.Ungueltig>();
+        (await Confirm()).Should().BeOfType<ConfirmationResult.Invalid>();
     }
 
     [Fact]
-    public async Task Die_Bestaetigung_steht_im_Protokoll()
+    public async Task The_confirmation_stands_in_the_trail()
     {
-        EsGibtDenToken();
-        EsGibtDasKonto();
+        TheTokenExists();
+        TheAccountExists();
 
-        await Bestaetige();
+        await Confirm();
 
         await _protokoll.Received(1).AppendAsync(
             Arg.Is<AuditEvent>(e => e.Action == AuditAction.EmailVerified && e.Actor == Anna),
             Arg.Any<CancellationToken>());
     }
 
-    public class MitFirmenabsicht : AdresseBestaetigenTests
+    public class WithCompanyIntent : ConfirmAddressTests
     {
         /// <summary>
         /// The domain comes from the confirmed address, never from a request —
         /// which is what makes it unforgeable (ADR-0019).
         /// </summary>
         [Fact]
-        public async Task Die_Firma_entsteht_erst_jetzt_und_auf_der_bewiesenen_Domain()
+        public async Task The_company_comes_into_being_only_now_and_on_the_proven_domain()
         {
-            EsGibtDenToken();
-            EsGibtDasKonto(offeneFirma: "Beispiel GmbH");
+            TheTokenExists();
+            TheAccountExists(openCompany: "Beispiel GmbH");
             _firmen.FindByDomainAsync(Arg.Any<EmailDomain>(), Arg.Any<CancellationToken>())
                 .Returns((Company?)null);
 
-            var result = await Bestaetige();
+            var result = await Confirm();
 
-            result.Should().BeOfType<Bestaetigungsergebnis.Bestaetigt>()
-                .Which.Firmenname.Should().Be("Beispiel GmbH");
+            result.Should().BeOfType<ConfirmationResult.Confirmed>()
+                .Which.CompanyName.Should().Be("Beispiel GmbH");
             await _firmen.Received(1).AddAsync(
                 Arg.Is<Company>(f => f.Domain.Value == "firma.example"),
                 Arg.Any<CancellationToken>());
         }
 
         [Fact]
-        public async Task Wer_sein_Unternehmen_anlegt_wird_dessen_Administrator()
+        public async Task Whoever_creates_their_company_becomes_its_administrator()
         {
-            EsGibtDenToken();
-            EsGibtDasKonto(offeneFirma: "Beispiel GmbH");
+            TheTokenExists();
+            TheAccountExists(openCompany: "Beispiel GmbH");
             _firmen.FindByDomainAsync(Arg.Any<EmailDomain>(), Arg.Any<CancellationToken>())
                 .Returns((Company?)null);
 
-            await Bestaetige();
+            await Confirm();
 
             await _mitglieder.Received(1).AddAsync(
                 Anna, Arg.Any<TenantId>(), MembershipRole.Admin, Arg.Any<CancellationToken>());
@@ -188,21 +188,21 @@ public class AdresseBestaetigenTests
         /// says what happened.
         /// </summary>
         [Fact]
-        public async Task Eine_beanspruchte_Domain_verhindert_die_Bestaetigung_nicht()
+        public async Task A_claimed_domain_does_not_prevent_the_confirmation()
         {
-            EsGibtDenToken();
-            var konto = EsGibtDasKonto(offeneFirma: "Beispiel GmbH");
+            TheTokenExists();
+            var account = TheAccountExists(openCompany: "Beispiel GmbH");
             _firmen.FindByDomainAsync(Arg.Any<EmailDomain>(), Arg.Any<CancellationToken>())
                 .Returns(Company.Restore(
                     TenantId.New(), "Andere GmbH",
                     new EmailDomain("firma.example"), TenantStatus.Active));
 
-            var result = await Bestaetige();
+            var result = await Confirm();
 
-            var bestaetigt = result.Should().BeOfType<Bestaetigungsergebnis.Bestaetigt>().Which;
-            bestaetigt.Firmenfehler.Should().Be("domain_already_claimed");
-            bestaetigt.Firmenname.Should().BeNull();
-            konto.Status.Should().Be(AccountStatus.Active);
+            var confirmed = result.Should().BeOfType<ConfirmationResult.Confirmed>().Which;
+            confirmed.CompanyError.Should().Be("domain_already_claimed");
+            confirmed.CompanyName.Should().BeNull();
+            account.Status.Should().Be(AccountStatus.Active);
         }
 
         /// <summary>
@@ -212,20 +212,20 @@ public class AdresseBestaetigenTests
         [Theory]
         [InlineData(true)]
         [InlineData(false)]
-        public async Task Die_Absicht_ist_danach_verbraucht_auch_bei_Ablehnung(bool abgelehnt)
+        public async Task The_intent_is_spent_afterwards_even_on_a_refusal(bool refused)
         {
-            EsGibtDenToken();
-            var konto = EsGibtDasKonto(offeneFirma: "Beispiel GmbH");
+            TheTokenExists();
+            var account = TheAccountExists(openCompany: "Beispiel GmbH");
             _firmen.FindByDomainAsync(Arg.Any<EmailDomain>(), Arg.Any<CancellationToken>())
-                .Returns(abgelehnt
+                .Returns(refused
                     ? Company.Restore(
                         TenantId.New(), "Andere GmbH",
                         new EmailDomain("firma.example"), TenantStatus.Active)
                     : null);
 
-            await Bestaetige();
+            await Confirm();
 
-            konto.PendingCompanyName.Should().BeNull();
+            account.PendingCompanyName.Should().BeNull();
         }
 
         /// <summary>
@@ -234,17 +234,17 @@ public class AdresseBestaetigenTests
         /// if somebody ever writes the intention another way.
         /// </summary>
         [Fact]
-        public async Task Eine_Freemail_Adresse_bekommt_auch_hier_keine_Firma()
+        public async Task A_freemail_address_gets_no_company_here_either()
         {
-            EsGibtDenToken();
-            EsGibtDasKonto(offeneFirma: "Beispiel GmbH", email: "chef@gmail.com");
+            TheTokenExists();
+            TheAccountExists(openCompany: "Beispiel GmbH", email: "chef@gmail.com");
             _firmen.FindByDomainAsync(Arg.Any<EmailDomain>(), Arg.Any<CancellationToken>())
                 .Returns((Company?)null);
 
-            var result = await Bestaetige();
+            var result = await Confirm();
 
-            result.Should().BeOfType<Bestaetigungsergebnis.Bestaetigt>()
-                .Which.Firmenfehler.Should().Be("public_email_domain");
+            result.Should().BeOfType<ConfirmationResult.Confirmed>()
+                .Which.CompanyError.Should().Be("public_email_domain");
             await _firmen.DidNotReceive().AddAsync(
                 Arg.Any<Company>(), Arg.Any<CancellationToken>());
         }

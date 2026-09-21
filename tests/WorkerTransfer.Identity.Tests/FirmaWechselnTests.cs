@@ -13,7 +13,7 @@ namespace WorkerTransfer.Identity.Tests;
 /// <summary>
 /// Acting for a company: the caller names it, the membership decides.
 /// </summary>
-public class FirmaWechselnTests
+public class SwitchCompanyTests
 {
     private readonly IMembershipRepository _mitglieder = Substitute.For<IMembershipRepository>();
     private readonly IUserRepository _benutzer = Substitute.For<IUserRepository>();
@@ -23,23 +23,23 @@ public class FirmaWechselnTests
     private readonly IAuditTrail _protokoll = Substitute.For<IAuditTrail>();
 
     private static readonly SubjectId Anna = SubjectId.New();
-    private static readonly TenantId Firma = TenantId.New();
-    private static readonly SessionId Sitzung = SessionId.New();
+    private static readonly TenantId Company = TenantId.New();
+    private static readonly SessionId Session = SessionId.New();
 
-    private Task<CompanySwitchResult> Wechseln() =>
+    private Task<CompanySwitchResult> Switch() =>
         new SwitchCompanyHandler(
             _mitglieder, _benutzer, _sitzungen, _form, _token, _protokoll,
-            new FesteKorrelation("abc-123"), TimeProvider.System)
-            .Handle(new SwitchCompanyCommand(Anna, Firma), CancellationToken.None);
+            new FixedCorrelation("abc-123"), TimeProvider.System)
+            .Handle(new SwitchCompanyCommand(Anna, Company), CancellationToken.None);
 
-    private void EsGibtDasKonto(AccountStatus status = AccountStatus.Active) =>
+    private void TheAccountExists(AccountStatus status = AccountStatus.Active) =>
         _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>())
-            .Returns(Konten.Bestehend(Anna, "anna@example.com", "$2b$12$x", status));
+            .Returns(Accounts.Existing(Anna, "anna@example.com", "$2b$12$x", status));
 
-    private void EineSitzungEntsteht()
+    private void ASessionComesIntoBeing()
     {
         _sitzungen.StartAsync(Anna, Arg.Any<CancellationToken>())
-            .Returns(new StartedSession(Sitzung, "erneuerung", DateTimeOffset.UtcNow.AddDays(1)));
+            .Returns(new StartedSession(Session, "erneuerung", DateTimeOffset.UtcNow.AddDays(1)));
         _token.IssueAsync(
                 Arg.Any<SubjectId>(), Arg.Any<string>(), Arg.Any<Capacity>(),
                 Arg.Any<SessionId>(), Arg.Any<CancellationToken>())
@@ -47,19 +47,19 @@ public class FirmaWechselnTests
     }
 
     [Fact]
-    public async Task Ein_Mitglied_bekommt_ein_Paar_das_fuer_die_Firma_handelt()
+    public async Task A_member_gets_a_pair_that_acts_for_the_company()
     {
-        _mitglieder.IsMemberAsync(Anna, Firma, Arg.Any<CancellationToken>()).Returns(true);
-        EsGibtDasKonto();
-        EineSitzungEntsteht();
+        _mitglieder.IsMemberAsync(Anna, Company, Arg.Any<CancellationToken>()).Returns(true);
+        TheAccountExists();
+        ASessionComesIntoBeing();
 
-        var result = await Wechseln();
+        var result = await Switch();
 
-        result.Should().BeOfType<CompanySwitchResult.Gewechselt>();
+        result.Should().BeOfType<CompanySwitchResult.Switched>();
         await _token.Received().IssueAsync(
             Anna, "anna@example.com",
-            Arg.Is<Capacity>(c => c.Equals(new Capacity.ForCompany(Firma))),
-            Sitzung, Arg.Any<CancellationToken>());
+            Arg.Is<Capacity>(c => c.Equals(new Capacity.ForCompany(Company))),
+            Session, Arg.Any<CancellationToken>());
     }
 
     /// <summary>
@@ -67,11 +67,11 @@ public class FirmaWechselnTests
     /// the request, it was derived from a checked membership.
     /// </summary>
     [Fact]
-    public async Task Ohne_Mitgliedschaft_wird_kein_Token_ausgestellt()
+    public async Task Without_a_membership_no_token_is_issued()
     {
-        _mitglieder.IsMemberAsync(Anna, Firma, Arg.Any<CancellationToken>()).Returns(false);
+        _mitglieder.IsMemberAsync(Anna, Company, Arg.Any<CancellationToken>()).Returns(false);
 
-        var result = await Wechseln();
+        var result = await Switch();
 
         result.Should().BeOfType<CompanySwitchResult.NoMember>();
         await _token.DidNotReceive().IssueAsync(
@@ -86,16 +86,16 @@ public class FirmaWechselnTests
     /// because it was refused.
     /// </summary>
     [Fact]
-    public async Task Eine_abgewiesene_Anfrage_nennt_die_Firma_im_Protokoll()
+    public async Task A_refused_request_names_the_company_in_the_trail()
     {
-        _mitglieder.IsMemberAsync(Anna, Firma, Arg.Any<CancellationToken>()).Returns(false);
+        _mitglieder.IsMemberAsync(Anna, Company, Arg.Any<CancellationToken>()).Returns(false);
 
-        await Wechseln();
+        await Switch();
 
         await _protokoll.Received(1).AppendAsync(
             Arg.Is<AuditEvent>(e => e.Action == AuditAction.TenantSwitchDenied
                                     && e.Actor == Anna
-                                    && e.Tenant == Firma),
+                                    && e.Tenant == Company),
             Arg.Any<CancellationToken>());
     }
 
@@ -104,32 +104,32 @@ public class FirmaWechselnTests
     /// keeps working, and the company-bound one can be ended on its own.
     /// </summary>
     [Fact]
-    public async Task Der_Wechsel_beginnt_eine_eigene_Sitzung_und_merkt_sich_die_Firma()
+    public async Task The_switch_begins_a_session_of_its_own_and_remembers_the_company()
     {
-        _mitglieder.IsMemberAsync(Anna, Firma, Arg.Any<CancellationToken>()).Returns(true);
-        EsGibtDasKonto();
-        EineSitzungEntsteht();
+        _mitglieder.IsMemberAsync(Anna, Company, Arg.Any<CancellationToken>()).Returns(true);
+        TheAccountExists();
+        ASessionComesIntoBeing();
 
-        await Wechseln();
+        await Switch();
 
         await _sitzungen.Received(1).StartAsync(Anna, Arg.Any<CancellationToken>());
         await _form.Received(1).RememberAsync(
-            Sitzung,
-            Arg.Is<Capacity>(c => c.Equals(new Capacity.ForCompany(Firma))),
+            Session,
+            Arg.Is<Capacity>(c => c.Equals(new Capacity.ForCompany(Company))),
             Arg.Any<CancellationToken>());
     }
 
     [Theory]
     [InlineData(AccountStatus.Disabled)]
     [InlineData(AccountStatus.Pending)]
-    public async Task Ein_Konto_das_nicht_handeln_darf_wechselt_auch_nicht(AccountStatus status)
+    public async Task An_account_that_may_not_act_does_not_switch_either(AccountStatus status)
     {
-        _mitglieder.IsMemberAsync(Anna, Firma, Arg.Any<CancellationToken>()).Returns(true);
-        EsGibtDasKonto(status);
+        _mitglieder.IsMemberAsync(Anna, Company, Arg.Any<CancellationToken>()).Returns(true);
+        TheAccountExists(status);
 
-        var result = await Wechseln();
+        var result = await Switch();
 
-        result.Should().BeOfType<CompanySwitchResult.Abgelehnt>();
+        result.Should().BeOfType<CompanySwitchResult.Refused>();
         await _sitzungen.DidNotReceive().StartAsync(
             Arg.Any<SubjectId>(), Arg.Any<CancellationToken>());
     }

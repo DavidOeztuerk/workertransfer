@@ -2,32 +2,33 @@ using FluentValidation;
 
 namespace WorkerTransfer.Identity.Application.Unternehmen;
 
-/// <summary>Ein Einladungstoken muss dasein.</summary>
+/// <summary>An invitation token has to be there.</summary>
 /// <remarks>
-/// Die Reihenfolge bleibt: erst Anmeldung, dann Eingabe. Der Endpunkt weist
-/// einen Fremden schon vorher ab — sonst lernte er aus dem Unterschied 422/401,
-/// dass es diesen Endpunkt gibt. Der Validator läuft danach, im Mediator.
+/// The order stays: authentication first, then the input. The endpoint refuses
+/// a stranger before that — otherwise they would learn from the difference
+/// 422/401 that this endpoint exists. The validator runs afterwards, in the
+/// mediator.
 /// </remarks>
 public sealed class InvitationValidator : AbstractValidator<AcceptInvitationCommand>
 {
-    /// <summary>Setzt die eine Regel.</summary>
+    /// <summary>Sets the one rule.</summary>
     public InvitationValidator() =>
-        RuleFor(befehl => befehl.Token)
+        RuleFor(command => command.Token)
             .NotEmpty().WithMessage("token is required")
             .OverridePropertyName("token");
 }
 
-/// <summary>Eine Firma braucht einen Namen.</summary>
+/// <summary>A company needs a name.</summary>
 /// <remarks>
-/// Die Domäne wird NICHT hier geprüft — sie stammt aus der bestätigten Adresse
-/// und nicht aus dem Rumpf, und ob sie schon beansprucht ist, ist eine Antwort
-/// (409) und keine kaputte ResumeRequest.
+/// The domain is NOT checked here — it comes from the confirmed address and not
+/// from the body, and whether it is already claimed is an answer (409) and not
+/// a malformed request.
 /// </remarks>
-public sealed class CompanyFoundingValidator : AbstractValidator<UnternehmenGruendenBefehl>
+public sealed class CompanyFoundingValidator : AbstractValidator<FoundCompanyCommand>
 {
-    /// <summary>Setzt die eine Regel.</summary>
+    /// <summary>Sets the one rule.</summary>
     public CompanyFoundingValidator() =>
-        RuleFor(befehl => befehl.Name)
+        RuleFor(command => command.Name)
             .NotEmpty().WithMessage("name is required")
             .OverridePropertyName("name");
 }

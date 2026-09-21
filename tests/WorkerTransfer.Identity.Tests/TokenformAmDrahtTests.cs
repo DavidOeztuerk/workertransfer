@@ -15,42 +15,40 @@ using WorkerTransfer.ServiceDefaults;
 namespace WorkerTransfer.Identity.Tests;
 
 /// <summary>
-/// Der Anspruchssatz, wie er den ENDPUNKT verlässt — nicht wie der Aussteller
-/// ihn baut.
+/// The claim set as it leaves the ENDPOINT — not as the issuer builds it.
 /// </summary>
 /// <remarks>
-/// <strong>Der Unterschied ist genau die Lücke, durch die der neunte Anspruch
-/// gerutscht ist.</strong> <see cref="TokenformTests"/> ruft Noelias Aussteller
-/// direkt und hält seinen Satz fest. Das ist richtig und reicht nicht: zwischen
-/// Aussteller und Draht liegen die Einstellungen des Dienstes, seine
-/// Verdrahtung und der Keks, in dem das Token schliesslich steht. Ein Anspruch,
-/// den erst diese Schicht hinzufügt, wäre dort unsichtbar — und war es: die
-/// Zusage in `CLAUDE.md` lautete „acht und nichts sonst", am laufenden Stapel
-/// gemessen waren es neun.
+/// <strong>The difference is exactly the gap the ninth claim slipped
+/// through.</strong> <see cref="TokenShapeTests"/> calls Noelia's issuer
+/// directly and pins its set. That is right and not enough: between the issuer
+/// and the wire sit the service's settings, its wiring and the cookie the token
+/// finally stands in. A claim added only by that layer would be invisible there
+/// — and was: the promise in `CLAUDE.md` read „eight and nothing else",
+/// measured against the running stack there were nine.
 ///
 /// <para>
-/// Diese Reihe geht deshalb den ganzen Weg: registrieren, bestätigen, anmelden,
-/// auf ein Unternehmen wechseln — und liest das Token dort, wo es der Browser
-/// bekommt, nämlich aus dem <c>Set-Cookie</c>. Im Rumpf steht es nie.
+/// So this suite goes the whole way: register, confirm, sign in, switch to a
+/// company — and reads the token where the browser gets it, namely out of the
+/// <c>Set-Cookie</c>. It is never in the body.
 /// </para>
 ///
 /// <para>
-/// Verglichen wird die MENGE, nicht einzelne Namen. Ein Test, der verbotene
-/// Namen aufzählt, bemerkt den zehnten nie, an den niemand gedacht hat.
+/// What is compared is the SET, not single names. A test that lists forbidden
+/// names never notices the tenth nobody thought of.
 /// </para>
 /// </remarks>
 [Collection(PostgresCollection.Name)]
-public class TokenformAmDrahtTests(Postgres postgres) : IAsyncLifetime
+public class TokenShapeAtTheWireTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Passwort = "geheim-und-lang-genug";
+    private const string Password = "geheim-und-lang-genug";
 
-    /// <summary>Was eine Person trägt, die für niemanden handelt.</summary>
+    /// <summary>What a person carries who acts for nobody.</summary>
     /// <remarks>
-    /// Der neunte — die lange WS-Schreibweise von <c>sub</c> — ist Noelias und
-    /// bleibt: <c>MapInboundClaims = false</c> schaltet die Ableitung ab, und
-    /// siebzehn Leser holen den Aufrufer über diesen Namen, zwei davon in
-    /// Fremdpaketen. Ihn zu streichen spart siebzig Byte und macht aus jedem
-    /// dieser Leser ein stilles <c>null</c>.
+    /// The ninth — the long WS spelling of <c>sub</c> — is Noelia's and stays:
+    /// <c>MapInboundClaims = false</c> switches the derivation off, and
+    /// seventeen readers fetch the caller over this name, two of them in foreign
+    /// packages. Dropping it saves seventy bytes and turns every one of those
+    /// readers into a silent <c>null</c>.
     /// </remarks>
     private static readonly string[] AlsPerson =
     [
@@ -66,24 +64,24 @@ public class TokenformAmDrahtTests(Postgres postgres) : IAsyncLifetime
     ];
 
     private WebApplicationFactory<Program> _dienst = null!;
-    private MitschreibenderVersender _versand = null!;
+    private RecordingMailSender _versand = null!;
 
     public async Task InitializeAsync()
     {
-        _versand = new MitschreibenderVersender(postgres.ConnectionString);
+        _versand = new RecordingMailSender(postgres.ConnectionString);
 
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:identity", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:PrivateKey", TokenShape.PrivateKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
-                services.Replace(ServiceDescriptor.Singleton<IVersender>(_versand)));
+                services.Replace(ServiceDescriptor.Singleton<IMailSender>(_versand)));
         });
 
         using var scope = _dienst.Services.CreateScope();
@@ -99,7 +97,7 @@ public class TokenformAmDrahtTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Der ganze Satz, in beiden Handlungsformen (ADR-0017).</summary>
     [Fact]
-    public async Task Am_Draht_traegt_das_Token_genau_diese_Ansprueche()
+    public async Task At_the_wire_the_token_carries_exactly_these_claims()
     {
         var domain = $"firma-{Guid.NewGuid():N}.example";
         var email = $"anna-{Guid.NewGuid():N}@{domain}";
@@ -110,7 +108,7 @@ public class TokenformAmDrahtTests(Postgres postgres) : IAsyncLifetime
         (await browser.PostAsJsonAsync("/auth/register", new
         {
             email,
-            password = Passwort,
+            password = Password,
             display_name = "Anna",
             company_name = "Beispiel GmbH"
         })).StatusCode.Should().Be(HttpStatusCode.Created);
@@ -118,41 +116,41 @@ public class TokenformAmDrahtTests(Postgres postgres) : IAsyncLifetime
         (await browser.PostAsJsonAsync("/auth/verify-email", new
         {
             token = Regex.Match(
-                _versand.Post.Last(p => p.Betreff.Contains("bestätige", StringComparison.Ordinal)).Text,
+                _versand.Post.Last(p => p.Subject.Contains("bestätige", StringComparison.Ordinal)).Text,
                 @"token=(?<token>[A-Za-z0-9_-]+)", RegexOptions.None, TimeSpan.FromSeconds(5))
                 .Groups["token"].Value
         })).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var angemeldet = await browser.PostAsJsonAsync(
-            "/auth/login", new { email, password = Passwort });
-        angemeldet.StatusCode.Should().Be(HttpStatusCode.OK);
+        var signedIn = await browser.PostAsJsonAsync(
+            "/auth/login", new { email, password = Password });
+        signedIn.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // ALS PERSON: kein Mandant. `null` heisst „handelt für sich selbst"
-        // und nicht „fehlt" — deshalb steht der Anspruch gar nicht erst da.
-        Ansprueche(angemeldet).Should().BeEquivalentTo(AlsPerson);
+        // AS A PERSON: no tenant. `null` means „acts for themselves" and not
+        // „missing" — which is why the claim is not there at all.
+        Ansprueche(signedIn).Should().BeEquivalentTo(AlsPerson);
 
-        var meine = JsonDocument.Parse(
+        var mine = JsonDocument.Parse(
             await (await browser.GetAsync("/me/companies")).Content.ReadAsStringAsync())
             .RootElement;
 
-        var gewechselt = await browser.PostAsync(
-            $"/auth/company/{meine[0].GetProperty("id").GetString()}", null);
-        gewechselt.StatusCode.Should().Be(HttpStatusCode.OK);
+        var switched = await browser.PostAsync(
+            $"/auth/company/{mine[0].GetProperty("id").GetString()}", null);
+        switched.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // FÜR EINE FIRMA: genau EINER kommt dazu. Nicht `tenant_id`, nicht
-        // `roles` — die Membership entscheidet je ResumeRequest (ADR-0018).
-        Ansprueche(gewechselt).Should().BeEquivalentTo([.. AlsPerson, "tenant"]);
+        // FOR A COMPANY: exactly ONE is added. Not `tenant_id`, not `roles` —
+        // the membership decides per request (ADR-0018).
+        Ansprueche(switched).Should().BeEquivalentTo([.. AlsPerson, "tenant"]);
     }
 
-    /// <summary>Im RUMPF steht das Token nie.</summary>
+    /// <summary>The token is never in the BODY.</summary>
     /// <remarks>
-    /// Es geht ausschliesslich als <c>httpOnly</c>-Keks hinaus, damit kein
-    /// Skript im Browser es lesen kann. Ein Feld daneben im Rumpf wäre ein
-    /// zweiter Weg an dieselbe Zeichenkette — und der erste, den jemand
-    /// versehentlich in ein Protokoll schreibt.
+    /// It goes out solely as an <c>httpOnly</c> cookie, so no script in the
+    /// browser can read it. A field beside it in the body would be a second way
+    /// to the same string — and the first one somebody writes into a log by
+    /// accident.
     /// </remarks>
     [Fact]
-    public async Task Das_Token_steht_nicht_im_Rumpf()
+    public async Task The_token_is_not_in_the_body()
     {
         var email = $"bo-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
 
@@ -162,28 +160,28 @@ public class TokenformAmDrahtTests(Postgres postgres) : IAsyncLifetime
         await browser.PostAsJsonAsync("/auth/register", new
         {
             email,
-            password = Passwort,
+            password = Password,
             display_name = "Bo"
         });
 
         await browser.PostAsJsonAsync("/auth/verify-email", new
         {
             token = Regex.Match(
-                _versand.Post.Last(p => p.Betreff.Contains("bestätige", StringComparison.Ordinal)).Text,
+                _versand.Post.Last(p => p.Subject.Contains("bestätige", StringComparison.Ordinal)).Text,
                 @"token=(?<token>[A-Za-z0-9_-]+)", RegexOptions.None, TimeSpan.FromSeconds(5))
                 .Groups["token"].Value
         });
 
-        var angemeldet = await browser.PostAsJsonAsync(
-            "/auth/login", new { email, password = Passwort });
+        var signedIn = await browser.PostAsJsonAsync(
+            "/auth/login", new { email, password = Password });
 
-        var body = await angemeldet.Content.ReadAsStringAsync();
+        var body = await signedIn.Content.ReadAsStringAsync();
 
         body.Should().NotContain("access_token");
-        body.Should().NotContain(Keks(angemeldet));
+        body.Should().NotContain(Keks(signedIn));
     }
 
-    /// <summary>Die Anspruchsnamen aus dem <c>access</c>-Keks der Antwort.</summary>
+    /// <summary>The claim names out of the answer's <c>access</c> cookie.</summary>
     private static IEnumerable<string> Ansprueche(HttpResponseMessage response)
     {
         var body = Keks(response).Split('.')[1];
@@ -199,13 +197,13 @@ public class TokenformAmDrahtTests(Postgres postgres) : IAsyncLifetime
     private static string Keks(HttpResponseMessage response)
     {
         response.Headers.TryGetValues("Set-Cookie", out var kekse).Should().BeTrue(
-            "das Token verlässt den Dienst ausschliesslich als Keks");
+            "the token leaves the service solely as a cookie");
 
-        var zugriff = kekse!.FirstOrDefault(k =>
+        var access = kekse!.FirstOrDefault(k =>
             k.StartsWith("access=", StringComparison.Ordinal));
 
-        zugriff.Should().NotBeNull("ohne `access` gäbe es keine Sitzung");
+        access.Should().NotBeNull("without `access` there would be no session");
 
-        return zugriff!["access=".Length..].Split(';')[0];
+        return access!["access=".Length..].Split(';')[0];
     }
 }

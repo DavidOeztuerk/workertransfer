@@ -12,34 +12,34 @@ namespace WorkerTransfer.Identity.Tests;
 /// account is not a disabled one, and answering them alike leaves whoever
 /// missed the mail in a dead end.
 /// </remarks>
-public class AnmeldeRegelnTests
+public class SignInRulesTests
 {
-    private static User Konto(AccountStatus status) =>
-        Konten.Bestehend(SubjectId.New(), status: status);
+    private static User Account(AccountStatus status) =>
+        Accounts.Existing(SubjectId.New(), status: status);
 
     [Fact]
-    public void Ein_aktives_Konto_darf_sich_anmelden()
+    public void An_active_account_may_sign_in()
     {
-        var darf = () => Konto(AccountStatus.Active).AssertCanSignIn();
+        var mayAct = () => Account(AccountStatus.Active).AssertCanSignIn();
 
-        darf.Should().NotThrow();
+        mayAct.Should().NotThrow();
     }
 
     [Fact]
-    public void Ein_unbestaetigtes_Konto_ist_nicht_gesperrt_sondern_unbestaetigt()
+    public void An_unconfirmed_account_is_not_disabled_but_unconfirmed()
     {
-        var darf = () => Konto(AccountStatus.Pending).AssertCanSignIn();
+        var mayAct = () => Account(AccountStatus.Pending).AssertCanSignIn();
 
-        darf.Should().Throw<EmailNotConfirmedException>();
+        mayAct.Should().Throw<EmailNotConfirmedException>();
     }
 
     [Theory]
     [InlineData(AccountStatus.Suspended)]
     [InlineData(AccountStatus.Disabled)]
-    public void Alles_andere_ist_gesperrt(AccountStatus status)
+    public void Everything_else_is_shut(AccountStatus status)
     {
-        var darf = () => Konto(status).AssertCanSignIn();
+        var mayAct = () => Account(status).AssertCanSignIn();
 
-        darf.Should().Throw<AccountDisabledException>();
+        mayAct.Should().Throw<AccountDisabledException>();
     }
 }

@@ -16,10 +16,10 @@ namespace WorkerTransfer.Identity.Application.Anmelden;
 /// that reaches a token was never taken from the request, it was derived from a
 /// checked membership.
 /// </remarks>
-/// <param name="Wer">Who is asking — from the token, never from the body.</param>
-/// <param name="Firma">The company they name.</param>
-public sealed record SwitchCompanyCommand(SubjectId Wer, TenantId Firma)
-    : IBefehl<CompanySwitchResult>;
+/// <param name="Subject">Who is asking — from the token, never from the body.</param>
+/// <param name="Company">The company they name.</param>
+public sealed record SwitchCompanyCommand(SubjectId Subject, TenantId Company)
+    : ICommand<CompanySwitchResult>;
 
 /// <summary>What the attempt to act for a company produced.</summary>
 public abstract record CompanySwitchResult
@@ -27,10 +27,10 @@ public abstract record CompanySwitchResult
     private CompanySwitchResult() { }
 
     /// <summary>A fresh pair, acting for the company.</summary>
-    public sealed record Gewechselt(
-        string Zugriffstoken,
-        string Erneuerungstoken,
-        DateTimeOffset ErneuerungLaeuftAb) : CompanySwitchResult;
+    public sealed record Switched(
+        string AccessToken,
+        string RefreshToken,
+        DateTimeOffset RefreshExpiresAt) : CompanySwitchResult;
 
     /// <summary>
     /// The caller is not a member of this company.
@@ -42,19 +42,19 @@ public abstract record CompanySwitchResult
     public sealed record NoMember : CompanySwitchResult;
 
     /// <summary>The account may not act at all.</summary>
-    public sealed record Abgelehnt : CompanySwitchResult;
+    public sealed record Refused : CompanySwitchResult;
 }
 
 /// <summary>Mints a company-bound pair after verifying membership.</summary>
 public sealed class SwitchCompanyHandler(
-    IMembershipRepository mitgliedschaften,
-    IUserRepository benutzer,
+    IMembershipRepository memberships,
+    IUserRepository users,
     ISessionService sessions,
-    ISessionCapacity handlungsform,
+    ISessionCapacity sessionCapacity,
     IAccessTokenIssuer token,
-    IAuditTrail protokoll,
-    IKorrelation korrelation,
-    TimeProvider uhr)
+    IAuditTrail auditTrail,
+    ICorrelation correlation,
+    TimeProvider clock)
     : IRequestHandler<SwitchCompanyCommand, CompanySwitchResult>
 {
     /// <inheritdoc />
@@ -64,60 +64,60 @@ public sealed class SwitchCompanyHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (!await mitgliedschaften.IsMemberAsync(request.Wer, request.Firma, cancellationToken))
+        if (!await memberships.IsMemberAsync(request.Subject, request.Company, cancellationToken))
         {
-            await protokoll.AppendAsync(
+            await auditTrail.AppendAsync(
                 new AuditEvent(
                     AuditAction.TenantSwitchDenied,
-                    uhr.GetUtcNow(),
-                    actor: request.Wer,
+                    clock.GetUtcNow(),
+                    actor: request.Subject,
                     // The company the caller asked for is the point of the
                     // record — especially because it was refused.
-                    tenant: request.Firma,
-                    correlationId: korrelation.Aktuell),
+                    tenant: request.Company,
+                    correlationId: correlation.Current),
                 cancellationToken);
 
             return new CompanySwitchResult.NoMember();
         }
 
-        var konto = await benutzer.FindByIdAsync(request.Wer, cancellationToken);
+        var account = await users.FindByIdAsync(request.Subject, cancellationToken);
 
-        if (konto is null)
+        if (account is null)
         {
-            return new CompanySwitchResult.Abgelehnt();
+            return new CompanySwitchResult.Refused();
         }
 
         try
         {
-            konto.AssertCanSignIn();
+            account.AssertCanSignIn();
         }
         catch (Exception error) when (error is EmailNotConfirmedException
                                               or AccountDisabledException)
         {
-            return new CompanySwitchResult.Abgelehnt();
+            return new CompanySwitchResult.Refused();
         }
 
         // A fresh sign-in rather than an edit of the old one: the personal
         // refresh token keeps working, and the company-bound one can be ended
         // on its own.
-        var session = await sessions.StartAsync(konto.Id, cancellationToken);
-        var form = new Capacity.ForCompany(request.Firma);
+        var session = await sessions.StartAsync(account.Id, cancellationToken);
+        var capacity = new Capacity.ForCompany(request.Company);
 
-        await handlungsform.RememberAsync(session.Session, form, cancellationToken);
+        await sessionCapacity.RememberAsync(session.Session, capacity, cancellationToken);
 
-        var zugriff = await token.IssueAsync(
-            konto.Id, konto.Email, form, session.Session, cancellationToken);
+        var accessToken = await token.IssueAsync(
+            account.Id, account.Email, capacity, session.Session, cancellationToken);
 
-        await protokoll.AppendAsync(
+        await auditTrail.AppendAsync(
             new AuditEvent(
                 AuditAction.TenantSwitch,
-                uhr.GetUtcNow(),
-                actor: konto.Id,
-                tenant: request.Firma,
-                correlationId: korrelation.Aktuell),
+                clock.GetUtcNow(),
+                actor: account.Id,
+                tenant: request.Company,
+                correlationId: correlation.Current),
             cancellationToken);
 
-        return new CompanySwitchResult.Gewechselt(
-            zugriff, session.RefreshToken, session.ExpiresAt);
+        return new CompanySwitchResult.Switched(
+            accessToken, session.RefreshToken, session.ExpiresAt);
     }
 }

@@ -12,7 +12,7 @@ namespace WorkerTransfer.Identity.Tests;
 /// thing standing between "it builds" and "it works", and the difference is
 /// what an empty scaffold is worst at showing.
 /// </remarks>
-public class GeruestTests
+public class ScaffoldTests
 {
     [Fact]
     public void Noelias_identity_primitives_are_available()

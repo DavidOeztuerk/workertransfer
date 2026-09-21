@@ -11,7 +11,7 @@ using WorkerTransfer.Identity.Domain.Users;
 namespace WorkerTransfer.Identity.Tests;
 
 /// <summary>Carrying a sign-in forward, and ending it.</summary>
-public class ErneuernUndAbmeldenTests
+public class RefreshAndSignOutTests
 {
     private readonly ISessionService _sitzungen = Substitute.For<ISessionService>();
     private readonly IUserRepository _benutzer = Substitute.For<IUserRepository>();
@@ -21,45 +21,45 @@ public class ErneuernUndAbmeldenTests
     private readonly IAuditTrail _protokoll = Substitute.For<IAuditTrail>();
 
     private static readonly SubjectId Anna = SubjectId.New();
-    private static readonly SessionId Sitzung = SessionId.New();
+    private static readonly SessionId Session = SessionId.New();
 
-    private ErneuernHandler Erneuern() => new(
+    private RefreshHandler Refresh() => new(
         _sitzungen, _benutzer, _mitglieder, _form, _token, _protokoll,
-        new FesteKorrelation("abc-123"), TimeProvider.System);
+        new FixedCorrelation("abc-123"), TimeProvider.System);
 
-    private Task<Erneuerungsergebnis> Erneuern(string token) =>
-        Erneuern().Handle(new ErneuernBefehl(token), CancellationToken.None);
+    private Task<RefreshResult> Refresh(string token) =>
+        Refresh().Handle(new RefreshCommand(token), CancellationToken.None);
 
-    private void HandeltAlsPrivatperson() =>
-        _form.RecallAsync(Sitzung, Arg.Any<CancellationToken>())
+    private void ActsAsAPrivatePerson() =>
+        _form.RecallAsync(Session, Arg.Any<CancellationToken>())
             .Returns(Capacity.AsSelf.Instance);
 
-    private void HandeltFuer(TenantId company) =>
-        _form.RecallAsync(Sitzung, Arg.Any<CancellationToken>())
+    private void ActsFor(TenantId company) =>
+        _form.RecallAsync(Session, Arg.Any<CancellationToken>())
             .Returns(new Capacity.ForCompany(company));
 
-    private void DieSitzungTraegtNoch() =>
+    private void TheSessionStillCarries() =>
         _sitzungen.RenewAsync("alt", Arg.Any<CancellationToken>())
-            .Returns(new RenewedSession(Sitzung, Anna, "neu", DateTimeOffset.UtcNow.AddDays(1)));
+            .Returns(new RenewedSession(Session, Anna, "neu", DateTimeOffset.UtcNow.AddDays(1)));
 
-    private void EsGibtDasKonto() =>
+    private void TheAccountExists() =>
         _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>())
-            .Returns(Konten.Bestehend(Anna, "anna@example.com", "$2b$12$x", AccountStatus.Active));
+            .Returns(Accounts.Existing(Anna, "anna@example.com", "$2b$12$x", AccountStatus.Active));
 
     [Fact]
-    public async Task Ein_gueltiger_Erneuerungstoken_ergibt_ein_frisches_Paar()
+    public async Task A_valid_refresh_token_gives_a_fresh_pair()
     {
-        DieSitzungTraegtNoch();
-        HandeltAlsPrivatperson();
-        EsGibtDasKonto();
-        _token.IssueAsync(Anna, "anna@example.com", Arg.Any<Capacity>(), Sitzung,
+        TheSessionStillCarries();
+        ActsAsAPrivatePerson();
+        TheAccountExists();
+        _token.IssueAsync(Anna, "anna@example.com", Arg.Any<Capacity>(), Session,
             Arg.Any<CancellationToken>()).Returns("frisch");
 
-        var result = await Erneuern("alt");
+        var result = await Refresh("alt");
 
-        var erneuert = result.Should().BeOfType<Erneuerungsergebnis.Erneuert>().Which;
-        erneuert.Zugriffstoken.Should().Be("frisch");
-        erneuert.Erneuerungstoken.Should().Be("neu");
+        var refreshed = result.Should().BeOfType<RefreshResult.Refreshed>().Which;
+        refreshed.AccessToken.Should().Be("frisch");
+        refreshed.RefreshToken.Should().Be("neu");
     }
 
     /// <summary>
@@ -67,38 +67,38 @@ public class ErneuernUndAbmeldenTests
     /// can still name the device it belongs to.
     /// </summary>
     [Fact]
-    public async Task Die_Sitzung_bleibt_dieselbe()
+    public async Task The_session_stays_the_same()
     {
-        DieSitzungTraegtNoch();
-        HandeltAlsPrivatperson();
-        EsGibtDasKonto();
+        TheSessionStillCarries();
+        ActsAsAPrivatePerson();
+        TheAccountExists();
 
-        await Erneuern("alt");
+        await Refresh("alt");
 
         await _token.Received().IssueAsync(
-            Anna, Arg.Any<string>(), Arg.Any<Capacity>(), Sitzung, Arg.Any<CancellationToken>());
+            Anna, Arg.Any<string>(), Arg.Any<Capacity>(), Session, Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Ein_verbrauchter_oder_unbekannter_Token_wird_abgewiesen()
+    public async Task A_spent_or_unknown_token_is_refused()
     {
         _sitzungen.RenewAsync("tot", Arg.Any<CancellationToken>()).Returns((RenewedSession?)null);
 
-        var result = await Erneuern("tot");
+        var result = await Refresh("tot");
 
-        result.Should().BeOfType<Erneuerungsergebnis.Abgewiesen>();
+        result.Should().BeOfType<RefreshResult.Rejected>();
     }
 
     [Fact]
-    public async Task Ohne_Konto_wird_kein_Token_ausgestellt()
+    public async Task Without_an_account_no_token_is_issued()
     {
-        DieSitzungTraegtNoch();
-        HandeltAlsPrivatperson();
+        TheSessionStillCarries();
+        ActsAsAPrivatePerson();
         _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>()).Returns((User?)null);
 
-        var result = await Erneuern("alt");
+        var result = await Refresh("alt");
 
-        result.Should().BeOfType<Erneuerungsergebnis.Abgewiesen>();
+        result.Should().BeOfType<RefreshResult.Rejected>();
         await _token.DidNotReceive().IssueAsync(
             Arg.Any<SubjectId>(), Arg.Any<string>(), Arg.Any<Capacity>(),
             Arg.Any<SessionId>(), Arg.Any<CancellationToken>());
@@ -109,13 +109,13 @@ public class ErneuernUndAbmeldenTests
     /// company is a step of its own — see <c>ISessionCapacity</c>.
     /// </summary>
     [Fact]
-    public async Task Eine_Erneuerung_macht_niemanden_zum_Unternehmen()
+    public async Task A_refresh_makes_nobody_a_company()
     {
-        DieSitzungTraegtNoch();
-        HandeltAlsPrivatperson();
-        EsGibtDasKonto();
+        TheSessionStillCarries();
+        ActsAsAPrivatePerson();
+        TheAccountExists();
 
-        await Erneuern("alt");
+        await Refresh("alt");
 
         await _token.Received().IssueAsync(
             Arg.Any<SubjectId>(), Arg.Any<string>(),
@@ -129,15 +129,15 @@ public class ErneuernUndAbmeldenTests
     /// as they keep refreshing.
     /// </summary>
     [Fact]
-    public async Task Eine_erloschene_Mitgliedschaft_faellt_bei_der_Erneuerung_weg()
+    public async Task A_lapsed_membership_falls_away_at_the_refresh()
     {
         var company = TenantId.New();
-        DieSitzungTraegtNoch();
-        EsGibtDasKonto();
-        HandeltFuer(company);
+        TheSessionStillCarries();
+        TheAccountExists();
+        ActsFor(company);
         _mitglieder.IsMemberAsync(Anna, company, Arg.Any<CancellationToken>()).Returns(false);
 
-        await Erneuern("alt");
+        await Refresh("alt");
 
         await _token.Received().IssueAsync(
             Anna, Arg.Any<string>(), Arg.Is<Capacity>(c => c is Capacity.AsSelf),
@@ -156,31 +156,31 @@ public class ErneuernUndAbmeldenTests
     /// relationship ended.
     /// </summary>
     [Fact]
-    public async Task Eine_erloschene_Mitgliedschaft_beendet_die_Sitzung_nicht()
+    public async Task A_lapsed_membership_does_not_end_the_session()
     {
         var company = TenantId.New();
-        DieSitzungTraegtNoch();
-        EsGibtDasKonto();
-        HandeltFuer(company);
+        TheSessionStillCarries();
+        TheAccountExists();
+        ActsFor(company);
         _mitglieder.IsMemberAsync(Anna, company, Arg.Any<CancellationToken>()).Returns(false);
 
-        var result = await Erneuern("alt");
+        var result = await Refresh("alt");
 
-        result.Should().BeOfType<Erneuerungsergebnis.Erneuert>();
+        result.Should().BeOfType<RefreshResult.Refreshed>();
         await _sitzungen.DidNotReceive().EndAsync(
             Arg.Any<SessionId>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Eine_bestehende_Mitgliedschaft_bleibt_ueber_die_Erneuerung_hinweg()
+    public async Task An_existing_membership_survives_the_refresh()
     {
         var company = TenantId.New();
-        DieSitzungTraegtNoch();
-        EsGibtDasKonto();
-        HandeltFuer(company);
+        TheSessionStillCarries();
+        TheAccountExists();
+        ActsFor(company);
         _mitglieder.IsMemberAsync(Anna, company, Arg.Any<CancellationToken>()).Returns(true);
 
-        await Erneuern("alt");
+        await Refresh("alt");
 
         await _token.Received().IssueAsync(
             Anna, Arg.Any<string>(),
@@ -197,44 +197,44 @@ public class ErneuernUndAbmeldenTests
     [InlineData(AccountStatus.Disabled)]
     [InlineData(AccountStatus.Suspended)]
     [InlineData(AccountStatus.Pending)]
-    public async Task Ein_Konto_das_sich_nicht_anmelden_darf_wird_auch_nicht_erneuert(
+    public async Task An_account_that_may_not_sign_in_is_not_refreshed_either(
         AccountStatus status)
     {
-        DieSitzungTraegtNoch();
-        HandeltAlsPrivatperson();
+        TheSessionStillCarries();
+        ActsAsAPrivatePerson();
         _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>())
-            .Returns(Konten.Bestehend(Anna, "anna@example.com", "$2b$12$x", status));
+            .Returns(Accounts.Existing(Anna, "anna@example.com", "$2b$12$x", status));
 
-        var result = await Erneuern("alt");
+        var result = await Refresh("alt");
 
-        result.Should().BeOfType<Erneuerungsergebnis.Abgewiesen>();
+        result.Should().BeOfType<RefreshResult.Rejected>();
         await _token.DidNotReceive().IssueAsync(
             Arg.Any<SubjectId>(), Arg.Any<string>(), Arg.Any<Capacity>(),
             Arg.Any<SessionId>(), Arg.Any<CancellationToken>());
     }
 
-    public class Abmelden
+    public class SignOut
     {
         private readonly ISessionService _sitzungen = Substitute.For<ISessionService>();
         private readonly ISessionCapacity _form = Substitute.For<ISessionCapacity>();
         private readonly IAuditTrail _protokoll = Substitute.For<IAuditTrail>();
 
         private static readonly SubjectId Anna = SubjectId.New();
-        private static readonly SessionId Sitzung = SessionId.New();
+        private static readonly SessionId Session = SessionId.New();
 
-        private AbmeldenHandler Handler() => new(
-            _sitzungen, _form, _protokoll, new FesteKorrelation(null), TimeProvider.System);
+        private SignOutHandler Handler() => new(
+            _sitzungen, _form, _protokoll, new FixedCorrelation(null), TimeProvider.System);
 
-        private Task Abmelden_(string? token) =>
-            Handler().Handle(new AbmeldenBefehl(token), CancellationToken.None);
+        private Task SignOut_(string? token) =>
+            Handler().Handle(new SignOutCommand(token), CancellationToken.None);
 
         [Fact]
-        public async Task Beendet_die_Sitzung_zum_vorgelegten_Token()
+        public async Task Ends_the_session_the_presented_token_belongs_to()
         {
             _sitzungen.EndByRefreshTokenAsync("meiner", Arg.Any<CancellationToken>())
-                .Returns(new EndedSession(Sitzung, Anna));
+                .Returns(new EndedSession(Session, Anna));
 
-            await Abmelden_("meiner");
+            await SignOut_("meiner");
 
             await _sitzungen.Received().EndByRefreshTokenAsync(
                 "meiner", Arg.Any<CancellationToken>());
@@ -249,24 +249,24 @@ public class ErneuernUndAbmeldenTests
         /// exists is worse than none.
         /// </summary>
         [Fact]
-        public async Task Vergisst_wofuer_die_Sitzung_gehandelt_hat()
+        public async Task Forgets_what_the_session_was_acting_for()
         {
             _sitzungen.EndByRefreshTokenAsync("meiner", Arg.Any<CancellationToken>())
-                .Returns(new EndedSession(Sitzung, Anna));
+                .Returns(new EndedSession(Session, Anna));
 
-            await Abmelden_("meiner");
+            await SignOut_("meiner");
 
-            await _form.Received(1).ForgetAsync(Sitzung, Arg.Any<CancellationToken>());
+            await _form.Received(1).ForgetAsync(Session, Arg.Any<CancellationToken>());
         }
 
         [Theory]
         [InlineData(null)]
         [InlineData("")]
-        public async Task Ohne_Token_passiert_nichts_und_niemand_erfaehrt_davon(string? keiner)
+        public async Task Without_a_token_nothing_happens_and_nobody_learns_of_it(string? none)
         {
-            var abmelden = () => Abmelden_(keiner);
+            var signOut = () => SignOut_(none);
 
-            await abmelden.Should().NotThrowAsync();
+            await signOut.Should().NotThrowAsync();
             await _sitzungen.DidNotReceive().EndByRefreshTokenAsync(
                 Arg.Any<string>(), Arg.Any<CancellationToken>());
         }
@@ -276,12 +276,12 @@ public class ErneuernUndAbmeldenTests
         /// entry anyway would put a sign-out in the trail that never happened.
         /// </summary>
         [Fact]
-        public async Task Ein_toter_Token_erzeugt_keinen_Protokolleintrag()
+        public async Task A_dead_token_produces_no_trail_entry()
         {
             _sitzungen.EndByRefreshTokenAsync("tot", Arg.Any<CancellationToken>())
                 .Returns((EndedSession?)null);
 
-            await Abmelden_("tot");
+            await SignOut_("tot");
 
             await _protokoll.DidNotReceive().AppendAsync(
                 Arg.Any<AuditEvent>(), Arg.Any<CancellationToken>());

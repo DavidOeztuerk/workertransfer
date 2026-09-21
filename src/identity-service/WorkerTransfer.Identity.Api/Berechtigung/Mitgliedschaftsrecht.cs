@@ -8,46 +8,46 @@ using WorkerTransfer.Identity.Domain.Companies;
 namespace WorkerTransfer.Identity.Api.Berechtigung;
 
 /// <summary>
-/// Beantwortet ein Firmenrecht aus der <strong>Mitgliedschaftstabelle</strong>,
-/// nicht aus dem Token.
+/// Answers a company permission out of the <strong>membership table</strong>,
+/// not out of the token.
 /// </summary>
 /// <remarks>
-/// <para><strong>Warum daneben und nicht statt.</strong> ASP.NET führt
-/// <em>alle</em> Handler zu einer Anforderung aus; ein <c>Succeed</c> genügt.
-/// Noelias <c>PermissionAuthorizationHandler</c> bleibt also stehen und liest
-/// weiter Ansprüche — er findet bei uns nur keine, weil unser Token keine
-/// trägt. Dieser hier antwortet stattdessen aus der Datenbank.</para>
+/// <para><strong>Why beside and not instead.</strong> ASP.NET runs <em>all</em>
+/// handlers for one requirement; one <c>Succeed</c> is enough. Noelia's
+/// <c>PermissionAuthorizationHandler</c> therefore stays standing and goes on
+/// reading claims — it only finds none of ours, because our token carries none.
+/// This one answers out of the database instead.</para>
 ///
-/// <para><strong>Und warum nicht einfach Rechte ins Token.</strong> Das wäre der
-/// kürzere Weg und der schlechtere: ein Token lebt weiter, nachdem jemand aus
-/// einer Firma entfernt wurde. Die Entfernung wirkte dann erst beim Ablauf —
-/// bei genau der Handlung, bei der sofort das Einzige ist, was zählt. Aus
-/// derselben Familie wie „eine Einwilligung muss sofort wirken": das gilt,
-/// weil es richtig ist.</para>
+/// <para><strong>And why not simply put permissions in the token.</strong> That
+/// would be the shorter way and the worse one: a token lives on after somebody
+/// was removed from a company. The removal would then take effect only on
+/// expiry — at exactly the operation where immediately is the only thing that
+/// counts. From the same family as „a consent must take effect immediately":
+/// that holds because it is right.</para>
 ///
-/// <para>Der Preis ist eine Abfrage je geschützter ResumeRequest. Sie trifft einen
-/// Primärschlüssel und betrifft nur die Verwaltungsendpunkte einer Firma —
-/// nicht die Lesewege, die Menschen den ganzen Tag benutzen.</para>
+/// <para>The price is one query per protected request. It hits a primary key
+/// and touches only a company's administrative endpoints — not the read paths
+/// people use all day.</para>
 ///
-/// <para><strong>Die Firma kommt aus dem Pfad, und das ist richtig so.</strong>
-/// Erst stand hier der Mandant aus dem Token — strenger, aber falsch: es hätte
-/// verlangt, dass jemand vorher <c>POST /auth/company/{id}</c> ruft, und die
-/// bestehenden Reisen tun das nicht. Der Pfad ist hier auch keine Vertrauens-
-/// frage: er benennt nur, <em>welche</em> Firma gemeint ist. Geprüft wird die
-/// Membership <em>des Aufrufers in genau dieser</em> Firma — wer für eine
-/// fremde fragt, hat dort keine Rolle und wird abgelehnt. Genau so las es
-/// <c>CompanyAccess.AsAdminAsync</c> schon vorher.</para>
+/// <para><strong>The company comes from the path, and that is right.</strong>
+/// At first the tenant from the token stood here — stricter, but wrong: it
+/// would have demanded that somebody call <c>POST /auth/company/{id}</c>
+/// beforehand, and the existing journeys do not. Nor is the path a question of
+/// trust here: it only names <em>which</em> company is meant. What is checked is
+/// <em>the caller's</em> membership <em>in exactly that</em> company — whoever
+/// asks for a foreign one has no role there and is refused. That is exactly how
+/// <c>CompanyAccess.AsAdminAsync</c> read it before.</para>
 /// </remarks>
 public sealed class MembershipPermission(
-    CompanyAccess zugriff,
-    IHttpContextAccessor zugang)
+    CompanyAccess access,
+    IHttpContextAccessor accessor)
     : AuthorizationHandler<PermissionRequirement>
 {
-    private static readonly string[] NurAdmin =
+    private static readonly string[] AdminOnly =
     [
-        CompanyPermissions.Einladen,
-        CompanyPermissions.EinladungZuruecknehmen,
-        CompanyPermissions.Entfernen
+        CompanyPermissions.Invite,
+        CompanyPermissions.WithdrawInvitation,
+        CompanyPermissions.Remove
     ];
 
     /// <inheritdoc />
@@ -58,19 +58,19 @@ public sealed class MembershipPermission(
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(requirement);
 
-        if (!NurAdmin.Contains(requirement.Permission, StringComparer.Ordinal))
+        if (!AdminOnly.Contains(requirement.Permission, StringComparer.Ordinal))
         {
             return;
         }
 
-        if (Wer(context.User) is not { } handelnder || Firma() is not { } company)
+        if (Subject(context.User) is not { } actor || Company() is not { } company)
         {
-            // Kein Succeed und kein Fail: hier ist nichts zu entscheiden — und
-            // ein anderer Handler darf trotzdem noch antworten.
+            // No Succeed and no Fail: there is nothing to decide here — and
+            // another handler may still answer.
             return;
         }
 
-        var role = await zugriff.RoleOrNoneAsync(handelnder, company);
+        var role = await access.RoleOrNoneAsync(actor, company);
 
         if (role == MembershipRole.Admin)
         {
@@ -79,28 +79,27 @@ public sealed class MembershipPermission(
     }
 
     /// <summary>
-    /// Wer fragt — aus dem <c>ClaimsPrincipal</c>, den die Autorisierung hält.
+    /// Who is asking — out of the <c>ClaimsPrincipal</c> the authorisation holds.
     /// </summary>
     /// <remarks>
-    /// NICHT aus <c>ICurrentPrincipal</c>. Das war der erste Versuch und ergab
-    /// an jeder geschützten ResumeRequest einen 403: Noelias <c>UseAuth()</c> ist
-    /// Authentifizierung <em>und</em> Autorisierung, und <c>UsePrincipal()</c>
-    /// läuft danach — während die Richtlinie entscheidet, ist
-    /// <c>ICurrentPrincipal.Current</c> also noch leer. Ein
-    /// Autorisierungshandler nimmt den Principal, den er bekommt.
+    /// NOT out of <c>ICurrentPrincipal</c>. That was the first attempt and gave
+    /// a 403 at every protected request: Noelia's <c>UseAuth()</c> is
+    /// authentication <em>and</em> authorisation, and <c>UsePrincipal()</c> runs
+    /// after it — so while the policy is deciding, <c>ICurrentPrincipal.Current</c>
+    /// is still empty. An authorisation handler takes the principal it is given.
     /// </remarks>
-    private static SubjectId? Wer(ClaimsPrincipal nutzer)
+    private static SubjectId? Subject(ClaimsPrincipal user)
     {
-        var roh = nutzer.FindFirst("sub")?.Value
-                  ?? nutzer.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var raw = user.FindFirst("sub")?.Value
+                  ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-        return Guid.TryParse(roh, out var id) ? new SubjectId(id) : null;
+        return Guid.TryParse(raw, out var id) ? new SubjectId(id) : null;
     }
 
-    /// <summary>Welche Firma der Pfad benennt.</summary>
-    private TenantId? Firma() =>
-        zugang.HttpContext?.GetRouteValue("tenantId") is string roh
-        && Guid.TryParse(roh, out var id)
+    /// <summary>Which company the path names.</summary>
+    private TenantId? Company() =>
+        accessor.HttpContext?.GetRouteValue("tenantId") is string raw
+        && Guid.TryParse(raw, out var id)
             ? new TenantId(id)
             : null;
 }

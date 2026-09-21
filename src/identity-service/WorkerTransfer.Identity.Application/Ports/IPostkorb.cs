@@ -27,21 +27,21 @@ namespace WorkerTransfer.Identity.Application.Ports;
 /// without a request at all — the deletion confirmation when the last of eight
 /// services acknowledges, the news mail from a dispatcher — so an
 /// <c>Accept-Language</c> would be absent exactly where it is needed
-/// (<see cref="Kontosprache"/>).
+/// (<see cref="AccountLanguage"/>).
 /// </para>
 /// </remarks>
-public interface IPostkorb
+public interface IMailTray
 {
     /// <summary>"Confirm your address", with the link.</summary>
-    /// <param name="an">Where to send it.</param>
-    /// <param name="empfaenger">
+    /// <param name="to">Where to send it.</param>
+    /// <param name="recipient">
     /// Whose account it is. For the log, so a failure does not write the
     /// address into it.
     /// </param>
-    /// <param name="klartextToken">The token, in the clear. Only ever here and in the mail.</param>
-    /// <param name="sprache">What to write in.</param>
-    void Bestaetigungslink(
-        string an, SubjectId recipient, string klartextToken, Kontosprache language);
+    /// <param name="plainTextToken">The token, in the clear. Only ever here and in the mail.</param>
+    /// <param name="language">What to write in.</param>
+    void ConfirmationLink(
+        string to, SubjectId recipient, string plainTextToken, AccountLanguage language);
 
     /// <summary>
     /// "Somebody tried to register with your address."
@@ -51,10 +51,10 @@ public interface IPostkorb
     /// only thing that happens on a duplicate registration, and it is why the
     /// endpoint can answer identically in both cases.
     /// </remarks>
-    /// <param name="an">Where to send it.</param>
-    /// <param name="empfaenger">Whose account it is.</param>
-    /// <param name="sprache">What to write in.</param>
-    void Doppelanmeldung(string an, SubjectId recipient, Kontosprache language);
+    /// <param name="to">Where to send it.</param>
+    /// <param name="recipient">Whose account it is.</param>
+    /// <param name="language">What to write in.</param>
+    void DuplicateRegistration(string to, SubjectId recipient, AccountLanguage language);
 
     /// <summary>
     /// "You have been invited into a company", with the link.
@@ -64,20 +64,20 @@ public interface IPostkorb
     /// mail must not differ between the two cases, or it becomes a way to ask
     /// about platform membership without asking the consent ledger.
     /// </remarks>
-    /// <param name="an">The invited address.</param>
-    /// <param name="einladender">
+    /// <param name="to">The invited address.</param>
+    /// <param name="inviter">
     /// Who invited. For the log; the mail names the company, not the person.
     /// </param>
-    /// <param name="firma">Which company, so the recipient can recognise it.</param>
-    /// <param name="klartextToken">The token, in the clear. Only ever here and in the mail.</param>
-    /// <param name="sprache">
+    /// <param name="company">Which company, so the recipient can recognise it.</param>
+    /// <param name="plainTextToken">The token, in the clear. Only ever here and in the mail.</param>
+    /// <param name="language">
     /// What to write in. Taken from the <em>inviting</em> account when the
     /// address is unknown here — an invitation goes to somebody who may have no
     /// account, so there is no row of theirs to read.
     /// </param>
-    void Einladung(
-        string an, SubjectId einladender, string company, string klartextToken,
-        Kontosprache language);
+    void InvitationMail(
+        string to, SubjectId inviter, string company, string plainTextToken,
+        AccountLanguage language);
 
     /// <summary>"Your account is gone."</summary>
     /// <remarks>
@@ -85,17 +85,17 @@ public interface IPostkorb
     /// the data into an inbox that may not be the person's alone (ADR-0027 §6)
     /// — and it would be the one place where a deletion produced a new record.
     /// </remarks>
-    /// <param name="an">
+    /// <param name="to">
     /// The address, read at delivery time from the row that is about to fall.
     /// Never from the outbox: that is durable storage.
     /// </param>
-    /// <param name="wer">Whose account it was. For the log.</param>
-    /// <param name="sprache">
+    /// <param name="subject">Whose account it was. For the log.</param>
+    /// <param name="language">
     /// What to write in — read from the row before it falls. This mail is the
     /// last thing that account ever receives, and it is written long after the
     /// request that asked for the deletion.
     /// </param>
-    void Loeschbestaetigung(string an, SubjectId subject, Kontosprache language);
+    void ErasureConfirmation(string to, SubjectId subject, AccountLanguage language);
 
     /// <summary>"There is something new for you." Nothing more.</summary>
     /// <remarks>
@@ -113,8 +113,8 @@ public interface IPostkorb
     /// boundary.
     /// </para>
     /// </remarks>
-    /// <param name="an">Where to send it.</param>
-    /// <param name="wer">Whose account it is. For the log.</param>
-    /// <param name="sprache">What to write in.</param>
-    void Neuigkeit(string an, SubjectId subject, Kontosprache language);
+    /// <param name="to">Where to send it.</param>
+    /// <param name="subject">Whose account it is. For the log.</param>
+    /// <param name="language">What to write in.</param>
+    void News(string to, SubjectId subject, AccountLanguage language);
 }

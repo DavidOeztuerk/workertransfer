@@ -3,20 +3,20 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Identity.Infrastructure.Sicherheit;
 
-/// <summary>Der Port auf den gemeinsamen SecretStore.</summary>
+/// <summary>The port onto the shared SecretStore.</summary>
 /// <remarks>
-/// Eine Zeile Umsetzung und trotzdem ein eigener Typ: die Anwendungsschicht darf
-/// nicht wissen, WIE verschlüsselt wird, und ein Test soll es ohne
-/// Hauptschlüssel tun können.
+/// One line of implementation and a type of its own all the same: the
+/// application layer must not know HOW encryption happens, and a test should be
+/// able to do it without a master key.
 /// </remarks>
 public sealed class Secrets(SecretStore store) : ISecrets
 {
     /// <inheritdoc />
-    public string Encrypt(string klartext) => store.Encrypt(klartext);
+    public string Encrypt(string plainText) => store.Encrypt(plainText);
 
     /// <inheritdoc />
-    public string Endung(string klartext) => SecretStore.Endung(klartext);
+    public string Suffix(string plainText) => SecretStore.Endung(plainText);
 
     /// <inheritdoc />
-    public string? Decrypt(string? gespeichert) => store.Decrypt(gespeichert);
+    public string? Decrypt(string? stored) => store.Decrypt(stored);
 }

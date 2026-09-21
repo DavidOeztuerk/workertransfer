@@ -9,7 +9,7 @@ namespace WorkerTransfer.Identity.Api;
 public static class ErasureEndpoints
 {
     /// <summary>Maps the one endpoint that ends an account.</summary>
-    public static IEndpointRouteBuilder MapLoeschEndpoints(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapErasureEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
@@ -19,11 +19,11 @@ public static class ErasureEndpoints
         // against them (ADR-0027).
         app.MapPost("/account/erasure", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
@@ -32,7 +32,7 @@ public static class ErasureEndpoints
             }
 
             await mediator.Send(
-                new RequestErasureCommand(handelnder.Subject), cancellationToken);
+                new RequestErasureCommand(actor.Subject), cancellationToken);
 
             // 202 either way, including when it was already running: pressing
             // twice is not an error, and the second press must not start a

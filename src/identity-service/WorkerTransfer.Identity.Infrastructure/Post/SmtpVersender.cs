@@ -10,37 +10,37 @@ namespace WorkerTransfer.Identity.Infrastructure.Post;
 /// three cloud providers and an HTTP client into an image that needs none of
 /// them.
 /// </remarks>
-public sealed class SmtpVersender(IOptions<Postsettings> einstellungen) : IVersender
+public sealed class SmtpMailSender(IOptions<MailSettings> settings) : IMailSender
 {
-    private readonly Postsettings _einstellungen = einstellungen.Value;
+    private readonly MailSettings _settings = settings.Value;
 
     /// <inheritdoc />
-    public async Task SendeAsync(
-        AusgehendePost post,
+    public async Task SendAsync(
+        OutgoingMail mail,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(post);
+        ArgumentNullException.ThrowIfNull(mail);
 
-        using var client = new SmtpClient(_einstellungen.Host, _einstellungen.Port)
+        using var client = new SmtpClient(_settings.Host, _settings.Port)
         {
-            EnableSsl = _einstellungen.Tls,
+            EnableSsl = _settings.Tls,
             Timeout = 10_000
         };
 
         // Only sign in where credentials are set. Mailpit and most development
         // catchers know no AUTH at all, and offering it unasked fails the send
         // before it starts.
-        if (!string.IsNullOrEmpty(_einstellungen.Benutzer)
-            && !string.IsNullOrEmpty(_einstellungen.Passwort))
+        if (!string.IsNullOrEmpty(_settings.Account)
+            && !string.IsNullOrEmpty(_settings.Password))
         {
             client.Credentials = new System.Net.NetworkCredential(
-                _einstellungen.Benutzer, _einstellungen.Passwort);
+                _settings.Account, _settings.Password);
         }
 
-        using var message = new MailMessage(_einstellungen.Absender, post.An)
+        using var message = new MailMessage(_settings.Absender, mail.To)
         {
-            Subject = post.Betreff,
-            Body = post.Text
+            Subject = mail.Subject,
+            Body = mail.Text
         };
 
         await client.SendMailAsync(message, cancellationToken);

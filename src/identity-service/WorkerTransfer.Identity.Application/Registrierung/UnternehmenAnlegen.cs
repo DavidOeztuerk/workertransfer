@@ -11,14 +11,14 @@ public abstract record CompanyResult
     private CompanyResult() { }
 
     /// <summary>Created, and the creator is its administrator.</summary>
-    public sealed record Angelegt(Company Firma) : CompanyResult;
+    public sealed record Created(Company Company) : CompanyResult;
 
     /// <summary>Refused, with a code the interface can act on.</summary>
     /// <param name="Code">
     /// <c>public_email_domain</c>, <c>domain_already_claimed</c>,
     /// <c>account_not_confirmed</c> or <c>invalid_company_name</c>.
     /// </param>
-    public sealed record Abgelehnt(string Code) : CompanyResult;
+    public sealed record Refused(string Code) : CompanyResult;
 }
 
 /// <summary>Creates a company whose domain is already proven.</summary>
@@ -33,14 +33,14 @@ public abstract record CompanyResult
 /// read path would have to check.
 /// </para>
 /// </remarks>
-public sealed class UnternehmenAnlegen(
+public sealed class CreateCompany(
     ICompanyRepository companies,
-    IMembershipRepository mitgliedschaften,
-    IAuditTrail protokoll,
-    IKorrelation korrelation,
-    TimeProvider uhr)
+    IMembershipRepository memberships,
+    IAuditTrail auditTrail,
+    ICorrelation correlation,
+    TimeProvider clock)
 {
-    /// <param name="konto">
+    /// <param name="account">
     /// The account creating it, as the caller holds it.
     /// </param>
     /// <param name="name">What it is to be called.</param>
@@ -53,23 +53,23 @@ public sealed class UnternehmenAnlegen(
     /// company would be refused for an account that was just confirmed.
     /// </remarks>
     public async Task<CompanyResult> ExecuteOneAsync(
-        User konto,
+        User account,
         string name,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(konto);
+        ArgumentNullException.ThrowIfNull(account);
 
-        if (konto.Status != AccountStatus.Active)
+        if (account.Status != AccountStatus.Active)
         {
             // An unconfirmed address proves no domain.
-            return new CompanyResult.Abgelehnt("account_not_confirmed");
+            return new CompanyResult.Refused("account_not_confirmed");
         }
 
-        var domain = EmailDomain.FromEmail(konto.Email);
+        var domain = EmailDomain.FromEmail(account.Email);
 
         if (await companies.FindByDomainAsync(domain, cancellationToken) is not null)
         {
-            return new CompanyResult.Abgelehnt("domain_already_claimed");
+            return new CompanyResult.Refused("domain_already_claimed");
         }
 
         Company company;
@@ -80,28 +80,28 @@ public sealed class UnternehmenAnlegen(
         }
         catch (PublicEmailDomainException)
         {
-            return new CompanyResult.Abgelehnt("public_email_domain");
+            return new CompanyResult.Refused("public_email_domain");
         }
         catch (InvalidCompanyNameException)
         {
-            return new CompanyResult.Abgelehnt("invalid_company_name");
+            return new CompanyResult.Refused("invalid_company_name");
         }
 
         await companies.AddAsync(company, cancellationToken);
-        await mitgliedschaften.AddAsync(
-            konto.Id, company.Id, MembershipRole.Admin, cancellationToken);
+        await memberships.AddAsync(
+            account.Id, company.Id, MembershipRole.Admin, cancellationToken);
 
-        await protokoll.AppendAsync(
+        await auditTrail.AppendAsync(
             new AuditEvent(
                 AuditAction.CompanyCreated,
-                uhr.GetUtcNow(),
-                actor: konto.Id,
+                clock.GetUtcNow(),
+                actor: account.Id,
                 // Unlike a personal act, this entry carries a tenant: it is
                 // about a company (ADR-0017).
                 tenant: company.Id,
-                correlationId: korrelation.Aktuell),
+                correlationId: correlation.Current),
             cancellationToken);
 
-        return new CompanyResult.Angelegt(company);
+        return new CompanyResult.Created(company);
     }
 }

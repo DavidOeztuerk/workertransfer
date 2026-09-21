@@ -16,30 +16,30 @@ namespace WorkerTransfer.Identity.Tests;
 
 /// <summary>Vorname, Nachname, PostalAddress — ADR-0038.</summary>
 [Collection(PostgresCollection.Name)]
-public class KlarnameTests(Postgres postgres) : IAsyncLifetime
+public class FullNameTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Passwort = "geheim-und-lang-genug";
+    private const string Password = "geheim-und-lang-genug";
 
     private WebApplicationFactory<Program> _dienst = null!;
-    private readonly Postmitschrift _post = new();
+    private readonly MailRecord _post = new();
 
     public async Task InitializeAsync()
     {
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:identity", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:PrivateKey", TokenShape.PrivateKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
             host.UseSetting("Notify:Geheimnis", "melde-geheimnis");
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
-                services.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
+                services.Replace(ServiceDescriptor.Singleton<IMailSender>(_post)));
         });
 
         using var scope = _dienst.Services.CreateScope();
@@ -56,7 +56,7 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
     private HttpClient Browser() =>
         _dienst.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
 
-    private async Task<HttpClient> Angemeldet(string? vorname = null, string? nachname = null)
+    private async Task<HttpClient> SignedIn(string? givenName = null, string? familyName = null)
     {
         var address = $"anna-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
         var browser = Browser();
@@ -64,16 +64,16 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
         await browser.PostAsJsonAsync("/auth/register", new
         {
             email = address,
-            password = Passwort,
+            password = Password,
             display_name = "Anna",
-            given_name = vorname,
-            family_name = nachname
+            given_name = givenName,
+            family_name = familyName
         });
 
         var token = Regex.Match(
             _post.Post[^1].Text, @"token=([A-Za-z0-9_\-]+)").Groups[1].Value;
         await browser.PostAsJsonAsync("/auth/verify-email", new { token });
-        await browser.PostAsJsonAsync("/auth/login", new { email = address, password = Passwort });
+        await browser.PostAsJsonAsync("/auth/login", new { email = address, password = Password });
         return browser;
     }
 
@@ -81,9 +81,9 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
         JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     [Fact]
-    public async Task Registrierung_ohne_Vornamen_ist_in_Ordnung()
+    public async Task Registration_without_a_given_name_is_fine()
     {
-        var browser = await Angemeldet();
+        var browser = await SignedIn();
         var session = await Json(await browser.GetAsync("/auth/session"));
 
         session.GetProperty("user").GetProperty("display_name").GetString().Should().Be("Anna");
@@ -93,9 +93,9 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Registrierung_nimmt_Klarnamen_in_snake_case()
+    public async Task Registration_takes_civil_names_in_snake_case()
     {
-        var browser = await Angemeldet("Anna", "Beispiel");
+        var browser = await SignedIn("Anna", "Beispiel");
         var session = await Json(await browser.GetAsync("/auth/session"));
         var subject = session.GetProperty("user");
 
@@ -105,9 +105,9 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Klarname_laesst_sich_setzen_und_leeren()
+    public async Task The_civil_name_can_be_set_and_cleared()
     {
-        var browser = await Angemeldet();
+        var browser = await SignedIn();
 
         (await browser.PutAsJsonAsync("/account/name", new
         {
@@ -129,9 +129,9 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Anschrift_ist_leer_bis_jemand_sie_setzt_und_steht_nicht_in_der_Session()
+    public async Task The_address_is_empty_until_somebody_sets_it_and_is_not_in_the_session()
     {
-        var browser = await Angemeldet();
+        var browser = await SignedIn();
 
         var leer = await Json(await browser.GetAsync("/account/address"));
         leer.GetProperty("line1").GetString().Should().Be("");
@@ -147,10 +147,10 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
             phone = "+49 30 123"
         })).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var anschrift = await Json(await browser.GetAsync("/account/address"));
-        anschrift.GetProperty("line1").GetString().Should().Be("Musterstraße 1");
-        anschrift.GetProperty("country").GetString().Should().Be("DE");
-        anschrift.GetProperty("phone").GetString().Should().Be("+49 30 123");
+        var address = await Json(await browser.GetAsync("/account/address"));
+        address.GetProperty("line1").GetString().Should().Be("Musterstraße 1");
+        address.GetProperty("country").GetString().Should().Be("DE");
+        address.GetProperty("phone").GetString().Should().Be("+49 30 123");
 
         var session = await Json(await browser.GetAsync("/auth/session"));
         session.GetProperty("user").TryGetProperty("line1", out _).Should().BeFalse();
@@ -158,7 +158,7 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Ohne_Token_bleibt_die_Anschrift_zu()
+    public async Task Without_a_token_the_address_stays_shut()
     {
         (await Browser().GetAsync("/account/address"))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);

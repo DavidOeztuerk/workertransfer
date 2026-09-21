@@ -9,45 +9,45 @@ namespace WorkerTransfer.Identity.Tests;
 /// <summary>
 /// The public question — "is anyone signed in?" — and the protected one.
 /// </summary>
-public class SitzungsstandTests
+public class SessionStateTests
 {
     private readonly ICurrentPrincipal _akteur = Substitute.For<ICurrentPrincipal>();
     private readonly IUserRepository _benutzer = Substitute.For<IUserRepository>();
 
     private static readonly SubjectId Anna = SubjectId.New();
 
-    private Task<SessionState> State(bool erneuerungLiegtVor) =>
+    private Task<SessionState> State(bool refreshPresent) =>
         new SessionStateHandler(_akteur, _benutzer)
-            .Handle(new SessionStateQuery(erneuerungLiegtVor), CancellationToken.None);
+            .Handle(new SessionStateQuery(refreshPresent), CancellationToken.None);
 
-    private void EsGibtDasKonto() =>
+    private void TheAccountExists() =>
         _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>())
-            .Returns(Konten.Bestehend(Anna, "anna@example.com", "$2b$12$x", AccountStatus.Active));
+            .Returns(Accounts.Existing(Anna, "anna@example.com", "$2b$12$x", AccountStatus.Active));
 
     [Fact]
-    public async Task Angemeldet_heisst_active_und_das_Konto_liegt_bei()
+    public async Task Signed_in_means_active_and_the_account_comes_with_it()
     {
         _akteur.Current.Returns(Principal.Person(Anna));
-        EsGibtDasKonto();
+        TheAccountExists();
 
-        var state = await State(erneuerungLiegtVor: false);
+        var state = await State(refreshPresent: false);
 
-        state.Zustand.Should().Be("active");
-        state.Benutzer.Should().NotBeNull();
-        state.Benutzer!.Email.Should().Be("anna@example.com");
-        state.Benutzer.Firma.Should().BeNull();
+        state.State.Should().Be("active");
+        state.Account.Should().NotBeNull();
+        state.Account!.Email.Should().Be("anna@example.com");
+        state.Account.Company.Should().BeNull();
     }
 
     [Fact]
-    public async Task Wer_fuer_eine_Firma_handelt_sieht_sie_hier()
+    public async Task Whoever_acts_for_a_company_sees_it_here()
     {
         var company = TenantId.New();
         _akteur.Current.Returns(Principal.Company(Anna, company));
-        EsGibtDasKonto();
+        TheAccountExists();
 
-        var state = await State(erneuerungLiegtVor: false);
+        var state = await State(refreshPresent: false);
 
-        state.Benutzer!.Firma.Should().Be(company);
+        state.Account!.Company.Should().Be(company);
     }
 
     /// <summary>
@@ -55,19 +55,19 @@ public class SitzungsstandTests
     /// the refresh endpoint deliberately instead of on the off-chance.
     /// </summary>
     [Fact]
-    public async Task Ein_Erneuerungscookie_ohne_Anmeldung_heisst_renewable()
+    public async Task A_refresh_cookie_without_a_sign_in_means_renewable()
     {
         _akteur.Current.Returns((Principal?)null);
 
-        (await State(erneuerungLiegtVor: true)).Zustand.Should().Be("renewable");
+        (await State(refreshPresent: true)).State.Should().Be("renewable");
     }
 
     [Fact]
-    public async Task Gar_nichts_heisst_anonymous()
+    public async Task Nothing_at_all_means_anonymous()
     {
         _akteur.Current.Returns((Principal?)null);
 
-        (await State(erneuerungLiegtVor: false)).Zustand.Should().Be("anonymous");
+        (await State(refreshPresent: false)).State.Should().Be("anonymous");
     }
 
     /// <summary>
@@ -77,23 +77,23 @@ public class SitzungsstandTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task Ohne_Anmeldung_wird_kein_Konto_gesucht(bool erneuerung)
+    public async Task Without_a_sign_in_no_account_is_looked_up(bool refresh)
     {
         _akteur.Current.Returns((Principal?)null);
 
-        var state = await State(erneuerung);
+        var state = await State(refresh);
 
-        state.Benutzer.Should().BeNull();
+        state.Account.Should().BeNull();
         await _benutzer.DidNotReceive().FindByIdAsync(
             Arg.Any<SubjectId>(), Arg.Any<CancellationToken>());
     }
 
-    public class MeinKonto
+    public class MyAccount
     {
         private readonly ICurrentPrincipal _akteur = Substitute.For<ICurrentPrincipal>();
         private readonly IUserRepository _benutzer = Substitute.For<IUserRepository>();
 
-        private Task<Kontoansicht?> Konto() =>
+        private Task<AccountView?> Account() =>
             new MyAccountHandler(_akteur, _benutzer)
                 .Handle(new MyAccountQuery(), CancellationToken.None);
 
@@ -103,11 +103,11 @@ public class SitzungsstandTests
         /// not one endpoint.
         /// </summary>
         [Fact]
-        public async Task Ohne_Anmeldung_gibt_es_nichts()
+        public async Task Without_a_sign_in_there_is_nothing()
         {
             _akteur.Current.Returns((Principal?)null);
 
-            (await Konto()).Should().BeNull();
+            (await Account()).Should().BeNull();
         }
 
         /// <summary>
@@ -116,14 +116,14 @@ public class SitzungsstandTests
         /// the signed-in person themselves.
         /// </summary>
         [Fact]
-        public async Task Die_Adresse_kommt_aus_dem_Konto_nicht_aus_dem_Token()
+        public async Task The_address_comes_from_the_account_not_from_the_token()
         {
             var anna = SubjectId.New();
             _akteur.Current.Returns(Principal.Person(anna));
             _benutzer.FindByIdAsync(anna, Arg.Any<CancellationToken>())
-                .Returns(Konten.Bestehend(anna, "anna@example.com", "$2b$12$x", AccountStatus.Active));
+                .Returns(Accounts.Existing(anna, "anna@example.com", "$2b$12$x", AccountStatus.Active));
 
-            (await Konto())!.Email.Should().Be("anna@example.com");
+            (await Account())!.Email.Should().Be("anna@example.com");
         }
     }
 }

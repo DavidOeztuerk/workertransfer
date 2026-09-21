@@ -9,51 +9,51 @@ namespace WorkerTransfer.Identity.Tests;
 /// What a sign-in acts as, across the table that remembers it.
 /// </summary>
 [Collection(PostgresCollection.Name)]
-public class HandlungsformTests(Postgres postgres) : IAsyncLifetime
+public class SessionCapacityTests(Postgres postgres) : IAsyncLifetime
 {
     private readonly SessionId _sitzung = SessionId.New();
 
     public async Task InitializeAsync()
     {
-        await using var context = Kontext();
+        await using var context = Context();
         await context.Database.MigrateAsync();
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    private IdentityDbContext Kontext() =>
-        IdentityDbContextFactory.Fuer(postgres.ConnectionString);
+    private IdentityDbContext Context() =>
+        IdentityDbContextFactory.For(postgres.ConnectionString);
 
     /// <summary>
     /// Acting for oneself is the state a person is in. A missing row is the
     /// answer, not a gap — which is why signing in writes nothing here.
     /// </summary>
     [Fact]
-    public async Task Eine_unbekannte_Sitzung_handelt_fuer_sich_selbst()
+    public async Task An_unknown_session_acts_for_itself()
     {
-        await using var context = Kontext();
+        await using var context = Context();
 
-        var form = await new EfSessionCapacity(context).RecallAsync(SessionId.New());
+        var capacity = await new EfSessionCapacity(context).RecallAsync(SessionId.New());
 
-        form.Should().BeOfType<Capacity.AsSelf>();
+        capacity.Should().BeOfType<Capacity.AsSelf>();
     }
 
     [Fact]
-    public async Task Eine_gemerkte_Firma_kommt_wieder_heraus()
+    public async Task A_remembered_company_comes_back_out()
     {
         var company = TenantId.New();
 
-        await using (var context = Kontext())
+        await using (var context = Context())
         {
             await new EfSessionCapacity(context)
                 .RememberAsync(_sitzung, new Capacity.ForCompany(company));
             await context.SaveChangesAsync();
         }
 
-        await using var gelesen = Kontext();
-        var form = await new EfSessionCapacity(gelesen).RecallAsync(_sitzung);
+        await using var read = Context();
+        var capacity = await new EfSessionCapacity(read).RecallAsync(_sitzung);
 
-        form.Should().BeOfType<Capacity.ForCompany>().Which.Tenant.Should().Be(company);
+        capacity.Should().BeOfType<Capacity.ForCompany>().Which.Tenant.Should().Be(company);
     }
 
     /// <summary>
@@ -61,26 +61,26 @@ public class HandlungsformTests(Postgres postgres) : IAsyncLifetime
     /// and nothing left behind that says otherwise.
     /// </summary>
     [Fact]
-    public async Task Zurueck_zur_Privatperson_raeumt_die_Zeile_weg()
+    public async Task Going_back_to_a_private_person_clears_the_row_away()
     {
-        await using (var context = Kontext())
+        await using (var context = Context())
         {
-            var form = new EfSessionCapacity(context);
-            await form.RememberAsync(_sitzung, new Capacity.ForCompany(TenantId.New()));
+            var capacity = new EfSessionCapacity(context);
+            await capacity.RememberAsync(_sitzung, new Capacity.ForCompany(TenantId.New()));
             await context.SaveChangesAsync();
         }
 
-        await using (var context = Kontext())
+        await using (var context = Context())
         {
             await new EfSessionCapacity(context)
                 .RememberAsync(_sitzung, Capacity.AsSelf.Instance);
             await context.SaveChangesAsync();
         }
 
-        await using var gelesen = Kontext();
-        (await gelesen.SessionCapacities.CountAsync(row => row.SessionId == _sitzung.Value))
+        await using var read = Context();
+        (await read.SessionCapacities.CountAsync(row => row.SessionId == _sitzung.Value))
             .Should().Be(0);
-        (await new EfSessionCapacity(gelesen).RecallAsync(_sitzung))
+        (await new EfSessionCapacity(read).RecallAsync(_sitzung))
             .Should().BeOfType<Capacity.AsSelf>();
     }
 
@@ -89,43 +89,43 @@ public class HandlungsformTests(Postgres postgres) : IAsyncLifetime
     /// row per rotation would turn a table of sign-ins into a table of tokens.
     /// </summary>
     [Fact]
-    public async Task Zweimal_dieselbe_Sitzung_ergibt_eine_Zeile()
+    public async Task The_same_session_twice_gives_one_row()
     {
-        var zuerst = TenantId.New();
-        var danach = TenantId.New();
+        var first = TenantId.New();
+        var after = TenantId.New();
 
-        await using (var context = Kontext())
+        await using (var context = Context())
         {
             await new EfSessionCapacity(context)
-                .RememberAsync(_sitzung, new Capacity.ForCompany(zuerst));
+                .RememberAsync(_sitzung, new Capacity.ForCompany(first));
             await context.SaveChangesAsync();
         }
 
-        await using (var context = Kontext())
+        await using (var context = Context())
         {
             await new EfSessionCapacity(context)
-                .RememberAsync(_sitzung, new Capacity.ForCompany(danach));
+                .RememberAsync(_sitzung, new Capacity.ForCompany(after));
             await context.SaveChangesAsync();
         }
 
-        await using var gelesen = Kontext();
-        (await gelesen.SessionCapacities.CountAsync(row => row.SessionId == _sitzung.Value))
+        await using var read = Context();
+        (await read.SessionCapacities.CountAsync(row => row.SessionId == _sitzung.Value))
             .Should().Be(1);
-        (await new EfSessionCapacity(gelesen).RecallAsync(_sitzung))
-            .Should().BeOfType<Capacity.ForCompany>().Which.Tenant.Should().Be(danach);
+        (await new EfSessionCapacity(read).RecallAsync(_sitzung))
+            .Should().BeOfType<Capacity.ForCompany>().Which.Tenant.Should().Be(after);
     }
 
     [Fact]
-    public async Task Vergessen_ist_auch_ohne_Zeile_kein_Fehler()
+    public async Task Forgetting_is_no_error_even_without_a_row()
     {
-        await using var context = Kontext();
+        await using var context = Context();
 
-        var vergessen = async () =>
+        var forgotten = async () =>
         {
             await new EfSessionCapacity(context).ForgetAsync(SessionId.New());
             await context.SaveChangesAsync();
         };
 
-        await vergessen.Should().NotThrowAsync();
+        await forgotten.Should().NotThrowAsync();
     }
 }

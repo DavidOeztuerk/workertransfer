@@ -14,35 +14,35 @@ namespace WorkerTransfer.Identity.Tests;
 /// alone leaves every journey green, which is exactly how a second guard gets
 /// deleted years later as "unreachable".
 /// </remarks>
-public class EinladungsregelnTests
+public class InvitationRulesTests
 {
-    private static readonly TenantId Firma = TenantId.New();
-    private static readonly SubjectId Chefin = SubjectId.New();
-    private static readonly DateTimeOffset Jetzt = DateTimeOffset.UtcNow;
+    private static readonly TenantId Company = TenantId.New();
+    private static readonly SubjectId Boss = SubjectId.New();
+    private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;
 
-    private static Invitation Ausgestellt(
+    private static Invitation Issued(
         MembershipRole role = MembershipRole.Member,
         string email = "kollege@andere.example") =>
-        Invitation.Issue(Firma, email, role, MembershipRole.Admin, Chefin, Jetzt);
+        Invitation.Issue(Company, email, role, MembershipRole.Admin, Boss, Now);
 
     [Fact]
-    public void Ein_gewoehnliches_Mitglied_kann_nicht_einladen()
+    public void An_ordinary_member_cannot_invite()
     {
-        var einladen = () => Invitation.Issue(
-            Firma, "wer@anders.example", MembershipRole.Member,
-            MembershipRole.Member, Chefin, Jetzt);
+        var invite = () => Invitation.Issue(
+            Company, "wer@anders.example", MembershipRole.Member,
+            MembershipRole.Member, Boss, Now);
 
-        einladen.Should().Throw<OnlyAdminsMayInviteException>();
+        invite.Should().Throw<OnlyAdminsMayInviteException>();
     }
 
     [Fact]
-    public void Ein_gewoehnliches_Mitglied_kann_keine_Einladung_zuruecknehmen()
+    public void An_ordinary_member_cannot_take_an_invitation_back()
     {
-        var invitation = Ausgestellt();
+        var invitation = Issued();
 
-        var zuruecknehmen = () => invitation.Withdraw(MembershipRole.Member);
+        var withdraw = () => invitation.Withdraw(MembershipRole.Member);
 
-        zuruecknehmen.Should().Throw<OnlyAdminsMayInviteException>();
+        withdraw.Should().Throw<OnlyAdminsMayInviteException>();
         invitation.Status.Should().Be(InvitationStatus.Pending);
     }
 
@@ -51,13 +51,13 @@ public class EinladungsregelnTests
     /// was invited.
     /// </summary>
     [Fact]
-    public void Eine_fremde_Adresse_nimmt_die_Einladung_nicht_an()
+    public void A_foreign_address_does_not_take_the_invitation_up()
     {
-        var invitation = Ausgestellt();
+        var invitation = Issued();
 
-        var annehmen = () => invitation.Accept("jemand@anders.example", Jetzt);
+        var accept = () => invitation.Accept("jemand@anders.example", Now);
 
-        annehmen.Should().Throw<NotYourInvitationException>();
+        accept.Should().Throw<NotYourInvitationException>();
         invitation.Status.Should().Be(InvitationStatus.Pending);
     }
 
@@ -67,11 +67,11 @@ public class EinladungsregelnTests
     /// capital letter their mail client added.
     /// </summary>
     [Fact]
-    public void Die_Schreibweise_der_Adresse_entscheidet_nicht()
+    public void The_spelling_of_the_address_does_not_decide()
     {
-        var invitation = Ausgestellt(email: "kollege@andere.example");
+        var invitation = Issued(email: "kollege@andere.example");
 
-        invitation.Accept("Kollege@Andere.Example", Jetzt);
+        invitation.Accept("Kollege@Andere.Example", Now);
 
         invitation.Status.Should().Be(InvitationStatus.Accepted);
     }
@@ -81,25 +81,25 @@ public class EinladungsregelnTests
     /// access to applicant data a year later; long enough for a holiday.
     /// </summary>
     [Fact]
-    public void Nach_sieben_Tagen_traegt_eine_Einladung_nicht_mehr()
+    public void After_seven_days_an_invitation_no_longer_carries()
     {
-        var invitation = Ausgestellt();
+        var invitation = Issued();
 
-        var annehmen = () => invitation.Accept(
-            "kollege@andere.example", Jetzt + Invitation.Lebensdauer);
+        var accept = () => invitation.Accept(
+            "kollege@andere.example", Now + Invitation.Lifetime);
 
-        annehmen.Should().Throw<InvitationExpiredException>();
+        accept.Should().Throw<InvitationExpiredException>();
     }
 
     [Fact]
-    public void Eine_zurueckgenommene_Einladung_laesst_sich_nicht_annehmen()
+    public void A_withdrawn_invitation_cannot_be_taken_up()
     {
-        var invitation = Ausgestellt();
+        var invitation = Issued();
         invitation.Withdraw(MembershipRole.Admin);
 
-        var annehmen = () => invitation.Accept("kollege@andere.example", Jetzt);
+        var accept = () => invitation.Accept("kollege@andere.example", Now);
 
-        annehmen.Should().Throw<InvitationInvalidException>();
+        accept.Should().Throw<InvitationInvalidException>();
     }
 
     /// <summary>
@@ -107,25 +107,25 @@ public class EinladungsregelnTests
     /// is a different operation, and suggesting it here would be dangerous.
     /// </summary>
     [Fact]
-    public void Eine_angenommene_Einladung_laesst_sich_nicht_zuruecknehmen()
+    public void An_accepted_invitation_cannot_be_taken_back()
     {
-        var invitation = Ausgestellt();
-        invitation.Accept("kollege@andere.example", Jetzt);
+        var invitation = Issued();
+        invitation.Accept("kollege@andere.example", Now);
 
-        var zuruecknehmen = () => invitation.Withdraw(MembershipRole.Admin);
+        var withdraw = () => invitation.Withdraw(MembershipRole.Admin);
 
-        zuruecknehmen.Should().Throw<InvitationInvalidException>();
+        withdraw.Should().Throw<InvitationInvalidException>();
         invitation.Status.Should().Be(InvitationStatus.Accepted);
     }
 
     [Fact]
-    public void Zweimal_annehmen_geht_nicht()
+    public void Accepting_twice_does_not_work()
     {
-        var invitation = Ausgestellt();
-        invitation.Accept("kollege@andere.example", Jetzt);
+        var invitation = Issued();
+        invitation.Accept("kollege@andere.example", Now);
 
-        var nochmal = () => invitation.Accept("kollege@andere.example", Jetzt);
+        var onceMore = () => invitation.Accept("kollege@andere.example", Now);
 
-        nochmal.Should().Throw<InvitationInvalidException>();
+        onceMore.Should().Throw<InvitationInvalidException>();
     }
 }

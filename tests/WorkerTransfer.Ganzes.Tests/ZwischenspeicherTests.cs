@@ -50,7 +50,7 @@ public class ZwischenspeicherTests
         { "portfolio", typeof(Portfolio.Application.Portfolios.MyPortfolioQuery) },
         { "jobs", typeof(Jobs.Application.Jobs.MyJobsQuery) },
         { "applications", typeof(Applications.Application.Applications.MyApplicationsQuery) },
-        { "companies", typeof(Companies.Application.Profile.MyProfileQuery) },
+        { "companies", typeof(Companies.Application.Profiles.MyProfileQuery) },
         { "transfer", typeof(Transfer.Application.Markt.MyMarketStatusQuery) },
         { "github", typeof(GitHub.Application.Connections.MyConnectionQuery) },
         { "notification", typeof(Notification.Application.Benachrichtigungen.MyInboxQuery) },

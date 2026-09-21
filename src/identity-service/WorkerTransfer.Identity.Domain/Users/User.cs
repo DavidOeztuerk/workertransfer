@@ -46,10 +46,10 @@ public sealed class User
         AccountStatus status,
         IReadOnlyList<string> roles,
         string? pendingCompanyName,
-        Kontosprache language,
+        AccountLanguage language,
         string? givenName,
         string? familyName,
-        OccupationalField? berufsfeld)
+        OccupationalField? occupationalField)
     {
         Id = id;
         Email = email;
@@ -58,10 +58,10 @@ public sealed class User
         Status = status;
         Roles = roles;
         PendingCompanyName = pendingCompanyName;
-        Kontosprache = language;
-        GivenName = LeerAlsNull(givenName);
-        FamilyName = LeerAlsNull(familyName);
-        OccupationalField = berufsfeld;
+        AccountLanguage = language;
+        GivenName = EmptyAsNull(givenName);
+        FamilyName = EmptyAsNull(familyName);
+        OccupationalField = occupationalField;
     }
 
     /// <summary>Who this is.</summary>
@@ -77,26 +77,26 @@ public sealed class User
     public string DisplayName { get; }
 
     /// <summary>
-    /// Bürgerlicher Vorname — für Briefkopf und Signatur, nicht für die Search.
+    /// The civil given name — for a letterhead and a signature, not for the search.
     /// </summary>
     /// <remarks>
-    /// Getrennt vom Anzeigenamen (ADR-0038). Leer/fehlend ist die Vorgabe
-    /// (Art. 25): wer sich nur umsieht, muss keinen Klarnamen hinterlegen.
+    /// Separate from the display name (ADR-0038). Empty/absent is the default
+    /// (Art. 25): whoever is only looking around need store no civil name.
     /// </remarks>
     public string? GivenName { get; private set; }
 
-    /// <summary>Bürgerlicher Nachname. Siehe <see cref="GivenName"/>.</summary>
+    /// <summary>The civil family name. See <see cref="GivenName"/>.</summary>
     public string? FamilyName { get; private set; }
 
     /// <summary>
-    /// Was unter das Anschreiben gehört: Vor- und Nachname, sonst der Anzeigename.
+    /// What belongs under a cover letter: given and family name, else the display name.
     /// </summary>
-    public string Klarname
+    public string FullName
     {
         get
         {
-            var voll = $"{GivenName} {FamilyName}".Trim();
-            return voll.Length > 0 ? voll : DisplayName;
+            var full = $"{GivenName} {FamilyName}".Trim();
+            return full.Length > 0 ? full : DisplayName;
         }
     }
 
@@ -120,15 +120,14 @@ public sealed class User
     /// <summary>The language this person is written to in.</summary>
     /// <remarks>
     /// On the account and not on the request, because the mails that matter
-    /// most go out without one — see <see cref="Users.Sprache"/>.
+    /// most go out without one — see <see cref="AccountLanguage"/>.
     /// </remarks>
-    public Kontosprache Kontosprache { get; private set; }
+    public AccountLanguage AccountLanguage { get; private set; }
 
-    /// <summary>In welcher Arbeitswelt diese Person steht, oder <c>null</c>.</summary>
+    /// <summary>Which working world this person stands in, or <c>null</c>.</summary>
     /// <remarks>
-    /// <c>null</c> heisst „nicht angegeben" und ist der Normalfall (ADR-0039).
-    /// Wird nie abgeleitet: eine GitHub-Connection macht niemanden zu
-    /// <c>it_software</c>.
+    /// <c>null</c> means „not stated" and is the ordinary case (ADR-0039). It is
+    /// never derived: a GitHub connection makes nobody <c>it_software</c>.
     /// </remarks>
     public OccupationalField? OccupationalField { get; private set; }
 
@@ -143,7 +142,7 @@ public sealed class User
     /// <param name="pendingCompanyName">
     /// A company to create once the address is confirmed, or <c>null</c>.
     /// </param>
-    /// <param name="sprache">
+    /// <param name="language">
     /// What to write to them in. Taken from the browser at registration, and
     /// changeable afterwards — the confirmation mail is the first thing this
     /// account ever receives, so guessing here is better than defaulting.
@@ -153,13 +152,13 @@ public sealed class User
         string passwordHash,
         string displayName,
         string? pendingCompanyName = null,
-        Kontosprache language = Sprachwahl.Vorgabe,
+        AccountLanguage language = LanguageChoice.Default,
         string? givenName = null,
         string? familyName = null,
-        OccupationalField? berufsfeld = null) =>
+        OccupationalField? occupationalField = null) =>
         new(SubjectId.New(), email, passwordHash, displayName,
             AccountStatus.Pending, ["user"], pendingCompanyName, language,
-            givenName, familyName, berufsfeld);
+            givenName, familyName, occupationalField);
 
     /// <summary>The account as a row holds it.</summary>
     /// <remarks>For repositories. Everything here is already true.</remarks>
@@ -171,12 +170,12 @@ public sealed class User
         AccountStatus status,
         IReadOnlyList<string> roles,
         string? pendingCompanyName,
-        Kontosprache language = Sprachwahl.Vorgabe,
+        AccountLanguage language = LanguageChoice.Default,
         string? givenName = null,
         string? familyName = null,
-        OccupationalField? berufsfeld = null) =>
+        OccupationalField? occupationalField = null) =>
         new(id, email, passwordHash, displayName, status, roles,
-            pendingCompanyName, language, givenName, familyName, berufsfeld);
+            pendingCompanyName, language, givenName, familyName, occupationalField);
 
     /// <summary>The address was confirmed.</summary>
     /// <remarks>
@@ -213,32 +212,32 @@ public sealed class User
     /// overwrite what somebody picked. Somebody who reads German while
     /// travelling in France should not find their mails in French afterwards.
     /// </remarks>
-    /// <param name="sprache">What they picked.</param>
-    public void SpracheWaehlen(Kontosprache language) => Kontosprache = language;
+    /// <param name="language">What they picked.</param>
+    public void ChooseLanguage(AccountLanguage language) => AccountLanguage = language;
 
-    /// <summary>Die Person nennt ihr OccupationalField — oder nimmt die Angabe zurück.</summary>
+    /// <summary>The person names their occupational field — or takes the statement back.</summary>
     /// <remarks>
-    /// <c>null</c> heisst entfernen, nicht „unverändert" — wie bei
-    /// <see cref="SetzeKlarname"/>.
+    /// <c>null</c> means remove, not „unchanged" — as with
+    /// <see cref="SetFullName"/>.
     /// </remarks>
-    /// <param name="berufsfeld">Was sie gewählt hat, oder <c>null</c>.</param>
-    public void BerufsfeldWaehlen(OccupationalField? berufsfeld) => OccupationalField = berufsfeld;
+    /// <param name="occupationalField">What they chose, or <c>null</c>.</param>
+    public void ChooseOccupationalField(OccupationalField? occupationalField) => OccupationalField = occupationalField;
 
-    /// <summary>Bürgerlichen Namen setzen oder leeren.</summary>
+    /// <summary>Set or clear the civil name.</summary>
     /// <remarks>
-    /// Leer heisst ENTFERNEN, nicht „unverändert": sonst gäbe es keinen Weg
-    /// zurück zu „keiner". Der Anzeigename bleibt unberührt.
+    /// Empty means REMOVE, not „unchanged": otherwise there would be no way
+    /// back to „none". The display name stays untouched.
     /// </remarks>
-    public void SetzeKlarname(string? givenName, string? familyName)
+    public void SetFullName(string? givenName, string? familyName)
     {
-        GivenName = LeerAlsNull(givenName);
-        FamilyName = LeerAlsNull(familyName);
+        GivenName = EmptyAsNull(givenName);
+        FamilyName = EmptyAsNull(familyName);
     }
 
-    private static string? LeerAlsNull(string? value)
+    private static string? EmptyAsNull(string? value)
     {
-        var getrimmt = value?.Trim();
-        return string.IsNullOrEmpty(getrimmt) ? null : getrimmt;
+        var trimmed = value?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
     }
 
     /// <summary>

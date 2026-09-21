@@ -10,30 +10,30 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Identity.Api;
 
-/// <summary>Interne Dienst-zu-Dienst-Endpunkte — hinter dem gemeinsamen Geheimnis.</summary>
+/// <summary>Internal service-to-service endpoints — behind the shared secret.</summary>
 /// <remarks>
-/// Diese Endpunkte haben KEINE Gateway-Route. Sie liegen unter `/internal/`
-/// und verhalten sich wie `/internal/notify` und `/internal/notifications`:
-/// ohne das Geheimnis antworten sie mit 404 (nicht 401), damit sie sich nicht
-/// über eine Methode verraten, die niemand benutzt.
+/// These endpoints have NO gateway route. They live under `/internal/` and
+/// behave like `/internal/notify` and `/internal/notifications`: without the
+/// secret they answer 404 (not 401), so they do not give themselves away over a
+/// method nobody uses.
 /// </remarks>
 public static class InternalEndpoints
 {
-    private const string Geheimniskopf = "X-Notify-Secret";
+    private const string SecretHeader = "X-Notify-Secret";
 
-    /// <summary>Bildet die internen Routen ab.</summary>
-    public static IEndpointRouteBuilder MapInterneEndpoints(this IEndpointRouteBuilder app)
+    /// <summary>Maps the internal routes.</summary>
+    public static IEndpointRouteBuilder MapInternalEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
         app.MapGet("/internal/companies/{tenantId:guid}/members", async (
             Guid tenantId,
             IMediator mediator,
-            IOptions<NotifySettings> einstellungen,
+            IOptions<NotifySettings> settings,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (!DarfMelden(context, einstellungen.Value))
+            if (!MayNotify(context, settings.Value))
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
@@ -50,26 +50,26 @@ public static class InternalEndpoints
             await context.Response.WriteAsJsonAsync(response, cancellationToken);
         });
 
-        // Die Rolle eines Menschen in einem Unternehmen — der Draht, ueber den
-        // die anderen zehn Dienste ein Firmenrecht beantworten.
+        // A human being's role in a company — the wire over which the other
+        // ten services answer a company permission.
         //
-        // Sie steht ABSICHTLICH nicht im Token: ein Token lebt weiter, nachdem
-        // jemand aus einer Firma entfernt wurde, und die Entfernung wirkte dann
-        // erst beim Ablauf. Hier wird je ResumeRequest gefragt, und ein Revocation
-        // wirkt bei der naechsten.
+        // It is DELIBERATELY not in the token: a token lives on after somebody
+        // was removed from a company, and the removal would then take effect
+        // only on expiry. Here it is asked per request, and a revocation takes
+        // effect at the next one.
         //
-        // EINE Frage, EINE Antwort: die Mitgliederliste daneben gaebe fuer jede
-        // Rechtepruefung die ganze Belegschaft heraus, um eine Zeile daraus zu
-        // lesen.
+        // ONE question, ONE answer: the members list beside it would hand out
+        // the whole workforce for every permission check, in order to read one
+        // row out of it.
         app.MapGet("/internal/companies/{tenantId:guid}/members/{subjectId:guid}/role", async (
             Guid tenantId,
             Guid subjectId,
             IMediator mediator,
-            IOptions<NotifySettings> einstellungen,
+            IOptions<NotifySettings> settings,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (!DarfMelden(context, einstellungen.Value))
+            if (!MayNotify(context, settings.Value))
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
@@ -80,32 +80,32 @@ public static class InternalEndpoints
                 new InternalRoleQuery(new TenantId(tenantId), new SubjectId(subjectId)),
                 cancellationToken);
 
-            // 200 mit `null` und nicht 404: „kein Mitglied" ist eine Antwort auf
-            // die gestellte Frage. Ein 404 waere von „Geheimnis falsch" nicht zu
-            // unterscheiden — und der Aufrufer koennte die beiden nicht
-            // auseinanderhalten, wo genau das den Unterschied zwischen „darf
-            // nicht" und „wir wissen es nicht" ausmacht.
+            // 200 with `null` and not 404: „not a member" is an answer to the
+            // question that was asked. A 404 would be indistinguishable from
+            // „wrong secret" — and the caller could not tell the two apart at
+            // exactly the place where that is the difference between „may not"
+            // and „we do not know".
             await context.Response.WriteAsJsonAsync(
                 new CompanyRoleV1(role is { } r ? MembershipRoleNames.ToDatabase(r) : null),
                 cancellationToken);
         });
 
-        // Wer ein Unternehmen IST — Name und bewiesene Domain, nicht seine
-        // Belegschaft. advisor-service braucht die Domain, damit ein Ausschluss
-        // greifen kann (ADR-0037): eine Person nennt die Unternehmen, mit denen
-        // kein Conversation zustande kommt, und sie nennt sie durch ihre Domain.
+        // Who a company IS — name and proven domain, not its workforce.
+        // advisor-service needs the domain so an exclusion can bite (ADR-0037):
+        // a person names the companies no conversation comes about with, and
+        // they name them by their domain.
         //
-        // Eine zweite Domaintabelle in advisor-service waere die, die als Erste
-        // veraltet — mit einem Ausschluss, der dann stillschweigend nicht mehr
-        // greift, und das ist der eine Fall, in dem Stille am teuersten ist.
+        // A second domain table in advisor-service would be the one that goes
+        // stale first — with an exclusion that then silently stops biting, and
+        // that is the one case where silence costs most.
         app.MapGet("/internal/companies/{tenantId:guid}", async (
             Guid tenantId,
             IMediator mediator,
-            IOptions<NotifySettings> einstellungen,
+            IOptions<NotifySettings> settings,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (!DarfMelden(context, einstellungen.Value))
+            if (!MayNotify(context, settings.Value))
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
@@ -126,24 +126,24 @@ public static class InternalEndpoints
                 new UnternehmensauskunftV1(company.Name, company.Domain.Value), cancellationToken);
         });
 
-        // Klarname und Kontakt — die empfindlichste dieser Tueren.
+        // The civil name and contact — the most sensitive of these doors.
         //
-        // DAS GEHEIMNIS IST HIER NICHT DIE GANZE ERLAUBNIS. Es beweist, dass ein
-        // Dienst fragt, nicht dass er fragen darf. Die Erlaubnis steht im
-        // Ledger, und advisor-service holt sie VOR diesem Aufruf: Stufe 3 ist
-        // `advisor.identity:tenant:<id>` (ADR-0037). Wer diese Tuer fuer etwas
-        // anderes benutzt, holt sich die Pruefung dazu.
+        // THE SECRET IS NOT THE WHOLE PERMISSION HERE. It proves that a service
+        // is asking, not that it may ask. The permission stands in the ledger,
+        // and advisor-service fetches it BEFORE this call: stage 3 is
+        // `advisor.identity:tenant:<id>` (ADR-0037). Whoever uses this door for
+        // something else fetches the check along with it.
         //
-        // Zwei Felder, keine PostalAddress, kein Telefon (ADR-0038) — und keine
-        // Liste: sie antwortet auf genau eine Kennung.
+        // Two fields, no postal address, no telephone (ADR-0038) — and no list:
+        // it answers on exactly one id.
         app.MapGet("/internal/account/{subjectId:guid}/identity", async (
             Guid subjectId,
             IMediator mediator,
-            IOptions<NotifySettings> einstellungen,
+            IOptions<NotifySettings> settings,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (!DarfMelden(context, einstellungen.Value))
+            if (!MayNotify(context, settings.Value))
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
@@ -167,39 +167,39 @@ public static class InternalEndpoints
         app.MapGet("/internal/account/{subjectId:guid}/ai", async (
             Guid subjectId,
             IMediator mediator,
-            IOptions<NotifySettings> einstellungen,
+            IOptions<NotifySettings> settings,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (!DarfMelden(context, einstellungen.Value))
+            if (!MayNotify(context, settings.Value))
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
                 return;
             }
 
-            var zugang = await mediator.Send(
+            var aiAccess = await mediator.Send(
                 new InternalAiAccessQuery(new SubjectId(subjectId)),
                 cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                new KiZugangV1(zugang.Anbieter, zugang.Adresse, zugang.Modell, zugang.Schluessel),
+                new KiZugangV1(aiAccess.Provider, aiAccess.Address, aiAccess.Model, aiAccess.Key),
                 cancellationToken);
         });
 
         return app;
     }
 
-    private static bool DarfMelden(HttpContext context, NotifySettings einstellungen)
+    private static bool MayNotify(HttpContext context, NotifySettings settings)
     {
-        if (string.IsNullOrEmpty(einstellungen.Geheimnis)
-            || !context.Request.Headers.TryGetValue(Geheimniskopf, out var vorgelegt))
+        if (string.IsNullOrEmpty(settings.Geheimnis)
+            || !context.Request.Headers.TryGetValue(SecretHeader, out var presented))
         {
             return false;
         }
 
         return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(vorgelegt.ToString()),
-            System.Text.Encoding.UTF8.GetBytes(einstellungen.Geheimnis));
+            System.Text.Encoding.UTF8.GetBytes(presented.ToString()),
+            System.Text.Encoding.UTF8.GetBytes(settings.Geheimnis));
     }
 }

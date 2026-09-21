@@ -5,19 +5,19 @@ using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Application.Anmelden;
 
-/// <summary>Eine Person nennt ihr OccupationalField — oder nimmt die Angabe zurück.</summary>
-/// <param name="Wer">Wessen Konto. Immer das des Aufrufers.</param>
-/// <param name="Berufsfeld">Was sie gewählt hat, oder <c>null</c> für „keins".</param>
-public sealed record ChooseOccupationalFieldCommand(SubjectId Wer, OccupationalField? OccupationalField)
-    : IBefehl<bool>;
+/// <summary>A person names their occupational field — or takes the statement back.</summary>
+/// <param name="Subject">Whose account. Always the caller's own.</param>
+/// <param name="OccupationalField">What they chose, or <c>null</c> for „none".</param>
+public sealed record ChooseOccupationalFieldCommand(SubjectId Subject, OccupationalField? OccupationalField)
+    : ICommand<bool>;
 
-/// <inheritdoc cref="BerufsfeldWaehlenBefehl" />
+/// <inheritdoc cref="ChooseOccupationalFieldCommand" />
 /// <remarks>
-/// Nur das eigene Konto — deshalb steht keine Kennung im Rumpf. <c>null</c>
-/// heisst entfernen, sonst wäre eine einmal getroffene Wahl endgültig. Das
-/// OccupationalField wird nie aus dem Verhalten geschlossen (ADR-0039).
+/// Only one's own account — which is why there is no id in the body. <c>null</c>
+/// means remove, or a choice once made would be final. The occupational field
+/// is never concluded from behaviour (ADR-0039).
 /// </remarks>
-public sealed class ChooseOccupationalFieldHandler(IUserRepository benutzer)
+public sealed class ChooseOccupationalFieldHandler(IUserRepository users)
     : IRequestHandler<ChooseOccupationalFieldCommand, bool>
 {
     /// <inheritdoc />
@@ -27,18 +27,18 @@ public sealed class ChooseOccupationalFieldHandler(IUserRepository benutzer)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var konto = await benutzer.FindByIdAsync(request.Wer, cancellationToken);
+        var account = await users.FindByIdAsync(request.Subject, cancellationToken);
 
-        if (konto is null)
+        if (account is null)
         {
             return false;
         }
 
-        konto.BerufsfeldWaehlen(request.OccupationalField);
+        account.ChooseOccupationalField(request.OccupationalField);
 
-        // Aggregate kommen losgelöst zurück: ohne diesen Aufruf erreicht die
-        // Wahl die Datenbank nie.
-        await benutzer.SaveAsync(konto, cancellationToken);
+        // Aggregates come back detached: without this call the choice never
+        // reaches the database.
+        await users.SaveAsync(account, cancellationToken);
 
         return true;
     }

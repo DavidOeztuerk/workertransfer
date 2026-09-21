@@ -6,10 +6,10 @@ using WorkerTransfer.Identity.Domain.Companies;
 namespace WorkerTransfer.Identity.Application.Unternehmen;
 
 /// <summary>Which companies may I act for?</summary>
-public sealed record MyCompaniesQuery(SubjectId Wer) : IAbfrage<IReadOnlyList<Membership>>;
+public sealed record MyCompaniesQuery(SubjectId Subject) : IQuery<IReadOnlyList<Membership>>;
 
-/// <inheritdoc cref="MeineUnternehmenAbfrage" />
-public sealed class MyCompaniesHandler(IMembershipRepository mitgliedschaften)
+/// <inheritdoc cref="MyCompaniesQuery" />
+public sealed class MyCompaniesHandler(IMembershipRepository memberships)
     : IRequestHandler<MyCompaniesQuery, IReadOnlyList<Membership>>
 {
     /// <inheritdoc />
@@ -19,23 +19,23 @@ public sealed class MyCompaniesHandler(IMembershipRepository mitgliedschaften)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return mitgliedschaften.ListForSubjectAsync(request.Wer, cancellationToken);
+        return memberships.ListForSubjectAsync(request.Subject, cancellationToken);
     }
 }
 
 /// <summary>Who may act for this company?</summary>
-public sealed record MembersQuery(SubjectId Wer, TenantId Firma)
-    : IAbfrage<IReadOnlyList<CompanyMember>>;
+public sealed record MembersQuery(SubjectId Subject, TenantId Company)
+    : IQuery<IReadOnlyList<CompanyMember>>;
 
-/// <inheritdoc cref="MitgliederAbfrage" />
+/// <inheritdoc cref="MembersQuery" />
 /// <remarks>
 /// Any member may read the list — it is the company's own team, and hiding
 /// colleagues from colleagues serves nobody. Only membership is required, and
 /// that check is what keeps it from being a directory of strangers.
 /// </remarks>
 public sealed class MembersHandler(
-    CompanyAccess zugriff,
-    IMembershipRepository mitgliedschaften)
+    CompanyAccess access,
+    IMembershipRepository memberships)
     : IRequestHandler<MembersQuery, IReadOnlyList<CompanyMember>>
 {
     /// <inheritdoc />
@@ -45,24 +45,24 @@ public sealed class MembersHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        await zugriff.RoleAsync(request.Wer, request.Firma, cancellationToken);
+        await access.RoleAsync(request.Subject, request.Company, cancellationToken);
 
-        return await mitgliedschaften.ListMembersAsync(request.Firma, cancellationToken);
+        return await memberships.ListMembersAsync(request.Company, cancellationToken);
     }
 }
 
-/// <summary>Die Mitglieder eines Unternehmens — für Dienst-zu-Dienst, ohne Aufrufer.</summary>
+/// <summary>A company's members — for service to service, without a caller.</summary>
 /// <remarks>
-/// Das Geheimnis am internen Endpunkt IST die Autorisierung. Die öffentliche
-/// Abfrage prüft Membership, weil sie einem Menschen antwortet; hier
-/// antwortet der Dienst einem Dienst, und <c>SubjectId.Empty</c> als
-/// Stellvertreter würde <c>NotAMemberException</c> werfen.
+/// The secret at the internal endpoint IS the authorisation. The public query
+/// checks membership because it answers a human being; here a service answers a
+/// service, and <c>SubjectId.Empty</c> as a stand-in would throw
+/// <c>NotAMemberException</c>.
 /// </remarks>
-public sealed record InternalMembersQuery(TenantId Firma)
-    : IAbfrage<IReadOnlyList<CompanyMember>>;
+public sealed record InternalMembersQuery(TenantId Company)
+    : IQuery<IReadOnlyList<CompanyMember>>;
 
-/// <inheritdoc cref="InterneMitgliederAbfrage" />
-public sealed class InternalMembersHandler(IMembershipRepository mitgliedschaften)
+/// <inheritdoc cref="InternalMembersQuery" />
+public sealed class InternalMembersHandler(IMembershipRepository memberships)
     : IRequestHandler<InternalMembersQuery, IReadOnlyList<CompanyMember>>
 {
     /// <inheritdoc />
@@ -72,17 +72,17 @@ public sealed class InternalMembersHandler(IMembershipRepository mitgliedschafte
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return mitgliedschaften.ListMembersAsync(request.Firma, cancellationToken);
+        return memberships.ListMembersAsync(request.Company, cancellationToken);
     }
 }
 
 /// <summary>Which invitations are still waiting?</summary>
-public sealed record OpenInvitationsQuery(SubjectId Wer, TenantId Firma)
-    : IAbfrage<IReadOnlyList<Invitation>>;
+public sealed record OpenInvitationsQuery(SubjectId Subject, TenantId Company)
+    : IQuery<IReadOnlyList<Invitation>>;
 
-/// <inheritdoc cref="OffeneEinladungenAbfrage" />
+/// <inheritdoc cref="OpenInvitationsQuery" />
 public sealed class OpenInvitationsHandler(
-    CompanyAccess zugriff,
+    CompanyAccess access,
     IInvitationRepository invitations)
     : IRequestHandler<OpenInvitationsQuery, IReadOnlyList<Invitation>>
 {
@@ -93,32 +93,31 @@ public sealed class OpenInvitationsHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        await zugriff.RoleAsync(request.Wer, request.Firma, cancellationToken);
+        await access.RoleAsync(request.Subject, request.Company, cancellationToken);
 
-        return await invitations.ListOpenAsync(request.Firma, cancellationToken);
+        return await invitations.ListOpenAsync(request.Company, cancellationToken);
     }
 }
 
-/// <summary>Welche Rolle hat dieser Mensch in diesem Unternehmen?</summary>
+/// <summary>What role does this human being have in this company?</summary>
 /// <remarks>
-/// <para>Für Dienst-zu-Dienst, ohne Aufrufer: das Geheimnis am internen
-/// Endpunkt IST die Autorisierung. Die öffentlichen Abfragen prüfen zuerst die
-/// Membership des Fragenden, weil sie einem Menschen antworten — hier
-/// antwortet ein Dienst einem Dienst.</para>
+/// <para>For service to service, without a caller: the secret at the internal
+/// endpoint IS the authorisation. The public queries check the asker's
+/// membership first, because they answer a human being — here a service answers
+/// a service.</para>
 ///
-/// <para><strong>Warum die anderen zehn Dienste überhaupt fragen müssen.</strong>
-/// Die Mitgliedschaftstabelle liegt hier und nirgends sonst (ADR-0004: keine
-/// gemeinsame Datenbank). Und ins Token gehört die Rolle nicht: ein Token lebt
-/// weiter, nachdem jemand aus einer Firma entfernt wurde, und die Entfernung
-/// wirkte dann erst beim Ablauf. Der Preis ist eine Abfrage je geschützter
-/// ResumeRequest — sie trifft einen Primärschlüssel und betrifft nur die Handlungen,
-/// die ein Unternehmen binden.</para>
+/// <para><strong>Why the other ten services have to ask at all.</strong> The
+/// membership table lives here and nowhere else (ADR-0004: no shared database).
+/// And the role does not belong in the token: a token lives on after somebody
+/// was removed from a company, and the removal would then take effect only on
+/// expiry. The price is one query per protected request — it hits a primary key
+/// and touches only the operations that bind a company.</para>
 /// </remarks>
-public sealed record InternalRoleQuery(TenantId Firma, SubjectId Wer)
-    : IAbfrage<MembershipRole?>;
+public sealed record InternalRoleQuery(TenantId Company, SubjectId Subject)
+    : IQuery<MembershipRole?>;
 
-/// <inheritdoc cref="InterneRolleAbfrage" />
-public sealed class InternalRoleHandler(IMembershipRepository mitgliedschaften)
+/// <inheritdoc cref="InternalRoleQuery" />
+public sealed class InternalRoleHandler(IMembershipRepository memberships)
     : IRequestHandler<InternalRoleQuery, MembershipRole?>
 {
     /// <inheritdoc />
@@ -128,30 +127,30 @@ public sealed class InternalRoleHandler(IMembershipRepository mitgliedschaften)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return mitgliedschaften.RoleOfAsync(request.Wer, request.Firma, cancellationToken);
+        return memberships.RoleOfAsync(request.Subject, request.Company, cancellationToken);
     }
 }
 
-/// <summary>Wer ein Unternehmen ist — Name und bewiesene Domain.</summary>
+/// <summary>Who a company is — name and proven domain.</summary>
 /// <remarks>
-/// <para>Für Dienst-zu-Dienst, ohne Aufrufer: das Geheimnis am internen
-/// Endpunkt IST die Autorisierung.</para>
+/// <para>For service to service, without a caller: the secret at the internal
+/// endpoint IS the authorisation.</para>
 ///
-/// <para><strong>Warum advisor-service das braucht.</strong> Eine Person darf
-/// Unternehmen ausschliessen, und sie benennt sie durch ihre Domain (ADR-0037).
-/// Ohne diese Abfrage müsste advisor-service eine zweite Domaintabelle halten —
-/// und die wäre die, die als Erste veraltet, mit einem Ausschluss, der dann
-/// stillschweigend nicht mehr greift.</para>
+/// <para><strong>Why advisor-service needs this.</strong> A person may exclude
+/// companies, and they name them by their domain (ADR-0037). Without this query
+/// advisor-service would have to hold a second domain table — and that would be
+/// the one that goes stale first, with an exclusion that then silently stops
+/// biting.</para>
 ///
-/// <para>Die Domain eines Unternehmens ist <strong>keine Auskunft über einen
-/// Menschen</strong>: sie steht auf jeder Karriereseite. Was hier nicht
-/// herausgeht, ist die Belegschaft — dafür gibt es die Mitgliederabfrage, und
-/// sie ist eine eigene Tür.</para>
+/// <para>A company's domain is <strong>no information about a human
+/// being</strong>: it stands on every careers page. What does not go out here
+/// is the workforce — the members query is there for that, and it is a door of
+/// its own.</para>
 /// </remarks>
-public sealed record InternalCompanyQuery(TenantId Firma) : IAbfrage<Company?>;
+public sealed record InternalCompanyQuery(TenantId Company) : IQuery<Company?>;
 
-/// <inheritdoc cref="InterneFirmaAbfrage" />
-public sealed class InternalCompanyHandler(ICompanyRepository unternehmen)
+/// <inheritdoc cref="InternalCompanyQuery" />
+public sealed class InternalCompanyHandler(ICompanyRepository companies)
     : IRequestHandler<InternalCompanyQuery, Company?>
 {
     /// <inheritdoc />
@@ -160,6 +159,6 @@ public sealed class InternalCompanyHandler(ICompanyRepository unternehmen)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return unternehmen.FindByIdAsync(request.Firma, cancellationToken);
+        return companies.FindByIdAsync(request.Company, cancellationToken);
     }
 }

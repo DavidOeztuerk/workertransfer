@@ -6,9 +6,9 @@ namespace WorkerTransfer.Identity.Infrastructure.Post;
 /// registration — tray, timing, wording — without an SMTP server, and still
 /// through the real code that decides what goes out.
 /// </remarks>
-public interface IVersender
+public interface IMailSender
 {
-    /// <param name="post">What to send.</param>
+    /// <param name="mail">What to send.</param>
     /// <param name="cancellationToken">Cancels the send.</param>
-    Task SendeAsync(AusgehendePost post, CancellationToken cancellationToken = default);
+    Task SendAsync(OutgoingMail mail, CancellationToken cancellationToken = default);
 }

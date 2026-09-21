@@ -10,27 +10,27 @@ using WorkerTransfer.Identity.Domain.Verification;
 namespace WorkerTransfer.Identity.Application.Registrierung;
 
 /// <summary>Register an account.</summary>
-/// <param name="Berufsfeld">
-/// In welcher Arbeitswelt die Person steht. <c>null</c> ist der Normalfall.
+/// <param name="OccupationalField">
+/// Which working world the person stands in. <c>null</c> is the ordinary case.
 /// </param>
-/// <param name="Firmenname">
+/// <param name="CompanyName">
 /// Set means "a company is registering here". It becomes a company only when
 /// the address is confirmed — until then it is an intention (E2.6).
 /// </param>
-public sealed record RegistrierenBefehl(
+public sealed record RegisterCommand(
     string Email,
-    string Passwort,
-    string Anzeigename,
-    string? Firmenname = null,
-    Kontosprache Kontosprache = Sprachwahl.Vorgabe,
-    string? Vorname = null,
-    string? Nachname = null,
-    OccupationalField? OccupationalField = null) : IBefehl<Registrierergebnis>;
+    string Password,
+    string DisplayName,
+    string? CompanyName = null,
+    AccountLanguage AccountLanguage = LanguageChoice.Default,
+    string? GivenName = null,
+    string? FamilyName = null,
+    OccupationalField? OccupationalField = null) : ICommand<RegistrationResult>;
 
 /// <summary>What registering produced.</summary>
-public abstract record Registrierergebnis
+public abstract record RegistrationResult
 {
-    private Registrierergebnis() { }
+    private RegistrationResult() { }
 
     /// <summary>
     /// Taken. Answered whether or not the address was already known.
@@ -42,44 +42,44 @@ public abstract record Registrierergebnis
     /// question that costs somebody their job. The real owner is told instead,
     /// by mail.
     /// </remarks>
-    public sealed record Angenommen : Registrierergebnis;
+    public sealed record Accepted : RegistrationResult;
 
     /// <summary>The password does not clear the floor.</summary>
-    public sealed record WeakPassword(string Grund) : Registrierergebnis;
+    public sealed record WeakPassword(string Reason) : RegistrationResult;
 
     /// <summary>A mass provider cannot be claimed as a company.</summary>
-    public sealed record OeffentlicheDomain(string Domain) : Registrierergebnis;
+    public sealed record PublicDomain(string Domain) : RegistrationResult;
 }
 
 /// <summary>Takes a registration.</summary>
-public sealed class RegistrierenHandler(
-    IUserRepository benutzer,
-    IPasswordHasher passwoerter,
+public sealed class RegisterHandler(
+    IUserRepository users,
+    IPasswordHasher passwords,
     IVerificationTokenRepository tokens,
-    IEinmaltoken einmaltoken,
-    IPostkorb postkorb,
-    IAuditTrail protokoll,
-    IKorrelation korrelation,
-    TimeProvider uhr)
-    : IRequestHandler<RegistrierenBefehl, Registrierergebnis>
+    IOneTimeToken oneTimeToken,
+    IMailTray mailTray,
+    IAuditTrail auditTrail,
+    ICorrelation correlation,
+    TimeProvider clock)
+    : IRequestHandler<RegisterCommand, RegistrationResult>
 {
     /// <summary>How long a confirmation link works.</summary>
-    private static readonly TimeSpan Gueltigkeit = TimeSpan.FromHours(24);
+    private static readonly TimeSpan Validity = TimeSpan.FromHours(24);
 
     /// <inheritdoc />
-    public async Task<Registrierergebnis> Handle(
-        RegistrierenBefehl request,
+    public async Task<RegistrationResult> Handle(
+        RegisterCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         try
         {
-            PasswordPolicy.Validate(request.Passwort);
+            PasswordPolicy.Validate(request.Password);
         }
-        catch (WeakPasswordException schwach)
+        catch (WeakPasswordException weak)
         {
-            return new Registrierergebnis.WeakPassword(schwach.Reason);
+            return new RegistrationResult.WeakPassword(weak.Reason);
         }
 
         // Freemail BEFORE the existence check, and that is not a matter of
@@ -94,13 +94,13 @@ public sealed class RegistrierenHandler(
         // would be an enumeration channel over companies, answerable by anyone
         // who guesses a domain. That waits for the confirmation, when the
         // address is proven.
-        if (request.Firmenname is not null)
+        if (request.CompanyName is not null)
         {
             var domain = EmailDomain.FromEmail(request.Email);
 
             if (domain.IsPublic)
             {
-                return new Registrierergebnis.OeffentlicheDomain(domain.Value);
+                return new RegistrationResult.PublicDomain(domain.Value);
             }
         }
 
@@ -109,51 +109,51 @@ public sealed class RegistrierenHandler(
         // be back in ten and would give away over the clock what the identical
         // status code is hiding. Otherwise the enumeration channel just moves
         // into the wristwatch.
-        var entry = passwoerter.Hash(request.Passwort);
+        var entry = passwords.Hash(request.Password);
 
-        var vorhanden = await benutzer.FindByEmailAsync(request.Email, cancellationToken);
+        var existing = await users.FindByEmailAsync(request.Email, cancellationToken);
 
-        if (vorhanden is not null)
+        if (existing is not null)
         {
-            // Die Kontosprache des BESTEHENDEN Kontos, nicht die der ResumeRequest: diese
-            // Mail geht an den rechtmäßigen Inhaber, und der hat gewählt. Die
-            // ResumeRequest kommt womöglich von jemand anderem.
-            postkorb.Doppelanmeldung(
-                vorhanden.Email, vorhanden.Id, vorhanden.Kontosprache);
-            return new Registrierergebnis.Angenommen();
+            // The language of the EXISTING account, not that of the request:
+            // this mail goes to the rightful owner, and they chose. The request
+            // may well come from somebody else.
+            mailTray.DuplicateRegistration(
+                existing.Email, existing.Id, existing.AccountLanguage);
+            return new RegistrationResult.Accepted();
         }
 
-        var konto = User.Register(
-            request.Email, entry, request.Anzeigename, request.Firmenname,
-            request.Kontosprache, request.Vorname, request.Nachname,
+        var account = User.Register(
+            request.Email, entry, request.DisplayName, request.CompanyName,
+            request.AccountLanguage, request.GivenName, request.FamilyName,
             request.OccupationalField);
 
-        await benutzer.AddAsync(konto, cancellationToken);
+        await users.AddAsync(account, cancellationToken);
 
-        await protokoll.AppendAsync(
+        await auditTrail.AppendAsync(
             new AuditEvent(
                 AuditAction.Register,
-                uhr.GetUtcNow(),
+                clock.GetUtcNow(),
                 // Registering is an act of a person, not of a company (ADR-0017).
-                actor: konto.Id,
-                correlationId: korrelation.Aktuell),
+                actor: account.Id,
+                correlationId: correlation.Current),
             cancellationToken);
 
-        var (klartext, hash) = einmaltoken.Erzeuge();
+        var (plainText, hash) = oneTimeToken.Create();
 
         await tokens.AddAsync(
             new VerificationToken(
                 Guid.CreateVersion7(),
-                konto.Id,
+                account.Id,
                 hash,
                 TokenPurpose.EmailVerify,
-                uhr.GetUtcNow() + Gueltigkeit,
+                clock.GetUtcNow() + Validity,
                 ConsumedAt: null),
             cancellationToken);
 
-        postkorb.Bestaetigungslink(
-            konto.Email, konto.Id, klartext, konto.Kontosprache);
+        mailTray.ConfirmationLink(
+            account.Email, account.Id, plainText, account.AccountLanguage);
 
-        return new Registrierergebnis.Angenommen();
+        return new RegistrationResult.Accepted();
     }
 }

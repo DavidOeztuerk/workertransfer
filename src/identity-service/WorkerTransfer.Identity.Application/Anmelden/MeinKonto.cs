@@ -8,34 +8,34 @@ namespace WorkerTransfer.Identity.Application.Anmelden;
 /// <summary>Who am I?</summary>
 /// <remarks>
 /// A protected resource, so an anonymous caller gets 401 — the opposite of
-/// <see cref="SitzungsstandAbfrage"/>, which asks a public question.
+/// <see cref="SessionStateQuery"/>, which asks a public question.
 /// </remarks>
-public sealed record MyAccountQuery : IAbfrage<Kontoansicht?>;
+public sealed record MyAccountQuery : IQuery<AccountView?>;
 
 /// <summary>Answers with the caller's own account.</summary>
-public sealed class MyAccountHandler(ICurrentPrincipal akteur, IUserRepository benutzer)
-    : IRequestHandler<MyAccountQuery, Kontoansicht?>
+public sealed class MyAccountHandler(ICurrentPrincipal principal, IUserRepository users)
+    : IRequestHandler<MyAccountQuery, AccountView?>
 {
     /// <inheritdoc />
-    public async Task<Kontoansicht?> Handle(
+    public async Task<AccountView?> Handle(
         MyAccountQuery request,
         CancellationToken cancellationToken)
     {
-        if (akteur.Current is not { } handelnder)
+        if (principal.Current is not { } actor)
         {
             return null;
         }
 
-        var konto = await benutzer.FindByIdAsync(handelnder.Subject, cancellationToken);
+        var account = await users.FindByIdAsync(actor.Subject, cancellationToken);
 
-        return new Kontoansicht(
-            handelnder.Subject,
-            konto?.Email,
-            handelnder.Acting is Capacity.ForCompany company ? company.Tenant : null,
-            konto?.Kontosprache ?? Sprachwahl.Vorgabe,
-            konto?.DisplayName ?? string.Empty,
-            konto?.GivenName,
-            konto?.FamilyName,
-            konto?.OccupationalField);
+        return new AccountView(
+            actor.Subject,
+            account?.Email,
+            actor.Acting is Capacity.ForCompany company ? company.Tenant : null,
+            account?.AccountLanguage ?? LanguageChoice.Default,
+            account?.DisplayName ?? string.Empty,
+            account?.GivenName,
+            account?.FamilyName,
+            account?.OccupationalField);
     }
 }

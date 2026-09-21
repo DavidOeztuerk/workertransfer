@@ -12,49 +12,50 @@ namespace WorkerTransfer.Identity.Infrastructure.Security;
 /// <c>iss</c>, <c>aud</c>, <c>session_id</c> and — while acting for a company —
 /// <c>tenant</c>.
 /// <para>
-/// Dazu <b>einen</b> weiteren, unaufgefordert:
+/// And <b>one</b> more, unasked:
 /// <c>http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier</c>
-/// — dieselbe Kennung wie <c>sub</c>, noch einmal. Er bleibt, und das ist
-/// gemessen: Noelia prüft Token mit <c>MapInboundClaims = false</c>, leitet ihn
-/// also nicht aus <c>sub</c> ab, und siebzehn Leser in Noelia lösen den
-/// Aufrufer darüber auf — zwei davon in Anbieterpaketen. Rund siebzig Bytes
-/// gespart, siebzehn stille Nulls gewonnen.
+/// — the same id as <c>sub</c>, once again. It stays, and that is measured:
+/// Noelia verifies tokens with <c>MapInboundClaims = false</c>, so it does not
+/// derive it from <c>sub</c>, and seventeen readers in Noelia resolve the
+/// caller through it — two of them in provider packages. Some seventy bytes
+/// saved, seventeen silent nulls gained.
 /// </para>
 /// <para>
-/// <b>Bis Girder 4.1.0 waren es drei.</b> <c>email_verified</c> und
-/// <c>account_status</c> standen in jedem Token und trugen <b>immer</b>
-/// dieselben Werte, <c>false</c> und <c>"Active"</c>, weil <c>UserClaims</c>
-/// sie so vorbelegte und niemand sie hier setzt. Ein Konto, dessen Adresse
-/// gerade bestätigt wurde, trug <c>email_verified: false</c>; ein gesperrtes
-/// trug <c>account_status: "Active"</c>. Noelias eigene Richtlinien
-/// <c>EmailVerifiedHandler</c> und <c>ActiveAccountHandler</c> lesen genau
-/// diese Ansprüche — die eine sperrte damit jeden aus, die andere ließ jeden
-/// durch. Seit 4.1.0 sind beide Felder <c>bool?</c> und <c>string?</c> ohne
-/// Vorgabe: ungesagt heißt nicht geschrieben, und beide Prüfer lehnen mangels
-/// Anspruch ab.
+/// <b>Until Girder 4.1.0 there were three.</b> <c>email_verified</c> and
+/// <c>account_status</c> stood in every token and <b>always</b> carried the
+/// same values, <c>false</c> and <c>"Active"</c>, because <c>UserClaims</c>
+/// pre-set them that way and nobody sets them here. An account whose address
+/// had just been confirmed carried <c>email_verified: false</c>; a suspended
+/// one carried <c>account_status: "Active"</c>. Noelia's own policies
+/// <c>EmailVerifiedHandler</c> and <c>ActiveAccountHandler</c> read exactly
+/// these claims — so the one locked everybody out, the other let everybody
+/// through. Since 4.1.0 both fields are <c>bool?</c> and <c>string?</c> with no
+/// default: unsaid means not written, and both checkers refuse for want of a
+/// claim.
 /// </para>
 /// <para>
-/// Uns kostete es nichts, weil wir beide Richtlinien nicht benutzen und der
-/// Kontostand je ResumeRequest aus der Datenbank kommt. <b>Umgangen wurde es nie</b>
-/// — die Ansprüche hier wegzufiltern hiesse, an Noelias Ausgabe vorbeizubauen,
-/// und der Umweg wäre jetzt stehen geblieben.
-/// <see cref="WorkerTransfer.Identity.Tests"/> nagelt die geschlossene Menge
-/// fest, nicht mehr einzelne Namen: was hier steht, ist ab jetzt vollständig.
+/// It cost us nothing, because we use neither policy and the account status
+/// comes out of the database per request. <b>It was never worked around</b> —
+/// filtering the claims away here would mean building past Noelia's output, and
+/// the detour would now have stayed standing.
+/// <see cref="WorkerTransfer.Identity.Tests"/> pins the closed set, no longer
+/// single names: what stands here is complete from now on.
 /// </para>
 /// <para>
-/// Zur Uebergangszeit standen hier zwei weitere: <c>tenant_id</c> neben Noelias
-/// <c>tenant</c>, und <c>type: "access"</c>. Pythons <c>TokenPayload</c>
-/// verlangte beides. Sie sind weg — <c>tenant_id</c> neben <c>tenant</c> war
-/// genau die Doppelung, bei der eines Tages eines von beiden gepflegt wird und
-/// das andere nicht.
+/// During the migration two more stood here: <c>tenant_id</c> beside Noelia's
+/// <c>tenant</c>, and <c>type: "access"</c>. Python's <c>TokenPayload</c>
+/// demanded both. They are gone — <c>tenant_id</c> beside <c>tenant</c> was
+/// exactly the duplication where one day one of the two gets maintained and the
+/// other does not.
 /// </para>
 /// <para>
 /// Roles and permissions are not written. They are read from
 /// <c>user_tenant_memberships</c> per operation, never from a token — so the
-/// token was never authoritative about them. Seit Girder 4.1.0 <em>ließen</em>
-/// sie sich als Liste schreiben (<c>UserClaims.CustomClaimArrays</c>); dass wir
-/// es nicht tun, ist damit wieder eine Entscheidung statt einer Grenze der
-/// Bibliothek. Ein Recht im Token wirkte bei einer Entziehung erst beim Ablauf.
+/// token was never authoritative about them. Since Girder 4.1.0 they
+/// <em>could</em> be written as a list (<c>UserClaims.CustomClaimArrays</c>);
+/// that we do not do it is therefore a decision again rather than a limit of
+/// the library. A permission in the token would take effect on a withdrawal
+/// only at expiry.
 /// </para>
 /// </remarks>
 public sealed class NoeliaAccessTokenIssuer(IJwtService jwt) : IAccessTokenIssuer

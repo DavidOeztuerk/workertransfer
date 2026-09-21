@@ -6,40 +6,40 @@ using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Application.Benachrichtigung;
 
-/// <summary>„Sag dieser Person, dass es etwas Neues gibt."</summary>
+/// <summary>„Tell this person there is something new."</summary>
 /// <remarks>
-/// Kommt von notification-service, das entschieden hat, <em>ob</em> etwas
-/// hinausgeht. Der Befehl trägt <strong>nur eine Kennung</strong> — keine Art,
-/// keinen Text: die Adresse liegt hier, der Satz auch, und ein Aufrufer, der
-/// etwas beisteuern könnte, wäre der Anfang von „nur diese eine Zeile noch".
+/// Comes from notification-service, which decided <em>whether</em> anything
+/// goes out. The command carries <strong>nothing but an id</strong> — no kind,
+/// no text: the address lives here, the sentence too, and a caller that could
+/// contribute something would be the beginning of „just this one line more".
 /// </remarks>
-public sealed record NeuigkeitMeldenBefehl(SubjectId Wer) : IBefehl<bool>;
+public sealed record ReportNewsCommand(SubjectId Subject) : ICommand<bool>;
 
-/// <summary>Löst die Adresse auf und legt die eine Mail in den Postkorb.</summary>
+/// <summary>Resolves the address and puts the one mail into the tray.</summary>
 /// <remarks>
-/// Gibt zurück, ob etwas eingelegt wurde — für Tests und Protokoll. Der
-/// Endpunkt gibt diese Auskunft <strong>nicht</strong> weiter: sonst wäre er
-/// ein Orakel darüber, ob es diese Person gibt und ob ihr Konto bestätigt ist.
+/// Answers whether anything was put in — for tests and the log. The endpoint
+/// does <strong>not</strong> pass that on: otherwise it would be an oracle
+/// about whether this person exists and whether their account is confirmed.
 /// </remarks>
-public sealed class NeuigkeitMeldenHandler(IUserRepository benutzer, IPostkorb postkorb)
-    : IRequestHandler<NeuigkeitMeldenBefehl, bool>
+public sealed class ReportNewsHandler(IUserRepository users, IMailTray mailTray)
+    : IRequestHandler<ReportNewsCommand, bool>
 {
     /// <inheritdoc />
     public async Task<bool> Handle(
-        NeuigkeitMeldenBefehl request, CancellationToken cancellationToken)
+        ReportNewsCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var konto = await benutzer.FindByIdAsync(request.Wer, cancellationToken);
+        var account = await users.FindByIdAsync(request.Subject, cancellationToken);
 
-        // Ein unbestätigtes Konto bekommt keine Post über Vorgänge — die
-        // Adresse ist noch nicht als seine erwiesen.
-        if (konto is null || konto.Status is not AccountStatus.Active)
+        // An unconfirmed account gets no mail about cases — the address has
+        // not been proven to be theirs yet.
+        if (account is null || account.Status is not AccountStatus.Active)
         {
             return false;
         }
 
-        postkorb.Neuigkeit(konto.Email, konto.Id, konto.Kontosprache);
+        mailTray.News(account.Email, account.Id, account.AccountLanguage);
 
         return true;
     }

@@ -3,8 +3,8 @@ using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Tests;
 
-/// <summary>Eine Adresse, die nicht zustellbar ist, darf kein Konto anlegen.</summary>
-public class EmailadresseTests
+/// <summary>An address that is not deliverable must create no account.</summary>
+public class EmailAddressTests
 {
     [Theory]
     [InlineData("bus")]
@@ -13,12 +13,12 @@ public class EmailadresseTests
     [InlineData("@example.org")]
     [InlineData("anna@")]
     [InlineData("anna example.org")]
-    // Syntaktisch erlaubt, im offenen Netz nicht zustellbar.
+    // Syntactically permitted, not deliverable on the open network.
     [InlineData("anna@localhost")]
-    // Gültige Absenderzeile, aber kein Inbox.
+    // A valid sender line, but no mailbox.
     [InlineData("Anna <anna@example.org>")]
-    public void Was_nicht_zustellbar_ist_faellt_durch(string address) =>
-        Emailadresse.IstZustellbar(address).Should().BeFalse();
+    public void What_is_not_deliverable_falls_through(string address) =>
+        EmailAddress.IsDeliverable(address).Should().BeFalse();
 
     [Theory]
     [InlineData("anna@example.org")]
@@ -26,32 +26,32 @@ public class EmailadresseTests
     [InlineData("anna+bewerbung@example.org")]
     [InlineData("a@b.de")]
     [InlineData("jörg@example.org")]
-    public void Was_zustellbar_ist_kommt_durch(string address) =>
-        Emailadresse.IstZustellbar(address).Should().BeTrue();
+    public void What_is_deliverable_gets_through(string address) =>
+        EmailAddress.IsDeliverable(address).Should().BeTrue();
 
     [Fact]
-    public void Eine_masslos_lange_Adresse_faellt_durch()
+    public void An_immoderately_long_address_falls_through()
     {
-        var zulang = new string('a', Emailadresse.Hoechstlaenge) + "@example.org";
+        var tooLong = new string('a', EmailAddress.MaxLength) + "@example.org";
 
-        Emailadresse.IstZustellbar(zulang).Should().BeFalse();
+        EmailAddress.IsDeliverable(tooLong).Should().BeFalse();
     }
 
-    /// <summary>Prüfung und Versand sprechen dieselbe Grammatik.</summary>
+    /// <summary>The check and the sending speak the same grammar.</summary>
     /// <remarks>
-    /// Was hier durchkommt, muss sich als <c>MailMessage</c> bauen lassen —
-    /// sonst steht die Zeile in der Datenbank und die Mail geht nie hinaus.
+    /// What gets through here has to be buildable as a <c>MailMessage</c> —
+    /// otherwise the row stands in the database and the mail never goes out.
     /// </remarks>
     [Theory]
     [InlineData("anna@example.org")]
     [InlineData("anna.beispiel@firma.co.uk")]
     [InlineData("a@b.de")]
-    public void Was_durchkommt_laesst_sich_auch_versenden(string address)
+    public void What_gets_through_can_also_be_sent(string address)
     {
-        Emailadresse.IstZustellbar(address).Should().BeTrue();
+        EmailAddress.IsDeliverable(address).Should().BeTrue();
 
-        var bauen = () => new System.Net.Mail.MailMessage("absender@example.org", address);
+        var build = () => new System.Net.Mail.MailMessage("absender@example.org", address);
 
-        bauen.Should().NotThrow();
+        build.Should().NotThrow();
     }
 }

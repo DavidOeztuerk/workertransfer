@@ -6,12 +6,12 @@ using WorkerTransfer.Identity.Domain.Users;
 namespace WorkerTransfer.Identity.Application.Anmelden;
 
 /// <summary>A person picks the language they are written to in.</summary>
-/// <param name="Wer">Whose account. Always the caller's own.</param>
-/// <param name="Sprache">What they picked.</param>
-public sealed record SpracheWaehlenBefehl(SubjectId Wer, Kontosprache Sprache)
-    : IBefehl<bool>;
+/// <param name="Subject">Whose account. Always the caller's own.</param>
+/// <param name="Language">What they picked.</param>
+public sealed record ChooseLanguageCommand(SubjectId Subject, AccountLanguage Language)
+    : ICommand<bool>;
 
-/// <inheritdoc cref="SpracheWaehlenBefehl" />
+/// <inheritdoc cref="ChooseLanguageCommand" />
 /// <remarks>
 /// <strong>Self only, and there is no id in the request.</strong> Writing to
 /// somebody else's account is not a feature this needs, and an id would be the
@@ -23,29 +23,29 @@ public sealed record SpracheWaehlenBefehl(SubjectId Wer, Kontosprache Sprache)
 /// afterwards.
 /// </para>
 /// </remarks>
-public sealed class SpracheWaehlenHandler(IUserRepository benutzer)
-    : IRequestHandler<SpracheWaehlenBefehl, bool>
+public sealed class ChooseLanguageHandler(IUserRepository users)
+    : IRequestHandler<ChooseLanguageCommand, bool>
 {
     /// <inheritdoc />
     public async Task<bool> Handle(
-        SpracheWaehlenBefehl request,
+        ChooseLanguageCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var konto = await benutzer.FindByIdAsync(request.Wer, cancellationToken);
+        var account = await users.FindByIdAsync(request.Subject, cancellationToken);
 
-        if (konto is null)
+        if (account is null)
         {
             return false;
         }
 
-        konto.SpracheWaehlen(request.Sprache);
+        account.ChooseLanguage(request.Language);
 
         // Aggregates come back detached from the repository, so the write
         // reaches the database only through this call. Forgetting it costs
         // nothing at test time and silently loses the choice in production.
-        await benutzer.SaveAsync(konto, cancellationToken);
+        await users.SaveAsync(account, cancellationToken);
 
         return true;
     }

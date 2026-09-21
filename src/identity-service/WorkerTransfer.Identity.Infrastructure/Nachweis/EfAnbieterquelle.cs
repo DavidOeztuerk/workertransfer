@@ -5,33 +5,31 @@ using WorkerTransfer.ServiceDefaults.Checks;
 
 namespace WorkerTransfer.Identity.Infrastructure.Nachweis;
 
-/// <summary>Welche KI-Anbieter die Menschen dieser Instanz eingetragen haben.</summary>
+/// <summary>Which AI providers the people of this instance have entered.</summary>
 /// <remarks>
-/// <para><strong>Das ist die Zeile, die kein Test schreiben kann.</strong>
-/// <c>Adr0022Tests</c> und <c>EntwurfsgrenzeTests</c> prüfen den Baum; der
-/// KI-Zugang steht in <c>KiZugangV1</c> — Anbieter, Adresse, Modell und
-/// Schlüssel je Person, zur Laufzeit aus den AccountSettings. Wohin dieser
-/// Baum heute Abend spricht, steht in dieser Tabelle und sonst nirgends.</para>
+/// <para><strong>This is the line no test can write.</strong>
+/// <c>Adr0022Tests</c> and <c>EntwurfsgrenzeTests</c> check the tree; the AI
+/// access lives in <c>KiZugangV1</c> — provider, address, model and key per
+/// person, at run time out of the account settings. Where this tree speaks
+/// tonight stands in this table and nowhere else.</para>
 ///
-/// <para><strong>Gezählt, nie genannt.</strong> Die Abfrage gruppiert nach
-/// Anbieter und Adresse und gibt eine Anzahl zurück; <c>subject_id</c> verlässt
-/// sie nicht, und die Adresse verliert alles bis auf den Host. Wer welchen
-/// Anbieter benutzt, ist eine Aussage über einen Menschen und gehört nicht in
-/// ein Dokument, das jemand herumreicht — ADR-0026 sagt dasselbe für
-/// Ereignisse.</para>
+/// <para><strong>Counted, never named.</strong> The query groups by provider
+/// and address and answers with a number; <c>subject_id</c> does not leave it,
+/// and the address loses everything but the host. Who uses which provider is a
+/// statement about a human being and does not belong in a document somebody
+/// passes around — ADR-0026 says the same for events.</para>
 ///
-/// <para><strong>Und der Schlüssel wird nicht einmal gelesen.</strong> Die
-/// Abfrage wählt drei Spalten aus; <c>ai_key_encrypted</c> ist keine davon. Was
-/// nicht geholt wird, kann auch nicht versehentlich in einen Befund geraten.</para>
+/// <para><strong>And the key is not even read.</strong> The query selects three
+/// columns; <c>ai_key_encrypted</c> is not one of them. What is not fetched
+/// cannot end up in a finding by accident either.</para>
 ///
-/// <para><c>none</c> fällt heraus: „kein Anbieter" ist kein Empfänger, und eine
-/// Zeile darüber wäre ein Eintrag über einen Empfänger, den es nicht gibt.</para>
+/// <para><c>none</c> drops out: „no provider" is no recipient, and a row about
+/// it would be an entry about a recipient that does not exist.</para>
 /// </remarks>
-/// <param name="anbieter">
-/// Der Container. Der Kontext wird in einem eigenen Bereich aufgelöst: Noelias
-/// Prüfungen sind Singletons, der <c>DbContext</c> ist bereichsgebunden — ihn
-/// direkt zu nehmen wäre eine gefangene Abhängigkeit, und der Container bricht
-/// dann beim Start ab.
+/// <param name="provider">
+/// The container. The context is resolved in a scope of its own: Noelia's
+/// checks are singletons, the <c>DbContext</c> is scoped — taking it directly
+/// would be a captive dependency, and the container then aborts at startup.
 /// </param>
 public sealed class EfProviderSource(IServiceProvider provider) : IProviderSource
 {
@@ -48,7 +46,7 @@ public sealed class EfProviderSource(IServiceProvider provider) : IProviderSourc
             {
                 group.Key.AiProvider,
                 group.Key.AiBaseUrl,
-                Menschen = group.Count()
+                People = group.Count()
             })
             .ToListAsync(ct);
 
@@ -58,14 +56,14 @@ public sealed class EfProviderSource(IServiceProvider provider) : IProviderSourc
                 .Select(group => new
                 {
                     group.AiProvider,
-                    group.Menschen,
+                    group.People,
                     Host = Uri.TryCreate(group.AiBaseUrl, UriKind.Absolute, out var target)
                         ? target.Host
                         : string.Empty
                 })
                 .Where(group => group.Host.Length > 0)
                 .Select(group => new ProviderRow(
-                    group.AiProvider, group.Host, ProviderOrigin.Person, group.Menschen))
+                    group.AiProvider, group.Host, ProviderOrigin.Person, group.People))
         ];
     }
 }

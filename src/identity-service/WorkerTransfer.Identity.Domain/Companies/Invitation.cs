@@ -106,7 +106,7 @@ public sealed class Invitation
     /// Seven days. Short enough that a forgotten invitation does not still open
     /// access to applicant data a year later; long enough for a holiday.
     /// </summary>
-    public static readonly TimeSpan Lebensdauer = TimeSpan.FromDays(7);
+    public static readonly TimeSpan Lifetime = TimeSpan.FromDays(7);
 
     private Invitation(
         Guid id,
@@ -180,7 +180,7 @@ public sealed class Invitation
 
         return new Invitation(
             Guid.CreateVersion7(), tenant, email, role, invitedBy,
-            InvitationStatus.Pending, now, now + Lebensdauer, acceptedAt: null);
+            InvitationStatus.Pending, now, now + Lifetime, acceptedAt: null);
     }
 
     /// <summary>The invitation as a row holds it.</summary>

@@ -7,36 +7,36 @@ using WorkerTransfer.Identity.Domain.Sessions;
 namespace WorkerTransfer.Identity.Application.Anmelden;
 
 /// <summary>End the sign-in the presented refresh token belongs to.</summary>
-/// <param name="Erneuerungstoken">
+/// <param name="RefreshToken">
 /// What the caller presented, if anything. Nothing is a supported input:
 /// someone asking to be signed out is entitled to be signed out, and telling
 /// them their token was already dead helps nobody and says something.
 /// </param>
-public sealed record AbmeldenBefehl(string? Erneuerungstoken) : IBefehl<Unit>;
+public sealed record SignOutCommand(string? RefreshToken) : ICommand<Unit>;
 
 /// <summary>Ends a sign-in.</summary>
-public sealed class AbmeldenHandler(
+public sealed class SignOutHandler(
     ISessionService sessions,
-    ISessionCapacity handlungsform,
-    IAuditTrail protokoll,
-    IKorrelation korrelation,
-    TimeProvider uhr)
-    : IRequestHandler<AbmeldenBefehl, Unit>
+    ISessionCapacity sessionCapacity,
+    IAuditTrail auditTrail,
+    ICorrelation correlation,
+    TimeProvider clock)
+    : IRequestHandler<SignOutCommand, Unit>
 {
     /// <inheritdoc />
-    public async Task<Unit> Handle(AbmeldenBefehl request, CancellationToken cancellationToken)
+    public async Task<Unit> Handle(SignOutCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (string.IsNullOrEmpty(request.Erneuerungstoken))
+        if (string.IsNullOrEmpty(request.RefreshToken))
         {
             return Unit.Value;
         }
 
-        var beendet = await sessions.EndByRefreshTokenAsync(
-            request.Erneuerungstoken, cancellationToken);
+        var ended = await sessions.EndByRefreshTokenAsync(
+            request.RefreshToken, cancellationToken);
 
-        if (beendet is null)
+        if (ended is null)
         {
             return Unit.Value;
         }
@@ -44,14 +44,14 @@ public sealed class AbmeldenHandler(
         // The sign-in is over, so what it was acting as is no longer an answer
         // to anything. Leaving the row would keep a company on a session that
         // no longer exists.
-        await handlungsform.ForgetAsync(beendet.Session, cancellationToken);
+        await sessionCapacity.ForgetAsync(ended.Session, cancellationToken);
 
-        await protokoll.AppendAsync(
+        await auditTrail.AppendAsync(
             new AuditEvent(
                 AuditAction.TokenRevoke,
-                uhr.GetUtcNow(),
-                actor: beendet.Subject,
-                correlationId: korrelation.Aktuell),
+                clock.GetUtcNow(),
+                actor: ended.Subject,
+                correlationId: correlation.Current),
             cancellationToken);
 
         return Unit.Value;

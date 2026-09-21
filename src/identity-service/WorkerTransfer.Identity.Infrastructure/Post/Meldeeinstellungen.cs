@@ -1,16 +1,16 @@
 namespace WorkerTransfer.Identity.Infrastructure.Post;
 
-/// <summary>Das Geheimnis, mit dem notification-service sich ausweist.</summary>
+/// <summary>The secret notification-service identifies itself with.</summary>
 /// <remarks>
-/// Ausdrücklich ein <em>anderes</em> als das der Löschung: „darf eine Mail
-/// anstoßen" und „darf alles über einen Menschen löschen" dürfen nicht dasselbe
-/// Papier sein (ADR-0027 §4.4). Leer heißt zu.
+/// Expressly a <em>different</em> one from the erasure's: „may trigger a mail"
+/// and „may delete everything about a human being" must not be the same piece
+/// of paper (ADR-0027 §4.4). Empty means shut.
 /// </remarks>
 public sealed class NotifySettings
 {
-    /// <summary>Der Section, an den das gebunden wird.</summary>
+    /// <summary>The configuration section this binds to.</summary>
     public const string Section = "Notify";
 
-    /// <summary>Das gemeinsame Geheimnis.</summary>
+    /// <summary>The shared secret.</summary>
     public string Geheimnis { get; set; } = string.Empty;
 }

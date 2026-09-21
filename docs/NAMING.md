@@ -109,10 +109,11 @@ Ein_leeres_Loeschgeheimnis_schliesst_den_Endpunkt
   → An_empty_erasure_secret_closes_the_endpoint
 ```
 
-## Five places where an identifier is also a contract
+## Six places where an identifier is also a contract
 
-A green build proves nothing about these. All five were measured on 21.09.2026,
-and each one surfaced only at runtime — or, in the last case, as a schema change.
+A green build proves nothing about these. Five were measured on 21.09.2026 and
+the sixth on 22.09.2026; each one surfaced only at runtime — or, in the last two
+cases, as a schema change and as a 500.
 
 - **Anonymous objects.** `new { dienst = …, pfad = … }` becomes JSON, and its
   keys carry no quotes, so masking string literals does not protect them. The
@@ -132,6 +133,16 @@ and each one surfaced only at runtime — or, in the last case, as a schema chan
   answer is not a hand-written `ALTER TYPE`: delete the migrations and let
   `dotnet ef migrations add` generate them, so a fresh schema creates the right
   label from the start.
+- **A settings property name IS the environment key.** `ConsentSettings.Adresse`
+  binds `Consent__Adresse`, and that key stands in `docker-compose.yml`, in the
+  chart and in `.env.example`. Renaming the property alone leaves the value
+  unbound at its default — measured: `Storage__Wurzel` → `Root` made
+  `POST /portfolios/me/attachments` answer **500**, and five of twenty portfolio
+  journeys fell. Some of those keys sit in the shared compose anchor
+  (`Erasure__Geheimnis`), so **one service cannot move alone**. They are
+  therefore renamed in a single pass over the whole tree — code, compose, chart,
+  `.env.example`, scripts — or not at all. Until then the property keeps the
+  key's spelling and says so at the line.
 
 ## How a rename is verified
 
@@ -139,6 +150,11 @@ and each one surfaced only at runtime — or, in the last case, as a schema chan
 its own invocation — never chained, or the Testcontainers suites die and look
 like real failures. For `web/`, `pnpm check`, then `pnpm test`, then `pnpm build`.
 
-**The build is not the check.** It misses every one of the five places above, and
-it missed all of them on 21.09.2026: the suite found them, at runtime, after a
-green build. A rename is finished when the suite is green, not when it compiles.
+**The build is not the check.** It misses every one of the places above, and it
+missed all of them on 21.09.2026: the suite found them, at runtime, after a green
+build. A rename is finished when the suite is green, not when it compiles.
+
+**And build the SOLUTION, not the project.** A per-project build is green while
+another suite still names the old type — measured 22.09.2026: renaming
+`Wortschatz.Kanonisch` and `Portfolio.Domain.Ablage` left six errors in three
+foreign test projects that `dotnet build <that>.csproj` could not see.

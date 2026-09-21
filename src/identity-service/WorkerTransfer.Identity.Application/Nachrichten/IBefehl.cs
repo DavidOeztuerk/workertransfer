@@ -16,15 +16,15 @@ namespace WorkerTransfer.Identity.Application.Nachrichten;
 /// and two error models means every endpoint translates between them.
 /// </para>
 /// </remarks>
-public interface IBefehl;
+public interface ICommand;
 
-/// <summary>A message that changes something and answers with <typeparamref name="TAntwort"/>.</summary>
-/// <typeparam name="TAntwort">What the handler answers.</typeparam>
-public interface IBefehl<out TAntwort> : IRequest<TAntwort>, IBefehl;
+/// <summary>A message that changes something and answers with <typeparamref name="TResponse"/>.</summary>
+/// <typeparam name="TResponse">What the handler answers.</typeparam>
+public interface ICommand<out TResponse> : IRequest<TResponse>, ICommand;
 
 /// <summary>A message that only reads.</summary>
 /// <remarks>
 /// No transaction is opened for these. A read that needs one is not a read.
 /// </remarks>
-/// <typeparam name="TAntwort">What the handler answers.</typeparam>
-public interface IAbfrage<out TAntwort> : IRequest<TAntwort>;
+/// <typeparam name="TResponse">What the handler answers.</typeparam>
+public interface IQuery<out TResponse> : IRequest<TResponse>;

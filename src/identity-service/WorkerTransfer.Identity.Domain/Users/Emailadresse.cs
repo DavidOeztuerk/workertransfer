@@ -2,50 +2,50 @@ using System.Net.Mail;
 
 namespace WorkerTransfer.Identity.Domain.Users;
 
-/// <summary>Ob eine Adresse zustellbar ist.</summary>
+/// <summary>Whether an address is deliverable.</summary>
 /// <remarks>
-/// Geprüft wird mit demselben Parser, der später versendet. Ein eigener
-/// regulärer Ausdruck wäre eine zweite Grammatik neben der von
-/// <see cref="MailAddress"/>, und was hier durchginge, könnte dort scheitern —
-/// dann steht die Zeile in der Datenbank und die Mail geht nie hinaus.
+/// Checked with the same parser that sends later. A regular expression of our
+/// own would be a second grammar beside <see cref="MailAddress"/>'s, and what
+/// passed here could fail there — and then the row stands in the database while
+/// the mail never goes out.
 /// <para>
-/// Geprüft wird die FORM, nie die Existenz: ob hinter der Adresse ein Inbox
-/// steht, darf dieser Dienst nicht verraten (<c>/auth/register</c> antwortet für
-/// bekannte und unbekannte Adressen gleich).
+/// What is checked is the FORM, never the existence: whether there is a mailbox
+/// behind the address is something this service must not give away
+/// (<c>/auth/register</c> answers identically for known and unknown addresses).
 /// </para>
 /// </remarks>
-public static class Emailadresse
+public static class EmailAddress
 {
-    /// <summary>Die Obergrenze aus RFC 5321: 254 Zeichen.</summary>
-    public const int Hoechstlaenge = 254;
+    /// <summary>The ceiling from RFC 5321: 254 characters.</summary>
+    public const int MaxLength = 254;
 
-    /// <summary>Lässt sich daraus eine Mail bauen?</summary>
-    /// <param name="adresse">Was jemand getippt hat.</param>
-    /// <returns><c>true</c>, wenn der Versand daran nicht scheitern wird.</returns>
-    public static bool IstZustellbar(string? address)
+    /// <summary>Can a mail be built from it?</summary>
+    /// <param name="address">What somebody typed.</param>
+    /// <returns><c>true</c> when sending will not fail over it.</returns>
+    public static bool IsDeliverable(string? address)
     {
-        if (string.IsNullOrWhiteSpace(address) || address.Length > Hoechstlaenge)
+        if (string.IsNullOrWhiteSpace(address) || address.Length > MaxLength)
         {
             return false;
         }
 
-        if (!MailAddress.TryCreate(address.Trim(), out var gebaut))
+        if (!MailAddress.TryCreate(address.Trim(), out var built))
         {
             return false;
         }
 
-        // Eine blosse Adresse, kein „Anna <a@b.de>": das stünde sonst so in der
-        // Spalte, die den Menschen identifiziert.
-        if (!string.Equals(gebaut.Address, address.Trim(), StringComparison.Ordinal)
-            || gebaut.DisplayName.Length > 0)
+        // A bare address, not „Anna <a@b.de>": otherwise that is what would
+        // stand in the column that identifies the human being.
+        if (!string.Equals(built.Address, address.Trim(), StringComparison.Ordinal)
+            || built.DisplayName.Length > 0)
         {
             return false;
         }
 
-        // `a@localhost` ist syntaktisch erlaubt und im offenen Netz nicht
-        // zustellbar.
-        var punkt = gebaut.Host.LastIndexOf('.');
+        // `a@localhost` is syntactically permitted and not deliverable on the
+        // open network.
+        var dot = built.Host.LastIndexOf('.');
 
-        return punkt > 0 && punkt < gebaut.Host.Length - 1;
+        return dot > 0 && dot < built.Host.Length - 1;
     }
 }

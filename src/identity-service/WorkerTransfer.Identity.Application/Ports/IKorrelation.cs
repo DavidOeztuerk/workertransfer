@@ -6,8 +6,8 @@ namespace WorkerTransfer.Identity.Application.Ports;
 /// the application layer must not have to know that a request is HTTP to be
 /// able to write down which one it was.
 /// </remarks>
-public interface IKorrelation
+public interface ICorrelation
 {
     /// <summary><c>null</c> outside a request — a background dispatcher has none.</summary>
-    string? Aktuell { get; }
+    string? Current { get; }
 }

@@ -17,9 +17,9 @@ namespace WorkerTransfer.Identity.Application.Erasure;
 /// on the request because there is no request — this runs from the dispatcher,
 /// possibly days after somebody asked to be deleted.
 /// </remarks>
-/// <param name="Adresse">The address the notice goes to.</param>
-/// <param name="Sprache">What to write it in.</param>
-public sealed record ClosingAddress(string Adresse, Kontosprache Sprache);
+/// <param name="Address">The address the notice goes to.</param>
+/// <param name="Language">What to write it in.</param>
+public sealed record ClosingAddress(string Address, AccountLanguage Language);
 
 public interface IErasureLedger
 {

@@ -17,7 +17,7 @@ public sealed class IdentityDesignTimeFactory : IDesignTimeDbContextFactory<Iden
     /// <inheritdoc />
     public IdentityDbContext CreateDbContext(string[] args) =>
         new((DbContextOptions<IdentityDbContext>)IdentityDbContextFactory
-            .ZurEntwurfszeit(
+            .AtDesignTime(
                 new DbContextOptionsBuilder<IdentityDbContext>(),
                 "Host=entwurfszeit;Database=identity")
             .Options);

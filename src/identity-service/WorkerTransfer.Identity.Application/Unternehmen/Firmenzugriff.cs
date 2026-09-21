@@ -15,7 +15,7 @@ namespace WorkerTransfer.Identity.Application.Unternehmen;
 /// nowhere, and the interface merely hides entries. That is not rebuilt.
 /// </para>
 /// </remarks>
-public sealed class CompanyAccess(IMembershipRepository mitgliedschaften)
+public sealed class CompanyAccess(IMembershipRepository memberships)
 {
     /// <summary>The caller's role, or a refusal that reveals nothing.</summary>
     /// <exception cref="NotAMemberException">
@@ -26,36 +26,35 @@ public sealed class CompanyAccess(IMembershipRepository mitgliedschaften)
         SubjectId subject,
         TenantId company,
         CancellationToken cancellationToken = default) =>
-        await mitgliedschaften.RoleOfAsync(subject, company, cancellationToken)
+        await memberships.RoleOfAsync(subject, company, cancellationToken)
         ?? throw new NotAMemberException();
 
     /// <summary>
-    /// Die Rolle, oder <c>null</c> — ohne zu werfen.
+    /// The role, or <c>null</c> — without throwing.
     /// </summary>
     /// <remarks>
-    /// Für den Berechtigungshandler: eine Autorisierungsprüfung entscheidet
-    /// „ja oder nein" und darf dafür keine Ausnahme brauchen. Wer eine
-    /// Begründung will (einladen? entfernen?), nimmt weiterhin
-    /// <see cref="AlsAdminAsync"/>.
+    /// For the permission handler: an authorisation check decides „yes or no"
+    /// and must not need an exception for that. Whoever wants a reason (invite?
+    /// remove?) keeps using <see cref="AsAdminAsync"/>.
     /// </remarks>
-    /// <param name="wer">Wer fragt.</param>
-    /// <param name="firma">Welche Firma.</param>
-    /// <param name="cancellationToken">Bricht die Abfrage ab.</param>
+    /// <param name="subject">Who is asking.</param>
+    /// <param name="company">Which company.</param>
+    /// <param name="cancellationToken">Cancels the lookup.</param>
     public Task<MembershipRole?> RoleOrNoneAsync(
         SubjectId subject,
         TenantId company,
         CancellationToken cancellationToken = default) =>
-        mitgliedschaften.RoleOfAsync(subject, company, cancellationToken);
+        memberships.RoleOfAsync(subject, company, cancellationToken);
 
     /// <summary>The caller's role, refusing anybody who is not an administrator.</summary>
-    /// <param name="wer">Who is asking.</param>
-    /// <param name="firma">Which company.</param>
-    /// <param name="fuers">What they are trying to do — decides which refusal.</param>
+    /// <param name="subject">Who is asking.</param>
+    /// <param name="company">Which company.</param>
+    /// <param name="act">What they are trying to do — decides which refusal.</param>
     /// <param name="cancellationToken">Cancels the lookup.</param>
     public async Task<MembershipRole> AsAdminAsync(
         SubjectId subject,
         TenantId company,
-        Verwaltungsakt fuers,
+        AdministrativeAct act,
         CancellationToken cancellationToken = default)
     {
         var role = await RoleAsync(subject, company, cancellationToken);
@@ -65,7 +64,7 @@ public sealed class CompanyAccess(IMembershipRepository mitgliedschaften)
             // 403 rather than 404: this is a statement about the caller, and
             // they already know they are a member. Hiding it would tell them
             // less than they can see.
-            throw fuers == Verwaltungsakt.Einladen
+            throw act == AdministrativeAct.Invite
                 ? new OnlyAdminsMayInviteException()
                 : new OnlyAdminsMayRemoveException();
         }
@@ -75,11 +74,11 @@ public sealed class CompanyAccess(IMembershipRepository mitgliedschaften)
 }
 
 /// <summary>Which administrative act is being attempted.</summary>
-public enum Verwaltungsakt
+public enum AdministrativeAct
 {
     /// <summary>Inviting somebody, or taking an invitation back.</summary>
-    Einladen,
+    Invite,
 
     /// <summary>Removing a member.</summary>
-    Entfernen
+    Remove
 }

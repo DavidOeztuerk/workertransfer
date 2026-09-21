@@ -56,15 +56,14 @@ public static class IdentityInfrastructure
 
         services.Configure<NotifySettings>(
             configuration.GetSection(NotifySettings.Section));
-        services.Configure<Postsettings>(configuration.GetSection(Postsettings.Section));
+        services.Configure<MailSettings>(configuration.GetSection(MailSettings.Section));
 
-        // bcrypt liest UND schreibt. Zur Uebergangszeit musste es das, damit
-        // der Python-Dienst dieselben Eintraege noch lesen konnte; jetzt ist es
-        // eine freie Entscheidung. Argon2id waere OWASPs erste Wahl und holte
-        // jede Person bei ihrer naechsten Anmeldung herueber
-        // (`AddArgon2Passwords()` plus `AddBCryptPasswordReader()`) — das ist
-        // eine eigene Entscheidung mit eigenem Commit, kein Nebenprodukt des
-        // Aufraeumens.
+        // bcrypt reads AND writes. During the migration it had to, so the
+        // Python service could still read the same entries; now it is a free
+        // decision. Argon2id would be OWASP's first choice and would carry every
+        // person over at their next sign-in (`AddArgon2Passwords()` plus
+        // `AddBCryptPasswordReader()`) — that is a decision of its own with a
+        // commit of its own, not a by-product of tidying up.
         services.AddBCryptPasswords();
 
 
@@ -80,14 +79,14 @@ public static class IdentityInfrastructure
         services.AddScoped<IMembershipRepository, EfMembershipRepository>();
         services.AddScoped<ICompanyRepository, EfCompanyRepository>();
         services.AddScoped<IVerificationTokenRepository, EfVerificationTokenRepository>();
-        services.AddScoped<UnternehmenAnlegen>();
+        services.AddScoped<CreateCompany>();
         services.AddScoped<IInvitationRepository, EfInvitationRepository>();
         services.AddScoped<IAccountSettingsStore, EfAccountSettingsStore>();
         services.AddScoped<IPostalAddresses, EfPostalAddresses>();
 
-        // Der Hauptschlüssel wird EINMAL beim Start gelesen, nicht je ResumeRequest:
-        // fehlt er, soll der Dienst beim Hochfahren sterben und nicht beim
-        // ersten Menschen, der etwas hinterlegen will.
+        // The master key is read ONCE at startup, not per request: if it is
+        // missing the service should die while coming up and not at the first
+        // human being who wants to store something.
         services.AddSingleton<SecretStore>();
         services.AddScoped<ISecrets, Secrets>();
         services.AddScoped<CompanyAccess>();
@@ -102,49 +101,49 @@ public static class IdentityInfrastructure
         // for an erasure it is exactly the silent failure ADR-0027 exists
         // against — a promise nobody redeems, and nobody sees it.
         services.AddOutbox<IdentityDbContext>(
-            configuration, einstellungen => einstellungen.HoechsteVersuche = null);
-        services.AddSingleton<IEinmaltoken, Sha256Einmaltoken>();
-        services.AddSingleton<IVersender, SmtpVersender>();
+            configuration, settings => settings.HoechsteVersuche = null);
+        services.AddSingleton<IOneTimeToken, Sha256OneTimeToken>();
+        services.AddSingleton<IMailSender, SmtpMailSender>();
 
         // One tray per request, and both ports on it. Queueing and sending are
         // two interfaces so a handler can only ever put something in.
-        services.AddScoped<Postkorb>();
-        services.AddScoped<IPostkorb>(provider => provider.GetRequiredService<Postkorb>());
-        services.AddScoped<IPostkorbVersand>(
-            provider => provider.GetRequiredService<Postkorb>());
+        services.AddScoped<MailTray>();
+        services.AddScoped<IMailTray>(provider => provider.GetRequiredService<MailTray>());
+        services.AddScoped<IMailTrayDispatch>(
+            provider => provider.GetRequiredService<MailTray>());
         services.AddScoped<IAuditTrail, EfAuditTrail>();
         services.AddScoped<ISessionCapacity, EfSessionCapacity>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IAccessTokenIssuer, NoeliaAccessTokenIssuer>();
         services.AddScoped<ISessionService, NoeliaSessionService>();
-        services.AddSingleton<IKorrelation, HttpKorrelation>();
+        services.AddSingleton<ICorrelation, HttpCorrelation>();
 
         // The mediator, and the one behaviour Noelia does not bring. Registered
         // last so the transaction is the innermost wrapper around a handler:
         // Noelia's logging and validation run before anything is written, which
         // is where a rejected command costs nothing.
-        services.AddCQRS(typeof(AnmeldenBefehl).Assembly);
+        services.AddCQRS(typeof(SignInCommand).Assembly);
 
         // Order is the point. Sending wraps the transaction, so a confirmation
         // link never reaches an inbox before the row it points at exists.
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(VersandBehavior<,>));
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(DispatchBehavior<,>));
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
         Nachweis(services, configuration);
 
         return services;
     }
 
-    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <summary>What this service can answer about itself (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
-    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
-    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    /// <para>They stand here and not in the ServiceFoundation, for the same
+    /// reason the ledger, the audit trail and the store stand here: they are
+    /// decisions of <em>this</em> service.</para>
     ///
-    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
-    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
-    /// vergessen kann.</para>
+    /// <para><c>wt.grenze.ziele</c> is deliberately missing here — it reads
+    /// nothing but the configuration, is therefore the same for every service,
+    /// and stands in <c>AddEvidence</c>. It is the one a new service cannot
+    /// forget.</para>
     /// </remarks>
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
@@ -152,32 +151,31 @@ public static class IdentityInfrastructure
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(AuditAction).Assembly, typeof(KiZugangV1).Assembly]));
 
-        // DIE EINE ZEILE, DIE KEIN TEST SCHREIBEN KANN.
+        // THE ONE LINE NO TEST CAN WRITE.
         //
-        // Hier steht die Tabelle, in der jede Person ihren eigenen Anbieter
-        // eintraegt — Etikett, Adresse, Modell. `Adr0022Tests` prueft den BAUM;
-        // wohin dieser Baum heute Abend spricht, steht allein hier. Gezaehlt
-        // wird, genannt wird niemand (ADR-0026), und der verschluesselte
-        // Schluessel wird nicht einmal aus der Datenbank geholt.
+        // Here stands the table in which every person enters their own provider
+        // — label, address, model. `Adr0022Tests` checks the TREE; where this
+        // tree speaks tonight stands here and nowhere else. What happens is
+        // counting, and nobody is named (ADR-0026), and the encrypted key is not
+        // even fetched from the database.
         services.AddSingleton<IProviderSource, EfProviderSource>();
 
         services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
             provider.GetServices<IProviderSource>()));
 
-        // Dieser Dienst fragt selbst kein Modell — aber er haelt den Schalter
-        // „Anfragen protokollieren", und den liest in diesem Baum niemand. Das
-        // ist genau der Befund, den ein Bildschirmfoto der Kontoseite
-        // andersherum erzaehlt, und deshalb steht `gegenstandVorhanden` hier
-        // auf wahr.
+        // This service asks no model itself — but it holds the switch „log
+        // requests", and nobody in this tree reads it. That is exactly the
+        // finding a screenshot of the account page tells the other way round,
+        // and that is why `gegenstandVorhanden` stands at true here.
 
         var erasure = new ErasureSettings();
         configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        // URSPRUNG und nicht Empfaenger: identity steht nicht in
-        // `ErasureRecipient.Fremde`, es IST die Kaskade. Die Frage ist deshalb
-        // eine andere — kennt es fuer jeden Empfaenger eine Adresse? Ohne
-        // Adresse bekommt der Empfaenger keinen Auftrag, und die Kaskade wartet
-        // auf eine Quittung, die niemand angefordert hat.
+        // ORIGIN and not recipient: identity does not stand in
+        // `ErasureRecipient.Fremde`, it IS the cascade. So the question is a
+        // different one — does it know an address for every recipient? Without
+        // an address the recipient gets no order, and the cascade waits for a
+        // receipt nobody asked for.
         services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsOrigin(
             "identity",
             ErasureRecipient.Fremde,
