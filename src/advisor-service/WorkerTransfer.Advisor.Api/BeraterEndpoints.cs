@@ -1,16 +1,16 @@
 using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Advisor.Application.Gespraeche;
-using WorkerTransfer.Advisor.Application.Mandate;
+using WorkerTransfer.Advisor.Application.Mandates;
 using WorkerTransfer.Advisor.Application.Ports;
 using WorkerTransfer.Advisor.Contracts;
 using WorkerTransfer.Advisor.Domain.Gespraeche;
-using WorkerTransfer.Advisor.Domain.Mandate;
+using WorkerTransfer.Advisor.Domain.Mandates;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Advisor.Api;
 
-/// <summary><c>/advisor</c> — das Mandat, die Gespräche und ihre Stufen.</summary>
+/// <summary><c>/advisor</c> — das Mandate, die Gespräche und ihre Stufen.</summary>
 /// <remarks>
 /// <para><strong>Zwei Seiten, getrennt in der Adresse.</strong> Unter
 /// <c>/advisor/me/…</c> handelt ein Mensch für sich selbst; unter
@@ -49,7 +49,7 @@ public static class BeraterEndpoints
     }
 
     // -----------------------------------------------------------------------
-    // Das Mandat — die vier eigenen Werte
+    // Das Mandate — die vier eigenen Werte
     // -----------------------------------------------------------------------
 
     private static void MapMandat(IEndpointRouteBuilder berater)
@@ -69,14 +69,14 @@ public static class BeraterEndpoints
                 return;
             }
 
-            var mandat = await mediator.Send(
-                new MeinMandatAbfrage(handelnder.Subject), cancellationToken);
+            var mandate = await mediator.Send(
+                new MyMandateQuery(handelnder.Subject), cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(Antwort(mandat), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Antwort(mandate), cancellationToken);
         });
 
         berater.MapPut("/me/mandate", async (
-            MandatSchreibenV1? koerper,
+            WriteMandateV1? koerper,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -90,11 +90,11 @@ public static class BeraterEndpoints
 
             try
             {
-                // Wessen Mandat es ist, kommt aus dem geprueften Token und nie
+                // Wessen Mandate es ist, kommt aus dem geprueften Token und nie
                 // aus dem Rumpf: eine Subjekt-Kennung auf der Leitung waere ein
-                // Weg, das Mandat eines anderen zu schreiben.
-                var mandat = await mediator.Send(
-                    new MandatSchreibenBefehl(
+                // Weg, das Mandate eines anderen zu schreiben.
+                var mandate = await mediator.Send(
+                    new WriteMandateCommand(
                         handelnder.Subject,
                         koerper?.EntryMonth,
                         koerper?.SalaryMin,
@@ -103,11 +103,11 @@ public static class BeraterEndpoints
                         koerper?.ExcludedDomains),
                     cancellationToken);
 
-                await context.Response.WriteAsJsonAsync(Antwort(mandat), cancellationToken);
+                await context.Response.WriteAsJsonAsync(Antwort(mandate), cancellationToken);
             }
-            catch (Eingabefehler fehler)
+            catch (Eingabefehler error)
             {
-                await Unbrauchbar(context, fehler.Message);
+                await Unbrauchbar(context, error.Message);
             }
         });
     }
@@ -131,10 +131,10 @@ public static class BeraterEndpoints
             }
 
             var meine = await mediator.Send(
-                new MeineGespraecheAbfrage(handelnder.Subject), cancellationToken);
+                new MyConversationsQuery(handelnder.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                new MeineGespraechslisteV1([.. meine.Select(Meines)]), cancellationToken);
+                new MyConversationListV1([.. meine.Select(Meines)]), cancellationToken);
         });
 
         // Eine Stufe freigeben. Der Ledger bekommt die Ereignisse; hier wird
@@ -148,10 +148,10 @@ public static class BeraterEndpoints
                 CancellationToken cancellationToken) =>
             Stufenzug(
                 id, koerper, mediator, akteur, context, cancellationToken,
-                (gespraech, wer, stufe) => new StufeFreigebenBefehl(gespraech, wer, stufe),
-                // Ohne Angabe die kleinste: eine Freigabe soll nicht
+                (conversation, subject, stage) => new StufeFreigebenBefehl(conversation, subject, stage),
+                // Ohne Angabe die kleinste: eine Release soll nicht
                 // versehentlich die weiteste sein.
-                Stufe.Profil));
+                Stufe.Profile));
 
         // Und sie zurueckzunehmen. Ohne Angabe ALLES — wer widerruft, meint im
         // Zweifel das Ganze, und eine Vorgabe, die nur die oberste Stufe naehme,
@@ -165,8 +165,8 @@ public static class BeraterEndpoints
                 CancellationToken cancellationToken) =>
             Stufenzug(
                 id, koerper, mediator, akteur, context, cancellationToken,
-                (gespraech, wer, stufe) => new StufeWiderrufenBefehl(gespraech, wer, stufe),
-                Stufe.Profil));
+                (conversation, subject, stage) => new RevokeStageCommand(conversation, subject, stage),
+                Stufe.Profile));
 
         berater.MapPost("/me/conversations/{id:guid}/agree", async (
             Guid id,
@@ -188,9 +188,9 @@ public static class BeraterEndpoints
 
                 await context.Response.WriteAsJsonAsync(Meines(ansicht), cancellationToken);
             }
-            catch (UebergangNichtErlaubt fehler)
+            catch (UebergangNichtErlaubt error)
             {
-                await Konflikt(context, fehler.Message);
+                await Konflikt(context, error.Message);
             }
         });
 
@@ -214,9 +214,9 @@ public static class BeraterEndpoints
 
                 await context.Response.WriteAsJsonAsync(Meines(ansicht), cancellationToken);
             }
-            catch (UebergangNichtErlaubt fehler)
+            catch (UebergangNichtErlaubt error)
             {
-                await Konflikt(context, fehler.Message);
+                await Konflikt(context, error.Message);
             }
         });
     }
@@ -228,13 +228,13 @@ public static class BeraterEndpoints
     private static void MapFirmengespraeche(IEndpointRouteBuilder berater)
     {
         berater.MapPost("/conversations", async (
-            GespraechEroeffnenV1? koerper,
+            OpenConversationV1? koerper,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (Firma(akteur) is not { } firma)
+            if (Firma(akteur) is not { } company)
             {
                 await OhneFirma(akteur, context);
                 return;
@@ -249,8 +249,8 @@ public static class BeraterEndpoints
             try
             {
                 var (ansicht, neu) = await mediator.Send(
-                    new GespraechEroeffnenBefehl(
-                        new SubjectId(koerper.SubjectId), firma, koerper.Note),
+                    new OpenConversationCommand(
+                        new SubjectId(koerper.SubjectId), company, koerper.Note),
                     cancellationToken);
 
                 context.Response.StatusCode =
@@ -258,9 +258,9 @@ public static class BeraterEndpoints
 
                 await context.Response.WriteAsJsonAsync(Ihres(ansicht), cancellationToken);
             }
-            catch (Eingabefehler fehler)
+            catch (Eingabefehler error)
             {
-                await Unbrauchbar(context, fehler.Message);
+                await Unbrauchbar(context, error.Message);
             }
         });
 
@@ -270,19 +270,19 @@ public static class BeraterEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (Firma(akteur) is not { } firma)
+            if (Firma(akteur) is not { } company)
             {
                 await OhneFirma(akteur, context);
                 return;
             }
 
             var ihre = await mediator.Send(
-                new FirmengespraecheAbfrage(firma), cancellationToken);
+                new CompanyConversationsQuery(company), cancellationToken);
 
-            // Keine Gesamtzahl (ADR-0026): sie verriete ueber die Differenz zur
+            // None Gesamtzahl (ADR-0026): sie verriete ueber die Differenz zur
             // Laenge, wie viele Gespraeche gerade NICHT auf Stufe 1 stehen.
             await context.Response.WriteAsJsonAsync(
-                new GespraechslisteV1([.. ihre.Select(Ihres)]), cancellationToken);
+                new ConversationListV1([.. ihre.Select(Ihres)]), cancellationToken);
         });
 
         berater.MapGet("/conversations/{id:guid}", async (
@@ -292,19 +292,19 @@ public static class BeraterEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (Firma(akteur) is not { } firma)
+            if (Firma(akteur) is not { } company)
             {
                 await OhneFirma(akteur, context);
                 return;
             }
 
             var ansicht = await mediator.Send(
-                new FirmengespraechAbfrage(id, firma), cancellationToken);
+                new CompanyConversationQuery(id, company), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(Ihres(ansicht), cancellationToken);
         });
 
-        // Die Einigung wird ein Vorgang. Der Dreieckskonsens steht in
+        // Die Einigung wird ein Case. Der Dreieckskonsens steht in
         // transfer-service und wird hier nicht nachgebaut — diese Route ruft
         // seine Tuer und reicht die Antwort ehrlich weiter.
         berater.MapPost("/conversations/{id:guid}/hand-over", async (
@@ -314,7 +314,7 @@ public static class BeraterEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (Firma(akteur) is not { } firma)
+            if (Firma(akteur) is not { } company)
             {
                 await OhneFirma(akteur, context);
                 return;
@@ -322,22 +322,22 @@ public static class BeraterEndpoints
 
             try
             {
-                var vorgang = await mediator.Send(
-                    new UebergebenBefehl(id, firma), cancellationToken);
+                var caseItem = await mediator.Send(
+                    new UebergebenBefehl(id, company), cancellationToken);
 
                 await context.Response.WriteAsJsonAsync(
-                    new Dictionary<string, object?> { ["transfer_id"] = vorgang },
+                    new Dictionary<string, object?> { ["transfer_id"] = caseItem },
                     cancellationToken);
             }
-            catch (UebergangNichtErlaubt fehler)
+            catch (UebergangNichtErlaubt error)
             {
-                await Konflikt(context, fehler.Message);
+                await Konflikt(context, error.Message);
             }
-            catch (UebergabeAbgelehnt fehler)
+            catch (HandoverRefused error)
             {
                 // Eine Ablehnung von dort ist eine Aussage ueber die Bedingungen
                 // dieses Vorgangs — nicht ueber diesen Dienst, und keine 500.
-                await Konflikt(context, fehler.Message);
+                await Konflikt(context, error.Message);
             }
         });
 
@@ -348,7 +348,7 @@ public static class BeraterEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (Firma(akteur) is not { } firma)
+            if (Firma(akteur) is not { } company)
             {
                 await OhneFirma(akteur, context);
                 return;
@@ -357,15 +357,15 @@ public static class BeraterEndpoints
             try
             {
                 var ansicht = await mediator.Send(
-                    new BeendenBefehl(id, null, firma), cancellationToken);
+                    new BeendenBefehl(id, null, company), cancellationToken);
 
-                // Ohne Mandat und ohne Klarnamen: ein beendetes Gespraech ist
+                // Ohne Mandate und ohne Klarnamen: ein beendetes Conversation ist
                 // kein Anlass, noch einmal etwas ueber einen Menschen zu holen.
                 await context.Response.WriteAsJsonAsync(Ihres(ansicht), cancellationToken);
             }
-            catch (UebergangNichtErlaubt fehler)
+            catch (UebergangNichtErlaubt error)
             {
-                await Konflikt(context, fehler.Message);
+                await Konflikt(context, error.Message);
             }
         });
     }
@@ -380,7 +380,7 @@ public static class BeraterEndpoints
         HttpContext context,
         CancellationToken cancellationToken,
         Func<Guid, SubjectId, Stufe, IRequest<Stufe>> baue,
-        Stufe vorgabe)
+        Stufe defaultStage)
     {
         if (akteur.Current is not { } handelnder)
         {
@@ -388,48 +388,48 @@ public static class BeraterEndpoints
             return;
         }
 
-        if (koerper?.Stage is { } genannt && Stufenfaehigkeiten.Lies(genannt) is null)
+        if (koerper?.Stage is { } genannt && StageCapabilities.Lies(genannt) is null)
         {
             await Unbrauchbar(context, "a stage is 1, 2 or 3");
             return;
         }
 
-        var stufe = Stufenfaehigkeiten.Lies(koerper?.Stage) ?? vorgabe;
+        var stage = StageCapabilities.Lies(koerper?.Stage) ?? default;
 
-        var steht = await mediator.Send(baue(id, handelnder.Subject, stufe), cancellationToken);
+        var steht = await mediator.Send(baue(id, handelnder.Subject, stage), cancellationToken);
 
         await context.Response.WriteAsJsonAsync(
-            new StufeV1(Stufenfaehigkeiten.Zahl(steht)), cancellationToken);
+            new StufeV1(StageCapabilities.Zahl(steht)), cancellationToken);
     }
 
-    /// <summary>Das Unternehmen aus dem Token — nie aus der Anfrage.</summary>
+    /// <summary>Das Unternehmen aus dem Token — nie aus der ResumeRequest.</summary>
     /// <remarks>
     /// Der Mandant kommt aus dem geprüften Token (ADR-0017/0018). Ihn aus einem
-    /// Kopf oder einem Feld zu nehmen hiesse, den Aufrufer entscheiden zu
+    /// Header oder einem Feld zu nehmen hiesse, den Aufrufer entscheiden zu
     /// lassen, in wessen Namen er spricht.
     /// </remarks>
     private static TenantId? Firma(ICurrentPrincipal akteur) =>
-        akteur.Current?.Acting is Capacity.ForCompany firma ? firma.Tenant : null;
+        akteur.Current?.Acting is Capacity.ForCompany company ? company.Tenant : null;
 
     private static Task OhneFirma(ICurrentPrincipal akteur, HttpContext context) =>
         akteur.Current is null
             ? NichtAngemeldet(context)
             // 403 ist eine Aussage ueber den Aufrufer und verraet nichts ueber
             // den Menschen, nach dem er fragt.
-            : ProblemDetailsMiddleware.Schreibe(
+            : ProblemDetailsMiddleware.Write(
                 context, StatusCodes.Status403Forbidden,
                 "Request failed", "no active company");
 
     private static Task NichtAngemeldet(HttpContext context) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
 
     private static Task Unbrauchbar(HttpContext context, string detail) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status422UnprocessableEntity, "Request failed", detail);
 
     private static Task Konflikt(HttpContext context, string detail) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status409Conflict, "Request failed", detail);
 
     /// <summary>
@@ -439,105 +439,105 @@ public static class BeraterEndpoints
     /// <strong>Nicht <c>null</c>.</strong> Ein Filter, der <c>null</c>
     /// zurückgibt, lässt das Rahmenwerk noch einmal schreiben — JSON-<c>null</c>
     /// samt Kopfzeilen, und die stehen zu diesem Zeitpunkt schon. Bei einer
-    /// Anfrage mit Rumpf reisst dann die Verbindung.
+    /// ResumeRequest mit Rumpf reisst dann die Connection.
     /// </remarks>
     private static readonly IResult Geschrieben = Results.Empty;
 
     private static async ValueTask<object?> Abfangen(
-        EndpointFilterInvocationContext aufruf, EndpointFilterDelegate weiter)
+        EndpointFilterInvocationContext call, EndpointFilterDelegate weiter)
     {
         try
         {
-            return await weiter(aufruf);
+            return await weiter(call);
         }
-        catch (KeinGespraech fehler)
+        catch (NoConversation error)
         {
             // DREI Lagen, EINE Antwort: gibt es nicht, steht auf keiner Stufe
             // mehr, oder das Unternehmen ist ausgeschlossen. Ein eigener Code
             // fuer die zweite oder dritte waere der „gesperrt"-Hinweis, der
             // verraet, dass es etwas gibt.
-            await ProblemDetailsMiddleware.Schreibe(
-                aufruf.HttpContext, StatusCodes.Status404NotFound,
-                "Request failed", fehler.Message);
+            await ProblemDetailsMiddleware.Write(
+                call.HttpContext, StatusCodes.Status404NotFound,
+                "Request failed", error.Message);
 
             return Geschrieben;
         }
-        catch (NichtDeins fehler)
+        catch (NichtDeins error)
         {
-            await ProblemDetailsMiddleware.Schreibe(
-                aufruf.HttpContext, StatusCodes.Status404NotFound,
-                "Request failed", fehler.Message);
+            await ProblemDetailsMiddleware.Write(
+                call.HttpContext, StatusCodes.Status404NotFound,
+                "Request failed", error.Message);
 
             return Geschrieben;
         }
-        catch (EinwilligungAbgelehnt fehler)
+        catch (ConsentRefused error)
         {
             // Der Ledger hat geantwortet, und zwar mit Nein. Das ist eine
             // Aussage ueber den AUFRUFER — er wollte fuer einen fremden
             // Menschen freigeben — und verraet ueber diesen nichts.
-            await ProblemDetailsMiddleware.Schreibe(
-                aufruf.HttpContext, StatusCodes.Status403Forbidden,
-                "Request failed", fehler.Message);
+            await ProblemDetailsMiddleware.Write(
+                call.HttpContext, StatusCodes.Status403Forbidden,
+                "Request failed", error.Message);
 
             return Geschrieben;
         }
-        catch (EinwilligungSchweigt fehler)
+        catch (ConsentGateSilent error)
         {
-            await ProblemDetailsMiddleware.Schreibe(
-                aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
-                "Request failed", fehler.Message);
+            await ProblemDetailsMiddleware.Write(
+                call.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                "Request failed", error.Message);
 
             return Geschrieben;
         }
-        catch (AuskunftSchweigt fehler)
+        catch (LookupSilent error)
         {
             // Ausdruecklich kein leeres Ergebnis und kein 404: beides waere eine
             // Aussage ueber einen Menschen, die aus unserem Ausfall stammt.
-            await ProblemDetailsMiddleware.Schreibe(
-                aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
-                "Request failed", fehler.Message);
+            await ProblemDetailsMiddleware.Write(
+                call.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                "Request failed", error.Message);
 
             return Geschrieben;
         }
     }
 
-    private static MandatV1 Antwort(Mandat mandat) =>
+    private static MandateV1 Antwort(Mandate mandate) =>
         new(
-            mandat.Eintrittstermin,
-            mandat.GehaltMin,
-            mandat.GehaltMax,
-            mandat.PensumProzent,
-            mandat.AusgeschlosseneUnternehmen,
-            mandat.GeaendertAm);
+            mandate.Eintrittstermin,
+            mandate.GehaltMin,
+            mandate.GehaltMax,
+            mandate.PensumProzent,
+            mandate.AusgeschlosseneUnternehmen,
+            mandate.GeaendertAm);
 
-    private static MeinGespraechV1 Meines(Gespraechsansicht ansicht) =>
+    private static MyConversationV1 Meines(ConversationView ansicht) =>
         new(
-            ansicht.Gespraech.Id,
-            ansicht.Gespraech.Firma.Value,
-            Gespraechsstaende.Wort(ansicht.Gespraech.Stand),
-            Stufenfaehigkeiten.Zahl(ansicht.Stufe),
-            ansicht.Gespraech.Anlass,
-            ansicht.Gespraech.EroeffnetAm,
-            ansicht.Gespraech.GeaendertAm);
+            ansicht.Conversation.Id,
+            ansicht.Conversation.Firma.Value,
+            ConversationStates.Wort(ansicht.Conversation.State),
+            StageCapabilities.Zahl(ansicht.Stufe),
+            ansicht.Conversation.Anlass,
+            ansicht.Conversation.EroeffnetAm,
+            ansicht.Conversation.GeaendertAm);
 
     /// <summary>
     /// Was das Unternehmen sieht — und was nicht einmal als Feld erscheint.
     /// </summary>
     /// <remarks>
     /// Die Auswahl steht in <see cref="Gespraechsansicht.Baue"/> und nicht hier:
-    /// dieselbe Entscheidung an zwei Stellen wäre eine, die die zweite
+    /// dieselbe Entscheidung an zwei Jobs wäre eine, die die zweite
     /// irgendwann vergisst. Diese Methode schreibt nur ab — was <c>null</c> ist,
     /// fehlt auf dem Draht.
     /// </remarks>
-    private static GespraechV1 Ihres(Gespraechsansicht ansicht) =>
+    private static ConversationV1 Ihres(ConversationView ansicht) =>
         new(
-            ansicht.Gespraech.Id,
-            ansicht.Gespraech.Wer.Value,
-            Gespraechsstaende.Wort(ansicht.Gespraech.Stand),
-            Stufenfaehigkeiten.Zahl(ansicht.Stufe),
-            ansicht.Gespraech.Anlass,
-            ansicht.Gespraech.EroeffnetAm,
-            ansicht.Gespraech.GeaendertAm)
+            ansicht.Conversation.Id,
+            ansicht.Conversation.Wer.Value,
+            ConversationStates.Wort(ansicht.Conversation.State),
+            StageCapabilities.Zahl(ansicht.Stufe),
+            ansicht.Conversation.Anlass,
+            ansicht.Conversation.EroeffnetAm,
+            ansicht.Conversation.GeaendertAm)
         {
             EntryMonth = ansicht.Eintrittstermin,
             WorkloadPercent = ansicht.PensumProzent,

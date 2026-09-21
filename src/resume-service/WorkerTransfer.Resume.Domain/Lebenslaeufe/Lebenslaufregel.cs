@@ -11,7 +11,7 @@ namespace WorkerTransfer.Resume.Domain.Lebenslaeufe;
 /// test and a client may depend on, the sentence is for a person reading a log.
 /// </para>
 /// </remarks>
-public sealed class Lebenslaufregel(string code, string erklaerung) : Exception(erklaerung)
+public sealed class ResumeRule(string code, string erklaerung) : Exception(erklaerung)
 {
     /// <summary>The stable label of the broken rule.</summary>
     public string Code { get; } = code;

@@ -1,10 +1,10 @@
 namespace WorkerTransfer.Outbox;
 
 /// <summary>How the dispatcher paces itself.</summary>
-public sealed class OutboxEinstellungen
+public sealed class OutboxSettings
 {
     /// <summary>The configuration section this binds to.</summary>
-    public const string Abschnitt = "Outbox";
+    public const string Section = "Outbox";
 
     /// <summary>Which table. Only where a service's conventions differ.</summary>
     public string Tabelle { get; set; } = OutboxModelBuilderExtensions.Tabelle;
@@ -24,7 +24,7 @@ public sealed class OutboxEinstellungen
     /// recipient therefore <em>blocks</em> completion. That is the point, and no
     /// timeout may "finish" it.
     /// </remarks>
-    public int? HoechsteVersuche { get; set; } = Zustellgrenzen.Standard;
+    public int? HoechsteVersuche { get; set; } = DeliveryLimits.Standard;
 
     /// <summary>How long between passes while things are moving.</summary>
     public TimeSpan Takt { get; set; } = TimeSpan.FromSeconds(5);

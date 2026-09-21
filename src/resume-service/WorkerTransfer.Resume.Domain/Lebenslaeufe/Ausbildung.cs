@@ -23,13 +23,13 @@ public sealed record Ausbildung
         string abschluss,
         Monat beginn,
         Monat? ende,
-        Ausbildungsart art)
+        Ausbildungsart kind)
     {
         Einrichtung = einrichtung;
         Abschluss = abschluss;
         Beginn = beginn;
         Ende = ende;
-        Art = art;
+        Art = kind;
     }
 
     /// <summary>Where.</summary>
@@ -57,7 +57,7 @@ public sealed record Ausbildung
         string abschluss,
         Monat beginn,
         Monat? ende = null,
-        Ausbildungsart art = Ausbildungsart.Ausbildung)
+        Ausbildungsart kind = Ausbildungsart.Ausbildung)
     {
         ArgumentNullException.ThrowIfNull(beginn);
 
@@ -68,6 +68,6 @@ public sealed record Ausbildung
             Text.Gepruegt("Abschluss", abschluss, pflicht: false, Text.HoechsteNamenslaenge),
             beginn,
             ende,
-            art);
+            kind);
     }
 }

@@ -1,37 +1,37 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Applications.Application.Bewerbungen;
+using WorkerTransfer.Applications.Application.Applications;
 using WorkerTransfer.Applications.Application.Ports;
 using WorkerTransfer.Applications.Contracts;
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Applications.Api;
 
-/// <summary>Die sechs Routen der Bewerbung.</summary>
+/// <summary>Die sechs Routen der JobApplication.</summary>
 /// <remarks>
-/// Keine trägt einen Punktwert, einen Rang oder eine Sortierung nach Passung.
-/// Wie gut jemand zu einer Stelle passt, wird im Browser gerechnet, der
+/// None trägt einen Punktwert, einen Rang oder eine Sortierung nach Passung.
+/// Wie gut jemand zu einer Job passt, wird im Browser gerechnet, der
 /// <em>Person</em> gezeigt und nie dem Unternehmen (ADR-0022); eine
 /// Bewerberliste, die dieser Dienst reihte, wäre die Kandidatenbewertung durch
 /// die Hintertür.
 /// </remarks>
-public static class BewerbungsEndpoints
+public static class ApplicationEndpoints
 {
     /// <summary>Bildet alle Routen dieses Dienstes ab.</summary>
     public static IEndpointRouteBuilder MapBewerbungsEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        var bewerbungen = Abgesichert(app.MapGroup("/applications"));
-        var stellen = Abgesichert(app.MapGroup("/jobs"));
-        var firmen = Abgesichert(app.MapGroup("/companies"));
+        var applications = Abgesichert(app.MapGroup("/applications"));
+        var jobs = Abgesichert(app.MapGroup("/jobs"));
+        var companies = Abgesichert(app.MapGroup("/companies"));
 
         // Bewerben — und damit die Daten für dieses eine Unternehmen freigeben.
-        // Die Freigabe entsteht im Ledger, nicht in dieser Datenbank, und sie
+        // Die Release entsteht im Ledger, nicht in dieser Datenbank, und sie
         // nennt den Empfänger.
-        bewerbungen.MapPost("/", async (
-            BewerbungAbschickenV1 body,
+        applications.MapPost("/", async (
+            SubmitApplicationV1 body,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -46,16 +46,16 @@ public static class BewerbungsEndpoints
             ArgumentNullException.ThrowIfNull(body);
 
             // Wer sich bewirbt, steht im geprüften Token und nie im Rumpf.
-            var ergebnis = await mediator.Send(
-                new BewerbungAbschickenBefehl(
+            var result = await mediator.Send(
+                new SubmitApplicationCommand(
                     body.JobId, handelnder.Subject, body.Message,
                     body.SharesResume, body.SharesPortfolio),
                 cancellationToken);
 
-            await Beantworte(context, ergebnis, cancellationToken, StatusCodes.Status201Created);
+            await Beantworte(context, result, cancellationToken, StatusCodes.Status201Created);
         });
 
-        bewerbungen.MapGet("/me", async (
+        applications.MapGet("/me", async (
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -68,13 +68,13 @@ public static class BewerbungsEndpoints
             }
 
             var meine = await mediator.Send(
-                new MeineBewerbungenAbfrage(handelnder.Subject), cancellationToken);
+                new MyApplicationsQuery(handelnder.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
                 meine.Select(Antwort), cancellationToken);
         });
 
-        bewerbungen.MapGet("/{id:guid}", async (
+        applications.MapGet("/{id:guid}", async (
             Guid id,
             IMediator mediator,
             ICurrentPrincipal akteur,
@@ -87,30 +87,30 @@ public static class BewerbungsEndpoints
                 return;
             }
 
-            TenantId? firma = handelnder.Acting is Capacity.ForCompany fuer
+            TenantId? company = handelnder.Acting is Capacity.ForCompany fuer
                 ? fuer.Tenant
                 : null;
 
-            var bewerbung = await mediator.Send(
-                new BewerbungLesenAbfrage(id, firma, handelnder.Subject),
+            var application = await mediator.Send(
+                new ReadApplicationQuery(id, company, handelnder.Subject),
                 cancellationToken);
 
-            if (bewerbung is null)
+            if (application is null)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "No such application");
                 return;
             }
 
-            await context.Response.WriteAsJsonAsync(Antwort(bewerbung), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Antwort(application), cancellationToken);
         });
 
-        // Zurückziehen — der Vorgang bleibt, die Daten sind weg. Dass jemand
+        // Zurückziehen — der Case bleibt, die Daten sind weg. Dass jemand
         // sich beworben und zurückgezogen hat, gehört zur Geschichte des
         // Verfahrens im Unternehmen; die Person dahinter ist danach nicht mehr
         // einsehbar.
-        bewerbungen.MapPost("/{id:guid}/withdraw", async (
+        applications.MapPost("/{id:guid}/withdraw", async (
             Guid id,
             IMediator mediator,
             ICurrentPrincipal akteur,
@@ -123,75 +123,75 @@ public static class BewerbungsEndpoints
                 return;
             }
 
-            var ergebnis = await mediator.Send(
-                new BewerbungZurueckziehenBefehl(id, handelnder.Subject), cancellationToken);
+            var result = await mediator.Send(
+                new WithdrawApplicationCommand(id, handelnder.Subject), cancellationToken);
 
-            await Beantworte(context, ergebnis, cancellationToken);
+            await Beantworte(context, result, cancellationToken);
         });
 
-        bewerbungen.MapPost("/{id:guid}/status", async (
+        applications.MapPost("/{id:guid}/status", async (
             Guid id,
-            BewerbungBewegenV1 body,
+            MoveApplicationV1 body,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (await Firma(context, akteur) is not { } firma)
+            if (await Firma(context, akteur) is not { } company)
             {
                 return;
             }
 
             ArgumentNullException.ThrowIfNull(body);
 
-            var ergebnis = await mediator.Send(
-                new BewerbungBewegenBefehl(id, firma, body.Status), cancellationToken);
+            var result = await mediator.Send(
+                new MoveApplicationCommand(id, company, body.Status), cancellationToken);
 
-            await Beantworte(context, ergebnis, cancellationToken);
+            await Beantworte(context, result, cancellationToken);
         });
 
-        stellen.MapGet("/{stelle:guid}/applications", async (
-            Guid stelle,
+        jobs.MapGet("/{job:guid}/applications", async (
+            Guid job,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (await Firma(context, akteur) is not { } firma)
+            if (await Firma(context, akteur) is not { } company)
             {
                 return;
             }
 
-            var gefunden = await mediator.Send(
-                new BewerbungenZurStelleAbfrage(stelle, firma), cancellationToken);
+            var found = await mediator.Send(
+                new ApplicationsForJobQuery(job, company), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                gefunden.Select(Antwort), cancellationToken);
+                found.Select(Antwort), cancellationToken);
         });
 
         // Zahlen über die EIGENEN Vorgänge. Das Unternehmen sieht sie ohnehin
         // einzeln; die Summe darüber ist eine Bequemlichkeit, keine neue
         // Auskunft. Was es hier nicht gibt und nicht geben soll, ist die
-        // Zusammenführung mit Marktstatus, Lebenslauf oder Vorgängen bei
+        // Zusammenführung mit MarketStatus, CurriculumVitae oder Vorgängen bei
         // anderen Firmen (ADR-0022/0026).
-        firmen.MapGet("/me/application-stats", async (
+        companies.MapGet("/me/application-stats", async (
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (await Firma(context, akteur) is not { } firma)
+            if (await Firma(context, akteur) is not { } company)
             {
                 return;
             }
 
-            var zahlen = await mediator.Send(new FirmenzahlenAbfrage(firma), cancellationToken);
+            var zahlen = await mediator.Send(new CompanyCountsQuery(company), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                new BewerbungszahlenV1(
+                new ApplicationCountsV1(
                     zahlen.ToDictionary(
-                        eintrag => Bewerbungsstaende.Wort(eintrag.Key),
-                        eintrag => eintrag.Value),
+                        entry => ApplicationStates.Wort(entry.Key),
+                        entry => entry.Value),
                     zahlen.Values.Sum()),
                 cancellationToken);
         });
@@ -207,7 +207,7 @@ public static class BewerbungsEndpoints
     /// zurückgibt, lässt das Rahmenwerk die Antwort noch einmal schreiben — als
     /// JSON-<c>null</c>, mitsamt Kopfzeilen, und die stehen zu diesem Zeitpunkt
     /// schon. Was dabei herauskommt, ist keine 500, sondern eine abgerissene
-    /// Verbindung: der Aufrufer bekommt „Error while copying content to a
+    /// Connection: der Aufrufer bekommt „Error while copying content to a
     /// stream" und nie das 503, das ihm zusteht. Gemessen an genau dieser
     /// Route, die zwei Tage lang wie ein kaputter Rumpf aussah.
     /// </remarks>
@@ -217,7 +217,7 @@ public static class BewerbungsEndpoints
     /// <remarks>
     /// Ein schweigender Ledger — und ein schweigender Jobs-Dienst — sind weder
     /// ein Ja noch ein Nein. Mit 404 zu antworten hieße zu behaupten, es gäbe
-    /// die Stelle nicht; die Bewerbung trotzdem anzulegen hieße, eine Freigabe
+    /// die Job nicht; die JobApplication trotzdem anzulegen hieße, eine Release
     /// zu unterstellen, die niemand bestätigt hat. 503 sagt das eine Wahre:
     /// dieser Dienst kann gerade nicht antworten.
     /// <para>
@@ -227,41 +227,41 @@ public static class BewerbungsEndpoints
     /// bis eine Abhängigkeit ausfällt.
     /// </para>
     /// </remarks>
-    private static RouteGroupBuilder Abgesichert(RouteGroupBuilder gruppe)
+    private static RouteGroupBuilder Abgesichert(RouteGroupBuilder group)
     {
-        gruppe.AddEndpointFilter(async (aufruf, weiter) =>
+        group.AddEndpointFilter(async (call, weiter) =>
         {
             try
             {
-                return await weiter(aufruf);
+                return await weiter(call);
             }
-            catch (EinwilligungSchweigt)
+            catch (ConsentGateSilent)
             {
-                await ProblemDetailsMiddleware.Schreibe(
-                    aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                await ProblemDetailsMiddleware.Write(
+                    call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "the consent ledger did not answer");
 
                 return Geschrieben;
             }
-            catch (StelleSchweigt)
+            catch (JobLookupSilent)
             {
-                await ProblemDetailsMiddleware.Schreibe(
-                    aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                await ProblemDetailsMiddleware.Write(
+                    call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "a dependency is unavailable");
 
                 return Geschrieben;
             }
-            catch (FirmaSchweigt)
+            catch (CompanyLookupSilent)
             {
-                await ProblemDetailsMiddleware.Schreibe(
-                    aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                await ProblemDetailsMiddleware.Write(
+                    call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "identity-service did not answer");
 
                 return Geschrieben;
             }
         });
 
-        return gruppe;
+        return group;
     }
 
     /// <summary>Die Firma des Aufrufers, oder eine schon geschriebene Absage.</summary>
@@ -273,92 +273,92 @@ public static class BewerbungsEndpoints
             return null;
         }
 
-        if (handelnder.Acting is not Capacity.ForCompany firma)
+        if (handelnder.Acting is not Capacity.ForCompany company)
         {
-            // Eine Aussage über den Aufrufer, die nichts verrät: Bewerbungen
+            // Eine Aussage über den Aufrufer, die nichts verrät: Applications
             // liest, wer für ein Unternehmen handelt, und eine Privatperson
             // weiß, dass sie keines ist.
-            await ProblemDetailsMiddleware.Schreibe(
+            await ProblemDetailsMiddleware.Write(
                 context, StatusCodes.Status403Forbidden,
                 "Request failed", "reading applications requires an active company");
 
             return null;
         }
 
-        return firma.Tenant;
+        return company.Tenant;
     }
 
     /// <summary>
-    /// Übersetzt die Antworten der Domäne in Statuscodes — an einer Stelle,
+    /// Übersetzt die Responses der Domäne in Statuscodes — an einer Job,
     /// damit vier Routen nicht auseinanderdriften.
     /// </summary>
     private static async Task Beantworte(
         HttpContext context,
-        Bewerbungsergebnis ergebnis,
+        ApplicationResult result,
         CancellationToken cancellationToken,
         int erfolg = StatusCodes.Status200OK)
     {
-        switch (ergebnis)
+        switch (result)
         {
-            case Bewerbungsergebnis.Erledigt erledigt:
+            case ApplicationResult.Erledigt erledigt:
                 context.Response.StatusCode = erfolg;
                 await context.Response.WriteAsJsonAsync(
-                    Antwort(erledigt.Bewerbung), cancellationToken);
+                    Antwort(erledigt.JobApplication), cancellationToken);
                 return;
 
-            case Bewerbungsergebnis.KeineStelle:
+            case ApplicationResult.NoJob:
                 // Entwurf, geschlossen und nicht vorhanden bleiben
                 // ununterscheidbar — so hält es der Jobs-Dienst selbst.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "No such job");
                 return;
 
-            case Bewerbungsergebnis.Unbekannt:
-                await ProblemDetailsMiddleware.Schreibe(
+            case ApplicationResult.Unbekannt:
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "No such application");
                 return;
 
-            case Bewerbungsergebnis.Zustandskonflikt konflikt:
+            case ApplicationResult.StateConflict konflikt:
                 // Die Eingabe ist in Ordnung, der Zustand passt nicht.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status409Conflict, "Request failed", konflikt.Grund);
                 return;
 
-            case Bewerbungsergebnis.Eingabe eingabe:
-                await ProblemDetailsMiddleware.Schreibe(
+            case ApplicationResult.Eingabe eingabe:
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", eingabe.Grund);
                 return;
 
             default:
-                throw new InvalidOperationException($"Unbehandeltes Ergebnis: {ergebnis}");
+                throw new InvalidOperationException($"Unbehandeltes Ergebnis: {result}");
         }
     }
 
-    private static BewerbungV1 Antwort(Bewerbung bewerbung) =>
-        new(bewerbung.Id,
-            bewerbung.Stelle,
-            bewerbung.Firma.Value,
-            bewerbung.Wer.Value,
-            bewerbung.Nachricht,
-            bewerbung.Mitgeschickt.Lebenslauf,
-            bewerbung.Mitgeschickt.Portfolio,
-            bewerbung.Mitgeschickt.Unterlagen,
-            Bewerbungsstaende.Wort(bewerbung.Stand),
-            bewerbung.AngelegtAm,
-            bewerbung.GeaendertAm,
-            new BewerbungskontaktV1(
-                bewerbung.Kontakt.Klarname,
-                bewerbung.Kontakt.Zeile1,
-                bewerbung.Kontakt.Zeile2,
-                bewerbung.Kontakt.Postleitzahl,
-                bewerbung.Kontakt.Ort,
-                bewerbung.Kontakt.Land,
-                bewerbung.Kontakt.Telefon,
-                bewerbung.Kontakt.Email));
+    private static ApplicationV1 Antwort(JobApplication application) =>
+        new(application.Id,
+            application.Job,
+            application.Firma.Value,
+            application.Wer.Value,
+            application.Nachricht,
+            application.Mitgeschickt.CurriculumVitae,
+            application.Mitgeschickt.Portfolio,
+            application.Mitgeschickt.Unterlagen,
+            ApplicationStates.Wort(application.State),
+            application.AngelegtAm,
+            application.GeaendertAm,
+            new ApplicantContactV1(
+                application.Kontakt.Klarname,
+                application.Kontakt.Zeile1,
+                application.Kontakt.Zeile2,
+                application.Kontakt.Postleitzahl,
+                application.Kontakt.Ort,
+                application.Kontakt.Land,
+                application.Kontakt.Telefon,
+                application.Kontakt.Email));
 
     private static Task NichtAngemeldet(HttpContext context) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
 }

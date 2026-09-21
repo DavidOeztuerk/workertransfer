@@ -8,19 +8,19 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// <c>.env.example</c> ist vollständig — und trägt kein Geheimnis.
 /// </summary>
 /// <remarks>
-/// <para>Eine Vorlage, die einen Schlüssel nicht kennt, ist schlimmer als
+/// <para>Eine ResumeTemplate, die einen Schlüssel nicht kennt, ist schlimmer als
 /// keine: sie sieht vollständig aus. Wer sie kopiert, bekommt einen Stapel, der
 /// beim Start abbricht — und sucht den Fehler bei sich.</para>
 ///
 /// <para>Geprüft wird gegen <c>docker-compose.yml</c>, weil dort steht, was
 /// wirklich gebraucht wird. Beide Richtungen: kein <c>${…}</c> ohne Eintrag in
-/// der Vorlage, und kein Eintrag in der Vorlage, den niemand liest.</para>
+/// der ResumeTemplate, und kein Eintrag in der ResumeTemplate, den niemand liest.</para>
 /// </remarks>
 public sealed class UmgebungTests
 {
     private static string Wurzel() => Postgres_Ersatz2.Repowurzel();
 
-    /// <summary>Die Namen, die docker-compose.yml aus der Umgebung erwartet.</summary>
+    /// <summary>Die Namen, die docker-compose.yml aus der EnvironmentFile erwartet.</summary>
     private static IReadOnlyList<string> AusCompose()
     {
         var roh = File.ReadAllText(Path.Combine(Wurzel(), "docker-compose.yml"));
@@ -29,23 +29,23 @@ public sealed class UmgebungTests
         // Vorgabewert weg ist — samt seiner Schreibweise.
         var ohneKommentar = string.Join(
             "\n",
-            roh.Split('\n').Where(zeile => !zeile.TrimStart().StartsWith('#')));
+            roh.Split('\n').Where(row => !row.TrimStart().StartsWith('#')));
 
         return [.. Regex.Matches(
                 ohneKommentar,
                 @"\$\{(?<name>WORKERTRANSFER_[A-Z_]+|ANTHROPIC_API_KEY)[:}]",
                 RegexOptions.None,
                 TimeSpan.FromSeconds(5))
-            .Select(treffer => treffer.Groups["name"].Value)
+            .Select(hit => hit.Groups["name"].Value)
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)];
     }
 
-    /// <summary>Die Namen, die die Vorlage setzt.</summary>
+    /// <summary>Die Namen, die die ResumeTemplate setzt.</summary>
     private static IReadOnlyList<string> AusVorlage() =>
         [.. File.ReadAllLines(Path.Combine(Wurzel(), ".env.example"))
-            .Where(zeile => !zeile.TrimStart().StartsWith('#'))
-            .Select(zeile => zeile.Split('=', 2))
+            .Where(row => !row.TrimStart().StartsWith('#'))
+            .Select(row => row.Split('=', 2))
             .Where(teile => teile.Length == 2 && teile[0].Trim().Length > 0)
             .Select(teile => teile[0].Trim())
             .Distinct(StringComparer.Ordinal)
@@ -63,7 +63,7 @@ public sealed class UmgebungTests
     }
 
     /// <summary>
-    /// Die drei Geheimnisse stehen in der Vorlage <strong>leer</strong>.
+    /// Die drei Secrets stehen in der ResumeTemplate <strong>leer</strong>.
     /// </summary>
     /// <remarks>
     /// Der Kern von H2: ein eingebauter Vorgabewert <em>ist</em> das Geheimnis,
@@ -76,10 +76,10 @@ public sealed class UmgebungTests
     [InlineData("WORKERTRANSFER_ERASURE_SECRET")]
     public void Kein_Geheimnis_traegt_einen_Wert(string name)
     {
-        var zeile = File.ReadAllLines(Path.Combine(Wurzel(), ".env.example"))
+        var row = File.ReadAllLines(Path.Combine(Wurzel(), ".env.example"))
             .Single(z => z.StartsWith($"{name}=", StringComparison.Ordinal));
 
-        zeile.Should().Be(
+        row.Should().Be(
             $"{name}=",
             "ein Vorgabewert waere das Geheimnis selbst, und es laege in git");
     }
@@ -110,7 +110,7 @@ public sealed class UmgebungTests
             $"'{name}' muss den Start abbrechen und sich benennen, wenn es fehlt");
     }
 
-    /// <summary>Jeder Einstiegspunkt lädt die Umgebung, und zwar als Erstes.</summary>
+    /// <summary>Jeder Einstiegspunkt lädt die EnvironmentFile, und zwar als Erstes.</summary>
     /// <remarks>
     /// „Als Erstes" ist keine Kosmetik: der Konfigurationsaufbau liest die
     /// Umgebungsvariablen beim Bauen des <c>WebApplicationBuilder</c>. Wer
@@ -121,35 +121,35 @@ public sealed class UmgebungTests
     {
         var einstiege = Directory
             .EnumerateFiles(Path.Combine(Wurzel(), "src"), "Program.cs", SearchOption.AllDirectories)
-            .Where(pfad => !pfad.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                        && !pfad.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                        && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .ToList();
 
         einstiege.Should().HaveCount(15, "vierzehn Dienste und das Gateway");
 
-        foreach (var pfad in einstiege)
+        foreach (var path in einstiege)
         {
-            var text = File.ReadAllText(pfad);
-            var laden = text.IndexOf("Umgebung.Laden()", StringComparison.Ordinal);
+            var text = File.ReadAllText(path);
+            var laden = text.IndexOf("EnvironmentFile.Load()", StringComparison.Ordinal);
             var bauen = text.IndexOf("WebApplication.CreateBuilder", StringComparison.Ordinal);
 
             laden.Should().BeGreaterThan(
-                -1, $"'{Path.GetFileName(Path.GetDirectoryName(pfad))}' laedt die Umgebung nicht");
+                -1, $"'{Path.GetFileName(Path.GetDirectoryName(path))}' laedt die Umgebung nicht");
             laden.Should().BeLessThan(
                 bauen,
-                $"'{Path.GetFileName(Path.GetDirectoryName(pfad))}' laedt sie zu spaet — "
+                $"'{Path.GetFileName(Path.GetDirectoryName(path))}' laedt sie zu spaet — "
                 + "der Konfigurationsaufbau hat die Umgebung dann schon gelesen");
         }
     }
 
     /// <summary>
-    /// <c>Umgebung.Laden()</c> setzt, was fehlt — und überschreibt nicht, was da ist.
+    /// <c>EnvironmentFile.Load()</c> setzt, was fehlt — und überschreibt nicht, was da ist.
     /// </summary>
     /// <remarks>
     /// Die zweite Hälfte ist die wichtigere. In Compose und in Kubernetes kommt
-    /// die Umgebung von dort; eine Datei, die im Bild liegen bleibt, dürfte das
+    /// die EnvironmentFile von dort; eine Datei, die im Bild liegen bleibt, dürfte das
     /// nie übersteuern — sonst entschiede der Inhalt des Bildes über die
-    /// Geheimnisse der Installation.
+    /// Secrets der Installation.
     /// </remarks>
     [Fact]
     public void Laden_setzt_Fehlendes_und_laesst_Gesetztes_stehen()
@@ -157,9 +157,9 @@ public sealed class UmgebungTests
         var ordner = Directory.CreateTempSubdirectory("wt-env-");
 
         // Eindeutige Namen, damit parallele Reihen sich nicht ins Gehege kommen.
-        var kennung = Guid.NewGuid().ToString("N")[..8];
-        var neuer = $"WT_PROBE_NEU_{kennung}";
-        var alter = $"WT_PROBE_ALT_{kennung}";
+        var id = Guid.NewGuid().ToString("N")[..8];
+        var neuer = $"WT_PROBE_NEU_{id}";
+        var alter = $"WT_PROBE_ALT_{id}";
 
         try
         {
@@ -169,7 +169,7 @@ public sealed class UmgebungTests
 
             Environment.SetEnvironmentVariable(alter, "aus-der-umgebung");
 
-            var geladen = Umgebung.Laden(ordner.FullName);
+            var geladen = EnvironmentFile.Load(ordner.FullName);
 
             geladen.Should().EndWith(".env");
             Environment.GetEnvironmentVariable(neuer).Should().Be("aus-der-datei");
@@ -187,7 +187,7 @@ public sealed class UmgebungTests
 
     /// <summary>Ohne Datei passiert nichts, und das ist kein Fehler.</summary>
     /// <remarks>
-    /// Im Container gibt es keine <c>.env</c> — die Umgebung kommt von Compose
+    /// Im Container gibt es keine <c>.env</c> — die EnvironmentFile kommt von Compose
     /// oder vom Chart. Ein Abbruch hier wäre ein Abbruch im Regelfall.
     /// </remarks>
     [Fact]
@@ -197,7 +197,7 @@ public sealed class UmgebungTests
 
         try
         {
-            Umgebung.Laden(ordner.FullName).Should().BeNull();
+            EnvironmentFile.Load(ordner.FullName).Should().BeNull();
         }
         finally
         {

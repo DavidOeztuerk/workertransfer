@@ -3,10 +3,10 @@ using Noelia.Core.Identity;
 namespace WorkerTransfer.Resume.Domain.Anfragen;
 
 /// <summary>Where the requests are kept.</summary>
-public interface IAnfragenSpeicher
+public interface IRequestStore
 {
     /// <summary>One by its id, or <c>null</c>.</summary>
-    Task<Anfrage?> HoleAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<ResumeRequest?> GetAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// The one this company already made about this person, or <c>null</c>.
@@ -17,20 +17,20 @@ public interface IAnfragenSpeicher
     /// may ask three times did not get a no, they got a delay. In the handler
     /// alone two simultaneous requests would both pass the check.
     /// </remarks>
-    Task<Anfrage?> FindeAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default);
+    Task<ResumeRequest?> FindeAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default);
 
     /// <summary>Adds a new one to the open transaction.</summary>
-    Task FuegeHinzuAsync(Anfrage anfrage, CancellationToken cancellationToken = default);
+    Task AppendAsync(ResumeRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>Writes an answered one back.</summary>
-    Task SichereAsync(Anfrage anfrage, CancellationToken cancellationToken = default);
+    Task SaveAsync(ResumeRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>Everything asked about this person — the transparency list.</summary>
-    Task<IReadOnlyList<Anfrage>> FuerPersonAsync(
-        SubjectId wer, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ResumeRequest>> ForPersonAsync(
+        SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Everything this company asked.</summary>
-    Task<IReadOnlyList<Anfrage>> FuerFirmaAsync(
-        TenantId firma, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ResumeRequest>> ForCompanyAsync(
+        TenantId company, CancellationToken cancellationToken = default);
 }

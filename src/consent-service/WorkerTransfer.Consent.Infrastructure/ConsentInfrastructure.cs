@@ -10,12 +10,12 @@ using WorkerTransfer.Consent.Application.Einwilligung;
 using WorkerTransfer.Consent.Application.Ports;
 using WorkerTransfer.Consent.Domain.Audit;
 using WorkerTransfer.Consent.Domain.Ledger;
-using WorkerTransfer.Consent.Infrastructure.Loeschung;
+using WorkerTransfer.Consent.Infrastructure.Erasure;
 using WorkerTransfer.Consent.Infrastructure.Persistence;
 using WorkerTransfer.Consent.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.Consent.Infrastructure.Nachweis;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Contracts.Consent;
 using Noelia.Abstractions.Security.Checks;
 
@@ -45,16 +45,16 @@ public static class ConsentInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Loescheinstellungen>(
-            configuration.GetSection(Loescheinstellungen.Abschnitt));
+        services.Configure<ErasureSettings>(
+            configuration.GetSection(ErasureSettings.Section));
 
 
         services.AddSingleton(_ => ConsentDbContextFactory.DataSource(connectionString));
         services.AddDbContext<ConsentDbContext>((provider, options) =>
-            ConsentDbContextFactory.Konfiguriere(
+            ConsentDbContextFactory.Configure(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<ConsentDbContext>("consent");
-        services.AddSchluesselbund<ConsentDbContext>();
+        services.AddDatabaseReadiness<ConsentDbContext>("consent");
+        services.AddKeyRing<ConsentDbContext>();
 
         services.TryAddSingleton(TimeProvider.System);
 
@@ -62,14 +62,14 @@ public static class ConsentInfrastructure
         services.AddScoped<IAuditTrail, EfAuditTrail>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IFreitextraeumung, EfFreitextraeumung>();
-        services.AddScoped<Einwilligungsschreiber>();
+        services.AddScoped<ConsentWriter>();
         services.AddSingleton<IKorrelation, HttpKorrelation>();
 
         // Seven handlers, so the mediator earns its keep. Registered before the
         // transaction behaviour so that one ends up innermost: Noelia's logging
         // and validation run before anything is written, which is where a
         // rejected command costs nothing.
-        services.AddCQRS(typeof(EinwilligungErteilenBefehl).Assembly);
+        services.AddCQRS(typeof(GrantConsentCommand).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
         Nachweis(services, configuration);
@@ -79,41 +79,41 @@ public static class ConsentInfrastructure
 
     /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
     /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
     /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
     ///
     /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
     /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
     /// vergessen kann.</para>
     /// </remarks>
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
-            [typeof(AuditAction).Assembly, typeof(EinwilligungsfrageV1).Assembly]));
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
+            [typeof(AuditAction).Assembly, typeof(ConsentQuestionV1).Assembly]));
 
-        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
+        // None KI-Naht: `ProviderCheck` ohne Quelle meldet NichtAnwendbar,
         // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
         // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
         // durchschneiden soll.
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
 
         // Der Ledger selbst — die eine Pruefung im Bereich `Ledger`, und der
         // Grund, dass es diesen Bereich gibt. Sie misst ein NICHT-Vorhandensein
         // (keine Mandantenspalte), und das sind die, die am leichtesten wieder
         // verschwinden.
-        services.AddSingleton<ISecurityCheck, Ledgerpruefung>();
+        services.AddSingleton<ISecurityCheck, LedgerCheck>();
 
-        var loeschung = new Loescheinstellungen();
-        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+        var erasure = new ErasureSettings();
+        configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsEmpfaenger(
             "consent",
-            !string.IsNullOrEmpty(loeschung.Geheimnis),
+            !string.IsNullOrEmpty(erasure.Geheimnis),
             pruefspurVorhanden: false));
     }
 }

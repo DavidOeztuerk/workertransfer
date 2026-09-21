@@ -384,7 +384,12 @@ function KiBlock() {
   );
 }
 
-/** Die Wege zu dem, was über einen festgehalten ist. */
+/**
+ * Die Wege zu dem, was über einen festgehalten ist.
+ *
+ * The closing paragraph names what is NOT possible here: a settings page
+ * that keeps a gap quiet looks complete and is not.
+ */
 function Nachweisblock() {
   const { t } = useTranslation();
 
@@ -404,11 +409,11 @@ function Nachweisblock() {
           <Button component={RouterLink} to="/my-data" variant="outlined">
             {t("einstellungen.nachweiseDaten")}
           </Button>
-          {/* Die Löschung gehört dorthin, wo Menschen ihr Konto verwalten.
-              Umrandet: auffindbar, ohne die naheliegende Handlung zu sein. */}
           <Button
             component={RouterLink}
+            // Deletion belongs where people manage their account.
             to="/delete-account"
+            // Outlined: findable without being the obvious action.
             variant="outlined"
             color="error"
           >
@@ -416,8 +421,6 @@ function Nachweisblock() {
           </Button>
         </Box>
 
-        {/* Was NICHT geht, steht auch da. Eine Einstellungsseite, die eine
-            Lücke verschweigt, sieht vollständig aus und ist es nicht. */}
         <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
           <strong>{t("einstellungen.firma")}.</strong> {t("einstellungen.firmaLead")}
         </Typography>

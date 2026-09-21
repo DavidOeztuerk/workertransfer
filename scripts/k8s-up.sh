@@ -19,6 +19,8 @@ RELEASE=workertransfer
 CHART=deploy/helm/workertransfer
 HOST_PORT=8090
 BASE="http://localhost:${HOST_PORT}"
+WEB_PORT=5173
+WEB="http://localhost:${WEB_PORT}"
 
 rot()  { printf '\033[31m%s\033[0m\n' "$*"; }
 gruen(){ printf '\033[32m%s\033[0m\n' "$*"; }
@@ -28,6 +30,26 @@ for werkzeug in docker kind helm kubectl; do
   command -v "$werkzeug" >/dev/null 2>&1 || { rot "$werkzeug fehlt. brew install kind helm"; exit 1; }
 done
 docker info >/dev/null 2>&1 || { rot "Docker läuft nicht."; exit 1; }
+
+# kind binds the host ports listed in deploy/kind/cluster.yaml, and compose
+# binds the same three. Whoever gets there first wins, and the loser fails
+# somewhere far from the cause — kind reports an unready node minutes later.
+# Named here, before anything is built.
+# Only when the cluster does not exist yet: once it runs, its own node holds
+# these ports, and a check that cannot tell the two apart blocks every re-run.
+if ! kind get clusters 2>/dev/null | grep -qx "$CLUSTER"; then
+  belegt=""
+  for hafen in "$HOST_PORT" "$WEB_PORT" 8025; do
+    if lsof -nP -iTCP:"$hafen" -sTCP:LISTEN >/dev/null 2>&1; then
+      belegt="$belegt $hafen"
+    fi
+  done
+  if [ -n "$belegt" ]; then
+    rot "Diese Host-Ports sind schon belegt:$belegt"
+    rot "Der compose-Stapel benutzt dieselben. Erst 'make down', dann 'make k8s-up'."
+    exit 1
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 schritt "Cluster"
@@ -201,14 +223,40 @@ grep -q "$mail" /tmp/wt-mail.json 2>/dev/null || {
 gruen "Registrierung angelegt, Bestätigungsmail liegt in Mailpit."
 
 # ---------------------------------------------------------------------------
+schritt "Beweis 4 — die Oberflaeche hat eine eigene Tuer, und das Gateway nicht"
+# Two halves, and the second is the one worth having. A UI that answers proves
+# the door works; a gateway that ALSO answers documents would mean ADR-0040 has
+# quietly come back, and nothing else in this script would notice.
+web_status=$(curl -s -o /tmp/wt-web.html -w '%{http_code}' "${WEB}/" || true)
+echo "GET ${WEB}/ -> ${web_status}"
+[ "$web_status" = "200" ] || { rot "Die Oberflaeche lieferte ${web_status}, erwartet 200."; exit 1; }
+grep -qi '<div id="root"' /tmp/wt-web.html || {
+  rot "Unter ${WEB}/ steht kein Anwendungsgeruest — geantwortet hat jemand anderes."
+  head -c 400 /tmp/wt-web.html
+  exit 1
+}
+
+# The counter-check: the gateway must answer a DOCUMENT request with its own
+# 404, never with HTML. `Sec-Fetch-Dest: document` is exactly what a browser
+# sends on a direct link, and it is what the deleted Navigation middleware
+# used to switch on.
+tor_dokument=$(curl -s -o /tmp/wt-tor.html -w '%{http_code}' \
+  -H 'Sec-Fetch-Dest: document' "${BASE}/overview" || true)
+echo "GET ${BASE}/overview (als Dokument) -> ${tor_dokument}"
+if grep -qi '<div id="root"' /tmp/wt-tor.html; then
+  rot "Das Gateway liefert die Oberflaeche aus. Das ist ADR-0040 zurueck."
+  exit 1
+fi
+gruen "Oberflaeche auf ${WEB}, API auf ${BASE} — zwei Tueren, keine Weiche."
+
+# ---------------------------------------------------------------------------
 printf '\n'
 gruen "Die lokale Staging-Umgebung läuft."
 cat <<TEXT
 
   API (Gateway)      ${BASE}
-  Oberfläche         KEINE — das Gateway liefert seit ADR-0040 nur die API,
-                     und das Chart veröffentlicht nur das Gateway. Wer sie
-                     hier braucht, gibt dem web-Pod einen eigenen Eingang.
+  Oberfläche         ${WEB}   (eigener Eingang — das Gateway liefert seit
+                     ADR-0040 nur die API und niemals ein Dokument)
   Mailpit            http://localhost:8025   (hier liegt der Bestätigungslink
                      aus der Registrierung — ohne ihn kommt man nicht hinein)
   Traefik-Übersicht  kubectl port-forward deploy/gateway 8081:8080  -> http://localhost:8081

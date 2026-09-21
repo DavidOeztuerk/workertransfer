@@ -1,37 +1,37 @@
 using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Jobs.Application.Nachrichten;
-using WorkerTransfer.Jobs.Domain.Stellen;
+using WorkerTransfer.Jobs.Domain.Jobs;
 
-namespace WorkerTransfer.Jobs.Application.Stellen;
+namespace WorkerTransfer.Jobs.Application.Jobs;
 
 /// <summary>Die Anzeigen des eigenen Unternehmens, alle Stände.</summary>
-public sealed record MeineStellenAbfrage(TenantId Firma) : IAbfrage<IReadOnlyList<Stelle>>;
+public sealed record MyJobsQuery(TenantId Firma) : IAbfrage<IReadOnlyList<Job>>;
 
 /// <inheritdoc cref="MeineStellenAbfrage" />
-public sealed class MeineStellenHandler(IStellenspeicher speicher)
-    : IRequestHandler<MeineStellenAbfrage, IReadOnlyList<Stelle>>
+public sealed class MyJobsHandler(IJobStore store)
+    : IRequestHandler<MyJobsQuery, IReadOnlyList<Job>>
 {
     /// <inheritdoc />
-    public Task<IReadOnlyList<Stelle>> Handle(
-        MeineStellenAbfrage request, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<Job>> Handle(
+        MyJobsQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return speicher.FuerFirmaAsync(request.Firma, cancellationToken);
+        return store.ForCompanyAsync(request.Firma, cancellationToken);
     }
 }
 
 /// <summary>Die öffentliche Liste.</summary>
 /// <remarks>
-/// Ohne Stand als Parameter: der wird im Speicher gefiltert. Ein
+/// Ohne State als Parameter: der wird im Speicher gefiltert. Ein
 /// <c>status=draft</c> auf der Leitung wäre ein Weg, fremde Entwürfe zu lesen.
 /// <para>
-/// Und ohne jede Sortierung nach Passung. Wie gut jemand zu einer Stelle passt,
+/// Und ohne jede Sortierung nach Passung. Wie gut jemand zu einer Job passt,
 /// wird im Browser gerechnet und der <em>Person</em> gezeigt (ADR-0022).
 /// </para>
 /// </remarks>
-public sealed record StellensucheAbfrage(
+public sealed record JobSearchQuery(
     int Seite,
     int Anzahl,
     IReadOnlyList<string>? Faehigkeiten = null,
@@ -40,19 +40,19 @@ public sealed record StellensucheAbfrage(
     string Suchbegriff = "",
     Guid? Firma = null,
     string Beschaeftigung = "",
-    Umkreis? Umkreis = null) : IAbfrage<Stellenseite>;
+    Umkreis? Umkreis = null) : IAbfrage<JobPage>;
 
 /// <inheritdoc cref="StellensucheAbfrage" />
-public sealed class StellensucheHandler(IStellenspeicher speicher)
-    : IRequestHandler<StellensucheAbfrage, Stellenseite>
+public sealed class JobSearchHandler(IJobStore store)
+    : IRequestHandler<JobSearchQuery, JobPage>
 {
     /// <inheritdoc />
-    public Task<Stellenseite> Handle(
-        StellensucheAbfrage request, CancellationToken cancellationToken)
+    public Task<JobPage> Handle(
+        JobSearchQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return speicher.SucheAsync(
+        return store.SearchAsync(
             request.Seite, request.Anzahl, request.Faehigkeiten,
             request.Ort, request.Remote, request.Suchbegriff, request.Firma,
             request.Beschaeftigung, request.Umkreis, cancellationToken);
@@ -63,7 +63,7 @@ public sealed class StellensucheHandler(IStellenspeicher speicher)
 /// <param name="Firma">
 /// Das Unternehmen des Aufrufers, oder <c>null</c> für eine Privatperson.
 /// </param>
-public sealed record StelleAbfrage(Guid Id, TenantId? Firma) : IAbfrage<Stelle?>;
+public sealed record JobQuery(Guid Id, TenantId? Firma) : IAbfrage<Job?>;
 
 /// <inheritdoc cref="StelleAbfrage" />
 /// <remarks>
@@ -71,23 +71,23 @@ public sealed record StelleAbfrage(Guid Id, TenantId? Firma) : IAbfrage<Stelle?>
 /// antwortet dieser Dienst wie bei einer Anzeige, die es nicht gibt — sonst
 /// verriete er, dass ein Unternehmen gerade etwas schreibt.
 /// </remarks>
-public sealed class StelleHandler(IStellenspeicher speicher)
-    : IRequestHandler<StelleAbfrage, Stelle?>
+public sealed class JobHandler(IJobStore store)
+    : IRequestHandler<JobQuery, Job?>
 {
     /// <inheritdoc />
-    public async Task<Stelle?> Handle(StelleAbfrage request, CancellationToken cancellationToken)
+    public async Task<Job?> Handle(JobQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var stelle = await speicher.HoleAsync(request.Id, cancellationToken);
+        var job = await store.GetAsync(request.Id, cancellationToken);
 
-        if (stelle is null)
+        if (job is null)
         {
             return null;
         }
 
-        var eigene = request.Firma is { } firma && stelle.Firma == firma;
+        var eigene = request.Firma is { } company && job.Firma == company;
 
-        return eigene || stelle.Stand is Stellenstand.Published ? stelle : null;
+        return eigene || job.State is JobState.Published ? job : null;
     }
 }

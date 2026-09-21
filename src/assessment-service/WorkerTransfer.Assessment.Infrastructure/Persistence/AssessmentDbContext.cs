@@ -3,9 +3,9 @@ using WorkerTransfer.Outbox;
 
 namespace WorkerTransfer.Assessment.Infrastructure.Persistence;
 
-/// <summary>Eine Zeile von <c>assessments</c> — ein ganzer Vorgang.</summary>
+/// <summary>Eine Zeile von <c>assessments</c> — ein ganzer Case.</summary>
 /// <remarks>
-/// <para><strong>Keine Spalte hält eine Zahl über einen Menschen.</strong> Kein
+/// <para><strong>None Spalte hält eine Zahl über einen Menschen.</strong> Kein
 /// <c>score</c>, kein <c>rating</c>, keine Sterne, kein Notenfeld — und ein Test
 /// liest das <em>EF-Modell</em>, nicht den Quelltext, damit auch eine Spalte
 /// auffällt, die aus einer Konvention entsteht (ADR-0042 §1).</para>
@@ -14,8 +14,8 @@ namespace WorkerTransfer.Assessment.Infrastructure.Persistence;
 /// <em>Aufgabe</em>, nicht vom Menschen. Genau das ist die Trennlinie von
 /// ADR-0022 — Anforderung rein, Belege raus, niemals Mensch rein, Zahl raus.</para>
 ///
-/// <para><strong>Und keine Standspalte.</strong> Wo ein Vorgang steht, wird bei
-/// jedem Lesen aus Einreichung, Bewertung und der Uhr gerechnet. Eine Spalte
+/// <para><strong>Und keine Standspalte.</strong> Wo ein Case steht, wird bei
+/// jedem Lesen aus Submission, Evaluation und der Uhr gerechnet. Eine Spalte
 /// müsste jemand umschalten, wenn eine Frist abläuft — ein Nachtlauf, der
 /// Vorgänge über Menschen anfasst, ohne dass jemand gefragt hat.</para>
 ///
@@ -23,9 +23,9 @@ namespace WorkerTransfer.Assessment.Infrastructure.Persistence;
 /// keine interne Notiz: wo es zwei gäbe, stünde im zweiten die Wahrheit, und
 /// die Person läse das andere (ADR-0042 §2).</para>
 /// </remarks>
-public sealed class VorgangsZeile
+public sealed class CaseRow
 {
-    /// <summary>Welcher Vorgang.</summary>
+    /// <summary>Welcher Case.</summary>
     public Guid Id { get; set; }
 
     /// <summary>Wem die Aufgabe gestellt wurde — die Personenspalte dieses Dienstes.</summary>
@@ -75,51 +75,51 @@ public sealed class VorgangsZeile
 /// <remarks>
 /// Verfolgen ist aus, als Voreinstellung des Kontexts und nicht je Abfrage. Je
 /// Abfrage wäre es Disziplin, und die nächste hinzugefügte vergisst es. Ein
-/// änderndes <c>SichereAsync</c> nimmt sich sein <c>AsTracking()</c> deshalb
+/// änderndes <c>SaveAsync</c> nimmt sich sein <c>AsTracking()</c> deshalb
 /// ausdrücklich.
 /// </remarks>
 public sealed class AssessmentDbContext(DbContextOptions<AssessmentDbContext> options)
     : DbContext(options)
 {
     /// <summary>Die Vorgänge.</summary>
-    public DbSet<VorgangsZeile> Vorgaenge => Set<VorgangsZeile>();
+    public DbSet<CaseRow> Vorgaenge => Set<CaseRow>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
-        modelBuilder.Entity<VorgangsZeile>(zeile =>
+        modelBuilder.Entity<CaseRow>(row =>
         {
-            zeile.ToTable("assessments");
-            zeile.HasKey(eintrag => eintrag.Id);
-            zeile.Property(eintrag => eintrag.Id).HasColumnName("id").ValueGeneratedNever();
-            zeile.Property(eintrag => eintrag.SubjectId).HasColumnName("subject_id").IsRequired();
-            zeile.Property(eintrag => eintrag.TenantId).HasColumnName("tenant_id").IsRequired();
-            zeile.Property(eintrag => eintrag.Title)
+            row.ToTable("assessments");
+            row.HasKey(entry => entry.Id);
+            row.Property(entry => entry.Id).HasColumnName("id").ValueGeneratedNever();
+            row.Property(entry => entry.SubjectId).HasColumnName("subject_id").IsRequired();
+            row.Property(entry => entry.TenantId).HasColumnName("tenant_id").IsRequired();
+            row.Property(entry => entry.Title)
                 .HasColumnName("title").HasMaxLength(200).IsRequired();
-            zeile.Property(eintrag => eintrag.Task)
+            row.Property(entry => entry.Task)
                 .HasColumnName("task").HasMaxLength(8000).IsRequired();
-            zeile.Property(eintrag => eintrag.Hours).HasColumnName("hours").IsRequired();
-            zeile.Property(eintrag => eintrag.DueAt).HasColumnName("due_at").IsRequired();
-            zeile.Property(eintrag => eintrag.SubmissionText)
+            row.Property(entry => entry.Hours).HasColumnName("hours").IsRequired();
+            row.Property(entry => entry.DueAt).HasColumnName("due_at").IsRequired();
+            row.Property(entry => entry.SubmissionText)
                 .HasColumnName("submission_text").HasMaxLength(8000);
-            zeile.Property(eintrag => eintrag.SubmissionUrl)
+            row.Property(entry => entry.SubmissionUrl)
                 .HasColumnName("submission_url").HasMaxLength(2000);
-            zeile.Property(eintrag => eintrag.SubmittedAt).HasColumnName("submitted_at");
-            zeile.Property(eintrag => eintrag.EvaluationText)
+            row.Property(entry => entry.SubmittedAt).HasColumnName("submitted_at");
+            row.Property(entry => entry.EvaluationText)
                 .HasColumnName("evaluation_text").HasMaxLength(8000);
-            zeile.Property(eintrag => eintrag.EvaluationOutcome)
+            row.Property(entry => entry.EvaluationOutcome)
                 .HasColumnName("evaluation_outcome").HasMaxLength(16);
-            zeile.Property(eintrag => eintrag.EvaluatedAt).HasColumnName("evaluated_at");
-            zeile.Property(eintrag => eintrag.CreatedAt).HasColumnName("created_at").IsRequired();
-            zeile.Property(eintrag => eintrag.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            row.Property(entry => entry.EvaluatedAt).HasColumnName("evaluated_at");
+            row.Property(entry => entry.CreatedAt).HasColumnName("created_at").IsRequired();
+            row.Property(entry => entry.UpdatedAt).HasColumnName("updated_at").IsRequired();
 
             // Die zwei Abfragen, die es gibt: meine Vorgaenge, und unsere. Eine
             // dritte — „die Vorgaenge DIESER Person", von einer Firma gefragt —
             // gibt es nicht, und deshalb auch keinen Index dafuer.
-            zeile.HasIndex(eintrag => eintrag.SubjectId);
-            zeile.HasIndex(eintrag => eintrag.TenantId);
+            row.HasIndex(entry => entry.SubjectId);
+            row.HasIndex(entry => entry.TenantId);
         });
 
         modelBuilder.ConfigureOutbox();

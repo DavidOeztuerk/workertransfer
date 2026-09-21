@@ -43,10 +43,10 @@ public static class MembershipRoleNames
 /// <param name="Name">What it is called.</param>
 /// <param name="Domain">The domain it was proven on.</param>
 /// <param name="Role">With what rights, read from the relation.</param>
-public sealed record Mitgliedschaft(TenantId Tenant, string Name, string Domain, MembershipRole Role);
+public sealed record Membership(TenantId Tenant, string Name, string Domain, MembershipRole Role);
 
 /// <summary>One member of a company, as a list needs them.</summary>
-public sealed record Firmenmitglied(SubjectId Subject, string DisplayName, MembershipRole Role);
+public sealed record CompanyMember(SubjectId Subject, string DisplayName, MembershipRole Role);
 
 /// <summary>Which companies a person may act for.</summary>
 /// <remarks>
@@ -91,12 +91,12 @@ public interface IMembershipRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>Every company this person may act for.</summary>
-    Task<IReadOnlyList<Mitgliedschaft>> ListForSubjectAsync(
+    Task<IReadOnlyList<Membership>> ListForSubjectAsync(
         SubjectId subject,
         CancellationToken cancellationToken = default);
 
     /// <summary>Everybody who may act for this company.</summary>
-    Task<IReadOnlyList<Firmenmitglied>> ListMembersAsync(
+    Task<IReadOnlyList<CompanyMember>> ListMembersAsync(
         TenantId tenant,
         CancellationToken cancellationToken = default);
 

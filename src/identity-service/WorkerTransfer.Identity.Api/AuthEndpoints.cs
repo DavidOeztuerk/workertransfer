@@ -18,7 +18,7 @@ public sealed record LoginBody(string Email, string Password);
 /// <param name="AiBaseUrl">Die Adresse des Anbieters.</param>
 /// <param name="AiModel">Das Modell.</param>
 /// <param name="AiAuditLog">Ob Anfragen protokolliert werden.</param>
-public sealed record EinstellungenBody(
+public sealed record SettingsBody(
     [property: JsonPropertyName("delete_after_months")] int? DeleteAfterMonths,
     [property: JsonPropertyName("ai_provider")] string AiProvider = "none",
     [property: JsonPropertyName("ai_base_url")] string AiBaseUrl = "",
@@ -37,11 +37,11 @@ public sealed record SchluesselBody(
 /// <param name="Language">A tag this platform has texts for: de, en or fr.</param>
 public sealed record SprachwahlBody(string Language);
 
-/// <summary>Was ein Aufrufer schickt, um sein Berufsfeld zu wählen.</summary>
+/// <summary>Was ein Aufrufer schickt, um sein OccupationalField zu wählen.</summary>
 /// <param name="OccupationalField">
 /// Eines der Etiketten aus <see cref="Berufsfeldwahl"/>. Leer heisst entfernen.
 /// </param>
-public sealed record BerufsfeldBody(
+public sealed record OccupationalFieldBody(
     [property: JsonPropertyName("occupational_field")] string? OccupationalField);
 
 /// <summary>Bürgerlicher Vor- und Nachname. Leer heisst entfernen.</summary>
@@ -50,7 +50,7 @@ public sealed record KlarnameBody(
     [property: JsonPropertyName("family_name")] string? FamilyName);
 
 /// <summary>Bewerbungsanschrift. Nie an ein Modell, nie ins Token.</summary>
-public sealed record AnschriftBody(
+public sealed record PostalAddressBody(
     [property: JsonPropertyName("line1")] string? Line1,
     [property: JsonPropertyName("line2")] string? Line2,
     [property: JsonPropertyName("postal_code")] string? PostalCode,
@@ -68,7 +68,7 @@ public sealed record AnschriftBody(
 /// </remarks>
 public static class AuthEndpoints
 {
-    private const string ZugriffsCookie = "access";
+    private const string AccessCookie = "access";
     private const string ErneuerungsCookie = "refresh";
     private const string ErneuerungsPfad = "/auth";
 
@@ -85,7 +85,7 @@ public static class AuthEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            // Die Pruefung steht NICHT mehr hier, sondern in `AnmeldenPruefung`
+            // Die Pruefung steht NICHT mehr hier, sondern in `SignInValidator`
             // — Noelias ValidationBehavior fuehrt sie aus, bevor der Handler
             // laeuft. Bis D2 stand sie hier, weil die Pipeline-Stufe fuer tot
             // gehalten wurde; sie ist es nicht, sie war nur leer.
@@ -93,10 +93,10 @@ public static class AuthEndpoints
             // Die Antwort bleibt 422: der Rumpf war lesbar, sein Inhalt nicht
             // brauchbar. 401 hiesse "die Zugangsdaten stimmen nicht", und das
             // waere eine Aussage ueber ein Konto, die hier niemand geprueft hat.
-            var ergebnis = await mediator.Send(
+            var result = await mediator.Send(
                 new AnmeldenBefehl(body.Email, body.Password), cancellationToken);
 
-            switch (ergebnis)
+            switch (result)
             {
                 case Anmeldeergebnis.Angemeldet angemeldet:
                     SetzeCookies(context, angemeldet.Zugriffstoken, angemeldet.Erneuerungstoken);
@@ -104,13 +104,13 @@ public static class AuthEndpoints
                     return;
 
                 case Anmeldeergebnis.NichtBestaetigt:
-                    await ProblemDetailsMiddleware.Schreibe(
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status403Forbidden,
                         "Request failed", "email not confirmed");
                     return;
 
                 default:
-                    await ProblemDetailsMiddleware.Schreibe(
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status401Unauthorized,
                         "Request failed", "invalid credentials");
                     return;
@@ -122,16 +122,16 @@ public static class AuthEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            var stand = await mediator.Send(
-                new SitzungsstandAbfrage(
+            var state = await mediator.Send(
+                new SessionStateQuery(
                     !string.IsNullOrEmpty(context.Request.Cookies[ErneuerungsCookie])),
                 cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
                 new Dictionary<string, object?>
                 {
-                    ["user"] = stand.Benutzer is { } konto ? Antwort(konto) : null,
-                    ["state"] = stand.Zustand
+                    ["user"] = state.Benutzer is { } konto ? Antwort(konto) : null,
+                    ["state"] = state.Zustand
                 },
                 cancellationToken);
         });
@@ -146,15 +146,15 @@ public static class AuthEndpoints
             if (string.IsNullOrEmpty(vorgelegt))
             {
                 // No cookie to clear, and no cookie is not a dead cookie.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "invalid credentials");
                 return;
             }
 
-            var ergebnis = await mediator.Send(new ErneuernBefehl(vorgelegt), cancellationToken);
+            var result = await mediator.Send(new ErneuernBefehl(vorgelegt), cancellationToken);
 
-            if (ergebnis is Erneuerungsergebnis.Erneuert erneuert)
+            if (result is Erneuerungsergebnis.Erneuert erneuert)
             {
                 SetzeCookies(context, erneuert.Zugriffstoken, erneuert.Erneuerungstoken);
                 await SchreibeOk(context, cancellationToken);
@@ -165,7 +165,7 @@ public static class AuthEndpoints
             // while the cookie is there, the app refreshes, the token does not
             // carry, and the next page load starts over.
             LoescheErneuerungsCookie(context);
-            await ProblemDetailsMiddleware.Schreibe(
+            await ProblemDetailsMiddleware.Write(
                 context, StatusCodes.Status401Unauthorized,
                 "Request failed", "invalid credentials");
         });
@@ -179,19 +179,19 @@ public static class AuthEndpoints
         {
             if (akteur.Current is not { } handelnder)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
-            var ergebnis = await mediator.Send(
-                new FirmaWechselnBefehl(handelnder.Subject, new TenantId(tenantId)),
+            var result = await mediator.Send(
+                new SwitchCompanyCommand(handelnder.Subject, new TenantId(tenantId)),
                 cancellationToken);
 
-            switch (ergebnis)
+            switch (result)
             {
-                case Firmenwechselergebnis.Gewechselt gewechselt:
+                case CompanySwitchResult.Gewechselt gewechselt:
                     SetzeCookies(context, gewechselt.Zugriffstoken, gewechselt.Erneuerungstoken);
                     await context.Response.WriteAsJsonAsync(
                         new Dictionary<string, string>
@@ -202,15 +202,15 @@ public static class AuthEndpoints
                         cancellationToken);
                     return;
 
-                case Firmenwechselergebnis.KeinMitglied:
+                case CompanySwitchResult.NoMember:
                     // 403 and not 404: never reveal whether the company exists.
-                    await ProblemDetailsMiddleware.Schreibe(
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status403Forbidden,
                         "Request failed", "not a member of this tenant");
                     return;
 
                 default:
-                    await ProblemDetailsMiddleware.Schreibe(
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status401Unauthorized,
                         "Request failed", "invalid credentials");
                     return;
@@ -230,7 +230,7 @@ public static class AuthEndpoints
             // The access cookie goes too. Nothing checks it against the session
             // table, so leaving it would keep someone signed in for its whole
             // lifetime — on a shared machine that is the whole problem.
-            context.Response.Cookies.Delete(ZugriffsCookie, new CookieOptions { Path = "/" });
+            context.Response.Cookies.Delete(AccessCookie, new CookieOptions { Path = "/" });
 
             context.Response.StatusCode = StatusCodes.Status204NoContent;
         });
@@ -248,7 +248,7 @@ public static class AuthEndpoints
         {
             if (akteur.Current is not { } handelnder)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
@@ -260,7 +260,7 @@ public static class AuthEndpoints
             // Wahl nicht hielt. Eine Wahl, die nicht wirkt, muss das sagen.
             if (!Sprachwahl.Kennen(body.Language))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "unsupported language");
                 return;
@@ -273,7 +273,7 @@ public static class AuthEndpoints
 
             if (!erledigt)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such account");
                 return;
@@ -284,7 +284,7 @@ public static class AuthEndpoints
 
         // Neben der Sprache: eine Entscheidung über das eigene Konto.
         app.MapPut("/account/occupational-field", async (
-            BerufsfeldBody body,
+            OccupationalFieldBody body,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -292,29 +292,29 @@ public static class AuthEndpoints
         {
             if (akteur.Current is not { } handelnder)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
             // Unbekanntes wird abgesagt, nicht still zu „keins" gemacht.
-            if (!Berufsfeldwahl.Kennen(body.OccupationalField))
+            if (!OccupationalFieldChoice.Kennen(body.OccupationalField))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "invalid: occupational_field");
                 return;
             }
 
             var erledigt = await mediator.Send(
-                new BerufsfeldWaehlenBefehl(
-                    handelnder.Subject, Berufsfeldwahl.Aus(body.OccupationalField)),
+                new ChooseOccupationalFieldCommand(
+                    handelnder.Subject, OccupationalFieldChoice.Aus(body.OccupationalField)),
                 cancellationToken);
 
             if (!erledigt)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such account");
                 return;
@@ -332,7 +332,7 @@ public static class AuthEndpoints
         {
             if (akteur.Current is not { } handelnder)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
@@ -344,7 +344,7 @@ public static class AuthEndpoints
 
             if (!erledigt)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such account");
                 return;
@@ -361,19 +361,19 @@ public static class AuthEndpoints
         {
             if (akteur.Current is not { } handelnder)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
-            var stand = await mediator.Send(
-                new AnschriftAbfrage(handelnder.Subject), cancellationToken);
-            await context.Response.WriteAsJsonAsync(AnschriftAntwort(stand), cancellationToken);
+            var state = await mediator.Send(
+                new PostalAddressQuery(handelnder.Subject), cancellationToken);
+            await context.Response.WriteAsJsonAsync(AnschriftAntwort(state), cancellationToken);
         });
 
         app.MapPut("/account/address", async (
-            AnschriftBody body,
+            PostalAddressBody body,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -381,14 +381,14 @@ public static class AuthEndpoints
         {
             if (akteur.Current is not { } handelnder)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
-            var stand = await mediator.Send(
-                new AnschriftSetzenBefehl(
+            var state = await mediator.Send(
+                new SetPostalAddressCommand(
                     handelnder.Subject,
                     body.Line1,
                     body.Line2,
@@ -398,7 +398,7 @@ public static class AuthEndpoints
                     body.Phone),
                 cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(AnschriftAntwort(stand), cancellationToken);
+            await context.Response.WriteAsJsonAsync(AnschriftAntwort(state), cancellationToken);
         });
 
         // Die eigenen Einstellungen. Unter `/account`, wie die Sprache und die
@@ -411,20 +411,20 @@ public static class AuthEndpoints
         {
             if (akteur.Current is not { } handelnder)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
-            var stand = await mediator.Send(
-                new EinstellungenAbfrage(handelnder.Subject), cancellationToken);
+            var state = await mediator.Send(
+                new SettingsQuery(handelnder.Subject), cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(Einstellungen(stand), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Einstellungen(state), cancellationToken);
         });
 
         app.MapPut("/account/settings", async (
-            EinstellungenBody body,
+            SettingsBody body,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -432,7 +432,7 @@ public static class AuthEndpoints
         {
             if (akteur.Current is not { } handelnder)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
@@ -440,8 +440,8 @@ public static class AuthEndpoints
 
             try
             {
-                var stand = await mediator.Send(
-                    new EinstellungenSetzenBefehl(
+                var state = await mediator.Send(
+                    new SetSettingsCommand(
                         handelnder.Subject,
                         body.DeleteAfterMonths,
                         body.AiProvider,
@@ -450,13 +450,13 @@ public static class AuthEndpoints
                         body.AiAuditLog),
                     cancellationToken);
 
-                await context.Response.WriteAsJsonAsync(Einstellungen(stand), cancellationToken);
+                await context.Response.WriteAsJsonAsync(Einstellungen(state), cancellationToken);
             }
             catch (ArgumentOutOfRangeException)
             {
                 // Der Verfall liegt ausserhalb der Grenzen. 422 und nicht 400:
                 // der Rumpf war lesbar, sein Inhalt ist es nicht.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "invalid: delete_after_months");
             }
@@ -472,7 +472,7 @@ public static class AuthEndpoints
         {
             if (akteur.Current is not { } handelnder)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
@@ -490,11 +490,11 @@ public static class AuthEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            var konto = await mediator.Send(new MeinKontoAbfrage(), cancellationToken);
+            var konto = await mediator.Send(new MyAccountQuery(), cancellationToken);
 
             if (konto is null)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
@@ -520,42 +520,42 @@ public static class AuthEndpoints
         // Anmelden Deutsch sehen — sonst wäre die Wahl nur so lange gültig, wie
         // derselbe Browser sie sich merkt.
         ["language"] = Sprachwahl.Etikett(konto.Sprache),
-        // Fuer das Bild im Kopf: aus dem Namen werden die Initialen, und die
+        // Fuer das Bild im Header: aus dem Namen werden die Initialen, und die
         // Farbe daneben folgt ihm. Aus einer Adresse liesse sich beides auch
         // ableiten — es waere nur falsch, denn `max.werber@…` ergibt „M" und
         // nicht „MW".
         ["display_name"] = konto.Anzeigename,
-        // Klarname für Signatur und Briefkopf. Keine Anschrift hier: die
-        // Bewerberauskunft liest die Session, und Anschrift darf nicht ins Modell.
+        // Klarname für Signatur und Briefkopf. None PostalAddress hier: die
+        // Bewerberauskunft liest die Session, und PostalAddress darf nicht ins Modell.
         ["given_name"] = konto.Vorname,
         ["family_name"] = konto.Nachname,
         // Damit die Oberfläche weiss, was sie anbieten soll (ADR-0039).
-        ["occupational_field"] = Berufsfeldwahl.Etikett(konto.Berufsfeld)
+        ["occupational_field"] = OccupationalFieldChoice.Etikett(konto.OccupationalField)
     };
 
-    private static Dictionary<string, string> AnschriftAntwort(Anschriftansicht stand) => new()
+    private static Dictionary<string, string> AnschriftAntwort(PostalAddressView state) => new()
     {
-        ["line1"] = stand.Zeile1,
-        ["line2"] = stand.Zeile2,
-        ["postal_code"] = stand.Postleitzahl,
-        ["city"] = stand.Ort,
-        ["country"] = stand.Land,
-        ["phone"] = stand.Telefon
+        ["line1"] = state.Zeile1,
+        ["line2"] = state.Zeile2,
+        ["postal_code"] = state.Postleitzahl,
+        ["city"] = state.Ort,
+        ["country"] = state.Land,
+        ["phone"] = state.Telefon
     };
 
     /// <summary>Die Einstellungen auf dem Draht — snake_case, wie überall.</summary>
-    private static Dictionary<string, object?> Einstellungen(Einstellungsansicht stand) => new()
+    private static Dictionary<string, object?> Einstellungen(SettingsView state) => new()
     {
-        ["delete_after_months"] = stand.LoeschungNachMonaten,
-        ["ai_provider"] = stand.Anbieter,
-        ["ai_base_url"] = stand.Adresse,
-        ["ai_model"] = stand.Modell,
+        ["delete_after_months"] = state.LoeschungNachMonaten,
+        ["ai_provider"] = state.Anbieter,
+        ["ai_base_url"] = state.Adresse,
+        ["ai_model"] = state.Modell,
         // NICHT der Schlüssel — nur, dass es einen gibt, und seine letzten vier
         // Zeichen. Ein Geheimnis, das man abrufen kann, ist eines, das man
         // abziehen kann.
-        ["ai_key_present"] = stand.SchluesselDa,
-        ["ai_key_tail"] = stand.SchluesselEndung,
-        ["ai_audit_log"] = stand.KiProtokoll
+        ["ai_key_present"] = state.SchluesselDa,
+        ["ai_key_tail"] = state.SchluesselEndung,
+        ["ai_audit_log"] = state.KiProtokoll
     };
 
     private static Task SchreibeOk(HttpContext context, CancellationToken cancellationToken) =>
@@ -567,7 +567,7 @@ public static class AuthEndpoints
         var sicher = !context.RequestServices
             .GetRequiredService<IHostEnvironment>().IsDevelopment();
 
-        context.Response.Cookies.Append(ZugriffsCookie, zugriff, new CookieOptions
+        context.Response.Cookies.Append(AccessCookie, zugriff, new CookieOptions
         {
             HttpOnly = true,
             SameSite = SameSiteMode.Strict,

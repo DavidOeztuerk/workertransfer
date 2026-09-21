@@ -6,15 +6,15 @@ using WorkerTransfer.Identity.Domain.Companies;
 namespace WorkerTransfer.Identity.Application.Unternehmen;
 
 /// <summary>Which companies may I act for?</summary>
-public sealed record MeineUnternehmenAbfrage(SubjectId Wer) : IAbfrage<IReadOnlyList<Mitgliedschaft>>;
+public sealed record MyCompaniesQuery(SubjectId Wer) : IAbfrage<IReadOnlyList<Membership>>;
 
 /// <inheritdoc cref="MeineUnternehmenAbfrage" />
-public sealed class MeineUnternehmenHandler(IMembershipRepository mitgliedschaften)
-    : IRequestHandler<MeineUnternehmenAbfrage, IReadOnlyList<Mitgliedschaft>>
+public sealed class MyCompaniesHandler(IMembershipRepository mitgliedschaften)
+    : IRequestHandler<MyCompaniesQuery, IReadOnlyList<Membership>>
 {
     /// <inheritdoc />
-    public Task<IReadOnlyList<Mitgliedschaft>> Handle(
-        MeineUnternehmenAbfrage request,
+    public Task<IReadOnlyList<Membership>> Handle(
+        MyCompaniesQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -24,8 +24,8 @@ public sealed class MeineUnternehmenHandler(IMembershipRepository mitgliedschaft
 }
 
 /// <summary>Who may act for this company?</summary>
-public sealed record MitgliederAbfrage(SubjectId Wer, TenantId Firma)
-    : IAbfrage<IReadOnlyList<Firmenmitglied>>;
+public sealed record MembersQuery(SubjectId Wer, TenantId Firma)
+    : IAbfrage<IReadOnlyList<CompanyMember>>;
 
 /// <inheritdoc cref="MitgliederAbfrage" />
 /// <remarks>
@@ -33,19 +33,19 @@ public sealed record MitgliederAbfrage(SubjectId Wer, TenantId Firma)
 /// colleagues from colleagues serves nobody. Only membership is required, and
 /// that check is what keeps it from being a directory of strangers.
 /// </remarks>
-public sealed class MitgliederHandler(
-    Firmenzugriff zugriff,
+public sealed class MembersHandler(
+    CompanyAccess zugriff,
     IMembershipRepository mitgliedschaften)
-    : IRequestHandler<MitgliederAbfrage, IReadOnlyList<Firmenmitglied>>
+    : IRequestHandler<MembersQuery, IReadOnlyList<CompanyMember>>
 {
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Firmenmitglied>> Handle(
-        MitgliederAbfrage request,
+    public async Task<IReadOnlyList<CompanyMember>> Handle(
+        MembersQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        await zugriff.RolleAsync(request.Wer, request.Firma, cancellationToken);
+        await zugriff.RoleAsync(request.Wer, request.Firma, cancellationToken);
 
         return await mitgliedschaften.ListMembersAsync(request.Firma, cancellationToken);
     }
@@ -54,20 +54,20 @@ public sealed class MitgliederHandler(
 /// <summary>Die Mitglieder eines Unternehmens — für Dienst-zu-Dienst, ohne Aufrufer.</summary>
 /// <remarks>
 /// Das Geheimnis am internen Endpunkt IST die Autorisierung. Die öffentliche
-/// Abfrage prüft Mitgliedschaft, weil sie einem Menschen antwortet; hier
+/// Abfrage prüft Membership, weil sie einem Menschen antwortet; hier
 /// antwortet der Dienst einem Dienst, und <c>SubjectId.Empty</c> als
 /// Stellvertreter würde <c>NotAMemberException</c> werfen.
 /// </remarks>
-public sealed record InterneMitgliederAbfrage(TenantId Firma)
-    : IAbfrage<IReadOnlyList<Firmenmitglied>>;
+public sealed record InternalMembersQuery(TenantId Firma)
+    : IAbfrage<IReadOnlyList<CompanyMember>>;
 
 /// <inheritdoc cref="InterneMitgliederAbfrage" />
-public sealed class InterneMitgliederHandler(IMembershipRepository mitgliedschaften)
-    : IRequestHandler<InterneMitgliederAbfrage, IReadOnlyList<Firmenmitglied>>
+public sealed class InternalMembersHandler(IMembershipRepository mitgliedschaften)
+    : IRequestHandler<InternalMembersQuery, IReadOnlyList<CompanyMember>>
 {
     /// <inheritdoc />
-    public Task<IReadOnlyList<Firmenmitglied>> Handle(
-        InterneMitgliederAbfrage request,
+    public Task<IReadOnlyList<CompanyMember>> Handle(
+        InternalMembersQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -77,25 +77,25 @@ public sealed class InterneMitgliederHandler(IMembershipRepository mitgliedschaf
 }
 
 /// <summary>Which invitations are still waiting?</summary>
-public sealed record OffeneEinladungenAbfrage(SubjectId Wer, TenantId Firma)
+public sealed record OpenInvitationsQuery(SubjectId Wer, TenantId Firma)
     : IAbfrage<IReadOnlyList<Invitation>>;
 
 /// <inheritdoc cref="OffeneEinladungenAbfrage" />
-public sealed class OffeneEinladungenHandler(
-    Firmenzugriff zugriff,
-    IInvitationRepository einladungen)
-    : IRequestHandler<OffeneEinladungenAbfrage, IReadOnlyList<Invitation>>
+public sealed class OpenInvitationsHandler(
+    CompanyAccess zugriff,
+    IInvitationRepository invitations)
+    : IRequestHandler<OpenInvitationsQuery, IReadOnlyList<Invitation>>
 {
     /// <inheritdoc />
     public async Task<IReadOnlyList<Invitation>> Handle(
-        OffeneEinladungenAbfrage request,
+        OpenInvitationsQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        await zugriff.RolleAsync(request.Wer, request.Firma, cancellationToken);
+        await zugriff.RoleAsync(request.Wer, request.Firma, cancellationToken);
 
-        return await einladungen.ListOpenAsync(request.Firma, cancellationToken);
+        return await invitations.ListOpenAsync(request.Firma, cancellationToken);
     }
 }
 
@@ -103,7 +103,7 @@ public sealed class OffeneEinladungenHandler(
 /// <remarks>
 /// <para>Für Dienst-zu-Dienst, ohne Aufrufer: das Geheimnis am internen
 /// Endpunkt IST die Autorisierung. Die öffentlichen Abfragen prüfen zuerst die
-/// Mitgliedschaft des Fragenden, weil sie einem Menschen antworten — hier
+/// Membership des Fragenden, weil sie einem Menschen antworten — hier
 /// antwortet ein Dienst einem Dienst.</para>
 ///
 /// <para><strong>Warum die anderen zehn Dienste überhaupt fragen müssen.</strong>
@@ -111,19 +111,19 @@ public sealed class OffeneEinladungenHandler(
 /// gemeinsame Datenbank). Und ins Token gehört die Rolle nicht: ein Token lebt
 /// weiter, nachdem jemand aus einer Firma entfernt wurde, und die Entfernung
 /// wirkte dann erst beim Ablauf. Der Preis ist eine Abfrage je geschützter
-/// Anfrage — sie trifft einen Primärschlüssel und betrifft nur die Handlungen,
+/// ResumeRequest — sie trifft einen Primärschlüssel und betrifft nur die Handlungen,
 /// die ein Unternehmen binden.</para>
 /// </remarks>
-public sealed record InterneRolleAbfrage(TenantId Firma, SubjectId Wer)
+public sealed record InternalRoleQuery(TenantId Firma, SubjectId Wer)
     : IAbfrage<MembershipRole?>;
 
 /// <inheritdoc cref="InterneRolleAbfrage" />
-public sealed class InterneRolleHandler(IMembershipRepository mitgliedschaften)
-    : IRequestHandler<InterneRolleAbfrage, MembershipRole?>
+public sealed class InternalRoleHandler(IMembershipRepository mitgliedschaften)
+    : IRequestHandler<InternalRoleQuery, MembershipRole?>
 {
     /// <inheritdoc />
     public Task<MembershipRole?> Handle(
-        InterneRolleAbfrage request,
+        InternalRoleQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -148,15 +148,15 @@ public sealed class InterneRolleHandler(IMembershipRepository mitgliedschaften)
 /// herausgeht, ist die Belegschaft — dafür gibt es die Mitgliederabfrage, und
 /// sie ist eine eigene Tür.</para>
 /// </remarks>
-public sealed record InterneFirmaAbfrage(TenantId Firma) : IAbfrage<Company?>;
+public sealed record InternalCompanyQuery(TenantId Firma) : IAbfrage<Company?>;
 
 /// <inheritdoc cref="InterneFirmaAbfrage" />
-public sealed class InterneFirmaHandler(ICompanyRepository unternehmen)
-    : IRequestHandler<InterneFirmaAbfrage, Company?>
+public sealed class InternalCompanyHandler(ICompanyRepository unternehmen)
+    : IRequestHandler<InternalCompanyQuery, Company?>
 {
     /// <inheritdoc />
     public Task<Company?> Handle(
-        InterneFirmaAbfrage request, CancellationToken cancellationToken)
+        InternalCompanyQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 

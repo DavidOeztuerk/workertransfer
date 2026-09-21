@@ -8,7 +8,7 @@ namespace WorkerTransfer.Notification.Domain.Benachrichtigungen;
 /// eine je Person, sie ist kein eigener Gegenstand, und eine zweite Tabelle
 /// wäre ein Verbund für einen Zeitstempel.
 /// </remarks>
-public sealed class Benachrichtigungswunsch
+public sealed class NotificationPreference
 {
     /// <summary>Höchstens eine Nachricht je Person und Stunde, über alle Arten hinweg.</summary>
     /// <remarks>
@@ -26,12 +26,12 @@ public sealed class Benachrichtigungswunsch
 
     private readonly Dictionary<Benachrichtigungsart, bool> _arten;
 
-    private Benachrichtigungswunsch(
-        SubjectId wer,
+    private NotificationPreference(
+        SubjectId subject,
         Dictionary<Benachrichtigungsart, bool> arten,
         DateTimeOffset? zuletztGesendetAm)
     {
-        Wer = wer;
+        Wer = subject;
         _arten = arten;
         ZuletztGesendetAm = zuletztGesendetAm;
     }
@@ -44,69 +44,69 @@ public sealed class Benachrichtigungswunsch
 
     /// <summary>Alle an.</summary>
     /// <remarks>
-    /// Eine Benachrichtigung über den <em>eigenen</em> Vorgang ist keine
+    /// Eine Benachrichtigung über den <em>eigenen</em> Case ist keine
     /// Werbung, sondern die Bedingung dafür, dass „die Person entscheidet"
     /// überhaupt eintreten kann. Wer nichts eingestellt hat, soll erfahren, dass
     /// jemand etwas von ihm will.
     /// </remarks>
-    public static Benachrichtigungswunsch Voreingestellt(SubjectId wer) =>
-        new(wer, Benachrichtigungsarten.Alle.ToDictionary(art => art, _ => true), null);
+    public static NotificationPreference Voreingestellt(SubjectId subject) =>
+        new(subject, Benachrichtigungsarten.Alle.ToDictionary(kind => kind, _ => true), null);
 
     /// <summary>Die Wünsche, wie eine Zeile sie hält.</summary>
-    public static Benachrichtigungswunsch Stelle_her(
-        SubjectId wer,
+    public static NotificationPreference Stelle_her(
+        SubjectId subject,
         IReadOnlyDictionary<Benachrichtigungsart, bool> arten,
         DateTimeOffset? zuletztGesendetAm) =>
-        new(wer, new Dictionary<Benachrichtigungsart, bool>(arten), zuletztGesendetAm);
+        new(subject, new Dictionary<Benachrichtigungsart, bool>(arten), zuletztGesendetAm);
 
     /// <summary>Will die Person Post dieser Art?</summary>
     /// <remarks>
     /// Eine unbekannte Art gilt als gewollt: eine neue Art soll nicht
     /// stillschweigend ausbleiben, weil eine alte Zeile sie nicht kennt.
     /// </remarks>
-    public bool Will(Benachrichtigungsart art) => _arten.GetValueOrDefault(art, true);
+    public bool Will(Benachrichtigungsart kind) => _arten.GetValueOrDefault(kind, true);
 
     /// <summary>Setzt einen Schalter.</summary>
-    public void Setze(Benachrichtigungsart art, bool gewollt) => _arten[art] = gewollt;
+    public void Set(Benachrichtigungsart kind, bool gewollt) => _arten[kind] = gewollt;
 
     /// <summary>Darf jetzt etwas hinausgehen?</summary>
-    public bool Darf(Benachrichtigungsart art, DateTimeOffset jetzt)
+    public bool Darf(Benachrichtigungsart kind, DateTimeOffset now)
     {
-        if (!Will(art))
+        if (!Will(kind))
         {
             return false;
         }
 
-        return ZuletztGesendetAm is not { } zuletzt || jetzt - zuletzt >= Drossel;
+        return ZuletztGesendetAm is not { } zuletzt || now - zuletzt >= Drossel;
     }
 
     /// <summary>Merkt sich, dass etwas hinausging.</summary>
-    public void MerkeGesendet(DateTimeOffset jetzt) => ZuletztGesendetAm = jetzt;
+    public void MerkeGesendet(DateTimeOffset now) => ZuletztGesendetAm = now;
 
     /// <summary>Die Schalter, zum Schreiben in eine Zeile.</summary>
     public IReadOnlyDictionary<Benachrichtigungsart, bool> Schalter => _arten;
 }
 
-/// <summary>Ein Eintrag im Postfach der Person.</summary>
+/// <summary>Ein Eintrag im Inbox der Person.</summary>
 /// <remarks>
 /// <strong>Kein Inhalt.</strong> Dieselbe Regel wie bei der Outbox, und aus
 /// demselben Grund: was hier steht, landet in jeder Sicherung. Eine Spalte für
-/// den Text wäre eine Einladung, „Acme GmbH möchte deinen Marktstatus sehen"
-/// hineinzuschreiben. Die Art genügt, um in der Anwendung die richtige Stelle
+/// den Text wäre eine Einladung, „Acme GmbH möchte deinen MarketStatus sehen"
+/// hineinzuschreiben. Die Art genügt, um in der Anwendung die richtige Job
 /// zu zeigen — und die Anwendung prüft, wer liest.
 /// </remarks>
 public sealed class Eingang
 {
     private Eingang(
         Guid id,
-        SubjectId wer,
-        Benachrichtigungsart art,
+        SubjectId subject,
+        Benachrichtigungsart kind,
         DateTimeOffset angelegtAm,
         DateTimeOffset? gelesenAm)
     {
         Id = id;
-        Wer = wer;
-        Art = art;
+        Wer = subject;
+        Art = kind;
         AngelegtAm = angelegtAm;
         GelesenAm = gelesenAm;
     }
@@ -127,63 +127,63 @@ public sealed class Eingang
     public DateTimeOffset? GelesenAm { get; private set; }
 
     /// <summary>Legt einen Eintrag an.</summary>
-    public static Eingang Lege_an(SubjectId wer, Benachrichtigungsart art, DateTimeOffset jetzt) =>
-        new(Guid.CreateVersion7(), wer, art, jetzt, null);
+    public static Eingang Lege_an(SubjectId subject, Benachrichtigungsart kind, DateTimeOffset now) =>
+        new(Guid.CreateVersion7(), subject, kind, now, null);
 
     /// <summary>Der Eintrag, wie eine Zeile ihn hält.</summary>
     public static Eingang Stelle_her(
         Guid id,
-        SubjectId wer,
-        Benachrichtigungsart art,
+        SubjectId subject,
+        Benachrichtigungsart kind,
         DateTimeOffset angelegtAm,
         DateTimeOffset? gelesenAm) =>
-        new(id, wer, art, angelegtAm, gelesenAm);
+        new(id, subject, kind, angelegtAm, gelesenAm);
 
     /// <summary>Markiert ihn als gelesen. Ein zweites Mal ändert nichts.</summary>
-    public void Lies(DateTimeOffset jetzt) => GelesenAm ??= jetzt;
+    public void Lies(DateTimeOffset now) => GelesenAm ??= now;
 }
 
 /// <summary>Findet und speichert Wünsche.</summary>
-public interface IWunschspeicher
+public interface IPreferenceStore
 {
     /// <summary>Die Wünsche dieser Person, oder <c>null</c>.</summary>
-    Task<Benachrichtigungswunsch?> HoleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default);
+    Task<NotificationPreference?> GetAsync(
+        SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(
-        Benachrichtigungswunsch wunsch, CancellationToken cancellationToken = default);
+    Task SaveAsync(
+        NotificationPreference preference, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Findet und speichert Eingänge.</summary>
-public interface IEingangsspeicher
+public interface IInboxStore
 {
     /// <summary>Legt einen Eintrag an.</summary>
-    Task FuegeHinzuAsync(Eingang eingang, CancellationToken cancellationToken = default);
+    Task AppendAsync(Eingang eingang, CancellationToken cancellationToken = default);
 
-    /// <summary>Das Postfach dieser Person, neueste zuerst.</summary>
-    Task<IReadOnlyList<Eingang>> FuerPersonAsync(
-        SubjectId wer, CancellationToken cancellationToken = default);
+    /// <summary>Das Inbox dieser Person, neueste zuerst.</summary>
+    Task<IReadOnlyList<Eingang>> ForPersonAsync(
+        SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Markiert alles Ungelesene als gelesen.</summary>
     /// <returns>Wie viele Einträge das betraf.</returns>
-    Task<int> LiesAllesAsync(
-        SubjectId wer, DateTimeOffset jetzt, CancellationToken cancellationToken = default);
+    Task<int> ReadAllAsync(
+        SubjectId subject, DateTimeOffset now, CancellationToken cancellationToken = default);
 
     /// <summary>Gab es seit <paramref name="seit"/> schon einen Eintrag dieser Art?</summary>
     /// <remarks>
-    /// <para>Die Tageskappe aus ADR-0033, und sie wird aus dem <em>Postfach</em>
+    /// <para>Die Tageskappe aus ADR-0033, und sie wird aus dem <em>Inbox</em>
     /// beantwortet statt aus einer eigenen Spalte. Das ist der Punkt: eine
     /// Spalte „zuletzt entdeckt am" wäre eine zweite Zeile über die
-    /// Sichtbarkeit eines Menschen, und das Postfach hält dieselbe Auskunft
+    /// Sichtbarkeit eines Menschen, und das Inbox hält dieselbe Auskunft
     /// bereits — es gehört ihm.</para>
     ///
     /// <para>Sie trägt nebenbei auch die Mindestens-einmal-Zustellung: eine
     /// zweite Ausgangszeile derselben Art am selben Tag legt nichts Neues an.</para>
     /// </remarks>
-    Task<bool> GabEsSeitAsync(
-        SubjectId wer,
-        Benachrichtigungsart art,
+    Task<bool> ExistedSinceAsync(
+        SubjectId subject,
+        Benachrichtigungsart kind,
         DateTimeOffset seit,
         CancellationToken cancellationToken = default);
 }

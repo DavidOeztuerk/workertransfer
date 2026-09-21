@@ -26,7 +26,7 @@ namespace WorkerTransfer.Resume.Tests;
 /// <strong>Der Zähler ist der Punkt, nicht die Bequemlichkeit.</strong> Die
 /// Zusage lautet „ohne Auslösung wird kein Dokument gelesen", und sie liesse
 /// sich auch am leeren Index ablesen — schwächer: ein Lesevorgang, der läuft
-/// und sein Ergebnis wegwirft, hat das Zeugnis trotzdem gelesen. Gemessen wird
+/// und sein Ergebnis wegwirft, hat das Reference trotzdem gelesen. Gemessen wird
 /// deshalb der <em>Aufruf</em>.
 /// <para>
 /// Er umhüllt den ECHTEN Erkenner statt ihn zu ersetzen: eine Attrappe, die
@@ -42,21 +42,21 @@ public sealed class Zaehlerkennung(PdfTexterkennung echter) : ITexterkennung
     public int Aufrufe => Volatile.Read(ref _aufrufe);
 
     /// <inheritdoc />
-    public Erkanntes Lies(ReadOnlyMemory<byte> inhalt, string inhaltstyp)
+    public Erkanntes Lies(ReadOnlyMemory<byte> content, string inhaltstyp)
     {
         Interlocked.Increment(ref _aufrufe);
-        return echter.Lies(inhalt, inhaltstyp);
+        return echter.Lies(content, inhaltstyp);
     }
 }
 
 /// <summary>
-/// Der Elektroniker lädt sein Zeugnis hoch, drückt einen Knopf, und die
+/// Der Elektroniker lädt sein Reference hoch, drückt einen Knopf, und die
 /// Plattform sagt ihm, was darin steht (PBI-7, ADR-0043).
 /// </summary>
 /// <remarks>
 /// <para><strong>Mit echten PDFs und dem echten Erkenner.</strong> Die halbe
 /// Zusage betrifft die Datei und nicht die Zeile: dass aus einem Bild nichts zu
-/// lesen ist, dass die Schreibweise im Zeugnis zum Namen im Profil wird, dass
+/// lesen ist, dass die Schreibweise im Reference zum Namen im Profile wird, dass
 /// ein Umbruch mitten im Wort nichts kaputtmacht. Eine Erkenner-Attrappe
 /// bestätigte all das, ohne eines davon zu prüfen.</para>
 ///
@@ -89,20 +89,20 @@ public class ErkennungsreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:resume", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
             host.UseSetting("Ablage:Verzeichnis", _ablage);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _tor));
-                dienste.Replace(ServiceDescriptor.Scoped<IZustellung>(_ => _versand));
-                dienste.Replace(ServiceDescriptor.Singleton<ITexterkennung>(anbieter =>
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _tor));
+                services.Replace(ServiceDescriptor.Scoped<IDelivery>(_ => _versand));
+                services.Replace(ServiceDescriptor.Singleton<ITexterkennung>(provider =>
                     new Zaehlerkennung(
                         new PdfTexterkennung(
-                            anbieter.GetRequiredService<
+                            provider.GetRequiredService<
                                 Microsoft.Extensions.Logging.ILogger<PdfTexterkennung>>()))));
             });
         });
@@ -134,63 +134,63 @@ public class ErkennungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// und damit auch der Fall, an dem PdfPigs <c>Text</c> zwei Blöcke ohne
     /// Leerzeichen aneinandersetzt.
     /// </remarks>
-    private static byte[] EinPdfMit(params string[] zeilen)
+    private static byte[] EinPdfMit(params string[] rows)
     {
         var bauer = new PdfDocumentBuilder();
-        var seite = bauer.AddPage(UglyToad.PdfPig.Content.PageSize.A4);
+        var page = bauer.AddPage(UglyToad.PdfPig.Content.PageSize.A4);
         var schrift = bauer.AddStandard14Font(Standard14Font.Helvetica);
 
         var y = 760.0;
 
-        foreach (var zeile in zeilen)
+        foreach (var row in rows)
         {
-            seite.AddText(zeile, 12, new PdfPoint(40, y), schrift);
+            page.AddText(row, 12, new PdfPoint(40, y), schrift);
             y -= 20;
         }
 
         return bauer.Build();
     }
 
-    private HttpClient AlsPerson(Guid wer)
+    private HttpClient AlsPerson(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Person(wer));
+            new AuthenticationHeaderValue("Bearer", Tokenform.Person(subject));
 
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     private static Task<HttpResponseMessage> Lade(
-        HttpClient browser, byte[] inhalt, string dateiname, string name)
+        HttpClient browser, byte[] content, string dateiname, string name)
     {
         var formular = new MultipartFormDataContent();
-        var datei = new ByteArrayContent(inhalt);
-        datei.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-        formular.Add(datei, "file", dateiname);
+        var file = new ByteArrayContent(content);
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        formular.Add(file, "file", dateiname);
         formular.Add(new StringContent(name), "name");
         formular.Add(new StringContent("zeugnis"), "kind");
 
         return browser.PostAsync("/resumes/me/documents", formular);
     }
 
-    /// <summary>Die Wörter, die zu einer Unterlage gefunden wurden.</summary>
-    private static string[] Begriffe(JsonElement stand, string name) =>
-        [.. stand.EnumerateArray()
-            .First(eintrag => eintrag.GetProperty("name").GetString() == name)
+    /// <summary>Die Wörter, die zu einer DocumentRecord gefunden wurden.</summary>
+    private static string[] Begriffe(JsonElement state, string name) =>
+        [.. state.EnumerateArray()
+            .First(entry => entry.GetProperty("name").GetString() == name)
             .GetProperty("terms").EnumerateArray()
-            .Select(wort => wort.GetString()!)];
+            .Select(word => word.GetString()!)];
 
-    private async Task<int> FundzeilenFuer(Guid wer)
+    private async Task<int> FundzeilenFuer(Guid subject)
     {
-        await using var quelle = ResumeDbContextFactory.DataSource(postgres.ConnectionString);
-        await using var kontext = new ResumeDbContext(
-            (DbContextOptions<ResumeDbContext>)ResumeDbContextFactory.Konfiguriere(
-                new DbContextOptionsBuilder<ResumeDbContext>(), quelle).Options);
+        await using var source = ResumeDbContextFactory.DataSource(postgres.ConnectionString);
+        await using var context = new ResumeDbContext(
+            (DbContextOptions<ResumeDbContext>)ResumeDbContextFactory.Configure(
+                new DbContextOptionsBuilder<ResumeDbContext>(), source).Options);
 
-        return await kontext.Funde.CountAsync(zeile => zeile.SubjectId == wer);
+        return await context.Funde.CountAsync(row => row.SubjectId == subject);
     }
 
     // -----------------------------------------------------------------------
@@ -207,7 +207,7 @@ public class ErkennungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// ADR-0004 für GitHub schon sagt: einmal auf Bitte hinsehen ist etwas
     /// anderes als dauerhaft hinterhersehen.
     /// <para>
-    /// Gemessen an drei Stellen, weil jede für sich zu schwach wäre: der
+    /// Gemessen an drei Jobs, weil jede für sich zu schwach wäre: der
     /// <em>Zähler</em> des Erkenners (es wurde nicht gelesen), die
     /// <em>Antwort</em> (<c>read_at</c> ist null, also „noch nie gelesen") und
     /// die <em>Tabelle</em> (es steht keine Zeile darin).
@@ -223,25 +223,25 @@ public class ErkennungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         _zaehler.Aufrufe.Should().Be(0, "das Hochladen ruft den Erkenner nicht");
 
-        var stand = await Json(await ihr.GetAsync("/resumes/me/documents/terms"));
+        var state = await Json(await ihr.GetAsync("/resumes/me/documents/terms"));
 
-        stand.GetArrayLength().Should().Be(1);
-        stand[0].GetProperty("read_at").ValueKind.Should().Be(JsonValueKind.Null);
-        stand[0].GetProperty("terms").GetArrayLength().Should().Be(0);
+        state.GetArrayLength().Should().Be(1);
+        state[0].GetProperty("read_at").ValueKind.Should().Be(JsonValueKind.Null);
+        state[0].GetProperty("terms").GetArrayLength().Should().Be(0);
 
         // Und auch die Abfrage selbst liest nicht — sonst wäre das Öffnen der
-        // Profilseite genau der Hintergrundlauf, den der Knopf vermeidet.
+        // ProfilePage genau der Hintergrundlauf, den der Knopf vermeidet.
         _zaehler.Aufrufe.Should().Be(0);
         (await FundzeilenFuer(anna)).Should().Be(0);
     }
 
     /// <summary>
-    /// <strong>Ein Klick, und im Zeugnis steht „Schweißfachmann".</strong>
+    /// <strong>Ein Klick, und im Reference steht „Schweißfachmann".</strong>
     /// </summary>
     /// <remarks>
     /// Die Abnahme aus PBI-7, ganz: hochgeladen wird ein PDF mit der
     /// Schreibweise ohne Eszett, zurück kommt der kanonische Name. Das ist der
-    /// Wortschatz bei der Arbeit — er <em>benennt um</em> und folgert nichts
+    /// Vocabulary bei der Arbeit — er <em>benennt um</em> und folgert nichts
     /// (ADR-0023): dass jemand auch schweissen kann, steht hier nicht.
     /// </remarks>
     [Fact]
@@ -262,11 +262,11 @@ public class ErkennungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         gelesen.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var stand = await Json(gelesen);
+        var state = await Json(gelesen);
 
-        stand[0].GetProperty("read_at").ValueKind.Should().NotBe(JsonValueKind.Null);
-        stand[0].GetProperty("has_text").GetBoolean().Should().BeTrue();
-        Begriffe(stand, "Arbeitszeugnis Nord").Should().Contain("Schweißfachmann").And.Contain("CNC");
+        state[0].GetProperty("read_at").ValueKind.Should().NotBe(JsonValueKind.Null);
+        state[0].GetProperty("has_text").GetBoolean().Should().BeTrue();
+        Begriffe(state, "Arbeitszeugnis Nord").Should().Contain("Schweißfachmann").And.Contain("CNC");
 
         _zaehler.Aufrufe.Should().Be(1, "genau eine Unterlage, genau ein Lesevorgang");
     }
@@ -277,7 +277,7 @@ public class ErkennungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// <remarks>
     /// Die Gegenprobe zur Verlockung. Wer „Schweißfachmann" liest, weiss, dass
     /// dieser Mensch schweisst — und darf es trotzdem nicht hinschreiben: das
-    /// wäre eine Aussage über ihn, die er nie getroffen hat, an einer Stelle,
+    /// wäre eine Aussage über ihn, die er nie getroffen hat, an einer Job,
     /// an der er nicht widerspricht. Dieselbe Prüfung wie
     /// <c>Aus_MIG_MAG_folgt_kein_Schweissen</c>, eine Schicht höher.
     /// </remarks>
@@ -287,9 +287,9 @@ public class ErkennungsreiseTests(Postgres postgres) : IAsyncLifetime
         var ihr = AlsPerson(Guid.CreateVersion7());
 
         await Lade(ihr, EinPdfMit("Schweissfachmann DVS, mit Urkunde."), "z.pdf", "Zeugnis");
-        var stand = await Json(await ihr.PostAsync("/resumes/me/documents/read", null));
+        var state = await Json(await ihr.PostAsync("/resumes/me/documents/read", null));
 
-        Begriffe(stand, "Zeugnis").Should().Equal("Schweißfachmann");
+        Begriffe(state, "Zeugnis").Should().Equal("Schweißfachmann");
     }
 
     /// <summary>
@@ -310,12 +310,12 @@ public class ErkennungsreiseTests(Postgres postgres) : IAsyncLifetime
         await Lade(ihr, EinBild, "brief.png", "Meisterbrief");
         await Lade(ihr, EinPdfMit("Ein Zeugnis ohne bekannte Woerter."), "z.pdf", "Zeugnis");
 
-        var stand = await Json(await ihr.PostAsync("/resumes/me/documents/read", null));
+        var state = await Json(await ihr.PostAsync("/resumes/me/documents/read", null));
 
-        var bild = stand.EnumerateArray()
-            .First(eintrag => eintrag.GetProperty("name").GetString() == "Meisterbrief");
-        var text = stand.EnumerateArray()
-            .First(eintrag => eintrag.GetProperty("name").GetString() == "Zeugnis");
+        var bild = state.EnumerateArray()
+            .First(entry => entry.GetProperty("name").GetString() == "Meisterbrief");
+        var text = state.EnumerateArray()
+            .First(entry => entry.GetProperty("name").GetString() == "Zeugnis");
 
         // Beide haben keine Wörter …
         bild.GetProperty("terms").GetArrayLength().Should().Be(0);
@@ -332,8 +332,8 @@ public class ErkennungsreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Zweimal lesen legt keine zweite Zeile an.</summary>
     /// <remarks>
-    /// Der Knopf liest jedes Mal alles neu — absichtlich, denn der Wortschatz
-    /// wächst per Pull Request, und ein Zeugnis, das vorher gelesen wurde,
+    /// Der Knopf liest jedes Mal alles neu — absichtlich, denn der Vocabulary
+    /// wächst per Pull Request, und ein Reference, das vorher gelesen wurde,
     /// trüge seinen Fund sonst für immer unvollständig. Er ersetzt dabei, statt
     /// anzuhäufen: sonst stünde derselbe Vorschlag doppelt in der Liste.
     /// </remarks>
@@ -354,10 +354,10 @@ public class ErkennungsreiseTests(Postgres postgres) : IAsyncLifetime
         _zaehler.Aufrufe.Should().Be(2);
     }
 
-    /// <summary>Wer die Unterlage wegnimmt, nimmt den Fund mit.</summary>
+    /// <summary>Wer die DocumentRecord wegnimmt, nimmt den Fund mit.</summary>
     /// <remarks>
-    /// Bliebe er stehen, böte die Profilseite weiter Wörter aus einem Zeugnis
-    /// an, das die Person eben gelöscht hat — ein Beleg ohne seinen Gegenstand.
+    /// Bliebe er stehen, böte die ProfilePage weiter Wörter aus einem Reference
+    /// an, das die Person eben gelöscht hat — ein Evidence ohne seinen Gegenstand.
     /// </remarks>
     [Fact]
     public async Task Mit_der_Unterlage_faellt_ihr_Fund()
@@ -387,7 +387,7 @@ public class ErkennungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// </summary>
     /// <remarks>
     /// Die Auflage, unter der dieser Index überhaupt gebaut werden durfte — und
-    /// die Stelle, an der sie am leisesten bricht: nach einer Löschung sind
+    /// die Job, an der sie am leisesten bricht: nach einer Löschung sind
     /// auch die Unterlagen weg, also antwortet <c>/terms</c> ohnehin leer. Ein
     /// Test, der nur die Antwort ansieht, wäre grün, während die Tabelle die
     /// Wörter aus den Zeugnissen eines gelöschten Menschen weiter hielte.

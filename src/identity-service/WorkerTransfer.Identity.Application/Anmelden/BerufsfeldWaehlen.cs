@@ -5,24 +5,24 @@ using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Application.Anmelden;
 
-/// <summary>Eine Person nennt ihr Berufsfeld — oder nimmt die Angabe zurück.</summary>
+/// <summary>Eine Person nennt ihr OccupationalField — oder nimmt die Angabe zurück.</summary>
 /// <param name="Wer">Wessen Konto. Immer das des Aufrufers.</param>
 /// <param name="Berufsfeld">Was sie gewählt hat, oder <c>null</c> für „keins".</param>
-public sealed record BerufsfeldWaehlenBefehl(SubjectId Wer, Berufsfeld? Berufsfeld)
+public sealed record ChooseOccupationalFieldCommand(SubjectId Wer, OccupationalField? OccupationalField)
     : IBefehl<bool>;
 
 /// <inheritdoc cref="BerufsfeldWaehlenBefehl" />
 /// <remarks>
 /// Nur das eigene Konto — deshalb steht keine Kennung im Rumpf. <c>null</c>
 /// heisst entfernen, sonst wäre eine einmal getroffene Wahl endgültig. Das
-/// Berufsfeld wird nie aus dem Verhalten geschlossen (ADR-0039).
+/// OccupationalField wird nie aus dem Verhalten geschlossen (ADR-0039).
 /// </remarks>
-public sealed class BerufsfeldWaehlenHandler(IUserRepository benutzer)
-    : IRequestHandler<BerufsfeldWaehlenBefehl, bool>
+public sealed class ChooseOccupationalFieldHandler(IUserRepository benutzer)
+    : IRequestHandler<ChooseOccupationalFieldCommand, bool>
 {
     /// <inheritdoc />
     public async Task<bool> Handle(
-        BerufsfeldWaehlenBefehl request,
+        ChooseOccupationalFieldCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -34,7 +34,7 @@ public sealed class BerufsfeldWaehlenHandler(IUserRepository benutzer)
             return false;
         }
 
-        konto.BerufsfeldWaehlen(request.Berufsfeld);
+        konto.BerufsfeldWaehlen(request.OccupationalField);
 
         // Aggregate kommen losgelöst zurück: ohne diesen Aufruf erreicht die
         // Wahl die Datenbank nie.

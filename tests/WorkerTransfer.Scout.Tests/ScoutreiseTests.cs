@@ -11,13 +11,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.Scout.Application.Ports;
-using WorkerTransfer.Scout.Domain.Treffer;
+using WorkerTransfer.Scout.Domain.Hit;
 using WorkerTransfer.Scout.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Scout.Tests;
 
-/// <summary>Suchen, ablegen, ansprechen — und gelöscht werden.</summary>
+/// <summary>Searches, ablegen, ansprechen — und gelöscht werden.</summary>
 /// <remarks>
 /// Die Reihe geht den ganzen Weg über den Draht, weil zwischen einem Handler
 /// und dem, was ein Browser bekommt, noch die Einstellungen, die Verdrahtung
@@ -56,18 +56,18 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:scout", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IProfilsuche>(_ => _suche));
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _tor));
-                dienste.Replace(ServiceDescriptor.Scoped<IBelege>(_ => _belege));
-                dienste.Replace(ServiceDescriptor.Scoped<IEntwerfer>(_ => _entwerfer));
-                dienste.Replace(ServiceDescriptor.Scoped<IStellen>(_ => _stellen));
+                services.Replace(ServiceDescriptor.Scoped<IProfileSearch>(_ => _suche));
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _tor));
+                services.Replace(ServiceDescriptor.Scoped<IEvidenceSource>(_ => _belege));
+                services.Replace(ServiceDescriptor.Scoped<IDrafter>(_ => _entwerfer));
+                services.Replace(ServiceDescriptor.Scoped<IJobs>(_ => _stellen));
             });
         });
     }
@@ -84,7 +84,7 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Ohne Token: 401. Als Person ohne Firma: 403.</summary>
     /// <remarks>
-    /// Die zweite Hälfte ist die, die man vergisst. Auf einem Transfermarkt ist
+    /// Die zweite Hälfte ist die, die man vergisst. Auf einem TransferMarket ist
     /// ein Mensch ohne Firma der Normalfall — und 403 ist eine Aussage über den
     /// <em>Aufrufer</em>, die über die Gesuchten nichts verrät.
     /// </remarks>
@@ -97,8 +97,8 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
         var person = await AlsPerson().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
         person.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        var firma = await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
-        firma.StatusCode.Should().Be(HttpStatusCode.OK);
+        var company = await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
+        company.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     // ---------------------------------------------------------------------
@@ -107,7 +107,7 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Der Ledger wird bei JEDEM Aufruf gefragt.</summary>
     /// <remarks>
-    /// ADR-0013: ein Widerruf muss beim nächsten Lesen wirken. Ein
+    /// ADR-0013: ein Revocation muss beim nächsten Lesen wirken. Ein
     /// Zwischenspeicher wäre hier kein Leistungsdetail, sondern ein Regelbruch —
     /// und er fiele erst auf, wenn jemand widerrufen hat und trotzdem gefunden
     /// wird.
@@ -115,9 +115,9 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Jeder_Aufruf_fragt_den_Ledger_erneut()
     {
-        var wer = Guid.NewGuid();
-        _suche.Bestand.Add(Profil(wer));
-        _tor.Frei.Add((wer, Firma));
+        var subject = Guid.NewGuid();
+        _suche.Bestand.Add(Profile(subject));
+        _tor.Frei.Add((subject, Firma));
 
         var vorher = _tor.Fragen;
 
@@ -131,32 +131,32 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_schweigender_Ledger_gibt_503()
     {
-        _suche.Bestand.Add(Profil(Guid.NewGuid()));
+        _suche.Bestand.Add(Profile(Guid.NewGuid()));
         _tor.Schweigt = true;
 
-        var antwort = await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
+        var response = await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
-        (await Json(antwort)).GetProperty("correlationId").GetString().Should().NotBeNullOrEmpty();
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await Json(response)).GetProperty("correlationId").GetString().Should().NotBeNullOrEmpty();
     }
 
     /// <summary>
     /// Eine Antwort, die nicht zu den Fragen passt, wird nicht geraten.
     /// </summary>
     /// <remarks>
-    /// Falsch zuzuordnen hiesse, das Profil der falschen Person zu zeigen. 503
+    /// Falsch zuzuordnen hiesse, das Profile der falschen Person zu zeigen. 503
     /// und nicht „so gut es geht".
     /// </remarks>
     [Fact]
     public async Task Eine_unpassende_Ledgerantwort_wird_nicht_geraten()
     {
-        _suche.Bestand.Add(Profil(Guid.NewGuid()));
-        _suche.Bestand.Add(Profil(Guid.NewGuid()));
+        _suche.Bestand.Add(Profile(Guid.NewGuid()));
+        _suche.Bestand.Add(Profile(Guid.NewGuid()));
         _tor.AntwortetMitLaenge = 1;
 
-        var antwort = await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
+        var response = await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     /// <summary>
@@ -179,9 +179,9 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
     {
         _suche.Verschlossen = true;
 
-        var antwort = await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
+        var response = await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
 
-        antwort.StatusCode.Should().Be(
+        response.StatusCode.Should().Be(
             HttpStatusCode.ServiceUnavailable,
             "eine leere Trefferliste waere eine Aussage ueber Menschen, die aus "
             + "einer fehlenden Umgebungsvariablen stammt");
@@ -197,9 +197,9 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
     {
         _suche.Schweigt = true;
 
-        var antwort = await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
+        var response = await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     /// <summary>Wer nicht freigegeben hat, taucht nicht auf — und die Seite bleibt kurz.</summary>
@@ -213,29 +213,29 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
         var frei = Guid.NewGuid();
         var verborgen = Guid.NewGuid();
 
-        _suche.Bestand.Add(Profil(frei));
-        _suche.Bestand.Add(Profil(verborgen));
+        _suche.Bestand.Add(Profile(frei));
+        _suche.Bestand.Add(Profile(verborgen));
         _tor.Frei.Add((frei, Firma));
 
-        var antwort = await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
-        var rumpf = await Json(antwort);
+        var response = await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
+        var body = await Json(response);
 
-        rumpf.GetProperty("items").EnumerateArray()
-            .Select(eintrag => eintrag.GetProperty("subject_id").GetGuid())
+        body.GetProperty("items").EnumerateArray()
+            .Select(entry => entry.GetProperty("subject_id").GetGuid())
             .Should().Equal(frei);
 
-        rumpf.TryGetProperty("total", out _).Should().BeFalse();
-        rumpf.TryGetProperty("count", out _).Should().BeFalse();
-        rumpf.EnumerateObject().Select(feld => feld.Name)
+        body.TryGetProperty("total", out _).Should().BeFalse();
+        body.TryGetProperty("count", out _).Should().BeFalse();
+        body.EnumerateObject().Select(field => field.Name)
             .Should().BeEquivalentTo("items", "next");
     }
 
     // ---------------------------------------------------------------------
-    // „Dein Profil wurde entdeckt"
+    // „Dein Profile wurde entdeckt"
     // ---------------------------------------------------------------------
 
     /// <summary>
-    /// Wer in einer Suche auftaucht, bekommt einen Vermerk im Postausgang —
+    /// Wer in einer Search auftaucht, bekommt einen Vermerk im Postausgang —
     /// und der nennt kein Unternehmen.
     /// </summary>
     /// <remarks>
@@ -253,24 +253,24 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
         var frei = Guid.NewGuid();
         var verborgen = Guid.NewGuid();
 
-        _suche.Bestand.Add(Profil(frei));
-        _suche.Bestand.Add(Profil(verborgen));
+        _suche.Bestand.Add(Profile(frei));
+        _suche.Bestand.Add(Profile(verborgen));
         _tor.Frei.Add((frei, Firma));
 
         await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
 
         var vermerke = await Postausgang();
 
-        vermerke.Where(zeile => zeile.UserId == frei)
+        vermerke.Where(row => row.UserId == frei)
             .Should().ContainSingle()
             .Which.Kind.Should().Be("profile_discovered");
 
-        vermerke.Should().NotContain(zeile => zeile.UserId == verborgen);
+        vermerke.Should().NotContain(row => row.UserId == verborgen);
 
         // Die Zeile traegt Kennung und Art. Der Mandant steht nirgends darin —
         // „ein Unternehmen" genuegt, und wer sucht, ist eine Aussage ueber das
         // Unternehmen.
-        var zeilenfelder = typeof(OutboxZeile).GetProperties().Select(e => e.Name);
+        var zeilenfelder = typeof(OutboxRow).GetProperties().Select(e => e.Name);
         zeilenfelder.Should().NotContain("TenantId");
     }
 
@@ -278,21 +278,21 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Derselbe_Mensch_bekommt_je_Seite_einen_Vermerk()
     {
-        var wer = Guid.NewGuid();
+        var subject = Guid.NewGuid();
 
         // Zweimal derselbe Mensch in einer Seite — das kann profile-service
         // nicht liefern, aber der Befehl soll es trotzdem aushalten.
-        _suche.Bestand.Add(Profil(wer));
-        _suche.Bestand.Add(Profil(wer));
-        _tor.Frei.Add((wer, Firma));
+        _suche.Bestand.Add(Profile(subject));
+        _suche.Bestand.Add(Profile(subject));
+        _tor.Frei.Add((subject, Firma));
 
         await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
 
-        (await Postausgang()).Count(zeile => zeile.UserId == wer).Should().Be(1);
+        (await Postausgang()).Count(row => row.UserId == subject).Should().Be(1);
     }
 
     // ---------------------------------------------------------------------
-    // Die Erreichbarkeit (ADR-0041)
+    // Die Availability (ADR-0041)
     // ---------------------------------------------------------------------
 
     /// <summary>
@@ -300,9 +300,9 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
     /// </summary>
     /// <remarks>
     /// <para>Die Kernauflage von ADR-0041, und sie ist eine Aussage über die
-    /// <em>Länge</em> der Liste: die Stelle filtert nicht. Beide Menschen kommen
+    /// <em>Länge</em> der Liste: die Job filtert nicht. Beide Menschen kommen
     /// zurück, einer mit Haken, einer mit Kreuz. Das Unternehmen entscheidet,
-    /// nicht die Suche — und es sieht, warum.</para>
+    /// nicht die Search — und es sieht, warum.</para>
     ///
     /// <para>Nebenbei die zweite Zusage: neben dem Häkchen steht keine
     /// Kilometerzahl, sondern stehen die beiden <em>Aussagen</em>.</para>
@@ -312,123 +312,123 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var nah = Guid.NewGuid();
         var fern = Guid.NewGuid();
-        var stelle = Guid.NewGuid();
+        var job = Guid.NewGuid();
 
-        _suche.Bestand.Add(Profil(nah) with { Ort = "Potsdam", Pendelstufe = Pendelstufe.Bis50 });
-        _suche.Bestand.Add(Profil(fern) with { Ort = "München", Pendelstufe = Pendelstufe.Bis10 });
+        _suche.Bestand.Add(Profile(nah) with { Ort = "Potsdam", Pendelstufe = Pendelstufe.Bis50 });
+        _suche.Bestand.Add(Profile(fern) with { Ort = "München", Pendelstufe = Pendelstufe.Bis10 });
         _tor.Frei.Add((nah, Firma));
         _tor.Frei.Add((fern, Firma));
-        _stellen.Bestand[stelle] = new Stellenaussage("Berlin", "", Anwesenheit.VorOrt);
+        _stellen.Bestand[job] = new JobStatement("Berlin", "", Anwesenheit.VorOrt);
 
-        var rumpf = await Json(await AlsFirma().GetAsync(
-            new Uri($"/scout/candidates?stelle={stelle}", UriKind.Relative)));
+        var body = await Json(await AlsFirma().GetAsync(
+            new Uri($"/scout/candidates?stelle={job}", UriKind.Relative)));
 
-        var eintraege = rumpf.GetProperty("items").EnumerateArray()
+        var entries = body.GetProperty("items").EnumerateArray()
             .ToDictionary(e => e.GetProperty("subject_id").GetGuid());
 
-        eintraege.Should().HaveCount(2, "die Stelle filtert nicht, sie erklaert");
-        eintraege[nah].GetProperty("reach").GetString().Should().Be("reachable");
-        eintraege[fern].GetProperty("reach").GetString().Should().Be("further");
+        entries.Should().HaveCount(2, "die Stelle filtert nicht, sie erklaert");
+        entries[nah].GetProperty("reach").GetString().Should().Be("reachable");
+        entries[fern].GetProperty("reach").GetString().Should().Be("further");
 
         // Die Aussagen stehen daneben, die Entfernung nicht.
-        eintraege[fern].GetProperty("reach_commute").GetString().Should().Be("bis_10");
-        eintraege[fern].GetProperty("reach_attendance").GetString().Should().Be("vor_ort");
+        entries[fern].GetProperty("reach_commute").GetString().Should().Be("bis_10");
+        entries[fern].GetProperty("reach_attendance").GetString().Should().Be("vor_ort");
 
-        var text = rumpf.ToString();
+        var text = body.ToString();
         foreach (var verboten in new[] { "km", "distance", "entfernung", "505" })
         {
             text.Should().NotContain(verboten, "keine Kilometerzahl auf dem Draht");
         }
     }
 
-    /// <summary>Ohne Stelle trägt jeder Treffer einen Strich — und keinen Fehler.</summary>
+    /// <summary>Ohne Job trägt jeder Hit einen Strich — und keinen Fehler.</summary>
     [Fact]
     public async Task Ohne_Stelle_traegt_jeder_Treffer_einen_Strich()
     {
-        var wer = Guid.NewGuid();
-        _suche.Bestand.Add(Profil(wer) with { Pendelstufe = Pendelstufe.Bis10 });
-        _tor.Frei.Add((wer, Firma));
+        var subject = Guid.NewGuid();
+        _suche.Bestand.Add(Profile(subject) with { Pendelstufe = Pendelstufe.Bis10 });
+        _tor.Frei.Add((subject, Firma));
 
-        var rumpf = await Json(await AlsFirma().GetAsync(
+        var body = await Json(await AlsFirma().GetAsync(
             new Uri("/scout/candidates", UriKind.Relative)));
 
-        rumpf.GetProperty("items").EnumerateArray().Should().ContainSingle()
+        body.GetProperty("items").EnumerateArray().Should().ContainSingle()
             .Which.GetProperty("reach").GetString().Should().Be("unsaid");
 
         _stellen.Fragen.Should().Be(0, "ohne Stelle wird jobs-service gar nicht gefragt");
     }
 
     /// <summary>
-    /// Eine schweigende Stelle kostet das Häkchen, nicht die Trefferseite.
+    /// Eine schweigende Job kostet das Häkchen, nicht die HitPage.
     /// </summary>
     /// <remarks>
     /// Der Unterschied zum Ledger und zur Profilsuche, und er ist bewusst: dort
     /// heisst Schweigen 503, weil eine leere Liste eine Aussage über Menschen
-    /// wäre. Hier fehlt nur eine Auskunft ÜBER die Liste — die Treffer selbst
+    /// wäre. Hier fehlt nur eine Auskunft ÜBER die Liste — die Hit selbst
     /// sind vollständig, und ein 503 nähme sie alle weg (ADR-0041).
     /// </remarks>
     [Fact]
     public async Task Eine_schweigende_Stelle_kostet_nur_das_Haekchen()
     {
-        var wer = Guid.NewGuid();
-        _suche.Bestand.Add(Profil(wer) with { Pendelstufe = Pendelstufe.Bis50 });
-        _tor.Frei.Add((wer, Firma));
+        var subject = Guid.NewGuid();
+        _suche.Bestand.Add(Profile(subject) with { Pendelstufe = Pendelstufe.Bis50 });
+        _tor.Frei.Add((subject, Firma));
         _stellen.Schweigt = true;
 
-        var antwort = await AlsFirma().GetAsync(
+        var response = await AlsFirma().GetAsync(
             new Uri($"/scout/candidates?stelle={Guid.NewGuid()}", UriKind.Relative));
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(antwort)).GetProperty("items").EnumerateArray().Should().ContainSingle()
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(response)).GetProperty("items").EnumerateArray().Should().ContainSingle()
             .Which.GetProperty("reach").GetString().Should().Be("unsaid");
     }
 
-    /// <summary>Die Stelle wird EINMAL je Seite gefragt, nicht je Zeile.</summary>
+    /// <summary>Die Job wird EINMAL je Seite gefragt, nicht je Zeile.</summary>
     /// <remarks>
-    /// Sie ist für alle Treffer dieselbe. Einmal je Zeile zu fragen wäre
+    /// Sie ist für alle Hit dieselbe. Einmal je Zeile zu fragen wäre
     /// derselbe Fehler, den die Sammelfrage an den Ledger behoben hat — nur
     /// gegenüber einem anderen Dienst.
     /// </remarks>
     [Fact]
     public async Task Die_Stelle_wird_einmal_je_Seite_gefragt()
     {
-        var stelle = Guid.NewGuid();
-        _stellen.Bestand[stelle] = new Stellenaussage("Berlin", "", Anwesenheit.VorOrt);
+        var job = Guid.NewGuid();
+        _stellen.Bestand[job] = new JobStatement("Berlin", "", Anwesenheit.VorOrt);
 
         foreach (var _ in Enumerable.Range(0, 5))
         {
-            var wer = Guid.NewGuid();
-            _suche.Bestand.Add(Profil(wer));
-            _tor.Frei.Add((wer, Firma));
+            var subject = Guid.NewGuid();
+            _suche.Bestand.Add(Profile(subject));
+            _tor.Frei.Add((subject, Firma));
         }
 
         await AlsFirma().GetAsync(
-            new Uri($"/scout/candidates?stelle={stelle}", UriKind.Relative));
+            new Uri($"/scout/candidates?stelle={job}", UriKind.Relative));
 
         _stellen.Fragen.Should().Be(1);
     }
 
     // ---------------------------------------------------------------------
-    // Die gespeicherte Anfrage
+    // Die gespeicherte ResumeRequest
     // ---------------------------------------------------------------------
 
-    /// <summary>Gespeichert wird die Anfrage — und nachweislich kein Ergebnis.</summary>
+    /// <summary>Gespeichert wird die ResumeRequest — und nachweislich kein Ergebnis.</summary>
     /// <remarks>
     /// Die Gegenprobe steckt in der zweiten Hälfte: es wird gesucht, es gibt
-    /// einen Treffer, die Suche wird abgelegt — und in der abgelegten Suche
-    /// steht der Treffer nicht. Ein gespeichertes Ergebnis über Menschen
-    /// veraltete gegen einen Widerruf (ADR-0036 Entscheidung 4).
+    /// einen Hit, die Search wird abgelegt — und in der abgelegten Search
+    /// steht der Hit nicht. Ein gespeichertes Ergebnis über Menschen
+    /// veraltete gegen einen Revocation (ADR-0036 Entscheidung 4).
     /// </remarks>
     [Fact]
     public async Task Gespeichert_wird_die_Anfrage_nie_das_Ergebnis()
     {
-        var wer = Guid.NewGuid();
-        _suche.Bestand.Add(Profil(wer, ["Go"]));
-        _tor.Frei.Add((wer, Firma));
+        var subject = Guid.NewGuid();
+        _suche.Bestand.Add(Profile(subject, ["Go"]));
+        _tor.Frei.Add((subject, Firma));
 
-        var gefunden = await AlsFirma().GetAsync(
+        var found = await AlsFirma().GetAsync(
             new Uri("/scout/candidates?skill=Go", UriKind.Relative));
-        (await Json(gefunden)).GetProperty("items").GetArrayLength().Should().Be(1);
+        (await Json(found)).GetProperty("items").GetArrayLength().Should().Be(1);
 
         var angelegt = await AlsFirma().PostAsJsonAsync(
             new Uri("/scout/searches", UriKind.Relative),
@@ -438,7 +438,7 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
 
         var text = await angelegt.Content.ReadAsStringAsync();
 
-        text.Should().NotContain(wer.ToString(), "eine gespeicherte Suche hält keinen Treffer");
+        text.Should().NotContain(subject.ToString(), "eine gespeicherte Suche hält keinen Treffer");
         text.Should().Contain("Go");
 
         var gelesen = await Json(
@@ -448,13 +448,13 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
             .Which.GetProperty("name").GetString().Should().Be("Go in Berlin");
 
         // Und in der Tabelle steht auch nichts anderes.
-        await using var kontext = Kontext();
-        var zeile = await kontext.Suchen.SingleAsync();
-        zeile.Skills.Should().Equal("Go");
-        zeile.SubjectId.Should().Be(Werber);
+        await using var context = Kontext();
+        var row = await context.Searches.SingleAsync();
+        row.Skills.Should().Equal("Go");
+        row.SubjectId.Should().Be(Werber);
     }
 
-    /// <summary>Eine fremde Suche gibt es für mich nicht.</summary>
+    /// <summary>Eine fremde Search gibt es für mich nicht.</summary>
     [Fact]
     public async Task Eine_fremde_Suche_gibt_es_fuer_mich_nicht()
     {
@@ -504,27 +504,27 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_Ansprache_wird_entworfen_und_nichts_davon_bleibt()
     {
-        var wer = Guid.NewGuid();
-        _suche.Bestand.Add(Profil(wer, ["Go"]));
-        _tor.Frei.Add((wer, Firma));
+        var subject = Guid.NewGuid();
+        _suche.Bestand.Add(Profile(subject, ["Go"]));
+        _tor.Frei.Add((subject, Firma));
 
         var vorher = (await Postausgang()).Count;
 
-        var antwort = await AlsFirma().PostAsJsonAsync(
-            new Uri($"/scout/candidates/{wer}/draft", UriKind.Relative),
+        var response = await AlsFirma().PostAsJsonAsync(
+            new Uri($"/scout/candidates/{subject}/draft", UriKind.Relative),
             new { skills = new[] { "Go" }, wish = "kurz" });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var rumpf = await Json(antwort);
-        rumpf.GetProperty("draft").GetString().Should().NotBeNullOrEmpty();
-        rumpf.EnumerateObject().Select(feld => feld.Name).Should().Equal("draft");
+        var body = await Json(response);
+        body.GetProperty("draft").GetString().Should().NotBeNullOrEmpty();
+        body.EnumerateObject().Select(field => field.Name).Should().Equal("draft");
 
         (await Postausgang()).Count.Should().Be(
             vorher, "ein Entwurf schickt niemandem etwas — auch keine Benachrichtigung");
 
-        await using var kontext = Kontext();
-        (await kontext.Suchen.CountAsync()).Should().Be(0, "ein Entwurf wird nicht abgelegt");
+        await using var context = Kontext();
+        (await context.Searches.CountAsync()).Should().Be(0, "ein Entwurf wird nicht abgelegt");
     }
 
     /// <summary>Wer nichts freigegeben hat, ist kein Ansprechpartner: 404.</summary>
@@ -536,12 +536,12 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Ohne_Freigabe_gibt_es_niemanden_anzusprechen()
     {
         var verborgen = Guid.NewGuid();
-        _suche.Bestand.Add(Profil(verborgen, ["Go"]));
+        _suche.Bestand.Add(Profile(verborgen, ["Go"]));
 
-        var antwort = await AlsFirma().PostAsJsonAsync(
+        var response = await AlsFirma().PostAsJsonAsync(
             new Uri($"/scout/candidates/{verborgen}/draft", UriKind.Relative), new { });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         var gibtEsNicht = await AlsFirma().PostAsJsonAsync(
             new Uri($"/scout/candidates/{Guid.NewGuid()}/draft", UriKind.Relative), new { });
@@ -550,29 +550,29 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
         _entwerfer.Letzte.Should().BeNull("ohne Freigabe sieht das Modell gar nichts");
     }
 
-    /// <summary>Ohne Anbieter sagt der Dienst das: 503, keine Vorlage.</summary>
+    /// <summary>Ohne Anbieter sagt der Dienst das: 503, keine ResumeTemplate.</summary>
     [Fact]
     public async Task Ohne_Anbieter_gibt_es_503_und_keine_Vorlage()
     {
-        var wer = Guid.NewGuid();
-        _suche.Bestand.Add(Profil(wer, ["Go"]));
-        _tor.Frei.Add((wer, Firma));
+        var subject = Guid.NewGuid();
+        _suche.Bestand.Add(Profile(subject, ["Go"]));
+        _tor.Frei.Add((subject, Firma));
         _entwerfer.Fehlt = true;
 
-        var antwort = await AlsFirma().PostAsJsonAsync(
-            new Uri($"/scout/candidates/{wer}/draft", UriKind.Relative), new { });
+        var response = await AlsFirma().PostAsJsonAsync(
+            new Uri($"/scout/candidates/{subject}/draft", UriKind.Relative), new { });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
-        (await antwort.Content.ReadAsStringAsync()).Should().NotContain("draft");
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await response.Content.ReadAsStringAsync()).Should().NotContain("draft");
     }
 
     // ---------------------------------------------------------------------
     // Die Löschung
     // ---------------------------------------------------------------------
 
-    /// <summary>Die Kaskade nimmt Suchen UND Vermerke mit.</summary>
+    /// <summary>Die Kaskade nimmt Searches UND Vermerke mit.</summary>
     /// <remarks>
-    /// Beides, und beides ist personenbezogen: die gespeicherte Suche gehört
+    /// Beides, und beides ist personenbezogen: die gespeicherte Search gehört
     /// dem Menschen, der sie abgelegt hat; die Ausgangszeile handelt von einem
     /// Menschen. Wer nur die eine löscht, hat die Zusage aus ADR-0027 zur
     /// Hälfte eingelöst — und niemand sieht es.
@@ -581,7 +581,7 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Die_Loeschung_nimmt_Suchen_und_Vermerke_mit()
     {
         var gefundener = Guid.NewGuid();
-        _suche.Bestand.Add(Profil(gefundener));
+        _suche.Bestand.Add(Profile(gefundener));
         _tor.Frei.Add((gefundener, Firma));
 
         await AlsFirma().GetAsync(new Uri("/scout/candidates", UriKind.Relative));
@@ -589,27 +589,27 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
             new Uri("/scout/searches", UriKind.Relative),
             new { name = "bleibt nicht", skills = new[] { "Go" } });
 
-        (await Postausgang()).Should().Contain(zeile => zeile.UserId == gefundener);
+        (await Postausgang()).Should().Contain(row => row.UserId == gefundener);
 
         // Der Mensch, der gefunden wurde.
         (await Loesche(gefundener)).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Postausgang()).Should().NotContain(zeile => zeile.UserId == gefundener);
+        (await Postausgang()).Should().NotContain(row => row.UserId == gefundener);
 
         // Und der Mensch, der gesucht hat.
         (await Loesche(Werber)).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        await using var kontext = Kontext();
-        (await kontext.Suchen.CountAsync(zeile => zeile.SubjectId == Werber)).Should().Be(0);
+        await using var context = Kontext();
+        (await context.Searches.CountAsync(row => row.SubjectId == Werber)).Should().Be(0);
     }
 
     /// <summary>Ohne das Geheimnis löscht niemand.</summary>
     [Fact]
     public async Task Ohne_Geheimnis_loescht_niemand()
     {
-        var antwort = await _dienst.CreateClient().PostAsJsonAsync(
+        var response = await _dienst.CreateClient().PostAsJsonAsync(
             new Uri("/erasure", UriKind.Relative), new { user_id = Guid.NewGuid() });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     // ---------------------------------------------------------------------
@@ -626,29 +626,29 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
-    private Task<HttpResponseMessage> Loesche(Guid wer)
+    private Task<HttpResponseMessage> Loesche(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", Loeschgeheimnis);
 
-        return browser.PostAsJsonAsync(new Uri("/erasure", UriKind.Relative), new { user_id = wer });
+        return browser.PostAsJsonAsync(new Uri("/erasure", UriKind.Relative), new { user_id = subject });
     }
 
     private ScoutDbContext Kontext() =>
-        new((DbContextOptions<ScoutDbContext>)ScoutDbContextFactory.Konfiguriere(
+        new((DbContextOptions<ScoutDbContext>)ScoutDbContextFactory.Configure(
             new DbContextOptionsBuilder<ScoutDbContext>(),
-            ScoutDbContextFactory.Datenquelle(postgres.ConnectionString)).Options);
+            ScoutDbContextFactory.DataSource(postgres.ConnectionString)).Options);
 
-    private async Task<List<OutboxZeile>> Postausgang()
+    private async Task<List<OutboxRow>> Postausgang()
     {
-        await using var kontext = Kontext();
+        await using var context = Kontext();
 
-        return await kontext.Set<OutboxZeile>().ToListAsync();
+        return await context.Set<OutboxRow>().ToListAsync();
     }
 
-    private static Profilfund Profil(Guid wer, string[]? genannt = null) =>
-        new(new SubjectId(wer), "Entwicklerin", "Ich schweisse.", "Berlin", true, genannt ?? ["Go"]);
+    private static ProfileHit Profile(Guid subject, string[]? genannt = null) =>
+        new(new SubjectId(subject), "Entwicklerin", "Ich schweisse.", "Berlin", true, genannt ?? ["Go"]);
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 }

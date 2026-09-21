@@ -42,13 +42,13 @@ public sealed class BestaetigungErneutSendenHandler(
             return Unit.Value;
         }
 
-        var jetzt = uhr.GetUtcNow();
+        var now = uhr.GetUtcNow();
 
         // Otherwise any number of valid links stay in circulation at once, and
         // the oldest — possibly the one that went to the wrong mailbox — keeps
         // working.
         await tokens.ConsumeOpenAsync(
-            konto.Id, TokenPurpose.EmailVerify, jetzt, cancellationToken);
+            konto.Id, TokenPurpose.EmailVerify, now, cancellationToken);
 
         var (klartext, hash) = einmaltoken.Erzeuge();
 
@@ -58,7 +58,7 @@ public sealed class BestaetigungErneutSendenHandler(
                 konto.Id,
                 hash,
                 TokenPurpose.EmailVerify,
-                jetzt + Gueltigkeit,
+                now + Gueltigkeit,
                 ConsumedAt: null),
             cancellationToken);
 

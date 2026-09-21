@@ -97,7 +97,7 @@ public sealed class NotYourInvitationException()
 /// The company's domain plays no part here. It proves who owns the domain and
 /// is why a company may exist at all; whom that company then lets in is its own
 /// decision — an external recruiter with a foreign address is an entirely
-/// ordinary case.
+/// ordinary caseItem.
 /// </para>
 /// </remarks>
 public sealed class Invitation

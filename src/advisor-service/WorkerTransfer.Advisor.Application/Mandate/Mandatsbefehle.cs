@@ -3,17 +3,17 @@ using MediatR;
 using WorkerTransfer.Advisor.Application.Nachrichten;
 using WorkerTransfer.Advisor.Application.Ports;
 using WorkerTransfer.Advisor.Domain.Gespraeche;
-using WorkerTransfer.Advisor.Domain.Mandate;
+using WorkerTransfer.Advisor.Domain.Mandates;
 
-namespace WorkerTransfer.Advisor.Application.Mandate;
+namespace WorkerTransfer.Advisor.Application.Mandates;
 
-/// <summary>„Zeig mir mein Mandat."</summary>
-public sealed record MeinMandatAbfrage(SubjectId Wer) : IAbfrage<Mandat>;
+/// <summary>„Zeig mir mein Mandate."</summary>
+public sealed record MyMandateQuery(SubjectId Wer) : IAbfrage<Mandate>;
 
-/// <summary>Liest das eigene Mandat — ohne den Ledger zu fragen.</summary>
+/// <summary>Liest das eigene Mandate — ohne den Ledger zu fragen.</summary>
 /// <remarks>
 /// Die eigene Einwilligung zu prüfen, um sich selbst zu sehen, wäre nicht nur
-/// ein überflüssiger Round-Trip: wer nichts freigegeben hat, könnte sein Mandat
+/// ein überflüssiger Round-Trip: wer nichts freigegeben hat, könnte sein Mandate
 /// sonst nicht mehr bearbeiten (ADR-0020 §5).
 /// <para>
 /// Nie <c>null</c>: „nichts gesagt" <em>ist</em> ein Zustand. Ein <c>null</c>
@@ -21,28 +21,28 @@ public sealed record MeinMandatAbfrage(SubjectId Wer) : IAbfrage<Mandat>;
 /// dass sie sich die falsche ausdenkt.
 /// </para>
 /// </remarks>
-public sealed class MeinMandatHandler(IMandatspeicher speicher, TimeProvider uhr)
-    : IRequestHandler<MeinMandatAbfrage, Mandat>
+public sealed class MyMandateHandler(IMandateStore store, TimeProvider uhr)
+    : IRequestHandler<MyMandateQuery, Mandate>
 {
     /// <inheritdoc />
-    public async Task<Mandat> Handle(
-        MeinMandatAbfrage request, CancellationToken cancellationToken)
+    public async Task<Mandate> Handle(
+        MyMandateQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return await speicher.HoleAsync(request.Wer, cancellationToken)
-               ?? Mandat.Leeres(request.Wer, uhr.GetUtcNow());
+        return await store.GetAsync(request.Wer, cancellationToken)
+               ?? Mandate.Leeres(request.Wer, uhr.GetUtcNow());
     }
 }
 
-/// <summary>„Schreib mein Mandat."</summary>
-public sealed record MandatSchreibenBefehl(
+/// <summary>„Schreib mein Mandate."</summary>
+public sealed record WriteMandateCommand(
     SubjectId Wer,
     string? Eintrittstermin,
     int? GehaltMin,
     int? GehaltMax,
     int? PensumProzent,
-    IReadOnlyList<string>? Ausgeschlossen) : IBefehl<Mandat>;
+    IReadOnlyList<string>? Ausgeschlossen) : IBefehl<Mandate>;
 
 /// <summary>
 /// Schreibt die vier Werte — und gibt <c>profile.visibility:public</c> auf,
@@ -51,7 +51,7 @@ public sealed record MandatSchreibenBefehl(
 /// <remarks>
 /// <para><strong>Das ist die Zeile, an der die Abnahme hängt.</strong> „Der
 /// jetzige Arbeitgeber sieht die eigene Belegschaft nicht im Scout" wird nicht
-/// durch ein zweites Tor im Scout eingelöst — das wäre eine zweite Stelle, an
+/// durch ein zweites Tor im Scout eingelöst — das wäre eine zweite Job, an
 /// der über Sichtbarkeit entschieden wird — sondern im Ledger selbst.</para>
 ///
 /// <para>Der Ledger kennt <strong>keine Verneinung</strong>. „Sichtbar für
@@ -61,29 +61,29 @@ public sealed record MandatSchreibenBefehl(
 /// Person nur noch für Unternehmen sichtbar, denen sie einzeln freigegeben
 /// hat — und der ausgeschlossene ist keines davon.</para>
 ///
-/// <para><strong>Der Widerruf läuft über den Ledger und nicht an ihm vorbei.</strong>
+/// <para><strong>Der Revocation läuft über den Ledger und nicht an ihm vorbei.</strong>
 /// Er wird mit dem Token der Person geschrieben; der Ledger verwaltet sich
 /// strikt selbst, also kann dieser Schritt nur gelingen, wenn die Person ihn
 /// selbst auslöst. Schweigt der Ledger, wird <em>nichts</em> gespeichert: ein
-/// Mandat mit Ausschluss neben einem weiter öffentlichen Profil wäre die
+/// Mandate mit Ausschluss neben einem weiter öffentlichen Profile wäre die
 /// Halb-fort-halb-da-Lage, in der die Zusage nur noch so aussieht.</para>
 /// </remarks>
-public sealed class MandatSchreibenHandler(
-    IMandatspeicher speicher, IEinwilligungstor tor, TimeProvider uhr)
-    : IRequestHandler<MandatSchreibenBefehl, Mandat>
+public sealed class WriteMandateHandler(
+    IMandateStore store, IConsentGate tor, TimeProvider uhr)
+    : IRequestHandler<WriteMandateCommand, Mandate>
 {
     /// <summary>Was im Ledger als Grund steht. Eine Form, nie ein Satz über jemanden.</summary>
     public const string Widerrufsgrund = "an excluded company was named";
 
     /// <inheritdoc />
     /// <exception cref="Eingabefehler">Eine Angabe hält die Regel nicht ein.</exception>
-    public async Task<Mandat> Handle(
-        MandatSchreibenBefehl request, CancellationToken cancellationToken)
+    public async Task<Mandate> Handle(
+        WriteMandateCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         // Erst pruefen, dann schreiben — und die Pruefung liegt im Aggregat.
-        var mandat = Mandat.Schreibe(
+        var mandate = Mandate.Write(
             request.Wer,
             request.Eintrittstermin,
             request.GehaltMin,
@@ -92,17 +92,17 @@ public sealed class MandatSchreibenHandler(
             request.Ausgeschlossen,
             uhr.GetUtcNow());
 
-        if (mandat.AusgeschlosseneUnternehmen.Count > 0)
+        if (mandate.AusgeschlosseneUnternehmen.Count > 0)
         {
             // VOR dem Speichern. Schweigt der Ledger, fliegt es hier — und das
-            // Mandat bleibt, wie es war. Andersherum stuende ein Ausschluss in
-            // der Tabelle, waehrend das Profil weiter fuer alle sichtbar ist.
-            await tor.WiderrufeAsync(
-                [Stufenfaehigkeiten.ProfilOeffentlich], Widerrufsgrund, cancellationToken);
+            // Mandate bleibt, wie es war. Andersherum stuende ein Ausschluss in
+            // der Tabelle, waehrend das Profile weiter fuer alle sichtbar ist.
+            await tor.RevokeAsync(
+                [StageCapabilities.ProfilOeffentlich], Widerrufsgrund, cancellationToken);
         }
 
-        await speicher.SichereAsync(mandat, cancellationToken);
+        await store.SaveAsync(mandate, cancellationToken);
 
-        return mandat;
+        return mandate;
     }
 }

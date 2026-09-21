@@ -5,7 +5,7 @@ namespace WorkerTransfer.Profile.Application.Nachrichten;
 /// <summary>Markiert eine Nachricht, die etwas ändert.</summary>
 /// <remarks>
 /// Absichtlich ohne Typparameter: die Transaktionsklammer ist generisch über
-/// Anfrage und Antwort und kann nicht bei jedem einzelnen Versand über die
+/// ResumeRequest und Antwort und kann nicht bei jedem einzelnen Versand über die
 /// Schnittstellen eines Typs reflektieren, um <c>IBefehl&lt;TAntwort&gt;</c> zu
 /// finden.
 /// <para>

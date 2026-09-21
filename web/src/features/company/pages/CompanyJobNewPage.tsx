@@ -142,19 +142,15 @@ export function CompanyJobNewPage() {
               minRows={5}
             />
             <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 2fr" } }}>
-              {/*
-                Die Postleitzahl steht VOR dem Ort und ist schmaler — so
-                schreibt man eine Adresse, und so sieht man auf einen Blick,
-                dass beides zusammengehört.
-
-                Sie ist freiwillig und trotzdem wichtig: ohne sie fällt die
-                Anzeige aus jeder Umkreissuche, deren Ortsname nicht eindeutig
-                ist. Der Hinweistext sagt das, statt es als Pflichtfeld zu
-                erzwingen — ein Unternehmen, das nur „bundesweit" anzugeben
-                hat, soll trotzdem ausschreiben können.
-              */}
               <TextField
+                // The postcode stands BEFORE the place and is narrower — that is
+                // how an address is written, and it shows at a glance that the
+                // two belong together.
                 label={t("firmenstellen.plz")}
+                // Optional and still important: without it the advert drops out
+                // of every radius search whose place name is ambiguous. The hint
+                // says so instead of forcing it as a required field — a company
+                // with only "nationwide" to give must still be able to post.
                 helperText={t("firmenstellen.plzHinweis")}
                 value={draft.postalCode}
                 slotProps={{ htmlInput: { maxLength: 10, inputMode: "numeric" } }}

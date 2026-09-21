@@ -3,15 +3,15 @@ using WorkerTransfer.Notification.Infrastructure;
 using WorkerTransfer.Notification.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
-// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
+// Konfiguration aus der EnvironmentFile. VOR CreateBuilder, weil der
 // Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
 // geladen hiesse geladen und von niemandem gelesen.
-WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 const string serviceName = "notification-service";
 
-// Kein AlsAussteller(): nur identity-service hält die private Hälfte.
+// Kein AsIssuer(): nur identity-service hält die private Hälfte.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName);
 
@@ -23,7 +23,7 @@ builder.Services.AddNotificationInfrastructure(
 var app = builder.Build();
 
 // Erst wandern, dann bedienen (ADR-0010).
-await app.WandereAsync<NotificationDbContext>();
+await app.MigrateSchemaAsync<NotificationDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 

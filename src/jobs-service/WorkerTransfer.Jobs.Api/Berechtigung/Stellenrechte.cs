@@ -10,16 +10,16 @@ namespace WorkerTransfer.Jobs.Api.Berechtigung;
 /// stellt sie hin, das andere nimmt sie weg — und mit ihr die Möglichkeit, sich
 /// zu bewerben.</para>
 ///
-/// <para>„Ein <c>member</c> kann meine Stellen nicht löschen" heisst in dieser
+/// <para>„Ein <c>member</c> kann meine Jobs nicht löschen" heisst in dieser
 /// Domäne genau <see cref="Schliessen"/>: gelöscht wird eine Anzeige nie, sie
 /// wird geschlossen.</para>
 ///
 /// <para>Die Namen sagen, <em>wozu</em> ein Endpunkt berechtigt sein will, und
 /// nicht, <em>wer</em> das ist — wer es ist, entscheidet
-/// <c>ServiceDefaults.Rollen.Adminrecht</c> aus der Mitgliedschaftstabelle von
+/// <c>ServiceDefaults.Roles.AdminPermission</c> aus der Mitgliedschaftstabelle von
 /// identity-service.</para>
 /// </remarks>
-public static class Stellenrechte
+public static class JobPermissions
 {
     /// <summary>Eine Anzeige veröffentlichen.</summary>
     public const string Veroeffentlichen = "jobs.publish";

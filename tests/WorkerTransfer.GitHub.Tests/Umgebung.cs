@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Testcontainers.PostgreSql;
 using WorkerTransfer.GitHub.Application.Ports;
-using WorkerTransfer.GitHub.Domain.Verbindungen;
+using WorkerTransfer.GitHub.Domain.Connections;
 using WorkerTransfer.GitHub.Infrastructure.Persistence;
 
 namespace WorkerTransfer.GitHub.Tests;
@@ -27,11 +27,11 @@ public sealed class Postgres : IAsyncLifetime
     {
         await _container.StartAsync();
 
-        await using var quelle = GitHubDbContextFactory.Datenquelle(ConnectionString);
-        await using var kontext = new GitHubDbContext(
-            GitHubDbContextFactory.Optionen(quelle).Options);
+        await using var source = GitHubDbContextFactory.DataSource(ConnectionString);
+        await using var context = new GitHubDbContext(
+            GitHubDbContextFactory.Optionen(source).Options);
 
-        await kontext.Database.MigrateAsync();
+        await context.Database.MigrateAsync();
     }
 
     public async Task DisposeAsync() => await _container.DisposeAsync();
@@ -39,7 +39,7 @@ public sealed class Postgres : IAsyncLifetime
     /// <summary>Ein eigener Kontext für Blicke in die Datenbank.</summary>
     public GitHubDbContext Kontext() =>
         new(GitHubDbContextFactory
-            .Optionen(GitHubDbContextFactory.Datenquelle(ConnectionString)).Options);
+            .Optionen(GitHubDbContextFactory.DataSource(ConnectionString)).Options);
 }
 
 [CollectionDefinition(Name)]
@@ -54,7 +54,7 @@ public sealed class PostgresCollection : ICollectionFixture<Postgres>
 /// Sie ersetzt den ganzen Rücksprung: was ein Browser bei GitHub täte, ist hier
 /// eine Zuordnung von Einmalcode auf Anmeldenamen.
 /// </remarks>
-public sealed class ProbeAnmeldung : IGitHubAnmeldung
+public sealed class ProbeAnmeldung : IGitHubSignIn
 {
     /// <summary>Welcher Code auf welchen Anmeldenamen führt.</summary>
     public Dictionary<string, string> Codes { get; } = new(StringComparer.Ordinal);
@@ -69,17 +69,17 @@ public sealed class ProbeAnmeldung : IGitHubAnmeldung
     public List<string> Zustaende { get; } = [];
 
     /// <inheritdoc />
-    public Uri Anmeldeadresse(string zustand)
+    public Uri Anmeldeadresse(string state)
     {
-        Zustaende.Add(zustand);
-        return new Uri($"https://github.test/login/oauth/authorize?state={zustand}");
+        Zustaende.Add(state);
+        return new Uri($"https://github.test/login/oauth/authorize?state={state}");
     }
 
     /// <inheritdoc />
-    public Task<string?> AnmeldenamenAsync(
+    public Task<string?> LoginNameAsync(
         string code, CancellationToken cancellationToken = default) =>
         Schweigt
-            ? throw new GitHubSchweigt("github is unreachable")
+            ? throw new GitHubSignInSilent("github is unreachable")
             : Task.FromResult(Codes.GetValueOrDefault(code));
 }
 
@@ -107,16 +107,16 @@ public sealed class ProbeGitHub : IGitHub
             Gists[login] = vorhandene;
         }
 
-        vorhandene.Add(Verbindung.Gistbeschreibung(einmalzeichenfolge));
+        vorhandene.Add(Connection.Gistbeschreibung(einmalzeichenfolge));
     }
 
     /// <inheritdoc />
-    public Task<bool> HatNachweisgistAsync(
+    public Task<bool> HasProofGistAsync(
         string login, string einmalzeichenfolge, CancellationToken cancellationToken = default)
     {
         Stumm(login);
 
-        var gesucht = Verbindung.Gistbeschreibung(einmalzeichenfolge);
+        var gesucht = Connection.Gistbeschreibung(einmalzeichenfolge);
 
         return Task.FromResult(
             Gists.TryGetValue(login, out var vorhandene) && vorhandene.Contains(gesucht));
@@ -142,30 +142,30 @@ public sealed class ProbeGitHub : IGitHub
 
         if (Schweigt)
         {
-            throw new GitHubSchweigt("Probe: GitHub schweigt.");
+            throw new GitHubSignInSilent("Probe: GitHub schweigt.");
         }
     }
 }
 
 /// <summary>Ein Ledger, der antwortet, was der Test bestimmt.</summary>
-public sealed class Probeledger : IEinwilligungstor
+public sealed class Probeledger : IConsentGate
 {
-    /// <summary>Wessen Verbindung freigegeben ist.</summary>
+    /// <summary>Wessen Connection freigegeben ist.</summary>
     public HashSet<Guid> Frei { get; } = [];
 
     /// <summary>Wenn gesetzt, schweigt der Ledger.</summary>
     public bool Schweigt { get; set; }
 
     /// <inheritdoc />
-    public Task<bool> DarfGezeigtWerdenAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public Task<bool> MayBeShownAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
         if (Schweigt)
         {
-            throw new EinwilligungSchweigt("Probe: der Ledger schweigt.");
+            throw new ConsentGateSilent("Probe: der Ledger schweigt.");
         }
 
-        return Task.FromResult(Frei.Contains(wer.Value));
+        return Task.FromResult(Frei.Contains(subject.Value));
     }
 }
 
@@ -198,11 +198,11 @@ public static class Tokenform
         return kurve;
     }
 
-    public static string Person(Guid wer)
+    public static string Person(Guid subject)
     {
         var token = new JwtSecurityToken(
             issuer: Issuer, audience: Audience,
-            claims: [new Claim(JwtRegisteredClaimNames.Sub, wer.ToString())],
+            claims: [new Claim(JwtRegisteredClaimNames.Sub, subject.ToString())],
             expires: DateTime.UtcNow.AddMinutes(15),
             signingCredentials: new SigningCredentials(
                 new ECDsaSecurityKey(Kurve) { KeyId = Kennung },

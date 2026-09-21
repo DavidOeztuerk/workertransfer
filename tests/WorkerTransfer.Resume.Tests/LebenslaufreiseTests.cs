@@ -21,7 +21,7 @@ namespace WorkerTransfer.Resume.Tests;
 /// answer — that it asks at all, on every read, and that a silent ledger is
 /// neither a yes nor a no.
 /// </remarks>
-public sealed class Probetor : IEinwilligungstor
+public sealed class Probetor : IConsentGate
 {
     /// <summary>Who has released their profile at all.</summary>
     public HashSet<Guid> ProfilFrei { get; } = [];
@@ -35,27 +35,27 @@ public sealed class Probetor : IEinwilligungstor
     /// <summary>When true, the ledger says nothing at all.</summary>
     public bool Schweigt { get; set; }
 
-    public Task<bool> DarfProfilSehenAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public Task<bool> MaySeeProfileAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
         Fragen++;
         return Schweigt
-            ? throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht")
-            : Task.FromResult(ProfilFrei.Contains(wer.Value));
+            ? throw new ConsentGateSilent("der Ledger antwortet im Test nicht")
+            : Task.FromResult(ProfilFrei.Contains(subject.Value));
     }
 
-    public Task<bool> DarfLebenslaufLesenAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default)
+    public Task<bool> MayReadResumeAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default)
     {
         Fragen++;
         return Schweigt
-            ? throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht")
-            : Task.FromResult(LebenslaufFrei.Contains((wer.Value, firma.Value)));
+            ? throw new ConsentGateSilent("der Ledger antwortet im Test nicht")
+            : Task.FromResult(LebenslaufFrei.Contains((subject.Value, company.Value)));
     }
 
     /// <summary>Welche Paare die Unterlagen freigegeben haben.</summary>
     /// <remarks>
-    /// Eine EIGENE Menge und nicht dieselbe wie beim Lebenslauf: die Probe soll
+    /// Eine EIGENE Menge und nicht dieselbe wie beim CurriculumVitae: die Probe soll
     /// den Fall abbilden können, in dem der Werdegang freigegeben ist und die
     /// Zeugnisse nicht. Zwei Fähigkeiten, die sich eine Probe teilen, sind im
     /// Test immer gleichzeitig gesetzt — und dann prüft niemand die Trennung.
@@ -63,41 +63,41 @@ public sealed class Probetor : IEinwilligungstor
     public HashSet<(Guid, Guid)> UnterlagenFrei { get; } = [];
 
     /// <inheritdoc />
-    public Task<bool> DarfUnterlagenSehenAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default)
+    public Task<bool> MaySeeDocumentsAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default)
     {
         Fragen++;
         return Schweigt
-            ? throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht")
-            : Task.FromResult(UnterlagenFrei.Contains((wer.Value, firma.Value)));
+            ? throw new ConsentGateSilent("der Ledger antwortet im Test nicht")
+            : Task.FromResult(UnterlagenFrei.Contains((subject.Value, company.Value)));
     }
 
     /// <summary>
     /// The service does not decide the release itself — it asks the ledger to
     /// record it. Here that write is what the answer to a request turns into.
     /// </summary>
-    public Task ErteileAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default)
+    public Task GrantAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default)
     {
-        LebenslaufFrei.Add((wer.Value, firma.Value));
+        LebenslaufFrei.Add((subject.Value, company.Value));
         return Task.CompletedTask;
     }
 
     /// <inheritdoc cref="ErteileAsync" />
-    public Task WiderrufeAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default)
+    public Task RevokeAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default)
     {
-        LebenslaufFrei.Remove((wer.Value, firma.Value));
+        LebenslaufFrei.Remove((subject.Value, company.Value));
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<bool>> DuerfenLebenslaufLesenAsync(
+    public Task<IReadOnlyList<bool>> MayEachReadResumeAsync(
         IReadOnlyList<(SubjectId Wer, TenantId Firma)> paare,
         CancellationToken cancellationToken = default)
     {
         Fragen++;
         return Schweigt
-            ? throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht")
+            ? throw new ConsentGateSilent("der Ledger antwortet im Test nicht")
             : Task.FromResult<IReadOnlyList<bool>>(
                 [.. paare.Select(paar =>
                     LebenslaufFrei.Contains((paar.Wer.Value, paar.Firma.Value)))]);
@@ -105,14 +105,14 @@ public sealed class Probetor : IEinwilligungstor
 }
 
 /// <summary>A delivery that records instead of sending.</summary>
-public sealed class Probezustellung : IZustellung
+public sealed class Probezustellung : IDelivery
 {
     public List<(Guid Wer, string Art)> Zugestellt { get; } = [];
 
-    public Task ZustelleAsync(
-        SubjectId empfaenger, string art, CancellationToken cancellationToken = default)
+    public Task DeliverAsync(
+        SubjectId recipient, string kind, CancellationToken cancellationToken = default)
     {
-        Zugestellt.Add((empfaenger.Value, art));
+        Zugestellt.Add((recipient.Value, kind));
         return Task.CompletedTask;
     }
 }
@@ -132,15 +132,15 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:resume", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _tor));
-                dienste.Replace(ServiceDescriptor.Scoped<IZustellung>(_ => _versand));
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _tor));
+                services.Replace(ServiceDescriptor.Scoped<IDelivery>(_ => _versand));
             });
         });
 
@@ -153,9 +153,9 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsPerson(Guid wer) => Mit(Tokenform.Person(wer));
+    private HttpClient AlsPerson(Guid subject) => Mit(Tokenform.Person(subject));
 
-    private HttpClient AlsFirma(Guid wer, Guid firma) => Mit(Tokenform.Firma(wer, firma));
+    private HttpClient AlsFirma(Guid subject, Guid company) => Mit(Tokenform.Firma(subject, company));
 
     private HttpClient Mit(string token)
     {
@@ -165,10 +165,10 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
-    private static Task<HttpResponseMessage> Schreibe(HttpClient browser) =>
+    private static Task<HttpResponseMessage> Write(HttpClient browser) =>
         browser.PutAsJsonAsync("/resumes/me", new
         {
             positions = new[]
@@ -198,14 +198,14 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
     /// Technologien an einer Station: <strong>vereinheitlicht und entdoppelt</strong>.
     /// </summary>
     /// <remarks>
-    /// Derselbe Wortschatz wie im Profil — „postgres" wird hier wie dort
+    /// Derselbe Vocabulary wie im Profile — „postgres" wird hier wie dort
     /// „PostgreSQL" (ADR-0023). Erst vereinheitlichen, dann entdoppeln: anders
     /// herum stünden beide Schreibweisen als zwei Einträge da und würden erst
     /// danach beide zu „PostgreSQL".
     /// <para>
     /// Der Grund, warum das Feld überhaupt existiert: es ist der zweite Ort, an
     /// dem jemand NENNEN kann, was er kann. Durchsuchbar wird das nicht — ein
-    /// Lebenslauf ist einzeln freigegeben (ADR-0020) — aber es wird im Profil
+    /// CurriculumVitae ist einzeln freigegeben (ADR-0020) — aber es wird im Profile
     /// mit einem Klick zu einer Nennung, und die ist suchbar.
     /// </para>
     /// </remarks>
@@ -236,17 +236,17 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
         var station = (await Json(geschrieben)).GetProperty("positions")[0];
 
         station.GetProperty("technologies").EnumerateArray()
-            .Select(eintrag => eintrag.GetString())
+            .Select(entry => entry.GetString())
             .Should().Equal("PostgreSQL", "Go");
     }
 
-    /// <summary>Mehr als zwölf sagen über eine einzelne Stelle nichts mehr.</summary>
+    /// <summary>Mehr als zwölf sagen über eine einzelne Job nichts mehr.</summary>
     [Fact]
     public async Task Zu_viele_Technologien_werden_abgewiesen()
     {
         var browser = AlsPerson(Guid.CreateVersion7());
 
-        var antwort = await browser.PutAsJsonAsync("/resumes/me", new
+        var response = await browser.PutAsJsonAsync("/resumes/me", new
         {
             positions = new[]
             {
@@ -263,7 +263,7 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
             education = Array.Empty<object>()
         });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     /// <summary>Eine Station ohne Technologien ist kein Fehler, sondern leer.</summary>
@@ -276,7 +276,7 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = AlsPerson(Guid.CreateVersion7());
 
-        var geschrieben = await Schreibe(browser);
+        var geschrieben = await Write(browser);
         var station = (await Json(geschrieben)).GetProperty("positions")[0];
 
         station.GetProperty("technologies").GetArrayLength().Should().Be(0);
@@ -288,15 +288,15 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         var chefin = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
 
         var ihr = AlsPerson(anna);
-        (await Schreibe(ihr)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Write(ihr)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Asking needs the PROFILE release, never the existence of a résumé.
         _tor.ProfilFrei.Add(anna);
 
-        var gefragt = await AlsFirma(chefin, firma)
+        var gefragt = await AlsFirma(chefin, company)
             .PostAsync($"/resumes/{anna}/requests", null);
         gefragt.StatusCode.Should().Be(HttpStatusCode.Created);
 
@@ -305,14 +305,14 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
         (await ihr.PostAsync($"/resumes/requests/{id}/grant", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var gelesen = await AlsFirma(chefin, firma).GetAsync($"/resumes/{anna}");
+        var gelesen = await AlsFirma(chefin, company).GetAsync($"/resumes/{anna}");
         gelesen.StatusCode.Should().Be(HttpStatusCode.OK);
         (await gelesen.Content.ReadAsStringAsync()).Should().Contain("Beispiel GmbH");
 
         (await ihr.PostAsync($"/resumes/requests/{id}/revoke", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        (await AlsFirma(chefin, firma).GetAsync($"/resumes/{anna}"))
+        (await AlsFirma(chefin, company).GetAsync($"/resumes/{anna}"))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -326,13 +326,13 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         var chefin = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
 
         var ihr = AlsPerson(anna);
-        await Schreibe(ihr);
+        await Write(ihr);
         _tor.ProfilFrei.Add(anna);
 
-        var id = (await Json(await AlsFirma(chefin, firma)
+        var id = (await Json(await AlsFirma(chefin, company)
             .PostAsync($"/resumes/{anna}/requests", null))).GetProperty("id").GetGuid();
 
         await ihr.PostAsync($"/resumes/requests/{id}/grant", null);
@@ -345,7 +345,7 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
         meine[0].GetProperty("active").GetBoolean().Should().BeFalse(
             "gilt jetzt nicht mehr — und das ist die andere Frage");
 
-        (await AlsFirma(chefin, firma).GetAsync($"/resumes/{anna}"))
+        (await AlsFirma(chefin, company).GetAsync($"/resumes/{anna}"))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -377,7 +377,7 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
         var erfunden = Guid.CreateVersion7();
         var browser = AlsFirma(Guid.CreateVersion7(), Guid.CreateVersion7());
 
-        await Schreibe(AlsPerson(anna));
+        await Write(AlsPerson(anna));
 
         var beiEchter = await browser.PostAsync($"/resumes/{anna}/requests", null);
         var beiErfundener = await browser.PostAsync($"/resumes/{erfunden}/requests", null);
@@ -391,11 +391,11 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Eine_Privatperson_liest_keinen_fremden_Lebenslauf()
     {
         var anna = Guid.CreateVersion7();
-        await Schreibe(AlsPerson(anna));
+        await Write(AlsPerson(anna));
 
-        var versuch = await AlsPerson(Guid.CreateVersion7()).GetAsync($"/resumes/{anna}");
+        var attempt = await AlsPerson(Guid.CreateVersion7()).GetAsync($"/resumes/{anna}");
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        attempt.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     /// <summary>
@@ -406,11 +406,11 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Der_Ledger_wird_bei_jedem_Lesen_neu_gefragt()
     {
         var anna = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
-        await Schreibe(AlsPerson(anna));
-        _tor.LebenslaufFrei.Add((anna, firma));
+        var company = Guid.CreateVersion7();
+        await Write(AlsPerson(anna));
+        _tor.LebenslaufFrei.Add((anna, company));
 
-        var browser = AlsFirma(Guid.CreateVersion7(), firma);
+        var browser = AlsFirma(Guid.CreateVersion7(), company);
         await browser.GetAsync($"/resumes/{anna}");
         var nachErstem = _tor.Fragen;
 
@@ -426,14 +426,14 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Schweigt_der_Ledger_wird_nichts_behauptet()
     {
         var anna = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
-        await Schreibe(AlsPerson(anna));
-        _tor.LebenslaufFrei.Add((anna, firma));
+        var company = Guid.CreateVersion7();
+        await Write(AlsPerson(anna));
+        _tor.LebenslaufFrei.Add((anna, company));
         _tor.Schweigt = true;
 
-        var versuch = await AlsFirma(Guid.CreateVersion7(), firma).GetAsync($"/resumes/{anna}");
+        var attempt = await AlsFirma(Guid.CreateVersion7(), company).GetAsync($"/resumes/{anna}");
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        attempt.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     /// <summary>
@@ -469,10 +469,10 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Zweimal_dieselbe_Firma_fragt_nicht_zweimal()
     {
         var anna = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
         _tor.ProfilFrei.Add(anna);
 
-        var browser = AlsFirma(Guid.CreateVersion7(), firma);
+        var browser = AlsFirma(Guid.CreateVersion7(), company);
         await browser.PostAsync($"/resumes/{anna}/requests", null);
 
         var zweite = await browser.PostAsync($"/resumes/{anna}/requests", null);
@@ -495,8 +495,8 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
 
         await AlsPerson(anna).PostAsync($"/resumes/requests/{id}/grant", null);
 
-        await using var kontext = Kontext();
-        var arten = kontext.Set<OutboxZeile>().Select(zeile => zeile.Kind).ToList();
+        await using var context = Kontext();
+        var arten = context.Set<OutboxRow>().Select(row => row.Kind).ToList();
 
         arten.Should().Contain("resume.requested");
         arten.Should().Contain("resume.granted");
@@ -521,12 +521,12 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
         await ihr.PostAsync($"/resumes/requests/{id}/grant", null);
 
         await using var vorher = Kontext();
-        var davor = vorher.Set<OutboxZeile>().Count();
+        var davor = vorher.Set<OutboxRow>().Count();
 
         await ihr.PostAsync($"/resumes/requests/{id}/revoke", null);
 
         await using var nachher = Kontext();
-        nachher.Set<OutboxZeile>().Count().Should().Be(davor);
+        nachher.Set<OutboxRow>().Count().Should().Be(davor);
     }
 
     /// <summary>
@@ -542,22 +542,22 @@ public class LebenslaufreiseTests(Postgres postgres) : IAsyncLifetime
         await AlsFirma(Guid.CreateVersion7(), Guid.CreateVersion7())
             .PostAsync($"/resumes/{anna}/requests", null);
 
-        await using var kontext = Kontext();
+        await using var context = Kontext();
 
-        kontext.Anfragen.Count(zeile => zeile.SubjectId == anna).Should().Be(1);
-        kontext.Set<OutboxZeile>().Count(zeile => zeile.UserId == anna).Should().Be(1);
+        context.Anfragen.Count(row => row.SubjectId == anna).Should().Be(1);
+        context.Set<OutboxRow>().Count(row => row.UserId == anna).Should().Be(1);
     }
 
     private Infrastructure.Persistence.ResumeDbContext Kontext()
     {
-        var quelle = Infrastructure.Persistence.ResumeDbContextFactory
+        var source = Infrastructure.Persistence.ResumeDbContextFactory
             .DataSource(postgres.ConnectionString);
 
         return new Infrastructure.Persistence.ResumeDbContext(
             (Microsoft.EntityFrameworkCore.DbContextOptions<
                 Infrastructure.Persistence.ResumeDbContext>)
-            Infrastructure.Persistence.ResumeDbContextFactory.Konfiguriere(
+            Infrastructure.Persistence.ResumeDbContextFactory.Configure(
                 new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<
-                    Infrastructure.Persistence.ResumeDbContext>(), quelle).Options);
+                    Infrastructure.Persistence.ResumeDbContext>(), source).Options);
     }
 }

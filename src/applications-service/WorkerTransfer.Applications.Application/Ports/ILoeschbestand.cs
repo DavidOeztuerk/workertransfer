@@ -9,9 +9,9 @@ namespace WorkerTransfer.Applications.Application.Ports;
 /// umgelegte Schalter deckt genau eine Zeilenklasse ab" — die zweite Aussage
 /// ist die, die jemand prüfen können muss, ohne dafür etwas umzustellen.
 /// </remarks>
-public interface ILoeschbestand
+public interface IErasureLedger
 {
-    /// <summary>Löscht die Bewerbungen dieses Menschen.</summary>
+    /// <summary>Löscht die Applications dieses Menschen.</summary>
     /// <param name="wer">Wessen.</param>
     /// <param name="eingestellteBehalten">
     /// Ob <c>hired</c>-Zeilen stehen bleiben. In der Voreinstellung
@@ -19,8 +19,8 @@ public interface ILoeschbestand
     /// </param>
     /// <param name="cancellationToken">Abbruch.</param>
     /// <returns>Wie viele absichtlich stehen blieben. Voreingestellt: 0.</returns>
-    Task<int> LoescheAsync(
-        SubjectId wer,
+    Task<int> DeleteAsync(
+        SubjectId subject,
         bool eingestellteBehalten,
         CancellationToken cancellationToken = default);
 }

@@ -34,7 +34,7 @@ public static class Projektion
 {
     /// <summary>Reduces a stream of facts to what currently holds.</summary>
     /// <param name="ereignisse">Facts about one pair, in any order.</param>
-    public static ConsentState Stand(IEnumerable<ConsentEvent> ereignisse)
+    public static ConsentState State(IEnumerable<ConsentEvent> ereignisse)
     {
         ArgumentNullException.ThrowIfNull(ereignisse);
 

@@ -9,21 +9,21 @@ namespace WorkerTransfer.Resume.Application.Lebenslaeufe;
 /// <remarks>
 /// Answers <c>null</c> rather than a refusal when there is none: "has not
 /// written one yet" is a state, and the interface shows an empty form for it.
-/// A failure here would force it to translate an error back into a normal case.
+/// A failure here would force it to translate an error back into a normal caseItem.
 /// </remarks>
-public sealed record MeinLebenslaufAbfrage(SubjectId Wer) : IAbfrage<Lebenslauf?>;
+public sealed record MyResumeQuery(SubjectId Wer) : IAbfrage<CurriculumVitae?>;
 
 /// <inheritdoc cref="MeinLebenslaufAbfrage" />
-public sealed class MeinLebenslaufHandler(ILebenslaufSpeicher speicher)
-    : IRequestHandler<MeinLebenslaufAbfrage, Lebenslauf?>
+public sealed class MyResumeHandler(IResumeStore store)
+    : IRequestHandler<MyResumeQuery, CurriculumVitae?>
 {
     /// <inheritdoc />
-    public Task<Lebenslauf?> Handle(
-        MeinLebenslaufAbfrage request,
+    public Task<CurriculumVitae?> Handle(
+        MyResumeQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return speicher.HoleAsync(request.Wer, cancellationToken);
+        return store.GetAsync(request.Wer, cancellationToken);
     }
 }

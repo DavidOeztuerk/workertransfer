@@ -5,8 +5,8 @@ using WorkerTransfer.Scout.Application.Nachrichten;
 
 namespace WorkerTransfer.Scout.Application.Kandidaten;
 
-/// <summary>„Sag diesen Menschen, dass ihr Profil entdeckt wurde."</summary>
-/// <param name="Wer">Die Menschen einer Trefferseite.</param>
+/// <summary>„Sag diesen Menschen, dass ihr Profile entdeckt wurde."</summary>
+/// <param name="Wer">Die Menschen einer HitPage.</param>
 public sealed record EntdeckungMeldenBefehl(IReadOnlyList<SubjectId> Wer) : IBefehl<int>;
 
 /// <summary>Vermerkt je Mensch eine Absicht im Postausgang. Mehr nicht.</summary>
@@ -29,7 +29,7 @@ public sealed record EntdeckungMeldenBefehl(IReadOnlyList<SubjectId> Wer) : IBef
 /// ist mindestens-einmal, eine zweite Zeile also jederzeit möglich, und eine
 /// Kappe im Absender wäre eine Tabelle „diese Person wurde am … gemeldet" —
 /// wieder ein Verzeichnis über die Sichtbarkeit eines Menschen. Der Empfänger
-/// kann dieselbe Zusage aus seinem eigenen Postfach beantworten, ohne dass
+/// kann dieselbe Zusage aus seinem eigenen Inbox beantworten, ohne dass
 /// irgendwo eine neue Zeile entsteht.</para>
 ///
 /// <para>Entdoppelt wird trotzdem, innerhalb dieses einen Aufrufs: derselbe
@@ -54,9 +54,9 @@ public sealed class EntdeckungMeldenHandler(IOutbox postausgang)
 
         var vermerkt = 0;
 
-        foreach (var wer in request.Wer.Distinct())
+        foreach (var subject in request.Wer.Distinct())
         {
-            await postausgang.VermerkeAsync(wer, Art, cancellationToken);
+            await postausgang.NoteAsync(subject, Art, cancellationToken);
             vermerkt++;
         }
 

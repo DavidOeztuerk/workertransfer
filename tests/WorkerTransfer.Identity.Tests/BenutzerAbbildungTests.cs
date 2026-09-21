@@ -25,10 +25,10 @@ public class BenutzerAbbildungTests(Postgres postgres)
         string hash = "$2b$12$K7ZQe8YHRy9zJQx1uKcOxeVJ0N4tGZ0dQpXWq6yLNfHb3sRmCvA1a")
     {
         var id = Guid.NewGuid();
-        await using var verbindung = new NpgsqlConnection(postgres.ConnectionString);
-        await verbindung.OpenAsync();
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await connection.OpenAsync();
 
-        await using var befehl = verbindung.CreateCommand();
+        await using var befehl = connection.CreateCommand();
         befehl.CommandText = """
             INSERT INTO users (id, email, password_hash, display_name, status, roles,
                                created_at, updated_at, version)
@@ -108,10 +108,10 @@ public class BenutzerAbbildungTests(Postgres postgres)
     public async Task Das_Aggregat_haengt_nicht_am_Aenderungsverfolger()
     {
         await SchreibeBenutzer("emil@example.com");
-        var kontext = Kontext();
+        var context = Kontext();
 
-        await new EfUserRepository(kontext, TimeProvider.System).FindByEmailAsync("emil@example.com");
+        await new EfUserRepository(context, TimeProvider.System).FindByEmailAsync("emil@example.com");
 
-        kontext.ChangeTracker.Entries().Should().BeEmpty();
+        context.ChangeTracker.Entries().Should().BeEmpty();
     }
 }

@@ -3,12 +3,12 @@ using WorkerTransfer.Identity.Domain.Users;
 
 namespace WorkerTransfer.Identity.Application.Ports;
 
-/// <summary>Die Bewerbungsanschrift — Vorlage, nie Suche, nie KI.</summary>
-public interface IAnschriften
+/// <summary>Die Bewerbungsanschrift — ResumeTemplate, nie Search, nie KI.</summary>
+public interface IPostalAddresses
 {
-    /// <summary>Die Vorlage, oder leer, wenn nie etwas gesetzt wurde.</summary>
-    Task<Anschrift> HoleAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    /// <summary>Die ResumeTemplate, oder leer, wenn nie etwas gesetzt wurde.</summary>
+    Task<PostalAddress> GetAsync(SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Schreibt sie zurück.</summary>
-    Task SichereAsync(Anschrift anschrift, CancellationToken cancellationToken = default);
+    Task SaveAsync(PostalAddress anschrift, CancellationToken cancellationToken = default);
 }

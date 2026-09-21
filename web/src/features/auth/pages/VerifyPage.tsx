@@ -97,6 +97,12 @@ export function VerifyPage() {
       // E2E-Hilfe genau darauf prüft (`exact: true`) — ein weiches Muster traf
       // sonst auch „Wird bestätigt…", und der Test war zufrieden, während die
       // Bestätigung noch lief.
+      //
+      // The third outcome — account confirmed, company refused — needs its own
+      // branch below; without it the page reads green while half the intent was
+      // dropped, and nobody learns why no company is there later. There is no
+      // second attempt: the token is spent and there is no "create a company"
+      // button.
       <AuthCard
         title={t("bestaetigung.fertigTitel")}
         lead={
@@ -106,15 +112,6 @@ export function VerifyPage() {
         }
       >
         <Box sx={{ display: "grid", gap: 2 }}>
-          {/* Der dritte Ausgang: Konto bestätigt, Unternehmen abgelehnt. Ohne
-              diesen Zweig wäre die Seite grün, während die halbe Absicht
-              verpufft ist — und niemand wüsste, warum später kein Unternehmen
-              da ist.
-
-              Es gibt keinen zweiten Versuch: der Token ist verbraucht, und
-              einen Knopf „Unternehmen anlegen" gibt es nicht mehr. Der richtige
-              Weg ist ohnehin ein anderer — wer eine Adresse auf dieser Domain
-              hat, hat dort Kollegen. */}
           {state.unternehmenFehler === "domain_already_claimed" ? (
             <Alert severity="warning">
               {t("bestaetigung.domainVergeben")}
@@ -204,9 +201,12 @@ function Gescheitert({
                 {t("bestaetigung.neuerLinkGescheitert")}
               </Alert>
             ) : null}
-            {/* Eine Bestätigung unterbricht nicht — deshalb `role="status"`. */}
             {gesendet ? (
-              <Alert role="status" severity="success">
+              <Alert
+                // A confirmation must not interrupt; MUI's Alert would set role="alert".
+                role="status"
+                severity="success"
+              >
                 {t("bestaetigung.neuerLinkGesendet")}
               </Alert>
             ) : null}

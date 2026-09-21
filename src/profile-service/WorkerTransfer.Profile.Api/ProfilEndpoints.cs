@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Profile.Application.Entwurf;
-using WorkerTransfer.Profile.Application.Loeschung;
+using WorkerTransfer.Profile.Application.Erasure;
 using WorkerTransfer.Profile.Application.Ports;
 using WorkerTransfer.Profile.Application.Profile;
 using WorkerTransfer.Profile.Domain;
@@ -11,12 +11,12 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Profile.Api;
 
-/// <summary>Was jemand schickt, um sein Profil zu schreiben.</summary>
+/// <summary>Was jemand schickt, um sein PersonProfile zu schreiben.</summary>
 /// <remarks>
-/// Ohne <c>subject_id</c>: wessen Profil das ist, steht im geprüften Token.
-/// Und <b>ohne jedes Sichtbarkeitsfeld</b> — ob ein Profil gezeigt werden darf,
+/// Ohne <c>subject_id</c>: wessen PersonProfile das ist, steht im geprüften Token.
+/// Und <b>ohne jedes Sichtbarkeitsfeld</b> — ob ein PersonProfile gezeigt werden darf,
 /// steht ausschließlich im Consent-Ledger (ADR-0020). Ein Feld hier wäre eine
-/// zweite Wahrheit, und die beiden wären beim ersten Widerruf uneins.
+/// zweite Wahrheit, und die beiden wären beim ersten Revocation uneins.
 /// </remarks>
 /// <remarks>
 /// <para><strong><c>remote_ok</c> steht ausdrücklich da, und hier war der Schaden
@@ -30,7 +30,7 @@ namespace WorkerTransfer.Profile.Api;
 /// das Häkchen war weg. Das ist die unangenehmere Hälfte desselben Fehlers:
 /// die Registrierung schlug wenigstens laut fehl.</para>
 /// </remarks>
-public sealed record ProfilKoerper(
+public sealed record ProfileBody(
     [property: JsonPropertyName("headline")] string Headline,
     [property: JsonPropertyName("bio")] string Bio,
     [property: JsonPropertyName("location")] string Location,
@@ -47,17 +47,17 @@ public sealed record ProfilKoerper(
     [property: JsonPropertyName("relocation")] string? Relocation = null);
 
 /// <summary>Was jemand schickt, um sich beim Formulieren helfen zu lassen.</summary>
-public sealed record EntwurfKoerper(string Wish);
+public sealed record DraftBody(string Wish);
 
 /// <summary><c>/profiles</c> — und seit dem 11.09.2026 nichts mehr daneben.</summary>
 /// <remarks>
 /// <c>GET /candidates</c> stand hier und ist gefallen: scout-service ist sein
-/// Nachfolger, und zwei Suchen nebeneinander waeren zwei Wahrheiten
+/// Nachfolger, und zwei Searches nebeneinander waeren zwei Wahrheiten
 /// (ADR-0036 Entscheidung 1). Was von ihm gebraucht wird, liegt jetzt hinter
 /// <c>/internal/profiles/search</c> — hinter dem geteilten Geheimnis, ohne
-/// Gateway-Route, und ohne Ledgerpruefung, weil die eine Ebene hoeher steht.
+/// Gateway-Route, und ohne LedgerCheck, weil die eine Ebene hoeher steht.
 /// </remarks>
-public static class ProfilEndpoints
+public static class ProfileEndpoints
 {
     /// <summary>Bindet die Profilrouten ein.</summary>
     public static IEndpointRouteBuilder MapProfilEndpoints(this IEndpointRouteBuilder app)
@@ -65,7 +65,7 @@ public static class ProfilEndpoints
         ArgumentNullException.ThrowIfNull(app);
 
         // Ein schweigender Ledger ist weder ein Ja noch ein Nein. 404 sagte,
-        // die Person sei nicht da; das Profil auszugeben hieße, etwas
+        // die Person sei nicht da; das PersonProfile auszugeben hieße, etwas
         // herzugeben, das niemand freigegeben hat. 503 sagt das einzig Wahre:
         // dieser Dienst kann gerade nicht antworten.
         //
@@ -75,7 +75,7 @@ public static class ProfilEndpoints
         var profile = app.MapGroup("/profiles").AddEndpointFilter(SchweigenAbfangen);
 
         profile.MapPut("/me", async (
-            ProfilKoerper koerper,
+            ProfileBody koerper,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -89,21 +89,21 @@ public static class ProfilEndpoints
 
             try
             {
-                var profil = await mediator.Send(
-                    new ProfilSpeichernBefehl(
+                var profile = await mediator.Send(
+                    new StoreProfileCommand(
                         handelnder.Subject, koerper.Headline, koerper.Bio,
                         koerper.Location, koerper.RemoteOk, koerper.Skills ?? [],
                         Pendelstufen.Lies(koerper.CommuteKm),
-                        Umzugsworte.Lies(koerper.Relocation)),
+                        RelocationTerms.Lies(koerper.Relocation)),
                     cancellationToken);
 
-                await context.Response.WriteAsJsonAsync(Antwort(profil), cancellationToken);
+                await context.Response.WriteAsJsonAsync(Antwort(profile), cancellationToken);
             }
-            catch (Eingabefehler fehler)
+            catch (Eingabefehler error)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
-                    "Request failed", fehler.Message);
+                    "Request failed", error.Message);
             }
         });
 
@@ -119,19 +119,19 @@ public static class ProfilEndpoints
                 return;
             }
 
-            // Das eigene Profil ohne Ledgerfrage: die Freigabe regelt, wer es
+            // Das eigene PersonProfile ohne Ledgerfrage: die Release regelt, wer es
             // von aussen sieht, nicht ob jemand sein eigenes lesen darf.
-            var profil = await mediator.Send(
-                new MeinProfilAbfrage(handelnder.Subject), cancellationToken);
+            var profile = await mediator.Send(
+                new MyProfileQuery(handelnder.Subject), cancellationToken);
 
             // 200 null, nicht 404: „noch keins" ist der Normalfall, und der
             // Browser macht aus jedem 404 eine Konsolezeile.
             await context.Response.WriteAsJsonAsync(
-                profil is null ? null : Antwort(profil), cancellationToken);
+                profile is null ? null : Antwort(profile), cancellationToken);
         });
 
         profile.MapPost("/me/draft", async (
-            EntwurfKoerper koerper,
+            DraftBody koerper,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -148,28 +148,28 @@ public static class ProfilEndpoints
                 // Der Entwurf lebt im Formular, bis die Person ihn speichert —
                 // und dann ist es ihr Text. Nichts davon wird hier abgelegt.
                 var text = await mediator.Send(
-                    new EntwurfAbfrage(handelnder.Subject, koerper.Wish ?? string.Empty),
+                    new DraftQuery(handelnder.Subject, koerper.Wish ?? string.Empty),
                     cancellationToken);
 
                 await context.Response.WriteAsJsonAsync(
                     new Dictionary<string, string> { ["draft"] = text }, cancellationToken);
             }
-            catch (EntwurfNichtVerfuegbar fehler)
+            catch (DraftUnavailable error)
             {
                 // Die Art des Fehlschlags, nie sein Inhalt — und ausdrücklich
-                // keine Vorlage, die wie ein Vorschlag aussähe.
-                await ProblemDetailsMiddleware.Schreibe(
+                // keine ResumeTemplate, die wie ein Vorschlag aussähe.
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status503ServiceUnavailable,
-                    "Request failed", fehler.Message);
+                    "Request failed", error.Message);
             }
-            catch (Eingabefehler fehler)
+            catch (Eingabefehler error)
             {
                 // Ein zu langer Wunsch ist eine Eingabe, kein Ausfall: 422, nicht
                 // 503. Ohne diesen Zweig verliesse er den Dienst als 500 — und
                 // ein 500 sagt dem Aufrufer, es liege nicht an ihm.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
-                    "Request failed", fehler.Message);
+                    "Request failed", error.Message);
             }
         });
 
@@ -186,30 +186,30 @@ public static class ProfilEndpoints
                 return;
             }
 
-            if (handelnder.Acting is not Capacity.ForCompany firma)
+            if (handelnder.Acting is not Capacity.ForCompany company)
             {
                 // 403 ist eine Aussage über den Aufrufer und verrät nichts über
                 // die Person, nach der er fragt.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status403Forbidden,
                     "Request failed", "no active company");
                 return;
             }
 
-            var profil = await mediator.Send(
-                new FremdesProfilAbfrage(new SubjectId(subjectId), firma.Tenant),
+            var profile = await mediator.Send(
+                new ForeignProfileQuery(new SubjectId(subjectId), company.Tenant),
                 cancellationToken);
 
-            if (profil is null)
+            if (profile is null)
             {
                 // Verborgen und nicht vorhanden antworten gleich, und das muss
                 // so bleiben: ein Unterschied sagte, ob dieser Mensch hier ist.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "no such profile");
                 return;
             }
 
-            await context.Response.WriteAsJsonAsync(Antwort(profil), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Antwort(profile), cancellationToken);
         });
 
         return app;
@@ -222,24 +222,24 @@ public static class ProfilEndpoints
     /// <strong>Nicht <c>null</c>.</strong> Ein Filter, der <c>null</c>
     /// zurückgibt, lässt das Rahmenwerk noch einmal schreiben — JSON-<c>null</c>
     /// samt Kopfzeilen, und die stehen zu diesem Zeitpunkt schon. Bei einer
-    /// Anfrage ohne Rumpf sieht der Aufrufer trotzdem sein 503 und nur das
+    /// ResumeRequest ohne Rumpf sieht der Aufrufer trotzdem sein 503 und nur das
     /// Protokoll trägt eine unbehandelte Ausnahme; bei einer mit Rumpf reißt
-    /// die Verbindung, und er bekommt „Error while copying content to a
+    /// die Connection, und er bekommt „Error while copying content to a
     /// stream". Gemessen an <c>POST /applications</c>.
     /// </remarks>
     private static readonly IResult Geschrieben = Results.Empty;
 
     private static async ValueTask<object?> SchweigenAbfangen(
-        EndpointFilterInvocationContext aufruf, EndpointFilterDelegate weiter)
+        EndpointFilterInvocationContext call, EndpointFilterDelegate weiter)
     {
         try
         {
-            return await weiter(aufruf);
+            return await weiter(call);
         }
-        catch (EinwilligungSchweigt)
+        catch (ConsentGateSilent)
         {
-            await ProblemDetailsMiddleware.Schreibe(
-                aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+            await ProblemDetailsMiddleware.Write(
+                call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                 "Request failed", "the consent ledger did not answer");
 
             return Geschrieben;
@@ -250,22 +250,22 @@ public static class ProfilEndpoints
     /// Trägt kein Sichtbarkeitsfeld, keinen Punktwert, keinen Rang und keinen
     /// Prozentwert — und es gehört keines darauf (ADR-0022).
     /// </remarks>
-    private static Dictionary<string, object?> Antwort(Profil profil) => new()
+    private static Dictionary<string, object?> Antwort(PersonProfile profile) => new()
     {
-        ["subject_id"] = profil.Wer.Value,
-        ["headline"] = profil.Ueberschrift,
-        ["bio"] = profil.Text,
-        ["location"] = profil.Ort,
-        ["remote_ok"] = profil.RemoteMoeglich,
-        ["skills"] = profil.Faehigkeiten.Werte,
+        ["subject_id"] = profile.Wer.Value,
+        ["headline"] = profile.Ueberschrift,
+        ["bio"] = profile.Text,
+        ["location"] = profile.Ort,
+        ["remote_ok"] = profile.RemoteMoeglich,
+        ["skills"] = profile.Faehigkeiten.Werte,
         // `null` reist mit und wird nicht weggelassen: die Oberflaeche muss
         // „nichts gesagt" von „Feld gibt es nicht" unterscheiden koennen.
-        ["commute_km"] = Pendelstufen.Wort(profil.Pendelbereitschaft),
-        ["relocation"] = Umzugsworte.Wort(profil.Umzugsbereitschaft),
-        ["updated_at"] = profil.GeaendertAm
+        ["commute_km"] = Pendelstufen.Wort(profile.Pendelbereitschaft),
+        ["relocation"] = RelocationTerms.Wort(profile.Umzugsbereitschaft),
+        ["updated_at"] = profile.GeaendertAm
     };
 
     private static Task NichtAngemeldet(HttpContext context) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
 }

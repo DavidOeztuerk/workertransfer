@@ -7,31 +7,31 @@ using WorkerTransfer.Transfer.Domain.Vorgaenge;
 namespace WorkerTransfer.Transfer.Infrastructure.Persistence;
 
 /// <summary>Liest und schreibt <c>market_status</c>.</summary>
-public sealed class EfMarktspeicher(TransferDbContext kontext) : IMarktspeicher
+public sealed class EfMarketStore(TransferDbContext context) : IMarketStore
 {
     /// <inheritdoc />
-    public async Task<Marktstatus?> HoleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<MarketStatus?> GetAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Marktstatus
-            .FirstOrDefaultAsync(kandidat => kandidat.Id == wer.Value, cancellationToken);
+        var row = await context.MarketStatus
+            .FirstOrDefaultAsync(kandidat => kandidat.Id == subject.Value, cancellationToken);
 
-        return zeile is null ? null : ZumAggregat(zeile);
+        return row is null ? null : ZumAggregat(row);
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(
-        Marktstatus status, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        MarketStatus status, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(status);
 
-        var vorhanden = await kontext.Marktstatus
+        var vorhanden = await context.MarketStatus
             .AsTracking()
             .FirstOrDefaultAsync(kandidat => kandidat.Id == status.Wer.Value, cancellationToken);
 
         if (vorhanden is null)
         {
-            kontext.Marktstatus.Add(new MarktZeile
+            context.MarketStatus.Add(new MarketRow
             {
                 Id = status.Wer.Value,
                 Availability = Verfuegbarkeiten.Wort(status.Verfuegbarkeit),
@@ -50,224 +50,224 @@ public sealed class EfMarktspeicher(TransferDbContext kontext) : IMarktspeicher
         vorhanden.UpdatedAt = status.GeaendertAm.UtcDateTime;
     }
 
-    private static Marktstatus ZumAggregat(MarktZeile zeile) =>
-        Marktstatus.Stelle_her(
-            new SubjectId(zeile.Id),
-            Verfuegbarkeiten.Lies(zeile.Availability)
+    private static MarketStatus ZumAggregat(MarketRow row) =>
+        MarketStatus.Stelle_her(
+            new SubjectId(row.Id),
+            Verfuegbarkeiten.Lies(row.Availability)
             ?? throw new InvalidOperationException(
-                $"Unbekannte Verfügbarkeit in der Datenbank: {zeile.Availability}"),
-            zeile.Employed,
-            zeile.Note,
-            new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
-            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero));
+                $"Unbekannte Verfügbarkeit in der Datenbank: {row.Availability}"),
+            row.Employed,
+            row.Note,
+            new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
+            new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero));
 }
 
 /// <summary>Liest und schreibt <c>market_requests</c>.</summary>
-public sealed class EfAnfragenspeicher(TransferDbContext kontext) : IAnfragenspeicher
+public sealed class EfRequestStore(TransferDbContext context) : IRequestStore
 {
     /// <inheritdoc />
-    public async Task<Marktanfrage?> HoleAsync(
+    public async Task<MarketRequest?> GetAsync(
         Guid id, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Anfragen
+        var row = await context.Anfragen
             .FirstOrDefaultAsync(kandidat => kandidat.Id == id, cancellationToken);
 
-        return zeile is null ? null : ZumAggregat(zeile);
+        return row is null ? null : ZumAggregat(row);
     }
 
     /// <inheritdoc />
-    public async Task<Marktanfrage?> HoleAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default)
+    public async Task<MarketRequest?> GetAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Anfragen.FirstOrDefaultAsync(
-            kandidat => kandidat.SubjectId == wer.Value && kandidat.TenantId == firma.Value,
+        var row = await context.Anfragen.FirstOrDefaultAsync(
+            kandidat => kandidat.SubjectId == subject.Value && kandidat.TenantId == company.Value,
             cancellationToken);
 
-        return zeile is null ? null : ZumAggregat(zeile);
+        return row is null ? null : ZumAggregat(row);
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(
-        Marktanfrage anfrage, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        MarketRequest request, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(anfrage);
+        ArgumentNullException.ThrowIfNull(request);
 
-        var vorhanden = await kontext.Anfragen
+        var vorhanden = await context.Anfragen
             .AsTracking()
-            .FirstOrDefaultAsync(kandidat => kandidat.Id == anfrage.Id, cancellationToken);
+            .FirstOrDefaultAsync(kandidat => kandidat.Id == request.Id, cancellationToken);
 
         if (vorhanden is null)
         {
-            kontext.Anfragen.Add(new AnfrageZeile
+            context.Anfragen.Add(new RequestRow
             {
-                Id = anfrage.Id,
-                SubjectId = anfrage.Wer.Value,
-                TenantId = anfrage.Firma.Value,
-                RequestedBy = anfrage.Frager?.Value,
-                Status = Anfragestaende.Wort(anfrage.Stand),
-                CreatedAt = anfrage.AngelegtAm.UtcDateTime,
-                AnsweredAt = anfrage.BeantwortetAm?.UtcDateTime
+                Id = request.Id,
+                SubjectId = request.Wer.Value,
+                TenantId = request.Firma.Value,
+                RequestedBy = request.Frager?.Value,
+                Status = RequestStates.Wort(request.State),
+                CreatedAt = request.AngelegtAm.UtcDateTime,
+                AnsweredAt = request.BeantwortetAm?.UtcDateTime
             });
 
             return;
         }
 
         // Wer, Firma und Frager stehen hier nicht: sie ändern sich nie, und
-        // eine Zuweisung, die es doch könnte, wäre der Weg, eine Anfrage
+        // eine Zuweisung, die es doch könnte, wäre der Weg, eine ResumeRequest
         // nachträglich jemand anderem zuzuschreiben.
-        vorhanden.Status = Anfragestaende.Wort(anfrage.Stand);
-        vorhanden.AnsweredAt = anfrage.BeantwortetAm?.UtcDateTime;
+        vorhanden.Status = RequestStates.Wort(request.State);
+        vorhanden.AnsweredAt = request.BeantwortetAm?.UtcDateTime;
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Marktanfrage>> FuerPersonAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<MarketRequest>> ForPersonAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.Anfragen
-            .Where(kandidat => kandidat.SubjectId == wer.Value)
+        var rows = await context.Anfragen
+            .Where(kandidat => kandidat.SubjectId == subject.Value)
             .OrderByDescending(kandidat => kandidat.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZumAggregat)];
+        return [.. rows.Select(ZumAggregat)];
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Marktanfrage>> FuerFirmaAsync(
-        TenantId firma, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<MarketRequest>> ForCompanyAsync(
+        TenantId company, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.Anfragen
-            .Where(kandidat => kandidat.TenantId == firma.Value)
+        var rows = await context.Anfragen
+            .Where(kandidat => kandidat.TenantId == company.Value)
             .OrderByDescending(kandidat => kandidat.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZumAggregat)];
+        return [.. rows.Select(ZumAggregat)];
     }
 
-    private static Marktanfrage ZumAggregat(AnfrageZeile zeile) =>
-        Marktanfrage.Stelle_her(
-            zeile.Id,
-            new SubjectId(zeile.SubjectId),
-            new TenantId(zeile.TenantId),
-            zeile.RequestedBy is { } frager ? new SubjectId(frager) : null,
-            Anfragestaende.Lies(zeile.Status)
+    private static MarketRequest ZumAggregat(RequestRow row) =>
+        MarketRequest.Stelle_her(
+            row.Id,
+            new SubjectId(row.SubjectId),
+            new TenantId(row.TenantId),
+            row.RequestedBy is { } frager ? new SubjectId(frager) : null,
+            RequestStates.Lies(row.Status)
             ?? throw new InvalidOperationException(
-                $"Unbekannter Anfragestand in der Datenbank: {zeile.Status}"),
-            new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
-            zeile.AnsweredAt is { } beantwortet
+                $"Unbekannter Anfragestand in der Datenbank: {row.Status}"),
+            new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
+            row.AnsweredAt is { } beantwortet
                 ? new DateTimeOffset(beantwortet, TimeSpan.Zero)
                 : null);
 }
 
 /// <summary>Liest und schreibt <c>transfers</c>.</summary>
-public sealed class EfTransferspeicher(TransferDbContext kontext) : ITransferspeicher
+public sealed class EfTransferStore(TransferDbContext context) : ITransferStore
 {
     private static readonly string[] Laufende =
         [.. Transferstaende.Laufende.Select(Transferstaende.Wort)];
 
     /// <inheritdoc />
-    public async Task<Domain.Vorgaenge.Transfer?> HoleAsync(
+    public async Task<Domain.Vorgaenge.Transfer?> GetAsync(
         Guid id, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Vorgaenge
+        var row = await context.Vorgaenge
             .FirstOrDefaultAsync(kandidat => kandidat.Id == id, cancellationToken);
 
-        return zeile is null ? null : ZumAggregat(zeile);
+        return row is null ? null : ZumAggregat(row);
     }
 
     /// <inheritdoc />
-    public async Task<Domain.Vorgaenge.Transfer?> HoleLaufendenAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default)
+    public async Task<Domain.Vorgaenge.Transfer?> GetCurrentAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Vorgaenge.FirstOrDefaultAsync(
-            kandidat => kandidat.SubjectId == wer.Value
-                        && kandidat.TenantId == firma.Value
+        var row = await context.Vorgaenge.FirstOrDefaultAsync(
+            kandidat => kandidat.SubjectId == subject.Value
+                        && kandidat.TenantId == company.Value
                         && Laufende.Contains(kandidat.Status),
             cancellationToken);
 
-        return zeile is null ? null : ZumAggregat(zeile);
+        return row is null ? null : ZumAggregat(row);
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(
-        Domain.Vorgaenge.Transfer vorgang, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        Domain.Vorgaenge.Transfer caseItem, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(vorgang);
+        ArgumentNullException.ThrowIfNull(caseItem);
 
-        var vorhanden = await kontext.Vorgaenge
+        var vorhanden = await context.Vorgaenge
             .AsTracking()
-            .FirstOrDefaultAsync(kandidat => kandidat.Id == vorgang.Id, cancellationToken);
+            .FirstOrDefaultAsync(kandidat => kandidat.Id == caseItem.Id, cancellationToken);
 
         if (vorhanden is null)
         {
-            var zeile = new VorgangsZeile
+            var row = new CaseRow
             {
-                Id = vorgang.Id,
-                SubjectId = vorgang.Wer.Value,
-                TenantId = vorgang.Firma.Value,
+                Id = caseItem.Id,
+                SubjectId = caseItem.Wer.Value,
+                TenantId = caseItem.Firma.Value,
                 // Nachricht und Freigabepflicht stehen nur hier: beide werden
                 // beim Anlegen festgelegt und danach nie geändert.
-                RequiresRelease = vorgang.BrauchtFreigabe,
-                Message = vorgang.Nachricht,
-                CreatedAt = vorgang.AngelegtAm.UtcDateTime
+                RequiresRelease = caseItem.BrauchtFreigabe,
+                Message = caseItem.Nachricht,
+                CreatedAt = caseItem.AngelegtAm.UtcDateTime
             };
 
-            Uebertrage(vorgang, zeile);
-            kontext.Vorgaenge.Add(zeile);
+            Uebertrage(caseItem, row);
+            context.Vorgaenge.Add(row);
 
             return;
         }
 
-        Uebertrage(vorgang, vorhanden);
+        Uebertrage(caseItem, vorhanden);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Domain.Vorgaenge.Transfer>> FuerPersonAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Domain.Vorgaenge.Transfer>> ForPersonAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.Vorgaenge
-            .Where(kandidat => kandidat.SubjectId == wer.Value)
+        var rows = await context.Vorgaenge
+            .Where(kandidat => kandidat.SubjectId == subject.Value)
             .OrderByDescending(kandidat => kandidat.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZumAggregat)];
+        return [.. rows.Select(ZumAggregat)];
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Domain.Vorgaenge.Transfer>> FuerFirmaAsync(
-        TenantId firma, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Domain.Vorgaenge.Transfer>> ForCompanyAsync(
+        TenantId company, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.Vorgaenge
-            .Where(kandidat => kandidat.TenantId == firma.Value)
+        var rows = await context.Vorgaenge
+            .Where(kandidat => kandidat.TenantId == company.Value)
             .OrderByDescending(kandidat => kandidat.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZumAggregat)];
+        return [.. rows.Select(ZumAggregat)];
     }
 
-    private static void Uebertrage(Domain.Vorgaenge.Transfer vorgang, VorgangsZeile zeile)
+    private static void Uebertrage(Domain.Vorgaenge.Transfer caseItem, CaseRow row)
     {
-        zeile.Status = Transferstaende.Wort(vorgang.Stand);
-        zeile.ReleaseConfirmed = vorgang.FreigabeBestaetigt;
-        zeile.OfferNote = vorgang.Angebotstext;
-        zeile.OfferStartOn = vorgang.Angebotsbeginn;
-        zeile.OfferFeeCents = vorgang.AngebotsgebuehrCent;
-        zeile.UpdatedAt = vorgang.GeaendertAm.UtcDateTime;
+        row.Status = Transferstaende.Wort(caseItem.State);
+        row.ReleaseConfirmed = caseItem.FreigabeBestaetigt;
+        row.OfferNote = caseItem.Angebotstext;
+        row.OfferStartOn = caseItem.Angebotsbeginn;
+        row.OfferFeeCents = caseItem.AngebotsgebuehrCent;
+        row.UpdatedAt = caseItem.GeaendertAm.UtcDateTime;
     }
 
-    private static Domain.Vorgaenge.Transfer ZumAggregat(VorgangsZeile zeile) =>
+    private static Domain.Vorgaenge.Transfer ZumAggregat(CaseRow row) =>
         Domain.Vorgaenge.Transfer.Stelle_her(
-            zeile.Id,
-            new SubjectId(zeile.SubjectId),
-            new TenantId(zeile.TenantId),
-            Transferstaende.Lies(zeile.Status)
+            row.Id,
+            new SubjectId(row.SubjectId),
+            new TenantId(row.TenantId),
+            Transferstaende.Lies(row.Status)
             ?? throw new InvalidOperationException(
-                $"Unbekannter Transferstand in der Datenbank: {zeile.Status}"),
-            zeile.RequiresRelease,
-            zeile.ReleaseConfirmed,
-            zeile.Message,
-            zeile.OfferNote,
-            zeile.OfferStartOn,
-            zeile.OfferFeeCents,
-            new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
-            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero));
+                $"Unbekannter Transferstand in der Datenbank: {row.Status}"),
+            row.RequiresRelease,
+            row.ReleaseConfirmed,
+            row.Message,
+            row.OfferNote,
+            row.OfferStartOn,
+            row.OfferFeeCents,
+            new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
+            new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero));
 }

@@ -8,13 +8,13 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Jobs.Application.Ports;
-using WorkerTransfer.ServiceDefaults.Rollen;
+using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Jobs.Tests;
 
 /// <summary>
-/// „admin" ist mehr als ein Wort in einer Tabelle — an den zwei Stellen, an
+/// „admin" ist mehr als ein Wort in einer Tabelle — an den zwei Jobs, an
 /// denen eine Anzeige das Unternehmen nach aussen vertritt.
 /// </summary>
 /// <remarks>
@@ -26,7 +26,7 @@ namespace WorkerTransfer.Jobs.Tests;
 /// <para><strong>Jede Reihe hier hat ihre eigene Gegenprobe.</strong> Ein
 /// Endpunkt, der IMMER 403 antwortet, ist von einem richtig geschuetzten nicht
 /// zu unterscheiden — also steht neben jedem „member bekommt 403" auch
-/// „admin bekommt 200", in derselben Reihe und am selben Vorgang.</para>
+/// „admin bekommt 200", in derselben Reihe und am selben Case.</para>
 /// </remarks>
 [Collection(PostgresCollection.Name)]
 public class RollenTests(Postgres postgres) : IAsyncLifetime
@@ -41,15 +41,15 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:jobs", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", "rueckzug-geheimnis");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IEntwerfer>(_ => new Probeentwerfer()));
-                dienste.Replace(ServiceDescriptor.Scoped<IFirmenrollen>(_ => _rollen));
+                services.Replace(ServiceDescriptor.Scoped<IDrafter>(_ => new Probeentwerfer()));
+                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => _rollen));
             });
         });
 
@@ -62,16 +62,16 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsFirma(Guid firma, Guid? wer = null)
+    private HttpClient AlsFirma(Guid company, Guid? subject = null)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer", Tokenform.Firma(wer ?? Guid.CreateVersion7(), firma));
+            "Bearer", Tokenform.Firma(subject ?? Guid.CreateVersion7(), company));
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     private static async Task<Guid> Entwurf(HttpClient browser)
     {
@@ -94,18 +94,18 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Nur_ein_Administrator_veroeffentlicht()
     {
-        var firma = Guid.CreateVersion7();
-        var browser = AlsFirma(firma);
+        var company = Guid.CreateVersion7();
+        var browser = AlsFirma(company);
         var id = await Entwurf(browser);
 
-        _rollen.Antwort = Firmenrolle.Mitglied;
+        _rollen.Antwort = CompanyRole.Mitglied;
         var alsMitglied = await browser.PostAsync($"/jobs/{id}/publish", null);
 
         alsMitglied.StatusCode.Should().Be(
             HttpStatusCode.Forbidden,
             "eine veroeffentlichte Anzeige vertritt das ganze Unternehmen");
 
-        _rollen.Antwort = Firmenrolle.Admin;
+        _rollen.Antwort = CompanyRole.Admin;
         var alsAdmin = await browser.PostAsync($"/jobs/{id}/publish", null);
 
         alsAdmin.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -115,26 +115,26 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     /// Und schliesst keine — das ist die Handlung aus der Nutzergeschichte.
     /// </summary>
     /// <remarks>
-    /// „Ein <c>member</c> kann meine Stellen nicht loeschen" heisst in dieser
+    /// „Ein <c>member</c> kann meine Jobs nicht loeschen" heisst in dieser
     /// Domaene genau das: geloescht wird eine Anzeige nie, sie wird
     /// geschlossen. Und mit ihr verschwindet die Moeglichkeit, sich zu bewerben.
     /// </remarks>
     [Fact]
     public async Task Nur_ein_Administrator_schliesst()
     {
-        var firma = Guid.CreateVersion7();
-        var browser = AlsFirma(firma);
+        var company = Guid.CreateVersion7();
+        var browser = AlsFirma(company);
         var id = await Entwurf(browser);
 
         (await browser.PostAsync($"/jobs/{id}/publish", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        _rollen.Antwort = Firmenrolle.Mitglied;
+        _rollen.Antwort = CompanyRole.Mitglied;
         var alsMitglied = await browser.PostAsync($"/jobs/{id}/close", null);
 
         alsMitglied.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        _rollen.Antwort = Firmenrolle.Admin;
+        _rollen.Antwort = CompanyRole.Admin;
         var alsAdmin = await browser.PostAsync($"/jobs/{id}/close", null);
 
         alsAdmin.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -153,7 +153,7 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_Mitglied_schreibt_und_aendert_eine_Anzeige()
     {
-        _rollen.Antwort = Firmenrolle.Mitglied;
+        _rollen.Antwort = CompanyRole.Mitglied;
 
         var browser = AlsFirma(Guid.CreateVersion7());
         var id = await Entwurf(browser);
@@ -173,26 +173,26 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>
     /// Gefragt wird nach der Firma aus dem TOKEN und dem Menschen aus dem
-    /// <c>sub</c> — nicht nach irgendetwas aus der Anfrage.
+    /// <c>sub</c> — nicht nach irgendetwas aus der ResumeRequest.
     /// </summary>
     /// <remarks>
     /// Ohne diese Reihe koennte die Attrappe „admin" sagen, waehrend der
     /// Aufrufer eine fremde Firma uebergibt, und alles saehe gruen aus. Der
     /// Mandant im Token kam nie aus einer Eingabe: ihn vergibt
-    /// <c>POST /auth/company/{id}</c>, nachdem der Server die Mitgliedschaft
+    /// <c>POST /auth/company/{id}</c>, nachdem der Server die Membership
     /// geprueft hat (ADR-0018).
     /// </remarks>
     [Fact]
     public async Task Gefragt_wird_nach_dem_Mandanten_aus_dem_Token()
     {
-        var firma = Guid.CreateVersion7();
-        var wer = Guid.CreateVersion7();
-        var browser = AlsFirma(firma, wer);
+        var company = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
+        var browser = AlsFirma(company, subject);
         var id = await Entwurf(browser);
 
         await browser.PostAsync($"/jobs/{id}/publish", null);
 
-        _rollen.Zuletzt.Should().Be((wer, firma));
+        _rollen.Zuletzt.Should().Be((subject, company));
     }
 
     /// <summary>
@@ -212,11 +212,11 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
         var id = await Entwurf(browser);
 
         _rollen.Schweigt = true;
-        var antwort = await browser.PostAsync($"/jobs/{id}/publish", null);
+        var response = await browser.PostAsync($"/jobs/{id}/publish", null);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
 
-        var problem = await Json(antwort);
+        var problem = await Json(response);
         problem.GetProperty("correlationId").GetString().Should().NotBeNullOrWhiteSpace();
     }
 

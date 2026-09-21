@@ -3,15 +3,15 @@ using WorkerTransfer.Advisor.Infrastructure;
 using WorkerTransfer.Advisor.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
-// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
+// Konfiguration aus der EnvironmentFile. VOR CreateBuilder, weil der
 // Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
 // geladen hiesse geladen und von niemandem gelesen.
-WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 const string dienstname = "advisor-service";
 
-// Kein AlsAussteller(): dieser Dienst prüft Tokens, er stellt keine aus.
+// Kein AsIssuer(): dieser Dienst prüft Tokens, er stellt keine aus.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, dienstname);
 
@@ -23,7 +23,7 @@ builder.Services.AddAdvisorInfrastructure(
 var app = builder.Build();
 
 // Erst wandern, dann bedienen (ADR-0010).
-await app.WandereAsync<AdvisorDbContext>();
+await app.MigrateSchemaAsync<AdvisorDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, dienstname);
 

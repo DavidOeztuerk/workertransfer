@@ -14,11 +14,11 @@ public sealed class ProbeKontext(DbContextOptions<ProbeKontext> options) : DbCon
 }
 
 /// <summary>Hands out contexts, the way the dispatcher asks for them.</summary>
-public sealed class Kontextfabrik(string verbindung) : IDbContextFactory<ProbeKontext>
+public sealed class Kontextfabrik(string connection) : IDbContextFactory<ProbeKontext>
 {
     public ProbeKontext CreateDbContext() =>
         new(new DbContextOptionsBuilder<ProbeKontext>()
-            .UseNpgsql(verbindung)
+            .UseNpgsql(connection)
             // As the services configure it. With tracking on by default
             // this suite could not see a dispatcher that writes onto an
             // untracked copy — which is exactly the bug it missed once.
@@ -42,8 +42,8 @@ public sealed class Postgres : IAsyncLifetime
     {
         await _container.StartAsync();
 
-        await using var kontext = new Kontextfabrik(ConnectionString).CreateDbContext();
-        await kontext.Database.EnsureCreatedAsync();
+        await using var context = new Kontextfabrik(ConnectionString).CreateDbContext();
+        await context.Database.EnsureCreatedAsync();
     }
 
     public async Task DisposeAsync() => await _container.DisposeAsync();

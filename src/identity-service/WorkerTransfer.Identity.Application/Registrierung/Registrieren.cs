@@ -25,7 +25,7 @@ public sealed record RegistrierenBefehl(
     Kontosprache Kontosprache = Sprachwahl.Vorgabe,
     string? Vorname = null,
     string? Nachname = null,
-    Berufsfeld? Berufsfeld = null) : IBefehl<Registrierergebnis>;
+    OccupationalField? OccupationalField = null) : IBefehl<Registrierergebnis>;
 
 /// <summary>What registering produced.</summary>
 public abstract record Registrierergebnis
@@ -45,7 +45,7 @@ public abstract record Registrierergebnis
     public sealed record Angenommen : Registrierergebnis;
 
     /// <summary>The password does not clear the floor.</summary>
-    public sealed record SchwachesPasswort(string Grund) : Registrierergebnis;
+    public sealed record WeakPassword(string Grund) : Registrierergebnis;
 
     /// <summary>A mass provider cannot be claimed as a company.</summary>
     public sealed record OeffentlicheDomain(string Domain) : Registrierergebnis;
@@ -79,7 +79,7 @@ public sealed class RegistrierenHandler(
         }
         catch (WeakPasswordException schwach)
         {
-            return new Registrierergebnis.SchwachesPasswort(schwach.Reason);
+            return new Registrierergebnis.WeakPassword(schwach.Reason);
         }
 
         // Freemail BEFORE the existence check, and that is not a matter of
@@ -109,24 +109,24 @@ public sealed class RegistrierenHandler(
         // be back in ten and would give away over the clock what the identical
         // status code is hiding. Otherwise the enumeration channel just moves
         // into the wristwatch.
-        var eintrag = passwoerter.Hash(request.Passwort);
+        var entry = passwoerter.Hash(request.Passwort);
 
         var vorhanden = await benutzer.FindByEmailAsync(request.Email, cancellationToken);
 
         if (vorhanden is not null)
         {
-            // Die Kontosprache des BESTEHENDEN Kontos, nicht die der Anfrage: diese
+            // Die Kontosprache des BESTEHENDEN Kontos, nicht die der ResumeRequest: diese
             // Mail geht an den rechtmäßigen Inhaber, und der hat gewählt. Die
-            // Anfrage kommt womöglich von jemand anderem.
+            // ResumeRequest kommt womöglich von jemand anderem.
             postkorb.Doppelanmeldung(
                 vorhanden.Email, vorhanden.Id, vorhanden.Kontosprache);
             return new Registrierergebnis.Angenommen();
         }
 
         var konto = User.Register(
-            request.Email, eintrag, request.Anzeigename, request.Firmenname,
+            request.Email, entry, request.Anzeigename, request.Firmenname,
             request.Kontosprache, request.Vorname, request.Nachname,
-            request.Berufsfeld);
+            request.OccupationalField);
 
         await benutzer.AddAsync(konto, cancellationToken);
 

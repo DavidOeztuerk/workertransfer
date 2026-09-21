@@ -19,8 +19,8 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// already formed. Here it would be an overview.
 /// </para>
 /// </remarks>
-public sealed record MeineFreigabenAbfrage(SubjectId Wer)
-    : IAbfrage<IReadOnlyList<Freigabe>>;
+public sealed record MyReleasesQuery(SubjectId Wer)
+    : IAbfrage<IReadOnlyList<Release>>;
 
 /// <summary>One permission that holds right now.</summary>
 /// <param name="Faehigkeit">Which permission.</param>
@@ -28,20 +28,20 @@ public sealed record MeineFreigabenAbfrage(SubjectId Wer)
 /// When it took effect — the effective grant, not the first one. Somebody who
 /// withdrew and later granted again has held it since the second time.
 /// </param>
-public sealed record Freigabe(Capability Faehigkeit, DateTimeOffset Seit);
+public sealed record Release(Capability Faehigkeit, DateTimeOffset Seit);
 
 /// <summary>Reduces every capability of one person and keeps what holds.</summary>
-public sealed class MeineFreigabenHandler(IConsentLedger buch)
-    : IRequestHandler<MeineFreigabenAbfrage, IReadOnlyList<Freigabe>>
+public sealed class MyReleasesHandler(IConsentLedger buch)
+    : IRequestHandler<MyReleasesQuery, IReadOnlyList<Release>>
 {
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Freigabe>> Handle(
-        MeineFreigabenAbfrage request,
+    public async Task<IReadOnlyList<Release>> Handle(
+        MyReleasesQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var neueste = await buch.NeuesteJeFaehigkeitAsync(request.Wer, cancellationToken);
+        var neueste = await buch.LatestPerSkillAsync(request.Wer, cancellationToken);
 
         // The same reduction as /check, applied to a stream of length one. This
         // list must not become a second reading of what "holds" means.
@@ -50,8 +50,8 @@ public sealed class MeineFreigabenHandler(IConsentLedger buch)
         // holds", not "what was". A history says who once asked, and that is
         // more than an overview promises.
         return [.. neueste
-            .Where(ereignis => Projektion.Stand([ereignis]).Granted)
-            .Select(ereignis => new Freigabe(ereignis.Capability, ereignis.RecordedAt))
-            .OrderBy(freigabe => freigabe.Faehigkeit.Value, StringComparer.Ordinal)];
+            .Where(ereignis => Projektion.State([ereignis]).Granted)
+            .Select(ereignis => new Release(ereignis.Capability, ereignis.RecordedAt))
+            .OrderBy(release => release.Faehigkeit.Value, StringComparer.Ordinal)];
     }
 }

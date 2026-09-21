@@ -1,16 +1,16 @@
 using MediatR;
 using Microsoft.Extensions.Options;
-using WorkerTransfer.Applications.Application.Loeschung;
-using WorkerTransfer.Applications.Infrastructure.Loeschung;
+using WorkerTransfer.Applications.Application.Erasure;
+using WorkerTransfer.Applications.Infrastructure.Erasure;
 using WorkerTransfer.Contracts.Erasure;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Applications.Api;
 
 /// <summary><c>POST /erasure</c> — der Eingang der Kaskade in diesen Dienst.</summary>
-public static class LoeschEndpoints
+public static class ErasureEndpoints
 {
-    /// <summary>Der Kopf, den der Ursprung vorlegt.</summary>
+    /// <summary>Der Header, den der Ursprung vorlegt.</summary>
     private const string Geheimniskopf = "X-Erasure-Secret";
 
     /// <summary>Bildet den einen Endpunkt ab, den die Löschkaskade ruft.</summary>
@@ -19,9 +19,9 @@ public static class LoeschEndpoints
         ArgumentNullException.ThrowIfNull(app);
 
         app.MapPost("/erasure", async (
-            LoeschungV1 body,
+            ErasureV1 body,
             IMediator mediator,
-            IOptions<Loescheinstellungen> einstellungen,
+            IOptions<ErasureSettings> einstellungen,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -30,34 +30,34 @@ public static class LoeschEndpoints
                 // Dieselbe Antwort für ein falsches und für ein nicht gesetztes
                 // Geheimnis: ein Aufrufer darf „falsch geraten" nicht von „hier
                 // ist noch nichts verdrahtet" unterscheiden können.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authorised");
                 return;
             }
 
             var behalten = await mediator.Send(
-                new PersonLoeschenBefehl(new Noelia.Core.Identity.SubjectId(body.UserId)),
+                new ErasePersonCommand(new Noelia.Core.Identity.SubjectId(body.UserId)),
                 cancellationToken);
 
             // Eine Zahl, kein Merker: in der Voreinstellung ist sie 0, weil auch
-            // die eingestellte Bewerbung fällt. Bliebe je etwas stehen, soll der
+            // die eingestellte JobApplication fällt. Bliebe je etwas stehen, soll der
             // Ursprung es erfahren, statt es zu vermuten — ausgesetzt ist nicht
             // übersprungen (ADR-0027 §3.4).
             await context.Response.WriteAsJsonAsync(
-                new LoeschungsquittungV1(behalten), cancellationToken);
+                new ErasureReceiptV1(behalten), cancellationToken);
         });
 
         return app;
     }
 
-    /// <summary>Ob diese Anfrage das Geheimnis der Kaskade trägt.</summary>
+    /// <summary>Ob diese ResumeRequest das Geheimnis der Kaskade trägt.</summary>
     /// <remarks>
     /// Ein leeres eingestelltes Geheimnis schließt den Endpunkt. In fester Zeit
     /// verglichen, damit die Dauer der Antwort nichts darüber sagt, wie viel
     /// von einem Rateversuch stimmte.
     /// </remarks>
-    private static bool DarfLoeschen(HttpContext context, Loescheinstellungen einstellungen)
+    private static bool DarfLoeschen(HttpContext context, ErasureSettings einstellungen)
     {
         if (string.IsNullOrEmpty(einstellungen.Geheimnis)
             || !context.Request.Headers.TryGetValue(Geheimniskopf, out var vorgelegt))

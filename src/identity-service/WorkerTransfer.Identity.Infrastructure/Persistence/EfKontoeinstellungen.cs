@@ -12,67 +12,67 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence;
 /// eine Entscheidung zu behaupten, die niemand getroffen hat; und die Vorgabe
 /// steht ohnehin im Aggregat, wo man sie liest.
 /// </remarks>
-public sealed class EfKontoeinstellungen(IdentityDbContext kontext, TimeProvider uhr)
-    : IKontoeinstellungen
+public sealed class EfAccountSettingsStore(IdentityDbContext context, TimeProvider uhr)
+    : IAccountSettingsStore
 {
     /// <inheritdoc />
-    public async Task<Kontoeinstellungen> HoleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<AccountSettings> GetAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.AccountSettings
-            .FirstOrDefaultAsync(eintrag => eintrag.SubjectId == wer.Value, cancellationToken);
+        var row = await context.AccountSettings
+            .FirstOrDefaultAsync(entry => entry.SubjectId == subject.Value, cancellationToken);
 
-        return zeile is null
-            ? Kontoeinstellungen.Vorgabe(wer)
-            : Kontoeinstellungen.Wiederherstellen(
-                wer,
-                zeile.DeleteAfterMonths,
-                Anbieter(zeile.AiProvider),
-                zeile.AiBaseUrl,
-                zeile.AiModel,
-                zeile.AiKeyEncrypted,
-                zeile.AiKeyTail,
-                zeile.AiAuditLog);
+        return row is null
+            ? AccountSettings.Vorgabe(subject)
+            : AccountSettings.Wiederherstellen(
+                subject,
+                row.DeleteAfterMonths,
+                Anbieter(row.AiProvider),
+                row.AiBaseUrl,
+                row.AiModel,
+                row.AiKeyEncrypted,
+                row.AiKeyTail,
+                row.AiAuditLog);
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(
-        Kontoeinstellungen einstellungen, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        AccountSettings einstellungen, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(einstellungen);
 
-        var jetzt = uhr.GetUtcNow().UtcDateTime;
+        var now = uhr.GetUtcNow().UtcDateTime;
 
-        var zeile = await kontext.AccountSettings
+        var row = await context.AccountSettings
             .AsTracking()
             .FirstOrDefaultAsync(
-                eintrag => eintrag.SubjectId == einstellungen.Wer.Value, cancellationToken);
+                entry => entry.SubjectId == einstellungen.Wer.Value, cancellationToken);
 
-        if (zeile is null)
+        if (row is null)
         {
-            zeile = new KontoeinstellungenRow
+            row = new AccountSettingsRow
             {
                 SubjectId = einstellungen.Wer.Value,
-                CreatedAt = jetzt
+                CreatedAt = now
             };
-            kontext.AccountSettings.Add(zeile);
+            context.AccountSettings.Add(row);
         }
 
-        zeile.DeleteAfterMonths = einstellungen.LoeschungNachMonaten;
-        zeile.AiProvider = Etikett(einstellungen.Anbieter);
-        zeile.AiBaseUrl = einstellungen.Adresse;
-        zeile.AiModel = einstellungen.Modell;
-        zeile.AiKeyEncrypted = einstellungen.SchluesselVerschluesselt;
-        zeile.AiKeyTail = einstellungen.SchluesselEndung;
-        zeile.AiAuditLog = einstellungen.KiProtokoll;
-        zeile.UpdatedAt = jetzt;
+        row.DeleteAfterMonths = einstellungen.LoeschungNachMonaten;
+        row.AiProvider = Etikett(einstellungen.Anbieter);
+        row.AiBaseUrl = einstellungen.Adresse;
+        row.AiModel = einstellungen.Modell;
+        row.AiKeyEncrypted = einstellungen.SchluesselVerschluesselt;
+        row.AiKeyTail = einstellungen.SchluesselEndung;
+        row.AiAuditLog = einstellungen.KiProtokoll;
+        row.UpdatedAt = now;
     }
 
     /// <summary>Das Etikett in der Spalte — snake_case, wie überall auf dem Draht.</summary>
-    private static string Etikett(KiAnbieter anbieter) => anbieter switch
+    private static string Etikett(AiProvider provider) => provider switch
     {
-        KiAnbieter.OpenAiKompatibel => "openai_compatible",
-        KiAnbieter.Anthropic => "anthropic",
+        AiProvider.OpenAiKompatibel => "openai_compatible",
+        AiProvider.Anthropic => "anthropic",
         _ => "none"
     };
 
@@ -84,10 +84,10 @@ public sealed class EfKontoeinstellungen(IdentityDbContext kontext, TimeProvider
     /// mit einem Anbieter findet, den es nicht mehr gibt, soll niemanden fragen
     /// und nicht abstürzen.
     /// </remarks>
-    private static KiAnbieter Anbieter(string etikett) => etikett switch
+    private static AiProvider Anbieter(string label) => label switch
     {
-        "openai_compatible" => KiAnbieter.OpenAiKompatibel,
-        "anthropic" => KiAnbieter.Anthropic,
-        _ => KiAnbieter.Keiner
+        "openai_compatible" => AiProvider.OpenAiKompatibel,
+        "anthropic" => AiProvider.Anthropic,
+        _ => AiProvider.None
     };
 }

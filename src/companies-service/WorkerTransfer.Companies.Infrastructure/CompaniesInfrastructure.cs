@@ -8,10 +8,10 @@ using Npgsql;
 using WorkerTransfer.Companies.Application.Behaviors;
 using WorkerTransfer.Companies.Application.Ports;
 using WorkerTransfer.Companies.Application.Profile;
-using WorkerTransfer.Companies.Domain.Arbeitgeberprofile;
+using WorkerTransfer.Companies.Domain.EmployerProfiles;
 using WorkerTransfer.Companies.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Companies.Contracts;
 using Noelia.Abstractions.Security.Checks;
 
@@ -21,7 +21,7 @@ namespace WorkerTransfer.Companies.Infrastructure;
 /// <remarks>
 /// Der kürzeste Kompositionswurzel-Aufruf im ganzen System, und das ist die
 /// Aussage: kein Consent-Tor, keine Outbox, keine Zustellung, kein
-/// Löschbestand. Ein Arbeitgeberprofil ist eine Aussage des Unternehmens über
+/// Löschbestand. Ein EmployerProfile ist eine Aussage des Unternehmens über
 /// sich selbst — es gibt niemanden, der einwilligen könnte, niemanden zu
 /// benachrichtigen und nichts über einen natürlichen Menschen zu löschen.
 /// </remarks>
@@ -39,19 +39,19 @@ public static class CompaniesInfrastructure
         ArgumentNullException.ThrowIfNull(configuration);
 
 
-        services.AddSingleton(_ => CompaniesDbContextFactory.Datenquelle(connectionString));
+        services.AddSingleton(_ => CompaniesDbContextFactory.DataSource(connectionString));
         services.AddDbContext<CompaniesDbContext>((provider, options) =>
-            CompaniesDbContextFactory.Konfiguriere(
+            CompaniesDbContextFactory.Configure(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<CompaniesDbContext>("companies");
-        services.AddSchluesselbund<CompaniesDbContext>();
+        services.AddDatabaseReadiness<CompaniesDbContext>("companies");
+        services.AddKeyRing<CompaniesDbContext>();
 
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddScoped<IProfilspeicher, EfProfilspeicher>();
+        services.AddScoped<IProfileStore, EfProfileStore>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
-        services.AddCQRS(typeof(ProfilSichernBefehl).Assembly);
+        services.AddCQRS(typeof(SaveProfileCommand).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
         Nachweis(services, configuration);
@@ -61,30 +61,30 @@ public static class CompaniesInfrastructure
 
     /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
     /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
     /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
     ///
     /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
     /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
     /// vergessen kann.</para>
     /// </remarks>
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
-            [typeof(Arbeitgeberprofil).Assembly, typeof(ArbeitgeberprofilV1).Assembly]));
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
+            [typeof(EmployerProfile).Assembly, typeof(EmployerProfileV1).Assembly]));
 
-        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
+        // None KI-Naht: `ProviderCheck` ohne Quelle meldet NichtAnwendbar,
         // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
         // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
         // durchschneiden soll.
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
 
-        // Kein Empfaenger: ein Arbeitgeberprofil gehoert einem Unternehmen, nicht einem Menschen (ADR-0027 §2).
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.OhneZeilen("companies"));
+        // Kein Empfaenger: ein EmployerProfile gehoert einem Unternehmen, nicht einem Menschen (ADR-0027 §2).
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.OhneZeilen("companies"));
     }
 }

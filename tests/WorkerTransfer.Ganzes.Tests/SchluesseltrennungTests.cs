@@ -12,7 +12,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 ///
 /// <para>Der Unterschied steht jetzt in <c>docker-compose.yml</c> und nicht im
 /// Code — deshalb prüft ihn ein Test, der die Datei liest. Ein zweiter Träger
-/// des privaten Schlüssels wäre eine zweite Stelle, die einen Handelnden
+/// des privaten Schlüssels wäre eine zweite Job, die einen Handelnden
 /// erschaffen kann, und nichts weiter unten könnte die beiden
 /// auseinanderhalten.</para>
 /// </remarks>
@@ -27,16 +27,16 @@ public sealed class SchluesseltrennungTests
     /// ihn beim Namen, und ein Test, der das mitzählt, misst seinen eigenen
     /// Kommentar.
     /// </remarks>
-    private static IReadOnlyList<string> TraegerVon(string schluessel)
+    private static IReadOnlyList<string> TraegerVon(string key)
     {
         var traeger = new List<string>();
         var oben = string.Empty;
-        var dienst = string.Empty;
+        var service = string.Empty;
 
-        foreach (var zeile in Compose().Split('\n'))
+        foreach (var row in Compose().Split('\n'))
         {
             var block = Regex.Match(
-                zeile, @"^(?<einzug> {0,2})(?<name>[a-zA-Z0-9_-]+):\s*(?:&[A-Za-z0-9_-]+\s*)?$",
+                row, @"^(?<einzug> {0,2})(?<name>[a-zA-Z0-9_-]+):\s*(?:&[A-Za-z0-9_-]+\s*)?$",
                 RegexOptions.None, TimeSpan.FromSeconds(5));
 
             if (block.Success)
@@ -44,22 +44,22 @@ public sealed class SchluesseltrennungTests
                 if (block.Groups["einzug"].Value.Length == 0)
                 {
                     oben = block.Groups["name"].Value;
-                    dienst = string.Empty;
+                    service = string.Empty;
                 }
                 else
                 {
-                    dienst = block.Groups["name"].Value;
+                    service = block.Groups["name"].Value;
                 }
 
                 continue;
             }
 
-            if (!zeile.TrimStart().StartsWith('#')
-                && zeile.Contains($"{schluessel}:", StringComparison.Ordinal))
+            if (!row.TrimStart().StartsWith('#')
+                && row.Contains($"{key}:", StringComparison.Ordinal))
             {
                 // Unter `services:` ist der Eigentuemer der Dienst, sonst der
                 // Anker selbst — `x-umgebung` hat keine zweite Ebene.
-                traeger.Add(oben == "services" ? dienst : oben);
+                traeger.Add(oben == "services" ? service : oben);
             }
         }
 
@@ -75,7 +75,7 @@ public sealed class SchluesseltrennungTests
 
     /// <summary>Und die Gegenprobe: der öffentliche steht im gemeinsamen Anker.</summary>
     /// <remarks>
-    /// Ohne sie bliebe offen, ob der private Schlüssel nur an einer Stelle
+    /// Ohne sie bliebe offen, ob der private Schlüssel nur an einer Job
     /// steht — oder ob dieser Test einfach nichts findet. Der Anker ist ein
     /// eigener Block und trägt deshalb keinen Dienstnamen.
     /// </remarks>

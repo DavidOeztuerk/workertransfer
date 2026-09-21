@@ -4,27 +4,27 @@ using WorkerTransfer.GitHub.Application.Ports;
 namespace WorkerTransfer.GitHub.Infrastructure.Persistence;
 
 /// <summary>Eine Datenbanktransaktion um einen Befehl.</summary>
-public sealed class EfUnitOfWork(GitHubDbContext kontext) : IUnitOfWork
+public sealed class EfUnitOfWork(GitHubDbContext context) : IUnitOfWork
 {
     /// <inheritdoc />
-    public async Task<T> InEinerTransaktionAsync<T>(
+    public async Task<T> InTransactionAsync<T>(
         Func<CancellationToken, Task<T>> arbeit,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(arbeit);
 
-        if (kontext.Database.CurrentTransaction is not null)
+        if (context.Database.CurrentTransaction is not null)
         {
             return await arbeit(cancellationToken);
         }
 
-        await using var klammer = await kontext.Database.BeginTransactionAsync(cancellationToken);
+        await using var klammer = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var ergebnis = await arbeit(cancellationToken);
+        var result = await arbeit(cancellationToken);
 
-        await kontext.SaveChangesAsync(cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
         await klammer.CommitAsync(cancellationToken);
 
-        return ergebnis;
+        return result;
     }
 }

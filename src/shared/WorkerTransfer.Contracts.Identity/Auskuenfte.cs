@@ -25,9 +25,9 @@ public sealed record UnternehmensauskunftV1(
 /// <remarks>
 /// <para>Antwort von <c>GET /internal/account/{subjectId}/identity</c>.</para>
 ///
-/// <para><strong>Zwei Felder, und mehr dürfen es nie werden.</strong> Keine
-/// Postanschrift und kein Telefon: ADR-0038 legt die Anschrift als
-/// <em>Vorlage</em> für einen Briefkopf ab, und sie gehört zu einer Bewerbung,
+/// <para><strong>Zwei Felder, und mehr dürfen es nie werden.</strong> None
+/// Postanschrift und kein Telefon: ADR-0038 legt die PostalAddress als
+/// <em>ResumeTemplate</em> für einen Briefkopf ab, und sie gehört zu einer JobApplication,
 /// die die Person selbst sendet — nicht in die Ansicht eines Unternehmens, das
 /// gerade ein Gespräch führt.</para>
 ///

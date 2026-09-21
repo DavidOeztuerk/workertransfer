@@ -30,6 +30,7 @@ export function LoginPage() {
 
   const status = useAppSelector((state) => state.auth.status);
   const pending = useAppSelector((state) => state.auth.pending);
+  // The error text comes from the server and is never invented here.
   const fehler = useAppSelector((state) => state.auth.error);
 
   const [email, setEmail] = useState("");
@@ -119,7 +120,6 @@ export function LoginPage() {
           required
         />
 
-        {/* Der Fehlertext kommt vom Server und wird nie erfunden. */}
         {fehler !== null ? <ErrorBlock error={fehler} /> : null}
         {stummerFehlschlag !== null ? (
           <Alert severity="error">{stummerFehlschlag}</Alert>

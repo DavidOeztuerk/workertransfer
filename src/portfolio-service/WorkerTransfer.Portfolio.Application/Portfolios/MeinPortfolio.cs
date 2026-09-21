@@ -8,22 +8,22 @@ namespace WorkerTransfer.Portfolio.Application.Portfolios;
 
 /// <summary>Das eigene Portfolio.</summary>
 /// <remarks>
-/// Ohne Ledgerfrage. Die Freigabe regelt, wer es von außen sieht, nicht ob
+/// Ohne Ledgerfrage. Die Release regelt, wer es von außen sieht, nicht ob
 /// jemand sein eigenes lesen darf.
 /// </remarks>
-public sealed record MeinPortfolioAbfrage(SubjectId Wer) : IAbfrage<Domain.Portfolios.Portfolio?>;
+public sealed record MyPortfolioQuery(SubjectId Wer) : IAbfrage<Domain.Portfolios.Portfolio?>;
 
 /// <inheritdoc cref="MeinPortfolioAbfrage" />
-public sealed class MeinPortfolioHandler(IPortfoliospeicher speicher)
-    : IRequestHandler<MeinPortfolioAbfrage, Domain.Portfolios.Portfolio?>
+public sealed class MyPortfolioHandler(IPortfolioStore store)
+    : IRequestHandler<MyPortfolioQuery, Domain.Portfolios.Portfolio?>
 {
     /// <inheritdoc />
     public Task<Domain.Portfolios.Portfolio?> Handle(
-        MeinPortfolioAbfrage request, CancellationToken cancellationToken)
+        MyPortfolioQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return speicher.HoleAsync(request.Wer, cancellationToken);
+        return store.GetAsync(request.Wer, cancellationToken);
     }
 }
 
@@ -44,7 +44,7 @@ public sealed record FremdesPortfolioAbfrage(SubjectId Wer)
 /// </para>
 /// </remarks>
 public sealed class FremdesPortfolioHandler(
-    IPortfoliospeicher speicher, IEinwilligungstor tor)
+    IPortfolioStore store, IConsentGate tor)
     : IRequestHandler<FremdesPortfolioAbfrage, Domain.Portfolios.Portfolio?>
 {
     /// <inheritdoc />
@@ -54,8 +54,8 @@ public sealed class FremdesPortfolioHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return await tor.DarfSehenAsync(request.Wer, cancellationToken)
-            ? await speicher.HoleAsync(request.Wer, cancellationToken)
+        return await tor.MaySeeAsync(request.Wer, cancellationToken)
+            ? await store.GetAsync(request.Wer, cancellationToken)
             : null;
     }
 }

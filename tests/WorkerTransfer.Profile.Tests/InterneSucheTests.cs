@@ -19,7 +19,7 @@ namespace WorkerTransfer.Profile.Tests;
 ///
 /// <para><strong>Sie prüft den Ledger nicht</strong>, und das ist der heikelste
 /// Satz an ihr. Die Prüfung steht bei scout-service, für die ganze Seite auf
-/// einmal (ADR-0030, ADR-0036 Entscheidung 1): genau EINE Stelle entscheidet
+/// einmal (ADR-0030, ADR-0036 Entscheidung 1): genau EINE Job entscheidet
 /// über Sichtbarkeit, zwei wären zwei Wahrheiten. Diese Reihe hält beides fest —
 /// dass die Tür verschlossen ist, und dass sie ODER sucht statt UND.</para>
 /// </remarks>
@@ -38,14 +38,14 @@ public class InterneSucheTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
             host.UseSetting("Notify:Geheimnis", Meldegeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _tor)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _tor)));
         });
 
         return Task.CompletedTask;
@@ -87,7 +87,7 @@ public class InterneSucheTests(Postgres postgres) : IAsyncLifetime
     /// <para><c>GET /candidates</c> suchte mit UND und ist am 11.09.2026
     /// gefallen; mit ihm der UND-Zweig im Speicher. Das ODER ist keine
     /// Lockerung, sondern die Voraussetzung für die Häkchenliste des Scouts:
-    /// unter UND erfüllte jeder Treffer alle Bedingungen, jedes Häkchen wäre
+    /// unter UND erfüllte jeder Hit alle Bedingungen, jedes Häkchen wäre
     /// gesetzt, und „welche Fähigkeit fehlt" hätte keine Antwort
     /// (ADR-0036 Entscheidung 2).</para>
     ///
@@ -101,17 +101,17 @@ public class InterneSucheTests(Postgres postgres) : IAsyncLifetime
         var eines = Guid.CreateVersion7();
         var beide = Guid.CreateVersion7();
 
-        // Eigene Worte statt eigener Zahlen: die Reihen dieser Sammlung teilen
+        // Own Worte statt eigener Zahlen: die Reihen dieser Sammlung teilen
         // sich EINE Datenbank, und ein Zaehlen ueber „Go" waere davon abhaengig,
         // wer vorher lief.
-        await Schreibe(eines, ["Buchbinderei"]);
-        await Schreibe(beide, ["Buchbinderei", "Reetdach"]);
+        await Write(eines, ["Buchbinderei"]);
+        await Write(beide, ["Buchbinderei", "Reetdach"]);
 
-        var gefunden = await Intern(
+        var found = await Intern(
             "/internal/profiles/search?skill=Buchbinderei&skill=Reetdach");
 
-        gefunden.GetProperty("items").EnumerateArray()
-            .Select(eintrag => eintrag.GetProperty("subject_id").GetGuid())
+        found.GetProperty("items").EnumerateArray()
+            .Select(entry => entry.GetProperty("subject_id").GetGuid())
             .Should().BeEquivalentTo(
                 [eines, beide],
                 "wer nur eines der beiden Worte nennt, gehoert dazu — sonst waere "
@@ -121,35 +121,35 @@ public class InterneSucheTests(Postgres postgres) : IAsyncLifetime
     /// <summary>Sie liefert genannte Fähigkeiten — und nichts über Sichtbarkeit.</summary>
     /// <remarks>
     /// Kein Sichtbarkeitsfeld im Rumpf (ADR-0020): das wäre eine zweite
-    /// Wahrheit neben dem Ledger, und die beiden wären beim ersten Widerruf
+    /// Wahrheit neben dem Ledger, und die beiden wären beim ersten Revocation
     /// uneins. Der Aufrufer fragt ihn selbst.
     /// </remarks>
     [Fact]
     public async Task Ein_Fund_traegt_kein_Sichtbarkeitsfeld()
     {
-        var wer = Guid.CreateVersion7();
-        await Schreibe(wer, ["Reepschlagen"]);
+        var subject = Guid.CreateVersion7();
+        await Write(subject, ["Reepschlagen"]);
 
-        var fund = await Intern($"/internal/profiles/{wer}");
+        var term = await Intern($"/internal/profiles/{subject}");
 
-        fund.EnumerateObject().Select(feld => feld.Name).Should().BeEquivalentTo(
+        term.EnumerateObject().Select(field => field.Name).Should().BeEquivalentTo(
             "subject_id", "headline", "bio", "location", "remote_ok", "skills",
             // ADR-0041: die STUFE reist, nicht eine Kilometerzahl. Beide sind
             // nullbar und heissen dann „nichts gesagt".
             "commute_km", "relocation");
 
-        fund.GetProperty("skills").EnumerateArray()
-            .Select(eintrag => eintrag.GetString()).Should().Equal("Reepschlagen");
+        term.GetProperty("skills").EnumerateArray()
+            .Select(entry => entry.GetString()).Should().Equal("Reepschlagen");
     }
 
     /// <summary>
-    /// Sie gibt AUCH Profile heraus, die niemand freigegeben hat — mit Absicht.
+    /// Sie gibt AUCH PersonProfile heraus, die niemand freigegeben hat — mit Absicht.
     /// </summary>
     /// <remarks>
     /// <para>Die unbequemste Zusage dieser Tür, und deshalb steht sie als
-    /// eigener Test da. Die Freigabe prüft scout-service, für die ganze Seite
+    /// eigener Test da. Die Release prüft scout-service, für die ganze Seite
     /// auf einmal. Wer diese Tür für etwas anderes benutzt, holt sich die
-    /// Prüfung dazu — sonst zeigt er Profile, die niemand freigegeben hat.</para>
+    /// Prüfung dazu — sonst zeigt er PersonProfile, die niemand freigegeben hat.</para>
     ///
     /// <para>Sie ist genau deshalb hinter dem geteilten Geheimnis und ohne
     /// Gateway-Route: von aussen ist sie nicht erreichbar.</para>
@@ -157,21 +157,21 @@ public class InterneSucheTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Sie_prueft_den_Ledger_nicht_und_das_ist_die_Zusage()
     {
-        var wer = Guid.CreateVersion7();
-        await Schreibe(wer, ["Rostschutz"]);
+        var subject = Guid.CreateVersion7();
+        await Write(subject, ["Rostschutz"]);
 
         var vorher = _tor.Fragen;
 
-        var gefunden = await Intern("/internal/profiles/search?skill=Rostschutz");
+        var found = await Intern("/internal/profiles/search?skill=Rostschutz");
 
-        gefunden.GetProperty("items").EnumerateArray()
-            .Select(eintrag => eintrag.GetProperty("subject_id").GetGuid())
-            .Should().Contain(wer, "niemand hat hier etwas freigegeben");
+        found.GetProperty("items").EnumerateArray()
+            .Select(entry => entry.GetProperty("subject_id").GetGuid())
+            .Should().Contain(subject, "niemand hat hier etwas freigegeben");
 
         _tor.Fragen.Should().Be(vorher, "diese Tür fragt den Ledger nicht");
     }
 
-    /// <summary>Ein Profil, das es nicht gibt, ist ein 404.</summary>
+    /// <summary>Ein PersonProfile, das es nicht gibt, ist ein 404.</summary>
     [Fact]
     public async Task Ein_unbekanntes_Profil_ist_ein_404()
     {
@@ -184,14 +184,14 @@ public class InterneSucheTests(Postgres postgres) : IAsyncLifetime
 
     // ---------------------------------------------------------------------
 
-    private async Task Schreibe(Guid wer, string[] faehigkeiten)
+    private async Task Write(Guid subject, string[] skills)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue(
-                "Bearer", Tokenform.Person(wer));
+                "Bearer", Tokenform.Person(subject));
 
-        var antwort = await browser.PutAsJsonAsync(
+        var response = await browser.PutAsJsonAsync(
             new Uri("/profiles/me", UriKind.Relative),
             new
             {
@@ -199,24 +199,24 @@ public class InterneSucheTests(Postgres postgres) : IAsyncLifetime
                 bio = "",
                 location = "Berlin",
                 remote_ok = true,
-                skills = faehigkeiten
+                skills = skills
             });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    private async Task<JsonElement> Intern(string pfad)
+    private async Task<JsonElement> Intern(string path)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Notify-Secret", Meldegeheimnis);
 
-        var antwort = await browser.GetAsync(new Uri(pfad, UriKind.Relative));
+        var response = await browser.GetAsync(new Uri(path, UriKind.Relative));
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        return await Json(antwort);
+        return await Json(response);
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 }

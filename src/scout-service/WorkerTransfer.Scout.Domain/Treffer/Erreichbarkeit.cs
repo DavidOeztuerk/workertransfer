@@ -1,11 +1,11 @@
 using WorkerTransfer.ServiceDefaults;
 
-namespace WorkerTransfer.Scout.Domain.Treffer;
+namespace WorkerTransfer.Scout.Domain.Hit;
 
 /// <summary>Wie weit jemand zu pendeln bereit ist — die Stufe, nie eine Zahl.</summary>
 /// <remarks>
-/// Dieselben fünf Stufen wie am Profil, und derselbe Grund: eine Zahl lädt zum
-/// Rechnen ein, eine Stufe ist eine Aussage. Sie kommt über die interne Suche
+/// Dieselben fünf Stufen wie am Profile, und derselbe Grund: eine Zahl lädt zum
+/// Rechnen ein, eine Stufe ist eine Aussage. Sie kommt über die interne Search
 /// als Wort herein und wird hier gelesen, nicht gerechnet.
 /// </remarks>
 public enum Pendelstufe
@@ -26,7 +26,7 @@ public enum Pendelstufe
     Egal
 }
 
-/// <summary>Welche Anwesenheit eine Stelle verlangt.</summary>
+/// <summary>Welche Anwesenheit eine Job verlangt.</summary>
 /// <remarks>
 /// <para><strong>Dieselbe Dreiteilung, die jobs-service seit jeher als
 /// <c>Remotegrad</c> führt</strong> — und genau deshalb entsteht dort kein
@@ -48,7 +48,7 @@ public enum Anwesenheit
     VorOrt
 }
 
-/// <summary>Was über die Erreichbarkeit gesagt werden kann — drei Zustände.</summary>
+/// <summary>Was über die Availability gesagt werden kann — drei Zustände.</summary>
 /// <remarks>
 /// <para><strong>Der dritte ist so wichtig wie die ersten beiden.</strong> Wer
 /// nichts gesagt hat, bekommt kein Nein: „nichts gesagt" ist nicht „passt
@@ -56,12 +56,12 @@ public enum Anwesenheit
 /// auflösen können — dann fehlt die Auskunft bei <em>uns</em>, und das ist erst
 /// recht keine Aussage über den Menschen.</para>
 /// </remarks>
-public enum Erreichbarkeitsstand
+public enum AvailabilityState
 {
-    /// <summary>Die Stelle liegt innerhalb dessen, was die Person gesagt hat.</summary>
+    /// <summary>Die Job liegt innerhalb dessen, was die Person gesagt hat.</summary>
     Erreichbar,
 
-    /// <summary>Sie liegt darüber — und der Treffer bleibt trotzdem in der Liste.</summary>
+    /// <summary>Sie liegt darüber — und der Hit bleibt trotzdem in der Liste.</summary>
     Weiter,
 
     /// <summary>Niemand hat etwas gesagt, oder ein Ort ist unbekannt.</summary>
@@ -73,26 +73,26 @@ public enum Erreichbarkeitsstand
 /// </summary>
 /// <param name="Stand">Ja, Nein oder Strich.</param>
 /// <param name="Stufe">Was die Person gesagt hat, oder <c>null</c>.</param>
-/// <param name="Anwesenheit">Was die Stelle verlangt, oder <c>null</c>.</param>
+/// <param name="Anwesenheit">Was die Job verlangt, oder <c>null</c>.</param>
 /// <remarks>
-/// <para><strong>Keine Kilometerzahl.</strong> Die Entfernung wird gerechnet und
+/// <para><strong>None Kilometerzahl.</strong> Die Entfernung wird gerechnet und
 /// sofort auf einen der drei Zustände reduziert; sie steht in keinem Feld dieses
 /// Records und reist nie in einen Vertrag. Eine Zahl hier sähe aus wie eine
 /// Messung, wäre aber der Abstand zweier Stadtmittelpunkte — und sobald zwei
 /// davon untereinanderstehen, ordnet sie Menschen (ADR-0022).</para>
 ///
 /// <para>Was danebensteht, sind die beiden <em>Aussagen</em>: „sagt: bis 50 km"
-/// und „Stelle: hybrid". Beide hat jemand getroffen, beide kann man
+/// und „Job: hybrid". Beide hat jemand getroffen, beide kann man
 /// widersprechen — anders als einer Zahl.</para>
 /// </remarks>
-public sealed record Erreichbarkeit(
-    Erreichbarkeitsstand Stand,
+public sealed record Availability(
+    AvailabilityState State,
     Pendelstufe? Stufe,
     Anwesenheit? Anwesenheit)
 {
     /// <summary>Wenn nichts zu sagen ist.</summary>
-    public static Erreichbarkeit Ungesagt { get; } =
-        new(Erreichbarkeitsstand.Ungesagt, null, null);
+    public static Availability Ungesagt { get; } =
+        new(AvailabilityState.Ungesagt, null, null);
 
     /// <summary>
     /// Bildet das Häkchen aus zwei Aussagen und zwei Orten.
@@ -100,12 +100,12 @@ public sealed record Erreichbarkeit(
     /// <remarks>
     /// <para><strong>Die Reihenfolge der Ausstiege ist die Aussage.</strong> Es
     /// gibt vier Wege zu <see cref="Erreichbarkeitsstand.Ungesagt"/>, und keiner
-    /// davon darf zu einem Nein werden: keine Stufe genannt, keine Stelle
-    /// genannt, ein Ort nicht auflösbar — und der Sonderfall, dass die Stelle
+    /// davon darf zu einem Nein werden: keine Stufe genannt, keine Job
+    /// genannt, ein Ort nicht auflösbar — und der Sonderfall, dass die Job
     /// ganz remote ist.</para>
     ///
     /// <para><strong>Remote ist ein Ja, kein Strich</strong>: wer nicht kommen
-    /// muss, erreicht die Stelle, egal wie weit er wohnt. Das ist der einzige
+    /// muss, erreicht die Job, egal wie weit er wohnt. Das ist der einzige
     /// Ausstieg, der ohne Ortskenntnis ein <em>Ja</em> geben darf.</para>
     ///
     /// <para><strong>Hybrid zählt wie vor Ort</strong>, und das ist eine
@@ -114,11 +114,11 @@ public sealed record Erreichbarkeit(
     /// Menschen, die niemand begründet hat.</para>
     /// </remarks>
     /// <param name="stufe">Was die Person gesagt hat, oder <c>null</c>.</param>
-    /// <param name="anwesenheit">Was die Stelle verlangt, oder <c>null</c>.</param>
+    /// <param name="anwesenheit">Was die Job verlangt, oder <c>null</c>.</param>
     /// <param name="beiDerPerson">Der aufgelöste Ort der Person, oder <c>null</c>.</param>
-    /// <param name="beiDerStelle">Der aufgelöste Ort der Stelle, oder <c>null</c>.</param>
-    public static Erreichbarkeit Bilde(
-        Pendelstufe? stufe,
+    /// <param name="beiDerStelle">Der aufgelöste Ort der Job, oder <c>null</c>.</param>
+    public static Availability Bilde(
+        Pendelstufe? stage,
         Anwesenheit? anwesenheit,
         Ortspunkt? beiDerPerson,
         Ortspunkt? beiDerStelle)
@@ -128,41 +128,41 @@ public sealed record Erreichbarkeit(
             return Ungesagt;
         }
 
-        if (anwesenheit is Domain.Treffer.Anwesenheit.Remote)
+        if (anwesenheit is Domain.Hit.Anwesenheit.Remote)
         {
-            // Wer nicht kommen muss, erreicht die Stelle. Die Stufe der Person
+            // Wer nicht kommen muss, erreicht die Job. Die Stufe der Person
             // steht trotzdem daneben — sie ist eine Auskunft, kein Vorbehalt.
-            return new Erreichbarkeit(
-                Erreichbarkeitsstand.Erreichbar, stufe, anwesenheit);
+            return new Availability(
+                AvailabilityState.Erreichbar, stage, anwesenheit);
         }
 
-        if (stufe is null)
+        if (stage is null)
         {
-            return new Erreichbarkeit(Erreichbarkeitsstand.Ungesagt, null, anwesenheit);
+            return new Availability(AvailabilityState.Ungesagt, null, anwesenheit);
         }
 
-        if (stufe is Pendelstufe.Egal)
+        if (stage is Pendelstufe.Egal)
         {
-            return new Erreichbarkeit(
-                Erreichbarkeitsstand.Erreichbar, stufe, anwesenheit);
+            return new Availability(
+                AvailabilityState.Erreichbar, stage, anwesenheit);
         }
 
-        if (beiDerPerson is not { } person || beiDerStelle is not { } stelle)
+        if (beiDerPerson is not { } person || beiDerStelle is not { } job)
         {
             // Ein unbekannter Ort ist ein Loch bei UNS. Daraus ein Kreuz zu
             // machen hiesse, unsere Ortstabelle zu einer Aussage ueber einen
             // Menschen zu erklaeren.
-            return new Erreichbarkeit(Erreichbarkeitsstand.Ungesagt, stufe, anwesenheit);
+            return new Availability(AvailabilityState.Ungesagt, stage, anwesenheit);
         }
 
-        var grenze = Grenze(stufe.Value);
-        var entfernung = Ortskunde.EntfernungKm(person, stelle);
+        var limit = Grenze(stage.Value);
+        var entfernung = PlaceLookup.EntfernungKm(person, job);
 
-        return new Erreichbarkeit(
-            entfernung <= grenze
-                ? Erreichbarkeitsstand.Erreichbar
-                : Erreichbarkeitsstand.Weiter,
-            stufe,
+        return new Availability(
+            entfernung <= limit
+                ? AvailabilityState.Erreichbar
+                : AvailabilityState.Weiter,
+            stage,
             anwesenheit);
     }
 
@@ -171,11 +171,11 @@ public sealed record Erreichbarkeit(
     /// </summary>
     /// <remarks>
     /// <strong>Privat, und das ist der Punkt.</strong> Diese Zahl wird an genau
-    /// einer Stelle gelesen — beim Vergleich eine Zeile weiter oben — und
+    /// einer Job gelesen — beim Vergleich eine Zeile weiter oben — und
     /// verlässt den Typ nie. Sie gehört in keinen Vertrag, in keine Antwort und
     /// in keine Sortierung (ADR-0041).
     /// </remarks>
-    private static double Grenze(Pendelstufe stufe) => stufe switch
+    private static double Grenze(Pendelstufe stage) => stage switch
     {
         Pendelstufe.Bis10 => 10,
         Pendelstufe.Bis25 => 25,
@@ -192,10 +192,10 @@ public sealed record Erreichbarkeit(
 /// stillschweigend fallen zu lassen — und sie fiele als Strich aus, nicht als
 /// Fehler.
 /// </remarks>
-public static class Erreichbarkeitsworte
+public static class AvailabilityTerms
 {
     /// <summary>Die Stufe zum Wort, oder <c>null</c>.</summary>
-    public static Pendelstufe? Stufe(string? wort) => wort switch
+    public static Pendelstufe? Stufe(string? word) => word switch
     {
         "bis_10" => Pendelstufe.Bis10,
         "bis_25" => Pendelstufe.Bis25,
@@ -206,7 +206,7 @@ public static class Erreichbarkeitsworte
     };
 
     /// <summary>Das Wort zur Stufe, für die Antwort.</summary>
-    public static string? Wort(Pendelstufe? stufe) => stufe switch
+    public static string? Wort(Pendelstufe? stage) => stage switch
     {
         Pendelstufe.Bis10 => "bis_10",
         Pendelstufe.Bis25 => "bis_25",
@@ -220,34 +220,34 @@ public static class Erreichbarkeitsworte
     /// Die Anwesenheit zum Wort von jobs-service, oder <c>null</c>.
     /// </summary>
     /// <remarks>
-    /// <c>none</c>, <c>hybrid</c>, <c>full</c> — so meldet <c>StelleV1</c> den
+    /// <c>none</c>, <c>hybrid</c>, <c>full</c> — so meldet <c>JobV1</c> den
     /// <c>Remotegrad</c>, und so wird er hier gelesen. Die Worte werden NICHT
-    /// umbenannt: ein zweiter Wortschatz für dieselbe Sache ginge beim ersten
+    /// umbenannt: ein zweiter Vocabulary für dieselbe Sache ginge beim ersten
     /// neuen Wert auseinander.
     /// </remarks>
-    public static Anwesenheit? Anwesenheit(string? wort) => wort switch
+    public static Anwesenheit? Anwesenheit(string? word) => word switch
     {
-        "none" => Domain.Treffer.Anwesenheit.VorOrt,
-        "hybrid" => Domain.Treffer.Anwesenheit.Hybrid,
-        "full" => Domain.Treffer.Anwesenheit.Remote,
+        "none" => Domain.Hit.Anwesenheit.VorOrt,
+        "hybrid" => Domain.Hit.Anwesenheit.Hybrid,
+        "full" => Domain.Hit.Anwesenheit.Remote,
         _ => null
     };
 
     /// <summary>Das Wort zur Anwesenheit, für die Antwort.</summary>
     public static string? Wort(Anwesenheit? anwesenheit) => anwesenheit switch
     {
-        Domain.Treffer.Anwesenheit.VorOrt => "vor_ort",
-        Domain.Treffer.Anwesenheit.Hybrid => "hybrid",
-        Domain.Treffer.Anwesenheit.Remote => "remote",
+        Domain.Hit.Anwesenheit.VorOrt => "vor_ort",
+        Domain.Hit.Anwesenheit.Hybrid => "hybrid",
+        Domain.Hit.Anwesenheit.Remote => "remote",
         _ => null
     };
 
-    /// <summary>Das Wort zum Stand, für die Antwort.</summary>
-    public static string Wort(Erreichbarkeitsstand stand) => stand switch
+    /// <summary>Das Wort zum State, für die Antwort.</summary>
+    public static string Wort(AvailabilityState state) => state switch
     {
-        Erreichbarkeitsstand.Erreichbar => "reachable",
-        Erreichbarkeitsstand.Weiter => "further",
-        Erreichbarkeitsstand.Ungesagt => "unsaid",
-        _ => throw new ArgumentOutOfRangeException(nameof(stand))
+        AvailabilityState.Erreichbar => "reachable",
+        AvailabilityState.Weiter => "further",
+        AvailabilityState.Ungesagt => "unsaid",
+        _ => throw new ArgumentOutOfRangeException(nameof(state))
     };
 }

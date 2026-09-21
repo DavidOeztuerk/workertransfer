@@ -7,14 +7,14 @@ namespace WorkerTransfer.Ablage;
 /// MinIO, Azure Blob, Pillow, python-magic —, und wurde deshalb auf einen Port
 /// und ein Backend zurückgeschnitten, das wirklich läuft. Genau das steht hier
 /// wieder, und keinen Schritt weiter: <strong>kein S3, noch nicht.</strong> Es
-/// zu bauen, bevor eine Umgebung es braucht, wäre der Fehler, der zu ADR-0021
+/// zu bauen, bevor eine EnvironmentFile es braucht, wäre der Fehler, der zu ADR-0021
 /// geführt hat.
 /// </remarks>
-public interface IAblage
+public interface IDocumentStore
 {
     /// <summary>Legt Bytes unter einem Schlüssel ab. Ersetzt, was dort lag.</summary>
-    Task LegeAbAsync(
-        string schluessel, ReadOnlyMemory<byte> inhalt, CancellationToken cancellationToken = default);
+    Task PutAsync(
+        string key, ReadOnlyMemory<byte> content, CancellationToken cancellationToken = default);
 
     /// <summary>Holt Bytes, oder <c>null</c>.</summary>
     /// <remarks>
@@ -22,7 +22,7 @@ public interface IAblage
     /// normaler Ausgang und kein Fehler. Wer daraus einen macht, zwingt jeden
     /// Aufrufer zu einem <c>try</c> um den Normalfall.
     /// </remarks>
-    Task<byte[]?> HoleAsync(string schluessel, CancellationToken cancellationToken = default);
+    Task<byte[]?> GetAsync(string key, CancellationToken cancellationToken = default);
 
     /// <summary>Löscht. Schweigt über einen unbekannten Schlüssel.</summary>
     /// <remarks>
@@ -30,5 +30,5 @@ public interface IAblage
     /// interessiert: ob die Datei noch da war, ändert nichts daran, dass sie
     /// danach weg sein soll.
     /// </remarks>
-    Task LoescheAsync(string schluessel, CancellationToken cancellationToken = default);
+    Task DeleteAsync(string key, CancellationToken cancellationToken = default);
 }

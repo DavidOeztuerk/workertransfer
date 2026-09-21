@@ -16,9 +16,9 @@ public sealed class MitgliederdrahtTests
     [Fact]
     public void Die_Kennung_ueberlebt_die_Runde()
     {
-        var wer = Guid.CreateVersion7();
-        var geschrieben = new UnternehmensmitgliederAntwortV1(
-            [new UnternehmensmitgliedV1(wer)]);
+        var subject = Guid.CreateVersion7();
+        var geschrieben = new CompanyMembersResponseV1(
+            [new CompanyMemberV1(subject)]);
 
         var json = JsonSerializer.Serialize(geschrieben);
         json.Should().Contain("subject_id");
@@ -27,11 +27,11 @@ public sealed class MitgliederdrahtTests
         json.Should().NotContain("displayName");
         json.Should().NotContain("display_name");
 
-        var gelesen = JsonSerializer.Deserialize<UnternehmensmitgliederAntwortV1>(json);
+        var gelesen = JsonSerializer.Deserialize<CompanyMembersResponseV1>(json);
 
         gelesen.Should().NotBeNull();
         gelesen!.Mitglieder.Should().ContainSingle()
-            .Which.SubjectId.Should().Be(wer);
+            .Which.SubjectId.Should().Be(subject);
     }
 
     /// <summary>Der KI-Zugang überlebt die Runde — inklusive leerem Schlüssel.</summary>
@@ -63,7 +63,7 @@ public sealed class MitgliederdrahtTests
         const string json =
             """{"display_name":"Muster GmbH","line1":"Weg 1","postal_code":"10115","city":"Berlin","country":"DE"}""";
 
-        var gelesen = JsonSerializer.Deserialize<WorkerTransfer.Applications.Infrastructure.Auskunft.Firmenprofilantwort>(json);
+        var gelesen = JsonSerializer.Deserialize<WorkerTransfer.Applications.Infrastructure.Auskunft.CompanyProfileResponse>(json);
 
         gelesen.Should().NotBeNull();
         gelesen!.Name.Should().Be("Muster GmbH");

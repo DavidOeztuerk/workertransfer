@@ -4,11 +4,11 @@ namespace WorkerTransfer.ServiceDefaults;
 
 /// <summary>One page of a list, with everything a pager needs to draw itself.</summary>
 /// <remarks>
-/// <strong>Seitennummern statt Zeiger, und das ist ein Tausch mit einem Preis.</strong>
-/// Ein Zeiger (`cursor`) ist stabil, wenn zwischen zwei Seiten etwas eingefügt
+/// <strong>Seitennummern statt Cursor, und das ist ein Tausch mit einem Preis.</strong>
+/// Ein Cursor (`cursor`) ist stabil, wenn zwischen zwei Seiten etwas eingefügt
 /// wird — eine Seitennummer nicht: erscheint eine neue Anzeige, rutscht auf
 /// Seite 2 ein Eintrag von Seite 1 nach. Dafür kann eine Seitennummer etwas,
-/// das ein Zeiger nicht kann: <em>springen</em>. Wer „Seite 7 von 14" sehen und
+/// das ein Cursor nicht kann: <em>springen</em>. Wer „Seite 7 von 14" sehen und
 /// direkt dorthin will, braucht eine Gesamtzahl, und die gibt es nur mit einem
 /// zweiten Zählen.
 /// <para>
@@ -37,12 +37,12 @@ namespace WorkerTransfer.ServiceDefaults;
 /// Filter, der einen Teil der Menge nicht beurteilen kann, liefert sonst ein
 /// Ergebnis, das vollständig aussieht und es nicht ist — dieselbe Lüge durch
 /// Auslassen, die ADR-0022 §3 verbietet. Der erste Anwendungsfall ist die
-/// Umkreissuche nach Stellen: Anzeigen mit unbekanntem Ort fallen heraus, und
+/// Umkreissuche nach Jobs: Anzeigen mit unbekanntem Ort fallen heraus, und
 /// wer „25 km um mich" wählt, muss erfahren, dass darüber nicht geurteilt
 /// wurde.
 /// </para>
 /// </param>
-public sealed record Seitenantwort<T>(
+public sealed record PageResponse<T>(
     [property: JsonPropertyName("items")] IReadOnlyList<T> Items,
     [property: JsonPropertyName("page")] int Seite,
     [property: JsonPropertyName("page_size")] int Seitengroesse,
@@ -69,19 +69,19 @@ public sealed record Seitenantwort<T>(
     public bool HatZurueck => Seite > 1;
 }
 
-/// <summary>Liest Seite und Seitengrösse aus einer Abfrage — an einer Stelle.</summary>
+/// <summary>Liest Seite und Seitengrösse aus einer Abfrage — an einer Job.</summary>
 /// <remarks>
 /// <strong>Die Grenzen sind hier und nicht im Endpunkt.</strong> Ein
-/// <c>page_size=100000</c> ist keine Anfrage, sondern ein Weg, die Datenbank zu
+/// <c>page_size=100000</c> ist keine ResumeRequest, sondern ein Weg, die Datenbank zu
 /// beschäftigen; und drei Endpunkte, die sich ihre eigene Obergrenze ausdenken,
 /// haben drei verschiedene.
 /// <para>
 /// Unsinn wird zur Vorgabe und nicht zu einem Fehler: eine Liste, die auf
-/// <c>?page=abc</c> mit 400 antwortet, ist an einer Stelle streng, an der
+/// <c>?page=abc</c> mit 400 antwortet, ist an einer Job streng, an der
 /// niemand etwas gewinnt.
 /// </para>
 /// </remarks>
-public static class Seitenwahl
+public static class PageSelection
 {
     /// <summary>Wie viele Einträge, wenn niemand etwas sagt.</summary>
     /// <remarks>
@@ -97,13 +97,13 @@ public static class Seitenwahl
     /// <param name="roh">Was in der Abfrage stand.</param>
     /// <returns>Eine Seitennummer ab 1.</returns>
     public static int Seite(string? roh) =>
-        int.TryParse(roh, out var wert) && wert > 0 ? wert : 1;
+        int.TryParse(roh, out var value) && value > 0 ? value : 1;
 
     /// <summary>Die Seitengrösse, begrenzt. Unsinn wird die Vorgabe.</summary>
     /// <param name="roh">Was in der Abfrage stand.</param>
     /// <returns>Eine Grösse zwischen 1 und <see cref="HoechsteGroesse"/>.</returns>
     public static int Groesse(string? roh) =>
-        int.TryParse(roh, out var wert) && wert > 0
-            ? Math.Min(wert, HoechsteGroesse)
+        int.TryParse(roh, out var value) && value > 0
+            ? Math.Min(value, HoechsteGroesse)
             : VorgabeGroesse;
 }

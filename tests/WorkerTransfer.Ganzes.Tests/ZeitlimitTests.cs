@@ -27,7 +27,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 ///
 /// <para><strong>Gesucht wird die ZUWEISUNG, nicht der Variablenname.</strong>
 /// Hier stand <c>client.Timeout</c>, und damit hing die Zusage daran, wie
-/// jemand seine lokale Variable nennt: <c>HttpFirmenrollen</c> setzt sein
+/// jemand seine lokale Variable nennt: <c>HttpCompanyRoles</c> setzt sein
 /// Zeitlimit an <c>klient</c> und fiel als „ohne Zeitlimit" durch, obwohl es
 /// eines hat. Ein Waechter, der bei richtigem Code rot wird, wird beim nächsten
 /// Mal weggeschaltet statt gelesen.</para>
@@ -39,26 +39,26 @@ public sealed class ZeitlimitTests
                 Path.Combine(Postgres_Ersatz2.Repowurzel(), "src"),
                 "*.cs",
                 SearchOption.AllDirectories)
-            .Where(pfad => !pfad.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
                        StringComparison.Ordinal)
-                   && !pfad.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+                   && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
                        StringComparison.Ordinal))
-            .Where(pfad => File.ReadAllText(pfad)
+            .Where(path => File.ReadAllText(path)
                 .Contains("fabrik.CreateClient(", StringComparison.Ordinal));
 
     [Fact]
     public void Jede_Aufrufstelle_setzt_ein_Zeitlimit()
     {
-        var stellen = Aufrufstellen().ToList();
+        var jobs = Aufrufstellen().ToList();
 
-        stellen.Should().HaveCountGreaterThan(
+        jobs.Should().HaveCountGreaterThan(
             10, "sonst findet dieser Test die Aufrufstellen gar nicht mehr");
 
-        foreach (var pfad in stellen)
+        foreach (var path in jobs)
         {
-            File.ReadAllText(pfad).Should().Contain(
+            File.ReadAllText(path).Should().Contain(
                 ".Timeout =",
-                $"'{Path.GetFileName(pfad)}' ruft einen anderen Dienst, setzt aber kein "
+                $"'{Path.GetFileName(path)}' ruft einen anderen Dienst, setzt aber kein "
                 + "Zeitlimit — dann gilt die Vorgabe von hundert Sekunden");
         }
     }
@@ -74,36 +74,36 @@ public sealed class ZeitlimitTests
     [Fact]
     public void Keine_Aufrufstelle_wartet_laenger_als_eine_Minute()
     {
-        var muster = new Regex(
+        var pattern = new Regex(
             @"Zeitueberschreitung \{ get; set; \} = TimeSpan\.From(?<einheit>Seconds|Minutes)\((?<zahl>[\d.]+)\)",
             RegexOptions.None,
             TimeSpan.FromSeconds(5));
 
         var quellen = Directory.EnumerateFiles(
                 Path.Combine(Postgres_Ersatz2.Repowurzel(), "src"), "*.cs", SearchOption.AllDirectories)
-            .Where(pfad => !pfad.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                        && !pfad.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                        && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
 
-        var gefunden = 0;
+        var found = 0;
 
-        foreach (var pfad in quellen)
+        foreach (var path in quellen)
         {
-            foreach (Match treffer in muster.Matches(File.ReadAllText(pfad)))
+            foreach (Match hit in pattern.Matches(File.ReadAllText(path)))
             {
-                gefunden++;
-                var zahl = double.Parse(treffer.Groups["zahl"].Value,
+                found++;
+                var zahl = double.Parse(hit.Groups["zahl"].Value,
                     System.Globalization.CultureInfo.InvariantCulture);
-                var spanne = treffer.Groups["einheit"].Value == "Minutes"
+                var spanne = hit.Groups["einheit"].Value == "Minutes"
                     ? TimeSpan.FromMinutes(zahl)
                     : TimeSpan.FromSeconds(zahl);
 
                 spanne.Should().BeLessThanOrEqualTo(
                     TimeSpan.FromMinutes(1),
-                    $"'{Path.GetFileName(pfad)}' wartet zu lange");
+                    $"'{Path.GetFileName(path)}' wartet zu lange");
             }
         }
 
-        gefunden.Should().BeGreaterThan(10, "sonst prueft dieser Test nichts");
+        found.Should().BeGreaterThan(10, "sonst prueft dieser Test nichts");
     }
 }
 

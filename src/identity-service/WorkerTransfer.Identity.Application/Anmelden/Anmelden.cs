@@ -46,7 +46,7 @@ public abstract record Anmeldeergebnis
 public sealed class AnmeldenHandler(
     IUserRepository benutzer,
     IPasswordHasher passwoerter,
-    ISessionService sitzungen,
+    ISessionService sessions,
     IAccessTokenIssuer token,
     IAuditTrail protokoll,
     IKorrelation korrelation,
@@ -89,7 +89,7 @@ public sealed class AnmeldenHandler(
             return new Anmeldeergebnis.Abgelehnt();
         }
 
-        var sitzung = await sitzungen.StartAsync(konto.Id, cancellationToken);
+        var session = await sessions.StartAsync(konto.Id, cancellationToken);
 
         // Signing in makes you yourself, never a company. Acting for one is a
         // second step that verifies membership before a tenant reaches a token.
@@ -97,7 +97,7 @@ public sealed class AnmeldenHandler(
             konto.Id,
             konto.Email,
             Capacity.AsSelf.Instance,
-            sitzung.Session,
+            session.Session,
             cancellationToken);
 
         await protokoll.AppendAsync(
@@ -109,7 +109,7 @@ public sealed class AnmeldenHandler(
             cancellationToken);
 
         return new Anmeldeergebnis.Angemeldet(
-            zugriff, sitzung.RefreshToken, sitzung.ExpiresAt);
+            zugriff, session.RefreshToken, session.ExpiresAt);
     }
 
     /// <summary>
@@ -117,18 +117,18 @@ public sealed class AnmeldenHandler(
     /// told apart, and it is not the answer.
     /// </summary>
     private Task NotiereAbweisung(
-        string grund,
-        SubjectId? wer,
+        string reason,
+        SubjectId? subject,
         CancellationToken cancellationToken) =>
         protokoll.AppendAsync(
             new AuditEvent(
                 AuditAction.LoginFailure,
                 uhr.GetUtcNow(),
-                actor: wer,
+                actor: subject,
                 correlationId: korrelation.Aktuell,
                 metadata: new Dictionary<string, string>(StringComparer.Ordinal)
                 {
-                    ["reason"] = grund
+                    ["reason"] = reason
                 }),
             cancellationToken);
 }

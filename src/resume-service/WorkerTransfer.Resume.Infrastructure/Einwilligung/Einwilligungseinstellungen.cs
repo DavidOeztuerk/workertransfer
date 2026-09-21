@@ -1,10 +1,10 @@
 namespace WorkerTransfer.Resume.Infrastructure.Einwilligung;
 
 /// <summary>Where the consent ledger answers.</summary>
-public sealed class Einwilligungseinstellungen
+public sealed class ConsentSettings
 {
     /// <summary>The configuration section this binds to.</summary>
-    public const string Abschnitt = "Consent";
+    public const string Section = "Consent";
 
     /// <summary>The ledger's base address.</summary>
     public string Adresse { get; set; } = string.Empty;

@@ -2,8 +2,8 @@ using Noelia.Core.Identity;
 
 namespace WorkerTransfer.Transfer.Domain.Vorgaenge;
 
-/// <summary>Wo ein Vorgang steht.</summary>
-public enum Transferstand
+/// <summary>Wo ein Case steht.</summary>
+public enum TransferState
 {
     /// <summary>Das Unternehmen hat Interesse gezeigt.</summary>
     Interested,
@@ -27,82 +27,82 @@ public enum Transferstand
     Withdrawn
 }
 
-/// <summary>Die Worte, mit denen ein Transferstand auf der Leitung steht.</summary>
+/// <summary>Die Worte, mit denen ein TransferState auf der Leitung steht.</summary>
 public static class Transferstaende
 {
-    /// <summary>Das Wort zum Stand.</summary>
-    public static string Wort(Transferstand stand) => stand switch
+    /// <summary>Das Wort zum State.</summary>
+    public static string Wort(TransferState state) => state switch
     {
-        Transferstand.Interested => "interested",
-        Transferstand.Talking => "talking",
-        Transferstand.Offered => "offered",
-        Transferstand.Accepted => "accepted",
-        Transferstand.Completed => "completed",
-        Transferstand.Declined => "declined",
-        Transferstand.Withdrawn => "withdrawn",
-        _ => throw new ArgumentOutOfRangeException(nameof(stand))
+        TransferState.Interested => "interested",
+        TransferState.Talking => "talking",
+        TransferState.Offered => "offered",
+        TransferState.Accepted => "accepted",
+        TransferState.Completed => "completed",
+        TransferState.Declined => "declined",
+        TransferState.Withdrawn => "withdrawn",
+        _ => throw new ArgumentOutOfRangeException(nameof(state))
     };
 
-    /// <summary>Der Stand zum Wort, oder <c>null</c>.</summary>
-    public static Transferstand? Lies(string? wort) => wort switch
+    /// <summary>Der State zum Wort, oder <c>null</c>.</summary>
+    public static TransferState? Lies(string? word) => word switch
     {
-        "interested" => Transferstand.Interested,
-        "talking" => Transferstand.Talking,
-        "offered" => Transferstand.Offered,
-        "accepted" => Transferstand.Accepted,
-        "completed" => Transferstand.Completed,
-        "declined" => Transferstand.Declined,
-        "withdrawn" => Transferstand.Withdrawn,
+        "interested" => TransferState.Interested,
+        "talking" => TransferState.Talking,
+        "offered" => TransferState.Offered,
+        "accepted" => TransferState.Accepted,
+        "completed" => TransferState.Completed,
+        "declined" => TransferState.Declined,
+        "withdrawn" => TransferState.Withdrawn,
         _ => null
     };
 
-    /// <summary>Die Stände, in denen ein Vorgang noch läuft.</summary>
+    /// <summary>Die Stände, in denen ein Case noch läuft.</summary>
     /// <remarks>
     /// Steht hier und nicht nur im Aggregat, weil der Teilindex in der
-    /// Datenbank dieselbe Menge braucht: genau ein laufender Vorgang je
+    /// Datenbank dieselbe Menge braucht: genau ein laufender Case je
     /// (Person, Unternehmen).
     /// </remarks>
-    public static readonly IReadOnlyList<Transferstand> Laufende =
+    public static readonly IReadOnlyList<TransferState> Laufende =
     [
-        Transferstand.Interested,
-        Transferstand.Talking,
-        Transferstand.Offered,
-        Transferstand.Accepted
+        TransferState.Interested,
+        TransferState.Talking,
+        TransferState.Offered,
+        TransferState.Accepted
     ];
 }
 
 /// <summary>Etwas an der Eingabe stimmt nicht.</summary>
-public abstract class Vorgangsfehler(string meldung) : Exception(meldung);
+public abstract class CaseError(string notification) : Exception(notification);
 
 /// <summary>Ein Textfeld ist zu lang.</summary>
-public sealed class Textfehler(string feld, int grenze)
-    : Vorgangsfehler($"{feld} exceeds {grenze} characters");
+public sealed class Textfehler(string field, int limit)
+    : CaseError($"{field} exceeds {limit} characters");
 
 /// <summary>Mit dem Angebot stimmt etwas nicht.</summary>
-public sealed class Angebotsfehler(string was) : Vorgangsfehler(was);
+public sealed class Angebotsfehler(string was) : CaseError(was);
 
-/// <summary>Das ist der Vorgang eines anderen Menschen.</summary>
-public sealed class NichtDeiner() : Vorgangsfehler("This transfer belongs to someone else");
+/// <summary>Das ist der Case eines anderen Menschen.</summary>
+public sealed class NichtDeiner() : CaseError("This transfer belongs to someone else");
 
 /// <summary>Dieser Schritt ist von hier aus nicht möglich.</summary>
-public sealed class UebergangNichtErlaubt(Transferstand jetzt, string was)
-    : Vorgangsfehler($"A {Transferstaende.Wort(jetzt)} transfer cannot be {was}");
+public sealed class UebergangNichtErlaubt(TransferState now, string was)
+    : CaseError($"A {Transferstaende.Wort(now)} transfer cannot be {was}");
 
-/// <summary>Der Transfer-Vorgang — drei Ja, jederzeit ein Nein.</summary>
+/// <summary>Der Transfer-Case — drei Ja, jederzeit ein Nein.</summary>
 /// <remarks>
 /// Der ULTRAPLAN verlangt „beschäftigt → Firma muss mitwirken". Das lässt sich
 /// so nicht bauen: <strong>die Plattform weiß nicht, wo jemand arbeitet.</strong>
 /// <c>Beschaeftigt</c> ist ein Wahrheitswert, den die Person selbst setzt; es
 /// gibt keinen Datensatz „Anna arbeitet bei X".
 /// <para>
-/// Und es soll keinen geben. Er wäre die Verbindung zwischen „arbeitet bei X"
+/// Und es soll keinen geben. Er wäre die Connection zwischen „arbeitet bei X"
 /// und „hört zu" — genau die Auskunft, die jemanden den Arbeitsplatz kostet, in
 /// einer einzigen Tabelle. Ihn anzulegen, damit die Plattform den Arbeitgeber
 /// anschreiben kann, hieße, das größte Risiko des Systems zu erzeugen, um eine
 /// Höflichkeit zu ermöglichen.
 /// </para>
 /// <para>
-/// Stattdessen: der Vorgang trägt, dass eine Freigabe <em>nötig</em> ist, und
+/// Stattdessen: der Case trägt, dass eine Release <em>nötig</em> ist, und
 /// die Person selbst bestätigt, dass sie vorliegt. Das ist schwächer (niemand
 /// prüft es) und sicherer. Zwischen einer Zusicherung, die niemand einlösen
 /// kann, und einer, die niemanden gefährdet, ist die zweite die ehrlichere.
@@ -115,12 +115,12 @@ public sealed class Transfer
 
     private Transfer(
         Guid id,
-        SubjectId wer,
-        TenantId firma,
-        Transferstand stand,
+        SubjectId subject,
+        TenantId company,
+        TransferState state,
         bool brauchtFreigabe,
         bool freigabeBestaetigt,
-        string nachricht,
+        string message,
         string angebotstext,
         string? angebotsbeginn,
         long? angebotsgebuehrCent,
@@ -128,12 +128,12 @@ public sealed class Transfer
         DateTimeOffset geaendertAm)
     {
         Id = id;
-        Wer = wer;
-        Firma = firma;
-        Stand = stand;
+        Wer = subject;
+        Firma = company;
+        State = state;
         BrauchtFreigabe = brauchtFreigabe;
         FreigabeBestaetigt = freigabeBestaetigt;
-        Nachricht = nachricht;
+        Nachricht = message;
         Angebotstext = angebotstext;
         Angebotsbeginn = angebotsbeginn;
         AngebotsgebuehrCent = angebotsgebuehrCent;
@@ -141,7 +141,7 @@ public sealed class Transfer
         GeaendertAm = geaendertAm;
     }
 
-    /// <summary>Welcher Vorgang.</summary>
+    /// <summary>Welcher Case.</summary>
     public Guid Id { get; }
 
     /// <summary>Um wen es geht.</summary>
@@ -151,11 +151,11 @@ public sealed class Transfer
     public TenantId Firma { get; }
 
     /// <summary>Wo er steht.</summary>
-    public Transferstand Stand { get; private set; }
+    public TransferState State { get; private set; }
 
-    /// <summary>Ob eine Freigabe des jetzigen Arbeitgebers nötig ist.</summary>
+    /// <summary>Ob eine Release des jetzigen Arbeitgebers nötig ist.</summary>
     /// <remarks>
-    /// Beim Anlegen aus dem Marktstatus kopiert, nicht bei jedem Lesezugriff
+    /// Beim Anlegen aus dem MarketStatus kopiert, nicht bei jedem Lesezugriff
     /// neu geholt: wer während eines laufenden Gesprächs kündigt, ändert damit
     /// nicht rückwirkend die Bedingungen eines Angebots — und ein Unternehmen
     /// kann nicht darauf hoffen, dass sich die Regel noch ändert.
@@ -192,55 +192,55 @@ public sealed class Transfer
     /// <summary>Läuft er noch?</summary>
     /// <remarks>
     /// Endgültig heißt endgültig. Wer erneut will, beginnt einen neuen
-    /// Vorgang — und braucht dafür wieder eine gültige Freigabe des
-    /// Marktstatus.
+    /// Case — und braucht dafür wieder eine gültige Release des
+    /// MarketStatus.
     /// </remarks>
-    public bool Laeuft => Transferstaende.Laufende.Contains(Stand);
+    public bool Laeuft => Transferstaende.Laufende.Contains(State);
 
     /// <summary>Ein Unternehmen zeigt Interesse.</summary>
     public static Transfer Zeige_Interesse(
-        SubjectId wer,
-        TenantId firma,
+        SubjectId subject,
+        TenantId company,
         bool brauchtFreigabe,
-        string nachricht,
-        DateTimeOffset jetzt) =>
-        new(Guid.CreateVersion7(), wer, firma, Transferstand.Interested, brauchtFreigabe,
-            freigabeBestaetigt: false, Text("Message", nachricht), string.Empty,
-            null, null, jetzt, jetzt);
+        string message,
+        DateTimeOffset now) =>
+        new(Guid.CreateVersion7(), subject, company, TransferState.Interested, brauchtFreigabe,
+            freigabeBestaetigt: false, Text("Message", message), string.Empty,
+            null, null, now, now);
 
-    /// <summary>Der Vorgang, wie eine Zeile ihn hält.</summary>
+    /// <summary>Der Case, wie eine Zeile ihn hält.</summary>
     public static Transfer Stelle_her(
         Guid id,
-        SubjectId wer,
-        TenantId firma,
-        Transferstand stand,
+        SubjectId subject,
+        TenantId company,
+        TransferState state,
         bool brauchtFreigabe,
         bool freigabeBestaetigt,
-        string nachricht,
+        string message,
         string angebotstext,
         string? angebotsbeginn,
         long? angebotsgebuehrCent,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm) =>
-        new(id, wer, firma, stand, brauchtFreigabe, freigabeBestaetigt, nachricht,
+        new(id, subject, company, state, brauchtFreigabe, freigabeBestaetigt, message,
             angebotstext, angebotsbeginn, angebotsgebuehrCent, angelegtAm, geaendertAm);
 
     // --- Die Person ------------------------------------------------------
 
     /// <summary>Die Person lässt sich auf ein Gespräch ein.</summary>
-    public void Nimm_Gespraech_an(SubjectId durch, DateTimeOffset jetzt)
+    public void Nimm_Gespraech_an(SubjectId durch, DateTimeOffset now)
     {
         Meiner(durch);
-        Genau(Transferstand.Interested, "opened for talks");
-        Nach(Transferstand.Talking, jetzt);
+        Genau(TransferState.Interested, "opened for talks");
+        Nach(TransferState.Talking, now);
     }
 
     /// <summary>Die Person nimmt das Angebot an.</summary>
-    public void Nimm_Angebot_an(SubjectId durch, DateTimeOffset jetzt)
+    public void Nimm_Angebot_an(SubjectId durch, DateTimeOffset now)
     {
         Meiner(durch);
-        Genau(Transferstand.Offered, "accepted");
-        Nach(Transferstand.Accepted, jetzt);
+        Genau(TransferState.Offered, "accepted");
+        Nach(TransferState.Accepted, now);
     }
 
     /// <summary>Die Person bestätigt, dass ihr Arbeitgeber sie gehen lässt.</summary>
@@ -249,18 +249,18 @@ public sealed class Transfer
     /// Arbeitgeber noch den Vertrag. Was der Schritt leistet, ist, die Frage zu
     /// stellen und die Antwort festzuhalten.
     /// </remarks>
-    public void Bestaetige_Freigabe(SubjectId durch, DateTimeOffset jetzt)
+    public void Bestaetige_Freigabe(SubjectId durch, DateTimeOffset now)
     {
         Meiner(durch);
-        Genau(Transferstand.Accepted, "released");
+        Genau(TransferState.Accepted, "released");
 
         if (!BrauchtFreigabe)
         {
-            throw new UebergangNichtErlaubt(Stand, "released without needing a release");
+            throw new UebergangNichtErlaubt(State, "released without needing a release");
         }
 
         FreigabeBestaetigt = true;
-        Nach(Transferstand.Completed, jetzt);
+        Nach(TransferState.Completed, now);
     }
 
     /// <summary>Die Person sagt ab.</summary>
@@ -268,20 +268,20 @@ public sealed class Transfer
     /// Immer möglich, aus jedem laufenden Zustand. Ein Verfahren, aus dem man
     /// nicht aussteigen kann, ist kein Verfahren, sondern eine Falle.
     /// </remarks>
-    public void Sage_ab(SubjectId durch, DateTimeOffset jetzt)
+    public void Sage_ab(SubjectId durch, DateTimeOffset now)
     {
         Meiner(durch);
         Laufend("declined");
-        Nach(Transferstand.Declined, jetzt);
+        Nach(TransferState.Declined, now);
     }
 
     // --- Das Unternehmen -------------------------------------------------
 
     /// <summary>Das Unternehmen macht ein Angebot.</summary>
     public void Mache_Angebot(
-        string text, string? beginn, long? gebuehrCent, DateTimeOffset jetzt)
+        string text, string? beginn, long? gebuehrCent, DateTimeOffset now)
     {
-        Genau(Transferstand.Talking, "offered");
+        Genau(TransferState.Talking, "offered");
 
         if (gebuehrCent is < 0)
         {
@@ -291,7 +291,7 @@ public sealed class Transfer
         Angebotstext = Text("Offer", text);
         Angebotsbeginn = beginn;
         AngebotsgebuehrCent = gebuehrCent;
-        Nach(Transferstand.Offered, jetzt);
+        Nach(TransferState.Offered, now);
     }
 
     /// <summary>Das Unternehmen schließt ab.</summary>
@@ -300,35 +300,35 @@ public sealed class Transfer
     /// Arbeitgeber. Die Person hat mit <see cref="Nimm_Angebot_an"/> bereits ja
     /// gesagt.
     /// </remarks>
-    public void Schliesse_ab(DateTimeOffset jetzt)
+    public void Schliesse_ab(DateTimeOffset now)
     {
-        Genau(Transferstand.Accepted, "completed");
+        Genau(TransferState.Accepted, "completed");
 
         if (BrauchtFreigabe)
         {
-            // Solange eine Freigabe nötig ist, schließt die Person ab — sie ist
+            // Solange eine Release nötig ist, schließt die Person ab — sie ist
             // die Einzige, die weiß, ob sie vorliegt.
-            throw new UebergangNichtErlaubt(Stand, "completed before the release is confirmed");
+            throw new UebergangNichtErlaubt(State, "completed before the release is confirmed");
         }
 
-        Nach(Transferstand.Completed, jetzt);
+        Nach(TransferState.Completed, now);
     }
 
     /// <summary>Das Unternehmen zieht zurück.</summary>
-    public void Ziehe_zurueck(DateTimeOffset jetzt)
+    public void Ziehe_zurueck(DateTimeOffset now)
     {
         Laufend("withdrawn");
-        Nach(Transferstand.Withdrawn, jetzt);
+        Nach(TransferState.Withdrawn, now);
     }
 
     // --- Gemeinsames -----------------------------------------------------
 
-    private static string Text(string feld, string? wert)
+    private static string Text(string field, string? value)
     {
-        var bereinigt = (wert ?? string.Empty).Trim();
+        var bereinigt = (value ?? string.Empty).Trim();
 
         return bereinigt.Length > HoechstlaengeText
-            ? throw new Textfehler(feld, HoechstlaengeText)
+            ? throw new Textfehler(field, HoechstlaengeText)
             : bereinigt;
     }
 
@@ -340,11 +340,11 @@ public sealed class Transfer
         }
     }
 
-    private void Genau(Transferstand gewollt, string was)
+    private void Genau(TransferState gewollt, string was)
     {
-        if (Stand != gewollt)
+        if (State != gewollt)
         {
-            throw new UebergangNichtErlaubt(Stand, was);
+            throw new UebergangNichtErlaubt(State, was);
         }
     }
 
@@ -352,35 +352,35 @@ public sealed class Transfer
     {
         if (!Laeuft)
         {
-            throw new UebergangNichtErlaubt(Stand, was);
+            throw new UebergangNichtErlaubt(State, was);
         }
     }
 
-    private void Nach(Transferstand ziel, DateTimeOffset jetzt)
+    private void Nach(TransferState target, DateTimeOffset now)
     {
-        Stand = ziel;
-        GeaendertAm = jetzt;
+        State = target;
+        GeaendertAm = now;
     }
 }
 
 /// <summary>Findet und speichert Vorgänge.</summary>
-public interface ITransferspeicher
+public interface ITransferStore
 {
-    /// <summary>Ein Vorgang, oder <c>null</c>.</summary>
-    Task<Transfer?> HoleAsync(Guid id, CancellationToken cancellationToken = default);
+    /// <summary>Ein Case, oder <c>null</c>.</summary>
+    Task<Transfer?> GetAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>Der laufende Vorgang zwischen diesen beiden, falls es ihn gibt.</summary>
-    Task<Transfer?> HoleLaufendenAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default);
+    /// <summary>Der laufende Case zwischen diesen beiden, falls es ihn gibt.</summary>
+    Task<Transfer?> GetCurrentAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default);
 
     /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(Transfer vorgang, CancellationToken cancellationToken = default);
+    Task SaveAsync(Transfer caseItem, CancellationToken cancellationToken = default);
 
     /// <summary>Die Vorgänge dieser Person.</summary>
-    Task<IReadOnlyList<Transfer>> FuerPersonAsync(
-        SubjectId wer, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Transfer>> ForPersonAsync(
+        SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Die Vorgänge dieses Unternehmens.</summary>
-    Task<IReadOnlyList<Transfer>> FuerFirmaAsync(
-        TenantId firma, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Transfer>> ForCompanyAsync(
+        TenantId company, CancellationToken cancellationToken = default);
 }

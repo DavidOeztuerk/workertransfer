@@ -2,14 +2,14 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace WorkerTransfer.Companies.Domain.Arbeitgeberprofile;
+namespace WorkerTransfer.Companies.Domain.EmployerProfiles;
 
 /// <summary>Die Adresse der Karriere-Seite.</summary>
 /// <remarks>
 /// <strong>Abgeleitet und nicht eingegeben</strong>: ein freies Feld lädt zum
 /// Besetzen fremder Namen ein.
 /// </remarks>
-public static partial class Kuerzel
+public static partial class Slug
 {
     /// <summary>Wie lang ein Kürzel höchstens wird.</summary>
     public const int Hoechstlaenge = 60;

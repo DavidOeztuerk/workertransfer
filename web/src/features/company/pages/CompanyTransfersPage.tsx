@@ -177,6 +177,12 @@ function Transferkarte({
   const [abloese, setAbloese] = useState("");
 
   const laeuftNoch = RUNNING.includes(transfer.status);
+  // The rule is SAID, not only enforced: silently dropping the completion
+  // button looks like a defect from outside, and whoever does not know the rule
+  // hunts for it in the wrong place. The sentence beside it says two things that
+  // both belong to the company — that the last step is not theirs, and that the
+  // platform does NOT ask the current employer. The second is the promise this
+  // market hangs on for the person.
   const darfAbschliessen =
     transfer.status === "accepted" && !transfer.requires_release;
   const zeigtAngebot =
@@ -189,17 +195,6 @@ function Transferkarte({
           {t(TITEL[transfer.status])}
         </Typography>
 
-        {/*
-          Die Regel stand hier nur im Kommentar, und `darfAbschliessen` setzte
-          sie still um: bei nötiger Freigabe fehlte der Abschluss-Knopf einfach.
-          Eine Regel, die wirkt, ohne sich zu zeigen, sieht von aussen aus wie
-          ein Fehler — und wer sie nicht kennt, sucht ihn im Falschen.
-
-          Der Satz sagt zwei Dinge, und beide gehören dem Unternehmen: dass der
-          letzte Schritt nicht ihm gehört, und dass die Plattform den jetzigen
-          Arbeitgeber NICHT fragt. Das zweite ist keine Feinheit — es ist das
-          Versprechen, an dem dieser Markt für die Person überhaupt hängt.
-        */}
         {transfer.requires_release && !transfer.release_confirmed ? (
           <Alert severity="info" sx={{ mb: 2 }}>
             <strong>{t("transfer.brauchtFreigabeTitel")}</strong>{" "}

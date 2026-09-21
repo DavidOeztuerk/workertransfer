@@ -77,11 +77,18 @@ export function RegisterPage() {
   const [running, setLaeuft] = useState(false);
   const [abgeschickt, setAbgeschickt] = useState(false);
 
+  // Referenced through `aria-describedby`, so the hint sits BESIDE the label and
+  // not inside it; otherwise a screen reader announces the option as "Für ein
+  // Unternehmen Braucht deine Arbeitsadresse — …" and a test naming it fails.
   const personHinweis = useId();
   const firmaHinweis = useId();
 
   // Nur wenn überhaupt eine Adresse dasteht: `isPublicEmailDomain("")` urteilte
   // über einen leeren Domainteil und blitzte beim ersten getippten Zeichen auf.
+  //
+  // Shown at once rather than after the confirmation mail, so nobody learns two
+  // steps later that their path is closed. The refusal is still the SERVER's
+  // (422); this only makes visible what already holds.
   const freemail = useMemo(
     () =>
       art === "company" && email.includes("@") && isPublicEmailDomain(email),
@@ -130,10 +137,6 @@ export function RegisterPage() {
           <FormLabel component="legend" sx={{ mb: 0.5 }}>
             {t("registrierung.wofuer")}
           </FormLabel>
-          {/* Der Hinweis steht NEBEN der Beschriftung, nicht darin: sonst hiesse
-              die Auswahl für einen Screenreader „Für ein Unternehmen Braucht
-              deine Arbeitsadresse — …", und ein Test, der sie beim Namen nennt,
-              fände sie nicht mehr. */}
           <RadioGroup
             name="art"
             value={art}
@@ -211,10 +214,6 @@ export function RegisterPage() {
           />
         ) : null}
 
-        {/* Sofort, nicht erst nach der Bestätigungsmail: sonst erfährt jemand
-            erst zwei Schritte später, dass sein Weg nicht geht. Die Absage
-            spricht weiterhin der SERVER aus (422) — hier wird nur sichtbar
-            gemacht, was ohnehin gilt. */}
         {freemail ? (
           <Alert severity="warning">
             {t("registrierung.freemail")}
@@ -301,6 +300,9 @@ function FastGeschafft({ email }: { email: string }) {
   const [gesendet, setGesendet] = useState(false);
   const [gescheitert, setGescheitert] = useState(false);
 
+  // The failure branch is load-bearing: without it the button visibly did
+  // NOTHING on a network error, and a 429 from the rate limit (3/min) produced
+  // the promise "on its way" while nothing was on its way.
   async function erneutSenden() {
     setLaeuft(true);
     setGescheitert(false);
@@ -316,10 +318,6 @@ function FastGeschafft({ email }: { email: string }) {
       lead={t("registrierung.fastGeschafftLead")}
     >
       <Box sx={{ display: "grid", gap: 2 }}>
-        {/* Ohne den Fehlerzweig tat dieser Knopf bei einem Netzfehler sichtbar
-            NICHTS: der Aufruf warf, die Zusage wurde nie gesetzt. Und ein 429
-            von der Bremse (3/min) erzeugte die Zusage „ist unterwegs", obwohl
-            nichts unterwegs war. */}
         <Button variant="outlined" onClick={erneutSenden} disabled={running}>
           {running ? t("registrierung.erneutLaeuft") : t("registrierung.erneut")}
         </Button>
@@ -330,10 +328,12 @@ function FastGeschafft({ email }: { email: string }) {
           </Alert>
         ) : null}
 
-        {/* `role="status"` und NICHT „alert": eine Bestätigung unterbricht
-            nicht. MUIs `Alert` trägt sonst immer `role="alert"`. */}
         {gesendet ? (
-          <Alert role="status" severity="success">
+          <Alert
+            // A confirmation must not interrupt; MUI's Alert would set role="alert".
+            role="status"
+            severity="success"
+          >
             {t("registrierung.erneutGesendet")}
           </Alert>
         ) : null}

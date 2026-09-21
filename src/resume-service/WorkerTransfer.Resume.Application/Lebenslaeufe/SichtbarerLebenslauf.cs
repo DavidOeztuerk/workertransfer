@@ -12,48 +12,48 @@ namespace WorkerTransfer.Resume.Application.Lebenslaeufe;
 /// not released to you". They must stay indistinguishable: a status code that
 /// told them apart would be an oracle over every guessed id (ADR-0020 §1).
 /// </remarks>
-public abstract record Lebenslaufergebnis
+public abstract record ResumeResult
 {
-    private Lebenslaufergebnis()
+    private ResumeResult()
     {
     }
 
     /// <summary>Here it is.</summary>
-    public sealed record Gefunden(Lebenslauf Lebenslauf) : Lebenslaufergebnis;
+    public sealed record Gefunden(CurriculumVitae CurriculumVitae) : ResumeResult;
 
     /// <summary>Hidden or non-existent — from outside the same thing.</summary>
-    public sealed record NichtSichtbar : Lebenslaufergebnis;
+    public sealed record NichtSichtbar : ResumeResult;
 }
 
 /// <summary>A company reads one person's résumé.</summary>
-public sealed record SichtbarerLebenslaufAbfrage(SubjectId Wer, TenantId Firma)
-    : IAbfrage<Lebenslaufergebnis>;
+public sealed record VisibleResumeQuery(SubjectId Wer, TenantId Firma)
+    : IAbfrage<ResumeResult>;
 
 /// <inheritdoc cref="SichtbarerLebenslaufAbfrage" />
-public sealed class SichtbarerLebenslaufHandler(
-    ILebenslaufSpeicher speicher,
-    IEinwilligungstor tor) : IRequestHandler<SichtbarerLebenslaufAbfrage, Lebenslaufergebnis>
+public sealed class VisibleResumeHandler(
+    IResumeStore store,
+    IConsentGate tor) : IRequestHandler<VisibleResumeQuery, ResumeResult>
 {
     /// <inheritdoc />
-    public async Task<Lebenslaufergebnis> Handle(
-        SichtbarerLebenslaufAbfrage request,
+    public async Task<ResumeResult> Handle(
+        VisibleResumeQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var lebenslauf = await speicher.HoleAsync(request.Wer, cancellationToken);
+        var resume = await store.GetAsync(request.Wer, cancellationToken);
 
-        if (lebenslauf is null)
+        if (resume is null)
         {
             // No ledger call for a résumé that does not exist: a needless round
             // trip, and it would report guessed subject ids to the ledger.
-            return new Lebenslaufergebnis.NichtSichtbar();
+            return new ResumeResult.NichtSichtbar();
         }
 
-        // EinwilligungSchweigt travels on deliberately: the endpoint turns it
+        // ConsentGateSilent travels on deliberately: the endpoint turns it
         // into 503, which is neither "there is nothing here" nor showing it.
-        return await tor.DarfLebenslaufLesenAsync(request.Wer, request.Firma, cancellationToken)
-            ? new Lebenslaufergebnis.Gefunden(lebenslauf)
-            : new Lebenslaufergebnis.NichtSichtbar();
+        return await tor.MayReadResumeAsync(request.Wer, request.Firma, cancellationToken)
+            ? new ResumeResult.Gefunden(resume)
+            : new ResumeResult.NichtSichtbar();
     }
 }

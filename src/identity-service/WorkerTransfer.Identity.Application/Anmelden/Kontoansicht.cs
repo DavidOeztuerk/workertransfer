@@ -27,4 +27,4 @@ public sealed record Kontoansicht(
     string Anzeigename,
     string? Vorname = null,
     string? Nachname = null,
-    Berufsfeld? Berufsfeld = null);
+    OccupationalField? OccupationalField = null);

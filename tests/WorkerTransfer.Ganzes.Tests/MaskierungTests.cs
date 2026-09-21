@@ -13,7 +13,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// mögliche Bedeutungen: es gibt nichts zu maskieren, oder die Maskierung läuft
 /// nicht. Ohne diese Tests wäre die erste Lesart eine Hoffnung.</para>
 ///
-/// <para><strong>4.4.0 dreht die Richtung an zwei Stellen</strong>, und beide
+/// <para><strong>4.4.0 dreht die Richtung an zwei Jobs</strong>, und beide
 /// sind hier festgehalten: verglichen wird jetzt <em>exakt</em> statt als
 /// Teilzeichenkette, wodurch <c>SecretName</c> und <c>TokenId</c> wieder lesbar
 /// sind — der Name eines Geheimnisses ist keines, und ohne ihn kann ein
@@ -30,14 +30,14 @@ namespace WorkerTransfer.Ganzes.Tests;
 public sealed class MaskierungTests
 {
     /// <summary>Ein Ereignis mit genau einer Eigenschaft, durch den Anreicherer.</summary>
-    private static string Angereichert(string name, string wert)
+    private static string Angereichert(string name, string value)
     {
         var ereignis = new LogEvent(
             DateTimeOffset.UnixEpoch,
             LogEventLevel.Information,
             exception: null,
             new MessageTemplate("egal", []),
-            [new LogEventProperty(name, new ScalarValue(wert))]);
+            [new LogEventProperty(name, new ScalarValue(value))]);
 
         new DataMaskingEnricher().Enrich(ereignis, propertyFactory: null!);
 
@@ -68,9 +68,9 @@ public sealed class MaskierungTests
     [Theory]
     [InlineData("SecretName", "jwt-signing-key")]
     [InlineData("TokenId", "01a070e2-847e-78f7")]
-    public void Wieder_sichtbar(string name, string wert)
+    public void Wieder_sichtbar(string name, string value)
     {
-        Angereichert(name, wert).Should().Be(wert);
+        Angereichert(name, value).Should().Be(value);
     }
 
     /// <summary>Exakt, nie als Teilzeichenkette.</summary>

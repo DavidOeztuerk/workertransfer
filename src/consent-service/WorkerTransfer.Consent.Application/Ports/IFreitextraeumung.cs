@@ -18,5 +18,5 @@ public interface IFreitextraeumung
 {
     /// <param name="subject">Whose rows.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
-    Task RaeumeAsync(Guid subject, CancellationToken cancellationToken = default);
+    Task ClearAsync(Guid subject, CancellationToken cancellationToken = default);
 }

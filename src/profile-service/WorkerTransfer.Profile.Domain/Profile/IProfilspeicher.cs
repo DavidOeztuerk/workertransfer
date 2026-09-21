@@ -15,7 +15,7 @@ namespace WorkerTransfer.Profile.Domain.Profile;
 /// sondern das, was später falsch wiederbelebt wird.</para>
 ///
 /// <para>Das ODER ist auch keine Lockerung, sondern die Voraussetzung für die
-/// Häkchenliste des Scouts: unter UND erfüllt jeder Treffer alle Bedingungen,
+/// Häkchenliste des Scouts: unter UND erfüllt jeder Hit alle Bedingungen,
 /// jedes Häkchen wäre gesetzt, und „welche Fähigkeit fehlt" hätte keine
 /// Antwort (ADR-0036 Entscheidung 2). Auch die erste Auflage wäre dann leer —
 /// es gäbe nichts, wonach man sortieren könnte.</para>
@@ -24,42 +24,42 @@ namespace WorkerTransfer.Profile.Domain.Profile;
 /// Einwilligung wird danach geprüft, nicht hier — der Speicher kennt keine
 /// Sichtbarkeit (ADR-0020).</para>
 /// </remarks>
-public sealed record Seitenanfrage(
+public sealed record PageRequest(
     // `Seitenlaenge` und nicht `Anzahl`, und der Grund ist derselbe, aus dem
-    // scout-service seine Seitenlaenge so nennt: `anzahl` steht im Wortschatz,
+    // scout-service seine Seitenlaenge so nennt: `anzahl` steht im Vocabulary,
     // den `wt.ki.keine-zahl` ueber Domaene und Vertraege absucht (ADR-0022 §1).
     // Hier waere es eine Seitenlaenge und harmlos — aber eine Ausnahmeliste je
-    // Dienst ist die Stelle, an der der naechste Eintrag nicht mehr harmlos ist.
+    // Dienst ist die Job, an der der naechste Eintrag nicht mehr harmlos ist.
     int Seitenlaenge,
-    Seitenzeiger? Ab = null,
+    PageCursor? Ab = null,
     IReadOnlyList<string>? Faehigkeiten = null,
     string Ort = "",
     bool NurRemote = false);
 
-/// <summary>Eine Seite Profile.</summary>
+/// <summary>Eine Seite PersonProfile.</summary>
 /// <param name="Eintraege">Die Zeilen, zuletzt geänderte zuerst.</param>
 /// <param name="Weiter">Wo es weitergeht, oder <c>null</c> am Ende.</param>
-public sealed record Profilseite(IReadOnlyList<Profil> Eintraege, Seitenzeiger? Weiter);
+public sealed record ProfilePage(IReadOnlyList<PersonProfile> Eintraege, PageCursor? Weiter);
 
-/// <summary>Wo die Profile liegen.</summary>
-public interface IProfilspeicher
+/// <summary>Wo die PersonProfile liegen.</summary>
+public interface IProfileStore
 {
-    /// <summary>Das Profil einer Person, oder <c>null</c>.</summary>
-    Task<Profil?> HoleAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    /// <summary>Das PersonProfile einer Person, oder <c>null</c>.</summary>
+    Task<PersonProfile?> GetAsync(SubjectId subject, CancellationToken cancellationToken = default);
 
-    /// <summary>Legt an oder ändert — ein Profil je Person.</summary>
+    /// <summary>Legt an oder ändert — ein PersonProfile je Person.</summary>
     /// <remarks>
     /// Muss aufgerufen werden. Das Aggregat kommt losgelöst aus
     /// <see cref="HoleAsync"/>, also bleibt jede Änderung ohne diesen Aufruf im
     /// Arbeitsspeicher: im Test folgenlos, in Betrieb ein verlorener Schreibgang.
     /// </remarks>
-    Task SpeichereAsync(Profil profil, CancellationToken cancellationToken = default);
+    Task StoreAsync(PersonProfile profile, CancellationToken cancellationToken = default);
 
     /// <summary>Eine Seite, nach <see cref="Seitenanfrage"/>.</summary>
-    Task<Profilseite> SeiteAsync(
-        Seitenanfrage anfrage, CancellationToken cancellationToken = default);
+    Task<ProfilePage> PageAsync(
+        PageRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>Löscht das Profil einer Person und sagt, was stehen blieb.</summary>
+    /// <summary>Löscht das PersonProfile einer Person und sagt, was stehen blieb.</summary>
     /// <remarks>
     /// Immer 0: dieser Dienst kennt keinen Aufbewahrungsfall. Der Rückgabewert
     /// ist trotzdem da, weil jeder Empfänger dieselbe Quittung gibt — der
@@ -70,5 +70,5 @@ public interface IProfilspeicher
     /// Zustellung „mindestens einmal“ sein darf.
     /// </para>
     /// </remarks>
-    Task<int> LoescheAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task<int> DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default);
 }

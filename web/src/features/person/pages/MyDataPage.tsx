@@ -187,10 +187,10 @@ export function MyDataPage() {
 
           {result !== null ? (
             <>
-              {/* Ein `<dl>`, keine Liste: zu jedem Abschnitt gehört die
-                  Auskunft, ob er enthalten ist. Diese Zuordnung IST der Inhalt
-                  der Aufstellung und steht damit im Markup statt im Layout. */}
               <Box
+                // A <dl> and not a list: every section carries whether it is
+                // included, and that pairing IS the content, so it belongs in
+                // the markup rather than in the layout.
                 component="dl"
                 sx={{
                   display: "grid",

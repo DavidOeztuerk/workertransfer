@@ -21,9 +21,9 @@ public class EinladungsregelnTests
     private static readonly DateTimeOffset Jetzt = DateTimeOffset.UtcNow;
 
     private static Invitation Ausgestellt(
-        MembershipRole rolle = MembershipRole.Member,
+        MembershipRole role = MembershipRole.Member,
         string email = "kollege@andere.example") =>
-        Invitation.Issue(Firma, email, rolle, MembershipRole.Admin, Chefin, Jetzt);
+        Invitation.Issue(Firma, email, role, MembershipRole.Admin, Chefin, Jetzt);
 
     [Fact]
     public void Ein_gewoehnliches_Mitglied_kann_nicht_einladen()
@@ -38,12 +38,12 @@ public class EinladungsregelnTests
     [Fact]
     public void Ein_gewoehnliches_Mitglied_kann_keine_Einladung_zuruecknehmen()
     {
-        var einladung = Ausgestellt();
+        var invitation = Ausgestellt();
 
-        var zuruecknehmen = () => einladung.Withdraw(MembershipRole.Member);
+        var zuruecknehmen = () => invitation.Withdraw(MembershipRole.Member);
 
         zuruecknehmen.Should().Throw<OnlyAdminsMayInviteException>();
-        einladung.Status.Should().Be(InvitationStatus.Pending);
+        invitation.Status.Should().Be(InvitationStatus.Pending);
     }
 
     /// <summary>
@@ -53,12 +53,12 @@ public class EinladungsregelnTests
     [Fact]
     public void Eine_fremde_Adresse_nimmt_die_Einladung_nicht_an()
     {
-        var einladung = Ausgestellt();
+        var invitation = Ausgestellt();
 
-        var annehmen = () => einladung.Accept("jemand@anders.example", Jetzt);
+        var annehmen = () => invitation.Accept("jemand@anders.example", Jetzt);
 
         annehmen.Should().Throw<NotYourInvitationException>();
-        einladung.Status.Should().Be(InvitationStatus.Pending);
+        invitation.Status.Should().Be(InvitationStatus.Pending);
     }
 
     /// <summary>
@@ -69,11 +69,11 @@ public class EinladungsregelnTests
     [Fact]
     public void Die_Schreibweise_der_Adresse_entscheidet_nicht()
     {
-        var einladung = Ausgestellt(email: "kollege@andere.example");
+        var invitation = Ausgestellt(email: "kollege@andere.example");
 
-        einladung.Accept("Kollege@Andere.Example", Jetzt);
+        invitation.Accept("Kollege@Andere.Example", Jetzt);
 
-        einladung.Status.Should().Be(InvitationStatus.Accepted);
+        invitation.Status.Should().Be(InvitationStatus.Accepted);
     }
 
     /// <summary>
@@ -83,9 +83,9 @@ public class EinladungsregelnTests
     [Fact]
     public void Nach_sieben_Tagen_traegt_eine_Einladung_nicht_mehr()
     {
-        var einladung = Ausgestellt();
+        var invitation = Ausgestellt();
 
-        var annehmen = () => einladung.Accept(
+        var annehmen = () => invitation.Accept(
             "kollege@andere.example", Jetzt + Invitation.Lebensdauer);
 
         annehmen.Should().Throw<InvitationExpiredException>();
@@ -94,10 +94,10 @@ public class EinladungsregelnTests
     [Fact]
     public void Eine_zurueckgenommene_Einladung_laesst_sich_nicht_annehmen()
     {
-        var einladung = Ausgestellt();
-        einladung.Withdraw(MembershipRole.Admin);
+        var invitation = Ausgestellt();
+        invitation.Withdraw(MembershipRole.Admin);
 
-        var annehmen = () => einladung.Accept("kollege@andere.example", Jetzt);
+        var annehmen = () => invitation.Accept("kollege@andere.example", Jetzt);
 
         annehmen.Should().Throw<InvitationInvalidException>();
     }
@@ -109,22 +109,22 @@ public class EinladungsregelnTests
     [Fact]
     public void Eine_angenommene_Einladung_laesst_sich_nicht_zuruecknehmen()
     {
-        var einladung = Ausgestellt();
-        einladung.Accept("kollege@andere.example", Jetzt);
+        var invitation = Ausgestellt();
+        invitation.Accept("kollege@andere.example", Jetzt);
 
-        var zuruecknehmen = () => einladung.Withdraw(MembershipRole.Admin);
+        var zuruecknehmen = () => invitation.Withdraw(MembershipRole.Admin);
 
         zuruecknehmen.Should().Throw<InvitationInvalidException>();
-        einladung.Status.Should().Be(InvitationStatus.Accepted);
+        invitation.Status.Should().Be(InvitationStatus.Accepted);
     }
 
     [Fact]
     public void Zweimal_annehmen_geht_nicht()
     {
-        var einladung = Ausgestellt();
-        einladung.Accept("kollege@andere.example", Jetzt);
+        var invitation = Ausgestellt();
+        invitation.Accept("kollege@andere.example", Jetzt);
 
-        var nochmal = () => einladung.Accept("kollege@andere.example", Jetzt);
+        var nochmal = () => invitation.Accept("kollege@andere.example", Jetzt);
 
         nochmal.Should().Throw<InvitationInvalidException>();
     }

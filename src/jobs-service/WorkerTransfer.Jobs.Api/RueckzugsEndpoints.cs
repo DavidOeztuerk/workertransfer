@@ -32,13 +32,13 @@ public static class RueckzugsEndpoints
         app.MapPost("/companies/withdrawal", async (
             UnternehmensrueckzugV1 koerper,
             IMediator mediator,
-            IOptions<Rueckzugseinstellungen> einstellungen,
+            IOptions<WithdrawalSettings> einstellungen,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
             if (!DarfZurueckziehen(context, einstellungen.Value))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authorised");
                 return;
@@ -59,7 +59,7 @@ public static class RueckzugsEndpoints
     }
 
     private static bool DarfZurueckziehen(
-        HttpContext context, Rueckzugseinstellungen einstellungen)
+        HttpContext context, WithdrawalSettings einstellungen)
     {
         if (string.IsNullOrEmpty(einstellungen.Geheimnis)
             || !context.Request.Headers.TryGetValue(Geheimniskopf, out var vorgelegt))

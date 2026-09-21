@@ -10,17 +10,17 @@ using WorkerTransfer.Scout.Application.Ports;
 namespace WorkerTransfer.Scout.Infrastructure.Einwilligung;
 
 /// <summary>Wo der Consent-Ledger erreichbar ist.</summary>
-public sealed class Einwilligungseinstellungen
+public sealed class ConsentSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Consent";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Consent";
 
     /// <summary>Die Basisadresse des Ledgers.</summary>
     /// <remarks>
     /// Im Compose-Netz der Dienstname, nicht <c>localhost</c> — der Aufruf läuft
     /// von Behälter zu Behälter. Und er steht in der Konfiguration, weil die
     /// Egress-Grenze ihre erlaubten Hosts von dort ableitet
-    /// (<c>Dienstgrundlage.GerufeneHosts</c>).
+    /// (<c>ServiceFoundation.GerufeneHosts</c>).
     /// </remarks>
     public string Adresse { get; set; } = "http://consent-service:8002";
 
@@ -41,30 +41,30 @@ public sealed class Einwilligungseinstellungen
 ///
 /// <para>Gefragt wird mit dem Token des <em>Aufrufers</em> und nicht mit einem
 /// eigenen Konto: der Dienst fragt in dessen Auftrag, und das Protokoll des
-/// Ledgers soll festhalten, wer wirklich gefragt hat. Der Kopf zuerst, sonst
+/// Ledgers soll festhalten, wer wirklich gefragt hat. Der Header zuerst, sonst
 /// das Cookie — die Oberfläche sieht das <c>httpOnly</c>-Token nie und kann es
 /// nur so zurückgeben.</para>
 /// </remarks>
-public sealed class HttpEinwilligungstor(
+public sealed class HttpConsentGate(
     IHttpClientFactory fabrik,
     IHttpContextAccessor zugriff,
-    IOptions<Einwilligungseinstellungen> einstellungen,
-    ILogger<HttpEinwilligungstor> protokoll) : IEinwilligungstor
+    IOptions<ConsentSettings> einstellungen,
+    ILogger<HttpConsentGate> protokoll) : IConsentGate
 {
     /// <summary>Der Name des Mandanten in der Clientfabrik.</summary>
     public const string Client = "consent";
 
-    private readonly Einwilligungseinstellungen _einstellungen = einstellungen.Value;
+    private readonly ConsentSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<bool>> DarfSehenAlleAsync(
-        IReadOnlyList<SubjectId> wer,
-        TenantId firma,
+    public async Task<IReadOnlyList<bool>> MaySeeAllAsync(
+        IReadOnlyList<SubjectId> subject,
+        TenantId company,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(wer);
+        ArgumentNullException.ThrowIfNull(subject);
 
-        if (wer.Count == 0)
+        if (subject.Count == 0)
         {
             return [];
         }
@@ -73,131 +73,131 @@ public sealed class HttpEinwilligungstor(
         {
             // Kein Ledger eingerichtet heisst nicht „alles frei". Es heisst,
             // dass dieser Dienst die Frage nicht beantworten kann.
-            throw new EinwilligungSchweigt("Consent:Adresse ist nicht gesetzt.");
+            throw new ConsentGateSilent("Consent:Adresse ist nicht gesetzt.");
         }
 
-        var fuerFirma = Sichtbarkeiten.FuerFirma(firma);
+        var fuerFirma = Sichtbarkeiten.FuerFirma(company);
 
-        var paare = wer
+        var paare = subject
             .SelectMany(einer => new[]
             {
-                new EinwilligungsfrageV1(einer.Value, Sichtbarkeiten.Oeffentlich),
-                new EinwilligungsfrageV1(einer.Value, fuerFirma)
+                new ConsentQuestionV1(einer.Value, Sichtbarkeiten.Oeffentlich),
+                new ConsentQuestionV1(einer.Value, fuerFirma)
             })
             .ToArray();
 
-        if (paare.Length > Einwilligungsgrenzen.HoechsteSammelgroesse)
+        if (paare.Length > ConsentLimits.HoechsteSammelgroesse)
         {
             // Der Aufrufer fragt mehr, als der Vertrag trägt. Das ist ein
             // Programmierfehler und keine Auskunft über einen Menschen —
             // deshalb laut, nicht als „nicht freigegeben".
-            throw new EinwilligungSchweigt(
+            throw new ConsentGateSilent(
                 $"{paare.Length} Paare überschreiten "
-                + $"{Einwilligungsgrenzen.HoechsteSammelgroesse}");
+                + $"{ConsentLimits.HoechsteSammelgroesse}");
         }
 
-        var antwort = await Sende(paare, cancellationToken);
+        var response = await Sende(paare, cancellationToken);
 
-        if (antwort.Results.Count != paare.Length)
+        if (response.Results.Count != paare.Length)
         {
-            throw new EinwilligungSchweigt(
-                $"{antwort.Results.Count} Antworten auf {paare.Length} Fragen");
+            throw new ConsentGateSilent(
+                $"{response.Results.Count} Antworten auf {paare.Length} Fragen");
         }
 
         return
         [
-            .. Enumerable.Range(0, wer.Count).Select(stelle =>
-                Gilt(antwort.Results[stelle * 2]) || Gilt(antwort.Results[(stelle * 2) + 1]))
+            .. Enumerable.Range(0, subject.Count).Select(job =>
+                Gilt(response.Results[job * 2]) || Gilt(response.Results[(job * 2) + 1]))
         ];
     }
 
     /// <summary>Eine gelöschte Fähigkeit zieht die Erlaubnis logisch zurück.</summary>
-    private static bool Gilt(EinwilligungsantwortV1 antwort) =>
-        antwort.Granted && !antwort.Deleted;
+    private static bool Gilt(ConsentResponseV1 response) =>
+        response.Granted && !response.Deleted;
 
-    private async Task<EinwilligungssammelantwortV1> Sende(
-        IReadOnlyList<EinwilligungsfrageV1> paare, CancellationToken cancellationToken)
+    private async Task<ConsentBatchResponseV1> Sende(
+        IReadOnlyList<ConsentQuestionV1> paare, CancellationToken cancellationToken)
     {
         using var client = fabrik.CreateClient(Client);
         client.Timeout = _einstellungen.Geduld;
 
-        using var anfrage = new HttpRequestMessage(
+        using var request = new HttpRequestMessage(
             HttpMethod.Post,
             new Uri(new Uri(_einstellungen.Adresse), "/consent/check-batch"))
         {
-            Content = JsonContent.Create(new EinwilligungssammelfrageV1(paare))
+            Content = JsonContent.Create(new ConsentBatchQuestionV1(paare))
         };
 
         if (Aufrufertoken() is { Length: > 0 } token)
         {
-            anfrage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
             // Nur die Art, nie der Inhalt: was gefragt wurde, ist eine Liste
             // von Menschen und gehört nicht ins Protokoll.
             protokoll.LogWarning(
-                "Der Consent-Ledger ist nicht erreichbar: {Art}", fehler.GetType().Name);
+                "Der Consent-Ledger ist nicht erreichbar: {Art}", error.GetType().Name);
 
-            throw new EinwilligungSchweigt("consent-service unreachable");
+            throw new ConsentGateSilent("consent-service unreachable");
         }
-        catch (TaskCanceledException fehler) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
             protokoll.LogWarning("Der Consent-Ledger hat nicht rechtzeitig geantwortet.");
 
-            throw new EinwilligungSchweigt($"consent-service timed out ({fehler.GetType().Name})");
+            throw new ConsentGateSilent($"consent-service timed out ({error.GetType().Name})");
         }
 
-        using (antwort)
+        using (response)
         {
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
                 // Auch 401 und 403: unser Token taugt nicht — das ist ein
                 // Systemproblem und keine Aussage darüber, ob die Person
                 // eingewilligt hat.
                 protokoll.LogWarning(
-                    "Der Consent-Ledger antwortete mit {Status}.", (int)antwort.StatusCode);
+                    "Der Consent-Ledger antwortete mit {Status}.", (int)response.StatusCode);
 
-                throw new EinwilligungSchweigt(
-                    $"consent-service returned {(int)antwort.StatusCode}");
+                throw new ConsentGateSilent(
+                    $"consent-service returned {(int)response.StatusCode}");
             }
 
             try
             {
-                return await antwort.Content
-                           .ReadFromJsonAsync<EinwilligungssammelantwortV1>(cancellationToken)
-                       ?? throw new EinwilligungSchweigt("consent-service sent an empty answer");
+                return await response.Content
+                           .ReadFromJsonAsync<ConsentBatchResponseV1>(cancellationToken)
+                       ?? throw new ConsentGateSilent("consent-service sent an empty answer");
             }
-            catch (Exception fehler) when (fehler is not EinwilligungSchweigt)
+            catch (Exception error) when (error is not ConsentGateSilent)
             {
                 protokoll.LogWarning("Der Consent-Ledger antwortete unverständlich.");
 
-                throw new EinwilligungSchweigt("consent-service sent an unusable answer");
+                throw new ConsentGateSilent("consent-service sent an unusable answer");
             }
         }
     }
 
-    /// <summary>Das Token des Aufrufers: erst der Kopf, dann das Cookie.</summary>
+    /// <summary>Das Token des Aufrufers: erst der Header, dann das Cookie.</summary>
     private string? Aufrufertoken()
     {
-        var kontext = zugriff.HttpContext;
+        var context = zugriff.HttpContext;
 
-        if (kontext is null)
+        if (context is null)
         {
             return null;
         }
 
-        var kopf = kontext.Request.Headers.Authorization.ToString();
+        var header = context.Request.Headers.Authorization.ToString();
 
-        return kopf.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-            ? kopf["Bearer ".Length..].Trim()
-            : kontext.Request.Cookies["access"];
+        return header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? header["Bearer ".Length..].Trim()
+            : context.Request.Cookies["access"];
     }
 }

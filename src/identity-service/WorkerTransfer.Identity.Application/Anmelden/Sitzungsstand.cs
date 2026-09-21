@@ -11,17 +11,17 @@ namespace WorkerTransfer.Identity.Application.Anmelden;
 /// that is what refreshing itself decides, and a second place that judges
 /// tokens is a second place that can judge them wrong.
 /// </param>
-public sealed record SitzungsstandAbfrage(bool ErneuerungLiegtVor) : IAbfrage<Sitzungsstand>;
+public sealed record SessionStateQuery(bool ErneuerungLiegtVor) : IAbfrage<SessionState>;
 
 /// <summary>Where a visitor stands.</summary>
 /// <param name="Benutzer">The account, when one is signed in.</param>
 /// <param name="Zustand">
 /// <c>active</c>, <c>renewable</c> or <c>anonymous</c>.
 /// </param>
-public sealed record Sitzungsstand(Kontoansicht? Benutzer, string Zustand)
+public sealed record SessionState(Kontoansicht? Benutzer, string Zustand)
 {
     /// <summary>Signed in; the account is here.</summary>
-    public static Sitzungsstand Aktiv(Kontoansicht konto) => new(konto, "active");
+    public static SessionState Aktiv(Kontoansicht konto) => new(konto, "active");
 
     /// <summary>
     /// The access token no longer carries, but a refresh token was presented.
@@ -31,10 +31,10 @@ public sealed record Sitzungsstand(Kontoansicht? Benutzer, string Zustand)
     /// interface call the refresh endpoint deliberately instead of on the
     /// off-chance.
     /// </remarks>
-    public static Sitzungsstand Erneuerbar { get; } = new(null, "renewable");
+    public static SessionState Erneuerbar { get; } = new(null, "renewable");
 
     /// <summary>Nobody is signed in, and nothing suggests anyone could be.</summary>
-    public static Sitzungsstand Anonym { get; } = new(null, "anonymous");
+    public static SessionState Anonym { get; } = new(null, "anonymous");
 }
 
 /// <summary>Answers the state of the current request.</summary>
@@ -43,12 +43,12 @@ public sealed record Sitzungsstand(Kontoansicht? Benutzer, string Zustand)
 /// this through <c>/me</c> would produce a 401 for every signed-out visitor,
 /// which is a failure entry about a completely normal state.
 /// </remarks>
-public sealed class SitzungsstandHandler(ICurrentPrincipal akteur, IUserRepository benutzer)
-    : IRequestHandler<SitzungsstandAbfrage, Sitzungsstand>
+public sealed class SessionStateHandler(ICurrentPrincipal akteur, IUserRepository benutzer)
+    : IRequestHandler<SessionStateQuery, SessionState>
 {
     /// <inheritdoc />
-    public async Task<Sitzungsstand> Handle(
-        SitzungsstandAbfrage request,
+    public async Task<SessionState> Handle(
+        SessionStateQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -57,20 +57,20 @@ public sealed class SitzungsstandHandler(ICurrentPrincipal akteur, IUserReposito
         {
             var konto = await benutzer.FindByIdAsync(handelnder.Subject, cancellationToken);
 
-            return Sitzungsstand.Aktiv(new Kontoansicht(
+            return SessionState.Aktiv(new Kontoansicht(
                 handelnder.Subject,
                 konto?.Email,
-                handelnder.Acting is Capacity.ForCompany firma ? firma.Tenant : null,
+                handelnder.Acting is Capacity.ForCompany company ? company.Tenant : null,
                 konto?.Kontosprache ?? Sprachwahl.Vorgabe,
                 konto?.DisplayName ?? string.Empty,
                 konto?.GivenName,
                 konto?.FamilyName,
-                konto?.Berufsfeld));
+                konto?.OccupationalField));
         }
 
         // Without a sign-in the answer is the same whatever cookies came with
         // it: this endpoint is public and must reveal nothing anyone could
         // conclude the existence of an account from.
-        return request.ErneuerungLiegtVor ? Sitzungsstand.Erneuerbar : Sitzungsstand.Anonym;
+        return request.ErneuerungLiegtVor ? SessionState.Erneuerbar : SessionState.Anonym;
     }
 }

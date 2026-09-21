@@ -5,7 +5,7 @@ using WorkerTransfer.Identity.Application.Nachrichten;
 using WorkerTransfer.Identity.Application.Ports;
 using WorkerTransfer.Outbox;
 
-namespace WorkerTransfer.Identity.Application.Loeschung;
+namespace WorkerTransfer.Identity.Application.Erasure;
 
 /// <summary>Delete this account, and everything anybody holds about the person.</summary>
 /// <remarks>
@@ -13,10 +13,10 @@ namespace WorkerTransfer.Identity.Application.Loeschung;
 /// from somebody who wants to leave is a lever against them — and the free text
 /// would be the one thing that afterwards had to be deleted again (ADR-0027).
 /// </remarks>
-public sealed record LoeschungVerlangenBefehl(SubjectId Wer) : IBefehl<Loeschergebnis>;
+public sealed record RequestErasureCommand(SubjectId Wer) : IBefehl<ErasureResult>;
 
 /// <summary>What asking produced.</summary>
-public enum Loeschergebnis
+public enum ErasureResult
 {
     /// <summary>Accepted. The cascade is running.</summary>
     Angenommen,
@@ -32,11 +32,11 @@ public enum Loeschergebnis
 }
 
 /// <summary>Takes the request, and makes it visible at once.</summary>
-public sealed class LoeschungVerlangenHandler(
-    ILoeschbestand bestand,
+public sealed class RequestErasureHandler(
+    IErasureLedger bestand,
     IOutbox outbox,
     TimeProvider uhr)
-    : IRequestHandler<LoeschungVerlangenBefehl, Loeschergebnis>
+    : IRequestHandler<RequestErasureCommand, ErasureResult>
 {
     /// <summary>
     /// The twelve rows, in the order they fall due.
@@ -47,36 +47,36 @@ public sealed class LoeschungVerlangenHandler(
     /// </remarks>
     public static IReadOnlyList<string> Absichten { get; } =
     [
-        .. Loeschempfaenger.Fremde.Select(Loeschempfaenger.Art),
-        Loeschempfaenger.Schlussnachricht,
-        Loeschempfaenger.Identitaet
+        .. ErasureRecipient.Fremde.Select(ErasureRecipient.Art),
+        ErasureRecipient.Schlussnachricht,
+        ErasureRecipient.Identitaet
     ];
 
     /// <inheritdoc />
-    public async Task<Loeschergebnis> Handle(
-        LoeschungVerlangenBefehl request,
+    public async Task<ErasureResult> Handle(
+        RequestErasureCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (await bestand.LaeuftBereitsAsync(request.Wer, cancellationToken))
+        if (await bestand.IsAlreadyRunningAsync(request.Wer, cancellationToken))
         {
-            return Loeschergebnis.LaeuftBereits;
+            return ErasureResult.LaeuftBereits;
         }
 
         // Immediately and visibly: every session revoked, the account disabled.
         // From this moment nothing happens under this name any more, even while
         // the cascade is still running (ADR-0027 §6).
-        await bestand.SperreAsync(request.Wer, uhr.GetUtcNow(), cancellationToken);
+        await bestand.LockAsync(request.Wer, uhr.GetUtcNow(), cancellationToken);
 
         // In the SAME transaction as that change (ADR-0025): if it goes
         // through, the intents stand; if it is rolled back, they are gone too.
         // There is no state "locked out, but nobody was told".
-        foreach (var art in Absichten)
+        foreach (var kind in Absichten)
         {
-            await outbox.VermerkeAsync(request.Wer, art, cancellationToken);
+            await outbox.NoteAsync(request.Wer, kind, cancellationToken);
         }
 
-        return Loeschergebnis.Angenommen;
+        return ErasureResult.Angenommen;
     }
 }

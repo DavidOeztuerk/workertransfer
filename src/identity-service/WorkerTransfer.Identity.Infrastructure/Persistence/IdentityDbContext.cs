@@ -51,10 +51,10 @@ public sealed class UserRow
     /// <remarks>
     /// Nullbar ohne Vorgabe (ADR-0039): bestehende Zeilen behalten die neutrale
     /// Ansicht. Eine Zeichenkette und nicht die Aufzählung, wie bei
-    /// <see cref="Language"/> — ein zwölftes Feld ist dann keine Wanderung des
+    /// <see cref="Language"/> — ein zwölftes Feld ist dann keine SchemaMigration des
     /// Spaltentyps.
     /// </remarks>
-    public string? Berufsfeld { get; set; }
+    public string? OccupationalField { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
@@ -65,12 +65,12 @@ public sealed class UserRow
 
 /// <summary>Was eine Person über sich entschieden hat.</summary>
 /// <remarks>
-/// <strong>Eine Personenzeile</strong> (siehe die Anmerkung unten): der
+/// <strong>Eine SubjectKeyedTable</strong> (siehe die Anmerkung unten): der
 /// Schlüssel IST die Person, es gibt keine `subject_id`-Spalte daneben. Der
 /// Löschwächter erkennt solche Tabellen an der Anmerkung und nicht am
 /// Spaltennamen — sonst übersähe er ausgerechnet die, die am meisten halten.
 /// </remarks>
-public sealed class KontoeinstellungenRow
+public sealed class AccountSettingsRow
 {
     /// <summary>Wessen. Zugleich der Schlüssel.</summary>
     public Guid SubjectId { get; set; }
@@ -93,7 +93,7 @@ public sealed class KontoeinstellungenRow
     /// <summary>Die letzten vier Zeichen, zum Wiedererkennen.</summary>
     public string AiKeyTail { get; set; } = string.Empty;
 
-    /// <summary>Ob festgehalten wird, DASS eine Anfrage hinausging.</summary>
+    /// <summary>Ob festgehalten wird, DASS eine ResumeRequest hinausging.</summary>
     public bool AiAuditLog { get; set; }
 
     public DateTime CreatedAt { get; set; }
@@ -102,13 +102,13 @@ public sealed class KontoeinstellungenRow
 }
 
 /// <summary>
-/// Die Bewerbungsanschrift — Vorlage für Briefkopf, nie für Suche, nie für KI.
+/// Die Bewerbungsanschrift — ResumeTemplate für Briefkopf, nie für Search, nie für KI.
 /// </summary>
 /// <remarks>
-/// Personenzeile: der Schlüssel IST die Person. Ohne die Anmerkung fände der
+/// SubjectKeyedTable: der Schlüssel IST die Person. Ohne die Anmerkung fände der
 /// Löschwächter die Tabelle nicht (ADR-0027/0038).
 /// </remarks>
-public sealed class AnschriftRow
+public sealed class PostalAddressRow
 {
     public Guid SubjectId { get; set; }
 
@@ -143,10 +143,10 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<UserRow> Users => Set<UserRow>();
 
     /// <summary>Was eine Person über sich entschieden hat.</summary>
-    public DbSet<KontoeinstellungenRow> AccountSettings => Set<KontoeinstellungenRow>();
+    public DbSet<AccountSettingsRow> AccountSettings => Set<AccountSettingsRow>();
 
-    /// <summary>Bewerbungsanschrift. Personenzeile.</summary>
-    public DbSet<AnschriftRow> Addresses => Set<AnschriftRow>();
+    /// <summary>Bewerbungsanschrift. SubjectKeyedTable.</summary>
+    public DbSet<PostalAddressRow> Addresses => Set<PostalAddressRow>();
 
     public DbSet<AuditEventRow> AuditEvents => Set<AuditEventRow>();
 
@@ -183,21 +183,26 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(row => row.Status).HasColumnName("status");
             entity.Property(row => row.Roles).HasColumnName("roles").HasColumnType("jsonb");
             entity.Property(row => row.PendingCompanyName).HasColumnName("pending_company_name");
-            entity.Property(row => row.Language).HasColumnName("language");
-            entity.Property(row => row.Berufsfeld).HasColumnName("berufsfeld");
+            // The default belongs in the model, not in a migration. It used to
+            // live only in the one that added the column, and a regenerated
+            // schema therefore dropped it — a row written without a language
+            // then fails the NOT NULL constraint instead of reading "de".
+            entity.Property(row => row.Language).HasColumnName("language")
+                .HasDefaultValue("de");
+            entity.Property(row => row.OccupationalField).HasColumnName("berufsfeld");
             entity.Property(row => row.CreatedAt).HasColumnName("created_at");
             entity.Property(row => row.UpdatedAt).HasColumnName("updated_at");
             entity.Property(row => row.Version).HasColumnName("version").IsConcurrencyToken();
         });
 
-        modelBuilder.Entity<KontoeinstellungenRow>(entity =>
+        modelBuilder.Entity<AccountSettingsRow>(entity =>
         {
             entity.ToTable("account_settings");
-            // `Personenzeile`: der Schlüssel IST die Person. Ohne diese
+            // `SubjectKeyedTable`: der Schlüssel IST die Person. Ohne diese
             // Anmerkung fände der Löschwächter die Tabelle nicht — er sucht
             // nach Spaltennamen UND nach dieser Anmerkung, genau weil solche
             // Tabellen keine `subject_id` neben dem Schlüssel haben.
-            entity.HasAnnotation(Personenzeile.Anmerkung, true);
+            entity.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
             entity.HasKey(row => row.SubjectId);
             entity.Property(row => row.SubjectId).HasColumnName("subject_id");
             entity.Property(row => row.DeleteAfterMonths).HasColumnName("delete_after_months");
@@ -211,10 +216,10 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(row => row.UpdatedAt).HasColumnName("updated_at");
         });
 
-        modelBuilder.Entity<AnschriftRow>(entity =>
+        modelBuilder.Entity<PostalAddressRow>(entity =>
         {
             entity.ToTable("addresses");
-            entity.HasAnnotation(Personenzeile.Anmerkung, true);
+            entity.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
             entity.HasKey(row => row.SubjectId);
             entity.Property(row => row.SubjectId).HasColumnName("subject_id");
             entity.Property(row => row.Line1).HasColumnName("line1");

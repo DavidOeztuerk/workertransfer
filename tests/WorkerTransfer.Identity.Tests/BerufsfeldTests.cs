@@ -15,7 +15,7 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Identity.Tests;
 
-/// <summary>Das Berufsfeld ordnet, was angeboten wird — und sonst nichts (ADR-0039).</summary>
+/// <summary>Das OccupationalField ordnet, was angeboten wird — und sonst nichts (ADR-0039).</summary>
 [Collection(PostgresCollection.Name)]
 public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
 {
@@ -32,17 +32,17 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
         });
 
-        using var bereich = _dienst.Services.CreateScope();
-        await bereich.ServiceProvider.GetRequiredService<IdentityDbContext>()
+        using var scope = _dienst.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IdentityDbContext>()
             .Database.MigrateAsync();
     }
 
@@ -55,7 +55,7 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
     /// <summary>Die elf Etiketten als MENGE, damit ein zwölftes auffällt.</summary>
     [Fact]
     public void Die_Liste_ist_geschlossen_und_vollstaendig() =>
-        Berufsfeldwahl.Etiketten.Should().BeEquivalentTo(
+        OccupationalFieldChoice.Etiketten.Should().BeEquivalentTo(
         [
             "handwerk", "industrie_technik", "bau", "gesundheit_pflege",
             "logistik_verkehr", "gastronomie_hotel", "handel_verkauf",
@@ -69,19 +69,19 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public void Jedes_Etikett_ueberlebt_den_Hin_und_Rueckweg()
     {
-        foreach (var etikett in Berufsfeldwahl.Etiketten)
+        foreach (var label in OccupationalFieldChoice.Etiketten)
         {
-            Berufsfeldwahl.Etikett(Berufsfeldwahl.Aus(etikett)).Should().Be(etikett);
+            OccupationalFieldChoice.Etikett(OccupationalFieldChoice.Aus(label)).Should().Be(label);
         }
     }
 
-    /// <summary>„Sonstiges" ist eine Wahl, „nichts" ist keine.</summary>
+    /// <summary>„Other" ist eine Wahl, „nichts" ist keine.</summary>
     [Fact]
     public void Sonstiges_ist_nicht_dasselbe_wie_nichts()
     {
-        Berufsfeldwahl.Aus("sonstiges").Should().Be(Berufsfeld.Sonstiges);
-        Berufsfeldwahl.Aus(null).Should().BeNull();
-        Berufsfeldwahl.Aus("  ").Should().BeNull();
+        OccupationalFieldChoice.Aus("sonstiges").Should().Be(OccupationalField.Other);
+        OccupationalFieldChoice.Aus(null).Should().BeNull();
+        OccupationalFieldChoice.Aus("  ").Should().BeNull();
     }
 
     /// <summary>Leer ist ein zulässiger Wert, Unsinn nicht.</summary>
@@ -92,32 +92,32 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
     [InlineData("HANDWERK", true)]
     [InlineData("industrietechnik", false)]
     [InlineData("metallbauer", false)]
-    public void Kennen_sagt_was_gespeichert_werden_darf(string? etikett, bool erwartet) =>
-        Berufsfeldwahl.Kennen(etikett).Should().Be(erwartet);
+    public void Kennen_sagt_was_gespeichert_werden_darf(string? label, bool erwartet) =>
+        OccupationalFieldChoice.Kennen(label).Should().Be(erwartet);
 
     /// <summary>
     /// Wer nichts wählt, bekommt <c>null</c>. Nichts wird geraten — eine
-    /// GitHub-Verbindung macht niemanden zu <c>it_software</c> (ADR-0022 §2).
+    /// GitHub-Connection macht niemanden zu <c>it_software</c> (ADR-0022 §2).
     /// </summary>
     [Fact]
     public async Task Ohne_Wahl_steht_nichts_da()
     {
         var browser = await AngemeldetesKonto();
 
-        var sitzung = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
+        var session = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
 
-        sitzung!.User!.OccupationalField.Should().BeNull();
+        session!.User!.OccupationalField.Should().BeNull();
     }
 
     /// <summary>Was bei der Registrierung gewählt wurde, steht danach da.</summary>
     [Fact]
     public async Task Die_Wahl_bei_der_Registrierung_haelt()
     {
-        var browser = await AngemeldetesKonto(feld: "handwerk");
+        var browser = await AngemeldetesKonto(field: "handwerk");
 
-        var sitzung = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
+        var session = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
 
-        sitzung!.User!.OccupationalField.Should().Be("handwerk");
+        session!.User!.OccupationalField.Should().Be("handwerk");
     }
 
     /// <summary>
@@ -148,23 +148,23 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_unbekanntes_Feld_wird_abgesagt()
     {
-        var browser = await AngemeldetesKonto(feld: "handwerk");
+        var browser = await AngemeldetesKonto(field: "handwerk");
 
-        var antwort = await browser.PutAsJsonAsync(
+        var response = await browser.PutAsJsonAsync(
             "/account/occupational-field", new { occupational_field = "metallbauer" });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
         // Eine abgesagte Änderung darf nichts angerichtet haben.
-        var sitzung = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
-        sitzung!.User!.OccupationalField.Should().Be("handwerk");
+        var session = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
+        session!.User!.OccupationalField.Should().Be("handwerk");
     }
 
     /// <summary>Auch die Registrierung sagt ab, statt die Angabe wegzuwerfen.</summary>
     [Fact]
     public async Task Eine_Registrierung_mit_Unsinn_wird_abgesagt()
     {
-        var antwort = await _dienst.CreateClient().PostAsJsonAsync("/auth/register", new
+        var response = await _dienst.CreateClient().PostAsJsonAsync("/auth/register", new
         {
             email = NeueAdresse("unsinn"),
             password = Passwort,
@@ -172,35 +172,35 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
             occupational_field = "raumfahrt"
         });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
-    /// <summary>Ohne Anmeldung ändert niemand ein Berufsfeld.</summary>
+    /// <summary>Ohne Anmeldung ändert niemand ein OccupationalField.</summary>
     [Fact]
     public async Task Ohne_Anmeldung_geht_es_nicht()
     {
-        var antwort = await _dienst.CreateClient().PutAsJsonAsync(
+        var response = await _dienst.CreateClient().PutAsJsonAsync(
             "/account/occupational-field", new { occupational_field = "bau" });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    private static string NeueAdresse(string wer) =>
-        $"{wer}-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
+    private static string NeueAdresse(string subject) =>
+        $"{subject}-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
 
     /// <summary>Registriert, bestätigt und meldet an.</summary>
-    private async Task<HttpClient> AngemeldetesKonto(string? feld = null)
+    private async Task<HttpClient> AngemeldetesKonto(string? field = null)
     {
-        var adresse = NeueAdresse("anna");
+        var address = NeueAdresse("anna");
         var browser = _dienst.CreateClient(
             new WebApplicationFactoryClientOptions { HandleCookies = true });
 
         await browser.PostAsJsonAsync("/auth/register", new
         {
-            email = adresse,
+            email = address,
             password = Passwort,
             display_name = "Anna",
-            occupational_field = feld
+            occupational_field = field
         });
 
         var token = Regex.Match(
@@ -208,7 +208,7 @@ public class BerufsfeldTests(Postgres postgres) : IAsyncLifetime
         await browser.PostAsJsonAsync("/auth/verify-email", new { token });
         await browser.PostAsJsonAsync("/auth/login", new
         {
-            email = adresse, password = Passwort
+            email = address, password = Passwort
         });
 
         return browser;

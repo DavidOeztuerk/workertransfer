@@ -1,0 +1,283 @@
+using System.Reflection;
+using System.Text.RegularExpressions;
+using Noelia.Abstractions.Compliance;
+using Noelia.Abstractions.Hosting;
+using Noelia.Abstractions.Security.Checks;
+
+namespace WorkerTransfer.ServiceDefaults.Checks;
+
+/// <summary>Ein Name, bei dem ein Wort der Verbotsliste ein Homonym ist.</summary>
+/// <remarks>
+/// <para><strong>Je Name, nie je Dienst und nie je Wort.</strong> Eine Ausnahme
+/// für ein <em>Wort</em> nähme die Prüfung an dieser Job ganz aus dem
+/// Betrieb; eine Ausnahme für einen <em>Dienst</em> wäre die Job, an der beim
+/// nächsten Feld niemand mehr hinsieht. Ein Name ist eine einzelne Entscheidung,
+/// und genau eine wird hier getroffen.</para>
+///
+/// <para><strong>Und sie steht im Befund.</strong> Das ist der eigentliche
+/// Mechanismus: wer eine Ausnahme hinzufügt, schreibt ihren Grund in ein
+/// Dokument, das ein Betriebsrat liest. Eine stille Liste in einem Testprojekt
+/// wächst; eine, die gelesen wird, nicht.</para>
+///
+/// <para>Dieselbe Form halten die drei Sprachkataloge der Oberfläche für echte
+/// Kognaten („Status“, „Website“, „Administrator“): kurz, und jede Zeile ein
+/// Einzelfall.</para>
+/// </remarks>
+/// <param name="Name">Der volle Name, wie die Prüfung ihn bildet: <c>Typ.Glied</c> oder <c>Typ</c>.</param>
+/// <param name="Grund">Warum dieses Wort hier kein Urteil über einen Menschen ist.</param>
+public sealed record TermException(string Name, string Grund);
+
+/// <summary>Trägt irgendeine öffentliche Fläche eine Zahl über einen Menschen?</summary>
+/// <remarks>
+/// <para><strong>Der Laufzeit-Zwilling von <c>Adr0022Tests</c> und
+/// <c>AuflagenTests</c>.</strong> Er liest Domäne und Verträge des Dienstes, der
+/// gerade läuft, und stellt die Frage, die ADR-0022 §1 stellt: gibt es hier
+/// einen Namen, der eine Zahl über einen Menschen ankündigt?</para>
+///
+/// <para><strong>Warum das im Nachweis steht und nicht nur im Test.</strong> Der
+/// Mensch, der die Anhang-III-Frage beantwortet, fragt als Erstes, ob dieses
+/// System Bewerber in einer Zahl zusammenfasst. „In Domäne und Verträgen von
+/// profile-service trägt kein Name eines der Worte“ ist ein Evidence, den er
+/// zitieren kann, samt Datum. Ein grüner Test in einem Testprojekt ist keiner —
+/// er steht in keinem Dokument.</para>
+///
+/// <para><strong>Verglichen wird je Silbe und am Silbenanfang — nicht als
+/// Teilzeichenkette.</strong> Das ist gemessen und nicht gewählt: eine
+/// Teilzeichenkettensuche meldete über diesen Baum <c>Capability</c> (der
+/// Kerntyp des Ledgers) wegen <c>ability</c>, <c>Benefits</c> wegen <c>fit</c>
+/// und <c>Availability</c> wegen <c>ability</c> — drei Fehlalarme über
+/// vollkommen korrekten Code. Genau diesen Fehler hatte Girder 4.3.0 in seiner
+/// Maskierung, und 4.4.0 hat ihn mit derselben Bewegung behoben.</para>
+///
+/// <para><strong>Was der Silbenanfang nicht findet, steht hier, damit niemand
+/// mehr glaubt:</strong> ein deutsches Kompositum, das das Wort am
+/// <em>Ende</em> trägt, entgeht ihm — <c>Trefferanzahl</c> ist eine Silbe und
+/// beginnt nicht mit <c>anzahl</c>. Die Regel ist dadurch nicht vollständig, und
+/// sie war es nie: der Name ist das Signal, nicht die Regel. Ein Feld, das eine
+/// Zahl über einen Menschen trägt und unauffällig heißt, findet keine
+/// Wortliste — dafür gibt es die geschlossenen Feldmengen.</para>
+///
+/// <para><strong>Geprüft werden Typnamen und Eigenschaften, sonst nichts.</strong>
+/// Nicht <c>Equals</c>, nicht <c>Deconstruct</c>, nicht die Operatoren: was der
+/// Übersetzer an einen Record hängt, trägt den Typnamen und meldete ihn ein
+/// Dutzend Mal. Und nicht die Kommentare — „ohne Evaluation“ ist eine Zusage und
+/// soll dort stehen dürfen.</para>
+/// </remarks>
+/// <param name="flaechen">Domäne und Verträge dieses Dienstes.</param>
+/// <param name="ausnahmen">Namen, bei denen ein Wort ein echtes Homonym ist.</param>
+/// <param name="wortschatz">
+/// Die Worte. Vorgabe ist <see cref="Kern"/>; ein Dienst darf strenger sein —
+/// scout-service verbietet in seinen eigenen Auflagen zusätzlich <c>bewert</c>,
+/// wo ein Wort neben einem Namen stünde.
+/// </param>
+public sealed class NumberCheck(
+    IReadOnlyList<Assembly> flaechen,
+    IReadOnlyList<TermException>? exceptions = null,
+    IReadOnlyList<string>? wortschatz = null) : ISecurityCheck
+{
+    /// <summary>Worte, die eine Zahl oder eine Rangfolge über einen Menschen ankündigen.</summary>
+    /// <remarks>
+    /// <para><strong>Über Zahlen, nicht über Urteile — und das ist eine
+    /// Messung.</strong> <c>bewert</c> stand hier und ist gefallen:
+    /// assessment-service hält <em>genau eine</em> Evaluation je Case, als
+    /// Text, und die Person liest sie immer (ADR-0042). Das Wort platformweit zu
+    /// verbieten hieße, dreißig Namen einzeln zu entschuldigen, die alle
+    /// richtig heißen — und nach der dritten Entschuldigung liest die Liste
+    /// niemand mehr. scout-service verbietet es weiterhin bei sich, und dort
+    /// gehört es hin: eine Evaluation neben einem Suchtreffer wäre die Zahl,
+    /// die ADR-0022 §1 meint.</para>
+    ///
+    /// <para><c>ability</c> und <c>talent</c> stehen ebenfalls nicht hier.
+    /// <c>Capability</c> ist der Kerntyp des Ledgers, und was ein Mensch kann,
+    /// heißt in diesem Baum <c>Faehigkeit</c> — eine <em>Nennung</em> der
+    /// Person und ausdrücklich erlaubt (ADR-0023). Ein Wort, das nur Fehlalarme
+    /// erzeugt, schwächt die ganze Liste.</para>
+    ///
+    /// <para><c>note</c> bleibt, obwohl es sieben Ausnahmen kostet: das deutsche
+    /// Wort ist die gefährlichste Vokabel, die eine Vermittlungsplattform haben
+    /// kann, und ADR-0042 baut den ganzen Dienst um sein Verbot herum. Dass es
+    /// auf Englisch „Anmerkung“ heißt, ist der Preis — und jede der sieben
+    /// Ausnahmen sagt das in einem Satz, den jemand liest.</para>
+    /// </remarks>
+    public static IReadOnlyList<string> Kern { get; } =
+    [
+        "score", "punkt", "rank", "rang", "passung", "fit", "percent", "prozent",
+        "quote", "anzahl", "gewicht", "weight", "level", "note", "match",
+        "probability", "wahrscheinlich", "aktivitaet", "activity"
+    ];
+
+    /// <summary>Die Worte, die diese Prüfung fährt.</summary>
+    public IReadOnlyList<string> Verboten { get; } = wortschatz ?? Kern;
+
+    /// <inheritdoc />
+    public string Id => "wt.ki.keine-zahl";
+
+    /// <inheritdoc />
+    public NoeliaModule Module => NoeliaModule.Composition;
+
+    /// <inheritdoc />
+    /// <remarks>Auswahlregel — siehe <c>ProviderCheck</c>.</remarks>
+    public SecurityCheckCategory Category => SecurityCheckCategory.Composition;
+
+    /// <inheritdoc />
+    public SecurityCheckSeverity Severity => SecurityCheckSeverity.Critical;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// „None Zahl über einen Menschen" ist die Tatsache, die Art. 22 DSGVO am
+    /// nächsten kommt, ohne ihn zu beantworten — und sie ist das Erste, wonach
+    /// gefragt wird, wenn jemand den Einsatz nach Anhang III einstuft.
+    /// <para>
+    /// <strong>§ 87 Abs. 1 Nr. 6 BetrVG gehört hierher und steht nicht hier</strong>,
+    /// sondern im Text der Abhilfe: <c>RegulatoryRegime</c> kennt kein
+    /// nationales Arbeitsrecht (<c>bugs/betrvg-hat-kein-regelwerk.md</c>). Ihn
+    /// auf <c>Gdpr</c> zu legen waere eine falsche Fundstelle in einem
+    /// Dokument, das ein Betriebsrat liest — schlimmer als keine.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<RegulatoryReference> References =>
+    [
+        AdditionalRegulatoryReferences.AutomatedDecision,
+        AdditionalRegulatoryReferences.AnnexThree
+    ];
+
+    /// <inheritdoc />
+    public string Remediation =>
+        "ADR-0022 §1: eine Zahl, die einen Menschen zusammenfasst, samt jeder "
+        + "Rangfolge daraus, gibt es hier nicht. Entweder das Feld faellt, oder "
+        + "es benennt eine Sache statt einer Person. Ein echtes Homonym wird "
+        + "einzeln begruendet und steht dann in diesem Befund. — "
+        + AdditionalRegulatoryReferences.WorksCouncilCodetermination;
+
+    /// <inheritdoc />
+    public Task<SecurityCheckResult> RunAsync(CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(flaechen);
+
+        var namen = Namen();
+
+        if (namen.Count == 0)
+        {
+            // Sonst meldete die Pruefung gruen ueber nichts — derselbe Fehler,
+            // den `scripts/test-dotnet.sh` mit seiner Zahl auf dem Schirm
+            // schliesst.
+            return Task.FromResult(Ergebnis(
+                SecurityCheckStatus.Fail,
+                "Die abgesuchten Flächen sind leer — diese Prüfung hat nichts "
+                + "angesehen und belegt damit nichts.",
+                "Im Verbundpunkt des Dienstes nachsehen, welche Assemblies "
+                + "übergeben werden."));
+        }
+
+        var erlaubt = exceptions ?? [];
+
+        // Eine Ausnahme fuer einen Namen, den es nicht mehr gibt, ist ein
+        // Freibrief, den niemand mehr braucht und den niemand zurueckzieht.
+        var verwaist = erlaubt
+            .Where(exception => !namen.Contains(exception.Name))
+            .Select(exception => exception.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
+        if (verwaist.Count > 0)
+        {
+            return Task.FromResult(Ergebnis(
+                SecurityCheckStatus.Fail,
+                $"{(verwaist.Count)} Ausnahme(n) zeigen auf Namen, "
+                + $"die es nicht mehr gibt: {string.Join(", ", verwaist)}.",
+                "Eine Ausnahme ohne Namen ist ein Freibrief, den niemand mehr "
+                + "braucht — sie gehört gelöscht, nicht stehengelassen."));
+        }
+
+        var hit = namen
+            .Where(name => !erlaubt.Any(
+                exception => exception.Name.Equals(name, StringComparison.Ordinal)))
+            .SelectMany(name => Verboten
+                .Where(word => Trifft(name, word))
+                .Select(word => $"{name} ({word})"))
+            .OrderBy(row => row, StringComparer.Ordinal)
+            .ToList();
+
+        if (hit.Count > 0)
+        {
+            return Task.FromResult(Ergebnis(
+                SecurityCheckStatus.Fail,
+                $"{(hit.Count)} öffentliche(r) Name(n) kündigen "
+                + $"eine Zahl über einen Menschen an: {string.Join(", ", hit)}.",
+                Remediation));
+        }
+
+        return Task.FromResult(Ergebnis(
+            SecurityCheckStatus.Pass,
+            $"In {(flaechen.Count)} Flächen "
+            + $"({string.Join(", ", flaechen.Select(Kurzname))}) kündigt keiner "
+            + $"von {(namen.Count)} öffentlichen Namen eine Zahl "
+            + $"über einen Menschen an ({(Verboten.Count)} Worte "
+            + "geprüft)"
+            + (erlaubt.Count > 0
+                ? ". Einzeln begründete Homonyme: "
+                  + string.Join("; ", erlaubt
+                      .OrderBy(exception => exception.Name, StringComparer.Ordinal)
+                      .Select(exception => $"{exception.Name} — {exception.Grund}"))
+                  + "."
+                : "."),
+            "Ein Feld, dessen Name eines dieser Worte am Silbenanfang trägt, "
+            + "stößt diesen Befund um — und ein Feld, das eine Zahl über einen "
+            + "Menschen trägt und unauffällig heißt, ebenfalls: der Name ist das "
+            + "Signal, nicht die Regel. Dafür stehen daneben die geschlossenen "
+            + "Feldmengen (wt.ki.naht)."));
+    }
+
+    /// <summary>Jeder öffentliche Typname und jede öffentliche Eigenschaft.</summary>
+    private HashSet<string> Namen() =>
+    [
+        .. flaechen
+            .SelectMany(flaeche => flaeche.GetExportedTypes())
+            .SelectMany(type => type
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance
+                               | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Select(eigenschaft => $"{type.Name}.{eigenschaft.Name}")
+                .Append(type.Name))
+    ];
+
+    /// <summary>Ob ein Name eines der Kernworte am Anfang einer Silbe trägt.</summary>
+    /// <remarks>
+    /// <para>Öffentlich, weil sie zwei Leser hat: diese Prüfung und der
+    /// Bauzeit-Zwilling, der sie auf Einzelfälle loslässt. Eine nachgebaute
+    /// zweite Regel wäre die, die als Erste falsch wird — und dann wäre grün
+    /// über der einen und rot über der anderen, ohne dass sich etwas geändert
+    /// hätte.</para>
+    ///
+    /// <para>Geprüft wird jede Silbe des Typnamens <em>und</em> jede Silbe des
+    /// Gliednamens. Beide, weil ein Typ <c>Passung</c> mit einem Glied
+    /// <c>Text</c> genauso falsch ist wie ein Typ <c>Conversation</c> mit einem
+    /// Glied <c>Passung</c>.</para>
+    /// </remarks>
+    /// <param name="name">Ein Typname oder <c>Typ.Glied</c>.</param>
+    /// <returns>Ob eines der Kernworte anschlägt.</returns>
+    public static bool Trifft(string name) =>
+        Kern.Any(word => Trifft(name, word));
+
+    private static bool Trifft(string name, string word) =>
+        name.Split('.')
+            .SelectMany(Silben)
+            .Any(silbe => silbe.StartsWith(word, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Ein Bezeichner, an seinen Großbuchstaben zerlegt.</summary>
+    private static IEnumerable<string> Silben(string bezeichner) =>
+        Zerlegung.Split(bezeichner).Where(silbe => silbe.Length > 0);
+
+    private static readonly Regex Zerlegung =
+        new(@"(?<!^)(?=[A-Z0-9])", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
+
+    /// <summary>Der Name einer Assembly, ohne Kultur und Schlüssel.</summary>
+    private static string Kurzname(Assembly flaeche) =>
+        flaeche.GetName().Name ?? "unbenannt";
+
+    private SecurityCheckResult Ergebnis(
+        SecurityCheckStatus state, string zusammenfassung, string abhilfe) =>
+        new(Id, Module, Category, state, Severity, zusammenfassung, abhilfe)
+        {
+            References = References
+        };
+}

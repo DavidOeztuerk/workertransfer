@@ -5,10 +5,10 @@ using WorkerTransfer.Portfolio.Domain.Ablage;
 namespace WorkerTransfer.Portfolio.Infrastructure.Ablage;
 
 /// <summary>Wo die Anhänge liegen.</summary>
-public sealed class Ablageeinstellungen
+public sealed class DocumentStoreSettings
 {
-    /// <summary>Der Abschnitt in der Konfiguration.</summary>
-    public const string Abschnitt = "Storage";
+    /// <summary>Der Section in der Konfiguration.</summary>
+    public const string Section = "Storage";
 
     /// <summary>Das Verzeichnis unter dem alles liegt.</summary>
     public string Wurzel { get; set; } = "/var/lib/workertransfer/portfolio";
@@ -24,7 +24,7 @@ public sealed class Ablageeinstellungen
 
 /// <summary>Eine Ablage, ein Backend: das Dateisystem.</summary>
 /// <remarks>
-/// Kein S3, kein Azure, kein MinIO, solange keine Umgebung eines verlangt. Das
+/// Kein S3, kein Azure, kein MinIO, solange keine EnvironmentFile eines verlangt. Das
 /// Vorgängerpaket erklärte fünf schwere Abhängigkeiten für null Konsumenten,
 /// und genau das machte es unbaubar (ADR-0021).
 /// <para>
@@ -32,67 +32,67 @@ public sealed class Ablageeinstellungen
 /// Namen. Nichts, was ein Aufrufer schickt, wird Teil eines Pfades.
 /// </para>
 /// </remarks>
-public sealed class Dateiablage(IOptions<Ablageeinstellungen> einstellungen) : IAblage
+public sealed class FileDocumentStore(IOptions<DocumentStoreSettings> einstellungen) : IDocumentStore
 {
-    private readonly Ablageeinstellungen _einstellungen = einstellungen.Value;
+    private readonly DocumentStoreSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task<string> LegeAbAsync(
-        SubjectId wer,
+    public async Task<string> PutAsync(
+        SubjectId subject,
         string dateiname,
         string medientyp,
-        Stream inhalt,
+        Stream content,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(inhalt);
+        ArgumentNullException.ThrowIfNull(content);
 
         // Der Name wird hier vergeben. Die Endung des Absenders wird
         // übernommen, weil sie dem Browser hilft — aber nur, wenn sie aus
         // Buchstaben und Ziffern besteht, sonst gar keine.
         var endung = Endung(dateiname);
         var name = $"{Guid.CreateVersion7():N}{endung}";
-        var ordner = Verzeichnis(wer);
+        var ordner = Verzeichnis(subject);
 
         Directory.CreateDirectory(ordner);
 
-        var ziel = Path.Combine(ordner, name);
+        var target = Path.Combine(ordner, name);
 
-        await using (var datei = File.Create(ziel))
+        await using (var file = File.Create(target))
         {
-            await inhalt.CopyToAsync(datei, cancellationToken);
+            await content.CopyToAsync(file, cancellationToken);
         }
 
         // Der Medientyp liegt daneben, nicht in der Datei: ihn aus dem Inhalt zu
         // raten braucht eine Bibliothek, und ihn beim Ausliefern zu raten wäre
         // schlimmer.
-        await File.WriteAllTextAsync(ziel + ".typ", Bereinigt(medientyp), cancellationToken);
+        await File.WriteAllTextAsync(target + ".typ", Bereinigt(medientyp), cancellationToken);
 
         return name;
     }
 
     /// <inheritdoc />
-    public async Task<Abgelegtes?> HoleAsync(
-        SubjectId wer, string name, CancellationToken cancellationToken = default)
+    public async Task<Abgelegtes?> GetAsync(
+        SubjectId subject, string name, CancellationToken cancellationToken = default)
     {
-        var ziel = Pfad(wer, name);
+        var target = Pfad(subject, name);
 
-        if (ziel is null || !File.Exists(ziel))
+        if (target is null || !File.Exists(target))
         {
             return null;
         }
 
-        var typ = File.Exists(ziel + ".typ")
-            ? await File.ReadAllTextAsync(ziel + ".typ", cancellationToken)
+        var type = File.Exists(target + ".typ")
+            ? await File.ReadAllTextAsync(target + ".typ", cancellationToken)
             : "application/octet-stream";
 
-        return new Abgelegtes(File.OpenRead(ziel), typ);
+        return new Abgelegtes(File.OpenRead(target), type);
     }
 
     /// <inheritdoc />
-    public Task<int> LoescheAllesAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public Task<int> DeleteAllAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var ordner = Verzeichnis(wer);
+        var ordner = Verzeichnis(subject);
 
         if (!Directory.Exists(ordner))
         {
@@ -100,17 +100,17 @@ public sealed class Dateiablage(IOptions<Ablageeinstellungen> einstellungen) : I
         }
 
         // Gezählt werden die Dateien, nicht die Typmarken daneben: gemeldet
-        // wird, wie viele Arbeitsproben verschwunden sind.
+        // wird, wie viele WorkSamples verschwunden sind.
         var wieViele = Directory.EnumerateFiles(ordner)
-            .Count(datei => !datei.EndsWith(".typ", StringComparison.Ordinal));
+            .Count(file => !file.EndsWith(".typ", StringComparison.Ordinal));
 
         Directory.Delete(ordner, recursive: true);
 
         return Task.FromResult(wieViele);
     }
 
-    private string Verzeichnis(SubjectId wer) =>
-        Path.Combine(_einstellungen.Wurzel, wer.Value.ToString("N"));
+    private string Verzeichnis(SubjectId subject) =>
+        Path.Combine(_einstellungen.Wurzel, subject.Value.ToString("N"));
 
     /// <summary>
     /// Der volle Pfad — oder <c>null</c>, wenn der Name keiner ist.
@@ -121,13 +121,13 @@ public sealed class Dateiablage(IOptions<Ablageeinstellungen> einstellungen) : I
     /// ab; das hier ist die zweite Wache, und sie steht, weil ein Weg aus einem
     /// fremden Verzeichnis heraus der teuerste denkbare Fehler wäre.
     /// </remarks>
-    private string? Pfad(SubjectId wer, string name)
+    private string? Pfad(SubjectId subject, string name)
     {
-        var ordner = Path.GetFullPath(Verzeichnis(wer));
-        var ziel = Path.GetFullPath(Path.Combine(ordner, name));
+        var ordner = Path.GetFullPath(Verzeichnis(subject));
+        var target = Path.GetFullPath(Path.Combine(ordner, name));
 
-        return ziel.StartsWith(ordner + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-            ? ziel
+        return target.StartsWith(ordner + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            ? target
             : null;
     }
 

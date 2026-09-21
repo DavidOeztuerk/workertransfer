@@ -76,9 +76,13 @@ export function DeleteAccountPage() {
       <PageShell title={t("loeschung.titel")} narrow>
         <Card>
           <CardContent>
-            {/* `info` und nicht `error`: das ist eine Bestätigung. Ein roter
-                Kasten hier läse sich, als sei etwas schiefgegangen. */}
-            <Alert severity="info" sx={{ mb: 2 }} role="status">
+            <Alert
+              // A confirmation, not a failure: a red box here would read as if
+              // something had gone wrong.
+              severity="info"
+              sx={{ mb: 2 }}
+              role="status"
+            >
               <strong>{t("loeschung.angenommenTitel")}</strong>{" "}
               <Trans
                 i18nKey="loeschung.angenommenText"

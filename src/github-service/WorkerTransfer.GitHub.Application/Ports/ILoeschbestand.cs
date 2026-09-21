@@ -17,9 +17,9 @@ namespace WorkerTransfer.GitHub.Application.Ports;
 /// Unternehmen gehörte.
 /// </para>
 /// </remarks>
-public interface ILoeschbestand
+public interface IErasureLedger
 {
-    /// <summary>Löscht die Verbindung.</summary>
+    /// <summary>Löscht die Connection.</summary>
     /// <returns>Was stehen blieb. Immer null.</returns>
-    Task<int> LoescheAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task<int> DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default);
 }

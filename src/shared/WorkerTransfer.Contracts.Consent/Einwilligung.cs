@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace WorkerTransfer.Contracts.Consent;
 
 /// <summary>One question: may this capability be exercised for this person?</summary>
-public sealed record EinwilligungsfrageV1(
+public sealed record ConsentQuestionV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("capability")] string Capability);
 
@@ -22,7 +22,7 @@ public sealed record EinwilligungsfrageV1(
 /// refactor.
 /// </para>
 /// </remarks>
-public sealed record EinwilligungsantwortV1(
+public sealed record ConsentResponseV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("capability")] string Capability,
     [property: JsonPropertyName("granted")] bool Granted)
@@ -43,7 +43,7 @@ public sealed record EinwilligungsantwortV1(
 /// answer.
 /// </para>
 /// </remarks>
-public sealed record EinwilligungssammelfrageV1(IReadOnlyList<EinwilligungsfrageV1> Pairs);
+public sealed record ConsentBatchQuestionV1(IReadOnlyList<ConsentQuestionV1> Pairs);
 
 /// <summary>
 /// The answers — <em>in the order of the questions</em>, one per pair.
@@ -59,10 +59,10 @@ public sealed record EinwilligungssammelfrageV1(IReadOnlyList<Einwilligungsfrage
 /// reason. A batch must not give away what the single question withholds.
 /// </para>
 /// </remarks>
-public sealed record EinwilligungssammelantwortV1(IReadOnlyList<EinwilligungsantwortV1> Results);
+public sealed record ConsentBatchResponseV1(IReadOnlyList<ConsentResponseV1> Results);
 
 /// <summary>The limits of the ledger's boundary.</summary>
-public static class Einwilligungsgrenzen
+public static class ConsentLimits
 {
     /// <summary>
     /// How many pairs a batch may carry at most.

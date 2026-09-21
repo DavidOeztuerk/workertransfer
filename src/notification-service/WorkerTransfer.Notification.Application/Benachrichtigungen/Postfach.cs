@@ -5,43 +5,43 @@ using WorkerTransfer.Notification.Domain.Benachrichtigungen;
 
 namespace WorkerTransfer.Notification.Application.Benachrichtigungen;
 
-/// <summary>Das eigene Postfach.</summary>
-public sealed record MeinPostfachAbfrage(SubjectId Wer) : IAbfrage<IReadOnlyList<Eingang>>;
+/// <summary>Das eigene Inbox.</summary>
+public sealed record MyInboxQuery(SubjectId Wer) : IAbfrage<IReadOnlyList<Eingang>>;
 
 /// <summary>Alles als gelesen markieren.</summary>
 public sealed record AllesGelesenBefehl(SubjectId Wer) : IBefehl<int>;
 
 /// <summary>Die eigenen Einstellungen.</summary>
-public sealed record MeineWuenscheAbfrage(SubjectId Wer) : IAbfrage<Benachrichtigungswunsch>;
+public sealed record MyPreferencesQuery(SubjectId Wer) : IAbfrage<NotificationPreference>;
 
 /// <summary>Die eigenen Einstellungen schreiben.</summary>
 public sealed record WuenscheSchreibenBefehl(
     SubjectId Wer, IReadOnlyDictionary<Benachrichtigungsart, bool> Schalter)
-    : IBefehl<Benachrichtigungswunsch>;
+    : IBefehl<NotificationPreference>;
 
-/// <summary>Postfach und Einstellungen — beides nur für einen selbst.</summary>
+/// <summary>Inbox und Einstellungen — beides nur für einen selbst.</summary>
 /// <remarks>
-/// Es gibt keine Route, über die jemand das Postfach eines anderen läse, und
-/// keine Kennung im Pfad: wessen Postfach es ist, steht im geprüften Token. Ein
+/// Es gibt keine Route, über die jemand das Inbox eines anderen läse, und
+/// keine Kennung im Pfad: wessen Inbox es ist, steht im geprüften Token. Ein
 /// Endpunkt <c>/notifications/{subjectId}</c> wäre ein Orakel darüber, ob und
 /// wie oft jemandem etwas passiert.
 /// </remarks>
-public sealed class Postfach(
-    IEingangsspeicher eingaenge,
-    IWunschspeicher wuensche,
+public sealed class Inbox(
+    IInboxStore eingaenge,
+    IPreferenceStore preferences,
     TimeProvider uhr) :
-    IRequestHandler<MeinPostfachAbfrage, IReadOnlyList<Eingang>>,
+    IRequestHandler<MyInboxQuery, IReadOnlyList<Eingang>>,
     IRequestHandler<AllesGelesenBefehl, int>,
-    IRequestHandler<MeineWuenscheAbfrage, Benachrichtigungswunsch>,
-    IRequestHandler<WuenscheSchreibenBefehl, Benachrichtigungswunsch>
+    IRequestHandler<MyPreferencesQuery, NotificationPreference>,
+    IRequestHandler<WuenscheSchreibenBefehl, NotificationPreference>
 {
     /// <inheritdoc />
     public Task<IReadOnlyList<Eingang>> Handle(
-        MeinPostfachAbfrage request, CancellationToken cancellationToken)
+        MyInboxQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return eingaenge.FuerPersonAsync(request.Wer, cancellationToken);
+        return eingaenge.ForPersonAsync(request.Wer, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -49,37 +49,37 @@ public sealed class Postfach(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return eingaenge.LiesAllesAsync(request.Wer, uhr.GetUtcNow(), cancellationToken);
+        return eingaenge.ReadAllAsync(request.Wer, uhr.GetUtcNow(), cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task<Benachrichtigungswunsch> Handle(
-        MeineWuenscheAbfrage request, CancellationToken cancellationToken)
+    public async Task<NotificationPreference> Handle(
+        MyPreferencesQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         // Nie `null`: wer nichts eingestellt hat, hat alles an — und die
         // Oberfläche soll sich keine Voreinstellung ausdenken müssen.
-        return await wuensche.HoleAsync(request.Wer, cancellationToken)
-               ?? Benachrichtigungswunsch.Voreingestellt(request.Wer);
+        return await preferences.GetAsync(request.Wer, cancellationToken)
+               ?? NotificationPreference.Voreingestellt(request.Wer);
     }
 
     /// <inheritdoc />
-    public async Task<Benachrichtigungswunsch> Handle(
+    public async Task<NotificationPreference> Handle(
         WuenscheSchreibenBefehl request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var wunsch = await wuensche.HoleAsync(request.Wer, cancellationToken)
-                     ?? Benachrichtigungswunsch.Voreingestellt(request.Wer);
+        var preference = await preferences.GetAsync(request.Wer, cancellationToken)
+                     ?? NotificationPreference.Voreingestellt(request.Wer);
 
-        foreach (var (art, gewollt) in request.Schalter)
+        foreach (var (kind, gewollt) in request.Schalter)
         {
-            wunsch.Setze(art, gewollt);
+            preference.Set(kind, gewollt);
         }
 
-        await wuensche.SichereAsync(wunsch, cancellationToken);
+        await preferences.SaveAsync(preference, cancellationToken);
 
-        return wunsch;
+        return preference;
     }
 }

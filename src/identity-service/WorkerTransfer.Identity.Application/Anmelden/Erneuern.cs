@@ -40,7 +40,7 @@ public abstract record Erneuerungsergebnis
 /// stolen one works once and the second use is visible.
 /// </remarks>
 public sealed class ErneuernHandler(
-    ISessionService sitzungen,
+    ISessionService sessions,
     IUserRepository benutzer,
     IMembershipRepository mitgliedschaften,
     ISessionCapacity handlungsform,
@@ -57,14 +57,14 @@ public sealed class ErneuernHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var sitzung = await sitzungen.RenewAsync(request.Erneuerungstoken, cancellationToken);
+        var session = await sessions.RenewAsync(request.Erneuerungstoken, cancellationToken);
 
-        if (sitzung is null)
+        if (session is null)
         {
             return new Erneuerungsergebnis.Abgewiesen();
         }
 
-        var konto = await benutzer.FindByIdAsync(sitzung.Subject, cancellationToken);
+        var konto = await benutzer.FindByIdAsync(session.Subject, cancellationToken);
 
         if (konto is null || !DarfNochAnmelden(konto))
         {
@@ -75,10 +75,10 @@ public sealed class ErneuernHandler(
             return new Erneuerungsergebnis.Abgewiesen();
         }
 
-        var form = await ErneutGeprueft(sitzung, cancellationToken);
+        var form = await ErneutGeprueft(session, cancellationToken);
 
         var zugriff = await token.IssueAsync(
-            konto.Id, konto.Email, form, sitzung.Session, cancellationToken);
+            konto.Id, konto.Email, form, session.Session, cancellationToken);
 
         await protokoll.AppendAsync(
             new AuditEvent(
@@ -94,7 +94,7 @@ public sealed class ErneuernHandler(
             cancellationToken);
 
         return new Erneuerungsergebnis.Erneuert(
-            zugriff, sitzung.RefreshToken, sitzung.ExpiresAt);
+            zugriff, session.RefreshToken, session.ExpiresAt);
     }
 
     /// <summary>
@@ -113,31 +113,31 @@ public sealed class ErneuernHandler(
     /// </para>
     /// </remarks>
     private async Task<Capacity> ErneutGeprueft(
-        RenewedSession sitzung,
+        RenewedSession session,
         CancellationToken cancellationToken)
     {
-        var form = await handlungsform.RecallAsync(sitzung.Session, cancellationToken);
+        var form = await handlungsform.RecallAsync(session.Session, cancellationToken);
 
-        if (form is not Capacity.ForCompany firma)
+        if (form is not Capacity.ForCompany company)
         {
             return form;
         }
 
-        if (await mitgliedschaften.IsMemberAsync(sitzung.Subject, firma.Tenant, cancellationToken))
+        if (await mitgliedschaften.IsMemberAsync(session.Subject, company.Tenant, cancellationToken))
         {
             return form;
         }
 
         await handlungsform.RememberAsync(
-            sitzung.Session, Capacity.AsSelf.Instance, cancellationToken);
+            session.Session, Capacity.AsSelf.Instance, cancellationToken);
 
         await protokoll.AppendAsync(
             new AuditEvent(
                 AuditAction.TenantSwitchDenied,
                 uhr.GetUtcNow(),
-                actor: sitzung.Subject,
+                actor: session.Subject,
                 // The company that was dropped is the point of the record.
-                tenant: firma.Tenant,
+                tenant: company.Tenant,
                 correlationId: korrelation.Aktuell,
                 metadata: new Dictionary<string, string>(StringComparer.Ordinal)
                 {

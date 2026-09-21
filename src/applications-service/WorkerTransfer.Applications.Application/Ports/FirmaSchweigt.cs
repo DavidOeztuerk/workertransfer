@@ -8,5 +8,5 @@ namespace WorkerTransfer.Applications.Application.Ports;
 /// dass dieser Dienst gerade nicht antworten kann — nicht, dass die Firma
 /// nicht existiert.
 /// </remarks>
-public sealed class FirmaSchweigt(string grund, Exception? ursache = null)
-    : Exception(grund, ursache);
+public sealed class CompanyLookupSilent(string reason, Exception? ursache = null)
+    : Exception(reason, ursache);

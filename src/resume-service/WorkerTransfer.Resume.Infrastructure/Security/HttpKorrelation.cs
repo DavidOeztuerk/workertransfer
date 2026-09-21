@@ -10,16 +10,16 @@ public sealed class HttpKorrelation(IHttpContextAccessor zugriff) : IKorrelation
 {
     /// <inheritdoc />
     public string? Aktuell =>
-        zugriff.HttpContext?.Items.TryGetValue("CorrelationId", out var wert) == true
-            ? wert?.ToString()
+        zugriff.HttpContext?.Items.TryGetValue("CorrelationId", out var value) == true
+            ? value?.ToString()
             : null;
 
     /// <inheritdoc />
-    public Pruefeintrag Eintrag(
-        Pruefhandlung handlung,
+    public AuditEntry Eintrag(
+        AuditAction action,
         DateTimeOffset geschehen,
         SubjectId? akteur = null,
-        TenantId? firma = null,
+        TenantId? company = null,
         SubjectId? betroffene = null) =>
-        new(handlung, geschehen, akteur, firma, betroffene, Aktuell);
+        new(action, geschehen, akteur, company, betroffene, Aktuell);
 }

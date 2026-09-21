@@ -14,16 +14,16 @@ using WorkerTransfer.ServiceDefaults;
 namespace WorkerTransfer.Notification.Tests;
 
 /// <summary>
-/// „Dein Profil wurde entdeckt" — höchstens eine je Person und Tag.
+/// „Dein Profile wurde entdeckt" — höchstens eine je Person und Tag.
 /// </summary>
 /// <remarks>
 /// <para>Die Auskunft aus ADR-0033, und die einzige Art mit einer
 /// <em>eigenen</em> Kappe. Bei jeder anderen entsteht der Postfacheintrag immer
-/// und nur die Mail wird gedrosselt: das Postfach liegt hinter der Anmeldung
+/// und nur die Mail wird gedrosselt: das Inbox liegt hinter der Anmeldung
 /// und verrät niemandem etwas.</para>
 ///
 /// <para>Hier ist das anders, und darin liegt der ganze Grund für diese Reihe:
-/// ein Eintrag je Treffer wäre ein <strong>Zähler über die eigene
+/// ein Eintrag je Hit wäre ein <strong>Zähler über die eigene
 /// Sichtbarkeit</strong> — auf Umwegen genau das Verzeichnis „wer hat wen
 /// angesehen", das nicht entstehen soll. Die Kappe nimmt deshalb den Eintrag
 /// mit, nicht nur die Mail.</para>
@@ -44,17 +44,17 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:notification", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Identity:Adresse", "http://identity.test");
             host.UseSetting("Identity:Geheimnis", Meldegeheimnis);
             host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IPostbote>(_ => _postbote));
-                dienste.Replace(ServiceDescriptor.Singleton<TimeProvider>(_uhr));
+                services.Replace(ServiceDescriptor.Scoped<IPostbote>(_ => _postbote));
+                services.Replace(ServiceDescriptor.Singleton<TimeProvider>(_uhr));
             });
         });
 
@@ -75,13 +75,13 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
 
         (await Melde(anna)).StatusCode.Should().Be(HttpStatusCode.Accepted);
 
-        var postfach = await Postfach(anna);
+        var inbox = await Inbox(anna);
 
-        postfach.EnumerateArray().Should().ContainSingle()
+        inbox.EnumerateArray().Should().ContainSingle()
             .Which.GetProperty("kind").GetString().Should().Be("profile_discovered");
     }
 
-    /// <summary>Zehn Treffer an einem Tag ergeben EINEN Eintrag.</summary>
+    /// <summary>Zehn Hit an einem Tag ergeben EINEN Eintrag.</summary>
     /// <remarks>
     /// Nicht zehn und auch nicht „einen Eintrag, aber nur eine Mail": zehn
     /// Einträge wären zehn Zeilen darüber, wie oft diese Person gesehen wurde.
@@ -98,7 +98,7 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
             _uhr.Weiter(TimeSpan.FromMinutes(30));
         }
 
-        (await Postfach(anna)).GetArrayLength().Should().Be(1);
+        (await Inbox(anna)).GetArrayLength().Should().Be(1);
         _postbote.Gebeten.Should().Equal(anna);
     }
 
@@ -112,7 +112,7 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         _uhr.Weiter(TimeSpan.FromDays(1));
         await Melde(anna);
 
-        (await Postfach(anna)).GetArrayLength().Should().Be(2);
+        (await Inbox(anna)).GetArrayLength().Should().Be(2);
     }
 
     /// <summary>Kurz vor dem Tag noch nicht.</summary>
@@ -129,12 +129,12 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         _uhr.Weiter(TimeSpan.FromDays(1) - TimeSpan.FromMinutes(1));
         await Melde(anna);
 
-        (await Postfach(anna)).GetArrayLength().Should().Be(1);
+        (await Inbox(anna)).GetArrayLength().Should().Be(1);
     }
 
     /// <summary>Die Kappe gilt je Art, nicht über alle Arten.</summary>
     /// <remarks>
-    /// Eine Marktanfrage am selben Tag muss ankommen. Wäre die Kappe global,
+    /// Eine MarketRequest am selben Tag muss ankommen. Wäre die Kappe global,
     /// verschluckte eine Entdeckung am Morgen die Lebenslaufanfrage am
     /// Nachmittag — und die ist etwas, worauf jemand antworten soll.
     /// </remarks>
@@ -147,8 +147,8 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         await Melde(anna, "market_request");
         await Melde(anna);
 
-        var arten = (await Postfach(anna)).EnumerateArray()
-            .Select(eintrag => eintrag.GetProperty("kind").GetString())
+        var arten = (await Inbox(anna)).EnumerateArray()
+            .Select(entry => entry.GetProperty("kind").GetString())
             .ToArray();
 
         arten.Should().BeEquivalentTo(["profile_discovered", "market_request"]);
@@ -164,8 +164,8 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         await Melde(anna);
         await Melde(bea);
 
-        (await Postfach(anna)).GetArrayLength().Should().Be(1);
-        (await Postfach(bea)).GetArrayLength().Should().Be(1);
+        (await Inbox(anna)).GetArrayLength().Should().Be(1);
+        (await Inbox(bea)).GetArrayLength().Should().Be(1);
     }
 
     /// <summary>Sie ist einzeln abbestellbar — und das Abbestellen wirkt.</summary>
@@ -209,7 +209,7 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         // Der EINTRAG entsteht trotzdem: er liegt hinter der Anmeldung, und ihn
         // wegzulassen hiesse, jemandem zu verschweigen, dass etwas passiert ist.
         // Abbestellt ist die MAIL.
-        (await Postfach(anna)).GetArrayLength().Should().Be(1);
+        (await Inbox(anna)).GetArrayLength().Should().Be(1);
     }
 
     /// <summary>Die Art ist eine von acht, und alle acht sind einstellbar.</summary>
@@ -229,7 +229,7 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
     /// <summary>Nur diese eine Art trägt eine Tageskappe.</summary>
     /// <remarks>
     /// Die Gegenprobe zur Kappe selbst: wer sie versehentlich auf eine weitere
-    /// Art legte, nähme dort den Postfacheintrag mit — und eine Bewerbung, die
+    /// Art legte, nähme dort den Postfacheintrag mit — und eine Application, die
     /// sich zweimal am Tag bewegt, verschwände zur Hälfte.
     /// </remarks>
     [Fact]
@@ -238,36 +238,36 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         Benachrichtigungsarten.Tageskappe(Benachrichtigungsart.ProfileDiscovered)
             .Should().Be(TimeSpan.FromDays(1));
 
-        foreach (var art in Benachrichtigungsarten.Alle
-                     .Where(art => art != Benachrichtigungsart.ProfileDiscovered))
+        foreach (var kind in Benachrichtigungsarten.Alle
+                     .Where(kind => kind != Benachrichtigungsart.ProfileDiscovered))
         {
-            Benachrichtigungsarten.Tageskappe(art).Should().BeNull(
-                $"{Benachrichtigungsarten.Wort(art)} darf so oft kommen, wie es passiert");
+            Benachrichtigungsarten.Tageskappe(kind).Should().BeNull(
+                $"{Benachrichtigungsarten.Wort(kind)} darf so oft kommen, wie es passiert");
         }
     }
 
     // ---------------------------------------------------------------------
 
-    private HttpClient AlsPerson(Guid wer)
+    private HttpClient AlsPerson(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Person(wer));
+            new AuthenticationHeaderValue("Bearer", Tokenform.Person(subject));
         return browser;
     }
 
-    private Task<HttpResponseMessage> Melde(Guid wer, string art = "profile_discovered")
+    private Task<HttpResponseMessage> Melde(Guid subject, string kind = "profile_discovered")
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Notify-Secret", Meldegeheimnis);
 
         return browser.PostAsJsonAsync(
-            new Uri("/internal/notifications", UriKind.Relative), new { user_id = wer, kind = art });
+            new Uri("/internal/notifications", UriKind.Relative), new { user_id = subject, kind = kind });
     }
 
-    private async Task<JsonElement> Postfach(Guid wer) =>
-        await Json(await AlsPerson(wer).GetAsync(new Uri("/notifications/me", UriKind.Relative)));
+    private async Task<JsonElement> Inbox(Guid subject) =>
+        await Json(await AlsPerson(subject).GetAsync(new Uri("/notifications/me", UriKind.Relative)));
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 }

@@ -57,7 +57,11 @@ metadata:
     {{- include "workertransfer.labels" . | nindent 4 }}
     app.kubernetes.io/component: web
 spec:
-  type: ClusterIP
+  {{/*
+  NodePort and not ClusterIP: the UI needs a door of its own. The alternative
+  — letting the gateway answer document requests — is what ADR-0040 removed.
+  */}}
+  type: NodePort
   selector:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: web
@@ -70,3 +74,4 @@ spec:
     - name: http
       port: 5173
       targetPort: http
+      nodePort: {{ .Values.web.nodePort }}

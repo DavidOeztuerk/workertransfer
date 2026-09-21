@@ -5,25 +5,25 @@ namespace WorkerTransfer.Assessment.Domain.Vorgaenge;
 /// <summary>Etwas an der Eingabe stimmt nicht.</summary>
 /// <remarks>
 /// Die Meldung nennt die <em>Regel</em> und nie den Wert. Der Text einer
-/// Aufgabe oder einer Bewertung stünde sonst am Ende im Protokoll — und beide
+/// Aufgabe oder einer Evaluation stünde sonst am Ende im Protokoll — und beide
 /// handeln von einem Menschen.
 /// </remarks>
 /// <param name="meldung">Was die Regel verlangt.</param>
-public sealed class Eingabefehler(string meldung) : Exception(meldung);
+public sealed class Eingabefehler(string notification) : Exception(notification);
 
 /// <summary>Von hier aus geht dieser Schritt nicht.</summary>
 /// <remarks>
 /// Getrennt vom <see cref="Eingabefehler"/>, weil es etwas anderes ist: die
-/// Eingabe war in Ordnung, der Vorgang steht nur woanders. Der Endpunkt macht
+/// Eingabe war in Ordnung, der Case steht nur woanders. Der Endpunkt macht
 /// daraus 409 und nicht 422 — „das geht jetzt nicht" ist keine Aussage über das
 /// Formular.
 /// </remarks>
 /// <param name="meldung">Warum nicht.</param>
-public sealed class SchrittNichtMoeglich(string meldung) : Exception(meldung);
+public sealed class SchrittNichtMoeglich(string notification) : Exception(notification);
 
 /// <summary>Es gibt hier nichts zu sehen.</summary>
 /// <remarks>
-/// <para><strong>Ein Ausgang für vier Lagen:</strong> den Vorgang gibt es
+/// <para><strong>Ein Ausgang für vier Lagen:</strong> den Case gibt es
 /// nicht; er gehört jemand anderem; er gehört einem anderen Unternehmen; die
 /// Person hat diesem Unternehmen nichts (mehr) freigegeben. Alle vier antworten
 /// 404, bis auf die Korrelationskennung byte-identisch (ADR-0020 §1).</para>
@@ -31,22 +31,22 @@ public sealed class SchrittNichtMoeglich(string meldung) : Exception(meldung);
 /// <para>Ein eigener Code für die letzte wäre der „gesperrt"-Hinweis — und
 /// verriete genau das, was nicht freigegeben ist: dass es etwas gibt.</para>
 /// </remarks>
-public sealed class KeinVorgang() : Exception("No such assessment");
+public sealed class NoCase() : Exception("No such assessment");
 
-/// <summary>Wo ein Vorgang steht.</summary>
+/// <summary>Wo ein Case steht.</summary>
 /// <remarks>
 /// <para><strong>Vier Werte, und keiner davon heisst „abgelehnt".</strong> Wer
 /// eine Aufgabe nicht annehmen will, tut nichts; die Frist läuft ab, und der
-/// Vorgang steht auf <see cref="Abgelaufen"/>. Dieser Stand ist
+/// Case steht auf <see cref="Abgelaufen"/>. Dieser State ist
 /// ununterscheidbar von „hat es sich vorgenommen und nicht geschafft" und von
 /// „war krank" — er sagt nur, dass nichts eingereicht wurde (ADR-0042 §3).</para>
 ///
 /// <para><strong>Er wird nicht gespeichert, sondern gerechnet</strong> — aus
-/// Einreichung, Bewertung und der Uhr. Eine Spalte müsste jemand umschalten,
+/// Submission, Evaluation und der Uhr. Eine Spalte müsste jemand umschalten,
 /// wenn eine Frist abläuft, und das wäre ein Nachtlauf, der Vorgänge über
 /// Menschen anfasst, ohne dass jemand gefragt hat.</para>
 /// </remarks>
-public enum Stand
+public enum State
 {
     /// <summary>Gestellt, nichts eingereicht, Frist läuft.</summary>
     Gestellt,
@@ -54,7 +54,7 @@ public enum Stand
     /// <summary>Eingereicht, noch nicht bewertet.</summary>
     Eingereicht,
 
-    /// <summary>Bewertet — und die Person liest die Bewertung.</summary>
+    /// <summary>Bewertet — und die Person liest die Evaluation.</summary>
     Bewertet,
 
     /// <summary>Die Frist ist verstrichen, ohne dass etwas kam.</summary>
@@ -68,8 +68,8 @@ public enum Stand
 /// verbirgt genau das, was hilft — was am Ergebnis fehlte —, und sie sieht
 /// dabei aus wie eine Messung.</para>
 ///
-/// <para>Sie handelt vom <em>Vorgang</em> und nicht vom Menschen: „wir machen
-/// weiter" oder „wir machen nicht weiter". Es gibt keine Stelle, an der solche
+/// <para>Sie handelt vom <em>Case</em> und nicht vom Menschen: „wir machen
+/// weiter" oder „wir machen nicht weiter". Es gibt keine Job, an der solche
 /// Ausgänge über Vorgänge hinweg gezählt werden, und keinen Endpunkt, der sie
 /// über Unternehmensgrenzen herausgibt.</para>
 /// </remarks>
@@ -82,17 +82,17 @@ public enum Ausgang
     Abgelehnt
 }
 
-/// <summary>Die Worte, mit denen Stand und Ausgang auf der Leitung stehen.</summary>
+/// <summary>Die Worte, mit denen State und Ausgang auf der Leitung stehen.</summary>
 public static class Woerter
 {
-    /// <summary>Das Wort zum Stand.</summary>
-    public static string Wort(Stand stand) => stand switch
+    /// <summary>Das Wort zum State.</summary>
+    public static string Wort(State state) => state switch
     {
-        Stand.Gestellt => "set",
-        Stand.Eingereicht => "submitted",
-        Stand.Bewertet => "evaluated",
-        Stand.Abgelaufen => "expired",
-        _ => throw new ArgumentOutOfRangeException(nameof(stand))
+        State.Gestellt => "set",
+        State.Eingereicht => "submitted",
+        State.Bewertet => "evaluated",
+        State.Abgelaufen => "expired",
+        _ => throw new ArgumentOutOfRangeException(nameof(state))
     };
 
     /// <summary>Das Wort zum Ausgang.</summary>
@@ -108,7 +108,7 @@ public static class Woerter
     /// <c>LiesAusgang</c> und nicht <c>Ausgang</c>: eine Methode, die heisst wie
     /// ihr Rückgabetyp, verdeckt ihn im ganzen Namensraum.
     /// </remarks>
-    public static Ausgang? LiesAusgang(string? wort) => wort switch
+    public static Ausgang? LiesAusgang(string? word) => word switch
     {
         "accepted" => Ausgang.Angenommen,
         "rejected" => Ausgang.Abgelehnt,
@@ -162,12 +162,12 @@ public sealed record Aufgabe
     /// <summary>Wie lang die Aufgabenstellung sein darf.</summary>
     public const int HoechstlaengeText = 8000;
 
-    private Aufgabe(string titel, string text, int stunden, DateTimeOffset frist)
+    private Aufgabe(string titel, string text, int stunden, DateTimeOffset deadline)
     {
         Titel = titel;
         Text = text;
         Stunden = stunden;
-        Frist = frist;
+        Frist = deadline;
     }
 
     /// <summary>Die Überschrift.</summary>
@@ -184,8 +184,8 @@ public sealed record Aufgabe
 
     /// <summary>Prüft jede Angabe und baut erst dann.</summary>
     /// <exception cref="Eingabefehler">Eine Angabe hält die Regel nicht ein.</exception>
-    public static Aufgabe Schreibe(
-        string? titel, string? text, int stunden, DateTimeOffset frist, DateTimeOffset jetzt)
+    public static Aufgabe Write(
+        string? titel, string? text, int stunden, DateTimeOffset deadline, DateTimeOffset now)
     {
         var ueberschrift = Pflichttext(titel, HoechstlaengeTitel, "a title");
         var aufgabe = Pflichttext(text, HoechstlaengeText, "a task description");
@@ -196,35 +196,35 @@ public sealed record Aufgabe
                 $"the stated effort is between {KleinsterUmfang} and {HoechsterUmfang} hours");
         }
 
-        if (frist - jetzt < Mindestfrist)
+        if (deadline - now < Mindestfrist)
         {
             throw new Eingabefehler(
                 $"a deadline lies at least {Mindestfrist.TotalHours:0} hours ahead");
         }
 
-        return new Aufgabe(ueberschrift, aufgabe, stunden, frist);
+        return new Aufgabe(ueberschrift, aufgabe, stunden, deadline);
     }
 
     /// <summary>Die Aufgabe, wie eine Zeile sie hält — ohne erneute Prüfung.</summary>
     /// <remarks>
     /// Eine gespeicherte Zeile war bei ihrer Entstehung gültig. Sie beim Lesen
-    /// abzulehnen hiesse, jemandem seinen Vorgang zu entziehen, weil sich eine
+    /// abzulehnen hiesse, jemandem seinen Case zu entziehen, weil sich eine
     /// Grenze geändert hat.
     /// </remarks>
     public static Aufgabe Stelle_her(
-        string titel, string text, int stunden, DateTimeOffset frist) =>
-        new(titel, text, stunden, frist);
+        string titel, string text, int stunden, DateTimeOffset deadline) =>
+        new(titel, text, stunden, deadline);
 
-    private static string Pflichttext(string? roh, int grenze, string was)
+    private static string Pflichttext(string? roh, int limit, string was)
     {
-        var wert = (roh ?? string.Empty).Trim();
+        var value = (roh ?? string.Empty).Trim();
 
-        return wert.Length switch
+        return value.Length switch
         {
             0 => throw new Eingabefehler($"{was} is required"),
-            var laenge when laenge > grenze =>
-                throw new Eingabefehler($"{was} is at most {grenze} characters"),
-            _ => wert
+            var length when length > limit =>
+                throw new Eingabefehler($"{was} is at most {limit} characters"),
+            _ => value
         };
     }
 }
@@ -243,7 +243,7 @@ public sealed record Aufgabe
 /// Egress-Grenze wiese sie ohnehin ab, weil sie in keiner Konfiguration steht.
 /// Das ist hier kein Hindernis, sondern die richtige Antwort.</para>
 /// </remarks>
-public sealed record Einreichung
+public sealed record Submission
 {
     /// <summary>Wie lang der Begleittext sein darf.</summary>
     public const int HoechstlaengeText = 8000;
@@ -251,10 +251,10 @@ public sealed record Einreichung
     /// <summary>Wie lang eine Adresse sein darf.</summary>
     public const int HoechstlaengeAdresse = 2000;
 
-    private Einreichung(string text, string? adresse, DateTimeOffset am)
+    private Submission(string text, string? address, DateTimeOffset am)
     {
         Text = text;
-        Adresse = adresse;
+        Adresse = address;
         Am = am;
     }
 
@@ -269,17 +269,17 @@ public sealed record Einreichung
 
     /// <summary>Prüft und baut.</summary>
     /// <remarks>
-    /// Eines von beiden muss da sein. Eine leere Einreichung wäre gar keine —
+    /// Eines von beiden muss da sein. Eine leere Submission wäre gar keine —
     /// und sie stünde als „eingereicht" da, was gegenüber der Person die
     /// falsche Zusage und gegenüber dem Unternehmen die falsche Auskunft wäre.
     /// </remarks>
     /// <exception cref="Eingabefehler">Eine Angabe hält die Regel nicht ein.</exception>
-    public static Einreichung Schreibe(string? text, string? adresse, DateTimeOffset jetzt)
+    public static Submission Write(string? text, string? address, DateTimeOffset now)
     {
         var begleit = (text ?? string.Empty).Trim();
-        var ziel = Adressform((adresse ?? string.Empty).Trim());
+        var target = Adressform((address ?? string.Empty).Trim());
 
-        if (begleit.Length == 0 && ziel is null)
+        if (begleit.Length == 0 && target is null)
         {
             throw new Eingabefehler("a submission carries a text or a link");
         }
@@ -289,12 +289,12 @@ public sealed record Einreichung
             throw new Eingabefehler($"a submission text is at most {HoechstlaengeText} characters");
         }
 
-        return new Einreichung(begleit, ziel, jetzt);
+        return new Submission(begleit, target, now);
     }
 
-    /// <summary>Die Einreichung, wie eine Zeile sie hält.</summary>
-    public static Einreichung Stelle_her(string text, string? adresse, DateTimeOffset am) =>
-        new(text, adresse, am);
+    /// <summary>Die Submission, wie eine Zeile sie hält.</summary>
+    public static Submission Stelle_her(string text, string? address, DateTimeOffset am) =>
+        new(text, address, am);
 
     private static string? Adressform(string roh)
     {
@@ -311,9 +311,9 @@ public sealed record Einreichung
         // Nur http und https, und nur als absolute Adresse. `javascript:` und
         // `data:` stuenden sonst als Verweis in einer fremden Oberflaeche —
         // gespeichert von einem Menschen, geklickt von einem anderen.
-        return Uri.TryCreate(roh, UriKind.Absolute, out var adresse)
-               && (adresse.Scheme == Uri.UriSchemeHttp || adresse.Scheme == Uri.UriSchemeHttps)
-            ? adresse.ToString()
+        return Uri.TryCreate(roh, UriKind.Absolute, out var address)
+               && (address.Scheme == Uri.UriSchemeHttp || address.Scheme == Uri.UriSchemeHttps)
+            ? address.ToString()
             : throw new Eingabefehler("a link is an absolute http or https address");
     }
 }
@@ -329,12 +329,12 @@ public sealed record Einreichung
 /// weglassen, und genau das ist der Tausch, den dieser Dienst nicht vermitteln
 /// darf: Arbeit gegen Schweigen.</para>
 /// </remarks>
-public sealed record Bewertung
+public sealed record Evaluation
 {
     /// <summary>Wie lang die Rückmeldung sein darf.</summary>
     public const int HoechstlaengeText = 8000;
 
-    private Bewertung(string text, Ausgang ausgang, DateTimeOffset am)
+    private Evaluation(string text, Ausgang ausgang, DateTimeOffset am)
     {
         Text = text;
         Ausgang = ausgang;
@@ -352,60 +352,60 @@ public sealed record Bewertung
 
     /// <summary>Prüft und baut.</summary>
     /// <exception cref="Eingabefehler">Der Text fehlt oder ist zu lang.</exception>
-    public static Bewertung Schreibe(string? text, Ausgang ausgang, DateTimeOffset jetzt)
+    public static Evaluation Write(string? text, Ausgang ausgang, DateTimeOffset now)
     {
-        var wort = (text ?? string.Empty).Trim();
+        var word = (text ?? string.Empty).Trim();
 
-        return wort.Length switch
+        return word.Length switch
         {
             0 => throw new Eingabefehler("an evaluation carries a text, a rejection too"),
-            var laenge when laenge > HoechstlaengeText =>
+            var length when length > HoechstlaengeText =>
                 throw new Eingabefehler($"an evaluation is at most {HoechstlaengeText} characters"),
-            _ => new Bewertung(wort, ausgang, jetzt)
+            _ => new Evaluation(word, ausgang, now)
         };
     }
 
-    /// <summary>Die Bewertung, wie eine Zeile sie hält.</summary>
-    public static Bewertung Stelle_her(string text, Ausgang ausgang, DateTimeOffset am) =>
+    /// <summary>Die Evaluation, wie eine Zeile sie hält.</summary>
+    public static Evaluation Stelle_her(string text, Ausgang ausgang, DateTimeOffset am) =>
         new(text, ausgang, am);
 }
 
-/// <summary>Ein Vorgang: eine Aufgabe, eine Einreichung, eine Bewertung.</summary>
+/// <summary>Ein Case: eine Aufgabe, eine Submission, eine Evaluation.</summary>
 /// <remarks>
-/// <para><strong>Die Bewertung gehört diesem Aggregat und sonst nichts</strong>
-/// (ADR-0042 §1). Sie steht in keiner Suche, in keinem Profil, und kein zweites
+/// <para><strong>Die Evaluation gehört diesem Aggregat und sonst nichts</strong>
+/// (ADR-0042 §1). Sie steht in keiner Search, in keinem Profile, und kein zweites
 /// Unternehmen sieht sie — nicht weil eine Prüfung das abwehrt, sondern weil es
 /// keinen Weg dorthin gibt: der Bestand kennt zwei Fragen, „die Vorgänge dieser
 /// Firma" und „meine Vorgänge", und eine dritte („die Vorgänge dieser Person",
 /// gestellt von einer Firma) existiert nicht.</para>
 ///
 /// <para><strong>Bewertet wird einmal.</strong> Ein zweites Mal ist 409. Eine
-/// Bewertung, die sich nachträglich ändern lässt, ist eine, die die Person
+/// Evaluation, die sich nachträglich ändern lässt, ist eine, die die Person
 /// gelesen haben kann, bevor sie ihren endgültigen Wortlaut bekam.</para>
 /// </remarks>
-public sealed class Vorgang
+public sealed class Case
 {
-    private Vorgang(
+    private Case(
         Guid id,
-        SubjectId wer,
-        TenantId firma,
+        SubjectId subject,
+        TenantId company,
         Aufgabe aufgabe,
-        Einreichung? einreichung,
-        Bewertung? bewertung,
+        Submission? submission,
+        Evaluation? evaluation,
         DateTimeOffset gestelltAm,
         DateTimeOffset geaendertAm)
     {
         Id = id;
-        Wer = wer;
-        Firma = firma;
+        Wer = subject;
+        Firma = company;
         Aufgabe = aufgabe;
-        Einreichung = einreichung;
-        Bewertung = bewertung;
+        Submission = submission;
+        Evaluation = evaluation;
         GestelltAm = gestelltAm;
         GeaendertAm = geaendertAm;
     }
 
-    /// <summary>Welcher Vorgang.</summary>
+    /// <summary>Welcher Case.</summary>
     public Guid Id { get; }
 
     /// <summary>Wem die Aufgabe gestellt wurde.</summary>
@@ -418,10 +418,10 @@ public sealed class Vorgang
     public Aufgabe Aufgabe { get; }
 
     /// <summary>Was abgegeben wurde, oder <c>null</c>.</summary>
-    public Einreichung? Einreichung { get; private set; }
+    public Submission? Submission { get; private set; }
 
     /// <summary>Was zurückkam, oder <c>null</c>.</summary>
-    public Bewertung? Bewertung { get; private set; }
+    public Evaluation? Evaluation { get; private set; }
 
     /// <summary>Wann die Aufgabe gestellt wurde.</summary>
     public DateTimeOffset GestelltAm { get; }
@@ -429,91 +429,91 @@ public sealed class Vorgang
     /// <summary>Wann sich zuletzt etwas bewegt hat.</summary>
     public DateTimeOffset GeaendertAm { get; private set; }
 
-    /// <summary>Wo der Vorgang zu diesem Zeitpunkt steht.</summary>
+    /// <summary>Wo der Case zu diesem Zeitpunkt steht.</summary>
     /// <remarks>
     /// Gerechnet, nicht gespeichert. Die Reihenfolge der Fragen ist die
-    /// Aussage: eine abgelaufene Frist macht einen eingereichten Vorgang nicht
+    /// Aussage: eine abgelaufene Frist macht einen eingereichten Case nicht
     /// wieder zunichte — wer geliefert hat, hat geliefert, und das Unternehmen
     /// schuldet die Antwort auch danach noch.
     /// </remarks>
-    public Stand Stand_am(DateTimeOffset jetzt)
+    public State Stand_am(DateTimeOffset now)
     {
-        if (Bewertung is not null)
+        if (Evaluation is not null)
         {
-            return Stand.Bewertet;
+            return State.Bewertet;
         }
 
-        if (Einreichung is not null)
+        if (Submission is not null)
         {
-            return Stand.Eingereicht;
+            return State.Eingereicht;
         }
 
-        return jetzt > Aufgabe.Frist ? Stand.Abgelaufen : Stand.Gestellt;
+        return now > Aufgabe.Frist ? State.Abgelaufen : State.Gestellt;
     }
 
     /// <summary>Stellt eine Aufgabe.</summary>
-    public static Vorgang Stelle(
-        SubjectId wer, TenantId firma, Aufgabe aufgabe, DateTimeOffset jetzt) =>
-        new(Guid.NewGuid(), wer, firma, aufgabe, null, null, jetzt, jetzt);
+    public static Case Job(
+        SubjectId subject, TenantId company, Aufgabe aufgabe, DateTimeOffset now) =>
+        new(Guid.NewGuid(), subject, company, aufgabe, null, null, now, now);
 
-    /// <summary>Der Vorgang, wie eine Zeile ihn hält.</summary>
-    public static Vorgang Stelle_her(
+    /// <summary>Der Case, wie eine Zeile ihn hält.</summary>
+    public static Case Stelle_her(
         Guid id,
-        SubjectId wer,
-        TenantId firma,
+        SubjectId subject,
+        TenantId company,
         Aufgabe aufgabe,
-        Einreichung? einreichung,
-        Bewertung? bewertung,
+        Submission? submission,
+        Evaluation? evaluation,
         DateTimeOffset gestelltAm,
         DateTimeOffset geaendertAm) =>
-        new(id, wer, firma, aufgabe, einreichung, bewertung, gestelltAm, geaendertAm);
+        new(id, subject, company, aufgabe, submission, evaluation, gestelltAm, geaendertAm);
 
     /// <summary>Die Person reicht ein.</summary>
     /// <remarks>
     /// Nach der Frist geht es nicht mehr, und das schützt beide Seiten: eine
-    /// Aufgabe ohne Ende ist eine, die in jemandes Kopf für immer offen bleibt.
+    /// Aufgabe ohne Ende ist eine, die in jemandes Header für immer offen bleibt.
     /// </remarks>
     /// <exception cref="SchrittNichtMoeglich">Schon eingereicht, oder Frist vorbei.</exception>
-    public void Reiche_ein(Einreichung einreichung, DateTimeOffset jetzt)
+    public void Reiche_ein(Submission submission, DateTimeOffset now)
     {
-        ArgumentNullException.ThrowIfNull(einreichung);
+        ArgumentNullException.ThrowIfNull(submission);
 
-        if (Einreichung is not null)
+        if (Submission is not null)
         {
             throw new SchrittNichtMoeglich("this assessment has already been submitted");
         }
 
-        if (jetzt > Aufgabe.Frist)
+        if (now > Aufgabe.Frist)
         {
             throw new SchrittNichtMoeglich("the deadline for this assessment has passed");
         }
 
-        Einreichung = einreichung;
-        GeaendertAm = jetzt;
+        Submission = submission;
+        GeaendertAm = now;
     }
 
     /// <summary>Das Unternehmen antwortet.</summary>
     /// <remarks>
-    /// Ohne Einreichung gibt es nichts zu bewerten — und eine Bewertung ohne
+    /// Ohne Submission gibt es nichts zu bewerten — und eine Evaluation ohne
     /// Arbeit wäre eine Aussage über den Menschen statt über seine Arbeit.
     /// </remarks>
     /// <exception cref="SchrittNichtMoeglich">Nichts eingereicht, oder schon bewertet.</exception>
-    public void Bewerte(Bewertung bewertung, DateTimeOffset jetzt)
+    public void Bewerte(Evaluation evaluation, DateTimeOffset now)
     {
-        ArgumentNullException.ThrowIfNull(bewertung);
+        ArgumentNullException.ThrowIfNull(evaluation);
 
-        if (Einreichung is null)
+        if (Submission is null)
         {
             throw new SchrittNichtMoeglich("there is nothing submitted to evaluate");
         }
 
-        if (Bewertung is not null)
+        if (Evaluation is not null)
         {
             throw new SchrittNichtMoeglich("this assessment has already been evaluated");
         }
 
-        Bewertung = bewertung;
-        GeaendertAm = jetzt;
+        Evaluation = evaluation;
+        GeaendertAm = now;
     }
 }
 
@@ -526,23 +526,23 @@ public sealed class Vorgang
 /// Auskunftei aus ADR-0042 §1 — und sie gibt es hier nicht, damit sie niemand
 /// vorfindet.</para>
 /// </remarks>
-public interface IVorgangsspeicher
+public interface ICaseStore
 {
-    /// <summary>Ein Vorgang, oder <c>null</c>.</summary>
-    Task<Vorgang?> HoleAsync(Guid id, CancellationToken cancellationToken = default);
+    /// <summary>Ein Case, oder <c>null</c>.</summary>
+    Task<Case?> GetAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>Alles, was einer Person gestellt wurde — ihre eigene Liste.</summary>
-    Task<IReadOnlyList<Vorgang>> FuerPersonAsync(
-        SubjectId wer, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Case>> ForPersonAsync(
+        SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Alles, was ein Unternehmen gestellt hat.</summary>
-    Task<IReadOnlyList<Vorgang>> FuerFirmaAsync(
-        TenantId firma, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Case>> ForCompanyAsync(
+        TenantId company, CancellationToken cancellationToken = default);
 
     /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(Vorgang vorgang, CancellationToken cancellationToken = default);
+    Task SaveAsync(Case caseItem, CancellationToken cancellationToken = default);
 
     /// <summary>Löscht alles über eine Person.</summary>
     /// <returns>Wie viel absichtlich stehen blieb. Immer null.</returns>
-    Task<int> LoescheAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task<int> DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default);
 }

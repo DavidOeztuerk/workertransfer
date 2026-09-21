@@ -185,10 +185,14 @@ export function AdvisorPage() {
 
           {mandat.pending && <LoadingBlock label={t("berater.laden")} />}
 
-          {/* Kein Ersatzformular, wenn das Mandat nicht abrufbar ist: wer dann
-              etwas anfasst und speichert, loescht still seine Angaben. */}
           {!mandat.pending && mandat.data !== null && !mandat.data.ok && (
-            <Alert severity="warning">{t("berater.mandatNichtAbrufbar")}</Alert>
+            <Alert
+              // No substitute form when the mandate cannot be read: whoever
+              // touches something and saves silently erases their own entries.
+              severity="warning"
+            >
+              {t("berater.mandatNichtAbrufbar")}
+            </Alert>
           )}
 
           {mandat.data?.ok === true && (
@@ -235,9 +239,13 @@ export function AdvisorPage() {
                 onChange={(event) => setAusschluss(event.target.value)}
               />
 
-              {/* Immer sichtbar und nicht erst beim Tippen: der Preis gehoert
-                  VOR die Entscheidung, nicht hinter sie. */}
-              <Alert severity="info">{t("berater.ausschlussWarnung")}</Alert>
+              <Alert
+                // Always visible and not only while typing: the price belongs
+                // BEFORE the decision, not behind it.
+                severity="info"
+              >
+                {t("berater.ausschlussWarnung")}
+              </Alert>
 
               {gespeichert && <Alert severity="success">{t("berater.gespeichert")}</Alert>}
 
@@ -342,14 +350,16 @@ function Gespraechskarte({
           {t("berater.wirkungSofort")}
         </Typography>
 
-        {/* DER HINWEIS, DEN DIE E2E-REISE ERZWUNGEN HAT. „Alles zurueckziehen"
-            stand hier einmal, und es war zu viel versprochen: wer sein Profil
-            auf „fuer alle Unternehmen" gestellt hat, bleibt darueber sichtbar,
-            und die Stufe faellt dann nicht auf 0. Das ist richtig so — ein
-            Knopf in EINEM Gespraech darf keinen plattformweiten Schalter
-            umlegen —, aber es muss dastehen. */}
         {gespraech.stage > 0 && (
-          <Typography variant="caption" sx={{ display: "block", mb: 1 }}>
+          <Typography
+            // "Withdraw everything" would promise too much: whoever set their
+            // profile to "for all companies" stays visible through that, and the
+            // stage does not fall to 0. That is right — a button in ONE
+            // conversation must not flip a platform-wide switch — but it has to
+            // be said here.
+            variant="caption"
+            sx={{ display: "block", mb: 1 }}
+          >
             {t("berater.zurueckHinweis")}
           </Typography>
         )}
@@ -366,13 +376,13 @@ function Gespraechskarte({
             </Button>
           )}
 
-          {/* EIN Knopf und nicht drei: eine Stufe ist ein Stand, und man geht
-              ihn hinunter. `withdraw` nimmt ab der genannten Stufe alles
-              darueber mit — von 3 bleibt also 2, von 1 bleibt 0. */}
           {gespraech.stage > 0 && (
             <Button
               size="small"
               disabled={laeuft}
+              // ONE button and not three: a stage is a standing and you walk it
+              // down. `withdraw` takes everything from the named stage upwards —
+              // from 3 leaves 2, from 1 leaves 0.
               onClick={() => aufStufe(false, gespraech.stage)}
             >
               {gespraech.stage === 1

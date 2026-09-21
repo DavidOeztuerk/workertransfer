@@ -5,12 +5,12 @@ using WorkerTransfer.Transfer.Application.Ports;
 namespace WorkerTransfer.Transfer.Tests;
 
 /// <summary>Ein Ledger, der aufschreibt statt zu fragen.</summary>
-public sealed class Probeledger : IEinwilligungstor
+public sealed class Probeledger : IConsentGate
 {
-    /// <summary>Wessen Profil als freigegeben gilt. Leer heißt: niemandes.</summary>
+    /// <summary>Wessen Profile als freigegeben gilt. Leer heißt: niemandes.</summary>
     public HashSet<Guid> ProfilFrei { get; } = [];
 
-    /// <summary>Welche (Person, Firma) den Marktstatus sehen darf.</summary>
+    /// <summary>Welche (Person, Firma) den MarketStatus sehen darf.</summary>
     public HashSet<(Guid Wer, Guid Firma)> MarktFrei { get; } = [];
 
     /// <summary>Wenn gesetzt, schweigt der Ledger.</summary>
@@ -23,23 +23,23 @@ public sealed class Probeledger : IEinwilligungstor
     public List<(Guid Wer, Guid Firma)> Widerrufen { get; } = [];
 
     /// <inheritdoc />
-    public Task<bool> DarfProfilSehenAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public Task<bool> MaySeeProfileAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
         Stumm();
-        return Task.FromResult(ProfilFrei.Contains(wer.Value));
+        return Task.FromResult(ProfilFrei.Contains(subject.Value));
     }
 
     /// <inheritdoc />
-    public Task<bool> DarfMarktSehenAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default)
+    public Task<bool> MaySeeMarketAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default)
     {
         Stumm();
-        return Task.FromResult(MarktFrei.Contains((wer.Value, firma.Value)));
+        return Task.FromResult(MarktFrei.Contains((subject.Value, company.Value)));
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<bool>> DuerfenMarktSehenAsync(
+    public Task<IReadOnlyList<bool>> MayEachSeeMarketAsync(
         IReadOnlyList<(SubjectId Wer, TenantId Firma)> paare,
         CancellationToken cancellationToken = default)
     {
@@ -51,22 +51,22 @@ public sealed class Probeledger : IEinwilligungstor
     }
 
     /// <inheritdoc />
-    public Task ErteileAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default)
+    public Task GrantAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default)
     {
         Stumm();
-        Erteilt.Add((wer.Value, firma.Value));
-        MarktFrei.Add((wer.Value, firma.Value));
+        Erteilt.Add((subject.Value, company.Value));
+        MarktFrei.Add((subject.Value, company.Value));
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public Task WiderrufeAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default)
+    public Task RevokeAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default)
     {
         Stumm();
-        Widerrufen.Add((wer.Value, firma.Value));
-        MarktFrei.Remove((wer.Value, firma.Value));
+        Widerrufen.Add((subject.Value, company.Value));
+        MarktFrei.Remove((subject.Value, company.Value));
         return Task.CompletedTask;
     }
 
@@ -74,16 +74,16 @@ public sealed class Probeledger : IEinwilligungstor
     {
         if (Schweigt)
         {
-            throw new EinwilligungSchweigt("Probe: der Ledger schweigt.");
+            throw new ConsentGateSilent("Probe: der Ledger schweigt.");
         }
     }
 }
 
 /// <summary>Eine Zustellung, die nichts tut — die Outbox-Zeile ist der Prüfstein.</summary>
-public sealed class Probezustellung : IZustellung
+public sealed class Probezustellung : IDelivery
 {
     /// <inheritdoc />
-    public Task ZustelleAsync(
-        SubjectId empfaenger, string art, CancellationToken cancellationToken = default) =>
+    public Task DeliverAsync(
+        SubjectId recipient, string kind, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
 }

@@ -6,32 +6,32 @@ namespace WorkerTransfer.Assessment.Infrastructure.Persistence;
 /// <summary>Eine Datenbanktransaktion um einen Befehl.</summary>
 /// <remarks>
 /// Sie umschliesst auch den Postausgang: der Vermerk, dass die Person ihre
-/// Bewertung lesen soll, entsteht in derselben Klammer wie die Bewertung, oder
+/// Evaluation lesen soll, entsteht in derselben Klammer wie die Evaluation, oder
 /// gar nicht (ADR-0025, ADR-0042 §2).
 /// </remarks>
-public sealed class EfUnitOfWork(AssessmentDbContext kontext) : IUnitOfWork
+public sealed class EfUnitOfWork(AssessmentDbContext context) : IUnitOfWork
 {
     /// <inheritdoc />
-    public async Task<T> InEinerTransaktionAsync<T>(
+    public async Task<T> InTransactionAsync<T>(
         Func<CancellationToken, Task<T>> arbeit,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(arbeit);
 
-        if (kontext.Database.CurrentTransaction is not null)
+        if (context.Database.CurrentTransaction is not null)
         {
             // Schon in einer. Eine zweite zu öffnen würde entweder werfen oder
             // die halbe Arbeit früh committen.
             return await arbeit(cancellationToken);
         }
 
-        await using var klammer = await kontext.Database.BeginTransactionAsync(cancellationToken);
+        await using var klammer = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var ergebnis = await arbeit(cancellationToken);
+        var result = await arbeit(cancellationToken);
 
-        await kontext.SaveChangesAsync(cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
         await klammer.CommitAsync(cancellationToken);
 
-        return ergebnis;
+        return result;
     }
 }

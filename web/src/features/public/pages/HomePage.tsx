@@ -44,8 +44,6 @@ export function HomePage() {
 
   return (
     <Box>
-      {/* Der Held. Grosszügig, ruhig, EIN Hauptaufruf — das hier ist das Erste,
-          was jemand von dieser Plattform sieht. */}
       <Box
         component="section"
         aria-labelledby={heldId}
@@ -102,14 +100,6 @@ export function HomePage() {
             >
               {t("start.text")}
             </Typography>
-            {/* Beide Wege führen nach /register, und der zweite trägt seine
-                ABSICHT mit: ohne `?as=company` landet jemand, der „Als
-                Unternehmen entdecken" klickt, im Personenformular — und merkt
-                es erst nach der Bestätigungsmail, wenn kein Unternehmen da ist.
-
-                Die Unterscheidung selbst trifft die Registrierung, nicht diese
-                Seite: ein Unternehmen braucht eine BESTÄTIGTE Adresse
-                (ADR-0019), und das Konto wäre hier noch pending. */}
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
               <Button
                 component={RouterLink}
@@ -121,6 +111,12 @@ export function HomePage() {
               </Button>
               <Button
                 component={RouterLink}
+                // Carries the INTENT: without `?as=company` whoever clicks
+                // "discover as a company" lands in the person form and notices
+                // only after the confirmation mail, when no company is there.
+                // The distinction itself is drawn at registration, not here: a
+                // company needs a CONFIRMED address (ADR-0019), and the account
+                // is still pending at this point.
                 to="/register?as=company"
                 variant="outlined"
                 size="large"

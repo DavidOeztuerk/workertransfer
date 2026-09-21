@@ -5,22 +5,22 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using WorkerTransfer.Applications.Application.Entwuerfe;
 using WorkerTransfer.Applications.Application.Ports;
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 using WorkerTransfer.Applications.Infrastructure.Security;
 
 namespace WorkerTransfer.Applications.Infrastructure.Anschreiben;
 
 /// <summary>
-/// Schreibt im Hintergrund. Die HTTP-Anfrage kehrt zurück, sobald der Auftrag
+/// Schreibt im Hintergrund. Die HTTP-ResumeRequest kehrt zurück, sobald der Auftrag
 /// angenommen ist — sonst hängt der Browser 133 Sekunden (gemessen) und ein
 /// Seitenwechsel bricht das Schreiben ab.
 /// </summary>
-public sealed class AnschreibenArbeiter(
-    IServiceScopeFactory speicher,
-    ILogger<AnschreibenArbeiter> protokoll) : BackgroundService, IAnschreibenSchlange
+public sealed class CoverLetterWorker(
+    IServiceScopeFactory store,
+    ILogger<CoverLetterWorker> protokoll) : BackgroundService, ICoverLetterQueue
 {
-    private readonly Channel<Anschreibenauftrag> _kanal =
-        Channel.CreateUnbounded<Anschreibenauftrag>(new UnboundedChannelOptions
+    private readonly Channel<CoverLetterJob> _kanal =
+        Channel.CreateUnbounded<CoverLetterJob>(new UnboundedChannelOptions
         {
             SingleReader = true,
             SingleWriter = false
@@ -29,24 +29,24 @@ public sealed class AnschreibenArbeiter(
     private readonly ConcurrentDictionary<Guid, byte> _laeuft = new();
 
     /// <inheritdoc />
-    public bool Plane(Anschreibenauftrag auftrag)
+    public bool Plane(CoverLetterJob letterJob)
     {
-        ArgumentNullException.ThrowIfNull(auftrag);
+        ArgumentNullException.ThrowIfNull(letterJob);
 
-        if (!_laeuft.TryAdd(auftrag.EntwurfId, 0))
+        if (!_laeuft.TryAdd(letterJob.EntwurfId, 0))
         {
             return false;
         }
 
-        if (_kanal.Writer.TryWrite(auftrag))
+        if (_kanal.Writer.TryWrite(letterJob))
         {
             protokoll.LogInformation(
                 "Anschreiben {EntwurfId} angestellt ({Art})",
-                auftrag.EntwurfId, auftrag.Art);
+                letterJob.EntwurfId, letterJob.Art);
             return true;
         }
 
-        _laeuft.TryRemove(auftrag.EntwurfId, out _);
+        _laeuft.TryRemove(letterJob.EntwurfId, out _);
         return false;
     }
 
@@ -56,108 +56,108 @@ public sealed class AnschreibenArbeiter(
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await foreach (var auftrag in _kanal.Reader.ReadAllAsync(stoppingToken))
+        await foreach (var letterJob in _kanal.Reader.ReadAllAsync(stoppingToken))
         {
             try
             {
-                await FuehreAusAsync(auftrag, stoppingToken);
+                await PerformAsync(letterJob, stoppingToken);
             }
-            catch (Exception fehler) when (fehler is not OperationCanceledException)
+            catch (Exception error) when (error is not OperationCanceledException)
             {
                 protokoll.LogWarning(
-                    fehler,
+                    error,
                     "Anschreibenauftrag {EntwurfId} ist fehlgeschlagen",
-                    auftrag.EntwurfId);
+                    letterJob.EntwurfId);
             }
             finally
             {
-                _laeuft.TryRemove(auftrag.EntwurfId, out _);
+                _laeuft.TryRemove(letterJob.EntwurfId, out _);
             }
         }
     }
 
-    private async Task FuehreAusAsync(
-        Anschreibenauftrag auftrag, CancellationToken stoppingToken)
+    private async Task PerformAsync(
+        CoverLetterJob letterJob, CancellationToken stoppingToken)
     {
-        using var bereich = speicher.CreateScope();
-        using var _ = HttpAufrufertoken.Mit(auftrag.Traeger);
+        using var scope = store.CreateScope();
+        using var _ = HttpAufrufertoken.Mit(letterJob.Traeger);
 
-        var entwuerfe = bereich.ServiceProvider.GetRequiredService<IEntwurfsspeicher>();
-        var einheit = bereich.ServiceProvider.GetRequiredService<IUnitOfWork>();
-        var anschreiber = bereich.ServiceProvider.GetRequiredService<IAnschreiber>();
-        var ki = bereich.ServiceProvider.GetRequiredService<IKiZugangAbfrage>();
-        var stellen = bereich.ServiceProvider.GetRequiredService<IStellenauskunft>();
-        var bewerber = bereich.ServiceProvider.GetRequiredService<IBewerberauskunft>();
-        var unternehmen = bereich.ServiceProvider.GetRequiredService<IUnternehmensauskunft>();
-        var uhr = bereich.ServiceProvider.GetRequiredService<TimeProvider>();
+        var drafts = scope.ServiceProvider.GetRequiredService<IDraftStore>();
+        var einheit = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var anschreiber = scope.ServiceProvider.GetRequiredService<ICoverLetterWriter>();
+        var ki = scope.ServiceProvider.GetRequiredService<IKiZugangAbfrage>();
+        var jobs = scope.ServiceProvider.GetRequiredService<IJobLookup>();
+        var bewerber = scope.ServiceProvider.GetRequiredService<IApplicantLookup>();
+        var unternehmen = scope.ServiceProvider.GetRequiredService<IUnternehmensauskunft>();
+        var uhr = scope.ServiceProvider.GetRequiredService<TimeProvider>();
 
-        // SichereAsync allein committet nicht — das tut nur die Befehlsklammer.
+        // SaveAsync allein committet nicht — das tut nur die Befehlsklammer.
         // Der Worker ist kein Befehl. Ohne diese Klammer bleibt der Brief leer,
-        // obwohl das Modell fertig ist (gemessen: 600–900 Zeichen, Stand weiter
+        // obwohl das Modell fertig ist (gemessen: 600–900 Zeichen, State weiter
         // Entsteht, GET stellt alle drei Minuten neu an).
-        Task HaltFest(Bewerbungsentwurf stand, CancellationToken token) =>
-            einheit.InEinerTransaktionAsync(async ct =>
+        Task HaltFest(ApplicationDraft state, CancellationToken token) =>
+            einheit.InTransactionAsync(async ct =>
             {
-                await entwuerfe.SichereAsync(stand, ct);
+                await drafts.SaveAsync(state, ct);
                 return 0;
             }, token);
 
-        var entwurf = await WarteAufStandAsync(entwuerfe, auftrag, stoppingToken);
+        var draft = await WaitForStateAsync(drafts, letterJob, stoppingToken);
 
-        if (entwurf is null)
+        if (draft is null)
         {
             return;
         }
 
-        if (entwurf.SchreibenBegonnen is null)
+        if (draft.SchreibenBegonnen is null)
         {
-            entwurf.Beginne_schreiben(uhr.GetUtcNow(), leeren: false);
-            await HaltFest(entwurf, stoppingToken);
+            draft.Beginne_schreiben(uhr.GetUtcNow(), leeren: false);
+            await HaltFest(draft, stoppingToken);
         }
 
         KiZugang zugang;
 
         try
         {
-            zugang = await ki.HoleAsync(auftrag.Wer, stoppingToken);
+            zugang = await ki.GetAsync(letterJob.Wer, stoppingToken);
         }
-        catch (AnschreibenNichtVerfuegbar fehler)
+        catch (CoverLetterUnavailable error)
         {
-            await ScheitereAsync(HaltFest, entwurf, fehler.Message, uhr, stoppingToken);
+            await FailAsync(HaltFest, draft, error.Message, uhr, stoppingToken);
             return;
         }
 
         if (!zugang.IstEingerichtet)
         {
-            await ScheitereAsync(
-                HaltFest, entwurf, "Es ist kein Entwurfsanbieter eingerichtet.", uhr, stoppingToken);
+            await FailAsync(
+                HaltFest, draft, "Es ist kein Entwurfsanbieter eingerichtet.", uhr, stoppingToken);
             return;
         }
 
-        var stelle = await stellen.HoleAsync(entwurf.Stelle, stoppingToken);
+        var job = await jobs.GetAsync(draft.Job, stoppingToken);
 
-        if (stelle is null)
+        if (job is null)
         {
-            await ScheitereAsync(
-                HaltFest, entwurf, "Die Stelle ist nicht mehr offen.", uhr, stoppingToken);
+            await FailAsync(
+                HaltFest, draft, "Die Stelle ist nicht mehr offen.", uhr, stoppingToken);
             return;
         }
 
-        Anschreibenkontext kontext;
+        CoverLetterContext context;
 
         try
         {
-            var eigen = await bewerber.HoleAsync(stoppingToken);
-            var firma = await unternehmen.NameAsync(stelle.Firma, stoppingToken);
+            var eigen = await bewerber.GetAsync(stoppingToken);
+            var company = await unternehmen.NameAsync(job.Firma, stoppingToken);
 
-            kontext = new Anschreibenkontext(
-                stelle.Titel, firma, stelle.Ort, stelle.Beschreibung, stelle.Faehigkeiten,
+            context = new CoverLetterContext(
+                job.Titel, company, job.Ort, job.Beschreibung, job.Faehigkeiten,
                 eigen.Name, eigen.Ueberschrift, eigen.Text, eigen.Faehigkeiten,
                 eigen.Werdegang, eigen.Sprache);
         }
-        catch (BewerberSchweigt fehler)
+        catch (ApplicantLookupSilent error)
         {
-            await ScheitereAsync(HaltFest, entwurf, fehler.Message, uhr, stoppingToken);
+            await FailAsync(HaltFest, draft, error.Message, uhr, stoppingToken);
             return;
         }
 
@@ -166,14 +166,14 @@ public sealed class AnschreibenArbeiter(
 
         async Task Fortschritt(string roh)
         {
-            var jetzt = uhr.GetUtcNow();
+            var now = uhr.GetUtcNow();
 
             // Erstes Token immer schreiben — sonst bleibt der Brief leer, bis
             // vierzig Zeichen oder 400 ms zusammen sind, und ein langsames
             // Modell sieht aus, als schriebe es nicht.
             if (zuletzt > 0
                 && roh.Length - zuletzt < 40
-                && jetzt - zuletztWann < TimeSpan.FromMilliseconds(400))
+                && now - zuletztWann < TimeSpan.FromMilliseconds(400))
             {
                 return;
             }
@@ -182,23 +182,23 @@ public sealed class AnschreibenArbeiter(
             {
                 protokoll.LogInformation(
                     "Anschreiben {EntwurfId}: erstes Bruchstück ({Zeichen} Zeichen)",
-                    auftrag.EntwurfId, roh.Length);
+                    letterJob.EntwurfId, roh.Length);
             }
 
             zuletzt = roh.Length;
-            zuletztWann = jetzt;
-            var (betreff, text) = Anschreibenformat.Lies(roh);
-            var stand = await entwuerfe.HoleAsync(auftrag.Wer, auftrag.EntwurfId, stoppingToken);
+            zuletztWann = now;
+            var (betreff, text) = CoverLetterFormat.Lies(roh);
+            var state = await drafts.GetAsync(letterJob.Wer, letterJob.EntwurfId, stoppingToken);
 
-            if (stand is null || stand.Stand != Entwurfsstand.Entsteht)
+            if (state is null || state.State != DraftState.Entsteht)
             {
                 return;
             }
 
             try
             {
-                stand.Nimm_bruchstueck(betreff, text, jetzt);
-                await HaltFest(stand, stoppingToken);
+                state.Nimm_bruchstueck(betreff, text, now);
+                await HaltFest(state, stoppingToken);
             }
             catch (Exception speicherFehler) when (speicherFehler is not OperationCanceledException)
             {
@@ -207,7 +207,7 @@ public sealed class AnschreibenArbeiter(
                 protokoll.LogWarning(
                     speicherFehler,
                     "Anschreiben {EntwurfId}: Bruchstück nicht gesichert",
-                    auftrag.EntwurfId);
+                    letterJob.EntwurfId);
             }
         }
 
@@ -217,106 +217,106 @@ public sealed class AnschreibenArbeiter(
 
             protokoll.LogInformation(
                 "Anschreiben {EntwurfId}: Modell {Modell} über {Anbieter}",
-                auftrag.EntwurfId, zugang.Modell, zugang.Anbieter);
+                letterJob.EntwurfId, zugang.Modell, zugang.Anbieter);
 
-            if (auftrag.Art == AnschreibenauftragArt.Ueberarbeiten)
+            if (letterJob.Art == CoverLetterJobKind.Ueberarbeiten)
             {
-                var auftraege = entwurf.OffeneAnmerkungen
-                    .Select(eintrag => eintrag.Zitat.Length > 0
-                        ? $"Zur markierten Stelle [{eintrag.Zitat}]: {eintrag.Text}"
-                        : eintrag.Text)
+                var auftraege = draft.OffeneAnmerkungen
+                    .Select(entry => entry.Zitat.Length > 0
+                        ? $"Zur markierten Stelle [{entry.Zitat}]: {entry.Text}"
+                        : entry.Text)
                     .ToArray();
 
-                ausgabe = await anschreiber.UeberarbeiteAsync(
-                    zugang, kontext, entwurf.Betreff, entwurf.Text, auftraege,
+                ausgabe = await anschreiber.ReviseAsync(
+                    zugang, context, draft.Betreff, draft.Text, auftraege,
                     Fortschritt, stoppingToken);
 
-                var frisch = await entwuerfe.HoleAsync(auftrag.Wer, auftrag.EntwurfId, stoppingToken);
+                var frisch = await drafts.GetAsync(letterJob.Wer, letterJob.EntwurfId, stoppingToken);
 
                 if (frisch is null)
                 {
                     return;
                 }
 
-                var (betreff, text) = Anschreibenformat.Lies(ausgabe);
+                var (betreff, text) = CoverLetterFormat.Lies(ausgabe);
                 frisch.Ueberarbeite(betreff, text, uhr.GetUtcNow());
                 await HaltFest(frisch, stoppingToken);
                 return;
             }
 
-            ausgabe = await anschreiber.SchreibeAsync(
-                zugang, kontext, Fortschritt, stoppingToken);
+            ausgabe = await anschreiber.WriteAsync(
+                zugang, context, Fortschritt, stoppingToken);
 
             protokoll.LogInformation(
                 "Anschreiben {EntwurfId}: Modell fertig ({Zeichen} Zeichen)",
-                auftrag.EntwurfId, ausgabe.Length);
+                letterJob.EntwurfId, ausgabe.Length);
 
-            var danach = await entwuerfe.HoleAsync(auftrag.Wer, auftrag.EntwurfId, stoppingToken);
+            var danach = await drafts.GetAsync(letterJob.Wer, letterJob.EntwurfId, stoppingToken);
 
             if (danach is null)
             {
                 return;
             }
 
-            var fertig = Anschreibenformat.Lies(ausgabe);
+            var fertig = CoverLetterFormat.Lies(ausgabe);
             danach.Nimm_text_an(fertig.Betreff, fertig.Text, uhr.GetUtcNow());
             await HaltFest(danach, stoppingToken);
         }
-        catch (AnschreibenNichtVerfuegbar fehler)
+        catch (CoverLetterUnavailable error)
         {
             protokoll.LogWarning(
                 "Anschreiben {EntwurfId} abgebrochen: {Grund}",
-                auftrag.EntwurfId, fehler.Message);
+                letterJob.EntwurfId, error.Message);
 
-            var stand = await entwuerfe.HoleAsync(auftrag.Wer, auftrag.EntwurfId, stoppingToken);
+            var state = await drafts.GetAsync(letterJob.Wer, letterJob.EntwurfId, stoppingToken);
 
-            if (stand is null)
+            if (state is null)
             {
                 return;
             }
 
-            if (stand.Text.Length > 0)
+            if (state.Text.Length > 0)
             {
-                stand.Nimm_text_an(stand.Betreff, stand.Text, uhr.GetUtcNow());
+                state.Nimm_text_an(state.Betreff, state.Text, uhr.GetUtcNow());
             }
             else
             {
-                stand.Scheitere(fehler.Message, uhr.GetUtcNow());
+                state.Scheitere(error.Message, uhr.GetUtcNow());
             }
 
-            await HaltFest(stand, stoppingToken);
+            await HaltFest(state, stoppingToken);
         }
     }
 
-    private static async Task<Bewerbungsentwurf?> WarteAufStandAsync(
-        IEntwurfsspeicher speicher,
-        Anschreibenauftrag auftrag,
+    private static async Task<ApplicationDraft?> WaitForStateAsync(
+        IDraftStore store,
+        CoverLetterJob letterJob,
         CancellationToken stoppingToken)
     {
-        for (var versuch = 0; versuch < 20; versuch++)
+        for (var attempt = 0; attempt < 20; attempt++)
         {
-            var entwurf = await speicher.HoleAsync(
-                auftrag.Wer, auftrag.EntwurfId, stoppingToken);
+            var draft = await store.GetAsync(
+                letterJob.Wer, letterJob.EntwurfId, stoppingToken);
 
-            if (entwurf is not null && entwurf.Stand == Entwurfsstand.Entsteht)
+            if (draft is not null && draft.State == DraftState.Entsteht)
             {
-                return entwurf;
+                return draft;
             }
 
             await Task.Delay(50, stoppingToken);
         }
 
-        return await speicher.HoleAsync(auftrag.Wer, auftrag.EntwurfId, stoppingToken);
+        return await store.GetAsync(letterJob.Wer, letterJob.EntwurfId, stoppingToken);
     }
 
-    private static async Task ScheitereAsync(
-        Func<Bewerbungsentwurf, CancellationToken, Task> halteFest,
-        Bewerbungsentwurf entwurf,
-        string grund,
+    private static async Task FailAsync(
+        Func<ApplicationDraft, CancellationToken, Task> halteFest,
+        ApplicationDraft draft,
+        string reason,
         TimeProvider uhr,
         CancellationToken stoppingToken)
     {
-        entwurf.Scheitere(grund, uhr.GetUtcNow());
-        await halteFest(entwurf, stoppingToken);
+        draft.Scheitere(reason, uhr.GetUtcNow());
+        await halteFest(draft, stoppingToken);
     }
 }

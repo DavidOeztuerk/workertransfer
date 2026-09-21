@@ -11,14 +11,14 @@ namespace WorkerTransfer.Identity.Tests;
 /// Dienst schreibt.
 /// </summary>
 /// <remarks>
-/// Solange Alembic das Schema besass, legte eine handgeschriebene Wanderung den
+/// Solange Alembic das Schema besass, legte eine handgeschriebene SchemaMigration den
 /// Typ unter einem Guard an, und dieser Test las dessen SQL. Seit dem Umzug
 /// erzeugt EF die Typen selbst — aus der Anmerkung <c>Npgsql:Enum:&lt;typ&gt;</c>
-/// in der Wanderung. Geprueft wird dasselbe wie vorher: <em>welche</em>
+/// in der SchemaMigration. Geprueft wird dasselbe wie vorher: <em>welche</em>
 /// Etiketten entstehen.
 /// <para>
 /// Jede Menge wird dreifach festgenagelt: ausgeschrieben, gegen die echte
-/// Spalte und gegen die Wanderung. Ein Etikett, das dieser Dienst kennt und die
+/// Spalte und gegen die SchemaMigration. Ein Etikett, das dieser Dienst kennt und die
 /// Spalte nicht, ist ein Einfuegen, das scheitert — bei
 /// <c>invitation_withdrawn</c> vielleicht erst bei der ersten je
 /// zurueckgenommenen Einladung, Monate spaeter.
@@ -54,11 +54,11 @@ public class SpaltenetikettenTests(Postgres postgres)
     [Theory]
     [MemberData(nameof(Aufzaehlungen))]
     public void Es_gibt_genau_ein_Etikett_je_Mitglied(
-        string typ, string[] etiketten, int mitglieder)
+        string type, string[] labels, int members)
     {
-        typ.Should().NotBeEmpty();
-        etiketten.Should().HaveCount(mitglieder);
-        etiketten.Should().OnlyHaveUniqueItems();
+        type.Should().NotBeEmpty();
+        labels.Should().HaveCount(members);
+        labels.Should().OnlyHaveUniqueItems();
     }
 
     [Fact]
@@ -76,46 +76,46 @@ public class SpaltenetikettenTests(Postgres postgres)
     [Theory]
     [MemberData(nameof(Aufzaehlungen))]
     public async Task Die_Spalte_kennt_genau_diese_Etiketten(
-        string typ, string[] etiketten, int mitglieder)
+        string type, string[] labels, int members)
     {
-        mitglieder.Should().BePositive();
+        members.Should().BePositive();
 
-        await using var verbindung = new NpgsqlConnection(postgres.ConnectionString);
-        await verbindung.OpenAsync();
-        await using var befehl = verbindung.CreateCommand();
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await connection.OpenAsync();
+        await using var befehl = connection.CreateCommand();
         befehl.CommandText = """
             SELECT e.enumlabel
             FROM pg_enum e
             JOIN pg_type t ON t.oid = e.enumtypid
-            WHERE t.typname = @typ
+            WHERE t.typname = @type
             ORDER BY e.enumsortorder
             """;
-        befehl.Parameters.AddWithValue("typ", typ);
+        befehl.Parameters.AddWithValue("type", type);
 
-        var gefunden = new List<string>();
+        var found = new List<string>();
         await using var leser = await befehl.ExecuteReaderAsync();
         while (await leser.ReadAsync())
         {
-            gefunden.Add(leser.GetString(0));
+            found.Add(leser.GetString(0));
         }
 
-        gefunden.Should().BeEquivalentTo(etiketten);
+        found.Should().BeEquivalentTo(labels);
     }
 
     /// <summary>
-    /// Und gegen die Wanderung, die den Typ auf einer frischen Datenbank
+    /// Und gegen die SchemaMigration, die den Typ auf einer frischen Datenbank
     /// anlegt.
     /// </summary>
     /// <remarks>
-    /// Eine Wanderung, die eine andere Menge anlegt als die hier festgenagelte,
+    /// Eine SchemaMigration, die eine andere Menge anlegt als die hier festgenagelte,
     /// verschoebe den Fehlschlag nur auf die erste frische Datenbank.
     /// </remarks>
     [Theory]
     [MemberData(nameof(Aufzaehlungen))]
     public void Die_Wanderung_legt_genau_diese_Etiketten_an(
-        string typ, string[] etiketten, int mitglieder)
+        string type, string[] labels, int members)
     {
-        mitglieder.Should().BePositive();
+        members.Should().BePositive();
 
         var ordner = Path.Combine(
             Postgres.Repowurzel(),
@@ -123,16 +123,16 @@ public class SpaltenetikettenTests(Postgres postgres)
             "WorkerTransfer.Identity.Infrastructure", "Persistence", "Migrations");
 
         var anmerkung = Directory.EnumerateFiles(ordner, "*.cs")
-            .Where(pfad => !pfad.EndsWith("ModelSnapshot.cs", StringComparison.Ordinal))
+            .Where(path => !path.EndsWith("ModelSnapshot.cs", StringComparison.Ordinal))
             .Select(File.ReadAllText)
             .Select(text => Regex.Match(
-                text, $@"""Npgsql:Enum:{typ}"", ""(?<werte>[^""]*)""",
+                text, $@"""Npgsql:Enum:{type}"", ""(?<werte>[^""]*)""",
                 RegexOptions.None, TimeSpan.FromSeconds(5)))
-            .SingleOrDefault(treffer => treffer.Success);
+            .SingleOrDefault(hit => hit.Success);
 
-        anmerkung.Should().NotBeNull($"genau eine Wanderung muss {typ} anlegen");
+        anmerkung.Should().NotBeNull($"genau eine Wanderung muss {type} anlegen");
 
         anmerkung!.Groups["werte"].Value.Split(',')
-            .Should().BeEquivalentTo(etiketten);
+            .Should().BeEquivalentTo(labels);
     }
 }

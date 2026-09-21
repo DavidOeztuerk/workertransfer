@@ -2,11 +2,11 @@ using System.Net.Http.Json;
 using Noelia.Core.Identity;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Contracts.Erasure;
-using WorkerTransfer.Identity.Application.Loeschung;
+using WorkerTransfer.Identity.Application.Erasure;
 using WorkerTransfer.Identity.Application.Ports;
 using WorkerTransfer.Outbox;
 
-namespace WorkerTransfer.Identity.Infrastructure.Loeschung;
+namespace WorkerTransfer.Identity.Infrastructure.Erasure;
 
 /// <summary>Delivers the cascade, and enforces its order.</summary>
 /// <remarks>
@@ -21,42 +21,42 @@ namespace WorkerTransfer.Identity.Infrastructure.Loeschung;
 /// comment cannot stop the account from falling while somebody still holds
 /// data (ADR-0027 §6).
 /// </remarks>
-public sealed class HttpLoeschzustellung(
+public sealed class HttpErasureDelivery(
     IHttpClientFactory fabrik,
-    ILoeschbestand bestand,
+    IErasureLedger bestand,
     IPostkorb postkorb,
     IPostkorbVersand versand,
-    IOptions<Loescheinstellungen> einstellungen,
-    TimeProvider uhr) : IZustellung
+    IOptions<ErasureSettings> einstellungen,
+    TimeProvider uhr) : IDelivery
 {
-    private readonly Loescheinstellungen _einstellungen = einstellungen.Value;
+    private readonly ErasureSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task ZustelleAsync(
-        SubjectId empfaenger,
-        string art,
+    public async Task DeliverAsync(
+        SubjectId recipient,
+        string kind,
         CancellationToken cancellationToken = default)
     {
-        if (art == Loeschempfaenger.Unternehmensrueckzug)
+        if (kind == ErasureRecipient.Unternehmensrueckzug)
         {
-            await ZiehAnzeigenZurueck(empfaenger, cancellationToken);
+            await ZiehAnzeigenZurueck(recipient, cancellationToken);
             return;
         }
 
-        if (art == Loeschempfaenger.Schlussnachricht)
+        if (kind == ErasureRecipient.Schlussnachricht)
         {
-            await SchickeSchlussnachricht(empfaenger, cancellationToken);
+            await SchickeSchlussnachricht(recipient, cancellationToken);
             return;
         }
 
-        if (art == Loeschempfaenger.Identitaet)
+        if (kind == ErasureRecipient.Identitaet)
         {
-            await SchliesseAb(empfaenger, cancellationToken);
+            await SchliesseAb(recipient, cancellationToken);
             return;
         }
 
-        var dienst = art[Loeschempfaenger.Praefix.Length..];
-        await Frag(dienst, "/erasure", new LoeschungV1(empfaenger.Value), cancellationToken);
+        var service = kind[ErasureRecipient.Praefix.Length..];
+        await Frag(service, "/erasure", new ErasureV1(recipient.Value), cancellationToken);
     }
 
     /// <summary>
@@ -68,13 +68,13 @@ public sealed class HttpLoeschzustellung(
     /// data would be the one lie this whole cascade exists to prevent.
     /// </remarks>
     private async Task SchickeSchlussnachricht(
-        SubjectId wer,
+        SubjectId subject,
         CancellationToken cancellationToken)
     {
-        var offen = await bestand.OffeneAbsichtenAsync(wer, cancellationToken);
+        var offen = await bestand.OpenIntentsAsync(subject, cancellationToken);
 
-        if (offen.Any(art => art != Loeschempfaenger.Schlussnachricht
-                             && art != Loeschempfaenger.Identitaet))
+        if (offen.Any(kind => kind != ErasureRecipient.Schlussnachricht
+                             && kind != ErasureRecipient.Identitaet))
         {
             throw new NochNichtException("noch nicht alle Empfänger haben quittiert");
         }
@@ -82,38 +82,38 @@ public sealed class HttpLoeschzustellung(
         // Read now, not carried along: the address and the language live in the
         // row that is about to be deleted, and putting either in the outbox
         // would write it into every backup (ADR-0025 §5).
-        var anschrift = await bestand.AdresseAsync(wer, cancellationToken);
+        var anschrift = await bestand.AddressAsync(subject, cancellationToken);
 
         if (anschrift is not null)
         {
-            postkorb.Loeschbestaetigung(anschrift.Adresse, wer, anschrift.Sprache);
-            await versand.VersendeGesammeltesAsync(cancellationToken);
+            postkorb.Loeschbestaetigung(anschrift.Adresse, subject, anschrift.Sprache);
+            await versand.SendCollectedAsync(cancellationToken);
         }
     }
 
     /// <summary>The account falls last, and only after the notice went out.</summary>
-    private async Task SchliesseAb(SubjectId wer, CancellationToken cancellationToken)
+    private async Task SchliesseAb(SubjectId subject, CancellationToken cancellationToken)
     {
-        var offen = await bestand.OffeneAbsichtenAsync(wer, cancellationToken);
+        var offen = await bestand.OpenIntentsAsync(subject, cancellationToken);
 
-        if (offen.Any(art => art != Loeschempfaenger.Identitaet))
+        if (offen.Any(kind => kind != ErasureRecipient.Identitaet))
         {
             throw new NochNichtException("die Schlussnachricht steht noch aus");
         }
 
-        var stillgelegt = await bestand.SchliesseAbAsync(wer, uhr.GetUtcNow(), cancellationToken);
+        var stillgelegt = await bestand.CompleteAsync(subject, uhr.GetUtcNow(), cancellationToken);
 
-        foreach (var firma in stillgelegt)
+        foreach (var company in stillgelegt)
         {
             await Frag(
                 "jobs", "/companies/withdrawal",
-                new UnternehmensrueckzugV1(firma.Value), cancellationToken);
+                new UnternehmensrueckzugV1(company.Value), cancellationToken);
         }
     }
 
-    private Task ZiehAnzeigenZurueck(SubjectId firma, CancellationToken cancellationToken) =>
+    private Task ZiehAnzeigenZurueck(SubjectId company, CancellationToken cancellationToken) =>
         Frag("jobs", "/companies/withdrawal",
-            new UnternehmensrueckzugV1(firma.Value), cancellationToken);
+            new UnternehmensrueckzugV1(company.Value), cancellationToken);
 
     /// <summary>
     /// One call, and it throws on anything that is not a success.
@@ -124,14 +124,14 @@ public sealed class HttpLoeschzustellung(
     /// make <c>delivered_at</c> a lie.
     /// </remarks>
     private async Task Frag<T>(
-        string dienst,
-        string pfad,
-        T rumpf,
+        string service,
+        string path,
+        T body,
         CancellationToken cancellationToken)
     {
-        if (!_einstellungen.Adressen.TryGetValue(dienst, out var basis))
+        if (!_einstellungen.Adressen.TryGetValue(service, out var basis))
         {
-            throw new InvalidOperationException($"Keine Adresse für '{dienst}' konfiguriert.");
+            throw new InvalidOperationException($"Keine Adresse für '{service}' konfiguriert.");
         }
 
         // Empty means nothing is delivered — and as a FAILURE, not as a silent
@@ -142,19 +142,19 @@ public sealed class HttpLoeschzustellung(
             throw new InvalidOperationException("Erasure:Geheimnis ist nicht gesetzt.");
         }
 
-        using var client = fabrik.CreateClient(nameof(HttpLoeschzustellung));
+        using var client = fabrik.CreateClient(nameof(HttpErasureDelivery));
 
         client.Timeout = _einstellungen.Zeitueberschreitung;
-        using var anfrage = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(basis), pfad))
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post, new Uri(new Uri(basis), path))
         {
-            Content = JsonContent.Create(rumpf)
+            Content = JsonContent.Create(body)
         };
 
-        anfrage.Headers.Add("X-Erasure-Secret", _einstellungen.Geheimnis);
+        request.Headers.Add("X-Erasure-Secret", _einstellungen.Geheimnis);
 
-        using var antwort = await client.SendAsync(anfrage, cancellationToken);
+        using var response = await client.SendAsync(request, cancellationToken);
 
-        antwort.EnsureSuccessStatusCode();
+        response.EnsureSuccessStatusCode();
     }
 }

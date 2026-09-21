@@ -20,7 +20,7 @@ public interface IUnitOfWork
     /// <param name="arbeit">What to run inside the transaction.</param>
     /// <param name="cancellationToken">Cancels the work and rolls back.</param>
     /// <returns>Whatever <paramref name="arbeit"/> answered.</returns>
-    Task<T> InEinerTransaktionAsync<T>(
+    Task<T> InTransactionAsync<T>(
         Func<CancellationToken, Task<T>> arbeit,
         CancellationToken cancellationToken = default);
 }

@@ -174,11 +174,14 @@ export function PortfolioPage() {
                   mb: 3,
                 }}
               >
-                {/* Die Reihenfolge ist die des gespeicherten Feldes, und die
-                    Adresse einer Arbeit ist ihre Stelle darin: eine Arbeit hat
-                    keine eigene Kennung. */}
                 {arbeiten.map((arbeit, index) => (
-                  <Card key={index} variant="outlined">
+                  <Card
+                    // The order is the stored field's, and a work sample's
+                    // address is its position in it: a work sample has no id of
+                    // its own.
+                    key={index}
+                    variant="outlined"
+                  >
                     <CardContent
                       sx={{
                         display: "flex",

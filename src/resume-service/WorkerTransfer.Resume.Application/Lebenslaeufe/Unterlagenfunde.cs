@@ -8,18 +8,18 @@ using WorkerTransfer.Skills;
 
 namespace WorkerTransfer.Resume.Application.Lebenslaeufe;
 
-/// <summary>Eine Unterlage samt dem, was zuletzt darin gelesen wurde.</summary>
+/// <summary>Eine DocumentRecord samt dem, was zuletzt darin gelesen wurde.</summary>
 /// <param name="Unterlage">Die Datei.</param>
 /// <param name="Fund">
 /// Der Fund — oder <c>null</c> für „noch nie gelesen". Die drei Zustände
 /// müssen unterscheidbar bleiben: nie gelesen, gelesen ohne Text, gelesen ohne
 /// bekanntes Wort. Zwei davon zusammenzulegen hiesse, jemandem stillschweigend
-/// zu sagen, in seinem Zeugnis stehe nichts (ADR-0022 §3).
+/// zu sagen, in seinem Reference stehe nichts (ADR-0022 §3).
 /// </param>
-public sealed record Unterlagenstand(Unterlage Unterlage, Unterlagenfund? Fund);
+public sealed record DocumentRecordState(DocumentRecord DocumentRecord, DocumentTerms? Fund);
 
 /// <summary>Was in meinen Unterlagen steht — ohne etwas zu lesen.</summary>
-public sealed record MeineFundeAbfrage(SubjectId Wer) : IAbfrage<IReadOnlyList<Unterlagenstand>>;
+public sealed record MyTermsQuery(SubjectId Wer) : IAbfrage<IReadOnlyList<DocumentRecordState>>;
 
 /// <summary>Lies meine Unterlagen. Der Knopf.</summary>
 /// <remarks>
@@ -28,7 +28,7 @@ public sealed record MeineFundeAbfrage(SubjectId Wer) : IAbfrage<IReadOnlyList<U
 /// sodass die Zeile nie festgeschrieben würde (dieselbe Falle wie bei
 /// <c>POST /me/oauth/start</c> in github-service).
 /// </remarks>
-public sealed record UnterlagenLesenBefehl(SubjectId Wer) : IBefehl<IReadOnlyList<Unterlagenstand>>;
+public sealed record ReadDocumentsCommand(SubjectId Wer) : IBefehl<IReadOnlyList<DocumentRecordState>>;
 
 /// <summary>Liest die eigenen Unterlagen — auf Auslösung, und nur dann.</summary>
 /// <remarks>
@@ -39,108 +39,108 @@ public sealed record UnterlagenLesenBefehl(SubjectId Wer) : IBefehl<IReadOnlyLis
 /// schon: <em>einmal auf Bitte hinsehen ist etwas anderes als dauerhaft
 /// hinterhersehen.</em> Ein Mensch drückt einen Knopf, liest, was gefunden
 /// wurde, und entscheidet. Deshalb steht der Aufruf hier und in
-/// <c>UnterlageHinzufuegenBefehl</c> ausdrücklich nicht — und deshalb misst
+/// <c>AddDocumentCommand</c> ausdrücklich nicht — und deshalb misst
 /// <c>ErkennungsreiseTests</c> nach dem Hochladen den Zähler des Erkenners,
 /// statt es zu behaupten.</para>
 ///
 /// <para><strong>Es liest jedes Mal alles neu.</strong> Nur die ungelesenen zu
-/// nehmen wäre sparsamer und falsch: der Wortschatz wächst per Pull Request,
-/// und ein Zeugnis, das vor der Erweiterung gelesen wurde, trüge seinen Fund
+/// nehmen wäre sparsamer und falsch: der Vocabulary wächst per Pull Request,
+/// und ein Reference, das vor der Erweiterung gelesen wurde, trüge seinen Fund
 /// für immer unvollständig. Der Knopf heisst „lies meine Unterlagen" und tut
 /// genau das.</para>
 ///
 /// <para><strong>Der Volltext bleibt in diesem Aufruf.</strong> Er wird nicht
 /// abgelegt, nicht protokolliert und nicht zurückgegeben — hinaus gehen allein
-/// die kanonischen Namen, die der Wortschatz wiedererkannt hat.</para>
+/// die kanonischen Namen, die der Vocabulary wiedererkannt hat.</para>
 /// </remarks>
-public sealed class Unterlagenfunde(
-    IUnterlagenSpeicher unterlagen,
-    IFundSpeicher funde,
-    IAblage ablage,
+public sealed class DocumentTermsList(
+    IDocumentRecordStore documents,
+    ITermStore terms,
+    IDocumentStore ablage,
     ITexterkennung erkennung,
     TimeProvider uhr) :
-    IRequestHandler<MeineFundeAbfrage, IReadOnlyList<Unterlagenstand>>,
-    IRequestHandler<UnterlagenLesenBefehl, IReadOnlyList<Unterlagenstand>>
+    IRequestHandler<MyTermsQuery, IReadOnlyList<DocumentRecordState>>,
+    IRequestHandler<ReadDocumentsCommand, IReadOnlyList<DocumentRecordState>>
 {
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Unterlagenstand>> Handle(
-        MeineFundeAbfrage request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<DocumentRecordState>> Handle(
+        MyTermsQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return await Stand(request.Wer, cancellationToken);
+        return await State(request.Wer, cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Unterlagenstand>> Handle(
-        UnterlagenLesenBefehl request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<DocumentRecordState>> Handle(
+        ReadDocumentsCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var alle = await unterlagen.AlleAsync(request.Wer, cancellationToken);
+        var alle = await documents.AllAsync(request.Wer, cancellationToken);
         var bisher = await Nachschlag(request.Wer, cancellationToken);
-        var stand = new List<Unterlagenstand>(alle.Count);
+        var state = new List<DocumentRecordState>(alle.Count);
 
-        foreach (var unterlage in alle)
+        foreach (var document in alle)
         {
-            var inhalt = await ablage.HoleAsync(unterlage.Ablageschluessel, cancellationToken);
+            var content = await ablage.GetAsync(document.Ablageschluessel, cancellationToken);
 
-            if (inhalt is null)
+            if (content is null)
             {
                 // Zeile ohne Datei. Von aussen ist das dasselbe wie „gibt es
                 // nicht" — und einen Fund dazu zu erfinden wäre eine Aussage
                 // über ein Dokument, das niemand mehr hat.
-                stand.Add(new Unterlagenstand(
-                    unterlage, bisher.GetValueOrDefault(unterlage.Id)));
+                state.Add(new DocumentRecordState(
+                    document, bisher.GetValueOrDefault(document.Id)));
                 continue;
             }
 
-            var erkanntes = erkennung.Lies(inhalt, unterlage.Inhaltstyp);
+            var erkanntes = erkennung.Lies(content, document.Inhaltstyp);
 
-            var fund = Unterlagenfund.Halte_fest(
+            var term = DocumentTerms.Halte_fest(
                 request.Wer,
-                unterlage.Id,
+                document.Id,
                 erkanntes.TextGefunden,
                 // DER WORTSCHATZ BENENNT UM UND FOLGERT NIE. Gefunden wird,
-                // was er kennt: „schweissfachmann" im Zeugnis wird zum Namen
+                // was er kennt: „schweissfachmann" im Reference wird zum Namen
                 // „Schweißfachmann" — eine Aussage über Sprache. Was er nicht
                 // kennt, bleibt ungefunden, und das ist die Grenze und nicht
                 // die Luecke (ADR-0023).
-                Wortfund.Finde(erkanntes.Text),
+                TermFinder.Find(erkanntes.Text),
                 uhr.GetUtcNow());
 
-            await funde.SichereAsync(fund, cancellationToken);
-            stand.Add(new Unterlagenstand(unterlage, fund));
+            await terms.SaveAsync(term, cancellationToken);
+            state.Add(new DocumentRecordState(document, term));
         }
 
         // ANTWORT AUS DEM, WAS EBEN GELESEN WURDE — und ausdrücklich nicht aus
         // einem neuen Lesen der Tabelle. `TransaktionsBehavior` schreibt erst
         // fest, wenn dieser Behandler zurückgekehrt ist; eine Abfrage von hier
         // aus sähe den eigenen Fund noch nicht und antwortete „nichts
-        // gefunden". Gemessen: die Reihe war rot, das Zeugnis war es nicht.
-        return stand;
+        // gefunden". Gemessen: die Reihe war rot, das Reference war es nicht.
+        return state;
     }
 
-    private async Task<IReadOnlyList<Unterlagenstand>> Stand(
-        SubjectId wer, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<DocumentRecordState>> State(
+        SubjectId subject, CancellationToken cancellationToken)
     {
-        var alle = await unterlagen.AlleAsync(wer, cancellationToken);
-        var nachUnterlage = await Nachschlag(wer, cancellationToken);
+        var alle = await documents.AllAsync(subject, cancellationToken);
+        var nachUnterlage = await Nachschlag(subject, cancellationToken);
 
         return
         [
-            .. alle.Select(unterlage => new Unterlagenstand(
-                unterlage, nachUnterlage.GetValueOrDefault(unterlage.Id)))
+            .. alle.Select(document => new DocumentRecordState(
+                document, nachUnterlage.GetValueOrDefault(document.Id)))
         ];
     }
 
-    private async Task<Dictionary<Guid, Unterlagenfund>> Nachschlag(
-        SubjectId wer, CancellationToken cancellationToken)
+    private async Task<Dictionary<Guid, DocumentTerms>> Nachschlag(
+        SubjectId subject, CancellationToken cancellationToken)
     {
-        var gelesen = await funde.AlleAsync(wer, cancellationToken);
+        var gelesen = await terms.AllAsync(subject, cancellationToken);
 
         return gelesen
-            .GroupBy(fund => fund.Unterlage)
-            .ToDictionary(gruppe => gruppe.Key, gruppe => gruppe.First());
+            .GroupBy(term => term.DocumentRecord)
+            .ToDictionary(group => group.Key, group => group.First());
     }
 }

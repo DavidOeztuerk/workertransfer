@@ -8,7 +8,7 @@ namespace WorkerTransfer.Contracts.Identity;
 /// </summary>
 /// <remarks>
 /// <para><strong>Ein TYPISIERTER Vertrag, kein anonymes Objekt.</strong> Vier
-/// Benachrichtigungsdrähte kamen nie an, weil an ihrer Stelle ein
+/// Benachrichtigungsdrähte kamen nie an, weil an ihrer Job ein
 /// <c>new { … }</c> stand und der Empfänger eine andere Eigenschaft erwartete.
 /// Ein Draht, an dem eine Zugriffsentscheidung hängt, darf das nicht können:
 /// ein nicht gelesenes Feld wäre hier stillschweigend „kein Admin".</para>
@@ -22,5 +22,5 @@ namespace WorkerTransfer.Contracts.Identity;
 /// nicht zu unterscheiden — derselbe Grund wie überall sonst: der Unterschied
 /// wäre eine Auskunft darüber, welche Unternehmen es gibt.</para>
 /// </remarks>
-public sealed record FirmenrolleV1(
+public sealed record CompanyRoleV1(
     [property: JsonPropertyName("role")] string? Rolle);

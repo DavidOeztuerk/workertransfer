@@ -37,12 +37,12 @@ public sealed class SmtpVersender(IOptions<Postsettings> einstellungen) : IVerse
                 _einstellungen.Benutzer, _einstellungen.Passwort);
         }
 
-        using var nachricht = new MailMessage(_einstellungen.Absender, post.An)
+        using var message = new MailMessage(_einstellungen.Absender, post.An)
         {
             Subject = post.Betreff,
             Body = post.Text
         };
 
-        await client.SendMailAsync(nachricht, cancellationToken);
+        await client.SendMailAsync(message, cancellationToken);
     }
 }

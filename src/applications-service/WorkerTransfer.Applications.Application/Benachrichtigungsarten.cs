@@ -9,7 +9,7 @@ namespace WorkerTransfer.Applications.Application;
 public static class Benachrichtigungsarten
 {
     /// <summary>
-    /// Das Unternehmen hat die Bewerbung bewegt.
+    /// Das Unternehmen hat die JobApplication bewegt.
     /// </summary>
     /// <remarks>
     /// Nur der Zug des Unternehmens wird gemeldet — der Rückzug durch die
@@ -18,11 +18,11 @@ public static class Benachrichtigungsarten
     public const string Bewegt = "application_update";
 
     /// <summary>
-    /// Eine Bewerbung ist bei einem Unternehmen eingegangen.
+    /// Eine JobApplication ist bei einem Unternehmen eingegangen.
     /// </summary>
     /// <remarks>
     /// Geht an die MITGLIEDER des Unternehmens, nicht an die Firma selbst.
-    /// Eine Firma hat kein Postfach.
+    /// Eine Firma hat kein Inbox.
     /// </remarks>
     public const string Angekommen = "application_received";
 }

@@ -1,10 +1,10 @@
-namespace WorkerTransfer.Identity.Infrastructure.Loeschung;
+namespace WorkerTransfer.Identity.Infrastructure.Erasure;
 
 /// <summary>Where the deletion orders go, and what proves they are ours.</summary>
-public sealed class Loescheinstellungen
+public sealed class ErasureSettings
 {
     /// <summary>The configuration section this binds to.</summary>
-    public const string Abschnitt = "Erasure";
+    public const string Section = "Erasure";
 
     /// <summary>
     /// The shared secret for the cascade.

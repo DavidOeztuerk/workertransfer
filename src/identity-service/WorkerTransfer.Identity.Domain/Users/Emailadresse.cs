@@ -9,7 +9,7 @@ namespace WorkerTransfer.Identity.Domain.Users;
 /// <see cref="MailAddress"/>, und was hier durchginge, könnte dort scheitern —
 /// dann steht die Zeile in der Datenbank und die Mail geht nie hinaus.
 /// <para>
-/// Geprüft wird die FORM, nie die Existenz: ob hinter der Adresse ein Postfach
+/// Geprüft wird die FORM, nie die Existenz: ob hinter der Adresse ein Inbox
 /// steht, darf dieser Dienst nicht verraten (<c>/auth/register</c> antwortet für
 /// bekannte und unbekannte Adressen gleich).
 /// </para>
@@ -22,21 +22,21 @@ public static class Emailadresse
     /// <summary>Lässt sich daraus eine Mail bauen?</summary>
     /// <param name="adresse">Was jemand getippt hat.</param>
     /// <returns><c>true</c>, wenn der Versand daran nicht scheitern wird.</returns>
-    public static bool IstZustellbar(string? adresse)
+    public static bool IstZustellbar(string? address)
     {
-        if (string.IsNullOrWhiteSpace(adresse) || adresse.Length > Hoechstlaenge)
+        if (string.IsNullOrWhiteSpace(address) || address.Length > Hoechstlaenge)
         {
             return false;
         }
 
-        if (!MailAddress.TryCreate(adresse.Trim(), out var gebaut))
+        if (!MailAddress.TryCreate(address.Trim(), out var gebaut))
         {
             return false;
         }
 
         // Eine blosse Adresse, kein „Anna <a@b.de>": das stünde sonst so in der
         // Spalte, die den Menschen identifiziert.
-        if (!string.Equals(gebaut.Address, adresse.Trim(), StringComparison.Ordinal)
+        if (!string.Equals(gebaut.Address, address.Trim(), StringComparison.Ordinal)
             || gebaut.DisplayName.Length > 0)
         {
             return false;

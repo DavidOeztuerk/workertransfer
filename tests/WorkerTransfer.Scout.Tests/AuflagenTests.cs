@@ -5,8 +5,8 @@ using WorkerTransfer.Scout.Application.Ansprache;
 using WorkerTransfer.Scout.Application.Kandidaten;
 using WorkerTransfer.Scout.Application.Ports;
 using WorkerTransfer.Scout.Contracts;
-using WorkerTransfer.Scout.Domain.Suchen;
-using WorkerTransfer.Scout.Domain.Treffer;
+using WorkerTransfer.Scout.Domain.Searches;
+using WorkerTransfer.Scout.Domain.Hit;
 
 namespace WorkerTransfer.Scout.Tests;
 
@@ -32,14 +32,14 @@ public class AuflagenTests
     // AUFLAGE 1 — KEINE SORTIERUNG NACH PASSUNG
     // ---------------------------------------------------------------------
 
-    /// <summary>Zwei gleiche Suchen liefern dieselbe Reihenfolge.</summary>
+    /// <summary>Zwei gleiche Searches liefern dieselbe Reihenfolge.</summary>
     [Fact]
     public async Task Zwei_gleiche_Suchen_liefern_dieselbe_Reihenfolge()
     {
-        var (handler, suche, tor, _) = Aufbau();
+        var (handler, search, tor, _) = Aufbau();
 
         var drei = Menschen(3);
-        suche.Bestand.AddRange(drei.Select(wer => Profil(wer, ["Python"])));
+        search.Bestand.AddRange(drei.Select(subject => Profile(subject, ["Python"])));
         Frei(tor, drei);
 
         var erste = await handler.Handle(Frage(), default);
@@ -65,7 +65,7 @@ public class AuflagenTests
     [Fact]
     public async Task Wer_mehr_erfuellt_rueckt_nicht_nach_vorn()
     {
-        var (handler, suche, tor, _) = Aufbau();
+        var (handler, search, tor, _) = Aufbau();
 
         var wenig = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
         var viel = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000002");
@@ -73,26 +73,26 @@ public class AuflagenTests
         // `wenig` steht vorn und erfuellt EINES der zwei gesuchten Worte;
         // `viel` steht hinten und erfuellt BEIDE. Eine Sortierung nach Passung
         // muesste `viel` nach vorn ziehen — und macht damit diese Zeile rot.
-        suche.Bestand.Add(Profil(wenig, ["Python", "Go"]));
-        suche.Bestand.Add(Profil(viel, ["Python", "Kubernetes"]));
+        search.Bestand.Add(Profile(wenig, ["Python", "Go"]));
+        search.Bestand.Add(Profile(viel, ["Python", "Kubernetes"]));
         Frei(tor, [wenig, viel]);
 
-        var seite = await handler.Handle(Frage("Python", "Kubernetes"), default);
+        var page = await handler.Handle(Frage("Python", "Kubernetes"), default);
 
-        seite.Eintraege.Select(t => t.Wer.Value).Should().Equal(
+        page.Eintraege.Select(t => t.Wer.Value).Should().Equal(
             [wenig, viel],
             "die Reihenfolge ist die von profile-service — wer beide gesuchten "
             + "Worte nennt, steht nicht deshalb vor dem, der eines nennt");
 
         // Und die Haekchen sagen, WELCHES fehlt — das ist die Auskunft, die
         // eine Zahl verbergen wuerde.
-        seite.Eintraege[0].Haken.Should().Equal(
+        page.Eintraege[0].Haken.Should().Equal(
             new Haken("Python", true), new Haken("Kubernetes", false));
-        seite.Eintraege[1].Haken.Should().Equal(
+        page.Eintraege[1].Haken.Should().Equal(
             new Haken("Python", true), new Haken("Kubernetes", true));
     }
 
-    /// <summary>Auch die Häkchen bleiben in der Reihenfolge der Suche.</summary>
+    /// <summary>Auch die Häkchen bleiben in der Reihenfolge der Search.</summary>
     /// <remarks>
     /// Die Haken nach „erfüllt zuerst" zu ordnen wäre eine Sortierung nach
     /// Passung im Kleinen — und der Anfang derselben im Grossen.
@@ -100,15 +100,15 @@ public class AuflagenTests
     [Fact]
     public async Task Die_Haken_stehen_in_der_Reihenfolge_der_Suche()
     {
-        var (handler, suche, tor, _) = Aufbau();
+        var (handler, search, tor, _) = Aufbau();
 
-        var wer = Menschen(1)[0];
-        suche.Bestand.Add(Profil(wer, ["Go"]));
-        Frei(tor, [wer]);
+        var subject = Menschen(1)[0];
+        search.Bestand.Add(Profile(subject, ["Go"]));
+        Frei(tor, [subject]);
 
-        var seite = await handler.Handle(Frage("Rust", "Go"), default);
+        var page = await handler.Handle(Frage("Rust", "Go"), default);
 
-        seite.Eintraege.Should().ContainSingle()
+        page.Eintraege.Should().ContainSingle()
             .Which.Haken.Select(h => (h.Wort, h.Genannt))
             .Should().Equal(("Rust", false), ("Go", true));
     }
@@ -133,7 +133,7 @@ public class AuflagenTests
     ];
 
     /// <summary>
-    /// Keine öffentliche Fläche der Domäne oder der Verträge trägt einen solchen
+    /// None öffentliche Fläche der Domäne oder der Verträge trägt einen solchen
     /// Namen.
     /// </summary>
     /// <remarks>
@@ -146,13 +146,13 @@ public class AuflagenTests
     [Fact]
     public void Nichts_hier_fasst_einen_Menschen_in_einer_Zahl_zusammen()
     {
-        var flaechen = new[] { typeof(Treffer).Assembly, typeof(TrefferV1).Assembly }
+        var flaechen = new[] { typeof(Hit).Assembly, typeof(HitV1).Assembly }
             .SelectMany(assembly => assembly.GetExportedTypes())
-            .SelectMany(typ => typ.GetMembers(
+            .SelectMany(type => type.GetMembers(
                     BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static |
                     BindingFlags.DeclaredOnly)
-                .Select(glied => $"{typ.Name}.{glied.Name}")
-                .Append(typ.Name))
+                .Select(glied => $"{type.Name}.{glied.Name}")
+                .Append(type.Name))
             .Distinct()
             .ToList();
 
@@ -160,10 +160,10 @@ public class AuflagenTests
 
         foreach (var name in flaechen)
         {
-            foreach (var wort in Verboten)
+            foreach (var word in Verboten)
             {
-                name.Contains(wort, StringComparison.OrdinalIgnoreCase)
-                    .Should().BeFalse($"'{name}' trägt '{wort}' — ADR-0022, ADR-0036 Auflage 2");
+                name.Contains(word, StringComparison.OrdinalIgnoreCase)
+                    .Should().BeFalse($"'{name}' trägt '{word}' — ADR-0022, ADR-0036 Auflage 2");
             }
         }
     }
@@ -176,10 +176,10 @@ public class AuflagenTests
     [InlineData("MatchScore", true)]
     [InlineData("Trefferanzahl", true)]
     public void Die_Erkennung_trennt_richtig(string name, bool erwartet) =>
-        Verboten.Any(wort => name.Contains(wort, StringComparison.OrdinalIgnoreCase))
+        Verboten.Any(word => name.Contains(word, StringComparison.OrdinalIgnoreCase))
             .Should().Be(erwartet);
 
-    /// <summary>Ein Treffer trägt eine Häkchen<em>liste</em> und keine Summe.</summary>
+    /// <summary>Ein Hit trägt eine Häkchen<em>liste</em> und keine Summe.</summary>
     /// <remarks>
     /// Die geschlossene Feldmenge, nicht eine Verbotsliste: wer ein Feld
     /// ergänzt, schreibt es hier hin — und beantwortet dabei, ob es
@@ -188,10 +188,10 @@ public class AuflagenTests
     [Fact]
     public void Ein_Treffer_traegt_genau_diese_Felder()
     {
-        Felder(typeof(TrefferV1)).Should().BeEquivalentTo(
+        Felder(typeof(HitV1)).Should().BeEquivalentTo(
             "SubjectId", "Headline", "Bio", "Location", "RemoteOk",
             "Named", "Checks", "Evidence", "EvidenceState",
-            // ADR-0041: drei Worte, keine Zahl. `Reach` ist der Stand,
+            // ADR-0041: drei Worte, keine Zahl. `Reach` ist der State,
             // die beiden anderen sind die AUSSAGEN, aus denen er entstand.
             "Reach", "ReachCommute", "ReachAttendance");
 
@@ -207,8 +207,8 @@ public class AuflagenTests
     [Fact]
     public void Eine_Seite_traegt_keine_Gesamtzahl()
     {
-        Felder(typeof(TrefferseiteV1)).Should().BeEquivalentTo("Items", "Next");
-        Felder(typeof(Trefferseite)).Should().BeEquivalentTo("Eintraege", "Weiter");
+        Felder(typeof(HitPageV1)).Should().BeEquivalentTo("Items", "Next");
+        Felder(typeof(HitPage)).Should().BeEquivalentTo("Eintraege", "Weiter");
     }
 
     // ---------------------------------------------------------------------
@@ -218,27 +218,27 @@ public class AuflagenTests
     /// <summary>Ein nur BELEGTES Wort findet niemanden.</summary>
     /// <remarks>
     /// <para>Die Auflage in einem Satz: „kubernetes" steht als GitHub-Topic an
-    /// einem Repository dieser Person und in keinem Profil. Eine Suche danach
+    /// einem Repository dieser Person und in keinem Profile. Eine Search danach
     /// findet sie nicht — ein Topic ist eine Aussage über ein <em>Artefakt</em>,
     /// und wer danach suchte, machte sie stillschweigend zu einer über den
     /// Menschen (ADR-0033).</para>
     ///
     /// <para>Die Gegenprobe steht in derselben Reihe: dieselbe Person ist über
-    /// ihr <em>genanntes</em> „Go" sehr wohl zu finden, und der Beleg taucht
-    /// dann am Treffer auf. Ohne diese zweite Hälfte wäre der Test auch grün,
-    /// wenn die Suche gar nichts fände.</para>
+    /// ihr <em>genanntes</em> „Go" sehr wohl zu finden, und der Evidence taucht
+    /// dann am Hit auf. Ohne diese zweite Hälfte wäre der Test auch grün,
+    /// wenn die Search gar nichts fände.</para>
     /// </remarks>
     [Fact]
     public async Task Ein_nur_belegtes_Wort_findet_niemanden()
     {
-        var (handler, suche, tor, belege) = Aufbau();
+        var (handler, search, tor, evidences) = Aufbau();
 
-        var wer = Menschen(1)[0];
-        suche.Bestand.Add(Profil(wer, ["Go"]));
-        Frei(tor, [wer]);
-        belege.Bestand[wer] = new Belegbogen(
-            [new Beleg("kubernetes", Belegart.Thema, "infra", "https://example.test/infra")],
-            Belegstand.Vollstaendig);
+        var subject = Menschen(1)[0];
+        search.Bestand.Add(Profile(subject, ["Go"]));
+        Frei(tor, [subject]);
+        evidences.Bestand[subject] = new EvidenceSheet(
+            [new Evidence("kubernetes", EvidenceKind.Thema, "infra", "https://example.test/infra")],
+            EvidenceState.Vollstaendig);
 
         var ueberDenBeleg = await handler.Handle(Frage("Kubernetes"), default);
 
@@ -252,7 +252,7 @@ public class AuflagenTests
                 "kubernetes", "zum Treffer DAZUGEHOLT wird er sehr wohl");
     }
 
-    /// <summary>Die Belege werden erst NACH der Freigabe geholt.</summary>
+    /// <summary>Die Belege werden erst NACH der Release geholt.</summary>
     /// <remarks>
     /// Die Reihenfolge ist die Zusage: wer nicht freigegeben hat, über den wird
     /// auch nichts nachgeschlagen. Ein Belegabruf für eine verborgene Person
@@ -262,39 +262,39 @@ public class AuflagenTests
     [Fact]
     public async Task Ueber_wen_nichts_freigegeben_ist_wird_nichts_nachgeschlagen()
     {
-        var (handler, suche, tor, belege) = Aufbau();
+        var (handler, search, tor, evidences) = Aufbau();
 
         var sichtbar = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000001");
         var verborgen = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000002");
 
-        suche.Bestand.Add(Profil(sichtbar, ["Go"]));
-        suche.Bestand.Add(Profil(verborgen, ["Go"]));
+        search.Bestand.Add(Profile(sichtbar, ["Go"]));
+        search.Bestand.Add(Profile(verborgen, ["Go"]));
         Frei(tor, [sichtbar]);
 
         await handler.Handle(Frage("Go"), default);
 
-        belege.Gefragt.Should().Equal(sichtbar);
+        evidences.Gefragt.Should().Equal(sichtbar);
     }
 
     /// <summary>Der Filter, der hinausgeht, trägt nur genannte Worte.</summary>
     /// <remarks>
     /// Am Typ und nicht am Verhalten: <see cref="Suchfilter"/> hat kein Feld für
-    /// einen Beleg, also gibt es keinen Weg, einen mitzuschicken. Wer eines
+    /// einen Evidence, also gibt es keinen Weg, einen mitzuschicken. Wer eines
     /// ergänzt, macht diese Zeile rot.
     /// </remarks>
     [Fact]
     public void Ein_Suchfilter_traegt_genau_diese_Felder() =>
-        Felder(typeof(Suchfilter)).Should().BeEquivalentTo(
+        Felder(typeof(SearchFilter)).Should().BeEquivalentTo(
             "GenannteWorte", "Ort", "NurRemote");
 
     // ---------------------------------------------------------------------
     // AUFLAGE 4 — DIE ANSPRACHE IST EIN ENTWURF
     // ---------------------------------------------------------------------
 
-    /// <summary>Der Ansprachekontext trägt vier Felder — und keines davon ist ein Beleg.</summary>
+    /// <summary>Der Ansprachekontext trägt vier Felder — und keines davon ist ein Evidence.</summary>
     /// <remarks>
     /// <para>Kein Name, keine E-Mail-Adresse, keine <c>SubjectId</c>, kein
-    /// Arbeitgeber, kein Lebenslauf, kein Marktstatus — und <strong>kein Name
+    /// Arbeitgeber, kein Resume, kein MarketStatus — und <strong>kein Name
     /// des suchenden Unternehmens</strong>: ein Firmenname im Prompt wäre die
     /// Einladung, das Modell etwas über den Arbeitgeber sagen zu lassen, was
     /// niemand geprüft hat (ADR-0024).</para>
@@ -314,20 +314,20 @@ public class AuflagenTests
     [Fact]
     public async Task Der_Prompt_traegt_nichts_ueber_die_Person_hinaus()
     {
-        var (_, suche, tor, _) = Aufbau();
+        var (_, search, tor, _) = Aufbau();
         var entwerfer = new Probeentwerfer();
-        var handler = new AnspracheHandler(tor, suche, entwerfer);
+        var handler = new AnspracheHandler(tor, search, entwerfer);
 
-        var wer = Menschen(1)[0];
-        suche.Bestand.Add(Profil(wer, ["Go"]));
-        Frei(tor, [wer]);
+        var subject = Menschen(1)[0];
+        search.Bestand.Add(Profile(subject, ["Go"]));
+        Frei(tor, [subject]);
 
         await handler.Handle(
-            new AnspracheAbfrage(Firma, new SubjectId(wer), ["Go"], "kürzer"), default);
+            new AnspracheAbfrage(Firma, new SubjectId(subject), ["Go"], "kürzer"), default);
 
         var prompt = entwerfer.Letzte!.Prompt;
 
-        prompt.Should().NotContain(wer.ToString());
+        prompt.Should().NotContain(subject.ToString());
         prompt.Should().NotContain(Firma.Value.ToString());
         prompt.Should().NotContain("@");
         prompt.Should().Contain("Go");
@@ -338,7 +338,7 @@ public class AuflagenTests
     /// <para>Der Test, der die vierte Auflage wirklich trägt — und er prüft
     /// eine <em>Abwesenheit</em>. Die Anwendungsschicht kennt genau einen Port
     /// nach draussen, über den etwas an einen Menschen ginge: den Postausgang
-    /// mit „dein Profil wurde entdeckt". Es gibt keinen Postboten, keine
+    /// mit „dein Profile wurde entdeckt". Es gibt keinen Postboten, keine
     /// Mailadresse, keinen Versand-Port und keinen Befehl, der eine Ansprache
     /// abschickte.</para>
     ///
@@ -353,11 +353,11 @@ public class AuflagenTests
 
         var namen = typeof(AnspracheAbfrage).Assembly
             .GetExportedTypes()
-            .SelectMany(typ => typ.GetMembers(
+            .SelectMany(type => type.GetMembers(
                     BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static |
                     BindingFlags.DeclaredOnly)
-                .Select(glied => $"{typ.Name}.{glied.Name}")
-                .Append(typ.Name))
+                .Select(glied => $"{type.Name}.{glied.Name}")
+                .Append(type.Name))
             .Distinct()
             .ToArray();
 
@@ -365,9 +365,9 @@ public class AuflagenTests
 
         foreach (var name in namen)
         {
-            foreach (var wort in verdaechtig)
+            foreach (var word in verdaechtig)
             {
-                name.Contains(wort, StringComparison.OrdinalIgnoreCase)
+                name.Contains(word, StringComparison.OrdinalIgnoreCase)
                     .Should().BeFalse(
                         $"'{name}' sieht nach einem Versandweg aus — der Dienst "
                         + "entwirft, er schreibt niemandem (ADR-0036 Auflage 4)");
@@ -378,7 +378,7 @@ public class AuflagenTests
     /// <summary>Der Entwurf trägt nur den Text — kein <c>sent_at</c>, keinen Empfänger.</summary>
     [Fact]
     public void Ein_Entwurf_traegt_nur_den_Text() =>
-        Felder(typeof(AnspracheentwurfV1)).Should().BeEquivalentTo("Draft");
+        Felder(typeof(ApproachDraftV1)).Should().BeEquivalentTo("Draft");
 
     // ---------------------------------------------------------------------
 
@@ -388,27 +388,27 @@ public class AuflagenTests
     /// Feld, das jemand befüllt. <c>Prompt</c> zählt dagegen mit, obwohl es
     /// abgeleitet ist — es ist die Zeichenkette, die wirklich hinausgeht.
     /// </remarks>
-    private static string[] Felder(Type typ) =>
-        [.. typ.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(e => e.Name)];
+    private static string[] Felder(Type type) =>
+        [.. type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(e => e.Name)];
 
     private static (KandidatenHandler, Probesuche, Probetor, Probebelege) Aufbau()
     {
-        var suche = new Probesuche();
+        var search = new Probesuche();
         var tor = new Probetor();
-        var belege = new Probebelege();
+        var evidences = new Probebelege();
 
-        return (new KandidatenHandler(suche, tor, belege, new Probestellen()), suche, tor, belege);
+        return (new KandidatenHandler(search, tor, evidences, new Probestellen()), search, tor, evidences);
     }
 
-    private static KandidatenAbfrage Frage(params string[] worte) =>
-        new(Firma, Suchfilter.Aus(worte, null, false), 20, null);
+    private static KandidatenAbfrage Frage(params string[] words) =>
+        new(Firma, SearchFilter.Aus(words, null, false), 20, null);
 
     private static Guid[] Menschen(int wie_viele) =>
         [.. Enumerable.Range(1, wie_viele).Select(
             nummer => Guid.Parse($"cccccccc-0000-0000-0000-{nummer:D12}"))];
 
-    private static Profilfund Profil(Guid wer, string[] genannt) =>
-        new(new SubjectId(wer), "Entwicklerin", "", "Berlin", true, genannt);
+    private static ProfileHit Profile(Guid subject, string[] genannt) =>
+        new(new SubjectId(subject), "Entwicklerin", "", "Berlin", true, genannt);
 
     /// <summary>Die Feldmenge des Treffers wächst um das Häkchen — bewusst.</summary>
     /// <remarks>
@@ -419,22 +419,22 @@ public class AuflagenTests
     [Fact]
     public void Das_Erreichbarkeits_Haekchen_traegt_keine_Kilometerzahl()
     {
-        var felder = Felder(typeof(Erreichbarkeit));
+        var fields = Felder(typeof(Availability));
 
-        felder.Should().BeEquivalentTo(
-            ["Stand", "Stufe", "Anwesenheit"],
+        fields.Should().BeEquivalentTo(
+            ["State", "Stufe", "Anwesenheit"],
             "die Entfernung wird gerechnet und sofort auf einen Stand reduziert — "
             + "sie gehoert in kein Feld (ADR-0041)");
 
-        felder.Should().NotContain(feld =>
-            feld.Contains("Km", StringComparison.OrdinalIgnoreCase)
-            || feld.Contains("Entfernung", StringComparison.OrdinalIgnoreCase)
-            || feld.Contains("Distanz", StringComparison.OrdinalIgnoreCase));
+        fields.Should().NotContain(field =>
+            field.Contains("Km", StringComparison.OrdinalIgnoreCase)
+            || field.Contains("Entfernung", StringComparison.OrdinalIgnoreCase)
+            || field.Contains("Distanz", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static void Frei(Probetor tor, IEnumerable<Guid> wer)
+    private static void Frei(Probetor tor, IEnumerable<Guid> subject)
     {
-        foreach (var einer in wer)
+        foreach (var einer in subject)
         {
             tor.Frei.Add((einer, Firma.Value));
         }

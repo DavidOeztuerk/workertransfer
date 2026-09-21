@@ -13,47 +13,47 @@ namespace WorkerTransfer.Resume.Application.Lebenslaeufe;
 /// subject is not in the body — it comes from the verified token, so a caller
 /// cannot name a different one.
 /// </remarks>
-public sealed record LebenslaufSichernBefehl(
+public sealed record SaveResumeCommand(
     SubjectId Wer,
     IReadOnlyList<Station> Stationen,
-    IReadOnlyList<Ausbildung> Ausbildungen) : IBefehl<Lebenslauf>;
+    IReadOnlyList<Ausbildung> Ausbildungen) : IBefehl<CurriculumVitae>;
 
 /// <summary>Creates it the first time and replaces it afterwards.</summary>
-public sealed class LebenslaufSichernHandler(
-    ILebenslaufSpeicher speicher,
-    IPruefspur pruefspur,
+public sealed class SaveResumeHandler(
+    IResumeStore store,
+    IAuditTrail pruefspur,
     IKorrelationsanhang anhang,
-    TimeProvider uhr) : IRequestHandler<LebenslaufSichernBefehl, Lebenslauf>
+    TimeProvider uhr) : IRequestHandler<SaveResumeCommand, CurriculumVitae>
 {
     /// <inheritdoc />
-    public async Task<Lebenslauf> Handle(
-        LebenslaufSichernBefehl request,
+    public async Task<CurriculumVitae> Handle(
+        SaveResumeCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var jetzt = uhr.GetUtcNow();
-        var vorhanden = await speicher.HoleAsync(request.Wer, cancellationToken);
+        var now = uhr.GetUtcNow();
+        var vorhanden = await store.GetAsync(request.Wer, cancellationToken);
 
-        Lebenslauf lebenslauf;
+        CurriculumVitae resume;
 
         if (vorhanden is null)
         {
-            lebenslauf = Lebenslauf.Anlegen(
-                request.Wer, request.Stationen, request.Ausbildungen, jetzt);
+            resume = CurriculumVitae.Anlegen(
+                request.Wer, request.Stationen, request.Ausbildungen, now);
         }
         else
         {
-            vorhanden.Aktualisiere(request.Stationen, request.Ausbildungen, jetzt);
-            lebenslauf = vorhanden;
+            vorhanden.Aktualisiere(request.Stationen, request.Ausbildungen, now);
+            resume = vorhanden;
         }
 
-        await speicher.SichereAsync(lebenslauf, cancellationToken);
+        await store.SaveAsync(resume, cancellationToken);
 
         await pruefspur.AppendAsync(
-            anhang.Eintrag(Pruefhandlung.ResumeSaved, jetzt, request.Wer, betroffene: request.Wer),
+            anhang.Eintrag(AuditAction.ResumeSaved, now, request.Wer, betroffene: request.Wer),
             cancellationToken);
 
-        return lebenslauf;
+        return resume;
     }
 }

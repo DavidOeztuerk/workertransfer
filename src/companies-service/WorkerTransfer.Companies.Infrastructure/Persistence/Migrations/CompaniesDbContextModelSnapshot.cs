@@ -17,12 +17,12 @@ namespace WorkerTransfer.Companies.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("WorkerTransfer.Companies.Infrastructure.Persistence.ProfilZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Companies.Infrastructure.Persistence.ProfileRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")

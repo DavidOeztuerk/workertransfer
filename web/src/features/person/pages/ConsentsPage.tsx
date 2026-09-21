@@ -58,6 +58,17 @@ import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
  * denselben Schalter sind kein Widerspruch: beide lesen und schreiben den
  * Ledger, es gibt nur eine Wahrheit. Was es nicht mehr gibt, ist genau ein Ort,
  * und den findet niemand.
+ *
+ * <strong>Granting sits above withdrawing</strong>, in the order the questions
+ * are asked: whoever comes here mostly wants to know how they become visible;
+ * whoever wants to withdraw already knows what to look for.
+ *
+ * <strong>The two outlined cards at the bottom say what has NO switch.</strong>
+ * Without them the page looks complete and is not: the CV is missing, and
+ * whoever looks for it takes that for an oversight. It is none — see ADR-0020.
+ * Both routes to the CV stand side by side, because the difference is not in
+ * the document but in WHO starts: a company asking, or an application sending
+ * it along.
  */
 export function ConsentsPage() {
   const { t } = useTranslation();
@@ -87,6 +98,10 @@ export function ConsentsPage() {
   const einzelne = consents.filter(
     (eintrag) => !global.includes(eintrag.capability),
   );
+
+  // No empty state on an error: "you have released nothing" would be the most
+  // reassuring wrong answer there is, so the empty state needs a successful read.
+  const nichtsFreigegeben = result?.ok === true && einzelne.length === 0;
 
   /*
    * Ohne NACHGEWIESENES Konto gibt es nichts freizugeben. Der Schalter bleibt
@@ -197,11 +212,6 @@ export function ConsentsPage() {
     >
       {fehler !== null ? <ErrorBlock error={fehler} /> : null}
 
-      {/*
-        ERTEILEN steht oben, ZURÜCKZIEHEN darunter — in der Reihenfolge, in der
-        man die Fragen stellt. Wer hierherkommt, will meistens wissen, wie er
-        sichtbar wird; wer widerrufen will, weiss schon, wonach er sucht.
-      */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 0.5 }}>
@@ -271,13 +281,11 @@ export function ConsentsPage() {
             <LoadingBlock label={t("freigaben.laden")} />
           ) : null}
 
-          {/* Kein leerer Zustand bei einem Fehler: „du hast nichts freigegeben"
-              wäre hier die beruhigendste falsche Antwort, die es gibt. */}
           {result !== undefined && !result.ok ? (
             <ErrorBlock error={result.error} />
           ) : null}
 
-          {result?.ok && einzelne.length === 0 ? (
+          {nichtsFreigegeben ? (
             <EmptyBlock
               title={t("freigaben.leerTitel")}
               hint={t("freigaben.leerHinweis")}
@@ -304,11 +312,6 @@ export function ConsentsPage() {
         </CardContent>
       </Card>
 
-      {/*
-        WAS KEINEN SCHALTER HAT, und warum. Ohne diesen Absatz sieht die Seite
-        vollständig aus und ist es nicht: der Lebenslauf fehlt, und wer ihn
-        sucht, hält das für ein Versehen. Er ist keins — siehe ADR-0020.
-      */}
       <Card variant="outlined">
         <CardContent>
           <Typography variant="h3" sx={{ mb: 1 }}>
@@ -323,18 +326,6 @@ export function ConsentsPage() {
         </CardContent>
       </Card>
 
-      {/*
-        DIE ZWEITE KARTE IST DIE HAELFTE, DIE HIER GEFEHLT HAT.
-
-        Es gibt zwei Wege zum Lebenslauf, und bis hierher stand nur einer da —
-        der, auf dem ein Unternehmen fragt. Also las jemand, der sich gerade
-        selbst bewerben wollte, einen Satz ueber seinen jetzigen Arbeitgeber
-        und verstand die Welt nicht mehr. Zu Recht: wer sich bewirbt, schickt
-        seinen Lebenslauf mit, das ist der ganze Sinn.
-
-        Die zwei Wege stehen jetzt nebeneinander, weil der Unterschied nicht im
-        Dokument liegt, sondern darin, WER anfaengt.
-      */}
       <Card variant="outlined" sx={{ mt: 2 }}>
         <CardContent>
           <Typography variant="h3" sx={{ mb: 1 }}>
@@ -365,6 +356,11 @@ function ConsentZeile({
 }) {
   const { t, i18n } = useTranslation();
   const parts = parseCapability(consent.capability);
+  // The date follows the CHOSEN language, not the device: otherwise a German
+  // sentence would stand next to an American date.
+  const freigegebenAm = new Date(consent.granted_at).toLocaleDateString(
+    i18n.language,
+  );
   // Eine unbekannte Form wird gezeigt, nicht verschluckt — und lässt sich
   // trotzdem zurückziehen.
   // Übersetzt wird NUR die erkannte Form. Die rohe Zeichenkette durch `t()` zu
@@ -395,13 +391,7 @@ function ConsentZeile({
           {was} · {wer}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          {/* Das Datum folgt der GEWÄHLTEN Sprache, nicht dem Gerät: sonst
-              stünde ein deutscher Satz neben einem amerikanischen Datum. */}
-          {t("freigaben.freigegebenAm", {
-            datum: new Date(consent.granted_at).toLocaleDateString(
-              i18n.language,
-            ),
-          })}
+          {t("freigaben.freigegebenAm", { datum: freigegebenAm })}
         </Typography>
       </Box>
       <Button variant="text" onClick={onWithdraw} disabled={busy}>

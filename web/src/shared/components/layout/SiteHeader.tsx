@@ -106,18 +106,19 @@ export function SiteHeader() {
         borderColor: "divider",
       }}
     >
-      {/* Das Randmass steht in allen drei Hüllen gleich (Kopf, Inhalt, Fuss).
-          Vorher trug jede ihr eigenes, und der Anmeldeknopf klebte rechts am
-          Rand — bei einer Kopfzeile fällt das am stärksten auf, weil sie auf
-          jeder Seite steht. */}
-      <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
+      <Container
+        maxWidth="lg"
+        // The same gutter in all three shells (header, content, footer): with
+        // its own, the sign-in button sticks to the right edge — most visible in
+        // a header, because it stands on every page.
+        sx={{ px: { xs: 2, sm: 3, md: 4 } }}
+      >
         <Toolbar disableGutters sx={{ gap: 2, minHeight: { xs: 60, md: 66 } }}>
-          {/* DIE NAVIGATION VERSCHWAND ERSATZLOS.
-              Bei 420px stand oben nur noch „workertransfer" und „Anmelden" —
-              `Stellen` lag hinter `display: { xs: "none", md: "flex" }` und war
-              von einem Telefon aus gar nicht erreichbar. Verstecken ohne Ersatz
-              ist kein responsives Verhalten, sondern eine fehlende Seite. */}
           <IconButton
+            // The drawer is the narrow-screen replacement for the navigation
+            // below, which hides behind `display: { xs: "none", md: "flex" }`.
+            // Hiding without a replacement is not responsive behaviour but a
+            // missing page.
             onClick={() => setSchublade(true)}
             aria-label={t("kopf.menueOeffnen")}
             size="small"
@@ -271,11 +272,6 @@ function AccountMenu() {
 
   return (
     <>
-      {/* DAS BILD DER PERSON, nicht ein Knopf mit dem Wort „Mein Konto".
-          Solange niemand ein Foto hochgeladen hat, stehen dort die Initialen
-          auf einer Farbe, die dem Namen folgt — beständig über Geräte hinweg,
-          sonst wäre sie kein Erkennungsmerkmal. Kommt das Foto, füllt es
-          `src` und sonst ändert sich nichts. */}
       <Tooltip title={t("kopf.meinKonto")}>
         <IconButton
           onClick={(event) => setAnker(event.currentTarget)}
@@ -362,10 +358,14 @@ function AccountMenu() {
           onOeffnen={() => setzeAnsicht("sprache")}
         />
 
-        {/* „Konto löschen" steht in den Einstellungen und auf „Meine Daten",
-            nicht hier neben „Abmelden". */}
         <Divider />
-        <Eintrag to="/logout" icon={<LogoutOutlinedIcon fontSize="small" />} onFertig={schliessen}>
+        <Eintrag
+          // "Delete account" lives in the settings and on "My data", never here
+          // beside "Sign out".
+          to="/logout"
+          icon={<LogoutOutlinedIcon fontSize="small" />}
+          onFertig={schliessen}
+        >
           {t("kopf.abmelden")}
         </Eintrag>
         </MenuList>

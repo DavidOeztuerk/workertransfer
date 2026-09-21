@@ -14,11 +14,11 @@ namespace WorkerTransfer.Gateway.Tests;
 
 /// <summary>
 /// Die Abweisung der Bremse trägt Sicherheitsköpfe — und sonst legt das
-/// Gateway keine über fremde Antworten.
+/// Gateway keine über fremde Responses.
 /// </summary>
 /// <remarks>
 /// <para><strong>Beide Hälften sind teuer bezahlt.</strong> Ein Prüfbericht
-/// meldete, Gateway-eigene Antworten trügen keine Sicherheitsköpfe. Das stimmte
+/// meldete, Gateway-eigene Responses trügen keine Sicherheitsköpfe. Das stimmte
 /// für die 429 der Bremse — sie ist eine gewöhnliche Antwort an einen
 /// gewöhnlichen Aufrufer und kommt bei jemandem an, der nie einen Dienst
 /// erreicht hat.</para>
@@ -73,11 +73,11 @@ public sealed class SicherheitskoepfeTests
 
         var wirt = bau.Build();
 
-        wirt.Use(async (kontext, weiter) =>
+        wirt.Use(async (context, weiter) =>
         {
-            if (kontext.Request.Headers.TryGetValue(HerkunftsKopf, out var wert))
+            if (context.Request.Headers.TryGetValue(HerkunftsKopf, out var value))
             {
-                kontext.Connection.RemoteIpAddress = System.Net.IPAddress.Parse(wert.ToString());
+                context.Connection.RemoteIpAddress = System.Net.IPAddress.Parse(value.ToString());
             }
 
             await weiter();
@@ -87,10 +87,10 @@ public sealed class SicherheitskoepfeTests
 
         // Steht für das, was Ocelot sonst durchreicht: eine fremde Seite, die
         // ihre eigenen Köpfe mitbringt (oder eben keine).
-        wirt.Run(async kontext =>
+        wirt.Run(async context =>
         {
-            kontext.Response.ContentType = "text/html";
-            await kontext.Response.WriteAsync("<!doctype html><p>durchgereicht");
+            context.Response.ContentType = "text/html";
+            await context.Response.WriteAsync("<!doctype html><p>durchgereicht");
         });
 
         return wirt;
@@ -123,11 +123,11 @@ public sealed class SicherheitskoepfeTests
         await using var wirt = Wirt();
         await wirt.StartAsync();
 
-        using var antwort = await Abgewiesen(wirt, "10.0.0.1");
+        using var response = await Abgewiesen(wirt, "10.0.0.1");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
-        antwort.Headers.GetValues("X-Content-Type-Options").Should().ContainSingle("nosniff");
-        antwort.Headers.GetValues("X-Frame-Options").Should().ContainSingle("DENY");
+        response.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        response.Headers.GetValues("X-Content-Type-Options").Should().ContainSingle("nosniff");
+        response.Headers.GetValues("X-Frame-Options").Should().ContainSingle("DENY");
     }
 
     /// <summary>
@@ -141,17 +141,17 @@ public sealed class SicherheitskoepfeTests
         await wirt.StartAsync();
 
         using var browser = Browser(wirt);
-        using var antwort = await browser.GetAsync("/verify");
+        using var response = await browser.GetAsync("/verify");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        antwort.Headers.Contains("Content-Security-Policy").Should().BeFalse(
+        response.Headers.Contains("Content-Security-Policy").Should().BeFalse(
             "eine CSP des Gateways ueber fremdem HTML verbietet Vites inline-Einstieg "
             + "und seine blob:-Worker — die Seite bleibt weiss");
 
-        antwort.Headers.TryGetValues("Content-Security-Policy", out var werte);
-        (werte ?? []).Should().NotContain(
-            wert => wert.Contains("upgrade-insecure-requests", StringComparison.Ordinal),
+        response.Headers.TryGetValues("Content-Security-Policy", out var values);
+        (values ?? []).Should().NotContain(
+            value => value.Contains("upgrade-insecure-requests", StringComparison.Ordinal),
             "der Browser schriebe http://localhost:8090 auf https:// um, wo niemand hoert");
     }
 }

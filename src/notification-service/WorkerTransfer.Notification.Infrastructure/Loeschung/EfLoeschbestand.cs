@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.Notification.Application.Ports;
 using WorkerTransfer.Notification.Infrastructure.Persistence;
 
-namespace WorkerTransfer.Notification.Infrastructure.Loeschung;
+namespace WorkerTransfer.Notification.Infrastructure.Erasure;
 
 /// <summary>Was eine Löschung in diesem Dienst anfasst.</summary>
 /// <remarks>
@@ -12,18 +12,18 @@ namespace WorkerTransfer.Notification.Infrastructure.Loeschung;
 /// und deshalb fällt jede. Und keinen Aufbewahrungsschalter: es wurde nie
 /// behauptet, dass hier etwas einer Aufbewahrungspflicht unterläge.
 /// </remarks>
-public sealed class EfLoeschbestand(NotificationDbContext kontext) : ILoeschbestand
+public sealed class EfErasureLedger(NotificationDbContext context) : IErasureLedger
 {
     /// <inheritdoc />
-    public async Task<int> LoescheAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<int> DeleteAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        await kontext.Eingaenge
-            .Where(zeile => zeile.UserId == wer.Value)
+        await context.Eingaenge
+            .Where(row => row.UserId == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
-        await kontext.Wuensche
-            .Where(zeile => zeile.Id == wer.Value)
+        await context.Wuensche
+            .Where(row => row.Id == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
         // Nichts bleibt. Die Quittung sagt es, statt den Ursprung raten zu

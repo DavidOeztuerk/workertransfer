@@ -11,60 +11,60 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence;
 /// dieses Menschen" und „nimm den Fund zu dieser Datei weg". Eine Frage nach
 /// dem <em>Wort</em> — welche Menschen tragen „Schweißfachmann" in ihren
 /// Unterlagen — gibt es nicht und darf es nicht geben: durchsuchbar ist allein,
-/// was jemand selbst in sein Profil getippt hat (ADR-0033). Deshalb liegt die
+/// was jemand selbst in sein Profile getippt hat (ADR-0033). Deshalb liegt die
 /// Wortliste auch als Feld in der Zeile und nicht als eigene Tabelle, in der
 /// sich nach ihr suchen liesse.
 /// </remarks>
-public sealed class EfFundSpeicher(ResumeDbContext kontext) : IFundSpeicher
+public sealed class EfTermStore(ResumeDbContext context) : ITermStore
 {
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Unterlagenfund>> AlleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DocumentTerms>> AllAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.Funde
+        var rows = await context.Funde
             .AsNoTracking()
-            .Where(zeile => zeile.SubjectId == wer.Value)
+            .Where(row => row.SubjectId == subject.Value)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZumAggregat)];
+        return [.. rows.Select(ZumAggregat)];
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(
-        Unterlagenfund fund, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        DocumentTerms term, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(fund);
+        ArgumentNullException.ThrowIfNull(term);
 
         // `AsTracking()` IST DER SCHREIBVORGANG. Der ganze Kontext faehrt
         // `QueryTrackingBehavior.NoTracking`; ohne diese Zeile kaeme die Zeile
         // ABGELOEST zurueck, die Zuweisungen unten liefen ins Leere, und der
         // zweite Klick auf „lies meine Unterlagen" schriebe lautlos nichts —
         // gemessen am 09.09.2026 an einem anderen Speicher in diesem Dienst.
-        var vorhanden = await kontext.Funde
+        var vorhanden = await context.Funde
             .AsTracking()
             .FirstOrDefaultAsync(
-                zeile => zeile.SubjectId == fund.Wer.Value
-                    && zeile.DocumentId == fund.Unterlage,
+                row => row.SubjectId == term.Wer.Value
+                    && row.DocumentId == term.DocumentRecord,
                 cancellationToken);
 
         if (vorhanden is null)
         {
-            vorhanden = new FundZeile { Id = fund.Id };
-            kontext.Funde.Add(vorhanden);
+            vorhanden = new TermRow { Id = term.Id };
+            context.Funde.Add(vorhanden);
         }
 
-        vorhanden.SubjectId = fund.Wer.Value;
-        vorhanden.DocumentId = fund.Unterlage;
-        vorhanden.HasText = fund.TextGefunden;
-        vorhanden.Terms = JsonSerializer.Serialize(fund.Begriffe, Gestalt);
-        vorhanden.ReadAt = fund.Gelesen.UtcDateTime;
+        vorhanden.SubjectId = term.Wer.Value;
+        vorhanden.DocumentId = term.DocumentRecord;
+        vorhanden.HasText = term.TextGefunden;
+        vorhanden.Terms = JsonSerializer.Serialize(term.Begriffe, Gestalt);
+        vorhanden.ReadAt = term.Gelesen.UtcDateTime;
     }
 
     /// <inheritdoc />
-    public Task LoescheAsync(
-        SubjectId wer, Guid unterlage, CancellationToken cancellationToken = default) =>
-        kontext.Funde
-            .Where(zeile => zeile.SubjectId == wer.Value && zeile.DocumentId == unterlage)
+    public Task DeleteAsync(
+        SubjectId subject, Guid document, CancellationToken cancellationToken = default) =>
+        context.Funde
+            .Where(row => row.SubjectId == subject.Value && row.DocumentId == document)
             .ExecuteDeleteAsync(cancellationToken);
 
     /// <summary>Wie die Wortliste in die Spalte kommt.</summary>
@@ -79,12 +79,12 @@ public sealed class EfFundSpeicher(ResumeDbContext kontext) : IFundSpeicher
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
-    private static Unterlagenfund ZumAggregat(FundZeile zeile) =>
-        Unterlagenfund.Stelle_her(
-            zeile.Id,
-            new SubjectId(zeile.SubjectId),
-            zeile.DocumentId,
-            zeile.HasText,
-            JsonSerializer.Deserialize<string[]>(zeile.Terms) ?? [],
-            new DateTimeOffset(zeile.ReadAt, TimeSpan.Zero));
+    private static DocumentTerms ZumAggregat(TermRow row) =>
+        DocumentTerms.Stelle_her(
+            row.Id,
+            new SubjectId(row.SubjectId),
+            row.DocumentId,
+            row.HasText,
+            JsonSerializer.Deserialize<string[]>(row.Terms) ?? [],
+            new DateTimeOffset(row.ReadAt, TimeSpan.Zero));
 }

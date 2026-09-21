@@ -5,15 +5,15 @@ namespace WorkerTransfer.Notification.Contracts;
 /// <summary>Was ein Dienst schickt, um jemanden zu benachrichtigen.</summary>
 /// <remarks>
 /// Zwei Felder, und mehr darf es nie werden. Kein Text, kein Grund, kein
-/// Firmenname: die Art genügt, um in der Anwendung die richtige Stelle zu
+/// Firmenname: die Art genügt, um in der Anwendung die richtige Job zu
 /// zeigen, und die Anwendung prüft, wer liest. Ein Feld für einen Satz wäre die
-/// Zeile, in der irgendwann „Acme GmbH möchte deinen Marktstatus sehen" steht.
+/// Zeile, in der irgendwann „Acme GmbH möchte deinen MarketStatus sehen" steht.
 /// </remarks>
 public sealed record BenachrichtigenV1(
     [property: JsonPropertyName("user_id")] Guid UserId,
     [property: JsonPropertyName("kind")] string Kind);
 
-/// <summary>Ein Eintrag im Postfach.</summary>
+/// <summary>Ein Eintrag im Inbox.</summary>
 public sealed record EingangV1(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("kind")] string Kind,
@@ -30,7 +30,7 @@ public sealed record EingangV1(
 /// kennt. Fehlt das Feld, bleibt der Schalter an.
 /// </para>
 /// <para>
-/// <c>profile_discovered</c> — „dein Profil wurde entdeckt" — steht aus
+/// <c>profile_discovered</c> — „dein Profile wurde entdeckt" — steht aus
 /// demselben Grund auf <c>true</c>, und es ist ausdrücklich <em>einzeln</em>
 /// abbestellbar (ADR-0033): es ist die einzige Auskunft, die eine Person über
 /// ihre eigene Sichtbarkeit bekommt, und wer sie nicht will, soll sie einzeln
@@ -46,7 +46,7 @@ public sealed record EingangV1(
 /// <para>
 /// <c>assessment_update</c> — „an deiner Arbeitsprobe hat sich etwas bewegt"
 /// (ADR-0042) — steht ebenfalls auf <c>true</c>. Sie trägt zwei Bewegungen, und
-/// die zweite ist eine Zusage: die Person <em>sieht</em> ihre Bewertung, immer.
+/// die zweite ist eine Zusage: die Person <em>sieht</em> ihre Evaluation, immer.
 /// Wer den Schalter abstellt, verliert die Mail und nicht den Eintrag — der
 /// steht hinter der Anmeldung in ihrer eigenen Liste.
 /// </para>

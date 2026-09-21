@@ -54,7 +54,7 @@ public class AuflagenTests
         "percent", "prozent", "weight", "gewicht", "fit", "passung", "level", "stufe"
     ];
 
-    /// <summary>Keine Spalte des EF-Modells trägt ein solches Wort.</summary>
+    /// <summary>None Spalte des EF-Modells trägt ein solches Wort.</summary>
     /// <remarks>
     /// Am <em>Modell</em> und nicht am Quelltext: eine Spalte kann aus einer
     /// Basisklasse oder einer Konvention kommen, und ein regulärer Ausdruck
@@ -64,18 +64,18 @@ public class AuflagenTests
     [Fact]
     public void Keine_Spalte_traegt_eine_Note()
     {
-        var spalten = Spalten();
+        var columns = Spalten();
 
-        spalten.Should().NotBeEmpty("sonst prüft dieser Test nichts");
-        spalten.Should().Contain("hours", "die erlaubte Zahl muss wirklich dastehen");
+        columns.Should().NotBeEmpty("sonst prüft dieser Test nichts");
+        columns.Should().Contain("hours", "die erlaubte Zahl muss wirklich dastehen");
 
-        foreach (var spalte in spalten)
+        foreach (var column in columns)
         {
-            foreach (var wort in Verboten)
+            foreach (var word in Verboten)
             {
-                spalte.Contains(wort, StringComparison.OrdinalIgnoreCase)
+                column.Contains(word, StringComparison.OrdinalIgnoreCase)
                     .Should().BeFalse(
-                        $"'{spalte}' trägt '{wort}' — eine Bewertung hat Text und keine Zahl "
+                        $"'{column}' trägt '{word}' — eine Bewertung hat Text und keine Zahl "
                         + "(ADR-0022, ADR-0042 §1)");
             }
         }
@@ -83,7 +83,7 @@ public class AuflagenTests
 
     /// <summary>Und kein Name in Domäne und Vertrag.</summary>
     /// <remarks>
-    /// Zwei Baugruppen, weil sie die zwei Stellen sind, an denen eine Zahl
+    /// Zwei Baugruppen, weil sie die zwei Jobs sind, an denen eine Zahl
     /// entstehen könnte: das Aggregat speichert sie, der Vertrag gäbe sie
     /// heraus. Die Anwendungsschicht rechnet nicht.
     /// </remarks>
@@ -97,10 +97,10 @@ public class AuflagenTests
 
         foreach (var name in namen)
         {
-            foreach (var wort in Verboten)
+            foreach (var word in Verboten)
             {
-                name.Contains(wort, StringComparison.OrdinalIgnoreCase)
-                    .Should().BeFalse($"'{name}' in {welche} trägt '{wort}'");
+                name.Contains(word, StringComparison.OrdinalIgnoreCase)
+                    .Should().BeFalse($"'{name}' in {welche} trägt '{word}'");
             }
         }
     }
@@ -108,8 +108,8 @@ public class AuflagenTests
     /// <summary>Die zwei Baugruppen, die nichts rechnen dürfen.</summary>
     public static TheoryData<string, Assembly> Baugruppen => new()
     {
-        { "Domain", typeof(Vorgang).Assembly },
-        { "Contracts", typeof(VorgangV1).Assembly }
+        { "Domain", typeof(Case).Assembly },
+        { "Contracts", typeof(CaseV1).Assembly }
     };
 
     /// <summary>Die Erkennung selbst stimmt — sonst wäre der Test grün, weil er nichts findet.</summary>
@@ -123,10 +123,10 @@ public class AuflagenTests
     [InlineData("fit_percent", true)]
     [InlineData("sterne", true)]
     public void Die_Erkennung_trennt_richtig(string name, bool erwartet) =>
-        Verboten.Any(wort => name.Contains(wort, StringComparison.OrdinalIgnoreCase))
+        Verboten.Any(word => name.Contains(word, StringComparison.OrdinalIgnoreCase))
             .Should().Be(erwartet);
 
-    /// <summary>Eine Bewertung trägt genau diese Felder — Text, Ausgang, Zeitpunkt.</summary>
+    /// <summary>Eine Evaluation trägt genau diese Felder — Text, Ausgang, Zeitpunkt.</summary>
     /// <remarks>
     /// Die geschlossene Feldmenge, nicht eine Verbotsliste: wer ein Feld
     /// ergänzt, schreibt es hier hin. <strong>Und es ist genau EIN Textfeld</strong>
@@ -137,16 +137,16 @@ public class AuflagenTests
     [Fact]
     public void Eine_Bewertung_traegt_genau_diese_Felder()
     {
-        Felder(typeof(Bewertung)).Should().BeEquivalentTo("Text", "Ausgang", "Am");
+        Felder(typeof(Evaluation)).Should().BeEquivalentTo("Text", "Ausgang", "Am");
 
-        Felder(typeof(BewertungV1)).Should().BeEquivalentTo("Outcome", "Text", "EvaluatedAt");
+        Felder(typeof(EvaluationV1)).Should().BeEquivalentTo("Outcome", "Text", "EvaluatedAt");
     }
 
     /// <summary>Und ein Ausgang kennt genau zwei Werte.</summary>
     /// <remarks>
     /// Zwei, nicht drei und nicht fünf: eine Skala mit drei Stufen ist eine Note
     /// mit Worten. „Weiter" oder „nicht weiter" ist eine Aussage über den
-    /// Vorgang, alles Feinere wäre eine über den Menschen.
+    /// Case, alles Feinere wäre eine über den Menschen.
     /// </remarks>
     [Fact]
     public void Ein_Ausgang_kennt_genau_zwei_Werte() =>
@@ -164,28 +164,28 @@ public class AuflagenTests
     /// </remarks>
     [Fact]
     public void Der_Bestand_kennt_genau_diese_Fragen() =>
-        typeof(IVorgangsspeicher).GetMethods().Select(glied => glied.Name)
+        typeof(ICaseStore).GetMethods().Select(glied => glied.Name)
             .Should().BeEquivalentTo(
-                "HoleAsync", "FuerPersonAsync", "FuerFirmaAsync", "SichereAsync", "LoescheAsync");
+                "GetAsync", "ForPersonAsync", "ForCompanyAsync", "SaveAsync", "DeleteAsync");
 
     /// <summary>Ein fremdes Unternehmen sieht nichts — dieselbe 404 wie „gibt es nicht".</summary>
     [Fact]
     public async Task Ein_fremdes_Unternehmen_sieht_den_Vorgang_nicht()
     {
-        var (vorgaenge, tor, _, uhr) = Aufbau();
-        var vorgang = await Stelle(vorgaenge, tor, uhr);
+        var (cases, tor, _, uhr) = Aufbau();
+        var caseItem = await Job(cases, tor, uhr);
 
-        // Auch mit Freigabe an das fremde Unternehmen: der Vorgang gehoert ihm
-        // nicht, und eine Bewertung reist nie zu einem zweiten Unternehmen.
-        tor.Stelle(Anna, Fremde, true);
+        // Auch mit Release an das fremde Unternehmen: der Case gehoert ihm
+        // nicht, und eine Evaluation reist nie zu einem zweiten Unternehmen.
+        tor.Job(Anna, Fremde, true);
 
-        var handler = new VorgangHandler(vorgaenge, tor);
+        var handler = new CaseHandler(cases, tor);
 
         await FluentActions
             .Awaiting(() => handler.Handle(
-                new VorgangAbfrage(vorgang.Id, new SubjectId(Fremde), new TenantId(Fremde)),
+                new CaseQuery(caseItem.Id, new SubjectId(Fremde), new TenantId(Fremde)),
                 default))
-            .Should().ThrowAsync<KeinVorgang>();
+            .Should().ThrowAsync<NoCase>();
     }
 
     // ---------------------------------------------------------------------
@@ -204,24 +204,24 @@ public class AuflagenTests
     [InlineData("")]
     [InlineData("   ")]
     public void Eine_Absage_ohne_Text_wird_abgewiesen(string? text) =>
-        FluentActions.Invoking(() => Bewertung.Schreibe(text, Ausgang.Abgelehnt, Jetzt))
+        FluentActions.Invoking(() => Evaluation.Write(text, Ausgang.Abgelehnt, Jetzt))
             .Should().Throw<Eingabefehler>();
 
     /// <summary>Und eine Zusage ohne Text ebenso — die Regel kennt keinen Ausnahmefall.</summary>
     [Fact]
     public void Eine_Zusage_ohne_Text_wird_ebenso_abgewiesen() =>
-        FluentActions.Invoking(() => Bewertung.Schreibe(" ", Ausgang.Angenommen, Jetzt))
+        FluentActions.Invoking(() => Evaluation.Write(" ", Ausgang.Angenommen, Jetzt))
             .Should().Throw<Eingabefehler>();
 
     /// <summary>Die Gegenprobe: mit Text geht es.</summary>
     [Fact]
     public void Mit_Text_wird_bewertet() =>
-        Bewertung.Schreibe("Sauber gelöst, nur die Fehlerbehandlung fehlt.",
+        Evaluation.Write("Sauber gelöst, nur die Fehlerbehandlung fehlt.",
             Ausgang.Abgelehnt, Jetzt).Text.Should().StartWith("Sauber");
 
     /// <summary>Die Personenseite fragt den Ledger nie.</summary>
     /// <remarks>
-    /// Weder für die Liste noch für den einzelnen Vorgang. Die eigene
+    /// Weder für die Liste noch für den einzelnen Case. Die eigene
     /// Einwilligung zu prüfen, um die eigene Arbeit zu sehen, wäre nicht nur ein
     /// überflüssiger Sprung — wer widerrufen hat, käme sonst an seine
     /// Bewertungen nicht mehr heran.
@@ -229,82 +229,82 @@ public class AuflagenTests
     [Fact]
     public async Task Die_Personenseite_fragt_den_Ledger_nie()
     {
-        var (vorgaenge, tor, _, uhr) = Aufbau();
-        var vorgang = await Stelle(vorgaenge, tor, uhr);
+        var (cases, tor, _, uhr) = Aufbau();
+        var caseItem = await Job(cases, tor, uhr);
         var vorher = tor.Fragen;
 
-        await new MeineVorgaengeHandler(vorgaenge).Handle(
-            new MeineVorgaengeAbfrage(new SubjectId(Anna)), default);
+        await new MyCasesHandler(cases).Handle(
+            new MyCasesQuery(new SubjectId(Anna)), default);
 
-        await new VorgangHandler(vorgaenge, tor).Handle(
-            new VorgangAbfrage(vorgang.Id, new SubjectId(Anna), null), default);
+        await new CaseHandler(cases, tor).Handle(
+            new CaseQuery(caseItem.Id, new SubjectId(Anna), null), default);
 
         tor.Fragen.Should().Be(vorher, "die eigene Arbeit braucht keine Freigabe");
     }
 
-    /// <summary>Nach einem Widerruf liest die Person weiter — das Unternehmen nicht.</summary>
+    /// <summary>Nach einem Revocation liest die Person weiter — das Unternehmen nicht.</summary>
     /// <remarks>
-    /// <strong>Der schärfste Satz dieses Dienstes.</strong> Eine Bewertung, aus
+    /// <strong>Der schärfste Satz dieses Dienstes.</strong> Eine Evaluation, aus
     /// der man sich aussperren kann, indem man Sichtbarkeit zurücknimmt, wäre
     /// eine Beurteilung, die der Beurteilte nie liest — genau das, was hier
-    /// nicht gebaut wird. Und die andere Hälfte gilt genauso: ein Widerruf
+    /// nicht gebaut wird. Und die andere Hälfte gilt genauso: ein Revocation
     /// wirkt beim nächsten Lesen (ADR-0013).
     /// </remarks>
     [Fact]
     public async Task Nach_einem_Widerruf_liest_die_Person_weiter()
     {
-        var (vorgaenge, tor, ausgang, uhr) = Aufbau();
-        var vorgang = await Stelle(vorgaenge, tor, uhr);
+        var (cases, tor, ausgang, uhr) = Aufbau();
+        var caseItem = await Job(cases, tor, uhr);
 
-        vorgang.Reiche_ein(Einreichung.Schreibe("Fertig.", null, uhr.GetUtcNow()), uhr.GetUtcNow());
+        caseItem.Reiche_ein(Submission.Write("Fertig.", null, uhr.GetUtcNow()), uhr.GetUtcNow());
 
-        await new BewertenHandler(vorgaenge, tor, ausgang, uhr).Handle(
-            new BewertenBefehl(vorgang.Id, new TenantId(Firma), Ausgang.Abgelehnt, "Zu knapp."),
+        await new EvaluateHandler(cases, tor, ausgang, uhr).Handle(
+            new EvaluateCommand(caseItem.Id, new TenantId(Firma), Ausgang.Abgelehnt, "Zu knapp."),
             default);
 
         // Und jetzt nimmt sie ihre Sichtbarkeit zurueck.
-        tor.Stelle(Anna, Firma, false);
+        tor.Job(Anna, Firma, false);
 
-        var handler = new VorgangHandler(vorgaenge, tor);
+        var handler = new CaseHandler(cases, tor);
 
         var ihrer = await handler.Handle(
-            new VorgangAbfrage(vorgang.Id, new SubjectId(Anna), null), default);
+            new CaseQuery(caseItem.Id, new SubjectId(Anna), null), default);
 
-        ihrer.Bewertung!.Text.Should().Be("Zu knapp.");
+        ihrer.Evaluation!.Text.Should().Be("Zu knapp.");
 
         await FluentActions
             .Awaiting(() => handler.Handle(
-                new VorgangAbfrage(vorgang.Id, new SubjectId(Guid.NewGuid()), new TenantId(Firma)),
+                new CaseQuery(caseItem.Id, new SubjectId(Guid.NewGuid()), new TenantId(Firma)),
                 default))
-            .Should().ThrowAsync<KeinVorgang>();
+            .Should().ThrowAsync<NoCase>();
     }
 
     /// <summary>Die Firmenliste fragt den Ledger bei jedem Lesen erneut.</summary>
     [Fact]
     public async Task Die_Firmenliste_fragt_den_Ledger_bei_jedem_Lesen()
     {
-        var (vorgaenge, tor, _, uhr) = Aufbau();
-        await Stelle(vorgaenge, tor, uhr);
+        var (cases, tor, _, uhr) = Aufbau();
+        await Job(cases, tor, uhr);
 
-        var handler = new FirmenvorgaengeHandler(vorgaenge, tor);
+        var handler = new CompanyCasesHandler(cases, tor);
         var vorher = tor.Fragen;
 
-        (await handler.Handle(new FirmenvorgaengeAbfrage(new TenantId(Firma)), default))
+        (await handler.Handle(new CompanyCasesQuery(new TenantId(Firma)), default))
             .Should().ContainSingle();
 
         tor.Fragen.Should().Be(vorher + 1);
 
-        // Widerruf — und schon die naechste Liste ist leer, nicht die
+        // Revocation — und schon die naechste Liste ist leer, nicht die
         // uebernaechste.
-        tor.Stelle(Anna, Firma, false);
+        tor.Job(Anna, Firma, false);
 
-        (await handler.Handle(new FirmenvorgaengeAbfrage(new TenantId(Firma)), default))
+        (await handler.Handle(new CompanyCasesQuery(new TenantId(Firma)), default))
             .Should().BeEmpty();
 
         tor.Fragen.Should().Be(vorher + 2);
     }
 
-    /// <summary>Eine Bewertung entsteht nur zusammen mit ihrem Vermerk.</summary>
+    /// <summary>Eine Evaluation entsteht nur zusammen mit ihrem Vermerk.</summary>
     /// <remarks>
     /// Ohne den Vermerk erführe die Person von einer Rückmeldung erst beim
     /// nächsten Vorbeischauen. Beides steht in <em>einer</em> Transaktion
@@ -314,14 +314,14 @@ public class AuflagenTests
     [Fact]
     public async Task Eine_Bewertung_vermerkt_dass_die_Person_sie_lesen_soll()
     {
-        var (vorgaenge, tor, ausgang, uhr) = Aufbau();
-        var vorgang = await Stelle(vorgaenge, tor, uhr);
+        var (cases, tor, ausgang, uhr) = Aufbau();
+        var caseItem = await Job(cases, tor, uhr);
 
-        vorgang.Reiche_ein(Einreichung.Schreibe("Fertig.", null, uhr.GetUtcNow()), uhr.GetUtcNow());
+        caseItem.Reiche_ein(Submission.Write("Fertig.", null, uhr.GetUtcNow()), uhr.GetUtcNow());
         ausgang.Vermerke.Clear();
 
-        await new BewertenHandler(vorgaenge, tor, ausgang, uhr).Handle(
-            new BewertenBefehl(vorgang.Id, new TenantId(Firma), Ausgang.Abgelehnt, "Zu knapp."),
+        await new EvaluateHandler(cases, tor, ausgang, uhr).Handle(
+            new EvaluateCommand(caseItem.Id, new TenantId(Firma), Ausgang.Abgelehnt, "Zu knapp."),
             default);
 
         ausgang.Vermerke.Should().ContainSingle()
@@ -330,34 +330,34 @@ public class AuflagenTests
 
     /// <summary>Bewertet wird einmal.</summary>
     /// <remarks>
-    /// Eine Bewertung, die sich nachträglich ändern lässt, ist eine, die die
+    /// Eine Evaluation, die sich nachträglich ändern lässt, ist eine, die die
     /// Person gelesen haben kann, bevor sie ihren endgültigen Wortlaut bekam —
     /// und was sie gelesen hat, wäre dann nicht mehr nachweisbar.
     /// </remarks>
     [Fact]
     public void Bewertet_wird_einmal()
     {
-        var vorgang = Vorgang.Stelle(
+        var caseItem = Case.Job(
             new SubjectId(Anna), new TenantId(Firma), Probeaufgabe(), Jetzt);
 
-        vorgang.Reiche_ein(Einreichung.Schreibe("Fertig.", null, Jetzt), Jetzt);
-        vorgang.Bewerte(Bewertung.Schreibe("Gut.", Ausgang.Angenommen, Jetzt), Jetzt);
+        caseItem.Reiche_ein(Submission.Write("Fertig.", null, Jetzt), Jetzt);
+        caseItem.Bewerte(Evaluation.Write("Gut.", Ausgang.Angenommen, Jetzt), Jetzt);
 
         FluentActions.Invoking(() =>
-                vorgang.Bewerte(Bewertung.Schreibe("Doch nicht.", Ausgang.Abgelehnt, Jetzt), Jetzt))
+                caseItem.Bewerte(Evaluation.Write("Doch nicht.", Ausgang.Abgelehnt, Jetzt), Jetzt))
             .Should().Throw<SchrittNichtMoeglich>();
     }
 
-    /// <summary>Ohne Einreichung gibt es nichts zu bewerten.</summary>
+    /// <summary>Ohne Submission gibt es nichts zu bewerten.</summary>
     /// <remarks>
-    /// Eine Bewertung ohne Arbeit wäre eine Aussage über den Menschen statt über
+    /// Eine Evaluation ohne Arbeit wäre eine Aussage über den Menschen statt über
     /// seine Arbeit.
     /// </remarks>
     [Fact]
     public void Ohne_Einreichung_gibt_es_nichts_zu_bewerten() =>
         FluentActions.Invoking(() =>
-                Vorgang.Stelle(new SubjectId(Anna), new TenantId(Firma), Probeaufgabe(), Jetzt)
-                    .Bewerte(Bewertung.Schreibe("Gut.", Ausgang.Angenommen, Jetzt), Jetzt))
+                Case.Job(new SubjectId(Anna), new TenantId(Firma), Probeaufgabe(), Jetzt)
+                    .Bewerte(Evaluation.Write("Gut.", Ausgang.Angenommen, Jetzt), Jetzt))
             .Should().Throw<SchrittNichtMoeglich>();
 
     // ---------------------------------------------------------------------
@@ -376,7 +376,7 @@ public class AuflagenTests
     [InlineData(9)]
     [InlineData(40)]
     public void Ein_Umfang_ausserhalb_der_Grenzen_wird_abgewiesen(int stunden) =>
-        FluentActions.Invoking(() => Aufgabe.Schreibe(
+        FluentActions.Invoking(() => Aufgabe.Write(
                 "Kleiner Dienst", "Bau etwas Kleines.", stunden, Jetzt.AddDays(7), Jetzt))
             .Should().Throw<Eingabefehler>();
 
@@ -384,7 +384,7 @@ public class AuflagenTests
     [Fact]
     public void Acht_Stunden_gehen_gerade_noch()
     {
-        Aufgabe.Schreibe("Kleiner Dienst", "Bau etwas Kleines.", 8, Jetzt.AddDays(7), Jetzt)
+        Aufgabe.Write("Kleiner Dienst", "Bau etwas Kleines.", 8, Jetzt.AddDays(7), Jetzt)
             .Stunden.Should().Be(8);
 
         Aufgabe.HoechsterUmfang.Should().Be(8, "ein Arbeitstag ist die Grenze, kein Startwert");
@@ -402,39 +402,39 @@ public class AuflagenTests
     [InlineData(12)]
     [InlineData(47)]
     public void Eine_zu_kurze_Frist_wird_abgewiesen(int stunden) =>
-        FluentActions.Invoking(() => Aufgabe.Schreibe(
+        FluentActions.Invoking(() => Aufgabe.Write(
                 "Kleiner Dienst", "Bau etwas Kleines.", 4, Jetzt.AddHours(stunden), Jetzt))
             .Should().Throw<Eingabefehler>();
 
     /// <summary>Und die Gegenprobe bei achtundvierzig.</summary>
     [Fact]
     public void Achtundvierzig_Stunden_gehen_gerade_noch() =>
-        Aufgabe.Schreibe("Kleiner Dienst", "Bau etwas Kleines.", 4, Jetzt.AddHours(48), Jetzt)
+        Aufgabe.Write("Kleiner Dienst", "Bau etwas Kleines.", 4, Jetzt.AddHours(48), Jetzt)
             .Frist.Should().Be(Jetzt.AddHours(48));
 
     /// <summary>Die Meldung nennt die Regel und nie den Wert.</summary>
     /// <remarks>
     /// <c>ValidationBehavior</c> protokolliert Fehlermeldungen. Ein
-    /// Aufgabentext oder eine Bewertung in einer Meldung stünde damit im
+    /// Aufgabentext oder eine Evaluation in einer Meldung stünde damit im
     /// Protokoll — und beide handeln von einem Menschen.
     /// </remarks>
     [Fact]
     public void Eine_Meldung_nennt_die_Regel_und_nie_den_Wert()
     {
-        var fehler = Assert.Throws<Eingabefehler>(() => Aufgabe.Schreibe(
+        var error = Assert.Throws<Eingabefehler>(() => Aufgabe.Write(
             "Geheimer Titel", "Geheimer Aufgabentext", 4, Jetzt.AddHours(1), Jetzt));
 
-        fehler.Message.Should().NotContain("Geheimer");
+        error.Message.Should().NotContain("Geheimer");
     }
 
-    /// <summary>Ein Stand kennt vier Werte, und keiner davon heisst „abgelehnt".</summary>
+    /// <summary>Ein State kennt vier Werte, und keiner davon heisst „abgelehnt".</summary>
     /// <remarks>
     /// <strong>Die dritte Auflage als Typprobe.</strong> Wer nicht will, tut
     /// nichts — es gibt keinen Zustand, in dem das vermerkt wäre.
     /// </remarks>
     [Fact]
     public void Kein_Stand_heisst_abgelehnt() =>
-        Enum.GetNames<Stand>().Should().BeEquivalentTo(
+        Enum.GetNames<State>().Should().BeEquivalentTo(
             "Gestellt", "Eingereicht", "Bewertet", "Abgelaufen");
 
     /// <summary>Und es gibt nirgends einen Weg, abzulehnen.</summary>
@@ -457,63 +457,63 @@ public class AuflagenTests
     [InlineData("ablehnen")]
     [InlineData("absagen")]
     [InlineData("verweiger")]
-    public void Es_gibt_keinen_Weg_abzulehnen(string wort)
+    public void Es_gibt_keinen_Weg_abzulehnen(string word)
     {
         string[] namen =
         [
-            .. Namen(typeof(AufgabeStellenBefehl).Assembly),
-            .. Namen(typeof(Vorgang).Assembly)
+            .. Namen(typeof(SetTaskCommand).Assembly),
+            .. Namen(typeof(Case).Assembly)
         ];
 
         namen.Should().NotContain(
-            name => name.Contains(wort, StringComparison.OrdinalIgnoreCase),
-            $"'{wort}' wäre der Vermerk, den ADR-0042 §3 ausschliesst");
+            name => name.Contains(word, StringComparison.OrdinalIgnoreCase),
+            $"'{word}' wäre der Vermerk, den ADR-0042 §3 ausschliesst");
     }
 
     /// <summary>Verstrichen ist verstrichen — egal, warum.</summary>
     /// <remarks>
     /// „Wollte nicht", „hat es nicht geschafft" und „war krank" sind derselbe
-    /// Stand: <c>expired</c>. Es gibt kein Feld, das sie unterscheidet, und
+    /// State: <c>expired</c>. Es gibt kein Feld, das sie unterscheidet, und
     /// deshalb auch keine Auskunft darüber.
     /// </remarks>
     [Fact]
     public void Verstrichen_ist_verstrichen()
     {
-        var vorgang = Vorgang.Stelle(
+        var caseItem = Case.Job(
             new SubjectId(Anna), new TenantId(Firma), Probeaufgabe(), Jetzt);
 
-        vorgang.Stand_am(Jetzt).Should().Be(Stand.Gestellt);
-        vorgang.Stand_am(Jetzt.AddDays(8)).Should().Be(Stand.Abgelaufen);
+        caseItem.Stand_am(Jetzt).Should().Be(State.Gestellt);
+        caseItem.Stand_am(Jetzt.AddDays(8)).Should().Be(State.Abgelaufen);
 
         // Und danach geht nichts mehr hinein: eine Aufgabe ohne Ende ist eine,
-        // die in jemandes Kopf fuer immer offen bleibt.
-        FluentActions.Invoking(() => vorgang.Reiche_ein(
-                Einreichung.Schreibe("Doch noch.", null, Jetzt.AddDays(8)), Jetzt.AddDays(8)))
+        // die in jemandes Header fuer immer offen bleibt.
+        FluentActions.Invoking(() => caseItem.Reiche_ein(
+                Submission.Write("Doch noch.", null, Jetzt.AddDays(8)), Jetzt.AddDays(8)))
             .Should().Throw<SchrittNichtMoeglich>();
     }
 
     /// <summary>Wer geliefert hat, gilt nicht als abgelaufen.</summary>
     /// <remarks>
     /// Die Reihenfolge der Fragen in <c>Stand_am</c> ist die Aussage: eine
-    /// abgelaufene Frist macht einen eingereichten Vorgang nicht wieder
+    /// abgelaufene Frist macht einen eingereichten Case nicht wieder
     /// zunichte, und das Unternehmen schuldet die Antwort auch danach noch.
     /// </remarks>
     [Fact]
     public void Wer_geliefert_hat_laeuft_nicht_ab()
     {
-        var vorgang = Vorgang.Stelle(
+        var caseItem = Case.Job(
             new SubjectId(Anna), new TenantId(Firma), Probeaufgabe(), Jetzt);
 
-        vorgang.Reiche_ein(Einreichung.Schreibe("Fertig.", null, Jetzt), Jetzt);
+        caseItem.Reiche_ein(Submission.Write("Fertig.", null, Jetzt), Jetzt);
 
-        vorgang.Stand_am(Jetzt.AddDays(8)).Should().Be(Stand.Eingereicht);
+        caseItem.Stand_am(Jetzt.AddDays(8)).Should().Be(State.Eingereicht);
     }
 
     // ---------------------------------------------------------------------
     // WAS DIESER DIENST NICHT TUT
     // ---------------------------------------------------------------------
 
-    /// <summary>Es gibt keine KI-Naht — und ausdrücklich keine für die Bewertung.</summary>
+    /// <summary>Es gibt keine KI-Naht — und ausdrücklich keine für die Evaluation.</summary>
     /// <remarks>
     /// Ein Modell, das die Arbeit eines Menschen beurteilt, wäre die Black Box
     /// mit Komma aus ADR-0022, nur in Prosa. Es gibt in diesem Dienst keinen
@@ -530,17 +530,17 @@ public class AuflagenTests
     [InlineData("draft")]
     [InlineData("prompt")]
     [InlineData("modell")]
-    public void Es_gibt_keine_KI_Naht(string wort)
+    public void Es_gibt_keine_KI_Naht(string word)
     {
         string[] namen =
         [
-            .. Namen(typeof(AufgabeStellenBefehl).Assembly),
-            .. Namen(typeof(Vorgang).Assembly),
+            .. Namen(typeof(SetTaskCommand).Assembly),
+            .. Namen(typeof(Case).Assembly),
             .. Namen(typeof(AssessmentDbContext).Assembly)
         ];
 
         namen.Should().NotContain(
-            name => name.Contains(wort, StringComparison.OrdinalIgnoreCase));
+            name => name.Contains(word, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>Nach draussen gehen genau zwei Türen, und beide sind benannt.</summary>
@@ -557,10 +557,10 @@ public class AuflagenTests
     [Fact]
     public void Nach_draussen_gehen_genau_zwei_Tueren() =>
         typeof(AssessmentDbContext).Assembly.GetExportedTypes()
-            .Where(typ => typ.GetConstructors().Any(bau => bau.GetParameters()
+            .Where(type => type.GetConstructors().Any(bau => bau.GetParameters()
                 .Any(glied => glied.ParameterType == typeof(IHttpClientFactory))))
-            .Select(typ => typ.Name)
-            .Should().BeEquivalentTo("HttpEinwilligungstor", "HttpBenachrichtigung");
+            .Select(type => type.Name)
+            .Should().BeEquivalentTo("HttpConsentGate", "HttpBenachrichtigung");
 
     /// <summary>Eine Adresse ist http oder https — sonst ist sie keine.</summary>
     /// <remarks>
@@ -573,37 +573,37 @@ public class AuflagenTests
     [InlineData("data:text/html,<script>")]
     [InlineData("file:///etc/passwd")]
     [InlineData("nicht mal eine Adresse")]
-    public void Eine_Adresse_ist_http_oder_gar_nichts(string adresse) =>
-        FluentActions.Invoking(() => Einreichung.Schreibe(null, adresse, Jetzt))
+    public void Eine_Adresse_ist_http_oder_gar_nichts(string address) =>
+        FluentActions.Invoking(() => Submission.Write(null, address, Jetzt))
             .Should().Throw<Eingabefehler>();
 
     /// <summary>Die Gegenprobe.</summary>
     [Fact]
     public void Eine_http_Adresse_geht_durch() =>
-        Einreichung.Schreibe(null, "https://beispiel.test/loesung", Jetzt)
+        Submission.Write(null, "https://beispiel.test/loesung", Jetzt)
             .Adresse.Should().Be("https://beispiel.test/loesung");
 
-    /// <summary>Eine leere Einreichung ist gar keine.</summary>
+    /// <summary>Eine leere Submission ist gar keine.</summary>
     [Fact]
     public void Eine_leere_Einreichung_ist_keine() =>
-        FluentActions.Invoking(() => Einreichung.Schreibe("  ", null, Jetzt))
+        FluentActions.Invoking(() => Submission.Write("  ", null, Jetzt))
             .Should().Throw<Eingabefehler>();
 
     // ---------------------------------------------------------------------
 
     /// <summary>Die öffentlichen Instanzeigenschaften eines Typs.</summary>
-    private static string[] Felder(Type typ) =>
-        [.. typ.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+    private static string[] Felder(Type type) =>
+        [.. type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(glied => glied.Name != "EqualityContract")
             .Select(glied => glied.Name)];
 
     private static string[] Namen(Assembly assembly) =>
         [.. assembly.GetExportedTypes()
-            .SelectMany(typ => typ.GetMembers(
+            .SelectMany(type => type.GetMembers(
                     BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static |
                     BindingFlags.DeclaredOnly)
-                .Select(glied => $"{typ.Name}.{glied.Name}")
-                .Append(typ.Name))
+                .Select(glied => $"{type.Name}.{glied.Name}")
+                .Append(type.Name))
             .Distinct(StringComparer.Ordinal)];
 
     /// <summary>Jede Spalte, die dieses Modell wirklich anlegt.</summary>
@@ -612,28 +612,28 @@ public class AuflagenTests
         var bauer = new DbContextOptionsBuilder<AssessmentDbContext>();
         AssessmentDbContextFactory.ZurEntwurfszeit(bauer, "Host=pruefstand;Database=assessment");
 
-        using var kontext = new AssessmentDbContext(bauer.Options);
+        using var context = new AssessmentDbContext(bauer.Options);
 
-        return [.. kontext.Model.GetEntityTypes()
-            .SelectMany(typ => typ.GetProperties())
+        return [.. context.Model.GetEntityTypes()
+            .SelectMany(type => type.GetProperties())
             .Select(eigenschaft => eigenschaft.GetColumnName())
             .Distinct(StringComparer.Ordinal)];
     }
 
     private static Aufgabe Probeaufgabe() =>
-        Aufgabe.Schreibe(
+        Aufgabe.Write(
             "Kleiner Dienst", "Bau einen kleinen Dienst.", 4, Jetzt.AddDays(7), Jetzt);
 
     private static (Probevorgaenge, Probetor, Probeausgang, Probeuhr) Aufbau() =>
         (new Probevorgaenge(), new Probetor(), new Probeausgang(), new Probeuhr(Jetzt));
 
-    private static async Task<Vorgang> Stelle(
-        Probevorgaenge vorgaenge, Probetor tor, Probeuhr uhr)
+    private static async Task<Case> Job(
+        Probevorgaenge cases, Probetor tor, Probeuhr uhr)
     {
-        tor.Stelle(Anna, Firma, true);
+        tor.Job(Anna, Firma, true);
 
-        return await new AufgabeStellenHandler(vorgaenge, tor, new Probeausgang(), uhr).Handle(
-            new AufgabeStellenBefehl(
+        return await new SetTaskHandler(cases, tor, new Probeausgang(), uhr).Handle(
+            new SetTaskCommand(
                 new SubjectId(Anna),
                 new TenantId(Firma),
                 "Kleiner Dienst",

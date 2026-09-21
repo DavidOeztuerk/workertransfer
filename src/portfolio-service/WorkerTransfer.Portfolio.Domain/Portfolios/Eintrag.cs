@@ -31,7 +31,7 @@ public sealed partial record Eintrag
 
     /// <summary>Wie viele Technologien eine Arbeit nennen darf.</summary>
     /// <remarks>
-    /// Zwölf, dieselbe Zahl wie an einer Lebenslauf-Station: wer dreissig
+    /// Zwölf, dieselbe Zahl wie an einer Resume-Station: wer dreissig
     /// aufzählt, sagt über eine einzelne Arbeit nichts mehr.
     /// </remarks>
     public const int HoechsteTechnologien = 12;
@@ -45,7 +45,7 @@ public sealed partial record Eintrag
     /// <remarks>
     /// Der Link wird von fremden Menschen angeklickt, und das Feld landet in
     /// einem Browser. Eine Liste erlaubter Schemata ist hier kein Purismus,
-    /// sondern die Stelle, an der ein <c>javascript:</c> abgefangen wird.
+    /// sondern die Job, an der ein <c>javascript:</c> abgefangen wird.
     /// </remarks>
     public static IReadOnlySet<string> ErlaubteSchemata { get; } =
         new HashSet<string>(StringComparer.Ordinal) { "http", "https" };
@@ -54,7 +54,7 @@ public sealed partial record Eintrag
         string titel,
         string zusammenfassung,
         string? link,
-        string rolle,
+        string role,
         int? jahr,
         string? anhang,
         IReadOnlyList<string> technologien)
@@ -62,7 +62,7 @@ public sealed partial record Eintrag
         Titel = titel;
         Zusammenfassung = zusammenfassung;
         Link = link;
-        Rolle = rolle;
+        Rolle = role;
         Jahr = jahr;
         Anhang = anhang;
         Technologien = technologien;
@@ -75,8 +75,8 @@ public sealed partial record Eintrag
     /// <remarks>
     /// <strong>Eine Nennung, keine Ableitung.</strong> Niemand liest aus einem
     /// Titel heraus, welche Werkzeuge dahinterstecken; hier steht, was die
-    /// Person geschrieben hat, durch denselben Wortschatz vereinheitlicht wie
-    /// im Profil (ADR-0023: benennt um, folgert nie).
+    /// Person geschrieben hat, durch denselben Vocabulary vereinheitlicht wie
+    /// im Profile (ADR-0023: benennt um, folgert nie).
     /// <para>
     /// Sie macht die Arbeit nicht durchsuchbar. Suchbar wird eine Fähigkeit
     /// erst, wenn sie im PROFIL steht — dorthin kommt sie mit einem Klick,
@@ -116,10 +116,10 @@ public sealed partial record Eintrag
     /// </param>
     public static Eintrag Aus(
         string titel,
-        DateTimeOffset jetzt,
+        DateTimeOffset now,
         string zusammenfassung = "",
         string? link = null,
-        string rolle = "",
+        string role = "",
         int? jahr = null,
         string? anhang = null,
         IEnumerable<string>? technologien = null) =>
@@ -127,8 +127,8 @@ public sealed partial record Eintrag
             Text("Der Titel", titel, pflicht: true, HoechstlaengeTitel),
             Text("Die Zusammenfassung", zusammenfassung, pflicht: false, HoechstlaengeZusammenfassung),
             Geprueft(link),
-            Text("Die Rolle", rolle, pflicht: false, HoechstlaengeRolle),
-            Jahreszahl(jahr, jetzt),
+            Text("Die Rolle", role, pflicht: false, HoechstlaengeRolle),
+            Jahreszahl(jahr, now),
             Anhangname(anhang),
             Vereinheitlicht(technologien ?? []));
 
@@ -140,44 +140,44 @@ public sealed partial record Eintrag
     private static IReadOnlyList<string> Vereinheitlicht(IEnumerable<string> roh)
     {
         var gesehen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var werte = new List<string>();
+        var values = new List<string>();
 
         foreach (var einzeln in roh)
         {
             var geprueft = Text(
-                "Die Technologie", einzeln, pflicht: false, Faehigkeitsgrenzen.Hoechstlaenge);
+                "Die Technologie", einzeln, pflicht: false, SkillLimits.Hoechstlaenge);
 
             if (geprueft.Length == 0)
             {
                 continue;
             }
 
-            var kanonisch = Wortschatz.Kanonisch(geprueft);
+            var kanonisch = Vocabulary.Kanonisch(geprueft);
 
             if (gesehen.Add(kanonisch))
             {
-                werte.Add(kanonisch);
+                values.Add(kanonisch);
             }
         }
 
-        return werte.Count > HoechsteTechnologien
+        return values.Count > HoechsteTechnologien
             ? throw new TextFehler(
                 "Die Technologien",
                 $"sind mehr als {HoechsteTechnologien}")
-            : werte;
+            : values;
     }
 
-    private static string Text(string feld, string? wert, bool pflicht, int grenze)
+    private static string Text(string field, string? value, bool pflicht, int limit)
     {
-        var bereinigt = (wert ?? string.Empty).Trim();
+        var bereinigt = (value ?? string.Empty).Trim();
 
         if (pflicht && bereinigt.Length == 0)
         {
-            throw new TextFehler(feld, "darf nicht leer sein");
+            throw new TextFehler(field, "darf nicht leer sein");
         }
 
-        return bereinigt.Length > grenze
-            ? throw new TextFehler(feld, $"ist länger als {grenze} Zeichen")
+        return bereinigt.Length > limit
+            ? throw new TextFehler(field, $"ist länger als {limit} Zeichen")
             : bereinigt;
     }
 
@@ -212,19 +212,19 @@ public sealed partial record Eintrag
             : bereinigt;
     }
 
-    private static int? Jahreszahl(int? jahr, DateTimeOffset jetzt)
+    private static int? Jahreszahl(int? jahr, DateTimeOffset now)
     {
-        if (jahr is not { } wert)
+        if (jahr is not { } value)
         {
             return null;
         }
 
         // Das nächste Jahr ist erlaubt: etwas kann gerade erscheinen. Weiter in
         // die Zukunft ist ein Tippfehler, kein Plan.
-        return wert < FruehestesJahr || wert > jetzt.Year + 1
+        return value < FruehestesJahr || value > now.Year + 1
             ? throw new JahrFehler(
-                $"Ein Jahr muss zwischen {FruehestesJahr} und {jetzt.Year + 1} liegen.")
-            : wert;
+                $"Ein Jahr muss zwischen {FruehestesJahr} und {now.Year + 1} liegen.")
+            : value;
     }
 
     /// <summary>

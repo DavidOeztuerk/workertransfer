@@ -344,14 +344,16 @@ export function JobsPage() {
         />
       ) : null}
 
-      {/*
-        WAS DER FILTER NICHT BEURTEILEN KONNTE, steht über der Liste und nicht
-        klein darunter. Eine Umkreissuche kann über eine Anzeige, deren Ort die
-        Ortstabelle nicht kennt, nichts sagen — sie stumm wegzulassen ergäbe ein
-        Ergebnis, das vollständig aussieht und es nicht ist (ADR-0022 §3).
-      */}
       {list.omitted !== null && list.omitted > 0 ? (
-        <Alert severity="info" icon={false} sx={{ mb: 2 }}>
+        <Alert
+          // WHAT THE FILTER COULD NOT JUDGE stands above the list, not small
+          // below it: a radius search can say nothing about an advert whose
+          // place the location table does not know, and dropping those silently
+          // would give a result that looks complete and is not (ADR-0022 §3).
+          severity="info"
+          icon={false}
+          sx={{ mb: 2 }}
+        >
           {t("stellen.ohneOrt", { count: list.omitted })}
         </Alert>
       ) : null}

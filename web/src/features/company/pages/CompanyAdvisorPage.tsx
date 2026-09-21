@@ -148,12 +148,23 @@ function Firmenkarte({
           />
         </Stack>
 
-        {/* Ab Stufe 3. Fehlt der Name, steht hier die Subjekt-Kennung — und
-            ausdruecklich kein Platzhalter wie „anonym": der behauptete, die
-            Person habe sich verborgen, und das waere eine Aussage ueber sie. */}
-        <Typography variant="h3" sx={{ mb: 1 }}>
-          {gespraech.name ?? gespraech.subject_id}
-        </Typography>
+        {gespraech.name !== undefined ? (
+          <Typography variant="h3" sx={{ mb: 1 }}>
+            {gespraech.name}
+          </Typography>
+        ) : (
+          // Without a name the id is shown as what it is — a case reference,
+          // not a heading. No placeholder: "anonymous" or "not released yet"
+          // would claim the person hid themselves, and ADR-0020 §1 wants the
+          // name absent rather than explained.
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 1, fontFamily: "monospace" }}
+          >
+            {gespraech.subject_id}
+          </Typography>
+        )}
 
         {gespraech.email !== undefined && (
           <Typography variant="body2" sx={{ mb: 1 }}>
@@ -168,11 +179,13 @@ function Firmenkarte({
         <Divider sx={{ my: 2 }} />
 
         <Stack spacing={0.5} sx={{ mb: 2 }}>
-          {/* Ab Stufe 1. Fehlt das Feld, steht hier NICHTS — kein „nicht
-              angegeben", kein „noch nicht freigegeben". Die beiden waeren von
-              aussen nicht zu unterscheiden, und genau das ist die Zusage. */}
           {gespraech.entry_month !== undefined && (
-            <Typography variant="body2">
+            <Typography
+              // From stage 1. If the field is missing, NOTHING stands here — no
+              // "not given", no "not released yet": from the outside the two are
+              // indistinguishable, and that is exactly the promise.
+              variant="body2"
+            >
               {t("berater.eintritt")}: {gespraech.entry_month}
             </Typography>
           )}
@@ -181,9 +194,12 @@ function Firmenkarte({
               {t("berater.pensum")}: {gespraech.workload_percent}
             </Typography>
           )}
-          {/* Ab Stufe 2. */}
           {(gespraech.salary_min !== undefined || gespraech.salary_max !== undefined) && (
-            <Typography variant="body2">
+            <Typography
+              // From stage 2 — absent and not released stay indistinguishable,
+              // as above.
+              variant="body2"
+            >
               {gespraech.salary_min !== undefined && gespraech.salary_max !== undefined
                 ? t("berater.spanne", {
                     von: gespraech.salary_min,

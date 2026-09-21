@@ -5,11 +5,11 @@ using WorkerTransfer.Consent.Application.Ports;
 using WorkerTransfer.Consent.Domain.Audit;
 using WorkerTransfer.Consent.Domain.Ledger;
 
-namespace WorkerTransfer.Consent.Application.Loeschung;
+namespace WorkerTransfer.Consent.Application.Erasure;
 
 /// <summary>Delete everything this service holds about one person.</summary>
 /// <param name="Wer">The person, as the cascade named them.</param>
-public sealed record LoeschungAusfuehrenBefehl(Guid Wer) : IBefehl<Loeschquittung>;
+public sealed record ExecuteErasureCommand(Guid Wer) : IBefehl<ErasureReceipt>;
 
 /// <summary>The receipt.</summary>
 /// <param name="Behalten">
@@ -17,7 +17,7 @@ public sealed record LoeschungAusfuehrenBefehl(Guid Wer) : IBefehl<Loeschquittun
 /// ADR-0027 §3 knows of are a hired application and a paid transfer, and
 /// neither stands here.
 /// </param>
-public sealed record Loeschquittung(int Behalten = 0);
+public sealed record ErasureReceipt(int Behalten = 0);
 
 /// <summary>
 /// The recipient where something deliberately <em>stays</em> (ADR-0027 §5).
@@ -47,24 +47,24 @@ public sealed record Loeschquittung(int Behalten = 0);
 /// alive, and the rest would then be pseudonymous rather than anonymous.
 /// </para>
 /// </remarks>
-public sealed class LoeschungAusfuehrenHandler(
+public sealed class ExecuteErasureHandler(
     IConsentLedger buch,
     IAuditTrail pruefspur,
     IFreitextraeumung raeumung,
     IKorrelation korrelation,
     TimeProvider uhr)
-    : IRequestHandler<LoeschungAusfuehrenBefehl, Loeschquittung>
+    : IRequestHandler<ExecuteErasureCommand, ErasureReceipt>
 {
     /// <inheritdoc />
-    public async Task<Loeschquittung> Handle(
-        LoeschungAusfuehrenBefehl request,
+    public async Task<ErasureReceipt> Handle(
+        ExecuteErasureCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         var subject = new SubjectId(request.Wer);
-        var jetzt = uhr.GetUtcNow();
-        var neueste = await buch.NeuesteJeFaehigkeitAsync(subject, cancellationToken);
+        var now = uhr.GetUtcNow();
+        var neueste = await buch.LatestPerSkillAsync(subject, cancellationToken);
 
         foreach (var ereignis in neueste)
         {
@@ -80,24 +80,24 @@ public sealed class LoeschungAusfuehrenHandler(
 
             // The person themselves. There is no delegation model, and that is
             // deliberate: nobody but they deletes their account.
-            await buch.AnhaengenAsync(
-                ConsentEvent.Delete(subject, ereignis.Capability, jetzt, subject),
+            await buch.AttachAsync(
+                ConsentEvent.Delete(subject, ereignis.Capability, now, subject),
                 cancellationToken);
         }
 
         // Without the capability names. The trail records that the erasure ran;
         // listing what it covered would be the one statement about the person
         // that the very next step has to remove again.
-        await pruefspur.AnhaengenAsync(
+        await pruefspur.AttachAsync(
             new AuditEvent(
-                AuditAction.ConsentDelete, jetzt, subject, null, subject, korrelation.Aktuell),
+                AuditAction.ConsentDelete, now, subject, null, subject, korrelation.Aktuell),
             cancellationToken);
 
         // Afterwards, not before: this way it also catches the rows just
         // written, and there stays exactly one place where "no free text any
         // more" is enforced instead of two that can drift apart.
-        await raeumung.RaeumeAsync(request.Wer, cancellationToken);
+        await raeumung.ClearAsync(request.Wer, cancellationToken);
 
-        return new Loeschquittung();
+        return new ErasureReceipt();
     }
 }

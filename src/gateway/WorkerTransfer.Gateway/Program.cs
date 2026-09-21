@@ -6,10 +6,10 @@ using Ocelot.DependencyInjection;
 using Ocelot.Middleware;
 using WorkerTransfer.Gateway;
 
-// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
+// Konfiguration aus der EnvironmentFile. VOR CreateBuilder, weil der
 // Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
 // geladen hiesse geladen und von niemandem gelesen.
-WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 

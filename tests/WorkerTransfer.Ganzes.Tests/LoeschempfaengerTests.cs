@@ -33,7 +33,7 @@ public class LoeschempfaengerTests
 
     /// <summary>Jeder Dienst mit seinem Kontext und seinem Namen in der Kaskade.</summary>
     /// <remarks>
-    /// Der Name ist der, den <c>Loeschempfaenger.Fremde</c> trägt und den
+    /// Der Name ist der, den <c>ErasureRecipient.Fremde</c> trägt und den
     /// identity-service in <c>Erasure__Adressen__&lt;name&gt;</c> nachschlägt.
     /// </remarks>
     public static TheoryData<string, Type> Dienste => new()
@@ -66,9 +66,9 @@ public class LoeschempfaengerTests
     /// </remarks>
     [Theory]
     [MemberData(nameof(Dienste))]
-    public void Empfaenger_ist_genau_wer_eine_Zeile_je_Mensch_haelt(string name, Type kontext)
+    public void Empfaenger_ist_genau_wer_eine_Zeile_je_Mensch_haelt(string name, Type context)
     {
-        var (spalten, personenzeilen) = Modell(kontext);
+        var (columns, personenzeilen) = Modell(context);
 
         // Zwei Signale, und beide sind noetig. Meistens steht die Person in
         // einer Spalte; bei manchen Aggregaten IST sie der Schluessel, und dann
@@ -76,25 +76,25 @@ public class LoeschempfaengerTests
         // uebersieht profile, portfolio und github — gemessen, beim ersten Lauf
         // dieser Reihe.
         var haeltMenschen =
-            spalten.Intersect(Personenspalten, StringComparer.Ordinal).Any() || personenzeilen;
+            columns.Intersect(Personenspalten, StringComparer.Ordinal).Any() || personenzeilen;
 
         // identity ist der Ursprung der Kaskade, nicht ihr Empfänger: seine
         // eigenen Tabellen fallen zuletzt und über einen eigenen Vermerk.
         if (name == "identity")
         {
             haeltMenschen.Should().BeTrue("sonst prüft dieser Test nichts");
-            Loeschempfaenger.Fremde.Should().NotContain(name);
+            ErasureRecipient.Fremde.Should().NotContain(name);
             return;
         }
 
         if (haeltMenschen)
         {
-            Loeschempfaenger.Fremde.Should().Contain(
+            ErasureRecipient.Fremde.Should().Contain(
                 name, $"{name} hält eine Zeile je Mensch");
         }
         else
         {
-            Loeschempfaenger.Fremde.Should().NotContain(
+            ErasureRecipient.Fremde.Should().NotContain(
                 name, $"{name} hält nichts über einen natürlichen Menschen");
         }
     }
@@ -103,22 +103,22 @@ public class LoeschempfaengerTests
     [Fact]
     public void Die_Liste_nennt_nur_Dienste_die_es_gibt()
     {
-        var bekannt = Dienste.Select(zeile => (string)zeile[0]!).ToHashSet(StringComparer.Ordinal);
+        var bekannt = Dienste.Select(row => (string)row[0]!).ToHashSet(StringComparer.Ordinal);
 
-        Loeschempfaenger.Fremde.Should().BeSubsetOf(bekannt);
+        ErasureRecipient.Fremde.Should().BeSubsetOf(bekannt);
     }
 
     /// <summary>Was ein Kontext wirklich anlegt: Spaltennamen und Personenzeilen.</summary>
-    private static (IReadOnlyCollection<string> Spalten, bool Personenzeilen) Modell(Type kontext)
+    private static (IReadOnlyCollection<string> Spalten, bool Personenzeilen) Modell(Type context)
     {
-        var typ = typeof(DbContextOptionsBuilder<>).MakeGenericType(kontext);
-        var bauer = (DbContextOptionsBuilder)Activator.CreateInstance(typ)!;
+        var type = typeof(DbContextOptionsBuilder<>).MakeGenericType(context);
+        var bauer = (DbContextOptionsBuilder)Activator.CreateInstance(type)!;
 
         // Npgsql, weil die Kontexte Postgres-Typen abbilden (jsonb, citext,
         // Aufzählungen). Es wird nie verbunden — nur das Modell gebaut.
         bauer.UseNpgsql("Host=modell;Database=modell");
 
-        using var instanz = (DbContext)Activator.CreateInstance(kontext, bauer.Options)!;
+        using var instanz = (DbContext)Activator.CreateInstance(context, bauer.Options)!;
 
         var typen = instanz.Model.GetEntityTypes().ToList();
 
@@ -130,6 +130,6 @@ public class LoeschempfaengerTests
                     .Distinct(StringComparer.Ordinal)
             ],
             typen.Any(entitaet =>
-                entitaet.FindAnnotation(Personenzeile.Anmerkung)?.Value is true));
+                entitaet.FindAnnotation(SubjectKeyedTable.Anmerkung)?.Value is true));
     }
 }

@@ -16,7 +16,7 @@ public sealed record AbmeldenBefehl(string? Erneuerungstoken) : IBefehl<Unit>;
 
 /// <summary>Ends a sign-in.</summary>
 public sealed class AbmeldenHandler(
-    ISessionService sitzungen,
+    ISessionService sessions,
     ISessionCapacity handlungsform,
     IAuditTrail protokoll,
     IKorrelation korrelation,
@@ -33,7 +33,7 @@ public sealed class AbmeldenHandler(
             return Unit.Value;
         }
 
-        var beendet = await sitzungen.EndByRefreshTokenAsync(
+        var beendet = await sessions.EndByRefreshTokenAsync(
             request.Erneuerungstoken, cancellationToken);
 
         if (beendet is null)

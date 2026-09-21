@@ -7,10 +7,10 @@ namespace WorkerTransfer.Jobs.Infrastructure.Rueckzug;
 /// natürliche Person und ist deshalb kein Empfänger der Kaskade (ADR-0027 §2).
 /// Was hier ankommt, ist eine Absicht über ein <em>Unternehmen</em>.
 /// </remarks>
-public sealed class Rueckzugseinstellungen
+public sealed class WithdrawalSettings
 {
-    /// <summary>Der Abschnitt in der Konfiguration.</summary>
-    public const string Abschnitt = "Erasure";
+    /// <summary>Der Section in der Konfiguration.</summary>
+    public const string Section = "Erasure";
 
     /// <summary>
     /// Das geteilte Geheimnis aus <c>X-Erasure-Secret</c>.

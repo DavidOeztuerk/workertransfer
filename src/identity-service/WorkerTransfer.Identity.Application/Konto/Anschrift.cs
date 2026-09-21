@@ -7,7 +7,7 @@ using WorkerTransfer.Identity.Domain.Users;
 namespace WorkerTransfer.Identity.Application.Konto;
 
 /// <summary>Die Bewerbungsanschrift zum Anzeigen — nie an ein Modell.</summary>
-public sealed record Anschriftansicht(
+public sealed record PostalAddressView(
     string Zeile1,
     string Zeile2,
     string Postleitzahl,
@@ -15,54 +15,54 @@ public sealed record Anschriftansicht(
     string Land,
     string Telefon);
 
-/// <summary>Die eigene Anschrift lesen.</summary>
-public sealed record AnschriftAbfrage(SubjectId Wer) : IAbfrage<Anschriftansicht>;
+/// <summary>Die eigene PostalAddress lesen.</summary>
+public sealed record PostalAddressQuery(SubjectId Wer) : IAbfrage<PostalAddressView>;
 
 /// <inheritdoc cref="AnschriftAbfrage" />
-public sealed class AnschriftHandler(IAnschriften speicher)
-    : IRequestHandler<AnschriftAbfrage, Anschriftansicht>
+public sealed class PostalAddressHandler(IPostalAddresses store)
+    : IRequestHandler<PostalAddressQuery, PostalAddressView>
 {
     /// <inheritdoc />
-    public async Task<Anschriftansicht> Handle(
-        AnschriftAbfrage request, CancellationToken cancellationToken)
+    public async Task<PostalAddressView> Handle(
+        PostalAddressQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return Ansicht(await speicher.HoleAsync(request.Wer, cancellationToken));
+        return Ansicht(await store.GetAsync(request.Wer, cancellationToken));
     }
 
-    internal static Anschriftansicht Ansicht(Anschrift stand) =>
-        new(stand.Zeile1, stand.Zeile2, stand.Postleitzahl, stand.Ort, stand.Land, stand.Telefon);
+    internal static PostalAddressView Ansicht(PostalAddress state) =>
+        new(state.Zeile1, state.Zeile2, state.Postleitzahl, state.Ort, state.Land, state.Telefon);
 }
 
-/// <summary>Die eigene Anschrift schreiben.</summary>
-public sealed record AnschriftSetzenBefehl(
+/// <summary>Die eigene PostalAddress schreiben.</summary>
+public sealed record SetPostalAddressCommand(
     SubjectId Wer,
     string? Zeile1,
     string? Zeile2,
     string? Postleitzahl,
     string? Ort,
     string? Land,
-    string? Telefon) : IBefehl<Anschriftansicht>;
+    string? Telefon) : IBefehl<PostalAddressView>;
 
 /// <inheritdoc cref="AnschriftSetzenBefehl" />
-public sealed class AnschriftSetzenHandler(IAnschriften speicher)
-    : IRequestHandler<AnschriftSetzenBefehl, Anschriftansicht>
+public sealed class SetPostalAddressHandler(IPostalAddresses store)
+    : IRequestHandler<SetPostalAddressCommand, PostalAddressView>
 {
     /// <inheritdoc />
-    public async Task<Anschriftansicht> Handle(
-        AnschriftSetzenBefehl request, CancellationToken cancellationToken)
+    public async Task<PostalAddressView> Handle(
+        SetPostalAddressCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var stand = await speicher.HoleAsync(request.Wer, cancellationToken);
-        stand.Setze(
+        var state = await store.GetAsync(request.Wer, cancellationToken);
+        state.Set(
             request.Zeile1,
             request.Zeile2,
             request.Postleitzahl,
             request.Ort,
             request.Land,
             request.Telefon);
-        await speicher.SichereAsync(stand, cancellationToken);
-        return AnschriftHandler.Ansicht(stand);
+        await store.SaveAsync(state, cancellationToken);
+        return PostalAddressHandler.Ansicht(state);
     }
 }

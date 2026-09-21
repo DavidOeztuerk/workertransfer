@@ -122,10 +122,12 @@ export function CompanyTeamPage() {
             {t("mannschaft.mitglieder")}
           </Typography>
 
-          {/* Der LADEZUSTAND fehlte im alten Code, und die Karte blieb
-              währenddessen leer. */}
           {mitglieder.pending ? (
-            <LoadingBlock label={t("mannschaft.mitgliederLaden")} />
+            <LoadingBlock
+              // Its own branch: without it the card stays empty while the
+              // members are in flight.
+              label={t("mannschaft.mitgliederLaden")}
+            />
           ) : null}
 
           {mitglieder.data !== null && !mitglieder.data.ok ? (

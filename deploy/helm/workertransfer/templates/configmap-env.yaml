@@ -19,4 +19,14 @@ data:
   nicht ein clusterinterner Servicename. Eine Mail mit http://identity-service
   darin führt niemanden irgendwohin.
   */}}
-  Mail__WebAdresse: {{ .Values.publicUrl | quote }}
+  Mail__WebAdresse: {{ .Values.webUrl | quote }}
+  {{/*
+  Who may call from a browser. Without this key Noelia falls back to
+  localhost:3000 in Development — an origin that does not exist here — and
+  every preflight comes back 204 without a single Access-Control-Allow-*
+  header: CORS wired in, letting nobody through.
+
+  It only matters because the UI has a door of its own. While the gateway
+  served the UI too, everything was same-origin and the gap stayed invisible.
+  */}}
+  CORS_ORIGINS: {{ printf "%s,%s" .Values.webUrl .Values.publicUrl | quote }}

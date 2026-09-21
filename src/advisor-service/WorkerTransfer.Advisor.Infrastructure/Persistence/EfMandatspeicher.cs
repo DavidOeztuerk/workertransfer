@@ -1,74 +1,74 @@
 using Noelia.Core.Identity;
 using Microsoft.EntityFrameworkCore;
-using WorkerTransfer.Advisor.Domain.Mandate;
+using WorkerTransfer.Advisor.Domain.Mandates;
 
 namespace WorkerTransfer.Advisor.Infrastructure.Persistence;
 
 /// <summary>Die Mandate in Postgres.</summary>
-public sealed class EfMandatspeicher(AdvisorDbContext kontext) : IMandatspeicher
+public sealed class EfMandateStore(AdvisorDbContext context) : IMandateStore
 {
     /// <inheritdoc />
-    public async Task<Mandat?> HoleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<Mandate?> GetAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Mandate
-            .FirstOrDefaultAsync(eintrag => eintrag.Id == wer.Value, cancellationToken);
+        var row = await context.Mandate
+            .FirstOrDefaultAsync(entry => entry.Id == subject.Value, cancellationToken);
 
-        return zeile is null ? null : ZurDomaene(zeile);
+        return row is null ? null : ZurDomaene(row);
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(Mandat mandat, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(Mandate mandate, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(mandat);
+        ArgumentNullException.ThrowIfNull(mandate);
 
         // AsTracking, weil hier geändert wird. Ohne das käme die Zeile losgelöst
         // zurück, die Zuweisungen gingen ins Leere, und der Aufrufer bekäme
         // trotzdem sein 200 — der Fehler, den `PUT /resumes/…/as-cv` einmal
         // gekostet hat.
-        var zeile = await kontext.Mandate
+        var row = await context.Mandate
             .AsTracking()
-            .FirstOrDefaultAsync(eintrag => eintrag.Id == mandat.Wer.Value, cancellationToken);
+            .FirstOrDefaultAsync(entry => entry.Id == mandate.Wer.Value, cancellationToken);
 
-        if (zeile is null)
+        if (row is null)
         {
-            kontext.Mandate.Add(ZurZeile(mandat));
+            context.Mandate.Add(ZurZeile(mandate));
             return;
         }
 
-        zeile.EntryMonth = mandat.Eintrittstermin;
-        zeile.SalaryMin = mandat.GehaltMin;
-        zeile.SalaryMax = mandat.GehaltMax;
-        zeile.WorkloadPercent = mandat.PensumProzent;
-        zeile.ExcludedDomains = [.. mandat.AusgeschlosseneUnternehmen];
-        zeile.UpdatedAt = mandat.GeaendertAm.UtcDateTime;
+        row.EntryMonth = mandate.Eintrittstermin;
+        row.SalaryMin = mandate.GehaltMin;
+        row.SalaryMax = mandate.GehaltMax;
+        row.WorkloadPercent = mandate.PensumProzent;
+        row.ExcludedDomains = [.. mandate.AusgeschlosseneUnternehmen];
+        row.UpdatedAt = mandate.GeaendertAm.UtcDateTime;
     }
 
-    private static MandatZeile ZurZeile(Mandat mandat) => new()
+    private static MandateRow ZurZeile(Mandate mandate) => new()
     {
-        Id = mandat.Wer.Value,
-        EntryMonth = mandat.Eintrittstermin,
-        SalaryMin = mandat.GehaltMin,
-        SalaryMax = mandat.GehaltMax,
-        WorkloadPercent = mandat.PensumProzent,
-        ExcludedDomains = [.. mandat.AusgeschlosseneUnternehmen],
-        UpdatedAt = mandat.GeaendertAm.UtcDateTime
+        Id = mandate.Wer.Value,
+        EntryMonth = mandate.Eintrittstermin,
+        SalaryMin = mandate.GehaltMin,
+        SalaryMax = mandate.GehaltMax,
+        WorkloadPercent = mandate.PensumProzent,
+        ExcludedDomains = [.. mandate.AusgeschlosseneUnternehmen],
+        UpdatedAt = mandate.GeaendertAm.UtcDateTime
     };
 
     /// <summary>Baut das Aggregat aus der Zeile.</summary>
     /// <remarks>
     /// Über <see cref="Mandat.Stelle_her"/> und damit ohne erneute Prüfung: eine
     /// gespeicherte Zeile war bei ihrer Entstehung gültig, und sie beim Lesen
-    /// abzulehnen hiesse, jemandem sein Mandat zu entziehen, weil sich eine
+    /// abzulehnen hiesse, jemandem sein Mandate zu entziehen, weil sich eine
     /// Grenze geändert hat.
     /// </remarks>
-    private static Mandat ZurDomaene(MandatZeile zeile) =>
-        Mandat.Stelle_her(
-            new SubjectId(zeile.Id),
-            zeile.EntryMonth,
-            zeile.SalaryMin,
-            zeile.SalaryMax,
-            zeile.WorkloadPercent,
-            zeile.ExcludedDomains,
-            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero));
+    private static Mandate ZurDomaene(MandateRow row) =>
+        Mandate.Stelle_her(
+            new SubjectId(row.Id),
+            row.EntryMonth,
+            row.SalaryMin,
+            row.SalaryMax,
+            row.WorkloadPercent,
+            row.ExcludedDomains,
+            new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero));
 }

@@ -207,7 +207,7 @@ make k8s-down    # delete the cluster and its data
 make k8s-lint    # helm lint + render, no cluster needed
 ```
 
-The app answers on **`http://localhost:8090`** — not 8080, which belongs to the compose gateway; two environments fighting over one port produce exactly the debugging session where nobody can say who answered. Mailpit is on `:8025`.
+**The two environments cannot run at the same time, and that was measured rather than reasoned.** The gateway answers on **`http://localhost:8090`** here *and* in compose, the UI on `:5173` in both, Mailpit on `:8025` in both — the comment in `docker-compose.yml` claiming 8090 avoids a port fight was describing 8080, and the fight it warns about is the one it creates. `scripts/k8s-up.sh` checks all three before it builds anything and names them; without that, kind reports an unready node minutes later and far from the cause. **Run `make down` first.** Sharing the ports on purpose is the better trade: one address for the UI and one for the API, whichever environment is up.
 
 Load-bearing, and easy to undo by tidying up (ADR-0028):
 
@@ -528,7 +528,12 @@ Ocelot 25. `ocelot.json` carries its own reasoning in `//` comments — measured
 
 It was the other way round until 11.09.2026: a `Navigation` middleware rewrote any request carrying `Sec-Fetch-Dest: document` onto a `/__ui/{alles}` route that proxied to the `web` container, so `…:8090/jobs` answered with the page while `fetch` got the resource. That is gone, deliberately (ADR-0040): one address meaning two things is a rule nobody remembers at the next endpoint, and it made the dev server a proxy target, which broke HMR through the gateway.
 
-**The cost is real and was accepted:** the Helm chart exposes only the gateway (`publicUrl`, `gateway.nodePort`), so `make k8s-up` now brings up a cluster with no reachable UI. Whoever wants staging back gives `web` its own entry and splits `publicUrl` into a web origin and an API origin.
+**The cost was paid rather than accepted, on 21.09.2026: `web` got a door of its own.** The chart used to expose only the gateway, so `make k8s-up` brought up a cluster with no reachable UI. Now the `web` Service is a `NodePort` (`web.nodePort` → host `5173`, the same port compose uses) and the origins are split — `webUrl` for the browser, `publicUrl` for the API.
+
+Two things had to come with it, and the second is the one that would have been missed:
+
+- **`CORS_ORIGINS` is set in the chart.** It never was, and it never mattered while the UI and the gateway shared an origin. A separate door makes every call cross-origin, and without the key Noelia falls back to `localhost:3000` in Development: a preflight that answers 204 with no `Access-Control-Allow-*` header at all.
+- **`Beweis 4` in `scripts/k8s-up.sh` has two halves.** That the UI answers proves the door; that the **gateway** answers a `Sec-Fetch-Dest: document` request *without* HTML proves ADR-0040 has not quietly come back. Only the second half could catch a regression, and nothing else in that script would notice it.
 
 Route order in `ocelot.json` is pinned by `ReihenfolgeTests` against a *reversed* fixture. A probe that merely set all priorities equal stayed green because file order happened to be right; only reversing the order exposed it, and eight routes fell.
 
@@ -1061,6 +1066,10 @@ that script was built against.
 
 ## Conventions that bite
 
+- **Code is written in English. All of it, backend and frontend.** Type names, members, locals, parameters, test method names, comments and XML docs. This is not a style preference and it is not negotiable: it was asked for explicitly, and it drifted back to German twice because it was nowhere written down.
+  - **The wire and the database were always English** and stay exactly as they are: 170 `[JsonPropertyName]` values, every `HasColumnName`, every `ToTable`. A rename touches identifiers only — no migration, no contract change. If a rename would move a JSON name or a column, the rename is wrong.
+  - **German stays in exactly two places**: the text a person reads (`web/src/core/i18n/kataloge/de.ts` — that is the product's language, and `en`/`fr` are translations of it), and prose documents like this one, the ADRs and `docs/`.
+  - Domain words with no faithful English equivalent (`Ablage`, `Personenzeile`) are renamed to what they *mean* (`DocumentStore`, `SubjectKeyedTable`), never transliterated. Where the German term is load-bearing in a document, the comment says so.
 - **Package managers are `dotnet`/NuGet and `pnpm`.** Never `npm`, never `yarn`. There is no Python here any more; if a command in an old document says `uv`, `ruff`, `mypy`, `pytest` or `alembic`, that document is describing the predecessor.
 - **Warnings are errors** (`Directory.Build.props`). Central package management via `Directory.Packages.props` — versions go there, not into a `.csproj`.
 - **Sharing rule**: only domain-neutral, transport-independent, non-business code goes in `src/shared/`. Profile, company, job, transfer, contract, application and matching models stay inside the owning service. `Contracts.*` holds versioned boundary DTOs, never a shared domain model.

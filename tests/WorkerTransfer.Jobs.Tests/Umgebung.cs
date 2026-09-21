@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Testcontainers.PostgreSql;
 using WorkerTransfer.Jobs.Infrastructure.Persistence;
-using WorkerTransfer.ServiceDefaults.Rollen;
+using WorkerTransfer.ServiceDefaults.Roles;
 
 namespace WorkerTransfer.Jobs.Tests;
 
@@ -25,12 +25,12 @@ public sealed class Postgres : IAsyncLifetime
     {
         await _container.StartAsync();
 
-        await using var quelle = JobsDbContextFactory.Datenquelle(ConnectionString);
-        await using var kontext = new JobsDbContext(
-            (DbContextOptions<JobsDbContext>)JobsDbContextFactory.Konfiguriere(
-                new DbContextOptionsBuilder<JobsDbContext>(), quelle).Options);
+        await using var source = JobsDbContextFactory.DataSource(ConnectionString);
+        await using var context = new JobsDbContext(
+            (DbContextOptions<JobsDbContext>)JobsDbContextFactory.Configure(
+                new DbContextOptionsBuilder<JobsDbContext>(), source).Options);
 
-        await kontext.Database.MigrateAsync();
+        await context.Database.MigrateAsync();
     }
 
     public async Task DisposeAsync() => await _container.DisposeAsync();
@@ -71,17 +71,17 @@ public static class Tokenform
         return kurve;
     }
 
-    public static string Person(Guid wer) => Baue(wer, null);
+    public static string Person(Guid subject) => Build(subject, null);
 
-    public static string Firma(Guid wer, Guid firma) => Baue(wer, firma);
+    public static string Firma(Guid subject, Guid company) => Build(subject, company);
 
-    private static string Baue(Guid wer, Guid? firma)
+    private static string Build(Guid subject, Guid? company)
     {
-        List<Claim> ansprueche = [new(JwtRegisteredClaimNames.Sub, wer.ToString())];
+        List<Claim> ansprueche = [new(JwtRegisteredClaimNames.Sub, subject.ToString())];
 
-        if (firma is { } mandant)
+        if (company is { } tenant)
         {
-            ansprueche.Add(new Claim("tenant", mandant.ToString()));
+            ansprueche.Add(new Claim("tenant", tenant.ToString()));
         }
 
         var token = new JwtSecurityToken(
@@ -106,10 +106,10 @@ public static class Tokenform
 /// Firma übergibt. Hier ist genau das die Frage — der Mandant muss aus dem
 /// TOKEN kommen.</para>
 /// </remarks>
-public sealed class Rollenprobe : IFirmenrollen
+public sealed class Rollenprobe : ICompanyRoles
 {
     /// <summary>Was sie antwortet.</summary>
-    public Firmenrolle Antwort { get; set; } = Firmenrolle.Admin;
+    public CompanyRole Antwort { get; set; } = CompanyRole.Admin;
 
     /// <summary>Ob sie stattdessen schweigt — der Ausfall von identity-service.</summary>
     public bool Schweigt { get; set; }
@@ -118,13 +118,13 @@ public sealed class Rollenprobe : IFirmenrollen
     public (Guid Wer, Guid Firma)? Zuletzt { get; private set; }
 
     /// <inheritdoc />
-    public Task<Firmenrolle> RolleAsync(
-        Guid wer, Guid firma, CancellationToken cancellationToken = default)
+    public Task<CompanyRole> RoleAsync(
+        Guid subject, Guid company, CancellationToken cancellationToken = default)
     {
-        Zuletzt = (wer, firma);
+        Zuletzt = (subject, company);
 
         return Schweigt
-            ? throw new RolleSchweigt("Die Probe schweigt.")
+            ? throw new RoleLookupSilent("Die Probe schweigt.")
             : Task.FromResult(Antwort);
     }
 }

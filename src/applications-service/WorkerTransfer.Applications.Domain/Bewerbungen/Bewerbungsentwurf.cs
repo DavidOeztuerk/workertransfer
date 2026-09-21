@@ -1,6 +1,6 @@
 using Noelia.Core.Identity;
 
-namespace WorkerTransfer.Applications.Domain.Bewerbungen;
+namespace WorkerTransfer.Applications.Domain.Applications;
 
 /// <summary>Wo ein Entwurf steht.</summary>
 /// <remarks>
@@ -10,7 +10,7 @@ namespace WorkerTransfer.Applications.Domain.Bewerbungen;
 /// Gesendet</strong>, und es darf keinen geben: zwischen dem Modell und dem
 /// Unternehmen stehen zwei Handlungen eines Menschen (ADR-0034).
 /// </remarks>
-public enum Entwurfsstand
+public enum DraftState
 {
     /// <summary>Das Modell schreibt gerade.</summary>
     Entsteht,
@@ -24,7 +24,7 @@ public enum Entwurfsstand
     /// <summary>Ein Mensch hat gesagt: so.</summary>
     Freigegeben,
 
-    /// <summary>Als Bewerbung hinausgegangen.</summary>
+    /// <summary>Als JobApplication hinausgegangen.</summary>
     Gesendet,
 
     /// <summary>Das Schreiben ist misslungen.</summary>
@@ -32,8 +32,8 @@ public enum Entwurfsstand
 }
 
 /// <summary>Dieser Schritt geht von hier aus nicht.</summary>
-public sealed class EntwurfsschrittNichtErlaubt(Entwurfsstand jetzt, string wollte)
-    : Eingabefehler($"Ein Entwurf im Stand {jetzt} kann nicht {wollte}.");
+public sealed class DraftStepNotAllowed(DraftState now, string wollte)
+    : Eingabefehler($"Ein Entwurf im Stand {now} kann nicht {wollte}.");
 
 /// <summary>Es liegen noch offene Anmerkungen an.</summary>
 public sealed class OffeneAnmerkungen()
@@ -42,7 +42,7 @@ public sealed class OffeneAnmerkungen()
 /// <summary>Eine Anmerkung am Entwurf.</summary>
 /// <remarks>
 /// <strong>Das Zitat ist der Unterschied zwischen „gefällt mir nicht" und
-/// einem Auftrag.</strong> Wer eine Stelle markiert, sagt dem Modell, worüber
+/// einem Auftrag.</strong> Wer eine Job markiert, sagt dem Modell, worüber
 /// er spricht — und dem nächsten Leser, worauf sich die Anmerkung bezog, auch
 /// wenn der Text sich inzwischen geändert hat.
 /// </remarks>
@@ -70,7 +70,7 @@ public sealed class Anmerkung
     /// <summary>Was der Mensch geschrieben hat.</summary>
     public string Text { get; }
 
-    /// <summary>Die markierte Stelle, oder leer.</summary>
+    /// <summary>Die markierte Job, oder leer.</summary>
     public string Zitat { get; }
 
     /// <summary>Ob eine Überarbeitung sie schon aufgenommen hat.</summary>
@@ -81,7 +81,7 @@ public sealed class Anmerkung
 
     /// <summary>Schreibt eine an.</summary>
     /// <exception cref="Eingabefehler">Text fehlt oder ist zu lang.</exception>
-    public static Anmerkung Schreibe(string? text, string? zitat, DateTimeOffset jetzt)
+    public static Anmerkung Write(string? text, string? zitat, DateTimeOffset now)
     {
         var sauber = (text ?? string.Empty).Trim();
 
@@ -103,7 +103,7 @@ public sealed class Anmerkung
             markiert = markiert[..HoechstlaengeZitat];
         }
 
-        return new Anmerkung(Guid.CreateVersion7(), sauber, markiert, false, jetzt);
+        return new Anmerkung(Guid.CreateVersion7(), sauber, markiert, false, now);
     }
 
     /// <summary>Die Anmerkung, wie eine Zeile sie hält.</summary>
@@ -116,21 +116,21 @@ public sealed class Anmerkung
 }
 
 /// <summary>Die Anmerkung taugt nicht.</summary>
-public sealed class AnmerkungFehler(string meldung) : Eingabefehler(meldung);
+public sealed class AnmerkungFehler(string notification) : Eingabefehler(notification);
 
-/// <summary>Ein Anschreiben auf dem Weg zur Bewerbung.</summary>
+/// <summary>Ein Anschreiben auf dem Weg zur JobApplication.</summary>
 /// <remarks>
 /// <strong>Der einzige Ort im System, an dem ein KI-Ergebnis liegen bleibt</strong>
 /// — und ADR-0034 sagt, warum das hier richtig und beim Profilentwurf falsch
 /// ist: dies ist ein <em>Dokument</em>, das über Tage in Runden entsteht, kein
 /// Vorschlag für ein Formularfeld.
 /// <para>
-/// Was hier <em>nicht</em> steht, ist genauso wichtig: keine Bewertung des
-/// Textes, kein Passungswert, keine Reihung der eigenen Bewerbungen nach Güte.
+/// Was hier <em>nicht</em> steht, ist genauso wichtig: keine Evaluation des
+/// Textes, kein Passungswert, keine Reihung der eigenen Applications nach Güte.
 /// Das wäre ADR-0022 auf dem Umweg über den eigenen Text.
 /// </para>
 /// </remarks>
-public sealed class Bewerbungsentwurf
+public sealed class ApplicationDraft
 {
     /// <summary>Wie lang die Betreffzeile sein darf.</summary>
     public const int HoechstlaengeBetreff = 300;
@@ -144,34 +144,34 @@ public sealed class Bewerbungsentwurf
     private readonly List<Anmerkung> _anmerkungen;
     private readonly List<Guid> _unterlagen;
 
-    private Bewerbungsentwurf(
+    private ApplicationDraft(
         Guid id,
-        Guid stelle,
-        TenantId firma,
-        SubjectId wer,
+        Guid job,
+        TenantId company,
+        SubjectId subject,
         string betreff,
         string text,
-        Entwurfsstand stand,
+        DraftState state,
         int fassung,
-        string fehler,
+        string error,
         bool teiltLebenslauf,
-        List<Guid> unterlagen,
+        List<Guid> documents,
         List<Anmerkung> anmerkungen,
         DateTimeOffset angelegt,
         DateTimeOffset geaendert,
         DateTimeOffset? schreibenBegonnen = null)
     {
         Id = id;
-        Stelle = stelle;
-        Firma = firma;
-        Wer = wer;
+        Job = job;
+        Firma = company;
+        Wer = subject;
         Betreff = betreff;
         Text = text;
-        Stand = stand;
+        State = state;
         Fassung = fassung;
-        Fehler = fehler;
+        Fehler = error;
         TeiltLebenslauf = teiltLebenslauf;
-        _unterlagen = unterlagen;
+        _unterlagen = documents;
         _anmerkungen = anmerkungen;
         Angelegt = angelegt;
         Geaendert = geaendert;
@@ -181,10 +181,10 @@ public sealed class Bewerbungsentwurf
     /// <summary>Die Kennung.</summary>
     public Guid Id { get; }
 
-    /// <summary>Für welche Stelle.</summary>
-    public Guid Stelle { get; }
+    /// <summary>Für welche Job.</summary>
+    public Guid Job { get; }
 
-    /// <summary>Welches Unternehmen die Stelle ausgeschrieben hat.</summary>
+    /// <summary>Welches Unternehmen die Job ausgeschrieben hat.</summary>
     public TenantId Firma { get; }
 
     /// <summary>Wessen Entwurf.</summary>
@@ -197,7 +197,7 @@ public sealed class Bewerbungsentwurf
     public string Text { get; private set; }
 
     /// <summary>Wo er steht.</summary>
-    public Entwurfsstand Stand { get; private set; }
+    public DraftState State { get; private set; }
 
     /// <summary>Die wievielte Fassung.</summary>
     /// <remarks>
@@ -209,7 +209,7 @@ public sealed class Bewerbungsentwurf
     /// <summary>Warum es misslang — die Art, nie der Inhalt.</summary>
     public string Fehler { get; private set; }
 
-    /// <summary>Ob der Lebenslauf mitgeht.</summary>
+    /// <summary>Ob der CurriculumVitae mitgeht.</summary>
     public bool TeiltLebenslauf { get; private set; }
 
     /// <summary>Welche Unterlagen mitgehen, in der gewählten Reihenfolge.</summary>
@@ -219,7 +219,7 @@ public sealed class Bewerbungsentwurf
     public IReadOnlyList<Anmerkung> Anmerkungen => _anmerkungen;
 
     /// <summary>Ob noch etwas offen ist.</summary>
-    public bool HatOffeneAnmerkungen => _anmerkungen.Any(eintrag => !eintrag.Erledigt);
+    public bool HatOffeneAnmerkungen => _anmerkungen.Any(entry => !entry.Erledigt);
 
     /// <summary>Wann er begann.</summary>
     public DateTimeOffset Angelegt { get; }
@@ -228,37 +228,37 @@ public sealed class Bewerbungsentwurf
     public DateTimeOffset Geaendert { get; private set; }
 
     /// <summary>
-    /// Wann dieses Schreiben begann. Unverändert, solange der Stand Entsteht
+    /// Wann dieses Schreiben begann. Unverändert, solange der State Entsteht
     /// ist — sonst springt die Oberfläche bei jedem Bruchstück auf null Sekunden.
     /// </summary>
     public DateTimeOffset? SchreibenBegonnen { get; private set; }
 
     /// <summary>Beginnt einen Entwurf. Das Modell schreibt noch nicht.</summary>
-    public static Bewerbungsentwurf Beginne(
-        Guid stelle, TenantId firma, SubjectId wer, DateTimeOffset jetzt) =>
-        new(Guid.CreateVersion7(), stelle, firma, wer, string.Empty, string.Empty,
-            Entwurfsstand.Entsteht, 1, string.Empty, true, [], [], jetzt, jetzt);
+    public static ApplicationDraft Beginne(
+        Guid job, TenantId company, SubjectId subject, DateTimeOffset now) =>
+        new(Guid.CreateVersion7(), job, company, subject, string.Empty, string.Empty,
+            DraftState.Entsteht, 1, string.Empty, true, [], [], now, now);
 
     /// <summary>Der Entwurf, wie Zeilen ihn halten. Prüft nichts.</summary>
-    public static Bewerbungsentwurf Stelle_her(
+    public static ApplicationDraft Stelle_her(
         Guid id,
-        Guid stelle,
-        TenantId firma,
-        SubjectId wer,
+        Guid job,
+        TenantId company,
+        SubjectId subject,
         string betreff,
         string text,
-        Entwurfsstand stand,
+        DraftState state,
         int fassung,
-        string fehler,
+        string error,
         bool teiltLebenslauf,
-        IReadOnlyList<Guid> unterlagen,
+        IReadOnlyList<Guid> documents,
         IReadOnlyList<Anmerkung> anmerkungen,
         DateTimeOffset angelegt,
         DateTimeOffset geaendert,
         DateTimeOffset? schreibenBegonnen = null) =>
-        new(id, stelle, firma, wer, betreff, text, stand, fassung, fehler,
-            teiltLebenslauf, [.. unterlagen],
-            [.. anmerkungen.OrderBy(eintrag => eintrag.Angelegt)], angelegt, geaendert,
+        new(id, job, company, subject, betreff, text, state, fassung, error,
+            teiltLebenslauf, [.. documents],
+            [.. anmerkungen.OrderBy(entry => entry.Angelegt)], angelegt, geaendert,
             schreibenBegonnen);
 
     /// <summary>Startet (noch einmal) das Schreiben — der Brief wird leer.</summary>
@@ -266,12 +266,12 @@ public sealed class Bewerbungsentwurf
     /// Aus Fehlgeschlagen zurück nach Entsteht, damit die Oberfläche „wird
     /// geschrieben" zeigt und das Modell denselben Entwurf füllen darf.
     /// </remarks>
-    public void Beginne_schreiben(DateTimeOffset jetzt, bool leeren = true)
+    public void Beginne_schreiben(DateTimeOffset now, bool leeren = true)
     {
-        if (Stand is not (Entwurfsstand.Entsteht or Entwurfsstand.Fehlgeschlagen
-            or Entwurfsstand.Ueberarbeiten or Entwurfsstand.Pruefen))
+        if (State is not (DraftState.Entsteht or DraftState.Fehlgeschlagen
+            or DraftState.Ueberarbeiten or DraftState.Pruefen))
         {
-            throw new EntwurfsschrittNichtErlaubt(Stand, "geschrieben werden");
+            throw new DraftStepNotAllowed(State, "geschrieben werden");
         }
 
         if (leeren)
@@ -281,50 +281,50 @@ public sealed class Bewerbungsentwurf
         }
 
         Fehler = string.Empty;
-        Stand = Entwurfsstand.Entsteht;
+        State = DraftState.Entsteht;
         // Schon laufendes Schreiben behält den Start — sonst springt die
         // Oberfläche bei einem zweiten Klick oder einem Poll auf null Sekunden.
         if (SchreibenBegonnen is null)
         {
-            SchreibenBegonnen = jetzt;
+            SchreibenBegonnen = now;
         }
 
-        Geaendert = jetzt;
+        Geaendert = now;
     }
 
     /// <summary>Ein Zwischenstand, während das Modell noch schreibt.</summary>
     /// <remarks>
-    /// Keine neue Fassung, kein Sprung nach Prüfen — sonst wäre ein halber
+    /// None neue Fassung, kein Sprung nach Prüfen — sonst wäre ein halber
     /// Brief freigabefähig.
     /// </remarks>
-    public void Nimm_bruchstueck(string? betreff, string? text, DateTimeOffset jetzt)
+    public void Nimm_bruchstueck(string? betreff, string? text, DateTimeOffset now)
     {
-        if (Stand != Entwurfsstand.Entsteht)
+        if (State != DraftState.Entsteht)
         {
-            throw new EntwurfsschrittNichtErlaubt(Stand, "geschrieben werden");
+            throw new DraftStepNotAllowed(State, "geschrieben werden");
         }
 
         Setze_text(betreff, text);
-        Geaendert = jetzt;
+        Geaendert = now;
     }
 
     /// <summary>Das Modell hat geschrieben.</summary>
     /// <exception cref="EntwurfsschrittNichtErlaubt">Er entstand gar nicht.</exception>
-    public void Nimm_text_an(string? betreff, string? text, DateTimeOffset jetzt)
+    public void Nimm_text_an(string? betreff, string? text, DateTimeOffset now)
     {
         // Auch aus Fehlgeschlagen: „noch einmal schreiben" ist derselbe
         // Schritt, nur nach einem misslungenen Versuch. Ihn zu verbieten
         // verwirft eine fertige Modellantwort als 422.
-        if (Stand is not (Entwurfsstand.Entsteht or Entwurfsstand.Fehlgeschlagen))
+        if (State is not (DraftState.Entsteht or DraftState.Fehlgeschlagen))
         {
-            throw new EntwurfsschrittNichtErlaubt(Stand, "geschrieben werden");
+            throw new DraftStepNotAllowed(State, "geschrieben werden");
         }
 
         Setze_text(betreff, text);
-        Stand = Entwurfsstand.Pruefen;
+        State = DraftState.Pruefen;
         Fehler = string.Empty;
         SchreibenBegonnen = null;
-        Geaendert = jetzt;
+        Geaendert = now;
     }
 
     /// <summary>Das Schreiben ist misslungen.</summary>
@@ -332,61 +332,61 @@ public sealed class Bewerbungsentwurf
     /// <c>grund</c> nennt die ART, nie den Inhalt — dieselbe Regel wie überall
     /// sonst: „der Anbieter antwortet nicht", nicht der halbe Text.
     /// </remarks>
-    public void Scheitere(string grund, DateTimeOffset jetzt)
+    public void Scheitere(string reason, DateTimeOffset now)
     {
-        Stand = Entwurfsstand.Fehlgeschlagen;
-        Fehler = (grund ?? string.Empty).Trim();
+        State = DraftState.Fehlgeschlagen;
+        Fehler = (reason ?? string.Empty).Trim();
         SchreibenBegonnen = null;
-        Geaendert = jetzt;
+        Geaendert = now;
     }
 
     /// <summary>Die Person ändert selbst.</summary>
     /// <remarks>
     /// Erlaubt in <c>Pruefen</c> und <c>Ueberarbeiten</c>, nicht danach: an
-    /// einem freigegebenen Text zu schreiben, ohne die Freigabe zu verlieren,
+    /// einem freigegebenen Text zu schreiben, ohne die Release zu verlieren,
     /// hiesse, dass „freigegeben" nichts über den Text aussagt. Deshalb fällt
-    /// der Stand hier auf <c>Pruefen</c> zurück.
+    /// der State hier auf <c>Pruefen</c> zurück.
     /// </remarks>
     /// <exception cref="EntwurfsschrittNichtErlaubt">Er ist schon hinaus.</exception>
-    public void Aendere_selbst(string? betreff, string? text, DateTimeOffset jetzt)
+    public void Aendere_selbst(string? betreff, string? text, DateTimeOffset now)
     {
-        if (Stand is Entwurfsstand.Gesendet or Entwurfsstand.Entsteht)
+        if (State is DraftState.Gesendet or DraftState.Entsteht)
         {
-            throw new EntwurfsschrittNichtErlaubt(Stand, "geändert werden");
+            throw new DraftStepNotAllowed(State, "geändert werden");
         }
 
         Setze_text(betreff, text);
-        Stand = HatOffeneAnmerkungen ? Entwurfsstand.Ueberarbeiten : Entwurfsstand.Pruefen;
-        Geaendert = jetzt;
+        State = HatOffeneAnmerkungen ? DraftState.Ueberarbeiten : DraftState.Pruefen;
+        Geaendert = now;
     }
 
     /// <summary>Wählt, was mitgeht.</summary>
     /// <exception cref="EntwurfsschrittNichtErlaubt">Er ist schon hinaus.</exception>
     public void Waehle_beilagen(
-        bool lebenslauf, IReadOnlyList<Guid> unterlagen, DateTimeOffset jetzt)
+        bool resume, IReadOnlyList<Guid> documents, DateTimeOffset now)
     {
-        ArgumentNullException.ThrowIfNull(unterlagen);
+        ArgumentNullException.ThrowIfNull(documents);
 
-        if (Stand == Entwurfsstand.Gesendet)
+        if (State == DraftState.Gesendet)
         {
-            throw new EntwurfsschrittNichtErlaubt(Stand, "geändert werden");
+            throw new DraftStepNotAllowed(State, "geändert werden");
         }
 
-        TeiltLebenslauf = lebenslauf;
+        TeiltLebenslauf = resume;
         _unterlagen.Clear();
         // Reihenfolge der Wahl, doppelte raus: die Mappe zeigt Reiter, und
         // zweimal derselbe Reiter waere ein Fehler, den niemand erklaeren kann.
-        _unterlagen.AddRange(unterlagen.Distinct());
-        Geaendert = jetzt;
+        _unterlagen.AddRange(documents.Distinct());
+        Geaendert = now;
     }
 
     /// <summary>Merkt etwas an — und damit ist der Entwurf nicht mehr fertig.</summary>
     /// <exception cref="EntwurfsschrittNichtErlaubt">Er ist schon hinaus.</exception>
-    public Anmerkung Merke_an(string? text, string? zitat, DateTimeOffset jetzt)
+    public Anmerkung Merke_an(string? text, string? zitat, DateTimeOffset now)
     {
-        if (Stand is Entwurfsstand.Gesendet or Entwurfsstand.Entsteht)
+        if (State is DraftState.Gesendet or DraftState.Entsteht)
         {
-            throw new EntwurfsschrittNichtErlaubt(Stand, "kommentiert werden");
+            throw new DraftStepNotAllowed(State, "kommentiert werden");
         }
 
         if (_anmerkungen.Count >= HoechsteAnmerkungen)
@@ -395,22 +395,22 @@ public sealed class Bewerbungsentwurf
                 $"Mehr als {HoechsteAnmerkungen} Anmerkungen trägt ein Entwurf nicht.");
         }
 
-        var anmerkung = Anmerkung.Schreibe(text, zitat, jetzt);
+        var anmerkung = Anmerkung.Write(text, zitat, now);
 
         _anmerkungen.Add(anmerkung);
 
-        // AUCH AUS `Freigegeben` ZURÜCK. Wer nach der Freigabe noch etwas
-        // findet, hat es gefunden — und eine Freigabe, die einen Widerspruch
+        // AUCH AUS `Freigegeben` ZURÜCK. Wer nach der Release noch etwas
+        // findet, hat es gefunden — und eine Release, die einen Widerspruch
         // überlebt, ist keine.
-        Stand = Entwurfsstand.Ueberarbeiten;
-        Geaendert = jetzt;
+        State = DraftState.Ueberarbeiten;
+        Geaendert = now;
 
         return anmerkung;
     }
 
     /// <summary>Was das Modell umsetzen soll.</summary>
     public IReadOnlyList<Anmerkung> OffeneAnmerkungen =>
-        [.. _anmerkungen.Where(eintrag => !eintrag.Erledigt)];
+        [.. _anmerkungen.Where(entry => !entry.Erledigt)];
 
     /// <summary>Das Modell hat überarbeitet.</summary>
     /// <remarks>
@@ -420,11 +420,11 @@ public sealed class Bewerbungsentwurf
     /// verändern.
     /// </remarks>
     /// <exception cref="OffeneAnmerkungen">Es gibt keinen Auftrag.</exception>
-    public void Ueberarbeite(string? betreff, string? text, DateTimeOffset jetzt)
+    public void Ueberarbeite(string? betreff, string? text, DateTimeOffset now)
     {
-        if (Stand == Entwurfsstand.Gesendet)
+        if (State == DraftState.Gesendet)
         {
-            throw new EntwurfsschrittNichtErlaubt(Stand, "überarbeitet werden");
+            throw new DraftStepNotAllowed(State, "überarbeitet werden");
         }
 
         if (!HatOffeneAnmerkungen)
@@ -434,24 +434,24 @@ public sealed class Bewerbungsentwurf
 
         Setze_text(betreff, text);
 
-        foreach (var anmerkung in _anmerkungen.Where(eintrag => !eintrag.Erledigt))
+        foreach (var anmerkung in _anmerkungen.Where(entry => !entry.Erledigt))
         {
             anmerkung.Hake_ab();
         }
 
         Fassung++;
-        Stand = Entwurfsstand.Pruefen;
+        State = DraftState.Pruefen;
         SchreibenBegonnen = null;
-        Geaendert = jetzt;
+        Geaendert = now;
     }
 
     /// <summary>So, und nicht anders.</summary>
     /// <exception cref="OffeneAnmerkungen">Es steht noch etwas aus.</exception>
-    public void Gib_frei(DateTimeOffset jetzt)
+    public void Gib_frei(DateTimeOffset now)
     {
-        if (Stand is not (Entwurfsstand.Pruefen or Entwurfsstand.Ueberarbeiten))
+        if (State is not (DraftState.Pruefen or DraftState.Ueberarbeiten))
         {
-            throw new EntwurfsschrittNichtErlaubt(Stand, "freigegeben werden");
+            throw new DraftStepNotAllowed(State, "freigegeben werden");
         }
 
         if (HatOffeneAnmerkungen)
@@ -464,74 +464,74 @@ public sealed class Bewerbungsentwurf
             throw new AnmerkungFehler("Ein leeres Anschreiben gibt niemand frei.");
         }
 
-        Stand = Entwurfsstand.Freigegeben;
-        Geaendert = jetzt;
+        State = DraftState.Freigegeben;
+        Geaendert = now;
     }
 
     /// <summary>Hinaus.</summary>
     /// <remarks>
     /// <strong>Nur aus <c>Freigegeben</c>.</strong> Freigeben und Senden sind
     /// zwei Handlungen; ein Knopf „freigeben und senden" spart einen Klick und
-    /// nimmt der Freigabe ihren Sinn (ADR-0034).
+    /// nimmt der Release ihren Sinn (ADR-0034).
     /// </remarks>
     /// <exception cref="EntwurfsschrittNichtErlaubt">Er ist nicht freigegeben.</exception>
-    public void Vermerke_versand(DateTimeOffset jetzt)
+    public void Vermerke_versand(DateTimeOffset now)
     {
-        if (Stand != Entwurfsstand.Freigegeben)
+        if (State != DraftState.Freigegeben)
         {
-            throw new EntwurfsschrittNichtErlaubt(Stand, "gesendet werden");
+            throw new DraftStepNotAllowed(State, "gesendet werden");
         }
 
-        Stand = Entwurfsstand.Gesendet;
-        Geaendert = jetzt;
+        State = DraftState.Gesendet;
+        Geaendert = now;
     }
 
     private void Setze_text(string? betreff, string? text)
     {
-        var zeile = (betreff ?? string.Empty).Trim();
-        var rumpf = (text ?? string.Empty).Trim();
+        var row = (betreff ?? string.Empty).Trim();
+        var body = (text ?? string.Empty).Trim();
 
-        if (zeile.Length > HoechstlaengeBetreff)
+        if (row.Length > HoechstlaengeBetreff)
         {
-            zeile = zeile[..HoechstlaengeBetreff];
+            row = row[..HoechstlaengeBetreff];
         }
 
-        if (rumpf.Length > HoechstlaengeText)
+        if (body.Length > HoechstlaengeText)
         {
             throw new AnmerkungFehler(
                 $"Das Anschreiben ist länger als {HoechstlaengeText} Zeichen.");
         }
 
-        Betreff = zeile;
-        Text = rumpf;
+        Betreff = row;
+        Text = body;
     }
 }
 
 /// <summary>Findet und speichert Entwürfe.</summary>
-public interface IEntwurfsspeicher
+public interface IDraftStore
 {
     /// <summary>Die Entwürfe dieser Person, neueste zuerst.</summary>
-    Task<IReadOnlyList<Bewerbungsentwurf>> MeineAsync(
-        SubjectId wer, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ApplicationDraft>> MineAsync(
+        SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Einer, oder <c>null</c>.</summary>
-    Task<Bewerbungsentwurf?> HoleAsync(
-        SubjectId wer, Guid id, CancellationToken cancellationToken = default);
+    Task<ApplicationDraft?> GetAsync(
+        SubjectId subject, Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>Der offene Entwurf zu dieser Stelle, oder <c>null</c>.</summary>
+    /// <summary>Der offene Entwurf zu dieser Job, oder <c>null</c>.</summary>
     /// <remarks>
-    /// „Offen" heißt: noch nicht gesendet. Zweimal für dieselbe Stelle zu
+    /// „Offen" heißt: noch nicht gesendet. Zweimal für dieselbe Job zu
     /// entwerfen, ohne es zu merken, kostet einen Modellaufruf und verwirrt die
     /// Liste.
     /// </remarks>
-    Task<Bewerbungsentwurf?> OffenerAsync(
-        SubjectId wer, Guid stelle, CancellationToken cancellationToken = default);
+    Task<ApplicationDraft?> OpenOneAsync(
+        SubjectId subject, Guid job, CancellationToken cancellationToken = default);
 
     /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(
-        Bewerbungsentwurf entwurf, CancellationToken cancellationToken = default);
+    Task SaveAsync(
+        ApplicationDraft draft, CancellationToken cancellationToken = default);
 
     /// <summary>Löscht einen.</summary>
-    Task LoescheAsync(
-        SubjectId wer, Guid id, CancellationToken cancellationToken = default);
+    Task DeleteAsync(
+        SubjectId subject, Guid id, CancellationToken cancellationToken = default);
 }

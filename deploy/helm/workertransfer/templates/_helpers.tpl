@@ -131,6 +131,16 @@ Instanz benutzt. LEER heisst: die Tuer ist zu und die Seite antwortet 404.
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_NACHWEIS_SECRET
+{{/*
+The master key, at EVERY service. It encrypts the data-protection key ring
+(ADR-0046) and a person's AI key. Without it the pod does not start — which is
+right, because in the clear nothing is stored.
+*/}}
+- name: WORKERTRANSFER_SECRETS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "workertransfer.secretName" $root }}
+      key: WORKER_SECRETS_KEY
 {{- if or (eq $svc.name "identity-service") (eq $svc.name "profile-service") }}
 {{/*
 profile-service prueft es an seiner internen Suchtuer (ADR-0036). LEER hiesse

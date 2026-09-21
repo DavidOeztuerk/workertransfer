@@ -58,6 +58,12 @@ export function testStore(fallback: AuthVorgabe = {}) {
 /** Kurzform für „angemeldet als Person, ohne Unternehmen" — der Normalfall. */
 export const ANGEMELDET: AuthVorgabe = { status: "authenticated", session: PERSON };
 
+/**
+ * The catalogues belong in the test host: without `I18nextProvider`
+ * `useTranslation` returns the key instead of the text, and a test looking for
+ * `sprache.label` then says nothing about the UI. German is pinned, like in the
+ * Playwright configuration and for the same reason (ADR-0031).
+ */
 export function renderMitStore(
   ui: ReactElement,
   {
@@ -71,12 +77,6 @@ export function renderMitStore(
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <Provider store={store}>
-        {/*
-          Die Kataloge gehoeren in den Testwirt, sonst zeigt `useTranslation`
-          den Schluessel statt des Textes — und ein Test, der `sprache.label`
-          sucht, sagt nichts ueber die Oberflaeche. Deutsch fest, wie in der
-          Playwright-Konfiguration und aus demselben Grund (ADR-0031).
-        */}
         <I18nextProvider i18n={i18n}>
           <ThemeProvider theme={buildTheme("light")}>
             <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>

@@ -21,9 +21,9 @@ public sealed record EintragV1(
     [property: JsonPropertyName("attachment")] string? Attachment = null,
     /// <summary>Womit gearbeitet wurde — von der Person selbst genannt.</summary>
     /// <remarks>
-    /// Vereinheitlicht durch denselben Wortschatz wie das Profil (ADR-0023).
+    /// Vereinheitlicht durch denselben Vocabulary wie das Profile (ADR-0023).
     /// Sie machen die Arbeit nicht durchsuchbar: suchbar wird eine Fähigkeit
-    /// erst im Profil, und dorthin kommt sie mit einem Klick.
+    /// erst im Profile, und dorthin kommt sie mit einem Klick.
     /// </remarks>
     [property: JsonPropertyName("technologies")] IReadOnlyList<string>? Technologies = null);
 

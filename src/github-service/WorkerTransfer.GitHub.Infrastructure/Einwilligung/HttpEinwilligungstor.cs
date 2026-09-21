@@ -9,10 +9,10 @@ using WorkerTransfer.GitHub.Application.Ports;
 namespace WorkerTransfer.GitHub.Infrastructure.Einwilligung;
 
 /// <summary>Wo der Consent-Ledger antwortet.</summary>
-public sealed class Einwilligungseinstellungen
+public sealed class ConsentSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Consent";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Consent";
 
     /// <summary>Die Basisadresse des Ledgers.</summary>
     public string Adresse { get; set; } = string.Empty;
@@ -27,11 +27,11 @@ public sealed class Einwilligungseinstellungen
 /// Token <em>des Aufrufers</em>, damit das Protokoll des Ledgers festhält, wer
 /// wirklich gefragt hat.
 /// </remarks>
-public sealed class HttpEinwilligungstor(
+public sealed class HttpConsentGate(
     IHttpClientFactory fabrik,
     IAufrufertoken token,
-    IOptions<Einwilligungseinstellungen> einstellungen,
-    ILogger<HttpEinwilligungstor> protokoll) : IEinwilligungstor
+    IOptions<ConsentSettings> einstellungen,
+    ILogger<HttpConsentGate> protokoll) : IConsentGate
 {
     /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
     public const string Klient = "consent";
@@ -41,76 +41,76 @@ public sealed class HttpEinwilligungstor(
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
 
-    private readonly Einwilligungseinstellungen _einstellungen = einstellungen.Value;
+    private readonly ConsentSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task<bool> DarfGezeigtWerdenAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<bool> MayBeShownAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(_einstellungen.Adresse))
         {
-            throw new EinwilligungSchweigt("Consent:Adresse ist nicht gesetzt.");
+            throw new ConsentGateSilent("Consent:Adresse ist nicht gesetzt.");
         }
 
         using var client = fabrik.CreateClient(Klient);
         client.Timeout = _einstellungen.Zeitueberschreitung;
 
-        using var anfrage = new HttpRequestMessage(
+        using var request = new HttpRequestMessage(
             HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), "/consent/check"))
         {
             Content = JsonContent.Create(
-                new EinwilligungsfrageV1(wer.Value, Einwilligungsschluessel.Sichtbarkeit),
+                new ConsentQuestionV1(subject.Value, ConsentKey.Sichtbarkeit),
                 options: Format)
         };
 
-        if (token.Wert is { Length: > 0 } wert)
+        if (token.Wert is { Length: > 0 } value)
         {
-            anfrage.Headers.Add("Authorization", $"Bearer {wert}");
+            request.Headers.Add("Authorization", $"Bearer {value}");
         }
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
-            protokoll.LogWarning("Consent-Ledger nicht erreichbar ({Art})", fehler.GetType().Name);
-            throw new EinwilligungSchweigt("consent-service ist nicht erreichbar.", fehler);
+            protokoll.LogWarning("Consent-Ledger nicht erreichbar ({Art})", error.GetType().Name);
+            throw new ConsentGateSilent("consent-service ist nicht erreichbar.", error);
         }
-        catch (TaskCanceledException fehler) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
             protokoll.LogWarning("Consent-Ledger antwortete nicht rechtzeitig");
-            throw new EinwilligungSchweigt("consent-service antwortete nicht rechtzeitig.", fehler);
+            throw new ConsentGateSilent("consent-service antwortete nicht rechtzeitig.", error);
         }
 
-        using (antwort)
+        using (response)
         {
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
                 // 401 und 403 eingeschlossen: unser Token taugt nicht — ein
                 // Systemproblem, keine Aussage über die Einwilligung.
                 protokoll.LogWarning(
-                    "Consent-Ledger antwortete mit {Code}", (int)antwort.StatusCode);
+                    "Consent-Ledger antwortete mit {Code}", (int)response.StatusCode);
 
-                throw new EinwilligungSchweigt(
-                    $"consent-service antwortete mit {(int)antwort.StatusCode}.");
+                throw new ConsentGateSilent(
+                    $"consent-service antwortete mit {(int)response.StatusCode}.");
             }
 
             try
             {
-                var gelesen = await antwort.Content
-                    .ReadFromJsonAsync<EinwilligungsantwortV1>(Format, cancellationToken)
-                    ?? throw new EinwilligungSchweigt("consent-service sandte nichts.");
+                var gelesen = await response.Content
+                    .ReadFromJsonAsync<ConsentResponseV1>(Format, cancellationToken)
+                    ?? throw new ConsentGateSilent("consent-service sandte nichts.");
 
                 // Erteilt und nicht gelöscht. Alles andere ist ein Nein.
                 return gelesen.Granted && !gelesen.Deleted;
             }
-            catch (JsonException fehler)
+            catch (JsonException error)
             {
-                throw new EinwilligungSchweigt(
-                    "consent-service sandte eine unbrauchbare Antwort.", fehler);
+                throw new ConsentGateSilent(
+                    "consent-service sandte eine unbrauchbare Antwort.", error);
             }
         }
     }

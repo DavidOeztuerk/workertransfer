@@ -2,7 +2,7 @@ using FluentAssertions;
 using Noelia.Core.Identity;
 using WorkerTransfer.Applications.Application.Entwuerfe;
 using WorkerTransfer.Applications.Application.Ports;
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 using WorkerTransfer.Applications.Infrastructure.Anschreiben;
 
 namespace WorkerTransfer.Applications.Tests;
@@ -13,15 +13,15 @@ public sealed class EntwurfsregelnTests
     private static readonly DateTimeOffset Jetzt =
         new(2026, 9, 5, 12, 0, 0, TimeSpan.Zero);
 
-    private static Bewerbungsentwurf Fertig()
+    private static ApplicationDraft Fertig()
     {
-        var entwurf = Bewerbungsentwurf.Beginne(
+        var draft = ApplicationDraft.Beginne(
             Guid.CreateVersion7(), new TenantId(Guid.CreateVersion7()),
             new SubjectId(Guid.CreateVersion7()), Jetzt);
 
-        entwurf.Nimm_text_an("Bewerbung als Entwickler", "Sehr geehrte …", Jetzt);
+        draft.Nimm_text_an("Bewerbung als Entwickler", "Sehr geehrte …", Jetzt);
 
-        return entwurf;
+        return draft;
     }
 
     /// <summary>
@@ -30,47 +30,47 @@ public sealed class EntwurfsregelnTests
     /// <remarks>
     /// Zwischen dem Modell und dem Unternehmen stehen zwei Handlungen eines
     /// Menschen: freigeben und senden. Ein Knopf „freigeben und senden" spart
-    /// einen Klick und nimmt der Freigabe ihren Sinn — sie ist der Moment, in
+    /// einen Klick und nimmt der Release ihren Sinn — sie ist der Moment, in
     /// dem jemand sagt „so, und nicht anders".
     /// </remarks>
     [Fact]
     public void Ohne_Freigabe_geht_nichts_hinaus()
     {
-        var entwurf = Fertig();
+        var draft = Fertig();
 
-        var versuch = () => entwurf.Vermerke_versand(Jetzt);
+        var attempt = () => draft.Vermerke_versand(Jetzt);
 
-        versuch.Should().Throw<EntwurfsschrittNichtErlaubt>();
-        entwurf.Stand.Should().Be(Entwurfsstand.Pruefen);
+        attempt.Should().Throw<DraftStepNotAllowed>();
+        draft.State.Should().Be(DraftState.Pruefen);
     }
 
     /// <summary>Und aus „entsteht" erst recht nicht.</summary>
     [Fact]
     public void Aus_dem_Entstehen_heraus_gibt_niemand_frei()
     {
-        var entwurf = Bewerbungsentwurf.Beginne(
+        var draft = ApplicationDraft.Beginne(
             Guid.CreateVersion7(), new TenantId(Guid.CreateVersion7()),
             new SubjectId(Guid.CreateVersion7()), Jetzt);
 
-        var freigeben = () => entwurf.Gib_frei(Jetzt);
-        var senden = () => entwurf.Vermerke_versand(Jetzt);
+        var freigeben = () => draft.Gib_frei(Jetzt);
+        var senden = () => draft.Vermerke_versand(Jetzt);
 
-        freigeben.Should().Throw<EntwurfsschrittNichtErlaubt>();
-        senden.Should().Throw<EntwurfsschrittNichtErlaubt>();
+        freigeben.Should().Throw<DraftStepNotAllowed>();
+        senden.Should().Throw<DraftStepNotAllowed>();
     }
 
-    /// <summary>Eine offene Anmerkung verhindert die Freigabe.</summary>
+    /// <summary>Eine offene Anmerkung verhindert die Release.</summary>
     [Fact]
     public void Mit_offener_Anmerkung_gibt_niemand_frei()
     {
-        var entwurf = Fertig();
+        var draft = Fertig();
 
-        entwurf.Merke_an("Der zweite Absatz klingt hohl.", "Sehr geehrte", Jetzt);
+        draft.Merke_an("Der zweite Absatz klingt hohl.", "Sehr geehrte", Jetzt);
 
-        var versuch = () => entwurf.Gib_frei(Jetzt);
+        var attempt = () => draft.Gib_frei(Jetzt);
 
-        versuch.Should().Throw<OffeneAnmerkungen>();
-        entwurf.Stand.Should().Be(Entwurfsstand.Ueberarbeiten);
+        attempt.Should().Throw<OffeneAnmerkungen>();
+        draft.State.Should().Be(DraftState.Ueberarbeiten);
     }
 
     /// <summary>
@@ -85,13 +85,13 @@ public sealed class EntwurfsregelnTests
     [Fact]
     public void Ohne_Anmerkung_wird_nicht_ueberarbeitet()
     {
-        var entwurf = Fertig();
+        var draft = Fertig();
 
-        var versuch = () => entwurf.Ueberarbeite("Neu", "Ganz anders", Jetzt);
+        var attempt = () => draft.Ueberarbeite("Neu", "Ganz anders", Jetzt);
 
-        versuch.Should().Throw<OffeneAnmerkungen>();
-        entwurf.Text.Should().Be("Sehr geehrte …");
-        entwurf.Fassung.Should().Be(1);
+        attempt.Should().Throw<OffeneAnmerkungen>();
+        draft.Text.Should().Be("Sehr geehrte …");
+        draft.Fassung.Should().Be(1);
     }
 
     /// <summary>Die Überarbeitung hakt ab und zählt hoch.</summary>
@@ -102,71 +102,71 @@ public sealed class EntwurfsregelnTests
     [Fact]
     public void Die_Ueberarbeitung_hakt_ab_und_zaehlt_hoch()
     {
-        var entwurf = Fertig();
+        var draft = Fertig();
 
-        entwurf.Merke_an("Kürzer.", null, Jetzt);
-        entwurf.Ueberarbeite("Bewerbung", "Kurz und gut.", Jetzt);
+        draft.Merke_an("Kürzer.", null, Jetzt);
+        draft.Ueberarbeite("Bewerbung", "Kurz und gut.", Jetzt);
 
-        entwurf.Stand.Should().Be(Entwurfsstand.Pruefen);
-        entwurf.Fassung.Should().Be(2);
-        entwurf.HatOffeneAnmerkungen.Should().BeFalse();
+        draft.State.Should().Be(DraftState.Pruefen);
+        draft.Fassung.Should().Be(2);
+        draft.HatOffeneAnmerkungen.Should().BeFalse();
 
-        // Die Anmerkung BLEIBT — sie ist der Beleg dafür, warum sich der Text
+        // Die Anmerkung BLEIBT — sie ist der Evidence dafür, warum sich der Text
         // geändert hat. Sie zu löschen brächte die Fassungsgeschichte um ihre
         // Begründung.
-        entwurf.Anmerkungen.Should().HaveCount(1);
-        entwurf.Anmerkungen[0].Erledigt.Should().BeTrue();
+        draft.Anmerkungen.Should().HaveCount(1);
+        draft.Anmerkungen[0].Erledigt.Should().BeTrue();
     }
 
-    /// <summary>Eine Anmerkung nach der Freigabe nimmt sie zurück.</summary>
+    /// <summary>Eine Anmerkung nach der Release nimmt sie zurück.</summary>
     /// <remarks>
-    /// Wer nach der Freigabe noch etwas findet, hat es gefunden. Eine Freigabe,
+    /// Wer nach der Release noch etwas findet, hat es gefunden. Eine Release,
     /// die einen Widerspruch überlebt, ist keine.
     /// </remarks>
     [Fact]
     public void Eine_Anmerkung_nach_der_Freigabe_nimmt_sie_zurueck()
     {
-        var entwurf = Fertig();
+        var draft = Fertig();
 
-        entwurf.Gib_frei(Jetzt);
-        entwurf.Stand.Should().Be(Entwurfsstand.Freigegeben);
+        draft.Gib_frei(Jetzt);
+        draft.State.Should().Be(DraftState.Freigegeben);
 
-        entwurf.Merke_an("Doch nicht.", null, Jetzt);
+        draft.Merke_an("Doch nicht.", null, Jetzt);
 
-        entwurf.Stand.Should().Be(Entwurfsstand.Ueberarbeiten);
+        draft.State.Should().Be(DraftState.Ueberarbeiten);
 
-        var versuch = () => entwurf.Vermerke_versand(Jetzt);
-        versuch.Should().Throw<EntwurfsschrittNichtErlaubt>();
+        var attempt = () => draft.Vermerke_versand(Jetzt);
+        attempt.Should().Throw<DraftStepNotAllowed>();
     }
 
-    /// <summary>Selbst zu ändern nimmt die Freigabe ebenfalls zurück.</summary>
+    /// <summary>Selbst zu ändern nimmt die Release ebenfalls zurück.</summary>
     /// <remarks>
     /// Sonst sagte „freigegeben" nichts über den Text aus, der dann hinausgeht.
     /// </remarks>
     [Fact]
     public void Eigene_Aenderung_nach_der_Freigabe_nimmt_sie_zurueck()
     {
-        var entwurf = Fertig();
+        var draft = Fertig();
 
-        entwurf.Gib_frei(Jetzt);
-        entwurf.Aendere_selbst("Bewerbung", "Ich habe noch etwas geändert.", Jetzt);
+        draft.Gib_frei(Jetzt);
+        draft.Aendere_selbst("Bewerbung", "Ich habe noch etwas geändert.", Jetzt);
 
-        entwurf.Stand.Should().Be(Entwurfsstand.Pruefen);
+        draft.State.Should().Be(DraftState.Pruefen);
     }
 
     /// <summary>Ein leeres Anschreiben gibt niemand frei.</summary>
     [Fact]
     public void Ein_leeres_Anschreiben_geht_nicht_durch()
     {
-        var entwurf = Bewerbungsentwurf.Beginne(
+        var draft = ApplicationDraft.Beginne(
             Guid.CreateVersion7(), new TenantId(Guid.CreateVersion7()),
             new SubjectId(Guid.CreateVersion7()), Jetzt);
 
-        entwurf.Nimm_text_an("Betreff", "", Jetzt);
+        draft.Nimm_text_an("Betreff", "", Jetzt);
 
-        var versuch = () => entwurf.Gib_frei(Jetzt);
+        var attempt = () => draft.Gib_frei(Jetzt);
 
-        versuch.Should().Throw<AnmerkungFehler>();
+        attempt.Should().Throw<AnmerkungFehler>();
     }
 
     /// <summary>
@@ -180,15 +180,15 @@ public sealed class EntwurfsregelnTests
     [Fact]
     public void Nach_einem_fehlgeschlagenen_Schreiben_darf_man_selbst_aendern()
     {
-        var entwurf = Bewerbungsentwurf.Beginne(
+        var draft = ApplicationDraft.Beginne(
             Guid.CreateVersion7(), new TenantId(Guid.CreateVersion7()),
             new SubjectId(Guid.CreateVersion7()), Jetzt);
 
-        entwurf.Scheitere("Es ist kein Entwurfsanbieter eingerichtet.", Jetzt);
-        entwurf.Aendere_selbst("Bewerbung", "Ich schreibe selbst.", Jetzt);
+        draft.Scheitere("Es ist kein Entwurfsanbieter eingerichtet.", Jetzt);
+        draft.Aendere_selbst("Bewerbung", "Ich schreibe selbst.", Jetzt);
 
-        entwurf.Stand.Should().Be(Entwurfsstand.Pruefen);
-        entwurf.Text.Should().Be("Ich schreibe selbst.");
+        draft.State.Should().Be(DraftState.Pruefen);
+        draft.Text.Should().Be("Ich schreibe selbst.");
     }
 
     /// <summary>
@@ -198,16 +198,16 @@ public sealed class EntwurfsregelnTests
     [Fact]
     public void Nach_einem_Fehlschlag_darf_das_Modell_nochmal_schreiben()
     {
-        var entwurf = Bewerbungsentwurf.Beginne(
+        var draft = ApplicationDraft.Beginne(
             Guid.CreateVersion7(), new TenantId(Guid.CreateVersion7()),
             new SubjectId(Guid.CreateVersion7()), Jetzt);
 
-        entwurf.Scheitere("Der Entwurfsanbieter antwortet mit 404.", Jetzt);
-        entwurf.Nimm_text_an("Bewerbung", "Sehr geehrte Damen und Herren.", Jetzt);
+        draft.Scheitere("Der Entwurfsanbieter antwortet mit 404.", Jetzt);
+        draft.Nimm_text_an("Bewerbung", "Sehr geehrte Damen und Herren.", Jetzt);
 
-        entwurf.Stand.Should().Be(Entwurfsstand.Pruefen);
-        entwurf.Text.Should().Be("Sehr geehrte Damen und Herren.");
-        entwurf.Fehler.Should().BeEmpty();
+        draft.State.Should().Be(DraftState.Pruefen);
+        draft.Text.Should().Be("Sehr geehrte Damen und Herren.");
+        draft.Fehler.Should().BeEmpty();
     }
 
     /// <summary>
@@ -217,89 +217,89 @@ public sealed class EntwurfsregelnTests
     [Fact]
     public void Das_Anschreiben_fordert_keine_lange_Antwort()
     {
-        HttpAnschreiber.HoechsteToken.Should().BeLessThanOrEqualTo(1500);
-        Anschreibenkontext.Regeln.Should().Contain("250");
-        Anschreibenkontext.Regeln.Should().Contain("Muttersprachler");
-        Anschreibenkontext.Regeln.Should().Contain("Erfinde");
-        Anschreibenkontext.Regeln.Should().Contain("Signatur");
+        HttpCoverLetterWriter.HoechsteToken.Should().BeLessThanOrEqualTo(1500);
+        CoverLetterContext.Regeln.Should().Contain("250");
+        CoverLetterContext.Regeln.Should().Contain("Muttersprachler");
+        CoverLetterContext.Regeln.Should().Contain("Erfinde");
+        CoverLetterContext.Regeln.Should().Contain("Signatur");
     }
 
     [Fact]
     public void Ein_Bruchstueck_bleibt_Entsteht()
     {
-        var entwurf = Bewerbungsentwurf.Beginne(
+        var draft = ApplicationDraft.Beginne(
             Guid.CreateVersion7(), new TenantId(Guid.CreateVersion7()),
             new SubjectId(Guid.CreateVersion7()), Jetzt);
 
-        entwurf.Beginne_schreiben(Jetzt);
-        var start = entwurf.SchreibenBegonnen;
+        draft.Beginne_schreiben(Jetzt);
+        var start = draft.SchreibenBegonnen;
 
-        entwurf.Nimm_bruchstueck("Bewerbung", "Sehr geehrte", Jetzt.AddSeconds(12));
+        draft.Nimm_bruchstueck("Bewerbung", "Sehr geehrte", Jetzt.AddSeconds(12));
 
-        entwurf.Stand.Should().Be(Entwurfsstand.Entsteht);
-        entwurf.Text.Should().Be("Sehr geehrte");
-        entwurf.Fassung.Should().Be(1);
-        entwurf.SchreibenBegonnen.Should().Be(start);
+        draft.State.Should().Be(DraftState.Entsteht);
+        draft.Text.Should().Be("Sehr geehrte");
+        draft.Fassung.Should().Be(1);
+        draft.SchreibenBegonnen.Should().Be(start);
     }
 
     [Fact]
     public void Das_erste_Schreiben_setzt_den_Start()
     {
-        var entwurf = Bewerbungsentwurf.Beginne(
+        var draft = ApplicationDraft.Beginne(
             Guid.CreateVersion7(), new TenantId(Guid.CreateVersion7()),
             new SubjectId(Guid.CreateVersion7()), Jetzt);
 
-        entwurf.SchreibenBegonnen.Should().BeNull();
+        draft.SchreibenBegonnen.Should().BeNull();
 
-        entwurf.Beginne_schreiben(Jetzt, leeren: false);
+        draft.Beginne_schreiben(Jetzt, leeren: false);
 
-        entwurf.SchreibenBegonnen.Should().Be(Jetzt);
-        entwurf.Stand.Should().Be(Entwurfsstand.Entsteht);
+        draft.SchreibenBegonnen.Should().Be(Jetzt);
+        draft.State.Should().Be(DraftState.Entsteht);
     }
 
     [Fact]
     public void Nach_einem_Fehlschlag_beginnt_das_Schreiben_wieder()
     {
-        var entwurf = Bewerbungsentwurf.Beginne(
+        var draft = ApplicationDraft.Beginne(
             Guid.CreateVersion7(), new TenantId(Guid.CreateVersion7()),
             new SubjectId(Guid.CreateVersion7()), Jetzt);
 
-        entwurf.Scheitere("Zeitüberschreitung", Jetzt);
-        entwurf.Beginne_schreiben(Jetzt);
+        draft.Scheitere("Zeitüberschreitung", Jetzt);
+        draft.Beginne_schreiben(Jetzt);
 
-        entwurf.Stand.Should().Be(Entwurfsstand.Entsteht);
-        entwurf.Fehler.Should().BeEmpty();
-        entwurf.Text.Should().BeEmpty();
+        draft.State.Should().Be(DraftState.Entsteht);
+        draft.Fehler.Should().BeEmpty();
+        draft.Text.Should().BeEmpty();
     }
 
     /// <summary>Der ganze Weg, mit jedem Sprung als eigener Handlung.</summary>
     [Fact]
     public void Der_ganze_Weg_verlangt_jeden_Schritt_einzeln()
     {
-        var entwurf = Fertig();
+        var draft = Fertig();
 
-        entwurf.Merke_an("Bitte konkreter.", "Sehr geehrte", Jetzt);
-        entwurf.Stand.Should().Be(Entwurfsstand.Ueberarbeiten);
+        draft.Merke_an("Bitte konkreter.", "Sehr geehrte", Jetzt);
+        draft.State.Should().Be(DraftState.Ueberarbeiten);
 
-        entwurf.Ueberarbeite("Bewerbung", "Konkret.", Jetzt);
-        entwurf.Stand.Should().Be(Entwurfsstand.Pruefen);
+        draft.Ueberarbeite("Bewerbung", "Konkret.", Jetzt);
+        draft.State.Should().Be(DraftState.Pruefen);
 
-        entwurf.Gib_frei(Jetzt);
-        entwurf.Stand.Should().Be(Entwurfsstand.Freigegeben);
+        draft.Gib_frei(Jetzt);
+        draft.State.Should().Be(DraftState.Freigegeben);
 
-        entwurf.Vermerke_versand(Jetzt);
-        entwurf.Stand.Should().Be(Entwurfsstand.Gesendet);
+        draft.Vermerke_versand(Jetzt);
+        draft.State.Should().Be(DraftState.Gesendet);
 
         // Danach ist Schluss: ein gesendetes Anschreiben ändert niemand mehr.
-        var nachtraeglich = () => entwurf.Aendere_selbst("x", "y", Jetzt);
-        nachtraeglich.Should().Throw<EntwurfsschrittNichtErlaubt>();
+        var nachtraeglich = () => draft.Aendere_selbst("x", "y", Jetzt);
+        nachtraeglich.Should().Throw<DraftStepNotAllowed>();
     }
 
     /// <summary>
     /// <strong>Der Kontext trägt nur eigene Angaben und die Anzeige.</strong>
     /// </summary>
     /// <remarks>
-    /// Dieselbe Prüfung, die ADR-0024 für <c>Anzeigenentwurf</c> und den
+    /// Dieselbe Prüfung, die ADR-0024 für <c>AdvertDraft</c> und den
     /// Profilentwurf vorsieht: die Feldliste ist die Grenze. Wer hier ein Feld
     /// ergänzt, beantwortet zuerst — gehört es der bewerbenden Person, oder
     /// steht es in der öffentlichen Anzeige? Alles andere wäre eine Aussage
@@ -308,27 +308,27 @@ public sealed class EntwurfsregelnTests
     [Fact]
     public void Der_Kontext_traegt_nichts_ueber_Dritte()
     {
-        typeof(Anschreibenkontext).GetProperties()
+        typeof(CoverLetterContext).GetProperties()
             .Select(eigenschaft => eigenschaft.Name)
             .Should().BeEquivalentTo(
                 // Die Anzeige — öffentlich lesbar, ohne Anmeldung.
-                nameof(Anschreibenkontext.StellenTitel),
-                nameof(Anschreibenkontext.Unternehmen),
-                nameof(Anschreibenkontext.StellenOrt),
-                nameof(Anschreibenkontext.StellenBeschreibung),
-                nameof(Anschreibenkontext.GesuchteFaehigkeiten),
+                nameof(CoverLetterContext.StellenTitel),
+                nameof(CoverLetterContext.Unternehmen),
+                nameof(CoverLetterContext.StellenOrt),
+                nameof(CoverLetterContext.StellenBeschreibung),
+                nameof(CoverLetterContext.GesuchteFaehigkeiten),
                 // Die eigenen Angaben.
-                nameof(Anschreibenkontext.EigenerName),
-                nameof(Anschreibenkontext.EigeneUeberschrift),
-                nameof(Anschreibenkontext.EigenerText),
-                nameof(Anschreibenkontext.EigeneFaehigkeiten),
-                nameof(Anschreibenkontext.EigenerWerdegang),
-                nameof(Anschreibenkontext.Sprache));
+                nameof(CoverLetterContext.EigenerName),
+                nameof(CoverLetterContext.EigeneUeberschrift),
+                nameof(CoverLetterContext.EigenerText),
+                nameof(CoverLetterContext.EigeneFaehigkeiten),
+                nameof(CoverLetterContext.EigenerWerdegang),
+                nameof(CoverLetterContext.Sprache));
     }
 
     /// <summary>
-    /// Anschrift, Mail und Telefon gehören auf den Briefbogen, nicht ins Modell
-    /// (ADR-0038). Die Allowlist oben reicht nicht: ein Feld <c>Anschrift</c>
+    /// PostalAddress, Mail und Telefon gehören auf den Briefbogen, nicht ins Modell
+    /// (ADR-0038). Die Allowlist oben reicht nicht: ein Feld <c>PostalAddress</c>
     /// anstelle von <c>EigeneUeberschrift</c> würde die Liste nur verschieben.
     /// </summary>
     [Theory]
@@ -338,16 +338,16 @@ public sealed class EntwurfsregelnTests
     [InlineData("telefon")]
     [InlineData("phone")]
     [InlineData("gehalt")]
-    public void Der_Kontext_traegt_keine_Anschrift(string wort)
+    public void Der_Kontext_traegt_keine_Anschrift(string word)
     {
-        typeof(Anschreibenkontext).GetProperties()
+        typeof(CoverLetterContext).GetProperties()
             .Select(eigenschaft => eigenschaft.Name.ToLowerInvariant())
-            .Should().NotContain(name => name.Contains(wort, StringComparison.Ordinal));
+            .Should().NotContain(name => name.Contains(word, StringComparison.Ordinal));
     }
 
     /// <summary>Und keine Zahl über einen Menschen, auch nicht die eigene.</summary>
     /// <remarks>
-    /// ADR-0022 an der Stelle, an der er am leichtesten zu übersehen ist:
+    /// ADR-0022 an der Job, an der er am leichtesten zu übersehen ist:
     /// „ich bin zu 90 % geeignet" wäre eine Zahl über einen Menschen, nur aus
     /// seiner eigenen Feder.
     /// </remarks>
@@ -357,44 +357,44 @@ public sealed class EntwurfsregelnTests
     [InlineData("weight")]
     [InlineData("fit")]
     [InlineData("percent")]
-    public void Kein_verbotenes_Wort_am_Entwurf(string wort)
+    public void Kein_verbotenes_Wort_am_Entwurf(string word)
     {
-        var namen = typeof(Bewerbungsentwurf).GetProperties()
+        var namen = typeof(ApplicationDraft).GetProperties()
             .Select(eigenschaft => eigenschaft.Name.ToLowerInvariant())
-            .Concat(typeof(Anschreibenkontext).GetProperties()
+            .Concat(typeof(CoverLetterContext).GetProperties()
                 .Select(eigenschaft => eigenschaft.Name.ToLowerInvariant()));
 
-        namen.Should().NotContain(name => name.Contains(wort, StringComparison.Ordinal));
+        namen.Should().NotContain(name => name.Contains(word, StringComparison.Ordinal));
     }
 
     /// <summary>Das Ausgabeformat wird gelesen, nicht geraten.</summary>
     /// <remarks>
     /// Ein Parser, der nur den Idealfall kann, macht aus einer leichten
-    /// Abweichung ein leeres Anschreiben — und ein leeres Anschreiben im Stand
+    /// Abweichung ein leeres Anschreiben — und ein leeres Anschreiben im State
     /// „prüfen" ist eine Einladung, es versehentlich freizugeben.
     /// </remarks>
     [Fact]
     public void Das_Ausgabeformat_ueberlebt_Abweichungen()
     {
-        Anschreibenformat.Lies("BETREFF: Bewerbung\n---\nSehr geehrte …")
+        CoverLetterFormat.Lies("BETREFF: Bewerbung\n---\nSehr geehrte …")
             .Should().Be(("Bewerbung", "Sehr geehrte …"));
 
         // Ohne Trennstrich.
-        Anschreibenformat.Lies("BETREFF: Bewerbung\nSehr geehrte …")
+        CoverLetterFormat.Lies("BETREFF: Bewerbung\nSehr geehrte …")
             .Should().Be(("Bewerbung", "Sehr geehrte …"));
 
         // Mit Markdown-Zaun und Sternchen.
-        Anschreibenformat.Lies("```\nBETREFF: **Bewerbung**\n---\nSehr geehrte …\n```")
+        CoverLetterFormat.Lies("```\nBETREFF: **Bewerbung**\n---\nSehr geehrte …\n```")
             .Should().Be(("Bewerbung", "Sehr geehrte …"));
 
         // Ganz ohne Marke: dann ist alles der Text, und der Betreff bleibt leer
         // — leer und nicht erfunden.
-        Anschreibenformat.Lies("Sehr geehrte …")
+        CoverLetterFormat.Lies("Sehr geehrte …")
             .Should().Be((string.Empty, "Sehr geehrte …"));
 
         // Unvollständige Betreffzeile: den Rohtext zeigen, sonst bleibt der
         // Brief leer, während das Modell den Betreff noch tippt.
-        Anschreibenformat.Lies("BETREFF: Bewerbung als")
+        CoverLetterFormat.Lies("BETREFF: Bewerbung als")
             .Should().Be((string.Empty, "BETREFF: Bewerbung als"));
     }
 }

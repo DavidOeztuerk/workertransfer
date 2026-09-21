@@ -3,7 +3,7 @@ using MediatR;
 using WorkerTransfer.Notification.Application.Nachrichten;
 using WorkerTransfer.Notification.Application.Ports;
 
-namespace WorkerTransfer.Notification.Application.Loeschung;
+namespace WorkerTransfer.Notification.Application.Erasure;
 
 /// <summary>Der Löschbefehl von identity-service (ADR-0027 §4).</summary>
 /// <remarks>
@@ -11,17 +11,17 @@ namespace WorkerTransfer.Notification.Application.Loeschung;
 /// Rechtfertigung von jemandem zu verlangen, der gehen will, ist ein Hebel
 /// gegen ihn.
 /// </remarks>
-public sealed record PersonLoeschenBefehl(SubjectId Wer) : IBefehl<int>;
+public sealed record ErasePersonCommand(SubjectId Wer) : IBefehl<int>;
 
-/// <summary>Löscht Postfach und Einstellungen.</summary>
-public sealed class PersonLoeschenHandler(ILoeschbestand bestand)
-    : IRequestHandler<PersonLoeschenBefehl, int>
+/// <summary>Löscht Inbox und Einstellungen.</summary>
+public sealed class ErasePersonHandler(IErasureLedger bestand)
+    : IRequestHandler<ErasePersonCommand, int>
 {
     /// <inheritdoc />
-    public Task<int> Handle(PersonLoeschenBefehl request, CancellationToken cancellationToken)
+    public Task<int> Handle(ErasePersonCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return bestand.LoescheAsync(request.Wer, cancellationToken);
+        return bestand.DeleteAsync(request.Wer, cancellationToken);
     }
 }

@@ -6,10 +6,10 @@ using WorkerTransfer.Scout.Application.Ports;
 namespace WorkerTransfer.Scout.Infrastructure.Entwurf;
 
 /// <summary>Ob und wohin überhaupt ein Modell gefragt wird.</summary>
-public sealed class Entwurfseinstellungen
+public sealed class DraftSettings
 {
-    /// <summary>Der Abschnitt in der Konfiguration.</summary>
-    public const string Abschnitt = "Draft";
+    /// <summary>Der Section in der Konfiguration.</summary>
+    public const string Section = "Draft";
 
     /// <summary>
     /// Leer heisst: es wird kein Fremddienst gerufen, und die Oberfläche sagt das.
@@ -23,7 +23,7 @@ public sealed class Entwurfseinstellungen
 
     /// <summary>Die Adresse des Anbieters.</summary>
     /// <remarks>
-    /// Sie gehört in die Umgebung und nicht nur hierher: eine eingebaute
+    /// Sie gehört in die EnvironmentFile und nicht nur hierher: eine eingebaute
     /// Zieladresse nach draussen ist genau das, was ein Souveränitätsbericht
     /// sichtbar machen soll — und die Egress-Grenze liest ihre erlaubten Hosts
     /// aus der Konfiguration.
@@ -45,15 +45,15 @@ public sealed class Entwurfseinstellungen
 
 /// <summary>Der Entwerfer, wenn keiner eingerichtet ist.</summary>
 /// <remarks>
-/// Er schweigt nicht und liefert auch keine Vorlage — er sagt, dass es ihn
+/// Er schweigt nicht und liefert auch keine ResumeTemplate — er sagt, dass es ihn
 /// nicht gibt. Ein Entwurf, der nicht vom Modell kommt, aber so aussieht, wäre
 /// die schlechtere Antwort: jemand hielte ihn für einen Vorschlag und schickte
 /// ihn an einen Menschen.
 /// </remarks>
-public sealed class KeinEntwerfer : IEntwerfer
+public sealed class NoDrafter : IDrafter
 {
     /// <inheritdoc />
-    public Task<string> EntwirfAsync(
+    public Task<string> DraftAsync(
         Ansprachelage lage, CancellationToken cancellationToken = default) =>
         throw new AnspracheNichtVerfuegbar("Es ist kein Entwurfsanbieter eingerichtet.");
 }
@@ -66,14 +66,14 @@ public sealed class KeinEntwerfer : IEntwerfer
 /// den Browser dessen, der gefragt hat. Dieser Dienst schreibt niemandem
 /// (ADR-0036 Auflage 4).
 /// </remarks>
-public sealed class HttpEntwerfer(
+public sealed class HttpDrafter(
     IHttpClientFactory fabrik,
-    IOptions<Entwurfseinstellungen> einstellungen) : IEntwerfer
+    IOptions<DraftSettings> einstellungen) : IDrafter
 {
-    private readonly Entwurfseinstellungen _einstellungen = einstellungen.Value;
+    private readonly DraftSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task<string> EntwirfAsync(
+    public async Task<string> DraftAsync(
         Ansprachelage lage, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(lage);
@@ -83,11 +83,11 @@ public sealed class HttpEntwerfer(
             throw new AnspracheNichtVerfuegbar("Es ist kein Entwurfsanbieter eingerichtet.");
         }
 
-        using var client = fabrik.CreateClient(nameof(HttpEntwerfer));
+        using var client = fabrik.CreateClient(nameof(HttpDrafter));
 
         client.Timeout = _einstellungen.Zeitueberschreitung;
 
-        using var anfrage = new HttpRequestMessage(HttpMethod.Post, _einstellungen.Adresse)
+        using var request = new HttpRequestMessage(HttpMethod.Post, _einstellungen.Adresse)
         {
             // Was hinausgeht, steht in Ansprachelage und nirgends sonst: kein
             // Name, keine Adresse, keine SubjectId, kein Arbeitgeber, kein
@@ -101,22 +101,22 @@ public sealed class HttpEntwerfer(
             })
         };
 
-        anfrage.Headers.Add("x-api-key", _einstellungen.Schluessel);
-        anfrage.Headers.Add("anthropic-version", "2023-06-01");
+        request.Headers.Add("x-api-key", _einstellungen.Schluessel);
+        request.Headers.Add("anthropic-version", "2023-06-01");
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
             // Die Art, nie der Inhalt. Ein Fehlschlag ist genau der Moment, in
             // dem jemand den Prompt sehen will, und genau der, in dem ihn
             // aufzuschreiben am schlechtesten ist.
             throw new AnspracheNichtVerfuegbar(
-                $"Der Entwurfsanbieter antwortet nicht ({fehler.GetType().Name}).");
+                $"Der Entwurfsanbieter antwortet nicht ({error.GetType().Name}).");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -127,20 +127,20 @@ public sealed class HttpEntwerfer(
                 "Der Entwurfsanbieter antwortet nicht (Zeitueberschreitung).");
         }
 
-        using (antwort)
+        using (response)
         {
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
                 throw new AnspracheNichtVerfuegbar(
-                    $"Der Entwurfsanbieter antwortet mit {(int)antwort.StatusCode}.");
+                    $"Der Entwurfsanbieter antwortet mit {(int)response.StatusCode}.");
             }
 
             using var gelesen = JsonDocument.Parse(
-                await antwort.Content.ReadAsStringAsync(cancellationToken));
+                await response.Content.ReadAsStringAsync(cancellationToken));
 
-            return gelesen.RootElement.TryGetProperty("content", out var inhalt)
-                   && inhalt.GetArrayLength() > 0
-                   && inhalt[0].TryGetProperty("text", out var text)
+            return gelesen.RootElement.TryGetProperty("content", out var content)
+                   && content.GetArrayLength() > 0
+                   && content[0].TryGetProperty("text", out var text)
                 ? text.GetString() ?? string.Empty
                 : throw new AnspracheNichtVerfuegbar(
                     "Der Entwurfsanbieter antwortet in unerwarteter Form.");

@@ -5,24 +5,24 @@ namespace WorkerTransfer.Outbox;
 
 /// <summary>Writes the intent into whatever transaction the caller has open.</summary>
 /// <typeparam name="TKontext">The service's own context. The table lives in its database.</typeparam>
-public sealed class EfOutbox<TKontext>(TKontext kontext, TimeProvider uhr) : IOutbox
+public sealed class EfOutbox<TKontext>(TKontext context, TimeProvider uhr) : IOutbox
     where TKontext : DbContext
 {
     /// <inheritdoc />
-    public Task<Guid> VermerkeAsync(
-        SubjectId empfaenger,
-        string art,
+    public Task<Guid> NoteAsync(
+        SubjectId recipient,
+        string kind,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(art);
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
 
         var id = Guid.CreateVersion7();
 
-        kontext.Set<OutboxZeile>().Add(new OutboxZeile
+        context.Set<OutboxRow>().Add(new OutboxRow
         {
             Id = id,
-            UserId = empfaenger.Value,
-            Kind = art,
+            UserId = recipient.Value,
+            Kind = kind,
             CreatedAt = uhr.GetUtcNow().UtcDateTime,
             Attempts = 0,
             DeliveredAt = null,

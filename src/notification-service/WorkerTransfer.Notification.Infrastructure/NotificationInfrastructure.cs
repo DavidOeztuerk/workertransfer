@@ -9,11 +9,11 @@ using WorkerTransfer.Notification.Application.Behaviors;
 using WorkerTransfer.Notification.Application.Benachrichtigungen;
 using WorkerTransfer.Notification.Application.Ports;
 using WorkerTransfer.Notification.Domain.Benachrichtigungen;
-using WorkerTransfer.Notification.Infrastructure.Loeschung;
+using WorkerTransfer.Notification.Infrastructure.Erasure;
 using WorkerTransfer.Notification.Infrastructure.Persistence;
 using WorkerTransfer.Notification.Infrastructure.Post;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Notification.Contracts;
 using Noelia.Abstractions.Security.Checks;
 
@@ -29,7 +29,7 @@ namespace WorkerTransfer.Notification.Infrastructure;
 public static class NotificationInfrastructure
 {
     /// <param name="services">Der Behälter.</param>
-    /// <param name="configuration">Woher Adressen und Geheimnisse kommen.</param>
+    /// <param name="configuration">Woher Adressen und Secrets kommen.</param>
     /// <param name="connectionString">Wo die Benachrichtigungsdatenbank liegt.</param>
     public static IServiceCollection AddNotificationInfrastructure(
         this IServiceCollection services,
@@ -39,26 +39,26 @@ public static class NotificationInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Posteinstellungen>(
-            configuration.GetSection(Posteinstellungen.Abschnitt));
-        services.Configure<Loescheinstellungen>(
-            configuration.GetSection(Loescheinstellungen.Abschnitt));
+        services.Configure<MailSettings>(
+            configuration.GetSection(MailSettings.Section));
+        services.Configure<ErasureSettings>(
+            configuration.GetSection(ErasureSettings.Section));
 
 
-        services.AddSingleton(_ => NotificationDbContextFactory.Datenquelle(connectionString));
+        services.AddSingleton(_ => NotificationDbContextFactory.DataSource(connectionString));
         services.AddDbContext<NotificationDbContext>((provider, options) =>
-            NotificationDbContextFactory.Konfiguriere(
+            NotificationDbContextFactory.Configure(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<NotificationDbContext>("notification");
-        services.AddSchluesselbund<NotificationDbContext>();
+        services.AddDatabaseReadiness<NotificationDbContext>("notification");
+        services.AddKeyRing<NotificationDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddScoped<IWunschspeicher, EfWunschspeicher>();
-        services.AddScoped<IEingangsspeicher, EfEingangsspeicher>();
+        services.AddScoped<IPreferenceStore, EfPreferenceStore>();
+        services.AddScoped<IInboxStore, EfInboxStore>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-        services.AddScoped<ILoeschbestand, EfLoeschbestand>();
+        services.AddScoped<IErasureLedger, EfErasureLedger>();
         services.AddScoped<IPostbote, HttpPostbote>();
 
         services.AddCQRS(typeof(BenachrichtigenBefehl).Assembly);
@@ -71,35 +71,35 @@ public static class NotificationInfrastructure
 
     /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
     /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
     /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
     ///
     /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
     /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
     /// vergessen kann.</para>
     /// </remarks>
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(Benachrichtigungsart).Assembly, typeof(BenachrichtigenV1).Assembly]));
 
-        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
+        // None KI-Naht: `ProviderCheck` ohne Quelle meldet NichtAnwendbar,
         // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
         // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
         // durchschneiden soll.
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
 
-        var loeschung = new Loescheinstellungen();
-        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+        var erasure = new ErasureSettings();
+        configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsEmpfaenger(
             "notification",
-            !string.IsNullOrEmpty(loeschung.Geheimnis),
+            !string.IsNullOrEmpty(erasure.Geheimnis),
             pruefspurVorhanden: false));
     }
 }

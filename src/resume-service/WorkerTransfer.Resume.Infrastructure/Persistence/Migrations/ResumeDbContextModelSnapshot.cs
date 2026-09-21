@@ -19,16 +19,16 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "audit_action", new[] { "resume_saved", "resume_requested", "request_granted", "request_declined", "access_revoked", "subject_erased" });
-            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "document_kind", new[] { "zeugnis", "zertifikat", "sonstiges", "lebenslauf" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "document_kind", new[] { "reference", "certificate", "other", "curriculum_vitae" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "request_status", new[] { "pending", "granted", "declined" });
-            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "resume_template", new[] { "schlicht", "klassisch", "modern" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "resume_template", new[] { "plain", "classic", "modern" });
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("WorkerTransfer.Outbox.OutboxZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Outbox.OutboxRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -72,129 +72,13 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox", (string)null);
                 });
 
-            modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.AnfrageZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.AuditRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<DateTime?>("AnsweredAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("answered_at");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid?>("RequestedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("requested_by");
-
-                    b.Property<Anfragestand>("Status")
-                        .HasColumnType("request_status")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("SubjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("subject_id");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SubjectId");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("SubjectId", "TenantId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_request_subject_tenant");
-
-                    b.ToTable("resume_requests", (string)null);
-                });
-
-            modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.FundZeile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("DocumentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("document_id");
-
-                    b.Property<bool>("HasText")
-                        .HasColumnType("boolean")
-                        .HasColumnName("has_text");
-
-                    b.Property<DateTime>("ReadAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("read_at");
-
-                    b.Property<Guid>("SubjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("subject_id");
-
-                    b.Property<string>("Terms")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("terms");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SubjectId");
-
-                    b.HasIndex("SubjectId", "DocumentId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_terms_subject_document");
-
-                    b.ToTable("resume_document_terms", (string)null);
-                });
-
-            modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.LebenslaufZeile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Education")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("education");
-
-                    b.Property<string>("Positions")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("positions");
-
-                    b.Property<int>("Template")
-                        .HasColumnType("integer")
-                        .HasColumnName("template");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("resumes", (string)null);
-
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
-                });
-
-            modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.PruefZeile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Pruefhandlung>("Action")
+                    b.Property<AuditAction>("Action")
                         .HasColumnType("audit_action")
                         .HasColumnName("action");
 
@@ -228,7 +112,7 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_events", (string)null);
                 });
 
-            modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.UnterlageZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.DocumentRecordRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -273,6 +157,122 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence.Migrations
                     b.HasIndex("SubjectId");
 
                     b.ToTable("resume_documents", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.RequestRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("AnsweredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("answered_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("RequestedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by");
+
+                    b.Property<RequestState>("Status")
+                        .HasColumnType("request_status")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubjectId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("SubjectId", "TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_request_subject_tenant");
+
+                    b.ToTable("resume_requests", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.ResumeRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Education")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("education");
+
+                    b.Property<string>("Positions")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("positions");
+
+                    b.Property<int>("Template")
+                        .HasColumnType("integer")
+                        .HasColumnName("template");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("resumes", (string)null);
+
+                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.TermRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<bool>("HasText")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_text");
+
+                    b.Property<DateTime>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<string>("Terms")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("terms");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubjectId");
+
+                    b.HasIndex("SubjectId", "DocumentId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_terms_subject_document");
+
+                    b.ToTable("resume_document_terms", (string)null);
                 });
 #pragma warning restore 612, 618
         }

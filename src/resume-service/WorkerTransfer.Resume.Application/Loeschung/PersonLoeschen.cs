@@ -4,7 +4,7 @@ using WorkerTransfer.Resume.Application.Nachrichten;
 using WorkerTransfer.Resume.Application.Ports;
 using WorkerTransfer.Resume.Domain.Pruefspur;
 
-namespace WorkerTransfer.Resume.Application.Loeschung;
+namespace WorkerTransfer.Resume.Application.Erasure;
 
 /// <summary>The deletion order from identity-service (ADR-0027 §4).</summary>
 /// <remarks>
@@ -12,7 +12,7 @@ namespace WorkerTransfer.Resume.Application.Loeschung;
 /// <em>has</em> no content, and no reason field, because demanding a
 /// justification from somebody who wants to leave is a lever against them.
 /// </remarks>
-public sealed record PersonLoeschenBefehl(SubjectId Wer) : IBefehl<int>;
+public sealed record ErasePersonCommand(SubjectId Wer) : IBefehl<int>;
 
 /// <summary>Deletes, records that it deleted, and answers what was left.</summary>
 /// <remarks>
@@ -23,23 +23,23 @@ public sealed record PersonLoeschenBefehl(SubjectId Wer) : IBefehl<int>;
 /// then have to sweep up its own proof (ADR-0027 §5: the argument is not "we
 /// may retain" but that nothing maps a subject id to a person afterwards).
 /// </remarks>
-public sealed class PersonLoeschenHandler(
-    ILoeschbestand bestand,
-    IPruefspur pruefspur,
+public sealed class ErasePersonHandler(
+    IErasureLedger bestand,
+    IAuditTrail pruefspur,
     IKorrelationsanhang anhang,
-    TimeProvider uhr) : IRequestHandler<PersonLoeschenBefehl, int>
+    TimeProvider uhr) : IRequestHandler<ErasePersonCommand, int>
 {
     /// <inheritdoc />
     public async Task<int> Handle(
-        PersonLoeschenBefehl request,
+        ErasePersonCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         await pruefspur.AppendAsync(
-            anhang.Eintrag(Pruefhandlung.SubjectErased, uhr.GetUtcNow()),
+            anhang.Eintrag(AuditAction.SubjectErased, uhr.GetUtcNow()),
             cancellationToken);
 
-        return await bestand.LoescheAsync(request.Wer, cancellationToken);
+        return await bestand.DeleteAsync(request.Wer, cancellationToken);
     }
 }

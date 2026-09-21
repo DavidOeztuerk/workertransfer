@@ -5,7 +5,7 @@ using Noelia.Application.Interfaces;
 namespace WorkerTransfer.Ganzes.Tests;
 
 /// <summary>
-/// Keine Abfrage darf zwischengespeichert werden (ADR-0013).
+/// None Abfrage darf zwischengespeichert werden (ADR-0013).
 /// </summary>
 /// <remarks>
 /// <para>Eine Einwilligung wird <strong>synchron und nie zwischengespeichert</strong>
@@ -17,7 +17,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// meint.</strong> Sie soll nicht die Frage beantworten „ist DIESE Abfrage
 /// heikel", sondern verhindern, dass jemand sie beantworten muss. Fast jede
 /// Leseabfrage in diesem System hängt mittelbar an einer Einwilligungsprüfung:
-/// <c>KandidatenAbfrage</c> fragt den Ledger direkt, <c>FremdesProfilAbfrage</c>
+/// <c>KandidatenAbfrage</c> fragt den Ledger direkt, <c>ForeignProfileQuery</c>
 /// auch, und was heute harmlos aussieht, bekommt morgen ein Tor davor. Wer eine
 /// Abfrage wirklich speichern will, muss diesen Test ändern und dabei
 /// hinschreiben, warum die Abfrage weder eine Prüfung enthält noch von einer
@@ -43,46 +43,46 @@ public class ZwischenspeicherTests
     /// </remarks>
     public static TheoryData<string, Type> Dienste => new()
     {
-        { "identity", typeof(Identity.Application.Anmelden.SitzungsstandAbfrage) },
-        { "consent", typeof(Consent.Application.Einwilligung.EinwilligungPruefenAbfrage) },
-        { "profile", typeof(Profile.Application.Profile.InterneProfilsucheAbfrage) },
-        { "resume", typeof(Resume.Application.Anfragen.MeineAnfragenAbfrage) },
-        { "portfolio", typeof(Portfolio.Application.Portfolios.MeinPortfolioAbfrage) },
-        { "jobs", typeof(Jobs.Application.Stellen.MeineStellenAbfrage) },
-        { "applications", typeof(Applications.Application.Bewerbungen.MeineBewerbungenAbfrage) },
-        { "companies", typeof(Companies.Application.Profile.MeinProfilAbfrage) },
-        { "transfer", typeof(Transfer.Application.Markt.MeinMarktstatusAbfrage) },
-        { "github", typeof(GitHub.Application.Verbindungen.MeineVerbindungAbfrage) },
-        { "notification", typeof(Notification.Application.Benachrichtigungen.MeinPostfachAbfrage) },
+        { "identity", typeof(Identity.Application.Anmelden.SessionStateQuery) },
+        { "consent", typeof(Consent.Application.Einwilligung.CheckConsentQuery) },
+        { "profile", typeof(Profile.Application.Profile.InternalProfileSearchQuery) },
+        { "resume", typeof(Resume.Application.Anfragen.MyRequestsQuery) },
+        { "portfolio", typeof(Portfolio.Application.Portfolios.MyPortfolioQuery) },
+        { "jobs", typeof(Jobs.Application.Jobs.MyJobsQuery) },
+        { "applications", typeof(Applications.Application.Applications.MyApplicationsQuery) },
+        { "companies", typeof(Companies.Application.Profile.MyProfileQuery) },
+        { "transfer", typeof(Transfer.Application.Markt.MyMarketStatusQuery) },
+        { "github", typeof(GitHub.Application.Connections.MyConnectionQuery) },
+        { "notification", typeof(Notification.Application.Benachrichtigungen.MyInboxQuery) },
 
         // scout-service haelt die schaerfste Fassung dieser Regel: er sucht
         // Menschen, und ein zwischengespeichertes Ergebnis ueberlebte einen
-        // Widerruf. Deshalb speichert er die ANFRAGE und nie das Ergebnis
-        // (ADR-0036 Entscheidung 4) — und auch die Anfrage ist kein Cache.
+        // Revocation. Deshalb speichert er die ANFRAGE und nie das Ergebnis
+        // (ADR-0036 Entscheidung 4) — und auch die ResumeRequest ist kein Cache.
         { "scout", typeof(Scout.Application.Kandidaten.KandidatenAbfrage) },
 
         // advisor-service haelt sie in derselben Schaerfe: die STUFE eines
         // Gespraechs steht nur im Ledger und wird bei jedem Lesen dort erfragt
         // (ADR-0037 Entscheidung 2). Eine zwischengespeicherte Antwort waere
         // hier dasselbe wie eine Stufenspalte, nur fluechtig.
-        { "advisor", typeof(Advisor.Application.Gespraeche.FirmengespraecheAbfrage) }
+        { "advisor", typeof(Advisor.Application.Gespraeche.CompanyConversationsQuery) }
     };
 
     /// <summary>Kein Typ eines Dienstes implementiert <c>ICacheableQuery</c>.</summary>
     [Theory]
     [MemberData(nameof(Dienste))]
-    public void Keine_Abfrage_darf_zwischengespeichert_werden(string dienst, Type ausDerSchicht)
+    public void Keine_Abfrage_darf_zwischengespeichert_werden(string service, Type ausDerSchicht)
     {
         var speicherbare = ausDerSchicht.Assembly
             .GetTypes()
-            .Where(typ => typeof(ICacheableQuery).IsAssignableFrom(typ))
-            .Where(typ => typ is { IsInterface: false, IsAbstract: false })
-            .Select(typ => typ.FullName)
+            .Where(type => typeof(ICacheableQuery).IsAssignableFrom(type))
+            .Where(type => type is { IsInterface: false, IsAbstract: false })
+            .Select(type => type.FullName)
             .ToArray();
 
         speicherbare.Should().BeEmpty(
             "{0} darf nichts zwischenspeichern: eine Ruecknahme muss beim "
-            + "naechsten Lesen wirken (ADR-0013)", dienst);
+            + "naechsten Lesen wirken (ADR-0013)", service);
     }
 
     /// <summary>
@@ -96,16 +96,16 @@ public class ZwischenspeicherTests
     [Fact]
     public void Die_Liste_deckt_alle_Dienste_ab()
     {
-        var dienste = Dienste.Select(zeile => (string)zeile[0]!).ToArray();
+        var services = Dienste.Select(row => (string)row[0]!).ToArray();
 
-        dienste.Should().HaveCount(13);
-        dienste.Should().OnlyHaveUniqueItems();
+        services.Should().HaveCount(13);
+        services.Should().OnlyHaveUniqueItems();
 
-        foreach (var zeile in Dienste)
+        foreach (var row in Dienste)
         {
-            var typ = (Type)zeile[1]!;
-            typ.Assembly.GetTypes().Should().NotBeEmpty(
-                "die Assembly von {0} muss wirklich geladen sein", typ.FullName);
+            var type = (Type)row[1]!;
+            type.Assembly.GetTypes().Should().NotBeEmpty(
+                "die Assembly von {0} muss wirklich geladen sein", type.FullName);
         }
     }
 }

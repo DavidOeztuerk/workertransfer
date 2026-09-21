@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Jobs.Application.Ports;
-using WorkerTransfer.ServiceDefaults.Rollen;
-using WorkerTransfer.Jobs.Domain.Stellen;
+using WorkerTransfer.ServiceDefaults.Roles;
+using WorkerTransfer.Jobs.Domain.Jobs;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Jobs.Tests;
@@ -34,7 +34,7 @@ public class OrtskundeTests
     [InlineData("Raum Berlin")]
     public void Ein_Ortsname_wird_grosszuegig_gelesen(string geschrieben)
     {
-        var punkt = Ortskunde.Finde(geschrieben);
+        var punkt = PlaceLookup.Find(geschrieben);
 
         punkt.Should().NotBeNull();
         punkt!.Value.Breite.Should().BeApproximately(52.52, 0.01);
@@ -47,19 +47,19 @@ public class OrtskundeTests
     [InlineData("Muenchen")]
     [InlineData("MÜNCHEN")]
     public void Umlaute_treffen_in_beiden_Schreibweisen(string geschrieben) =>
-        Ortskunde.Finde(geschrieben).Should().NotBeNull();
+        PlaceLookup.Find(geschrieben).Should().NotBeNull();
 
     /// <summary>Der längere Name gewinnt.</summary>
     /// <remarks>
-    /// „Frankfurt am Main" enthält „Frankfurt". Gewänne der kürzere Treffer,
+    /// „Frankfurt am Main" enthält „Frankfurt". Gewänne der kürzere Hit,
     /// entschiede die Aufzählungsreihenfolge eines Dictionary darüber, wo eine
-    /// Stelle liegt — und die ist keine Zusage.
+    /// Job liegt — und die ist keine Zusage.
     /// </remarks>
     [Fact]
     public void Der_laengere_Name_gewinnt()
     {
-        var lang = Ortskunde.Finde("Frankfurt am Main");
-        var kurz = Ortskunde.Finde("Frankfurt");
+        var lang = PlaceLookup.Find("Frankfurt am Main");
+        var kurz = PlaceLookup.Find("Frankfurt");
 
         lang.Should().NotBeNull();
         lang.Should().Be(kurz);
@@ -75,7 +75,7 @@ public class OrtskundeTests
     [Fact]
     public void Die_Tabelle_ist_mitgeliefert()
     {
-        var (postleitzahlen, orte) = Ortskunde.Umfang();
+        var (postleitzahlen, orte) = PlaceLookup.Umfang();
 
         postleitzahlen.Should().BeGreaterThan(10000);
         orte.Should().BeGreaterThan(10000);
@@ -92,13 +92,13 @@ public class OrtskundeTests
     [InlineData("69190", 49.30, 8.64)]
     [InlineData("D-10115", 52.53, 13.38)]
     [InlineData(" 10115 ", 52.53, 13.38)]
-    public void Eine_Postleitzahl_trifft(string plz, double breite, double laenge)
+    public void Eine_Postleitzahl_trifft(string plz, double breite, double length)
     {
-        var punkt = Ortskunde.Finde(plz, "");
+        var punkt = PlaceLookup.Find(plz, "");
 
         punkt.Should().NotBeNull();
         punkt!.Value.Breite.Should().BeApproximately(breite, 0.05);
-        punkt.Value.Laenge.Should().BeApproximately(laenge, 0.05);
+        punkt.Value.Laenge.Should().BeApproximately(length, 0.05);
     }
 
     /// <summary>Eine Grosskunden-Postleitzahl bezeichnet keinen Ort.</summary>
@@ -110,7 +110,7 @@ public class OrtskundeTests
     /// </remarks>
     [Fact]
     public void Eine_Grosskunden_Postleitzahl_ist_kein_Ort() =>
-        Ortskunde.Finde("10875", "").Should().BeNull();
+        PlaceLookup.Find("10875", "").Should().BeNull();
 
     /// <summary>
     /// Ein vierstelliger Code gehört Österreich UND der Schweiz — der Ortsname
@@ -124,8 +124,8 @@ public class OrtskundeTests
     [Fact]
     public void Ein_mehrdeutiger_Code_braucht_den_Ortsnamen()
     {
-        var wien = Ortskunde.Finde("1010", "Wien");
-        var ohne = Ortskunde.Finde("1010", "");
+        var wien = PlaceLookup.Find("1010", "Wien");
+        var ohne = PlaceLookup.Find("1010", "");
 
         wien.Should().NotBeNull();
         wien!.Value.Breite.Should().BeApproximately(48.21, 0.1);
@@ -141,7 +141,7 @@ public class OrtskundeTests
     [Fact]
     public void Eine_Postleitzahl_im_Freitext_wird_gelesen()
     {
-        var punkt = Ortskunde.Finde(null, "10115 Berlin");
+        var punkt = PlaceLookup.Find(null, "10115 Berlin");
 
         punkt.Should().NotBeNull();
         punkt!.Value.Breite.Should().BeApproximately(52.53, 0.05);
@@ -158,12 +158,12 @@ public class OrtskundeTests
     [Fact]
     public void Der_grosse_Ort_gewinnt_der_mehrdeutige_nicht()
     {
-        var husum = Ortskunde.Finde("Husum");
+        var husum = PlaceLookup.Find("Husum");
 
         husum.Should().NotBeNull();
         husum!.Value.Breite.Should().BeApproximately(54.49, 0.1);
 
-        Ortskunde.Finde("Neustadt").Should().BeNull();
+        PlaceLookup.Find("Neustadt").Should().BeNull();
     }
 
     /// <summary>Fremdsprachige Namensformen grosser Städte treffen auch.</summary>
@@ -176,13 +176,13 @@ public class OrtskundeTests
     [InlineData("Cologne", 50.93, 6.95)]
     [InlineData("Vienna", 48.21, 16.37)]
     [InlineData("Geneva", 46.20, 6.15)]
-    public void Fremdsprachige_Namen_treffen(string name, double breite, double laenge)
+    public void Fremdsprachige_Namen_treffen(string name, double breite, double length)
     {
-        var punkt = Ortskunde.Finde(name);
+        var punkt = PlaceLookup.Find(name);
 
         punkt.Should().NotBeNull();
         punkt!.Value.Breite.Should().BeApproximately(breite, 0.1);
-        punkt.Value.Laenge.Should().BeApproximately(laenge, 0.1);
+        punkt.Value.Laenge.Should().BeApproximately(length, 0.1);
     }
 
     /// <summary>Aus Prosa wird kein Ort herausgepflückt.</summary>
@@ -205,7 +205,7 @@ public class OrtskundeTests
     [InlineData("Wir sitzen mitten in der Lage")]
     [InlineData("Zum Essen gehen wir raus")]
     public void Aus_Prosa_wird_kein_Ort_gepflueckt(string satz) =>
-        Ortskunde.Finde(satz).Should().BeNull();
+        PlaceLookup.Find(satz).Should().BeNull();
 
     /// <summary>Zwei bis drei Wörter werden weiterhin zerlegt.</summary>
     [Theory]
@@ -214,7 +214,7 @@ public class OrtskundeTests
     [InlineData("Standort: Hamburg")]
     [InlineData("Berlin oder remote")]
     public void Kurze_Angaben_werden_weiterhin_zerlegt(string angabe) =>
-        Ortskunde.Finde(angabe).Should().NotBeNull();
+        PlaceLookup.Find(angabe).Should().NotBeNull();
 
     /// <summary>Was die Tabelle nicht kennt, wird nicht geraten.</summary>
     /// <remarks>
@@ -229,7 +229,7 @@ public class OrtskundeTests
     [InlineData("Atlantis")]
     [InlineData("Elbonien")]
     public void Unbekanntes_wird_nicht_geraten(string geschrieben) =>
-        Ortskunde.Finde(geschrieben).Should().BeNull();
+        PlaceLookup.Find(geschrieben).Should().BeNull();
 
     /// <summary>Die Entfernung stimmt gegen bekannte Strecken.</summary>
     /// <remarks>
@@ -244,21 +244,21 @@ public class OrtskundeTests
     [InlineData("Köln", "Dresden", 470)]
     public void Die_Entfernung_stimmt(string von, string nach, double sollKm)
     {
-        var a = Ortskunde.Finde(von)!.Value;
-        var b = Ortskunde.Finde(nach)!.Value;
+        var a = PlaceLookup.Find(von)!.Value;
+        var b = PlaceLookup.Find(nach)!.Value;
 
         // Zehn Prozent Toleranz: die Zahlen sind Stadtmittelpunkte, und keine
         // Umkreissuche hängt an einem Kilometer.
-        Ortskunde.EntfernungKm(a, b).Should().BeApproximately(sollKm, sollKm * 0.1);
+        PlaceLookup.EntfernungKm(a, b).Should().BeApproximately(sollKm, sollKm * 0.1);
     }
 
     /// <summary>Dieselbe Stadt ist null Kilometer weit weg.</summary>
     [Fact]
     public void Dieselbe_Stadt_ist_null_Kilometer_weit_weg()
     {
-        var berlin = Ortskunde.Finde("Berlin")!.Value;
+        var berlin = PlaceLookup.Find("Berlin")!.Value;
 
-        Ortskunde.EntfernungKm(berlin, berlin).Should().BeApproximately(0, 0.001);
+        PlaceLookup.EntfernungKm(berlin, berlin).Should().BeApproximately(0, 0.001);
     }
 
     /// <summary>Unvollständiges ergibt keinen Filter, kein halbes Ergebnis.</summary>
@@ -269,8 +269,8 @@ public class OrtskundeTests
     [InlineData(200.0, 13.4, 25.0)]
     [InlineData(52.5, 400.0, 25.0)]
     public void Unvollstaendiges_ergibt_keinen_Umkreis(
-        double? breite, double? laenge, double? radius) =>
-        Umkreis.Aus(breite, laenge, radius).Should().BeNull();
+        double? breite, double? length, double? radius) =>
+        Umkreis.Aus(breite, length, radius).Should().BeNull();
 
     /// <summary>Ein unsinniger Radius wird geklemmt, nicht verworfen.</summary>
     /// <remarks>
@@ -307,18 +307,18 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:jobs", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", "rueckzug-geheimnis");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IEntwerfer>(_ => new Probeentwerfer()));
+                services.Replace(ServiceDescriptor.Scoped<IDrafter>(_ => new Probeentwerfer()));
                 // Veroeffentlichen verlangt seit PBI-2 einen `admin`. Diese
                 // Reihe misst das Blaettern und nicht die Rolle — also
                 // antwortet die Probe wie eine Inhaberin.
-                dienste.Replace(ServiceDescriptor.Scoped<IFirmenrollen>(_ => new Rollenprobe()));
+                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => new Rollenprobe()));
             });
         });
 
@@ -342,8 +342,8 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     /// <summary>Legt eine veröffentlichte Anzeige an und gibt ihren Titel zurück.</summary>
     /// <remarks>
@@ -358,7 +358,7 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
         // EIN Browser für beide Schritte. Zwei Aufrufe von `AlsFirma()` wären
         // zwei verschiedene Unternehmen, und das Veröffentlichen einer fremden
         // Anzeige beantwortet der Dienst mit 403 — die Anzeige bliebe Entwurf,
-        // und jede Probe zählte null Treffer, ohne dass etwas kaputt wäre.
+        // und jede Probe zählte null Hit, ohne dass etwas kaputt wäre.
         var browser = AlsFirma();
 
         var angelegt = await browser.PostAsJsonAsync("/jobs", new
@@ -380,17 +380,17 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
         return id;
     }
 
-    private async Task<JsonElement> Suche(string abfrage) =>
+    private async Task<JsonElement> Search(string abfrage) =>
         await Json(await _dienst.CreateClient().GetAsync($"/jobs?{abfrage}"));
 
-    private static IEnumerable<Guid> Kennungen(JsonElement seite) =>
-        seite.GetProperty("items").EnumerateArray().Select(e => e.GetProperty("id").GetGuid());
+    private static IEnumerable<Guid> Kennungen(JsonElement page) =>
+        page.GetProperty("items").EnumerateArray().Select(e => e.GetProperty("id").GetGuid());
 
     /// <summary>Nah ist drin, fern ist draussen — und der Radius entscheidet.</summary>
     /// <remarks>
     /// Potsdam liegt siebenundzwanzig Kilometer von Berlin. Es steht hier statt
     /// Hamburg, weil es GENAU zwischen den beiden geprüften Radien liegt: eine
-    /// Suche, die den Radius gar nicht liest, wäre bei Hamburg (255 km) in
+    /// Search, die den Radius gar nicht liest, wäre bei Hamburg (255 km) in
     /// beiden Fällen gleich und sähe grün aus.
     /// </remarks>
     [Fact]
@@ -401,9 +401,9 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
         var mittel = await LegeAn("Potsdam", kennwort);
         var fern = await LegeAn("Hamburg", kennwort);
 
-        var eng = await Suche($"q={kennwort}&{Berlin}&radius_km=25");
-        var weit = await Suche($"q={kennwort}&{Berlin}&radius_km=50");
-        var sehrWeit = await Suche($"q={kennwort}&{Berlin}&radius_km=300");
+        var eng = await Search($"q={kennwort}&{Berlin}&radius_km=25");
+        var weit = await Search($"q={kennwort}&{Berlin}&radius_km=50");
+        var sehrWeit = await Search($"q={kennwort}&{Berlin}&radius_km=300");
 
         Kennungen(eng).Should().BeEquivalentTo([nah]);
         Kennungen(weit).Should().BeEquivalentTo([nah, mittel]);
@@ -412,7 +412,7 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Voll remote ist immer dabei.</summary>
     /// <remarks>
-    /// Von wo aus so eine Stelle erreichbar ist, ist keine Frage der Entfernung.
+    /// Von wo aus so eine Job erreichbar ist, ist keine Frage der Entfernung.
     /// Sie wegen eines Ortsfilters zu verstecken träfe genau die Anzeigen, die
     /// für jemanden ausserhalb der Ballungsräume die interessantesten sind.
     /// </remarks>
@@ -423,7 +423,7 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
         var weitWegAberRemote = await LegeAn("Wien", kennwort, remote: "full");
         await LegeAn("Wien", kennwort, remote: "hybrid");
 
-        var eng = await Suche($"q={kennwort}&{Berlin}&radius_km=25");
+        var eng = await Search($"q={kennwort}&{Berlin}&radius_km=25");
 
         Kennungen(eng).Should().BeEquivalentTo([weitWegAberRemote]);
     }
@@ -444,11 +444,11 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
         await LegeAn("Auf dem Hof meiner Oma", kennwort);
         await LegeAn("", kennwort);
 
-        var seite = await Suche($"q={kennwort}&{Berlin}&radius_km=25");
+        var page = await Search($"q={kennwort}&{Berlin}&radius_km=25");
 
-        Kennungen(seite).Should().BeEquivalentTo([bekannt]);
-        seite.GetProperty("total_items").GetInt32().Should().Be(1);
-        seite.GetProperty("omitted").GetInt32().Should().Be(2);
+        Kennungen(page).Should().BeEquivalentTo([bekannt]);
+        page.GetProperty("total_items").GetInt32().Should().Be(1);
+        page.GetProperty("omitted").GetInt32().Should().Be(2);
     }
 
     /// <summary>Ohne Umkreissuche steht <c>omitted</c> gar nicht in der Antwort.</summary>
@@ -463,10 +463,10 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
         var kennwort = $"ohne{Guid.NewGuid():N}";
         await LegeAn("Auf dem Hof meiner Oma", kennwort);
 
-        var seite = await Suche($"q={kennwort}");
+        var page = await Search($"q={kennwort}");
 
-        seite.GetProperty("total_items").GetInt32().Should().Be(1);
-        seite.TryGetProperty("omitted", out _).Should().BeFalse();
+        page.GetProperty("total_items").GetInt32().Should().Be(1);
+        page.TryGetProperty("omitted", out _).Should().BeFalse();
     }
 
     /// <summary>Eine unvollständige Umkreisangabe filtert nicht.</summary>
@@ -484,10 +484,10 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
         var kennwort = $"halb{Guid.NewGuid():N}";
         await LegeAn("Hamburg", kennwort);
 
-        var seite = await Suche($"q={kennwort}&{umkreis}");
+        var page = await Search($"q={kennwort}&{umkreis}");
 
-        seite.GetProperty("total_items").GetInt32().Should().Be(1);
-        seite.TryGetProperty("omitted", out _).Should().BeFalse();
+        page.GetProperty("total_items").GetInt32().Should().Be(1);
+        page.TryGetProperty("omitted", out _).Should().BeFalse();
     }
 
     /// <summary>Umkreis und Fähigkeiten wirken zusammen, nicht gegeneinander.</summary>
@@ -500,15 +500,15 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
     public async Task Umkreis_und_Faehigkeiten_wirken_zusammen()
     {
         var kennwort = $"beides{Guid.NewGuid():N}";
-        var treffer = await LegeAn("Berlin", kennwort, skill: "Rust");
+        var hit = await LegeAn("Berlin", kennwort, skill: "Rust");
         await LegeAn("Berlin", kennwort, skill: "Cobol");
         await LegeAn("Hamburg", kennwort, skill: "Rust");
 
-        var seite = await Suche($"q={kennwort}&skill=Rust&{Berlin}&radius_km=25");
+        var page = await Search($"q={kennwort}&skill=Rust&{Berlin}&radius_km=25");
 
-        Kennungen(seite).Should().BeEquivalentTo([treffer]);
-        seite.GetProperty("total_items").GetInt32().Should().Be(1);
-        seite.GetProperty("total_pages").GetInt32().Should().Be(1);
+        Kennungen(page).Should().BeEquivalentTo([hit]);
+        page.GetProperty("total_items").GetInt32().Should().Be(1);
+        page.GetProperty("total_pages").GetInt32().Should().Be(1);
     }
 
     /// <summary>
@@ -532,8 +532,8 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
         var berlin = await LegeAn("Berlin", kennwort);
         await LegeAn("Wien", kennwort);
 
-        var eng = await Suche($"q={kennwort}&location=Leipzig&radius_km=25");
-        var weit = await Suche($"q={kennwort}&location=Leipzig&radius_km=200");
+        var eng = await Search($"q={kennwort}&location=Leipzig&radius_km=25");
+        var weit = await Search($"q={kennwort}&location=Leipzig&radius_km=200");
 
         Kennungen(eng).Should().BeEquivalentTo([leipzig]);
         Kennungen(weit).Should().BeEquivalentTo([leipzig, berlin]);
@@ -551,9 +551,9 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
         var leipzig = await LegeAn("Leipzig", kennwort);
         await LegeAn("Berlin", kennwort);
 
-        var seite = await Suche($"q={kennwort}&location=Leipzig");
+        var page = await Search($"q={kennwort}&location=Leipzig");
 
-        Kennungen(seite).Should().BeEquivalentTo([leipzig]);
+        Kennungen(page).Should().BeEquivalentTo([leipzig]);
     }
 
     /// <summary>Die Gegenrichtung: welcher Ort liegt an diesem Punkt?</summary>
@@ -574,9 +574,9 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
     [InlineData("lat=47.37&lon=8.54", "Zürich")]
     public async Task Die_Gegenrichtung_nennt_den_Ort(string punkt, string soll)
     {
-        var antwort = await Json(await _dienst.CreateClient().GetAsync($"/jobs/place?{punkt}"));
+        var response = await Json(await _dienst.CreateClient().GetAsync($"/jobs/place?{punkt}"));
 
-        antwort.GetProperty("location").GetString().Should().Be(soll);
+        response.GetProperty("location").GetString().Should().Be(soll);
     }
 
     /// <summary>Ausserhalb bleibt sie stumm, statt einen Ort zu erfinden.</summary>
@@ -592,9 +592,9 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
     [InlineData("")]
     public async Task Ausserhalb_nennt_die_Gegenrichtung_nichts(string punkt)
     {
-        var antwort = await Json(await _dienst.CreateClient().GetAsync($"/jobs/place?{punkt}"));
+        var response = await Json(await _dienst.CreateClient().GetAsync($"/jobs/place?{punkt}"));
 
-        antwort.GetProperty("location").ValueKind.Should().Be(JsonValueKind.Null);
+        response.GetProperty("location").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     /// <summary>Die Umkreissuche blättert wie jede andere.</summary>
@@ -608,8 +608,8 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
             await LegeAn("Berlin", kennwort);
         }
 
-        var erste = await Suche($"q={kennwort}&{Berlin}&radius_km=25&page_size=2");
-        var zweite = await Suche($"q={kennwort}&{Berlin}&radius_km=25&page_size=2&page=2");
+        var erste = await Search($"q={kennwort}&{Berlin}&radius_km=25&page_size=2");
+        var zweite = await Search($"q={kennwort}&{Berlin}&radius_km=25&page_size=2&page=2");
 
         erste.GetProperty("total_items").GetInt32().Should().Be(5);
         erste.GetProperty("total_pages").GetInt32().Should().Be(3);

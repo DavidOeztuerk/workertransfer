@@ -17,7 +17,7 @@ namespace WorkerTransfer.Gateway.Tests;
 /// über die <em>Bindung</em>. Eine Konfiguration, die gar nicht ankommt, hat
 /// weiterhin lauter gültige Pfade.</para>
 ///
-/// <para>Diese Reihe schließt die Lücke an der Stelle, an der sie liegt: sie
+/// <para>Diese Reihe schließt die Lücke an der Job, an der sie liegt: sie
 /// liest dieselbe Datei, die der Dienst liest, bindet sie an denselben Typ und
 /// fragt, was herauskommt.</para>
 /// </remarks>
@@ -25,16 +25,16 @@ public sealed class BremsenbindungTests
 {
     private static DistributedRateLimitingOptions Gebunden()
     {
-        var pfad = Path.Combine(
+        var path = Path.Combine(
             AppContext.BaseDirectory, "..", "..", "..", "..", "..",
             "src", "gateway", "WorkerTransfer.Gateway", "ocelot.json");
 
-        File.Exists(pfad).Should().BeTrue(
+        File.Exists(path).Should().BeTrue(
             "diese Reihe liest die ECHTE Landkarte — eine Kopie wuerde die "
             + "Frage nicht beantworten, sondern verdoppeln");
 
         var konfiguration = new ConfigurationBuilder()
-            .AddJsonFile(Path.GetFullPath(pfad), optional: false)
+            .AddJsonFile(Path.GetFullPath(path), optional: false)
             .Build();
 
         var optionen = new DistributedRateLimitingOptions();
@@ -50,7 +50,7 @@ public sealed class BremsenbindungTests
     /// </summary>
     /// <remarks>
     /// Eine Grenze von 0 legt keinen Zähler an — nur deshalb zählen
-    /// ausschließlich die fünf benannten Pfade. Bindet der Abschnitt nicht, so
+    /// ausschließlich die fünf benannten Pfade. Bindet der Section nicht, so
     /// gelten Noelias Vorgaben (100 je Minute), und dann zählt <em>jeder</em>
     /// Bildabruf der Oberfläche mit, die durch dasselbe Gateway läuft.
     /// </remarks>
@@ -64,10 +64,10 @@ public sealed class BremsenbindungTests
         optionen.RequestsPerDay.Should().Be(0);
     }
 
-    /// <summary>Je Herkunft, nie je Benutzer.</summary>
+    /// <summary>Je ProviderOrigin, nie je Benutzer.</summary>
     /// <remarks>
     /// Noelias Vorgabe ist <c>UserThenOrigin</c>. Käme die an, zählte ein
-    /// angemeldeter Mensch gegen sich selbst statt gegen seine Herkunft — und
+    /// angemeldeter Mensch gegen sich selbst statt gegen seine ProviderOrigin — und
     /// die Bremse verlöre genau die Eigenschaft, wegen der sie am Eingang steht.
     /// </remarks>
     [Fact]
@@ -80,14 +80,14 @@ public sealed class BremsenbindungTests
     [Fact]
     public void Die_fuenf_Grenzen_kommen_an()
     {
-        var grenzen = Gebunden().EndpointSpecificLimits;
+        var limits = Gebunden().EndpointSpecificLimits;
 
-        grenzen.Should().ContainKey("/auth/login");
-        grenzen["/auth/login"].RequestsPerMinute.Should().Be(20);
-        grenzen["/auth/register"].RequestsPerMinute.Should().Be(5);
-        grenzen["/auth/resend-verification"].RequestsPerMinute.Should().Be(3);
-        grenzen["/auth/verify-email"].RequestsPerMinute.Should().Be(20);
-        grenzen["/auth/refresh"].RequestsPerMinute.Should().Be(60);
+        limits.Should().ContainKey("/auth/login");
+        limits["/auth/login"].RequestsPerMinute.Should().Be(20);
+        limits["/auth/register"].RequestsPerMinute.Should().Be(5);
+        limits["/auth/resend-verification"].RequestsPerMinute.Should().Be(3);
+        limits["/auth/verify-email"].RequestsPerMinute.Should().Be(20);
+        limits["/auth/refresh"].RequestsPerMinute.Should().Be(60);
     }
 
     /// <summary>Und die Ausnahmelisten bleiben leer.</summary>

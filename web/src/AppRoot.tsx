@@ -22,6 +22,9 @@ import { useThemeMode } from "./shared/hooks/useThemeMode";
  * `useThemeMode` bekommt — und das liest die Vorliebe aus dem Store. Ein Hook
  * braucht eine Komponente unterhalb des `Provider`; in `main.tsx` gäbe es die
  * noch nicht.
+ *
+ * `CssBaseline` also sets `color-scheme`, so the browser's scrollbars and form
+ * fields follow dark mode instead of staying light.
  */
 export function AppRoot() {
   const { theme } = useThemeMode();
@@ -53,8 +56,6 @@ export function AppRoot() {
   return (
     <I18nextProvider i18n={i18n}>
       <ThemeProvider theme={theme}>
-        {/* Setzt auch `color-scheme`, damit Scrollbalken und Formularfelder des
-            Browsers im Dunkelmodus mitziehen — sonst bleiben sie hell. */}
         <CssBaseline />
         <RouterProvider router={router} />
       </ThemeProvider>

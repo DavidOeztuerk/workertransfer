@@ -1,7 +1,7 @@
 using Noelia.Core.Identity;
 using WorkerTransfer.Identity.Domain.Users;
 
-namespace WorkerTransfer.Identity.Application.Loeschung;
+namespace WorkerTransfer.Identity.Application.Erasure;
 
 /// <summary>What this service itself has to do for an erasure.</summary>
 /// <remarks>
@@ -19,19 +19,19 @@ namespace WorkerTransfer.Identity.Application.Loeschung;
 /// </remarks>
 /// <param name="Adresse">The address the notice goes to.</param>
 /// <param name="Sprache">What to write it in.</param>
-public sealed record Schlussanschrift(string Adresse, Kontosprache Sprache);
+public sealed record ClosingAddress(string Adresse, Kontosprache Sprache);
 
-public interface ILoeschbestand
+public interface IErasureLedger
 {
     /// <summary>Whether a cascade for this person is already under way.</summary>
-    Task<bool> LaeuftBereitsAsync(
-        SubjectId wer,
+    Task<bool> IsAlreadyRunningAsync(
+        SubjectId subject,
         CancellationToken cancellationToken = default);
 
     /// <summary>Disables the account and ends every session, at once.</summary>
-    Task SperreAsync(
-        SubjectId wer,
-        DateTimeOffset jetzt,
+    Task LockAsync(
+        SubjectId subject,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default);
 
     /// <summary>What is still outstanding for this person, as a query.</summary>
@@ -45,8 +45,8 @@ public interface ILoeschbestand
     /// would again hang on an organisational question.
     /// </para>
     /// </remarks>
-    Task<IReadOnlyList<string>> OffeneAbsichtenAsync(
-        SubjectId wer,
+    Task<IReadOnlyList<string>> OpenIntentsAsync(
+        SubjectId subject,
         CancellationToken cancellationToken = default);
 
     /// <summary>The address, while it still exists.</summary>
@@ -57,8 +57,8 @@ public interface ILoeschbestand
     /// forbidden: an outbox is durable storage and lands in every backup
     /// (ADR-0025 §5).
     /// </remarks>
-    Task<Schlussanschrift?> AdresseAsync(
-        SubjectId wer, CancellationToken cancellationToken = default);
+    Task<ClosingAddress?> AddressAsync(
+        SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// The last step: <c>users</c> falls, and what hangs on it.
@@ -71,8 +71,8 @@ public interface ILoeschbestand
     /// Idempotent: if the row is already gone, this step succeeded once before
     /// and there is nothing left to do.
     /// </remarks>
-    Task<IReadOnlyList<TenantId>> SchliesseAbAsync(
-        SubjectId wer,
-        DateTimeOffset jetzt,
+    Task<IReadOnlyList<TenantId>> CompleteAsync(
+        SubjectId subject,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default);
 }

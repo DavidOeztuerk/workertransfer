@@ -14,7 +14,7 @@ namespace WorkerTransfer.Outbox;
 /// the current state itself. That is also why a redelivery is harmless.
 /// </para>
 /// </remarks>
-public sealed class OutboxZeile
+public sealed class OutboxRow
 {
     /// <summary>Which intent.</summary>
     public Guid Id { get; set; }
@@ -67,23 +67,23 @@ public static class OutboxModelBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
-        modelBuilder.Entity<OutboxZeile>(entity =>
+        modelBuilder.Entity<OutboxRow>(entity =>
         {
             entity.ToTable(tabelle);
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id");
-            entity.Property(zeile => zeile.UserId).HasColumnName("user_id").IsRequired();
-            entity.Property(zeile => zeile.Kind)
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id");
+            entity.Property(row => row.UserId).HasColumnName("user_id").IsRequired();
+            entity.Property(row => row.Kind)
                 .HasColumnName("kind").HasMaxLength(64).IsRequired();
-            entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
-            entity.Property(zeile => zeile.Attempts).HasColumnName("attempts").IsRequired();
-            entity.Property(zeile => zeile.DeliveredAt).HasColumnName("delivered_at");
-            entity.Property(zeile => zeile.LastError)
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(row => row.Attempts).HasColumnName("attempts").IsRequired();
+            entity.Property(row => row.DeliveredAt).HasColumnName("delivered_at");
+            entity.Property(row => row.LastError)
                 .HasColumnName("last_error").HasMaxLength(120).IsRequired();
 
             // Both are the dispatcher's search, on every tick.
-            entity.HasIndex(zeile => zeile.CreatedAt);
-            entity.HasIndex(zeile => zeile.DeliveredAt);
+            entity.HasIndex(row => row.CreatedAt);
+            entity.HasIndex(row => row.DeliveredAt);
         });
 
         return modelBuilder;

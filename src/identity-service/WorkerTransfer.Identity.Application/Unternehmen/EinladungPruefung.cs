@@ -8,10 +8,10 @@ namespace WorkerTransfer.Identity.Application.Unternehmen;
 /// einen Fremden schon vorher ab — sonst lernte er aus dem Unterschied 422/401,
 /// dass es diesen Endpunkt gibt. Der Validator läuft danach, im Mediator.
 /// </remarks>
-public sealed class EinladungPruefung : AbstractValidator<EinladungAnnehmenBefehl>
+public sealed class InvitationValidator : AbstractValidator<AcceptInvitationCommand>
 {
     /// <summary>Setzt die eine Regel.</summary>
-    public EinladungPruefung() =>
+    public InvitationValidator() =>
         RuleFor(befehl => befehl.Token)
             .NotEmpty().WithMessage("token is required")
             .OverridePropertyName("token");
@@ -21,12 +21,12 @@ public sealed class EinladungPruefung : AbstractValidator<EinladungAnnehmenBefeh
 /// <remarks>
 /// Die Domäne wird NICHT hier geprüft — sie stammt aus der bestätigten Adresse
 /// und nicht aus dem Rumpf, und ob sie schon beansprucht ist, ist eine Antwort
-/// (409) und keine kaputte Anfrage.
+/// (409) und keine kaputte ResumeRequest.
 /// </remarks>
-public sealed class GruendungPruefung : AbstractValidator<UnternehmenGruendenBefehl>
+public sealed class CompanyFoundingValidator : AbstractValidator<UnternehmenGruendenBefehl>
 {
     /// <summary>Setzt die eine Regel.</summary>
-    public GruendungPruefung() =>
+    public CompanyFoundingValidator() =>
         RuleFor(befehl => befehl.Name)
             .NotEmpty().WithMessage("name is required")
             .OverridePropertyName("name");

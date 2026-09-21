@@ -1,9 +1,9 @@
 using Noelia.Core.Identity;
 
-namespace WorkerTransfer.Jobs.Domain.Stellen;
+namespace WorkerTransfer.Jobs.Domain.Jobs;
 
-/// <summary>Wo eine Stelle steht.</summary>
-public enum Stellenstand
+/// <summary>Wo eine Job steht.</summary>
+public enum JobState
 {
     /// <summary>Geschrieben, nicht veröffentlicht.</summary>
     Draft,
@@ -34,7 +34,7 @@ public enum Remotegrad
 }
 
 /// <summary>Welche Art von Anstellung.</summary>
-public enum Anstellungsart
+public enum EmploymentKind
 {
     FullTime,
     PartTime,
@@ -50,12 +50,12 @@ public enum Anstellungsart
 /// der „erledigt" sagt, ohne je etwas zu tun.
 /// <para>
 /// Es gibt hier keinen Punktwert, keine Rangfolge und keine Passung. Wie gut
-/// jemand zu einer Stelle passt, wird im Browser gerechnet, der Person gezeigt
-/// und nie dem Unternehmen — und es ordnet <em>Stellen</em>, nicht Menschen
+/// jemand zu einer Job passt, wird im Browser gerechnet, der Person gezeigt
+/// und nie dem Unternehmen — und es ordnet <em>Jobs</em>, nicht Menschen
 /// (ADR-0022).
 /// </para>
 /// </remarks>
-public sealed class Stelle
+public sealed class Job
 {
     /// <summary>Wie lang ein Titel sein darf.</summary>
     public const int HoechstlaengeTitel = 160;
@@ -68,10 +68,10 @@ public sealed class Stelle
 
     /// <summary>Wie lang eine Postleitzahl sein darf.</summary>
     /// <remarks>
-    /// Zehn, nicht fünf: Deutschland hat fünf Stellen, Österreich und die
+    /// Zehn, nicht fünf: Deutschland hat fünf Jobs, Österreich und die
     /// Schweiz vier, und „D-10115" schreiben genug Leute, dass ein Feld, das
     /// es abweist, mehr Ärger macht als es Ordnung schafft. Gelesen werden
-    /// ohnehin nur die Ziffern (<c>Ortskunde</c>).
+    /// ohnehin nur die Ziffern (<c>PlaceLookup</c>).
     /// </remarks>
     public const int HoechstlaengePlz = 10;
 
@@ -83,31 +83,31 @@ public sealed class Stelle
     /// </remarks>
     public const int HoechstlaengeWunsch = 500;
 
-    private Stelle(
+    private Job(
         Guid id,
-        TenantId firma,
+        TenantId company,
         string titel,
         string beschreibung,
         string ort,
         string postleitzahl,
         Remotegrad remote,
-        Anstellungsart art,
-        Faehigkeitenliste faehigkeiten,
-        Stellenstand stand,
+        EmploymentKind kind,
+        SkillList skills,
+        JobState state,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm,
         DateTimeOffset? veroeffentlichtAm)
     {
         Id = id;
-        Firma = firma;
+        Firma = company;
         Titel = titel;
         Beschreibung = beschreibung;
         Ort = ort;
         Postleitzahl = postleitzahl;
         Remote = remote;
-        Art = art;
-        Faehigkeiten = faehigkeiten;
-        Stand = stand;
+        Art = kind;
+        Faehigkeiten = skills;
+        State = state;
         AngelegtAm = angelegtAm;
         GeaendertAm = geaendertAm;
         VeroeffentlichtAm = veroeffentlichtAm;
@@ -144,13 +144,13 @@ public sealed class Stelle
     public Remotegrad Remote { get; private set; }
 
     /// <summary>Welche Anstellung.</summary>
-    public Anstellungsart Art { get; private set; }
+    public EmploymentKind Art { get; private set; }
 
     /// <summary>Was verlangt wird.</summary>
-    public Faehigkeitenliste Faehigkeiten { get; private set; }
+    public SkillList Faehigkeiten { get; private set; }
 
     /// <summary>Wo sie steht.</summary>
-    public Stellenstand Stand { get; private set; }
+    public JobState State { get; private set; }
 
     /// <summary>Wann sie geschrieben wurde.</summary>
     public DateTimeOffset AngelegtAm { get; }
@@ -164,61 +164,61 @@ public sealed class Stelle
     /// <summary>Schreibt eine neue Anzeige. Sie beginnt als Entwurf.</summary>
     /// <remarks>
     /// Nie sofort sichtbar. Wer eine Anzeige schreibt, soll sie lesen können,
-    /// bevor Bewerbungen darauf eingehen.
+    /// bevor Applications darauf eingehen.
     /// </remarks>
-    public static Stelle Lege_an(
-        TenantId firma,
+    public static Job Lege_an(
+        TenantId company,
         string titel,
         string beschreibung,
         string ort,
         string postleitzahl,
         Remotegrad remote,
-        Anstellungsart art,
-        Faehigkeitenliste faehigkeiten,
-        DateTimeOffset jetzt) =>
+        EmploymentKind kind,
+        SkillList skills,
+        DateTimeOffset now) =>
         new(
-            Guid.CreateVersion7(), firma,
+            Guid.CreateVersion7(), company,
             Text("Der Titel", titel, pflicht: true, HoechstlaengeTitel),
             Text("Die Beschreibung", beschreibung, pflicht: true, HoechstlaengeBeschreibung),
             Text("Der Ort", ort, pflicht: false, HoechstlaengeOrt),
             Text("Die Postleitzahl", postleitzahl, pflicht: false, HoechstlaengePlz),
-            remote, art, faehigkeiten, Stellenstand.Draft, jetzt, jetzt, null);
+            remote, kind, skills, JobState.Draft, now, now, null);
 
     /// <summary>Die Anzeige, wie eine Zeile sie hält.</summary>
-    public static Stelle Stelle_her(
+    public static Job Stelle_her(
         Guid id,
-        TenantId firma,
+        TenantId company,
         string titel,
         string beschreibung,
         string ort,
         string postleitzahl,
         Remotegrad remote,
-        Anstellungsart art,
-        Faehigkeitenliste faehigkeiten,
-        Stellenstand stand,
+        EmploymentKind kind,
+        SkillList skills,
+        JobState state,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm,
         DateTimeOffset? veroeffentlichtAm) =>
-        new(id, firma, titel, beschreibung, ort, postleitzahl, remote, art, faehigkeiten,
-            stand, angelegtAm, geaendertAm, veroeffentlichtAm);
+        new(id, company, titel, beschreibung, ort, postleitzahl, remote, kind, skills,
+            state, angelegtAm, geaendertAm, veroeffentlichtAm);
 
     /// <summary>Ändert den Inhalt.</summary>
-    /// <exception cref="UebergangNichtErlaubt">Eine geschlossene Stelle ändert niemand mehr.</exception>
+    /// <exception cref="UebergangNichtErlaubt">Eine geschlossene Job ändert niemand mehr.</exception>
     public void Aendere(
         string titel,
         string beschreibung,
         string ort,
         string postleitzahl,
         Remotegrad remote,
-        Anstellungsart art,
-        Faehigkeitenliste faehigkeiten,
-        DateTimeOffset jetzt)
+        EmploymentKind kind,
+        SkillList skills,
+        DateTimeOffset now)
     {
         // Eine geschlossene Anzeige zu ändern hieße, den Text zu verändern, auf
         // den sich Menschen beworben haben.
-        if (Stand is Stellenstand.Closed)
+        if (State is JobState.Closed)
         {
-            throw new UebergangNichtErlaubt(Stand, Stellenstand.Draft);
+            throw new UebergangNichtErlaubt(State, JobState.Draft);
         }
 
         Titel = Text("Der Titel", titel, pflicht: true, HoechstlaengeTitel);
@@ -228,26 +228,26 @@ public sealed class Stelle
         Postleitzahl = Text(
             "Die Postleitzahl", postleitzahl, pflicht: false, HoechstlaengePlz);
         Remote = remote;
-        Art = art;
-        Faehigkeiten = faehigkeiten;
-        GeaendertAm = jetzt;
+        Art = kind;
+        Faehigkeiten = skills;
+        GeaendertAm = now;
     }
 
     /// <summary>Macht sie sichtbar.</summary>
     /// <remarks>
-    /// Auch eine geschlossene darf wieder heraus: eine Stelle, die neu besetzt
+    /// Auch eine geschlossene darf wieder heraus: eine Job, die neu besetzt
     /// werden muss, ist derselbe Text.
     /// </remarks>
-    public void Veroeffentliche(DateTimeOffset jetzt)
+    public void Veroeffentliche(DateTimeOffset now)
     {
-        if (Stand is Stellenstand.Published)
+        if (State is JobState.Published)
         {
             return;
         }
 
-        Stand = Stellenstand.Published;
-        VeroeffentlichtAm ??= jetzt;
-        GeaendertAm = jetzt;
+        State = JobState.Published;
+        VeroeffentlichtAm ??= now;
+        GeaendertAm = now;
     }
 
     /// <summary>Zieht sie zurück.</summary>
@@ -255,32 +255,32 @@ public sealed class Stelle
     /// Ein Entwurf kann auch geschlossen werden — er ist dann verworfen, und
     /// das ist ein legitimer Ausgang.
     /// </remarks>
-    public void Schliesse(DateTimeOffset jetzt)
+    public void Schliesse(DateTimeOffset now)
     {
-        Stand = Stellenstand.Closed;
-        GeaendertAm = jetzt;
+        State = JobState.Closed;
+        GeaendertAm = now;
     }
 
-    private static string Text(string feld, string? wert, bool pflicht, int grenze)
+    private static string Text(string field, string? value, bool pflicht, int limit)
     {
-        var bereinigt = (wert ?? string.Empty).Trim();
+        var bereinigt = (value ?? string.Empty).Trim();
 
         if (pflicht && bereinigt.Length == 0)
         {
-            throw new TextFehler(feld, "darf nicht leer sein");
+            throw new TextFehler(field, "darf nicht leer sein");
         }
 
-        return bereinigt.Length > grenze
-            ? throw new TextFehler(feld, $"ist länger als {grenze} Zeichen")
+        return bereinigt.Length > limit
+            ? throw new TextFehler(field, $"ist länger als {limit} Zeichen")
             : bereinigt;
     }
 }
 
-/// <summary>Eine Seite Stellen und wo es weitergeht.</summary>
-/// <summary>Eine Seite Stellen und wie viele es insgesamt gibt.</summary>
+/// <summary>Eine Seite Jobs und wo es weitergeht.</summary>
+/// <summary>Eine Seite Jobs und wie viele es insgesamt gibt.</summary>
 /// <remarks>
-/// <strong>Gesamtzahl statt Zeiger</strong>, seit die Liste blätterbar ist: wer
-/// „Seite 3 von 9" sehen und dorthin springen will, braucht die Zahl. Ein Zeiger
+/// <strong>Gesamtzahl statt Cursor</strong>, seit die Liste blätterbar ist: wer
+/// „Seite 3 von 9" sehen und dorthin springen will, braucht die Zahl. Ein Cursor
 /// kann nur vorwärts, und die Frage „wie viele gibt es überhaupt" beantwortet er
 /// nie.
 /// <para>
@@ -289,8 +289,8 @@ public sealed class Stelle
 /// nicht in einem gemeinsamen Listentyp.
 /// </para>
 /// </remarks>
-/// <param name="Eintraege">Die Stellen dieser Seite.</param>
-/// <param name="Gesamt">Wie viele Stellen der Filter insgesamt trifft.</param>
+/// <param name="Eintraege">Die Jobs dieser Seite.</param>
+/// <param name="Gesamt">Wie viele Jobs der Filter insgesamt trifft.</param>
 /// <param name="OhneOrt">
 /// Wie viele Anzeigen eine Umkreissuche NICHT beurteilen konnte, weil ihre
 /// Ortsangabe unbekannt ist. Ohne Umkreissuche immer null.
@@ -301,26 +301,26 @@ public sealed class Stelle
 /// einen Teil der Anzeigen gar nichts sagen konnte.
 /// </para>
 /// </param>
-public sealed record Stellenseite(IReadOnlyList<Stelle> Eintraege, int Gesamt, int OhneOrt = 0);
+public sealed record JobPage(IReadOnlyList<Job> Eintraege, int Gesamt, int OhneOrt = 0);
 
 /// <summary>Findet und speichert Anzeigen.</summary>
-public interface IStellenspeicher
+public interface IJobStore
 {
     /// <summary>Eine Anzeige, oder <c>null</c>.</summary>
-    Task<Stelle?> HoleAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Job?> GetAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(Stelle stelle, CancellationToken cancellationToken = default);
+    Task SaveAsync(Job job, CancellationToken cancellationToken = default);
 
     /// <summary>Die Anzeigen eines Unternehmens, alle Stände.</summary>
-    Task<IReadOnlyList<Stelle>> FuerFirmaAsync(
-        TenantId firma, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Job>> ForCompanyAsync(
+        TenantId company, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Die öffentliche Liste — nur veröffentlichte.
     /// </summary>
     /// <remarks>
-    /// Der Stand wird hier gefiltert und nicht vom Aufrufer: ein Parameter
+    /// Der State wird hier gefiltert und nicht vom Aufrufer: ein Parameter
     /// <c>status=draft</c> wäre ein Weg, fremde Entwürfe zu lesen.
     /// </remarks>
     /// <param name="seite">
@@ -343,21 +343,21 @@ public interface IStellenspeicher
     /// <param name="umkreis">
     /// „Höchstens N Kilometer von hier." <c>null</c> heisst „egal wo".
     /// <para>
-    /// Voll remote ausgeschriebene Stellen sind IMMER dabei, unabhängig vom
+    /// Voll remote ausgeschriebene Jobs sind IMMER dabei, unabhängig vom
     /// Radius: von wo aus sie erreichbar sind, ist bei ihnen keine Frage der
     /// Entfernung. Sie wegen eines Ortsfilters auszublenden hiesse, genau die
     /// Anzeigen zu verstecken, die für jemanden ausserhalb der Ballungsräume
     /// die interessantesten sind.
     /// </para>
     /// </param>
-    Task<Stellenseite> SucheAsync(
-        int seite,
-        int anzahl,
-        IReadOnlyList<string>? faehigkeiten,
+    Task<JobPage> SearchAsync(
+        int page,
+        int count,
+        IReadOnlyList<string>? skills,
         string ort,
         Remotegrad? remote,
         string suchbegriff = "",
-        Guid? firma = null,
+        Guid? company = null,
         string beschaeftigung = "",
         Umkreis? umkreis = null,
         CancellationToken cancellationToken = default);
@@ -369,8 +369,8 @@ public interface IStellenspeicher
     /// <c>role='admin'</c> hat ihr Konto gelöscht. Das Unternehmen wird
     /// stillgelegt, nicht gelöscht — es ist keine natürliche Person, und seine
     /// Anzeigen gehören ihm auch dann noch. Aber eine unbeaufsichtigte
-    /// Stellenanzeige ist schlechter als keine: Bewerbungen liefen an niemanden.
+    /// Stellenanzeige ist schlechter als keine: Applications liefen an niemanden.
     /// </remarks>
-    Task<int> ZieheZurueckAsync(
-        TenantId firma, DateTimeOffset jetzt, CancellationToken cancellationToken = default);
+    Task<int> WithdrawAsync(
+        TenantId company, DateTimeOffset now, CancellationToken cancellationToken = default);
 }

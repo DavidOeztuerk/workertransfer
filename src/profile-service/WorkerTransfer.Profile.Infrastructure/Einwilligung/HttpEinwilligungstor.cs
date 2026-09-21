@@ -11,82 +11,82 @@ namespace WorkerTransfer.Profile.Infrastructure.Einwilligung;
 
 /// <summary>Fragt den Consent-Ledger über HTTP.</summary>
 /// <remarks>
-/// Synchron und ohne Zwischenspeicher (ADR-0013). Ein Widerruf muss beim
+/// Synchron und ohne Zwischenspeicher (ADR-0013). Ein Revocation muss beim
 /// nächsten Abruf wirken, nicht beim übernächsten — ein Cache wäre hier kein
 /// Leistungsdetail, sondern ein Regelbruch.
 /// <para>
 /// Gefragt wird mit dem Token des <em>Aufrufers</em> und nicht mit einem
-/// eigenen Konto: der Dienst fragt in dessen Auftrag. Der Kopf zuerst, sonst
+/// eigenen Konto: der Dienst fragt in dessen Auftrag. Der Header zuerst, sonst
 /// das Cookie — die Oberfläche sieht das <c>httpOnly</c>-Token nie und kann es
 /// nur so zurückgeben.
 /// </para>
 /// </remarks>
-public sealed class HttpEinwilligungstor(
+public sealed class HttpConsentGate(
     IHttpClientFactory fabrik,
     IHttpContextAccessor zugriff,
-    IOptions<Einwilligungseinstellungen> einstellungen,
-    ILogger<HttpEinwilligungstor> protokoll) : IEinwilligungstor
+    IOptions<ConsentSettings> einstellungen,
+    ILogger<HttpConsentGate> protokoll) : IConsentGate
 {
     /// <summary>Der Name des Mandanten in der Clientfabrik.</summary>
     public const string Client = "consent";
 
-    private readonly Einwilligungseinstellungen _einstellungen = einstellungen.Value;
+    private readonly ConsentSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task<bool> DarfSehenAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default)
+    public async Task<bool> MaySeeAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default)
     {
         // Zwei Fragen in einer Runde, obwohl es nur um einen Menschen geht: die
-        // öffentliche Freigabe ist der häufige Fall, aber ein zweiter Umlauf
+        // öffentliche Release ist der häufige Fall, aber ein zweiter Umlauf
         // für die andere kostet mehr als die zweite Zeile im selben Rumpf.
         //
         // `Frage` traegt weiterhin eine Liste, obwohl nur noch EIN Aufrufer
         // kommt: sie beantwortet die Paarbildung und die Laengenpruefung, und
         // die sind fuer einen Menschen dieselben wie fuer zwanzig.
-        var urteile = await Frage([wer], firma, cancellationToken);
+        var urteile = await Frage([subject], company, cancellationToken);
 
         return urteile[0];
     }
 
     /// <summary>Eine Sammelfrage, zwei Paare je Person, in deren Reihenfolge.</summary>
     private async Task<IReadOnlyList<bool>> Frage(
-        IReadOnlyList<SubjectId> wer, TenantId firma, CancellationToken cancellationToken)
+        IReadOnlyList<SubjectId> subject, TenantId company, CancellationToken cancellationToken)
     {
-        var fuerFirma = Sichtbarkeiten.FuerFirma(firma);
+        var fuerFirma = Sichtbarkeiten.FuerFirma(company);
 
-        var paare = wer
+        var paare = subject
             .SelectMany(einer => new[]
             {
-                new EinwilligungsfrageV1(einer.Value, Sichtbarkeiten.Oeffentlich),
-                new EinwilligungsfrageV1(einer.Value, fuerFirma)
+                new ConsentQuestionV1(einer.Value, Sichtbarkeiten.Oeffentlich),
+                new ConsentQuestionV1(einer.Value, fuerFirma)
             })
             .ToArray();
 
-        if (paare.Length > Einwilligungsgrenzen.HoechsteSammelgroesse)
+        if (paare.Length > ConsentLimits.HoechsteSammelgroesse)
         {
             // Der Aufrufer fragt mehr, als der Vertrag trägt. Das ist ein
             // Programmierfehler und keine Auskunft über einen Menschen —
             // deshalb laut, nicht als „nicht freigegeben“.
-            throw new EinwilligungSchweigt(
+            throw new ConsentGateSilent(
                 $"{paare.Length} Paare überschreiten "
-                + $"{Einwilligungsgrenzen.HoechsteSammelgroesse}");
+                + $"{ConsentLimits.HoechsteSammelgroesse}");
         }
 
-        var antwort = await Sende(paare, cancellationToken);
+        var response = await Sende(paare, cancellationToken);
 
-        if (antwort.Results.Count != paare.Length)
+        if (response.Results.Count != paare.Length)
         {
             // Eine Antwort, die nicht zu den Fragen passt, lässt sich nicht
-            // zuordnen — und falsch zuzuordnen hieße, das Profil der falschen
+            // zuordnen — und falsch zuzuordnen hieße, das PersonProfile der falschen
             // Person zu zeigen. Also weigern statt raten.
-            throw new EinwilligungSchweigt(
-                $"{antwort.Results.Count} Antworten auf {paare.Length} Fragen");
+            throw new ConsentGateSilent(
+                $"{response.Results.Count} Antworten auf {paare.Length} Fragen");
         }
 
-        // Zwei Antworten je Person, in der Reihenfolge der Fragen: öffentlich
+        // Zwei Responses je Person, in der Reihenfolge der Fragen: öffentlich
         // ODER für dieses Unternehmen.
-        return [.. Enumerable.Range(0, wer.Count).Select(stelle =>
-            Gilt(antwort.Results[stelle * 2]) || Gilt(antwort.Results[(stelle * 2) + 1]))];
+        return [.. Enumerable.Range(0, subject.Count).Select(job =>
+            Gilt(response.Results[job * 2]) || Gilt(response.Results[(job * 2) + 1]))];
     }
 
     /// <summary>
@@ -96,92 +96,92 @@ public sealed class HttpEinwilligungstor(
     /// Beides zu prüfen macht die Absicht auch dann richtig, wenn der Ledger
     /// einmal beides zugleich meldet.
     /// </remarks>
-    private static bool Gilt(EinwilligungsantwortV1 antwort) =>
-        antwort.Granted && !antwort.Deleted;
+    private static bool Gilt(ConsentResponseV1 response) =>
+        response.Granted && !response.Deleted;
 
-    private async Task<EinwilligungssammelantwortV1> Sende(
-        IReadOnlyList<EinwilligungsfrageV1> paare, CancellationToken cancellationToken)
+    private async Task<ConsentBatchResponseV1> Sende(
+        IReadOnlyList<ConsentQuestionV1> paare, CancellationToken cancellationToken)
     {
         using var client = fabrik.CreateClient(Client);
         client.Timeout = _einstellungen.Geduld;
 
-        using var anfrage = new HttpRequestMessage(
+        using var request = new HttpRequestMessage(
             HttpMethod.Post,
             new Uri(new Uri(_einstellungen.Adresse), "/consent/check-batch"))
         {
-            Content = JsonContent.Create(new EinwilligungssammelfrageV1(paare))
+            Content = JsonContent.Create(new ConsentBatchQuestionV1(paare))
         };
 
         if (Aufrufertoken() is { Length: > 0 } token)
         {
-            anfrage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
             // Nur die Art, nie der Inhalt: was gefragt wurde, ist eine Liste
             // von Menschen und gehört nicht ins Protokoll.
             protokoll.LogWarning("Der Consent-Ledger ist nicht erreichbar: {Art}",
-                fehler.GetType().Name);
+                error.GetType().Name);
 
-            throw new EinwilligungSchweigt("consent-service unreachable");
+            throw new ConsentGateSilent("consent-service unreachable");
         }
-        catch (TaskCanceledException fehler) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
             protokoll.LogWarning("Der Consent-Ledger hat nicht rechtzeitig geantwortet.");
 
-            throw new EinwilligungSchweigt($"consent-service timed out ({fehler.GetType().Name})");
+            throw new ConsentGateSilent($"consent-service timed out ({error.GetType().Name})");
         }
 
-        using (antwort)
+        using (response)
         {
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
                 // Auch 401 und 403: unser Token taugt nicht — das ist ein
                 // Systemproblem und keine Aussage darüber, ob die Person
                 // eingewilligt hat.
                 protokoll.LogWarning("Der Consent-Ledger antwortete mit {Status}.",
-                    (int)antwort.StatusCode);
+                    (int)response.StatusCode);
 
-                throw new EinwilligungSchweigt(
-                    $"consent-service returned {(int)antwort.StatusCode}");
+                throw new ConsentGateSilent(
+                    $"consent-service returned {(int)response.StatusCode}");
             }
 
             try
             {
-                return await antwort.Content
-                    .ReadFromJsonAsync<EinwilligungssammelantwortV1>(cancellationToken)
-                    ?? throw new EinwilligungSchweigt("consent-service sent an empty answer");
+                return await response.Content
+                    .ReadFromJsonAsync<ConsentBatchResponseV1>(cancellationToken)
+                    ?? throw new ConsentGateSilent("consent-service sent an empty answer");
             }
-            catch (Exception fehler) when (fehler is not EinwilligungSchweigt)
+            catch (Exception error) when (error is not ConsentGateSilent)
             {
                 protokoll.LogWarning("Der Consent-Ledger antwortete unverständlich.");
 
-                throw new EinwilligungSchweigt("consent-service sent an unusable answer");
+                throw new ConsentGateSilent("consent-service sent an unusable answer");
             }
         }
     }
 
-    /// <summary>Das Token des Aufrufers: erst der Kopf, dann das Cookie.</summary>
+    /// <summary>Das Token des Aufrufers: erst der Header, dann das Cookie.</summary>
     private string? Aufrufertoken()
     {
-        var kontext = zugriff.HttpContext;
+        var context = zugriff.HttpContext;
 
-        if (kontext is null)
+        if (context is null)
         {
             return null;
         }
 
-        var kopf = kontext.Request.Headers.Authorization.ToString();
+        var header = context.Request.Headers.Authorization.ToString();
 
-        return kopf.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-            ? kopf["Bearer ".Length..].Trim()
-            : kontext.Request.Cookies["access"];
+        return header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? header["Bearer ".Length..].Trim()
+            : context.Request.Cookies["access"];
     }
 }

@@ -2,8 +2,8 @@ using Noelia.Core.Identity;
 
 namespace WorkerTransfer.Applications.Application.Ports;
 
-/// <summary>Schreiben und Überarbeiten laufen hinter der Anfrage weiter.</summary>
-public enum AnschreibenauftragArt
+/// <summary>Schreiben und Überarbeiten laufen hinter der ResumeRequest weiter.</summary>
+public enum CoverLetterJobKind
 {
     /// <summary>Ein neues Anschreiben.</summary>
     Schreiben,
@@ -17,14 +17,14 @@ public enum AnschreibenauftragArt
 /// <param name="EntwurfId">Welcher Entwurf.</param>
 /// <param name="Traeger">Das Zugriffstoken, damit die Auskunft denselben sieht.</param>
 /// <param name="Art">Schreiben oder überarbeiten.</param>
-public sealed record Anschreibenauftrag(
-    SubjectId Wer, Guid EntwurfId, string? Traeger, AnschreibenauftragArt Art);
+public sealed record CoverLetterJob(
+    SubjectId Wer, Guid EntwurfId, string? Traeger, CoverLetterJobKind Art);
 
 /// <summary>Nimmt Aufträge entgegen, ohne auf das Modell zu warten.</summary>
-public interface IAnschreibenSchlange
+public interface ICoverLetterQueue
 {
     /// <summary>Stellt den Auftrag hinten an. <c>false</c>, wenn er schon läuft.</summary>
-    bool Plane(Anschreibenauftrag auftrag);
+    bool Plane(CoverLetterJob job);
 
     /// <summary>Ob dieser Entwurf gerade geschrieben wird.</summary>
     bool Laeuft(Guid entwurfId);

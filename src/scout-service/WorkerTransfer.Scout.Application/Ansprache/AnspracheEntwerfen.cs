@@ -28,7 +28,7 @@ public sealed record AnspracheAbfrage(
 /// bleiben: ein Unterschied sagte, ob dieser Mensch auf der Plattform ist
 /// (ADR-0020).
 /// </remarks>
-public sealed class KeinAnsprechpartner() : Exception("no such profile");
+public sealed class NoContactPerson() : Exception("no such profileSearch");
 
 /// <summary>
 /// Fragt zuerst den Ledger, baut dann den Kontext — und speichert nichts.
@@ -40,8 +40,8 @@ public sealed class KeinAnsprechpartner() : Exception("no such profile");
 /// sehen. Gefragt wird synchron und ohne Zwischenspeicher, wie überall
 /// (ADR-0013).</para>
 ///
-/// <para><strong>Der Kontext kommt aus dem GESPEICHERTEN Profil</strong>, nicht
-/// aus der Anfrage: was der Aufrufer nicht schicken kann, kann er nicht in
+/// <para><strong>Der Kontext kommt aus dem GESPEICHERTEN Profile</strong>, nicht
+/// aus der ResumeRequest: was der Aufrufer nicht schicken kann, kann er nicht in
 /// einen fremden Dienst schleusen. Er steuert genau zwei Dinge bei, und beide
 /// sind seine eigenen Worte — wonach er gesucht hat, und was er am Entwurf
 /// anders haben will.</para>
@@ -52,14 +52,14 @@ public sealed class KeinAnsprechpartner() : Exception("no such profile");
 /// ADR-0033 nicht entstehen lassen will.</para>
 ///
 /// <para>Und ausdrücklich <strong>keine Benachrichtigung</strong> an die
-/// angesprochene Person: sie erfährt aus der Suche, dass sie entdeckt wurde
+/// angesprochene Person: sie erfährt aus der Search, dass sie entdeckt wurde
 /// (<c>profile_discovered</c>), und eine zweite Nachricht „jemand entwirft
 /// gerade etwas an dich" wäre ein Zähler über die eigene Sichtbarkeit.</para>
 /// </remarks>
 public sealed class AnspracheHandler(
-    IEinwilligungstor tor,
-    IProfilsuche profile,
-    IEntwerfer entwerfer) : IRequestHandler<AnspracheAbfrage, string>
+    IConsentGate tor,
+    IProfileSearch profileSearch,
+    IDrafter entwerfer) : IRequestHandler<AnspracheAbfrage, string>
 {
     /// <inheritdoc />
     /// <exception cref="EinwilligungSchweigt">Der Ledger antwortet nicht.</exception>
@@ -70,31 +70,31 @@ public sealed class AnspracheHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var urteile = await tor.DarfSehenAlleAsync(
+        var urteile = await tor.MaySeeAllAsync(
             [request.Wen], request.Firma, cancellationToken);
 
         if (urteile.Count != 1)
         {
-            throw new EinwilligungSchweigt($"{urteile.Count} Antworten auf eine Frage");
+            throw new ConsentGateSilent($"{urteile.Count} Antworten auf eine Frage");
         }
 
         if (!urteile[0])
         {
-            throw new KeinAnsprechpartner();
+            throw new NoContactPerson();
         }
 
-        var profil = await profile.HoleAsync(request.Wen, cancellationToken)
-                     ?? throw new KeinAnsprechpartner();
+        var theProfile = await profileSearch.GetAsync(request.Wen, cancellationToken)
+                     ?? throw new NoContactPerson();
 
-        // Nur schon sichtbare, GENANNTE Worte. Keine Belege: die sind sichtbar,
+        // Nur schon sichtbare, GENANNTE Worte. None Belege: die sind sichtbar,
         // aber nicht genannt — sie einer Person zuzuschreiben ist der Schritt,
         // den ADR-0033 ihr selbst vorbehaelt.
         var lage = new Ansprachelage(
-            profil.Ueberschrift,
-            profil.Genannt,
+            theProfile.Ueberschrift,
+            theProfile.Genannt,
             request.Gesucht,
             request.Wunsch);
 
-        return await entwerfer.EntwirfAsync(lage, cancellationToken);
+        return await entwerfer.DraftAsync(lage, cancellationToken);
     }
 }

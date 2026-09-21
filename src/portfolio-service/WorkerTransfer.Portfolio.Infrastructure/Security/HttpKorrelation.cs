@@ -8,7 +8,7 @@ public sealed class HttpKorrelation(IHttpContextAccessor zugriff) : IKorrelation
 {
     /// <inheritdoc />
     public string? Aktuell =>
-        zugriff.HttpContext?.Items.TryGetValue("CorrelationId", out var wert) == true
-            ? wert?.ToString()
+        zugriff.HttpContext?.Items.TryGetValue("CorrelationId", out var value) == true
+            ? value?.ToString()
             : null;
 }

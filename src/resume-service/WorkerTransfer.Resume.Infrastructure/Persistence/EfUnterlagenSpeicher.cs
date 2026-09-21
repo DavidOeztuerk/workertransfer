@@ -11,37 +11,37 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence;
 /// Speichern. Das Vergessen kostet im Test nichts und verliert in Produktion
 /// den Schreibvorgang.
 /// </remarks>
-public sealed class EfUnterlagenSpeicher(ResumeDbContext kontext) : IUnterlagenSpeicher
+public sealed class EfDocumentRecordStore(ResumeDbContext context) : IDocumentRecordStore
 {
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Unterlage>> AlleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DocumentRecord>> AllAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.Unterlagen
+        var rows = await context.Unterlagen
             .AsNoTracking()
-            .Where(zeile => zeile.SubjectId == wer.Value)
-            .OrderByDescending(zeile => zeile.CreatedAt)
+            .Where(row => row.SubjectId == subject.Value)
+            .OrderByDescending(row => row.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZumAggregat)];
+        return [.. rows.Select(ZumAggregat)];
     }
 
     /// <inheritdoc />
-    public async Task<Unterlage?> HoleAsync(
-        SubjectId wer, Guid id, CancellationToken cancellationToken = default)
+    public async Task<DocumentRecord?> GetAsync(
+        SubjectId subject, Guid id, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Unterlagen
+        var row = await context.Unterlagen
             .AsNoTracking()
             .FirstOrDefaultAsync(
-                eintrag => eintrag.Id == id && eintrag.SubjectId == wer.Value,
+                entry => entry.Id == id && entry.SubjectId == subject.Value,
                 cancellationToken);
 
-        return zeile is null ? null : ZumAggregat(zeile);
+        return row is null ? null : ZumAggregat(row);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Unterlage>> HoleVieleAsync(
-        SubjectId wer, IReadOnlyList<Guid> kennungen, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DocumentRecord>> GetManyAsync(
+        SubjectId subject, IReadOnlyList<Guid> kennungen, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(kennungen);
 
@@ -50,28 +50,28 @@ public sealed class EfUnterlagenSpeicher(ResumeDbContext kontext) : IUnterlagenS
             return [];
         }
 
-        var zeilen = await kontext.Unterlagen
+        var rows = await context.Unterlagen
             .AsNoTracking()
-            .Where(zeile => zeile.SubjectId == wer.Value && kennungen.Contains(zeile.Id))
+            .Where(row => row.SubjectId == subject.Value && kennungen.Contains(row.Id))
             .ToListAsync(cancellationToken);
 
         // In der REIHENFOLGE DER FRAGE, nicht in der der Datenbank: die Mappe
         // zeigt die Reiter so, wie die Person sie beigelegt hat.
-        var nachKennung = zeilen.ToDictionary(zeile => zeile.Id);
+        var nachKennung = rows.ToDictionary(row => row.Id);
 
         return
         [
             .. kennungen
                 .Where(nachKennung.ContainsKey)
-                .Select(kennung => ZumAggregat(nachKennung[kennung]))
+                .Select(id => ZumAggregat(nachKennung[id]))
         ];
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(
-        Unterlage unterlage, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        DocumentRecord document, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(unterlage);
+        ArgumentNullException.ThrowIfNull(document);
 
         // `AsTracking()` IST DER SCHREIBVORGANG, nicht eine Feinheit.
         //
@@ -86,40 +86,40 @@ public sealed class EfUnterlagenSpeicher(ResumeDbContext kontext) : IUnterlagenS
         // deshalb faellt so etwas erst beim ersten AENDERNDEN Aufrufer auf, und
         // dieser Speicher hatte bis dahin keinen. Alle achtzehn anderen Speicher
         // im Baum rufen `AsTracking()`; dieser war der einzige ohne.
-        var vorhanden = await kontext.Unterlagen
+        var vorhanden = await context.Unterlagen
             .AsTracking()
-            .FirstOrDefaultAsync(zeile => zeile.Id == unterlage.Id, cancellationToken);
+            .FirstOrDefaultAsync(row => row.Id == document.Id, cancellationToken);
 
         if (vorhanden is null)
         {
-            vorhanden = new UnterlageZeile { Id = unterlage.Id };
-            kontext.Unterlagen.Add(vorhanden);
+            vorhanden = new DocumentRecordRow { Id = document.Id };
+            context.Unterlagen.Add(vorhanden);
         }
 
-        vorhanden.SubjectId = unterlage.Wer.Value;
-        vorhanden.Name = unterlage.Name;
-        vorhanden.Kind = unterlage.Art;
-        vorhanden.ContentType = unterlage.Inhaltstyp;
-        vorhanden.SizeBytes = unterlage.Groesse;
-        vorhanden.StorageKey = unterlage.Ablageschluessel;
-        vorhanden.CreatedAt = unterlage.Hochgeladen.UtcDateTime;
+        vorhanden.SubjectId = document.Wer.Value;
+        vorhanden.Name = document.Name;
+        vorhanden.Kind = document.Art;
+        vorhanden.ContentType = document.Inhaltstyp;
+        vorhanden.SizeBytes = document.Groesse;
+        vorhanden.StorageKey = document.Ablageschluessel;
+        vorhanden.CreatedAt = document.Hochgeladen.UtcDateTime;
     }
 
     /// <inheritdoc />
-    public Task LoescheAsync(
-        SubjectId wer, Guid id, CancellationToken cancellationToken = default) =>
-        kontext.Unterlagen
-            .Where(zeile => zeile.Id == id && zeile.SubjectId == wer.Value)
+    public Task DeleteAsync(
+        SubjectId subject, Guid id, CancellationToken cancellationToken = default) =>
+        context.Unterlagen
+            .Where(row => row.Id == id && row.SubjectId == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
-    private static Unterlage ZumAggregat(UnterlageZeile zeile) =>
-        Unterlage.Stelle_her(
-            zeile.Id,
-            new SubjectId(zeile.SubjectId),
-            zeile.Name,
-            zeile.Kind,
-            zeile.ContentType,
-            zeile.SizeBytes,
-            zeile.StorageKey,
-            new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero));
+    private static DocumentRecord ZumAggregat(DocumentRecordRow row) =>
+        DocumentRecord.Stelle_her(
+            row.Id,
+            new SubjectId(row.SubjectId),
+            row.Name,
+            row.Kind,
+            row.ContentType,
+            row.SizeBytes,
+            row.StorageKey,
+            new DateTimeOffset(row.CreatedAt, TimeSpan.Zero));
 }

@@ -14,7 +14,7 @@ namespace WorkerTransfer.ServiceDefaults;
 /// entsteht.
 /// </para>
 /// </remarks>
-public static class Personenzeile
+public static class SubjectKeyedTable
 {
     /// <summary>Der Name der Anmerkung am Entitätstyp.</summary>
     public const string Anmerkung = "WorkerTransfer:Personenzeile";

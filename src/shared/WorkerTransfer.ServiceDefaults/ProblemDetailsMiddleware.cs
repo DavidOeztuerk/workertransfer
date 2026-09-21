@@ -50,22 +50,22 @@ public sealed class ProblemDetailsMiddleware(
             // Wert einer Person in einem Fehlerdokument — das landet in
             // Bildschirmfotos und Fehlerberichten. Ein Feldname ist Form, kein
             // Inhalt.
-            var felder = string.Join(
+            var fields = string.Join(
                 ", ",
-                ungueltig.Errors.Select(fehler => fehler.PropertyName)
+                ungueltig.Errors.Select(error => error.PropertyName)
                     .Where(name => !string.IsNullOrWhiteSpace(name))
                     .Distinct(StringComparer.Ordinal));
 
-            logger.LogWarning("Validation failed for {Fields}", felder);
+            logger.LogWarning("Validation failed for {Fields}", fields);
 
             if (context.Response.HasStarted)
             {
                 throw;
             }
 
-            await Schreibe(context, StatusCodes.Status422UnprocessableEntity,
+            await Write(context, StatusCodes.Status422UnprocessableEntity,
                 "Request failed",
-                felder.Length > 0 ? $"invalid: {felder}" : "validation failed");
+                fields.Length > 0 ? $"invalid: {fields}" : "validation failed");
         }
         catch (BadHttpRequestException kaputt)
         {
@@ -91,7 +91,7 @@ public sealed class ProblemDetailsMiddleware(
                 throw;
             }
 
-            await Schreibe(context, kaputt.StatusCode,
+            await Write(context, kaputt.StatusCode,
                 "Request failed", "malformed request body");
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
@@ -135,7 +135,7 @@ public sealed class ProblemDetailsMiddleware(
                 throw;
             }
 
-            await Schreibe(context, StatusCodes.Status500InternalServerError,
+            await Write(context, StatusCodes.Status500InternalServerError,
                 "Internal server error", "An unexpected error occurred.");
         }
     }
@@ -145,7 +145,7 @@ public sealed class ProblemDetailsMiddleware(
     /// <param name="status">The status code.</param>
     /// <param name="title">The kind of failure.</param>
     /// <param name="detail">What the caller is told. Never what they sent.</param>
-    public static async Task Schreibe(
+    public static async Task Write(
         HttpContext context,
         int status,
         string title,

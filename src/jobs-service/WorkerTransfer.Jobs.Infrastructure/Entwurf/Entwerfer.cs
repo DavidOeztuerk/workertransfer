@@ -6,10 +6,10 @@ using WorkerTransfer.Jobs.Application.Ports;
 namespace WorkerTransfer.Jobs.Infrastructure.Entwurf;
 
 /// <summary>Ob und wohin überhaupt ein Modell gefragt wird.</summary>
-public sealed class Entwurfseinstellungen
+public sealed class DraftSettings
 {
-    /// <summary>Der Abschnitt in der Konfiguration.</summary>
-    public const string Abschnitt = "Draft";
+    /// <summary>Der Section in der Konfiguration.</summary>
+    public const string Section = "Draft";
 
     /// <summary>
     /// Leer heißt: es wird kein Fremddienst gerufen, und die Oberfläche sagt das.
@@ -35,65 +35,65 @@ public sealed class Entwurfseinstellungen
 
 /// <summary>Der Entwerfer, wenn keiner eingerichtet ist.</summary>
 /// <remarks>
-/// Er liefert keine Vorlage, sondern sagt, dass es ihn nicht gibt. Ein Entwurf,
+/// Er liefert keine ResumeTemplate, sondern sagt, dass es ihn nicht gibt. Ein Entwurf,
 /// der nicht vom Modell kommt, aber so aussieht, wäre die schlechtere Antwort.
 /// </remarks>
-public sealed class KeinEntwerfer : IEntwerfer
+public sealed class NoDrafter : IDrafter
 {
     /// <inheritdoc />
-    public Task<string> EntwirfAsync(
-        Anzeigenentwurf entwurf, CancellationToken cancellationToken = default) =>
-        throw new EntwurfNichtVerfuegbar("Es ist kein Entwurfsanbieter eingerichtet.");
+    public Task<string> DraftAsync(
+        AdvertDraft draft, CancellationToken cancellationToken = default) =>
+        throw new DraftUnavailable("Es ist kein Entwurfsanbieter eingerichtet.");
 }
 
 /// <summary>Fragt ein Modell, einmal, und behält nichts.</summary>
-public sealed class HttpEntwerfer(
-    IHttpClientFactory fabrik, IOptions<Entwurfseinstellungen> einstellungen) : IEntwerfer
+public sealed class HttpDrafter(
+    IHttpClientFactory fabrik, IOptions<DraftSettings> einstellungen) : IDrafter
 {
-    private readonly Entwurfseinstellungen _einstellungen = einstellungen.Value;
+    private readonly DraftSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task<string> EntwirfAsync(
-        Anzeigenentwurf entwurf, CancellationToken cancellationToken = default)
+    public async Task<string> DraftAsync(
+        AdvertDraft draft, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(entwurf);
+        ArgumentNullException.ThrowIfNull(draft);
 
         if (string.IsNullOrEmpty(_einstellungen.Schluessel))
         {
-            throw new EntwurfNichtVerfuegbar("Es ist kein Entwurfsanbieter eingerichtet.");
+            throw new DraftUnavailable("Es ist kein Entwurfsanbieter eingerichtet.");
         }
 
-        using var client = fabrik.CreateClient(nameof(HttpEntwerfer));
+        using var client = fabrik.CreateClient(nameof(HttpDrafter));
 
         client.Timeout = _einstellungen.Zeitueberschreitung;
 
-        using var anfrage = new HttpRequestMessage(HttpMethod.Post, _einstellungen.Adresse)
+        using var request = new HttpRequestMessage(HttpMethod.Post, _einstellungen.Adresse)
         {
-            // Was hinausgeht, steht in Anzeigenentwurf und nirgends sonst:
+            // Was hinausgeht, steht in AdvertDraft und nirgends sonst:
             // keine tenant_id, kein Firmenname, nichts über einen Menschen.
             Content = JsonContent.Create(new
             {
                 model = _einstellungen.Modell,
                 max_tokens = 800,
-                system = Anzeigenentwurf.Regeln,
-                messages = new[] { new { role = "user", content = entwurf.Prompt } }
+                system = AdvertDraft.Regeln,
+                messages = new[] { new { role = "user", content = draft.Prompt } }
             })
         };
 
-        anfrage.Headers.Add("x-api-key", _einstellungen.Schluessel);
-        anfrage.Headers.Add("anthropic-version", "2023-06-01");
+        request.Headers.Add("x-api-key", _einstellungen.Schluessel);
+        request.Headers.Add("anthropic-version", "2023-06-01");
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
             // Die Art, nie der Inhalt.
-            throw new EntwurfNichtVerfuegbar(
-                $"Der Entwurfsanbieter antwortet nicht ({fehler.GetType().Name}).");
+            throw new DraftUnavailable(
+                $"Der Entwurfsanbieter antwortet nicht ({error.GetType().Name}).");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -106,26 +106,26 @@ public sealed class HttpEntwerfer(
             // Ausnahmetyp teilen. Ist das Token des Aufrufers gezogen, hat der
             // Browser aufgelegt — dann ist gar nichts kaputt, und die Ausnahme
             // gehoert weitergereicht statt in eine 503 verwandelt.
-            throw new EntwurfNichtVerfuegbar(
+            throw new DraftUnavailable(
                 "Der Entwurfsanbieter antwortet nicht (Zeitueberschreitung).");
         }
 
-        using (antwort)
+        using (response)
         {
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
-                throw new EntwurfNichtVerfuegbar(
-                    $"Der Entwurfsanbieter antwortet mit {(int)antwort.StatusCode}.");
+                throw new DraftUnavailable(
+                    $"Der Entwurfsanbieter antwortet mit {(int)response.StatusCode}.");
             }
 
             using var gelesen = JsonDocument.Parse(
-                await antwort.Content.ReadAsStringAsync(cancellationToken));
+                await response.Content.ReadAsStringAsync(cancellationToken));
 
-            return gelesen.RootElement.TryGetProperty("content", out var inhalt)
-                   && inhalt.GetArrayLength() > 0
-                   && inhalt[0].TryGetProperty("text", out var text)
+            return gelesen.RootElement.TryGetProperty("content", out var content)
+                   && content.GetArrayLength() > 0
+                   && content[0].TryGetProperty("text", out var text)
                 ? text.GetString() ?? string.Empty
-                : throw new EntwurfNichtVerfuegbar(
+                : throw new DraftUnavailable(
                     "Der Entwurfsanbieter antwortet in unerwarteter Form.");
         }
     }

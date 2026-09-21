@@ -34,14 +34,14 @@ public class ProfilsuchedrahtTests
 {
     private static readonly Guid Wer = Guid.Parse("3f2504e0-4f89-11d3-9a0c-0305e82c3301");
 
-    /// <summary>Ein Profil überlebt die Naht — mit Kennung und Remote-Häkchen.</summary>
+    /// <summary>Ein Profile überlebt die Naht — mit Kennung und Remote-Häkchen.</summary>
     [Fact]
     public void Ein_Profil_kommt_vollstaendig_an()
     {
         var geschrieben = JsonSerializer.Serialize(
-            new ProfilfundV1(Wer, "Entwicklerin", "Ich baue verteilte Systeme.", "Berlin", true, ["Go", "PostgreSQL"]));
+            new ProfileHitV1(Wer, "Entwicklerin", "Ich baue verteilte Systeme.", "Berlin", true, ["Go", "PostgreSQL"]));
 
-        var gelesen = JsonSerializer.Deserialize<FremdprofilV1>(geschrieben);
+        var gelesen = JsonSerializer.Deserialize<ForeignProfileV1>(geschrieben);
 
         gelesen.Should().NotBeNull();
         gelesen!.SubjectId.Should().Be(Wer, "ohne die Kennung ist ein Treffer niemand");
@@ -53,20 +53,20 @@ public class ProfilsuchedrahtTests
         gelesen.Skills.Should().Equal("Go", "PostgreSQL");
     }
 
-    /// <summary>Und eine Seite samt ihrem Zeiger.</summary>
+    /// <summary>Und eine Seite samt ihrem Cursor.</summary>
     /// <remarks>
-    /// Ohne den Zeiger gäbe es keine zweite Seite — und das sähe aus wie „es
+    /// Ohne den Cursor gäbe es keine zweite Seite — und das sähe aus wie „es
     /// gibt niemanden mehr".
     /// </remarks>
     [Fact]
     public void Eine_Seite_kommt_mit_ihrem_Zeiger_an()
     {
         var geschrieben = JsonSerializer.Serialize(
-            new ProfilfundseiteV1(
-                [new ProfilfundV1(Wer, "Entwicklerin", "", "Berlin", false, ["Go"])],
+            new ProfileHitPageV1(
+                [new ProfileHitV1(Wer, "Entwicklerin", "", "Berlin", false, ["Go"])],
                 "ZWVpbg=="));
 
-        var gelesen = JsonSerializer.Deserialize<FremdprofilseiteV1>(geschrieben);
+        var gelesen = JsonSerializer.Deserialize<ForeignProfilePageV1>(geschrieben);
 
         gelesen.Should().NotBeNull();
         gelesen!.Items.Should().ContainSingle().Which.SubjectId.Should().Be(Wer);
@@ -90,7 +90,7 @@ public class ProfilsuchedrahtTests
              "bio":"z","location":"y","remoteOk":true,"skills":[]}
             """;
 
-        var gelesen = JsonSerializer.Deserialize<FremdprofilV1>(camelCase);
+        var gelesen = JsonSerializer.Deserialize<ForeignProfileV1>(camelCase);
 
         gelesen!.SubjectId.Should().Be(
             Guid.Empty, "genau so band `userId` einmal still auf Guid.Empty");

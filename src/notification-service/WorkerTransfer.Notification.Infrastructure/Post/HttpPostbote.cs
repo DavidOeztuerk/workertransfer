@@ -7,10 +7,10 @@ using WorkerTransfer.Notification.Application.Ports;
 namespace WorkerTransfer.Notification.Infrastructure.Post;
 
 /// <summary>Wo identity-service antwortet, und was uns als uns ausweist.</summary>
-public sealed class Posteinstellungen
+public sealed class MailSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Identity";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Identity";
 
     /// <summary>Die Basisadresse von identity-service.</summary>
     public string Adresse { get; set; } = string.Empty;
@@ -25,9 +25,9 @@ public sealed class Posteinstellungen
 /// <summary>Bittet identity-service, den einen Satz hinauszuschicken.</summary>
 /// <remarks>
 /// <strong>Feuern und vergessen.</strong> Ein Fehlschlag hier darf niemals den
-/// Vorgang kippen, der ihn ausgelöst hat — die genaue Umkehrung der
+/// Case kippen, der ihn ausgelöst hat — die genaue Umkehrung der
 /// Einwilligungsregel, und aus demselben Grund richtig: beim Ledger geht es um
-/// Erlaubnis (im Zweifel nein), hier um Höflichkeit. Einen Widerruf
+/// Erlaubnis (im Zweifel nein), hier um Höflichkeit. Einen Revocation
 /// zurückzurollen, weil eine Mail nicht rausging, wäre grotesk.
 /// <para>
 /// Der Rumpf trägt <strong>nur die Kennung</strong>. Weder die Art noch ein
@@ -38,22 +38,22 @@ public sealed class Posteinstellungen
 /// </remarks>
 public sealed class HttpPostbote(
     IHttpClientFactory fabrik,
-    IOptions<Posteinstellungen> einstellungen,
+    IOptions<MailSettings> einstellungen,
     ILogger<HttpPostbote> protokoll) : IPostbote
 {
     /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
     public const string Klient = "identity";
 
-    private readonly Posteinstellungen _einstellungen = einstellungen.Value;
+    private readonly MailSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task SchickeAsync(SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task SendAsync(SubjectId subject, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(_einstellungen.Adresse)
             || string.IsNullOrEmpty(_einstellungen.Geheimnis))
         {
             // Kein Geheimnis, kein Versuch: der Endpunkt wäre ohnehin zu, und
-            // ein Aufruf ins Leere kostet bei jedem Vorgang eine
+            // ein Aufruf ins Leere kostet bei jedem Case eine
             // Zeitüberschreitung.
             return;
         }
@@ -63,38 +63,38 @@ public sealed class HttpPostbote(
             using var client = fabrik.CreateClient(Klient);
             client.Timeout = _einstellungen.Zeitueberschreitung;
 
-            using var anfrage = new HttpRequestMessage(
+            using var request = new HttpRequestMessage(
                 HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), "/internal/notify"))
             {
                 // `user_id`, nicht `userId`. identity-service deklariert
                 // [JsonPropertyName("user_id")]; camelCase band still auf
                 // Guid.Empty. Dieser Fehlschlag ist der stillste im System —
                 // er wirft nicht, er protokolliert eine Warnung, und der
-                // Ausgangskorb sieht ihn nie. Gemessen: im Postfach standen
+                // Ausgangskorb sieht ihn nie. Gemessen: im Inbox standen
                 // ausschliesslich Bestaetigungsmails, die identity selbst
                 // verschickt.
-                Content = JsonContent.Create(new { user_id = wer.Value })
+                Content = JsonContent.Create(new { user_id = subject.Value })
             };
 
-            anfrage.Headers.Add("X-Notify-Secret", _einstellungen.Geheimnis);
+            request.Headers.Add("X-Notify-Secret", _einstellungen.Geheimnis);
 
-            using var antwort = await client.SendAsync(anfrage, cancellationToken);
+            using var response = await client.SendAsync(request, cancellationToken);
 
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
                 // Protokolliert wird die Art des Fehlschlags, nie der Empfänger:
                 // ein Protokoll ist auch ein Ort, an dem etwas landet.
                 protokoll.LogWarning(
-                    "identity-service antwortete mit {Code}", (int)antwort.StatusCode);
+                    "identity-service antwortete mit {Code}", (int)response.StatusCode);
             }
         }
-        catch (Exception fehler) when (fehler is not OperationCanceledException)
+        catch (Exception error) when (error is not OperationCanceledException)
         {
             // Schluckt jeden Fehler. Das ist der Zweck, nicht eine
             // Nachlässigkeit — die Drossel ist bereits gesetzt, diese Nachricht
             // ist verloren, und das ist die richtige Richtung.
             protokoll.LogWarning(
-                "Benachrichtigung konnte nicht angestoßen werden ({Art})", fehler.GetType().Name);
+                "Benachrichtigung konnte nicht angestoßen werden ({Art})", error.GetType().Name);
         }
     }
 }

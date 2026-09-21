@@ -12,19 +12,19 @@ public sealed class Portfolio
 {
     /// <summary>Wie viele Einträge ein Portfolio trägt.</summary>
     /// <remarks>
-    /// Eine Grenze, keine Bewertung: dreißig Einträge sind ein Schaufenster,
+    /// Eine Grenze, keine Evaluation: dreißig Einträge sind ein Schaufenster,
     /// dreihundert wären ein Aktenschrank, und niemand liest ihn.
     /// </remarks>
     public const int HoechsteEintraege = 30;
 
     private Portfolio(
-        SubjectId wer,
-        IReadOnlyList<Eintrag> eintraege,
+        SubjectId subject,
+        IReadOnlyList<Eintrag> entries,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm)
     {
-        Wer = wer;
-        Eintraege = eintraege;
+        Wer = subject;
+        Eintraege = entries;
         AngelegtAm = angelegtAm;
         GeaendertAm = geaendertAm;
     }
@@ -49,16 +49,16 @@ public sealed class Portfolio
 
     /// <exception cref="ZuVieleEintraege">Es sind zu viele.</exception>
     public static Portfolio Lege_an(
-        SubjectId wer, IReadOnlyList<Eintrag> eintraege, DateTimeOffset jetzt) =>
-        new(wer, Geprueft(eintraege), jetzt, jetzt);
+        SubjectId subject, IReadOnlyList<Eintrag> entries, DateTimeOffset now) =>
+        new(subject, Geprueft(entries), now, now);
 
     /// <summary>Das Portfolio, wie eine Zeile es hält.</summary>
     public static Portfolio Stelle_her(
-        SubjectId wer,
-        IReadOnlyList<Eintrag> eintraege,
+        SubjectId subject,
+        IReadOnlyList<Eintrag> entries,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm) =>
-        new(wer, eintraege, angelegtAm, geaendertAm);
+        new(subject, entries, angelegtAm, geaendertAm);
 
     /// <summary>Ersetzt die Einträge.</summary>
     /// <remarks>
@@ -66,10 +66,10 @@ public sealed class Portfolio
     /// kein halb geändertes Aggregat hinterlassen.
     /// </remarks>
     /// <exception cref="ZuVieleEintraege">Es sind zu viele.</exception>
-    public void Aendere(IReadOnlyList<Eintrag> eintraege, DateTimeOffset jetzt)
+    public void Aendere(IReadOnlyList<Eintrag> entries, DateTimeOffset now)
     {
-        Eintraege = Geprueft(eintraege);
-        GeaendertAm = jetzt;
+        Eintraege = Geprueft(entries);
+        GeaendertAm = now;
     }
 
     /// <summary>Ob dieser Anhang zu diesem Portfolio gehört.</summary>
@@ -80,28 +80,28 @@ public sealed class Portfolio
     /// verschwunden ist.
     /// </remarks>
     public bool Nennt(string anhang) =>
-        Eintraege.Any(eintrag => string.Equals(eintrag.Anhang, anhang, StringComparison.Ordinal));
+        Eintraege.Any(entry => string.Equals(entry.Anhang, anhang, StringComparison.Ordinal));
 
-    private static IReadOnlyList<Eintrag> Geprueft(IReadOnlyList<Eintrag> eintraege)
+    private static IReadOnlyList<Eintrag> Geprueft(IReadOnlyList<Eintrag> entries)
     {
-        ArgumentNullException.ThrowIfNull(eintraege);
+        ArgumentNullException.ThrowIfNull(entries);
 
-        return eintraege.Count > HoechsteEintraege
+        return entries.Count > HoechsteEintraege
             ? throw new ZuVieleEintraege(HoechsteEintraege)
-            : eintraege;
+            : entries;
     }
 }
 
 /// <summary>Findet und speichert Portfolios.</summary>
-public interface IPortfoliospeicher
+public interface IPortfolioStore
 {
     /// <summary>Das Portfolio einer Person, oder <c>null</c>.</summary>
-    Task<Portfolio?> HoleAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task<Portfolio?> GetAsync(SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(Portfolio portfolio, CancellationToken cancellationToken = default);
+    Task SaveAsync(Portfolio portfolio, CancellationToken cancellationToken = default);
 
     /// <summary>Löscht alles zu dieser Person.</summary>
     /// <returns>Wie viele Zeilen absichtlich stehen blieben. Immer null.</returns>
-    Task<int> LoescheAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task<int> DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default);
 }

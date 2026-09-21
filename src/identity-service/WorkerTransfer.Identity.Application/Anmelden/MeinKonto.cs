@@ -10,15 +10,15 @@ namespace WorkerTransfer.Identity.Application.Anmelden;
 /// A protected resource, so an anonymous caller gets 401 — the opposite of
 /// <see cref="SitzungsstandAbfrage"/>, which asks a public question.
 /// </remarks>
-public sealed record MeinKontoAbfrage : IAbfrage<Kontoansicht?>;
+public sealed record MyAccountQuery : IAbfrage<Kontoansicht?>;
 
 /// <summary>Answers with the caller's own account.</summary>
-public sealed class MeinKontoHandler(ICurrentPrincipal akteur, IUserRepository benutzer)
-    : IRequestHandler<MeinKontoAbfrage, Kontoansicht?>
+public sealed class MyAccountHandler(ICurrentPrincipal akteur, IUserRepository benutzer)
+    : IRequestHandler<MyAccountQuery, Kontoansicht?>
 {
     /// <inheritdoc />
     public async Task<Kontoansicht?> Handle(
-        MeinKontoAbfrage request,
+        MyAccountQuery request,
         CancellationToken cancellationToken)
     {
         if (akteur.Current is not { } handelnder)
@@ -31,11 +31,11 @@ public sealed class MeinKontoHandler(ICurrentPrincipal akteur, IUserRepository b
         return new Kontoansicht(
             handelnder.Subject,
             konto?.Email,
-            handelnder.Acting is Capacity.ForCompany firma ? firma.Tenant : null,
+            handelnder.Acting is Capacity.ForCompany company ? company.Tenant : null,
             konto?.Kontosprache ?? Sprachwahl.Vorgabe,
             konto?.DisplayName ?? string.Empty,
             konto?.GivenName,
             konto?.FamilyName,
-            konto?.Berufsfeld);
+            konto?.OccupationalField);
     }
 }

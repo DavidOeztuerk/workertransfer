@@ -7,49 +7,49 @@ using WorkerTransfer.Advisor.Domain.Gespraeche;
 namespace WorkerTransfer.Advisor.Application.Gespraeche;
 
 /// <summary>„Ich bin einverstanden."</summary>
-public sealed record ZustimmenBefehl(Guid Id, SubjectId Wer) : IBefehl<Gespraechsansicht>;
+public sealed record ZustimmenBefehl(Guid Id, SubjectId Wer) : IBefehl<ConversationView>;
 
 /// <summary>
 /// Die Zustimmung der Person — und nur sie macht eine Übergabe möglich.
 /// </summary>
 /// <remarks>
-/// Die Einigung, aus der ein Vorgang wird, gehört dem Menschen, um den es geht.
+/// Die Einigung, aus der ein Case wird, gehört dem Menschen, um den es geht.
 /// Ein Gespräch, das ein Unternehmen allein in einen Transfer heben könnte,
 /// wäre eine Einladung, die man nicht ausschlagen kann.
 /// </remarks>
 public sealed class ZustimmenHandler(
-    IGespraechsspeicher speicher, IEinwilligungstor tor, TimeProvider uhr)
-    : IRequestHandler<ZustimmenBefehl, Gespraechsansicht>
+    IConversationStore store, IConsentGate tor, TimeProvider uhr)
+    : IRequestHandler<ZustimmenBefehl, ConversationView>
 {
     /// <inheritdoc />
     /// <remarks>
     /// <strong>Die Stufe kommt auch hier aus dem Ledger.</strong> Sie hier
-    /// auszulassen — etwa als <c>Stufe.Keine</c>, weil dieser Schritt sie nicht
+    /// auszulassen — etwa als <c>Stufe.None</c>, weil dieser Schritt sie nicht
     /// ändert — hiesse, in der Antwort „nichts freigegeben" zu behaupten,
     /// unmittelbar nachdem jemand zugestimmt hat. Eine Antwort, die lügt, ist
     /// das, was später geglaubt wird.
     /// </remarks>
     /// <exception cref="KeinGespraech">Gibt es nicht, oder gehört einem anderen Menschen.</exception>
-    /// <exception cref="UebergangNichtErlaubt">Von diesem Stand aus nicht.</exception>
-    public async Task<Gespraechsansicht> Handle(
+    /// <exception cref="UebergangNichtErlaubt">Von diesem State aus nicht.</exception>
+    public async Task<ConversationView> Handle(
         ZustimmenBefehl request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var gespraech = await StufeFreigebenHandler.Meins(
-            speicher, request.Id, request.Wer, cancellationToken);
+        var conversation = await StufeFreigebenHandler.Meins(
+            store, request.Id, request.Wer, cancellationToken);
 
-        gespraech.Stimme_zu(request.Wer, uhr.GetUtcNow());
+        conversation.Stimme_zu(request.Wer, uhr.GetUtcNow());
 
-        await speicher.SichereAsync(gespraech, cancellationToken);
+        await store.SaveAsync(conversation, cancellationToken);
 
-        var stufen = await tor.StufenAsync([(gespraech.Wer, gespraech.Firma)], cancellationToken);
+        var stages = await tor.StagesAsync([(conversation.Wer, conversation.Firma)], cancellationToken);
 
-        return new Gespraechsansicht(gespraech, stufen[0]);
+        return new ConversationView(conversation, stages[0]);
     }
 }
 
-/// <summary>„Macht einen Vorgang daraus."</summary>
+/// <summary>„Macht einen Case daraus."</summary>
 public sealed record UebergebenBefehl(Guid Id, TenantId Firma) : IBefehl<Guid>;
 
 /// <summary>
@@ -58,10 +58,10 @@ public sealed record UebergebenBefehl(Guid Id, TenantId Firma) : IBefehl<Guid>;
 /// </summary>
 /// <remarks>
 /// <para>ADR-0037 Entscheidung 4: ein Gespräch lebt hier, solange es um Stufen
-/// und Mandat geht; erst die Einigung wird ein Vorgang. Der Dreieckskonsens
+/// und Mandate geht; erst die Einigung wird ein Case. Der Dreieckskonsens
 /// steht in transfer-service und wird <em>nicht</em> nachgebaut — ob der
-/// Marktstatus diesem Unternehmen freigegeben ist, ob die Person ansprechbar
-/// ist, ob eine Freigabe des jetzigen Arbeitgebers nötig ist: alles das prüft
+/// MarketStatus diesem Unternehmen freigegeben ist, ob die Person ansprechbar
+/// ist, ob eine Release des jetzigen Arbeitgebers nötig ist: alles das prüft
 /// die Tür, die hier gerufen wird.</para>
 ///
 /// <para><strong>Eine Ablehnung von dort ist keine 500.</strong> Sie ist eine
@@ -69,12 +69,12 @@ public sealed record UebergebenBefehl(Guid Id, TenantId Firma) : IBefehl<Guid>;
 /// 409. Ein Schweigen dagegen ist 503: „wir wissen es nicht" ist etwas anderes
 /// als „geht nicht".</para>
 ///
-/// <para><strong>Erst schreiben, wenn es geklappt hat.</strong> Der Stand geht
-/// nach <c>handed_over</c>, nachdem der Vorgang wirklich angelegt ist —
+/// <para><strong>Erst schreiben, wenn es geklappt hat.</strong> Der State geht
+/// nach <c>handed_over</c>, nachdem der Case wirklich angelegt ist —
 /// andersherum stünde hier „übergeben" und dort nichts.</para>
 /// </remarks>
 public sealed class UebergebenHandler(
-    IGespraechsspeicher speicher, IVorgangsuebergabe uebergabe, TimeProvider uhr)
+    IConversationStore store, ICaseHandover handover, TimeProvider uhr)
     : IRequestHandler<UebergebenBefehl, Guid>
 {
     /// <inheritdoc />
@@ -85,26 +85,26 @@ public sealed class UebergebenHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var gespraech = await speicher.HoleAsync(request.Id, cancellationToken);
+        var conversation = await store.GetAsync(request.Id, cancellationToken);
 
-        if (gespraech is null || gespraech.Firma != request.Firma)
+        if (conversation is null || conversation.Firma != request.Firma)
         {
-            throw new KeinGespraech();
+            throw new NoConversation();
         }
 
-        if (gespraech.Stand != Gespraechsstand.Zugestimmt)
+        if (conversation.State != ConversationState.Zugestimmt)
         {
-            throw new UebergangNichtErlaubt(gespraech.Stand, "handed over");
+            throw new UebergangNichtErlaubt(conversation.State, "handed over");
         }
 
-        var vorgang = await uebergabe.UebergibAsync(
-            gespraech.Wer, gespraech.Anlass, cancellationToken);
+        var caseItem = await handover.HandOverAsync(
+            conversation.Wer, conversation.Anlass, cancellationToken);
 
-        gespraech.Uebergib(uhr.GetUtcNow());
+        conversation.Uebergib(uhr.GetUtcNow());
 
-        await speicher.SichereAsync(gespraech, cancellationToken);
+        await store.SaveAsync(conversation, cancellationToken);
 
-        return vorgang;
+        return caseItem;
     }
 }
 
@@ -112,9 +112,9 @@ public sealed class UebergebenHandler(
 /// <param name="Wer">Gesetzt, wenn die Person beendet.</param>
 /// <param name="Firma">Gesetzt, wenn das Unternehmen beendet.</param>
 public sealed record BeendenBefehl(Guid Id, SubjectId? Wer, TenantId? Firma)
-    : IBefehl<Gespraechsansicht>;
+    : IBefehl<ConversationView>;
 
-/// <summary>Beide Seiten dürfen aufhören, aus jedem laufenden Stand.</summary>
+/// <summary>Beide Seiten dürfen aufhören, aus jedem laufenden State.</summary>
 /// <remarks>
 /// Ein Verfahren, aus dem man nicht aussteigen kann, ist kein Verfahren,
 /// sondern eine Falle — dieselbe Zeile steht in transfer-service, und sie gilt
@@ -126,8 +126,8 @@ public sealed record BeendenBefehl(Guid Id, SubjectId? Wer, TenantId? Firma)
 /// </para>
 /// </remarks>
 public sealed class BeendenHandler(
-    IGespraechsspeicher speicher, IEinwilligungstor tor, TimeProvider uhr)
-    : IRequestHandler<BeendenBefehl, Gespraechsansicht>
+    IConversationStore store, IConsentGate tor, TimeProvider uhr)
+    : IRequestHandler<BeendenBefehl, ConversationView>
 {
     /// <inheritdoc />
     /// <remarks>
@@ -136,28 +136,28 @@ public sealed class BeendenHandler(
     /// </remarks>
     /// <exception cref="KeinGespraech">Gibt es nicht, oder gehört jemand anderem.</exception>
     /// <exception cref="UebergangNichtErlaubt">Es läuft nicht mehr.</exception>
-    public async Task<Gespraechsansicht> Handle(
+    public async Task<ConversationView> Handle(
         BeendenBefehl request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var gespraech = await speicher.HoleAsync(request.Id, cancellationToken);
+        var conversation = await store.GetAsync(request.Id, cancellationToken);
 
-        var meins = gespraech is not null
-                    && ((request.Wer is { } wer && gespraech.Wer == wer)
-                        || (request.Firma is { } firma && gespraech.Firma == firma));
+        var meins = conversation is not null
+                    && ((request.Wer is { } subject && conversation.Wer == subject)
+                        || (request.Firma is { } company && conversation.Firma == company));
 
-        if (gespraech is null || !meins)
+        if (conversation is null || !meins)
         {
-            throw new KeinGespraech();
+            throw new NoConversation();
         }
 
-        gespraech.Beende(uhr.GetUtcNow());
+        conversation.Beende(uhr.GetUtcNow());
 
-        await speicher.SichereAsync(gespraech, cancellationToken);
+        await store.SaveAsync(conversation, cancellationToken);
 
-        var stufen = await tor.StufenAsync([(gespraech.Wer, gespraech.Firma)], cancellationToken);
+        var stages = await tor.StagesAsync([(conversation.Wer, conversation.Firma)], cancellationToken);
 
-        return new Gespraechsansicht(gespraech, stufen[0]);
+        return new ConversationView(conversation, stages[0]);
     }
 }

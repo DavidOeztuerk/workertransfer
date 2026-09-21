@@ -7,9 +7,9 @@ namespace WorkerTransfer.Transfer.Application.Ports;
 /// Fünf Anweisungen, und zwei laufen in verschiedene Richtungen:
 /// <list type="bullet">
 /// <item><c>market_status</c> fällt, samt Notiz.</item>
-/// <item>Eine Anfrage <em>über</em> die Person fällt — die Zeile <em>ist</em>
+/// <item>Eine ResumeRequest <em>über</em> die Person fällt — die Zeile <em>ist</em>
 /// eine Aussage über sie.</item>
-/// <item>Eine Anfrage <em>von</em> der Person bleibt, ohne ihren Namen: sie
+/// <item>Eine ResumeRequest <em>von</em> der Person bleibt, ohne ihren Namen: sie
 /// gehört dem Unternehmen und handelt von einem Dritten.</item>
 /// <item>Ihre Vorgänge fallen, samt Nachricht und Angebotstext.</item>
 /// <item>Offene Vermerke in der Outbox fallen.</item>
@@ -21,7 +21,7 @@ namespace WorkerTransfer.Transfer.Application.Ports;
 /// ankommt.
 /// </para>
 /// </remarks>
-public interface ILoeschbestand
+public interface IErasureLedger
 {
     /// <summary>Löscht alles über diesen Menschen.</summary>
     /// <param name="wer">Wessen.</param>
@@ -31,8 +31,8 @@ public interface ILoeschbestand
     /// </param>
     /// <param name="cancellationToken">Abbruch.</param>
     /// <returns>Wie viele absichtlich stehen blieben. Voreingestellt: 0.</returns>
-    Task<int> LoescheAsync(
-        SubjectId wer,
+    Task<int> DeleteAsync(
+        SubjectId subject,
         bool bezahlteBehalten,
         CancellationToken cancellationToken = default);
 }

@@ -1,55 +1,55 @@
 using Noelia.Core.Identity;
 
-namespace WorkerTransfer.Scout.Domain.Suchen;
+namespace WorkerTransfer.Scout.Domain.Searches;
 
-/// <summary>Eine gespeicherte Anfrage — und ausdrücklich kein gespeichertes Ergebnis.</summary>
+/// <summary>Eine gespeicherte ResumeRequest — und ausdrücklich kein gespeichertes Ergebnis.</summary>
 /// <remarks>
 /// <para><strong>Die vierte Entscheidung aus ADR-0036 steht in diesem Typ.</strong>
-/// Eine gespeicherte Suche hält Filter. Sie hält keinen Treffer, keine
+/// Eine gespeicherte Search hält Filter. Sie hält keinen Hit, keine
 /// Kennung eines Menschen, keinen Zeitpunkt eines Laufs und keine Zahl über
 /// irgendjemanden — weil ein gespeichertes Ergebnis über Menschen gegen einen
-/// Widerruf veraltet. Ein Widerruf muss beim nächsten Aufruf wirken (ADR-0013),
-/// und ein Treffer-Zwischenspeicher wäre genau der Bruch dieser Regel.</para>
+/// Revocation veraltet. Ein Revocation muss beim nächsten Aufruf wirken (ADR-0013),
+/// und ein Hit-Zwischenspeicher wäre genau der Bruch dieser Regel.</para>
 ///
 /// <para>Aus demselben Grund gibt es <em>keinen</em> nächtlichen Lauf, der
-/// „neue Treffer" an das Unternehmen meldete: das wäre derselbe Zwischenspeicher
+/// „neue Hit" an das Unternehmen meldete: das wäre derselbe Zwischenspeicher
 /// mit einem Wecker davor, plus eine zweite Benachrichtigung neben der an die
 /// Person.</para>
 ///
 /// <para>Sie gehört einem <em>Menschen in einem Unternehmen</em>, nicht dem
 /// Unternehmen allein: <see cref="Wer"/> ist die Personenspalte, an der die
 /// Löschkaskade diesen Dienst erkennt (ADR-0027). Wer geht, nimmt seine
-/// gespeicherten Suchen mit.</para>
+/// gespeicherten Searches mit.</para>
 /// </remarks>
-public sealed class Suche
+public sealed class Search
 {
-    /// <summary>Wie lang der Name einer gespeicherten Suche sein darf.</summary>
+    /// <summary>Wie lang der Name einer gespeicherten Search sein darf.</summary>
     public const int HoechstlaengeName = 80;
 
-    /// <summary>Wie viele Suchen ein Mensch je Unternehmen ablegen darf.</summary>
+    /// <summary>Wie viele Searches ein Mensch je Unternehmen ablegen darf.</summary>
     /// <remarks>
     /// Eine Grenze, damit aus dem Ablegen kein Speicher wird, den niemand
     /// aufräumt. Grosszügig genug, dass niemand sie im Alltag trifft.
     /// </remarks>
     public const int HoechstzahlJeMensch = 50;
 
-    private Suche(
+    private Search(
         Guid id,
-        TenantId firma,
-        SubjectId wer,
+        TenantId company,
+        SubjectId subject,
         string name,
-        Suchfilter filter,
+        SearchFilter filter,
         DateTimeOffset angelegtAm)
     {
         Id = id;
-        Firma = firma;
-        Wer = wer;
+        Firma = company;
+        Wer = subject;
         Name = name;
         Filter = filter;
         AngelegtAm = angelegtAm;
     }
 
-    /// <summary>Welche Suche.</summary>
+    /// <summary>Welche Search.</summary>
     public Guid Id { get; }
 
     /// <summary>Für welches Unternehmen sie gilt.</summary>
@@ -61,16 +61,16 @@ public sealed class Suche
     /// <summary>Wie die Person sie genannt hat.</summary>
     public string Name { get; }
 
-    /// <summary>Die Anfrage. Mehr steht hier nicht.</summary>
-    public Suchfilter Filter { get; }
+    /// <summary>Die ResumeRequest. Mehr steht hier nicht.</summary>
+    public SearchFilter Filter { get; }
 
     /// <summary>Wann sie abgelegt wurde.</summary>
     public DateTimeOffset AngelegtAm { get; }
 
-    /// <summary>Legt eine Suche an.</summary>
+    /// <summary>Legt eine Search an.</summary>
     /// <exception cref="Eingabefehler">Der Name fehlt oder ist zu lang.</exception>
-    public static Suche Lege_an(
-        TenantId firma, SubjectId wer, string? name, Suchfilter filter, DateTimeOffset jetzt)
+    public static Search Lege_an(
+        TenantId company, SubjectId subject, string? name, SearchFilter filter, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(filter);
 
@@ -81,43 +81,43 @@ public sealed class Suche
             0 => throw new Eingabefehler("a saved search needs a name"),
             > HoechstlaengeName => throw new Eingabefehler(
                 $"a name may not be longer than {HoechstlaengeName} characters"),
-            _ => new Suche(Guid.CreateVersion7(), firma, wer, gekuerzt, filter, jetzt)
+            _ => new Search(Guid.CreateVersion7(), company, subject, gekuerzt, filter, now)
         };
     }
 
-    /// <summary>Die Suche, wie eine Zeile sie hält.</summary>
-    public static Suche Stelle_her(
+    /// <summary>Die Search, wie eine Zeile sie hält.</summary>
+    public static Search Stelle_her(
         Guid id,
-        TenantId firma,
-        SubjectId wer,
+        TenantId company,
+        SubjectId subject,
         string name,
-        Suchfilter filter,
+        SearchFilter filter,
         DateTimeOffset angelegtAm) =>
-        new(id, firma, wer, name, filter, angelegtAm);
+        new(id, company, subject, name, filter, angelegtAm);
 }
 
-/// <summary>Findet und speichert gespeicherte Suchen.</summary>
-public interface ISuchspeicher
+/// <summary>Findet und speichert gespeicherte Searches.</summary>
+public interface ISearchStore
 {
-    /// <summary>Legt eine Suche an.</summary>
-    Task FuegeHinzuAsync(Suche suche, CancellationToken cancellationToken = default);
+    /// <summary>Legt eine Search an.</summary>
+    Task AppendAsync(Search search, CancellationToken cancellationToken = default);
 
-    /// <summary>Die Suchen dieses Menschen in diesem Unternehmen, neueste zuerst.</summary>
+    /// <summary>Die Searches dieses Menschen in diesem Unternehmen, neueste zuerst.</summary>
     /// <remarks>
     /// Je Mensch <em>und</em> je Unternehmen: wer für zwei Firmen arbeitet, soll
-    /// die Suchen der einen nicht in der anderen sehen. Und wer aus einem
-    /// Unternehmen ausscheidet, nimmt seine Suchen nicht dorthin mit, wo er
+    /// die Searches der einen nicht in der anderen sehen. Und wer aus einem
+    /// Unternehmen ausscheidet, nimmt seine Searches nicht dorthin mit, wo er
     /// später arbeitet.
     /// </remarks>
-    Task<IReadOnlyList<Suche>> FuerMenschAsync(
-        TenantId firma, SubjectId wer, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Search>> ForHumanAsync(
+        TenantId company, SubjectId subject, CancellationToken cancellationToken = default);
 
-    /// <summary>Entfernt eine Suche, wenn sie diesem Menschen gehört.</summary>
+    /// <summary>Entfernt eine Search, wenn sie diesem Menschen gehört.</summary>
     /// <returns><c>true</c>, wenn etwas entfernt wurde.</returns>
-    Task<bool> EntferneAsync(
-        Guid id, TenantId firma, SubjectId wer, CancellationToken cancellationToken = default);
+    Task<bool> RemoveAsync(
+        Guid id, TenantId company, SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Alles, was dieser Dienst über einen Menschen hält.</summary>
     /// <returns>Wie viel absichtlich stehen blieb. Immer null.</returns>
-    Task<int> LoescheAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task<int> DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default);
 }

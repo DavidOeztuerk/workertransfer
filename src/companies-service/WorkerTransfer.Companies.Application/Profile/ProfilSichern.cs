@@ -1,17 +1,17 @@
 using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Companies.Application.Nachrichten;
-using WorkerTransfer.Companies.Domain.Arbeitgeberprofile;
+using WorkerTransfer.Companies.Domain.EmployerProfiles;
 
 namespace WorkerTransfer.Companies.Application.Profile;
 
-/// <summary>Das eigene Arbeitgeberprofil schreiben.</summary>
+/// <summary>Das eigene EmployerProfile schreiben.</summary>
 /// <remarks>
 /// <strong>Jedes Mitglied darf das</strong> — dieselbe Abwägung wie bei den
-/// Stellen. Das Rollensystem kennt zwei Rollen, und <c>admin</c> heißt
+/// Jobs. Das Rollensystem kennt zwei Rollen, und <c>admin</c> heißt
 /// „verwaltet die Mannschaft"; Inhalte sind die Arbeit der Mitglieder.
 /// </remarks>
-public sealed record ProfilSichernBefehl(
+public sealed record SaveProfileCommand(
     TenantId Firma,
     string Anzeigename,
     string UeberUns,
@@ -22,34 +22,34 @@ public sealed record ProfilSichernBefehl(
     string? Postleitzahl = null,
     string? Ort = null,
     string? Land = null,
-    string? Telefon = null) : IBefehl<Arbeitgeberprofil>;
+    string? Telefon = null) : IBefehl<EmployerProfile>;
 
 /// <summary>Legt an oder ändert — und vergibt das Kürzel genau einmal.</summary>
-public sealed class ProfilSichernHandler(IProfilspeicher speicher, TimeProvider uhr)
-    : IRequestHandler<ProfilSichernBefehl, Arbeitgeberprofil>
+public sealed class SaveProfileHandler(IProfileStore store, TimeProvider uhr)
+    : IRequestHandler<SaveProfileCommand, EmployerProfile>
 {
     /// <inheritdoc />
-    public async Task<Arbeitgeberprofil> Handle(
-        ProfilSichernBefehl request,
+    public async Task<EmployerProfile> Handle(
+        SaveProfileCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var jetzt = uhr.GetUtcNow();
-        var vorhanden = await speicher.HoleAsync(request.Firma, cancellationToken);
-        Arbeitgeberprofil profil;
+        var now = uhr.GetUtcNow();
+        var vorhanden = await store.GetAsync(request.Firma, cancellationToken);
+        EmployerProfile profile;
 
         if (vorhanden is null)
         {
             // Das Kürzel entsteht genau einmal, beim ersten Speichern. Danach
             // folgt es dem Anzeigenamen nicht mehr — sonst bräche jeder
             // geteilte Link auf die Karriere-Seite.
-            var kuerzel = await speicher.FreiesKuerzelAsync(
-                Domain.Arbeitgeberprofile.Kuerzel.Aus(request.Anzeigename), cancellationToken);
+            var slug = await store.FreeSlugAsync(
+                Domain.EmployerProfiles.Slug.Aus(request.Anzeigename), cancellationToken);
 
-            profil = Arbeitgeberprofil.Lege_an(
-                request.Firma, kuerzel, request.Anzeigename, request.UeberUns,
-                request.Netzseite, request.Orte, request.Leistungen, jetzt,
+            profile = EmployerProfile.Lege_an(
+                request.Firma, slug, request.Anzeigename, request.UeberUns,
+                request.Netzseite, request.Orte, request.Leistungen, now,
                 request.Zeile1, request.Postleitzahl, request.Ort, request.Land,
                 request.Telefon);
         }
@@ -57,15 +57,15 @@ public sealed class ProfilSichernHandler(IProfilspeicher speicher, TimeProvider 
         {
             vorhanden.Aendere(
                 request.Anzeigename, request.UeberUns, request.Netzseite,
-                request.Orte, request.Leistungen, jetzt,
+                request.Orte, request.Leistungen, now,
                 request.Zeile1, request.Postleitzahl, request.Ort, request.Land,
                 request.Telefon);
 
-            profil = vorhanden;
+            profile = vorhanden;
         }
 
-        await speicher.SichereAsync(profil, cancellationToken);
+        await store.SaveAsync(profile, cancellationToken);
 
-        return profil;
+        return profile;
     }
 }

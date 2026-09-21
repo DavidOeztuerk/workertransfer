@@ -12,7 +12,7 @@ using WorkerTransfer.Identity.Application.Anmelden;
 using WorkerTransfer.Identity.Application.Behaviors;
 using WorkerTransfer.Identity.Application.Ports;
 using WorkerTransfer.Identity.Application.Registrierung;
-using WorkerTransfer.Identity.Application.Loeschung;
+using WorkerTransfer.Identity.Application.Erasure;
 using WorkerTransfer.Identity.Application.Unternehmen;
 using WorkerTransfer.Identity.Domain.Audit;
 using WorkerTransfer.Identity.Domain.Companies;
@@ -20,7 +20,7 @@ using WorkerTransfer.Identity.Domain.Sessions;
 using WorkerTransfer.Identity.Domain.Verification;
 using WorkerTransfer.Identity.Domain.Users;
 using WorkerTransfer.Identity.Infrastructure.Persistence;
-using WorkerTransfer.Identity.Infrastructure.Loeschung;
+using WorkerTransfer.Identity.Infrastructure.Erasure;
 using WorkerTransfer.Identity.Infrastructure.Post;
 using WorkerTransfer.Identity.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
@@ -28,7 +28,7 @@ using WorkerTransfer.Identity.Infrastructure.Sicherheit;
 using WorkerTransfer.Contracts.Erasure;
 using WorkerTransfer.Contracts.Identity;
 using WorkerTransfer.Identity.Infrastructure.Nachweis;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Identity.Infrastructure;
@@ -54,9 +54,9 @@ public static class IdentityInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Meldeeinstellungen>(
-            configuration.GetSection(Meldeeinstellungen.Abschnitt));
-        services.Configure<Postsettings>(configuration.GetSection(Postsettings.Abschnitt));
+        services.Configure<NotifySettings>(
+            configuration.GetSection(NotifySettings.Section));
+        services.Configure<Postsettings>(configuration.GetSection(Postsettings.Section));
 
         // bcrypt liest UND schreibt. Zur Uebergangszeit musste es das, damit
         // der Python-Dienst dieselben Eintraege noch lesen konnte; jetzt ist es
@@ -70,10 +70,10 @@ public static class IdentityInfrastructure
 
         services.AddSingleton(_ => IdentityDbContextFactory.DataSource(connectionString));
         services.AddDbContext<IdentityDbContext>((provider, options) =>
-            IdentityDbContextFactory.Konfiguriere(
+            IdentityDbContextFactory.Configure(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<IdentityDbContext>("identity");
-        services.AddSchluesselbund<IdentityDbContext>();
+        services.AddDatabaseReadiness<IdentityDbContext>("identity");
+        services.AddKeyRing<IdentityDbContext>();
 
         services.AddEntityFrameworkRefreshTokens<IdentityDbContext>();
         services.AddScoped<IUserRepository, EfUserRepository>();
@@ -82,21 +82,21 @@ public static class IdentityInfrastructure
         services.AddScoped<IVerificationTokenRepository, EfVerificationTokenRepository>();
         services.AddScoped<UnternehmenAnlegen>();
         services.AddScoped<IInvitationRepository, EfInvitationRepository>();
-        services.AddScoped<IKontoeinstellungen, EfKontoeinstellungen>();
-        services.AddScoped<IAnschriften, EfAnschriften>();
+        services.AddScoped<IAccountSettingsStore, EfAccountSettingsStore>();
+        services.AddScoped<IPostalAddresses, EfPostalAddresses>();
 
-        // Der Hauptschlüssel wird EINMAL beim Start gelesen, nicht je Anfrage:
+        // Der Hauptschlüssel wird EINMAL beim Start gelesen, nicht je ResumeRequest:
         // fehlt er, soll der Dienst beim Hochfahren sterben und nicht beim
         // ersten Menschen, der etwas hinterlegen will.
-        services.AddSingleton<Geheimnisspeicher>();
-        services.AddScoped<IGeheimnisse, Geheimnisse>();
-        services.AddScoped<Firmenzugriff>();
-        services.AddScoped<ILoeschbestand, EfLoeschbestand>();
+        services.AddSingleton<SecretStore>();
+        services.AddScoped<ISecrets, Secrets>();
+        services.AddScoped<CompanyAccess>();
+        services.AddScoped<IErasureLedger, EfErasureLedger>();
 
-        services.Configure<Loescheinstellungen>(
-            configuration.GetSection(Loescheinstellungen.Abschnitt));
-        services.AddHttpClient(nameof(HttpLoeschzustellung));
-        services.AddScoped<IZustellung, HttpLoeschzustellung>();
+        services.Configure<ErasureSettings>(
+            configuration.GetSection(ErasureSettings.Section));
+        services.AddHttpClient(nameof(HttpErasureDelivery));
+        services.AddScoped<IDelivery, HttpErasureDelivery>();
 
         // No attempt ceiling. For a notification "leave it after ten" is right;
         // for an erasure it is exactly the silent failure ADR-0027 exists
@@ -109,9 +109,9 @@ public static class IdentityInfrastructure
         // One tray per request, and both ports on it. Queueing and sending are
         // two interfaces so a handler can only ever put something in.
         services.AddScoped<Postkorb>();
-        services.AddScoped<IPostkorb>(anbieter => anbieter.GetRequiredService<Postkorb>());
+        services.AddScoped<IPostkorb>(provider => provider.GetRequiredService<Postkorb>());
         services.AddScoped<IPostkorbVersand>(
-            anbieter => anbieter.GetRequiredService<Postkorb>());
+            provider => provider.GetRequiredService<Postkorb>());
         services.AddScoped<IAuditTrail, EfAuditTrail>();
         services.AddScoped<ISessionCapacity, EfSessionCapacity>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
@@ -137,19 +137,19 @@ public static class IdentityInfrastructure
 
     /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
     /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
     /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
     ///
     /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
     /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
     /// vergessen kann.</para>
     /// </remarks>
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(AuditAction).Assembly, typeof(KiZugangV1).Assembly]));
 
         // DIE EINE ZEILE, DIE KEIN TEST SCHREIBEN KANN.
@@ -159,10 +159,10 @@ public static class IdentityInfrastructure
         // wohin dieser Baum heute Abend spricht, steht allein hier. Gezaehlt
         // wird, genannt wird niemand (ADR-0026), und der verschluesselte
         // Schluessel wird nicht einmal aus der Datenbank geholt.
-        services.AddSingleton<IAnbieterquelle, EfAnbieterquelle>();
+        services.AddSingleton<IProviderSource, EfProviderSource>();
 
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
         // Dieser Dienst fragt selbst kein Modell — aber er haelt den Schalter
         // „Anfragen protokollieren", und den liest in diesem Baum niemand. Das
@@ -170,19 +170,19 @@ public static class IdentityInfrastructure
         // andersherum erzaehlt, und deshalb steht `gegenstandVorhanden` hier
         // auf wahr.
 
-        var loeschung = new Loescheinstellungen();
-        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+        var erasure = new ErasureSettings();
+        configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
         // URSPRUNG und nicht Empfaenger: identity steht nicht in
-        // `Loeschempfaenger.Fremde`, es IST die Kaskade. Die Frage ist deshalb
+        // `ErasureRecipient.Fremde`, es IST die Kaskade. Die Frage ist deshalb
         // eine andere — kennt es fuer jeden Empfaenger eine Adresse? Ohne
         // Adresse bekommt der Empfaenger keinen Auftrag, und die Kaskade wartet
         // auf eine Quittung, die niemand angefordert hat.
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsUrsprung(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsUrsprung(
             "identity",
-            Loeschempfaenger.Fremde,
-            [.. loeschung.Adressen
-                .Where(eintrag => !string.IsNullOrWhiteSpace(eintrag.Value))
-                .Select(eintrag => eintrag.Key)]));
+            ErasureRecipient.Fremde,
+            [.. erasure.Adressen
+                .Where(entry => !string.IsNullOrWhiteSpace(entry.Value))
+                .Select(entry => entry.Key)]));
     }
 }

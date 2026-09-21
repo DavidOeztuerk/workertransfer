@@ -15,10 +15,10 @@ public class EmailadresseTests
     [InlineData("anna example.org")]
     // Syntaktisch erlaubt, im offenen Netz nicht zustellbar.
     [InlineData("anna@localhost")]
-    // Gültige Absenderzeile, aber kein Postfach.
+    // Gültige Absenderzeile, aber kein Inbox.
     [InlineData("Anna <anna@example.org>")]
-    public void Was_nicht_zustellbar_ist_faellt_durch(string adresse) =>
-        Emailadresse.IstZustellbar(adresse).Should().BeFalse();
+    public void Was_nicht_zustellbar_ist_faellt_durch(string address) =>
+        Emailadresse.IstZustellbar(address).Should().BeFalse();
 
     [Theory]
     [InlineData("anna@example.org")]
@@ -26,8 +26,8 @@ public class EmailadresseTests
     [InlineData("anna+bewerbung@example.org")]
     [InlineData("a@b.de")]
     [InlineData("jörg@example.org")]
-    public void Was_zustellbar_ist_kommt_durch(string adresse) =>
-        Emailadresse.IstZustellbar(adresse).Should().BeTrue();
+    public void Was_zustellbar_ist_kommt_durch(string address) =>
+        Emailadresse.IstZustellbar(address).Should().BeTrue();
 
     [Fact]
     public void Eine_masslos_lange_Adresse_faellt_durch()
@@ -46,11 +46,11 @@ public class EmailadresseTests
     [InlineData("anna@example.org")]
     [InlineData("anna.beispiel@firma.co.uk")]
     [InlineData("a@b.de")]
-    public void Was_durchkommt_laesst_sich_auch_versenden(string adresse)
+    public void Was_durchkommt_laesst_sich_auch_versenden(string address)
     {
-        Emailadresse.IstZustellbar(adresse).Should().BeTrue();
+        Emailadresse.IstZustellbar(address).Should().BeTrue();
 
-        var bauen = () => new System.Net.Mail.MailMessage("absender@example.org", adresse);
+        var bauen = () => new System.Net.Mail.MailMessage("absender@example.org", address);
 
         bauen.Should().NotThrow();
     }

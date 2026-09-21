@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using WorkerTransfer.ServiceDefaults.Rollen;
+using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Companies.Tests;
@@ -26,16 +26,16 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:companies", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("environment", "Development");
             // Das Schaufenster zu schreiben verlangt seit PBI-2 einen `admin`.
-            // Diese Reihe misst das Profil und nicht die Rolle — also antwortet
+            // Diese Reihe misst das Profile und nicht die Rolle — also antwortet
             // die Probe wie eine Inhaberin. `RollenTests` dreht sie auf
             // `member`.
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Scoped<IFirmenrollen>(_ => new Rollenprobe())));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => new Rollenprobe())));
         });
 
         return Task.CompletedTask;
@@ -47,11 +47,11 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsFirma(Guid firma)
+    private HttpClient AlsFirma(Guid company)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer", Tokenform.Firma(Guid.CreateVersion7(), firma));
+            "Bearer", Tokenform.Firma(Guid.CreateVersion7(), company));
         return browser;
     }
 
@@ -63,10 +63,10 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
-    private static Task<HttpResponseMessage> Schreibe(
+    private static Task<HttpResponseMessage> Write(
         HttpClient browser,
         string name = "Muster GmbH",
         string? netzseite = "https://muster.example",
@@ -84,8 +84,8 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_Briefanschrift_ueberlebt_die_Runde()
     {
-        var firma = Guid.CreateVersion7();
-        var browser = AlsFirma(firma);
+        var company = Guid.CreateVersion7();
+        var browser = AlsFirma(company);
 
         var geschrieben = await browser.PutAsJsonAsync("/companies/me/profile", new
         {
@@ -104,7 +104,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
         geschrieben.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var oeffentlich = await Json(
-            await _dienst.CreateClient().GetAsync($"/companies/{firma}/profile"));
+            await _dienst.CreateClient().GetAsync($"/companies/{company}/profile"));
 
         oeffentlich.GetProperty("line1").GetString().Should().Be("Musterstraße 1");
         oeffentlich.GetProperty("postal_code").GetString().Should().Be("10115");
@@ -118,22 +118,22 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_Profil_ist_ohne_Anmeldung_lesbar()
     {
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
 
-        var geschrieben = await Schreibe(AlsFirma(firma));
+        var geschrieben = await Write(AlsFirma(company));
 
         geschrieben.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var kuerzel = (await Json(geschrieben)).GetProperty("slug").GetString();
+        var slug = (await Json(geschrieben)).GetProperty("slug").GetString();
 
         var ohneAnmeldung = _dienst.CreateClient();
 
-        var ueberKennung = await ohneAnmeldung.GetAsync($"/companies/{firma}/profile");
-        var ueberKuerzel = await ohneAnmeldung.GetAsync($"/companies/by-slug/{kuerzel}");
+        var ueberKennung = await ohneAnmeldung.GetAsync($"/companies/{company}/profile");
+        var ueberKuerzel = await ohneAnmeldung.GetAsync($"/companies/by-slug/{slug}");
 
         ueberKennung.StatusCode.Should().Be(HttpStatusCode.OK);
         ueberKuerzel.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(ueberKuerzel)).GetProperty("tenant_id").GetGuid().Should().Be(firma);
+        (await Json(ueberKuerzel)).GetProperty("tenant_id").GetGuid().Should().Be(company);
     }
 
     /// <summary>
@@ -146,13 +146,13 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Das_Kuerzel_bleibt_wenn_der_Name_sich_aendert()
     {
-        var firma = Guid.CreateVersion7();
-        var browser = AlsFirma(firma);
+        var company = Guid.CreateVersion7();
+        var browser = AlsFirma(company);
 
-        var zuerst = (await Json(await Schreibe(browser, "Alte Marke")))
+        var zuerst = (await Json(await Write(browser, "Alte Marke")))
             .GetProperty("slug").GetString();
 
-        var danach = (await Json(await Schreibe(browser, "Ganz neue Marke")))
+        var danach = (await Json(await Write(browser, "Ganz neue Marke")))
             .GetProperty("slug").GetString();
 
         danach.Should().Be(zuerst);
@@ -166,9 +166,9 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     {
         const string name = "Gleichnamig AG";
 
-        var eine = (await Json(await Schreibe(AlsFirma(Guid.CreateVersion7()), name)))
+        var eine = (await Json(await Write(AlsFirma(Guid.CreateVersion7()), name)))
             .GetProperty("slug").GetString();
-        var andere = (await Json(await Schreibe(AlsFirma(Guid.CreateVersion7()), name)))
+        var andere = (await Json(await Write(AlsFirma(Guid.CreateVersion7()), name)))
             .GetProperty("slug").GetString();
 
         eine.Should().NotBe(andere);
@@ -182,20 +182,20 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Das_Kuerzel_verraet_die_Mandantenkennung_nicht()
     {
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
 
-        var kuerzel = (await Json(await Schreibe(AlsFirma(firma), "Diskret GmbH")))
+        var slug = (await Json(await Write(AlsFirma(company), "Diskret GmbH")))
             .GetProperty("slug").GetString();
 
-        kuerzel.Should().NotContain(firma.ToString());
-        kuerzel.Should().NotContain(firma.ToString("N"));
+        slug.Should().NotContain(company.ToString());
+        slug.Should().NotContain(company.ToString("N"));
     }
 
     /// <summary>Umlaute werden zerlegt, ihre Grundbuchstaben bleiben.</summary>
     [Fact]
     public async Task Aus_dem_Namen_wird_eine_Adresse()
     {
-        var geschrieben = await Schreibe(AlsFirma(Guid.CreateVersion7()), "Grün & Söhne GmbH");
+        var geschrieben = await Write(AlsFirma(Guid.CreateVersion7()), "Grün & Söhne GmbH");
 
         (await Json(geschrieben)).GetProperty("slug").GetString()
             .Should().Be("grun-sohne-gmbh");
@@ -208,12 +208,12 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_Name_ganz_ohne_lateinische_Buchstaben_bekommt_trotzdem_eine_Adresse()
     {
-        var geschrieben = await Schreibe(AlsFirma(Guid.CreateVersion7()), "株式会社");
+        var geschrieben = await Write(AlsFirma(Guid.CreateVersion7()), "株式会社");
 
-        var kuerzel = (await Json(geschrieben)).GetProperty("slug").GetString();
+        var slug = (await Json(geschrieben)).GetProperty("slug").GetString();
 
-        kuerzel.Should().StartWith("unternehmen");
-        (await _dienst.CreateClient().GetAsync($"/companies/by-slug/{kuerzel}"))
+        slug.Should().StartWith("unternehmen");
+        (await _dienst.CreateClient().GetAsync($"/companies/by-slug/{slug}"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -221,33 +221,33 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Das_eigene_Profil_ist_null_solange_keins_da_ist()
     {
-        var antwort = await AlsFirma(Guid.CreateVersion7()).GetAsync("/companies/me/profile");
+        var response = await AlsFirma(Guid.CreateVersion7()).GetAsync("/companies/me/profile");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await antwort.Content.ReadAsStringAsync()).Trim().Should().Be("null");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).Trim().Should().Be("null");
     }
 
     /// <summary>
     /// Für die Öffentlichkeit gibt es nichts, solange nichts angelegt wurde —
-    /// dann bleibt eine Stelle anonym.
+    /// dann bleibt eine Job anonym.
     /// </summary>
     [Fact]
     public async Task Oeffentlich_gibt_es_nichts_solange_nichts_angelegt_ist()
     {
-        var antwort = await _dienst.CreateClient()
+        var response = await _dienst.CreateClient()
             .GetAsync($"/companies/{Guid.CreateVersion7()}/profile");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await antwort.Content.ReadAsStringAsync()).Trim().Should().Be("null");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).Trim().Should().Be("null");
     }
 
     /// <summary>Ein Kürzel, das es nicht gibt, ist 404 und kein Absturz.</summary>
     [Fact]
     public async Task Ein_unbekanntes_Kuerzel_ist_404()
     {
-        var antwort = await _dienst.CreateClient().GetAsync("/companies/by-slug/gibt-es-nicht");
+        var response = await _dienst.CreateClient().GetAsync("/companies/by-slug/gibt-es-nicht");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>
@@ -256,18 +256,18 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_Privatperson_schreibt_kein_Arbeitgeberprofil()
     {
-        var antwort = await Schreibe(AlsPerson());
+        var response = await Write(AlsPerson());
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    /// <summary>Ohne Anmeldung gibt es kein eigenes Profil.</summary>
+    /// <summary>Ohne Anmeldung gibt es kein eigenes Profile.</summary>
     [Fact]
     public async Task Ohne_Token_ist_das_eigene_Profil_401()
     {
-        var antwort = await _dienst.CreateClient().GetAsync("/companies/me/profile");
+        var response = await _dienst.CreateClient().GetAsync("/companies/me/profile");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     /// <summary>
@@ -285,15 +285,15 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = AlsFirma(Guid.CreateVersion7());
 
-        var boese = await Schreibe(browser, netzseite: "javascript:alert(1)");
+        var boese = await Write(browser, netzseite: "javascript:alert(1)");
 
         boese.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        var fremdesSchema = await Schreibe(browser, netzseite: "ftp://muster.example/datei");
+        var fremdesSchema = await Write(browser, netzseite: "ftp://muster.example/datei");
 
         fremdesSchema.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        var ohneWirt = await Schreibe(browser, netzseite: "https://");
+        var ohneWirt = await Write(browser, netzseite: "https://");
 
         ohneWirt.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
@@ -306,7 +306,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_leerer_Link_wird_null()
     {
-        var geschrieben = await Schreibe(AlsFirma(Guid.CreateVersion7()), netzseite: "   ");
+        var geschrieben = await Write(AlsFirma(Guid.CreateVersion7()), netzseite: "   ");
 
         geschrieben.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(geschrieben)).GetProperty("website").ValueKind
@@ -322,7 +322,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var vieleGleiche = Enumerable.Repeat("Homeoffice", 21).ToArray();
 
-        var geschrieben = await Schreibe(
+        var geschrieben = await Write(
             AlsFirma(Guid.CreateVersion7()), leistungen: vieleGleiche);
 
         geschrieben.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -335,18 +335,18 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var vieleVerschiedene = Enumerable.Range(1, 21).Select(n => $"Ort {n}").ToArray();
 
-        var geschrieben = await Schreibe(AlsFirma(Guid.CreateVersion7()), orte: vieleVerschiedene);
+        var geschrieben = await Write(AlsFirma(Guid.CreateVersion7()), orte: vieleVerschiedene);
 
         geschrieben.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
-    /// <summary>Ein abgelehntes Formular hinterlässt kein halb geändertes Profil.</summary>
+    /// <summary>Ein abgelehntes Formular hinterlässt kein halb geändertes Profile.</summary>
     [Fact]
     public async Task Eine_abgewiesene_Aenderung_aendert_nichts()
     {
-        var firma = Guid.CreateVersion7();
-        var browser = AlsFirma(firma);
-        await Schreibe(browser, "Erste Fassung");
+        var company = Guid.CreateVersion7();
+        var browser = AlsFirma(company);
+        await Write(browser, "Erste Fassung");
 
         var abgewiesen = await browser.PutAsJsonAsync("/companies/me/profile", new
         {
@@ -359,25 +359,25 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
 
         abgewiesen.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        var jetzt = await Json(await browser.GetAsync("/companies/me/profile"));
+        var now = await Json(await browser.GetAsync("/companies/me/profile"));
 
-        jetzt.GetProperty("display_name").GetString().Should().Be("Erste Fassung");
-        jetzt.GetProperty("locations").EnumerateArray()
-            .Select(eintrag => eintrag.GetString()).Should().Equal("Berlin");
+        now.GetProperty("display_name").GetString().Should().Be("Erste Fassung");
+        now.GetProperty("locations").EnumerateArray()
+            .Select(entry => entry.GetString()).Should().Equal("Berlin");
     }
 
     /// <summary>Ein Anzeigename ist Pflicht — ohne ihn zeigt sich niemand.</summary>
     [Fact]
     public async Task Ohne_Anzeigenamen_geht_es_nicht()
     {
-        var antwort = await Schreibe(AlsFirma(Guid.CreateVersion7()), "   ");
+        var response = await Write(AlsFirma(Guid.CreateVersion7()), "   ");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
-    /// <summary>Ein fremdes Profil lässt sich nicht überschreiben.</summary>
+    /// <summary>Ein fremdes Profile lässt sich nicht überschreiben.</summary>
     /// <remarks>
-    /// Wem das Profil gehört, steht im geprüften Token und nie im Rumpf — es
+    /// Wem das Profile gehört, steht im geprüften Token und nie im Rumpf — es
     /// gibt kein <c>tenant_id</c>-Feld, in das man eine fremde Kennung
     /// schreiben könnte.
     /// </remarks>
@@ -386,9 +386,9 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var eine = Guid.CreateVersion7();
         var andere = Guid.CreateVersion7();
-        await Schreibe(AlsFirma(eine), "Die Eine");
+        await Write(AlsFirma(eine), "Die Eine");
 
-        var versuch = await AlsFirma(andere).PutAsJsonAsync("/companies/me/profile", new
+        var attempt = await AlsFirma(andere).PutAsJsonAsync("/companies/me/profile", new
         {
             tenant_id = eine,
             display_name = "Die Andere",
@@ -398,8 +398,8 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
             benefits = Array.Empty<string>()
         });
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(versuch)).GetProperty("tenant_id").GetGuid().Should().Be(andere);
+        attempt.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(attempt)).GetProperty("tenant_id").GetGuid().Should().Be(andere);
 
         var unberuehrt = await Json(
             await _dienst.CreateClient().GetAsync($"/companies/{eine}/profile"));
@@ -411,14 +411,14 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Es_gibt_genau_ein_Profil_je_Unternehmen()
     {
-        var firma = Guid.CreateVersion7();
-        var browser = AlsFirma(firma);
+        var company = Guid.CreateVersion7();
+        var browser = AlsFirma(company);
 
-        await Schreibe(browser, "Einmal");
-        await Schreibe(browser, "Zweimal");
+        await Write(browser, "Einmal");
+        await Write(browser, "Zweimal");
 
-        await using var kontext = postgres.Kontext();
+        await using var context = postgres.Kontext();
 
-        (await kontext.Profile.CountAsync(zeile => zeile.Id == firma)).Should().Be(1);
+        (await context.Profile.CountAsync(row => row.Id == company)).Should().Be(1);
     }
 }

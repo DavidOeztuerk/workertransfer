@@ -9,8 +9,8 @@ using WorkerTransfer.Resume.Domain.Pruefspur;
 namespace WorkerTransfer.Resume.Application.Anfragen;
 
 /// <summary>The person answers one company's question.</summary>
-public sealed record AnfrageBeantwortenBefehl(Guid Anfrage, SubjectId Akteur, bool Erteilen)
-    : IBefehl<Anfrageergebnis>;
+public sealed record AnswerRequestCommand(Guid ResumeRequest, SubjectId Akteur, bool Erteilen)
+    : IBefehl<ResumeRequestResult>;
 
 /// <summary>Writes the ledger first and the proceeding second.</summary>
 /// <remarks>
@@ -28,65 +28,65 @@ public sealed record AnfrageBeantwortenBefehl(Guid Anfrage, SubjectId Akteur, bo
 /// before.
 /// </para>
 /// </remarks>
-public sealed class AnfrageBeantwortenHandler(
-    IAnfragenSpeicher speicher,
-    IEinwilligungstor tor,
+public sealed class AnswerRequestHandler(
+    IRequestStore store,
+    IConsentGate tor,
     IOutbox outbox,
-    IPruefspur pruefspur,
+    IAuditTrail pruefspur,
     IKorrelationsanhang anhang,
-    TimeProvider uhr) : IRequestHandler<AnfrageBeantwortenBefehl, Anfrageergebnis>
+    TimeProvider uhr) : IRequestHandler<AnswerRequestCommand, ResumeRequestResult>
 {
     /// <inheritdoc />
-    public async Task<Anfrageergebnis> Handle(
-        AnfrageBeantwortenBefehl request,
+    public async Task<ResumeRequestResult> Handle(
+        AnswerRequestCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var anfrage = await speicher.HoleAsync(request.Anfrage, cancellationToken);
+        var requestRecord = await store.GetAsync(request.ResumeRequest, cancellationToken);
 
         // A foreign request id behaves like a foreign subject id: not there and
         // not mine are the same thing from outside.
-        if (anfrage is null || anfrage.Wer != request.Akteur)
+        if (requestRecord is null || requestRecord.Wer != request.Akteur)
         {
-            return new Anfrageergebnis.NichtSichtbar();
+            return new ResumeRequestResult.NichtSichtbar();
         }
 
-        var jetzt = uhr.GetUtcNow();
+        var now = uhr.GetUtcNow();
 
         try
         {
             if (request.Erteilen)
             {
-                anfrage.Erteile(request.Akteur, jetzt);
+                requestRecord.Erteile(request.Akteur, now);
             }
             else
             {
-                anfrage.LehneAb(request.Akteur, jetzt);
+                requestRecord.LehneAb(request.Akteur, now);
             }
         }
-        catch (Anfrageregel regel)
+        catch (ResumeRequestRule rule)
         {
-            return new Anfrageergebnis.Regelverstoss(regel.Code, regel.Message);
+            return new ResumeRequestResult.Regelverstoss(rule.Code, rule.Message);
         }
 
         if (request.Erteilen)
         {
-            await tor.ErteileAsync(anfrage.Wer, anfrage.Firma, cancellationToken);
+            await tor.GrantAsync(requestRecord.Wer, requestRecord.Firma, cancellationToken);
         }
         else
         {
-            await tor.WiderrufeAsync(anfrage.Wer, anfrage.Firma, cancellationToken);
+            await tor.RevokeAsync(requestRecord.Wer, requestRecord.Firma, cancellationToken);
         }
 
-        await speicher.SichereAsync(anfrage, cancellationToken);
+        await store.SaveAsync(requestRecord, cancellationToken);
 
         // To whoever asked, not to the company as such: an outbox row names one
         // person. `null` means that account is gone, and then there is nobody
         // to tell.
-        if (anfrage.Frager is { } frager)
+        if (requestRecord.Frager is { } frager)
         {
-            await outbox.VermerkeAsync(
+            await outbox.NoteAsync(
                 frager,
                 request.Erteilen ? Benachrichtigungsarten.Erteilt : Benachrichtigungsarten.Abgelehnt,
                 cancellationToken);
@@ -94,10 +94,10 @@ public sealed class AnfrageBeantwortenHandler(
 
         await pruefspur.AppendAsync(
             anhang.Eintrag(
-                request.Erteilen ? Pruefhandlung.RequestGranted : Pruefhandlung.RequestDeclined,
-                jetzt, akteur: anfrage.Wer, firma: anfrage.Firma, betroffene: anfrage.Wer),
+                request.Erteilen ? AuditAction.RequestGranted : AuditAction.RequestDeclined,
+                now, akteur: requestRecord.Wer, company: requestRecord.Firma, betroffene: requestRecord.Wer),
             cancellationToken);
 
-        return new Anfrageergebnis.Erledigt(anfrage);
+        return new ResumeRequestResult.Erledigt(requestRecord);
     }
 }

@@ -46,10 +46,10 @@ public sealed class User
         AccountStatus status,
         IReadOnlyList<string> roles,
         string? pendingCompanyName,
-        Kontosprache sprache,
+        Kontosprache language,
         string? givenName,
         string? familyName,
-        Berufsfeld? berufsfeld)
+        OccupationalField? berufsfeld)
     {
         Id = id;
         Email = email;
@@ -58,10 +58,10 @@ public sealed class User
         Status = status;
         Roles = roles;
         PendingCompanyName = pendingCompanyName;
-        Kontosprache = sprache;
+        Kontosprache = language;
         GivenName = LeerAlsNull(givenName);
         FamilyName = LeerAlsNull(familyName);
-        Berufsfeld = berufsfeld;
+        OccupationalField = berufsfeld;
     }
 
     /// <summary>Who this is.</summary>
@@ -77,7 +77,7 @@ public sealed class User
     public string DisplayName { get; }
 
     /// <summary>
-    /// Bürgerlicher Vorname — für Briefkopf und Signatur, nicht für die Suche.
+    /// Bürgerlicher Vorname — für Briefkopf und Signatur, nicht für die Search.
     /// </summary>
     /// <remarks>
     /// Getrennt vom Anzeigenamen (ADR-0038). Leer/fehlend ist die Vorgabe
@@ -113,7 +113,7 @@ public sealed class User
     /// An intention, not a company. It is redeemed when the address is
     /// confirmed and not a moment earlier: the domain a company is claimed on
     /// comes from a <em>proven</em> address, so it cannot be forged (ADR-0019).
-    /// <c>null</c> means a person registered, which is the ordinary case.
+    /// <c>null</c> means a person registered, which is the ordinary caseItem.
     /// </remarks>
     public string? PendingCompanyName { get; private set; }
 
@@ -127,10 +127,10 @@ public sealed class User
     /// <summary>In welcher Arbeitswelt diese Person steht, oder <c>null</c>.</summary>
     /// <remarks>
     /// <c>null</c> heisst „nicht angegeben" und ist der Normalfall (ADR-0039).
-    /// Wird nie abgeleitet: eine GitHub-Verbindung macht niemanden zu
+    /// Wird nie abgeleitet: eine GitHub-Connection macht niemanden zu
     /// <c>it_software</c>.
     /// </remarks>
-    public Berufsfeld? Berufsfeld { get; private set; }
+    public OccupationalField? OccupationalField { get; private set; }
 
     /// <summary>A new account, unconfirmed.</summary>
     /// <remarks>
@@ -153,12 +153,12 @@ public sealed class User
         string passwordHash,
         string displayName,
         string? pendingCompanyName = null,
-        Kontosprache sprache = Sprachwahl.Vorgabe,
+        Kontosprache language = Sprachwahl.Vorgabe,
         string? givenName = null,
         string? familyName = null,
-        Berufsfeld? berufsfeld = null) =>
+        OccupationalField? berufsfeld = null) =>
         new(SubjectId.New(), email, passwordHash, displayName,
-            AccountStatus.Pending, ["user"], pendingCompanyName, sprache,
+            AccountStatus.Pending, ["user"], pendingCompanyName, language,
             givenName, familyName, berufsfeld);
 
     /// <summary>The account as a row holds it.</summary>
@@ -171,12 +171,12 @@ public sealed class User
         AccountStatus status,
         IReadOnlyList<string> roles,
         string? pendingCompanyName,
-        Kontosprache sprache = Sprachwahl.Vorgabe,
+        Kontosprache language = Sprachwahl.Vorgabe,
         string? givenName = null,
         string? familyName = null,
-        Berufsfeld? berufsfeld = null) =>
+        OccupationalField? berufsfeld = null) =>
         new(id, email, passwordHash, displayName, status, roles,
-            pendingCompanyName, sprache, givenName, familyName, berufsfeld);
+            pendingCompanyName, language, givenName, familyName, berufsfeld);
 
     /// <summary>The address was confirmed.</summary>
     /// <remarks>
@@ -214,15 +214,15 @@ public sealed class User
     /// travelling in France should not find their mails in French afterwards.
     /// </remarks>
     /// <param name="sprache">What they picked.</param>
-    public void SpracheWaehlen(Kontosprache sprache) => Kontosprache = sprache;
+    public void SpracheWaehlen(Kontosprache language) => Kontosprache = language;
 
-    /// <summary>Die Person nennt ihr Berufsfeld — oder nimmt die Angabe zurück.</summary>
+    /// <summary>Die Person nennt ihr OccupationalField — oder nimmt die Angabe zurück.</summary>
     /// <remarks>
     /// <c>null</c> heisst entfernen, nicht „unverändert" — wie bei
     /// <see cref="SetzeKlarname"/>.
     /// </remarks>
     /// <param name="berufsfeld">Was sie gewählt hat, oder <c>null</c>.</param>
-    public void BerufsfeldWaehlen(Berufsfeld? berufsfeld) => Berufsfeld = berufsfeld;
+    public void BerufsfeldWaehlen(OccupationalField? berufsfeld) => OccupationalField = berufsfeld;
 
     /// <summary>Bürgerlichen Namen setzen oder leeren.</summary>
     /// <remarks>
@@ -235,9 +235,9 @@ public sealed class User
         FamilyName = LeerAlsNull(familyName);
     }
 
-    private static string? LeerAlsNull(string? wert)
+    private static string? LeerAlsNull(string? value)
     {
-        var getrimmt = wert?.Trim();
+        var getrimmt = value?.Trim();
         return string.IsNullOrEmpty(getrimmt) ? null : getrimmt;
     }
 

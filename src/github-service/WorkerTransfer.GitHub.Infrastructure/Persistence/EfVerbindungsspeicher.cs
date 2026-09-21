@@ -2,17 +2,17 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Noelia.Core.Identity;
 using Microsoft.EntityFrameworkCore;
-using WorkerTransfer.GitHub.Domain.Verbindungen;
+using WorkerTransfer.GitHub.Domain.Connections;
 
 namespace WorkerTransfer.GitHub.Infrastructure.Persistence;
 
 /// <summary>Ein Repository, wie es in der jsonb-Spalte steht.</summary>
 /// <remarks>
-/// Eigene Namen für die Spalte statt der deutschen des Aggregats: was hier
+/// Own Namen für die Spalte statt der deutschen des Aggregats: was hier
 /// liegt, ist eine Kopie dessen, was GitHub gesagt hat, und wer die Zeile
 /// später von Hand liest, soll die Felder wiedererkennen.
 /// </remarks>
-internal sealed record RepoAblage(
+internal sealed record RepositoryDocumentStore(
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("description")] string Description,
     [property: JsonPropertyName("language")] string? Language,
@@ -26,85 +26,85 @@ internal sealed record RepoAblage(
     [property: JsonPropertyName("topics")] IReadOnlyList<string>? Topics = null);
 
 /// <summary>Liest und schreibt <c>github_connections</c>.</summary>
-public sealed class EfVerbindungsspeicher(GitHubDbContext kontext) : IVerbindungsspeicher
+public sealed class EfConnectionStore(GitHubDbContext context) : IConnectionStore
 {
     /// <inheritdoc />
-    public async Task<Verbindung?> HoleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<Connection?> GetAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Verbindungen
-            .FirstOrDefaultAsync(kandidat => kandidat.Id == wer.Value, cancellationToken);
+        var row = await context.Connections
+            .FirstOrDefaultAsync(kandidat => kandidat.Id == subject.Value, cancellationToken);
 
-        return zeile is null ? null : ZumAggregat(zeile);
+        return row is null ? null : ZumAggregat(row);
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(
-        Verbindung verbindung, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        Connection connection, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(verbindung);
+        ArgumentNullException.ThrowIfNull(connection);
 
-        var vorhanden = await kontext.Verbindungen
+        var vorhanden = await context.Connections
             .AsTracking()
             .FirstOrDefaultAsync(
-                kandidat => kandidat.Id == verbindung.Wer.Value, cancellationToken);
+                kandidat => kandidat.Id == connection.Wer.Value, cancellationToken);
 
         if (vorhanden is null)
         {
-            var zeile = new VerbindungsZeile
+            var row = new ConnectionRow
             {
-                Id = verbindung.Wer.Value,
+                Id = connection.Wer.Value,
                 CreatedAt = DateTime.UtcNow
             };
 
-            Uebertrage(verbindung, zeile);
-            kontext.Verbindungen.Add(zeile);
+            Uebertrage(connection, row);
+            context.Connections.Add(row);
 
             return;
         }
 
-        Uebertrage(verbindung, vorhanden);
+        Uebertrage(connection, vorhanden);
     }
 
     /// <inheritdoc />
-    public Task LoescheAsync(SubjectId wer, CancellationToken cancellationToken = default) =>
-        kontext.Verbindungen
-            .Where(zeile => zeile.Id == wer.Value)
+    public Task DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default) =>
+        context.Connections
+            .Where(row => row.Id == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
-    private static void Uebertrage(Verbindung verbindung, VerbindungsZeile zeile)
+    private static void Uebertrage(Connection connection, ConnectionRow row)
     {
-        zeile.Login = verbindung.Login;
-        zeile.Challenge = verbindung.Einmalzeichenfolge;
-        zeile.VerifiedAt = verbindung.NachgewiesenAm?.UtcDateTime;
-        zeile.FetchedAt = verbindung.GeholtAm?.UtcDateTime;
-        zeile.LanguagesComplete = verbindung.SprachenVollstaendig;
-        zeile.Repositories = JsonSerializer.Serialize(
-            verbindung.Repositories.Select(eintrag => new RepoAblage(
-                eintrag.Name, eintrag.Beschreibung, eintrag.Sprache,
-                eintrag.Sterne, eintrag.Adresse, eintrag.ZuletztGeschoben,
-                eintrag.Sprachen, eintrag.Themen)));
-        zeile.UpdatedAt = DateTime.UtcNow;
+        row.Login = connection.Login;
+        row.Challenge = connection.Einmalzeichenfolge;
+        row.VerifiedAt = connection.NachgewiesenAm?.UtcDateTime;
+        row.FetchedAt = connection.GeholtAm?.UtcDateTime;
+        row.LanguagesComplete = connection.SprachenVollstaendig;
+        row.Repositories = JsonSerializer.Serialize(
+            connection.Repositories.Select(entry => new RepositoryDocumentStore(
+                entry.Name, entry.Beschreibung, entry.Sprache,
+                entry.Sterne, entry.Adresse, entry.ZuletztGeschoben,
+                entry.Sprachen, entry.Themen)));
+        row.UpdatedAt = DateTime.UtcNow;
     }
 
-    private static Verbindung ZumAggregat(VerbindungsZeile zeile)
+    private static Connection ZumAggregat(ConnectionRow row)
     {
-        var abgelegt = JsonSerializer.Deserialize<List<RepoAblage>>(zeile.Repositories) ?? [];
+        var abgelegt = JsonSerializer.Deserialize<List<RepositoryDocumentStore>>(row.Repositories) ?? [];
 
-        return Verbindung.Stelle_her(
-            new SubjectId(zeile.Id),
-            zeile.Login,
-            zeile.Challenge,
-            zeile.VerifiedAt is { } bewiesen
+        return Connection.Stelle_her(
+            new SubjectId(row.Id),
+            row.Login,
+            row.Challenge,
+            row.VerifiedAt is { } bewiesen
                 ? new DateTimeOffset(bewiesen, TimeSpan.Zero)
                 : null,
-            zeile.FetchedAt is { } geholt ? new DateTimeOffset(geholt, TimeSpan.Zero) : null,
+            row.FetchedAt is { } geholt ? new DateTimeOffset(geholt, TimeSpan.Zero) : null,
             [
-                .. abgelegt.Select(eintrag => new Repository(
-                    eintrag.Name, eintrag.Description, eintrag.Language,
-                    eintrag.Stars, eintrag.Url, eintrag.PushedAt,
-                    eintrag.Languages ?? [], eintrag.Topics ?? []))
+                .. abgelegt.Select(entry => new Repository(
+                    entry.Name, entry.Description, entry.Language,
+                    entry.Stars, entry.Url, entry.PushedAt,
+                    entry.Languages ?? [], entry.Topics ?? []))
             ],
-            zeile.LanguagesComplete);
+            row.LanguagesComplete);
     }
 }

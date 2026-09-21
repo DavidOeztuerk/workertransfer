@@ -17,14 +17,14 @@ public interface IOutbox
     /// </param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>The id of the row, for a caller that wants to watch it.</returns>
-    Task<Guid> VermerkeAsync(
-        SubjectId empfaenger,
-        string art,
+    Task<Guid> NoteAsync(
+        SubjectId recipient,
+        string kind,
         CancellationToken cancellationToken = default);
 }
 
 /// <summary>What delivers — HTTP, SMTP, whatever.</summary>
-public interface IZustellung
+public interface IDelivery
 {
     /// <summary>
     /// Delivers one intent, or throws.
@@ -36,9 +36,9 @@ public interface IZustellung
     /// of ADR-0027 would prove nothing.
     /// </remarks>
     /// <exception cref="NochNichtException">The row's turn has not come.</exception>
-    Task ZustelleAsync(
-        SubjectId empfaenger,
-        string art,
+    Task DeliverAsync(
+        SubjectId recipient,
+        string kind,
         CancellationToken cancellationToken = default);
 }
 
@@ -57,4 +57,4 @@ public interface IZustellung
 /// waited its turn.
 /// </para>
 /// </remarks>
-public sealed class NochNichtException(string grund) : Exception(grund);
+public sealed class NochNichtException(string reason) : Exception(reason);

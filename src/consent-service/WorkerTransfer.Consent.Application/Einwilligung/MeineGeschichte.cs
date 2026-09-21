@@ -17,20 +17,20 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// the difference between "belongs to them" and "concerns others".
 /// </para>
 /// </remarks>
-public sealed record MeineGeschichteAbfrage(SubjectId Wer)
+public sealed record MyHistoryQuery(SubjectId Wer)
     : IAbfrage<IReadOnlyList<ConsentEvent>>;
 
 /// <summary>Reads the whole stream, unreduced.</summary>
-public sealed class MeineGeschichteHandler(IConsentLedger buch)
-    : IRequestHandler<MeineGeschichteAbfrage, IReadOnlyList<ConsentEvent>>
+public sealed class MyHistoryHandler(IConsentLedger buch)
+    : IRequestHandler<MyHistoryQuery, IReadOnlyList<ConsentEvent>>
 {
     /// <inheritdoc />
     public Task<IReadOnlyList<ConsentEvent>> Handle(
-        MeineGeschichteAbfrage request,
+        MyHistoryQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return buch.VerlaufAsync(request.Wer, cancellationToken);
+        return buch.HistoryAsync(request.Wer, cancellationToken);
     }
 }

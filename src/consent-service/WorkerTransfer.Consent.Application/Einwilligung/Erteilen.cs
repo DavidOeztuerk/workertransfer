@@ -14,25 +14,25 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// A command, not a <c>PUT</c> on a resource: it appends a fact. Mapping it
 /// onto a verb that implies mutation would misrepresent an append-only ledger.
 /// </remarks>
-public sealed record EinwilligungErteilenBefehl(
+public sealed record GrantConsentCommand(
     SubjectId Handelnder,
     TenantId? Firma,
     Guid Gegenstand,
     string Faehigkeit,
-    string? Grund) : IBefehl<Einwilligungsergebnis>;
+    string? Grund) : IBefehl<ConsentResult>;
 
 /// <summary>Records the grant.</summary>
-public sealed class EinwilligungErteilenHandler(Einwilligungsschreiber schreiber)
-    : IRequestHandler<EinwilligungErteilenBefehl, Einwilligungsergebnis>
+public sealed class GrantConsentHandler(ConsentWriter schreiber)
+    : IRequestHandler<GrantConsentCommand, ConsentResult>
 {
     /// <inheritdoc />
-    public Task<Einwilligungsergebnis> Handle(
-        EinwilligungErteilenBefehl request,
+    public Task<ConsentResult> Handle(
+        GrantConsentCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return schreiber.ErteileAsync(
+        return schreiber.GrantAsync(
             request.Handelnder, request.Firma, request.Gegenstand, request.Faehigkeit,
             request.Grund, cancellationToken);
     }

@@ -55,16 +55,16 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:resume", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
             host.UseSetting("Ablage:Verzeichnis", _ablage);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _tor));
-                dienste.Replace(ServiceDescriptor.Scoped<IZustellung>(_ => _versand));
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _tor));
+                services.Replace(ServiceDescriptor.Scoped<IDelivery>(_ => _versand));
             });
         });
 
@@ -83,9 +83,9 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsPerson(Guid wer) => Mit(Tokenform.Person(wer));
+    private HttpClient AlsPerson(Guid subject) => Mit(Tokenform.Person(subject));
 
-    private HttpClient AlsFirma(Guid wer, Guid firma) => Mit(Tokenform.Firma(wer, firma));
+    private HttpClient AlsFirma(Guid subject, Guid company) => Mit(Tokenform.Firma(subject, company));
 
     private HttpClient Mit(string token)
     {
@@ -96,21 +96,21 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     /// <summary>Lädt hoch, wie ein Browser es täte: multipart, mit Namen und Art.</summary>
     private static Task<HttpResponseMessage> Lade(
-        HttpClient browser, byte[] inhalt, string dateiname, string name, string art = "zeugnis")
+        HttpClient browser, byte[] content, string dateiname, string name, string kind = "zeugnis")
     {
         var formular = new MultipartFormDataContent();
-        var datei = new ByteArrayContent(inhalt);
+        var file = new ByteArrayContent(content);
 
         // Der BEHAUPTETE Typ, absichtlich: der Dienst darf ihm nicht glauben.
-        datei.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-        formular.Add(datei, "file", dateiname);
+        file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        formular.Add(file, "file", dateiname);
         formular.Add(new StringContent(name), "name");
-        formular.Add(new StringContent(art), "kind");
+        formular.Add(new StringContent(kind), "kind");
 
         return browser.PostAsync("/resumes/me/documents", formular);
     }
@@ -131,24 +131,24 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
 
         angelegt.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var eintrag = await Json(angelegt);
-        var id = eintrag.GetProperty("id").GetGuid();
+        var entry = await Json(angelegt);
+        var id = entry.GetProperty("id").GetGuid();
 
-        eintrag.GetProperty("name").GetString().Should().Be("Arbeitszeugnis Acme");
-        eintrag.GetProperty("kind").GetString().Should().Be("zeugnis");
+        entry.GetProperty("name").GetString().Should().Be("Arbeitszeugnis Acme");
+        entry.GetProperty("kind").GetString().Should().Be("zeugnis");
         // Der Typ kommt aus den BYTES: hochgeladen als „image/png" behauptet.
-        eintrag.GetProperty("content_type").GetString().Should().Be("application/pdf");
-        eintrag.GetProperty("size_bytes").GetInt32().Should().Be(EinPdf.Length);
+        entry.GetProperty("content_type").GetString().Should().Be("application/pdf");
+        entry.GetProperty("size_bytes").GetInt32().Should().Be(EinPdf.Length);
 
         DateienAufDerPlatte().Should().Be(1, "die Bytes liegen in der Ablage, nicht in der Zeile");
 
-        var liste = await Json(await ihr.GetAsync("/resumes/me/documents"));
-        liste.GetArrayLength().Should().Be(1);
+        var list = await Json(await ihr.GetAsync("/resumes/me/documents"));
+        list.GetArrayLength().Should().Be(1);
 
-        var inhalt = await ihr.GetAsync($"/resumes/me/documents/{id}/content");
-        inhalt.StatusCode.Should().Be(HttpStatusCode.OK);
-        inhalt.Content.Headers.ContentType!.MediaType.Should().Be("application/pdf");
-        (await inhalt.Content.ReadAsByteArrayAsync()).Should().Equal(EinPdf);
+        var content = await ihr.GetAsync($"/resumes/me/documents/{id}/content");
+        content.StatusCode.Should().Be(HttpStatusCode.OK);
+        content.Content.Headers.ContentType!.MediaType.Should().Be("application/pdf");
+        (await content.Content.ReadAsByteArrayAsync()).Should().Equal(EinPdf);
 
         (await ihr.DeleteAsync($"/resumes/me/documents/{id}")).StatusCode
             .Should().Be(HttpStatusCode.NoContent);
@@ -202,7 +202,7 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
     /// <summary>Zehn sind genug.</summary>
     /// <remarks>
     /// Ohne Grenze baut ein Aufrufer mit einer Schleife eine beliebig teure
-    /// Ablage — und eine Bewerbung mit dreissig Anhängen liest ohnehin niemand.
+    /// Ablage — und eine Application mit dreissig Anhängen liest ohnehin niemand.
     /// </remarks>
     [Fact]
     public async Task Mehr_als_zehn_nimmt_niemand_an()
@@ -247,12 +247,12 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Ohne_Freigabe_sieht_die_Firma_nichts()
     {
         var anna = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
 
         var angelegt = await Json(await Lade(AlsPerson(anna), EinPdf, "z.pdf", "Zeugnis"));
         var id = angelegt.GetProperty("id").GetGuid();
 
-        var chefin = AlsFirma(Guid.CreateVersion7(), firma);
+        var chefin = AlsFirma(Guid.CreateVersion7(), company);
 
         (await Json(await chefin.GetAsync($"/resumes/{anna}/documents")))
             .GetArrayLength().Should().Be(0);
@@ -265,9 +265,9 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
             .GetArrayLength().Should().Be(0);
     }
 
-    /// <summary>Mit Freigabe sieht sie sie — und der Ledger wird jedes Mal gefragt.</summary>
+    /// <summary>Mit Release sieht sie sie — und der Ledger wird jedes Mal gefragt.</summary>
     /// <remarks>
-    /// Ein Widerruf muss auf den nächsten Aufruf wirken, nicht auf den
+    /// Ein Revocation muss auf den nächsten Aufruf wirken, nicht auf den
     /// übernächsten (ADR-0013). Deshalb prüft dieser Test beide Richtungen in
     /// einem Zug: erteilen, lesen, widerrufen, wieder lesen.
     /// </remarks>
@@ -275,23 +275,23 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Mit_Freigabe_sieht_die_Firma_sie_und_ein_Widerruf_wirkt_sofort()
     {
         var anna = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
 
         var angelegt = await Json(await Lade(AlsPerson(anna), EinPdf, "z.pdf", "Zeugnis"));
         var id = angelegt.GetProperty("id").GetGuid();
 
-        _tor.UnterlagenFrei.Add((anna, firma));
+        _tor.UnterlagenFrei.Add((anna, company));
 
-        var chefin = AlsFirma(Guid.CreateVersion7(), firma);
+        var chefin = AlsFirma(Guid.CreateVersion7(), company);
 
         (await Json(await chefin.GetAsync($"/resumes/{anna}/documents")))
             .GetArrayLength().Should().Be(1);
 
-        var inhalt = await chefin.GetAsync($"/resumes/{anna}/documents/{id}/content");
-        inhalt.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await inhalt.Content.ReadAsByteArrayAsync()).Should().Equal(EinPdf);
+        var content = await chefin.GetAsync($"/resumes/{anna}/documents/{id}/content");
+        content.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await content.Content.ReadAsByteArrayAsync()).Should().Equal(EinPdf);
 
-        _tor.UnterlagenFrei.Remove((anna, firma));
+        _tor.UnterlagenFrei.Remove((anna, company));
 
         (await Json(await chefin.GetAsync($"/resumes/{anna}/documents")))
             .GetArrayLength().Should().Be(0);
@@ -300,26 +300,26 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// <strong>Die Freigabe des Lebenslaufs ist NICHT die der Unterlagen.</strong>
+    /// <strong>Die Release des Lebenslaufs ist NICHT die der Unterlagen.</strong>
     /// </summary>
     /// <remarks>
     /// Zwei Fähigkeiten, zwei Entscheidungen: ein Werdegang ist selbst
-    /// geschriebener Text, ein Zeugnis ein Dokument Dritter mit Namen und Noten
+    /// geschriebener Text, ein Reference ein Dokument Dritter mit Namen und Noten
     /// (ADR-0035). Wer das eine zeigen will und das andere nicht, muss das
-    /// können — und wenn eine Freigabe beide öffnete, könnte er es nicht.
+    /// können — und wenn eine Release beide öffnete, könnte er es nicht.
     /// </remarks>
     [Fact]
     public async Task Die_Lebenslauffreigabe_oeffnet_die_Unterlagen_nicht()
     {
         var anna = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
 
         await Lade(AlsPerson(anna), EinPdf, "z.pdf", "Zeugnis");
 
-        // NUR der Lebenslauf ist frei.
-        _tor.LebenslaufFrei.Add((anna, firma));
+        // NUR der CurriculumVitae ist frei.
+        _tor.LebenslaufFrei.Add((anna, company));
 
-        (await Json(await AlsFirma(Guid.CreateVersion7(), firma)
+        (await Json(await AlsFirma(Guid.CreateVersion7(), company)
                 .GetAsync($"/resumes/{anna}/documents")))
             .GetArrayLength().Should().Be(0);
     }
@@ -339,9 +339,9 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    /// <summary>Eine hochgeladene Datei kann DER Lebenslauf sein.</summary>
+    /// <summary>Eine hochgeladene Datei kann DER CurriculumVitae sein.</summary>
     /// <remarks>
-    /// Der zweite Weg zum Lebenslauf: wer ihn als PDF hat, soll ihn nicht
+    /// Der zweite Weg zum CurriculumVitae: wer ihn als PDF hat, soll ihn nicht
     /// abtippen müssen. Die Art wechselt, die Datei bleibt dieselbe.
     /// </remarks>
     [Fact]
@@ -354,11 +354,11 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
         (await ihr.PutAsync($"/resumes/me/documents/{id}/as-cv", content: null)).StatusCode
             .Should().Be(HttpStatusCode.NoContent);
 
-        var liste = await Json(await ihr.GetAsync("/resumes/me/documents"));
-        liste[0].GetProperty("kind").GetString().Should().Be("lebenslauf");
+        var list = await Json(await ihr.GetAsync("/resumes/me/documents"));
+        list[0].GetProperty("kind").GetString().Should().Be("lebenslauf");
     }
 
-    /// <summary>Was es nicht gibt, wird nicht zum Lebenslauf.</summary>
+    /// <summary>Was es nicht gibt, wird nicht zum CurriculumVitae.</summary>
     [Fact]
     public async Task Eine_fremde_Kennung_wird_nicht_zum_Lebenslauf()
     {
@@ -367,7 +367,7 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    /// <summary>Die Vorlage ist ein Wert, und sie kommt zurück.</summary>
+    /// <summary>Die ResumeTemplate ist ein Wert, und sie kommt zurück.</summary>
     [Fact]
     public async Task Eine_Vorlage_wird_gesetzt_und_gelesen()
     {
@@ -387,7 +387,7 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// <strong>Eine unbekannte Vorlage wird abgewiesen, nicht still gedreht.</strong>
+    /// <strong>Eine unbekannte ResumeTemplate wird abgewiesen, nicht still gedreht.</strong>
     /// </summary>
     /// <remarks>
     /// Sonst wählt jemand etwas, bekommt 204 zurück und sieht danach etwas
@@ -413,7 +413,7 @@ public class UnterlagenreiseTests(Postgres postgres) : IAsyncLifetime
     /// <strong>Die Löschung räumt Zeilen UND Dateien.</strong>
     /// </summary>
     /// <remarks>
-    /// Die Zusage aus ADR-0027, an der Stelle, an der sie am leisesten bricht:
+    /// Die Zusage aus ADR-0027, an der Job, an der sie am leisesten bricht:
     /// die Oberfläche sieht nach einer Löschung leer aus, ob die Bytes noch
     /// daliegen oder nicht. Nur ein Blick auf die Platte unterscheidet das.
     /// </remarks>

@@ -65,7 +65,13 @@ function Punkte({ punkte }: { punkte: string[] }) {
   );
 }
 
-/** <c>/imprint</c> — die Angaben nach § 5 DDG, und was davon fehlt. */
+/**
+ * <c>/imprint</c> — die Angaben nach § 5 DDG, und was davon fehlt.
+ *
+ * The last section is the GeoNames attribution. It stands here and not only in
+ * NOTICE.md because CC BY demands it towards the USERS, and nobody of them ever
+ * sees a file in the source tree.
+ */
 export function ImprintPage() {
   const { t } = useTranslation();
 
@@ -84,11 +90,6 @@ export function ImprintPage() {
         <Absatz>{t("recht.impressumStreitText")}</Absatz>
       </Abschnitt>
 
-      {/*
-        Die Namensnennung für GeoNames. Sie steht hier und nicht nur in
-        NOTICE.md, weil CC BY sie gegenüber den NUTZENDEN verlangt und eine
-        Datei im Quellbaum niemand von ihnen sieht.
-      */}
       <Abschnitt titel={t("recht.impressumDaten")}>
         <Absatz>{t("recht.impressumDatenText")}</Absatz>
       </Abschnitt>

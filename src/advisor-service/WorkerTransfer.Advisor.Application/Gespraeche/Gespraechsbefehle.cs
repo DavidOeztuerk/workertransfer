@@ -3,7 +3,7 @@ using MediatR;
 using WorkerTransfer.Advisor.Application.Nachrichten;
 using WorkerTransfer.Advisor.Application.Ports;
 using WorkerTransfer.Advisor.Domain.Gespraeche;
-using WorkerTransfer.Advisor.Domain.Mandate;
+using WorkerTransfer.Advisor.Domain.Mandates;
 using WorkerTransfer.Outbox;
 
 namespace WorkerTransfer.Advisor.Application.Gespraeche;
@@ -19,15 +19,15 @@ namespace WorkerTransfer.Advisor.Application.Gespraeche;
 /// aber nicht" wäre ein Orakel — und ein „gesperrt"-Hinweis verriete genau das,
 /// was in dieser Stufe nicht freigegeben ist: dass es etwas gibt.</para>
 /// </remarks>
-public sealed class KeinGespraech() : Exception("No such conversation");
+public sealed class NoConversation() : Exception("No such conversation");
 
 // ---------------------------------------------------------------------------
 // Eröffnen
 // ---------------------------------------------------------------------------
 
 /// <summary>Ein Unternehmen eröffnet ein Gespräch.</summary>
-public sealed record GespraechEroeffnenBefehl(
-    SubjectId Wer, TenantId Firma, string? Anlass) : IBefehl<(Gespraechsansicht Ansicht, bool Neu)>;
+public sealed record OpenConversationCommand(
+    SubjectId Wer, TenantId Firma, string? Anlass) : IBefehl<(ConversationView Ansicht, bool Neu)>;
 
 /// <summary>
 /// Legt es an — aber nur, wenn Stufe 1 schon steht und niemand ausgeschlossen
@@ -37,7 +37,7 @@ public sealed record GespraechEroeffnenBefehl(
 /// <para><strong>Die Reihenfolge ist die Zusage.</strong> Zuerst der Ledger:
 /// wer diesem Unternehmen nichts freigegeben hat, für den gibt es hier nichts —
 /// und zwar dieselbe 404 wie für einen Menschen, den es nicht gibt. Erst danach
-/// das Mandat, und auch ein Ausschluss antwortet mit derselben 404. Ein
+/// das Mandate, und auch ein Ausschluss antwortet mit derselben 404. Ein
 /// eigener Code sagte „du stehst auf ihrer Liste", und das ist eine Auskunft
 /// über einen Menschen an das Unternehmen, vor dem sie sich schützt.</para>
 ///
@@ -51,59 +51,59 @@ public sealed record GespraechEroeffnenBefehl(
 /// Nachricht nennt kein Unternehmen: sie trägt nur eine Art, und wer es war,
 /// steht hinter der Anmeldung in ihrer eigenen Liste.</para>
 /// </remarks>
-public sealed class GespraechEroeffnenHandler(
-    IGespraechsspeicher gespraeche,
-    IMandatspeicher mandate,
-    IEinwilligungstor tor,
-    IFirmenauskunft firmen,
+public sealed class OpenConversationHandler(
+    IConversationStore conversations,
+    IMandateStore mandateStore,
+    IConsentGate tor,
+    ICompanyLookup companies,
     IOutbox postausgang,
     TimeProvider uhr)
-    : IRequestHandler<GespraechEroeffnenBefehl, (Gespraechsansicht Ansicht, bool Neu)>
+    : IRequestHandler<OpenConversationCommand, (ConversationView Ansicht, bool Neu)>
 {
     /// <summary>Das Wort auf dem Draht. Dasselbe, das notification-service liest.</summary>
     public const string Art = "advisor_conversation";
 
     /// <inheritdoc />
     /// <exception cref="KeinGespraech">Nichts freigegeben, oder ausgeschlossen.</exception>
-    public async Task<(Gespraechsansicht, bool)> Handle(
-        GespraechEroeffnenBefehl request, CancellationToken cancellationToken)
+    public async Task<(ConversationView, bool)> Handle(
+        OpenConversationCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var stufen = await tor.StufenAsync([(request.Wer, request.Firma)], cancellationToken);
-        var stufe = stufen[0];
+        var stages = await tor.StagesAsync([(request.Wer, request.Firma)], cancellationToken);
+        var stage = stages[0];
 
-        if (stufe < Stufe.Profil)
+        if (stage < Stufe.Profile)
         {
-            throw new KeinGespraech();
+            throw new NoConversation();
         }
 
-        var mandat = await mandate.HoleAsync(request.Wer, cancellationToken);
+        var theMandate = await mandateStore.GetAsync(request.Wer, cancellationToken);
 
-        if (mandat is not null && await Ausgeschlossen(mandat, request.Firma, cancellationToken))
+        if (theMandate is not null && await Ausgeschlossen(theMandate, request.Firma, cancellationToken))
         {
-            throw new KeinGespraech();
+            throw new NoConversation();
         }
 
-        if (await gespraeche.HoleLaufendesAsync(request.Wer, request.Firma, cancellationToken)
+        if (await conversations.GetRunningAsync(request.Wer, request.Firma, cancellationToken)
             is { } laufendes)
         {
-            return (Gespraechsansicht.Baue(laufendes, stufe, mandat, null), false);
+            return (ConversationView.Build(laufendes, stage, theMandate, null), false);
         }
 
-        var gespraech = Gespraech.Eroeffne(
+        var conversation = Conversation.Eroeffne(
             request.Wer, request.Firma, request.Anlass, uhr.GetUtcNow());
 
-        await gespraeche.SichereAsync(gespraech, cancellationToken);
-        await postausgang.VermerkeAsync(request.Wer, Art, cancellationToken);
+        await conversations.SaveAsync(conversation, cancellationToken);
+        await postausgang.NoteAsync(request.Wer, Art, cancellationToken);
 
-        return (Gespraechsansicht.Baue(gespraech, stufe, mandat, null), true);
+        return (ConversationView.Build(conversation, stage, theMandate, null), true);
     }
 
     private async Task<bool> Ausgeschlossen(
-        Mandat mandat, TenantId firma, CancellationToken cancellationToken)
+        Mandate theMandate, TenantId company, CancellationToken cancellationToken)
     {
-        if (mandat.AusgeschlosseneUnternehmen.Count == 0)
+        if (theMandate.AusgeschlosseneUnternehmen.Count == 0)
         {
             // Kein Ausschluss heisst: gar nicht erst fragen. Ein Aufruf an
             // identity-service fuer jede Eroeffnung waere ein Sprung, der in
@@ -111,9 +111,9 @@ public sealed class GespraechEroeffnenHandler(
             return false;
         }
 
-        var bild = await firmen.HoleAsync(firma, cancellationToken);
+        var bild = await companies.GetAsync(company, cancellationToken);
 
-        return mandat.Schliesst_aus(bild?.Domain);
+        return theMandate.Schliesst_aus(bild?.Domain);
     }
 }
 
@@ -122,48 +122,48 @@ public sealed class GespraechEroeffnenHandler(
 // ---------------------------------------------------------------------------
 
 /// <summary>„Zeig mir meine Gespräche."</summary>
-public sealed record MeineGespraecheAbfrage(SubjectId Wer)
-    : IAbfrage<IReadOnlyList<Gespraechsansicht>>;
+public sealed record MyConversationsQuery(SubjectId Wer)
+    : IAbfrage<IReadOnlyList<ConversationView>>;
 
 /// <summary>Die Person sieht alle ihre Gespräche, auch die zurückgezogenen.</summary>
 /// <remarks>
 /// <strong>Ohne Stufenfilter</strong>, anders als die Firmenliste: wer eine
 /// Stufe zurückgenommen hat, muss sie wiedergeben können. Eine Liste, aus der
-/// ein Gespräch nach dem Widerruf verschwände, machte den Widerruf zur
+/// ein Gespräch nach dem Revocation verschwände, machte den Revocation zur
 /// Einbahnstraße.
 /// <para>
-/// Das Mandat kommt nicht mit: es ist ihr eigenes und steht unter
-/// <c>/advisor/me/mandate</c>. Zweimal dasselbe auszuliefern wären zwei Stellen,
+/// Das Mandate kommt nicht mit: es ist ihr eigenes und steht unter
+/// <c>/advisor/me/mandate</c>. Zweimal dasselbe auszuliefern wären zwei Jobs,
 /// an denen es später auseinanderläuft.
 /// </para>
 /// </remarks>
-public sealed class MeineGespraecheHandler(
-    IGespraechsspeicher gespraeche, IEinwilligungstor tor)
-    : IRequestHandler<MeineGespraecheAbfrage, IReadOnlyList<Gespraechsansicht>>
+public sealed class MyConversationsHandler(
+    IConversationStore conversations, IConsentGate tor)
+    : IRequestHandler<MyConversationsQuery, IReadOnlyList<ConversationView>>
 {
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Gespraechsansicht>> Handle(
-        MeineGespraecheAbfrage request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ConversationView>> Handle(
+        MyConversationsQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var meine = await gespraeche.FuerPersonAsync(request.Wer, cancellationToken);
+        var meine = await conversations.ForPersonAsync(request.Wer, cancellationToken);
 
         if (meine.Count == 0)
         {
             return [];
         }
 
-        var stufen = await tor.StufenAsync(
+        var stages = await tor.StagesAsync(
             [.. meine.Select(g => (g.Wer, g.Firma))], cancellationToken);
 
-        return [.. meine.Select((g, i) => new Gespraechsansicht(g, stufen[i]))];
+        return [.. meine.Select((g, i) => new ConversationView(g, stages[i]))];
     }
 }
 
 /// <summary>„Zeig uns unsere Gespräche."</summary>
-public sealed record FirmengespraecheAbfrage(TenantId Firma)
-    : IAbfrage<IReadOnlyList<Gespraechsansicht>>;
+public sealed record CompanyConversationsQuery(TenantId Firma)
+    : IAbfrage<IReadOnlyList<ConversationView>>;
 
 /// <summary>
 /// Das Unternehmen sieht, was auf Stufe 1 oder höher steht — und sonst nichts.
@@ -182,45 +182,45 @@ public sealed record FirmengespraecheAbfrage(TenantId Firma)
 /// und nur für die Zeilen, die Stufe 3 tragen. Über wen nichts freigegeben ist,
 /// über den wird auch nichts nachgeschlagen.</para>
 /// </remarks>
-public sealed class FirmengespraecheHandler(
-    IGespraechsspeicher gespraeche,
-    IMandatspeicher mandate,
-    IEinwilligungstor tor,
+public sealed class CompanyConversationsHandler(
+    IConversationStore conversations,
+    IMandateStore mandateStore,
+    IConsentGate tor,
     IPersonenauskunft personen)
-    : IRequestHandler<FirmengespraecheAbfrage, IReadOnlyList<Gespraechsansicht>>
+    : IRequestHandler<CompanyConversationsQuery, IReadOnlyList<ConversationView>>
 {
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Gespraechsansicht>> Handle(
-        FirmengespraecheAbfrage request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ConversationView>> Handle(
+        CompanyConversationsQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var ihre = await gespraeche.FuerFirmaAsync(request.Firma, cancellationToken);
+        var ihre = await conversations.ForCompanyAsync(request.Firma, cancellationToken);
 
         if (ihre.Count == 0)
         {
             return [];
         }
 
-        var stufen = await tor.StufenAsync(
+        var stages = await tor.StagesAsync(
             [.. ihre.Select(g => (g.Wer, g.Firma))], cancellationToken);
 
-        var ansichten = new List<Gespraechsansicht>(ihre.Count);
+        var ansichten = new List<ConversationView>(ihre.Count);
 
         for (var i = 0; i < ihre.Count; i++)
         {
-            if (stufen[i] < Stufe.Profil)
+            if (stages[i] < Stufe.Profile)
             {
                 continue;
             }
 
-            var mandat = await mandate.HoleAsync(ihre[i].Wer, cancellationToken);
+            var theMandate = await mandateStore.GetAsync(ihre[i].Wer, cancellationToken);
 
-            var person = stufen[i] >= Stufe.Person
-                ? await personen.HoleAsync(ihre[i].Wer, cancellationToken)
+            var person = stages[i] >= Stufe.Person
+                ? await personen.GetAsync(ihre[i].Wer, cancellationToken)
                 : null;
 
-            ansichten.Add(Gespraechsansicht.Baue(ihre[i], stufen[i], mandat, person));
+            ansichten.Add(ConversationView.Build(ihre[i], stages[i], theMandate, person));
         }
 
         return ansichten;
@@ -228,47 +228,47 @@ public sealed class FirmengespraecheHandler(
 }
 
 /// <summary>„Zeig uns dieses eine Gespräch."</summary>
-public sealed record FirmengespraechAbfrage(Guid Id, TenantId Firma)
-    : IAbfrage<Gespraechsansicht>;
+public sealed record CompanyConversationQuery(Guid Id, TenantId Firma)
+    : IAbfrage<ConversationView>;
 
 /// <summary>Eines — oder 404, aus jedem der drei Gründe.</summary>
-public sealed class FirmengespraechHandler(
-    IGespraechsspeicher gespraeche,
-    IMandatspeicher mandate,
-    IEinwilligungstor tor,
+public sealed class CompanyConversationHandler(
+    IConversationStore conversations,
+    IMandateStore mandateStore,
+    IConsentGate tor,
     IPersonenauskunft personen)
-    : IRequestHandler<FirmengespraechAbfrage, Gespraechsansicht>
+    : IRequestHandler<CompanyConversationQuery, ConversationView>
 {
     /// <inheritdoc />
     /// <exception cref="KeinGespraech">Gibt es nicht, gehört anderen, oder Stufe 0.</exception>
-    public async Task<Gespraechsansicht> Handle(
-        FirmengespraechAbfrage request, CancellationToken cancellationToken)
+    public async Task<ConversationView> Handle(
+        CompanyConversationQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var gespraech = await gespraeche.HoleAsync(request.Id, cancellationToken);
+        var conversation = await conversations.GetAsync(request.Id, cancellationToken);
 
         // „Gehoert einem anderen Unternehmen" und „gibt es nicht" antworten
-        // gleich: ein Unterschied verriete, dass dieses Gespraech existiert.
-        if (gespraech is null || gespraech.Firma != request.Firma)
+        // gleich: ein Unterschied verriete, dass dieses Conversation existiert.
+        if (conversation is null || conversation.Firma != request.Firma)
         {
-            throw new KeinGespraech();
+            throw new NoConversation();
         }
 
-        var stufen = await tor.StufenAsync(
-            [(gespraech.Wer, gespraech.Firma)], cancellationToken);
+        var stages = await tor.StagesAsync(
+            [(conversation.Wer, conversation.Firma)], cancellationToken);
 
-        if (stufen[0] < Stufe.Profil)
+        if (stages[0] < Stufe.Profile)
         {
-            throw new KeinGespraech();
+            throw new NoConversation();
         }
 
-        var mandat = await mandate.HoleAsync(gespraech.Wer, cancellationToken);
+        var theMandate = await mandateStore.GetAsync(conversation.Wer, cancellationToken);
 
-        var person = stufen[0] >= Stufe.Person
-            ? await personen.HoleAsync(gespraech.Wer, cancellationToken)
+        var person = stages[0] >= Stufe.Person
+            ? await personen.GetAsync(conversation.Wer, cancellationToken)
             : null;
 
-        return Gespraechsansicht.Baue(gespraech, stufen[0], mandat, person);
+        return ConversationView.Build(conversation, stages[0], theMandate, person);
     }
 }

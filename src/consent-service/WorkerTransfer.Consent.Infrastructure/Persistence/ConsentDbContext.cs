@@ -96,17 +96,17 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options)
     /// mapping beside it.
     /// </remarks>
     private static readonly ValueConverter<ConsentAction, string> Handlungswert = new(
-        wert => wert == ConsentAction.Grant
+        value => value == ConsentAction.Grant
             ? "GRANT"
-            : wert == ConsentAction.Revoke ? "REVOKE" : "DELETE",
+            : value == ConsentAction.Revoke ? "REVOKE" : "DELETE",
         text => text == "GRANT"
             ? ConsentAction.Grant
             : text == "REVOKE" ? ConsentAction.Revoke : ConsentAction.Delete);
 
     private static readonly ValueConverter<AuditAction, string> Pruefhandlungswert = new(
-        wert => wert == AuditAction.ConsentGrant
+        value => value == AuditAction.ConsentGrant
             ? "consent_grant"
-            : wert == AuditAction.ConsentRevoke ? "consent_revoke" : "consent_delete",
+            : value == AuditAction.ConsentRevoke ? "consent_revoke" : "consent_delete",
         text => text == "consent_grant"
             ? AuditAction.ConsentGrant
             : text == "consent_revoke" ? AuditAction.ConsentRevoke : AuditAction.ConsentDelete);

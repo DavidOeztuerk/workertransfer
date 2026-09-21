@@ -7,10 +7,10 @@ using WorkerTransfer.Outbox;
 namespace WorkerTransfer.Advisor.Infrastructure.Benachrichtigung;
 
 /// <summary>Wohin Benachrichtigungen gehen, und was sie als unsere ausweist.</summary>
-public sealed class Benachrichtigungseinstellungen
+public sealed class NotificationSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Notifications";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Notifications";
 
     /// <summary>Die Basisadresse des notification-service.</summary>
     public string Adresse { get; set; } = string.Empty;
@@ -39,13 +39,13 @@ public sealed class Benachrichtigungseinstellungen
 /// </remarks>
 public sealed class HttpBenachrichtigung(
     IHttpClientFactory fabrik,
-    IOptions<Benachrichtigungseinstellungen> einstellungen) : IZustellung
+    IOptions<NotificationSettings> einstellungen) : IDelivery
 {
-    private readonly Benachrichtigungseinstellungen _einstellungen = einstellungen.Value;
+    private readonly NotificationSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task ZustelleAsync(
-        SubjectId empfaenger, string art, CancellationToken cancellationToken = default)
+    public async Task DeliverAsync(
+        SubjectId recipient, string kind, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(_einstellungen.Adresse))
         {
@@ -61,19 +61,19 @@ public sealed class HttpBenachrichtigung(
 
         client.Timeout = _einstellungen.Zeitueberschreitung;
 
-        using var anfrage = new HttpRequestMessage(
+        using var request = new HttpRequestMessage(
             HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), "/internal/notifications"))
         {
             // Der ganze Inhalt: ueber wen und welcher Art. KEIN Firmenname,
             // kein Text, kein Grund — die Art genuegt, und wer es war, steht
             // hinter der Anmeldung in der eigenen Liste der Person.
-            Content = JsonContent.Create(new GespraechsmeldungV1(empfaenger.Value, art))
+            Content = JsonContent.Create(new ConversationNotificationV1(recipient.Value, kind))
         };
 
-        anfrage.Headers.Add("X-Notify-Secret", _einstellungen.Geheimnis);
+        request.Headers.Add("X-Notify-Secret", _einstellungen.Geheimnis);
 
-        using var antwort = await client.SendAsync(anfrage, cancellationToken);
+        using var response = await client.SendAsync(request, cancellationToken);
 
-        antwort.EnsureSuccessStatusCode();
+        response.EnsureSuccessStatusCode();
     }
 }

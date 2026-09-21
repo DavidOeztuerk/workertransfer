@@ -60,9 +60,9 @@ public class AdresseBestaetigenTests
         EsGibtDenToken();
         var konto = EsGibtDasKonto();
 
-        var ergebnis = await Bestaetige();
+        var result = await Bestaetige();
 
-        ergebnis.Should().BeOfType<Bestaetigungsergebnis.Bestaetigt>();
+        result.Should().BeOfType<Bestaetigungsergebnis.Bestaetigt>();
         konto.Status.Should().Be(AccountStatus.Active);
         await _benutzer.Received().SaveAsync(konto, Arg.Any<CancellationToken>());
         await _tokens.Received(1).ConsumeAsync(
@@ -158,9 +158,9 @@ public class AdresseBestaetigenTests
             _firmen.FindByDomainAsync(Arg.Any<EmailDomain>(), Arg.Any<CancellationToken>())
                 .Returns((Company?)null);
 
-            var ergebnis = await Bestaetige();
+            var result = await Bestaetige();
 
-            ergebnis.Should().BeOfType<Bestaetigungsergebnis.Bestaetigt>()
+            result.Should().BeOfType<Bestaetigungsergebnis.Bestaetigt>()
                 .Which.Firmenname.Should().Be("Beispiel GmbH");
             await _firmen.Received(1).AddAsync(
                 Arg.Is<Company>(f => f.Domain.Value == "firma.example"),
@@ -197,9 +197,9 @@ public class AdresseBestaetigenTests
                     TenantId.New(), "Andere GmbH",
                     new EmailDomain("firma.example"), TenantStatus.Active));
 
-            var ergebnis = await Bestaetige();
+            var result = await Bestaetige();
 
-            var bestaetigt = ergebnis.Should().BeOfType<Bestaetigungsergebnis.Bestaetigt>().Which;
+            var bestaetigt = result.Should().BeOfType<Bestaetigungsergebnis.Bestaetigt>().Which;
             bestaetigt.Firmenfehler.Should().Be("domain_already_claimed");
             bestaetigt.Firmenname.Should().BeNull();
             konto.Status.Should().Be(AccountStatus.Active);
@@ -241,9 +241,9 @@ public class AdresseBestaetigenTests
             _firmen.FindByDomainAsync(Arg.Any<EmailDomain>(), Arg.Any<CancellationToken>())
                 .Returns((Company?)null);
 
-            var ergebnis = await Bestaetige();
+            var result = await Bestaetige();
 
-            ergebnis.Should().BeOfType<Bestaetigungsergebnis.Bestaetigt>()
+            result.Should().BeOfType<Bestaetigungsergebnis.Bestaetigt>()
                 .Which.Firmenfehler.Should().Be("public_email_domain");
             await _firmen.DidNotReceive().AddAsync(
                 Arg.Any<Company>(), Arg.Any<CancellationToken>());

@@ -45,7 +45,7 @@ public sealed record EmailDomain
         Value = raw.Trim().ToLowerInvariant();
     }
 
-    /// <summary>The domain, lower case.</summary>
+    /// <summary>The domain, lower caseItem.</summary>
     public string Value { get; }
 
     /// <summary>The domain of an address.</summary>

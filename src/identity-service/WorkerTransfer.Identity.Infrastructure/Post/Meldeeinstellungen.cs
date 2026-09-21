@@ -6,10 +6,10 @@ namespace WorkerTransfer.Identity.Infrastructure.Post;
 /// anstoßen" und „darf alles über einen Menschen löschen" dürfen nicht dasselbe
 /// Papier sein (ADR-0027 §4.4). Leer heißt zu.
 /// </remarks>
-public sealed class Meldeeinstellungen
+public sealed class NotifySettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Notify";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Notify";
 
     /// <summary>Das gemeinsame Geheimnis.</summary>
     public string Geheimnis { get; set; } = string.Empty;

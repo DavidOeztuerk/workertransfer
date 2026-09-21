@@ -1,22 +1,22 @@
 using Noelia.Core.Identity;
-using WorkerTransfer.Advisor.Domain.Mandate;
+using WorkerTransfer.Advisor.Domain.Mandates;
 
 namespace WorkerTransfer.Advisor.Domain.Gespraeche;
 
 /// <summary>Dieser Schritt ist von hier aus nicht möglich.</summary>
-public sealed class UebergangNichtErlaubt(Gespraechsstand jetzt, string was)
-    : Exception($"A {Gespraechsstaende.Wort(jetzt)} conversation cannot be {was}");
+public sealed class UebergangNichtErlaubt(ConversationState now, string was)
+    : Exception($"A {ConversationStates.Wort(now)} conversation cannot be {was}");
 
 /// <summary>Das ist das Gespräch eines anderen Menschen.</summary>
 public sealed class NichtDeins() : Exception("This conversation belongs to someone else");
 
 /// <summary>Wo ein Gespräch steht.</summary>
 /// <remarks>
-/// Vier Stände, und keiner davon ist eine Stufe. Der Stand sagt, ob noch
+/// Vier Stände, und keiner davon ist eine Stufe. Der State sagt, ob noch
 /// gesprochen wird; die <see cref="Stufe"/> sagt, wie weit geöffnet ist — und
 /// sie kommt aus dem Ledger, nicht von hier.
 /// </remarks>
-public enum Gespraechsstand
+public enum ConversationState
 {
     /// <summary>Man spricht.</summary>
     Laufend,
@@ -31,23 +31,23 @@ public enum Gespraechsstand
     Beendet
 }
 
-/// <summary>Die Worte, mit denen ein Stand auf der Leitung steht.</summary>
-public static class Gespraechsstaende
+/// <summary>Die Worte, mit denen ein State auf der Leitung steht.</summary>
+public static class ConversationStates
 {
-    /// <summary>Das Wort zum Stand.</summary>
-    public static string Wort(Gespraechsstand stand) => stand switch
+    /// <summary>Das Wort zum State.</summary>
+    public static string Wort(ConversationState state) => state switch
     {
-        Gespraechsstand.Laufend => "talking",
-        Gespraechsstand.Zugestimmt => "agreed",
-        Gespraechsstand.Uebergeben => "handed_over",
-        Gespraechsstand.Beendet => "ended",
-        _ => throw new ArgumentOutOfRangeException(nameof(stand))
+        ConversationState.Laufend => "talking",
+        ConversationState.Zugestimmt => "agreed",
+        ConversationState.Uebergeben => "handed_over",
+        ConversationState.Beendet => "ended",
+        _ => throw new ArgumentOutOfRangeException(nameof(state))
     };
 
     /// <summary>Die Stände, in denen noch gesprochen wird.</summary>
-    public static readonly IReadOnlyList<Gespraechsstand> Laufende =
+    public static readonly IReadOnlyList<ConversationState> Laufende =
     [
-        Gespraechsstand.Laufend, Gespraechsstand.Zugestimmt
+        ConversationState.Laufend, ConversationState.Zugestimmt
     ];
 }
 
@@ -55,14 +55,14 @@ public static class Gespraechsstaende
 /// Ein Gespräch zwischen einem Menschen und einem Unternehmen.
 /// </summary>
 /// <remarks>
-/// <para><strong>Es lebt hier, solange es um Stufen und Mandat geht</strong>
-/// (ADR-0037 Entscheidung 4). Erst die Einigung wird ein Vorgang in
+/// <para><strong>Es lebt hier, solange es um Stufen und Mandate geht</strong>
+/// (ADR-0037 Entscheidung 4). Erst die Einigung wird ein Case in
 /// transfer-service — und dort steht der Dreieckskonsens, der hier
 /// ausdrücklich <em>nicht</em> nachgebaut wird.</para>
 ///
-/// <para><strong>Keine Stufenspalte.</strong> Ein <c>hasStage</c> wäre die
+/// <para><strong>None Stufenspalte.</strong> Ein <c>hasStage</c> wäre die
 /// Stufe als zweite Tür neben dem Ledger; die Stufe wird bei jedem Lesen dort
-/// erfragt. Was dieses Aggregat hält, ist die Beziehung und ihr Stand, sonst
+/// erfragt. Was dieses Aggregat hält, ist die Beziehung und ihr State, sonst
 /// nichts.</para>
 ///
 /// <para><strong>Und kein Nachrichtenverlauf.</strong> ADR-0037 Entscheidung 5
@@ -71,24 +71,24 @@ public static class Gespraechsstaende
 /// Der <see cref="Anlass"/> ist das eine Feld, das die Firma beim Eröffnen
 /// schreibt.</para>
 /// </remarks>
-public sealed class Gespraech
+public sealed class Conversation
 {
     /// <summary>Wie lang der Anlass sein darf.</summary>
     public const int HoechstlaengeAnlass = 2000;
 
-    private Gespraech(
+    private Conversation(
         Guid id,
-        SubjectId wer,
-        TenantId firma,
-        Gespraechsstand stand,
+        SubjectId subject,
+        TenantId company,
+        ConversationState state,
         string anlass,
         DateTimeOffset eroeffnetAm,
         DateTimeOffset geaendertAm)
     {
         Id = id;
-        Wer = wer;
-        Firma = firma;
-        Stand = stand;
+        Wer = subject;
+        Firma = company;
+        State = state;
         Anlass = anlass;
         EroeffnetAm = eroeffnetAm;
         GeaendertAm = geaendertAm;
@@ -104,7 +104,7 @@ public sealed class Gespraech
     public TenantId Firma { get; }
 
     /// <summary>Wo es steht.</summary>
-    public Gespraechsstand Stand { get; private set; }
+    public ConversationState State { get; private set; }
 
     /// <summary>Was das Unternehmen beim Eröffnen geschrieben hat.</summary>
     public string Anlass { get; }
@@ -116,72 +116,72 @@ public sealed class Gespraech
     public DateTimeOffset GeaendertAm { get; private set; }
 
     /// <summary>Läuft es noch?</summary>
-    public bool Laeuft => Gespraechsstaende.Laufende.Contains(Stand);
+    public bool Laeuft => ConversationStates.Laufende.Contains(State);
 
     /// <summary>Ein Unternehmen eröffnet ein Gespräch.</summary>
     /// <exception cref="Eingabefehler">Der Anlass ist zu lang.</exception>
-    public static Gespraech Eroeffne(
-        SubjectId wer, TenantId firma, string? anlass, DateTimeOffset jetzt) =>
-        new(Guid.CreateVersion7(), wer, firma, Gespraechsstand.Laufend,
-            Text(anlass), jetzt, jetzt);
+    public static Conversation Eroeffne(
+        SubjectId subject, TenantId company, string? anlass, DateTimeOffset now) =>
+        new(Guid.CreateVersion7(), subject, company, ConversationState.Laufend,
+            Text(anlass), now, now);
 
     /// <summary>Das Gespräch, wie eine Zeile es hält.</summary>
-    public static Gespraech Stelle_her(
+    public static Conversation Stelle_her(
         Guid id,
-        SubjectId wer,
-        TenantId firma,
-        Gespraechsstand stand,
+        SubjectId subject,
+        TenantId company,
+        ConversationState state,
         string anlass,
         DateTimeOffset eroeffnetAm,
         DateTimeOffset geaendertAm) =>
-        new(id, wer, firma, stand, anlass, eroeffnetAm, geaendertAm);
+        new(id, subject, company, state, anlass, eroeffnetAm, geaendertAm);
 
     /// <summary>Die Person ist einverstanden.</summary>
     /// <remarks>
     /// Nur die Person, und das ist der ganze Punkt: die Zustimmung, aus der ein
-    /// Vorgang wird, gehört dem Menschen, um den es geht.
+    /// Case wird, gehört dem Menschen, um den es geht.
     /// </remarks>
-    public void Stimme_zu(SubjectId durch, DateTimeOffset jetzt)
+    public void Stimme_zu(SubjectId durch, DateTimeOffset now)
     {
         Meins(durch);
-        Genau(Gespraechsstand.Laufend, "agreed to");
-        Nach(Gespraechsstand.Zugestimmt, jetzt);
+        Genau(ConversationState.Laufend, "agreed to");
+        Nach(ConversationState.Zugestimmt, now);
     }
 
     /// <summary>
-    /// Das Unternehmen macht daraus einen Vorgang.
+    /// Das Unternehmen macht daraus einen Case.
     /// </summary>
     /// <remarks>
     /// <strong>Erst nach der Zustimmung der Person</strong> — und deshalb ist
-    /// die Übergabe ein Schritt des Unternehmens: der Vorgang in
+    /// die Übergabe ein Schritt des Unternehmens: der Case in
     /// transfer-service beginnt damit, dass ein Unternehmen Interesse zeigt,
     /// und dort greifen dann dessen eigene Bedingungen (Marktfreigabe,
     /// Ansprechbarkeit). Hier wird davon nichts wiederholt.
     /// </remarks>
-    public void Uebergib(DateTimeOffset jetzt)
+    public void Uebergib(DateTimeOffset now)
     {
-        Genau(Gespraechsstand.Zugestimmt, "handed over");
-        Nach(Gespraechsstand.Uebergeben, jetzt);
+        Genau(ConversationState.Zugestimmt, "handed over");
+        Nach(ConversationState.Uebergeben, now);
     }
 
     /// <summary>Jemand beendet das Gespräch.</summary>
     /// <remarks>
-    /// Aus jedem laufenden Stand, von beiden Seiten. Ein Verfahren, aus dem man
+    /// Aus jedem laufenden State, von beiden Seiten. Ein Verfahren, aus dem man
     /// nicht aussteigen kann, ist kein Verfahren, sondern eine Falle.
     /// </remarks>
-    public void Beende(DateTimeOffset jetzt)
+    public void Beende(DateTimeOffset now)
     {
         if (!Laeuft)
         {
-            throw new UebergangNichtErlaubt(Stand, "ended");
+            throw new UebergangNichtErlaubt(State, "ended");
         }
 
-        Nach(Gespraechsstand.Beendet, jetzt);
+        Nach(ConversationState.Beendet, now);
     }
 
-    private static string Text(string? wert)
+    private static string Text(string? value)
     {
-        var bereinigt = (wert ?? string.Empty).Trim();
+        var bereinigt = (value ?? string.Empty).Trim();
 
         return bereinigt.Length > HoechstlaengeAnlass
             ? throw new Eingabefehler(
@@ -197,47 +197,47 @@ public sealed class Gespraech
         }
     }
 
-    private void Genau(Gespraechsstand gewollt, string was)
+    private void Genau(ConversationState gewollt, string was)
     {
-        if (Stand != gewollt)
+        if (State != gewollt)
         {
-            throw new UebergangNichtErlaubt(Stand, was);
+            throw new UebergangNichtErlaubt(State, was);
         }
     }
 
-    private void Nach(Gespraechsstand ziel, DateTimeOffset jetzt)
+    private void Nach(ConversationState target, DateTimeOffset now)
     {
-        Stand = ziel;
-        GeaendertAm = jetzt;
+        State = target;
+        GeaendertAm = now;
     }
 }
 
 /// <summary>Findet und speichert Gespräche.</summary>
-public interface IGespraechsspeicher
+public interface IConversationStore
 {
     /// <summary>Ein Gespräch, oder <c>null</c>.</summary>
-    Task<Gespraech?> HoleAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Conversation?> GetAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>Das laufende Gespräch zwischen diesen beiden, falls es eines gibt.</summary>
     /// <remarks>
     /// Genau eines je (Mensch, Unternehmen) — sonst stünden zwei Stufenstände
     /// nebeneinander, die dieselben Fähigkeiten meinen.
     /// </remarks>
-    Task<Gespraech?> HoleLaufendesAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default);
+    Task<Conversation?> GetRunningAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default);
 
     /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(Gespraech gespraech, CancellationToken cancellationToken = default);
+    Task SaveAsync(Conversation conversation, CancellationToken cancellationToken = default);
 
     /// <summary>Die Gespräche dieser Person, neueste zuerst.</summary>
-    Task<IReadOnlyList<Gespraech>> FuerPersonAsync(
-        SubjectId wer, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Conversation>> ForPersonAsync(
+        SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Die Gespräche dieses Unternehmens, neueste zuerst.</summary>
-    Task<IReadOnlyList<Gespraech>> FuerFirmaAsync(
-        TenantId firma, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Conversation>> ForCompanyAsync(
+        TenantId company, CancellationToken cancellationToken = default);
 
     /// <summary>Alles, was dieser Dienst über einen Menschen hält.</summary>
     /// <returns>Wie viel absichtlich stehen blieb. Immer null.</returns>
-    Task<int> LoescheAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task<int> DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default);
 }

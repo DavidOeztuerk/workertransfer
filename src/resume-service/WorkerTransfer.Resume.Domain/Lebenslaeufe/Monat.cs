@@ -32,32 +32,32 @@ public sealed partial record Monat : IComparable<Monat>
 
     /// <summary>Reads <c>YYYY-MM</c>, or throws.</summary>
     /// <exception cref="Lebenslaufregel">The text is not a month.</exception>
-    public static Monat Lies(string wert) =>
-        Versuche(wert, out var monat)
+    public static Monat Lies(string value) =>
+        Versuche(value, out var monat)
             ? monat
-            : throw new Lebenslaufregel(
-                Regelcodes.Monat, $"Erwartet wurde YYYY-MM, gelesen wurde '{wert}'.");
+            : throw new ResumeRule(
+                Regelcodes.Monat, $"Erwartet wurde YYYY-MM, gelesen wurde '{value}'.");
 
     /// <summary>Reads <c>YYYY-MM</c> without throwing.</summary>
-    public static bool Versuche(string? wert, out Monat monat)
+    public static bool Versuche(string? value, out Monat monat)
     {
         monat = null!;
 
-        if (wert is null)
+        if (value is null)
         {
             return false;
         }
 
-        var treffer = Muster().Match(wert.Trim());
+        var hit = Muster().Match(value.Trim());
 
-        if (!treffer.Success)
+        if (!hit.Success)
         {
             return false;
         }
 
         monat = new Monat(
-            int.Parse(treffer.Groups[1].Value, CultureInfo.InvariantCulture),
-            int.Parse(treffer.Groups[2].Value, CultureInfo.InvariantCulture));
+            int.Parse(hit.Groups[1].Value, CultureInfo.InvariantCulture),
+            int.Parse(hit.Groups[2].Value, CultureInfo.InvariantCulture));
 
         return true;
     }

@@ -1,38 +1,38 @@
 using System.Text.Json;
 using Noelia.Core.Identity;
 using Microsoft.EntityFrameworkCore;
-using WorkerTransfer.Companies.Domain.Arbeitgeberprofile;
+using WorkerTransfer.Companies.Domain.EmployerProfiles;
 
 namespace WorkerTransfer.Companies.Infrastructure.Persistence;
 
 /// <summary>Liest und schreibt <c>company_profiles</c>.</summary>
-public sealed class EfProfilspeicher(CompaniesDbContext kontext) : IProfilspeicher
+public sealed class EfProfileStore(CompaniesDbContext context) : IProfileStore
 {
     /// <inheritdoc />
-    public async Task<Arbeitgeberprofil?> HoleAsync(
-        TenantId firma, CancellationToken cancellationToken = default)
+    public async Task<EmployerProfile?> GetAsync(
+        TenantId company, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Profile
-            .FirstOrDefaultAsync(kandidat => kandidat.Id == firma.Value, cancellationToken);
+        var row = await context.Profile
+            .FirstOrDefaultAsync(kandidat => kandidat.Id == company.Value, cancellationToken);
 
-        return zeile is null ? null : ZumAggregat(zeile);
+        return row is null ? null : ZumAggregat(row);
     }
 
     /// <inheritdoc />
-    public async Task<Arbeitgeberprofil?> HoleAsync(
-        string kuerzel, CancellationToken cancellationToken = default)
+    public async Task<EmployerProfile?> GetAsync(
+        string slug, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Profile
-            .FirstOrDefaultAsync(kandidat => kandidat.Slug == kuerzel, cancellationToken);
+        var row = await context.Profile
+            .FirstOrDefaultAsync(kandidat => kandidat.Slug == slug, cancellationToken);
 
-        return zeile is null ? null : ZumAggregat(zeile);
+        return row is null ? null : ZumAggregat(row);
     }
 
     /// <inheritdoc />
-    public async Task<string> FreiesKuerzelAsync(
+    public async Task<string> FreeSlugAsync(
         string gewuenscht, CancellationToken cancellationToken = default)
     {
-        var vergeben = await kontext.Profile
+        var vergeben = await context.Profile
             .Where(kandidat => kandidat.Slug.StartsWith(gewuenscht))
             .Select(kandidat => kandidat.Slug)
             .ToListAsync(cancellationToken);
@@ -57,70 +57,70 @@ public sealed class EfProfilspeicher(CompaniesDbContext kontext) : IProfilspeich
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(
-        Arbeitgeberprofil profil, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        EmployerProfile profile, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(profil);
+        ArgumentNullException.ThrowIfNull(profile);
 
-        var vorhanden = await kontext.Profile
+        var vorhanden = await context.Profile
             .AsTracking()
-            .FirstOrDefaultAsync(kandidat => kandidat.Id == profil.Firma.Value, cancellationToken);
+            .FirstOrDefaultAsync(kandidat => kandidat.Id == profile.Firma.Value, cancellationToken);
 
         if (vorhanden is null)
         {
-            kontext.Profile.Add(ZurZeile(profil));
+            context.Profile.Add(ZurZeile(profile));
             return;
         }
 
-        Uebertrage(profil, vorhanden);
+        Uebertrage(profile, vorhanden);
     }
 
-    private static Arbeitgeberprofil ZumAggregat(ProfilZeile zeile) =>
-        Arbeitgeberprofil.Stelle_her(
-            new TenantId(zeile.Id),
-            zeile.Slug,
-            zeile.DisplayName,
-            zeile.About,
-            zeile.Website,
-            Liste(zeile.Locations),
-            Liste(zeile.Benefits),
-            new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
-            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero),
-            zeile.Line1,
-            zeile.PostalCode,
-            zeile.City,
-            zeile.Country,
-            zeile.Phone);
+    private static EmployerProfile ZumAggregat(ProfileRow row) =>
+        EmployerProfile.Stelle_her(
+            new TenantId(row.Id),
+            row.Slug,
+            row.DisplayName,
+            row.About,
+            row.Website,
+            Liste(row.Locations),
+            Liste(row.Benefits),
+            new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
+            new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero),
+            row.Line1,
+            row.PostalCode,
+            row.City,
+            row.Country,
+            row.Phone);
 
-    private static ProfilZeile ZurZeile(Arbeitgeberprofil profil)
+    private static ProfileRow ZurZeile(EmployerProfile profile)
     {
-        var zeile = new ProfilZeile
+        var row = new ProfileRow
         {
-            Id = profil.Firma.Value,
+            Id = profile.Firma.Value,
             // Das Kürzel steht nur hier und nicht in `Uebertrage`: es wird
             // einmal vergeben und danach nie wieder geschrieben.
-            Slug = profil.Kuerzel,
-            CreatedAt = profil.AngelegtAm.UtcDateTime
+            Slug = profile.Slug,
+            CreatedAt = profile.AngelegtAm.UtcDateTime
         };
 
-        Uebertrage(profil, zeile);
+        Uebertrage(profile, row);
 
-        return zeile;
+        return row;
     }
 
-    private static void Uebertrage(Arbeitgeberprofil profil, ProfilZeile zeile)
+    private static void Uebertrage(EmployerProfile profile, ProfileRow row)
     {
-        zeile.DisplayName = profil.Anzeigename;
-        zeile.About = profil.UeberUns;
-        zeile.Website = profil.Netzseite;
-        zeile.Locations = JsonSerializer.Serialize(profil.Orte);
-        zeile.Benefits = JsonSerializer.Serialize(profil.Leistungen);
-        zeile.Line1 = profil.Zeile1;
-        zeile.PostalCode = profil.Postleitzahl;
-        zeile.City = profil.Ort;
-        zeile.Country = profil.Land;
-        zeile.Phone = profil.Telefon;
-        zeile.UpdatedAt = profil.GeaendertAm.UtcDateTime;
+        row.DisplayName = profile.Anzeigename;
+        row.About = profile.UeberUns;
+        row.Website = profile.Netzseite;
+        row.Locations = JsonSerializer.Serialize(profile.Orte);
+        row.Benefits = JsonSerializer.Serialize(profile.Leistungen);
+        row.Line1 = profile.Zeile1;
+        row.PostalCode = profile.Postleitzahl;
+        row.City = profile.Ort;
+        row.Country = profile.Land;
+        row.Phone = profile.Telefon;
+        row.UpdatedAt = profile.GeaendertAm.UtcDateTime;
     }
 
     private static IReadOnlyList<string> Liste(string jsonb) =>

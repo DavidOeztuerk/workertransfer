@@ -8,21 +8,21 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Jobs.Application.Ports;
-using WorkerTransfer.ServiceDefaults.Rollen;
+using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Jobs.Tests;
 
 /// <summary>Ein Entwerfer, der aufschreibt statt zu fragen.</summary>
-public sealed class Probeentwerfer : IEntwerfer
+public sealed class Probeentwerfer : IDrafter
 {
     /// <summary>Was zuletzt hinausgegangen wäre — das ist die interessante Frage.</summary>
-    public Anzeigenentwurf? Letzter { get; private set; }
+    public AdvertDraft? Letzter { get; private set; }
 
-    public Task<string> EntwirfAsync(
-        Anzeigenentwurf entwurf, CancellationToken cancellationToken = default)
+    public Task<string> DraftAsync(
+        AdvertDraft draft, CancellationToken cancellationToken = default)
     {
-        Letzter = entwurf;
+        Letzter = draft;
         return Task.FromResult("Wir suchen jemanden für verteilte Systeme.");
     }
 }
@@ -44,18 +44,18 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:jobs", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", Rueckzugsgeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IEntwerfer>(_ => _entwerfer));
+                services.Replace(ServiceDescriptor.Scoped<IDrafter>(_ => _entwerfer));
                 // Der Draht zu identity-service. Die Vorgabe ist `admin`, damit
                 // die bestehenden Reisen weiter das messen, wofuer sie da sind;
                 // `Rollenreise` dreht ihn auf `member` und prueft die Rolle.
-                dienste.Replace(ServiceDescriptor.Scoped<IFirmenrollen>(_ => _rollen));
+                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => _rollen));
             });
         });
 
@@ -68,7 +68,7 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsFirma(Guid firma) => Mit(Tokenform.Firma(Guid.CreateVersion7(), firma));
+    private HttpClient AlsFirma(Guid company) => Mit(Tokenform.Firma(Guid.CreateVersion7(), company));
 
     private HttpClient AlsPerson() => Mit(Tokenform.Person(Guid.CreateVersion7()));
 
@@ -83,11 +83,11 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
-    private static Task<HttpResponseMessage> Schreibe(
-        HttpClient browser, string titel = "Entwicklerin", params string[] faehigkeiten) =>
+    private static Task<HttpResponseMessage> Write(
+        HttpClient browser, string titel = "Entwicklerin", params string[] skills) =>
         browser.PostAsJsonAsync("/jobs", new
         {
             title = titel,
@@ -95,12 +95,12 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
             location = "Berlin",
             remote_mode = "hybrid",
             employment_type = "full_time",
-            skills = faehigkeiten.Length > 0 ? faehigkeiten : ["C#", "Postgres"]
+            skills = skills.Length > 0 ? skills : ["C#", "Postgres"]
         });
 
-    private async Task<Guid> Veroeffentlicht(HttpClient browser, params string[] faehigkeiten)
+    private async Task<Guid> Veroeffentlicht(HttpClient browser, params string[] skills)
     {
-        var angelegt = await Schreibe(browser, faehigkeiten: faehigkeiten);
+        var angelegt = await Write(browser, skills: skills);
         var id = (await Json(angelegt)).GetProperty("id").GetGuid();
 
         (await browser.PostAsync($"/jobs/{id}/publish", null))
@@ -110,14 +110,14 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Wer eine Anzeige schreibt, soll sie lesen können, bevor Bewerbungen
+    /// Wer eine Anzeige schreibt, soll sie lesen können, bevor Applications
     /// darauf eingehen.
     /// </summary>
     [Fact]
     public async Task Eine_neue_Anzeige_ist_ein_Entwurf_und_nicht_sichtbar()
     {
-        var firma = Guid.CreateVersion7();
-        var angelegt = await Schreibe(AlsFirma(firma));
+        var company = Guid.CreateVersion7();
+        var angelegt = await Write(AlsFirma(company));
 
         angelegt.StatusCode.Should().Be(HttpStatusCode.Created);
         (await Json(angelegt)).GetProperty("status").GetString().Should().Be("draft");
@@ -126,7 +126,7 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
         var oeffentlich = await Json(await AlsPerson().GetAsync("/jobs"));
 
         oeffentlich.GetProperty("items").EnumerateArray()
-            .Should().NotContain(eintrag => eintrag.GetProperty("id").GetGuid() == id);
+            .Should().NotContain(entry => entry.GetProperty("id").GetGuid() == id);
     }
 
     /// <summary>
@@ -135,7 +135,7 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_fremder_Entwurf_sieht_aus_wie_keine_Anzeige()
     {
-        var angelegt = await Schreibe(AlsFirma(Guid.CreateVersion7()));
+        var angelegt = await Write(AlsFirma(Guid.CreateVersion7()));
         var id = (await Json(angelegt)).GetProperty("id").GetGuid();
         var erfunden = Guid.CreateVersion7();
 
@@ -151,13 +151,13 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Veroeffentlichen_macht_sie_findbar()
     {
-        var firma = Guid.CreateVersion7();
-        var id = await Veroeffentlicht(AlsFirma(firma));
+        var company = Guid.CreateVersion7();
+        var id = await Veroeffentlicht(AlsFirma(company));
 
-        var gefunden = await Json(await AlsPerson().GetAsync("/jobs"));
+        var found = await Json(await AlsPerson().GetAsync("/jobs"));
 
-        gefunden.GetProperty("items").EnumerateArray()
-            .Should().Contain(eintrag => eintrag.GetProperty("id").GetGuid() == id);
+        found.GetProperty("items").EnumerateArray()
+            .Should().Contain(entry => entry.GetProperty("id").GetGuid() == id);
     }
 
     /// <summary>
@@ -172,7 +172,7 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     /// <para>Bezahlt hat sie die Karriereseite. <c>/careers/&lt;kürzel&gt;</c>
     /// ist in <c>docs/routenkarte.yml</c> ausdrücklich als öffentlich
     /// beschrieben und zeigte einem anonymen Besucher trotzdem keine einzige
-    /// Stelle — Name und Beschreibung des Unternehmens ja, seine Anzeigen
+    /// Job — Name und Beschreibung des Unternehmens ja, seine Anzeigen
     /// nicht.</para>
     /// </remarks>
     [Fact]
@@ -180,29 +180,29 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var id = await Veroeffentlicht(AlsFirma(Guid.CreateVersion7()));
 
-        var antwort = await Ohne().GetAsync("/jobs");
+        var response = await Ohne().GetAsync("/jobs");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(antwort)).GetProperty("items").EnumerateArray()
-            .Should().Contain(eintrag => eintrag.GetProperty("id").GetGuid() == id);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(response)).GetProperty("items").EnumerateArray()
+            .Should().Contain(entry => entry.GetProperty("id").GetGuid() == id);
     }
 
     /// <summary>Ein Entwurf bleibt auch für einen anonymen Aufrufer drinnen.</summary>
     /// <remarks>
-    /// Die Gegenprobe zur Öffnung. Der Stand wird im Speicher gefiltert und nie
+    /// Die Gegenprobe zur Öffnung. Der State wird im Speicher gefiltert und nie
     /// vom Aufrufer — ein <c>status=draft</c> auf der Leitung wäre sonst der Weg
     /// zu fremden Entwürfen.
     /// </remarks>
     [Fact]
     public async Task Ein_Entwurf_bleibt_auch_ohne_Konto_verborgen()
     {
-        var angelegt = await Schreibe(AlsFirma(Guid.CreateVersion7()), "Geheimer Entwurf");
+        var angelegt = await Write(AlsFirma(Guid.CreateVersion7()), "Geheimer Entwurf");
         var id = (await Json(angelegt)).GetProperty("id").GetGuid();
 
-        var gefunden = await Json(await Ohne().GetAsync("/jobs"));
+        var found = await Json(await Ohne().GetAsync("/jobs"));
 
-        gefunden.GetProperty("items").EnumerateArray()
-            .Should().NotContain(eintrag => eintrag.GetProperty("id").GetGuid() == id);
+        found.GetProperty("items").EnumerateArray()
+            .Should().NotContain(entry => entry.GetProperty("id").GetGuid() == id);
     }
 
     /// <summary>
@@ -214,8 +214,8 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     /// Karriereseite ist eine Adresse zum Weitergeben: wer sie öffnet, hat kein
     /// Konto, und ein 401 machte aus der Anzeige eine Anmeldeaufforderung. Und
     /// <c>applications-service</c> fragt hier Dienst-zu-Dienst nach, ob es die
-    /// Stelle gibt — ohne Token, weil er keines hat. Gemessen: <b>jede</b>
-    /// Bewerbung endete mit 503, und im Protokoll stand „jobs-service
+    /// Job gibt — ohne Token, weil er keines hat. Gemessen: <b>jede</b>
+    /// Application endete mit 503, und im Protokoll stand „jobs-service
     /// antwortete mit 401".
     /// <para>
     /// Der zweite Teil ist die Gegenprobe zur Öffnung und der wichtigere: ein
@@ -227,16 +227,16 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_Anzeige_liest_auch_wer_kein_Konto_hat()
     {
-        var firma = Guid.CreateVersion7();
-        var entwurf = (await Json(await Schreibe(AlsFirma(firma), "Geheimer Entwurf")))
+        var company = Guid.CreateVersion7();
+        var draft = (await Json(await Write(AlsFirma(company), "Geheimer Entwurf")))
             .GetProperty("id").GetGuid();
-        var offen = (await Json(await Schreibe(AlsFirma(firma), "Offene Stelle")))
+        var offen = (await Json(await Write(AlsFirma(company), "Offene Stelle")))
             .GetProperty("id").GetGuid();
-        (await AlsFirma(firma).PostAsync($"/jobs/{offen}/publish", null))
+        (await AlsFirma(company).PostAsync($"/jobs/{offen}/publish", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
         var sichtbar = await Ohne().GetAsync($"/jobs/{offen}");
-        var beiEntwurf = await Ohne().GetAsync($"/jobs/{entwurf}");
+        var beiEntwurf = await Ohne().GetAsync($"/jobs/{draft}");
         var beiErfundener = await Ohne().GetAsync($"/jobs/{Guid.CreateVersion7()}");
 
         sichtbar.StatusCode.Should().Be(
@@ -259,13 +259,13 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     /// eine: <c>Union-Investment</c> — eine reale deutsche Fondsgesellschaft —
     /// kam als <b>400</b> zurück, ebenso <c>Select-Kundenberater</c> und
     /// <c>Drop-In-Zentrum</c>. Auf einer Stellenbörse ist das kein Randfall,
-    /// sondern eine normale Suche, die ohne Erklärung scheitert.
+    /// sondern eine normale Search, die ohne Erklärung scheitert.
     /// <para>
-    /// Die Middleware ist deshalb aus <c>Dienstgrundlage.cs</c> entfernt
+    /// Die Middleware ist deshalb aus <c>ServiceFoundation.cs</c> entfernt
     /// (<c>bugs/eingabepruefung-weist-gewoehnliche-woerter-ab.md</c>). Dieser
     /// Test ist der Grund, warum das auffällt, wenn jemand sie zurückholt:
     /// dann steht hier eine rote Zeile mit einem Firmennamen darin, statt einer
-    /// Suche, die im Betrieb still nicht funktioniert.
+    /// Search, die im Betrieb still nicht funktioniert.
     /// </para>
     /// <para>
     /// Geprüft wird der <b>Statuscode</b> und nicht das Ergebnis: dass nichts
@@ -280,10 +280,10 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     [InlineData("Update-Managerin")]
     public async Task Ein_Suchbegriff_mit_einem_SQL_Wort_wird_beantwortet(string begriff)
     {
-        var antwort = await Ohne().GetAsync(
+        var response = await Ohne().GetAsync(
             $"/jobs?q={Uri.EscapeDataString(begriff)}");
 
-        antwort.StatusCode.Should().Be(
+        response.StatusCode.Should().Be(
             HttpStatusCode.OK,
             "„{0}\" ist ein Suchbegriff und keine Injektion", begriff);
     }
@@ -296,7 +296,7 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     /// Der Parameter wurde von der Oberfläche <strong>seit jeher</strong>
     /// geschickt und vom Dienst nie gelesen. Ohne diesen Test fällt das nicht
     /// auf: die Liste ist nicht leer, sie ist nur falsch — und eine
-    /// Karriereseite mit fremden Stellen sieht aus wie eine volle.
+    /// Karriereseite mit fremden Jobs sieht aus wie eine volle.
     /// </remarks>
     [Fact]
     public async Task Der_Firmenfilter_zeigt_nur_die_eigenen_Anzeigen()
@@ -307,11 +307,11 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
         var meineId = await Veroeffentlicht(AlsFirma(meine));
         var fremdeId = await Veroeffentlicht(AlsFirma(fremde));
 
-        var gefunden = await Json(await Ohne().GetAsync($"/jobs?company={meine}"));
-        var eintraege = gefunden.GetProperty("items").EnumerateArray().ToList();
+        var found = await Json(await Ohne().GetAsync($"/jobs?company={meine}"));
+        var entries = found.GetProperty("items").EnumerateArray().ToList();
 
-        eintraege.Should().Contain(eintrag => eintrag.GetProperty("id").GetGuid() == meineId);
-        eintraege.Should().NotContain(eintrag => eintrag.GetProperty("id").GetGuid() == fremdeId);
+        entries.Should().Contain(entry => entry.GetProperty("id").GetGuid() == meineId);
+        entries.Should().NotContain(entry => entry.GetProperty("id").GetGuid() == fremdeId);
     }
 
     /// <summary>Der Suchbegriff sucht — über Titel und Beschreibung.</summary>
@@ -323,18 +323,18 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Der_Suchbegriff_trifft_Titel_und_Beschreibung()
     {
-        var firma = AlsFirma(Guid.CreateVersion7());
-        var gesucht = await Veroeffentlicht(firma);
-        var anderes = (await Json(await Schreibe(firma, "Gaertnerin"))).GetProperty("id").GetGuid();
-        (await firma.PostAsync($"/jobs/{anderes}/publish", null))
+        var company = AlsFirma(Guid.CreateVersion7());
+        var gesucht = await Veroeffentlicht(company);
+        var anderes = (await Json(await Write(company, "Gaertnerin"))).GetProperty("id").GetGuid();
+        (await company.PostAsync($"/jobs/{anderes}/publish", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var gefunden = await Json(await Ohne().GetAsync("/jobs?q=entwickler"));
-        var eintraege = gefunden.GetProperty("items").EnumerateArray().ToList();
+        var found = await Json(await Ohne().GetAsync("/jobs?q=entwickler"));
+        var entries = found.GetProperty("items").EnumerateArray().ToList();
 
         // Kleingeschrieben gesucht, gross geschrieben gespeichert.
-        eintraege.Should().Contain(eintrag => eintrag.GetProperty("id").GetGuid() == gesucht);
-        eintraege.Should().NotContain(eintrag => eintrag.GetProperty("id").GetGuid() == anderes);
+        entries.Should().Contain(entry => entry.GetProperty("id").GetGuid() == gesucht);
+        entries.Should().NotContain(entry => entry.GetProperty("id").GetGuid() == anderes);
     }
 
     [Fact]
@@ -342,12 +342,12 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var id = await Veroeffentlicht(AlsFirma(Guid.CreateVersion7()));
 
-        var versuch = await AlsFirma(Guid.CreateVersion7()).PutAsJsonAsync($"/jobs/{id}", new
+        var attempt = await AlsFirma(Guid.CreateVersion7()).PutAsJsonAsync($"/jobs/{id}", new
         {
             title = "Uebernommen", description = "Nicht meine Anzeige."
         });
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        attempt.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>
@@ -362,20 +362,20 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
 
         await browser.PostAsync($"/jobs/{id}/close", null);
 
-        var versuch = await browser.PutAsJsonAsync($"/jobs/{id}", new
+        var attempt = await browser.PutAsJsonAsync($"/jobs/{id}", new
         {
             title = "Doch anders", description = "Nachtraeglich."
         });
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        attempt.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     [Fact]
     public async Task Eine_Privatperson_schreibt_keine_Anzeige()
     {
-        var versuch = await Schreibe(AlsPerson());
+        var attempt = await Write(AlsPerson());
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        attempt.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     /// <summary>
@@ -385,12 +385,12 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Postgres_und_PostgreSQL_sind_eine_Anforderung()
     {
-        var angelegt = await Schreibe(
-            AlsFirma(Guid.CreateVersion7()), faehigkeiten: ["Postgres", "PostgreSQL", "C#"]);
+        var angelegt = await Write(
+            AlsFirma(Guid.CreateVersion7()), skills: ["Postgres", "PostgreSQL", "C#"]);
 
-        var faehigkeiten = (await Json(angelegt)).GetProperty("skills");
+        var skills = (await Json(angelegt)).GetProperty("skills");
 
-        faehigkeiten.GetArrayLength().Should().Be(2);
+        skills.GetArrayLength().Should().Be(2);
     }
 
     /// <summary>
@@ -400,26 +400,26 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Aus_React_wird_kein_JavaScript()
     {
-        var angelegt = await Schreibe(AlsFirma(Guid.CreateVersion7()), faehigkeiten: ["React"]);
+        var angelegt = await Write(AlsFirma(Guid.CreateVersion7()), skills: ["React"]);
 
-        var faehigkeiten = (await Json(angelegt)).GetProperty("skills")
-            .EnumerateArray().Select(eintrag => eintrag.GetString()).ToList();
+        var skills = (await Json(angelegt)).GetProperty("skills")
+            .EnumerateArray().Select(entry => entry.GetString()).ToList();
 
-        faehigkeiten.Should().ContainSingle();
-        faehigkeiten.Should().NotContain("JavaScript");
+        skills.Should().ContainSingle();
+        skills.Should().NotContain("JavaScript");
     }
 
     /// <summary>
     /// Eine Anforderung, die länger ist, als eine Person sie überhaupt
-    /// eintragen kann, wäre garantiert nie ein Treffer — eine Zeile, die für
+    /// eintragen kann, wäre garantiert nie ein Hit — eine Zeile, die für
     /// niemanden je ein Haken werden kann.
     /// </summary>
     [Fact]
     public void Eine_Stelle_darf_keine_Faehigkeit_verlangen_die_kein_Profil_haelt()
     {
-        Domain.Stellen.Faehigkeitenliste.Hoechstlaenge
+        Domain.Jobs.SkillList.Hoechstlaenge
             .Should().BeLessThanOrEqualTo(
-                Profile.Domain.Faehigkeiten.Faehigkeitenliste.Hoechstlaenge);
+                Profile.Domain.Faehigkeiten.SkillList.Hoechstlaenge);
     }
 
     [Fact]
@@ -427,9 +427,9 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var zuViele = Enumerable.Range(0, 21).Select(nummer => $"Faehigkeit{nummer}").ToArray();
 
-        var versuch = await Schreibe(AlsFirma(Guid.CreateVersion7()), faehigkeiten: zuViele);
+        var attempt = await Write(AlsFirma(Guid.CreateVersion7()), skills: zuViele);
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        attempt.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     /// <summary>
@@ -439,9 +439,9 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Der_Entwurf_traegt_weder_Mandant_noch_Firmennamen()
     {
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
 
-        var entworfen = await AlsFirma(firma).PostAsJsonAsync("/jobs/draft", new
+        var entworfen = await AlsFirma(company).PostAsJsonAsync("/jobs/draft", new
         {
             title = "Entwicklerin",
             description = "Wir bauen verteilte Systeme.",
@@ -455,7 +455,7 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
         _entwerfer.Letzter.Should().NotBeNull();
         var prompt = _entwerfer.Letzter!.Prompt;
 
-        prompt.Should().NotContain(firma.ToString(), "keine tenant_id");
+        prompt.Should().NotContain(company.ToString(), "keine tenant_id");
         prompt.Should().Contain("kuerzer");
     }
 
@@ -468,35 +468,35 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     /// längst begrenzt, der Wunsch kam roh aus dem Rumpf und ging ungeprüft an
     /// den fremden Anbieter. Geprüft wird beides — dass 501 Zeichen abgelehnt
     /// werden, und dass 500 durchgehen: eine Grenze, die auch das Erlaubte
-    /// abweist, merkt man erst an einer echten Anfrage.
+    /// abweist, merkt man erst an einer echten ResumeRequest.
     /// </remarks>
     [Theory]
     [InlineData(500, HttpStatusCode.OK)]
     [InlineData(501, HttpStatusCode.UnprocessableEntity)]
-    public async Task Ein_zu_langer_Wunsch_ist_ein_422(int laenge, HttpStatusCode erwartet)
+    public async Task Ein_zu_langer_Wunsch_ist_ein_422(int length, HttpStatusCode erwartet)
     {
-        var antwort = await AlsFirma(Guid.CreateVersion7()).PostAsJsonAsync("/jobs/draft", new
+        var response = await AlsFirma(Guid.CreateVersion7()).PostAsJsonAsync("/jobs/draft", new
         {
             title = "Entwicklerin",
             description = "Wir bauen verteilte Systeme.",
             skills = new[] { "C#" },
             location = "Berlin",
-            wish = new string('a', laenge)
+            wish = new string('a', length)
         });
 
-        antwort.StatusCode.Should().Be(erwartet);
+        response.StatusCode.Should().Be(erwartet);
     }
 
     /// <summary>
-    /// Keine Aussagen über Bewerberinnen und Bewerber — die Regeln sagen es
+    /// None Aussagen über Bewerberinnen und Bewerber — die Regeln sagen es
     /// ausdrücklich, weil eine Anzeige der Ort ist, an dem so etwas sonst
     /// hineinrutscht.
     /// </summary>
     [Fact]
     public void Die_Entwurfsregeln_verbieten_Aussagen_ueber_Menschen()
     {
-        Anzeigenentwurf.Regeln.Should().Contain("Erfinde NICHTS hinzu");
-        Anzeigenentwurf.Regeln.Should().Contain("Keine Aussagen über Bewerberinnen");
+        AdvertDraft.Regeln.Should().Contain("Erfinde NICHTS hinzu");
+        AdvertDraft.Regeln.Should().Contain("Keine Aussagen über Bewerberinnen");
     }
 
     /// <summary>
@@ -507,15 +507,15 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Es_gibt_keinen_Loeschendpunkt()
     {
-        var anfrage = new HttpRequestMessage(HttpMethod.Post, "/erasure")
+        var request = new HttpRequestMessage(HttpMethod.Post, "/erasure")
         {
             Content = JsonContent.Create(new { user_id = Guid.CreateVersion7() })
         };
-        anfrage.Headers.Add("X-Erasure-Secret", Rueckzugsgeheimnis);
+        request.Headers.Add("X-Erasure-Secret", Rueckzugsgeheimnis);
 
-        var versuch = await _dienst.CreateClient().SendAsync(anfrage);
+        var attempt = await _dienst.CreateClient().SendAsync(request);
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        attempt.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>
@@ -526,19 +526,19 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Der_Unternehmensrueckzug_schliesst_alle_offenen_Anzeigen()
     {
-        var firma = Guid.CreateVersion7();
-        var browser = AlsFirma(firma);
+        var company = Guid.CreateVersion7();
+        var browser = AlsFirma(company);
 
         await Veroeffentlicht(browser);
-        await Schreibe(browser, "Ein Entwurf");
+        await Write(browser, "Ein Entwurf");
 
-        var anfrage = new HttpRequestMessage(HttpMethod.Post, "/companies/withdrawal")
+        var request = new HttpRequestMessage(HttpMethod.Post, "/companies/withdrawal")
         {
-            Content = JsonContent.Create(new { tenant_id = firma })
+            Content = JsonContent.Create(new { tenant_id = company })
         };
-        anfrage.Headers.Add("X-Erasure-Secret", Rueckzugsgeheimnis);
+        request.Headers.Add("X-Erasure-Secret", Rueckzugsgeheimnis);
 
-        var zurueck = await _dienst.CreateClient().SendAsync(anfrage);
+        var zurueck = await _dienst.CreateClient().SendAsync(request);
 
         zurueck.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(zurueck)).GetProperty("withdrawn").GetInt32().Should().Be(2);
@@ -546,24 +546,24 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
         var meine = await Json(await browser.GetAsync("/companies/me/jobs"));
 
         meine.EnumerateArray()
-            .Should().OnlyContain(eintrag => eintrag.GetProperty("status").GetString() == "closed");
+            .Should().OnlyContain(entry => entry.GetProperty("status").GetString() == "closed");
     }
 
     [Fact]
     public async Task Ohne_das_richtige_Geheimnis_wird_nichts_zurueckgezogen()
     {
-        var firma = Guid.CreateVersion7();
-        await Veroeffentlicht(AlsFirma(firma));
+        var company = Guid.CreateVersion7();
+        await Veroeffentlicht(AlsFirma(company));
 
-        var anfrage = new HttpRequestMessage(HttpMethod.Post, "/companies/withdrawal")
+        var request = new HttpRequestMessage(HttpMethod.Post, "/companies/withdrawal")
         {
-            Content = JsonContent.Create(new { tenant_id = firma })
+            Content = JsonContent.Create(new { tenant_id = company })
         };
-        anfrage.Headers.Add("X-Erasure-Secret", "falsch");
+        request.Headers.Add("X-Erasure-Secret", "falsch");
 
-        var versuch = await _dienst.CreateClient().SendAsync(anfrage);
+        var attempt = await _dienst.CreateClient().SendAsync(request);
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        attempt.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     /// <summary>
@@ -575,28 +575,28 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     {
         await Veroeffentlicht(AlsFirma(Guid.CreateVersion7()));
 
-        var rumpf = await (await AlsPerson().GetAsync("/jobs")).Content.ReadAsStringAsync();
+        var body = await (await AlsPerson().GetAsync("/jobs")).Content.ReadAsStringAsync();
 
         foreach (var verboten in new[] { "score", "rank", "match", "percent", "weight" })
         {
-            rumpf.Should().NotContain(verboten);
+            body.Should().NotContain(verboten);
         }
     }
 
     /// <summary>
-    /// Der Stand wird im Speicher gefiltert, nicht vom Aufrufer: ein
+    /// Der State wird im Speicher gefiltert, nicht vom Aufrufer: ein
     /// <c>status=draft</c> auf der Leitung wäre ein Weg, fremde Entwürfe zu
     /// lesen.
     /// </summary>
     [Fact]
     public async Task Ein_Standparameter_oeffnet_keine_fremden_Entwuerfe()
     {
-        var angelegt = await Schreibe(AlsFirma(Guid.CreateVersion7()));
+        var angelegt = await Write(AlsFirma(Guid.CreateVersion7()));
         var id = (await Json(angelegt)).GetProperty("id").GetGuid();
 
-        var seite = await Json(await AlsPerson().GetAsync("/jobs?status=draft"));
+        var page = await Json(await AlsPerson().GetAsync("/jobs?status=draft"));
 
-        seite.GetProperty("items").EnumerateArray()
-            .Should().NotContain(eintrag => eintrag.GetProperty("id").GetGuid() == id);
+        page.GetProperty("items").EnumerateArray()
+            .Should().NotContain(entry => entry.GetProperty("id").GetGuid() == id);
     }
 }

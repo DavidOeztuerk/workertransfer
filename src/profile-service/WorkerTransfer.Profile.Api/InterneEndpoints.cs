@@ -20,12 +20,12 @@ namespace WorkerTransfer.Profile.Api;
 /// <para><strong>Sie prüfen den Ledger nicht, und das ist der heikelste Satz
 /// dieser Datei.</strong> Der Aufrufer ist scout-service, und dort steht die
 /// Freigabeprüfung — für die ganze Seite auf einmal, über <c>/check-batch</c>
-/// (ADR-0030, ADR-0036 Entscheidung 1). Genau EINE Stelle entscheidet über
+/// (ADR-0030, ADR-0036 Entscheidung 1). Genau EINE Job entscheidet über
 /// Sichtbarkeit; zwei wären zwei Wahrheiten. Wer diese Tür für etwas anderes
-/// benutzt, holt sich die Prüfung dazu — oder er zeigt Profile, die niemand
+/// benutzt, holt sich die Prüfung dazu — oder er zeigt PersonProfile, die niemand
 /// freigegeben hat.</para>
 /// </remarks>
-public static class InterneEndpoints
+public static class InternalEndpoints
 {
     private const string Geheimniskopf = "X-Notify-Secret";
 
@@ -34,12 +34,12 @@ public static class InterneEndpoints
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        // Die Suche fuer scout-service. Nur ueber GENANNTE Faehigkeiten
+        // Die Search fuer scout-service. Nur ueber GENANNTE Faehigkeiten
         // (ADR-0033): profile-service kennt keine Belege, und diese Route ist
         // ein Grund, das so zu lassen.
         app.MapGet("/internal/profiles/search", async (
             IMediator mediator,
-            IOptions<Meldeeinstellungen> einstellungen,
+            IOptions<NotifySettings> einstellungen,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -49,31 +49,31 @@ public static class InterneEndpoints
                 return;
             }
 
-            var anfrage = context.Request.Query;
+            var request = context.Request.Query;
 
-            var seite = await mediator.Send(
-                new InterneProfilsucheAbfrage(
-                    Anzahl(anfrage["limit"]),
-                    anfrage["cursor"],
-                    anfrage["skill"].Count > 0 ? [.. anfrage["skill"]!] : null,
-                    anfrage["location"].ToString(),
-                    anfrage["remote"] == "true"),
+            var page = await mediator.Send(
+                new InternalProfileSearchQuery(
+                    Anzahl(request["limit"]),
+                    request["cursor"],
+                    request["skill"].Count > 0 ? [.. request["skill"]!] : null,
+                    request["location"].ToString(),
+                    request["remote"] == "true"),
                 cancellationToken);
 
-            // Keine Gesamtzahl — auch hier nicht, wo nur ein Dienst mitliest:
+            // None Gesamtzahl — auch hier nicht, wo nur ein Dienst mitliest:
             // was es nicht gibt, kann niemand versehentlich weiterreichen.
             await context.Response.WriteAsJsonAsync(
-                new ProfilfundseiteV1(
-                    [.. seite.Eintraege.Select(Fund)],
-                    seite.Weiter?.Schreibe()),
+                new ProfileHitPageV1(
+                    [.. page.Eintraege.Select(Fund)],
+                    page.Weiter?.Write()),
                 cancellationToken);
         });
 
-        // Ein einzelnes Profil — fuer den Entwurf einer Ansprache.
+        // Ein einzelnes PersonProfile — fuer den Entwurf einer Ansprache.
         app.MapGet("/internal/profiles/{subjectId:guid}", async (
             Guid subjectId,
             IMediator mediator,
-            IOptions<Meldeeinstellungen> einstellungen,
+            IOptions<NotifySettings> einstellungen,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -83,10 +83,10 @@ public static class InterneEndpoints
                 return;
             }
 
-            var profil = await mediator.Send(
-                new MeinProfilAbfrage(new SubjectId(subjectId)), cancellationToken);
+            var profile = await mediator.Send(
+                new MyProfileQuery(new SubjectId(subjectId)), cancellationToken);
 
-            if (profil is null)
+            if (profile is null)
             {
                 // 404 heisst hier „es gibt keins". Ob es gezeigt werden darf,
                 // hat der Aufrufer schon gefragt — hier gibt es dazu nichts zu
@@ -95,36 +95,36 @@ public static class InterneEndpoints
                 return;
             }
 
-            await context.Response.WriteAsJsonAsync(Fund(profil), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Fund(profile), cancellationToken);
         });
 
         return app;
     }
 
-    private static ProfilfundV1 Fund(Profil profil) =>
+    private static ProfileHitV1 Fund(PersonProfile profile) =>
         new(
-            profil.Wer.Value,
-            profil.Ueberschrift,
-            profil.Text,
-            profil.Ort,
-            profil.RemoteMoeglich,
-            profil.Faehigkeiten.Werte,
-            Pendelstufen.Wort(profil.Pendelbereitschaft),
-            Umzugsworte.Wort(profil.Umzugsbereitschaft));
+            profile.Wer.Value,
+            profile.Ueberschrift,
+            profile.Text,
+            profile.Ort,
+            profile.RemoteMoeglich,
+            profile.Faehigkeiten.Werte,
+            Pendelstufen.Wort(profile.Pendelbereitschaft),
+            RelocationTerms.Wort(profile.Umzugsbereitschaft));
 
     /// <summary>Wie viele Zeilen eine Seite traegt.</summary>
     private static int Anzahl(string? roh) =>
-        int.TryParse(roh, out var wert)
-        && wert > 0
-        && wert <= InterneProfilsucheHandler.Hoechstzahl
-            ? wert
-            : InterneProfilsucheHandler.Vorgabe;
+        int.TryParse(roh, out var value)
+        && value > 0
+        && value <= InternalProfileSearchHandler.Hoechstzahl
+            ? value
+            : InternalProfileSearchHandler.Vorgabe;
 
     private static Task NichtGefunden(HttpContext context) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
 
-    private static bool DarfFragen(HttpContext context, Meldeeinstellungen einstellungen)
+    private static bool DarfFragen(HttpContext context, NotifySettings einstellungen)
     {
         if (string.IsNullOrEmpty(einstellungen.Geheimnis)
             || !context.Request.Headers.TryGetValue(Geheimniskopf, out var vorgelegt))

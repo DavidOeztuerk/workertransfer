@@ -124,11 +124,12 @@ export function ApplicationsPage() {
 
       <Card>
         <CardContent>
-          {/* Reihenfolge: lädt, dann Fehler, dann leer, dann Inhalt. Der
-              Ladezustand FEHLTE im alten Code — solange die Liste unterwegs
-              war, griff keiner der Zweige und man sah eine leere Karte. */}
           {bewerbungen.pending ? (
-            <LoadingBlock label={t("bewerbungen.laden")} />
+            <LoadingBlock
+              // Its own branch, before error and empty: without it no branch
+              // matched while the list was in flight and the card stayed empty.
+              label={t("bewerbungen.laden")}
+            />
           ) : null}
 
           {result !== null && !result.ok ? (

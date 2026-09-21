@@ -11,7 +11,7 @@ namespace WorkerTransfer.Portfolio.Infrastructure.Persistence;
 /// eigene Tabelle brächte nur eine Verknüpfung und eine Reihenfolge, die
 /// niemand braucht.
 /// </remarks>
-public sealed class PortfolioZeile
+public sealed class PortfolioRow
 {
     /// <summary>Die <c>SubjectId</c>. Sie <em>ist</em> der Schlüssel.</summary>
     public Guid Id { get; set; }
@@ -35,22 +35,22 @@ public sealed class PortfolioZeile
 public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options)
     : DbContext(options)
 {
-    public DbSet<PortfolioZeile> Portfolios => Set<PortfolioZeile>();
+    public DbSet<PortfolioRow> Portfolios => Set<PortfolioRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
-        modelBuilder.Entity<PortfolioZeile>(zeile =>
+        modelBuilder.Entity<PortfolioRow>(row =>
         {
-            zeile.ToTable("portfolios");
-            zeile.HasAnnotation(Personenzeile.Anmerkung, true);
-            zeile.HasKey(eintrag => eintrag.Id);
-            zeile.Property(eintrag => eintrag.Id).HasColumnName("id");
-            zeile.Property(eintrag => eintrag.Items)
+            row.ToTable("portfolios");
+            row.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
+            row.HasKey(entry => entry.Id);
+            row.Property(entry => entry.Id).HasColumnName("id");
+            row.Property(entry => entry.Items)
                 .HasColumnName("items").HasColumnType("jsonb").IsRequired();
-            zeile.Property(eintrag => eintrag.CreatedAt).HasColumnName("created_at");
-            zeile.Property(eintrag => eintrag.UpdatedAt).HasColumnName("updated_at");
+            row.Property(entry => entry.CreatedAt).HasColumnName("created_at");
+            row.Property(entry => entry.UpdatedAt).HasColumnName("updated_at");
         });
 
         base.OnModelCreating(modelBuilder);

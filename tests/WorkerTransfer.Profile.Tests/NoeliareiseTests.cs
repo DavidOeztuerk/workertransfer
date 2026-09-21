@@ -16,7 +16,7 @@ namespace WorkerTransfer.Profile.Tests;
 /// <remarks>
 /// <para><strong>Am Draht und nicht an der Klasse.</strong> Zwischen der Prüfung
 /// und dem, was ein Mensch liest, liegen der Verbundpunkt, die Tür, die
-/// Weichen und das Entkommen in der Seite — vier Stellen, an denen aus einem
+/// Weichen und das Entkommen in der Seite — vier Jobs, an denen aus einem
 /// richtigen Befund eine falsche Seite werden kann. <c>NachweisTests</c> in der
 /// Ganzes-Reihe prüft die Prüfungen; diese Reihe prüft den Weg.</para>
 ///
@@ -34,7 +34,7 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Ein Schlüssel, wie ihn jemand versehentlich hinterlegt.</summary>
     /// <remarks>
-    /// Er steht in <c>Draft:Schluessel</c>, also an genau der Stelle, an der ein
+    /// Er steht in <c>Draft:Schluessel</c>, also an genau der Job, an der ein
     /// echter stünde, und die KI-Naht gilt damit als eingerichtet. Taucht er in
     /// einer Seite oder im Bericht auf, ist das kein Schönheitsfehler, sondern
     /// ein Schlüssel in einem Dokument, das jemand herumreicht.
@@ -53,7 +53,7 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
@@ -113,12 +113,12 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
     [InlineData("/noelia/obligations")]
     [InlineData("/noelia/composition")]
     [InlineData("/noelia/report.json")]
-    public async Task Ohne_Geheimnis_antwortet_jede_Adresse_mit_404(string pfad)
+    public async Task Ohne_Geheimnis_antwortet_jede_Adresse_mit_404(string path)
     {
-        var antwort = await _dienst.CreateClient().GetAsync(pfad);
+        var response = await _dienst.CreateClient().GetAsync(path);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        antwort.StatusCode.Should().NotBe(
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().NotBe(
             HttpStatusCode.Forbidden,
             "ein 403 sagte, dass es hier etwas zu holen gibt");
     }
@@ -143,7 +143,7 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
             .Should().Be(OhneKorrelation(await ohne.Content.ReadAsStringAsync()));
     }
 
-    /// <summary>Ohne gesetztes Geheimnis ist die Tür zu — auch mit Kopf.</summary>
+    /// <summary>Ohne gesetztes Geheimnis ist die Tür zu — auch mit Header.</summary>
     /// <remarks>
     /// <strong>Leer heißt zu, nicht offen.</strong> Ohne diesen Test läuft der
     /// Zweig „Geheimnis nicht gesetzt" in keiner Reihe, und ein Patch, der dann
@@ -157,7 +157,7 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Nachweis:Geheimnis", "");
@@ -167,21 +167,21 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
         var browser = ohneTuer.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Noelia-Operator", Geheimnis);
 
-        foreach (var pfad in Adressen)
+        foreach (var path in Adressen)
         {
-            (await browser.GetAsync(pfad)).StatusCode
+            (await browser.GetAsync(path)).StatusCode
                 .Should().Be(
                     HttpStatusCode.NotFound,
-                    $"{pfad}: ein leeres Geheimnis heißt zu, nicht offen");
+                    $"{path}: ein leeres Geheimnis heißt zu, nicht offen");
         }
 
-        // Und ohne Kopf genauso — sonst unterschiede sich „nicht eingerichtet"
+        // Und ohne Header genauso — sonst unterschiede sich „nicht eingerichtet"
         // danach, ob jemand etwas vorgezeigt hat.
         (await ohneTuer.CreateClient().GetAsync("/noelia")).StatusCode
             .Should().Be(HttpStatusCode.NotFound);
     }
 
-    /// <summary>Ein Pfad, der keinen Abschnitt benennt, antwortet 404.</summary>
+    /// <summary>Ein Pfad, der keinen Section benennt, antwortet 404.</summary>
     /// <remarks>
     /// Und nicht die Übersicht unter falscher Adresse: eine Seite, die zwei
     /// Dinge heißt, ist eine Regel, an die sich beim nächsten Endpunkt niemand
@@ -191,8 +191,8 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
     [InlineData("/noelia/erfunden")]
     [InlineData("/nachweis/bericht")]
     [InlineData("/nachweis/ki/mehr")]
-    public async Task Ein_Pfad_ohne_Abschnitt_antwortet_404(string pfad) =>
-        (await MitGeheimnis().GetAsync(pfad)).StatusCode
+    public async Task Ein_Pfad_ohne_Abschnitt_antwortet_404(string path) =>
+        (await MitGeheimnis().GetAsync(path)).StatusCode
             .Should().Be(HttpStatusCode.NotFound);
 
     // ------------------------------------------------------------- Die Seiten
@@ -206,12 +206,12 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
     [InlineData("/noelia/obligations", "text/html")]
     [InlineData("/noelia/composition", "text/html")]
     [InlineData("/noelia/report.json", "application/json")]
-    public async Task Mit_Geheimnis_antwortet_jede_Adresse(string pfad, string art)
+    public async Task Mit_Geheimnis_antwortet_jede_Adresse(string path, string kind)
     {
-        var antwort = await MitGeheimnis().GetAsync(pfad);
+        var response = await MitGeheimnis().GetAsync(path);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-        antwort.Content.Headers.ContentType!.MediaType.Should().Be(art);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be(kind);
     }
 
     /// <summary>Die KI-Seite trägt die Befunde, die dieser Dienst hat.</summary>
@@ -226,25 +226,25 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
     {
         // Unter `/noelia/security`: Noelias KI-Seite wird von den
         // SOUVERAENITAETS-Abhaengigkeiten gespeist, nicht von Pruefungen.
-        var seite = await MitGeheimnis().GetStringAsync("/noelia/security");
+        var page = await MitGeheimnis().GetStringAsync("/noelia/security");
 
-        seite.Should().Contain("wt.ki.naht")
+        page.Should().Contain("wt.ki.naht")
             .And.Contain("wt.ki.keine-zahl")
             .And.Contain("wt.ki.anbieter");
 
         // `wt.ki.protokoll` ist GEFALLEN und steht deshalb nicht mehr da:
         // Noelias `noelia.ai.record-keeping` beantwortet dieselbe Frage. Was
         // Noelia liefert, wird hier geloescht und nicht danebengestellt.
-        seite.Should().NotContain("wt.ki.protokoll");
-        seite.Should().Contain("noelia.ai.record-keeping");
+        page.Should().NotContain("wt.ki.protokoll");
+        page.Should().Contain("noelia.ai.record-keeping");
 
         // Und das ist der Unterschied, um den es geht: Noelias Verzeichnis
         // erkennt Modell-Endpunkte am HOSTNAMEN und meldet hier „kein
         // erkannter Endpunkt"; unseres liest die eingetragenen Zugaenge und
         // nennt api.anthropic.com. Untergrenze gegen Vollstaendigkeit.
-        seite.Should().Contain("noelia.ai.inventory");
+        page.Should().Contain("noelia.ai.inventory");
 
-        seite.Should().Contain("Ueberschrift").And.Contain("Wunsch");
+        page.Should().Contain("Ueberschrift").And.Contain("Wunsch");
     }
 
     /// <summary>
@@ -253,16 +253,16 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_Pflichtenseite_hat_vier_Spalten_und_kein_Urteil()
     {
-        var seite = await MitGeheimnis().GetStringAsync("/noelia/obligations");
+        var page = await MitGeheimnis().GetStringAsync("/noelia/obligations");
 
-        seite.Should().Contain("Article")
+        page.Should().Contain("Article")
             .And.Contain("What it asks for")
             .And.Contain("Evidence here")
             .And.Contain("What you still decide");
 
         foreach (var urteil in new[] { "konform", "zertifi", "compliant" })
         {
-            seite.Should().NotContain(
+            page.Should().NotContain(
                 urteil,
                 $"„{urteil}“ wäre eine Urteilsspalte — ein Artikel ist nichts, "
                 + "was eine Prüfung bestehen kann");
@@ -277,14 +277,14 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_Pflichtenseite_nennt_die_Fristen()
     {
-        var seite = await MitGeheimnis().GetStringAsync("/noelia/obligations");
+        var page = await MitGeheimnis().GetStringAsync("/noelia/obligations");
 
         // Anhang III ist UNSER Zitat, nicht Noelias — eine Bibliothek weiss nicht,
         // ob ihr Verbraucher ueber Menschen entscheidet. Dass es hier steht,
         // belegt, dass unsere Pruefungen ihre Zitate mitbringen.
-        seite.Should().Contain("Anhang III");
+        page.Should().Contain("Anhang III");
 
-        seite.Should().NotContain(
+        page.Should().NotContain(
             "nicht hochriskant",
             "die Einstufung gehoert nicht uns");
     }
@@ -303,13 +303,13 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = MitGeheimnis();
 
-        var bericht = JsonDocument.Parse(
+        var report = JsonDocument.Parse(
             await browser.GetStringAsync("/noelia/report.json")).RootElement;
 
-        var befunde = bericht.GetProperty("securityChecks").GetProperty("results")
+        var findings = report.GetProperty("securityChecks").GetProperty("results")
             .EnumerateArray().ToList();
 
-        befunde.Should().NotBeEmpty("sonst prüft dieser Test nichts");
+        findings.Should().NotBeEmpty("sonst prüft dieser Test nichts");
 
         var seiten = new Dictionary<string, string>
         {
@@ -318,27 +318,27 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
             ["composition"] = await browser.GetStringAsync("/noelia/composition")
         };
 
-        foreach (var befund in befunde)
+        foreach (var finding in findings)
         {
-            var id = befund.GetProperty("id").GetString()!;
+            var id = finding.GetProperty("id").GetString()!;
 
-            seiten.Values.Any(seite => seite.Contains(id, StringComparison.Ordinal))
+            seiten.Values.Any(page => page.Contains(id, StringComparison.Ordinal))
                 .Should().BeTrue($"„{id}“ steht im Bericht, aber auf keiner Seite");
         }
 
-        bericht.GetProperty("service").GetString().Should().Be("profile-service");
-        bericht.GetProperty("schemaVersion").GetInt32().Should().Be(2);
+        report.GetProperty("service").GetString().Should().Be("profile-service");
+        report.GetProperty("schemaVersion").GetInt32().Should().Be(2);
     }
 
     /// <summary>Jeder Bezug im Bericht trägt, was offenbleibt.</summary>
     [Fact]
     public async Task Kein_Zitat_im_Bericht_laesst_die_offene_Frage_leer()
     {
-        var bericht = JsonDocument.Parse(
+        var report = JsonDocument.Parse(
             await MitGeheimnis().GetStringAsync("/noelia/report.json")).RootElement;
 
-        var bezuege = bericht.GetProperty("securityChecks").GetProperty("results").EnumerateArray()
-            .SelectMany(befund => befund.GetProperty("references").EnumerateArray())
+        var bezuege = report.GetProperty("securityChecks").GetProperty("results").EnumerateArray()
+            .SelectMany(finding => finding.GetProperty("references").EnumerateArray())
             .ToList();
 
         bezuege.Should().NotBeEmpty("sonst prüft dieser Test nichts");
@@ -372,23 +372,23 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = MitGeheimnis();
 
-        foreach (var pfad in Adressen)
+        foreach (var path in Adressen)
         {
-            var inhalt = await browser.GetStringAsync(pfad);
+            var content = await browser.GetStringAsync(path);
 
-            inhalt.Should().NotContain(
-                Kanarienvogel, $"{pfad} trägt einen hinterlegten Schlüssel");
+            content.Should().NotContain(
+                Kanarienvogel, $"{path} trägt einen hinterlegten Schlüssel");
 
-            inhalt.Should().NotContain(
-                Namenskanarie, $"{pfad} trägt den Namen eines Menschen");
+            content.Should().NotContain(
+                Namenskanarie, $"{path} trägt den Namen eines Menschen");
 
-            inhalt.Should().NotContain(
+            content.Should().NotContain(
                 postgres.ConnectionString,
-                $"{pfad} trägt eine Verbindungszeichenfolge");
+                $"{path} trägt eine Verbindungszeichenfolge");
 
-            inhalt.Should().NotContain(
+            content.Should().NotContain(
                 Tokenform.PrivatSchluessel,
-                $"{pfad} trägt den privaten Signaturschlüssel");
+                $"{path} trägt den privaten Signaturschlüssel");
         }
     }
 
@@ -404,25 +404,25 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
     {
         // Unter `/noelia/security`: Noelias KI-Seite wird von den
         // SOUVERAENITAETS-Abhaengigkeiten gespeist, nicht von Pruefungen.
-        var seite = await MitGeheimnis().GetStringAsync("/noelia/security");
+        var page = await MitGeheimnis().GetStringAsync("/noelia/security");
 
-        seite.Should().Contain("api.anthropic.com");
-                seite.Should().NotContain("/v1/messages", "die Adresse ist nicht der Host");
+        page.Should().Contain("api.anthropic.com");
+                page.Should().NotContain("/v1/messages", "die Adresse ist nicht der Host");
     }
 
-    private static string OhneKorrelation(string rumpf) =>
+    private static string OhneKorrelation(string body) =>
         System.Text.RegularExpressions.Regex.Replace(
-            rumpf, "\"correlationId\"\\s*:\\s*\"[^\"]*\"", "\"correlationId\":\"\"");
+            body, "\"correlationId\"\\s*:\\s*\"[^\"]*\"", "\"correlationId\":\"\"");
 }
 
 /// <summary>Was <c>/health/ready</c> tatsächlich beantwortet.</summary>
 /// <remarks>
-/// <para><strong>Eine leere Bereitschaft antwortet 200.</strong> Die Adresse
+/// <para><strong>Eine leere Readiness antwortet 200.</strong> Die Adresse
 /// filtert die eingetragenen Prüfungen nach dem Etikett <c>ready</c>; ohne eine
 /// einzige ist die gefilterte Menge leer, ein leerer Bericht gilt als gesund,
 /// und der Dienst meldet sich bereit — auch über einer unerreichbaren
 /// Datenbank. Der Orchestrierer schickt dann Verkehr an einen Dienst, der jede
-/// Anfrage mit 500 beantwortet.</para>
+/// ResumeRequest mit 500 beantwortet.</para>
 ///
 /// <para>Deshalb prüft dieser Test den <em>Inhalt</em> der Antwort und nicht
 /// ihren Status: der Status ist genau dann grün, wenn nichts geprüft wird.</para>
@@ -439,7 +439,7 @@ public sealed class BereitschaftsreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
         });
@@ -456,18 +456,18 @@ public sealed class BereitschaftsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_Bereitschaft_antwortet_fuer_die_Datenbank_und_nicht_fuer_nichts()
     {
-        var antwort = await _dienst.CreateClient().GetAsync(new Uri("/health/ready", UriKind.Relative));
+        var response = await _dienst.CreateClient().GetAsync(new Uri("/health/ready", UriKind.Relative));
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        using var bericht = JsonDocument.Parse(await antwort.Content.ReadAsStringAsync());
-        var pruefungen = bericht.RootElement.GetProperty("checks").EnumerateArray().ToList();
+        using var report = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var checks = report.RootElement.GetProperty("checks").EnumerateArray().ToList();
 
-        pruefungen.Should().NotBeEmpty(
+        checks.Should().NotBeEmpty(
             "eine Bereitschaft ohne Eintragung meldet 200 ueber jeder Datenbank");
 
-        pruefungen.Should().Contain(
-            eintrag => eintrag.GetProperty("name").GetString() == "profile-datenbank",
+        checks.Should().Contain(
+            entry => entry.GetProperty("name").GetString() == "profile-datenbank",
             "der Dienst kann ohne seine Datenbank keine einzige Anfrage beantworten");
     }
 
@@ -480,11 +480,11 @@ public sealed class BereitschaftsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_Bereitschaft_nennt_keine_Verbindungszeichenfolge()
     {
-        var inhalt = await _dienst.CreateClient()
+        var content = await _dienst.CreateClient()
             .GetStringAsync(new Uri("/health/ready", UriKind.Relative));
 
-        inhalt.Should().NotContain(postgres.ConnectionString);
-        inhalt.Should().NotContainEquivalentOf("password");
+        content.Should().NotContain(postgres.ConnectionString);
+        content.Should().NotContainEquivalentOf("password");
     }
 }
 
@@ -511,10 +511,10 @@ public sealed class SchluesselbundreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-den-bund");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-den-bund");
         });
 
         return Task.CompletedTask;
@@ -552,25 +552,25 @@ public sealed class SchluesselbundreiseTests(Postgres postgres) : IAsyncLifetime
         _dienst.Services.GetRequiredService<IDataProtectionProvider>()
             .CreateProtector("reise").Protect("etwas");
 
-        await using var quelle = ProfileDbContextFactory.Datenquelle(postgres.ConnectionString);
-        await using var befehl = quelle.CreateCommand(
+        await using var source = ProfileDbContextFactory.DataSource(postgres.ConnectionString);
+        await using var befehl = source.CreateCommand(
             "SELECT inhalt FROM dataprotection_schluessel");
         await using var leser = await befehl.ExecuteReaderAsync();
 
-        var zeilen = new List<string>();
+        var rows = new List<string>();
 
         while (await leser.ReadAsync())
         {
-            zeilen.Add(leser.GetString(0));
+            rows.Add(leser.GetString(0));
         }
 
-        zeilen.Should().NotBeEmpty("sonst prueft dieser Test eine leere Tabelle");
+        rows.Should().NotBeEmpty("sonst prueft dieser Test eine leere Tabelle");
 
-        foreach (var zeile in zeilen)
+        foreach (var row in rows)
         {
-            zeile.Should().NotContain(
+            row.Should().NotContain(
                 "<masterKey", "das waere das Schluesselmaterial im Klartext");
-            zeile.Should().Contain(
+            row.Should().Contain(
                 "wtGeschuetzterSchluessel", "die Huelle nennt sich selbst");
         }
     }

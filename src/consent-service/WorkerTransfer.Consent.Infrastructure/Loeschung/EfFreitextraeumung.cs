@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.Consent.Application.Ports;
 using WorkerTransfer.Consent.Infrastructure.Persistence;
 
-namespace WorkerTransfer.Consent.Infrastructure.Loeschung;
+namespace WorkerTransfer.Consent.Infrastructure.Erasure;
 
 /// <summary>Clears the free text out of one person's rows, and nothing else.</summary>
 /// <remarks>
@@ -16,31 +16,31 @@ namespace WorkerTransfer.Consent.Infrastructure.Loeschung;
 /// already have covered them.
 /// </para>
 /// </remarks>
-public sealed class EfFreitextraeumung(ConsentDbContext kontext) : IFreitextraeumung
+public sealed class EfFreitextraeumung(ConsentDbContext context) : IFreitextraeumung
 {
     /// <inheritdoc />
-    public async Task RaeumeAsync(Guid subject, CancellationToken cancellationToken = default)
+    public async Task ClearAsync(Guid subject, CancellationToken cancellationToken = default)
     {
         // Pending rows first. An UPDATE runs in the database and cannot reach a
         // row that is still only in the change tracker — the closing facts the
         // erasure just appended would keep their free text, which is precisely
         // what this is here to prevent.
-        await kontext.SaveChangesAsync(cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
 
-        await kontext.ConsentEvents
-            .Where(zeile => zeile.SubjectId == subject)
+        await context.ConsentEvents
+            .Where(row => row.SubjectId == subject)
             .ExecuteUpdateAsync(
-                zeile => zeile
-                    .SetProperty(spalte => spalte.Reason, (string?)null)
-                    .SetProperty(spalte => spalte.Metadata, "{}"),
+                row => row
+                    .SetProperty(column => column.Reason, (string?)null)
+                    .SetProperty(column => column.Metadata, "{}"),
                 cancellationToken);
 
         // The row itself stays: the trail is not cascaded (ADR-0012), it is
         // emptied of what a person wrote.
-        await kontext.AuditEvents
-            .Where(zeile => zeile.TargetId == subject || zeile.ActorId == subject)
+        await context.AuditEvents
+            .Where(row => row.TargetId == subject || row.ActorId == subject)
             .ExecuteUpdateAsync(
-                zeile => zeile.SetProperty(spalte => spalte.Metadata, "{}"),
+                row => row.SetProperty(column => column.Metadata, "{}"),
                 cancellationToken);
     }
 }

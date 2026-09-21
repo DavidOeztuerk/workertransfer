@@ -18,13 +18,54 @@ namespace WorkerTransfer.Profile.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "pruef_handlung", new[] { "profil_angelegt", "profil_geaendert", "profil_geloescht" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "audit_action", new[] { "profile_created", "profile_changed", "profile_deleted" });
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("WorkerTransfer.Profile.Infrastructure.Persistence.ProfilZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Profile.Infrastructure.Persistence.AuditRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AkteurId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<Guid?>("BetroffenId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.Property<string>("Daten")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata");
+
+                    b.Property<Guid?>("FirmaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("GeschehenAm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<AuditAction>("Handlung")
+                        .HasColumnType("audit_action")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Korrelation")
+                        .HasColumnType("text")
+                        .HasColumnName("correlation_id");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("audit_events", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Profile.Infrastructure.Persistence.ProfileRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -82,47 +123,6 @@ namespace WorkerTransfer.Profile.Infrastructure.Persistence.Migrations
                     b.ToTable("profiles", (string)null);
 
                     b.HasAnnotation("WorkerTransfer:Personenzeile", true);
-                });
-
-            modelBuilder.Entity("WorkerTransfer.Profile.Infrastructure.Persistence.Pruefzeile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("AkteurId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("actor_id");
-
-                    b.Property<Guid?>("BetroffenId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("target_id");
-
-                    b.Property<string>("Daten")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("metadata");
-
-                    b.Property<Guid?>("FirmaId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset>("GeschehenAm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("occurred_at");
-
-                    b.Property<Pruefhandlung>("Handlung")
-                        .HasColumnType("pruef_handlung")
-                        .HasColumnName("action");
-
-                    b.Property<string>("Korrelation")
-                        .HasColumnType("text")
-                        .HasColumnName("correlation_id");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("audit_events", (string)null);
                 });
 #pragma warning restore 612, 618
         }

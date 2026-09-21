@@ -14,40 +14,40 @@ namespace WorkerTransfer.Identity.Application.Unternehmen;
 /// answer is the same either way, or the endpoint would be a way to ask about
 /// platform membership without asking the consent ledger.
 /// </remarks>
-public sealed record MitgliedEinladenBefehl(
+public sealed record InviteMemberCommand(
     SubjectId Wer, TenantId Firma, string Email, MembershipRole Rolle) : IBefehl<Invitation>;
 
 /// <inheritdoc cref="MitgliedEinladenBefehl" />
-public sealed class MitgliedEinladenHandler(
-    Firmenzugriff zugriff,
-    IInvitationRepository einladungen,
-    ICompanyRepository firmen,
+public sealed class InviteMemberHandler(
+    CompanyAccess zugriff,
+    IInvitationRepository invitations,
+    ICompanyRepository companies,
     IUserRepository benutzer,
     IEinmaltoken einmaltoken,
     IPostkorb postkorb,
     IAuditTrail protokoll,
     IKorrelation korrelation,
     TimeProvider uhr)
-    : IRequestHandler<MitgliedEinladenBefehl, Invitation>
+    : IRequestHandler<InviteMemberCommand, Invitation>
 {
     /// <inheritdoc />
     public async Task<Invitation> Handle(
-        MitgliedEinladenBefehl request,
+        InviteMemberCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var rolle = await zugriff.AlsAdminAsync(
+        var role = await zugriff.AsAdminAsync(
             request.Wer, request.Firma, Verwaltungsakt.Einladen, cancellationToken);
 
-        var einladung = Invitation.Issue(
+        var invitation = Invitation.Issue(
             request.Firma, request.Email.Trim().ToLowerInvariant(), request.Rolle,
-            rolle, request.Wer, uhr.GetUtcNow());
+            role, request.Wer, uhr.GetUtcNow());
 
         var (klartext, hash) = einmaltoken.Erzeuge();
-        await einladungen.AddAsync(einladung, hash, cancellationToken);
+        await invitations.AddAsync(invitation, hash, cancellationToken);
 
-        var firma = await firmen.FindByIdAsync(request.Firma, cancellationToken);
+        var company = await companies.FindByIdAsync(request.Firma, cancellationToken);
 
         // Die Kontosprache der EINLADENDEN, und das ist eine bewusste Notlösung:
         // die eingeladene Adresse hat hier womöglich gar kein Konto — genau
@@ -58,9 +58,9 @@ public sealed class MitgliedEinladenHandler(
             request.Wer, cancellationToken);
 
         postkorb.Einladung(
-            einladung.Email,
+            invitation.Email,
             request.Wer,
-            firma?.Name ?? string.Empty,
+            company?.Name ?? string.Empty,
             klartext,
             einladenderKonto?.Kontosprache ?? Sprachwahl.Vorgabe);
 
@@ -80,42 +80,42 @@ public sealed class MitgliedEinladenHandler(
                 }),
             cancellationToken);
 
-        return einladung;
+        return invitation;
     }
 }
 
 /// <summary>Take an open invitation back.</summary>
-public sealed record EinladungZuruecknehmenBefehl(SubjectId Wer, TenantId Firma, Guid Einladung)
+public sealed record RevokeInvitationCommand(SubjectId Wer, TenantId Firma, Guid Einladung)
     : IBefehl<Unit>;
 
 /// <inheritdoc cref="EinladungZuruecknehmenBefehl" />
-public sealed class EinladungZuruecknehmenHandler(
-    Firmenzugriff zugriff,
-    IInvitationRepository einladungen,
+public sealed class RevokeInvitationHandler(
+    CompanyAccess zugriff,
+    IInvitationRepository invitations,
     IAuditTrail protokoll,
     IKorrelation korrelation,
     TimeProvider uhr)
-    : IRequestHandler<EinladungZuruecknehmenBefehl, Unit>
+    : IRequestHandler<RevokeInvitationCommand, Unit>
 {
     /// <inheritdoc />
     public async Task<Unit> Handle(
-        EinladungZuruecknehmenBefehl request,
+        RevokeInvitationCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var rolle = await zugriff.AlsAdminAsync(
+        var role = await zugriff.AsAdminAsync(
             request.Wer, request.Firma, Verwaltungsakt.Einladen, cancellationToken);
 
         // Looked up inside the company, never by id alone: otherwise an
         // administrator of one company could act on another company's
         // invitation.
-        var einladung = await einladungen.FindAsync(
+        var invitation = await invitations.FindAsync(
             request.Firma, request.Einladung, cancellationToken)
             ?? throw new InvitationInvalidException();
 
-        einladung.Withdraw(rolle);
-        await einladungen.SaveAsync(einladung, cancellationToken);
+        invitation.Withdraw(role);
+        await invitations.SaveAsync(invitation, cancellationToken);
 
         await protokoll.AppendAsync(
             new AuditEvent(
@@ -136,64 +136,64 @@ public sealed class EinladungZuruecknehmenHandler(
 /// link is not necessarily who was invited. The address comes from the account,
 /// not from the request.
 /// </remarks>
-public sealed record EinladungAnnehmenBefehl(SubjectId Wer, string Token)
-    : IBefehl<Mitgliedschaft>;
+public sealed record AcceptInvitationCommand(SubjectId Wer, string Token)
+    : IBefehl<Membership>;
 
 /// <inheritdoc cref="EinladungAnnehmenBefehl" />
-public sealed class EinladungAnnehmenHandler(
-    IInvitationRepository einladungen,
+public sealed class AcceptInvitationHandler(
+    IInvitationRepository invitations,
     IUserRepository benutzer,
     IMembershipRepository mitgliedschaften,
-    ICompanyRepository firmen,
+    ICompanyRepository companies,
     IEinmaltoken einmaltoken,
     IAuditTrail protokoll,
     IKorrelation korrelation,
     TimeProvider uhr)
-    : IRequestHandler<EinladungAnnehmenBefehl, Mitgliedschaft>
+    : IRequestHandler<AcceptInvitationCommand, Membership>
 {
     /// <inheritdoc />
-    public async Task<Mitgliedschaft> Handle(
-        EinladungAnnehmenBefehl request,
+    public async Task<Membership> Handle(
+        AcceptInvitationCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var einladung = await einladungen.FindByTokenHashAsync(
+        var invitation = await invitations.FindByTokenHashAsync(
             einmaltoken.Hashe(request.Token), cancellationToken)
             ?? throw new InvitationInvalidException();
 
         var konto = await benutzer.FindByIdAsync(request.Wer, cancellationToken)
             ?? throw new InvitationInvalidException();
 
-        einladung.Accept(konto.Email, uhr.GetUtcNow());
-        await einladungen.SaveAsync(einladung, cancellationToken);
+        invitation.Accept(konto.Email, uhr.GetUtcNow());
+        await invitations.SaveAsync(invitation, cancellationToken);
 
         await mitgliedschaften.AddAsync(
-            request.Wer, einladung.Tenant, einladung.Role, cancellationToken);
+            request.Wer, invitation.Tenant, invitation.Role, cancellationToken);
 
         await protokoll.AppendAsync(
             new AuditEvent(
                 AuditAction.MemberJoined,
                 uhr.GetUtcNow(),
                 actor: request.Wer,
-                tenant: einladung.Tenant,
+                tenant: invitation.Tenant,
                 correlationId: korrelation.Aktuell,
                 metadata: new Dictionary<string, string>(StringComparer.Ordinal)
                 {
-                    ["role"] = MembershipRoleNames.ToDatabase(einladung.Role)
+                    ["role"] = MembershipRoleNames.ToDatabase(invitation.Role)
                 }),
             cancellationToken);
 
-        var firma = await firmen.FindByIdAsync(einladung.Tenant, cancellationToken);
+        var company = await companies.FindByIdAsync(invitation.Tenant, cancellationToken);
 
         // Joining changes the memberships, not the running session: to act for
         // the new company one switches deliberately afterwards (ADR-0018). An
         // automatic switch would push somebody out of the company they are
         // working in, unasked.
-        return new Mitgliedschaft(
-            einladung.Tenant,
-            firma?.Name ?? string.Empty,
-            firma?.Domain.Value ?? string.Empty,
-            einladung.Role);
+        return new Membership(
+            invitation.Tenant,
+            company?.Name ?? string.Empty,
+            company?.Domain.Value ?? string.Empty,
+            invitation.Role);
     }
 }

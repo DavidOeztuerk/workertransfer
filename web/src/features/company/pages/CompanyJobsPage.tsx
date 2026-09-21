@@ -104,12 +104,13 @@ export function CompanyJobsPage() {
 
       <Card>
         <CardContent>
-          {/* Reihenfolge: lädt, dann Fehler, dann leer, dann Inhalt. Der
-              LADEZUSTAND fehlte im alten Code — und weil auch der Leersatz eine
-              geglückte Antwort verlangte, blieb die Karte währenddessen
-              vollständig leer. */}
           {stellen.pending ? (
-            <LoadingBlock label={t("firmenstellen.laden")} />
+            <LoadingBlock
+              // Its own branch, before error and empty: the empty sentence needs
+              // a successful answer, so without this branch the card stayed
+              // completely empty while loading.
+              label={t("firmenstellen.laden")}
+            />
           ) : null}
 
           {result !== null && !result.ok ? (

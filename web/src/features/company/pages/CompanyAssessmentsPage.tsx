@@ -194,10 +194,10 @@ function Stellformular({ fertig }: { fertig: () => void }) {
             minRows={4}
             fullWidth
           />
-          {/* Pflichtfeld mit Obergrenze, und der Hinweis sagt WARUM — nicht
-              „bitte ausfuellen", sondern was acht Stunden bedeuten. */}
           <TextField
             label={t("probe.umfangFeld")}
+            // Required, with an upper bound, and the hint says WHY — not "please
+            // fill in" but what eight hours mean.
             helperText={t("probe.umfangHinweis", { max: HOECHSTER_UMFANG })}
             value={stunden}
             onChange={(event) => setStunden(event.target.value)}
@@ -282,10 +282,14 @@ function Firmenkarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void
                 {vorgang.submission.text}
               </Typography>
             )}
-            {/* Ein Verweis, kein eingebetteter Inhalt: die Adresse hat ein
-                Fremder gewaehlt, und weder Server noch Seite rufen sie ab. */}
             {vorgang.submission.url !== null && (
-              <Link href={vorgang.submission.url} rel="noreferrer noopener" target="_blank">
+              <Link
+                // A reference, never embedded content: a stranger chose this
+                // address, and neither the server nor the page fetches it.
+                href={vorgang.submission.url}
+                rel="noreferrer noopener"
+                target="_blank"
+              >
                 {vorgang.submission.url}
               </Link>
             )}
@@ -333,9 +337,9 @@ function Firmenkarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void
                 </RadioGroup>
               </FormControl>
 
-              {/* EIN Feld, und es ist dasselbe, das die Person liest. Kein
-                  internes daneben, keine Note, keine Skala. */}
               <TextField
+                // ONE field, and it is the same one the person reads. No
+                // internal note beside it, no mark, no scale (ADR-0042 §1).
                 label={t("probe.rueckmeldungFeld")}
                 helperText={t("probe.rueckmeldungHinweis")}
                 value={text}

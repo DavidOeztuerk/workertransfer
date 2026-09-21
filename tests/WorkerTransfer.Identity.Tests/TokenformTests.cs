@@ -95,13 +95,13 @@ public class TokenformTests
         ];
 
         var alsPerson = await IssueAsync(Capacity.AsSelf.Instance);
-        alsPerson.EnumerateObject().Select(feld => feld.Name)
+        alsPerson.EnumerateObject().Select(field => field.Name)
             .Should().BeEquivalentTo(erwartetAlsPerson);
 
         // Fuer eine Firma kommt GENAU EINER dazu: `tenant`. Nicht `tenant_id`,
-        // nicht `roles` — die Mitgliedschaft entscheidet je Anfrage (ADR-0018).
+        // nicht `roles` — die Membership entscheidet je ResumeRequest (ADR-0018).
         var fuerFirma = await IssueAsync(new Capacity.ForCompany(Firma));
-        fuerFirma.EnumerateObject().Select(feld => feld.Name)
+        fuerFirma.EnumerateObject().Select(field => field.Name)
             .Should().BeEquivalentTo([.. erwartetAlsPerson, "tenant"]);
     }
 

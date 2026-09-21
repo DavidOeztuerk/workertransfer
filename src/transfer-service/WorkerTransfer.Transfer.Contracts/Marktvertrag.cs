@@ -2,8 +2,8 @@ using System.Text.Json.Serialization;
 
 namespace WorkerTransfer.Transfer.Contracts;
 
-/// <summary>Ein Marktstatus, wie er gelesen wird.</summary>
-public sealed record MarktstatusV1(
+/// <summary>Ein MarketStatus, wie er gelesen wird.</summary>
+public sealed record MarketStatusV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("availability")] string Availability,
     [property: JsonPropertyName("employed")] bool Employed,
@@ -16,19 +16,19 @@ public sealed record MarktstatusV1(
     [property: JsonPropertyName("is_approachable")] bool IsApproachable,
     [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt);
 
-/// <summary>Ein Marktstatus, wie er geschrieben wird.</summary>
+/// <summary>Ein MarketStatus, wie er geschrieben wird.</summary>
 /// <remarks>
 /// Ohne <c>subject_id</c>: wessen Status es ist, steht im geprüften Token. Ein
-/// Feld dafür wäre ein Weg, den Marktstatus eines anderen zu setzen — und das
+/// Feld dafür wäre ein Weg, den MarketStatus eines anderen zu setzen — und das
 /// ist die gefährlichste Angabe im ganzen System.
 /// </remarks>
-public sealed record MarktstatusSchreibenV1(
+public sealed record WriteMarketStatusV1(
     [property: JsonPropertyName("availability")] string Availability,
     [property: JsonPropertyName("employed")] bool Employed = false,
     [property: JsonPropertyName("note")] string Note = "");
 
-/// <summary>Die Anfrage eines Unternehmens nach einem Marktstatus.</summary>
-public sealed record MarktanfrageV1(
+/// <summary>Die ResumeRequest eines Unternehmens nach einem MarketStatus.</summary>
+public sealed record MarketRequestV1(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("tenant_id")] Guid TenantId,
@@ -39,11 +39,11 @@ public sealed record MarktanfrageV1(
     /// <remarks>
     /// <c>null</c> für das anfragende Unternehmen: es hat die Antwort schon in
     /// Form des Status, den es sieht oder nicht sieht — und ein Feld hier
-    /// ließe sich abfragen, ohne je einen Marktstatus zu lesen.
+    /// ließe sich abfragen, ohne je einen MarketStatus zu lesen.
     /// </remarks>
     [property: JsonPropertyName("active")] bool? Active);
 
-/// <summary>Ein Transfer-Vorgang, wie er gelesen wird.</summary>
+/// <summary>Ein Transfer-Case, wie er gelesen wird.</summary>
 public sealed record TransferV1(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("subject_id")] Guid SubjectId,

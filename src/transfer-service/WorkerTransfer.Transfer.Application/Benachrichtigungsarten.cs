@@ -9,9 +9,9 @@ namespace WorkerTransfer.Transfer.Application;
 /// </remarks>
 public static class Benachrichtigungsarten
 {
-    /// <summary>Ein Unternehmen hat nach dem Marktstatus gefragt.</summary>
+    /// <summary>Ein Unternehmen hat nach dem MarketStatus gefragt.</summary>
     public const string Angefragt = "market_request";
 
-    /// <summary>Ein Vorgang hat sich bewegt.</summary>
+    /// <summary>Ein Case hat sich bewegt.</summary>
     public const string Bewegt = "transfer_update";
 }

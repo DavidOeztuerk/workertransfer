@@ -3,7 +3,7 @@ using MediatR;
 using WorkerTransfer.Transfer.Api.Berechtigung;
 using WorkerTransfer.Transfer.Application.Vorgaenge;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.ServiceDefaults.Rollen;
+using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.Transfer.Contracts;
 
 namespace WorkerTransfer.Transfer.Api;
@@ -14,27 +14,27 @@ namespace WorkerTransfer.Transfer.Api;
 /// einer Seite, und ein gemeinsamer müsste bei jedem Aufruf herausfinden, wer
 /// gerade was darf. Getrennt steht es in der Adresse.
 /// </remarks>
-public static class VorgangsEndpoints
+public static class CaseEndpoints
 {
     /// <summary>Bildet die neun Routen der Vorgänge ab.</summary>
     public static IEndpointRouteBuilder MapVorgangsEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        var vorgaenge = Antworten.Abgesichert(app.MapGroup("/transfers"));
+        var cases = Responses.Abgesichert(app.MapGroup("/transfers"));
 
-        // Ein Unternehmen zeigt Interesse. Voraussetzung: der Marktstatus ist
+        // Ein Unternehmen zeigt Interesse. Voraussetzung: der MarketStatus ist
         // diesem Unternehmen freigegeben UND die Person ist ansprechbar.
-        // `unavailable` heißt nein, auch mit Freigabe — die Freigabe erlaubt zu
+        // `unavailable` heißt nein, auch mit Release — die Release erlaubt zu
         // sehen, nicht zu stören.
-        vorgaenge.MapPost("/", async (
+        cases.MapPost("/", async (
             InteresseZeigenV1 body,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (await Antworten.Firma(context, akteur) is not { } firma)
+            if (await Responses.Firma(context, akteur) is not { } company)
             {
                 return;
             }
@@ -43,25 +43,25 @@ public static class VorgangsEndpoints
 
             // Ohne `subjectId` gibt es niemanden, an dem Interesse bestuende.
             // Der leere Guid lief frueher bis in `new SubjectId(...)` und kam
-            // als 500 zurueck (D2) — eine kaputte Anfrage, keine kaputte
+            // als 500 zurueck (D2) — eine kaputte ResumeRequest, keine kaputte
             // Anwendung.
             if (body.SubjectId == Guid.Empty)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "subjectId is required");
                 return;
             }
 
-            var ergebnis = await mediator.Send(
-                new InteresseZeigenBefehl(new SubjectId(body.SubjectId), firma, body.Message),
+            var result = await mediator.Send(
+                new InteresseZeigenBefehl(new SubjectId(body.SubjectId), company, body.Message),
                 cancellationToken);
 
-            await Antworten.Schreibe(
-                context, ergebnis, cancellationToken, StatusCodes.Status201Created);
+            await Responses.Write(
+                context, result, cancellationToken, StatusCodes.Status201Created);
         });
 
-        vorgaenge.MapGet("/me", async (
+        cases.MapGet("/me", async (
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -69,41 +69,41 @@ public static class VorgangsEndpoints
         {
             if (akteur.Current is not { } handelnder)
             {
-                await Antworten.NichtAngemeldet(context);
+                await Responses.NichtAngemeldet(context);
                 return;
             }
 
             var meine = await mediator.Send(
-                new MeineVorgaengeAbfrage(handelnder.Subject), cancellationToken);
+                new MyCasesQuery(handelnder.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                meine.Select(Antworten.Zu), cancellationToken);
+                meine.Select(Responses.Zu), cancellationToken);
         });
 
-        vorgaenge.MapGet("/", async (
+        cases.MapGet("/", async (
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (await Antworten.Firma(context, akteur) is not { } firma)
+            if (await Responses.Firma(context, akteur) is not { } company)
             {
                 return;
             }
 
-            var ihre = await mediator.Send(new FirmenvorgaengeAbfrage(firma), cancellationToken);
+            var ihre = await mediator.Send(new CompanyCasesQuery(company), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                ihre.Select(Antworten.Zu), cancellationToken);
+                ihre.Select(Responses.Zu), cancellationToken);
         });
 
-        vorgaenge.MapPost("/{id:guid}/accept-talk", (
+        cases.MapPost("/{id:guid}/accept-talk", (
                 Guid id, IMediator mediator, ICurrentPrincipal akteur,
                 HttpContext context, CancellationToken cancellationToken) =>
             Person(id, Personenzug.GespraechAnnehmen, mediator, akteur, context,
                 cancellationToken));
 
-        vorgaenge.MapPost("/{id:guid}/accept-offer", (
+        cases.MapPost("/{id:guid}/accept-offer", (
                 Guid id, IMediator mediator, ICurrentPrincipal akteur,
                 HttpContext context, CancellationToken cancellationToken) =>
             Person(id, Personenzug.AngebotAnnehmen, mediator, akteur, context,
@@ -113,7 +113,7 @@ public static class VorgangsEndpoints
         // Plattform prüft das nicht und kann es nicht — sie kennt weder den
         // Arbeitgeber noch den Vertrag. Was der Schritt leistet, ist, die Frage
         // zu stellen und die Antwort festzuhalten.
-        vorgaenge.MapPost("/{id:guid}/confirm-release", (
+        cases.MapPost("/{id:guid}/confirm-release", (
                 Guid id, IMediator mediator, ICurrentPrincipal akteur,
                 HttpContext context, CancellationToken cancellationToken) =>
             Person(id, Personenzug.FreigabeBestaetigen, mediator, akteur, context,
@@ -121,12 +121,12 @@ public static class VorgangsEndpoints
 
         // Immer möglich, aus jedem laufenden Zustand. Ein Verfahren, aus dem
         // man nicht aussteigen kann, ist kein Verfahren, sondern eine Falle.
-        vorgaenge.MapPost("/{id:guid}/decline", (
+        cases.MapPost("/{id:guid}/decline", (
                 Guid id, IMediator mediator, ICurrentPrincipal akteur,
                 HttpContext context, CancellationToken cancellationToken) =>
             Person(id, Personenzug.Absagen, mediator, akteur, context, cancellationToken));
 
-        vorgaenge.MapPost("/{id:guid}/offer", async (
+        cases.MapPost("/{id:guid}/offer", async (
             Guid id,
             AngebotV1 body,
             IMediator mediator,
@@ -134,38 +134,38 @@ public static class VorgangsEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (await Antworten.Firma(context, akteur) is not { } firma)
+            if (await Responses.Firma(context, akteur) is not { } company)
             {
                 return;
             }
 
             ArgumentNullException.ThrowIfNull(body);
 
-            var ergebnis = await mediator.Send(
-                new AngebotMachenBefehl(id, firma, body.Note, body.StartOn, body.FeeCents),
+            var result = await mediator.Send(
+                new AngebotMachenBefehl(id, company, body.Note, body.StartOn, body.FeeCents),
                 cancellationToken);
 
-            await Antworten.Schreibe(context, ergebnis, cancellationToken);
+            await Responses.Write(context, result, cancellationToken);
         })
         // Ein Angebot nennt Eintrittstermin und Gebuehr — es bindet das
         // Unternehmen, und darum verlangt es einen `admin`. Aufgeloest aus der
         // Mitgliedschaftstabelle von identity-service, nie aus dem Token.
-        .RequireAuthorization(AdminrechteErweiterungen.Richtlinie(Vorgangsrechte.Anbieten));
+        .RequireAuthorization(AdminPermissionExtensions.Richtlinie(CasePermissions.Anbieten));
 
-        vorgaenge.MapPost("/{id:guid}/complete", (
+        cases.MapPost("/{id:guid}/complete", (
                 Guid id, IMediator mediator, ICurrentPrincipal akteur,
                 HttpContext context, CancellationToken cancellationToken) =>
-            Firma(id, Firmenzug.Abschliessen, mediator, akteur, context, cancellationToken))
+            Firma(id, CompanySwitch.Abschliessen, mediator, akteur, context, cancellationToken))
             .RequireAuthorization(
-                AdminrechteErweiterungen.Richtlinie(Vorgangsrechte.Abschliessen));
+                AdminPermissionExtensions.Richtlinie(CasePermissions.Abschliessen));
 
-        // KEIN Firmenrecht: wer einen Vorgang anfangen darf, muss ihn beenden
+        // KEIN Firmenrecht: wer einen Case anfangen darf, muss ihn beenden
         // duerfen. Sonst waere die Einladung eine Falle — derselbe Satz, den
         // `/decline` fuer die Person schon traegt.
-        vorgaenge.MapPost("/{id:guid}/withdraw", (
+        cases.MapPost("/{id:guid}/withdraw", (
                 Guid id, IMediator mediator, ICurrentPrincipal akteur,
                 HttpContext context, CancellationToken cancellationToken) =>
-            Firma(id, Firmenzug.Zurueckziehen, mediator, akteur, context, cancellationToken));
+            Firma(id, CompanySwitch.Zurueckziehen, mediator, akteur, context, cancellationToken));
 
         return app;
     }
@@ -180,31 +180,31 @@ public static class VorgangsEndpoints
     {
         if (akteur.Current is not { } handelnder)
         {
-            await Antworten.NichtAngemeldet(context);
+            await Responses.NichtAngemeldet(context);
             return;
         }
 
-        var ergebnis = await mediator.Send(
+        var result = await mediator.Send(
             new PersonenzugBefehl(id, handelnder.Subject, zug), cancellationToken);
 
-        await Antworten.Schreibe(context, ergebnis, cancellationToken);
+        await Responses.Write(context, result, cancellationToken);
     }
 
     private static async Task Firma(
         Guid id,
-        Firmenzug zug,
+        CompanySwitch zug,
         IMediator mediator,
         ICurrentPrincipal akteur,
         HttpContext context,
         CancellationToken cancellationToken)
     {
-        if (await Antworten.Firma(context, akteur) is not { } firma)
+        if (await Responses.Firma(context, akteur) is not { } company)
         {
             return;
         }
 
-        var ergebnis = await mediator.Send(new FirmenzugBefehl(id, firma, zug), cancellationToken);
+        var result = await mediator.Send(new CompanySwitchCommand(id, company, zug), cancellationToken);
 
-        await Antworten.Schreibe(context, ergebnis, cancellationToken);
+        await Responses.Write(context, result, cancellationToken);
     }
 }

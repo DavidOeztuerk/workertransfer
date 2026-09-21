@@ -13,17 +13,17 @@ using WorkerTransfer.Contracts.Consent;
 namespace WorkerTransfer.Advisor.Infrastructure.Einwilligung;
 
 /// <summary>Wo der Consent-Ledger erreichbar ist.</summary>
-public sealed class Einwilligungseinstellungen
+public sealed class ConsentSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Consent";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Consent";
 
     /// <summary>Die Basisadresse des Ledgers.</summary>
     /// <remarks>
     /// Im Compose-Netz der Dienstname, nicht <c>localhost</c> — der Aufruf läuft
     /// von Behälter zu Behälter. Und er steht in der Konfiguration, weil die
     /// Egress-Grenze ihre erlaubten Hosts von dort ableitet
-    /// (<c>Dienstgrundlage.GerufeneHosts</c>): ein Ziel, das nur im Quelltext
+    /// (<c>ServiceFoundation.GerufeneHosts</c>): ein Ziel, das nur im Quelltext
     /// stünde, wird abgewiesen — ohne Protokollzeile.
     /// </remarks>
     public string Adresse { get; set; } = string.Empty;
@@ -42,12 +42,12 @@ internal sealed record Erteilung(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("capability")] string Capability);
 
-/// <summary>Wie ein Widerruf aussieht.</summary>
+/// <summary>Wie ein Revocation aussieht.</summary>
 /// <remarks>
-/// Der Ledger verlangt für einen Widerruf eine Begründung und für eine
+/// Der Ledger verlangt für einen Revocation eine Begründung und für eine
 /// Erteilung keine: etwas wegzunehmen muss erklärbar sein, es zu geben nicht.
 /// </remarks>
-internal sealed record Widerruf(
+internal sealed record Revocation(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("capability")] string Capability,
     [property: JsonPropertyName("reason")] string Reason);
@@ -60,7 +60,7 @@ internal sealed record Widerruf(
 /// <para>Es gibt hier kein Feld, das eine Antwort halten könnte, und keinen
 /// <c>IMemoryCache</c> im Konstruktor. In einem Dienst, dessen ganzer Zweck
 /// gestufte Sichtbarkeit ist, wäre ein Zwischenspeicher kein Leistungsdetail,
-/// sondern der Bruch der Zusage: ein Widerruf muss bei der nächsten Anfrage
+/// sondern der Bruch der Zusage: ein Revocation muss bei der nächsten ResumeRequest
 /// wirken (ADR-0013).</para>
 ///
 /// <para><strong>Wessen Subjekt gefragt oder geschrieben wird, steht nie im
@@ -70,12 +70,12 @@ internal sealed record Widerruf(
 /// wenn sie nicht passt. Deshalb kann eine Stufenfreigabe nur gelingen, wenn
 /// die Person sie auslöst.</para>
 /// </remarks>
-public sealed class HttpEinwilligungstor(
+public sealed class HttpConsentGate(
     IHttpClientFactory fabrik,
     IAufrufertoken token,
     ICurrentPrincipal akteur,
-    IOptions<Einwilligungseinstellungen> einstellungen,
-    ILogger<HttpEinwilligungstor> protokoll) : IEinwilligungstor
+    IOptions<ConsentSettings> einstellungen,
+    ILogger<HttpConsentGate> protokoll) : IConsentGate
 {
     /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
     public const string Klient = "consent";
@@ -88,12 +88,12 @@ public sealed class HttpEinwilligungstor(
     /// der Ledger deckelt eine Sammelfrage bei hundert Paaren. Vier mal
     /// fünfundzwanzig ist hundert.
     /// </remarks>
-    public const int PaareJeRunde = Einwilligungsgrenzen.HoechsteSammelgroesse / 4;
+    public const int PaareJeRunde = ConsentLimits.HoechsteSammelgroesse / 4;
 
-    private readonly Einwilligungseinstellungen _einstellungen = einstellungen.Value;
+    private readonly ConsentSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Stufe>> StufenAsync(
+    public async Task<IReadOnlyList<Stufe>> StagesAsync(
         IReadOnlyList<(SubjectId Wer, TenantId Firma)> paare,
         CancellationToken cancellationToken = default)
     {
@@ -104,7 +104,7 @@ public sealed class HttpEinwilligungstor(
             return [];
         }
 
-        var stufen = new List<Stufe>(paare.Count);
+        var stages = new List<Stufe>(paare.Count);
 
         // Gestueckelt, weil der Ledger eine Sammelfrage deckelt. Mehrere Wege
         // hin und zurueck sind immer noch einer je fuenfundzwanzig Zeilen statt
@@ -113,62 +113,62 @@ public sealed class HttpEinwilligungstor(
         {
             var fragen = stapel
                 .SelectMany(paar => Faehigkeiten(paar.Firma)
-                    .Select(faehigkeit => new EinwilligungsfrageV1(paar.Wer.Value, faehigkeit)))
+                    .Select(skill => new ConsentQuestionV1(paar.Wer.Value, skill)))
                 .ToArray();
 
-            var antwort = await SchickeAsync<EinwilligungssammelfrageV1,
-                EinwilligungssammelantwortV1>(
+            var response = await SendAsync<ConsentBatchQuestionV1,
+                ConsentBatchResponseV1>(
                 "/consent/check-batch",
-                new EinwilligungssammelfrageV1(fragen),
+                new ConsentBatchQuestionV1(fragen),
                 cancellationToken);
 
             // Die Reihenfolge gehoert zum Vertrag, und die Laenge auch. Eine
             // unpassende Antwort wird abgewiesen statt geraten: sie falsch
-            // zuzuordnen hiesse, die Freigabe des falschen Menschen zu lesen.
-            if (antwort.Results.Count != fragen.Length)
+            // zuzuordnen hiesse, die Release des falschen Menschen zu lesen.
+            if (response.Results.Count != fragen.Length)
             {
-                throw new EinwilligungSchweigt(
-                    $"{antwort.Results.Count} Antworten auf {fragen.Length} Fragen");
+                throw new ConsentGateSilent(
+                    $"{response.Results.Count} Antworten auf {fragen.Length} Fragen");
             }
 
             for (var i = 0; i < stapel.Length; i++)
             {
-                stufen.Add(Lies(antwort.Results, i * Anzahl));
+                stages.Add(Lies(response.Results, i * Anzahl));
             }
         }
 
-        return stufen;
+        return stages;
     }
 
     /// <inheritdoc />
-    public async Task ErteileAsync(
-        IReadOnlyList<string> faehigkeiten, CancellationToken cancellationToken = default)
+    public async Task GrantAsync(
+        IReadOnlyList<string> skills, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(faehigkeiten);
+        ArgumentNullException.ThrowIfNull(skills);
 
-        var wer = Selbst();
+        var subject = Selbst();
 
-        foreach (var faehigkeit in faehigkeiten)
+        foreach (var skill in skills)
         {
-            await SchickeAsync<Erteilung, JsonElement>(
-                "/consent/grant", new Erteilung(wer, faehigkeit), cancellationToken);
+            await SendAsync<Erteilung, JsonElement>(
+                "/consent/grant", new Erteilung(subject, skill), cancellationToken);
         }
     }
 
     /// <inheritdoc />
-    public async Task WiderrufeAsync(
-        IReadOnlyList<string> faehigkeiten,
-        string grund,
+    public async Task RevokeAsync(
+        IReadOnlyList<string> skills,
+        string reason,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(faehigkeiten);
+        ArgumentNullException.ThrowIfNull(skills);
 
-        var wer = Selbst();
+        var subject = Selbst();
 
-        foreach (var faehigkeit in faehigkeiten)
+        foreach (var skill in skills)
         {
-            await SchickeAsync<Widerruf, JsonElement>(
-                "/consent/revoke", new Widerruf(wer, faehigkeit, grund), cancellationToken);
+            await SendAsync<Revocation, JsonElement>(
+                "/consent/revoke", new Revocation(subject, skill, reason), cancellationToken);
         }
     }
 
@@ -176,133 +176,133 @@ public sealed class HttpEinwilligungstor(
     /// <remarks>
     /// Die Reihenfolge ist der Vertrag zwischen dieser Methode und
     /// <see cref="Lies"/>; sie zu ändern, ohne dort zu zählen, hiesse, die
-    /// Antwort auf „Lebenslauf" als „Profil" zu lesen.
+    /// Antwort auf „Resume" als „Profil" zu lesen.
     /// </remarks>
-    private static string[] Faehigkeiten(TenantId firma) =>
+    private static string[] Faehigkeiten(TenantId company) =>
     [
-        Stufenfaehigkeiten.Profil(firma),
-        Stufenfaehigkeiten.ProfilOeffentlich,
-        Stufenfaehigkeiten.Lebenslauf(firma),
-        Stufenfaehigkeiten.Klarname(firma)
+        StageCapabilities.Profile(company),
+        StageCapabilities.ProfilOeffentlich,
+        StageCapabilities.Resume(company),
+        StageCapabilities.Klarname(company)
     ];
 
     private const int Anzahl = 4;
 
-    /// <summary>Aus vier Antworten eine Stufe — kumulativ.</summary>
+    /// <summary>Aus vier Responses eine Stufe — kumulativ.</summary>
     /// <remarks>
-    /// Eine Stufe ist ein <em>Stand</em> und kein Sprung: wer Stufe 1
+    /// Eine Stufe ist ein <em>State</em> und kein Sprung: wer Stufe 1
     /// zurückgenommen hat, steht nicht auf 3, auch wenn die Fähigkeit von
-    /// Stufe 3 noch steht. Der Lebenslauf sichtbar und das Profil nicht wäre
+    /// Stufe 3 noch steht. Der Resume sichtbar und das Profile nicht wäre
     /// eine Erlaubnis ohne Grundlage.
     /// </remarks>
-    private static Stufe Lies(IReadOnlyList<EinwilligungsantwortV1> antworten, int ab)
+    private static Stufe Lies(IReadOnlyList<ConsentResponseV1> responses, int ab)
     {
-        var profil = Gilt(antworten[ab]) || Gilt(antworten[ab + 1]);
-        var lebenslauf = Gilt(antworten[ab + 2]);
-        var klarname = Gilt(antworten[ab + 3]);
+        var profile = Gilt(responses[ab]) || Gilt(responses[ab + 1]);
+        var resume = Gilt(responses[ab + 2]);
+        var klarname = Gilt(responses[ab + 3]);
 
-        if (!profil)
+        if (!profile)
         {
-            return Stufe.Keine;
+            return Stufe.None;
         }
 
-        if (!lebenslauf)
+        if (!resume)
         {
-            return Stufe.Profil;
+            return Stufe.Profile;
         }
 
         return klarname ? Stufe.Person : Stufe.Unterlagen;
     }
 
     /// <summary>Eine gelöschte Fähigkeit zieht die Erlaubnis logisch zurück.</summary>
-    private static bool Gilt(EinwilligungsantwortV1 antwort) =>
-        antwort.Granted && !antwort.Deleted;
+    private static bool Gilt(ConsentResponseV1 response) =>
+        response.Granted && !response.Deleted;
 
     /// <summary>Wer gerade handelt — aus dem geprüften Token, nie aus dem Rumpf.</summary>
     private Guid Selbst() =>
         akteur.Current is { } handelnder
             ? handelnder.Subject.Value
-            : throw new EinwilligungAbgelehnt("not authenticated");
+            : throw new ConsentRefused("not authenticated");
 
-    private async Task<TAntwort> SchickeAsync<TFrage, TAntwort>(
-        string pfad, TFrage rumpf, CancellationToken cancellationToken)
+    private async Task<TAntwort> SendAsync<TFrage, TAntwort>(
+        string path, TFrage body, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(_einstellungen.Adresse))
         {
             // Kein Ledger eingerichtet heisst nicht „alles frei". Es heisst,
             // dass dieser Dienst die Frage nicht beantworten kann.
-            throw new EinwilligungSchweigt("Consent:Adresse ist nicht gesetzt.");
+            throw new ConsentGateSilent("Consent:Adresse ist nicht gesetzt.");
         }
 
         using var client = fabrik.CreateClient(Klient);
         client.Timeout = _einstellungen.Geduld;
 
-        using var anfrage = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), pfad))
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), path))
         {
-            Content = JsonContent.Create(rumpf)
+            Content = JsonContent.Create(body)
         };
 
-        if (token.Wert is { Length: > 0 } wert)
+        if (token.Wert is { Length: > 0 } value)
         {
-            anfrage.Headers.Add("Authorization", $"Bearer {wert}");
+            request.Headers.Add("Authorization", $"Bearer {value}");
         }
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
             // Nur die Art, nie der Inhalt: gefragt wurde nach einem Menschen.
             protokoll.LogWarning(
-                "Der Consent-Ledger ist nicht erreichbar: {Art}", fehler.GetType().Name);
+                "Der Consent-Ledger ist nicht erreichbar: {Art}", error.GetType().Name);
 
-            throw new EinwilligungSchweigt("consent-service unreachable");
+            throw new ConsentGateSilent("consent-service unreachable");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             protokoll.LogWarning("Der Consent-Ledger hat nicht rechtzeitig geantwortet.");
 
-            throw new EinwilligungSchweigt("consent-service timed out");
+            throw new ConsentGateSilent("consent-service timed out");
         }
 
-        using (antwort)
+        using (response)
         {
-            if (antwort.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
+            if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
             {
                 // Der Ledger HAT geantwortet, und zwar mit Nein — das ist etwas
                 // anderes als sein Schweigen. Es passiert genau dann, wenn
                 // jemand fuer einen fremden Menschen erteilen wollte.
                 protokoll.LogWarning(
-                    "Der Consent-Ledger hat abgelehnt: {Status}", (int)antwort.StatusCode);
+                    "Der Consent-Ledger hat abgelehnt: {Status}", (int)response.StatusCode);
 
-                throw new EinwilligungAbgelehnt(
-                    $"consent-service refused with {(int)antwort.StatusCode}");
+                throw new ConsentRefused(
+                    $"consent-service refused with {(int)response.StatusCode}");
             }
 
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
                 protokoll.LogWarning(
-                    "Der Consent-Ledger antwortete mit {Status}.", (int)antwort.StatusCode);
+                    "Der Consent-Ledger antwortete mit {Status}.", (int)response.StatusCode);
 
-                throw new EinwilligungSchweigt(
-                    $"consent-service returned {(int)antwort.StatusCode}");
+                throw new ConsentGateSilent(
+                    $"consent-service returned {(int)response.StatusCode}");
             }
 
             try
             {
-                return await antwort.Content
+                return await response.Content
                            .ReadFromJsonAsync<TAntwort>(cancellationToken)
-                       ?? throw new EinwilligungSchweigt("consent-service sent an empty answer");
+                       ?? throw new ConsentGateSilent("consent-service sent an empty answer");
             }
-            catch (Exception fehler) when (fehler is not EinwilligungSchweigt)
+            catch (Exception error) when (error is not ConsentGateSilent)
             {
                 protokoll.LogWarning("Der Consent-Ledger antwortete unverständlich.");
 
-                throw new EinwilligungSchweigt("consent-service sent an unusable answer");
+                throw new ConsentGateSilent("consent-service sent an unusable answer");
             }
         }
     }

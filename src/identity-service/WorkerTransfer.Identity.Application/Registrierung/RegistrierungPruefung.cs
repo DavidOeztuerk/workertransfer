@@ -13,7 +13,7 @@ namespace WorkerTransfer.Identity.Application.Registrierung;
 ///
 /// <para><strong>Es prüft die Form, nie die Existenz.</strong> Ob die Adresse
 /// bekannt ist, beantwortet dieser Endpunkt bewusst nicht: er antwortet für
-/// bekannte und unbekannte gleich, sonst verriete er die Mitgliedschaft auf
+/// bekannte und unbekannte gleich, sonst verriete er die Membership auf
 /// dieser Plattform, ohne den Ledger zu fragen. Ein Prüfer sieht nur den Rumpf
 /// und kann diese Zusage deshalb gar nicht brechen.</para>
 ///
@@ -37,12 +37,12 @@ namespace WorkerTransfer.Identity.Application.Registrierung;
 ///
 /// <para><strong>Der Firmenname bleibt ungeprüft.</strong> Er ist optional, und
 /// „nicht gesetzt" ist der Normalfall: der übliche Mensch auf einem
-/// Transfermarkt hat keine Firma.</para>
+/// TransferMarket hat keine Firma.</para>
 /// </remarks>
-public sealed class RegistrierungPruefung : AbstractValidator<RegistrierenBefehl>
+public sealed class RegistrationValidator : AbstractValidator<RegistrierenBefehl>
 {
     /// <summary>Setzt die Regeln.</summary>
-    public RegistrierungPruefung()
+    public RegistrationValidator()
     {
         RuleFor(befehl => befehl.Email)
             .NotEmpty().WithMessage("email is required")

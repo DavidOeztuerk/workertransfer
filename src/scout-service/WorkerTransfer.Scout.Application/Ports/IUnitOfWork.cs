@@ -4,7 +4,7 @@ namespace WorkerTransfer.Scout.Application.Ports;
 public interface IUnitOfWork
 {
     /// <summary>Führt die Arbeit aus und schreibt sie gemeinsam fest.</summary>
-    Task<T> InEinerTransaktionAsync<T>(
+    Task<T> InTransactionAsync<T>(
         Func<CancellationToken, Task<T>> arbeit,
         CancellationToken cancellationToken = default);
 }

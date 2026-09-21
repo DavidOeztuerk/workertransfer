@@ -6,8 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Testcontainers.PostgreSql;
 using WorkerTransfer.Scout.Application.Ports;
-using WorkerTransfer.Scout.Domain.Suchen;
-using WorkerTransfer.Scout.Domain.Treffer;
+using WorkerTransfer.Scout.Domain.Searches;
+using WorkerTransfer.Scout.Domain.Hit;
 using WorkerTransfer.Scout.Infrastructure.Persistence;
 
 namespace WorkerTransfer.Scout.Tests;
@@ -29,12 +29,12 @@ public sealed class Postgres : IAsyncLifetime
     {
         await _behaelter.StartAsync();
 
-        await using var quelle = ScoutDbContextFactory.Datenquelle(ConnectionString);
-        await using var kontext = new ScoutDbContext(
-            (DbContextOptions<ScoutDbContext>)ScoutDbContextFactory.Konfiguriere(
-                new DbContextOptionsBuilder<ScoutDbContext>(), quelle).Options);
+        await using var source = ScoutDbContextFactory.DataSource(ConnectionString);
+        await using var context = new ScoutDbContext(
+            (DbContextOptions<ScoutDbContext>)ScoutDbContextFactory.Configure(
+                new DbContextOptionsBuilder<ScoutDbContext>(), source).Options);
 
-        await kontext.Database.MigrateAsync();
+        await context.Database.MigrateAsync();
     }
 
     public async Task DisposeAsync() => await _behaelter.DisposeAsync();
@@ -76,18 +76,18 @@ public static class Tokenform
     }
 
     /// <summary>Ein Token für eine Person, die für sich selbst handelt.</summary>
-    public static string Person(Guid wer) => Baue(wer, firma: null);
+    public static string Person(Guid subject) => Build(subject, company: null);
 
     /// <summary>Ein Token für jemanden, der für ein Unternehmen handelt.</summary>
-    public static string Firma(Guid wer, Guid firma) => Baue(wer, firma);
+    public static string Firma(Guid subject, Guid company) => Build(subject, company);
 
-    private static string Baue(Guid wer, Guid? firma)
+    private static string Build(Guid subject, Guid? company)
     {
-        List<Claim> ansprueche = [new(JwtRegisteredClaimNames.Sub, wer.ToString())];
+        List<Claim> ansprueche = [new(JwtRegisteredClaimNames.Sub, subject.ToString())];
 
-        if (firma is { } mandant)
+        if (company is { } tenant)
         {
-            ansprueche.Add(new Claim("tenant", mandant.ToString()));
+            ansprueche.Add(new Claim("tenant", tenant.ToString()));
         }
 
         var token = new JwtSecurityToken(
@@ -108,16 +108,16 @@ public static class Tokenform
 /// Sie hält fest, <em>womit</em> gefragt wurde — das ist die interessante
 /// Frage: gesucht werden darf nur über Genanntes.
 /// </remarks>
-public sealed class Probesuche : IProfilsuche
+public sealed class Probesuche : IProfileSearch
 {
     /// <summary>Die Profile, in genau dieser Reihenfolge.</summary>
-    public List<Profilfund> Bestand { get; } = [];
+    public List<ProfileHit> Bestand { get; } = [];
 
     /// <summary>Womit zuletzt gesucht wurde.</summary>
-    public Suchfilter? LetzterFilter { get; private set; }
+    public SearchFilter? LetzterFilter { get; private set; }
 
     /// <summary>Wie oft gesucht wurde.</summary>
-    public int Suchen { get; private set; }
+    public int Searches { get; private set; }
 
     /// <summary>Wenn wahr, antwortet profile-service gar nicht.</summary>
     public bool Schweigt { get; set; }
@@ -134,23 +134,23 @@ public sealed class Probesuche : IProfilsuche
     public bool Verschlossen { get; set; }
 
     /// <inheritdoc />
-    public Task<Profilfundseite> SucheAsync(
-        Suchfilter filter,
+    public Task<ProfileHitPage> SearchAsync(
+        SearchFilter filter,
         int seitenlaenge,
         string? zeiger,
         CancellationToken cancellationToken = default)
     {
-        Suchen++;
+        Searches++;
         LetzterFilter = filter;
 
         if (Schweigt)
         {
-            throw new ProfilsucheSchweigt("profile-service antwortet im Test nicht");
+            throw new ProfileSearchSilent("profile-service antwortet im Test nicht");
         }
 
         if (Verschlossen)
         {
-            throw new ProfilsucheSchweigt(
+            throw new ProfileSearchSilent(
                 "profile-service answered 404 to the search — the shared secret "
                 + "is refused or the door is closed");
         }
@@ -158,35 +158,35 @@ public sealed class Probesuche : IProfilsuche
         // Genau wie der echte Dienst: gefiltert wird ueber GENANNTE Worte, und
         // als ODER — wer eines nennt, ist dabei. Nichts anderes ist hier
         // durchsuchbar.
-        var treffer = Bestand
-            .Where(profil => filter.GenannteWorte.Count == 0
+        var hit = Bestand
+            .Where(profile => filter.GenannteWorte.Count == 0
                              || filter.GenannteWorte.Any(
-                                 wort => profil.Genannt.Contains(
-                                     wort, StringComparer.OrdinalIgnoreCase)))
-            .Where(profil => filter.Ort.Length == 0
-                             || profil.Ort.Contains(filter.Ort, StringComparison.OrdinalIgnoreCase))
-            .Where(profil => !filter.NurRemote || profil.RemoteMoeglich)
+                                 word => profile.Genannt.Contains(
+                                     word, StringComparer.OrdinalIgnoreCase)))
+            .Where(profile => filter.Ort.Length == 0
+                             || profile.Ort.Contains(filter.Ort, StringComparison.OrdinalIgnoreCase))
+            .Where(profile => !filter.NurRemote || profile.RemoteMoeglich)
             .Take(seitenlaenge)
             .ToArray();
 
-        return Task.FromResult(new Profilfundseite(treffer, null));
+        return Task.FromResult(new ProfileHitPage(hit, null));
     }
 
     /// <inheritdoc />
-    public Task<Profilfund?> HoleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public Task<ProfileHit?> GetAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
         if (Schweigt)
         {
-            throw new ProfilsucheSchweigt("profile-service antwortet im Test nicht");
+            throw new ProfileSearchSilent("profile-service antwortet im Test nicht");
         }
 
-        return Task.FromResult(Bestand.FirstOrDefault(profil => profil.Wer == wer));
+        return Task.FromResult(Bestand.FirstOrDefault(profile => profile.Wer == subject));
     }
 }
 
 /// <summary>Ein Ledger, den der Test steuert.</summary>
-public sealed class Probetor : IEinwilligungstor
+public sealed class Probetor : IConsentGate
 {
     /// <summary>Wer für welches Unternehmen sichtbar ist.</summary>
     public HashSet<(Guid Wer, Guid Firma)> Frei { get; } = [];
@@ -205,16 +205,16 @@ public sealed class Probetor : IEinwilligungstor
     public int? AntwortetMitLaenge { get; set; }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<bool>> DarfSehenAlleAsync(
-        IReadOnlyList<SubjectId> wer,
-        TenantId firma,
+    public Task<IReadOnlyList<bool>> MaySeeAllAsync(
+        IReadOnlyList<SubjectId> subject,
+        TenantId company,
         CancellationToken cancellationToken = default)
     {
         Fragen++;
 
         if (Schweigt)
         {
-            throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht");
+            throw new ConsentGateSilent("der Ledger antwortet im Test nicht");
         }
 
         if (AntwortetMitLaenge is { } falsch)
@@ -223,37 +223,37 @@ public sealed class Probetor : IEinwilligungstor
         }
 
         return Task.FromResult<IReadOnlyList<bool>>(
-            [.. wer.Select(einer => Frei.Contains((einer.Value, firma.Value)))]);
+            [.. subject.Select(einer => Frei.Contains((einer.Value, company.Value)))]);
     }
 }
 
 /// <summary>Belege, die der Test steuert.</summary>
-public sealed class Probebelege : IBelege
+public sealed class Probebelege : IEvidenceSource
 {
     /// <summary>Was zu wem vorliegt.</summary>
-    public Dictionary<Guid, Belegbogen> Bestand { get; } = [];
+    public Dictionary<Guid, EvidenceSheet> Bestand { get; } = [];
 
     /// <summary>Wen zuletzt gefragt wurde — in der Reihenfolge der Aufrufe.</summary>
     public List<Guid> Gefragt { get; } = [];
 
     /// <inheritdoc />
-    public Task<Belegbogen> HoleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public Task<EvidenceSheet> GetAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        Gefragt.Add(wer.Value);
+        Gefragt.Add(subject.Value);
 
         return Task.FromResult(
-            Bestand.TryGetValue(wer.Value, out var bogen)
+            Bestand.TryGetValue(subject.Value, out var bogen)
                 ? bogen
-                : new Belegbogen([], Belegstand.KeineFreigegeben));
+                : new EvidenceSheet([], EvidenceState.KeineFreigegeben));
     }
 }
 
 /// <summary>Stellenaussagen, die der Test steuert.</summary>
-public sealed class Probestellen : IStellen
+public sealed class Probestellen : IJobs
 {
     /// <summary>Was zu welcher Anzeige vorliegt.</summary>
-    public Dictionary<Guid, Stellenaussage> Bestand { get; } = [];
+    public Dictionary<Guid, JobStatement> Bestand { get; } = [];
 
     /// <summary>Wie oft gefragt wurde — EINMAL je Seite, nicht je Zeile.</summary>
     public int Fragen { get; private set; }
@@ -262,19 +262,19 @@ public sealed class Probestellen : IStellen
     public bool Schweigt { get; set; }
 
     /// <inheritdoc />
-    public Task<Stellenaussage?> HoleAsync(
-        Guid stelle, CancellationToken cancellationToken = default)
+    public Task<JobStatement?> GetAsync(
+        Guid job, CancellationToken cancellationToken = default)
     {
         Fragen++;
 
         return Schweigt
-            ? throw new StelleSchweigt("jobs-service antwortet im Test nicht")
-            : Task.FromResult(Bestand.GetValueOrDefault(stelle));
+            ? throw new JobLookupSilent("jobs-service antwortet im Test nicht")
+            : Task.FromResult(Bestand.GetValueOrDefault(job));
     }
 }
 
 /// <summary>Ein Entwerfer, der mitschreibt statt zu fragen.</summary>
-public sealed class Probeentwerfer : IEntwerfer
+public sealed class Probeentwerfer : IDrafter
 {
     /// <summary>Was zuletzt hinausgegangen wäre — das ist die interessante Frage.</summary>
     public Ansprachelage? Letzte { get; private set; }
@@ -283,7 +283,7 @@ public sealed class Probeentwerfer : IEntwerfer
     public bool Fehlt { get; set; }
 
     /// <inheritdoc />
-    public Task<string> EntwirfAsync(
+    public Task<string> DraftAsync(
         Ansprachelage lage, CancellationToken cancellationToken = default)
     {
         Letzte = lage;

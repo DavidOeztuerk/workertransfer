@@ -30,4 +30,8 @@ nodes:
       # `kubectl port-forward` anmelden kann, wird nicht benutzt.
       - containerPort: 30825
         hostPort: 8025
+      # The UI, on the same host port compose uses. It is a door of its own —
+      # the gateway on 8090 serves the API and never a document (ADR-0040).
+      - containerPort: 30173
+        hostPort: 5173
         protocol: TCP

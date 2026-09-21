@@ -45,6 +45,8 @@ export function AusUnterlagen({
 
   const gelesen = funde.filter((fund) => fund.read_at !== null);
   const ohneText = gelesen.filter((fund) => !fund.has_text);
+  // "Read, nothing found" says nothing about the document: the vocabulary knows
+  // what someone entered by pull request, not every trade there is (ADR-0023).
   const nichtsGefunden =
     gelesen.length > 0 && gelesen.every((fund) => fund.terms.length === 0);
 
@@ -76,12 +78,6 @@ export function AusUnterlagen({
         </Alert>
       ) : null}
 
-      {/*
-        „Gelesen, nichts gefunden" — und ausdrücklich mit dem Nachsatz, dass das
-        nichts über die Unterlage sagt. Der Wortschatz kennt, was jemand per
-        Pull Request eingetragen hat; er ist keine Liste aller Arbeit, die es
-        gibt (ADR-0023).
-      */}
       {nichtsGefunden && ohneText.length < gelesen.length ? (
         <Typography
           variant="caption"

@@ -17,49 +17,12 @@ namespace WorkerTransfer.Applications.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("WorkerTransfer.Applications.Infrastructure.Persistence.AnmerkungsZeile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("body");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("DraftId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("draft_id");
-
-                    b.Property<string>("Quote")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("quote");
-
-                    b.Property<bool>("Resolved")
-                        .HasColumnType("boolean")
-                        .HasColumnName("resolved");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DraftId");
-
-                    b.ToTable("application_draft_comments", (string)null);
-                });
-
-            modelBuilder.Entity("WorkerTransfer.Applications.Infrastructure.Persistence.BewerbungsZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Applications.Infrastructure.Persistence.ApplicationRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -137,7 +100,44 @@ namespace WorkerTransfer.Applications.Infrastructure.Persistence.Migrations
                     b.ToTable("applications", (string)null);
                 });
 
-            modelBuilder.Entity("WorkerTransfer.Applications.Infrastructure.Persistence.EntwurfsZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Applications.Infrastructure.Persistence.CommentRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("body");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("draft_id");
+
+                    b.Property<string>("Quote")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("quote");
+
+                    b.Property<bool>("Resolved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("resolved");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DraftId");
+
+                    b.ToTable("application_draft_comments", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Applications.Infrastructure.Persistence.DraftRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -209,7 +209,7 @@ namespace WorkerTransfer.Applications.Infrastructure.Persistence.Migrations
                     b.ToTable("application_drafts", (string)null);
                 });
 
-            modelBuilder.Entity("WorkerTransfer.Outbox.OutboxZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Outbox.OutboxRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()

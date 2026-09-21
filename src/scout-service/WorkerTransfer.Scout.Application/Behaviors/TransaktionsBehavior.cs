@@ -10,7 +10,7 @@ namespace WorkerTransfer.Scout.Application.Behaviors;
 /// ist, den niemand bemerkt: alles, was er schreibt, landet trotzdem — nur
 /// nicht gemeinsam.
 /// <para>
-/// In diesem Dienst hängt daran mehr als eine Zeile: der Vermerk „dein Profil
+/// In diesem Dienst hängt daran mehr als eine Zeile: der Vermerk „dein Profile
 /// wurde entdeckt" entsteht im Postausgang und muss mit dem Befehl gemeinsam
 /// festgeschrieben werden oder gar nicht (ADR-0025).
 /// </para>
@@ -28,7 +28,7 @@ public sealed class TransaktionsBehavior<TAnfrage, TAntwort>(IUnitOfWork arbeits
         ArgumentNullException.ThrowIfNull(next);
 
         return request is IBefehl
-            ? arbeitseinheit.InEinerTransaktionAsync(next.Invoke, cancellationToken)
+            ? arbeitseinheit.InTransactionAsync(next.Invoke, cancellationToken)
             : next(cancellationToken);
     }
 }

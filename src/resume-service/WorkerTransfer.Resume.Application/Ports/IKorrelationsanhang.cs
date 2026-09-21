@@ -12,10 +12,10 @@ namespace WorkerTransfer.Resume.Application.Ports;
 public interface IKorrelationsanhang
 {
     /// <summary>One entry, correlated.</summary>
-    Pruefeintrag Eintrag(
-        Pruefhandlung handlung,
+    AuditEntry Eintrag(
+        AuditAction action,
         DateTimeOffset geschehen,
         SubjectId? akteur = null,
-        TenantId? firma = null,
+        TenantId? company = null,
         SubjectId? betroffene = null);
 }

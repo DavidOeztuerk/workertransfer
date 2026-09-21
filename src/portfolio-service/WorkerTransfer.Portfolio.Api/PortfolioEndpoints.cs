@@ -8,7 +8,7 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Portfolio.Api;
 
-/// <summary><c>/portfolios/*</c> — schreiben, lesen, Arbeitsproben.</summary>
+/// <summary><c>/portfolios/*</c> — schreiben, lesen, WorkSamples.</summary>
 public static class PortfolioEndpoints
 {
     /// <summary>Wie groß eine hochgeladene Datei sein darf.</summary>
@@ -23,16 +23,16 @@ public static class PortfolioEndpoints
         // Filter für die ganze Gruppe, weil die Route, die es vergisst, wie
         // eine funktionierende aussieht, bis der Ledger ausfällt.
         var portfolios = app.MapGroup("/portfolios").AddEndpointFilter(
-            async (aufruf, weiter) =>
+            async (call, weiter) =>
             {
                 try
                 {
-                    return await weiter(aufruf);
+                    return await weiter(call);
                 }
-                catch (EinwilligungSchweigt)
+                catch (ConsentGateSilent)
                 {
-                    await ProblemDetailsMiddleware.Schreibe(
-                        aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                    await ProblemDetailsMiddleware.Write(
+                        call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                         "Request failed", "the consent ledger did not answer");
 
                     return Geschrieben;
@@ -61,11 +61,11 @@ public static class PortfolioEndpoints
 
                 await context.Response.WriteAsJsonAsync(Antwort(portfolio), cancellationToken);
             }
-            catch (Eingabefehler fehler)
+            catch (Eingabefehler error)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
-                    "Request failed", fehler.Message);
+                    "Request failed", error.Message);
             }
         });
 
@@ -81,10 +81,10 @@ public static class PortfolioEndpoints
                 return;
             }
 
-            // Ohne Ledgerfrage: die Freigabe regelt, wer es von außen sieht,
+            // Ohne Ledgerfrage: die Release regelt, wer es von außen sieht,
             // nicht ob jemand sein eigenes lesen darf.
             var portfolio = await mediator.Send(
-                new MeinPortfolioAbfrage(handelnder.Subject), cancellationToken);
+                new MyPortfolioQuery(handelnder.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
                 portfolio is null ? null : Antwort(portfolio), cancellationToken);
@@ -111,7 +111,7 @@ public static class PortfolioEndpoints
                 // Verborgen und nicht vorhanden antworten gleich, und das muss
                 // so bleiben: ein Unterschied sagte, ob dieser Mensch hier
                 // etwas gezeigt hat.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such portfolio");
                 return;
@@ -134,18 +134,18 @@ public static class PortfolioEndpoints
 
             if (!context.Request.HasFormContentType)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status415UnsupportedMediaType,
                     "Request failed", "expected a multipart upload");
                 return;
             }
 
             var formular = await context.Request.ReadFormAsync(cancellationToken);
-            var datei = formular.Files.GetFile("file");
+            var file = formular.Files.GetFile("file");
 
-            if (datei is null || datei.Length == 0)
+            if (file is null || file.Length == 0)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "no file");
                 return;
@@ -153,21 +153,21 @@ public static class PortfolioEndpoints
 
             // Eine Grenze, weil ohne sie die erste Videodatei den Datenträger
             // füllt — und weil ein Portfolio ein Schaufenster ist, kein Archiv.
-            if (datei.Length > HoechsteGroesse)
+            if (file.Length > HoechsteGroesse)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status413PayloadTooLarge,
                     "Request failed", "the file is too large");
                 return;
             }
 
-            await using var inhalt = datei.OpenReadStream();
+            await using var content = file.OpenReadStream();
 
             // Der Name kommt von der Ablage zurück, nicht vom Client: ein vom
             // Aufrufer gewählter Name wäre ein Pfad, den jemand formen kann.
             var name = await mediator.Send(
                 new AnhangAblegenBefehl(
-                    handelnder.Subject, datei.FileName, datei.ContentType, inhalt),
+                    handelnder.Subject, file.FileName, file.ContentType, content),
                 cancellationToken);
 
             context.Response.StatusCode = StatusCodes.Status201Created;
@@ -197,7 +197,7 @@ public static class PortfolioEndpoints
             {
                 // Dieselbe Antwort, ob die Datei fehlt, das Portfolio verborgen
                 // ist oder kein Eintrag sie nennt. Drei Gründe, eine Antwort.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such attachment");
                 return;
@@ -227,9 +227,9 @@ public static class PortfolioEndpoints
     /// <strong>Nicht <c>null</c>.</strong> Ein Filter, der <c>null</c>
     /// zurückgibt, lässt das Rahmenwerk noch einmal schreiben — JSON-<c>null</c>
     /// samt Kopfzeilen, und die stehen zu diesem Zeitpunkt schon. Bei einer
-    /// Anfrage ohne Rumpf sieht der Aufrufer trotzdem sein 503 und nur das
+    /// ResumeRequest ohne Rumpf sieht der Aufrufer trotzdem sein 503 und nur das
     /// Protokoll trägt eine unbehandelte Ausnahme; bei einer mit Rumpf reißt
-    /// die Verbindung, und er bekommt „Error while copying content to a
+    /// die Connection, und er bekommt „Error while copying content to a
     /// stream". Gemessen an <c>POST /applications</c>.
     /// </remarks>
     private static readonly IResult Geschrieben = Results.Empty;
@@ -237,21 +237,21 @@ public static class PortfolioEndpoints
     private static IReadOnlyList<Eintrag> Eintraege(
         PortfolioSchreibenV1 koerper, TimeProvider uhr)
     {
-        var jetzt = uhr.GetUtcNow();
+        var now = uhr.GetUtcNow();
 
-        return [.. (koerper.Items ?? []).Select(eintrag => Eintrag.Aus(
-            eintrag.Title, jetzt, eintrag.Summary, eintrag.Url,
-            eintrag.Role, eintrag.Year, eintrag.Attachment, eintrag.Technologies))];
+        return [.. (koerper.Items ?? []).Select(entry => Eintrag.Aus(
+            entry.Title, now, entry.Summary, entry.Url,
+            entry.Role, entry.Year, entry.Attachment, entry.Technologies))];
     }
 
     private static PortfolioV1 Antwort(Domain.Portfolios.Portfolio portfolio) => new(
         portfolio.Wer.Value,
-        [.. portfolio.Eintraege.Select(eintrag => new EintragV1(
-            eintrag.Titel, eintrag.Zusammenfassung, eintrag.Link,
-            eintrag.Rolle, eintrag.Jahr, eintrag.Anhang, eintrag.Technologien))],
+        [.. portfolio.Eintraege.Select(entry => new EintragV1(
+            entry.Titel, entry.Zusammenfassung, entry.Link,
+            entry.Rolle, entry.Jahr, entry.Anhang, entry.Technologien))],
         portfolio.GeaendertAm);
 
     private static Task NichtAngemeldet(HttpContext context) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
 }

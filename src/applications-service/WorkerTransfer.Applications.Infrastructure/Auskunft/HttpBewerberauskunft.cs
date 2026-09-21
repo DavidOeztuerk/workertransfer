@@ -5,15 +5,15 @@ using System.Text.Json.Serialization;
 using Noelia.Core.Identity;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Applications.Application.Ports;
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 
 namespace WorkerTransfer.Applications.Infrastructure.Auskunft;
 
 /// <summary>Wo die Dienste antworten, die die eigenen Angaben halten.</summary>
-public sealed class Auskunftseinstellungen
+public sealed class LookupSettings
 {
-    /// <summary>Der Abschnitt in der Konfiguration.</summary>
-    public const string Abschnitt = "Auskunft";
+    /// <summary>Der Section in der Konfiguration.</summary>
+    public const string Section = "Auskunft";
 
     /// <summary>identity-service — Name und Sprache.</summary>
     public string Identity { get; set; } = string.Empty;
@@ -22,7 +22,7 @@ public sealed class Auskunftseinstellungen
     public string Profile { get; set; } = string.Empty;
 
     /// <summary>resume-service — der Werdegang.</summary>
-    public string Resume { get; set; } = string.Empty;
+    public string CurriculumVitae { get; set; } = string.Empty;
 
     /// <summary>companies-service — der Name des Unternehmens.</summary>
     public string Companies { get; set; } = string.Empty;
@@ -31,17 +31,17 @@ public sealed class Auskunftseinstellungen
     public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
 }
 
-internal sealed record Sitzungsantwort(
-    [property: JsonPropertyName("user")] Sitzungsbenutzer? User);
+internal sealed record SessionResponse(
+    [property: JsonPropertyName("user")] SessionUser? User);
 
-internal sealed record Sitzungsbenutzer(
+internal sealed record SessionUser(
     [property: JsonPropertyName("display_name")] string? DisplayName,
     [property: JsonPropertyName("given_name")] string? GivenName,
     [property: JsonPropertyName("family_name")] string? FamilyName,
     [property: JsonPropertyName("email")] string? Email,
     [property: JsonPropertyName("language")] string? Language);
 
-internal sealed record Anschriftantwort(
+internal sealed record PostalAddressResponse(
     [property: JsonPropertyName("line1")] string? Line1,
     [property: JsonPropertyName("line2")] string? Line2,
     [property: JsonPropertyName("postal_code")] string? PostalCode,
@@ -49,12 +49,12 @@ internal sealed record Anschriftantwort(
     [property: JsonPropertyName("country")] string? Country,
     [property: JsonPropertyName("phone")] string? Phone);
 
-internal sealed record Profilantwort(
+internal sealed record ProfileResponse(
     [property: JsonPropertyName("headline")] string? Headline,
     [property: JsonPropertyName("bio")] string? Bio,
     [property: JsonPropertyName("skills")] IReadOnlyList<string>? Skills);
 
-internal sealed record Stationsantwort(
+internal sealed record StationResponse(
     [property: JsonPropertyName("employer")] string? Employer,
     [property: JsonPropertyName("title")] string? Title,
     [property: JsonPropertyName("started_on")] string? StartedOn,
@@ -62,15 +62,15 @@ internal sealed record Stationsantwort(
     [property: JsonPropertyName("description")] string? Description,
     [property: JsonPropertyName("technologies")] IReadOnlyList<string>? Technologies);
 
-internal sealed record Lebenslaufantwort(
-    [property: JsonPropertyName("positions")] IReadOnlyList<Stationsantwort>? Positions);
+internal sealed record ResumeResponse(
+    [property: JsonPropertyName("positions")] IReadOnlyList<StationResponse>? Positions);
 
 /// <summary>
-/// Öffentliches Arbeitgeberprofil — dieselben Namen wie
-/// <c>ArbeitgeberprofilV1</c>. <c>name</c> statt <c>display_name</c> kam
+/// Öffentliches EmployerProfile — dieselben Namen wie
+/// <c>EmployerProfileV1</c>. <c>name</c> statt <c>display_name</c> kam
 /// immer leer an, und der Brief ging ohne Firma hinaus.
 /// </summary>
-public sealed record Firmenprofilantwort(
+public sealed record CompanyProfileResponse(
     [property: JsonPropertyName("display_name")] string? Name,
     [property: JsonPropertyName("line1")] string? Line1 = null,
     [property: JsonPropertyName("postal_code")] string? PostalCode = null,
@@ -85,105 +85,105 @@ public sealed record Firmenprofilantwort(
 /// Server halten kann. Geholt wird mit dem Token des Aufrufers — also genau
 /// das, was diese Person ohnehin sehen darf, und keine Zeile mehr.
 /// <para>
-/// <strong>Ein fehlender Teil ist kein Fehler.</strong> Wer kein Profil und
-/// keinen Lebenslauf hinterlegt hat, bekommt ein dünneres Anschreiben, keine
+/// <strong>Ein fehlender Teil ist kein Fehler.</strong> Wer kein Profile und
+/// keinen CurriculumVitae hinterlegt hat, bekommt ein dünneres Anschreiben, keine
 /// Fehlermeldung. Nur wenn ein Dienst <em>antwortet, aber unbrauchbar</em>,
 /// oder gar nicht antwortet, fliegt <see cref="BewerberSchweigt" /> — denn dann
 /// wüssten wir nicht, ob etwas fehlt oder nur gerade nicht zu bekommen ist.
 /// </para>
 /// </remarks>
-public sealed class HttpBewerberauskunft(
+public sealed class HttpApplicantLookup(
     IHttpClientFactory fabrik,
-    IOptions<Auskunftseinstellungen> einstellungen,
-    IAufrufertoken token) : IBewerberauskunft, IUnternehmensauskunft, IKontaktauskunft
+    IOptions<LookupSettings> einstellungen,
+    IAufrufertoken token) : IApplicantLookup, IUnternehmensauskunft, IKontaktauskunft
 {
     /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
     public const string Klient = "auskunft";
 
-    private readonly Auskunftseinstellungen _einstellungen = einstellungen.Value;
+    private readonly LookupSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task<Eigenbild> HoleAsync(CancellationToken cancellationToken = default)
+    public async Task<Eigenbild> GetAsync(CancellationToken cancellationToken = default)
     {
-        var sitzung = await LiesAsync<Sitzungsantwort>(
+        var session = await LiesAsync<SessionResponse>(
             _einstellungen.Identity, "/auth/session", cancellationToken);
-        var profil = await LiesAsync<Profilantwort>(
+        var profile = await LiesAsync<ProfileResponse>(
             _einstellungen.Profile, "/profiles/me", cancellationToken);
-        var lebenslauf = await LiesAsync<Lebenslaufantwort>(
-            _einstellungen.Resume, "/resumes/me", cancellationToken);
+        var resume = await LiesAsync<ResumeResponse>(
+            _einstellungen.CurriculumVitae, "/resumes/me", cancellationToken);
 
         return new Eigenbild(
-            Klarname(sitzung?.User),
-            profil?.Headline ?? string.Empty,
-            profil?.Bio ?? string.Empty,
-            profil?.Skills ?? [],
+            Klarname(session?.User),
+            profile?.Headline ?? string.Empty,
+            profile?.Bio ?? string.Empty,
+            profile?.Skills ?? [],
             [
-                .. (lebenslauf?.Positions ?? []).Select(station => new Werdegangstation(
+                .. (resume?.Positions ?? []).Select(station => new Werdegangstation(
                     station.Employer ?? string.Empty,
                     station.Title ?? string.Empty,
                     // „seit" statt eines offenen Bindestrichs: eine laufende
-                    // Stelle ist eine Aussage, kein fehlender Wert.
+                    // Job ist eine Aussage, kein fehlender Wert.
                     station.EndedOn is { Length: > 0 } ende
                         ? $"{station.StartedOn} bis {ende}"
                         : $"seit {station.StartedOn}",
                     station.Description ?? string.Empty,
                     station.Technologies ?? []))
             ],
-            sitzung?.User?.Language ?? "de");
+            session?.User?.Language ?? "de");
     }
 
     /// <inheritdoc />
     public async Task<string> NameAsync(
-        TenantId firma, CancellationToken cancellationToken = default)
+        TenantId company, CancellationToken cancellationToken = default)
     {
-        var profil = await LiesAsync<Firmenprofilantwort>(
+        var profile = await LiesAsync<CompanyProfileResponse>(
             _einstellungen.Companies,
-            $"/companies/{firma.Value}/profile",
+            $"/companies/{company.Value}/profile",
             cancellationToken);
 
-        return profil?.Name ?? string.Empty;
+        return profile?.Name ?? string.Empty;
     }
 
     /// <inheritdoc />
-    public async Task<Bewerbungskontakt> HoleKontaktAsync(CancellationToken cancellationToken = default)
+    public async Task<ApplicantContact> GetContactAsync(CancellationToken cancellationToken = default)
     {
-        // Geteilter Name mit IBewerberauskunft — deshalb explizit. Anschrift
+        // Geteilter Name mit IApplicantLookup — deshalb explizit. PostalAddress
         // darf in Eigenbild NICHT landen; dieser Weg ist nur der Snapshot.
         try
         {
-            var sitzung = await LiesAsync<Sitzungsantwort>(
+            var session = await LiesAsync<SessionResponse>(
                 _einstellungen.Identity, "/auth/session", cancellationToken);
-            var anschrift = await LiesAsync<Anschriftantwort>(
+            var anschrift = await LiesAsync<PostalAddressResponse>(
                 _einstellungen.Identity, "/account/address", cancellationToken);
 
-            return new Bewerbungskontakt(
-                Klarname(sitzung?.User),
+            return new ApplicantContact(
+                Klarname(session?.User),
                 anschrift?.Line1 ?? string.Empty,
                 anschrift?.Line2 ?? string.Empty,
                 anschrift?.PostalCode ?? string.Empty,
                 anschrift?.City ?? string.Empty,
                 string.IsNullOrEmpty(anschrift?.Country) ? "DE" : anschrift.Country,
                 anschrift?.Phone ?? string.Empty,
-                sitzung?.User?.Email ?? string.Empty);
+                session?.User?.Email ?? string.Empty);
         }
-        catch (BewerberSchweigt)
+        catch (ApplicantLookupSilent)
         {
-            return Bewerbungskontakt.Leer;
+            return ApplicantContact.Leer;
         }
     }
 
     /// <summary>
-    /// Vor- und Nachname, sonst der Anzeigename. Nie eine Anschrift.
+    /// Vor- und Nachname, sonst der Anzeigename. Nie eine PostalAddress.
     /// </summary>
-    internal static string Klarname(Sitzungsbenutzer? wer)
+    internal static string Klarname(SessionUser? subject)
     {
-        var voll = $"{wer?.GivenName} {wer?.FamilyName}".Trim();
-        return voll.Length > 0 ? voll : wer?.DisplayName ?? string.Empty;
+        var voll = $"{subject?.GivenName} {subject?.FamilyName}".Trim();
+        return voll.Length > 0 ? voll : subject?.DisplayName ?? string.Empty;
     }
 
     /// <summary>Ein GET mit dem Token des Aufrufers. <c>null</c> heißt „nichts da".</summary>
     private async Task<T?> LiesAsync<T>(
-        string basis, string pfad, CancellationToken cancellationToken)
+        string basis, string path, CancellationToken cancellationToken)
         where T : class
     {
         if (string.IsNullOrEmpty(basis))
@@ -196,54 +196,54 @@ public sealed class HttpBewerberauskunft(
         using var client = fabrik.CreateClient(Klient);
         client.Timeout = _einstellungen.Zeitueberschreitung;
 
-        using var anfrage = new HttpRequestMessage(
-            HttpMethod.Get, new Uri(new Uri(basis), pfad));
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, new Uri(new Uri(basis), path));
 
         if (token.Wert is { Length: > 0 } bearer)
         {
-            anfrage.Headers.Add("Authorization", $"Bearer {bearer}");
+            request.Headers.Add("Authorization", $"Bearer {bearer}");
         }
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
-            throw new BewerberSchweigt(
-                $"Ein Dienst mit den eigenen Angaben antwortet nicht ({fehler.GetType().Name}).");
+            throw new ApplicantLookupSilent(
+                $"Ein Dienst mit den eigenen Angaben antwortet nicht ({error.GetType().Name}).");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new BewerberSchweigt(
+            throw new ApplicantLookupSilent(
                 "Ein Dienst mit den eigenen Angaben antwortet nicht (Zeitüberschreitung).");
         }
 
-        using (antwort)
+        using (response)
         {
             // 404 heisst „hat keins" — das ist eine Antwort und kein Ausfall.
-            if (antwort.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.NoContent)
+            if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.NoContent)
             {
                 return null;
             }
 
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
-                throw new BewerberSchweigt(
-                    $"Ein Dienst mit den eigenen Angaben antwortet mit {(int)antwort.StatusCode}.");
+                throw new ApplicantLookupSilent(
+                    $"Ein Dienst mit den eigenen Angaben antwortet mit {(int)response.StatusCode}.");
             }
 
             try
             {
-                return await antwort.Content.ReadFromJsonAsync<T>(cancellationToken);
+                return await response.Content.ReadFromJsonAsync<T>(cancellationToken);
             }
-            catch (JsonException fehler)
+            catch (JsonException error)
             {
-                throw new BewerberSchweigt(
+                throw new ApplicantLookupSilent(
                     "Ein Dienst mit den eigenen Angaben sandte eine unbrauchbare Antwort.",
-                    fehler);
+                    error);
             }
         }
     }

@@ -1,12 +1,12 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Identity.Application.Loeschung;
+using WorkerTransfer.Identity.Application.Erasure;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Identity.Api;
 
 /// <summary><c>POST /account/erasure</c>.</summary>
-public static class LoeschEndpoints
+public static class ErasureEndpoints
 {
     /// <summary>Maps the one endpoint that ends an account.</summary>
     public static IEndpointRouteBuilder MapLoeschEndpoints(this IEndpointRouteBuilder app)
@@ -25,14 +25,14 @@ public static class LoeschEndpoints
         {
             if (akteur.Current is not { } handelnder)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
             await mediator.Send(
-                new LoeschungVerlangenBefehl(handelnder.Subject), cancellationToken);
+                new RequestErasureCommand(handelnder.Subject), cancellationToken);
 
             // 202 either way, including when it was already running: pressing
             // twice is not an error, and the second press must not start a

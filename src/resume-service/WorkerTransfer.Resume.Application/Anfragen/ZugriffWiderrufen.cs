@@ -8,8 +8,8 @@ using WorkerTransfer.Resume.Domain.Pruefspur;
 namespace WorkerTransfer.Resume.Application.Anfragen;
 
 /// <summary>The person takes a release back.</summary>
-public sealed record ZugriffWiderrufenBefehl(Guid Anfrage, SubjectId Akteur)
-    : IBefehl<Anfrageergebnis>;
+public sealed record RevokeAccessCommand(Guid ResumeRequest, SubjectId Akteur)
+    : IBefehl<ResumeRequestResult>;
 
 /// <summary>Works in the ledger, and leaves the proceeding untouched.</summary>
 /// <remarks>
@@ -18,35 +18,35 @@ public sealed record ZugriffWiderrufenBefehl(Guid Anfrage, SubjectId Akteur)
 /// the ledger anyway. This is the single place where somebody reading the code
 /// is most tempted to "fix" a bug that is the design.
 /// </remarks>
-public sealed class ZugriffWiderrufenHandler(
-    IAnfragenSpeicher speicher,
-    IEinwilligungstor tor,
-    IPruefspur pruefspur,
+public sealed class RevokeAccessHandler(
+    IRequestStore store,
+    IConsentGate tor,
+    IAuditTrail pruefspur,
     IKorrelationsanhang anhang,
-    TimeProvider uhr) : IRequestHandler<ZugriffWiderrufenBefehl, Anfrageergebnis>
+    TimeProvider uhr) : IRequestHandler<RevokeAccessCommand, ResumeRequestResult>
 {
     /// <inheritdoc />
-    public async Task<Anfrageergebnis> Handle(
-        ZugriffWiderrufenBefehl request,
+    public async Task<ResumeRequestResult> Handle(
+        RevokeAccessCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var anfrage = await speicher.HoleAsync(request.Anfrage, cancellationToken);
+        var requestRecord = await store.GetAsync(request.ResumeRequest, cancellationToken);
 
-        if (anfrage is null || anfrage.Wer != request.Akteur)
+        if (requestRecord is null || requestRecord.Wer != request.Akteur)
         {
-            return new Anfrageergebnis.NichtSichtbar();
+            return new ResumeRequestResult.NichtSichtbar();
         }
 
-        await tor.WiderrufeAsync(anfrage.Wer, anfrage.Firma, cancellationToken);
+        await tor.RevokeAsync(requestRecord.Wer, requestRecord.Firma, cancellationToken);
 
         await pruefspur.AppendAsync(
             anhang.Eintrag(
-                Pruefhandlung.AccessRevoked, uhr.GetUtcNow(),
-                akteur: anfrage.Wer, firma: anfrage.Firma, betroffene: anfrage.Wer),
+                AuditAction.AccessRevoked, uhr.GetUtcNow(),
+                akteur: requestRecord.Wer, company: requestRecord.Firma, betroffene: requestRecord.Wer),
             cancellationToken);
 
-        return new Anfrageergebnis.Erledigt(anfrage);
+        return new ResumeRequestResult.Erledigt(requestRecord);
     }
 }

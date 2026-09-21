@@ -17,14 +17,14 @@ public static class ResumeDbContextFactory
     public static NpgsqlDataSource DataSource(string connectionString)
     {
         var builder = new NpgsqlDataSourceBuilder(connectionString);
-        builder.MapEnum<Anfragestand>(Enumnamen.Anfragestand);
-        builder.MapEnum<Pruefhandlung>(Enumnamen.Pruefhandlung);
+        builder.MapEnum<RequestState>(Enumnamen.RequestState);
+        builder.MapEnum<AuditAction>(Enumnamen.AuditAction);
         return builder.Build();
     }
 
     /// <summary>Options for a data source the caller owns.</summary>
     public static DbContextOptionsBuilder<ResumeDbContext> Optionen(NpgsqlDataSource dataSource) =>
-        (DbContextOptionsBuilder<ResumeDbContext>)Konfiguriere(
+        (DbContextOptionsBuilder<ResumeDbContext>)Configure(
             new DbContextOptionsBuilder<ResumeDbContext>(), dataSource);
 
     /// <summary>
@@ -32,7 +32,7 @@ public static class ResumeDbContextFactory
     /// the container, the tests and <c>dotnet ef</c> cannot end up with
     /// different models.
     /// </summary>
-    public static DbContextOptionsBuilder Konfiguriere(
+    public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
         NpgsqlDataSource dataSource)
     {
@@ -65,7 +65,7 @@ public static class ResumeDbContextFactory
     /// </summary>
     private static void Gemeinsam(NpgsqlDbContextOptionsBuilder npgsql)
     {
-        npgsql.MapEnum<Anfragestand>(Enumnamen.Anfragestand);
-        npgsql.MapEnum<Pruefhandlung>(Enumnamen.Pruefhandlung);
+        npgsql.MapEnum<RequestState>(Enumnamen.RequestState);
+        npgsql.MapEnum<AuditAction>(Enumnamen.AuditAction);
     }
 }

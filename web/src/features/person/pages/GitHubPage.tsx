@@ -50,6 +50,12 @@ import { ausRepositories, vorschlaegeAus } from "../lib/vorschlaege";
  * schlechter, sondern woanders. Die Seite sagt das ausdrücklich.
  *
  * <strong>Geholt wird nur auf Auslösung.</strong> Kein Abgleich im Hintergrund.
+ *
+ * <strong>The fast path comes first and asks for no name.</strong> Typing the
+ * account was the GIST's requirement — a gist search must know whose gists to
+ * look in. OAuth does not need it: GitHub reports only the account that really
+ * consented, so there is nothing to compare. The manual path stays complete and
+ * is the only one when this server has no OAuth configured.
  */
 export function GitHubPage() {
   const { t, i18n } = useTranslation();
@@ -107,6 +113,10 @@ export function GitHubPage() {
     session !== null,
   );
   const mitAnmeldung = moeglich.value === true;
+
+  // Without configured OAuth the manual path is not a side path but THE path —
+  // then there is nothing to expand.
+  const vonHandZeigen = !mitAnmeldung || vonHand;
 
   /*
    * EIN GENANNTES KONTO IST KEIN GRUND, DEN GIST AUFZUZWINGEN.
@@ -201,19 +211,6 @@ export function GitHubPage() {
         <ErrorBlock error={connection.value.error} />
       ) : null}
 
-      {/*
-        DER SCHNELLE WEG IST DER ERSTE, UND ER VERLANGT KEINEN NAMEN.
-
-        Vorher stand hier ein Formular: erst das Konto tippen, dann beweisen.
-        Das war die Anforderung des GISTS — der muss wissen, in wessen Gists er
-        sucht. Die Anmeldung braucht sie nicht: GitHub meldet allein das Konto,
-        das wirklich zugestimmt hat, also gibt es nichts zu vergleichen. Der
-        Namensschritt hat davor niemanden geschützt, nur ausgesperrt, wer sich
-        vertippt hat oder noch einen alten Namen stehen hatte.
-
-        Der Weg von Hand bleibt vollständig — er ist der einzige, wenn dieser
-        Server keine Anmeldung eingerichtet hat. Dann steht er auch offen da.
-      */}
       {loaded && (current === null || !current.verified) ? (
         <Card>
           <CardContent>
@@ -273,9 +270,7 @@ export function GitHubPage() {
               </Box>
             ) : null}
 
-            {/* Ohne eingerichtete Anmeldung ist der Weg von Hand kein
-                Nebenweg, sondern der Weg — dann ist nichts aufzuklappen. */}
-            {!mitAnmeldung || vonHand ? (
+            {vonHandZeigen ? (
               <Box>
                 {mitAnmeldung ? <Divider sx={{ mb: 2.5 }} /> : null}
 
@@ -346,8 +341,6 @@ export function GitHubPage() {
                       >
                         {running ? t("github.nachweisLaeuft") : t("github.nachweisPruefen")}
                       </Button>
-                      {/* „Anderes Konto" steht oben, neben dem genannten —
-                          zweimal derselbe Knopf wäre zweimal dieselbe Frage. */}
                       {mitAnmeldung ? null : (
                         <Button
                           variant="text"
@@ -390,9 +383,12 @@ export function GitHubPage() {
               />
             </Typography>
 
-            {/* ADR-0022 §3: eine gekuerzte Menge sagt, dass sie gekuerzt ist. */}
             {!current.languages_complete && current.repositories.length > 0 ? (
-              <Alert severity="info" sx={{ mb: 2 }}>
+              <Alert
+                // ADR-0022 §3: a shortened set says that it is shortened.
+                severity="info"
+                sx={{ mb: 2 }}
+              >
                 {t("github.sprachenUnvollstaendig")}
               </Alert>
             ) : null}
@@ -403,52 +399,49 @@ export function GitHubPage() {
               </Typography>
             ) : (
               <Box component="ul" sx={{ pl: 2.5, mb: 2 }}>
-                {current.repositories.map((repo) => (
-                  <Box component="li" key={repo.name} sx={{ mb: 1 }}>
-                    <Link
-                      href={repo.url}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                    >
-                      {repo.name}
-                    </Link>
-                    <Typography variant="body2" color="text.secondary">
-                      {repo.language ?? t("github.ohneSprache")} · {repo.stars}{" "}
-                      ★
-                      {repo.description !== "" ? ` · ${repo.description}` : ""}
-                    </Typography>
-
-                    {/*
-                      WAS DIESES REPOSITORY BENUTZT — Topics zuerst, weil sie
-                      eine Nennung sind: „kubernetes" hat der Besitzer selbst
-                      dorthin geschrieben. Die Sprachen stehen daneben als
-                      Menge, ohne Anteil: aus dem Byteverhältnis rechnete das
-                      gelöschte Paket sein „Können" (ADR-0022 §2).
-
-                      Beides ist eine Aussage über ein REPOSITORY, nie über
-                      einen Menschen. Wer daraus eine Fähigkeit machen will,
-                      übernimmt sie mit einem Klick ins Profil — dann hat sie
-                      ein Mensch gesagt.
-                    */}
-                    {[...new Set([...repo.topics, ...repo.languages])].length >
-                    0 ? (
-                      <Box
-                        sx={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: 0.5,
-                          mt: 0.5,
-                        }}
+                {current.repositories.map((repo) => {
+                  // WHAT THIS REPOSITORY USES — topics first, because they are
+                  // a naming: the owner wrote "kubernetes" there themselves.
+                  // Languages stand beside them as a SET, without a share: the
+                  // deleted package computed its "skill" from the byte ratio
+                  // (ADR-0022 §2). Both are statements about a REPOSITORY, never
+                  // about a person; one click carries a word into the profile,
+                  // and only then has a human said it.
+                  const woerter = [
+                    ...new Set([...repo.topics, ...repo.languages]),
+                  ];
+                  return (
+                    <Box component="li" key={repo.name} sx={{ mb: 1 }}>
+                      <Link
+                        href={repo.url}
+                        target="_blank"
+                        rel="noreferrer noopener"
                       >
-                        {[...new Set([...repo.topics, ...repo.languages])].map(
-                          (wort) => (
+                        {repo.name}
+                      </Link>
+                      <Typography variant="body2" color="text.secondary">
+                        {repo.language ?? t("github.ohneSprache")} ·{" "}
+                        {repo.stars} ★
+                        {repo.description !== "" ? ` · ${repo.description}` : ""}
+                      </Typography>
+
+                      {woerter.length > 0 ? (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 0.5,
+                            mt: 0.5,
+                          }}
+                        >
+                          {woerter.map((wort) => (
                             <Chip key={wort} label={wort} size="small" />
-                          ),
-                        )}
-                      </Box>
-                    ) : null}
-                  </Box>
-                ))}
+                          ))}
+                        </Box>
+                      ) : null}
+                    </Box>
+                  );
+                })}
               </Box>
             )}
 

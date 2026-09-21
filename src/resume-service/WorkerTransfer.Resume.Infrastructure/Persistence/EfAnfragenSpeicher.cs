@@ -5,57 +5,57 @@ using WorkerTransfer.Resume.Domain.Anfragen;
 namespace WorkerTransfer.Resume.Infrastructure.Persistence;
 
 /// <summary>Reads and writes <c>resume_requests</c>.</summary>
-public sealed class EfAnfragenSpeicher(ResumeDbContext kontext) : IAnfragenSpeicher
+public sealed class EfRequestStore(ResumeDbContext context) : IRequestStore
 {
     /// <inheritdoc />
-    public async Task<Anfrage?> HoleAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<ResumeRequest?> GetAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Anfragen.SingleOrDefaultAsync(z => z.Id == id, cancellationToken);
+        var row = await context.Anfragen.SingleOrDefaultAsync(z => z.Id == id, cancellationToken);
 
-        return zeile is null ? null : ZuDomaene(zeile);
+        return row is null ? null : ZuDomaene(row);
     }
 
     /// <inheritdoc />
-    public async Task<Anfrage?> FindeAsync(
-        SubjectId wer,
-        TenantId firma,
+    public async Task<ResumeRequest?> FindeAsync(
+        SubjectId subject,
+        TenantId company,
         CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Anfragen.SingleOrDefaultAsync(
-            z => z.SubjectId == wer.Value && z.TenantId == firma.Value, cancellationToken);
+        var row = await context.Anfragen.SingleOrDefaultAsync(
+            z => z.SubjectId == subject.Value && z.TenantId == company.Value, cancellationToken);
 
-        return zeile is null ? null : ZuDomaene(zeile);
+        return row is null ? null : ZuDomaene(row);
     }
 
     /// <inheritdoc />
-    public Task FuegeHinzuAsync(Anfrage anfrage, CancellationToken cancellationToken = default)
+    public Task AppendAsync(ResumeRequest request, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(anfrage);
+        ArgumentNullException.ThrowIfNull(request);
 
-        kontext.Anfragen.Add(new AnfrageZeile
+        context.Anfragen.Add(new RequestRow
         {
-            Id = anfrage.Id,
-            SubjectId = anfrage.Wer.Value,
-            TenantId = anfrage.Firma.Value,
-            RequestedBy = anfrage.Frager?.Value,
-            Status = anfrage.Stand,
-            CreatedAt = anfrage.Gestellt.UtcDateTime,
-            AnsweredAt = anfrage.Beantwortet?.UtcDateTime
+            Id = request.Id,
+            SubjectId = request.Wer.Value,
+            TenantId = request.Firma.Value,
+            RequestedBy = request.Frager?.Value,
+            Status = request.State,
+            CreatedAt = request.Gestellt.UtcDateTime,
+            AnsweredAt = request.Beantwortet?.UtcDateTime
         });
 
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(Anfrage anfrage, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(ResumeRequest request, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(anfrage);
+        ArgumentNullException.ThrowIfNull(request);
 
-        var zeile = await kontext.Anfragen
+        var row = await context.Anfragen
             .AsTracking()
-            .SingleOrDefaultAsync(z => z.Id == anfrage.Id, cancellationToken);
+            .SingleOrDefaultAsync(z => z.Id == request.Id, cancellationToken);
 
-        if (zeile is null)
+        if (row is null)
         {
             return;
         }
@@ -63,39 +63,39 @@ public sealed class EfAnfragenSpeicher(ResumeDbContext kontext) : IAnfragenSpeic
         // Only the two an answer may move. `requested_by` is not among them:
         // it is nulled by the erasure alone, and re-writing it here would put a
         // deleted person's id back (ADR-0027 §2).
-        zeile.Status = anfrage.Stand;
-        zeile.AnsweredAt = anfrage.Beantwortet?.UtcDateTime;
+        row.Status = request.State;
+        row.AnsweredAt = request.Beantwortet?.UtcDateTime;
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Anfrage>> FuerPersonAsync(
-        SubjectId wer,
+    public async Task<IReadOnlyList<ResumeRequest>> ForPersonAsync(
+        SubjectId subject,
         CancellationToken cancellationToken = default) =>
-        [.. (await kontext.Anfragen
-                .Where(z => z.SubjectId == wer.Value)
+        [.. (await context.Anfragen
+                .Where(z => z.SubjectId == subject.Value)
                 .OrderByDescending(z => z.CreatedAt)
                 .ToListAsync(cancellationToken))
             .Select(ZuDomaene)];
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Anfrage>> FuerFirmaAsync(
-        TenantId firma,
+    public async Task<IReadOnlyList<ResumeRequest>> ForCompanyAsync(
+        TenantId company,
         CancellationToken cancellationToken = default) =>
-        [.. (await kontext.Anfragen
-                .Where(z => z.TenantId == firma.Value)
+        [.. (await context.Anfragen
+                .Where(z => z.TenantId == company.Value)
                 .OrderByDescending(z => z.CreatedAt)
                 .ToListAsync(cancellationToken))
             .Select(ZuDomaene)];
 
-    private static Anfrage ZuDomaene(AnfrageZeile zeile) =>
-        Anfrage.Wiederherstellen(
-            zeile.Id,
-            new SubjectId(zeile.SubjectId),
-            new TenantId(zeile.TenantId),
-            zeile.RequestedBy is { } frager ? new SubjectId(frager) : null,
-            zeile.Status,
-            new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
-            zeile.AnsweredAt is { } beantwortet
+    private static ResumeRequest ZuDomaene(RequestRow row) =>
+        ResumeRequest.Wiederherstellen(
+            row.Id,
+            new SubjectId(row.SubjectId),
+            new TenantId(row.TenantId),
+            row.RequestedBy is { } frager ? new SubjectId(frager) : null,
+            row.Status,
+            new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
+            row.AnsweredAt is { } beantwortet
                 ? new DateTimeOffset(beantwortet, TimeSpan.Zero)
                 : null);
 }

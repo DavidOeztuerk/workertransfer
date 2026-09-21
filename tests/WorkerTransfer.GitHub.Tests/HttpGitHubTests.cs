@@ -4,14 +4,14 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.GitHub.Application.Ports;
-using WorkerTransfer.GitHub.Domain.Verbindungen;
+using WorkerTransfer.GitHub.Domain.Connections;
 using WorkerTransfer.GitHub.Infrastructure.Netz;
 
 namespace WorkerTransfer.GitHub.Tests;
 
 /// <summary>Ein GitHub aus Papier.</summary>
 public sealed class Papierantwort(
-    Func<HttpRequestMessage, (HttpStatusCode Code, string Rumpf)> antwort)
+    Func<HttpRequestMessage, (HttpStatusCode Code, string Rumpf)> response)
     : HttpMessageHandler
 {
     /// <summary>Welche Pfade abgefragt wurden.</summary>
@@ -26,11 +26,11 @@ public sealed class Papierantwort(
         Pfade.Add(request.RequestUri!.PathAndQuery);
         Anfragen.Add(request);
 
-        var (code, rumpf) = antwort(request);
+        var (code, body) = response(request);
 
         return Task.FromResult(new HttpResponseMessage(code)
         {
-            Content = new StringContent(rumpf, Encoding.UTF8, "application/json")
+            Content = new StringContent(body, Encoding.UTF8, "application/json")
         });
     }
 }
@@ -49,28 +49,28 @@ public sealed class Einzelfabrik(HttpMessageHandler behandler) : IHttpClientFact
 /// Reisetests ersetzen <see cref="IGitHub"/> durch eine Probe, und damit war
 /// alles ungeprüft, was <em>im</em> Klienten steht — allen voran der
 /// Fork-Filter. Forks wegzulassen ist keine Kosmetik: eine Kopie fremder Arbeit
-/// ist kein Beleg für eigene, und sie unter „meine Repositories" zu zeigen wäre
+/// ist kein Evidence für eigene, und sie unter „meine Repositories" zu zeigen wäre
 /// genau die stillschweigende Behauptung, die ADR-0022 ausschließt.
 /// </remarks>
 public class HttpGitHubTests
 {
     /// <summary>Antwortet mit dieser Liste — und auf jede Sprachfrage leer.</summary>
     /// <remarks>
-    /// Ohne die Trennung bekäme eine <c>/languages</c>-Anfrage die
+    /// Ohne die Trennung bekäme eine <c>/languages</c>-ResumeRequest die
     /// Repository-<em>Liste</em> als Antwort. Das ist kein Wörterbuch, also
     /// wirft es — ein echter Fehler, der aber in der Probe läge und nicht im
     /// Code. Seit die Sprachen auch ohne Token geholt werden, trifft das jede
     /// Probe, die pauschal antwortet.
     /// </remarks>
-    private static Papierantwort NurListe(string liste) =>
-        new(anfrage =>
-            anfrage.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
+    private static Papierantwort NurListe(string list) =>
+        new(request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, "{}")
-                : (HttpStatusCode.OK, liste));
+                : (HttpStatusCode.OK, list));
 
-    private static HttpGitHub Baue(Papierantwort papier, string token = "") =>
+    private static HttpGitHub Build(Papierantwort papier, string token = "") =>
         new(new Einzelfabrik(papier),
-            Options.Create(new GitHubeinstellungen
+            Options.Create(new GitHubSettings
             {
                 Adresse = "https://api.github.test",
                 Token = token
@@ -78,18 +78,18 @@ public class HttpGitHubTests
             NullLogger<HttpGitHub>.Instance);
 
     /// <summary>
-    /// <strong>Jede Anfrage trägt einen <c>User-Agent</c> — sonst antwortet
+    /// <strong>Jede ResumeRequest trägt einen <c>User-Agent</c> — sonst antwortet
     /// GitHub mit 403.</strong>
     /// </summary>
     /// <remarks>
     /// Kein Stilfehler, sondern der Grund, warum dieser Dienst nie funktioniert
-    /// hat. GitHub verlangt den Kopf und weist ohne ihn ALLES ab — nicht mit
+    /// hat. GitHub verlangt den Header und weist ohne ihn ALLES ab — nicht mit
     /// 400, nicht mit einer Meldung, die das Wort nennt, sondern mit einem 403,
     /// das aussieht wie ein Ratenlimit. Gemessen am 04.09.2026 an derselben
-    /// Adresse: mit Kopf 200, ohne Kopf 403.
+    /// Adresse: mit Header 200, ohne Header 403.
     /// <para>
     /// Solange er fehlte, scheiterte auch der Gist-Nachweis — niemand konnte
-    /// eine Verbindung je abschliessen, und die Oberfläche sagte dazu „github
+    /// eine Connection je abschliessen, und die Oberfläche sagte dazu „github
     /// unavailable", was nach einem Ausfall bei GitHub aussieht.
     /// </para>
     /// </remarks>
@@ -97,19 +97,19 @@ public class HttpGitHubTests
     public async Task Jede_Anfrage_traegt_eine_Benutzerkennung()
     {
         var papier = new Papierantwort(_ => (HttpStatusCode.OK, "[]"));
-        var dienst = Baue(papier);
+        var service = Build(papier);
 
-        await dienst.RepositoriesAsync("anna-dev");
-        await dienst.HatNachweisgistAsync("anna-dev", "workertransfer-verify-abc");
+        await service.RepositoriesAsync("anna-dev");
+        await service.HasProofGistAsync("anna-dev", "workertransfer-verify-abc");
 
         papier.Anfragen.Should().NotBeEmpty("sonst prüft der Test nichts");
         papier.Anfragen.Should().OnlyContain(
-            anfrage => anfrage.Headers.UserAgent.Count > 0);
+            request => request.Headers.UserAgent.Count > 0);
     }
 
     /// <summary>Die Topics kommen mit, weil sie eine NENNUNG sind.</summary>
     /// <remarks>
-    /// Der stärkste Beleg von allen: „kubernetes" hat ein Mensch an das
+    /// Der stärkste Evidence von allen: „kubernetes" hat ein Mensch an das
     /// Repository geschrieben, kein Zähler abgeleitet. Und sie kosten nichts —
     /// GitHub liefert sie seit 2022 ohne Zutun in derselben Liste mit.
     /// </remarks>
@@ -123,17 +123,17 @@ public class HttpGitHubTests
               "topics":["react","kubernetes","observability"]}]
             """);
 
-        var eintrag = (await Baue(papier).RepositoriesAsync("anna-dev")).Repositories.Single();
+        var entry = (await Build(papier).RepositoriesAsync("anna-dev")).Repositories.Single();
 
-        eintrag.Themen.Should().Equal("react", "kubernetes", "observability");
+        entry.Themen.Should().Equal("react", "kubernetes", "observability");
     }
 
     /// <summary>Ein Repository ohne Topics ist kein Fehler, sondern leer.</summary>
     [Fact]
     public async Task Ohne_Topics_bleibt_die_Liste_leer()
     {
-        var papier = new Papierantwort(anfrage =>
-            anfrage.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
+        var papier = new Papierantwort(request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, "{}")
                 : (HttpStatusCode.OK, """
                     [{"name":"still","description":"","language":null,
@@ -141,10 +141,10 @@ public class HttpGitHubTests
                       "pushed_at":null,"fork":false}]
                     """));
 
-        var eintrag = (await Baue(papier).RepositoriesAsync("anna-dev")).Repositories.Single();
+        var entry = (await Build(papier).RepositoriesAsync("anna-dev")).Repositories.Single();
 
-        eintrag.Themen.Should().BeEmpty();
-        eintrag.Sprachen.Should().BeEmpty();
+        entry.Themen.Should().BeEmpty();
+        entry.Sprachen.Should().BeEmpty();
     }
 
     /// <summary>
@@ -160,8 +160,8 @@ public class HttpGitHubTests
     [Fact]
     public async Task Ohne_Token_kommen_die_Sprachen_trotzdem()
     {
-        var papier = new Papierantwort(anfrage =>
-            anfrage.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
+        var papier = new Papierantwort(request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, """{"Python":70,"TypeScript":26,"CSS":1}""")
                 : (HttpStatusCode.OK, """
                     [{"name":"werkzeug","description":"","language":"Python",
@@ -169,7 +169,7 @@ public class HttpGitHubTests
                       "pushed_at":null,"fork":false}]
                     """));
 
-        var abzug = await Baue(papier).RepositoriesAsync("anna-dev");
+        var abzug = await Build(papier).RepositoriesAsync("anna-dev");
 
         abzug.Repositories.Single().Sprachen
             .Should().BeEquivalentTo(["Python", "TypeScript", "CSS"]);
@@ -199,19 +199,19 @@ public class HttpGitHubTests
             + "\"html_url\":\"https://github.com/anna/repo" + nummer + "\","
             + "\"pushed_at\":null,\"fork\":false}"));
 
-        var papier = new Papierantwort(anfrage =>
-            anfrage.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
+        var papier = new Papierantwort(request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, """{"Go":1}""")
                 : (HttpStatusCode.OK, $"[{viele}]"));
 
-        var abzug = await Baue(papier).RepositoriesAsync("anna-dev");
+        var abzug = await Build(papier).RepositoriesAsync("anna-dev");
 
         abzug.Repositories.Should().HaveCount(11);
         abzug.SprachenVollstaendig.Should().BeFalse();
 
         // Die zehn zuletzt bearbeiteten haben ihre Sprachen — GitHub liefert
         // nach `pushed` sortiert, also trifft das Budget die ältesten.
-        abzug.Repositories.Take(10).Should().OnlyContain(eintrag => eintrag.Sprachen.Count == 1);
+        abzug.Repositories.Take(10).Should().OnlyContain(entry => entry.Sprachen.Count == 1);
         abzug.Repositories.Last().Sprachen.Should().BeEmpty();
     }
 
@@ -228,8 +228,8 @@ public class HttpGitHubTests
     [Fact]
     public async Task Sprachen_kommen_als_Menge_ohne_Bytes()
     {
-        var papier = new Papierantwort(anfrage =>
-            anfrage.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
+        var papier = new Papierantwort(request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, """{"Go":120000,"Shell":210,"Dockerfile":90}""")
                 : (HttpStatusCode.OK, """
                     [{"name":"werkzeug","description":"","language":"Go",
@@ -237,13 +237,13 @@ public class HttpGitHubTests
                       "pushed_at":null,"fork":false}]
                     """));
 
-        var eintrag = (await Baue(papier, token: "ein-token")
+        var entry = (await Build(papier, token: "ein-token")
             .RepositoriesAsync("anna-dev")).Repositories.Single();
 
-        eintrag.Sprachen.Should().BeEquivalentTo(["Go", "Shell", "Dockerfile"]);
+        entry.Sprachen.Should().BeEquivalentTo(["Go", "Shell", "Dockerfile"]);
 
         // Die Zahlen dürfen nirgends mitgereist sein — auch nicht als Text.
-        var abgelegt = System.Text.Json.JsonSerializer.Serialize(eintrag);
+        var abgelegt = System.Text.Json.JsonSerializer.Serialize(entry);
         abgelegt.Should().NotContain("120000");
         abgelegt.Should().NotContain("210");
     }
@@ -251,8 +251,8 @@ public class HttpGitHubTests
     /// <summary>Ohne Token wird gefragt, aber nicht beliebig oft.</summary>
     /// <remarks>
     /// Hier stand bis zum 05.09.2026 die Behauptung, ohne Token werde gar nicht
-    /// gefragt — mit der Begründung, ein halb gefüllter Beleg sei schlechter
-    /// als ein ehrlich leerer. Am echten Konto gemessen war der leere Beleg
+    /// gefragt — mit der Begründung, ein halb gefüllter Evidence sei schlechter
+    /// als ein ehrlich leerer. Am echten Konto gemessen war der leere Evidence
     /// nicht ehrlich: er zeigte „Python", wo GitHub sieben Sprachen meldet,
     /// und sagte nirgends, dass er nur eine kennt. Gefragt wird jetzt für die
     /// zehn zuletzt bearbeiteten Repositories — elf Anfragen von sechzig —,
@@ -267,19 +267,19 @@ public class HttpGitHubTests
             + "\"html_url\":\"https://github.com/anna/repo" + nummer + "\","
             + "\"pushed_at\":null,\"fork\":false}"));
 
-        var papier = new Papierantwort(anfrage =>
-            anfrage.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
+        var papier = new Papierantwort(request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, """{"Go":1}""")
                 : (HttpStatusCode.OK, $"[{viele}]"));
 
-        await Baue(papier).RepositoriesAsync("anna-dev");
+        await Build(papier).RepositoriesAsync("anna-dev");
 
         papier.Pfade
-            .Count(pfad => pfad.Contains("/languages", StringComparison.Ordinal))
+            .Count(path => path.Contains("/languages", StringComparison.Ordinal))
             .Should().Be(10);
     }
 
-    /// <summary>Ein Fork ist kein Beleg für eigene Arbeit.</summary>
+    /// <summary>Ein Fork ist kein Evidence für eigene Arbeit.</summary>
     [Fact]
     public async Task Forks_bleiben_draussen()
     {
@@ -294,9 +294,9 @@ public class HttpGitHubTests
             ]
             """);
 
-        var gefunden = await Baue(papier).RepositoriesAsync("anna-dev");
+        var found = await Build(papier).RepositoriesAsync("anna-dev");
 
-        gefunden.Repositories.Select(eintrag => eintrag.Name).Should().Equal("eigenes");
+        found.Repositories.Select(entry => entry.Name).Should().Equal("eigenes");
     }
 
     /// <summary>Jedes Feld kommt von GitHub, keins ist gerechnet.</summary>
@@ -310,13 +310,13 @@ public class HttpGitHubTests
               "topics":["cli","verteilte-systeme"]}]
             """);
 
-        var eintrag = (await Baue(papier).RepositoriesAsync("anna-dev")).Repositories.Single();
+        var entry = (await Build(papier).RepositoriesAsync("anna-dev")).Repositories.Single();
 
         // `BeEquivalentTo` und nicht `Be`: seit `Repository` zwei Listen trägt,
         // vergleicht die Gleichheit eines `record` sie über die REFERENZ — zwei
         // gleich befüllte Listen sind damit nie gleich. Der Vergleich muss
         // strukturell sein, sonst prüft er nur, ob es dasselbe Objekt ist.
-        eintrag.Should().BeEquivalentTo(new Repository(
+        entry.Should().BeEquivalentTo(new Repository(
             "werkzeug", "Ein Werkzeug", "Go", 42,
             "https://github.com/anna/werkzeug",
             new DateTimeOffset(2026, 8, 1, 10, 0, 0, TimeSpan.Zero),
@@ -336,11 +336,11 @@ public class HttpGitHubTests
               "pushed_at":null,"fork":false}]
             """);
 
-        var eintrag = (await Baue(papier).RepositoriesAsync("anna-dev")).Repositories.Single();
+        var entry = (await Build(papier).RepositoriesAsync("anna-dev")).Repositories.Single();
 
-        eintrag.Beschreibung.Should().BeEmpty();
-        eintrag.Sprache.Should().BeNull();
-        eintrag.ZuletztGeschoben.Should().BeNull();
+        entry.Beschreibung.Should().BeEmpty();
+        entry.Sprache.Should().BeNull();
+        entry.ZuletztGeschoben.Should().BeNull();
     }
 
     /// <summary>Der Nachweis hängt an der Beschreibung, nicht am Inhalt.</summary>
@@ -357,10 +357,10 @@ public class HttpGitHubTests
              {"description":"workertransfer-verify-abc123"}]
             """);
 
-        var github = Baue(papier);
+        var github = Build(papier);
 
-        (await github.HatNachweisgistAsync("anna-dev", "abc123")).Should().BeTrue();
-        (await github.HatNachweisgistAsync("anna-dev", "xyz789")).Should().BeFalse();
+        (await github.HasProofGistAsync("anna-dev", "abc123")).Should().BeTrue();
+        (await github.HasProofGistAsync("anna-dev", "xyz789")).Should().BeFalse();
     }
 
     /// <summary>„Gibt es nicht" ist eine Antwort, kein Ausfall.</summary>
@@ -368,10 +368,10 @@ public class HttpGitHubTests
     public async Task Ein_unbekanntes_Konto_ist_kein_Ausfall()
     {
         var papier = new Papierantwort(_ => (HttpStatusCode.NotFound, "{}"));
-        var github = Baue(papier);
+        var github = Build(papier);
 
         (await github.RepositoriesAsync("gibt-es-nicht")).Repositories.Should().BeEmpty();
-        (await github.HatNachweisgistAsync("gibt-es-nicht", "abc")).Should().BeFalse();
+        (await github.HasProofGistAsync("gibt-es-nicht", "abc")).Should().BeFalse();
     }
 
     /// <summary>Ein Ratenlimit ist ein Systemzustand, kein Ergebnis.</summary>
@@ -384,9 +384,9 @@ public class HttpGitHubTests
     {
         var papier = new Papierantwort(_ => ((HttpStatusCode)403, "rate limited"));
 
-        var versuch = async () => await Baue(papier).RepositoriesAsync("anna-dev");
+        var attempt = async () => await Build(papier).RepositoriesAsync("anna-dev");
 
-        await versuch.Should().ThrowAsync<GitHubSchweigt>();
+        await attempt.Should().ThrowAsync<GitHubSignInSilent>();
     }
 
     /// <summary>Ein unbrauchbarer Rumpf ebenso.</summary>
@@ -395,9 +395,9 @@ public class HttpGitHubTests
     {
         var papier = new Papierantwort(_ => (HttpStatusCode.OK, "kein json"));
 
-        var versuch = async () => await Baue(papier).RepositoriesAsync("anna-dev");
+        var attempt = async () => await Build(papier).RepositoriesAsync("anna-dev");
 
-        await versuch.Should().ThrowAsync<GitHubSchweigt>();
+        await attempt.Should().ThrowAsync<GitHubSignInSilent>();
     }
 
     /// <summary>Gefragt wird nach eigenen Repositories, nach Datum sortiert.</summary>
@@ -410,7 +410,7 @@ public class HttpGitHubTests
     {
         var papier = new Papierantwort(_ => (HttpStatusCode.OK, "[]"));
 
-        await Baue(papier).RepositoriesAsync("anna-dev");
+        await Build(papier).RepositoriesAsync("anna-dev");
 
         papier.Pfade.Single().Should()
             .Be($"/users/anna-dev/repos?per_page={HttpGitHub.JeSeite}&sort=pushed&type=owner");

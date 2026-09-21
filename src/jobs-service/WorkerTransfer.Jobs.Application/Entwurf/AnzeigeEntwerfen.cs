@@ -14,7 +14,7 @@ namespace WorkerTransfer.Jobs.Application.Entwurf;
 /// Consent-Ledger: der Knopf ist die Einwilligung, informiert und je Benutzung
 /// (ADR-0024).
 /// </remarks>
-public sealed record AnzeigeEntwerfenAbfrage(
+public sealed record DraftAdvertQuery(
     string Titel,
     string Beschreibung,
     IReadOnlyList<string> Faehigkeiten,
@@ -22,20 +22,20 @@ public sealed record AnzeigeEntwerfenAbfrage(
     string Wunsch) : IAbfrage<string>;
 
 /// <inheritdoc cref="AnzeigeEntwerfenAbfrage" />
-public sealed class AnzeigeEntwerfenHandler(IEntwerfer entwerfer)
-    : IRequestHandler<AnzeigeEntwerfenAbfrage, string>
+public sealed class DraftAdvertHandler(IDrafter entwerfer)
+    : IRequestHandler<DraftAdvertQuery, string>
 {
     /// <inheritdoc />
     /// <exception cref="EntwurfNichtVerfuegbar">Kein Anbieter, oder er schweigt.</exception>
     public Task<string> Handle(
-        AnzeigeEntwerfenAbfrage request, CancellationToken cancellationToken)
+        DraftAdvertQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         // Ohne tenant_id und ohne Firmennamen — die Kontextklasse hat keine
         // Felder dafür, also kann auch nichts hineinrutschen.
-        return entwerfer.EntwirfAsync(
-            new Anzeigenentwurf(
+        return entwerfer.DraftAsync(
+            new AdvertDraft(
                 request.Titel, request.Beschreibung, request.Faehigkeiten,
                 request.Ort, request.Wunsch),
             cancellationToken);

@@ -5,7 +5,7 @@ using WorkerTransfer.Skills;
 
 namespace WorkerTransfer.Skills.Tests;
 
-/// <summary>Der Wortschatz benennt um und schließt nie etwas.</summary>
+/// <summary>Der Vocabulary benennt um und schließt nie etwas.</summary>
 public class WortschatzTests
 {
     [Theory]
@@ -17,19 +17,19 @@ public class WortschatzTests
     [InlineData("dotnet", ".NET")]
     [InlineData("kundenservice", "Kundenbetreuung")]
     public void Dieselbe_Sache_bekommt_dasselbe_Wort(string getippt, string erwartet) =>
-        Wortschatz.Kanonisch(getippt).Should().Be(erwartet);
+        Vocabulary.Kanonisch(getippt).Should().Be(erwartet);
 
     /// <summary>
     /// Der Kern von ADR-0023: „React“ heißt React und sonst nichts.
     /// </summary>
     /// <remarks>
-    /// Eine Ableitung wäre eine Aussage über einen Menschen an einer Stelle, an
+    /// Eine Ableitung wäre eine Aussage über einen Menschen an einer Job, an
     /// der er nicht widersprechen kann. Wer React kann und JavaScript nennen
     /// will, nennt es.
     /// </remarks>
     [Fact]
     public void Aus_React_folgt_kein_JavaScript() =>
-        Wortschatz.KanonischAlle(["React"]).Should().Equal("React");
+        Vocabulary.KanonischAlle(["React"]).Should().Equal("React");
 
     /// <summary>
     /// Wie <see cref="Aus_React_folgt_kein_JavaScript"/>, an dem Ort, an dem
@@ -37,15 +37,15 @@ public class WortschatzTests
     /// </summary>
     [Fact]
     public void Aus_MIG_MAG_folgt_kein_Schweissen() =>
-        Wortschatz.KanonischAlle(["MIG/MAG"]).Should().Equal("MIG/MAG");
+        Vocabulary.KanonischAlle(["MIG/MAG"]).Should().Equal("MIG/MAG");
 
     /// <summary>
-    /// Ein Staplerschein ist ein Papier, kein Gabelstapler. Der Wortschatz
+    /// Ein Staplerschein ist ein Papier, kein Gabelstapler. Der Vocabulary
     /// führt beide Wörter und verbindet sie nicht.
     /// </summary>
     [Fact]
     public void Ein_Schein_ist_keine_Maschine() =>
-        Wortschatz.KanonischAlle(["Staplerschein", "Gabelstapler"])
+        Vocabulary.KanonischAlle(["Staplerschein", "Gabelstapler"])
             .Should().Equal("Staplerschein", "Gabelstapler");
 
     /// <summary>Das Handwerk wird kanonisiert wie alles andere auch.</summary>
@@ -61,19 +61,19 @@ public class WortschatzTests
     [InlineData("gesundheits- und krankenpfleger", "Pflegefachkraft")]
     [InlineData("  Ameise  ", "Hubwagen")]
     public void Handwerksbegriffe_bekommen_dasselbe_Wort(string getippt, string erwartet) =>
-        Wortschatz.Kanonisch(getippt).Should().Be(erwartet);
+        Vocabulary.Kanonisch(getippt).Should().Be(erwartet);
 
     [Fact]
     public void Unbekanntes_bleibt_stehen_wie_getippt() =>
-        Wortschatz.Kanonisch("Hufbeschlag").Should().Be("Hufbeschlag");
+        Vocabulary.Kanonisch("Hufbeschlag").Should().Be("Hufbeschlag");
 
     [Fact]
     public void Leeres_faellt_aus_der_Liste() =>
-        Wortschatz.KanonischAlle(["Go", "   ", "", "aws"])
+        Vocabulary.KanonischAlle(["Go", "   ", "", "aws"])
             .Should().Equal("Go", "Amazon Web Services");
 
     /// <summary>
-    /// Eine Liste entdoppelt der Wortschatz absichtlich <em>nicht</em>.
+    /// Eine Liste entdoppelt der Vocabulary absichtlich <em>nicht</em>.
     /// </summary>
     /// <remarks>
     /// Das gehört in <see cref="Faehigkeitenliste"/> und dort NACH dem
@@ -81,13 +81,13 @@ public class WortschatzTests
     /// </remarks>
     [Fact]
     public void Der_Wortschatz_entdoppelt_nicht() =>
-        Wortschatz.KanonischAlle(["Postgres", "PostgreSQL"])
+        Vocabulary.KanonischAlle(["Postgres", "PostgreSQL"])
             .Should().Equal("PostgreSQL", "PostgreSQL");
 
     [Fact]
     public void Ein_Name_steht_nie_als_eigene_Schreibweise()
     {
-        foreach (var (name, schreibweisen) in Wortschatz.Schreibweisen)
+        foreach (var (name, schreibweisen) in Vocabulary.Schreibweisen)
         {
             schreibweisen.Should().NotContain(
                 schreibweise => string.Equals(schreibweise, name, StringComparison.OrdinalIgnoreCase),
@@ -98,8 +98,8 @@ public class WortschatzTests
     [Fact]
     public void Eine_Schreibweise_gehoert_zu_hoechstens_einem_Namen()
     {
-        var alle = Wortschatz.Schreibweisen
-            .SelectMany(eintrag => eintrag.Value)
+        var alle = Vocabulary.Schreibweisen
+            .SelectMany(entry => entry.Value)
             .Select(schreibweise => schreibweise.ToLowerInvariant())
             .ToList();
 
@@ -113,9 +113,9 @@ public class WortschatzTests
     [Fact]
     public void Kein_Name_ist_die_Schreibweise_eines_anderen()
     {
-        var namen = Wortschatz.Schreibweisen.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var namen = Vocabulary.Schreibweisen.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (name, schreibweisen) in Wortschatz.Schreibweisen)
+        foreach (var (name, schreibweisen) in Vocabulary.Schreibweisen)
         {
             foreach (var schreibweise in schreibweisen)
             {
@@ -129,7 +129,7 @@ public class WortschatzTests
     /// <summary>
     /// Die Grenze, die sich am leichtesten verschieben lässt: irgendwann will
     /// jemand ein Niveau, ein Gewicht oder eine Rangfolge — und ab da bewertet
-    /// der Wortschatz Menschen (ADR-0022, ADR-0023).
+    /// der Vocabulary Menschen (ADR-0022, ADR-0023).
     /// </summary>
     [Theory]
     [InlineData("level")]
@@ -144,9 +144,9 @@ public class WortschatzTests
     [InlineData("impliziert")]
     public void Der_Wortschatz_kennt_kein_Wort_fuer_Bewertung(string verboten)
     {
-        var namen = typeof(Wortschatz)
+        var namen = typeof(Vocabulary)
             .GetMembers(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)
-            .Select(mitglied => mitglied.Name);
+            .Select(member => member.Name);
 
         namen.Should().NotContain(
             name => name.Contains(verboten, StringComparison.OrdinalIgnoreCase));

@@ -271,6 +271,12 @@ export function ProfilePage() {
     ...ausUnterlagen(gefunden),
   ];
 
+  // EVIDENCE BECOMES A SUGGESTION, NEVER A NAMING. What occurs in a repository
+  // is a fact about a repository; that a person can do something is a statement
+  // about a human, and only they may make it (ADR-0022). Taking a word over is
+  // therefore TWO acts: a click fills the field, and only Save makes it a
+  // naming. A search knows only what was named — evidence stands beside it and
+  // never finds.
   const vorschlaege = vorschlaegeAus(quellen, bereitsGenannt);
 
   function uebernimm(wort: string) {
@@ -463,19 +469,6 @@ export function ProfilePage() {
               fullWidth
             />
 
-            {/*
-              AUS BELEGEN WERDEN VORSCHLÄGE — NIE NENNUNGEN.
-
-              Was in einem Repository vorkommt, ist eine Tatsache über ein
-              Repository. Dass eine Person etwas kann, ist eine Aussage über
-              einen Menschen, und die darf nur sie selbst treffen (ADR-0022).
-              Diese Wörter zu übernehmen sind deshalb ZWEI Handlungen: ein Klick
-              füllt das Feld darüber, und erst „Speichern" macht daraus eine
-              Nennung. Nichts wandert von allein hinüber.
-
-              Und genau darauf kommt es später an: eine Suche kennt nur
-              Genanntes. Belege stehen daneben, sie finden nie.
-            */}
             {vorschlaege.length > 0 || gefunden.length > 0 ? (
               <Box>
                 {vorschlaege.length > 0 ? (
@@ -505,8 +498,6 @@ export function ProfilePage() {
                     </Box>
                   </>
                 ) : null}
-                {/* Der Knopf steht UNTER den Wörtern, nicht daneben: was schon
-                    gefunden wurde, liest man zuerst. */}
                 <AusUnterlagen
                   funde={gefunden}
                   laeuft={liest}
@@ -515,12 +506,12 @@ export function ProfilePage() {
                 />
               </Box>
             ) : null}
-            {/* Eine Ankreuzbox und KEIN Schalter: dies ist ein Profilfeld, und
-                es gilt erst mit dem Speichern. Genau umgekehrt zur Freigabe
-                darüber — dort wäre eine Box das falsche Versprechen. */}
             <FormControlLabel
               control={
                 <Checkbox
+                  // A checkbox and NOT a switch: this is a profile field and it
+                  // only holds once saved. The opposite of the consent switch
+                  // above, where a box would be the wrong promise.
                   checked={form.remote_ok}
                   onChange={(event) =>
                     change("remote_ok", event.target.checked)
@@ -530,14 +521,12 @@ export function ProfilePage() {
               label={t("profil.remote")}
             />
 
-            {/* ADR-0041: eine STUFE und keine Kilometerzahl. Ein Zahlenfeld
-                lüde zum Rechnen ein — „37 ≤ 50, also 74 % passend" —, eine
-                Stufe ist eine Aussage, die jemand getroffen hat.
-
-                Beide sind freiwillig, und die leere Wahl steht ausdrücklich
-                oben: „nichts gesagt" ist ein Zustand, kein Versäumnis, und es
-                muss sich zurücknehmen lassen. */}
             <TextField
+              // ADR-0041: a STEP and no kilometre figure. A number field would
+              // invite arithmetic ("37 ≤ 50, so 74 % fitting"); a step is a
+              // statement somebody made. The empty choice stands at the top on
+              // purpose — "said nothing" is a state, not an omission, and it
+              // must be revocable.
               select
               label={t("profil.pendeln")}
               helperText={t("profil.pendelnHinweis")}
@@ -568,10 +557,13 @@ export function ProfilePage() {
             </TextField>
 
             {fehler !== null ? <ErrorBlock error={fehler} /> : null}
-            {/* `role="status"` und nicht `alert`: eine Bestätigung, die den
-                Vorleser unterbricht, ist Lärm. */}
             {saved && fehler === null ? (
-              <Alert severity="success" role="status">
+              <Alert
+                severity="success"
+                // A confirmation that interrupts the screen reader is noise;
+                // MUI's Alert would otherwise set role="alert".
+                role="status"
+              >
                 {t("profil.gespeichert")}
               </Alert>
             ) : null}

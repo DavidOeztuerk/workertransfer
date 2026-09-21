@@ -45,7 +45,7 @@ public sealed record CheckBody(
 public sealed record CheckBatchBody(IReadOnlyList<CheckBody> Pairs);
 
 /// <summary><c>/consent/*</c> — the ledger's whole surface.</summary>
-public static class EinwilligungsEndpoints
+public static class ConsentEndpoints
 {
     /// <summary>Maps the five endpoints of the ledger.</summary>
     public static IEndpointRouteBuilder MapEinwilligungsEndpoints(this IEndpointRouteBuilder app)
@@ -67,13 +67,13 @@ public static class EinwilligungsEndpoints
                 return;
             }
 
-            var ergebnis = await mediator.Send(
-                new EinwilligungErteilenBefehl(
+            var result = await mediator.Send(
+                new GrantConsentCommand(
                     handelnder.Subject, Firma(handelnder),
                     body.SubjectId, body.Capability, body.Reason),
                 cancellationToken);
 
-            await Beantworte(context, ergebnis, cancellationToken);
+            await Beantworte(context, result, cancellationToken);
         });
 
         consent.MapPost("/revoke", async (
@@ -89,13 +89,13 @@ public static class EinwilligungsEndpoints
                 return;
             }
 
-            var ergebnis = await mediator.Send(
-                new EinwilligungWiderrufenBefehl(
+            var result = await mediator.Send(
+                new RevokeConsentCommand(
                     handelnder.Subject, Firma(handelnder),
                     body.SubjectId, body.Capability, body.Reason),
                 cancellationToken);
 
-            await Beantworte(context, ergebnis, cancellationToken);
+            await Beantworte(context, result, cancellationToken);
         });
 
         // Deliberately takes no subject — not in the path and not as a query.
@@ -114,14 +114,14 @@ public static class EinwilligungsEndpoints
                 return;
             }
 
-            var freigaben = await mediator.Send(
-                new MeineFreigabenAbfrage(handelnder.Subject), cancellationToken);
+            var releases = await mediator.Send(
+                new MyReleasesQuery(handelnder.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                freigaben.Select(freigabe => new Dictionary<string, string>
+                releases.Select(release => new Dictionary<string, string>
                 {
-                    ["capability"] = freigabe.Faehigkeit.Value,
-                    ["granted_at"] = freigabe.Seit.ToString("O")
+                    ["capability"] = release.Faehigkeit.Value,
+                    ["granted_at"] = release.Seit.ToString("O")
                 }),
                 cancellationToken);
         });
@@ -143,16 +143,16 @@ public static class EinwilligungsEndpoints
                 return;
             }
 
-            var verlauf = await mediator.Send(
-                new MeineGeschichteAbfrage(handelnder.Subject), cancellationToken);
+            var history = await mediator.Send(
+                new MyHistoryQuery(handelnder.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                verlauf.Select(eintrag => new Dictionary<string, string?>
+                history.Select(entry => new Dictionary<string, string?>
                 {
-                    ["capability"] = eintrag.Capability.Value,
-                    ["action"] = eintrag.Action.ToString().ToUpperInvariant(),
-                    ["recorded_at"] = eintrag.RecordedAt.ToString("O"),
-                    ["reason"] = eintrag.Reason?.Value
+                    ["capability"] = entry.Capability.Value,
+                    ["action"] = entry.Action.ToString().ToUpperInvariant(),
+                    ["recorded_at"] = entry.RecordedAt.ToString("O"),
+                    ["reason"] = entry.Reason?.Value
                 }),
                 cancellationToken);
         });
@@ -174,20 +174,20 @@ public static class EinwilligungsEndpoints
                 return;
             }
 
-            var ergebnis = await mediator.Send(
-                new EinwilligungPruefenAbfrage(body.SubjectId, body.Capability),
+            var result = await mediator.Send(
+                new CheckConsentQuery(body.SubjectId, body.Capability),
                 cancellationToken);
 
-            switch (ergebnis)
+            switch (result)
             {
-                case Pruefergebnis.Stand stand:
+                case AuditResult.State state:
                     await context.Response.WriteAsJsonAsync(
-                        Antwort(body.SubjectId, body.Capability, stand.Zustand),
+                        Antwort(body.SubjectId, body.Capability, state.Zustand),
                         cancellationToken);
                     return;
 
-                case Pruefergebnis.Unbrauchbar unbrauchbar:
-                    await ProblemDetailsMiddleware.Schreibe(
+                case AuditResult.Unbrauchbar unbrauchbar:
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status422UnprocessableEntity,
                         "Request failed", unbrauchbar.Detail);
                     return;
@@ -213,7 +213,7 @@ public static class EinwilligungsEndpoints
 
             if (body.Pairs is not { Count: > 0 })
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "at least one pair is required");
                 return;
@@ -222,21 +222,21 @@ public static class EinwilligungsEndpoints
             // Derived, not chosen: one page is fifty people and a person can be
             // asked about two capabilities. A batch makes asking cheaper, and a
             // ceiling keeps that difference small.
-            if (body.Pairs.Count > Einwilligungsgrenzen.HoechsteSammelgroesse)
+            if (body.Pairs.Count > ConsentLimits.HoechsteSammelgroesse)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity, "Request failed",
-                    $"at most {Einwilligungsgrenzen.HoechsteSammelgroesse} pairs per request");
+                    $"at most {ConsentLimits.HoechsteSammelgroesse} pairs per request");
                 return;
             }
 
-            var ergebnis = await mediator.Send(
-                new SammelpruefungAbfrage(
+            var result = await mediator.Send(
+                new BatchCheckQuery(
                     [.. body.Pairs.Select(paar =>
-                        new EinwilligungPruefenAbfrage(paar.SubjectId, paar.Capability))]),
+                        new CheckConsentQuery(paar.SubjectId, paar.Capability))]),
                 cancellationToken);
 
-            switch (ergebnis)
+            switch (result)
             {
                 case Sammelergebnis.Staende staende:
                     // In the order of the questions, one per pair. The order is
@@ -246,15 +246,15 @@ public static class EinwilligungsEndpoints
                         new Dictionary<string, object>
                         {
                             ["results"] = staende.Zustaende
-                                .Select((zustand, i) => Antwort(
-                                    body.Pairs[i].SubjectId, body.Pairs[i].Capability, zustand))
+                                .Select((state, i) => Antwort(
+                                    body.Pairs[i].SubjectId, body.Pairs[i].Capability, state))
                                 .ToArray()
                         },
                         cancellationToken);
                     return;
 
                 case Sammelergebnis.Unbrauchbar unbrauchbar:
-                    await ProblemDetailsMiddleware.Schreibe(
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status422UnprocessableEntity,
                         "Request failed", unbrauchbar.Detail);
                     return;
@@ -273,43 +273,43 @@ public static class EinwilligungsEndpoints
     /// it; this shape has no field for one, so it cannot leak by accident.
     /// </remarks>
     private static Dictionary<string, object> Antwort(
-        Guid gegenstand, string faehigkeit, ConsentState zustand) => new()
+        Guid gegenstand, string skill, ConsentState state) => new()
     {
         ["subject_id"] = gegenstand,
-        ["capability"] = faehigkeit,
-        ["granted"] = zustand.Granted,
-        ["deleted"] = zustand.Deleted
+        ["capability"] = skill,
+        ["granted"] = state.Granted,
+        ["deleted"] = state.Deleted
     };
 
     private static async Task Beantworte(
         HttpContext context,
-        Einwilligungsergebnis ergebnis,
+        ConsentResult result,
         CancellationToken cancellationToken)
     {
-        switch (ergebnis)
+        switch (result)
         {
-            case Einwilligungsergebnis.Stand stand:
+            case ConsentResult.State state:
                 await context.Response.WriteAsJsonAsync(
                     new Dictionary<string, object?>
                     {
-                        ["granted"] = stand.Zustand.Granted,
-                        ["deleted"] = stand.Zustand.Deleted,
-                        ["reason"] = stand.Zustand.Reason
+                        ["granted"] = state.Zustand.Granted,
+                        ["deleted"] = state.Zustand.Deleted,
+                        ["reason"] = state.Zustand.Reason
                     },
                     cancellationToken);
                 return;
 
-            case Einwilligungsergebnis.FremderGegenstand:
+            case ConsentResult.ForeignSubject:
                 // Strict self-management: there is no delegation model, and
                 // admin or guardian consent is a later, deliberate decision
                 // rather than something allowed by omission.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status403Forbidden,
                     "Request failed", "a consent belongs to its subject");
                 return;
 
-            case Einwilligungsergebnis.Unbrauchbar unbrauchbar:
-                await ProblemDetailsMiddleware.Schreibe(
+            case ConsentResult.Unbrauchbar unbrauchbar:
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", unbrauchbar.Detail);
                 return;
@@ -326,9 +326,9 @@ public static class EinwilligungsEndpoints
     /// somebody was acting, not so anyone can act for another.
     /// </remarks>
     private static TenantId? Firma(Principal handelnder) =>
-        handelnder.Acting is Capacity.ForCompany firma ? firma.Tenant : null;
+        handelnder.Acting is Capacity.ForCompany company ? company.Tenant : null;
 
     private static Task NichtAngemeldet(HttpContext context) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
 }

@@ -9,13 +9,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Outbox;
-using WorkerTransfer.ServiceDefaults.Rollen;
+using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.Transfer.Application.Ports;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Transfer.Tests;
 
-/// <summary>Der Vorgang: drei Ja, jederzeit ein Nein.</summary>
+/// <summary>Der Case: drei Ja, jederzeit ein Nein.</summary>
 [Collection(PostgresCollection.Name)]
 public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
 {
@@ -29,20 +29,20 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:transfer", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _ledger));
-                dienste.Replace(ServiceDescriptor.Scoped<IZustellung, Probezustellung>());
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _ledger));
+                services.Replace(ServiceDescriptor.Scoped<IDelivery, Probezustellung>());
                 // Angebot und Abschluss verlangen seit PBI-2 einen `admin`.
-                // Diese Reihen messen den Vorgang und nicht die Rolle — also
+                // Diese Reihen messen den Case und nicht die Rolle — also
                 // antwortet die Probe wie eine Inhaberin. `RollenTests` dreht
                 // sie auf `member`.
-                dienste.Replace(ServiceDescriptor.Scoped<IFirmenrollen>(_ => new Rollenprobe()));
+                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => new Rollenprobe()));
             });
         });
 
@@ -55,9 +55,9 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsFirma(Guid firma) => Mit(Tokenform.Firma(Guid.CreateVersion7(), firma));
+    private HttpClient AlsFirma(Guid company) => Mit(Tokenform.Firma(Guid.CreateVersion7(), company));
 
-    private HttpClient AlsPerson(Guid wer) => Mit(Tokenform.Person(wer));
+    private HttpClient AlsPerson(Guid subject) => Mit(Tokenform.Person(subject));
 
     private HttpClient Mit(string token)
     {
@@ -67,41 +67,41 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     /// <summary>Eine ansprechbare Person, deren Status dieser Firma freigegeben ist.</summary>
     private async Task<Guid> Ansprechbar(
-        Guid firma, bool beschaeftigt = false, string zustand = "listening")
+        Guid company, bool beschaeftigt = false, string state = "listening")
     {
-        var wer = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
 
-        await AlsPerson(wer).PutAsJsonAsync("/market/me", new
+        await AlsPerson(subject).PutAsJsonAsync("/market/me", new
         {
-            availability = zustand, employed = beschaeftigt, note = string.Empty
+            availability = state, employed = beschaeftigt, note = string.Empty
         });
 
-        _ledger.MarktFrei.Add((wer, firma));
+        _ledger.MarktFrei.Add((subject, company));
 
-        return wer;
+        return subject;
     }
 
-    private Task<HttpResponseMessage> ZeigeInteresse(Guid firma, Guid wer) =>
-        AlsFirma(firma).PostAsJsonAsync("/transfers", new
+    private Task<HttpResponseMessage> ZeigeInteresse(Guid company, Guid subject) =>
+        AlsFirma(company).PostAsJsonAsync("/transfers", new
         {
-            subject_id = wer, message = "Wir hätten da etwas."
+            subject_id = subject, message = "Wir hätten da etwas."
         });
 
     /// <summary>Der ganze Weg: Interesse, Gespräch, Angebot, Annahme, Abschluss.</summary>
     [Fact]
     public async Task Interesse_Gespraech_Angebot_Annahme_Abschluss()
     {
-        var firma = Guid.CreateVersion7();
-        var anna = await Ansprechbar(firma);
+        var company = Guid.CreateVersion7();
+        var anna = await Ansprechbar(company);
         var ihr = AlsPerson(anna);
-        var sie = AlsFirma(firma);
+        var sie = AlsFirma(company);
 
-        var angelegt = await ZeigeInteresse(firma, anna);
+        var angelegt = await ZeigeInteresse(company, anna);
 
         angelegt.StatusCode.Should().Be(HttpStatusCode.Created);
         (await Json(angelegt)).GetProperty("status").GetString().Should().Be("interested");
@@ -130,17 +130,17 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>
     /// Wer beschäftigt ist, schließt selbst ab — sie ist die Einzige, die weiß,
-    /// ob die Freigabe vorliegt.
+    /// ob die Release vorliegt.
     /// </summary>
     [Fact]
     public async Task Bei_Freigabepflicht_schliesst_die_Person_ab()
     {
-        var firma = Guid.CreateVersion7();
-        var anna = await Ansprechbar(firma, beschaeftigt: true);
+        var company = Guid.CreateVersion7();
+        var anna = await Ansprechbar(company, beschaeftigt: true);
         var ihr = AlsPerson(anna);
-        var sie = AlsFirma(firma);
+        var sie = AlsFirma(company);
 
-        var id = (await Json(await ZeigeInteresse(firma, anna))).GetProperty("id").GetGuid();
+        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
 
         (await Json(await ihr.GetAsync("/transfers/me")))
             .EnumerateArray().Single()
@@ -159,9 +159,9 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
 
         bestaetigt.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var rumpf = await Json(bestaetigt);
-        rumpf.GetProperty("status").GetString().Should().Be("completed");
-        rumpf.GetProperty("release_confirmed").GetBoolean().Should().BeTrue();
+        var body = await Json(bestaetigt);
+        body.GetProperty("status").GetString().Should().Be("completed");
+        body.GetProperty("release_confirmed").GetBoolean().Should().BeTrue();
     }
 
     /// <summary>
@@ -170,12 +170,12 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_Freigabepflicht_gibt_es_nichts_zu_bestaetigen()
     {
-        var firma = Guid.CreateVersion7();
-        var anna = await Ansprechbar(firma);
+        var company = Guid.CreateVersion7();
+        var anna = await Ansprechbar(company);
         var ihr = AlsPerson(anna);
-        var sie = AlsFirma(firma);
+        var sie = AlsFirma(company);
 
-        var id = (await Json(await ZeigeInteresse(firma, anna))).GetProperty("id").GetGuid();
+        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
         await ihr.PostAsync($"/transfers/{id}/accept-talk", null);
         await sie.PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Angebot." });
         await ihr.PostAsync($"/transfers/{id}/accept-offer", null);
@@ -186,17 +186,17 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Ein späterer Wechsel des Marktstatus verschiebt die Bedingungen eines
+    /// Ein späterer Wechsel des MarketStatus verschiebt die Bedingungen eines
     /// laufenden Vorgangs nicht rückwirkend.
     /// </summary>
     [Fact]
     public async Task Die_Freigabepflicht_wird_beim_Anlegen_kopiert()
     {
-        var firma = Guid.CreateVersion7();
-        var anna = await Ansprechbar(firma, beschaeftigt: true);
+        var company = Guid.CreateVersion7();
+        var anna = await Ansprechbar(company, beschaeftigt: true);
         var ihr = AlsPerson(anna);
 
-        var id = (await Json(await ZeigeInteresse(firma, anna))).GetProperty("id").GetGuid();
+        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
 
         // Sie kündigt mitten im Gespräch.
         await ihr.PutAsJsonAsync("/market/me", new
@@ -204,10 +204,10 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
             availability = "listening", employed = false, note = string.Empty
         });
 
-        var jetzt = (await Json(await ihr.GetAsync("/transfers/me")))
-            .EnumerateArray().Single(eintrag => eintrag.GetProperty("id").GetGuid() == id);
+        var now = (await Json(await ihr.GetAsync("/transfers/me")))
+            .EnumerateArray().Single(entry => entry.GetProperty("id").GetGuid() == id);
 
-        jetzt.GetProperty("requires_release").GetBoolean().Should().BeTrue();
+        now.GetProperty("requires_release").GetBoolean().Should().BeTrue();
     }
 
     /// <summary>Die Freigabepflicht hat keinen Setzer.</summary>
@@ -226,20 +226,20 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
             .CanWrite.Should().BeFalse();
     }
 
-    /// <summary>Die Freigabe erlaubt zu SEHEN, nicht zu STÖREN.</summary>
+    /// <summary>Die Release erlaubt zu SEHEN, nicht zu STÖREN.</summary>
     [Fact]
     public async Task Unavailable_heisst_nein_auch_mit_Freigabe()
     {
-        var firma = Guid.CreateVersion7();
-        var anna = await Ansprechbar(firma, zustand: "unavailable");
+        var company = Guid.CreateVersion7();
+        var anna = await Ansprechbar(company, state: "unavailable");
 
-        var versuch = await ZeigeInteresse(firma, anna);
+        var attempt = await ZeigeInteresse(company, anna);
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        attempt.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>
-    /// Kein Status, keine Freigabe, oder „gerade nicht" — alles dasselbe nach
+    /// Kein Status, keine Release, oder „gerade nicht" — alles dasselbe nach
     /// außen.
     /// </summary>
     /// <remarks>
@@ -249,39 +249,39 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_drei_Nein_sehen_gleich_aus()
     {
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
         var ohneStatus = Guid.CreateVersion7();
         var ohneFreigabe = Guid.CreateVersion7();
         await AlsPerson(ohneFreigabe).PutAsJsonAsync("/market/me", new
         {
             availability = "open", employed = false, note = string.Empty
         });
-        var nichtAnsprechbar = await Ansprechbar(firma, zustand: "unavailable");
+        var nichtAnsprechbar = await Ansprechbar(company, state: "unavailable");
 
-        var antworten = new List<string>();
+        var responses = new List<string>();
 
-        foreach (var wer in new[] { ohneStatus, ohneFreigabe, nichtAnsprechbar })
+        foreach (var subject in new[] { ohneStatus, ohneFreigabe, nichtAnsprechbar })
         {
-            var antwort = await ZeigeInteresse(firma, wer);
-            antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
-            antworten.Add(
-                (await Json(antwort)).GetProperty("detail").GetString() ?? string.Empty);
+            var response = await ZeigeInteresse(company, subject);
+            response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            responses.Add(
+                (await Json(response)).GetProperty("detail").GetString() ?? string.Empty);
         }
 
-        antworten.Distinct().Should().ContainSingle();
+        responses.Distinct().Should().ContainSingle();
     }
 
     /// <summary>
-    /// Ein zweiter laufender Vorgang wäre Nachfassen an der Absage vorbei.
+    /// Ein zweiter laufender Case wäre Nachfassen an der Absage vorbei.
     /// </summary>
     [Fact]
     public async Task Es_laeuft_nur_ein_Vorgang_je_Paar()
     {
-        var firma = Guid.CreateVersion7();
-        var anna = await Ansprechbar(firma);
+        var company = Guid.CreateVersion7();
+        var anna = await Ansprechbar(company);
 
-        await ZeigeInteresse(firma, anna);
-        var zweiter = await ZeigeInteresse(firma, anna);
+        await ZeigeInteresse(company, anna);
+        var zweiter = await ZeigeInteresse(company, anna);
 
         zweiter.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
@@ -290,13 +290,13 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Nach_der_Absage_darf_ein_neuer_beginnen()
     {
-        var firma = Guid.CreateVersion7();
-        var anna = await Ansprechbar(firma);
+        var company = Guid.CreateVersion7();
+        var anna = await Ansprechbar(company);
 
-        var id = (await Json(await ZeigeInteresse(firma, anna))).GetProperty("id").GetGuid();
+        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
         await AlsPerson(anna).PostAsync($"/transfers/{id}/decline", null);
 
-        var neuer = await ZeigeInteresse(firma, anna);
+        var neuer = await ZeigeInteresse(company, anna);
 
         neuer.StatusCode.Should().Be(HttpStatusCode.Created);
         (await Json(neuer)).GetProperty("id").GetGuid().Should().NotBe(id);
@@ -309,14 +309,14 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Absagen_geht_aus_jedem_laufenden_Zustand()
     {
-        var firma = Guid.CreateVersion7();
-        var sie = AlsFirma(firma);
+        var company = Guid.CreateVersion7();
+        var sie = AlsFirma(company);
 
         foreach (var bisWohin in new[] { "interested", "talking", "offered", "accepted" })
         {
-            var anna = await Ansprechbar(firma);
+            var anna = await Ansprechbar(company);
             var ihr = AlsPerson(anna);
-            var id = (await Json(await ZeigeInteresse(firma, anna))).GetProperty("id").GetGuid();
+            var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
 
             if (bisWohin != "interested")
             {
@@ -340,13 +340,13 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
         }
     }
 
-    /// <summary>Ein fremder Vorgang ist von außen wie keiner.</summary>
+    /// <summary>Ein fremder Case ist von außen wie keiner.</summary>
     [Fact]
     public async Task Ein_fremder_Vorgang_ist_404_und_nicht_403()
     {
-        var firma = Guid.CreateVersion7();
-        var anna = await Ansprechbar(firma);
-        var id = (await Json(await ZeigeInteresse(firma, anna))).GetProperty("id").GetGuid();
+        var company = Guid.CreateVersion7();
+        var anna = await Ansprechbar(company);
+        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
 
         var fremdePerson = await AlsPerson(Guid.CreateVersion7())
             .PostAsync($"/transfers/{id}/accept-talk", null);
@@ -361,12 +361,12 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_negative_Abloese_wird_abgewiesen()
     {
-        var firma = Guid.CreateVersion7();
-        var anna = await Ansprechbar(firma);
-        var id = (await Json(await ZeigeInteresse(firma, anna))).GetProperty("id").GetGuid();
+        var company = Guid.CreateVersion7();
+        var anna = await Ansprechbar(company);
+        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
         await AlsPerson(anna).PostAsync($"/transfers/{id}/accept-talk", null);
 
-        var angebot = await AlsFirma(firma).PostAsJsonAsync($"/transfers/{id}/offer", new
+        var angebot = await AlsFirma(company).PostAsJsonAsync($"/transfers/{id}/offer", new
         {
             note = "Angebot.", fee_cents = -1L
         });
@@ -383,14 +383,14 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Nur_die_Zuege_des_Unternehmens_werden_gemeldet()
     {
-        var firma = Guid.CreateVersion7();
-        var anna = await Ansprechbar(firma);
-        var id = (await Json(await ZeigeInteresse(firma, anna))).GetProperty("id").GetGuid();
+        var company = Guid.CreateVersion7();
+        var anna = await Ansprechbar(company);
+        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
 
         // Interesse: gemeldet.
         await using (var nachInteresse = postgres.Kontext())
         {
-            (await nachInteresse.Set<OutboxZeile>().CountAsync(zeile => zeile.UserId == anna))
+            (await nachInteresse.Set<OutboxRow>().CountAsync(row => row.UserId == anna))
                 .Should().Be(1);
         }
 
@@ -399,30 +399,30 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
 
         await using (var nachIhremZug = postgres.Kontext())
         {
-            (await nachIhremZug.Set<OutboxZeile>().CountAsync(zeile => zeile.UserId == anna))
+            (await nachIhremZug.Set<OutboxRow>().CountAsync(row => row.UserId == anna))
                 .Should().Be(1);
         }
 
         // Ihr Angebot: gemeldet.
-        await AlsFirma(firma).PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Ja." });
+        await AlsFirma(company).PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Ja." });
 
         await using var nachAngebot = postgres.Kontext();
-        var vermerke = await nachAngebot.Set<OutboxZeile>()
-            .Where(zeile => zeile.UserId == anna)
+        var vermerke = await nachAngebot.Set<OutboxRow>()
+            .Where(row => row.UserId == anna)
             .ToListAsync();
 
         vermerke.Should().HaveCount(2);
-        vermerke.Should().OnlyContain(zeile => zeile.Kind == "transfer_update");
+        vermerke.Should().OnlyContain(row => row.Kind == "transfer_update");
     }
 
     /// <summary>
-    /// Der Widerruf beendet den laufenden Vorgang NICHT: er hat seine eigene
+    /// Der Revocation beendet den laufenden Case NICHT: er hat seine eigene
     /// Tür und seine eigene Absage.
     /// </summary>
     [Fact]
     public async Task Ein_Widerruf_beendet_den_Vorgang_nicht()
     {
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
         var anna = Guid.CreateVersion7();
         _ledger.ProfilFrei.Add(anna);
         var ihr = AlsPerson(anna);
@@ -432,17 +432,17 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
             availability = "listening", employed = false, note = string.Empty
         });
 
-        var anfrage = (await Json(
-                await AlsFirma(firma).PostAsync($"/market/{anna}/requests", null)))
+        var request = (await Json(
+                await AlsFirma(company).PostAsync($"/market/{anna}/requests", null)))
             .GetProperty("id").GetGuid();
-        await ihr.PostAsync($"/market/requests/{anfrage}/grant", null);
+        await ihr.PostAsync($"/market/requests/{request}/grant", null);
 
-        var id = (await Json(await ZeigeInteresse(firma, anna))).GetProperty("id").GetGuid();
+        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
 
-        await ihr.PostAsync($"/market/requests/{anfrage}/revoke", null);
+        await ihr.PostAsync($"/market/requests/{request}/revoke", null);
 
         var laeuftNoch = (await Json(await ihr.GetAsync("/transfers/me")))
-            .EnumerateArray().Single(eintrag => eintrag.GetProperty("id").GetGuid() == id);
+            .EnumerateArray().Single(entry => entry.GetProperty("id").GetGuid() == id);
 
         laeuftNoch.GetProperty("status").GetString().Should().Be("interested");
     }
@@ -451,11 +451,11 @@ public class VorgangsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_Privatperson_zeigt_kein_Interesse()
     {
-        var antwort = await AlsPerson(Guid.CreateVersion7()).PostAsJsonAsync("/transfers", new
+        var response = await AlsPerson(Guid.CreateVersion7()).PostAsJsonAsync("/transfers", new
         {
             subject_id = Guid.CreateVersion7(), message = "Hallo."
         });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

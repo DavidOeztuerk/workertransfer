@@ -39,61 +39,61 @@ internal sealed record AusbildungsSatz(
 /// fake that returns the same instance and silently loses the write in
 /// production — which is why the repository is built so that it cannot.
 /// </remarks>
-public sealed class EfLebenslaufSpeicher(ResumeDbContext kontext) : ILebenslaufSpeicher
+public sealed class EfResumeStore(ResumeDbContext context) : IResumeStore
 {
     private static readonly JsonSerializerOptions Format = new(JsonSerializerDefaults.Web);
 
     /// <inheritdoc />
-    public async Task<Lebenslauf?> HoleAsync(
-        SubjectId wer,
+    public async Task<CurriculumVitae?> GetAsync(
+        SubjectId subject,
         CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Lebenslaeufe
-            .SingleOrDefaultAsync(z => z.Id == wer.Value, cancellationToken);
+        var row = await context.Lebenslaeufe
+            .SingleOrDefaultAsync(z => z.Id == subject.Value, cancellationToken);
 
-        return zeile is null ? null : ZuDomaene(zeile);
+        return row is null ? null : ZuDomaene(row);
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(
-        Lebenslauf lebenslauf,
+    public async Task SaveAsync(
+        CurriculumVitae resume,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(lebenslauf);
+        ArgumentNullException.ThrowIfNull(resume);
 
-        var zeile = await kontext.Lebenslaeufe
+        var row = await context.Lebenslaeufe
             .AsTracking()
-            .SingleOrDefaultAsync(z => z.Id == lebenslauf.Wer.Value, cancellationToken);
+            .SingleOrDefaultAsync(z => z.Id == resume.Wer.Value, cancellationToken);
 
-        if (zeile is null)
+        if (row is null)
         {
-            kontext.Lebenslaeufe.Add(new LebenslaufZeile
+            context.Lebenslaeufe.Add(new ResumeRow
             {
-                Id = lebenslauf.Wer.Value,
-                Positions = Schreibe(lebenslauf.Stationen),
-                Education = Schreibe(lebenslauf.Ausbildungen),
-                CreatedAt = lebenslauf.Angelegt.UtcDateTime,
-                UpdatedAt = lebenslauf.Geaendert.UtcDateTime
+                Id = resume.Wer.Value,
+                Positions = Write(resume.Stationen),
+                Education = Write(resume.Ausbildungen),
+                CreatedAt = resume.Angelegt.UtcDateTime,
+                UpdatedAt = resume.Geaendert.UtcDateTime
             });
 
             return;
         }
 
-        zeile.Positions = Schreibe(lebenslauf.Stationen);
-        zeile.Education = Schreibe(lebenslauf.Ausbildungen);
-        zeile.Template = lebenslauf.Vorlage;
-        zeile.UpdatedAt = lebenslauf.Geaendert.UtcDateTime;
+        row.Positions = Write(resume.Stationen);
+        row.Education = Write(resume.Ausbildungen);
+        row.Template = resume.ResumeTemplate;
+        row.UpdatedAt = resume.Geaendert.UtcDateTime;
     }
 
-    private static Lebenslauf ZuDomaene(LebenslaufZeile zeile)
+    private static CurriculumVitae ZuDomaene(ResumeRow row)
     {
-        var stationen = JsonSerializer.Deserialize<List<StationsSatz>>(zeile.Positions, Format)
+        var stationen = JsonSerializer.Deserialize<List<StationsSatz>>(row.Positions, Format)
                         ?? [];
         var ausbildungen = JsonSerializer
-            .Deserialize<List<AusbildungsSatz>>(zeile.Education, Format) ?? [];
+            .Deserialize<List<AusbildungsSatz>>(row.Education, Format) ?? [];
 
-        return Lebenslauf.Wiederherstellen(
-            new SubjectId(zeile.Id),
+        return CurriculumVitae.Wiederherstellen(
+            new SubjectId(row.Id),
             [.. stationen.Select(s => Station.Aus(
                 s.Employer, s.Title, Monat.Lies(s.StartedOn),
                 s.EndedOn is null ? null : Monat.Lies(s.EndedOn), s.Description,
@@ -102,19 +102,19 @@ public sealed class EfLebenslaufSpeicher(ResumeDbContext kontext) : ILebenslaufS
                 a.Institution, a.Qualification, Monat.Lies(a.StartedOn),
                 a.EndedOn is null ? null : Monat.Lies(a.EndedOn),
                 a.Kind == "schule" ? Ausbildungsart.Schule : Ausbildungsart.Ausbildung))],
-            new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
-            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero),
-            zeile.Template);
+            new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
+            new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero),
+            row.Template);
     }
 
-    private static string Schreibe(IReadOnlyList<Station> stationen) =>
+    private static string Write(IReadOnlyList<Station> stationen) =>
         JsonSerializer.Serialize(
             stationen.Select(s => new StationsSatz(
                 s.Arbeitgeber, s.Titel, s.Beginn.ToString(), s.Ende?.ToString(), s.Beschreibung,
                 s.Technologien)),
             Format);
 
-    private static string Schreibe(IReadOnlyList<Ausbildung> ausbildungen) =>
+    private static string Write(IReadOnlyList<Ausbildung> ausbildungen) =>
         JsonSerializer.Serialize(
             ausbildungen.Select(a => new AusbildungsSatz(
                 a.Einrichtung, a.Abschluss, a.Beginn.ToString(), a.Ende?.ToString(),

@@ -16,7 +16,7 @@ namespace WorkerTransfer.Assessment.Api;
 /// einen Menschen herausgibt (ADR-0042 §1).</para>
 ///
 /// <para><strong>Und eine, die es ausdrücklich nicht gibt: Ablehnen.</strong>
-/// Keine Route, kein Zustand, kein Feld. Wer eine Aufgabe nicht will, tut
+/// None Route, kein Zustand, kein Feld. Wer eine Aufgabe nicht will, tut
 /// nichts; die Frist läuft ab, und das ist ununterscheidbar von „hat es nicht
 /// geschafft". Ein höflicher Absageknopf wäre freundlicher zum Unternehmen und
 /// erzeugte genau den Vermerk, den ADR-0042 §3 verbietet — „hat dreimal
@@ -28,7 +28,7 @@ namespace WorkerTransfer.Assessment.Api;
 /// der Firma; sie bindet das Unternehmen nicht. Ein zweites Recht davor machte
 /// aus einer Einladung eine Zuschauerkarte.</para>
 /// </remarks>
-public static class ArbeitsprobenEndpoints
+public static class WorkSampleEndpoints
 {
     /// <summary>Bindet die Routen ein.</summary>
     public static IEndpointRouteBuilder MapArbeitsprobenEndpoints(this IEndpointRouteBuilder app)
@@ -53,13 +53,13 @@ public static class ArbeitsprobenEndpoints
     private static void MapFirmenseite(IEndpointRouteBuilder proben)
     {
         proben.MapPost("/", async (
-            AufgabeStellenV1? koerper,
+            SetTaskV1? koerper,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (Firma(akteur) is not { } firma)
+            if (Firma(akteur) is not { } company)
             {
                 await OhneFirma(akteur, context);
                 return;
@@ -80,25 +80,25 @@ public static class ArbeitsprobenEndpoints
                 return;
             }
 
-            if (koerper.DueAt is not { } frist)
+            if (koerper.DueAt is not { } deadline)
             {
                 await Unbrauchbar(context, "due_at is required");
                 return;
             }
 
-            var vorgang = await mediator.Send(
-                new AufgabeStellenBefehl(
+            var caseItem = await mediator.Send(
+                new SetTaskCommand(
                     new SubjectId(koerper.SubjectId),
-                    firma,
+                    company,
                     koerper.Title,
                     koerper.Task,
                     stunden,
-                    frist),
+                    deadline),
                 cancellationToken);
 
             context.Response.StatusCode = StatusCodes.Status201Created;
 
-            await context.Response.WriteAsJsonAsync(Sicht(vorgang, context), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Sicht(caseItem, context), cancellationToken);
         });
 
         proben.MapGet("/", async (
@@ -107,32 +107,32 @@ public static class ArbeitsprobenEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (Firma(akteur) is not { } firma)
+            if (Firma(akteur) is not { } company)
             {
                 await OhneFirma(akteur, context);
                 return;
             }
 
             var unsere = await mediator.Send(
-                new FirmenvorgaengeAbfrage(firma), cancellationToken);
+                new CompanyCasesQuery(company), cancellationToken);
 
-            // Keine Gesamtzahl (ADR-0026): sie verriete ueber die Differenz zur
+            // None Gesamtzahl (ADR-0026): sie verriete ueber die Differenz zur
             // Laenge, wie viele Menschen dem Unternehmen die Sicht entzogen
             // haben.
             await context.Response.WriteAsJsonAsync(
-                new VorgangslisteV1([.. unsere.Select(vorgang => Sicht(vorgang, context))]),
+                new CaseListV1([.. unsere.Select(caseItem => Sicht(caseItem, context))]),
                 cancellationToken);
         });
 
         proben.MapPost("/{id:guid}/evaluation", async (
             Guid id,
-            BewertenV1? koerper,
+            EvaluateV1? koerper,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (Firma(akteur) is not { } firma)
+            if (Firma(akteur) is not { } company)
             {
                 await OhneFirma(akteur, context);
                 return;
@@ -147,10 +147,10 @@ public static class ArbeitsprobenEndpoints
             // Der Text ist Pflicht — auch bei einer Absage. Geprueft wird das im
             // Aggregat, damit es kein Handler und kein zweiter Endpunkt umgehen
             // kann; hier faellt es als 422 heraus (ADR-0042 §2).
-            var vorgang = await mediator.Send(
-                new BewertenBefehl(id, firma, ausgang, koerper?.Text), cancellationToken);
+            var caseItem = await mediator.Send(
+                new EvaluateCommand(id, company, ausgang, koerper?.Text), cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(Sicht(vorgang, context), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Sicht(caseItem, context), cancellationToken);
         });
     }
 
@@ -179,16 +179,16 @@ public static class ArbeitsprobenEndpoints
             // der Beurteilte nicht liest, ist genau das, was hier nicht gebaut
             // wird (ADR-0042 §2).
             var meine = await mediator.Send(
-                new MeineVorgaengeAbfrage(handelnder.Subject), cancellationToken);
+                new MyCasesQuery(handelnder.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                new VorgangslisteV1([.. meine.Select(vorgang => Sicht(vorgang, context))]),
+                new CaseListV1([.. meine.Select(caseItem => Sicht(caseItem, context))]),
                 cancellationToken);
         });
 
         proben.MapPost("/{id:guid}/submission", async (
             Guid id,
-            EinreichenV1? koerper,
+            SubmitV1? koerper,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -200,11 +200,11 @@ public static class ArbeitsprobenEndpoints
                 return;
             }
 
-            var vorgang = await mediator.Send(
-                new EinreichenBefehl(id, handelnder.Subject, koerper?.Text, koerper?.Url),
+            var caseItem = await mediator.Send(
+                new SubmitCommand(id, handelnder.Subject, koerper?.Text, koerper?.Url),
                 cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(Sicht(vorgang, context), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Sicht(caseItem, context), cancellationToken);
         });
     }
 
@@ -217,14 +217,14 @@ public static class ArbeitsprobenEndpoints
         /*
          * EINE Route für beide Seiten, und das ist kein Sparen an Zeilen.
          *
-         * „Die Person sieht die Bewertung" (ADR-0042 §2) ist hier keine Regel,
+         * „Die Person sieht die Evaluation" (ADR-0042 §2) ist hier keine Regel,
          * sondern ein Bau: es gibt keine Firmensicht neben einer Personensicht,
-         * weil es nur einen Endpunkt gibt, der einen Vorgang herausgibt — und
+         * weil es nur einen Endpunkt gibt, der einen Case herausgibt — und
          * er baut sein Dokument mit derselben Methode. Zwei Sichten wären die
-         * Stelle, an der die beiden auseinanderlaufen, und zwar erst Monate
+         * Job, an der die beiden auseinanderlaufen, und zwar erst Monate
          * später, beim nächsten Feld.
          *
-         * Ein Test vergleicht die zwei Antworten Byte für Byte.
+         * Ein Test vergleicht die zwei Responses Byte für Byte.
          */
         proben.MapGet("/{id:guid}", async (
             Guid id,
@@ -239,51 +239,51 @@ public static class ArbeitsprobenEndpoints
                 return;
             }
 
-            var vorgang = await mediator.Send(
-                new VorgangAbfrage(id, handelnder.Subject, Firma(akteur)), cancellationToken);
+            var caseItem = await mediator.Send(
+                new CaseQuery(id, handelnder.Subject, Firma(akteur)), cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(Sicht(vorgang, context), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Sicht(caseItem, context), cancellationToken);
         });
     }
 
     // -----------------------------------------------------------------------
 
-    /// <summary>Das Unternehmen aus dem Token — nie aus der Anfrage.</summary>
+    /// <summary>Das Unternehmen aus dem Token — nie aus der ResumeRequest.</summary>
     /// <remarks>
     /// Der Mandant kommt aus dem geprüften Token (ADR-0017/0018). Ihn aus einem
-    /// Kopf oder einem Feld zu nehmen hiesse, den Aufrufer entscheiden zu
+    /// Header oder einem Feld zu nehmen hiesse, den Aufrufer entscheiden zu
     /// lassen, in wessen Namen er spricht.
     /// </remarks>
     private static TenantId? Firma(ICurrentPrincipal akteur) =>
-        akteur.Current?.Acting is Capacity.ForCompany firma ? firma.Tenant : null;
+        akteur.Current?.Acting is Capacity.ForCompany company ? company.Tenant : null;
 
-    /// <summary>Der eine Weg von einem Vorgang zu dem, was auf der Leitung steht.</summary>
+    /// <summary>Der eine Weg von einem Case zu dem, was auf der Leitung steht.</summary>
     /// <remarks>
     /// Die Uhr kommt aus dem Container und nicht aus <c>DateTimeOffset.UtcNow</c>,
     /// damit ein Test eine Frist verstreichen lassen kann, ohne zu warten.
     /// </remarks>
-    private static VorgangV1 Sicht(Vorgang vorgang, HttpContext context)
+    private static CaseV1 Sicht(Case caseItem, HttpContext context)
     {
         var uhr = context.RequestServices.GetRequiredService<TimeProvider>();
 
-        return new VorgangV1(
-            vorgang.Id,
-            vorgang.Wer.Value,
-            vorgang.Firma.Value,
-            vorgang.Aufgabe.Titel,
-            vorgang.Aufgabe.Text,
-            vorgang.Aufgabe.Stunden,
-            vorgang.Aufgabe.Frist,
-            Woerter.Wort(vorgang.Stand_am(uhr.GetUtcNow())),
-            vorgang.GestelltAm,
-            vorgang.GeaendertAm)
+        return new CaseV1(
+            caseItem.Id,
+            caseItem.Wer.Value,
+            caseItem.Firma.Value,
+            caseItem.Aufgabe.Titel,
+            caseItem.Aufgabe.Text,
+            caseItem.Aufgabe.Stunden,
+            caseItem.Aufgabe.Frist,
+            Woerter.Wort(caseItem.Stand_am(uhr.GetUtcNow())),
+            caseItem.GestelltAm,
+            caseItem.GeaendertAm)
         {
-            Submission = vorgang.Einreichung is { } einreichung
-                ? new EinreichungV1(einreichung.Text, einreichung.Adresse, einreichung.Am)
+            Submission = caseItem.Submission is { } submission
+                ? new SubmissionV1(submission.Text, submission.Adresse, submission.Am)
                 : null,
-            Evaluation = vorgang.Bewertung is { } bewertung
-                ? new BewertungV1(
-                    Woerter.Wort(bewertung.Ausgang), bewertung.Text, bewertung.Am)
+            Evaluation = caseItem.Evaluation is { } evaluation
+                ? new EvaluationV1(
+                    Woerter.Wort(evaluation.Ausgang), evaluation.Text, evaluation.Am)
                 : null
         };
     }
@@ -293,16 +293,16 @@ public static class ArbeitsprobenEndpoints
             ? NichtAngemeldet(context)
             // 403 ist eine Aussage ueber den Aufrufer und verraet nichts ueber
             // den Menschen, nach dem er fragt.
-            : ProblemDetailsMiddleware.Schreibe(
+            : ProblemDetailsMiddleware.Write(
                 context, StatusCodes.Status403Forbidden,
                 "Request failed", "no active company");
 
     private static Task NichtAngemeldet(HttpContext context) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
 
     private static Task Unbrauchbar(HttpContext context, string detail) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status422UnprocessableEntity, "Request failed", detail);
 
     /// <summary>
@@ -312,54 +312,54 @@ public static class ArbeitsprobenEndpoints
     /// <strong>Nicht <c>null</c>.</strong> Ein Filter, der <c>null</c>
     /// zurückgibt, lässt das Rahmenwerk noch einmal schreiben — JSON-<c>null</c>
     /// samt Kopfzeilen, und die stehen zu diesem Zeitpunkt schon. Bei einer
-    /// Anfrage mit Rumpf reisst dann die Verbindung.
+    /// ResumeRequest mit Rumpf reisst dann die Connection.
     /// </remarks>
     private static readonly IResult Geschrieben = Results.Empty;
 
     private static async ValueTask<object?> Abfangen(
-        EndpointFilterInvocationContext aufruf, EndpointFilterDelegate weiter)
+        EndpointFilterInvocationContext call, EndpointFilterDelegate weiter)
     {
         try
         {
-            return await weiter(aufruf);
+            return await weiter(call);
         }
-        catch (KeinVorgang fehler)
+        catch (NoCase error)
         {
             // VIER Lagen, EINE Antwort: gibt es nicht; gehoert jemand anderem;
             // gehoert einem anderen Unternehmen; nichts (mehr) freigegeben. Ein
             // eigener Code fuer die letzte waere der „gesperrt"-Hinweis, der
             // verraet, dass es etwas gibt (ADR-0020 §1).
-            await Schreibe(aufruf, StatusCodes.Status404NotFound, fehler.Message);
+            await Write(call, StatusCodes.Status404NotFound, error.Message);
 
             return Geschrieben;
         }
-        catch (Eingabefehler fehler)
+        catch (Eingabefehler error)
         {
-            await Schreibe(aufruf, StatusCodes.Status422UnprocessableEntity, fehler.Message);
+            await Write(call, StatusCodes.Status422UnprocessableEntity, error.Message);
 
             return Geschrieben;
         }
-        catch (SchrittNichtMoeglich fehler)
+        catch (SchrittNichtMoeglich error)
         {
-            // 409 und nicht 422: die Eingabe war in Ordnung, der Vorgang steht
+            // 409 und nicht 422: die Eingabe war in Ordnung, der Case steht
             // nur woanders.
-            await Schreibe(aufruf, StatusCodes.Status409Conflict, fehler.Message);
+            await Write(call, StatusCodes.Status409Conflict, error.Message);
 
             return Geschrieben;
         }
-        catch (EinwilligungSchweigt fehler)
+        catch (ConsentGateSilent error)
         {
             // Ausdruecklich kein 404 und keine leere Liste: beides waere eine
             // Aussage ueber einen Menschen, die aus unserem Ausfall stammt
             // (ADR-0020 §3).
-            await Schreibe(aufruf, StatusCodes.Status503ServiceUnavailable, fehler.Message);
+            await Write(call, StatusCodes.Status503ServiceUnavailable, error.Message);
 
             return Geschrieben;
         }
     }
 
-    private static Task Schreibe(
-        EndpointFilterInvocationContext aufruf, int status, string detail) =>
-        ProblemDetailsMiddleware.Schreibe(
-            aufruf.HttpContext, status, "Request failed", detail);
+    private static Task Write(
+        EndpointFilterInvocationContext call, int status, string detail) =>
+        ProblemDetailsMiddleware.Write(
+            call.HttpContext, status, "Request failed", detail);
 }

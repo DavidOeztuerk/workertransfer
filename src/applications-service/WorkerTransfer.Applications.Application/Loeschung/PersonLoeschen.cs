@@ -3,7 +3,7 @@ using MediatR;
 using WorkerTransfer.Applications.Application.Nachrichten;
 using WorkerTransfer.Applications.Application.Ports;
 
-namespace WorkerTransfer.Applications.Application.Loeschung;
+namespace WorkerTransfer.Applications.Application.Erasure;
 
 /// <summary>Der Löschbefehl von identity-service (ADR-0027 §4).</summary>
 /// <remarks>
@@ -12,23 +12,23 @@ namespace WorkerTransfer.Applications.Application.Loeschung;
 /// Rechtfertigung von jemandem zu verlangen, der gehen will, ein Hebel gegen
 /// ihn ist.
 /// </remarks>
-public sealed record PersonLoeschenBefehl(SubjectId Wer) : IBefehl<int>;
+public sealed record ErasePersonCommand(SubjectId Wer) : IBefehl<int>;
 
 /// <summary>Löscht und sagt, was stehen blieb.</summary>
 /// <remarks>
-/// Die einzige Stelle, an der die Konstante gelesen wird. Ausgesetzt ist nicht
+/// Die einzige Job, an der die Konstante gelesen wird. Ausgesetzt ist nicht
 /// übersprungen: bleibt etwas stehen, soll der Ursprung es erfahren, statt es
 /// zu vermuten (ADR-0027 §3.4).
 /// </remarks>
-public sealed class PersonLoeschenHandler(ILoeschbestand bestand)
-    : IRequestHandler<PersonLoeschenBefehl, int>
+public sealed class ErasePersonHandler(IErasureLedger bestand)
+    : IRequestHandler<ErasePersonCommand, int>
 {
     /// <inheritdoc />
-    public Task<int> Handle(PersonLoeschenBefehl request, CancellationToken cancellationToken)
+    public Task<int> Handle(ErasePersonCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return bestand.LoescheAsync(
-            request.Wer, Aufbewahrung.EingestellteBehalten, cancellationToken);
+        return bestand.DeleteAsync(
+            request.Wer, Retention.EingestellteBehalten, cancellationToken);
     }
 }

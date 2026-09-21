@@ -78,16 +78,16 @@ public class TokenformAmDrahtTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Singleton<IVersender>(_versand)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Singleton<IVersender>(_versand)));
         });
 
-        using var bereich = _dienst.Services.CreateScope();
-        await bereich.ServiceProvider.GetRequiredService<IdentityDbContext>()
+        using var scope = _dienst.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IdentityDbContext>()
             .Database.MigrateAsync();
     }
 
@@ -140,7 +140,7 @@ public class TokenformAmDrahtTests(Postgres postgres) : IAsyncLifetime
         gewechselt.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // FÜR EINE FIRMA: genau EINER kommt dazu. Nicht `tenant_id`, nicht
-        // `roles` — die Mitgliedschaft entscheidet je Anfrage (ADR-0018).
+        // `roles` — die Membership entscheidet je ResumeRequest (ADR-0018).
         Ansprueche(gewechselt).Should().BeEquivalentTo([.. AlsPerson, "tenant"]);
     }
 
@@ -177,28 +177,28 @@ public class TokenformAmDrahtTests(Postgres postgres) : IAsyncLifetime
         var angemeldet = await browser.PostAsJsonAsync(
             "/auth/login", new { email, password = Passwort });
 
-        var rumpf = await angemeldet.Content.ReadAsStringAsync();
+        var body = await angemeldet.Content.ReadAsStringAsync();
 
-        rumpf.Should().NotContain("access_token");
-        rumpf.Should().NotContain(Keks(angemeldet));
+        body.Should().NotContain("access_token");
+        body.Should().NotContain(Keks(angemeldet));
     }
 
     /// <summary>Die Anspruchsnamen aus dem <c>access</c>-Keks der Antwort.</summary>
-    private static IEnumerable<string> Ansprueche(HttpResponseMessage antwort)
+    private static IEnumerable<string> Ansprueche(HttpResponseMessage response)
     {
-        var rumpf = Keks(antwort).Split('.')[1];
+        var body = Keks(response).Split('.')[1];
 
         return JsonDocument
             .Parse(Convert.FromBase64String(
-                rumpf.Replace('-', '+').Replace('_', '/')
-                    .PadRight(rumpf.Length + ((4 - (rumpf.Length % 4)) % 4), '=')))
-            .RootElement.EnumerateObject().Select(feld => feld.Name);
+                body.Replace('-', '+').Replace('_', '/')
+                    .PadRight(body.Length + ((4 - (body.Length % 4)) % 4), '=')))
+            .RootElement.EnumerateObject().Select(field => field.Name);
     }
 
     /// <summary>Das Token, gelesen wie ein Browser es bekommt.</summary>
-    private static string Keks(HttpResponseMessage antwort)
+    private static string Keks(HttpResponseMessage response)
     {
-        antwort.Headers.TryGetValues("Set-Cookie", out var kekse).Should().BeTrue(
+        response.Headers.TryGetValues("Set-Cookie", out var kekse).Should().BeTrue(
             "das Token verlässt den Dienst ausschliesslich als Keks");
 
         var zugriff = kekse!.FirstOrDefault(k =>

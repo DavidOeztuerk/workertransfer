@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Noelia.Core.Identity;
-using WorkerTransfer.Companies.Domain.Arbeitgeberprofile;
+using WorkerTransfer.Companies.Domain.EmployerProfiles;
 
 namespace WorkerTransfer.Companies.Tests;
 
@@ -9,7 +9,7 @@ namespace WorkerTransfer.Companies.Tests;
 /// Diese Reihe gibt es, weil eine Gegenprobe eine Lücke gezeigt hat: die
 /// Reihenfolge „erst vollständig prüfen, dann schreiben" ließ sich über HTTP
 /// nicht widerlegen. Der Speicher gibt gelesene Zeilen als <em>neues</em>
-/// Aggregat zurück und schreibt nur über <c>SichereAsync</c>, das nach einer
+/// Aggregat zurück und schreibt nur über <c>SaveAsync</c>, das nach einer
 /// Ausnahme gar nicht mehr aufgerufen wird — die halb geänderte Instanz wird
 /// einfach verworfen. Die Regel schützt also den, der das Aggregat über den
 /// Fehlschlag hinaus in der Hand behält, und genau dort muss sie geprüft
@@ -17,8 +17,8 @@ namespace WorkerTransfer.Companies.Tests;
 /// </remarks>
 public class ProfilregelnTests
 {
-    private static Arbeitgeberprofil Profil() =>
-        Arbeitgeberprofil.Lege_an(
+    private static EmployerProfile Profile() =>
+        EmployerProfile.Lege_an(
             new TenantId(Guid.CreateVersion7()),
             "muster",
             "Erste Fassung",
@@ -35,20 +35,20 @@ public class ProfilregelnTests
     [Fact]
     public void Eine_abgewiesene_Aenderung_laesst_das_Aggregat_unberuehrt()
     {
-        var profil = Profil();
+        var profile = Profile();
 
-        var versuch = () => profil.Aendere(
+        var attempt = () => profile.Aendere(
             "Zweite Fassung", "Ganz anders.", "ftp://muster.example",
             ["Hamburg"], ["Dienstrad"], DateTimeOffset.UnixEpoch.AddDays(1));
 
-        versuch.Should().Throw<Linkfehler>();
+        attempt.Should().Throw<Linkfehler>();
 
-        profil.Anzeigename.Should().Be("Erste Fassung");
-        profil.UeberUns.Should().Be("Über uns.");
-        profil.Netzseite.Should().Be("https://muster.example");
-        profil.Orte.Should().Equal("Berlin");
-        profil.Leistungen.Should().Equal("Homeoffice");
-        profil.GeaendertAm.Should().Be(DateTimeOffset.UnixEpoch);
+        profile.Anzeigename.Should().Be("Erste Fassung");
+        profile.UeberUns.Should().Be("Über uns.");
+        profile.Netzseite.Should().Be("https://muster.example");
+        profile.Orte.Should().Equal("Berlin");
+        profile.Leistungen.Should().Equal("Homeoffice");
+        profile.GeaendertAm.Should().Be(DateTimeOffset.UnixEpoch);
     }
 
     /// <summary>Das Kürzel hat keinen Weg, sich zu ändern.</summary>
@@ -60,8 +60,8 @@ public class ProfilregelnTests
     [Fact]
     public void Das_Kuerzel_hat_keinen_Setzer()
     {
-        typeof(Arbeitgeberprofil)
-            .GetProperty(nameof(Arbeitgeberprofil.Kuerzel))!
+        typeof(EmployerProfile)
+            .GetProperty(nameof(EmployerProfile.Slug))!
             .CanWrite.Should().BeFalse();
     }
 
@@ -70,12 +70,12 @@ public class ProfilregelnTests
     [InlineData("Grün & Söhne GmbH", "grun-sohne-gmbh")]
     [InlineData("  Führende   Technik  ", "fuhrende-technik")]
     [InlineData("ACME", "acme")]
-    [InlineData("株式会社", Kuerzel.Rueckfall)]
-    [InlineData("", Kuerzel.Rueckfall)]
-    [InlineData("---", Kuerzel.Rueckfall)]
+    [InlineData("株式会社", Slug.Rueckfall)]
+    [InlineData("", Slug.Rueckfall)]
+    [InlineData("---", Slug.Rueckfall)]
     public void Aus_dem_Namen_wird_ein_Kuerzel(string name, string erwartet)
     {
-        Kuerzel.Aus(name).Should().Be(erwartet);
+        Slug.Aus(name).Should().Be(erwartet);
     }
 
     /// <summary>Ein Kürzel endet nie auf einem Trennstrich.</summary>
@@ -88,10 +88,10 @@ public class ProfilregelnTests
     {
         var sehrLang = string.Join(" ", Enumerable.Repeat("wort", 40));
 
-        var kuerzel = Kuerzel.Aus(sehrLang);
+        var slug = Slug.Aus(sehrLang);
 
-        kuerzel.Length.Should().BeLessThanOrEqualTo(Kuerzel.Hoechstlaenge);
-        kuerzel.Should().NotEndWith("-");
-        kuerzel.Should().NotStartWith("-");
+        slug.Length.Should().BeLessThanOrEqualTo(Slug.Hoechstlaenge);
+        slug.Should().NotEndWith("-");
+        slug.Should().NotStartWith("-");
     }
 }

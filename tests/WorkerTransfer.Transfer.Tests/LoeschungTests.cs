@@ -9,10 +9,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Outbox;
-using WorkerTransfer.Transfer.Application.Loeschung;
+using WorkerTransfer.Transfer.Application.Erasure;
 using WorkerTransfer.Transfer.Application.Ports;
 using WorkerTransfer.Transfer.Domain.Vorgaenge;
-using WorkerTransfer.Transfer.Infrastructure.Loeschung;
+using WorkerTransfer.Transfer.Infrastructure.Erasure;
 using WorkerTransfer.Transfer.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
@@ -33,15 +33,15 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:transfer", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor, Probeledger>());
-                dienste.Replace(ServiceDescriptor.Scoped<IZustellung, Probezustellung>());
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate, Probeledger>());
+                services.Replace(ServiceDescriptor.Scoped<IDelivery, Probezustellung>());
             });
         });
 
@@ -57,13 +57,13 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     /// <summary><strong>Die zweite tragende Zusage des Systems.</strong></summary>
     /// <remarks>
     /// Ein Betrag, auf den sich zwei Unternehmen geeinigt haben, macht die
-    /// Zeile nicht zur Unterlage eines Vermittlers: die Plattform führt kein
+    /// Zeile nicht zur DocumentRecord eines Vermittlers: die Plattform führt kein
     /// Geld. Fällt dieser Test, ist die Voreinstellung gekippt.
     /// </remarks>
     [Fact]
     public void Der_Schalter_steht_auf_aus()
     {
-        Aufbewahrung.BezahlteBehalten.Should().BeFalse();
+        Retention.BezahlteBehalten.Should().BeFalse();
     }
 
     /// <summary>
@@ -71,14 +71,14 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     /// gehören <em>nicht</em> dazu.
     /// </summary>
     /// <remarks>
-    /// Ein abgesagter Vorgang begründet nichts. Diese Liste ist deshalb
+    /// Ein abgesagter Case begründet nichts. Diese Liste ist deshalb
     /// bewusst nicht die Endzustandsmenge des Aggregats.
     /// </remarks>
     [Fact]
     public void Abgeschlossen_heisst_accepted_oder_completed()
     {
-        Aufbewahrung.Abgeschlossene.Should().Equal(
-            Transferstand.Accepted, Transferstand.Completed);
+        Retention.Abgeschlossene.Should().Equal(
+            TransferState.Accepted, TransferState.Completed);
     }
 
     /// <summary>„Erledigt" heißt erledigt — auch der bezahlte Transfer.</summary>
@@ -86,22 +86,22 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     public async Task Die_Voreinstellung_loescht_auch_den_bezahlten_Transfer()
     {
         var anna = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
-        var bezahlt = await Vorgang(anna, firma, "completed", gebuehr: 500_000);
-        var laufend = await Vorgang(anna, Guid.CreateVersion7(), "talking");
+        var company = Guid.CreateVersion7();
+        var bezahlt = await Case(anna, company, "completed", gebuehr: 500_000);
+        var laufend = await Case(anna, Guid.CreateVersion7(), "talking");
         await Status(anna);
 
-        var antwort = await Loesche(anna);
+        var response = await Loesche(anna);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var quittung = JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+        var quittung = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
         quittung.GetProperty("retained").GetInt32().Should().Be(0);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Vorgaenge.AnyAsync(zeile => zeile.Id == bezahlt)).Should().BeFalse();
-        (await kontext.Vorgaenge.AnyAsync(zeile => zeile.Id == laufend)).Should().BeFalse();
-        (await kontext.Marktstatus.AnyAsync(zeile => zeile.Id == anna)).Should().BeFalse();
+        await using var context = postgres.Kontext();
+        (await context.Vorgaenge.AnyAsync(row => row.Id == bezahlt)).Should().BeFalse();
+        (await context.Vorgaenge.AnyAsync(row => row.Id == laufend)).Should().BeFalse();
+        (await context.MarketStatus.AnyAsync(row => row.Id == anna)).Should().BeFalse();
     }
 
     /// <summary>
@@ -109,7 +109,7 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     /// ab: ein abgeschlossener Handel <em>mit</em> Vergütung.
     /// </summary>
     /// <remarks>
-    /// Keine Ausdehnung auf <c>interested</c>/<c>talking</c>/<c>offered</c> —
+    /// None Ausdehnung auf <c>interested</c>/<c>talking</c>/<c>offered</c> —
     /// ein Gespräch ist kein Vertrag — und ohne Vergütung ist kein
     /// Handelsvorgang entstanden, an dem etwas hängen könnte.
     /// </remarks>
@@ -117,27 +117,27 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     public async Task Der_umgelegte_Schalter_deckt_genau_den_bezahlten_Abschluss_ab()
     {
         var anna = Guid.CreateVersion7();
-        var abgeschlossenBezahlt = await Vorgang(
+        var abgeschlossenBezahlt = await Case(
             anna, Guid.CreateVersion7(), "completed", gebuehr: 500_000);
-        var angenommenBezahlt = await Vorgang(
+        var angenommenBezahlt = await Case(
             anna, Guid.CreateVersion7(), "accepted", gebuehr: 1);
-        var abgeschlossenUnbezahlt = await Vorgang(anna, Guid.CreateVersion7(), "completed");
-        var angebotBezahlt = await Vorgang(
+        var abgeschlossenUnbezahlt = await Case(anna, Guid.CreateVersion7(), "completed");
+        var angebotBezahlt = await Case(
             anna, Guid.CreateVersion7(), "offered", gebuehr: 500_000);
-        var abgesagtBezahlt = await Vorgang(
+        var abgesagtBezahlt = await Case(
             anna, Guid.CreateVersion7(), "declined", gebuehr: 500_000);
 
-        await using var kontext = postgres.Kontext();
-        var bestand = new EfLoeschbestand(kontext);
+        await using var context = postgres.Kontext();
+        var bestand = new EfErasureLedger(context);
 
-        var behalten = await bestand.LoescheAsync(
+        var behalten = await bestand.DeleteAsync(
             new SubjectId(anna), bezahlteBehalten: true);
 
         behalten.Should().Be(2);
 
-        var uebrig = await kontext.Vorgaenge
-            .Where(zeile => zeile.SubjectId == anna)
-            .Select(zeile => zeile.Id)
+        var uebrig = await context.Vorgaenge
+            .Where(row => row.SubjectId == anna)
+            .Select(row => row.Id)
             .ToListAsync();
 
         uebrig.Should().BeEquivalentTo([abgeschlossenBezahlt, angenommenBezahlt]);
@@ -158,16 +158,16 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     public async Task Gefragt_worden_faellt_gefragt_haben_bleibt_ohne_Namen()
     {
         var recruiter = Guid.CreateVersion7();
-        var ueberIhn = await Anfrage(recruiter, Guid.CreateVersion7(), Guid.CreateVersion7());
-        var vonIhm = await Anfrage(Guid.CreateVersion7(), Guid.CreateVersion7(), recruiter);
+        var ueberIhn = await ResumeRequest(recruiter, Guid.CreateVersion7(), Guid.CreateVersion7());
+        var vonIhm = await ResumeRequest(Guid.CreateVersion7(), Guid.CreateVersion7(), recruiter);
 
         await Loesche(recruiter);
 
-        await using var kontext = postgres.Kontext();
+        await using var context = postgres.Kontext();
 
-        (await kontext.Anfragen.AnyAsync(zeile => zeile.Id == ueberIhn)).Should().BeFalse();
+        (await context.Anfragen.AnyAsync(row => row.Id == ueberIhn)).Should().BeFalse();
 
-        var geblieben = await kontext.Anfragen.SingleAsync(zeile => zeile.Id == vonIhm);
+        var geblieben = await context.Anfragen.SingleAsync(row => row.Id == vonIhm);
         geblieben.RequestedBy.Should().BeNull("der Vorgang gehört dem Unternehmen");
     }
 
@@ -179,7 +179,7 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
 
         await using (var vorher = postgres.Kontext())
         {
-            vorher.Set<OutboxZeile>().Add(new OutboxZeile
+            vorher.Set<OutboxRow>().Add(new OutboxRow
             {
                 Id = Guid.CreateVersion7(),
                 UserId = anna,
@@ -193,7 +193,7 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         await Loesche(anna);
 
         await using var nachher = postgres.Kontext();
-        (await nachher.Set<OutboxZeile>().AnyAsync(zeile => zeile.UserId == anna))
+        (await nachher.Set<OutboxRow>().AnyAsync(row => row.UserId == anna))
             .Should().BeFalse();
     }
 
@@ -205,13 +205,13 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         var jemand = Guid.CreateVersion7();
         await Status(anna);
         await Status(jemand);
-        var fremder = await Vorgang(jemand, Guid.CreateVersion7(), "talking");
+        var fremder = await Case(jemand, Guid.CreateVersion7(), "talking");
 
         await Loesche(anna);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Marktstatus.AnyAsync(zeile => zeile.Id == jemand)).Should().BeTrue();
-        (await kontext.Vorgaenge.AnyAsync(zeile => zeile.Id == fremder)).Should().BeTrue();
+        await using var context = postgres.Kontext();
+        (await context.MarketStatus.AnyAsync(row => row.Id == jemand)).Should().BeTrue();
+        (await context.Vorgaenge.AnyAsync(row => row.Id == fremder)).Should().BeTrue();
     }
 
     /// <summary>Ohne das Geheimnis passiert nichts.</summary>
@@ -224,12 +224,12 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", "geraten");
 
-        var antwort = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
+        var response = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Marktstatus.AnyAsync(zeile => zeile.Id == anna)).Should().BeTrue();
+        await using var context = postgres.Kontext();
+        (await context.MarketStatus.AnyAsync(row => row.Id == anna)).Should().BeTrue();
     }
 
     /// <summary>Ein zweiter Aufruf ist kein Fehlschlag.</summary>
@@ -247,76 +247,76 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         (await Loesche(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    private Task<HttpResponseMessage> Loesche(Guid wer)
+    private Task<HttpResponseMessage> Loesche(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", Loeschgeheimnis);
-        return browser.PostAsJsonAsync("/erasure", new { user_id = wer });
+        return browser.PostAsJsonAsync("/erasure", new { user_id = subject });
     }
 
-    private async Task Status(Guid wer)
+    private async Task Status(Guid subject)
     {
-        await using var kontext = postgres.Kontext();
-        var jetzt = DateTime.UtcNow;
+        await using var context = postgres.Kontext();
+        var now = DateTime.UtcNow;
 
-        kontext.Marktstatus.Add(new MarktZeile
+        context.MarketStatus.Add(new MarketRow
         {
-            Id = wer,
+            Id = subject,
             Availability = "listening",
             Employed = false,
             Note = "Nur Remote.",
-            CreatedAt = jetzt,
-            UpdatedAt = jetzt
+            CreatedAt = now,
+            UpdatedAt = now
         });
 
-        await kontext.SaveChangesAsync();
+        await context.SaveChangesAsync();
     }
 
-    /// <summary>Legt einen Vorgang in einem bestimmten Stand an.</summary>
+    /// <summary>Legt einen Case in einem bestimmten State an.</summary>
     /// <remarks>
     /// Direkt in die Tabelle: einen bezahlten Abschluss über die Routen zu
     /// erreichen kostet fünf Aufrufe und prüft hier nichts, was nicht anderswo
     /// schon geprüft ist.
     /// </remarks>
-    private async Task<Guid> Vorgang(Guid wer, Guid firma, string stand, long? gebuehr = null)
+    private async Task<Guid> Case(Guid subject, Guid company, string state, long? gebuehr = null)
     {
-        await using var kontext = postgres.Kontext();
-        var jetzt = DateTime.UtcNow;
-        var zeile = new VorgangsZeile
+        await using var context = postgres.Kontext();
+        var now = DateTime.UtcNow;
+        var row = new CaseRow
         {
             Id = Guid.CreateVersion7(),
-            SubjectId = wer,
-            TenantId = firma,
-            Status = stand,
+            SubjectId = subject,
+            TenantId = company,
+            Status = state,
             Message = "Wir hätten da etwas.",
             OfferNote = gebuehr is null ? string.Empty : "Angebot.",
             OfferFeeCents = gebuehr,
-            CreatedAt = jetzt,
-            UpdatedAt = jetzt
+            CreatedAt = now,
+            UpdatedAt = now
         };
 
-        kontext.Vorgaenge.Add(zeile);
-        await kontext.SaveChangesAsync();
+        context.Vorgaenge.Add(row);
+        await context.SaveChangesAsync();
 
-        return zeile.Id;
+        return row.Id;
     }
 
-    private async Task<Guid> Anfrage(Guid ueberWen, Guid firma, Guid frager)
+    private async Task<Guid> ResumeRequest(Guid ueberWen, Guid company, Guid frager)
     {
-        await using var kontext = postgres.Kontext();
-        var zeile = new AnfrageZeile
+        await using var context = postgres.Kontext();
+        var row = new RequestRow
         {
             Id = Guid.CreateVersion7(),
             SubjectId = ueberWen,
-            TenantId = firma,
+            TenantId = company,
             RequestedBy = frager,
             Status = "PENDING",
             CreatedAt = DateTime.UtcNow
         };
 
-        kontext.Anfragen.Add(zeile);
-        await kontext.SaveChangesAsync();
+        context.Anfragen.Add(row);
+        await context.SaveChangesAsync();
 
-        return zeile.Id;
+        return row.Id;
     }
 }

@@ -6,19 +6,19 @@ using WorkerTransfer.Identity.Domain.Users;
 namespace WorkerTransfer.Identity.Application.Registrierung;
 
 /// <summary>What creating a company produced.</summary>
-public abstract record Firmenergebnis
+public abstract record CompanyResult
 {
-    private Firmenergebnis() { }
+    private CompanyResult() { }
 
     /// <summary>Created, and the creator is its administrator.</summary>
-    public sealed record Angelegt(Company Firma) : Firmenergebnis;
+    public sealed record Angelegt(Company Firma) : CompanyResult;
 
     /// <summary>Refused, with a code the interface can act on.</summary>
     /// <param name="Code">
     /// <c>public_email_domain</c>, <c>domain_already_claimed</c>,
     /// <c>account_not_confirmed</c> or <c>invalid_company_name</c>.
     /// </param>
-    public sealed record Abgelehnt(string Code) : Firmenergebnis;
+    public sealed record Abgelehnt(string Code) : CompanyResult;
 }
 
 /// <summary>Creates a company whose domain is already proven.</summary>
@@ -34,7 +34,7 @@ public abstract record Firmenergebnis
 /// </para>
 /// </remarks>
 public sealed class UnternehmenAnlegen(
-    ICompanyRepository firmen,
+    ICompanyRepository companies,
     IMembershipRepository mitgliedschaften,
     IAuditTrail protokoll,
     IKorrelation korrelation,
@@ -52,7 +52,7 @@ public sealed class UnternehmenAnlegen(
     /// <em>row</em>, and the activation is still in the change tracker — so the
     /// company would be refused for an account that was just confirmed.
     /// </remarks>
-    public async Task<Firmenergebnis> AusfuehrenAsync(
+    public async Task<CompanyResult> ExecuteOneAsync(
         User konto,
         string name,
         CancellationToken cancellationToken = default)
@@ -62,34 +62,34 @@ public sealed class UnternehmenAnlegen(
         if (konto.Status != AccountStatus.Active)
         {
             // An unconfirmed address proves no domain.
-            return new Firmenergebnis.Abgelehnt("account_not_confirmed");
+            return new CompanyResult.Abgelehnt("account_not_confirmed");
         }
 
         var domain = EmailDomain.FromEmail(konto.Email);
 
-        if (await firmen.FindByDomainAsync(domain, cancellationToken) is not null)
+        if (await companies.FindByDomainAsync(domain, cancellationToken) is not null)
         {
-            return new Firmenergebnis.Abgelehnt("domain_already_claimed");
+            return new CompanyResult.Abgelehnt("domain_already_claimed");
         }
 
-        Company firma;
+        Company company;
 
         try
         {
-            firma = Company.Create(name, domain);
+            company = Company.Create(name, domain);
         }
         catch (PublicEmailDomainException)
         {
-            return new Firmenergebnis.Abgelehnt("public_email_domain");
+            return new CompanyResult.Abgelehnt("public_email_domain");
         }
         catch (InvalidCompanyNameException)
         {
-            return new Firmenergebnis.Abgelehnt("invalid_company_name");
+            return new CompanyResult.Abgelehnt("invalid_company_name");
         }
 
-        await firmen.AddAsync(firma, cancellationToken);
+        await companies.AddAsync(company, cancellationToken);
         await mitgliedschaften.AddAsync(
-            konto.Id, firma.Id, MembershipRole.Admin, cancellationToken);
+            konto.Id, company.Id, MembershipRole.Admin, cancellationToken);
 
         await protokoll.AppendAsync(
             new AuditEvent(
@@ -98,10 +98,10 @@ public sealed class UnternehmenAnlegen(
                 actor: konto.Id,
                 // Unlike a personal act, this entry carries a tenant: it is
                 // about a company (ADR-0017).
-                tenant: firma.Id,
+                tenant: company.Id,
                 correlationId: korrelation.Aktuell),
             cancellationToken);
 
-        return new Firmenergebnis.Angelegt(firma);
+        return new CompanyResult.Angelegt(company);
     }
 }

@@ -24,7 +24,7 @@ public sealed record RenewedSession(
 /// <summary>A sign-in that was ended.</summary>
 /// <param name="Session">Which sign-in it was.</param>
 /// <param name="Subject">Whose it was, from the stored record.</param>
-public sealed record BeendeteSitzung(SessionId Session, SubjectId Subject);
+public sealed record EndedSession(SessionId Session, SubjectId Subject);
 
 /// <summary>Beginning, carrying forward and ending a sign-in.</summary>
 /// <remarks>
@@ -62,7 +62,7 @@ public interface ISessionService
     /// Idempotent: a token that was never issued, already used or expired has
     /// no sign-in to end, and that is not an error.
     /// </remarks>
-    Task<BeendeteSitzung?> EndByRefreshTokenAsync(
+    Task<EndedSession?> EndByRefreshTokenAsync(
         string refreshToken,
         CancellationToken cancellationToken = default);
 }

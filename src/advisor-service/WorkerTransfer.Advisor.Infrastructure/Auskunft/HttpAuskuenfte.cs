@@ -9,10 +9,10 @@ using WorkerTransfer.Advisor.Application.Ports;
 namespace WorkerTransfer.Advisor.Infrastructure.Auskunft;
 
 /// <summary>Wo identity-service seine internen Türen hat.</summary>
-public sealed class Auskunftseinstellungen
+public sealed class LookupSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Identity";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Identity";
 
     /// <summary>Die Basisadresse von identity-service.</summary>
     /// <remarks>
@@ -34,12 +34,12 @@ public sealed class Auskunftseinstellungen
 }
 
 /// <summary>Was die interne Tür über ein Unternehmen sagt.</summary>
-internal sealed record FirmenantwortV1(
+internal sealed record CompanyResponseV1(
     [property: JsonPropertyName("name")] string? Name,
     [property: JsonPropertyName("domain")] string? Domain);
 
 /// <summary>Was sie über einen Menschen sagt.</summary>
-internal sealed record PersonenantwortV1(
+internal sealed record PersonResponseV1(
     [property: JsonPropertyName("name")] string? Name,
     [property: JsonPropertyName("email")] string? Email);
 
@@ -54,44 +54,44 @@ internal sealed record PersonenantwortV1(
 /// Aufrufer ist hier das <em>Unternehmen</em>, und es darf den Klarnamen eines
 /// Menschen nicht aus eigener Kraft abrufen können. Was es darf, entscheidet
 /// eine Zeile höher der Ledger — und deshalb ist diese Tür so eng: zwei Felder,
-/// keine Anschrift, kein Telefon.</para>
+/// keine PostalAddress, kein Telefon.</para>
 /// </remarks>
 public sealed class HttpAuskuenfte(
     IHttpClientFactory fabrik,
-    IOptions<Auskunftseinstellungen> einstellungen,
-    ILogger<HttpAuskuenfte> protokoll) : IFirmenauskunft, IPersonenauskunft
+    IOptions<LookupSettings> einstellungen,
+    ILogger<HttpAuskuenfte> protokoll) : ICompanyLookup, IPersonenauskunft
 {
     /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
     public const string Klient = "identity";
 
     private const string Geheimniskopf = "X-Notify-Secret";
 
-    private readonly Auskunftseinstellungen _einstellungen = einstellungen.Value;
+    private readonly LookupSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task<Firmenbild?> HoleAsync(
-        TenantId firma, CancellationToken cancellationToken = default)
+    public async Task<CompanyLogo?> GetAsync(
+        TenantId company, CancellationToken cancellationToken = default)
     {
-        var antwort = await LiesAsync<FirmenantwortV1>(
-            $"/internal/companies/{firma.Value}", cancellationToken);
+        var response = await LiesAsync<CompanyResponseV1>(
+            $"/internal/companies/{company.Value}", cancellationToken);
 
-        return antwort is null ? null : new Firmenbild(antwort.Name ?? string.Empty,
-            antwort.Domain ?? string.Empty);
+        return response is null ? null : new CompanyLogo(response.Name ?? string.Empty,
+            response.Domain ?? string.Empty);
     }
 
     /// <inheritdoc />
-    public async Task<Personenbild?> HoleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<Personenbild?> GetAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var antwort = await LiesAsync<PersonenantwortV1>(
-            $"/internal/account/{wer.Value}/identity", cancellationToken);
+        var response = await LiesAsync<PersonResponseV1>(
+            $"/internal/account/{subject.Value}/identity", cancellationToken);
 
-        return antwort is null ? null : new Personenbild(antwort.Name ?? string.Empty,
-            antwort.Email ?? string.Empty);
+        return response is null ? null : new Personenbild(response.Name ?? string.Empty,
+            response.Email ?? string.Empty);
     }
 
     /// <summary>Ein GET hinter dem Geheimnis. <c>null</c> heisst „gibt es nicht".</summary>
-    private async Task<T?> LiesAsync<T>(string pfad, CancellationToken cancellationToken)
+    private async Task<T?> LiesAsync<T>(string path, CancellationToken cancellationToken)
         where T : class
     {
         if (string.IsNullOrEmpty(_einstellungen.Adresse)
@@ -100,40 +100,40 @@ public sealed class HttpAuskuenfte(
             // Nicht eingerichtet ist ein SYSTEMzustand und keine Aussage ueber
             // einen Menschen. Still `null` zu antworten hiesse hier „diese Firma
             // gibt es nicht" — und ein Ausschluss griffe dann nie.
-            throw new AuskunftSchweigt("Identity:Adresse oder :Geheimnis ist nicht gesetzt.");
+            throw new LookupSilent("Identity:Adresse oder :Geheimnis ist nicht gesetzt.");
         }
 
         using var client = fabrik.CreateClient(Klient);
         client.Timeout = _einstellungen.Geduld;
 
-        using var anfrage = new HttpRequestMessage(
-            HttpMethod.Get, new Uri(new Uri(_einstellungen.Adresse), pfad));
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, new Uri(new Uri(_einstellungen.Adresse), path));
 
-        anfrage.Headers.Add(Geheimniskopf, _einstellungen.Geheimnis);
+        request.Headers.Add(Geheimniskopf, _einstellungen.Geheimnis);
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
             protokoll.LogWarning(
-                "identity-service ist nicht erreichbar: {Art}", fehler.GetType().Name);
+                "identity-service ist nicht erreichbar: {Art}", error.GetType().Name);
 
-            throw new AuskunftSchweigt("identity-service unreachable");
+            throw new LookupSilent("identity-service unreachable");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             protokoll.LogWarning("identity-service hat nicht rechtzeitig geantwortet.");
 
-            throw new AuskunftSchweigt("identity-service timed out");
+            throw new LookupSilent("identity-service timed out");
         }
 
-        using (antwort)
+        using (response)
         {
-            if (antwort.StatusCode == HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 // Die Tuer antwortet 404 auch dann, wenn das Geheimnis nicht
                 // passt — absichtlich, damit sie sich nicht ueber eine Methode
@@ -141,24 +141,24 @@ public sealed class HttpAuskuenfte(
                 return null;
             }
 
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
                 protokoll.LogWarning(
-                    "identity-service antwortete mit {Status}.", (int)antwort.StatusCode);
+                    "identity-service antwortete mit {Status}.", (int)response.StatusCode);
 
-                throw new AuskunftSchweigt(
-                    $"identity-service returned {(int)antwort.StatusCode}");
+                throw new LookupSilent(
+                    $"identity-service returned {(int)response.StatusCode}");
             }
 
             try
             {
-                return await antwort.Content.ReadFromJsonAsync<T>(cancellationToken);
+                return await response.Content.ReadFromJsonAsync<T>(cancellationToken);
             }
-            catch (Exception fehler) when (fehler is not AuskunftSchweigt)
+            catch (Exception error) when (error is not LookupSilent)
             {
                 protokoll.LogWarning("identity-service antwortete unverständlich.");
 
-                throw new AuskunftSchweigt("identity-service sent an unusable answer");
+                throw new LookupSilent("identity-service sent an unusable answer");
             }
         }
     }

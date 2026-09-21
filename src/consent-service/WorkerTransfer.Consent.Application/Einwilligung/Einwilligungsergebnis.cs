@@ -9,14 +9,14 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// The endpoint maps each to its status code, and the compiler asks about a
 /// fourth case if one ever appears.
 /// </remarks>
-public abstract record Einwilligungsergebnis
+public abstract record ConsentResult
 {
-    private Einwilligungsergebnis()
+    private ConsentResult()
     {
     }
 
     /// <summary>The fact was recorded; this is what now holds.</summary>
-    public sealed record Stand(ConsentState Zustand) : Einwilligungsergebnis;
+    public sealed record State(ConsentState Zustand) : ConsentResult;
 
     /// <summary>
     /// The caller tried to change somebody else's consent.
@@ -26,28 +26,28 @@ public abstract record Einwilligungsergebnis
     /// guardian consent is a later, deliberate decision rather than something
     /// allowed by omission (ADR-0013).
     /// </remarks>
-    public sealed record FremderGegenstand : Einwilligungsergebnis;
+    public sealed record ForeignSubject : ConsentResult;
 
     /// <summary>The capability or the reason does not read as one.</summary>
     /// <param name="Detail">
     /// Which of the two, in words a caller can act on — never the value they
     /// sent, which would put it in a log and a screenshot.
     /// </param>
-    public sealed record Unbrauchbar(string Detail) : Einwilligungsergebnis;
+    public sealed record Unbrauchbar(string Detail) : ConsentResult;
 }
 
 /// <summary>What a check produced.</summary>
-public abstract record Pruefergebnis
+public abstract record AuditResult
 {
-    private Pruefergebnis()
+    private AuditResult()
     {
     }
 
     /// <summary>What holds for the pair that was asked about.</summary>
-    public sealed record Stand(ConsentState Zustand) : Pruefergebnis;
+    public sealed record State(ConsentState Zustand) : AuditResult;
 
     /// <summary>The capability does not read as one.</summary>
-    public sealed record Unbrauchbar(string Detail) : Pruefergebnis;
+    public sealed record Unbrauchbar(string Detail) : AuditResult;
 }
 
 /// <summary>What a batch check produced.</summary>

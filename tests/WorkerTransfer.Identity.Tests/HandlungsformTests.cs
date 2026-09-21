@@ -15,8 +15,8 @@ public class HandlungsformTests(Postgres postgres) : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await using var kontext = Kontext();
-        await kontext.Database.MigrateAsync();
+        await using var context = Kontext();
+        await context.Database.MigrateAsync();
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -31,9 +31,9 @@ public class HandlungsformTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_unbekannte_Sitzung_handelt_fuer_sich_selbst()
     {
-        await using var kontext = Kontext();
+        await using var context = Kontext();
 
-        var form = await new EfSessionCapacity(kontext).RecallAsync(SessionId.New());
+        var form = await new EfSessionCapacity(context).RecallAsync(SessionId.New());
 
         form.Should().BeOfType<Capacity.AsSelf>();
     }
@@ -41,19 +41,19 @@ public class HandlungsformTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_gemerkte_Firma_kommt_wieder_heraus()
     {
-        var firma = TenantId.New();
+        var company = TenantId.New();
 
-        await using (var kontext = Kontext())
+        await using (var context = Kontext())
         {
-            await new EfSessionCapacity(kontext)
-                .RememberAsync(_sitzung, new Capacity.ForCompany(firma));
-            await kontext.SaveChangesAsync();
+            await new EfSessionCapacity(context)
+                .RememberAsync(_sitzung, new Capacity.ForCompany(company));
+            await context.SaveChangesAsync();
         }
 
         await using var gelesen = Kontext();
         var form = await new EfSessionCapacity(gelesen).RecallAsync(_sitzung);
 
-        form.Should().BeOfType<Capacity.ForCompany>().Which.Tenant.Should().Be(firma);
+        form.Should().BeOfType<Capacity.ForCompany>().Which.Tenant.Should().Be(company);
     }
 
     /// <summary>
@@ -63,18 +63,18 @@ public class HandlungsformTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Zurueck_zur_Privatperson_raeumt_die_Zeile_weg()
     {
-        await using (var kontext = Kontext())
+        await using (var context = Kontext())
         {
-            var form = new EfSessionCapacity(kontext);
+            var form = new EfSessionCapacity(context);
             await form.RememberAsync(_sitzung, new Capacity.ForCompany(TenantId.New()));
-            await kontext.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
-        await using (var kontext = Kontext())
+        await using (var context = Kontext())
         {
-            await new EfSessionCapacity(kontext)
+            await new EfSessionCapacity(context)
                 .RememberAsync(_sitzung, Capacity.AsSelf.Instance);
-            await kontext.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         await using var gelesen = Kontext();
@@ -94,18 +94,18 @@ public class HandlungsformTests(Postgres postgres) : IAsyncLifetime
         var zuerst = TenantId.New();
         var danach = TenantId.New();
 
-        await using (var kontext = Kontext())
+        await using (var context = Kontext())
         {
-            await new EfSessionCapacity(kontext)
+            await new EfSessionCapacity(context)
                 .RememberAsync(_sitzung, new Capacity.ForCompany(zuerst));
-            await kontext.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
-        await using (var kontext = Kontext())
+        await using (var context = Kontext())
         {
-            await new EfSessionCapacity(kontext)
+            await new EfSessionCapacity(context)
                 .RememberAsync(_sitzung, new Capacity.ForCompany(danach));
-            await kontext.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         await using var gelesen = Kontext();
@@ -118,12 +118,12 @@ public class HandlungsformTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Vergessen_ist_auch_ohne_Zeile_kein_Fehler()
     {
-        await using var kontext = Kontext();
+        await using var context = Kontext();
 
         var vergessen = async () =>
         {
-            await new EfSessionCapacity(kontext).ForgetAsync(SessionId.New());
-            await kontext.SaveChangesAsync();
+            await new EfSessionCapacity(context).ForgetAsync(SessionId.New());
+            await context.SaveChangesAsync();
         };
 
         await vergessen.Should().NotThrowAsync();

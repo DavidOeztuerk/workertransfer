@@ -17,12 +17,12 @@ namespace WorkerTransfer.Transfer.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("WorkerTransfer.Outbox.OutboxZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Outbox.OutboxRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -66,86 +66,7 @@ namespace WorkerTransfer.Transfer.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox", (string)null);
                 });
 
-            modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.AnfrageZeile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime?>("AnsweredAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("answered_at");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid?>("RequestedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("requested_by");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("SubjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("subject_id");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SubjectId");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("SubjectId", "TenantId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_market_requests_subject_tenant");
-
-                    b.ToTable("market_requests", (string)null);
-                });
-
-            modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.MarktZeile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Availability")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("availability");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<bool>("Employed")
-                        .HasColumnType("boolean")
-                        .HasColumnName("employed");
-
-                    b.Property<string>("Note")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("note");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("market_status", (string)null);
-                });
-
-            modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.VorgangsZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.CaseRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -212,6 +133,87 @@ namespace WorkerTransfer.Transfer.Infrastructure.Persistence.Migrations
                         .HasFilter("status IN ('interested', 'talking', 'offered', 'accepted')");
 
                     b.ToTable("transfers", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.MarketRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Availability")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("availability");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("Employed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("employed");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("market_status", (string)null);
+
+                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.RequestRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("AnsweredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("answered_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("RequestedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubjectId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("SubjectId", "TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_market_requests_subject_tenant");
+
+                    b.ToTable("market_requests", (string)null);
                 });
 #pragma warning restore 612, 618
         }

@@ -1,9 +1,9 @@
-using WorkerTransfer.Jobs.Domain.Stellen;
+using WorkerTransfer.Jobs.Domain.Jobs;
 
 namespace WorkerTransfer.Jobs.Application.Ports;
 
 /// <summary>Der Anbieter hat nicht geantwortet — oder es ist keiner eingerichtet.</summary>
-public sealed class EntwurfNichtVerfuegbar(string meldung) : Exception(meldung);
+public sealed class DraftUnavailable(string notification) : Exception(notification);
 
 /// <summary>
 /// Was in den Prompt darf — und damit auch: was nicht (ADR-0024).
@@ -28,12 +28,12 @@ public sealed class EntwurfNichtVerfuegbar(string meldung) : Exception(meldung);
 /// <para>
 /// Eine eigene Kontextklasse und kein geteilter Prompt mit Verzweigung: die
 /// Regeln für einen Profiltext und die für eine Stellenanzeige haben nichts
-/// miteinander zu tun, und eine Verzweigung ist genau die Stelle, an der
+/// miteinander zu tun, und eine Verzweigung ist genau die Job, an der
 /// irgendwann „erfinde nichts über die Person" für eine Anzeige gälte — oder,
 /// schlimmer, umgekehrt.
 /// </para>
 /// </remarks>
-public sealed record Anzeigenentwurf(
+public sealed record AdvertDraft(
     string Titel,
     string Beschreibung,
     IReadOnlyList<string> Faehigkeiten,
@@ -45,11 +45,11 @@ public sealed record Anzeigenentwurf(
     /// Die Prüfung steht hier und nicht am Endpunkt, weil dieser Typ die Grenze
     /// ist — eine zweite Aufrufstelle bekäme sie sonst nicht mit. Titel,
     /// Beschreibung, Ort und Fähigkeiten sind bereits Wertobjekte der Domäne und
-    /// dort begrenzt; der Wunsch kommt roh aus dem Rumpf der Anfrage.
+    /// dort begrenzt; der Wunsch kommt roh aus dem Rumpf der ResumeRequest.
     /// </remarks>
     public string Wunsch { get; init; } =
-        Wunsch is { Length: > Stelle.HoechstlaengeWunsch }
-            ? throw new WunschFehler()
+        Wunsch is { Length: > Job.HoechstlaengeWunsch }
+            ? throw new PreferenceError()
             : Wunsch;
 
     /// <summary>Woran das Modell sich zu halten hat.</summary>
@@ -78,9 +78,9 @@ public sealed record Anzeigenentwurf(
 }
 
 /// <summary>Schreibt einen Entwurf und behält nichts davon.</summary>
-public interface IEntwerfer
+public interface IDrafter
 {
     /// <exception cref="EntwurfNichtVerfuegbar">Kein Anbieter, oder er schweigt.</exception>
-    Task<string> EntwirfAsync(
-        Anzeigenentwurf entwurf, CancellationToken cancellationToken = default);
+    Task<string> DraftAsync(
+        AdvertDraft draft, CancellationToken cancellationToken = default);
 }

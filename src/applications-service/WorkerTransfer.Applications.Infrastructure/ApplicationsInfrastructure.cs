@@ -6,21 +6,21 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using WorkerTransfer.Applications.Application.Behaviors;
-using WorkerTransfer.Applications.Application.Bewerbungen;
+using WorkerTransfer.Applications.Application.Applications;
 using WorkerTransfer.Applications.Application.Ports;
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 using WorkerTransfer.Applications.Infrastructure.Benachrichtigung;
 using WorkerTransfer.Applications.Infrastructure.Anschreiben;
 using WorkerTransfer.Applications.Infrastructure.Auskunft;
 using WorkerTransfer.Applications.Infrastructure.Einwilligung;
-using WorkerTransfer.Applications.Infrastructure.Loeschung;
+using WorkerTransfer.Applications.Infrastructure.Erasure;
 using WorkerTransfer.Applications.Infrastructure.Persistence;
 using WorkerTransfer.Applications.Infrastructure.Security;
-using WorkerTransfer.Applications.Infrastructure.Stellen;
+using WorkerTransfer.Applications.Infrastructure.Jobs;
 using WorkerTransfer.Applications.Infrastructure.Unternehmen;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Applications.Contracts;
 using Noelia.Abstractions.Security.Checks;
 
@@ -38,7 +38,7 @@ namespace WorkerTransfer.Applications.Infrastructure;
 public static class ApplicationsInfrastructure
 {
     /// <param name="services">Der Behälter.</param>
-    /// <param name="configuration">Woher Ledger, Stellen und Geheimnisse kommen.</param>
+    /// <param name="configuration">Woher Ledger, Jobs und Secrets kommen.</param>
     /// <param name="connectionString">Wo die Bewerbungsdatenbank liegt.</param>
     public static IServiceCollection AddApplicationsInfrastructure(
         this IServiceCollection services,
@@ -48,65 +48,65 @@ public static class ApplicationsInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Einwilligungseinstellungen>(
-            configuration.GetSection(Einwilligungseinstellungen.Abschnitt));
-        services.Configure<Stelleneinstellungen>(
-            configuration.GetSection(Stelleneinstellungen.Abschnitt));
-        services.Configure<Benachrichtigungseinstellungen>(
-            configuration.GetSection(Benachrichtigungseinstellungen.Abschnitt));
-        services.Configure<UnternehmensmitgliederEinstellungen>(
-            configuration.GetSection(UnternehmensmitgliederEinstellungen.Abschnitt));
-        services.Configure<Loescheinstellungen>(
-            configuration.GetSection(Loescheinstellungen.Abschnitt));
-        services.Configure<Anschreibeneinstellungen>(
-            configuration.GetSection(Anschreibeneinstellungen.Abschnitt));
-        services.Configure<Auskunftseinstellungen>(
-            configuration.GetSection(Auskunftseinstellungen.Abschnitt));
+        services.Configure<ConsentSettings>(
+            configuration.GetSection(ConsentSettings.Section));
+        services.Configure<JobSettings>(
+            configuration.GetSection(JobSettings.Section));
+        services.Configure<NotificationSettings>(
+            configuration.GetSection(NotificationSettings.Section));
+        services.Configure<CompanyMemberSettings>(
+            configuration.GetSection(CompanyMemberSettings.Section));
+        services.Configure<ErasureSettings>(
+            configuration.GetSection(ErasureSettings.Section));
+        services.Configure<CoverLetterSettings>(
+            configuration.GetSection(CoverLetterSettings.Section));
+        services.Configure<LookupSettings>(
+            configuration.GetSection(LookupSettings.Section));
 
 
-        services.AddSingleton(_ => ApplicationsDbContextFactory.Datenquelle(connectionString));
+        services.AddSingleton(_ => ApplicationsDbContextFactory.DataSource(connectionString));
         services.AddDbContext<ApplicationsDbContext>((provider, options) =>
-            ApplicationsDbContextFactory.Konfiguriere(
+            ApplicationsDbContextFactory.Configure(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<ApplicationsDbContext>("applications");
-        services.AddSchluesselbund<ApplicationsDbContext>();
+        services.AddDatabaseReadiness<ApplicationsDbContext>("applications");
+        services.AddKeyRing<ApplicationsDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddScoped<IBewerbungsspeicher, EfBewerbungsspeicher>();
+        services.AddScoped<IApplicationStore, EfApplicationStore>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-        services.AddScoped<ILoeschbestand, EfLoeschbestand>();
-        services.AddScoped<IEinwilligungsschreiber, HttpEinwilligungsschreiber>();
-        services.AddScoped<IStellenauskunft, HttpStellenauskunft>();
+        services.AddScoped<IErasureLedger, EfErasureLedger>();
+        services.AddScoped<IConsentWriter, HttpConsentWriter>();
+        services.AddScoped<IJobLookup, HttpJobLookup>();
         services.AddScoped<IAufrufertoken, HttpAufrufertoken>();
-        services.AddScoped<IEntwurfsspeicher, EfEntwurfsspeicher>();
+        services.AddScoped<IDraftStore, EfDraftStore>();
 
         // Die eigenen Angaben und der Firmenname — beide über HTTP, beide mit
         // dem Token des Aufrufers. Ein Adapter für zwei Ports, weil er dieselbe
-        // Verbindung und dieselben Einstellungen benutzt; zwei Klassen wären
-        // zwei Stellen, an denen ein Zeitlimit fehlen kann.
-        services.AddScoped<HttpBewerberauskunft>();
-        services.AddScoped<IBewerberauskunft>(
-            anbieter => anbieter.GetRequiredService<HttpBewerberauskunft>());
+        // Connection und dieselben Einstellungen benutzt; zwei Klassen wären
+        // zwei Jobs, an denen ein Zeitlimit fehlen kann.
+        services.AddScoped<HttpApplicantLookup>();
+        services.AddScoped<IApplicantLookup>(
+            provider => provider.GetRequiredService<HttpApplicantLookup>());
         services.AddScoped<IUnternehmensauskunft>(
-            anbieter => anbieter.GetRequiredService<HttpBewerberauskunft>());
+            provider => provider.GetRequiredService<HttpApplicantLookup>());
         services.AddScoped<IKontaktauskunft>(
-            anbieter => anbieter.GetRequiredService<HttpBewerberauskunft>());
+            provider => provider.GetRequiredService<HttpApplicantLookup>());
 
-        services.AddScoped<IUnternehmensmitgliederAbfrage, HttpUnternehmensmitgliederAbfrage>();
+        services.AddScoped<ICompanyMemberLookup, HttpCompanyMemberLookup>();
 
-        // Der Zugang kommt aus den Kontoeinstellungen der Person (Ollama,
+        // Der Zugang kommt aus den AccountSettings der Person (Ollama,
         // MiniMax, Anthropic). Draft__Schluessel bleibt ein Fallback für die
         // Plattform, nicht die einzige Quelle — sonst antwortet Schreiben
         // 503, während die Oberfläche schon einen Anbieter zeigt.
         services.AddScoped<IKiZugangAbfrage, HttpKiZugang>();
-        services.AddScoped<IAnschreiber, HttpAnschreiber>();
-        services.AddSingleton<AnschreibenArbeiter>();
-        services.AddSingleton<IAnschreibenSchlange>(anbieter =>
-            anbieter.GetRequiredService<AnschreibenArbeiter>());
-        services.AddHostedService(anbieter =>
-            anbieter.GetRequiredService<AnschreibenArbeiter>());
+        services.AddScoped<ICoverLetterWriter, HttpCoverLetterWriter>();
+        services.AddSingleton<CoverLetterWorker>();
+        services.AddSingleton<ICoverLetterQueue>(provider =>
+            provider.GetRequiredService<CoverLetterWorker>());
+        services.AddHostedService(provider =>
+            provider.GetRequiredService<CoverLetterWorker>());
 
         // Vorher ging die Benachrichtigung nach dem Commit als HTTP-Aufruf
         // hinaus, dessen Fehler geschluckt wurde — die Zusage stimmte, aber die
@@ -114,10 +114,10 @@ public static class ApplicationsInfrastructure
         // Änderung, und ein Zusteller bringt sie (ADR-0025). Zehn Versuche, nicht
         // unbegrenzt: nie aufzugeben ist der Löschung vorbehalten, wo ein toter
         // Empfänger die Vollständigkeit blockieren muss.
-        services.AddScoped<IZustellung, HttpBenachrichtigung>();
+        services.AddScoped<IDelivery, HttpBenachrichtigung>();
         services.AddOutbox<ApplicationsDbContext>(configuration);
 
-        services.AddCQRS(typeof(BewerbungAbschickenBefehl).Assembly);
+        services.AddCQRS(typeof(SubmitApplicationCommand).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
         Nachweis(services, configuration);
@@ -131,13 +131,13 @@ public static class ApplicationsInfrastructure
     /// zur Laufzeit und <c>WortschatzTests</c> zur Bauzeit. Zwei Listen über
     /// dieselbe Frage laufen auseinander, und die stillere von beiden wüchse.
     /// <para>
-    /// <c>Quote</c> ist hier das <em>Zitat</em>: die Stelle im Anschreiben, auf
+    /// <c>Quote</c> ist hier das <em>Zitat</em>: die Job im Anschreiben, auf
     /// die sich eine Anmerkung bezieht — wörtlich, damit die Überarbeitung
     /// weiß, wovon die Rede ist. Das deutsche Wort wäre ein Verhältnis und
     /// gehört zu Recht auf die Liste.
     /// </para>
     /// </remarks>
-    public static IReadOnlyList<Wortausnahme> Wortausnahmen { get; } =
+    public static IReadOnlyList<TermException> Wortausnahmen { get; } =
     [
         new("AnmerkenV1.Quote", Zitat),
         new("AnmerkungV1.Quote", Zitat)
@@ -150,52 +150,52 @@ public static class ApplicationsInfrastructure
 
     /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
     /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
     /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
     ///
     /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
     /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
     /// vergessen kann.</para>
     /// </remarks>
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        var anschreiben = new Anschreibeneinstellungen();
-        configuration.GetSection(Anschreibeneinstellungen.Abschnitt).Bind(anschreiben);
+        var anschreiben = new CoverLetterSettings();
+        configuration.GetSection(CoverLetterSettings.Section).Bind(anschreiben);
 
         // Der Schluessel des BETREIBERS ist hier nur der Rueckfall: den Zugang
-        // waehlt die Person in ihren Kontoeinstellungen, und ihn kennt allein
+        // waehlt die Person in ihren AccountSettings, und ihn kennt allein
         // identity-service. Was dieser Dienst ueber Anbieter sagen kann, ist
         // deshalb die Haelfte — die andere steht in `identity-service`, gezaehlt.
         var naht = !string.IsNullOrEmpty(anschreiben.Schluessel);
 
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
-            [typeof(Bewerbungsstand).Assembly, typeof(BewerbungV1).Assembly],
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
+            [typeof(ApplicationState).Assembly, typeof(ApplicationV1).Assembly],
             Wortausnahmen));
 
-        services.AddSingleton<ISecurityCheck>(_ => new Nahtpruefung(
-            typeof(Anschreibenkontext),
+        services.AddSingleton<ISecurityCheck>(_ => new SeamCheck(
+            typeof(CoverLetterContext),
             ["StellenTitel", "Unternehmen", "StellenOrt", "StellenBeschreibung", "GesuchteFaehigkeiten", "EigenerName", "EigeneUeberschrift", "EigenerText", "EigeneFaehigkeiten", "EigenerWerdegang", "Sprache"],
             "für ein Anschreiben"));
 
         // Der Anbieter dieses Dienstes ist der des BETREIBERS: `Draft__*` aus
-        // der Umgebung, einer fuer alle. Den Zugang je Person haelt
+        // der EnvironmentFile, einer fuer alle. Den Zugang je Person haelt
         // identity-service, und dort wird gezaehlt statt genannt.
-        services.AddSingleton<IAnbieterquelle>(_ => new Betreiberquelle(
+        services.AddSingleton<IProviderSource>(_ => new OperatorProviderSource(
             "anthropic", anschreiben.Adresse, naht));
 
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
 
-        var loeschung = new Loescheinstellungen();
-        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+        var erasure = new ErasureSettings();
+        configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsEmpfaenger(
             "applications",
-            !string.IsNullOrEmpty(loeschung.Geheimnis),
+            !string.IsNullOrEmpty(erasure.Geheimnis),
             pruefspurVorhanden: false));
     }
 }

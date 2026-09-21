@@ -73,6 +73,7 @@ function eintraegeFuerDieFirma(current: Aufgabenstand): Eintrag[] {
   ];
 }
 
+/** What is counted are PROCESSES, never people (ADR-0022/0026). */
 function Liste({ titel, eintraege }: { titel: string; eintraege: Eintrag[] }) {
   const { t } = useTranslation();
 
@@ -82,7 +83,6 @@ function Liste({ titel, eintraege }: { titel: string; eintraege: Eintrag[] }) {
         <Typography variant="h2" sx={{ mb: 1.5 }}>
           {titel}
         </Typography>
-        {/* Gezählt werden VORGÄNGE, nie Personen (ADR-0022/0026). */}
         <Box
           component="ul"
           sx={{ listStyle: "none", m: 0, p: 0, display: "grid", gap: 1 }}

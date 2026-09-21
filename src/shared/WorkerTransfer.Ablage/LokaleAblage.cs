@@ -4,10 +4,10 @@ using Microsoft.Extensions.Options;
 namespace WorkerTransfer.Ablage;
 
 /// <summary>Wo die lokale Ablage liegt.</summary>
-public sealed class Ablageeinstellungen
+public sealed class DocumentStoreSettings
 {
-    /// <summary>Der Abschnitt in der Konfiguration.</summary>
-    public const string Abschnitt = "Ablage";
+    /// <summary>Der Section in der Konfiguration.</summary>
+    public const string Section = "Ablage";
 
     /// <summary>Das Verzeichnis. In Containern ein Band, sonst ein Ordner.</summary>
     public string Verzeichnis { get; set; } = "ablage";
@@ -21,12 +21,12 @@ public sealed class Ablageeinstellungen
 /// Umbenennen innerhalb eines Dateisystems ist unteilbar; entweder liegt die
 /// ganze Datei da oder gar keine.
 /// </remarks>
-public sealed class LokaleAblage : IAblage
+public sealed class LocalDocumentStore : IDocumentStore
 {
     private readonly string _wurzel;
 
     /// <summary>Baut die Ablage und legt ihr Verzeichnis an.</summary>
-    public LokaleAblage(IOptions<Ablageeinstellungen> einstellungen)
+    public LocalDocumentStore(IOptions<DocumentStoreSettings> einstellungen)
     {
         ArgumentNullException.ThrowIfNull(einstellungen);
 
@@ -35,18 +35,18 @@ public sealed class LokaleAblage : IAblage
     }
 
     /// <inheritdoc />
-    public async Task LegeAbAsync(
-        string schluessel, ReadOnlyMemory<byte> inhalt, CancellationToken cancellationToken = default)
+    public async Task PutAsync(
+        string key, ReadOnlyMemory<byte> content, CancellationToken cancellationToken = default)
     {
-        var ziel = Pfad(schluessel);
-        Directory.CreateDirectory(Path.GetDirectoryName(ziel)!);
+        var target = Pfad(key);
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
 
-        var unterwegs = ziel + ".teil-" + Guid.CreateVersion7().ToString("N");
+        var unterwegs = target + ".teil-" + Guid.CreateVersion7().ToString("N");
 
         try
         {
-            await File.WriteAllBytesAsync(unterwegs, inhalt, cancellationToken);
-            File.Move(unterwegs, ziel, overwrite: true);
+            await File.WriteAllBytesAsync(unterwegs, content, cancellationToken);
+            File.Move(unterwegs, target, overwrite: true);
         }
         catch
         {
@@ -62,31 +62,31 @@ public sealed class LokaleAblage : IAblage
     }
 
     /// <inheritdoc />
-    public async Task<byte[]?> HoleAsync(
-        string schluessel, CancellationToken cancellationToken = default)
+    public async Task<byte[]?> GetAsync(
+        string key, CancellationToken cancellationToken = default)
     {
-        var pfad = Pfad(schluessel);
+        var path = Pfad(key);
 
-        return File.Exists(pfad)
-            ? await File.ReadAllBytesAsync(pfad, cancellationToken)
+        return File.Exists(path)
+            ? await File.ReadAllBytesAsync(path, cancellationToken)
             : null;
     }
 
     /// <inheritdoc />
-    public Task LoescheAsync(string schluessel, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
-        var pfad = Pfad(schluessel);
+        var path = Pfad(key);
 
-        if (File.Exists(pfad))
+        if (File.Exists(path))
         {
-            File.Delete(pfad);
+            File.Delete(path);
         }
 
         return Task.CompletedTask;
     }
 
     /// <summary>
-    /// Der Pfad zum Schluessel — und die Stelle, an der ein Ausbruch scheitert.
+    /// Der Pfad zum Schluessel — und die Job, an der ein Ausbruch scheitert.
     /// </summary>
     /// <remarks>
     /// Ein Schluessel wie <c>../../etc/passwd</c> waere sonst ein Leseweg durch
@@ -95,15 +95,15 @@ public sealed class LokaleAblage : IAblage
     /// liegen. Eine Textpruefung uebersieht die naechste Schreibweise, ein
     /// Vergleich der aufgeloesten Pfade nicht.
     /// </remarks>
-    private string Pfad(string schluessel)
+    private string Pfad(string key)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(schluessel);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
-        var voll = Path.GetFullPath(Path.Combine(_wurzel, schluessel));
+        var voll = Path.GetFullPath(Path.Combine(_wurzel, key));
 
         if (!voll.StartsWith(_wurzel + Path.DirectorySeparatorChar, StringComparison.Ordinal))
         {
-            throw new ArgumentException("key escapes the storage root", nameof(schluessel));
+            throw new ArgumentException("key escapes the storage root", nameof(key));
         }
 
         return voll;
@@ -111,19 +111,19 @@ public sealed class LokaleAblage : IAblage
 }
 
 /// <summary>Haengt die Ablage in einen Dienst.</summary>
-public static class Ablageverdrahtung
+public static class DocumentStoreWiring
 {
     /// <summary>Registriert die lokale Ablage samt Einstellungen.</summary>
     public static IServiceCollection AddAblage(
-        this IServiceCollection dienste, Microsoft.Extensions.Configuration.IConfiguration konfiguration)
+        this IServiceCollection services, Microsoft.Extensions.Configuration.IConfiguration konfiguration)
     {
-        ArgumentNullException.ThrowIfNull(dienste);
+        ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(konfiguration);
 
-        dienste.Configure<Ablageeinstellungen>(
-            konfiguration.GetSection(Ablageeinstellungen.Abschnitt));
-        dienste.AddSingleton<IAblage, LokaleAblage>();
+        services.Configure<DocumentStoreSettings>(
+            konfiguration.GetSection(DocumentStoreSettings.Section));
+        services.AddSingleton<IDocumentStore, LocalDocumentStore>();
 
-        return dienste;
+        return services;
     }
 }

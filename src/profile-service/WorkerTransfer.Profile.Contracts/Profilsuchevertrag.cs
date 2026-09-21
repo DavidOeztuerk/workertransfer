@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace WorkerTransfer.Profile.Contracts;
 
-/// <summary>Ein Profil, wie die interne Suche es meldet.</summary>
+/// <summary>Ein PersonProfile, wie die interne Search es meldet.</summary>
 /// <remarks>
 /// <para>Nur, was die Person selbst geschrieben hat. Kein Name, keine Adresse,
 /// kein Arbeitgeber — der Aufrufer ist ein Dienst, der sucht, und was er nicht
@@ -10,14 +10,14 @@ namespace WorkerTransfer.Profile.Contracts;
 ///
 /// <para><c>skills</c> ist die Herkunftsklasse <em>genannt</em> aus ADR-0033 und
 /// das Einzige, worüber gesucht wird. Belege stehen hier nicht: sie holt
-/// scout-service zum Treffer dazu, bei dem Dienst, der sie hält.</para>
+/// scout-service zum Hit dazu, bei dem Dienst, der sie hält.</para>
 ///
-/// <para><strong>Und kein Sichtbarkeitsfeld.</strong> Ob dieses Profil gezeigt
+/// <para><strong>Und kein Sichtbarkeitsfeld.</strong> Ob dieses PersonProfile gezeigt
 /// werden darf, steht im Consent-Ledger und nirgends sonst (ADR-0020). Der
 /// Aufrufer fragt ihn selbst, für die ganze Seite auf einmal — ein Feld hier
-/// wäre eine zweite Wahrheit, und die beiden wären beim ersten Widerruf uneins.</para>
+/// wäre eine zweite Wahrheit, und die beiden wären beim ersten Revocation uneins.</para>
 /// </remarks>
-public sealed record ProfilfundV1(
+public sealed record ProfileHitV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("headline")] string Headline,
     /// <summary>Was die Person über sich geschrieben hat.</summary>
@@ -39,13 +39,13 @@ public sealed record ProfilfundV1(
     [property: JsonPropertyName("commute_km")] string? CommuteKm = null,
     [property: JsonPropertyName("relocation")] string? Relocation = null);
 
-/// <summary>Eine Seite der internen Suche.</summary>
+/// <summary>Eine Seite der internen Search.</summary>
 /// <remarks>
 /// <strong>Ohne Gesamtzahl</strong> (ADR-0026) — auch hier, wo nur ein Dienst
 /// mitliest: was es nicht gibt, kann auch nicht versehentlich weitergereicht
 /// werden. Die Reihenfolge ist <c>updated_at DESC, id DESC</c>: stabil und
-/// sachfremd, damit zwei gleiche Suchen dasselbe liefern.
+/// sachfremd, damit zwei gleiche Searches dasselbe liefern.
 /// </remarks>
-public sealed record ProfilfundseiteV1(
-    [property: JsonPropertyName("items")] IReadOnlyList<ProfilfundV1> Items,
+public sealed record ProfileHitPageV1(
+    [property: JsonPropertyName("items")] IReadOnlyList<ProfileHitV1> Items,
     [property: JsonPropertyName("next")] string? Next);

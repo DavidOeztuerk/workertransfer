@@ -28,12 +28,12 @@ public sealed class Postgres : IAsyncLifetime
     {
         await _behaelter.StartAsync();
 
-        await using var quelle = AdvisorDbContextFactory.Datenquelle(ConnectionString);
-        await using var kontext = new AdvisorDbContext(
-            (DbContextOptions<AdvisorDbContext>)AdvisorDbContextFactory.Konfiguriere(
-                new DbContextOptionsBuilder<AdvisorDbContext>(), quelle).Options);
+        await using var source = AdvisorDbContextFactory.DataSource(ConnectionString);
+        await using var context = new AdvisorDbContext(
+            (DbContextOptions<AdvisorDbContext>)AdvisorDbContextFactory.Configure(
+                new DbContextOptionsBuilder<AdvisorDbContext>(), source).Options);
 
-        await kontext.Database.MigrateAsync();
+        await context.Database.MigrateAsync();
     }
 
     public async Task DisposeAsync() => await _behaelter.DisposeAsync();
@@ -75,18 +75,18 @@ public static class Tokenform
     }
 
     /// <summary>Ein Token für eine Person, die für sich selbst handelt.</summary>
-    public static string Person(Guid wer) => Baue(wer, firma: null);
+    public static string Person(Guid subject) => Build(subject, company: null);
 
     /// <summary>Ein Token für jemanden, der für ein Unternehmen handelt.</summary>
-    public static string Firma(Guid wer, Guid firma) => Baue(wer, firma);
+    public static string Firma(Guid subject, Guid company) => Build(subject, company);
 
-    private static string Baue(Guid wer, Guid? firma)
+    private static string Build(Guid subject, Guid? company)
     {
-        List<Claim> ansprueche = [new(JwtRegisteredClaimNames.Sub, wer.ToString())];
+        List<Claim> ansprueche = [new(JwtRegisteredClaimNames.Sub, subject.ToString())];
 
-        if (firma is { } mandant)
+        if (company is { } tenant)
         {
-            ansprueche.Add(new Claim("tenant", mandant.ToString()));
+            ansprueche.Add(new Claim("tenant", tenant.ToString()));
         }
 
         var token = new JwtSecurityToken(
@@ -107,7 +107,7 @@ public static class Tokenform
 /// Er hält fest, <em>was</em> geschrieben wurde — das ist die interessante
 /// Frage: eine Stufe entsteht als Ledger-Ereignis und nirgends sonst.
 /// </remarks>
-public sealed class Probetor : IEinwilligungstor
+public sealed class Probetor : IConsentGate
 {
     /// <summary>Welche Fähigkeit für wen gilt.</summary>
     public HashSet<string> Erteilt { get; } = [];
@@ -131,30 +131,30 @@ public sealed class Probetor : IEinwilligungstor
     public bool LehntAb { get; set; }
 
     /// <summary>Setzt eine Stufe, wie der echte Ledger sie hielte.</summary>
-    public void Stelle(Guid wer, Guid firma, Stufe stufe)
+    public void Job(Guid subject, Guid company, Stufe stage)
     {
-        var mandant = new TenantId(firma);
+        var tenant = new TenantId(company);
 
-        Loese(wer, Stufenfaehigkeiten.Profil(mandant), stufe >= Stufe.Profil);
-        Loese(wer, Stufenfaehigkeiten.Lebenslauf(mandant), stufe >= Stufe.Unterlagen);
-        Loese(wer, Stufenfaehigkeiten.Klarname(mandant), stufe >= Stufe.Person);
+        Loese(subject, StageCapabilities.Profile(tenant), stage >= Stufe.Profile);
+        Loese(subject, StageCapabilities.Resume(tenant), stage >= Stufe.Unterlagen);
+        Loese(subject, StageCapabilities.Klarname(tenant), stage >= Stufe.Person);
     }
 
     /// <summary>Setzt „für alle Unternehmen sichtbar".</summary>
-    public void Oeffentlich(Guid wer, bool an) =>
-        Loese(wer, Stufenfaehigkeiten.ProfilOeffentlich, an);
+    public void Oeffentlich(Guid subject, bool an) =>
+        Loese(subject, StageCapabilities.ProfilOeffentlich, an);
 
-    private void Loese(Guid wer, string faehigkeit, bool an)
+    private void Loese(Guid subject, string skill, bool an)
     {
-        var schluessel = Schluessel(wer, faehigkeit);
+        var key = Schluessel(subject, skill);
 
         if (an)
         {
-            Erteilt.Add(schluessel);
+            Erteilt.Add(key);
         }
         else
         {
-            Erteilt.Remove(schluessel);
+            Erteilt.Remove(key);
         }
     }
 
@@ -162,7 +162,7 @@ public sealed class Probetor : IEinwilligungstor
     public Guid Selbst { get; set; }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<Stufe>> StufenAsync(
+    public Task<IReadOnlyList<Stufe>> StagesAsync(
         IReadOnlyList<(SubjectId Wer, TenantId Firma)> paare,
         CancellationToken cancellationToken = default)
     {
@@ -170,7 +170,7 @@ public sealed class Probetor : IEinwilligungstor
 
         if (Schweigt)
         {
-            throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht");
+            throw new ConsentGateSilent("der Ledger antwortet im Test nicht");
         }
 
         return Task.FromResult<IReadOnlyList<Stufe>>([.. paare.Select(Lies)]);
@@ -178,80 +178,80 @@ public sealed class Probetor : IEinwilligungstor
 
     private Stufe Lies((SubjectId Wer, TenantId Firma) paar)
     {
-        var wer = paar.Wer.Value;
+        var subject = paar.Wer.Value;
 
-        var profil = Erteilt.Contains(Schluessel(wer, Stufenfaehigkeiten.Profil(paar.Firma)))
-                     || Erteilt.Contains(Schluessel(wer, Stufenfaehigkeiten.ProfilOeffentlich));
+        var profile = Erteilt.Contains(Schluessel(subject, StageCapabilities.Profile(paar.Firma)))
+                     || Erteilt.Contains(Schluessel(subject, StageCapabilities.ProfilOeffentlich));
 
-        if (!profil)
+        if (!profile)
         {
-            return Stufe.Keine;
+            return Stufe.None;
         }
 
-        if (!Erteilt.Contains(Schluessel(wer, Stufenfaehigkeiten.Lebenslauf(paar.Firma))))
+        if (!Erteilt.Contains(Schluessel(subject, StageCapabilities.Resume(paar.Firma))))
         {
-            return Stufe.Profil;
+            return Stufe.Profile;
         }
 
-        return Erteilt.Contains(Schluessel(wer, Stufenfaehigkeiten.Klarname(paar.Firma)))
+        return Erteilt.Contains(Schluessel(subject, StageCapabilities.Klarname(paar.Firma)))
             ? Stufe.Person
             : Stufe.Unterlagen;
     }
 
     /// <inheritdoc />
-    public Task ErteileAsync(
-        IReadOnlyList<string> faehigkeiten, CancellationToken cancellationToken = default)
+    public Task GrantAsync(
+        IReadOnlyList<string> skills, CancellationToken cancellationToken = default)
     {
         if (Schweigt)
         {
-            throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht");
+            throw new ConsentGateSilent("der Ledger antwortet im Test nicht");
         }
 
         if (LehntAb)
         {
-            throw new EinwilligungAbgelehnt("a consent belongs to its subject");
+            throw new ConsentRefused("a consent belongs to its subject");
         }
 
-        foreach (var faehigkeit in faehigkeiten)
+        foreach (var skill in skills)
         {
-            Erteilungen.Add(faehigkeit);
-            Erteilt.Add(Schluessel(Selbst, faehigkeit));
+            Erteilungen.Add(skill);
+            Erteilt.Add(Schluessel(Selbst, skill));
         }
 
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public Task WiderrufeAsync(
-        IReadOnlyList<string> faehigkeiten,
-        string grund,
+    public Task RevokeAsync(
+        IReadOnlyList<string> skills,
+        string reason,
         CancellationToken cancellationToken = default)
     {
         if (Schweigt)
         {
-            throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht");
+            throw new ConsentGateSilent("der Ledger antwortet im Test nicht");
         }
 
         if (LehntAb)
         {
-            throw new EinwilligungAbgelehnt("a consent belongs to its subject");
+            throw new ConsentRefused("a consent belongs to its subject");
         }
 
-        foreach (var faehigkeit in faehigkeiten)
+        foreach (var skill in skills)
         {
-            Widerrufe.Add(faehigkeit);
-            Gruende.Add(grund);
-            Erteilt.Remove(Schluessel(Selbst, faehigkeit));
+            Widerrufe.Add(skill);
+            Gruende.Add(reason);
+            Erteilt.Remove(Schluessel(Selbst, skill));
         }
 
         return Task.CompletedTask;
     }
 
-    private static string Schluessel(Guid wer, string faehigkeit) => $"{wer}|{faehigkeit}";
+    private static string Schluessel(Guid subject, string skill) => $"{subject}|{skill}";
 }
 
 /// <summary>Eine Firmenauskunft, die der Test steuert.</summary>
-public sealed class Probefirmen : IFirmenauskunft
+public sealed class Probefirmen : ICompanyLookup
 {
     /// <summary>Welches Unternehmen welche Domain hat.</summary>
     public Dictionary<Guid, string> Domains { get; } = [];
@@ -263,19 +263,19 @@ public sealed class Probefirmen : IFirmenauskunft
     public bool Schweigt { get; set; }
 
     /// <inheritdoc />
-    public Task<Firmenbild?> HoleAsync(
-        TenantId firma, CancellationToken cancellationToken = default)
+    public Task<CompanyLogo?> GetAsync(
+        TenantId company, CancellationToken cancellationToken = default)
     {
         Fragen++;
 
         if (Schweigt)
         {
-            throw new AuskunftSchweigt("identity-service antwortet im Test nicht");
+            throw new LookupSilent("identity-service antwortet im Test nicht");
         }
 
         return Task.FromResult(
-            Domains.TryGetValue(firma.Value, out var domain)
-                ? new Firmenbild("Beispiel GmbH", domain)
+            Domains.TryGetValue(company.Value, out var domain)
+                ? new CompanyLogo("Beispiel GmbH", domain)
                 : null);
     }
 }
@@ -290,17 +290,17 @@ public sealed class Probepersonen : IPersonenauskunft
     public List<Guid> Gefragt { get; } = [];
 
     /// <inheritdoc />
-    public Task<Personenbild?> HoleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public Task<Personenbild?> GetAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        Gefragt.Add(wer.Value);
+        Gefragt.Add(subject.Value);
 
-        return Task.FromResult(Bestand.GetValueOrDefault(wer.Value));
+        return Task.FromResult(Bestand.GetValueOrDefault(subject.Value));
     }
 }
 
 /// <summary>Eine Übergabe, die der Test steuert.</summary>
-public sealed class Probeuebergabe : IVorgangsuebergabe
+public sealed class Probeuebergabe : ICaseHandover
 {
     /// <summary>Für wen zuletzt übergeben wurde.</summary>
     public List<Guid> Uebergeben { get; } = [];
@@ -312,25 +312,25 @@ public sealed class Probeuebergabe : IVorgangsuebergabe
     public bool Schweigt { get; set; }
 
     /// <summary>Die Kennung, die zurückkommt.</summary>
-    public Guid Vorgang { get; } = Guid.NewGuid();
+    public Guid Case { get; } = Guid.NewGuid();
 
     /// <inheritdoc />
-    public Task<Guid> UebergibAsync(
-        SubjectId wer, string anlass, CancellationToken cancellationToken = default)
+    public Task<Guid> HandOverAsync(
+        SubjectId subject, string anlass, CancellationToken cancellationToken = default)
     {
         if (Schweigt)
         {
-            throw new AuskunftSchweigt("transfer-service antwortet im Test nicht");
+            throw new LookupSilent("transfer-service antwortet im Test nicht");
         }
 
         if (LehntAb)
         {
-            throw new UebergabeAbgelehnt("transfer-service refused with 403");
+            throw new HandoverRefused("transfer-service refused with 403");
         }
 
-        Uebergeben.Add(wer.Value);
+        Uebergeben.Add(subject.Value);
 
-        return Task.FromResult(Vorgang);
+        return Task.FromResult(Case);
     }
 }
 
@@ -346,65 +346,65 @@ public sealed class Probeuebergabe : IVorgangsuebergabe
 /// heraus — und genau deshalb steht die andere Reihe daneben.
 /// </para>
 /// </remarks>
-public sealed class Probegespraeche : IGespraechsspeicher
+public sealed class Probegespraeche : IConversationStore
 {
-    private readonly List<Gespraech> _bestand = [];
+    private readonly List<Conversation> _bestand = [];
 
     /// <inheritdoc />
-    public Task<Gespraech?> HoleAsync(Guid id, CancellationToken cancellationToken = default) =>
+    public Task<Conversation?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_bestand.FirstOrDefault(g => g.Id == id));
 
     /// <inheritdoc />
-    public Task<Gespraech?> HoleLaufendesAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default) =>
+    public Task<Conversation?> GetRunningAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default) =>
         Task.FromResult(_bestand.FirstOrDefault(
-            g => g.Wer == wer && g.Firma == firma && g.Laeuft));
+            g => g.Wer == subject && g.Firma == company && g.Laeuft));
 
     /// <inheritdoc />
-    public Task SichereAsync(Gespraech gespraech, CancellationToken cancellationToken = default)
+    public Task SaveAsync(Conversation conversation, CancellationToken cancellationToken = default)
     {
-        if (!_bestand.Contains(gespraech))
+        if (!_bestand.Contains(conversation))
         {
-            _bestand.Add(gespraech);
+            _bestand.Add(conversation);
         }
 
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<Gespraech>> FuerPersonAsync(
-        SubjectId wer, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Gespraech>>([.. _bestand.Where(g => g.Wer == wer)]);
+    public Task<IReadOnlyList<Conversation>> ForPersonAsync(
+        SubjectId subject, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Conversation>>([.. _bestand.Where(g => g.Wer == subject)]);
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<Gespraech>> FuerFirmaAsync(
-        TenantId firma, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Gespraech>>([.. _bestand.Where(g => g.Firma == firma)]);
+    public Task<IReadOnlyList<Conversation>> ForCompanyAsync(
+        TenantId company, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Conversation>>([.. _bestand.Where(g => g.Firma == company)]);
 
     /// <inheritdoc />
-    public Task<int> LoescheAsync(SubjectId wer, CancellationToken cancellationToken = default)
+    public Task<int> DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default)
     {
-        _bestand.RemoveAll(g => g.Wer == wer);
+        _bestand.RemoveAll(g => g.Wer == subject);
 
         return Task.FromResult(0);
     }
 }
 
 /// <summary>Mandate im Arbeitsspeicher.</summary>
-public sealed class Probemandate : Domain.Mandate.IMandatspeicher
+public sealed class Probemandate : Domain.Mandates.IMandateStore
 {
-    private readonly Dictionary<Guid, Domain.Mandate.Mandat> _bestand = [];
+    private readonly Dictionary<Guid, Domain.Mandates.Mandate> _bestand = [];
 
     /// <inheritdoc />
-    public Task<Domain.Mandate.Mandat?> HoleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default) =>
-        Task.FromResult(_bestand.GetValueOrDefault(wer.Value));
+    public Task<Domain.Mandates.Mandate?> GetAsync(
+        SubjectId subject, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_bestand.GetValueOrDefault(subject.Value));
 
     /// <inheritdoc />
-    public Task SichereAsync(
-        Domain.Mandate.Mandat mandat, CancellationToken cancellationToken = default)
+    public Task SaveAsync(
+        Domain.Mandates.Mandate mandate, CancellationToken cancellationToken = default)
     {
-        _bestand[mandat.Wer.Value] = mandat;
+        _bestand[mandate.Wer.Value] = mandate;
 
         return Task.CompletedTask;
     }
@@ -422,10 +422,10 @@ public sealed class Probeausgang : Outbox.IOutbox
     public List<(Guid Wer, string Art)> Vermerke { get; } = [];
 
     /// <inheritdoc />
-    public Task<Guid> VermerkeAsync(
-        SubjectId empfaenger, string art, CancellationToken cancellationToken = default)
+    public Task<Guid> NoteAsync(
+        SubjectId recipient, string kind, CancellationToken cancellationToken = default)
     {
-        Vermerke.Add((empfaenger.Value, art));
+        Vermerke.Add((recipient.Value, kind));
 
         return Task.FromResult(Guid.NewGuid());
     }

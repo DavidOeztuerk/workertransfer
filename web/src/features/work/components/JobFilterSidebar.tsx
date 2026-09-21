@@ -123,6 +123,9 @@ export function JobFilterSidebar({
 
   // Ein Fehlschlag, sonst die Bestätigung, sonst — falls der Browser gar nicht
   // orten kann — der Grund dafür. Im Ruhezustand nichts.
+  //
+  // Only when there is something to say: what the button does and that the
+  // position is rounded lives in its tooltip, on demand instead of permanently.
   const hinweis =
     ortung.fehler ??
     (hatStandort
@@ -191,13 +194,11 @@ export function JobFilterSidebar({
           }
         />
 
-        {/*
-          Ohne Hilfetext unter dem Feld: der Platzhalter („Python, Kubernetes")
-          sagt dasselbe kürzer, und drei Zeilen Erklärung unter einem von sechs
-          Feldern machen aus einer Filterleiste eine Anleitung.
-        */}
         <TextField
           label={t("stellen.faehigkeiten")}
+          // No helper text below the field: the placeholder says the same thing
+          // shorter, and three lines under one of six fields turn a filter bar
+          // into a manual.
           placeholder={t("stellen.faehigkeitenBeispiel")}
           value={entwurf.skills}
           onChange={(ereignis) =>
@@ -249,16 +250,12 @@ export function JobFilterSidebar({
           ))}
         </TextField>
 
-        {/*
-          ORT UND ENTFERNUNG SIND EINE GRUPPE, und sie steht am Ende.
-
-          Vorher stand der Ort zwischen Fähigkeiten und Arbeitsform — also
-          getrennt von dem einen Feld, mit dem er zusammen gelesen wird. Beide
-          beantworten dieselbe Frage („wo?"), nur auf zwei Arten: als Name und
-          als Umkreis. Der engere Abstand innerhalb der Gruppe zeigt das, ohne
-          dass eine Überschrift es sagen muss.
-        */}
-        <Box sx={{ display: "grid", gap: 1.25 }}>
+        <Box
+          // PLACE AND DISTANCE ARE ONE GROUP, and it stands last: both answer
+          // the same question ("where?"), as a name and as a radius. The tighter
+          // gap inside the group shows that without a heading having to say it.
+          sx={{ display: "grid", gap: 1.25 }}
+        >
           <TextField
             label={t("stellen.ort")}
             value={entwurf.location}
@@ -299,10 +296,12 @@ export function JobFilterSidebar({
                       : t("stellen.standortHolenHinweis")
                   }
                 >
-                  {/* Der Rahmen ist nötig: ein abgeschalteter Knopf sendet keine
-                  Zeigerereignisse, und der Hinweis erschiene nie — gerade
-                  dann, wenn er am meisten erklärte. */}
-                  <Box component="span">
+                  <Box
+                    // The wrapper is needed: a disabled button sends no pointer
+                    // events, so the tooltip would never appear — exactly when it
+                    // explains the most.
+                    component="span"
+                  >
                     <IconButton
                       aria-label={
                         hatStandort
@@ -335,19 +334,6 @@ export function JobFilterSidebar({
                 </Tooltip>
               </Box>
 
-              {/*
-              NUR wenn es etwas zu sagen gibt.
-
-              Hier stand vorher IMMER ein Satz, im Ruhezustand „Auf Knopfdruck —
-              dein Browser fragt dich". Das erklärte ein Knopfsymbol, das sich
-              selbst erklärt, und kostete drei Zeilen in einer Leiste mit sechs
-              Feldern. Was der Knopf tut und dass die Position gerundet wird,
-              steht jetzt in seinem Hinweisfähnchen — abrufbar statt dauernd da.
-
-              Ein Fehlschlag und die Bestätigung bleiben: der eine ist die
-              Antwort auf eine Handlung, die andere die Zusage, die diesen Knopf
-              vertretbar macht.
-            */}
               {hinweis === null ? null : (
                 <FormHelperText error={ortung.fehler !== null} sx={{ mx: 0 }}>
                   {hinweis}

@@ -10,9 +10,9 @@ namespace WorkerTransfer.Assessment.Application.Behaviors;
 /// ist, den niemand bemerkt: alles, was er schreibt, landet trotzdem — nur
 /// nicht gemeinsam.
 /// <para>
-/// In diesem Dienst hängt daran mehr als eine Zeile: die Bewertung und der
+/// In diesem Dienst hängt daran mehr als eine Zeile: die Evaluation und der
 /// Vermerk im Postausgang, der die Person davon in Kenntnis setzt, müssen
-/// gemeinsam festgeschrieben werden oder gar nicht (ADR-0025). Eine Bewertung
+/// gemeinsam festgeschrieben werden oder gar nicht (ADR-0025). Eine Evaluation
 /// ohne den Vermerk wäre eine Beurteilung, von der die Person nichts erfährt —
 /// und genau das wird hier nicht gebaut.
 /// </para>
@@ -30,7 +30,7 @@ public sealed class TransaktionsBehavior<TAnfrage, TAntwort>(IUnitOfWork arbeits
         ArgumentNullException.ThrowIfNull(next);
 
         return request is IBefehl
-            ? arbeitseinheit.InEinerTransaktionAsync(next.Invoke, cancellationToken)
+            ? arbeitseinheit.InTransactionAsync(next.Invoke, cancellationToken)
             : next(cancellationToken);
     }
 }

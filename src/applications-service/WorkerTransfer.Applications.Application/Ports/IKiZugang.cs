@@ -4,7 +4,7 @@ namespace WorkerTransfer.Applications.Application.Ports;
 
 /// <summary>Der KI-Zugang der Person, die den Entwurf anfordert.</summary>
 /// <remarks>
-/// Kommt aus den Kontoeinstellungen (identity-service), nicht aus einer
+/// Kommt aus den AccountSettings (identity-service), nicht aus einer
 /// Umgebungsvariable der Plattform. Die Oberfläche richtet Ollama oder MiniMax
 /// ein; ohne diese Abfrage sähe der Anschreiben-Dienst immer nur
 /// <c>Draft__Schluessel</c> und antwortete 503, während die Person glaubt,
@@ -33,5 +33,5 @@ public sealed record KiZugang(
 public interface IKiZugangAbfrage
 {
     /// <summary>Was diese Person eingerichtet hat — oder nichts.</summary>
-    Task<KiZugang> HoleAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task<KiZugang> GetAsync(SubjectId subject, CancellationToken cancellationToken = default);
 }

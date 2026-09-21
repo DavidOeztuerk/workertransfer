@@ -10,9 +10,9 @@ using WorkerTransfer.Contracts.Identity;
 namespace WorkerTransfer.Applications.Infrastructure.Unternehmen;
 
 /// <summary>Wo der Identity-Dienst für interne Abfragen antwortet.</summary>
-public sealed class UnternehmensmitgliederEinstellungen
+public sealed class CompanyMemberSettings
 {
-    public const string Abschnitt = "Identity";
+    public const string Section = "Identity";
 
     public string Adresse { get; set; } = string.Empty;
 
@@ -35,81 +35,81 @@ public sealed class UnternehmensmitgliederEinstellungen
 /// Liest den geteilten Vertrag — nie ein anonymes Objekt, nie einen zweiten
 /// Typen mit denselben Feldern.
 /// </remarks>
-public sealed class HttpUnternehmensmitgliederAbfrage(
+public sealed class HttpCompanyMemberLookup(
     IHttpClientFactory fabrik,
-    IOptions<UnternehmensmitgliederEinstellungen> einstellungen,
-    ILogger<HttpUnternehmensmitgliederAbfrage> protokoll) : IUnternehmensmitgliederAbfrage
+    IOptions<CompanyMemberSettings> einstellungen,
+    ILogger<HttpCompanyMemberLookup> protokoll) : ICompanyMemberLookup
 {
-    private readonly UnternehmensmitgliederEinstellungen _einstellungen = einstellungen.Value;
+    private readonly CompanyMemberSettings _einstellungen = einstellungen.Value;
 
     public const string Klient = "identity-internal";
 
     private const string Geheimniskopf = "X-Notify-Secret";
 
-    public async Task<IReadOnlyList<SubjectId>> HoleAsync(
-        TenantId firma,
+    public async Task<IReadOnlyList<SubjectId>> GetAsync(
+        TenantId company,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(_einstellungen.Adresse))
         {
-            throw new FirmaSchweigt("Identity:Adresse ist nicht gesetzt.");
+            throw new CompanyLookupSilent("Identity:Adresse ist nicht gesetzt.");
         }
 
         if (string.IsNullOrEmpty(_einstellungen.Geheimnis))
         {
-            throw new FirmaSchweigt("Identity:Geheimnis ist nicht gesetzt.");
+            throw new CompanyLookupSilent("Identity:Geheimnis ist nicht gesetzt.");
         }
 
         using var client = fabrik.CreateClient(Klient);
         client.Timeout = _einstellungen.Zeitueberschreitung;
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            using var anfrage = new HttpRequestMessage(
+            using var request = new HttpRequestMessage(
                 HttpMethod.Get,
-                new Uri(new Uri(_einstellungen.Adresse), $"/internal/companies/{firma.Value}/members"));
-            anfrage.Headers.Add(Geheimniskopf, _einstellungen.Geheimnis);
+                new Uri(new Uri(_einstellungen.Adresse), $"/internal/companies/{company.Value}/members"));
+            request.Headers.Add(Geheimniskopf, _einstellungen.Geheimnis);
 
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
-            protokoll.LogWarning("Identity-Dienst (intern) nicht erreichbar ({Art})", fehler.GetType().Name);
-            throw new FirmaSchweigt("identity-service (intern) ist nicht erreichbar.", fehler);
+            protokoll.LogWarning("Identity-Dienst (intern) nicht erreichbar ({Art})", error.GetType().Name);
+            throw new CompanyLookupSilent("identity-service (intern) ist nicht erreichbar.", error);
         }
-        catch (TaskCanceledException fehler) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
             protokoll.LogWarning("Identity-Dienst (intern) antwortete nicht rechtzeitig");
-            throw new FirmaSchweigt("identity-service (intern) antwortete nicht rechtzeitig.", fehler);
+            throw new CompanyLookupSilent("identity-service (intern) antwortete nicht rechtzeitig.", error);
         }
 
-        using (antwort)
+        using (response)
         {
-            if (antwort.StatusCode == HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
-                throw new FirmaSchweigt("identity-service (intern) nicht erreichbar oder Geheimnis ungültig.");
+                throw new CompanyLookupSilent("identity-service (intern) nicht erreichbar oder Geheimnis ungültig.");
             }
 
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
-                throw new FirmaSchweigt(
-                    $"identity-service (intern) antwortete mit {(int)antwort.StatusCode}.");
+                throw new CompanyLookupSilent(
+                    $"identity-service (intern) antwortete mit {(int)response.StatusCode}.");
             }
 
             try
             {
-                var gelesen = await antwort.Content
-                    .ReadFromJsonAsync<UnternehmensmitgliederAntwortV1>(cancellationToken)
-                    ?? throw new FirmaSchweigt("identity-service (intern) sandte nichts.");
+                var gelesen = await response.Content
+                    .ReadFromJsonAsync<CompanyMembersResponseV1>(cancellationToken)
+                    ?? throw new CompanyLookupSilent("identity-service (intern) sandte nichts.");
 
                 return [.. gelesen.Mitglieder.Select(m => new SubjectId(m.SubjectId))];
             }
-            catch (JsonException fehler)
+            catch (JsonException error)
             {
-                throw new FirmaSchweigt(
-                    "identity-service (intern) sandte eine unbrauchbare Antwort.", fehler);
+                throw new CompanyLookupSilent(
+                    "identity-service (intern) sandte eine unbrauchbare Antwort.", error);
             }
         }
     }

@@ -10,5 +10,5 @@ namespace WorkerTransfer.Identity.Application.Ports;
 public interface IPostkorbVersand
 {
     /// <summary>Sends everything queued in this request, and clears it.</summary>
-    Task VersendeGesammeltesAsync(CancellationToken cancellationToken = default);
+    Task SendCollectedAsync(CancellationToken cancellationToken = default);
 }

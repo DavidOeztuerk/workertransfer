@@ -33,55 +33,55 @@ public sealed class Postkorb(
 
     /// <inheritdoc />
     public void Bestaetigungslink(
-        string an, SubjectId empfaenger, string klartextToken, Kontosprache sprache)
+        string an, SubjectId recipient, string klartextToken, Kontosprache language)
     {
         var basis = _einstellungen.WebAdresse.TrimEnd('/');
         var text = Mailtexte.Bestaetigung(
-            sprache, $"{basis}/verify?token={klartextToken}");
+            language, $"{basis}/verify?token={klartextToken}");
 
-        _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, empfaenger));
+        _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, recipient));
     }
 
     /// <inheritdoc />
-    public void Doppelanmeldung(string an, SubjectId empfaenger, Kontosprache sprache)
+    public void Doppelanmeldung(string an, SubjectId recipient, Kontosprache language)
     {
-        var text = Mailtexte.Doppelanmeldung(sprache);
-        _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, empfaenger));
+        var text = Mailtexte.Doppelanmeldung(language);
+        _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, recipient));
     }
 
     /// <inheritdoc />
     public void Einladung(
-        string an, SubjectId einladender, string firma, string klartextToken,
-        Kontosprache sprache)
+        string an, SubjectId einladender, string company, string klartextToken,
+        Kontosprache language)
     {
         var basis = _einstellungen.WebAdresse.TrimEnd('/');
-        var wen = string.IsNullOrWhiteSpace(firma)
-            ? Mailtexte.EinUnternehmen(sprache)
-            : firma;
+        var wen = string.IsNullOrWhiteSpace(company)
+            ? Mailtexte.EinUnternehmen(language)
+            : company;
         var text = Mailtexte.Einladung(
-            sprache, wen, $"{basis}/invitation?token={klartextToken}");
+            language, wen, $"{basis}/invitation?token={klartextToken}");
 
         _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, einladender));
     }
 
     /// <inheritdoc />
-    public void Loeschbestaetigung(string an, SubjectId wer, Kontosprache sprache)
+    public void Loeschbestaetigung(string an, SubjectId subject, Kontosprache language)
     {
-        var text = Mailtexte.Loeschbestaetigung(sprache);
-        _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, wer));
+        var text = Mailtexte.Loeschbestaetigung(language);
+        _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, subject));
     }
 
     /// <inheritdoc />
-    public void Neuigkeit(string an, SubjectId wer, Kontosprache sprache)
+    public void Neuigkeit(string an, SubjectId subject, Kontosprache language)
     {
         var basis = _einstellungen.WebAdresse.TrimEnd('/');
-        var text = Mailtexte.Neuigkeit(sprache, basis);
+        var text = Mailtexte.Neuigkeit(language, basis);
 
-        _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, wer));
+        _wartend.Add(new AusgehendePost(an, text.Betreff, text.Text, subject));
     }
 
     /// <inheritdoc />
-    public async Task VersendeGesammeltesAsync(CancellationToken cancellationToken = default)
+    public async Task SendCollectedAsync(CancellationToken cancellationToken = default)
     {
         // Taken out first: a send that throws must not leave the tray full for
         // whatever runs next in this scope.
@@ -94,10 +94,10 @@ public sealed class Postkorb(
             {
                 await versender.SendeAsync(post, cancellationToken);
             }
-            catch (Exception fehler)
+            catch (Exception error)
             {
                 protokoll.LogError(
-                    fehler, "Mail an Konto {Konto} konnte nicht zugestellt werden",
+                    error, "Mail an Konto {Konto} konnte nicht zugestellt werden",
                     post.Empfaenger);
             }
         }

@@ -17,11 +17,11 @@ namespace WorkerTransfer.Resume.Application.Anfragen;
 /// to <c>false</c>. Exactly why the permission is not a field on the
 /// proceeding.
 /// </remarks>
-public sealed record Anfrageansicht(Anfrage Anfrage, bool Aktiv);
+public sealed record ResumeRequestView(ResumeRequest ResumeRequest, bool Aktiv);
 
 /// <summary>Who asked about me, and what they hold right now.</summary>
-public sealed record MeineAnfragenAbfrage(SubjectId Wer)
-    : IAbfrage<IReadOnlyList<Anfrageansicht>>;
+public sealed record MyRequestsQuery(SubjectId Wer)
+    : IAbfrage<IReadOnlyList<ResumeRequestView>>;
 
 /// <summary>Reads the proceedings, then asks the ledger about the granted ones.</summary>
 /// <remarks>
@@ -30,22 +30,22 @@ public sealed record MeineAnfragenAbfrage(SubjectId Wer)
 /// the Python service made one call per row and paid for a person with forty
 /// requests in seconds (ADR-0030).
 /// </remarks>
-public sealed class MeineAnfragenHandler(IAnfragenSpeicher speicher, IEinwilligungstor tor)
-    : IRequestHandler<MeineAnfragenAbfrage, IReadOnlyList<Anfrageansicht>>
+public sealed class MyRequestsHandler(IRequestStore store, IConsentGate tor)
+    : IRequestHandler<MyRequestsQuery, IReadOnlyList<ResumeRequestView>>
 {
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Anfrageansicht>> Handle(
-        MeineAnfragenAbfrage request,
+    public async Task<IReadOnlyList<ResumeRequestView>> Handle(
+        MyRequestsQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var anfragen = await speicher.FuerPersonAsync(request.Wer, cancellationToken);
-        var erteilte = anfragen.Where(a => a.Stand == Anfragestand.Granted).ToList();
+        var requests = await store.ForPersonAsync(request.Wer, cancellationToken);
+        var erteilte = requests.Where(a => a.State == RequestState.Granted).ToList();
 
         var urteile = erteilte.Count == 0
             ? []
-            : await tor.DuerfenLebenslaufLesenAsync(
+            : await tor.MayEachReadResumeAsync(
                 [.. erteilte.Select(a => (a.Wer, a.Firma))], cancellationToken);
 
         var aktivNach = new Dictionary<Guid, bool>();
@@ -55,7 +55,7 @@ public sealed class MeineAnfragenHandler(IAnfragenSpeicher speicher, IEinwilligu
             aktivNach[erteilte[i].Id] = urteile[i];
         }
 
-        return [.. anfragen.Select(a => new Anfrageansicht(
+        return [.. requests.Select(a => new ResumeRequestView(
             a, aktivNach.TryGetValue(a.Id, out var aktiv) && aktiv))];
     }
 }

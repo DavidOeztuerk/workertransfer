@@ -17,12 +17,12 @@ namespace WorkerTransfer.Scout.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("WorkerTransfer.Outbox.OutboxZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Outbox.OutboxRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -66,7 +66,7 @@ namespace WorkerTransfer.Scout.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox", (string)null);
                 });
 
-            modelBuilder.Entity("WorkerTransfer.Scout.Infrastructure.Persistence.SucheZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Scout.Infrastructure.Persistence.SearchRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")

@@ -83,8 +83,9 @@ export function PaginationControls({
         borderColor: "divider",
       }}
     >
-      {/* LINKS: wo man ist. Bereich und Nummern sind EINE Aussage. */}
       <Box
+        // LEFT: where you are. Range and numbers are ONE statement, so they
+        // share a box.
         sx={{
           display: "flex",
           alignItems: "center",
@@ -122,15 +123,6 @@ export function PaginationControls({
         ) : null}
       </Box>
 
-      {/*
-        RECHTS: wie viel auf eine Seite kommt — Beschriftung NEBEN dem Feld.
-
-        Die Beschriftung steht als eigenes `label` daneben und nicht als
-        `label`-Eigenschaft am Feld: die Oberfläche setzt Feldbeschriftungen
-        grundsätzlich ÜBER das Feld (siehe `MuiInputLabel` im Thema), und hier
-        wäre das eine zweizeilige Insel neben einer einzeiligen Leiste. Über
-        `htmlFor` bleibt es trotzdem eine echte Beschriftung.
-      */}
       <Box
         sx={{
           display: "flex",
@@ -140,6 +132,11 @@ export function PaginationControls({
         }}
       >
         <Typography
+          // RIGHT: how much fits on a page — the label stands BESIDE the field
+          // as its own `label` and not as the field's `label` property: this UI
+          // puts field labels ABOVE the field (see `MuiInputLabel` in the
+          // theme), which here would be a two-line island next to a one-line
+          // bar. `htmlFor` keeps it a real label.
           component="label"
           htmlFor={groessenFeld}
           variant="body2"

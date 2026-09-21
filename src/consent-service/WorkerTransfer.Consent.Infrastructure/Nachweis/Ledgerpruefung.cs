@@ -4,7 +4,7 @@ using Noelia.Abstractions.Compliance;
 using Noelia.Abstractions.Hosting;
 using Noelia.Abstractions.Security.Checks;
 using WorkerTransfer.Consent.Infrastructure.Persistence;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 
 namespace WorkerTransfer.Consent.Infrastructure.Nachweis;
 
@@ -23,7 +23,7 @@ namespace WorkerTransfer.Consent.Infrastructure.Nachweis;
 /// <c>AuflagenTests</c>: eine Spalte, die über eine Konvention oder eine
 /// Basisklasse hereinkäme, stünde in keiner Datei, die ein Textsucher
 /// durchsieht. Das Modell wird dafür gebaut, nicht abgefragt — es braucht keine
-/// Verbindung, und diese Prüfung rührt die Datenbank nicht an.</para>
+/// Connection, und diese Prüfung rührt die Datenbank nicht an.</para>
 ///
 /// <para>Der Ledger kennt außerdem <strong>keine Verweigerung</strong>: jede
 /// Fähigkeit ist eine Sichtbarkeit, und es gibt nur Gewähren und Widerrufen
@@ -37,9 +37,9 @@ namespace WorkerTransfer.Consent.Infrastructure.Nachweis;
 /// ist kein Umstand, sondern Pflicht: Noelias Pruefungen sind Singletons, der
 /// <c>DbContext</c> ist bereichsgebunden. Ihn in ein Singleton zu ziehen waere
 /// eine gefangene Abhaengigkeit — ein Kontext, der ewig lebt, und der erste
-/// Fehler daran faellt Wochen spaeter an einer ganz anderen Stelle auf.
+/// Fehler daran faellt Wochen spaeter an einer ganz anderen Job auf.
 /// </param>
-public sealed class Ledgerpruefung(IServiceProvider anbieter) : ISecurityCheck
+public sealed class LedgerCheck(IServiceProvider provider) : ISecurityCheck
 {
     /// <summary>Spaltennamen, die einen Mandanten bezeichnen.</summary>
     private static readonly string[] Mandantenworte =
@@ -52,7 +52,7 @@ public sealed class Ledgerpruefung(IServiceProvider anbieter) : ISecurityCheck
     public NoeliaModule Module => NoeliaModule.Composition;
 
     /// <inheritdoc />
-    /// <remarks>Auswahlregel — siehe <c>Anbieterpruefung</c>.</remarks>
+    /// <remarks>Auswahlregel — siehe <c>ProviderCheck</c>.</remarks>
     public SecurityCheckCategory Category => SecurityCheckCategory.Composition;
 
     /// <inheritdoc />
@@ -68,15 +68,15 @@ public sealed class Ledgerpruefung(IServiceProvider anbieter) : ISecurityCheck
     /// <inheritdoc />
     public IReadOnlyList<RegulatoryReference> References =>
     [
-        Rechtsbezuege.Widerruf,
-        Rechtsbezuege.Rechenschaft
+        AdditionalRegulatoryReferences.Revocation,
+        AdditionalRegulatoryReferences.Accountability
     ];
 
     /// <inheritdoc />
     public Task<SecurityCheckResult> RunAsync(CancellationToken cancellationToken = default)
     {
-        using var bereich = anbieter.CreateScope();
-        var kontext = bereich.ServiceProvider.GetRequiredService<ConsentDbContext>();
+        using var scope = provider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ConsentDbContext>();
 
         // NUR DER LEDGER, und das ist beim ersten Lauf gegen den echten Stapel
         // gemessen worden: ueber ALLE Entitaeten gelesen meldete diese Pruefung
@@ -89,9 +89,9 @@ public sealed class Ledgerpruefung(IServiceProvider anbieter) : ISecurityCheck
         // Zwei Tabellen, zwei Regeln — eine Pruefung, die beide ueber einen
         // Kamm schert, ist nicht strenger, sondern unbrauchbar: sie meldet rot
         // ueber korrekten Code, und beim zweiten Mal schaltet sie jemand ab.
-        var ledger = kontext.Model.FindEntityType(typeof(ConsentEventRow));
+        var ledger = context.Model.FindEntityType(typeof(ConsentEventRow));
 
-        var spalten = ledger is null
+        var columns = ledger is null
             ? []
             : ledger.GetProperties()
                 .Select(eigenschaft => (
@@ -99,7 +99,7 @@ public sealed class Ledgerpruefung(IServiceProvider anbieter) : ISecurityCheck
                     Spalte: eigenschaft.Name))
                 .ToList();
 
-        if (spalten.Count == 0)
+        if (columns.Count == 0)
         {
             return Task.FromResult(Ergebnis(
                 SecurityCheckStatus.Fail,
@@ -110,19 +110,19 @@ public sealed class Ledgerpruefung(IServiceProvider anbieter) : ISecurityCheck
                 + "sieht aus wie in Ordnung."));
         }
 
-        var treffer = spalten
-            .Where(eintrag => Mandantenworte.Any(wort =>
-                eintrag.Spalte.Contains(wort, StringComparison.OrdinalIgnoreCase)))
-            .Select(eintrag => $"{eintrag.Tabelle}.{eintrag.Spalte}")
+        var hit = columns
+            .Where(entry => Mandantenworte.Any(word =>
+                entry.Spalte.Contains(word, StringComparison.OrdinalIgnoreCase)))
+            .Select(entry => $"{entry.Tabelle}.{entry.Spalte}")
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
 
-        if (treffer.Count > 0)
+        if (hit.Count > 0)
         {
             return Task.FromResult(Ergebnis(
                 SecurityCheckStatus.Fail,
-                $"Der Ledger trägt {treffer.Count} Spalte(n), die einen "
-                + $"Mandanten bezeichnen: {string.Join(", ", treffer)}.",
+                $"Der Ledger trägt {hit.Count} Spalte(n), die einen "
+                + $"Mandanten bezeichnen: {string.Join(", ", hit)}.",
                 "Eine Einwilligung gehört der Person und folgt ihr über "
                 + "Arbeitgeber hinweg (ADR-0017). Eine Mandantenspalte bindet "
                 + "sie an ein Unternehmen — beim Wechsel wäre sie weg, und "
@@ -131,7 +131,7 @@ public sealed class Ledgerpruefung(IServiceProvider anbieter) : ISecurityCheck
 
         return Task.FromResult(Ergebnis(
             SecurityCheckStatus.Pass,
-            $"Keine der {spalten.Count} Spalten der Ledger-Tabelle bezeichnet einen "
+            $"Keine der {columns.Count} Spalten der Ledger-Tabelle bezeichnet einen "
             + "Mandanten: eine Einwilligung gehört der Person und folgt ihr über "
             + "Arbeitgeber hinweg. Der Ledger kennt außerdem nur Gewähren und "
             + "Widerrufen — eine Verweigerung gibt es nicht, und „sichtbar für "
@@ -143,8 +143,8 @@ public sealed class Ledgerpruefung(IServiceProvider anbieter) : ISecurityCheck
     }
 
     private SecurityCheckResult Ergebnis(
-        SecurityCheckStatus stand, string zusammenfassung, string abhilfe) =>
-        new(Id, Module, Category, stand, Severity, zusammenfassung, abhilfe)
+        SecurityCheckStatus state, string zusammenfassung, string abhilfe) =>
+        new(Id, Module, Category, state, Severity, zusammenfassung, abhilfe)
         {
             References = References
         };

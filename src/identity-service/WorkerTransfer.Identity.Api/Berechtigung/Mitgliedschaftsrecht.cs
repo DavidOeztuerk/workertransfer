@@ -25,7 +25,7 @@ namespace WorkerTransfer.Identity.Api.Berechtigung;
 /// derselben Familie wie „eine Einwilligung muss sofort wirken": das gilt,
 /// weil es richtig ist.</para>
 ///
-/// <para>Der Preis ist eine Abfrage je geschützter Anfrage. Sie trifft einen
+/// <para>Der Preis ist eine Abfrage je geschützter ResumeRequest. Sie trifft einen
 /// Primärschlüssel und betrifft nur die Verwaltungsendpunkte einer Firma —
 /// nicht die Lesewege, die Menschen den ganzen Tag benutzen.</para>
 ///
@@ -34,20 +34,20 @@ namespace WorkerTransfer.Identity.Api.Berechtigung;
 /// verlangt, dass jemand vorher <c>POST /auth/company/{id}</c> ruft, und die
 /// bestehenden Reisen tun das nicht. Der Pfad ist hier auch keine Vertrauens-
 /// frage: er benennt nur, <em>welche</em> Firma gemeint ist. Geprüft wird die
-/// Mitgliedschaft <em>des Aufrufers in genau dieser</em> Firma — wer für eine
+/// Membership <em>des Aufrufers in genau dieser</em> Firma — wer für eine
 /// fremde fragt, hat dort keine Rolle und wird abgelehnt. Genau so las es
-/// <c>Firmenzugriff.AlsAdminAsync</c> schon vorher.</para>
+/// <c>CompanyAccess.AsAdminAsync</c> schon vorher.</para>
 /// </remarks>
-public sealed class Mitgliedschaftsrecht(
-    Firmenzugriff zugriff,
+public sealed class MembershipPermission(
+    CompanyAccess zugriff,
     IHttpContextAccessor zugang)
     : AuthorizationHandler<PermissionRequirement>
 {
     private static readonly string[] NurAdmin =
     [
-        Firmenrechte.Einladen,
-        Firmenrechte.EinladungZuruecknehmen,
-        Firmenrechte.Entfernen
+        CompanyPermissions.Einladen,
+        CompanyPermissions.EinladungZuruecknehmen,
+        CompanyPermissions.Entfernen
     ];
 
     /// <inheritdoc />
@@ -63,16 +63,16 @@ public sealed class Mitgliedschaftsrecht(
             return;
         }
 
-        if (Wer(context.User) is not { } handelnder || Firma() is not { } firma)
+        if (Wer(context.User) is not { } handelnder || Firma() is not { } company)
         {
             // Kein Succeed und kein Fail: hier ist nichts zu entscheiden — und
             // ein anderer Handler darf trotzdem noch antworten.
             return;
         }
 
-        var rolle = await zugriff.RolleOderNichtsAsync(handelnder, firma);
+        var role = await zugriff.RoleOrNoneAsync(handelnder, company);
 
-        if (rolle == MembershipRole.Admin)
+        if (role == MembershipRole.Admin)
         {
             context.Succeed(requirement);
         }
@@ -83,7 +83,7 @@ public sealed class Mitgliedschaftsrecht(
     /// </summary>
     /// <remarks>
     /// NICHT aus <c>ICurrentPrincipal</c>. Das war der erste Versuch und ergab
-    /// an jeder geschützten Anfrage einen 403: Noelias <c>UseAuth()</c> ist
+    /// an jeder geschützten ResumeRequest einen 403: Noelias <c>UseAuth()</c> ist
     /// Authentifizierung <em>und</em> Autorisierung, und <c>UsePrincipal()</c>
     /// läuft danach — während die Richtlinie entscheidet, ist
     /// <c>ICurrentPrincipal.Current</c> also noch leer. Ein
@@ -94,13 +94,13 @@ public sealed class Mitgliedschaftsrecht(
         var roh = nutzer.FindFirst("sub")?.Value
                   ?? nutzer.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-        return Guid.TryParse(roh, out var kennung) ? new SubjectId(kennung) : null;
+        return Guid.TryParse(roh, out var id) ? new SubjectId(id) : null;
     }
 
     /// <summary>Welche Firma der Pfad benennt.</summary>
     private TenantId? Firma() =>
         zugang.HttpContext?.GetRouteValue("tenantId") is string roh
-        && Guid.TryParse(roh, out var kennung)
-            ? new TenantId(kennung)
+        && Guid.TryParse(roh, out var id)
+            ? new TenantId(id)
             : null;
 }

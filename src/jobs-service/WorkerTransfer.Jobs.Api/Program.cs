@@ -3,12 +3,12 @@ using WorkerTransfer.Jobs.Api.Berechtigung;
 using WorkerTransfer.Jobs.Infrastructure;
 using WorkerTransfer.Jobs.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.ServiceDefaults.Rollen;
+using WorkerTransfer.ServiceDefaults.Roles;
 
-// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
+// Konfiguration aus der EnvironmentFile. VOR CreateBuilder, weil der
 // Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
 // geladen hiesse geladen und von niemandem gelesen.
-WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 const string dienstname = "jobs-service";
@@ -18,7 +18,7 @@ builder.Services.AddWorkerTransferDefaults(
 
 // Zwei Handlungen binden dieses Unternehmen nach aussen — eine Anzeige
 // hinstellen und sie wegnehmen. Wer das darf, entscheidet die
-// MITGLIEDSCHAFTSTABELLE von identity-service, je Anfrage und nicht das Token:
+// MITGLIEDSCHAFTSTABELLE von identity-service, je ResumeRequest und nicht das Token:
 // ein Token lebt weiter, nachdem jemand aus einer Firma entfernt wurde, und die
 // Entfernung wirkte dann erst beim Ablauf.
 //
@@ -26,8 +26,8 @@ builder.Services.AddWorkerTransferDefaults(
 // darf nicht elfmal beantwortet werden, die Liste ist eine Entscheidung.
 builder.Services.AddAdminrechte(
     builder.Configuration,
-    Stellenrechte.Veroeffentlichen,
-    Stellenrechte.Schliessen);
+    JobPermissions.Veroeffentlichen,
+    JobPermissions.Schliessen);
 
 builder.Services.AddJobsInfrastructure(
     builder.Configuration,
@@ -37,7 +37,7 @@ builder.Services.AddJobsInfrastructure(
 var app = builder.Build();
 
 // Erst wandern, dann bedienen (ADR-0010).
-await app.WandereAsync<JobsDbContext>();
+await app.MigrateSchemaAsync<JobsDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, dienstname);
 

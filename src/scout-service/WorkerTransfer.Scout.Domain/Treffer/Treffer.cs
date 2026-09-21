@@ -1,6 +1,6 @@
 using Noelia.Core.Identity;
 
-namespace WorkerTransfer.Scout.Domain.Treffer;
+namespace WorkerTransfer.Scout.Domain.Hit;
 
 /// <summary>Ein Haken: wurde dieses Wort von der Person genannt?</summary>
 /// <remarks>
@@ -15,21 +15,21 @@ namespace WorkerTransfer.Scout.Domain.Treffer;
 /// man nicht bestreiten.</para>
 /// </remarks>
 /// <param name="Wort">Das Wort, nach dem gesucht wurde — kanonisch.</param>
-/// <param name="Genannt">Ob die Person es selbst in ihr Profil getippt hat.</param>
+/// <param name="Genannt">Ob die Person es selbst in ihr Profile getippt hat.</param>
 public sealed record Haken(string Wort, bool Genannt);
 
-/// <summary>Woher ein Beleg kommt.</summary>
+/// <summary>Woher ein Evidence kommt.</summary>
 /// <remarks>
-/// Ein Beleg ist eine Aussage über ein <em>Artefakt</em>, nie über einen
-/// Menschen (ADR-0033). Die Herkunft steht deshalb dabei: wer den Beleg liest,
+/// Ein Evidence ist eine Aussage über ein <em>Artefakt</em>, nie über einen
+/// Menschen (ADR-0033). Die ProviderOrigin steht deshalb dabei: wer den Evidence liest,
 /// soll sehen, wer ihn geschrieben hat — ein Mensch an ein Repository, oder
 /// GitHubs Sprachenerkennung an dessen Dateien.
 /// </remarks>
-public enum Belegart
+public enum EvidenceKind
 {
     /// <summary>Ein Topic, das ein Mensch an das Repository geschrieben hat.</summary>
     /// <remarks>
-    /// Der stärkste Beleg, weil er eine <em>Nennung</em> ist und nichts
+    /// Der stärkste Evidence, weil er eine <em>Nennung</em> ist und nichts
     /// Abgeleitetes (ADR-0033).
     /// </remarks>
     Thema,
@@ -43,18 +43,18 @@ public enum Belegart
     Sprache
 }
 
-/// <summary>Ein einzelner Beleg mit seiner Herkunft.</summary>
+/// <summary>Ein einzelner Evidence mit seiner ProviderOrigin.</summary>
 /// <param name="Wort">Das Topic oder der Sprachname, abgeschrieben.</param>
 /// <param name="Art">Wer es gesagt hat.</param>
 /// <param name="Projekt">Das Repository, aus dem es stammt.</param>
-/// <param name="Adresse">Der Link dorthin — ein Beleg ohne Nachprüfbarkeit ist keiner.</param>
-public sealed record Beleg(string Wort, Belegart Art, string Projekt, string Adresse);
+/// <param name="Adresse">Der Link dorthin — ein Evidence ohne Nachprüfbarkeit ist keiner.</param>
+public sealed record Evidence(string Wort, EvidenceKind Art, string Projekt, string Adresse);
 
-/// <summary>Was ein Treffer über seine eigene Unvollständigkeit sagt.</summary>
+/// <summary>Was ein Hit über seine eigene Unvollständigkeit sagt.</summary>
 /// <remarks>
 /// <para><strong>Die dritte Entscheidung aus ADR-0036, und sie ist die
 /// unbequemste.</strong> Wer nichts auf GitHub hat, ist nicht schlechter,
-/// sondern woanders (ADR-0022 §3). Ein Treffer ohne Belege bekommt deshalb
+/// sondern woanders (ADR-0022 §3). Ein Hit ohne Belege bekommt deshalb
 /// dieselbe Antwortgestalt wie jeder andere und einen <em>Hinweis in der
 /// JSON</em> — keine leere Box, keine ausgegraute Karte, kein Weglassen.</para>
 ///
@@ -62,12 +62,12 @@ public sealed record Beleg(string Wort, Belegart Art, string Projekt, string Adr
 /// lesenden Person (ADR-0031), und ein deutscher Satz auf dem Draht wäre eine
 /// Sprache, die der Server für alle festlegt.</para>
 /// </remarks>
-public enum Belegstand
+public enum EvidenceState
 {
     /// <summary>Belege liegen vor, und sie sind vollständig.</summary>
     Vollstaendig,
 
-    /// <summary>Diese Person hat keine nachgewiesene, freigegebene Verbindung.</summary>
+    /// <summary>Diese Person hat keine nachgewiesene, freigegebene Connection.</summary>
     /// <remarks>
     /// Das ist <em>kein</em> Urteil. Es heisst: hier steht nichts, und hier
     /// steht auch nicht, dass nichts wäre.
@@ -91,7 +91,7 @@ public enum Belegstand
 /// <remarks>
 /// <para>Was hier steht, hat die Person selbst geschrieben
 /// (<see cref="Ueberschrift"/>, <see cref="Ort"/>, <see cref="Genannt"/>) oder
-/// ist ein Beleg mit Herkunft und Link. Nichts ist gerechnet, nichts
+/// ist ein Evidence mit ProviderOrigin und Link. Nichts ist gerechnet, nichts
 /// zusammengefasst, nichts geordnet.</para>
 ///
 /// <para><strong>Die Häkchenliste gehört in diesen Typ und nicht in die
@@ -99,7 +99,7 @@ public enum Belegstand
 /// rechnete der Browser sich eine Zahl aus den Rohdaten — und ADR-0022 wäre
 /// durch die Hintertür da.</para>
 /// </remarks>
-public sealed record Treffer(
+public sealed record Hit(
     SubjectId Wer,
     string Ueberschrift,
     string Text,
@@ -107,14 +107,14 @@ public sealed record Treffer(
     bool RemoteMoeglich,
     IReadOnlyList<string> Genannt,
     IReadOnlyList<Haken> Haken,
-    IReadOnlyList<Beleg> Belege,
-    Belegstand Belegstand,
+    IReadOnlyList<Evidence> Belege,
+    EvidenceState EvidenceState,
     /// <summary>Das Häkchen zur Entfernung (ADR-0041) — nie eine Zahl.</summary>
-    Erreichbarkeit Erreichbarkeit);
+    Availability Availability);
 
-/// <summary>Eine Seite Treffer.</summary>
+/// <summary>Eine Seite Hit.</summary>
 /// <remarks>
-/// <para><strong>Keine Gesamtzahl</strong> (ADR-0026, ADR-0036). Sie verriete
+/// <para><strong>None Gesamtzahl</strong> (ADR-0026, ADR-0036). Sie verriete
 /// über die Differenz zur Seitenlänge, wie viele Profile <em>nicht</em>
 /// freigegeben sind — genau die Auskunft, die der Ledger schützt.</para>
 ///
@@ -122,4 +122,4 @@ public sealed record Treffer(
 /// (ADR-0020 §4): nachzuladen, bis die Seite voll ist, verriete dasselbe über
 /// die Anzahl der Runden. Eine kurze Seite ist hier eine richtige Antwort.</para>
 /// </remarks>
-public sealed record Trefferseite(IReadOnlyList<Treffer> Eintraege, string? Weiter);
+public sealed record HitPage(IReadOnlyList<Hit> Eintraege, string? Weiter);

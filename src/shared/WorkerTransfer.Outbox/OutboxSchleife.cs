@@ -19,7 +19,7 @@ namespace WorkerTransfer.Outbox;
 /// <typeparam name="TKontext">The service's own context.</typeparam>
 public sealed class OutboxSchleife<TKontext>(
     IServiceScopeFactory bereiche,
-    OutboxEinstellungen einstellungen,
+    OutboxSettings einstellungen,
     TimeProvider uhr,
     ILogger<OutboxSchleife<TKontext>> protokoll) : BackgroundService
     where TKontext : DbContext
@@ -39,19 +39,19 @@ public sealed class OutboxSchleife<TKontext>(
                 // A scope per pass: the dispatcher and its delivery reach into
                 // a database, and a background loop that holds one context for
                 // its whole life holds it for days.
-                using var bereich = bereiche.CreateScope();
+                using var scope = bereiche.CreateScope();
 
-                (faellig, zugestellt) = await bereich.ServiceProvider
-                    .GetRequiredService<OutboxZusteller<TKontext>>()
-                    .DurchlaufAsync(stoppingToken);
+                (faellig, zugestellt) = await scope.ServiceProvider
+                    .GetRequiredService<OutboxDispatcher<TKontext>>()
+                    .PassAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 return;
             }
-            catch (Exception fehler)
+            catch (Exception error)
             {
-                protokoll.LogWarning(fehler, "Outbox-Durchlauf fehlgeschlagen");
+                protokoll.LogWarning(error, "Outbox-Durchlauf fehlgeschlagen");
                 (faellig, zugestellt) = (1, 0);
             }
 

@@ -12,95 +12,95 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// do it, what is recorded alongside, what is answered. One writer keeps the
 /// agreement true rather than duplicated.
 /// </remarks>
-public sealed class Einwilligungsschreiber(
+public sealed class ConsentWriter(
     IConsentLedger buch,
     IAuditTrail pruefspur,
     IKorrelation korrelation,
     TimeProvider uhr)
 {
     /// <summary>Records a grant.</summary>
-    public Task<Einwilligungsergebnis> ErteileAsync(
+    public Task<ConsentResult> GrantAsync(
         SubjectId handelnder,
-        TenantId? firma,
+        TenantId? company,
         Guid gegenstand,
-        string faehigkeit,
-        string? grund,
+        string skill,
+        string? reason,
         CancellationToken cancellationToken) =>
-        SchreibeAsync(
-            ConsentAction.Grant, handelnder, firma, gegenstand, faehigkeit, grund,
+        WriteAsync(
+            ConsentAction.Grant, handelnder, company, gegenstand, skill, reason,
             cancellationToken);
 
     /// <summary>Records a withdrawal.</summary>
-    public Task<Einwilligungsergebnis> WiderrufeAsync(
+    public Task<ConsentResult> RevokeAsync(
         SubjectId handelnder,
-        TenantId? firma,
+        TenantId? company,
         Guid gegenstand,
-        string faehigkeit,
-        string grund,
+        string skill,
+        string reason,
         CancellationToken cancellationToken) =>
-        SchreibeAsync(
-            ConsentAction.Revoke, handelnder, firma, gegenstand, faehigkeit, grund,
+        WriteAsync(
+            ConsentAction.Revoke, handelnder, company, gegenstand, skill, reason,
             cancellationToken);
 
-    private static AuditAction Pruefhandlung(ConsentAction handlung) => handlung switch
+    private static AuditAction ToAuditAction(ConsentAction action) => action switch
     {
         ConsentAction.Grant => AuditAction.ConsentGrant,
         ConsentAction.Revoke => AuditAction.ConsentRevoke,
         _ => AuditAction.ConsentDelete
     };
 
-    private async Task<Einwilligungsergebnis> SchreibeAsync(
-        ConsentAction handlung,
+    private async Task<ConsentResult> WriteAsync(
+        ConsentAction action,
         SubjectId handelnder,
-        TenantId? firma,
+        TenantId? company,
         Guid gegenstand,
-        string faehigkeit,
-        string? grund,
+        string skill,
+        string? reason,
         CancellationToken cancellationToken)
     {
         // Before anything is read or written: a person manages their own
         // consent and nobody else's.
         if (handelnder.Value != gegenstand)
         {
-            return new Einwilligungsergebnis.FremderGegenstand();
+            return new ConsentResult.ForeignSubject();
         }
 
-        if (!Capability.TryParse(faehigkeit, out var faehigkeitswert))
+        if (!Capability.TryParse(skill, out var faehigkeitswert))
         {
-            return new Einwilligungsergebnis.Unbrauchbar("capability");
+            return new ConsentResult.Unbrauchbar("capability");
         }
 
         WithdrawalReason? grundwert = null;
 
-        if (grund is not null && !WithdrawalReason.TryParse(grund, out grundwert))
+        if (reason is not null && !WithdrawalReason.TryParse(reason, out grundwert))
         {
-            return new Einwilligungsergebnis.Unbrauchbar("reason");
+            return new ConsentResult.Unbrauchbar("reason");
         }
 
-        if (handlung is ConsentAction.Revoke && grundwert is null)
+        if (action is ConsentAction.Revoke && grundwert is null)
         {
-            return new Einwilligungsergebnis.Unbrauchbar("reason");
+            return new ConsentResult.Unbrauchbar("reason");
         }
 
-        var jetzt = uhr.GetUtcNow();
+        var now = uhr.GetUtcNow();
         var subject = new SubjectId(gegenstand);
 
-        var ereignis = handlung is ConsentAction.Grant
-            ? ConsentEvent.Grant(subject, faehigkeitswert, jetzt, handelnder, grundwert)
-            : ConsentEvent.Revoke(subject, faehigkeitswert, jetzt, grundwert!, handelnder);
+        var ereignis = action is ConsentAction.Grant
+            ? ConsentEvent.Grant(subject, faehigkeitswert, now, handelnder, grundwert)
+            : ConsentEvent.Revoke(subject, faehigkeitswert, now, grundwert!, handelnder);
 
-        await buch.AnhaengenAsync(ereignis, cancellationToken);
+        await buch.AttachAsync(ereignis, cancellationToken);
 
         // Same transaction as the fact above (ADR-0012). The capability name is
         // allowlisted metadata; the data it governs never is, and neither is
         // the reason the person wrote — that one stays in the ledger row, where
         // only they can read it back.
-        await pruefspur.AnhaengenAsync(
+        await pruefspur.AttachAsync(
             new AuditEvent(
-                Pruefhandlung(handlung),
-                jetzt,
+                ToAuditAction(action),
+                now,
                 handelnder,
-                firma,
+                company,
                 subject,
                 korrelation.Aktuell,
                 new Dictionary<string, string>(StringComparer.Ordinal)
@@ -112,9 +112,9 @@ public sealed class Einwilligungsschreiber(
         // Read back rather than assumed: the fact just written is the newest
         // one unless a clock went backwards, and in that case the ledger is
         // right and this handler is not.
-        var neuestes = await buch.NeuestesAsync(subject, faehigkeitswert, cancellationToken);
+        var neuestes = await buch.LatestOneAsync(subject, faehigkeitswert, cancellationToken);
 
-        return new Einwilligungsergebnis.Stand(
-            Projektion.Stand(neuestes is null ? [] : [neuestes]));
+        return new ConsentResult.State(
+            Projektion.State(neuestes is null ? [] : [neuestes]));
     }
 }

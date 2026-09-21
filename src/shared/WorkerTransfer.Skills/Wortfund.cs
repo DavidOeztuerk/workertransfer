@@ -7,8 +7,8 @@ namespace WorkerTransfer.Skills;
 /// <remarks>
 /// <strong>Es sucht, was der <see cref="Wortschatz"/> kennt, und rät nie.</strong>
 /// Das ist die ganze Grenze, und sie ist dieselbe wie eine Zeile weiter oben:
-/// <c>Wortschatz</c> benennt um und folgert nicht, und diese Funktion wendet
-/// genau das auf einen gefundenen Text an. Sie liest in einem Zeugnis die
+/// <c>Vocabulary</c> benennt um und folgert nicht, und diese Funktion wendet
+/// genau das auf einen gefundenen Text an. Sie liest in einem Reference die
 /// Schreibweise <c>„schweissfachmann"</c> und bietet dafür den kanonischen
 /// Namen <c>„Schweißfachmann"</c> an — eine Aussage über <em>Sprache</em>.
 /// <para>
@@ -16,11 +16,11 @@ namespace WorkerTransfer.Skills;
 /// dass es eine Fähigkeit sei. „Grossgeschrieben", „steht hinter dem Doppelpunkt",
 /// „kommt oft vor" — jede dieser Regeln wäre eine Vermutung über einen Menschen,
 /// gebildet aus der Gestalt seines Dokuments. Wer ein Wort vermisst, erweitert
-/// den Wortschatz per Pull Request; er wird nie aus den Unterlagen von Menschen
+/// den Vocabulary per Pull Request; er wird nie aus den Unterlagen von Menschen
 /// gelernt (ADR-0023).
 /// </para>
 /// <para>
-/// Der Preis ist ehrlich und muss es bleiben: <strong>was der Wortschatz nicht
+/// Der Preis ist ehrlich und muss es bleiben: <strong>was der Vocabulary nicht
 /// kennt, wird nicht gefunden.</strong> Eine Oberfläche, die das verschweigt,
 /// behauptet stillschweigend, in einem Dokument stehe nichts — ADR-0022 §3.
 /// </para>
@@ -31,14 +31,14 @@ namespace WorkerTransfer.Skills;
 /// Nennung (ADR-0033).
 /// </para>
 /// </remarks>
-public static class Wortfund
+public static class TermFinder
 {
     /// <summary>Ab welcher Länge eine Schreibweise in jeder Schreibung gilt.</summary>
     /// <remarks>
     /// <strong>Kurze Kürzel nur in Grossbuchstaben, und das ist gemessen.</strong>
     /// „wig" ist im Englischen eine Perücke, „go" ein alltägliches Verb, „ts"
     /// und „py" stehen in jedem zweiten Dateinamen. In Kleinschreibung trifft
-    /// ein Dreibuchstabenwort irgendwo in jedem längeren Zeugnis — und ein
+    /// ein Dreibuchstabenwort irgendwo in jedem längeren Reference — und ein
     /// falscher Vorschlag ist hier teurer als ein fehlender, weil er der Person
     /// ein Wort über sich selbst anbietet, das in ihrem Dokument nie stand.
     /// <para>
@@ -56,7 +56,7 @@ public static class Wortfund
     /// niemand merkte es, weil ein nicht gefundenes Wort wie ein Dokument ohne
     /// Inhalt aussieht.
     /// </remarks>
-    private static readonly FrozenDictionary<string, string> NachSchreibweise = Baue();
+    private static readonly FrozenDictionary<string, string> NachSchreibweise = Build();
 
     /// <summary>Die längste Schreibweise — die Obergrenze jedes Vergleichsfensters.</summary>
     private static readonly int LaengsteSchreibweise =
@@ -69,7 +69,7 @@ public static class Wortfund
     /// Die Reihenfolge ordnet <em>Wörter</em> in <em>einem Dokument</em> und
     /// nie Menschen; eine Zahl entsteht daraus nirgends.
     /// </returns>
-    public static IReadOnlyList<string> Finde(string? text)
+    public static IReadOnlyList<string> Find(string? text)
     {
         var geputzt = Verdichte(text);
 
@@ -79,7 +79,7 @@ public static class Wortfund
         }
 
         var klein = geputzt.ToLowerInvariant();
-        var gefunden = new List<string>();
+        var found = new List<string>();
         var schon = new HashSet<string>(StringComparer.Ordinal);
 
         for (var start = 0; start < klein.Length; start++)
@@ -95,40 +95,40 @@ public static class Wortfund
             // Teilwort und der längere Name käme nie zum Zug.
             var laengste = Math.Min(LaengsteSchreibweise, klein.Length - start);
 
-            for (var laenge = laengste; laenge > 0; laenge--)
+            for (var length = laengste; length > 0; length--)
             {
-                if (!EndetEinWort(klein, start + laenge))
+                if (!EndetEinWort(klein, start + length))
                 {
                     continue;
                 }
 
-                var fenster = klein.Substring(start, laenge);
+                var fenster = klein.Substring(start, length);
 
                 if (!NachSchreibweise.TryGetValue(fenster, out var name))
                 {
                     continue;
                 }
 
-                if (laenge < UnterDieserLaengeNurVersal
+                if (length < UnterDieserLaengeNurVersal
                     && fenster.All(char.IsLetter)
-                    && !IstVersal(geputzt, start, laenge))
+                    && !IstVersal(geputzt, start, length))
                 {
                     continue;
                 }
 
                 if (schon.Add(name))
                 {
-                    gefunden.Add(name);
+                    found.Add(name);
                 }
 
-                // Über den Treffer hinweg, nicht mitten hinein: „MIG/MAG" darf
+                // Über den Hit hinweg, nicht mitten hinein: „MIG/MAG" darf
                 // nicht ein zweites Mal als sein eigener Bestandteil zählen.
-                start += laenge - 1;
+                start += length - 1;
                 break;
             }
         }
 
-        return gefunden;
+        return found;
     }
 
     /// <summary>Ein Zeichen, das kein Wort fortsetzt — oder der Rand des Textes.</summary>
@@ -137,18 +137,18 @@ public static class Wortfund
     /// und „sps" in einem beliebigen Wortinneren. Ein Bindestrich ist eine
     /// Grenze, ein Buchstabe ist keine.
     /// </remarks>
-    private static bool BeginntEinWort(string text, int stelle) =>
-        stelle == 0 || !char.IsLetterOrDigit(text[stelle - 1]);
+    private static bool BeginntEinWort(string text, int job) =>
+        job == 0 || !char.IsLetterOrDigit(text[job - 1]);
 
-    private static bool EndetEinWort(string text, int stelle) =>
-        stelle >= text.Length || !char.IsLetterOrDigit(text[stelle]);
+    private static bool EndetEinWort(string text, int job) =>
+        job >= text.Length || !char.IsLetterOrDigit(text[job]);
 
     /// <summary>Steht dieses Stück im Text ohne einen einzigen Kleinbuchstaben da?</summary>
-    private static bool IstVersal(string text, int start, int laenge)
+    private static bool IstVersal(string text, int start, int length)
     {
-        for (var stelle = start; stelle < start + laenge; stelle++)
+        for (var job = start; job < start + length; job++)
         {
-            if (char.IsLower(text[stelle]))
+            if (char.IsLower(text[job]))
             {
                 return false;
             }
@@ -195,11 +195,11 @@ public static class Wortfund
         return bau.ToString();
     }
 
-    private static FrozenDictionary<string, string> Baue()
+    private static FrozenDictionary<string, string> Build()
     {
         var tabelle = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        foreach (var (name, schreibweisen) in Wortschatz.Schreibweisen)
+        foreach (var (name, schreibweisen) in Vocabulary.Schreibweisen)
         {
             // Der kanonische Name zeigt auf sich selbst: wer „Kubernetes"
             // schreibt, hat Kubernetes geschrieben.

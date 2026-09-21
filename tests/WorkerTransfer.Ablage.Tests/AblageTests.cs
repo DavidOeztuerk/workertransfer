@@ -10,8 +10,8 @@ public sealed class AblageTests : IDisposable
     private readonly string _verzeichnis =
         Path.Combine(Path.GetTempPath(), "wt-ablage-" + Guid.CreateVersion7().ToString("N"));
 
-    private LokaleAblage Baue() =>
-        new(Options.Create(new Ablageeinstellungen { Verzeichnis = _verzeichnis }));
+    private LocalDocumentStore Build() =>
+        new(Options.Create(new DocumentStoreSettings { Verzeichnis = _verzeichnis }));
 
     /// <inheritdoc />
     public void Dispose()
@@ -25,12 +25,12 @@ public sealed class AblageTests : IDisposable
     [Fact]
     public async Task Was_abgelegt_wurde_kommt_unveraendert_zurueck()
     {
-        var ablage = Baue();
-        byte[] inhalt = [0x89, 0x50, 0x4E, 0x47, 1, 2, 3];
+        var ablage = Build();
+        byte[] content = [0x89, 0x50, 0x4E, 0x47, 1, 2, 3];
 
-        await ablage.LegeAbAsync("person/abc.png", inhalt);
+        await ablage.PutAsync("person/abc.png", content);
 
-        (await ablage.HoleAsync("person/abc.png")).Should().Equal(inhalt);
+        (await ablage.GetAsync("person/abc.png")).Should().Equal(content);
     }
 
     /// <summary>„Gibt es nicht" ist beim Abrufen ein Ausgang, kein Fehler.</summary>
@@ -41,27 +41,27 @@ public sealed class AblageTests : IDisposable
     [Fact]
     public async Task Was_es_nicht_gibt_kommt_als_null()
     {
-        (await Baue().HoleAsync("nichts/da.png")).Should().BeNull();
+        (await Build().GetAsync("nichts/da.png")).Should().BeNull();
     }
 
     /// <summary>Löschen schweigt über einen unbekannten Schlüssel.</summary>
     [Fact]
     public async Task Loeschen_schweigt_ueber_Unbekanntes()
     {
-        var versuch = async () => await Baue().LoescheAsync("nie/dagewesen.png");
+        var attempt = async () => await Build().DeleteAsync("nie/dagewesen.png");
 
-        await versuch.Should().NotThrowAsync();
+        await attempt.Should().NotThrowAsync();
     }
 
     [Fact]
     public async Task Geloeschtes_ist_fort()
     {
-        var ablage = Baue();
-        await ablage.LegeAbAsync("weg/damit.png", new byte[] { 1, 2, 3 });
+        var ablage = Build();
+        await ablage.PutAsync("weg/damit.png", new byte[] { 1, 2, 3 });
 
-        await ablage.LoescheAsync("weg/damit.png");
+        await ablage.DeleteAsync("weg/damit.png");
 
-        (await ablage.HoleAsync("weg/damit.png")).Should().BeNull();
+        (await ablage.GetAsync("weg/damit.png")).Should().BeNull();
     }
 
     /// <summary>
@@ -75,11 +75,11 @@ public sealed class AblageTests : IDisposable
     [Theory]
     [InlineData("../ausbruch.png")]
     [InlineData("a/../../ausbruch.png")]
-    public async Task Ein_Schluessel_bricht_nicht_aus(string schluessel)
+    public async Task Ein_Schluessel_bricht_nicht_aus(string key)
     {
-        var versuch = async () => await Baue().HoleAsync(schluessel);
+        var attempt = async () => await Build().GetAsync(key);
 
-        await versuch.Should().ThrowAsync<ArgumentException>();
+        await attempt.Should().ThrowAsync<ArgumentException>();
     }
 
     /// <summary>
@@ -110,7 +110,7 @@ public sealed class AblageTests : IDisposable
         Typerkennung.Erlaubt.Should().Contain(erwartet);
     }
 
-    /// <summary>Ein zu kurzer Anfang ist kein Treffer, sondern nichts.</summary>
+    /// <summary>Ein zu kurzer Anfang ist kein Hit, sondern nichts.</summary>
     [Fact]
     public void Zu_wenige_Bytes_sind_kein_Typ()
     {

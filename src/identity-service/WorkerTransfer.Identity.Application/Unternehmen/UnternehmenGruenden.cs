@@ -18,16 +18,16 @@ namespace WorkerTransfer.Identity.Application.Unternehmen;
 /// </para>
 /// </remarks>
 public sealed record UnternehmenGruendenBefehl(SubjectId Wer, string Name)
-    : IBefehl<Firmenergebnis>;
+    : IBefehl<CompanyResult>;
 
 /// <inheritdoc cref="UnternehmenGruendenBefehl" />
 public sealed class UnternehmenGruendenHandler(
     IUserRepository benutzer,
     UnternehmenAnlegen unternehmen)
-    : IRequestHandler<UnternehmenGruendenBefehl, Firmenergebnis>
+    : IRequestHandler<UnternehmenGruendenBefehl, CompanyResult>
 {
     /// <inheritdoc />
-    public async Task<Firmenergebnis> Handle(
+    public async Task<CompanyResult> Handle(
         UnternehmenGruendenBefehl request,
         CancellationToken cancellationToken)
     {
@@ -36,7 +36,7 @@ public sealed class UnternehmenGruendenHandler(
         var konto = await benutzer.FindByIdAsync(request.Wer, cancellationToken);
 
         return konto is null
-            ? new Firmenergebnis.Abgelehnt("account_not_confirmed")
-            : await unternehmen.AusfuehrenAsync(konto, request.Name, cancellationToken);
+            ? new CompanyResult.Abgelehnt("account_not_confirmed")
+            : await unternehmen.ExecuteOneAsync(konto, request.Name, cancellationToken);
     }
 }

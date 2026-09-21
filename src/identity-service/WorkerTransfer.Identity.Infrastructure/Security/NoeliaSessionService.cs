@@ -6,14 +6,14 @@ using WorkerTransfer.Identity.Application.Ports;
 namespace WorkerTransfer.Identity.Infrastructure.Security;
 
 /// <summary>Answers the session port with Noelia's sign-in service.</summary>
-public sealed class NoeliaSessionService(ITokenSessionService sitzungen) : ISessionService
+public sealed class NoeliaSessionService(ITokenSessionService sessions) : ISessionService
 {
     /// <inheritdoc />
     public async Task<StartedSession> StartAsync(
         SubjectId subject,
         CancellationToken cancellationToken = default)
     {
-        var begonnen = await sitzungen.SignInAsync(subject, cancellationToken: cancellationToken);
+        var begonnen = await sessions.SignInAsync(subject, cancellationToken: cancellationToken);
 
         return new StartedSession(begonnen.Session, begonnen.RefreshToken, begonnen.ExpiresAt);
     }
@@ -29,17 +29,17 @@ public sealed class NoeliaSessionService(ITokenSessionService sitzungen) : ISess
         string refreshToken,
         CancellationToken cancellationToken = default)
     {
-        var ergebnis = await sitzungen.RefreshAsync(refreshToken, cancellationToken);
+        var result = await sessions.RefreshAsync(refreshToken, cancellationToken);
 
-        return ergebnis is { Succeeded: true, Session: { } sitzung, Subject: { } subjekt,
+        return result is { Succeeded: true, Session: { } session, Subject: { } subjekt,
                              RefreshToken: { } nachfolger, ExpiresAt: { } laeuftAb }
-            ? new RenewedSession(sitzung, subjekt, nachfolger, laeuftAb)
+            ? new RenewedSession(session, subjekt, nachfolger, laeuftAb)
             : null;
     }
 
     /// <inheritdoc />
     public Task EndAsync(SessionId session, CancellationToken cancellationToken = default) =>
-        sitzungen.SignOutAsync(session, cancellationToken);
+        sessions.SignOutAsync(session, cancellationToken);
 
     /// <inheritdoc />
     /// <remarks>
@@ -47,19 +47,19 @@ public sealed class NoeliaSessionService(ITokenSessionService sitzungen) : ISess
     /// caller holds a token. Consuming the token first retires it and names the
     /// session; ending that session then closes every token in the chain.
     /// </remarks>
-    public async Task<BeendeteSitzung?> EndByRefreshTokenAsync(
+    public async Task<EndedSession?> EndByRefreshTokenAsync(
         string refreshToken,
         CancellationToken cancellationToken = default)
     {
-        var ergebnis = await sitzungen.RefreshAsync(refreshToken, cancellationToken);
+        var result = await sessions.RefreshAsync(refreshToken, cancellationToken);
 
-        if (ergebnis is not { Session: { } sitzung, Subject: { } subjekt })
+        if (result is not { Session: { } session, Subject: { } subjekt })
         {
             return null;
         }
 
-        await sitzungen.SignOutAsync(sitzung, cancellationToken);
+        await sessions.SignOutAsync(session, cancellationToken);
 
-        return new BeendeteSitzung(sitzung, subjekt);
+        return new EndedSession(session, subjekt);
     }
 }

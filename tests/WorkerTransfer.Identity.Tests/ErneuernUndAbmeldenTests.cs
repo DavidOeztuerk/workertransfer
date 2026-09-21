@@ -34,9 +34,9 @@ public class ErneuernUndAbmeldenTests
         _form.RecallAsync(Sitzung, Arg.Any<CancellationToken>())
             .Returns(Capacity.AsSelf.Instance);
 
-    private void HandeltFuer(TenantId firma) =>
+    private void HandeltFuer(TenantId company) =>
         _form.RecallAsync(Sitzung, Arg.Any<CancellationToken>())
-            .Returns(new Capacity.ForCompany(firma));
+            .Returns(new Capacity.ForCompany(company));
 
     private void DieSitzungTraegtNoch() =>
         _sitzungen.RenewAsync("alt", Arg.Any<CancellationToken>())
@@ -55,9 +55,9 @@ public class ErneuernUndAbmeldenTests
         _token.IssueAsync(Anna, "anna@example.com", Arg.Any<Capacity>(), Sitzung,
             Arg.Any<CancellationToken>()).Returns("frisch");
 
-        var ergebnis = await Erneuern("alt");
+        var result = await Erneuern("alt");
 
-        var erneuert = ergebnis.Should().BeOfType<Erneuerungsergebnis.Erneuert>().Which;
+        var erneuert = result.Should().BeOfType<Erneuerungsergebnis.Erneuert>().Which;
         erneuert.Zugriffstoken.Should().Be("frisch");
         erneuert.Erneuerungstoken.Should().Be("neu");
     }
@@ -84,9 +84,9 @@ public class ErneuernUndAbmeldenTests
     {
         _sitzungen.RenewAsync("tot", Arg.Any<CancellationToken>()).Returns((RenewedSession?)null);
 
-        var ergebnis = await Erneuern("tot");
+        var result = await Erneuern("tot");
 
-        ergebnis.Should().BeOfType<Erneuerungsergebnis.Abgewiesen>();
+        result.Should().BeOfType<Erneuerungsergebnis.Abgewiesen>();
     }
 
     [Fact]
@@ -96,9 +96,9 @@ public class ErneuernUndAbmeldenTests
         HandeltAlsPrivatperson();
         _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>()).Returns((User?)null);
 
-        var ergebnis = await Erneuern("alt");
+        var result = await Erneuern("alt");
 
-        ergebnis.Should().BeOfType<Erneuerungsergebnis.Abgewiesen>();
+        result.Should().BeOfType<Erneuerungsergebnis.Abgewiesen>();
         await _token.DidNotReceive().IssueAsync(
             Arg.Any<SubjectId>(), Arg.Any<string>(), Arg.Any<Capacity>(),
             Arg.Any<SessionId>(), Arg.Any<CancellationToken>());
@@ -131,11 +131,11 @@ public class ErneuernUndAbmeldenTests
     [Fact]
     public async Task Eine_erloschene_Mitgliedschaft_faellt_bei_der_Erneuerung_weg()
     {
-        var firma = TenantId.New();
+        var company = TenantId.New();
         DieSitzungTraegtNoch();
         EsGibtDasKonto();
-        HandeltFuer(firma);
-        _mitglieder.IsMemberAsync(Anna, firma, Arg.Any<CancellationToken>()).Returns(false);
+        HandeltFuer(company);
+        _mitglieder.IsMemberAsync(Anna, company, Arg.Any<CancellationToken>()).Returns(false);
 
         await Erneuern("alt");
 
@@ -144,7 +144,7 @@ public class ErneuernUndAbmeldenTests
             Arg.Any<SessionId>(), Arg.Any<CancellationToken>());
         await _protokoll.Received(1).AppendAsync(
             Arg.Is<AuditEvent>(e => e.Action == AuditAction.TenantSwitchDenied
-                                    && e.Tenant == firma
+                                    && e.Tenant == company
                                     && e.Metadata["reason"] == "membership_gone_on_refresh"),
             Arg.Any<CancellationToken>());
     }
@@ -158,15 +158,15 @@ public class ErneuernUndAbmeldenTests
     [Fact]
     public async Task Eine_erloschene_Mitgliedschaft_beendet_die_Sitzung_nicht()
     {
-        var firma = TenantId.New();
+        var company = TenantId.New();
         DieSitzungTraegtNoch();
         EsGibtDasKonto();
-        HandeltFuer(firma);
-        _mitglieder.IsMemberAsync(Anna, firma, Arg.Any<CancellationToken>()).Returns(false);
+        HandeltFuer(company);
+        _mitglieder.IsMemberAsync(Anna, company, Arg.Any<CancellationToken>()).Returns(false);
 
-        var ergebnis = await Erneuern("alt");
+        var result = await Erneuern("alt");
 
-        ergebnis.Should().BeOfType<Erneuerungsergebnis.Erneuert>();
+        result.Should().BeOfType<Erneuerungsergebnis.Erneuert>();
         await _sitzungen.DidNotReceive().EndAsync(
             Arg.Any<SessionId>(), Arg.Any<CancellationToken>());
     }
@@ -174,17 +174,17 @@ public class ErneuernUndAbmeldenTests
     [Fact]
     public async Task Eine_bestehende_Mitgliedschaft_bleibt_ueber_die_Erneuerung_hinweg()
     {
-        var firma = TenantId.New();
+        var company = TenantId.New();
         DieSitzungTraegtNoch();
         EsGibtDasKonto();
-        HandeltFuer(firma);
-        _mitglieder.IsMemberAsync(Anna, firma, Arg.Any<CancellationToken>()).Returns(true);
+        HandeltFuer(company);
+        _mitglieder.IsMemberAsync(Anna, company, Arg.Any<CancellationToken>()).Returns(true);
 
         await Erneuern("alt");
 
         await _token.Received().IssueAsync(
             Anna, Arg.Any<string>(),
-            Arg.Is<Capacity>(c => c.Equals(new Capacity.ForCompany(firma))),
+            Arg.Is<Capacity>(c => c.Equals(new Capacity.ForCompany(company))),
             Arg.Any<SessionId>(), Arg.Any<CancellationToken>());
     }
 
@@ -205,9 +205,9 @@ public class ErneuernUndAbmeldenTests
         _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>())
             .Returns(Konten.Bestehend(Anna, "anna@example.com", "$2b$12$x", status));
 
-        var ergebnis = await Erneuern("alt");
+        var result = await Erneuern("alt");
 
-        ergebnis.Should().BeOfType<Erneuerungsergebnis.Abgewiesen>();
+        result.Should().BeOfType<Erneuerungsergebnis.Abgewiesen>();
         await _token.DidNotReceive().IssueAsync(
             Arg.Any<SubjectId>(), Arg.Any<string>(), Arg.Any<Capacity>(),
             Arg.Any<SessionId>(), Arg.Any<CancellationToken>());
@@ -232,7 +232,7 @@ public class ErneuernUndAbmeldenTests
         public async Task Beendet_die_Sitzung_zum_vorgelegten_Token()
         {
             _sitzungen.EndByRefreshTokenAsync("meiner", Arg.Any<CancellationToken>())
-                .Returns(new BeendeteSitzung(Sitzung, Anna));
+                .Returns(new EndedSession(Sitzung, Anna));
 
             await Abmelden_("meiner");
 
@@ -252,7 +252,7 @@ public class ErneuernUndAbmeldenTests
         public async Task Vergisst_wofuer_die_Sitzung_gehandelt_hat()
         {
             _sitzungen.EndByRefreshTokenAsync("meiner", Arg.Any<CancellationToken>())
-                .Returns(new BeendeteSitzung(Sitzung, Anna));
+                .Returns(new EndedSession(Sitzung, Anna));
 
             await Abmelden_("meiner");
 
@@ -279,7 +279,7 @@ public class ErneuernUndAbmeldenTests
         public async Task Ein_toter_Token_erzeugt_keinen_Protokolleintrag()
         {
             _sitzungen.EndByRefreshTokenAsync("tot", Arg.Any<CancellationToken>())
-                .Returns((BeendeteSitzung?)null);
+                .Returns((EndedSession?)null);
 
             await Abmelden_("tot");
 

@@ -59,7 +59,7 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
         // `SessionObservations` ist seit 5.1.0 ein Singleton und der fuenfte
         // Konstruktorparameter von `TokenSessionService` (MIGRATION.md:451).
         // Vorher war die Menge der beobachteten Subjekte ein Instanzfeld an
-        // einem `AddScoped`-Dienst — je Anfrage ein neues, leeres Woerterbuch,
+        // einem `AddScoped`-Dienst — je ResumeRequest ein neues, leeres Woerterbuch,
         // weshalb die Sitzungsuebersicht dauerhaft „0 active sessions" meldete.
         //
         // Diese Reihe baut den Dienst selbst, statt das Modul zu fahren; sie
@@ -71,19 +71,19 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
 
         _anbieter = services.BuildServiceProvider();
 
-        using var bereich = _anbieter.CreateScope();
-        var kontext = bereich.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
+        using var scope = _anbieter.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
 
         // Not EnsureCreated: the database already carries the Alembic schema,
         // so it would decide there is nothing to do. xunit builds one
         // instance per test, hence the check.
-        var vorhanden = await kontext.Database
+        var vorhanden = await context.Database
             .SqlQuery<int>($"SELECT 1 AS \"Value\" FROM pg_class WHERE relname = 'probe_refresh_tokens'")
             .AnyAsync();
 
         if (!vorhanden)
         {
-            await ((RelationalDatabaseCreator)kontext.Database.GetService<IDatabaseCreator>())
+            await ((RelationalDatabaseCreator)context.Database.GetService<IDatabaseCreator>())
                 .CreateTablesAsync();
         }
     }
@@ -97,13 +97,13 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_Anmeldung_laeuft_in_einer_offenen_Transaktion()
     {
-        using var bereich = _anbieter.CreateScope();
-        var kontext = bereich.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
-        var sitzungen = bereich.ServiceProvider.GetRequiredService<ITokenSessionService>();
+        using var scope = _anbieter.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
+        var sessions = scope.ServiceProvider.GetRequiredService<ITokenSessionService>();
 
-        await using var klammer = await kontext.Database.BeginTransactionAsync();
+        await using var klammer = await context.Database.BeginTransactionAsync();
 
-        var angemeldet = await sitzungen.SignInAsync(SubjectId.New());
+        var angemeldet = await sessions.SignInAsync(SubjectId.New());
         await klammer.CommitAsync();
 
         angemeldet.RefreshToken.Should().NotBeEmpty();
@@ -115,21 +115,21 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
     /// dauerhaft.
     /// </summary>
     /// <remarks>
-    /// Bis Girder 3.0.1 warf diese Stelle
+    /// Bis Girder 3.0.1 warf diese Job
     /// <c>"The connection is already in a transaction"</c> — der Grund, warum
     /// <c>POST /auth/refresh</c> und <c>/auth/logout</c> eine Weile rot standen.
     /// </remarks>
     [Fact]
     public async Task Eine_Erneuerung_laeuft_in_einer_offenen_Transaktion()
     {
-        using var bereich = _anbieter.CreateScope();
-        var kontext = bereich.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
-        var sitzungen = bereich.ServiceProvider.GetRequiredService<ITokenSessionService>();
+        using var scope = _anbieter.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
+        var sessions = scope.ServiceProvider.GetRequiredService<ITokenSessionService>();
 
-        var angemeldet = await sitzungen.SignInAsync(SubjectId.New());
+        var angemeldet = await sessions.SignInAsync(SubjectId.New());
 
-        await using var klammer = await kontext.Database.BeginTransactionAsync();
-        var erneuert = await sitzungen.RefreshAsync(angemeldet.RefreshToken);
+        await using var klammer = await context.Database.BeginTransactionAsync();
+        var erneuert = await sessions.RefreshAsync(angemeldet.RefreshToken);
         await klammer.CommitAsync();
 
         erneuert.Succeeded.Should().BeTrue();
@@ -141,7 +141,7 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
         // Zeile — innerhalb des Kulanzfensters also ein Geschwister, kein
         // Diebstahl. Das beweist, dass die Rotation an der Klammer des Aufrufers
         // hing und dessen Commit überlebt hat; ohne sie stünde hier Rotated.
-        var nochmal = await sitzungen.RefreshAsync(angemeldet.RefreshToken);
+        var nochmal = await sessions.RefreshAsync(angemeldet.RefreshToken);
         nochmal.Outcome.Should().Be(ConsumeOutcome.RotatedWithinGrace);
     }
 
@@ -163,29 +163,29 @@ public class TransaktionsklammerTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_Abmeldung_laeuft_in_einer_offenen_Transaktion()
     {
-        using var bereich = _anbieter.CreateScope();
-        var kontext = bereich.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
-        var sitzungen = bereich.ServiceProvider.GetRequiredService<ITokenSessionService>();
+        using var scope = _anbieter.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<NurNoeliaKontext>();
+        var sessions = scope.ServiceProvider.GetRequiredService<ITokenSessionService>();
 
-        var angemeldet = await sitzungen.SignInAsync(SubjectId.New());
+        var angemeldet = await sessions.SignInAsync(SubjectId.New());
 
-        await using var klammer = await kontext.Database.BeginTransactionAsync();
+        await using var klammer = await context.Database.BeginTransactionAsync();
 
-        var verbraucht = await sitzungen.RefreshAsync(angemeldet.RefreshToken);
+        var verbraucht = await sessions.RefreshAsync(angemeldet.RefreshToken);
 
-        if (verbraucht is not { Session: { } sitzung })
+        if (verbraucht is not { Session: { } session })
         {
             throw new InvalidOperationException(
                 "die Erneuerung nannte keine Sitzung — der Test prueft dann nichts");
         }
 
-        await sitzungen.SignOutAsync(sitzung);
+        await sessions.SignOutAsync(session);
         await klammer.CommitAsync();
 
         // Nach dem Commit des Aufrufers ist die Sitzung wirklich zu. Ohne die
         // Abmeldung traege der eben gedrehte Token noch das Kulanzfenster und
         // wuerde erneuern — deshalb ist genau er die Probe.
-        var danach = await sitzungen.RefreshAsync(verbraucht.RefreshToken!);
+        var danach = await sessions.RefreshAsync(verbraucht.RefreshToken!);
         danach.Succeeded.Should().BeFalse(
             "die Abmeldung lag in derselben Klammer und hat deren Commit ueberlebt");
     }

@@ -12,11 +12,11 @@ using WorkerTransfer.Portfolio.Domain.Ablage;
 using WorkerTransfer.Portfolio.Domain.Portfolios;
 using WorkerTransfer.Portfolio.Infrastructure.Ablage;
 using WorkerTransfer.Portfolio.Infrastructure.Einwilligung;
-using WorkerTransfer.Portfolio.Infrastructure.Loeschung;
+using WorkerTransfer.Portfolio.Infrastructure.Erasure;
 using WorkerTransfer.Portfolio.Infrastructure.Persistence;
 using WorkerTransfer.Portfolio.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Portfolio.Contracts;
 using Noelia.Abstractions.Security.Checks;
 
@@ -41,28 +41,28 @@ public static class PortfolioInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Einwilligungseinstellungen>(
-            configuration.GetSection(Einwilligungseinstellungen.Abschnitt));
-        services.Configure<Ablageeinstellungen>(
-            configuration.GetSection(Ablageeinstellungen.Abschnitt));
-        services.Configure<Loescheinstellungen>(
-            configuration.GetSection(Loescheinstellungen.Abschnitt));
+        services.Configure<ConsentSettings>(
+            configuration.GetSection(ConsentSettings.Section));
+        services.Configure<DocumentStoreSettings>(
+            configuration.GetSection(DocumentStoreSettings.Section));
+        services.Configure<ErasureSettings>(
+            configuration.GetSection(ErasureSettings.Section));
 
 
-        services.AddSingleton(_ => PortfolioDbContextFactory.Datenquelle(connectionString));
-        services.AddDbContext<PortfolioDbContext>((anbieter, optionen) =>
-            PortfolioDbContextFactory.Konfiguriere(
-                optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<PortfolioDbContext>("portfolio");
-        services.AddSchluesselbund<PortfolioDbContext>();
+        services.AddSingleton(_ => PortfolioDbContextFactory.DataSource(connectionString));
+        services.AddDbContext<PortfolioDbContext>((provider, optionen) =>
+            PortfolioDbContextFactory.Configure(
+                optionen, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatabaseReadiness<PortfolioDbContext>("portfolio");
+        services.AddKeyRing<PortfolioDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddScoped<IPortfoliospeicher, EfPortfoliospeicher>();
+        services.AddScoped<IPortfolioStore, EfPortfolioStore>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-        services.AddScoped<IEinwilligungstor, HttpEinwilligungstor>();
-        services.AddSingleton<IAblage, Dateiablage>();
+        services.AddScoped<IConsentGate, HttpConsentGate>();
+        services.AddSingleton<IDocumentStore, FileDocumentStore>();
         services.AddSingleton<IKorrelation, HttpKorrelation>();
 
         services.AddCQRS(typeof(PortfolioSichernBefehl).Assembly);
@@ -75,43 +75,43 @@ public static class PortfolioInfrastructure
 
     /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
     /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
     /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
     ///
     /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
     /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
     /// vergessen kann.</para>
     /// </remarks>
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(Abgelegtes).Assembly, typeof(EintragV1).Assembly]));
 
-        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
+        // None KI-Naht: `ProviderCheck` ohne Quelle meldet NichtAnwendbar,
         // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
         // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
         // durchschneiden soll.
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
 
         // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
         // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
         // Zwischenspeicher davor faellt niemandem auf, weil alles
-        // weiterfunktioniert, nur eben mit dem Stand von vorhin.
-        services.AddSingleton<ISecurityCheck>(anbieter =>
-            new Widerrufspruefung<IEinwilligungstor>(
-                anbieter, typeof(HttpEinwilligungstor)));
+        // weiterfunktioniert, nur eben mit dem State von vorhin.
+        services.AddSingleton<ISecurityCheck>(provider =>
+            new RevocationCheck<IConsentGate>(
+                provider, typeof(HttpConsentGate)));
 
-        var loeschung = new Loescheinstellungen();
-        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+        var erasure = new ErasureSettings();
+        configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsEmpfaenger(
             "portfolio",
-            !string.IsNullOrEmpty(loeschung.Geheimnis),
+            !string.IsNullOrEmpty(erasure.Geheimnis),
             pruefspurVorhanden: false));
     }
 }

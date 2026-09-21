@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using WorkerTransfer.ServiceDefaults.Rollen;
+using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Companies.Tests;
@@ -16,7 +16,7 @@ namespace WorkerTransfer.Companies.Tests;
 /// Das Schaufenster schreibt, wer für das Unternehmen sprechen darf.
 /// </summary>
 /// <remarks>
-/// Ein Arbeitgeberprofil trägt Name, Beschreibung, Anschrift und das Kürzel,
+/// Ein EmployerProfile trägt Name, Beschreibung, PostalAddress und das Kürzel,
 /// unter dem die Karriereseite <strong>ohne Anmeldung</strong> erreichbar ist.
 /// Wer es ändert, ändert, wie das Unternehmen in der Welt erscheint — und zwar
 /// für alle anderen mit.
@@ -37,12 +37,12 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:companies", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Scoped<IFirmenrollen>(_ => _rollen)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => _rollen)));
         });
 
         return Task.CompletedTask;
@@ -54,15 +54,15 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsFirma(Guid firma, Guid? wer = null)
+    private HttpClient AlsFirma(Guid company, Guid? subject = null)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer", Tokenform.Firma(wer ?? Guid.CreateVersion7(), firma));
+            "Bearer", Tokenform.Firma(subject ?? Guid.CreateVersion7(), company));
         return browser;
     }
 
-    private static Task<HttpResponseMessage> Schreibe(HttpClient browser, string name) =>
+    private static Task<HttpResponseMessage> Write(HttpClient browser, string name) =>
         browser.PutAsJsonAsync("/companies/me/profile", new
         {
             display_name = name,
@@ -78,15 +78,15 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = AlsFirma(Guid.CreateVersion7());
 
-        _rollen.Antwort = Firmenrolle.Mitglied;
-        var alsMitglied = await Schreibe(browser, "Muster GmbH");
+        _rollen.Antwort = CompanyRole.Mitglied;
+        var alsMitglied = await Write(browser, "Muster GmbH");
 
         alsMitglied.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         // Die Gegenprobe in derselben Reihe: ein Endpunkt, der immer 403 gibt,
         // saehe von hier aus genauso aus.
-        _rollen.Antwort = Firmenrolle.Admin;
-        var alsAdmin = await Schreibe(browser, "Muster GmbH");
+        _rollen.Antwort = CompanyRole.Admin;
+        var alsAdmin = await Write(browser, "Muster GmbH");
 
         alsAdmin.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -98,34 +98,34 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_Mitglied_liest_das_eigene_Schaufenster()
     {
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
 
-        _rollen.Antwort = Firmenrolle.Admin;
-        (await Schreibe(AlsFirma(firma), "Muster GmbH"))
+        _rollen.Antwort = CompanyRole.Admin;
+        (await Write(AlsFirma(company), "Muster GmbH"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        _rollen.Antwort = Firmenrolle.Mitglied;
-        var gelesen = await AlsFirma(firma).GetAsync("/companies/me/profile");
+        _rollen.Antwort = CompanyRole.Mitglied;
+        var gelesen = await AlsFirma(company).GetAsync("/companies/me/profile");
 
         gelesen.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var rumpf = JsonDocument.Parse(await gelesen.Content.ReadAsStringAsync()).RootElement;
-        rumpf.GetProperty("display_name").GetString().Should().Be("Muster GmbH");
+        var body = JsonDocument.Parse(await gelesen.Content.ReadAsStringAsync()).RootElement;
+        body.GetProperty("display_name").GetString().Should().Be("Muster GmbH");
     }
 
     /// <summary>
     /// Gefragt wird nach der Firma aus dem TOKEN, nicht nach etwas aus der
-    /// Anfrage.
+    /// ResumeRequest.
     /// </summary>
     [Fact]
     public async Task Gefragt_wird_nach_dem_Mandanten_aus_dem_Token()
     {
-        var firma = Guid.CreateVersion7();
-        var wer = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
 
-        await Schreibe(AlsFirma(firma, wer), "Muster GmbH");
+        await Write(AlsFirma(company, subject), "Muster GmbH");
 
-        _rollen.Zuletzt.Should().Be((wer, firma));
+        _rollen.Zuletzt.Should().Be((subject, company));
     }
 
     /// <summary>Schweigt die Rollenauskunft, ist das kein Nein.</summary>
@@ -134,9 +134,9 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     {
         _rollen.Schweigt = true;
 
-        var antwort = await Schreibe(AlsFirma(Guid.CreateVersion7()), "Muster GmbH");
+        var response = await Write(AlsFirma(Guid.CreateVersion7()), "Muster GmbH");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     /// <summary>
@@ -146,13 +146,13 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_Token_und_ohne_Firma_bleibt_es_wie_es_war()
     {
-        var ohne = await Schreibe(_dienst.CreateClient(), "Muster GmbH");
+        var ohne = await Write(_dienst.CreateClient(), "Muster GmbH");
         ohne.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
         var person = _dienst.CreateClient();
         person.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
             "Bearer", Tokenform.Person(Guid.CreateVersion7()));
 
-        (await Schreibe(person, "Muster GmbH")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await Write(person, "Muster GmbH")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

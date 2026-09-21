@@ -8,58 +8,58 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence;
 /// <summary>Die Bewerbungsanschrift in ihrer Zeile.</summary>
 /// <remarks>
 /// Wer nie etwas gesetzt hat, hat keine Zeile und bekommt leer. Für jedes
-/// Konto eine Zeile zu schreiben hiesse, eine Anschrift zu behaupten, die
+/// Konto eine Zeile zu schreiben hiesse, eine PostalAddress zu behaupten, die
 /// niemand hinterlegt hat.
 /// </remarks>
-public sealed class EfAnschriften(IdentityDbContext kontext, TimeProvider uhr) : IAnschriften
+public sealed class EfPostalAddresses(IdentityDbContext context, TimeProvider uhr) : IPostalAddresses
 {
     /// <inheritdoc />
-    public async Task<Anschrift> HoleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<PostalAddress> GetAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Addresses
-            .FirstOrDefaultAsync(eintrag => eintrag.SubjectId == wer.Value, cancellationToken);
+        var row = await context.Addresses
+            .FirstOrDefaultAsync(entry => entry.SubjectId == subject.Value, cancellationToken);
 
-        return zeile is null
-            ? Anschrift.Leer(wer)
-            : Anschrift.Wiederherstellen(
-                wer,
-                zeile.Line1,
-                zeile.Line2,
-                zeile.PostalCode,
-                zeile.City,
-                zeile.Country,
-                zeile.Phone);
+        return row is null
+            ? PostalAddress.Leer(subject)
+            : PostalAddress.Wiederherstellen(
+                subject,
+                row.Line1,
+                row.Line2,
+                row.PostalCode,
+                row.City,
+                row.Country,
+                row.Phone);
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(
-        Anschrift anschrift, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        PostalAddress anschrift, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(anschrift);
 
-        var jetzt = uhr.GetUtcNow().UtcDateTime;
-        var zeile = await kontext.Addresses
+        var now = uhr.GetUtcNow().UtcDateTime;
+        var row = await context.Addresses
             .AsTracking()
             .FirstOrDefaultAsync(
-                eintrag => eintrag.SubjectId == anschrift.Wer.Value, cancellationToken);
+                entry => entry.SubjectId == anschrift.Wer.Value, cancellationToken);
 
-        if (zeile is null)
+        if (row is null)
         {
-            zeile = new AnschriftRow
+            row = new PostalAddressRow
             {
                 SubjectId = anschrift.Wer.Value,
-                CreatedAt = jetzt
+                CreatedAt = now
             };
-            kontext.Addresses.Add(zeile);
+            context.Addresses.Add(row);
         }
 
-        zeile.Line1 = anschrift.Zeile1;
-        zeile.Line2 = anschrift.Zeile2;
-        zeile.PostalCode = anschrift.Postleitzahl;
-        zeile.City = anschrift.Ort;
-        zeile.Country = anschrift.Land;
-        zeile.Phone = anschrift.Telefon;
-        zeile.UpdatedAt = jetzt;
+        row.Line1 = anschrift.Zeile1;
+        row.Line2 = anschrift.Zeile2;
+        row.PostalCode = anschrift.Postleitzahl;
+        row.City = anschrift.Ort;
+        row.Country = anschrift.Land;
+        row.Phone = anschrift.Telefon;
+        row.UpdatedAt = now;
     }
 }

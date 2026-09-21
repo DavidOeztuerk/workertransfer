@@ -61,14 +61,14 @@ public static class Sprachwahl
     /// </remarks>
     /// <param name="etikett">A BCP 47 tag, or anything at all.</param>
     /// <returns>The language to use.</returns>
-    public static Kontosprache Aus(string? etikett)
+    public static Kontosprache Aus(string? label)
     {
-        if (string.IsNullOrWhiteSpace(etikett))
+        if (string.IsNullOrWhiteSpace(label))
         {
             return Vorgabe;
         }
 
-        var haupt = etikett.Trim().Split('-', ';', ',')[0].ToLowerInvariant();
+        var haupt = label.Trim().Split('-', ';', ',')[0].ToLowerInvariant();
 
         return haupt switch
         {
@@ -90,14 +90,14 @@ public static class Sprachwahl
     /// </remarks>
     /// <param name="kopf">The raw header value, or <c>null</c>.</param>
     /// <returns>The first language we have, else <see cref="Vorgabe"/>.</returns>
-    public static Kontosprache AusKopf(string? kopf)
+    public static Kontosprache AusKopf(string? header)
     {
-        if (string.IsNullOrWhiteSpace(kopf))
+        if (string.IsNullOrWhiteSpace(header))
         {
             return Vorgabe;
         }
 
-        foreach (var teil in kopf.Split(','))
+        foreach (var teil in header.Split(','))
         {
             var haupt = teil.Split(';')[0].Trim();
             if (haupt.Length == 0 || haupt == "*")
@@ -122,7 +122,7 @@ public static class Sprachwahl
     /// <summary>The tag as it is stored and sent.</summary>
     /// <param name="sprache">The language.</param>
     /// <returns>Two lowercase letters.</returns>
-    public static string Etikett(Kontosprache sprache) => sprache switch
+    public static string Etikett(Kontosprache language) => language switch
     {
         Kontosprache.En => "en",
         Kontosprache.Fr => "fr",
@@ -139,12 +139,12 @@ public static class Sprachwahl
     /// </remarks>
     /// <param name="etikett">A BCP 47 tag.</param>
     /// <returns><c>true</c> if a catalogue exists for it.</returns>
-    public static bool Kennen(string? etikett) =>
-        !string.IsNullOrWhiteSpace(etikett) && Erkannt(etikett);
+    public static bool Kennen(string? label) =>
+        !string.IsNullOrWhiteSpace(label) && Erkannt(label);
 
-    private static bool Erkannt(string etikett)
+    private static bool Erkannt(string label)
     {
-        var haupt = etikett.Split('-')[0].ToLowerInvariant();
+        var haupt = label.Split('-')[0].ToLowerInvariant();
         return haupt is "de" or "en" or "fr";
     }
 }

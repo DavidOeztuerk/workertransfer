@@ -11,5 +11,5 @@ public interface IAuditTrail
 {
     /// <param name="eintrag">What to record.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
-    Task AnhaengenAsync(AuditEvent eintrag, CancellationToken cancellationToken = default);
+    Task AttachAsync(AuditEvent entry, CancellationToken cancellationToken = default);
 }

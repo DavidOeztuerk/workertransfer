@@ -1,5 +1,5 @@
 using FluentAssertions;
-using WorkerTransfer.Scout.Domain.Treffer;
+using WorkerTransfer.Scout.Domain.Hit;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Scout.Tests;
@@ -21,10 +21,10 @@ namespace WorkerTransfer.Scout.Tests;
 /// </remarks>
 public class ErreichbarkeitTests
 {
-    private static readonly Ortspunkt? Berlin = Ortskunde.Finde("Berlin");
-    private static readonly Ortspunkt? Potsdam = Ortskunde.Finde("Potsdam");
-    private static readonly Ortspunkt? Wittenberg = Ortskunde.Finde("Wittenberg");
-    private static readonly Ortspunkt? Muenchen = Ortskunde.Finde("München");
+    private static readonly Ortspunkt? Berlin = PlaceLookup.Find("Berlin");
+    private static readonly Ortspunkt? Potsdam = PlaceLookup.Find("Potsdam");
+    private static readonly Ortspunkt? Wittenberg = PlaceLookup.Find("Wittenberg");
+    private static readonly Ortspunkt? Muenchen = PlaceLookup.Find("München");
 
     /// <summary>Die Ortstabelle kennt diese vier — sonst prüft nichts hier etwas.</summary>
     [Fact]
@@ -38,58 +38,58 @@ public class ErreichbarkeitTests
         // Und die Entfernungen sind die, mit denen die Faelle unten rechnen.
         // Ohne diese drei Zeilen waere jeder Fall unten eine Annahme ueber die
         // Ortstabelle — und genau daran ist der erste Entwurf gescheitert.
-        Ortskunde.EntfernungKm(Berlin!.Value, Potsdam!.Value).Should().BeInRange(20, 35);
-        Ortskunde.EntfernungKm(Berlin.Value, Wittenberg!.Value).Should().BeInRange(70, 99);
-        Ortskunde.EntfernungKm(Berlin.Value, Muenchen!.Value).Should().BeInRange(450, 550);
+        PlaceLookup.EntfernungKm(Berlin!.Value, Potsdam!.Value).Should().BeInRange(20, 35);
+        PlaceLookup.EntfernungKm(Berlin.Value, Wittenberg!.Value).Should().BeInRange(70, 99);
+        PlaceLookup.EntfernungKm(Berlin.Value, Muenchen!.Value).Should().BeInRange(450, 550);
     }
 
     /// <summary>Innerhalb der genannten Stufe: ein Ja.</summary>
     [Fact]
     public void Wer_weit_genug_pendelt_erreicht_die_Stelle() =>
-        Erreichbarkeit.Bilde(Pendelstufe.Bis50, Anwesenheit.VorOrt, Berlin, Potsdam)
-            .Stand.Should().Be(Erreichbarkeitsstand.Erreichbar);
+        Availability.Bilde(Pendelstufe.Bis50, Anwesenheit.VorOrt, Berlin, Potsdam)
+            .State.Should().Be(AvailabilityState.Erreichbar);
 
-    /// <summary>Darüber: ein Nein — und der Treffer bleibt trotzdem in der Liste.</summary>
+    /// <summary>Darüber: ein Nein — und der Hit bleibt trotzdem in der Liste.</summary>
     /// <remarks>
     /// Dass er bleibt, prüft <c>ScoutreiseTests</c> am Endpunkt. Hier steht nur,
     /// dass das Häkchen ehrlich ist.
     /// </remarks>
     [Fact]
     public void Wer_naeher_bleiben_will_bekommt_ein_Kreuz() =>
-        Erreichbarkeit.Bilde(Pendelstufe.Bis10, Anwesenheit.VorOrt, Berlin, Muenchen)
-            .Stand.Should().Be(Erreichbarkeitsstand.Weiter);
+        Availability.Bilde(Pendelstufe.Bis10, Anwesenheit.VorOrt, Berlin, Muenchen)
+            .State.Should().Be(AvailabilityState.Weiter);
 
     /// <summary>Die Stufe entscheidet, nicht die Entfernung allein.</summary>
     /// <remarks>
-    /// Dieselbe Strecke, zwei Aussagen, zwei Antworten — das ist der ganze
+    /// Dieselbe Strecke, zwei Aussagen, zwei Responses — das ist der ganze
     /// Gedanke des ADR. Berlin–Wittenberg sind 90 km: über 50, unter 100.
     /// </remarks>
     [Theory]
-    [InlineData(Pendelstufe.Bis25, Erreichbarkeitsstand.Weiter)]
-    [InlineData(Pendelstufe.Bis50, Erreichbarkeitsstand.Weiter)]
-    [InlineData(Pendelstufe.Bis100, Erreichbarkeitsstand.Erreichbar)]
-    [InlineData(Pendelstufe.Egal, Erreichbarkeitsstand.Erreichbar)]
+    [InlineData(Pendelstufe.Bis25, AvailabilityState.Weiter)]
+    [InlineData(Pendelstufe.Bis50, AvailabilityState.Weiter)]
+    [InlineData(Pendelstufe.Bis100, AvailabilityState.Erreichbar)]
+    [InlineData(Pendelstufe.Egal, AvailabilityState.Erreichbar)]
     public void Dieselbe_Strecke_vier_Aussagen_zwei_Antworten(
-        Pendelstufe stufe, Erreichbarkeitsstand erwartet) =>
-        Erreichbarkeit.Bilde(stufe, Anwesenheit.VorOrt, Berlin, Wittenberg)
-            .Stand.Should().Be(erwartet);
+        Pendelstufe stage, AvailabilityState erwartet) =>
+        Availability.Bilde(stage, Anwesenheit.VorOrt, Berlin, Wittenberg)
+            .State.Should().Be(erwartet);
 
     /// <summary>„Egal" ist ein Ja, ohne dass irgendetwas gerechnet wird.</summary>
     [Fact]
     public void Egal_erreicht_alles() =>
-        Erreichbarkeit.Bilde(Pendelstufe.Egal, Anwesenheit.VorOrt, Berlin, Muenchen)
-            .Stand.Should().Be(Erreichbarkeitsstand.Erreichbar);
+        Availability.Bilde(Pendelstufe.Egal, Anwesenheit.VorOrt, Berlin, Muenchen)
+            .State.Should().Be(AvailabilityState.Erreichbar);
 
     /// <summary>Remote ist ein Ja, auch über fünfhundert Kilometer.</summary>
     /// <remarks>
-    /// Wer nicht kommen muss, erreicht die Stelle. Das ist der einzige Ausstieg,
+    /// Wer nicht kommen muss, erreicht die Job. Das ist der einzige Ausstieg,
     /// der ohne Ortskenntnis ein Ja geben darf — und er darf es, weil die Frage
     /// dann gar nicht gestellt ist.
     /// </remarks>
     [Fact]
     public void Remote_erreicht_alles() =>
-        Erreichbarkeit.Bilde(Pendelstufe.Bis10, Anwesenheit.Remote, Berlin, Muenchen)
-            .Stand.Should().Be(Erreichbarkeitsstand.Erreichbar);
+        Availability.Bilde(Pendelstufe.Bis10, Anwesenheit.Remote, Berlin, Muenchen)
+            .State.Should().Be(AvailabilityState.Erreichbar);
 
     /// <summary>Hybrid zählt wie vor Ort.</summary>
     /// <remarks>
@@ -99,8 +99,8 @@ public class ErreichbarkeitTests
     /// </remarks>
     [Fact]
     public void Hybrid_zaehlt_wie_vor_Ort() =>
-        Erreichbarkeit.Bilde(Pendelstufe.Bis10, Anwesenheit.Hybrid, Berlin, Muenchen)
-            .Stand.Should().Be(Erreichbarkeitsstand.Weiter);
+        Availability.Bilde(Pendelstufe.Bis10, Anwesenheit.Hybrid, Berlin, Muenchen)
+            .State.Should().Be(AvailabilityState.Weiter);
 
     // ---------------------------------------------------------------------
     // DIE VIER WEGE ZUM STRICH — und keiner darf ein Kreuz werden.
@@ -115,17 +115,17 @@ public class ErreichbarkeitTests
     [Fact]
     public void Ohne_Angabe_der_Person_gibt_es_einen_Strich()
     {
-        var haken = Erreichbarkeit.Bilde(null, Anwesenheit.VorOrt, Berlin, Muenchen);
+        var haken = Availability.Bilde(null, Anwesenheit.VorOrt, Berlin, Muenchen);
 
-        haken.Stand.Should().Be(Erreichbarkeitsstand.Ungesagt);
-        haken.Stand.Should().NotBe(Erreichbarkeitsstand.Weiter);
+        haken.State.Should().Be(AvailabilityState.Ungesagt);
+        haken.State.Should().NotBe(AvailabilityState.Weiter);
     }
 
-    /// <summary>Ohne Stelle gibt es nichts zu vergleichen.</summary>
+    /// <summary>Ohne Job gibt es nichts zu vergleichen.</summary>
     [Fact]
     public void Ohne_Stelle_gibt_es_einen_Strich() =>
-        Erreichbarkeit.Bilde(Pendelstufe.Bis10, null, Berlin, Muenchen)
-            .Stand.Should().Be(Erreichbarkeitsstand.Ungesagt);
+        Availability.Bilde(Pendelstufe.Bis10, null, Berlin, Muenchen)
+            .State.Should().Be(AvailabilityState.Ungesagt);
 
     /// <summary>Ein unbekannter Ort ist ein Loch bei UNS, kein Nein über die Person.</summary>
     /// <remarks>
@@ -138,12 +138,12 @@ public class ErreichbarkeitTests
     [InlineData(false, true)]
     [InlineData(false, false)]
     public void Ein_unbekannter_Ort_gibt_einen_Strich(bool personBekannt, bool stelleBekannt) =>
-        Erreichbarkeit.Bilde(
+        Availability.Bilde(
                 Pendelstufe.Bis10,
                 Anwesenheit.VorOrt,
                 personBekannt ? Berlin : null,
                 stelleBekannt ? Muenchen : null)
-            .Stand.Should().Be(Erreichbarkeitsstand.Ungesagt);
+            .State.Should().Be(AvailabilityState.Ungesagt);
 
     /// <summary>Und der Strich trägt trotzdem, was gesagt wurde.</summary>
     /// <remarks>
@@ -154,7 +154,7 @@ public class ErreichbarkeitTests
     [Fact]
     public void Der_Strich_traegt_die_Aussagen_die_es_gibt()
     {
-        var haken = Erreichbarkeit.Bilde(
+        var haken = Availability.Bilde(
             Pendelstufe.Bis10, Anwesenheit.VorOrt, null, Muenchen);
 
         haken.Stufe.Should().Be(Pendelstufe.Bis10);
@@ -175,15 +175,15 @@ public class ErreichbarkeitTests
     [InlineData(Pendelstufe.Bis50)]
     [InlineData(Pendelstufe.Bis100)]
     [InlineData(Pendelstufe.Egal)]
-    public void Jede_Stufe_ueberlebt_den_Draht(Pendelstufe stufe) =>
-        Erreichbarkeitsworte.Stufe(Erreichbarkeitsworte.Wort(stufe)).Should().Be(stufe);
+    public void Jede_Stufe_ueberlebt_den_Draht(Pendelstufe stage) =>
+        AvailabilityTerms.Stufe(AvailabilityTerms.Wort(stage)).Should().Be(stage);
 
     /// <summary>
     /// Und der Remotegrad von jobs-service wird gelesen, wie er dort heisst.
     /// </summary>
     /// <remarks>
     /// <c>none</c>, <c>hybrid</c>, <c>full</c> — nicht umbenannt. Ein zweiter
-    /// Wortschatz für dieselbe Sache ginge beim ersten neuen Wert auseinander.
+    /// Vocabulary für dieselbe Sache ginge beim ersten neuen Wert auseinander.
     /// </remarks>
     [Theory]
     [InlineData("none", Anwesenheit.VorOrt)]
@@ -191,16 +191,16 @@ public class ErreichbarkeitTests
     [InlineData("full", Anwesenheit.Remote)]
     [InlineData("", null)]
     [InlineData(null, null)]
-    public void Der_Remotegrad_wird_gelesen_wie_er_heisst(string? wort, Anwesenheit? erwartet) =>
-        Erreichbarkeitsworte.Anwesenheit(wort).Should().Be(erwartet);
+    public void Der_Remotegrad_wird_gelesen_wie_er_heisst(string? word, Anwesenheit? erwartet) =>
+        AvailabilityTerms.Anwesenheit(word).Should().Be(erwartet);
 
     /// <summary>Ein unbekanntes Wort wird zum Strich, nicht zu einem Fehler.</summary>
     /// <remarks>
     /// Es ist eine freiwillige Angabe. Ein Fehlschlag hier hielte eine ganze
-    /// Trefferseite auf, weil ein Wert falsch geschrieben war, den niemand
+    /// HitPage auf, weil ein Wert falsch geschrieben war, den niemand
     /// ausfüllen musste.
     /// </remarks>
     [Fact]
     public void Ein_unbekanntes_Wort_wird_zum_Strich() =>
-        Erreichbarkeitsworte.Stufe("bis_42").Should().BeNull();
+        AvailabilityTerms.Stufe("bis_42").Should().BeNull();
 }

@@ -13,18 +13,18 @@ public sealed record HakenV1(
     [property: JsonPropertyName("word")] string Word,
     [property: JsonPropertyName("named")] bool Named);
 
-/// <summary>Ein Beleg mit Herkunft und Link.</summary>
+/// <summary>Ein Evidence mit ProviderOrigin und Link.</summary>
 /// <remarks>
 /// <c>origin</c> sagt, wer es gesagt hat — ein Mensch an ein Repository
 /// (<c>topic</c>) oder GitHubs Sprachenerkennung (<c>language</c>). Ohne diese
 /// Angabe läse sich beides wie eine Aussage über die Person.
 /// <para>
-/// <strong>Keine Byte-Zahl, kein Anteil, keine Sterne.</strong> Genau daraus
+/// <strong>None Byte-Zahl, kein Anteil, keine Sterne.</strong> Genau daraus
 /// rechnete das gelöschte Paket sein „Können" (ADR-0022 §2). Was nicht da ist,
 /// kann niemand aufsummieren.
 /// </para>
 /// </remarks>
-public sealed record BelegV1(
+public sealed record EvidenceV1(
     [property: JsonPropertyName("word")] string Word,
     [property: JsonPropertyName("origin")] string Origin,
     [property: JsonPropertyName("project")] string Project,
@@ -47,7 +47,7 @@ public sealed record BelegV1(
 /// <c>percent</c> — und auch kein <c>matched_count</c>, das dasselbe unter
 /// anderem Namen wäre.</para>
 /// </remarks>
-public sealed record TrefferV1(
+public sealed record HitV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("headline")] string Headline,
     [property: JsonPropertyName("bio")] string Bio,
@@ -55,7 +55,7 @@ public sealed record TrefferV1(
     [property: JsonPropertyName("remote_ok")] bool RemoteOk,
     [property: JsonPropertyName("named")] IReadOnlyList<string> Named,
     [property: JsonPropertyName("checks")] IReadOnlyList<HakenV1> Checks,
-    [property: JsonPropertyName("evidence")] IReadOnlyList<BelegV1> Evidence,
+    [property: JsonPropertyName("evidence")] IReadOnlyList<EvidenceV1> Evidence,
     [property: JsonPropertyName("evidence_state")] string EvidenceState,
     /// <summary>Das Häkchen zur Entfernung — <c>reachable</c>, <c>further</c>, <c>unsaid</c>.</summary>
     /// <remarks>
@@ -66,32 +66,32 @@ public sealed record TrefferV1(
     /// sobald zwei davon untereinanderstehen, ordnet sie Menschen.</para>
     ///
     /// <para><c>unsaid</c> ist kein Nein. Es heisst: die Person hat nichts
-    /// gesagt, oder es wurde keine Stelle genannt, oder ein Ort ist uns
+    /// gesagt, oder es wurde keine Job genannt, oder ein Ort ist uns
     /// unbekannt. Wer nichts gesagt hat, bekommt kein Kreuz (ADR-0022 §3).</para>
     /// </remarks>
     [property: JsonPropertyName("reach")] string Reach,
     /// <summary>Was die Person gesagt hat — als Wort, oder <c>null</c>.</summary>
     [property: JsonPropertyName("reach_commute")] string? ReachCommute,
-    /// <summary>Was die Stelle verlangt — als Wort, oder <c>null</c>.</summary>
+    /// <summary>Was die Job verlangt — als Wort, oder <c>null</c>.</summary>
     [property: JsonPropertyName("reach_attendance")] string? ReachAttendance);
 
-/// <summary>Eine Seite Treffer.</summary>
+/// <summary>Eine Seite Hit.</summary>
 /// <remarks>
 /// <strong>Ohne Gesamtzahl</strong> (ADR-0026): sie verriete über die Differenz
 /// zur Seitenlänge, wie viele Profile <em>nicht</em> freigegeben sind. Dieselbe
 /// Gestalt wie jede andere Seite hier: <c>items</c> und <c>next</c>.
 /// </remarks>
-public sealed record TrefferseiteV1(
-    [property: JsonPropertyName("items")] IReadOnlyList<TrefferV1> Items,
+public sealed record HitPageV1(
+    [property: JsonPropertyName("items")] IReadOnlyList<HitV1> Items,
     [property: JsonPropertyName("next")] string? Next);
 
-/// <summary>Eine gespeicherte Anfrage.</summary>
+/// <summary>Eine gespeicherte ResumeRequest.</summary>
 /// <remarks>
-/// Filter und ein Name. <strong>Kein Treffer, keine Kennung eines gefundenen
+/// Filter und ein Name. <strong>Kein Hit, keine Kennung eines gefundenen
 /// Menschen, kein Zeitpunkt eines Laufs</strong> — ein gespeichertes Ergebnis
-/// über Menschen veraltet gegen einen Widerruf (ADR-0036 Entscheidung 4).
+/// über Menschen veraltet gegen einen Revocation (ADR-0036 Entscheidung 4).
 /// </remarks>
-public sealed record SucheV1(
+public sealed record SearchV1(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("skills")] IReadOnlyList<string> Skills,
@@ -99,8 +99,8 @@ public sealed record SucheV1(
     [property: JsonPropertyName("remote")] bool Remote,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt);
 
-/// <summary>Was jemand schickt, um eine Suche abzulegen.</summary>
-public sealed record SucheAnlegenV1(
+/// <summary>Was jemand schickt, um eine Search abzulegen.</summary>
+public sealed record CreateSearchV1(
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("skills")] IReadOnlyList<string>? Skills,
     [property: JsonPropertyName("location")] string? Location,
@@ -109,11 +109,11 @@ public sealed record SucheAnlegenV1(
 /// <summary>Was jemand schickt, um sich eine Ansprache entwerfen zu lassen.</summary>
 /// <remarks>
 /// <c>skills</c> sind die Worte, nach denen gesucht wurde — die eigenen Worte
-/// des Absenders. Sie stehen im Rumpf und nicht in einer gespeicherten Suche,
-/// weil eine Ansprache auch zu einer Suche gehören darf, die niemand abgelegt
+/// des Absenders. Sie stehen im Rumpf und nicht in einer gespeicherten Search,
+/// weil eine Ansprache auch zu einer Search gehören darf, die niemand abgelegt
 /// hat.
 /// </remarks>
-public sealed record AnspracheAnfrageV1(
+public sealed record ApproachRequestV1(
     [property: JsonPropertyName("skills")] IReadOnlyList<string>? Skills,
     [property: JsonPropertyName("wish")] string? Wish);
 
@@ -124,7 +124,7 @@ public sealed record AnspracheAnfrageV1(
 /// hat, und liegt dort in einem Formular. Es gibt hier deshalb kein
 /// <c>sent_at</c> und keinen Empfänger — und es soll auch keines geben.
 /// </remarks>
-public sealed record AnspracheentwurfV1(
+public sealed record ApproachDraftV1(
     [property: JsonPropertyName("draft")] string Draft);
 
 /// <summary>Was dieser Dienst an notification-service schickt.</summary>
@@ -141,11 +141,11 @@ public sealed record AnspracheentwurfV1(
 /// Unternehmen, und die Person kann damit nichts anfangen, solange niemand sie
 /// angesprochen hat.</para>
 /// </remarks>
-public sealed record EntdeckungsmeldungV1(
+public sealed record DiscoveryNotificationV1(
     [property: JsonPropertyName("user_id")] Guid UserId,
     [property: JsonPropertyName("kind")] string Kind);
 
-/// <summary>Ein Profil, wie dieser Dienst es von profile-service liest.</summary>
+/// <summary>Ein Profile, wie dieser Dienst es von profile-service liest.</summary>
 /// <remarks>
 /// <para><strong>Die Leseseite einer Naht zwischen zwei Diensten.</strong> Der
 /// Absender deklariert denselben Draht in <c>WorkerTransfer.Profile.Contracts</c>
@@ -161,7 +161,7 @@ public sealed record EntdeckungsmeldungV1(
 /// kein Feld für Belege, und das ist die dritte Auflage aus ADR-0036 als Typ:
 /// was nicht ankommt, kann nicht zum Finden benutzt werden.</para>
 /// </remarks>
-public sealed record FremdprofilV1(
+public sealed record ForeignProfileV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("headline")] string Headline,
     [property: JsonPropertyName("bio")] string Bio,
@@ -173,8 +173,8 @@ public sealed record FremdprofilV1(
     [property: JsonPropertyName("relocation")] string? Relocation = null);
 
 /// <summary>Eine Seite der internen Profilsuche.</summary>
-public sealed record FremdprofilseiteV1(
-    [property: JsonPropertyName("items")] IReadOnlyList<FremdprofilV1> Items,
+public sealed record ForeignProfilePageV1(
+    [property: JsonPropertyName("items")] IReadOnlyList<ForeignProfileV1> Items,
     [property: JsonPropertyName("next")] string? Next);
 
 /// <summary>Ein Repository, wie dieser Dienst es von github-service liest.</summary>
@@ -191,13 +191,13 @@ public sealed record FremdrepositoryV1(
     [property: JsonPropertyName("languages")] IReadOnlyList<string>? Languages,
     [property: JsonPropertyName("topics")] IReadOnlyList<string>? Topics);
 
-/// <summary>Eine GitHub-Verbindung, wie dieser Dienst sie liest.</summary>
+/// <summary>Eine GitHub-Connection, wie dieser Dienst sie liest.</summary>
 /// <remarks>
 /// <c>languages_complete</c> wird gelesen und weitergereicht: eine Menge, die
 /// unvollständig ist und so tut, als wäre sie es nicht, ist die
 /// stillschweigende Vollständigkeit aus ADR-0022 §3.
 /// </remarks>
-public sealed record FremdverbindungV1(
+public sealed record ForeignConnectionV1(
     [property: JsonPropertyName("repositories")] IReadOnlyList<FremdrepositoryV1>? Repositories,
     [property: JsonPropertyName("languages_complete")] bool LanguagesComplete);
 
@@ -213,7 +213,7 @@ public sealed record FremdverbindungV1(
 /// Anwesenheit aus ADR-0041 §2; ein zweites Feld dafür wäre eine zweite
 /// Wahrheit über dieselbe Frage.</para>
 /// </remarks>
-public sealed record FremdstelleV1(
+public sealed record ForeignJobV1(
     [property: JsonPropertyName("location")] string? Location,
     [property: JsonPropertyName("postal_code")] string? PostalCode,
     [property: JsonPropertyName("remote_mode")] string? RemoteMode);

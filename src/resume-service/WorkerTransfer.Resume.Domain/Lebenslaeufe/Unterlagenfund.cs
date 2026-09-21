@@ -2,7 +2,7 @@ using Noelia.Core.Identity;
 
 namespace WorkerTransfer.Resume.Domain.Lebenslaeufe;
 
-/// <summary>Was in einer Unterlage gelesen wurde — auf Auslösung, einmal.</summary>
+/// <summary>Was in einer DocumentRecord gelesen wurde — auf Auslösung, einmal.</summary>
 /// <remarks>
 /// <strong>Der Index aus PBI-7, und er lebt hier, weil die Unterlagen hier
 /// liegen.</strong> Nicht in profile-service, nicht in scout-service: ein Index
@@ -13,7 +13,7 @@ namespace WorkerTransfer.Resume.Domain.Lebenslaeufe;
 /// <strong>Gespeichert werden Namen, nie der Text.</strong> Der gefundene
 /// Volltext lebt im Arbeitsspeicher des einen Aufrufs und wird danach
 /// weggeworfen. Eine Spalte mit dem Wortlaut eines Zeugnisses wäre eine zweite
-/// Kopie der Unterlage — in der Datenbank statt in der Ablage, und damit in
+/// Kopie der DocumentRecord — in der Datenbank statt in der Ablage, und damit in
 /// jeder Sicherung und in jedem Abzug, den irgendwer für eine Fehlersuche zieht
 /// (dieselbe Begründung wie in <see cref="Unterlage"/>).
 /// </para>
@@ -21,25 +21,25 @@ namespace WorkerTransfer.Resume.Domain.Lebenslaeufe;
 /// <strong>Ein Fund ist ein BELEG, keine Nennung</strong> (ADR-0033). Er ist
 /// eine Aussage über ein <em>Dokument</em> — dieses Wort steht in dieser Datei
 /// — und wird niemals durchsuchbar. Suchbar ist allein, was die Person selbst
-/// in ihr Profil getippt und gespeichert hat; zwischen dem Fund und dieser
+/// in ihr Profile getippt und gespeichert hat; zwischen dem Fund und dieser
 /// Aussage liegen zwei Handlungen im Browser.
 /// </para>
 /// </remarks>
-public sealed class Unterlagenfund
+public sealed class DocumentTerms
 {
     private readonly List<string> _begriffe;
 
-    private Unterlagenfund(
+    private DocumentTerms(
         Guid id,
-        SubjectId wer,
-        Guid unterlage,
+        SubjectId subject,
+        Guid document,
         bool textGefunden,
         IEnumerable<string> begriffe,
         DateTimeOffset gelesen)
     {
         Id = id;
-        Wer = wer;
-        Unterlage = unterlage;
+        Wer = subject;
+        DocumentRecord = document;
         TextGefunden = textGefunden;
         _begriffe = [.. begriffe];
         Gelesen = gelesen;
@@ -48,11 +48,11 @@ public sealed class Unterlagenfund
     /// <summary>Die Kennung dieser Zeile.</summary>
     public Guid Id { get; }
 
-    /// <summary>Wessen Unterlage gelesen wurde.</summary>
+    /// <summary>Wessen DocumentRecord gelesen wurde.</summary>
     public SubjectId Wer { get; }
 
-    /// <summary>Welche Unterlage.</summary>
-    public Guid Unterlage { get; }
+    /// <summary>Welche DocumentRecord.</summary>
+    public Guid DocumentRecord { get; }
 
     /// <summary>War überhaupt Text zu lesen?</summary>
     /// <remarks>
@@ -76,33 +76,33 @@ public sealed class Unterlagenfund
     public DateTimeOffset Gelesen { get; }
 
     /// <summary>Hält fest, was ein ausgelöster Lesevorgang ergeben hat.</summary>
-    /// <param name="wer">Wem die Unterlage gehört.</param>
+    /// <param name="wer">Wem die DocumentRecord gehört.</param>
     /// <param name="unterlage">Welche.</param>
     /// <param name="textGefunden">Ob überhaupt Text zu lesen war.</param>
     /// <param name="begriffe">Die kanonischen Namen aus dem Text.</param>
     /// <param name="jetzt">Der Zeitpunkt.</param>
-    public static Unterlagenfund Halte_fest(
-        SubjectId wer,
-        Guid unterlage,
+    public static DocumentTerms Halte_fest(
+        SubjectId subject,
+        Guid document,
         bool textGefunden,
         IEnumerable<string> begriffe,
-        DateTimeOffset jetzt)
+        DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(begriffe);
 
-        return new Unterlagenfund(
-            Guid.CreateVersion7(), wer, unterlage, textGefunden, begriffe, jetzt);
+        return new DocumentTerms(
+            Guid.CreateVersion7(), subject, document, textGefunden, begriffe, now);
     }
 
     /// <summary>Der Fund, wie eine Zeile ihn hält. Prüft nichts.</summary>
-    public static Unterlagenfund Stelle_her(
+    public static DocumentTerms Stelle_her(
         Guid id,
-        SubjectId wer,
-        Guid unterlage,
+        SubjectId subject,
+        Guid document,
         bool textGefunden,
         IEnumerable<string> begriffe,
         DateTimeOffset gelesen) =>
-        new(id, wer, unterlage, textGefunden, begriffe, gelesen);
+        new(id, subject, document, textGefunden, begriffe, gelesen);
 }
 
 /// <summary>Führt die Funde. Zwei Fragen, und eine dritte gibt es nicht.</summary>
@@ -110,25 +110,25 @@ public sealed class Unterlagenfund
 /// <strong>Die Methodenmenge IST die Zusage</strong>, und <c>AuflagenTests</c>
 /// vergleicht sie als Menge statt auf Enthaltensein. Gefragt werden kann
 /// „was steht in den Unterlagen DIESES Menschen" — nie „welche Menschen haben
-/// das Wort X in ihren Unterlagen". Die zweite Frage wäre eine Suche über
+/// das Wort X in ihren Unterlagen". Die zweite Frage wäre eine Search über
 /// fremde Dokumente und damit das Gegenteil dieser ganzen Arbeit: durchsuchbar
 /// ist allein, was jemand selbst genannt hat (ADR-0033).
 /// </remarks>
-public interface IFundSpeicher
+public interface ITermStore
 {
     /// <summary>Die Funde dieser Person.</summary>
-    Task<IReadOnlyList<Unterlagenfund>> AlleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DocumentTerms>> AllAsync(
+        SubjectId subject, CancellationToken cancellationToken = default);
 
-    /// <summary>Legt einen Fund ab und ersetzt einen früheren zu derselben Unterlage.</summary>
-    Task SichereAsync(Unterlagenfund fund, CancellationToken cancellationToken = default);
+    /// <summary>Legt einen Fund ab und ersetzt einen früheren zu derselben DocumentRecord.</summary>
+    Task SaveAsync(DocumentTerms term, CancellationToken cancellationToken = default);
 
-    /// <summary>Nimmt den Fund zu dieser Unterlage weg.</summary>
+    /// <summary>Nimmt den Fund zu dieser DocumentRecord weg.</summary>
     /// <remarks>
-    /// Für den Weg, auf dem die Unterlage selbst verschwindet: ein Fund ohne
+    /// Für den Weg, auf dem die DocumentRecord selbst verschwindet: ein Fund ohne
     /// seine Datei wäre der Wortlaut eines gelöschten Zeugnisses, der stehen
     /// bleibt.
     /// </remarks>
-    Task LoescheAsync(
-        SubjectId wer, Guid unterlage, CancellationToken cancellationToken = default);
+    Task DeleteAsync(
+        SubjectId subject, Guid document, CancellationToken cancellationToken = default);
 }

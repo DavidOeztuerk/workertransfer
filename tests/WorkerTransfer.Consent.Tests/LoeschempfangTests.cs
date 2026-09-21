@@ -35,40 +35,40 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private WebApplicationFactory<Program> Dienst(string geheimnis) =>
+    private WebApplicationFactory<Program> Dienst(string secret) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:consent", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
-            host.UseSetting("Erasure:Geheimnis", geheimnis);
+            host.UseSetting("Erasure:Geheimnis", secret);
             host.UseSetting("environment", "Development");
         });
 
-    private HttpClient Als(Guid wer)
+    private HttpClient Als(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Fuer(wer));
+            new AuthenticationHeaderValue("Bearer", Tokenform.Fuer(subject));
         return browser;
     }
 
-    private static HttpRequestMessage Loeschbefehl(Guid wer, string? geheimnis)
+    private static HttpRequestMessage Loeschbefehl(Guid subject, string? secret)
     {
-        var anfrage = new HttpRequestMessage(HttpMethod.Post, "/erasure")
+        var request = new HttpRequestMessage(HttpMethod.Post, "/erasure")
         {
-            Content = JsonContent.Create(new { user_id = wer })
+            Content = JsonContent.Create(new { user_id = subject })
         };
 
-        if (geheimnis is not null)
+        if (secret is not null)
         {
-            anfrage.Headers.Add("X-Erasure-Secret", geheimnis);
+            request.Headers.Add("X-Erasure-Secret", secret);
         }
 
-        return anfrage;
+        return request;
     }
 
     private async Task<Guid> PersonMitFreigaben()
@@ -94,23 +94,23 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
         return anna;
     }
 
-    private async Task<List<(string Action, string? Reason)>> Zeilen(Guid wer)
+    private async Task<List<(string Action, string? Reason)>> Zeilen(Guid subject)
     {
-        await using var verbindung = new NpgsqlConnection(postgres.ConnectionString);
-        await verbindung.OpenAsync();
-        await using var befehl = verbindung.CreateCommand();
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await connection.OpenAsync();
+        await using var befehl = connection.CreateCommand();
         befehl.CommandText =
             "SELECT action::text, reason FROM consent_events WHERE subject_id = @wer ORDER BY id";
-        befehl.Parameters.AddWithValue("wer", wer);
+        befehl.Parameters.AddWithValue("wer", subject);
 
-        var zeilen = new List<(string, string?)>();
+        var rows = new List<(string, string?)>();
         await using var leser = await befehl.ExecuteReaderAsync();
         while (await leser.ReadAsync())
         {
-            zeilen.Add((leser.GetString(0), leser.IsDBNull(1) ? null : leser.GetString(1)));
+            rows.Add((leser.GetString(0), leser.IsDBNull(1) ? null : leser.GetString(1)));
         }
 
-        return zeilen;
+        return rows;
     }
 
     /// <summary>
@@ -123,10 +123,10 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
     {
         using var ohne = Dienst(string.Empty);
 
-        var antwort = await ohne.CreateClient().SendAsync(
+        var response = await ohne.CreateClient().SendAsync(
             Loeschbefehl(Guid.CreateVersion7(), "irgendwas"));
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Theory]
@@ -136,10 +136,10 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = await PersonMitFreigaben();
 
-        var antwort = await _dienst.CreateClient().SendAsync(Loeschbefehl(anna, vorgelegt));
+        var response = await _dienst.CreateClient().SendAsync(Loeschbefehl(anna, vorgelegt));
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await Zeilen(anna)).Should().NotContain(zeile => zeile.Action == "DELETE");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await Zeilen(anna)).Should().NotContain(row => row.Action == "DELETE");
     }
 
     /// <summary>
@@ -152,18 +152,18 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = await PersonMitFreigaben();
 
-        var antwort = await _dienst.CreateClient().SendAsync(Loeschbefehl(anna, Geheimnis));
+        var response = await _dienst.CreateClient().SendAsync(Loeschbefehl(anna, Geheimnis));
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var zeilen = await Zeilen(anna);
+        var rows = await Zeilen(anna);
 
-        zeilen.Should().Contain(zeile => zeile.Action == "GRANT", "die Kette bleibt");
-        zeilen.Should().Contain(zeile => zeile.Action == "REVOKE");
-        zeilen.Count(zeile => zeile.Action == "DELETE")
+        rows.Should().Contain(row => row.Action == "GRANT", "die Kette bleibt");
+        rows.Should().Contain(row => row.Action == "REVOKE");
+        rows.Count(row => row.Action == "DELETE")
             .Should().Be(2, "je jemals gehaltener Faehigkeit eine Schlusszeile");
-        zeilen.Should().OnlyContain(
-            zeile => zeile.Reason == null, "der Freitext ist ueberall geleert");
+        rows.Should().OnlyContain(
+            row => row.Reason == null, "der Freitext ist ueberall geleert");
     }
 
     [Fact]
@@ -176,10 +176,10 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
         var geprueft = await Als(Guid.CreateVersion7()).PostAsJsonAsync(
             "/consent/check", new { subject_id = anna, capability = "profile.visibility:public" });
 
-        var stand = JsonDocument.Parse(await geprueft.Content.ReadAsStringAsync()).RootElement;
+        var state = JsonDocument.Parse(await geprueft.Content.ReadAsStringAsync()).RootElement;
 
-        stand.GetProperty("granted").GetBoolean().Should().BeFalse();
-        stand.GetProperty("deleted").GetBoolean().Should().BeTrue(
+        state.GetProperty("granted").GetBoolean().Should().BeFalse();
+        state.GetProperty("deleted").GetBoolean().Should().BeTrue(
             "geloescht ist nicht dasselbe wie widerrufen");
     }
 
@@ -220,9 +220,9 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = await PersonMitFreigaben();
 
-        var antwort = await _dienst.CreateClient().SendAsync(Loeschbefehl(anna, Geheimnis));
+        var response = await _dienst.CreateClient().SendAsync(Loeschbefehl(anna, Geheimnis));
         var quittung = JsonDocument.Parse(
-            await antwort.Content.ReadAsStringAsync()).RootElement;
+            await response.Content.ReadAsStringAsync()).RootElement;
 
         quittung.GetProperty("retained").GetInt32().Should().Be(0);
     }

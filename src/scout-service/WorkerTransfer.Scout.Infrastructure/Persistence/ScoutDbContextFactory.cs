@@ -4,18 +4,18 @@ using Npgsql;
 
 namespace WorkerTransfer.Scout.Infrastructure.Persistence;
 
-/// <summary>Baut Datenquelle und Kontext.</summary>
+/// <summary>Baut DataSource und Kontext.</summary>
 public static class ScoutDbContextFactory
 {
-    /// <summary>Die Datenquelle.</summary>
-    public static NpgsqlDataSource Datenquelle(string connectionString) =>
+    /// <summary>Die DataSource.</summary>
+    public static NpgsqlDataSource DataSource(string connectionString) =>
         new NpgsqlDataSourceBuilder(connectionString).Build();
 
     /// <summary>
-    /// Die eine Stelle, an der Verfolgen abgeschaltet wird, damit Behälter und
+    /// Die eine Job, an der Verfolgen abgeschaltet wird, damit Behälter und
     /// Tests nicht mit verschiedenem Verhalten enden.
     /// </summary>
-    public static DbContextOptionsBuilder Konfiguriere(
+    public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options, NpgsqlDataSource dataSource)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -25,7 +25,7 @@ public static class ScoutDbContextFactory
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
     }
 
-    /// <summary>Dasselbe Modell für <c>dotnet ef</c>, das keine Verbindung braucht.</summary>
+    /// <summary>Dasselbe Modell für <c>dotnet ef</c>, das keine Connection braucht.</summary>
     public static DbContextOptionsBuilder ZurEntwurfszeit(
         DbContextOptionsBuilder options, string connectionString)
     {

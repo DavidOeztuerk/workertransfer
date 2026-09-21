@@ -19,9 +19,9 @@ namespace WorkerTransfer.Resume.Application.Ports;
 /// precautionary assumption ADR-0027 §3 abolishes.
 /// </para>
 /// </remarks>
-public interface ILoeschbestand
+public interface IErasureLedger
 {
     /// <summary>Deletes everything about this person.</summary>
     /// <returns>What was left standing. Zero, always.</returns>
-    Task<int> LoescheAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task<int> DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default);
 }

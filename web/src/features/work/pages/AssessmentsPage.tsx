@@ -67,9 +67,12 @@ export function AssessmentsPage() {
     <PageShell title={t("probe.titel")} narrow>
       <Typography sx={{ mb: 1 }}>{t("probe.lead")}</Typography>
 
-      {/* Nicht wegklickbar, und kein Tooltip: wer eine Aufgabe nicht machen
-          will, soll es lesen, ohne danach zu suchen. */}
-      <Alert severity="info" sx={{ mb: 3 }}>
+      <Alert
+        // Not dismissible and no tooltip: whoever does not want to do a task
+        // should read this without having to look for it.
+        severity="info"
+        sx={{ mb: 3 }}
+      >
         {t("probe.keinAblehnen")}
       </Alert>
 
@@ -127,8 +130,8 @@ function MeineKarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void 
       <CardContent>
         <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap", gap: 1 }}>
           <Chip label={t(`probe.stand_${vorgang.state}`)} size="small" />
-          {/* Der Umfang, und er steht NEBEN dem Stand — nicht im Kleingedruckten. */}
           <Chip
+            // The effort, BESIDE the state and not in the small print.
             label={t("probe.umfang", { stunden: vorgang.hours })}
             size="small"
             color="primary"
@@ -164,13 +167,13 @@ function MeineKarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void 
           </>
         )}
 
-        {/* DIE BEWERTUNG. Sie steht hier, sobald es sie gibt — bei einer Zusage
-            wie bei einer Absage, und unabhaengig davon, was gerade freigegeben
-            ist (ADR-0042 §2). */}
         {vorgang.evaluation !== undefined && (
           <>
             <Divider sx={{ my: 2 }} />
             <Alert
+              // THE EVALUATION. It stands here as soon as it exists — on an
+              // acceptance as on a rejection, and regardless of what is released
+              // right now (ADR-0042 §2).
               severity={vorgang.evaluation.outcome === "accepted" ? "success" : "info"}
               sx={{ mb: 1 }}
             >

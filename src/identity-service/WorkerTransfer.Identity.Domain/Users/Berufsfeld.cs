@@ -3,7 +3,7 @@ namespace WorkerTransfer.Identity.Domain.Users;
 /// <summary>In welcher Arbeitswelt eine Person steht (ADR-0039).</summary>
 /// <remarks>
 /// Eine Angabe der Person, aus der genau eine Sache folgt: was die Oberfläche
-/// anbietet. Keine Berechtigung, keine Sichtbarkeit, keine Sortierung. Es steht
+/// anbietet. None Berechtigung, keine Sichtbarkeit, keine Sortierung. Es steht
 /// nicht im Token.
 /// <para>
 /// Die Menge ist geschlossen, weil aus diesem Feld eine Navigation folgt und
@@ -12,7 +12,7 @@ namespace WorkerTransfer.Identity.Domain.Users;
 /// dasselbe wie <c>null</c>.
 /// </para>
 /// </remarks>
-public enum Berufsfeld
+public enum OccupationalField
 {
     /// <summary>Handwerk — Metall, Holz, Sanitär, Kfz.</summary>
     Handwerk,
@@ -45,53 +45,53 @@ public enum Berufsfeld
     BildungSoziales,
 
     /// <summary>Etwas anderes — eine Wahl, kein Fehlen.</summary>
-    Sonstiges
+    Other
 }
 
-/// <summary>Liest ein Berufsfeld aus einem Etikett und zurück.</summary>
+/// <summary>Liest ein OccupationalField aus einem Etikett und zurück.</summary>
 /// <remarks>
 /// Das Etikett ist snake_case, wie der ganze Draht. Es leitet sich nicht aus
 /// dem Aufzählungsnamen ab: <c>ToLower()</c> ergäbe <c>industrietechnik</c>.
 /// </remarks>
-public static class Berufsfeldwahl
+public static class OccupationalFieldChoice
 {
-    /// <summary>Etikett → Feld. Die einzige Stelle, an der die Liste steht.</summary>
-    private static readonly IReadOnlyDictionary<string, Berufsfeld> NachEtikett =
-        new Dictionary<string, Berufsfeld>(StringComparer.OrdinalIgnoreCase)
+    /// <summary>Etikett → Feld. Die einzige Job, an der die Liste steht.</summary>
+    private static readonly IReadOnlyDictionary<string, OccupationalField> NachEtikett =
+        new Dictionary<string, OccupationalField>(StringComparer.OrdinalIgnoreCase)
         {
-            ["handwerk"] = Berufsfeld.Handwerk,
-            ["industrie_technik"] = Berufsfeld.IndustrieTechnik,
-            ["bau"] = Berufsfeld.Bau,
-            ["gesundheit_pflege"] = Berufsfeld.GesundheitPflege,
-            ["logistik_verkehr"] = Berufsfeld.LogistikVerkehr,
-            ["gastronomie_hotel"] = Berufsfeld.GastronomieHotel,
-            ["handel_verkauf"] = Berufsfeld.HandelVerkauf,
-            ["buero_verwaltung"] = Berufsfeld.BueroVerwaltung,
-            ["it_software"] = Berufsfeld.ItSoftware,
-            ["bildung_soziales"] = Berufsfeld.BildungSoziales,
-            ["sonstiges"] = Berufsfeld.Sonstiges
+            ["handwerk"] = OccupationalField.Handwerk,
+            ["industrie_technik"] = OccupationalField.IndustrieTechnik,
+            ["bau"] = OccupationalField.Bau,
+            ["gesundheit_pflege"] = OccupationalField.GesundheitPflege,
+            ["logistik_verkehr"] = OccupationalField.LogistikVerkehr,
+            ["gastronomie_hotel"] = OccupationalField.GastronomieHotel,
+            ["handel_verkauf"] = OccupationalField.HandelVerkauf,
+            ["buero_verwaltung"] = OccupationalField.BueroVerwaltung,
+            ["it_software"] = OccupationalField.ItSoftware,
+            ["bildung_soziales"] = OccupationalField.BildungSoziales,
+            ["sonstiges"] = OccupationalField.Other
         };
 
     /// <summary>Alle Etiketten, in der Reihenfolge der Aufzählung.</summary>
     public static IReadOnlyList<string> Etiketten { get; } =
-        [.. NachEtikett.OrderBy(eintrag => eintrag.Value).Select(eintrag => eintrag.Key)];
+        [.. NachEtikett.OrderBy(entry => entry.Value).Select(entry => entry.Key)];
 
     /// <summary>Das Feld zu einem Etikett — oder <c>null</c>.</summary>
     /// <remarks>
-    /// Unbekanntes wird <c>null</c> und nie eine Vorgabe: ein Berufsfeld zu
+    /// Unbekanntes wird <c>null</c> und nie eine Vorgabe: ein OccupationalField zu
     /// raten wäre die abgeleitete Eigenschaft, die ADR-0039 verwirft. Ob eine
     /// Eingabe taugte, beantwortet <see cref="Kennen"/>.
     /// </remarks>
     /// <param name="etikett">Was hereinkam.</param>
     /// <returns>Das Feld, oder <c>null</c>.</returns>
-    public static Berufsfeld? Aus(string? etikett)
+    public static OccupationalField? Aus(string? label)
     {
-        if (string.IsNullOrWhiteSpace(etikett))
+        if (string.IsNullOrWhiteSpace(label))
         {
             return null;
         }
 
-        return NachEtikett.TryGetValue(etikett.Trim(), out var feld) ? feld : null;
+        return NachEtikett.TryGetValue(label.Trim(), out var field) ? field : null;
     }
 
     /// <summary>Kennen wir dieses Etikett?</summary>
@@ -102,25 +102,25 @@ public static class Berufsfeldwahl
     /// </remarks>
     /// <param name="etikett">Was hereinkam.</param>
     /// <returns><c>true</c>, wenn es gespeichert werden darf.</returns>
-    public static bool Kennen(string? etikett) =>
-        string.IsNullOrWhiteSpace(etikett) || NachEtikett.ContainsKey(etikett.Trim());
+    public static bool Kennen(string? label) =>
+        string.IsNullOrWhiteSpace(label) || NachEtikett.ContainsKey(label.Trim());
 
     /// <summary>Das Etikett, wie es in der Spalte und auf dem Draht steht.</summary>
     /// <param name="feld">Das Feld, oder <c>null</c>.</param>
     /// <returns>snake_case — oder <c>null</c>, wenn niemand gewählt hat.</returns>
-    public static string? Etikett(Berufsfeld? feld) => feld switch
+    public static string? Etikett(OccupationalField? field) => field switch
     {
-        Berufsfeld.Handwerk => "handwerk",
-        Berufsfeld.IndustrieTechnik => "industrie_technik",
-        Berufsfeld.Bau => "bau",
-        Berufsfeld.GesundheitPflege => "gesundheit_pflege",
-        Berufsfeld.LogistikVerkehr => "logistik_verkehr",
-        Berufsfeld.GastronomieHotel => "gastronomie_hotel",
-        Berufsfeld.HandelVerkauf => "handel_verkauf",
-        Berufsfeld.BueroVerwaltung => "buero_verwaltung",
-        Berufsfeld.ItSoftware => "it_software",
-        Berufsfeld.BildungSoziales => "bildung_soziales",
-        Berufsfeld.Sonstiges => "sonstiges",
+        OccupationalField.Handwerk => "handwerk",
+        OccupationalField.IndustrieTechnik => "industrie_technik",
+        OccupationalField.Bau => "bau",
+        OccupationalField.GesundheitPflege => "gesundheit_pflege",
+        OccupationalField.LogistikVerkehr => "logistik_verkehr",
+        OccupationalField.GastronomieHotel => "gastronomie_hotel",
+        OccupationalField.HandelVerkauf => "handel_verkauf",
+        OccupationalField.BueroVerwaltung => "buero_verwaltung",
+        OccupationalField.ItSoftware => "it_software",
+        OccupationalField.BildungSoziales => "bildung_soziales",
+        OccupationalField.Other => "sonstiges",
         _ => null
     };
 }

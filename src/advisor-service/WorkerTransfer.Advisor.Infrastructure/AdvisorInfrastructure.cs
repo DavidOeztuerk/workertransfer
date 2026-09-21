@@ -8,16 +8,16 @@ using WorkerTransfer.Advisor.Application.Behaviors;
 using WorkerTransfer.Advisor.Application.Gespraeche;
 using WorkerTransfer.Advisor.Application.Ports;
 using WorkerTransfer.Advisor.Domain.Gespraeche;
-using WorkerTransfer.Advisor.Domain.Mandate;
+using WorkerTransfer.Advisor.Domain.Mandates;
 using WorkerTransfer.Advisor.Infrastructure.Auskunft;
 using WorkerTransfer.Advisor.Infrastructure.Benachrichtigung;
 using WorkerTransfer.Advisor.Infrastructure.Einwilligung;
-using WorkerTransfer.Advisor.Infrastructure.Loeschung;
+using WorkerTransfer.Advisor.Infrastructure.Erasure;
 using WorkerTransfer.Advisor.Infrastructure.Persistence;
 using WorkerTransfer.Advisor.Infrastructure.Sicherheit;
 using WorkerTransfer.Advisor.Infrastructure.Uebergabe;
 using WorkerTransfer.Outbox;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Advisor.Contracts;
 using Noelia.Abstractions.Security.Checks;
 using WorkerTransfer.ServiceDefaults;
@@ -47,7 +47,7 @@ namespace WorkerTransfer.Advisor.Infrastructure;
 public static class AdvisorInfrastructure
 {
     /// <param name="services">Der Container.</param>
-    /// <param name="configuration">Woher Ledger, Auskünfte und Geheimnisse kommen.</param>
+    /// <param name="configuration">Woher Ledger, Auskünfte und Secrets kommen.</param>
     /// <param name="connectionString">Wo die Berater-Datenbank liegt.</param>
     public static IServiceCollection AddAdvisorInfrastructure(
         this IServiceCollection services,
@@ -57,44 +57,44 @@ public static class AdvisorInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Einwilligungseinstellungen>(
-            configuration.GetSection(Einwilligungseinstellungen.Abschnitt));
-        services.Configure<Auskunftseinstellungen>(
-            configuration.GetSection(Auskunftseinstellungen.Abschnitt));
-        services.Configure<Uebergabeeinstellungen>(
-            configuration.GetSection(Uebergabeeinstellungen.Abschnitt));
-        services.Configure<Benachrichtigungseinstellungen>(
-            configuration.GetSection(Benachrichtigungseinstellungen.Abschnitt));
-        services.Configure<Loescheinstellungen>(
-            configuration.GetSection(Loescheinstellungen.Abschnitt));
+        services.Configure<ConsentSettings>(
+            configuration.GetSection(ConsentSettings.Section));
+        services.Configure<LookupSettings>(
+            configuration.GetSection(LookupSettings.Section));
+        services.Configure<HandoverSettings>(
+            configuration.GetSection(HandoverSettings.Section));
+        services.Configure<NotificationSettings>(
+            configuration.GetSection(NotificationSettings.Section));
+        services.Configure<ErasureSettings>(
+            configuration.GetSection(ErasureSettings.Section));
 
-        services.AddSingleton(_ => AdvisorDbContextFactory.Datenquelle(connectionString));
-        services.AddDbContext<AdvisorDbContext>((anbieter, optionen) =>
-            AdvisorDbContextFactory.Konfiguriere(
-                optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<AdvisorDbContext>("advisor");
-        services.AddSchluesselbund<AdvisorDbContext>();
+        services.AddSingleton(_ => AdvisorDbContextFactory.DataSource(connectionString));
+        services.AddDbContext<AdvisorDbContext>((provider, optionen) =>
+            AdvisorDbContextFactory.Configure(
+                optionen, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatabaseReadiness<AdvisorDbContext>("advisor");
+        services.AddKeyRing<AdvisorDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<IAufrufertoken, HttpAufrufertoken>();
-        services.AddScoped<IMandatspeicher, EfMandatspeicher>();
-        services.AddScoped<IGespraechsspeicher, EfGespraechsspeicher>();
+        services.AddScoped<IMandateStore, EfMandateStore>();
+        services.AddScoped<IConversationStore, EfConversationStore>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-        services.AddScoped<IEinwilligungstor, HttpEinwilligungstor>();
-        services.AddScoped<IVorgangsuebergabe, HttpVorgangsuebergabe>();
+        services.AddScoped<IConsentGate, HttpConsentGate>();
+        services.AddScoped<ICaseHandover, HttpCaseHandover>();
 
         // Eine Klasse, zwei Ports: dieselbe Tür, zwei Fragen. Getrennt
         // registriert, damit ein Handler nur die sieht, die er braucht.
         services.AddScoped<HttpAuskuenfte>();
-        services.AddScoped<IFirmenauskunft>(a => a.GetRequiredService<HttpAuskuenfte>());
+        services.AddScoped<ICompanyLookup>(a => a.GetRequiredService<HttpAuskuenfte>());
         services.AddScoped<IPersonenauskunft>(a => a.GetRequiredService<HttpAuskuenfte>());
 
-        services.AddScoped<IZustellung, HttpBenachrichtigung>();
+        services.AddScoped<IDelivery, HttpBenachrichtigung>();
         services.AddOutbox<AdvisorDbContext>(configuration);
 
-        services.AddCQRS(typeof(GespraechEroeffnenBefehl).Assembly);
+        services.AddCQRS(typeof(OpenConversationCommand).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
         Nachweis(services, configuration);
@@ -113,24 +113,24 @@ public static class AdvisorInfrastructure
     /// Befund, den ein Betriebsrat liest.</para>
     ///
     /// <para><c>WorkloadPercent</c> ist das Pensum, das die Person selbst für
-    /// ihre nächste Stelle nennt — eine Angabe über eine <em>Stelle</em>.
+    /// ihre nächste Job nennt — eine Angabe über eine <em>Job</em>.
     /// <c>Note</c> ist englisch und heißt Anmerkung: der erste Satz eines
-    /// Unternehmens an einen Menschen. Das deutsche Wort wäre eine Bewertung,
+    /// Unternehmens an einen Menschen. Das deutsche Wort wäre eine Evaluation,
     /// und genau deshalb steht es auf der Liste — hier ist es nicht gemeint.</para>
     ///
     /// <para>Dieselbe Form halten die drei Sprachkataloge der Oberfläche für
     /// echte Kognaten („Status", „Website", „Administrator"): kurz, und jede
     /// Zeile ein Einzelfall.</para>
     /// </remarks>
-    public static IReadOnlyList<Wortausnahme> Wortausnahmen { get; } =
+    public static IReadOnlyList<TermException> Wortausnahmen { get; } =
     [
-        new("MandatV1.WorkloadPercent", Pensum),
-        new("MandatSchreibenV1.WorkloadPercent", Pensum),
-        new("GespraechV1.WorkloadPercent", Pensum),
-        new("Mandat.PensumProzent", Pensum),
-        new("GespraechEroeffnenV1.Note", Anmerkung),
-        new("GespraechV1.Note", Anmerkung),
-        new("MeinGespraechV1.Note", Anmerkung)
+        new("MandateV1.WorkloadPercent", Pensum),
+        new("WriteMandateV1.WorkloadPercent", Pensum),
+        new("ConversationV1.WorkloadPercent", Pensum),
+        new("Mandate.PensumProzent", Pensum),
+        new("OpenConversationV1.Note", Anmerkung),
+        new("ConversationV1.Note", Anmerkung),
+        new("MyConversationV1.Note", Anmerkung)
     ];
 
     private const string Pensum =
@@ -144,44 +144,44 @@ public static class AdvisorInfrastructure
 
     /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
     /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
     /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
     ///
     /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
     /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
     /// vergessen kann.</para>
     /// </remarks>
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
-            [typeof(UebergangNichtErlaubt).Assembly, typeof(MandatV1).Assembly],
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
+            [typeof(UebergangNichtErlaubt).Assembly, typeof(MandateV1).Assembly],
             Wortausnahmen));
 
-        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
+        // None KI-Naht: `ProviderCheck` ohne Quelle meldet NichtAnwendbar,
         // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
         // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
         // durchschneiden soll.
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
 
         // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
         // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
         // Zwischenspeicher davor faellt niemandem auf, weil alles
-        // weiterfunktioniert, nur eben mit dem Stand von vorhin.
-        services.AddSingleton<ISecurityCheck>(anbieter =>
-            new Widerrufspruefung<IEinwilligungstor>(
-                anbieter, typeof(HttpEinwilligungstor)));
+        // weiterfunktioniert, nur eben mit dem State von vorhin.
+        services.AddSingleton<ISecurityCheck>(provider =>
+            new RevocationCheck<IConsentGate>(
+                provider, typeof(HttpConsentGate)));
 
-        var loeschung = new Loescheinstellungen();
-        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+        var erasure = new ErasureSettings();
+        configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsEmpfaenger(
             "advisor",
-            !string.IsNullOrEmpty(loeschung.Geheimnis),
+            !string.IsNullOrEmpty(erasure.Geheimnis),
             pruefspurVorhanden: false));
     }
 }

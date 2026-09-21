@@ -4,12 +4,12 @@ namespace WorkerTransfer.Profile.Application.Ports;
 
 /// <summary>Der Anbieter hat nicht geantwortet — oder es ist keiner eingerichtet.</summary>
 /// <remarks>
-/// Ein eigener Fehler und <b>kein stiller Rückfall auf eine Vorlage</b>: ein
+/// Ein eigener Fehler und <b>kein stiller Rückfall auf eine ResumeTemplate</b>: ein
 /// Entwurf, der nicht vom Modell kommt, aber so aussieht, wäre die schlechtere
 /// Antwort. Die Meldung trägt nie den Prompt und nie die Antwort.
 /// </remarks>
 /// <param name="meldung">Die Art des Fehlschlags, nie sein Inhalt.</param>
-public sealed class EntwurfNichtVerfuegbar(string meldung) : Exception(meldung);
+public sealed class DraftUnavailable(string notification) : Exception(notification);
 
 /// <summary>
 /// Was in den Prompt darf — und damit auch: was nicht (ADR-0024).
@@ -21,15 +21,15 @@ public sealed class EntwurfNichtVerfuegbar(string meldung) : Exception(meldung);
 /// <remarks>
 /// <b>Diese Klasse IST die Grenze.</b> Sie trägt, was die Person über sich
 /// geschrieben hat, und sonst nichts: kein Name, keine E-Mail-Adresse, keine
-/// <c>SubjectId</c>, kein Arbeitgeber, kein Lebenslauf, keine Bewerbung, kein
-/// Marktstatus.
+/// <c>SubjectId</c>, kein Arbeitgeber, kein Resume, keine JobApplication, kein
+/// MarketStatus.
 /// <para>
 /// Ein Record mit benannten Feldern und kein freies Wörterbuch, weil ein
 /// Wörterbuch beim nächsten Merkmal stillschweigend einen Schlüssel mehr trägt
 /// — und niemand es beim Lesen sieht.
 /// </para>
 /// </remarks>
-public sealed record Entwurfslage(
+public sealed record DraftSituation(
     string Ueberschrift,
     string Text,
     IReadOnlyList<string> Faehigkeiten,
@@ -41,26 +41,26 @@ public sealed record Entwurfslage(
     /// ist: eine zweite Aufrufstelle — ein Stapelauftrag, ein zweiter Endpunkt —
     /// bekäme sie sonst nicht mit. Und sie ist die einzige Länge in dieser
     /// Klasse, die geprüft werden muss: Überschrift, Text und Fähigkeiten kommen
-    /// aus dem gespeicherten Profil und sind dort längst begrenzt, der Wunsch
-    /// dagegen kommt roh aus dem Rumpf der Anfrage.
+    /// aus dem gespeicherten PersonProfile und sind dort längst begrenzt, der Wunsch
+    /// dagegen kommt roh aus dem Rumpf der ResumeRequest.
     /// </remarks>
     public string Wunsch { get; init; } =
-        Wunsch is { Length: > Profil.HoechstlaengeWunsch }
-            ? throw new WunschFehler()
+        Wunsch is { Length: > PersonProfile.HoechstlaengeWunsch }
+            ? throw new PreferenceError()
             : Wunsch;
 
     /// <summary>Woran das Modell sich zu halten hat.</summary>
     /// <remarks>
-    /// „Schreibe ALS die Person“ ist der Kern: der Entwurf ist ein Vorschlag für
+    /// „Write ALS die Person“ ist der Kern: der Entwurf ist ein Vorschlag für
     /// ihren eigenen Text, keine Beschreibung von außen. Daher auch das Verbot,
-    /// etwas hinzuzuerfinden — eine Fähigkeit im Profil, die die Person nie
+    /// etwas hinzuzuerfinden — eine Fähigkeit im PersonProfile, die die Person nie
     /// genannt hat, ist eine Falschaussage über sie, und sie merkt es womöglich
     /// erst im Gespräch.
     /// <para>
     /// Eine eigene Regelmenge je Art von Entwurf, statt eines gemeinsamen
     /// Prompts mit Verzweigung: die Regeln für einen Profiltext und die für eine
     /// Stellenanzeige haben nichts miteinander zu tun, und eine Verzweigung ist
-    /// die Stelle, an der irgendwann eine Regel für die falsche Seite gilt.
+    /// die Job, an der irgendwann eine Regel für die falsche Seite gilt.
     /// </para>
     /// </remarks>
     public static string Regeln =>
@@ -99,10 +99,10 @@ public sealed record Entwurfslage(
 /// niemand gegeben hat. <b>Der Knopf ist die Einwilligung</b>, informiert und
 /// je Benutzung.
 /// </remarks>
-public interface IEntwerfer
+public interface IDrafter
 {
     /// <exception cref="EntwurfNichtVerfuegbar">
     /// Kein Anbieter eingerichtet, oder er antwortet nicht.
     /// </exception>
-    Task<string> EntwirfAsync(Entwurfslage lage, CancellationToken cancellationToken = default);
+    Task<string> DraftAsync(DraftSituation lage, CancellationToken cancellationToken = default);
 }

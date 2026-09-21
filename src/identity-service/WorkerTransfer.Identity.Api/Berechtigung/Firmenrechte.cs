@@ -6,17 +6,17 @@ namespace WorkerTransfer.Identity.Api.Berechtigung;
 /// <remarks>
 /// Namen, keine Rollen. Ein Endpunkt sagt damit, <em>wozu</em> er berechtigt
 /// sein will, und nicht, <em>wer</em> das ist — wer es ist, entscheidet
-/// <see cref="Mitgliedschaftsrecht"/> beim Lesen der Mitgliedschaft.
+/// <see cref="Mitgliedschaftsrecht"/> beim Lesen der Membership.
 /// <para>
 /// Der Präfix <c>Permission:</c> ist Noelias: sein
 /// <c>PermissionPolicyProvider</c> baut aus jedem so benannten Richtliniennamen
 /// zur Laufzeit eine Richtlinie. Deshalb muss keine davon vorher angemeldet
 /// werden — und deshalb ist es wichtig, dass der Anbieter überhaupt
 /// registriert ist: ohne ihn beantwortet niemand diese Namen, und das Gerüst
-/// lehnt <em>jede</em> Anfrage an den geschützten Endpunkt ab.
+/// lehnt <em>jede</em> ResumeRequest an den geschützten Endpunkt ab.
 /// </para>
 /// </remarks>
-public static class Firmenrechte
+public static class CompanyPermissions
 {
     /// <summary>Noelias Präfix für dynamisch aufgelöste Richtlinien.</summary>
     public const string Praefix = "Permission:";
@@ -39,5 +39,5 @@ public static class Firmenrechte
     public const string Entfernen = "company.members.remove";
 
     /// <summary>Der Richtlinienname zu einem Recht.</summary>
-    public static string Richtlinie(string recht) => Praefix + recht;
+    public static string Richtlinie(string permission) => Praefix + permission;
 }

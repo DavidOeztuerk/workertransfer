@@ -17,7 +17,7 @@ namespace WorkerTransfer.Identity.Api;
 /// ohne das Geheimnis antworten sie mit 404 (nicht 401), damit sie sich nicht
 /// über eine Methode verraten, die niemand benutzt.
 /// </remarks>
-public static class InterneEndpoints
+public static class InternalEndpoints
 {
     private const string Geheimniskopf = "X-Notify-Secret";
 
@@ -29,25 +29,25 @@ public static class InterneEndpoints
         app.MapGet("/internal/companies/{tenantId:guid}/members", async (
             Guid tenantId,
             IMediator mediator,
-            IOptions<Meldeeinstellungen> einstellungen,
+            IOptions<NotifySettings> einstellungen,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
             if (!DarfMelden(context, einstellungen.Value))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
                 return;
             }
 
-            var mitglieder = await mediator.Send(
-                new InterneMitgliederAbfrage(new TenantId(tenantId)),
+            var members = await mediator.Send(
+                new InternalMembersQuery(new TenantId(tenantId)),
                 cancellationToken);
 
-            var antwort = new UnternehmensmitgliederAntwortV1(
-                [.. mitglieder.Select(m => new UnternehmensmitgliedV1(m.Subject.Value))]);
+            var response = new CompanyMembersResponseV1(
+                [.. members.Select(m => new CompanyMemberV1(m.Subject.Value))]);
 
-            await context.Response.WriteAsJsonAsync(antwort, cancellationToken);
+            await context.Response.WriteAsJsonAsync(response, cancellationToken);
         });
 
         // Die Rolle eines Menschen in einem Unternehmen — der Draht, ueber den
@@ -55,7 +55,7 @@ public static class InterneEndpoints
         //
         // Sie steht ABSICHTLICH nicht im Token: ein Token lebt weiter, nachdem
         // jemand aus einer Firma entfernt wurde, und die Entfernung wirkte dann
-        // erst beim Ablauf. Hier wird je Anfrage gefragt, und ein Widerruf
+        // erst beim Ablauf. Hier wird je ResumeRequest gefragt, und ein Revocation
         // wirkt bei der naechsten.
         //
         // EINE Frage, EINE Antwort: die Mitgliederliste daneben gaebe fuer jede
@@ -65,19 +65,19 @@ public static class InterneEndpoints
             Guid tenantId,
             Guid subjectId,
             IMediator mediator,
-            IOptions<Meldeeinstellungen> einstellungen,
+            IOptions<NotifySettings> einstellungen,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
             if (!DarfMelden(context, einstellungen.Value))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
                 return;
             }
 
-            var rolle = await mediator.Send(
-                new InterneRolleAbfrage(new TenantId(tenantId), new SubjectId(subjectId)),
+            var role = await mediator.Send(
+                new InternalRoleQuery(new TenantId(tenantId), new SubjectId(subjectId)),
                 cancellationToken);
 
             // 200 mit `null` und nicht 404: „kein Mitglied" ist eine Antwort auf
@@ -86,14 +86,14 @@ public static class InterneEndpoints
             // auseinanderhalten, wo genau das den Unterschied zwischen „darf
             // nicht" und „wir wissen es nicht" ausmacht.
             await context.Response.WriteAsJsonAsync(
-                new FirmenrolleV1(rolle is { } r ? MembershipRoleNames.ToDatabase(r) : null),
+                new CompanyRoleV1(role is { } r ? MembershipRoleNames.ToDatabase(r) : null),
                 cancellationToken);
         });
 
         // Wer ein Unternehmen IST — Name und bewiesene Domain, nicht seine
         // Belegschaft. advisor-service braucht die Domain, damit ein Ausschluss
         // greifen kann (ADR-0037): eine Person nennt die Unternehmen, mit denen
-        // kein Gespraech zustande kommt, und sie nennt sie durch ihre Domain.
+        // kein Conversation zustande kommt, und sie nennt sie durch ihre Domain.
         //
         // Eine zweite Domaintabelle in advisor-service waere die, die als Erste
         // veraltet — mit einem Ausschluss, der dann stillschweigend nicht mehr
@@ -101,29 +101,29 @@ public static class InterneEndpoints
         app.MapGet("/internal/companies/{tenantId:guid}", async (
             Guid tenantId,
             IMediator mediator,
-            IOptions<Meldeeinstellungen> einstellungen,
+            IOptions<NotifySettings> einstellungen,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
             if (!DarfMelden(context, einstellungen.Value))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
                 return;
             }
 
-            var firma = await mediator.Send(
-                new InterneFirmaAbfrage(new TenantId(tenantId)), cancellationToken);
+            var company = await mediator.Send(
+                new InternalCompanyQuery(new TenantId(tenantId)), cancellationToken);
 
-            if (firma is null)
+            if (company is null)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
                 return;
             }
 
             await context.Response.WriteAsJsonAsync(
-                new UnternehmensauskunftV1(firma.Name, firma.Domain.Value), cancellationToken);
+                new UnternehmensauskunftV1(company.Name, company.Domain.Value), cancellationToken);
         });
 
         // Klarname und Kontakt — die empfindlichste dieser Tueren.
@@ -134,28 +134,28 @@ public static class InterneEndpoints
         // `advisor.identity:tenant:<id>` (ADR-0037). Wer diese Tuer fuer etwas
         // anderes benutzt, holt sich die Pruefung dazu.
         //
-        // Zwei Felder, keine Anschrift, kein Telefon (ADR-0038) — und keine
+        // Zwei Felder, keine PostalAddress, kein Telefon (ADR-0038) — und keine
         // Liste: sie antwortet auf genau eine Kennung.
         app.MapGet("/internal/account/{subjectId:guid}/identity", async (
             Guid subjectId,
             IMediator mediator,
-            IOptions<Meldeeinstellungen> einstellungen,
+            IOptions<NotifySettings> einstellungen,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
             if (!DarfMelden(context, einstellungen.Value))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
                 return;
             }
 
             var person = await mediator.Send(
-                new InternePersonAbfrage(new SubjectId(subjectId)), cancellationToken);
+                new InternalPersonQuery(new SubjectId(subjectId)), cancellationToken);
 
             if (person is null)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
                 return;
             }
@@ -167,19 +167,19 @@ public static class InterneEndpoints
         app.MapGet("/internal/account/{subjectId:guid}/ai", async (
             Guid subjectId,
             IMediator mediator,
-            IOptions<Meldeeinstellungen> einstellungen,
+            IOptions<NotifySettings> einstellungen,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
             if (!DarfMelden(context, einstellungen.Value))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
                 return;
             }
 
             var zugang = await mediator.Send(
-                new InterneKiZugangAbfrage(new SubjectId(subjectId)),
+                new InternalAiAccessQuery(new SubjectId(subjectId)),
                 cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
@@ -190,7 +190,7 @@ public static class InterneEndpoints
         return app;
     }
 
-    private static bool DarfMelden(HttpContext context, Meldeeinstellungen einstellungen)
+    private static bool DarfMelden(HttpContext context, NotifySettings einstellungen)
     {
         if (string.IsNullOrEmpty(einstellungen.Geheimnis)
             || !context.Request.Headers.TryGetValue(Geheimniskopf, out var vorgelegt))

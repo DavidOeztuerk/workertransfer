@@ -14,7 +14,7 @@ public static class ConsentDbContextFactory
     /// The one place tracking is switched off, so the container, the tests and
     /// <c>dotnet ef</c> cannot end up with different models.
     /// </summary>
-    public static DbContextOptionsBuilder Konfiguriere(
+    public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
         NpgsqlDataSource dataSource)
     {

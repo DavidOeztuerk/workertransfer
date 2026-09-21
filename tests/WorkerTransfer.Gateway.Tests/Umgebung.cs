@@ -24,7 +24,7 @@ namespace WorkerTransfer.Gateway.Tests;
 /// seine Ziele über HTTP, und ein <c>TestServer</c> hat keinen Socket. Ein
 /// Test, der das umginge, prüfte eine andere Verdrahtung als die, die läuft.
 /// <para>
-/// Die Landkarte wird aus dem Quellbaum gelesen und nur an einer Stelle
+/// Die Landkarte wird aus dem Quellbaum gelesen und nur an einer Job
 /// verbogen: die Häfen zeigen auf die Attrappen. Pfade, Prioritäten und die
 /// Kopfregel bleiben, wie sie ausgeliefert werden — sonst prüfte der Test seine
 /// eigene Kopie.
@@ -89,25 +89,25 @@ public class Landschaft : IAsyncLifetime
 
     /// <summary>Wer hat geantwortet, und auf welchen Pfad?</summary>
     public async Task<(string Dienst, string Pfad)> Frage(
-        string pfad, params (string Name, string Wert)[] koepfe)
+        string path, params (string Name, string Wert)[] headers)
     {
-        using var anfrage = new HttpRequestMessage(HttpMethod.Get, pfad);
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
 
-        foreach (var (name, wert) in koepfe)
+        foreach (var (name, value) in headers)
         {
-            anfrage.Headers.TryAddWithoutValidation(name, wert);
+            request.Headers.TryAddWithoutValidation(name, value);
         }
 
-        using var antwort = await Browser.SendAsync(anfrage);
+        using var response = await Browser.SendAsync(request);
 
-        if (antwort.StatusCode == HttpStatusCode.NotFound)
+        if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            return ("<keine Route>", pfad);
+            return ("<keine Route>", path);
         }
 
-        var rumpf = JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
-        return (rumpf.GetProperty("dienst").GetString()!, rumpf.GetProperty("pfad").GetString()!);
+        return (body.GetProperty("service").GetString()!, body.GetProperty("path").GetString()!);
     }
 
     /// <summary>Ein Dienst, der nur sagt, dass er es war.</summary>
@@ -117,12 +117,12 @@ public class Landschaft : IAsyncLifetime
         bau.WebHost.UseUrls("http://127.0.0.1:0");
         bau.Logging.ClearProviders();
 
-        var dienst = bau.Build();
+        var service = bau.Build();
 
-        dienst.Map("/{**alles}", (HttpContext kontext) =>
-            Results.Ok(new { dienst = name, pfad = kontext.Request.Path.Value }));
+        service.Map("/{**alles}", (HttpContext context) =>
+            Results.Ok(new { service = name, path = context.Request.Path.Value }));
 
-        return dienst;
+        return service;
     }
 
     /// <summary>Das echte Gateway, mit auf die Attrappen gebogenen Häfen.</summary>
@@ -158,26 +158,26 @@ public class Landschaft : IAsyncLifetime
     /// <summary>Die ausgelieferte Landkarte, nur mit anderen Häfen.</summary>
     private static string Landkarte(IReadOnlyDictionary<string, int> haefen, bool umgedreht)
     {
-        var quelle = Path.Combine(AppContext.BaseDirectory, "ocelot.json");
-        var roh = File.ReadAllText(quelle);
+        var source = Path.Combine(AppContext.BaseDirectory, "ocelot.json");
+        var roh = File.ReadAllText(source);
 
         // `"Host": "jobs-service", "Port": 8006` -> der Hafen der Attrappe.
         // Der Name bleibt `127.0.0.1`, weil die Attrappe dort hoert.
         var gebogen = Regex.Replace(
             roh,
             "\"Host\": \"(?<name>[a-z]+)(-service)?\",\\s*\n\\s*\"Port\": \\d+",
-            treffer => "\"Host\": \"127.0.0.1\",\n          \"Port\": "
-                       + haefen[treffer.Groups["name"].Value]);
+            hit => "\"Host\": \"127.0.0.1\",\n          \"Port\": "
+                       + haefen[hit.Groups["name"].Value]);
 
         if (umgedreht)
         {
             gebogen = RoutenUmdrehen(gebogen);
         }
 
-        var ziel = Path.Combine(Path.GetTempPath(), $"ocelot-{Guid.NewGuid():N}.json");
-        File.WriteAllText(ziel, gebogen);
+        var target = Path.Combine(Path.GetTempPath(), $"ocelot-{Guid.NewGuid():N}.json");
+        File.WriteAllText(target, gebogen);
 
-        return ziel;
+        return target;
     }
 
     /// <summary>Dieselben Routen, in umgekehrter Reihenfolge.</summary>

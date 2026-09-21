@@ -35,15 +35,15 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("environment", "Development");
         });
 
-        using (var bereich = _dienst.Services.CreateScope())
+        using (var scope = _dienst.Services.CreateScope())
         {
-            await bereich.ServiceProvider.GetRequiredService<IdentityDbContext>()
+            await scope.ServiceProvider.GetRequiredService<IdentityDbContext>()
                 .Database.MigrateAsync();
         }
 
@@ -60,9 +60,9 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
 
     private async Task LegeKontoAn(Guid id, string email)
     {
-        await using var verbindung = new NpgsqlConnection(postgres.ConnectionString);
-        await verbindung.OpenAsync();
-        await using var befehl = verbindung.CreateCommand();
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await connection.OpenAsync();
+        await using var befehl = connection.CreateCommand();
         befehl.CommandText = """
             INSERT INTO users (id, email, password_hash, display_name, status, roles,
                                created_at, updated_at, version)
@@ -81,43 +81,43 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
     /// </summary>
     private async Task<Guid> LegeFirmaAnMitMitglied(Guid benutzer)
     {
-        var firma = Guid.NewGuid();
+        var company = Guid.NewGuid();
 
-        await using var verbindung = new NpgsqlConnection(postgres.ConnectionString);
-        await verbindung.OpenAsync();
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await connection.OpenAsync();
 
-        await using (var befehl = verbindung.CreateCommand())
+        await using (var befehl = connection.CreateCommand())
         {
             befehl.CommandText = """
                 INSERT INTO tenants (id, name, domain, status, created_at)
                 VALUES (@id, 'Beispiel GmbH', @domain, 'active', now())
                 """;
-            befehl.Parameters.AddWithValue("id", firma);
-            befehl.Parameters.AddWithValue("domain", $"{firma:N}.example.com");
+            befehl.Parameters.AddWithValue("id", company);
+            befehl.Parameters.AddWithValue("domain", $"{company:N}.example.com");
             await befehl.ExecuteNonQueryAsync();
         }
 
-        await using (var befehl = verbindung.CreateCommand())
+        await using (var befehl = connection.CreateCommand())
         {
             befehl.CommandText = """
                 INSERT INTO user_tenant_memberships (id, user_id, tenant_id, role, granted_at)
-                VALUES (@id, @benutzer, @firma, 'admin', now())
+                VALUES (@id, @benutzer, @company, 'admin', now())
                 """;
             befehl.Parameters.AddWithValue("id", Guid.NewGuid());
             befehl.Parameters.AddWithValue("benutzer", benutzer);
-            befehl.Parameters.AddWithValue("firma", firma);
+            befehl.Parameters.AddWithValue("company", company);
             await befehl.ExecuteNonQueryAsync();
         }
 
-        return firma;
+        return company;
     }
 
     /// <summary>Somebody else, so the foreign membership has a real owner.</summary>
     private async Task<Guid> FremdesKonto()
     {
-        var wer = Guid.NewGuid();
-        await LegeKontoAn(wer, $"bea-{Guid.NewGuid():N}@example.com");
-        return wer;
+        var subject = Guid.NewGuid();
+        await LegeKontoAn(subject, $"bea-{Guid.NewGuid():N}@example.com");
+        return subject;
     }
 
     private HttpClient Browser() =>
@@ -126,14 +126,14 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
     private async Task<HttpClient> AngemeldeterBrowser()
     {
         var browser = Browser();
-        var antwort = await browser.PostAsJsonAsync(
+        var response = await browser.PostAsJsonAsync(
             "/auth/login", new { email = _email, password = Passwort });
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
         return browser;
     }
 
-    private static async Task<Dictionary<string, object?>> Json(HttpResponseMessage antwort) =>
-        (await antwort.Content.ReadFromJsonAsync<Dictionary<string, object?>>())!;
+    private static async Task<Dictionary<string, object?>> Json(HttpResponseMessage response) =>
+        (await response.Content.ReadFromJsonAsync<Dictionary<string, object?>>())!;
 
     /// <summary>
     /// Public, and always 200. Asking this through <c>/me</c> would produce a
@@ -143,18 +143,18 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_alles_meldet_die_Sitzung_anonymous_und_nicht_401()
     {
-        var antwort = await Browser().GetAsync("/auth/session");
+        var response = await Browser().GetAsync("/auth/session");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(antwort))["state"]!.ToString().Should().Be("anonymous");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(response))["state"]!.ToString().Should().Be("anonymous");
     }
 
     [Fact]
     public async Task Angemeldet_meldet_die_Sitzung_active_mit_der_Adresse()
     {
-        var antwort = await (await AngemeldeterBrowser()).GetAsync("/auth/session");
+        var response = await (await AngemeldeterBrowser()).GetAsync("/auth/session");
 
-        var körper = await Json(antwort);
+        var körper = await Json(response);
         körper["state"]!.ToString().Should().Be("active");
         körper["user"]!.ToString().Should().Contain(_email);
     }
@@ -162,18 +162,18 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_Anmeldung_antwortet_me_mit_401()
     {
-        var antwort = await Browser().GetAsync("/me");
+        var response = await Browser().GetAsync("/me");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
     public async Task Angemeldet_nennt_me_die_Person_und_keine_Firma()
     {
-        var antwort = await (await AngemeldeterBrowser()).GetAsync("/me");
+        var response = await (await AngemeldeterBrowser()).GetAsync("/me");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-        var körper = await Json(antwort);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var körper = await Json(response);
         körper["user_id"]!.ToString().Should().Be(_anna.ToString());
         körper["email"]!.ToString().Should().Be(_email);
         körper["tenant_id"].Should().BeNull("eine Anmeldung macht niemanden zum Unternehmen");
@@ -182,15 +182,15 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_Mitglied_darf_fuer_seine_Firma_handeln()
     {
-        var firma = await LegeFirmaAnMitMitglied(_anna);
+        var company = await LegeFirmaAnMitMitglied(_anna);
         var browser = await AngemeldeterBrowser();
 
-        var gewechselt = await browser.PostAsync($"/auth/company/{firma}", null);
+        var gewechselt = await browser.PostAsync($"/auth/company/{company}", null);
 
         gewechselt.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var körper = await Json(await browser.GetAsync("/me"));
-        körper["tenant_id"]!.ToString().Should().Be(firma.ToString());
+        körper["tenant_id"]!.ToString().Should().Be(company.ToString());
     }
 
     /// <summary>
@@ -214,11 +214,11 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_Anmeldung_wechselt_niemand_die_Firma()
     {
-        var firma = await LegeFirmaAnMitMitglied(_anna);
+        var company = await LegeFirmaAnMitMitglied(_anna);
 
-        var antwort = await Browser().PostAsync($"/auth/company/{firma}", null);
+        var response = await Browser().PostAsync($"/auth/company/{company}", null);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     /// <summary>
@@ -235,24 +235,24 @@ public class SitzungsendpunkteTests(Postgres postgres) : IAsyncLifetime
         await browser.PostAsync($"/auth/company/{meine}", null);
         await browser.PostAsync($"/auth/company/{fremde}", null);
 
-        await using var verbindung = new NpgsqlConnection(postgres.ConnectionString);
-        await verbindung.OpenAsync();
-        await using var befehl = verbindung.CreateCommand();
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await connection.OpenAsync();
+        await using var befehl = connection.CreateCommand();
         befehl.CommandText = """
             SELECT action::text, tenant_id FROM audit_events
-            WHERE actor_id = @wer AND action IN ('tenant_switch', 'tenant_switch_denied')
+            WHERE actor_id = @subject AND action IN ('tenant_switch', 'tenant_switch_denied')
             ORDER BY occurred_at
             """;
-        befehl.Parameters.AddWithValue("wer", _anna);
+        befehl.Parameters.AddWithValue("subject", _anna);
 
-        var gefunden = new List<(string Handlung, Guid Firma)>();
+        var found = new List<(string Handlung, Guid Firma)>();
         await using var leser = await befehl.ExecuteReaderAsync();
         while (await leser.ReadAsync())
         {
-            gefunden.Add((leser.GetString(0), leser.GetGuid(1)));
+            found.Add((leser.GetString(0), leser.GetGuid(1)));
         }
 
-        gefunden.Should().Contain(("tenant_switch", meine));
-        gefunden.Should().Contain(("tenant_switch_denied", fremde));
+        found.Should().Contain(("tenant_switch", meine));
+        found.Should().Contain(("tenant_switch_denied", fremde));
     }
 }

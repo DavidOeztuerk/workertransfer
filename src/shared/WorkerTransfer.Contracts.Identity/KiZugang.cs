@@ -12,7 +12,7 @@ namespace WorkerTransfer.Contracts.Identity;
 /// schicken muss — und genau deshalb darf diese Gestalt den Browser nie
 /// erreichen. <c>GET /account/settings</c> trägt ihn absichtlich nicht.
 /// <para>
-/// <c>provider</c> ist das Etikett aus den Kontoeinstellungen:
+/// <c>provider</c> ist das Etikett aus den AccountSettings:
 /// <c>none</c>, <c>openai_compatible</c> (Ollama, vLLM, MiniMax, LM Studio)
 /// oder <c>anthropic</c>. Bei einem eigenen Server darf <c>key</c> leer sein.
 /// </para>

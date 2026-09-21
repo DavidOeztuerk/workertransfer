@@ -4,23 +4,23 @@ using Npgsql;
 
 namespace WorkerTransfer.GitHub.Infrastructure.Persistence;
 
-/// <summary>Baut Datenquelle und Kontext über dem Schema dieses Dienstes.</summary>
+/// <summary>Baut DataSource und Kontext über dem Schema dieses Dienstes.</summary>
 public static class GitHubDbContextFactory
 {
-    /// <summary>Die Datenquelle.</summary>
-    public static NpgsqlDataSource Datenquelle(string connectionString) =>
+    /// <summary>Die DataSource.</summary>
+    public static NpgsqlDataSource DataSource(string connectionString) =>
         new NpgsqlDataSourceBuilder(connectionString).Build();
 
-    /// <summary>Optionen über einer Datenquelle, die dem Aufrufer gehört.</summary>
+    /// <summary>Optionen über einer DataSource, die dem Aufrufer gehört.</summary>
     public static DbContextOptionsBuilder<GitHubDbContext> Optionen(
         NpgsqlDataSource datenquelle) =>
-        (DbContextOptionsBuilder<GitHubDbContext>)Konfiguriere(
+        (DbContextOptionsBuilder<GitHubDbContext>)Configure(
             new DbContextOptionsBuilder<GitHubDbContext>(), datenquelle);
 
     /// <summary>
-    /// Die eine Stelle, an der die Nachverfolgung ausgeschaltet wird.
+    /// Die eine Job, an der die Nachverfolgung ausgeschaltet wird.
     /// </summary>
-    public static DbContextOptionsBuilder Konfiguriere(
+    public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
         NpgsqlDataSource datenquelle)
     {

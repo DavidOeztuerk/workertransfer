@@ -9,8 +9,8 @@ using WorkerTransfer.Resume.Domain.Pruefspur;
 namespace WorkerTransfer.Resume.Application.Anfragen;
 
 /// <summary>A company asks a person for their résumé.</summary>
-public sealed record LebenslaufAnfragenBefehl(SubjectId Wer, TenantId Firma, SubjectId Frager)
-    : IBefehl<Anfrageergebnis>;
+public sealed record RequestResumeCommand(SubjectId Wer, TenantId Firma, SubjectId Frager)
+    : IBefehl<ResumeRequestResult>;
 
 /// <summary>
 /// Opens the proceeding — if the person's profile is released.
@@ -22,47 +22,47 @@ public sealed record LebenslaufAnfragenBefehl(SubjectId Wer, TenantId Firma, Sub
 /// that got a different answer for a person with a résumé than for one without
 /// would have learned it without asking.
 /// </remarks>
-public sealed class LebenslaufAnfragenHandler(
-    IAnfragenSpeicher speicher,
-    IEinwilligungstor tor,
+public sealed class RequestResumeHandler(
+    IRequestStore store,
+    IConsentGate tor,
     IOutbox outbox,
-    IPruefspur pruefspur,
+    IAuditTrail pruefspur,
     IKorrelationsanhang anhang,
-    TimeProvider uhr) : IRequestHandler<LebenslaufAnfragenBefehl, Anfrageergebnis>
+    TimeProvider uhr) : IRequestHandler<RequestResumeCommand, ResumeRequestResult>
 {
     /// <inheritdoc />
-    public async Task<Anfrageergebnis> Handle(
-        LebenslaufAnfragenBefehl request,
+    public async Task<ResumeRequestResult> Handle(
+        RequestResumeCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (!await tor.DarfProfilSehenAsync(request.Wer, cancellationToken))
+        if (!await tor.MaySeeProfileAsync(request.Wer, cancellationToken))
         {
-            return new Anfrageergebnis.NichtSichtbar();
+            return new ResumeRequestResult.NichtSichtbar();
         }
 
-        if (await speicher.FindeAsync(request.Wer, request.Firma, cancellationToken) is not null)
+        if (await store.FindeAsync(request.Wer, request.Firma, cancellationToken) is not null)
         {
-            return new Anfrageergebnis.SchonGefragt();
+            return new ResumeRequestResult.SchonGefragt();
         }
 
-        var jetzt = uhr.GetUtcNow();
-        var anfrage = Anfrage.Oeffne(request.Wer, request.Firma, request.Frager, jetzt);
+        var now = uhr.GetUtcNow();
+        var requestRecord = ResumeRequest.Oeffne(request.Wer, request.Firma, request.Frager, now);
 
-        await speicher.FuegeHinzuAsync(anfrage, cancellationToken);
+        await store.AppendAsync(requestRecord, cancellationToken);
 
         // In the SAME transaction as the request (ADR-0025). If the request
         // gets through, the notification is settled; if it rolls back, nobody
         // is told a company asked when none did.
-        await outbox.VermerkeAsync(request.Wer, Benachrichtigungsarten.Angefragt, cancellationToken);
+        await outbox.NoteAsync(request.Wer, Benachrichtigungsarten.Angefragt, cancellationToken);
 
         await pruefspur.AppendAsync(
             anhang.Eintrag(
-                Pruefhandlung.ResumeRequested, jetzt,
-                akteur: request.Frager, firma: request.Firma, betroffene: request.Wer),
+                AuditAction.ResumeRequested, now,
+                akteur: request.Frager, company: request.Firma, betroffene: request.Wer),
             cancellationToken);
 
-        return new Anfrageergebnis.Erledigt(anfrage);
+        return new ResumeRequestResult.Erledigt(requestRecord);
     }
 }

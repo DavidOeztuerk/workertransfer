@@ -1,7 +1,7 @@
 using System.Reflection;
 using FluentAssertions;
 using WorkerTransfer.GitHub.Contracts;
-using WorkerTransfer.GitHub.Domain.Verbindungen;
+using WorkerTransfer.GitHub.Domain.Connections;
 
 namespace WorkerTransfer.GitHub.Tests;
 
@@ -28,7 +28,7 @@ public class Adr0022Tests
          "faehigkeit", "skill", "talent", "bewert", "aktivitaet", "activity"];
 
     /// <summary>
-    /// Keine öffentliche Fläche dieses Dienstes trägt einen solchen Namen.
+    /// None öffentliche Fläche dieses Dienstes trägt einen solchen Namen.
     /// </summary>
     /// <remarks>
     /// Der Test greift zwei Assemblies ab: die Domäne, wo ein Punktwert
@@ -39,13 +39,13 @@ public class Adr0022Tests
     [Fact]
     public void Nichts_hier_fasst_einen_Menschen_in_einer_Zahl_zusammen()
     {
-        var flaechen = new[] { typeof(Verbindung).Assembly, typeof(VerbindungV1).Assembly }
+        var flaechen = new[] { typeof(Connection).Assembly, typeof(ConnectionV1).Assembly }
             .SelectMany(assembly => assembly.GetExportedTypes())
-            .SelectMany(typ => typ.GetMembers(
+            .SelectMany(type => type.GetMembers(
                     BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static |
                     BindingFlags.DeclaredOnly)
-                .Select(glied => $"{typ.Name}.{glied.Name}")
-                .Append(typ.Name))
+                .Select(glied => $"{type.Name}.{glied.Name}")
+                .Append(type.Name))
             .Distinct()
             .ToList();
 
@@ -53,10 +53,10 @@ public class Adr0022Tests
 
         foreach (var name in flaechen)
         {
-            foreach (var wort in Verboten)
+            foreach (var word in Verboten)
             {
-                name.Contains(wort, StringComparison.OrdinalIgnoreCase)
-                    .Should().BeFalse($"'{name}' trägt '{wort}' — ADR-0022");
+                name.Contains(word, StringComparison.OrdinalIgnoreCase)
+                    .Should().BeFalse($"'{name}' trägt '{word}' — ADR-0022");
             }
         }
     }
@@ -66,7 +66,7 @@ public class Adr0022Tests
     /// </summary>
     /// <remarks>
     /// Acht Felder, alle abgeschrieben, keins gerechnet. Ein neuntes wäre die
-    /// Stelle, an der aus einem Beleg eine Wertung wird.
+    /// Job, an der aus einem Evidence eine Wertung wird.
     /// <para>
     /// <strong>Die zwei jüngsten sind der Grund, diesen Test genau zu lesen.</strong>
     /// <c>Themen</c> sind die Topics, die der Besitzer selbst gesetzt hat — eine
@@ -100,7 +100,7 @@ public class Adr0022Tests
     }
 
     /// <summary>
-    /// Und die Verbindung trägt keine Zusammenfassung über den Menschen.
+    /// Und die Connection trägt keine Zusammenfassung über den Menschen.
     /// </summary>
     /// <remarks>
     /// <c>SprachenVollstaendig</c> ist die einzige Eigenschaft hier, die nicht
@@ -118,16 +118,16 @@ public class Adr0022Tests
     [Fact]
     public void Eine_Verbindung_traegt_keine_Zusammenfassung()
     {
-        typeof(Verbindung).GetProperties()
+        typeof(Connection).GetProperties()
             .Select(eigenschaft => eigenschaft.Name)
             .Should().BeEquivalentTo(
-                nameof(Verbindung.Wer),
-                nameof(Verbindung.Login),
-                nameof(Verbindung.Einmalzeichenfolge),
-                nameof(Verbindung.NachgewiesenAm),
-                nameof(Verbindung.GeholtAm),
-                nameof(Verbindung.Repositories),
-                nameof(Verbindung.SprachenVollstaendig),
-                nameof(Verbindung.Nachgewiesen));
+                nameof(Connection.Wer),
+                nameof(Connection.Login),
+                nameof(Connection.Einmalzeichenfolge),
+                nameof(Connection.NachgewiesenAm),
+                nameof(Connection.GeholtAm),
+                nameof(Connection.Repositories),
+                nameof(Connection.SprachenVollstaendig),
+                nameof(Connection.Nachgewiesen));
     }
 }

@@ -23,7 +23,7 @@ namespace WorkerTransfer.Identity.Api;
 /// </remarks>
 public static class MeldeEndpoints
 {
-    /// <summary>Der Kopf, den notification-service mitschickt.</summary>
+    /// <summary>Der Header, den notification-service mitschickt.</summary>
     private const string Geheimniskopf = "X-Notify-Secret";
 
     /// <summary>Was hereinkommt: eine Kennung, sonst nichts.</summary>
@@ -38,14 +38,14 @@ public static class MeldeEndpoints
         app.MapPost("/internal/notify", async (
             MeldungV1 body,
             IMediator mediator,
-            IOptions<Meldeeinstellungen> einstellungen,
+            IOptions<NotifySettings> einstellungen,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
             if (!DarfMelden(context, einstellungen.Value))
             {
                 // 404 statt 401: ein 401 bestätigt, dass es den Endpunkt gibt.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
                 return;
             }
@@ -54,7 +54,7 @@ public static class MeldeEndpoints
 
             // Das Ergebnis wird verworfen. Ob es die Person gibt und ob ihr
             // Konto bestätigt ist, geht den Aufrufer nichts an — sonst wäre der
-            // Endpunkt ein Orakel über die Mitgliedschaft auf dieser Plattform.
+            // Endpunkt ein Orakel über die Membership auf dieser Plattform.
             await mediator.Send(
                 new NeuigkeitMeldenBefehl(new SubjectId(body.UserId)), cancellationToken);
 
@@ -64,13 +64,13 @@ public static class MeldeEndpoints
         return app;
     }
 
-    /// <summary>Ob diese Anfrage das Geheimnis trägt.</summary>
+    /// <summary>Ob diese ResumeRequest das Geheimnis trägt.</summary>
     /// <remarks>
     /// Ein leeres eingestelltes Geheimnis schließt den Endpunkt. In fester Zeit
     /// verglichen, damit die Dauer der Antwort nichts darüber sagt, wie viel
     /// von einem Rateversuch stimmte.
     /// </remarks>
-    private static bool DarfMelden(HttpContext context, Meldeeinstellungen einstellungen)
+    private static bool DarfMelden(HttpContext context, NotifySettings einstellungen)
     {
         if (string.IsNullOrEmpty(einstellungen.Geheimnis)
             || !context.Request.Headers.TryGetValue(Geheimniskopf, out var vorgelegt))

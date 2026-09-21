@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Outbox;
-using WorkerTransfer.ServiceDefaults.Rollen;
+using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.Transfer.Application.Ports;
 using WorkerTransfer.ServiceDefaults;
 
@@ -25,7 +25,7 @@ namespace WorkerTransfer.Transfer.Tests;
 /// Unternehmen.</para>
 ///
 /// <para><strong><c>withdraw</c> steht bewusst nicht dabei</strong>, und die
-/// Reihe dazu steht hier: wer einen Vorgang anfangen darf, muss ihn beenden
+/// Reihe dazu steht hier: wer einen Case anfangen darf, muss ihn beenden
 /// dürfen. Sonst ist die Einladung eine Falle.</para>
 /// </remarks>
 [Collection(PostgresCollection.Name)]
@@ -42,16 +42,16 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:transfer", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _ledger));
-                dienste.Replace(ServiceDescriptor.Scoped<IZustellung, Probezustellung>());
-                dienste.Replace(ServiceDescriptor.Scoped<IFirmenrollen>(_ => _rollen));
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _ledger));
+                services.Replace(ServiceDescriptor.Scoped<IDelivery, Probezustellung>());
+                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => _rollen));
             });
         });
 
@@ -72,42 +72,42 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
-    private HttpClient AlsFirma(Guid firma, Guid? wer = null) =>
-        Mit(Tokenform.Firma(wer ?? Guid.CreateVersion7(), firma));
+    private HttpClient AlsFirma(Guid company, Guid? subject = null) =>
+        Mit(Tokenform.Firma(subject ?? Guid.CreateVersion7(), company));
 
-    private HttpClient AlsPerson(Guid wer) => Mit(Tokenform.Person(wer));
+    private HttpClient AlsPerson(Guid subject) => Mit(Tokenform.Person(subject));
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
-    /// <summary>Ein laufender Vorgang, bis kurz vor das Angebot.</summary>
-    private async Task<(Guid Vorgang, Guid Wer)> ImGespraech(Guid firma)
+    /// <summary>Ein laufender Case, bis kurz vor das Angebot.</summary>
+    private async Task<(Guid Case, Guid Wer)> ImGespraech(Guid company)
     {
-        var wer = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
 
-        await AlsPerson(wer).PutAsJsonAsync("/market/me", new
+        await AlsPerson(subject).PutAsJsonAsync("/market/me", new
         {
             availability = "listening", employed = false, note = string.Empty
         });
 
-        _ledger.MarktFrei.Add((wer, firma));
+        _ledger.MarktFrei.Add((subject, company));
 
-        var angelegt = await AlsFirma(firma).PostAsJsonAsync("/transfers", new
+        var angelegt = await AlsFirma(company).PostAsJsonAsync("/transfers", new
         {
-            subject_id = wer, message = "Wir hätten da etwas."
+            subject_id = subject, message = "Wir hätten da etwas."
         });
 
         angelegt.StatusCode.Should().Be(HttpStatusCode.Created);
         var id = (await Json(angelegt)).GetProperty("id").GetGuid();
 
-        (await AlsPerson(wer).PostAsync($"/transfers/{id}/accept-talk", null))
+        (await AlsPerson(subject).PostAsync($"/transfers/{id}/accept-talk", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        return (id, wer);
+        return (id, subject);
     }
 
-    private static Task<HttpResponseMessage> Angebot(HttpClient browser, Guid vorgang) =>
-        browser.PostAsJsonAsync($"/transfers/{vorgang}/offer", new
+    private static Task<HttpResponseMessage> Angebot(HttpClient browser, Guid caseItem) =>
+        browser.PostAsJsonAsync($"/transfers/{caseItem}/offer", new
         {
             note = "Wir bieten die Stelle an.", start_on = "2026-10", fee_cents = 250_000L
         });
@@ -116,43 +116,43 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Nur_ein_Administrator_macht_ein_Angebot()
     {
-        var firma = Guid.CreateVersion7();
-        var (vorgang, _) = await ImGespraech(firma);
+        var company = Guid.CreateVersion7();
+        var (caseItem, _) = await ImGespraech(company);
 
-        _rollen.Antwort = Firmenrolle.Mitglied;
-        var alsMitglied = await Angebot(AlsFirma(firma), vorgang);
+        _rollen.Antwort = CompanyRole.Mitglied;
+        var alsMitglied = await Angebot(AlsFirma(company), caseItem);
 
         alsMitglied.StatusCode.Should().Be(
             HttpStatusCode.Forbidden, "ein Angebot nennt Termin und Gebuehr");
 
-        _rollen.Antwort = Firmenrolle.Admin;
-        var alsAdmin = await Angebot(AlsFirma(firma), vorgang);
+        _rollen.Antwort = CompanyRole.Admin;
+        var alsAdmin = await Angebot(AlsFirma(company), caseItem);
 
         alsAdmin.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    /// <summary>Und schliesst keinen Vorgang ab.</summary>
+    /// <summary>Und schliesst keinen Case ab.</summary>
     [Fact]
     public async Task Nur_ein_Administrator_schliesst_einen_Vorgang_ab()
     {
-        var firma = Guid.CreateVersion7();
-        var (vorgang, wer) = await ImGespraech(firma);
+        var company = Guid.CreateVersion7();
+        var (caseItem, subject) = await ImGespraech(company);
 
-        _rollen.Antwort = Firmenrolle.Admin;
-        (await Angebot(AlsFirma(firma), vorgang)).StatusCode.Should().Be(HttpStatusCode.OK);
+        _rollen.Antwort = CompanyRole.Admin;
+        (await Angebot(AlsFirma(company), caseItem)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Kein `confirm-release`: die Person hier ist nicht beschaeftigt, es
         // gibt also niemanden, der sie gehen lassen muesste.
-        (await AlsPerson(wer).PostAsync($"/transfers/{vorgang}/accept-offer", null))
+        (await AlsPerson(subject).PostAsync($"/transfers/{caseItem}/accept-offer", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        _rollen.Antwort = Firmenrolle.Mitglied;
-        var alsMitglied = await AlsFirma(firma).PostAsync($"/transfers/{vorgang}/complete", null);
+        _rollen.Antwort = CompanyRole.Mitglied;
+        var alsMitglied = await AlsFirma(company).PostAsync($"/transfers/{caseItem}/complete", null);
 
         alsMitglied.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        _rollen.Antwort = Firmenrolle.Admin;
-        var alsAdmin = await AlsFirma(firma).PostAsync($"/transfers/{vorgang}/complete", null);
+        _rollen.Antwort = CompanyRole.Admin;
+        var alsAdmin = await AlsFirma(company).PostAsync($"/transfers/{caseItem}/complete", null);
 
         alsAdmin.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(alsAdmin)).GetProperty("status").GetString().Should().Be("completed");
@@ -171,12 +171,12 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_Mitglied_zeigt_Interesse_und_zieht_es_zurueck()
     {
-        var firma = Guid.CreateVersion7();
-        var (vorgang, _) = await ImGespraech(firma);
+        var company = Guid.CreateVersion7();
+        var (caseItem, _) = await ImGespraech(company);
 
-        _rollen.Antwort = Firmenrolle.Mitglied;
+        _rollen.Antwort = CompanyRole.Mitglied;
 
-        var zurueck = await AlsFirma(firma).PostAsync($"/transfers/{vorgang}/withdraw", null);
+        var zurueck = await AlsFirma(company).PostAsync($"/transfers/{caseItem}/withdraw", null);
 
         zurueck.StatusCode.Should().Be(
             HttpStatusCode.OK, "wer anfangen darf, muss aufhoeren duerfen");
@@ -186,26 +186,26 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Gefragt_wird_nach_dem_Mandanten_aus_dem_Token()
     {
-        var firma = Guid.CreateVersion7();
-        var wer = Guid.CreateVersion7();
-        var (vorgang, _) = await ImGespraech(firma);
+        var company = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
+        var (caseItem, _) = await ImGespraech(company);
 
-        await Angebot(AlsFirma(firma, wer), vorgang);
+        await Angebot(AlsFirma(company, subject), caseItem);
 
-        _rollen.Zuletzt.Should().Be((wer, firma));
+        _rollen.Zuletzt.Should().Be((subject, company));
     }
 
     /// <summary>Schweigt die Rollenauskunft, ist das kein Nein.</summary>
     [Fact]
     public async Task Eine_schweigende_Rollenauskunft_ist_kein_Nein()
     {
-        var firma = Guid.CreateVersion7();
-        var (vorgang, _) = await ImGespraech(firma);
+        var company = Guid.CreateVersion7();
+        var (caseItem, _) = await ImGespraech(company);
 
         _rollen.Schweigt = true;
-        var antwort = await Angebot(AlsFirma(firma), vorgang);
+        var response = await Angebot(AlsFirma(company), caseItem);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     /// <summary>
@@ -215,13 +215,13 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_Token_und_ohne_Firma_bleibt_es_wie_es_war()
     {
-        var firma = Guid.CreateVersion7();
-        var (vorgang, wer) = await ImGespraech(firma);
+        var company = Guid.CreateVersion7();
+        var (caseItem, subject) = await ImGespraech(company);
 
-        (await Angebot(_dienst.CreateClient(), vorgang))
+        (await Angebot(_dienst.CreateClient(), caseItem))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        (await Angebot(AlsPerson(wer), vorgang))
+        (await Angebot(AlsPerson(subject), caseItem))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

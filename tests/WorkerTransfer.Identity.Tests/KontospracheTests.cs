@@ -15,11 +15,11 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Identity.Tests;
 
-/// <summary>Die Sprache steht am Konto, nicht an der Anfrage.</summary>
+/// <summary>Die Sprache steht am Konto, nicht an der ResumeRequest.</summary>
 /// <remarks>
 /// Die Reihe hält drei Dinge fest, und alle drei sind der Grund für die Spalte:
-/// die Bestätigungsmail folgt beim ersten Mal dem Kopf, die Wahl überschreibt
-/// ihn dauerhaft, und eine Mail, die ohne Anfrage geschrieben wird, findet die
+/// die Bestätigungsmail folgt beim ersten Mal dem Header, die Wahl überschreibt
+/// ihn dauerhaft, und eine Mail, die ohne ResumeRequest geschrieben wird, findet die
 /// Wahl trotzdem.
 /// </remarks>
 [Collection(PostgresCollection.Name)]
@@ -39,18 +39,18 @@ public class KontospracheTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
             host.UseSetting("Notify:Geheimnis", Meldegeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
         });
 
-        using var bereich = _dienst.Services.CreateScope();
-        await bereich.ServiceProvider.GetRequiredService<IdentityDbContext>()
+        using var scope = _dienst.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IdentityDbContext>()
             .Database.MigrateAsync();
     }
 
@@ -73,19 +73,19 @@ public class KontospracheTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
-    private static string NeueAdresse(string wer) =>
-        $"{wer}-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
+    private static string NeueAdresse(string subject) =>
+        $"{subject}-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
 
     /// <summary>Registriert, bestätigt und meldet an. Gibt den Browser zurück.</summary>
     private async Task<(HttpClient Browser, string Adresse)> AngemeldetesKonto(
         string? sprachkopf = null)
     {
-        var adresse = NeueAdresse("anna");
+        var address = NeueAdresse("anna");
         var browser = Browser(sprachkopf);
 
         await browser.PostAsJsonAsync("/auth/register", new
         {
-            email = adresse, password = Passwort, display_name = "Anna"
+            email = address, password = Passwort, display_name = "Anna"
         });
 
         var token = Regex.Match(
@@ -93,14 +93,14 @@ public class KontospracheTests(Postgres postgres) : IAsyncLifetime
         await browser.PostAsJsonAsync("/auth/verify-email", new { token });
         await browser.PostAsJsonAsync("/auth/login", new
         {
-            email = adresse, password = Passwort
+            email = address, password = Passwort
         });
 
-        return (browser, adresse);
+        return (browser, address);
     }
 
     /// <summary>
-    /// Beim ersten Mal gibt es nur den Kopf — und die Mail folgt ihm.
+    /// Beim ersten Mal gibt es nur den Header — und die Mail folgt ihm.
     /// </summary>
     /// <remarks>
     /// Die Bestätigungsmail geht raus, bevor irgendjemand eine Sprache wählen
@@ -111,9 +111,9 @@ public class KontospracheTests(Postgres postgres) : IAsyncLifetime
     [InlineData("fr-CA,fr;q=0.9", "Merci de confirmer")]
     [InlineData("en-GB,en;q=0.9", "Please confirm")]
     [InlineData("de-DE,de;q=0.9", "Bitte bestätige")]
-    public async Task Die_erste_Mail_folgt_dem_Kopf(string kopf, string erwartet)
+    public async Task Die_erste_Mail_folgt_dem_Kopf(string header, string erwartet)
     {
-        await Browser(kopf).PostAsJsonAsync("/auth/register", new
+        await Browser(header).PostAsJsonAsync("/auth/register", new
         {
             email = NeueAdresse("erst"), password = Passwort, display_name = "Erst"
         });
@@ -127,8 +127,8 @@ public class KontospracheTests(Postgres postgres) : IAsyncLifetime
     /// </summary>
     /// <remarks>
     /// Eine Registrierung darf nicht daran scheitern, dass ein Browser
-    /// Isländisch ansagt. Und der Kopf nennt oft mehrere: steht eine Sprache,
-    /// die wir haben, an zweiter Stelle, muss sie gewinnen — sonst hätte die
+    /// Isländisch ansagt. Und der Header nennt oft mehrere: steht eine Sprache,
+    /// die wir haben, an zweiter Job, muss sie gewinnen — sonst hätte die
     /// erste unbekannte Angabe die Wirkung einer Wahl.
     /// </remarks>
     [Theory]
@@ -136,9 +136,9 @@ public class KontospracheTests(Postgres postgres) : IAsyncLifetime
     [InlineData("is-IS,fr;q=0.8", "Merci de confirmer")]
     [InlineData("*", "Bitte bestätige")]
     public async Task Unbekanntes_im_Kopf_faellt_auf_die_Quellsprache(
-        string kopf, string erwartet)
+        string header, string erwartet)
     {
-        await Browser(kopf).PostAsJsonAsync("/auth/register", new
+        await Browser(header).PostAsJsonAsync("/auth/register", new
         {
             email = NeueAdresse("fremd"), password = Passwort, display_name = "Fremd"
         });
@@ -146,10 +146,10 @@ public class KontospracheTests(Postgres postgres) : IAsyncLifetime
         _post.Post[^1].Betreff.Should().Contain(erwartet);
     }
 
-    /// <summary>Die Wahl steht am Konto und schlägt den Kopf.</summary>
+    /// <summary>Die Wahl steht am Konto und schlägt den Header.</summary>
     /// <remarks>
     /// Der entscheidende Fall: der Browser sagt weiterhin Deutsch, das Konto
-    /// sagt Französisch. Würde der Kopf gelesen, wäre die Wahl folgenlos —
+    /// sagt Französisch. Würde der Header gelesen, wäre die Wahl folgenlos —
     /// und niemand erführe davon.
     /// </remarks>
     [Fact]
@@ -161,23 +161,23 @@ public class KontospracheTests(Postgres postgres) : IAsyncLifetime
             "/account/language", new { language = "fr" });
         gesetzt.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Derselbe Browser, weiterhin mit deutschem Kopf.
+        // Derselbe Browser, weiterhin mit deutschem Header.
         await browser.PostAsJsonAsync("/auth/resend-verification", new
         {
             email = "unbekannt@example.org"
         });
 
-        var sitzung = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
-        sitzung!.User!.Language.Should().Be("fr");
+        var session = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
+        session!.User!.Language.Should().Be("fr");
     }
 
     /// <summary>
-    /// Eine Mail ohne Anfrage findet die Wahl trotzdem — das ist der Grund für
+    /// Eine Mail ohne ResumeRequest findet die Wahl trotzdem — das ist der Grund für
     /// die Spalte.
     /// </summary>
     /// <remarks>
     /// <c>POST /internal/notify</c> kommt von notification-service und trägt
-    /// keinen Browserkopf. Stünde die Sprache an der Anfrage, wäre diese Mail
+    /// keinen Browserkopf. Stünde die Sprache an der ResumeRequest, wäre diese Mail
     /// immer deutsch.
     /// </remarks>
     [Fact]
@@ -186,13 +186,13 @@ public class KontospracheTests(Postgres postgres) : IAsyncLifetime
         var (browser, _) = await AngemeldetesKonto("de-DE");
         await browser.PutAsJsonAsync("/account/language", new { language = "fr" });
 
-        var sitzung = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
-        var wer = Guid.Parse(sitzung!.User!.UserId);
+        var session = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
+        var subject = Guid.Parse(session!.User!.UserId);
 
         var melder = Browser();
         melder.DefaultRequestHeaders.Add("X-Notify-Secret", Meldegeheimnis);
         var gemeldet = await melder.PostAsJsonAsync(
-            "/internal/notify", new { user_id = wer });
+            "/internal/notify", new { user_id = subject });
 
         gemeldet.StatusCode.Should().Be(HttpStatusCode.Accepted);
         _post.Post[^1].Betreff.Should().Be("Du nouveau sur WorkerTransfer");
@@ -212,13 +212,13 @@ public class KontospracheTests(Postgres postgres) : IAsyncLifetime
     {
         var (browser, _) = await AngemeldetesKonto();
 
-        var antwort = await browser.PutAsJsonAsync(
+        var response = await browser.PutAsJsonAsync(
             "/account/language", new { language = "is" });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        var sitzung = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
-        sitzung!.User!.Language.Should().Be("de");
+        var session = await browser.GetFromJsonAsync<SitzungsAntwort>("/auth/session");
+        session!.User!.Language.Should().Be("de");
     }
 
     /// <summary>Ohne Anmeldung ändert niemand eine Sprache.</summary>
@@ -229,10 +229,10 @@ public class KontospracheTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_Anmeldung_geht_es_nicht()
     {
-        var antwort = await Browser().PutAsJsonAsync(
+        var response = await Browser().PutAsJsonAsync(
             "/account/language", new { language = "fr" });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     /// <summary>Jede der drei Sprachen hat jeden der fünf Texte.</summary>
@@ -247,9 +247,9 @@ public class KontospracheTests(Postgres postgres) : IAsyncLifetime
     {
         var deutsch = Texte(Kontosprache.De);
 
-        foreach (var sprache in new[] { Kontosprache.En, Kontosprache.Fr })
+        foreach (var language in new[] { Kontosprache.En, Kontosprache.Fr })
         {
-            var texte = Texte(sprache);
+            var texte = Texte(language);
 
             texte.Should().HaveSameCount(deutsch);
             texte.Should().OnlyContain(
@@ -260,18 +260,18 @@ public class KontospracheTests(Postgres postgres) : IAsyncLifetime
             {
                 texte[i].Betreff.Should().NotBe(
                     deutsch[i].Betreff,
-                    $"{sprache} soll übersetzen, nicht kopieren");
+                    $"{language} soll übersetzen, nicht kopieren");
             }
         }
     }
 
-    private static IReadOnlyList<Mailtext> Texte(Kontosprache sprache) =>
+    private static IReadOnlyList<Mailtext> Texte(Kontosprache language) =>
     [
-        Mailtexte.Bestaetigung(sprache, "http://x/verify?token=t"),
-        Mailtexte.Doppelanmeldung(sprache),
-        Mailtexte.Einladung(sprache, "Acme", "http://x/invitation?token=t"),
-        Mailtexte.Loeschbestaetigung(sprache),
-        Mailtexte.Neuigkeit(sprache, "http://x")
+        Mailtexte.Bestaetigung(language, "http://x/verify?token=t"),
+        Mailtexte.Doppelanmeldung(language),
+        Mailtexte.Einladung(language, "Acme", "http://x/invitation?token=t"),
+        Mailtexte.Loeschbestaetigung(language),
+        Mailtexte.Neuigkeit(language, "http://x")
     ];
 
     private sealed record SitzungsAntwort(BenutzerAntwort? User);

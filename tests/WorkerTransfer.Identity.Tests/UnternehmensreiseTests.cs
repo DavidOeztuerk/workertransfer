@@ -40,16 +40,16 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Singleton<IVersender>(_versand)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Singleton<IVersender>(_versand)));
         });
 
-        using var bereich = _dienst.Services.CreateScope();
-        await bereich.ServiceProvider.GetRequiredService<IdentityDbContext>()
+        using var scope = _dienst.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IdentityDbContext>()
             .Database.MigrateAsync();
     }
 
@@ -72,7 +72,7 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>Registers, confirms and signs in — the way in for every actor here.</summary>
-    private async Task<HttpClient> Person(string email, string? firma = null)
+    private async Task<HttpClient> Person(string email, string? company = null)
     {
         var browser = Browser();
 
@@ -81,7 +81,7 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
             email,
             password = Passwort,
             display_name = email.Split('@')[0],
-            company_name = firma
+            company_name = company
         });
         angelegt.StatusCode.Should().Be(HttpStatusCode.Created);
 
@@ -101,8 +101,8 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
 
     private static string NeueDomain() => $"firma-{Guid.NewGuid():N}.example";
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     private static async Task<string> ErsteFirma(HttpClient browser)
     {
@@ -113,7 +113,7 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Wer_gruendet_ist_Administrator_seiner_Firma()
     {
-        var chefin = await Person(Adresse("chefin", NeueDomain()), firma: "Beispiel GmbH");
+        var chefin = await Person(Adresse("chefin", NeueDomain()), company: "Beispiel GmbH");
 
         var meine = await Json(await chefin.GetAsync("/me/companies"));
 
@@ -143,12 +143,12 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Eine_Einladung_fuehrt_ueber_die_Adresse_in_die_Firma()
     {
         var domain = NeueDomain();
-        var chefin = await Person(Adresse("chefin", domain), firma: "Beispiel GmbH");
-        var firma = await ErsteFirma(chefin);
+        var chefin = await Person(Adresse("chefin", domain), company: "Beispiel GmbH");
+        var company = await ErsteFirma(chefin);
 
         var kollege = Adresse("kollege", "andere.example");
         var eingeladen = await chefin.PostAsJsonAsync(
-            $"/companies/{firma}/invitations", new { email = kollege, role = "member" });
+            $"/companies/{company}/invitations", new { email = kollege, role = "member" });
         eingeladen.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var browser = await Person(kollege);
@@ -169,11 +169,11 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_fremde_Adresse_darf_eingeladen_werden()
     {
-        var chefin = await Person(Adresse("chefin", NeueDomain()), firma: "Beispiel GmbH");
-        var firma = await ErsteFirma(chefin);
+        var chefin = await Person(Adresse("chefin", NeueDomain()), company: "Beispiel GmbH");
+        var company = await ErsteFirma(chefin);
 
         var eingeladen = await chefin.PostAsJsonAsync(
-            $"/companies/{firma}/invitations",
+            $"/companies/{company}/invitations",
             new { email = Adresse("berater", "gmail.com"), role = "member" });
 
         eingeladen.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -186,41 +186,41 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Wer_nicht_eingeladen_war_kommt_mit_dem_Token_nicht_hinein()
     {
-        var chefin = await Person(Adresse("chefin", NeueDomain()), firma: "Beispiel GmbH");
-        var firma = await ErsteFirma(chefin);
+        var chefin = await Person(Adresse("chefin", NeueDomain()), company: "Beispiel GmbH");
+        var company = await ErsteFirma(chefin);
 
         await chefin.PostAsJsonAsync(
-            $"/companies/{firma}/invitations",
+            $"/companies/{company}/invitations",
             new { email = Adresse("gemeint", "andere.example"), role = "member" });
 
         var token = LetzterLink("eingeladen");
         var fremder = await Person(Adresse("fremder", "andere.example"));
 
-        var versuch = await fremder.PostAsJsonAsync("/invitations/accept", new { token });
+        var attempt = await fremder.PostAsJsonAsync("/invitations/accept", new { token });
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        attempt.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]
     public async Task Nur_ein_Administrator_darf_einladen()
     {
         var domain = NeueDomain();
-        var chefin = await Person(Adresse("chefin", domain), firma: "Beispiel GmbH");
-        var firma = await ErsteFirma(chefin);
+        var chefin = await Person(Adresse("chefin", domain), company: "Beispiel GmbH");
+        var company = await ErsteFirma(chefin);
 
         var kollege = Adresse("kollege", "andere.example");
         await chefin.PostAsJsonAsync(
-            $"/companies/{firma}/invitations", new { email = kollege, role = "member" });
+            $"/companies/{company}/invitations", new { email = kollege, role = "member" });
 
         var browser = await Person(kollege);
         await browser.PostAsJsonAsync(
             "/invitations/accept", new { token = LetzterLink("eingeladen") });
 
-        var versuch = await browser.PostAsJsonAsync(
-            $"/companies/{firma}/invitations",
+        var attempt = await browser.PostAsJsonAsync(
+            $"/companies/{company}/invitations",
             new { email = Adresse("noch-einer", "andere.example"), role = "member" });
 
-        versuch.StatusCode.Should().Be(
+        attempt.StatusCode.Should().Be(
             HttpStatusCode.Forbidden, "Python prueft das nirgends — hier schon");
     }
 
@@ -231,13 +231,13 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Wer_kein_Mitglied_ist_sieht_die_Firma_gar_nicht()
     {
-        var chefin = await Person(Adresse("chefin", NeueDomain()), firma: "Beispiel GmbH");
-        var firma = await ErsteFirma(chefin);
+        var chefin = await Person(Adresse("chefin", NeueDomain()), company: "Beispiel GmbH");
+        var company = await ErsteFirma(chefin);
         var erfunden = Guid.NewGuid();
 
         var fremder = await Person(Adresse("fremder", NeueDomain()));
 
-        var beiEchter = await fremder.GetAsync($"/companies/{firma}/members");
+        var beiEchter = await fremder.GetAsync($"/companies/{company}/members");
         var beiErfundener = await fremder.GetAsync($"/companies/{erfunden}/members");
 
         beiEchter.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -253,61 +253,61 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Der_letzte_Administrator_darf_nicht_gehen()
     {
-        var chefin = await Person(Adresse("chefin", NeueDomain()), firma: "Beispiel GmbH");
-        var firma = await ErsteFirma(chefin);
-        var wer = (await Json(await chefin.GetAsync("/me"))).GetProperty("user_id").GetString();
+        var chefin = await Person(Adresse("chefin", NeueDomain()), company: "Beispiel GmbH");
+        var company = await ErsteFirma(chefin);
+        var subject = (await Json(await chefin.GetAsync("/me"))).GetProperty("user_id").GetString();
 
-        var versuch = await chefin.DeleteAsync($"/companies/{firma}/members/{wer}");
+        var attempt = await chefin.DeleteAsync($"/companies/{company}/members/{subject}");
 
-        versuch.StatusCode.Should().Be(
+        attempt.StatusCode.Should().Be(
             HttpStatusCode.Conflict, "409, nicht 403 — entfernen darf sie, nur diesen nicht");
     }
 
     [Fact]
     public async Task Ein_Administrator_entfernt_ein_Mitglied_und_es_verschwindet_aus_der_Liste()
     {
-        var chefin = await Person(Adresse("chefin", NeueDomain()), firma: "Beispiel GmbH");
-        var firma = await ErsteFirma(chefin);
+        var chefin = await Person(Adresse("chefin", NeueDomain()), company: "Beispiel GmbH");
+        var company = await ErsteFirma(chefin);
 
         var kollege = Adresse("kollege", "andere.example");
         await chefin.PostAsJsonAsync(
-            $"/companies/{firma}/invitations", new { email = kollege, role = "member" });
+            $"/companies/{company}/invitations", new { email = kollege, role = "member" });
 
         var browser = await Person(kollege);
         await browser.PostAsJsonAsync(
             "/invitations/accept", new { token = LetzterLink("eingeladen") });
 
-        var wer = (await Json(await browser.GetAsync("/me"))).GetProperty("user_id").GetString();
+        var subject = (await Json(await browser.GetAsync("/me"))).GetProperty("user_id").GetString();
 
-        var entfernt = await chefin.DeleteAsync($"/companies/{firma}/members/{wer}");
+        var entfernt = await chefin.DeleteAsync($"/companies/{company}/members/{subject}");
         entfernt.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        var mitglieder = await Json(await chefin.GetAsync($"/companies/{firma}/members"));
-        mitglieder.GetArrayLength().Should().Be(1);
+        var members = await Json(await chefin.GetAsync($"/companies/{company}/members"));
+        members.GetArrayLength().Should().Be(1);
     }
 
     [Fact]
     public async Task Eine_zurueckgenommene_Einladung_traegt_nicht_mehr()
     {
-        var chefin = await Person(Adresse("chefin", NeueDomain()), firma: "Beispiel GmbH");
-        var firma = await ErsteFirma(chefin);
+        var chefin = await Person(Adresse("chefin", NeueDomain()), company: "Beispiel GmbH");
+        var company = await ErsteFirma(chefin);
 
         var kollege = Adresse("kollege", "andere.example");
         var eingeladen = await chefin.PostAsJsonAsync(
-            $"/companies/{firma}/invitations", new { email = kollege, role = "member" });
+            $"/companies/{company}/invitations", new { email = kollege, role = "member" });
         var token = LetzterLink("eingeladen");
         var id = (await Json(eingeladen)).GetProperty("id").GetString();
 
-        var zurueck = await chefin.DeleteAsync($"/companies/{firma}/invitations/{id}");
+        var zurueck = await chefin.DeleteAsync($"/companies/{company}/invitations/{id}");
         zurueck.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        (await Json(await chefin.GetAsync($"/companies/{firma}/invitations")))
+        (await Json(await chefin.GetAsync($"/companies/{company}/invitations")))
             .GetArrayLength().Should().Be(0);
 
         var browser = await Person(kollege);
-        var versuch = await browser.PostAsJsonAsync("/invitations/accept", new { token });
+        var attempt = await browser.PostAsJsonAsync("/invitations/accept", new { token });
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        attempt.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>
@@ -323,12 +323,12 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Nur_ein_Administrator_darf_eine_Einladung_zuruecknehmen()
     {
-        var chefin = await Person(Adresse("chefin", NeueDomain()), firma: "Beispiel GmbH");
-        var firma = await ErsteFirma(chefin);
+        var chefin = await Person(Adresse("chefin", NeueDomain()), company: "Beispiel GmbH");
+        var company = await ErsteFirma(chefin);
 
         var kollege = Adresse("kollege", "andere.example");
         await chefin.PostAsJsonAsync(
-            $"/companies/{firma}/invitations", new { email = kollege, role = "member" });
+            $"/companies/{company}/invitations", new { email = kollege, role = "member" });
 
         var browser = await Person(kollege);
         await browser.PostAsJsonAsync(
@@ -336,11 +336,11 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
 
         // Eine zweite, offene Einladung — das Ziel des Versuchs.
         var offen = await chefin.PostAsJsonAsync(
-            $"/companies/{firma}/invitations",
+            $"/companies/{company}/invitations",
             new { email = Adresse("dritte", "andere.example"), role = "member" });
         var id = (await Json(offen)).GetProperty("id").GetString();
 
-        var alsMitglied = await browser.DeleteAsync($"/companies/{firma}/invitations/{id}");
+        var alsMitglied = await browser.DeleteAsync($"/companies/{company}/invitations/{id}");
 
         alsMitglied.StatusCode.Should().Be(
             HttpStatusCode.Forbidden,
@@ -348,7 +348,7 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
 
         // Die Gegenprobe in derselben Reihe: sonst wäre ein Endpunkt, der IMMER
         // 403 antwortet, von einem richtig geschützten nicht zu unterscheiden.
-        var alsAdmin = await chefin.DeleteAsync($"/companies/{firma}/invitations/{id}");
+        var alsAdmin = await chefin.DeleteAsync($"/companies/{company}/invitations/{id}");
 
         alsAdmin.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -360,20 +360,20 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_Einladung_einer_fremden_Firma_laesst_sich_nicht_zuruecknehmen()
     {
-        var eine = await Person(Adresse("chefin", NeueDomain()), firma: "Eine GmbH");
+        var eine = await Person(Adresse("chefin", NeueDomain()), company: "Eine GmbH");
         var einesFirma = await ErsteFirma(eine);
         var eingeladen = await eine.PostAsJsonAsync(
             $"/companies/{einesFirma}/invitations",
             new { email = Adresse("kollege", "andere.example"), role = "member" });
         var id = (await Json(eingeladen)).GetProperty("id").GetString();
 
-        var andere = await Person(Adresse("chef", NeueDomain()), firma: "Andere GmbH");
+        var andere = await Person(Adresse("chef", NeueDomain()), company: "Andere GmbH");
         var anderesFirma = await ErsteFirma(andere);
 
-        var versuch = await andere.DeleteAsync(
+        var attempt = await andere.DeleteAsync(
             $"/companies/{anderesFirma}/invitations/{id}");
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        attempt.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>
@@ -384,12 +384,12 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_Beitritt_wechselt_die_laufende_Sitzung_nicht()
     {
-        var chefin = await Person(Adresse("chefin", NeueDomain()), firma: "Beispiel GmbH");
-        var firma = await ErsteFirma(chefin);
+        var chefin = await Person(Adresse("chefin", NeueDomain()), company: "Beispiel GmbH");
+        var company = await ErsteFirma(chefin);
 
         var kollege = Adresse("kollege", "andere.example");
         await chefin.PostAsJsonAsync(
-            $"/companies/{firma}/invitations", new { email = kollege, role = "member" });
+            $"/companies/{company}/invitations", new { email = kollege, role = "member" });
 
         var browser = await Person(kollege);
         await browser.PostAsJsonAsync(
@@ -397,18 +397,18 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
 
         var ich = await Json(await browser.GetAsync("/me"));
 
-        ich.TryGetProperty("tenant_id", out var mandant).Should().BeTrue();
-        mandant.ValueKind.Should().Be(JsonValueKind.Null);
+        ich.TryGetProperty("tenant_id", out var tenant).Should().BeTrue();
+        tenant.ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     /// <summary>
-    /// Wer entfernt wird, ist bei der NÄCHSTEN Anfrage draußen — mit demselben
+    /// Wer entfernt wird, ist bei der NÄCHSTEN ResumeRequest draußen — mit demselben
     /// Token.
     /// </summary>
     /// <remarks>
     /// <strong>Der Test, der die ganze Bauart begründet.</strong> Die Rechte
-    /// stehen absichtlich nicht im Token: `Mitgliedschaftsrecht` liest die
-    /// Mitgliedschaft je Anfrage aus der Tabelle. Lägen sie im Token, wirkte
+    /// stehen absichtlich nicht im Token: `MembershipPermission` liest die
+    /// Membership je ResumeRequest aus der Tabelle. Lägen sie im Token, wirkte
     /// eine Entfernung erst, wenn es abläuft — und bei genau dieser Handlung
     /// ist sofort das Einzige, was zählt.
     /// <para>
@@ -421,33 +421,33 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Ein_entfernter_Administrator_darf_sofort_nichts_mehr()
     {
         var domain = NeueDomain();
-        var chefin = await Person(Adresse("chefin", domain), firma: "Beispiel GmbH");
-        var firma = await ErsteFirma(chefin);
+        var chefin = await Person(Adresse("chefin", domain), company: "Beispiel GmbH");
+        var company = await ErsteFirma(chefin);
 
         // Eine zweite Person als ADMIN hereinholen.
         var zweite = Adresse("zweite", "andere.example");
         await chefin.PostAsJsonAsync(
-            $"/companies/{firma}/invitations", new { email = zweite, role = "admin" });
+            $"/companies/{company}/invitations", new { email = zweite, role = "admin" });
 
         var browser = await Person(zweite);
         await browser.PostAsJsonAsync(
             "/invitations/accept", new { token = LetzterLink("eingeladen") });
 
-        // Sie darf jetzt einladen — der Beleg, dass die Richtlinie ueberhaupt
+        // Sie darf jetzt einladen — der Evidence, dass die Richtlinie ueberhaupt
         // etwas durchlaesst und nicht bloss alles ablehnt.
         var vorher = await browser.PostAsJsonAsync(
-            $"/companies/{firma}/invitations",
+            $"/companies/{company}/invitations",
             new { email = Adresse("dritte", "andere.example"), role = "member" });
         vorher.StatusCode.Should().Be(HttpStatusCode.Created);
 
         // Die Chefin entfernt sie.
-        var wer = await Subjekt(browser);
-        var entfernt = await chefin.DeleteAsync($"/companies/{firma}/members/{wer}");
+        var subject = await Subjekt(browser);
+        var entfernt = await chefin.DeleteAsync($"/companies/{company}/members/{subject}");
         entfernt.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // DASSELBE Token, kein neues Anmelden.
         var nachher = await browser.PostAsJsonAsync(
-            $"/companies/{firma}/invitations",
+            $"/companies/{company}/invitations",
             new { email = Adresse("vierte", "andere.example"), role = "member" });
 
         nachher.StatusCode.Should().Be(
@@ -462,7 +462,7 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     /// </summary>
     /// <remarks>
     /// Eine Autorisierung wirft nicht, sie schließt die Antwort kurz — ohne
-    /// <c>Ablehnungsgestalt</c> fiele hier ein nackter 403 mit leerem Rumpf
+    /// <c>RejectionShape</c> fiele hier ein nackter 403 mit leerem Rumpf
     /// heraus, und der Bericht eines Menschen hätte keine
     /// Korrelationskennung.
     /// </remarks>
@@ -470,43 +470,43 @@ public class UnternehmensreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Die_Ablehnung_traegt_das_uebliche_Fehlerdokument()
     {
         var domain = NeueDomain();
-        var chefin = await Person(Adresse("chefin", domain), firma: "Beispiel GmbH");
-        var firma = await ErsteFirma(chefin);
+        var chefin = await Person(Adresse("chefin", domain), company: "Beispiel GmbH");
+        var company = await ErsteFirma(chefin);
 
         var kollege = Adresse("kollege", "andere.example");
         await chefin.PostAsJsonAsync(
-            $"/companies/{firma}/invitations", new { email = kollege, role = "member" });
+            $"/companies/{company}/invitations", new { email = kollege, role = "member" });
 
         var browser = await Person(kollege);
         await browser.PostAsJsonAsync(
             "/invitations/accept", new { token = LetzterLink("eingeladen") });
 
-        var versuch = await browser.PostAsJsonAsync(
-            $"/companies/{firma}/invitations",
+        var attempt = await browser.PostAsJsonAsync(
+            $"/companies/{company}/invitations",
             new { email = Adresse("noch-einer", "andere.example"), role = "member" });
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        versuch.Content.Headers.ContentType!.MediaType
+        attempt.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        attempt.Content.Headers.ContentType!.MediaType
             .Should().Be("application/problem+json");
 
-        var rumpf = JsonDocument.Parse(
-            await versuch.Content.ReadAsStringAsync()).RootElement;
+        var body = JsonDocument.Parse(
+            await attempt.Content.ReadAsStringAsync()).RootElement;
 
-        rumpf.GetProperty("status").GetInt32().Should().Be(403);
-        rumpf.GetProperty("detail").GetString().Should().Be("not permitted");
-        rumpf.GetProperty("correlationId").GetString().Should().NotBeNullOrWhiteSpace();
+        body.GetProperty("status").GetInt32().Should().Be(403);
+        body.GetProperty("detail").GetString().Should().Be("not permitted");
+        body.GetProperty("correlationId").GetString().Should().NotBeNullOrWhiteSpace();
 
         // WELCHE Richtlinie fehlte, steht nicht darin — das waere eine
         // Landkarte der Rechte fuer jeden, der sie abfragt.
-        rumpf.ToString().Should().NotContain("company.invite");
+        body.ToString().Should().NotContain("company.invite");
     }
 
     /// <summary>Die eigene Subjektkennung, wie sie /me nennt.</summary>
     private static async Task<string> Subjekt(HttpClient browser)
     {
-        var antwort = await browser.GetFromJsonAsync<JsonElement>("/me");
+        var response = await browser.GetFromJsonAsync<JsonElement>("/me");
 
-        return antwort.GetProperty("user_id").GetString()!;
+        return response.GetProperty("user_id").GetString()!;
     }
 
 }

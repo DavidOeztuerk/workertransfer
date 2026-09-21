@@ -16,21 +16,21 @@ public sealed class HttpAufrufertoken(IHttpContextAccessor zugriff) : IAufrufert
     {
         get
         {
-            var anfrage = zugriff.HttpContext?.Request;
+            var request = zugriff.HttpContext?.Request;
 
-            if (anfrage is null)
+            if (request is null)
             {
                 return null;
             }
 
-            var kopf = anfrage.Headers.Authorization.ToString();
+            var header = request.Headers.Authorization.ToString();
 
-            if (kopf.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            if (header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
             {
-                return kopf["Bearer ".Length..];
+                return header["Bearer ".Length..];
             }
 
-            return anfrage.Cookies.TryGetValue("access", out var ausCookie)
+            return request.Cookies.TryGetValue("access", out var ausCookie)
                    && !string.IsNullOrEmpty(ausCookie)
                 ? ausCookie
                 : null;

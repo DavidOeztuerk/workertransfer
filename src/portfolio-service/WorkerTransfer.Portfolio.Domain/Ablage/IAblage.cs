@@ -16,30 +16,30 @@ public sealed record Abgelegtes(Stream Inhalt, string Medientyp) : IAsyncDisposa
 /// <b>Eine Schnittstelle, eine Umsetzung.</b> Das Vorgängerpaket erklärte fünf
 /// schwere Abhängigkeiten — pillow, python-magic, boto3, minio, azure — für
 /// null Konsumenten, und genau das machte es unbaubar (ADR-0021). Solange keine
-/// Umgebung ein Objektlager verlangt, gibt es hier keines.
+/// EnvironmentFile ein Objektlager verlangt, gibt es hier keines.
 /// <para>
 /// Der Schlüssel entsteht aus <c>SubjectId</c> und Name und nie aus einer
 /// Eingabe. Das ist die Struktur, die verhindert, dass jemand mit einem fremden
 /// Namen an eine fremde Datei kommt.
 /// </para>
 /// </remarks>
-public interface IAblage
+public interface IDocumentStore
 {
     /// <summary>Legt eine Datei ab und gibt den Namen zurück, unter dem sie liegt.</summary>
     /// <remarks>
     /// Der Name wird <em>hier</em> vergeben, nicht vom Client geschickt: ein
     /// vom Aufrufer gewählter Name ist ein Pfad, den jemand formen kann.
     /// </remarks>
-    Task<string> LegeAbAsync(
-        SubjectId wer,
+    Task<string> PutAsync(
+        SubjectId subject,
         string dateiname,
         string medientyp,
-        Stream inhalt,
+        Stream content,
         CancellationToken cancellationToken = default);
 
     /// <summary>Holt eine Datei, oder <c>null</c>, wenn es sie nicht gibt.</summary>
-    Task<Abgelegtes?> HoleAsync(
-        SubjectId wer, string name, CancellationToken cancellationToken = default);
+    Task<Abgelegtes?> GetAsync(
+        SubjectId subject, string name, CancellationToken cancellationToken = default);
 
     /// <summary>Löscht alles, was zu dieser Person abgelegt ist.</summary>
     /// <returns>Wie viele Dateien verschwunden sind.</returns>
@@ -48,5 +48,5 @@ public interface IAblage
     /// das stille Scheitern, gegen das ADR-0027 antritt: die Zeile ist weg, die
     /// Arbeitsprobe nicht.
     /// </remarks>
-    Task<int> LoescheAllesAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task<int> DeleteAllAsync(SubjectId subject, CancellationToken cancellationToken = default);
 }

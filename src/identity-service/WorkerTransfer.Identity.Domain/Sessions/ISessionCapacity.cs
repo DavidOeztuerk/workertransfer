@@ -22,7 +22,7 @@ namespace WorkerTransfer.Identity.Domain.Sessions;
 /// wäre das eine Entscheidung mit eigenem Commit, kein Aufräumen.
 /// </para>
 /// <para>
-/// <strong>Nicht wegzukürzen:</strong> die Mitgliedschaft wird bei
+/// <strong>Nicht wegzukürzen:</strong> die Membership wird bei
 /// <em>jeder</em> Erneuerung neu geprüft und nie aus dieser Zeile geglaubt.
 /// Einmal geprüft ist ein Nachweis genau einmal gut; wer hineingelassen wurde,
 /// bliebe sonst drin, solange er weiter erneuert — lange nachdem das

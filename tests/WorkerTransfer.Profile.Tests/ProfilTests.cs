@@ -10,18 +10,18 @@ public class ProfilTests
 {
     private static readonly DateTimeOffset Jetzt = new(2026, 8, 22, 9, 0, 0, TimeSpan.Zero);
 
-    private static Profil Beispiel(
+    private static PersonProfile Beispiel(
         string ueberschrift = "Entwicklerin",
         string text = "Ich baue Dienste.",
         string ort = "Hamburg",
         bool remote = true,
-        params string[] faehigkeiten) =>
-        Profil.Lege_an(
+        params string[] skills) =>
+        PersonProfile.Lege_an(
             SubjectId.New(), ueberschrift, text, ort, remote,
-            Faehigkeitenliste.Aus(faehigkeiten), Jetzt);
+            SkillList.Aus(skills), Jetzt);
 
     /// <summary>
-    /// ADR-0020: ob ein Profil gezeigt werden darf, steht ausschließlich im
+    /// ADR-0020: ob ein PersonProfile gezeigt werden darf, steht ausschließlich im
     /// Consent-Ledger. Ein Feld hier wäre eine zweite Wahrheit — und die eine,
     /// die man vergisst mitzuändern.
     /// </summary>
@@ -33,7 +33,7 @@ public class ProfilTests
     [InlineData("freigabe")]
     public void Das_Profil_hat_kein_Sichtbarkeitsfeld(string verboten)
     {
-        var namen = typeof(Profil).GetProperties().Select(eigenschaft => eigenschaft.Name);
+        var namen = typeof(PersonProfile).GetProperties().Select(eigenschaft => eigenschaft.Name);
 
         namen.Should().NotContain(
             name => name.Contains(verboten, StringComparison.OrdinalIgnoreCase));
@@ -42,53 +42,53 @@ public class ProfilTests
     [Fact]
     public void Die_Person_ist_der_Schluessel()
     {
-        var wer = SubjectId.New();
+        var subject = SubjectId.New();
 
-        Profil.Lege_an(wer, "Titel", "", "", false, Faehigkeitenliste.Leer, Jetzt)
-            .Wer.Should().Be(wer);
+        PersonProfile.Lege_an(subject, "Titel", "", "", false, SkillList.Leer, Jetzt)
+            .Wer.Should().Be(subject);
     }
 
     [Fact]
     public void Weissraum_faellt_weg()
     {
-        var profil = Beispiel(ueberschrift: "  Entwicklerin  ", text: "  Hallo  ", ort: "  Kiel ");
+        var profile = Beispiel(ueberschrift: "  Entwicklerin  ", text: "  Hallo  ", ort: "  Kiel ");
 
-        profil.Ueberschrift.Should().Be("Entwicklerin");
-        profil.Text.Should().Be("Hallo");
-        profil.Ort.Should().Be("Kiel");
+        profile.Ueberschrift.Should().Be("Entwicklerin");
+        profile.Text.Should().Be("Hallo");
+        profile.Ort.Should().Be("Kiel");
     }
 
     [Fact]
     public void Ohne_Ueberschrift_entsteht_kein_Profil()
     {
-        var handlung = () => Beispiel(ueberschrift: "   ");
+        var action = () => Beispiel(ueberschrift: "   ");
 
-        handlung.Should().Throw<UeberschriftFehler>();
+        action.Should().Throw<UeberschriftFehler>();
     }
 
     [Fact]
     public void Eine_zu_lange_Ueberschrift_wird_abgelehnt()
     {
-        var handlung = () =>
-            Beispiel(ueberschrift: new string('x', Profil.HoechstlaengeUeberschrift + 1));
+        var action = () =>
+            Beispiel(ueberschrift: new string('x', PersonProfile.HoechstlaengeUeberschrift + 1));
 
-        handlung.Should().Throw<UeberschriftFehler>();
+        action.Should().Throw<UeberschriftFehler>();
     }
 
     [Fact]
     public void Ein_zu_langer_Text_wird_abgelehnt()
     {
-        var handlung = () => Beispiel(text: new string('x', Profil.HoechstlaengeText + 1));
+        var action = () => Beispiel(text: new string('x', PersonProfile.HoechstlaengeText + 1));
 
-        handlung.Should().Throw<TextFehler>();
+        action.Should().Throw<TextFehler>();
     }
 
     [Fact]
     public void Ein_zu_langer_Ort_wird_abgelehnt()
     {
-        var handlung = () => Beispiel(ort: new string('x', Profil.HoechstlaengeOrt + 1));
+        var action = () => Beispiel(ort: new string('x', PersonProfile.HoechstlaengeOrt + 1));
 
-        handlung.Should().Throw<OrtFehler>();
+        action.Should().Throw<OrtFehler>();
     }
 
     /// <summary>
@@ -99,42 +99,42 @@ public class ProfilTests
     [Fact]
     public void Eine_abgelehnte_Aenderung_aendert_gar_nichts()
     {
-        var profil = Beispiel();
+        var profile = Beispiel();
 
-        var handlung = () => profil.Aendere(
-            "", "Neuer Text", "Berlin", false, Faehigkeitenliste.Leer, Jetzt.AddHours(1));
+        var action = () => profile.Aendere(
+            "", "Neuer Text", "Berlin", false, SkillList.Leer, Jetzt.AddHours(1));
 
-        handlung.Should().Throw<UeberschriftFehler>();
-        profil.Text.Should().Be("Ich baue Dienste.");
-        profil.Ort.Should().Be("Hamburg");
-        profil.RemoteMoeglich.Should().BeTrue();
-        profil.GeaendertAm.Should().Be(Jetzt);
+        action.Should().Throw<UeberschriftFehler>();
+        profile.Text.Should().Be("Ich baue Dienste.");
+        profile.Ort.Should().Be("Hamburg");
+        profile.RemoteMoeglich.Should().BeTrue();
+        profile.GeaendertAm.Should().Be(Jetzt);
     }
 
     [Fact]
     public void Eine_Aenderung_setzt_den_Zeitstempel_und_laesst_das_Anlegen_stehen()
     {
-        var profil = Beispiel();
+        var profile = Beispiel();
         var spaeter = Jetzt.AddDays(3);
 
-        profil.Aendere("Neu", "Text", "Kiel", false, Faehigkeitenliste.Aus(["Go"]), spaeter);
+        profile.Aendere("Neu", "Text", "Kiel", false, SkillList.Aus(["Go"]), spaeter);
 
-        profil.GeaendertAm.Should().Be(spaeter);
-        profil.AngelegtAm.Should().Be(Jetzt);
-        profil.Faehigkeiten.Werte.Should().Equal("Go");
+        profile.GeaendertAm.Should().Be(spaeter);
+        profile.AngelegtAm.Should().Be(Jetzt);
+        profile.Faehigkeiten.Werte.Should().Equal("Go");
     }
 
     /// <summary>
     /// Eine gespeicherte Zeile beim Lesen abzulehnen hieße, jemandem sein
-    /// Profil zu entziehen, weil sich eine Obergrenze geändert hat.
+    /// PersonProfile zu entziehen, weil sich eine Obergrenze geändert hat.
     /// </summary>
     [Fact]
     public void Herstellen_prueft_nicht_erneut()
     {
-        var profil = Profil.Stelle_her(
-            SubjectId.New(), new string('x', Profil.HoechstlaengeUeberschrift + 40),
-            "", "", false, Faehigkeitenliste.Leer, Jetzt, Jetzt);
+        var profile = PersonProfile.Stelle_her(
+            SubjectId.New(), new string('x', PersonProfile.HoechstlaengeUeberschrift + 40),
+            "", "", false, SkillList.Leer, Jetzt, Jetzt);
 
-        profil.Ueberschrift.Should().HaveLength(Profil.HoechstlaengeUeberschrift + 40);
+        profile.Ueberschrift.Should().HaveLength(PersonProfile.HoechstlaengeUeberschrift + 40);
     }
 }

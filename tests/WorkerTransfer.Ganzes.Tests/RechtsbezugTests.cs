@@ -2,7 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Noelia.Abstractions.Compliance;
 using Noelia.Abstractions.Security.Checks;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 
 namespace WorkerTransfer.Ganzes.Tests;
 
@@ -10,7 +10,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// <remarks>
 /// <para><strong>Die Wortliste ist ein echtes Risiko, kein theoretisches.</strong>
 /// Nach Art. 42/43 DSGVO darf nur eine Aufsichtsbehörde oder eine nach
-/// EN ISO/IEC 17065 akkreditierte Stelle zertifizieren; BSI C5 attestiert nur
+/// EN ISO/IEC 17065 akkreditierte Job zertifizieren; BSI C5 attestiert nur
 /// ein zugelassener Prüfer, SecNumCloud qualifiziert nur die ANSSI. Wir sind
 /// nichts davon. „Zertifiziert“ ohne Akkreditierung ist in der EU eine
 /// irreführende Geschäftspraxis — RL 2005/29/EG gegenüber Verbrauchern,
@@ -28,7 +28,7 @@ public class RechtsbezugTests
     /// <summary>Worte, die eine Zusage machen, die niemand hier geben darf.</summary>
     /// <remarks>
     /// <c>attest</c> steht mit dabei: ein „Attest“ ist im Deutschen genauso
-    /// eine Bescheinigung wie ein Zertifikat, und der englische Ausweg der
+    /// eine Bescheinigung wie ein Certificate, und der englische Ausweg der
     /// amerikanischen Anbieter trägt hier gerade nicht.
     /// </remarks>
     public static IReadOnlyList<string> Untersagt { get; } =
@@ -48,9 +48,9 @@ public class RechtsbezugTests
     [Fact]
     public void Kein_Rechtsbezug_hat_einen_leeren_Leser()
     {
-        Rechtsbezuege.Eigene.Should().NotBeEmpty("sonst prüft dieser Test nichts");
+        AdditionalRegulatoryReferences.Own.Should().NotBeEmpty("sonst prüft dieser Test nichts");
 
-        foreach (var bezug in Rechtsbezuege.Eigene)
+        foreach (var bezug in AdditionalRegulatoryReferences.Own)
         {
             bezug.Reader.Should().NotBeNullOrWhiteSpace(
                 $"{bezug.Citation} muss sagen, was ein Mensch danach noch "
@@ -68,14 +68,14 @@ public class RechtsbezugTests
     [Fact]
     public void Kein_Rechtsbezug_behauptet_Konformitaet()
     {
-        foreach (var bezug in Rechtsbezuege.Eigene)
+        foreach (var bezug in AdditionalRegulatoryReferences.Own)
         {
-            foreach (var wort in Untersagt)
+            foreach (var word in Untersagt)
             {
                 $"{bezug.Obligation} {bezug.Reader}".Contains(
-                        wort, StringComparison.OrdinalIgnoreCase)
+                        word, StringComparison.OrdinalIgnoreCase)
                     .Should().BeFalse(
-                        $"{bezug.Citation} trägt „{wort}“ — Belege, keine "
+                        $"{bezug.Citation} trägt „{word}“ — Belege, keine "
                         + "Konformität");
             }
         }
@@ -94,7 +94,7 @@ public class RechtsbezugTests
     [InlineData("Wir bescheinigen die Einhaltung.", true)]
     [InlineData("Geprüft durch eine unabhängige Stelle.", true)]
     public void Die_Wortliste_trifft_genau_das_Gemeinte(string satz, bool erwartet) =>
-        Untersagt.Any(wort => satz.Contains(wort, StringComparison.OrdinalIgnoreCase))
+        Untersagt.Any(word => satz.Contains(word, StringComparison.OrdinalIgnoreCase))
             .Should().Be(erwartet);
 
     /// <summary>Unsere fünf sind genau die, die Noelia nicht hat.</summary>
@@ -117,9 +117,9 @@ public class RechtsbezugTests
             RegulatoryReferences.AiActTransparency
         }.Select(bezug => bezug.Citation).ToHashSet(StringComparer.Ordinal);
 
-        Rechtsbezuege.Eigene.Should().NotBeEmpty("sonst prüft dieser Test nichts");
+        AdditionalRegulatoryReferences.Own.Should().NotBeEmpty("sonst prüft dieser Test nichts");
 
-        Rechtsbezuege.Eigene.Select(bezug => bezug.Citation)
+        AdditionalRegulatoryReferences.Own.Select(bezug => bezug.Citation)
             .Should().NotIntersectWith(vonNoelia);
     }
 
@@ -137,7 +137,7 @@ public class RechtsbezugTests
     [Fact]
     public void Die_Mitbestimmung_ist_ein_Satz_und_kein_falsches_Zitat()
     {
-        Rechtsbezuege.Mitbestimmung.Should().Contain("§ 87 Abs. 1 Nr. 6 BetrVG");
+        AdditionalRegulatoryReferences.WorksCouncilCodetermination.Should().Contain("§ 87 Abs. 1 Nr. 6 BetrVG");
 
         Enum.GetNames<RegulatoryRegime>().Should().NotContain(
             name => name.Contains("Betr", StringComparison.OrdinalIgnoreCase)
@@ -149,17 +149,17 @@ public class RechtsbezugTests
 
     /// <summary>Anhang III stuft nicht ein, und sagt das.</summary>
     /// <remarks>
-    /// <strong>Schreibe nie, dass WorkerTransfer nicht hochriskant ist.</strong>
-    /// Schreibe, welche Belege vorliegen und wer die Frage beantwortet. Dieser
+    /// <strong>Write nie, dass WorkerTransfer nicht hochriskant ist.</strong>
+    /// Write, welche Belege vorliegen und wer die Frage beantwortet. Dieser
     /// Test hält den zweiten Teil fest.
     /// </remarks>
     [Fact]
     public void Anhang_III_gibt_die_Frage_an_einen_Menschen_weiter()
     {
-        Rechtsbezuege.AnhangIII.Reader.Should()
+        AdditionalRegulatoryReferences.AnnexThree.Reader.Should()
             .Contain("Mensch").And.Contain("juristischer Ausbildung");
 
-        Rechtsbezuege.AnhangIII.Reader.Should().NotContain(
+        AdditionalRegulatoryReferences.AnnexThree.Reader.Should().NotContain(
             "nicht hochriskant",
             "die Einstufung gehört nicht uns — der Nachweis legt die Belege "
             + "daneben und stuft nichts ein");
@@ -177,13 +177,13 @@ public class RechtsbezugTests
     public void Kein_Zitat_steht_ohne_Pruefung_da()
     {
         var belegt = Pruefungen()
-            .SelectMany(pruefung => pruefung.References)
+            .SelectMany(check => check.References)
             .Select(bezug => bezug.Citation)
             .ToHashSet(StringComparer.Ordinal);
 
         belegt.Should().NotBeEmpty("sonst prüft dieser Test nichts");
 
-        Rechtsbezuege.Eigene.Select(bezug => bezug.Citation)
+        AdditionalRegulatoryReferences.Own.Select(bezug => bezug.Citation)
             .Should().OnlyContain(fundstelle => belegt.Contains(fundstelle));
     }
 
@@ -201,7 +201,7 @@ public class RechtsbezugTests
         // Punkt dieses Tests ist ein anderer — dass niemand einen Artikel
         // NEBEN einer der beiden Sammlungen erfindet, denn dann stuenden zwei
         // Fassungen desselben Zitats im selben Dokument.
-        var sammlung = Rechtsbezuege.Eigene
+        var sammlung = AdditionalRegulatoryReferences.Own
             .Concat(
             [
                 RegulatoryReferences.GdprRecordsOfProcessing,
@@ -217,10 +217,10 @@ public class RechtsbezugTests
             ])
             .ToHashSet();
 
-        foreach (var pruefung in Pruefungen())
+        foreach (var check in Pruefungen())
         {
-            pruefung.References.Should().OnlyContain(bezug => sammlung.Contains(bezug),
-                $"{pruefung.Id} nennt ein Zitat, das nicht in Rechtsbezuege.Eigene steht");
+            check.References.Should().OnlyContain(bezug => sammlung.Contains(bezug),
+                $"{check.Id} nennt ein Zitat, das nicht in Rechtsbezuege.Eigene steht");
         }
     }
 
@@ -235,31 +235,31 @@ public class RechtsbezugTests
     [Fact]
     public async Task Jeder_Befund_traegt_die_Zitate_seiner_Pruefung()
     {
-        foreach (var pruefung in Pruefungen())
+        foreach (var check in Pruefungen())
         {
-            var befund = await pruefung.RunAsync();
+            var finding = await check.RunAsync();
 
-            befund.References.Should().BeEquivalentTo(
-                pruefung.References,
-                $"{pruefung.Id} muss seine Zitate an den Befund hängen — sonst "
+            finding.References.Should().BeEquivalentTo(
+                check.References,
+                $"{check.Id} muss seine Zitate an den Befund hängen — sonst "
                 + "steht die Pflichtenseite ohne sie da");
         }
     }
 
     /// <summary>Jede Prüfung dieses Baumes, die Zitate trägt.</summary>
     /// <remarks>
-    /// Ohne Container gebaut: <c>Widerrufspruefung</c> und <c>Ledgerpruefung</c>
+    /// Ohne Container gebaut: <c>RevocationCheck</c> und <c>LedgerCheck</c>
     /// brauchen einen, und ihre Zitate sind dieselben wie die der anderen.
     /// </remarks>
     private static IReadOnlyList<ISecurityCheck> Pruefungen() =>
     [
-        new Nahtpruefung(typeof(object), [], "probe"),
-        new Zahlpruefung([]),
-        new Anbieterpruefung([]),
-        Loeschpruefung.OhneZeilen("probe"),
+        new SeamCheck(typeof(object), [], "probe"),
+        new NumberCheck([]),
+        new ProviderCheck([]),
+        ErasureCheck.OhneZeilen("probe"),
         // Ohne registriertes Tor meldet sie NotApplicable — ihre Zitate traegt
         // sie trotzdem, und genau die fehlten dieser Liste.
-        new Widerrufspruefung<object>(
+        new RevocationCheck<object>(
             new ServiceCollection().BuildServiceProvider(), typeof(object))
     ];
 }

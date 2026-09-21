@@ -4,11 +4,11 @@ namespace WorkerTransfer.Profile.Domain.Pruefspur;
 
 /// <summary>Ein Schlüssel, der nicht auf der Liste steht.</summary>
 /// <param name="schluessel">Der abgelehnte Schlüssel.</param>
-public sealed class PruefdatenFehler(string schluessel)
-    : Exception($"Der Prüfspur-Schlüssel '{schluessel}' steht nicht auf der Liste.")
+public sealed class AuditDataError(string key)
+    : Exception($"Der Prüfspur-Schlüssel '{key}' steht nicht auf der Liste.")
 {
     /// <summary>Der abgelehnte Schlüssel.</summary>
-    public string Schluessel { get; } = schluessel;
+    public string Schluessel { get; } = key;
 }
 
 /// <summary>Ein Eintrag in der Spur. Unveränderlich, sobald geschrieben.</summary>
@@ -19,11 +19,11 @@ public sealed class PruefdatenFehler(string schluessel)
 /// Schreiben von Menschen gelesen, die nicht dabei waren — und eine Überschrift
 /// oder ein Freitext, der einmal hineingeraten ist, steht in jeder Sicherung.
 /// </remarks>
-public sealed class Pruefeintrag
+public sealed class AuditEntry
 {
     /// <summary>Die einzigen Schlüssel, die ein Eintrag tragen darf.</summary>
     /// <remarks>
-    /// Technische Tatsachen über eine Anfrage, nie Aussagen über einen
+    /// Technische Tatsachen über eine ResumeRequest, nie Aussagen über einen
     /// Menschen. Was die Person geschrieben hat — Überschrift, Text, Ort,
     /// Fähigkeiten — steht ausdrücklich nicht darauf: der Inhalt des Profils
     /// gehört in die Profiltabelle, wo er gelöscht wird, und nicht in eine
@@ -35,37 +35,37 @@ public sealed class Pruefeintrag
     /// <exception cref="PruefdatenFehler">
     /// <paramref name="daten"/> trägt einen Schlüssel, der nicht erlaubt ist.
     /// </exception>
-    public Pruefeintrag(
-        Pruefhandlung handlung,
+    public AuditEntry(
+        AuditAction action,
         DateTimeOffset geschehenAm,
         SubjectId? akteur = null,
-        TenantId? firma = null,
+        TenantId? company = null,
         SubjectId? betroffen = null,
         string? korrelation = null,
         IReadOnlyDictionary<string, string>? daten = null)
     {
         if (daten is not null)
         {
-            foreach (var schluessel in daten.Keys)
+            foreach (var key in daten.Keys)
             {
-                if (!ErlaubteSchluessel.Contains(schluessel))
+                if (!ErlaubteSchluessel.Contains(key))
                 {
-                    throw new PruefdatenFehler(schluessel);
+                    throw new AuditDataError(key);
                 }
             }
         }
 
-        Handlung = handlung;
+        Handlung = action;
         GeschehenAm = geschehenAm;
         Akteur = akteur;
-        Firma = firma;
+        Firma = company;
         Betroffen = betroffen;
         Korrelation = korrelation;
         Daten = daten ?? new Dictionary<string, string>(StringComparer.Ordinal);
     }
 
     /// <summary>Was geschehen ist.</summary>
-    public Pruefhandlung Handlung { get; }
+    public AuditAction Handlung { get; }
 
     /// <summary>Wann.</summary>
     public DateTimeOffset GeschehenAm { get; }
@@ -83,7 +83,7 @@ public sealed class Pruefeintrag
     /// <summary>An wem, wo das vom Akteur abweicht.</summary>
     public SubjectId? Betroffen { get; }
 
-    /// <summary>Die Anfrage, damit sich eine Geschichte über Dienste hinweg lesen lässt.</summary>
+    /// <summary>Die ResumeRequest, damit sich eine Geschichte über Dienste hinweg lesen lässt.</summary>
     public string? Korrelation { get; }
 
     /// <summary>Technisches Beiwerk, nur von der Liste.</summary>

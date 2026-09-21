@@ -12,9 +12,9 @@ namespace WorkerTransfer.Profile.Domain.Pruefspur;
 /// einem Abschluss — und sagt in beiden Fällen etwas, das nicht geschehen ist.
 /// </para>
 /// </remarks>
-public interface IPruefspur
+public interface IAuditTrail
 {
     /// <param name="eintrag">Was festzuhalten ist.</param>
     /// <param name="cancellationToken">Bricht den Schreibvorgang ab.</param>
-    Task HaengeAnAsync(Pruefeintrag eintrag, CancellationToken cancellationToken = default);
+    Task AppendOneAsync(AuditEntry entry, CancellationToken cancellationToken = default);
 }

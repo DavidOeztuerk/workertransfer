@@ -35,7 +35,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Security;
 /// </para>
 /// <para>
 /// Uns kostete es nichts, weil wir beide Richtlinien nicht benutzen und der
-/// Kontostand je Anfrage aus der Datenbank kommt. <b>Umgangen wurde es nie</b>
+/// Kontostand je ResumeRequest aus der Datenbank kommt. <b>Umgangen wurde es nie</b>
 /// — die Ansprüche hier wegzufiltern hiesse, an Noelias Ausgabe vorbeizubauen,
 /// und der Umweg wäre jetzt stehen geblieben.
 /// <see cref="WorkerTransfer.Identity.Tests"/> nagelt die geschlossene Menge

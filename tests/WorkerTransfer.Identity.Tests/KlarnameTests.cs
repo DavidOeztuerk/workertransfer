@@ -14,7 +14,7 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Identity.Tests;
 
-/// <summary>Vorname, Nachname, Anschrift — ADR-0038.</summary>
+/// <summary>Vorname, Nachname, PostalAddress — ADR-0038.</summary>
 [Collection(PostgresCollection.Name)]
 public class KlarnameTests(Postgres postgres) : IAsyncLifetime
 {
@@ -31,19 +31,19 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
             host.UseSetting("Notify:Geheimnis", "melde-geheimnis");
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
         });
 
-        using var bereich = _dienst.Services.CreateScope();
-        await bereich.ServiceProvider.GetRequiredService<IdentityDbContext>()
+        using var scope = _dienst.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IdentityDbContext>()
             .Database.MigrateAsync();
     }
 
@@ -58,12 +58,12 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
 
     private async Task<HttpClient> Angemeldet(string? vorname = null, string? nachname = null)
     {
-        var adresse = $"anna-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
+        var address = $"anna-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
         var browser = Browser();
 
         await browser.PostAsJsonAsync("/auth/register", new
         {
-            email = adresse,
+            email = address,
             password = Passwort,
             display_name = "Anna",
             given_name = vorname,
@@ -73,35 +73,35 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
         var token = Regex.Match(
             _post.Post[^1].Text, @"token=([A-Za-z0-9_\-]+)").Groups[1].Value;
         await browser.PostAsJsonAsync("/auth/verify-email", new { token });
-        await browser.PostAsJsonAsync("/auth/login", new { email = adresse, password = Passwort });
+        await browser.PostAsJsonAsync("/auth/login", new { email = address, password = Passwort });
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     [Fact]
     public async Task Registrierung_ohne_Vornamen_ist_in_Ordnung()
     {
         var browser = await Angemeldet();
-        var sitzung = await Json(await browser.GetAsync("/auth/session"));
+        var session = await Json(await browser.GetAsync("/auth/session"));
 
-        sitzung.GetProperty("user").GetProperty("display_name").GetString().Should().Be("Anna");
-        sitzung.GetProperty("user").GetProperty("given_name").ValueKind
+        session.GetProperty("user").GetProperty("display_name").GetString().Should().Be("Anna");
+        session.GetProperty("user").GetProperty("given_name").ValueKind
             .Should().Be(JsonValueKind.Null);
-        sitzung.GetProperty("user").TryGetProperty("line1", out _).Should().BeFalse();
+        session.GetProperty("user").TryGetProperty("line1", out _).Should().BeFalse();
     }
 
     [Fact]
     public async Task Registrierung_nimmt_Klarnamen_in_snake_case()
     {
         var browser = await Angemeldet("Anna", "Beispiel");
-        var sitzung = await Json(await browser.GetAsync("/auth/session"));
-        var wer = sitzung.GetProperty("user");
+        var session = await Json(await browser.GetAsync("/auth/session"));
+        var subject = session.GetProperty("user");
 
-        wer.GetProperty("given_name").GetString().Should().Be("Anna");
-        wer.GetProperty("family_name").GetString().Should().Be("Beispiel");
-        wer.GetProperty("display_name").GetString().Should().Be("Anna");
+        subject.GetProperty("given_name").GetString().Should().Be("Anna");
+        subject.GetProperty("family_name").GetString().Should().Be("Beispiel");
+        subject.GetProperty("display_name").GetString().Should().Be("Anna");
     }
 
     [Fact]
@@ -115,8 +115,8 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
             family_name = "Muster"
         })).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var sitzung = await Json(await browser.GetAsync("/auth/session"));
-        sitzung.GetProperty("user").GetProperty("given_name").GetString().Should().Be("Bea");
+        var session = await Json(await browser.GetAsync("/auth/session"));
+        session.GetProperty("user").GetProperty("given_name").GetString().Should().Be("Bea");
 
         (await browser.PutAsJsonAsync("/account/name", new
         {
@@ -124,8 +124,8 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
             family_name = ""
         })).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        sitzung = await Json(await browser.GetAsync("/me"));
-        sitzung.GetProperty("given_name").ValueKind.Should().Be(JsonValueKind.Null);
+        session = await Json(await browser.GetAsync("/me"));
+        session.GetProperty("given_name").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Fact]
@@ -152,9 +152,9 @@ public class KlarnameTests(Postgres postgres) : IAsyncLifetime
         anschrift.GetProperty("country").GetString().Should().Be("DE");
         anschrift.GetProperty("phone").GetString().Should().Be("+49 30 123");
 
-        var sitzung = await Json(await browser.GetAsync("/auth/session"));
-        sitzung.GetProperty("user").TryGetProperty("line1", out _).Should().BeFalse();
-        sitzung.GetProperty("user").TryGetProperty("phone", out _).Should().BeFalse();
+        var session = await Json(await browser.GetAsync("/auth/session"));
+        session.GetProperty("user").TryGetProperty("line1", out _).Should().BeFalse();
+        session.GetProperty("user").TryGetProperty("phone", out _).Should().BeFalse();
     }
 
     [Fact]

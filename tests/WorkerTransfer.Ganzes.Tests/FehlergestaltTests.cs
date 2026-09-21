@@ -44,15 +44,15 @@ public sealed class FehlergestaltTests
     }
 
     private static async Task<(HttpStatusCode Code, JsonElement Rumpf, string? Typ)> Frag(
-        WebApplication wirt, HttpRequestMessage anfrage)
+        WebApplication wirt, HttpRequestMessage request)
     {
         using var browser = new HttpClient { BaseAddress = new Uri(wirt.Urls.First()) };
-        using var antwort = await browser.SendAsync(anfrage);
-        var roh = await antwort.Content.ReadAsStringAsync();
+        using var response = await browser.SendAsync(request);
+        var roh = await response.Content.ReadAsStringAsync();
 
-        return (antwort.StatusCode,
+        return (response.StatusCode,
                 JsonDocument.Parse(roh).RootElement,
-                antwort.Content.Headers.ContentType?.MediaType);
+                response.Content.Headers.ContentType?.MediaType);
     }
 
     /// <summary>
@@ -91,18 +91,18 @@ public sealed class FehlergestaltTests
         try
         {
             using var browser = new HttpClient { BaseAddress = new Uri(wirt.Urls.First()) };
-            using var abbruch = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+            using var cancellationToken = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
 
-            var versuch = async () => await browser.GetAsync("/langsam", abbruch.Token);
+            var attempt = async () => await browser.GetAsync("/langsam", cancellationToken.Token);
 
-            await versuch.Should().ThrowAsync<TaskCanceledException>(
+            await attempt.Should().ThrowAsync<TaskCanceledException>(
                 "der Aufrufer legt selbst auf");
 
             // Dem Dienst Zeit geben, den Abbruch zu verarbeiten.
             await Task.Delay(TimeSpan.FromMilliseconds(500));
 
             protokoll.Fehler.Should().NotContain(
-                zeile => zeile.Contains("Unhandled request exception", StringComparison.Ordinal),
+                row => row.Contains("Unhandled request exception", StringComparison.Ordinal),
                 "ein Aufrufer, der auflegt, ist kein Serverfehler");
         }
         finally
@@ -128,11 +128,11 @@ public sealed class FehlergestaltTests
 
         try
         {
-            var (code, rumpf, _) = await Frag(
+            var (code, body, _) = await Frag(
                 wirt, new HttpRequestMessage(HttpMethod.Get, "/werfen"));
 
             code.Should().Be(HttpStatusCode.InternalServerError);
-            rumpf.GetProperty("detail").GetString().Should().Be("An unexpected error occurred.");
+            body.GetProperty("detail").GetString().Should().Be("An unexpected error occurred.");
         }
         finally
         {
@@ -159,12 +159,12 @@ public sealed class FehlergestaltTests
             StatusCodes.Status400BadRequest));
         await wirt.StartAsync();
 
-        using var anfrage = new HttpRequestMessage(HttpMethod.Get, "/werfen");
-        var (code, rumpf, typ) = await Frag(wirt, anfrage);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/werfen");
+        var (code, body, type) = await Frag(wirt, request);
 
         code.Should().Be(HttpStatusCode.BadRequest);
-        rumpf.GetProperty("detail").GetString().Should().Be("malformed request body");
-        typ.Should().Be("application/problem+json");
+        body.GetProperty("detail").GetString().Should().Be("malformed request body");
+        type.Should().Be("application/problem+json");
     }
 
     /// <summary>
@@ -183,32 +183,32 @@ public sealed class FehlergestaltTests
             StatusCodes.Status400BadRequest));
         await wirt.StartAsync();
 
-        using var anfrage = new HttpRequestMessage(HttpMethod.Get, "/werfen");
-        var (_, rumpf, _) = await Frag(wirt, anfrage);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/werfen");
+        var (_, body, _) = await Frag(wirt, request);
 
-        rumpf.ToString().Should().NotContain("Weber");
-        rumpf.ToString().Should().NotContain("Wert");
+        body.ToString().Should().NotContain("Weber");
+        body.ToString().Should().NotContain("Wert");
     }
 
     /// <summary>Eine gescheiterte Prüfung gibt 422 und nennt die Felder.</summary>
     [Fact]
     public async Task Eine_gescheiterte_Pruefung_gibt_422_mit_Feldnamen()
     {
-        var fehler = new[]
+        var error = new[]
         {
             new FluentValidation.Results.ValidationFailure("Email", "email is required"),
             new FluentValidation.Results.ValidationFailure("Passwort", "password is required")
         };
 
-        await using var wirt = Wirt(() => throw new ValidationException(fehler));
+        await using var wirt = Wirt(() => throw new ValidationException(error));
         await wirt.StartAsync();
 
-        using var anfrage = new HttpRequestMessage(HttpMethod.Get, "/werfen");
-        var (code, rumpf, typ) = await Frag(wirt, anfrage);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/werfen");
+        var (code, body, type) = await Frag(wirt, request);
 
         code.Should().Be(HttpStatusCode.UnprocessableEntity);
-        rumpf.GetProperty("detail").GetString().Should().Be("invalid: Email, Passwort");
-        typ.Should().Be("application/problem+json");
+        body.GetProperty("detail").GetString().Should().Be("invalid: Email, Passwort");
+        type.Should().Be("application/problem+json");
     }
 
     /// <summary>
@@ -223,21 +223,21 @@ public sealed class FehlergestaltTests
     [Fact]
     public async Task Die_Pruefantwort_traegt_keinen_Wert()
     {
-        var fehler = new[]
+        var error = new[]
         {
             new FluentValidation.Results.ValidationFailure(
                 "Email", "'Email' hat den Wert 'anna@example.org' und ist ungueltig")
         };
 
-        await using var wirt = Wirt(() => throw new ValidationException(fehler));
+        await using var wirt = Wirt(() => throw new ValidationException(error));
         await wirt.StartAsync();
 
-        using var anfrage = new HttpRequestMessage(HttpMethod.Get, "/werfen");
-        var (_, rumpf, _) = await Frag(wirt, anfrage);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/werfen");
+        var (_, body, _) = await Frag(wirt, request);
 
-        rumpf.ToString().Should().NotContain("anna");
-        rumpf.ToString().Should().NotContain("example.org");
-        rumpf.GetProperty("detail").GetString().Should().Be("invalid: Email");
+        body.ToString().Should().NotContain("anna");
+        body.ToString().Should().NotContain("example.org");
+        body.GetProperty("detail").GetString().Should().Be("invalid: Email");
     }
 
     /// <summary>Alles andere bleibt 500 — ein Serverfehler ist einer.</summary>
@@ -247,12 +247,12 @@ public sealed class FehlergestaltTests
         await using var wirt = Wirt(() => throw new InvalidOperationException("kaputt"));
         await wirt.StartAsync();
 
-        using var anfrage = new HttpRequestMessage(HttpMethod.Get, "/werfen");
-        var (code, rumpf, _) = await Frag(wirt, anfrage);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/werfen");
+        var (code, body, _) = await Frag(wirt, request);
 
         code.Should().Be(HttpStatusCode.InternalServerError);
-        rumpf.GetProperty("detail").GetString().Should().Be("An unexpected error occurred.");
-        rumpf.ToString().Should().NotContain("kaputt", "die Ausnahmemeldung gehoert ins Log, nicht in die Antwort");
+        body.GetProperty("detail").GetString().Should().Be("An unexpected error occurred.");
+        body.ToString().Should().NotContain("kaputt", "die Ausnahmemeldung gehoert ins Log, nicht in die Antwort");
     }
 }
 
@@ -268,7 +268,7 @@ internal sealed class Sammelprotokoll : ILoggerProvider
     /// <inheritdoc />
     public void Dispose() { }
 
-    private sealed class Schreiber(List<string> fehler) : ILogger
+    private sealed class Schreiber(List<string> error) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
@@ -286,9 +286,9 @@ internal sealed class Sammelprotokoll : ILoggerProvider
                 return;
             }
 
-            lock (fehler)
+            lock (error)
             {
-                fehler.Add(formatter(state, exception));
+                error.Add(formatter(state, exception));
             }
         }
     }

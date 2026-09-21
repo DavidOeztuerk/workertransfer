@@ -34,19 +34,19 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:applications", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(
-                    ServiceDescriptor.Scoped<IEinwilligungsschreiber>(_ => _ledger));
-                dienste.Replace(ServiceDescriptor.Scoped<IStellenauskunft>(_ => _stellen));
-                dienste.Replace(ServiceDescriptor.Scoped<IZustellung, Probezustellung>());
-                dienste.Replace(ServiceDescriptor.Scoped<IUnternehmensmitgliederAbfrage>(_ => _mitglieder));
-                dienste.Replace(ServiceDescriptor.Scoped<IKiZugangAbfrage>(_ => _ki));
+                services.Replace(
+                    ServiceDescriptor.Scoped<IConsentWriter>(_ => _ledger));
+                services.Replace(ServiceDescriptor.Scoped<IJobLookup>(_ => _stellen));
+                services.Replace(ServiceDescriptor.Scoped<IDelivery, Probezustellung>());
+                services.Replace(ServiceDescriptor.Scoped<ICompanyMemberLookup>(_ => _mitglieder));
+                services.Replace(ServiceDescriptor.Scoped<IKiZugangAbfrage>(_ => _ki));
             });
         });
 
@@ -59,9 +59,9 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsFirma(Guid wer, Guid firma) => Mit(Tokenform.Firma(wer, firma));
+    private HttpClient AlsFirma(Guid subject, Guid company) => Mit(Tokenform.Firma(subject, company));
 
-    private HttpClient AlsPerson(Guid wer) => Mit(Tokenform.Person(wer));
+    private HttpClient AlsPerson(Guid subject) => Mit(Tokenform.Person(subject));
 
     private HttpClient Mit(string token)
     {
@@ -71,65 +71,65 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     private static Task<HttpResponseMessage> Bewirb(
-        HttpClient browser, Guid stelle, bool lebenslauf = false, bool portfolio = false) =>
+        HttpClient browser, Guid job, bool resume = false, bool portfolio = false) =>
         browser.PostAsJsonAsync("/applications", new
         {
-            job_id = stelle,
+            job_id = job,
             message = "Ich baue gern verteilte Systeme.",
-            shares_resume = lebenslauf,
+            shares_resume = resume,
             shares_portfolio = portfolio
         });
 
     /// <summary>
-    /// Die Freigabe entsteht im Ledger, nicht in dieser Datenbank — und sie
+    /// Die Release entsteht im Ledger, nicht in dieser Datenbank — und sie
     /// nennt den Empfänger.
     /// </summary>
     [Fact]
     public async Task Bewerben_erteilt_die_Freigaben_fuer_genau_dieses_Unternehmen()
     {
-        var firma = Guid.CreateVersion7();
-        var wer = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
+        var company = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
 
-        _mitglieder.Fuer(new TenantId(firma), new SubjectId(Guid.CreateVersion7()));
+        _mitglieder.Fuer(new TenantId(company), new SubjectId(Guid.CreateVersion7()));
 
-        var antwort = await Bewirb(AlsPerson(wer), stelle, lebenslauf: true);
+        var response = await Bewirb(AlsPerson(subject), job, resume: true);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var rumpf = await Json(antwort);
-        rumpf.GetProperty("status").GetString().Should().Be("submitted");
-        rumpf.GetProperty("tenant_id").GetGuid().Should().Be(firma);
-        rumpf.GetProperty("shares_resume").GetBoolean().Should().BeTrue();
+        var body = await Json(response);
+        body.GetProperty("status").GetString().Should().Be("submitted");
+        body.GetProperty("tenant_id").GetGuid().Should().Be(company);
+        body.GetProperty("shares_resume").GetBoolean().Should().BeTrue();
 
         _ledger.Erteilt.Should().Equal(
-            $"profile.visibility:tenant:{firma}",
-            $"resume.visibility:tenant:{firma}");
+            $"profile.visibility:tenant:{company}",
+            $"resume.visibility:tenant:{company}");
     }
 
     /// <summary>
-    /// Eine eingegangene Bewerbung erzeugt je Mitglied genau eine Outbox-Zeile.
+    /// Eine eingegangene JobApplication erzeugt je Mitglied genau eine Outbox-Zeile.
     /// Die Zeile trägt keinen Inhalt — nur Kennung und Art (ADR-0025).
     /// </summary>
     [Fact]
     public async Task Bewerben_hinterlaesst_je_Mitglied_eine_inhaltsfreie_Absicht()
     {
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
         var anna = new SubjectId(Guid.CreateVersion7());
         var bea = new SubjectId(Guid.CreateVersion7());
-        var stelle = _stellen.Oeffentlich(firma);
-        _mitglieder.Fuer(new TenantId(firma), anna, bea);
+        var job = _stellen.Oeffentlich(company);
+        _mitglieder.Fuer(new TenantId(company), anna, bea);
 
-        var antwort = await Bewirb(AlsPerson(Guid.CreateVersion7()), stelle);
+        var response = await Bewirb(AlsPerson(Guid.CreateVersion7()), job);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        await using var kontext = postgres.Kontext();
-        var vermerke = await kontext.Set<OutboxZeile>()
+        await using var context = postgres.Kontext();
+        var vermerke = await context.Set<OutboxRow>()
             .Where(z => z.UserId == anna.Value || z.UserId == bea.Value)
             .ToListAsync();
 
@@ -140,23 +140,23 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Schweigt identity-service, darf keine Bewerbung entstehen: sonst ginge
+    /// Schweigt identity-service, darf keine JobApplication entstehen: sonst ginge
     /// sie hinaus, ohne dass jemand im Unternehmen davon erfährt.
     /// </summary>
     [Fact]
     public async Task Ein_schweigendes_Identity_laesst_keine_Bewerbung_zurueck()
     {
-        var firma = Guid.CreateVersion7();
-        var wer = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
+        var company = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
         _mitglieder.Schweigt = true;
 
-        var antwort = await Bewirb(AlsPerson(wer), stelle);
+        var response = await Bewirb(AlsPerson(subject), job);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Bewerbungen.AnyAsync(zeile => zeile.SubjectId == wer))
+        await using var context = postgres.Kontext();
+        (await context.Applications.AnyAsync(row => row.SubjectId == subject))
             .Should().BeFalse();
         _ledger.Erteilt.Should().BeEmpty();
     }
@@ -165,15 +165,15 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_Bewerbung_liest_nur_wer_sie_sehen_darf()
     {
-        var firma = Guid.CreateVersion7();
-        var wer = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
-        var id = (await Json(await Bewirb(AlsPerson(wer), stelle))).GetProperty("id").GetGuid();
+        var company = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
+        var id = (await Json(await Bewirb(AlsPerson(subject), job))).GetProperty("id").GetGuid();
 
-        (await AlsPerson(wer).GetAsync($"/applications/{id}"))
+        (await AlsPerson(subject).GetAsync($"/applications/{id}"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        (await AlsFirma(Guid.CreateVersion7(), firma).GetAsync($"/applications/{id}"))
+        (await AlsFirma(Guid.CreateVersion7(), company).GetAsync($"/applications/{id}"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
         (await AlsPerson(Guid.CreateVersion7()).GetAsync($"/applications/{id}"))
@@ -184,38 +184,38 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Das Profil ist immer dabei — eine Bewerbung ohne jede Angabe zur Person
-    /// ist keine. Portfolio und Lebenslauf nur, wenn sie mitgeschickt werden.
+    /// Das Profile ist immer dabei — eine JobApplication ohne jede Angabe zur Person
+    /// ist keine. Portfolio und Resume nur, wenn sie mitgeschickt werden.
     /// </summary>
     [Fact]
     public async Task Ohne_Anhaenge_geht_nur_das_Profil_in_den_Ledger()
     {
-        var firma = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
+        var company = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
 
-        await Bewirb(AlsPerson(Guid.CreateVersion7()), stelle);
+        await Bewirb(AlsPerson(Guid.CreateVersion7()), job);
 
-        _ledger.Erteilt.Should().Equal($"profile.visibility:tenant:{firma}");
+        _ledger.Erteilt.Should().Equal($"profile.visibility:tenant:{company}");
     }
 
     /// <summary>
-    /// Schweigt der Ledger, darf keine Bewerbung entstehen: das Unternehmen
-    /// sähe einen Vorgang, dessen Daten es nicht lesen darf.
+    /// Schweigt der Ledger, darf keine JobApplication entstehen: das Unternehmen
+    /// sähe einen Case, dessen Daten es nicht lesen darf.
     /// </summary>
     [Fact]
     public async Task Ein_schweigender_Ledger_laesst_keine_Bewerbung_zurueck()
     {
-        var firma = Guid.CreateVersion7();
-        var wer = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
+        var company = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
         _ledger.Schweigt = true;
 
-        var antwort = await Bewirb(AlsPerson(wer), stelle);
+        var response = await Bewirb(AlsPerson(subject), job);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Bewerbungen.AnyAsync(zeile => zeile.SubjectId == wer))
+        await using var context = postgres.Kontext();
+        (await context.Applications.AnyAsync(row => row.SubjectId == subject))
             .Should().BeFalse();
     }
 
@@ -228,18 +228,18 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
     {
         _stellen.Schweigt = true;
 
-        var antwort = await Bewirb(AlsPerson(Guid.CreateVersion7()), Guid.CreateVersion7());
+        var response = await Bewirb(AlsPerson(Guid.CreateVersion7()), Guid.CreateVersion7());
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     /// <summary>Entwurf, geschlossen und nicht vorhanden bleiben ununterscheidbar.</summary>
     [Fact]
     public async Task Eine_Stelle_die_es_oeffentlich_nicht_gibt_ist_404()
     {
-        var antwort = await Bewirb(AlsPerson(Guid.CreateVersion7()), Guid.CreateVersion7());
+        var response = await Bewirb(AlsPerson(Guid.CreateVersion7()), Guid.CreateVersion7());
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>
@@ -252,43 +252,43 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Zurueckziehen_widerruft_bedingungslos_alle_vier()
     {
-        var firma = Guid.CreateVersion7();
-        var wer = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
-        var browser = AlsPerson(wer);
+        var company = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
+        var browser = AlsPerson(subject);
 
-        var id = (await Json(await Bewirb(browser, stelle))).GetProperty("id").GetGuid();
+        var id = (await Json(await Bewirb(browser, job))).GetProperty("id").GetGuid();
 
-        var antwort = await browser.PostAsync($"/applications/{id}/withdraw", null);
+        var response = await browser.PostAsync($"/applications/{id}/withdraw", null);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(antwort)).GetProperty("status").GetString().Should().Be("withdrawn");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(response)).GetProperty("status").GetString().Should().Be("withdrawn");
 
         _ledger.Widerrufen.Should().Equal(
-            $"profile.visibility:tenant:{firma}",
-            $"resume.visibility:tenant:{firma}",
-            $"portfolio.visibility:tenant:{firma}",
+            $"profile.visibility:tenant:{company}",
+            $"resume.visibility:tenant:{company}",
+            $"portfolio.visibility:tenant:{company}",
             // Die vierte kam mit der Bewerbungsmappe dazu (ADR-0035). Sie ist
             // eigenstaendig und nicht unter `resume` mitgefuehrt: der Werdegang
-            // ist selbst geschriebener Text, ein Zeugnis ein Dokument Dritter
+            // ist selbst geschriebener Text, ein Reference ein Dokument Dritter
             // mit Namen und Noten — wer das eine zeigen will und das andere
             // nicht, muss das koennen.
-            $"documents.visibility:tenant:{firma}");
+            $"documents.visibility:tenant:{company}");
     }
 
-    /// <summary>Eine fremde Bewerbung ist von außen wie keine.</summary>
+    /// <summary>Eine fremde JobApplication ist von außen wie keine.</summary>
     [Fact]
     public async Task Eine_fremde_Bewerbung_zurueckzuziehen_ist_404_und_nicht_403()
     {
-        var firma = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
-        var id = (await Json(await Bewirb(AlsPerson(Guid.CreateVersion7()), stelle)))
+        var company = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
+        var id = (await Json(await Bewirb(AlsPerson(Guid.CreateVersion7()), job)))
             .GetProperty("id").GetGuid();
 
-        var antwort = await AlsPerson(Guid.CreateVersion7())
+        var response = await AlsPerson(Guid.CreateVersion7())
             .PostAsync($"/applications/{id}/withdraw", null);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>
@@ -298,16 +298,16 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Nach_dem_Rueckzug_geht_es_wieder_nach_der_Absage_nicht()
     {
-        var firma = Guid.CreateVersion7();
-        var wer = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
-        var person = AlsPerson(wer);
-        var unternehmen = AlsFirma(Guid.CreateVersion7(), firma);
+        var company = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
+        var person = AlsPerson(subject);
+        var unternehmen = AlsFirma(Guid.CreateVersion7(), company);
 
-        var id = (await Json(await Bewirb(person, stelle))).GetProperty("id").GetGuid();
+        var id = (await Json(await Bewirb(person, job))).GetProperty("id").GetGuid();
         await person.PostAsync($"/applications/{id}/withdraw", null);
 
-        var wieder = await Bewirb(person, stelle);
+        var wieder = await Bewirb(person, job);
 
         wieder.StatusCode.Should().Be(HttpStatusCode.Created);
         (await Json(wieder)).GetProperty("id").GetGuid().Should().Be(id);
@@ -316,7 +316,7 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
             $"/applications/{id}/status", new { status = "rejected" }))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var nachfassen = await Bewirb(person, stelle);
+        var nachfassen = await Bewirb(person, job);
 
         nachfassen.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
@@ -328,21 +328,21 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Bewegen_hinterlaesst_die_Absicht_in_der_Outbox()
     {
-        var firma = Guid.CreateVersion7();
-        var wer = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
+        var company = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
 
-        var id = (await Json(await Bewirb(AlsPerson(wer), stelle))).GetProperty("id").GetGuid();
+        var id = (await Json(await Bewirb(AlsPerson(subject), job))).GetProperty("id").GetGuid();
 
-        var antwort = await AlsFirma(Guid.CreateVersion7(), firma)
+        var response = await AlsFirma(Guid.CreateVersion7(), company)
             .PostAsJsonAsync($"/applications/{id}/status", new { status = "reviewing" });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(antwort)).GetProperty("status").GetString().Should().Be("reviewing");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(response)).GetProperty("status").GetString().Should().Be("reviewing");
 
-        await using var kontext = postgres.Kontext();
-        var vermerke = await kontext.Set<OutboxZeile>()
-            .Where(zeile => zeile.UserId == wer)
+        await using var context = postgres.Kontext();
+        var vermerke = await context.Set<OutboxRow>()
+            .Where(row => row.UserId == subject)
             .ToListAsync();
 
         vermerke.Should().ContainSingle()
@@ -356,109 +356,109 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Der_Rueckzug_der_Person_wird_nicht_gemeldet()
     {
-        var firma = Guid.CreateVersion7();
-        var wer = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
-        var browser = AlsPerson(wer);
+        var company = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
+        var browser = AlsPerson(subject);
 
-        var id = (await Json(await Bewirb(browser, stelle))).GetProperty("id").GetGuid();
+        var id = (await Json(await Bewirb(browser, job))).GetProperty("id").GetGuid();
         await browser.PostAsync($"/applications/{id}/withdraw", null);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Set<OutboxZeile>().AnyAsync(zeile => zeile.UserId == wer))
+        await using var context = postgres.Kontext();
+        (await context.Set<OutboxRow>().AnyAsync(row => row.UserId == subject))
             .Should().BeFalse();
     }
 
     /// <summary>
-    /// Ein Unternehmen zieht keine Bewerbung zurück — das ist die Handlung der
+    /// Ein Unternehmen zieht keine JobApplication zurück — das ist die Handlung der
     /// Person, und sie hier zuzulassen hieße, sie in ihrem Namen zu tun.
     /// </summary>
     [Fact]
     public async Task Ein_Unternehmen_kann_nicht_in_ihrem_Namen_zurueckziehen()
     {
-        var firma = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
-        var id = (await Json(await Bewirb(AlsPerson(Guid.CreateVersion7()), stelle)))
+        var company = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
+        var id = (await Json(await Bewirb(AlsPerson(Guid.CreateVersion7()), job)))
             .GetProperty("id").GetGuid();
 
-        var antwort = await AlsFirma(Guid.CreateVersion7(), firma)
+        var response = await AlsFirma(Guid.CreateVersion7(), company)
             .PostAsJsonAsync($"/applications/{id}/status", new { status = "withdrawn" });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     /// <summary>Ein Standwort, das es nicht gibt, ist eine Eingabe und kein Absturz.</summary>
     [Fact]
     public async Task Ein_erfundener_Stand_ist_422()
     {
-        var firma = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
-        var id = (await Json(await Bewirb(AlsPerson(Guid.CreateVersion7()), stelle)))
+        var company = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
+        var id = (await Json(await Bewirb(AlsPerson(Guid.CreateVersion7()), job)))
             .GetProperty("id").GetGuid();
 
-        var antwort = await AlsFirma(Guid.CreateVersion7(), firma)
+        var response = await AlsFirma(Guid.CreateVersion7(), company)
             .PostAsJsonAsync($"/applications/{id}/status", new { status = "eingeladen" });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     /// <summary>Eine fremde Firma sieht 404, nicht 403.</summary>
     [Fact]
     public async Task Eine_fremde_Firma_kann_eine_Bewerbung_nicht_bewegen()
     {
-        var firma = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
-        var id = (await Json(await Bewirb(AlsPerson(Guid.CreateVersion7()), stelle)))
+        var company = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
+        var id = (await Json(await Bewirb(AlsPerson(Guid.CreateVersion7()), job)))
             .GetProperty("id").GetGuid();
 
-        var antwort = await AlsFirma(Guid.CreateVersion7(), Guid.CreateVersion7())
+        var response = await AlsFirma(Guid.CreateVersion7(), Guid.CreateVersion7())
             .PostAsJsonAsync($"/applications/{id}/status", new { status = "reviewing" });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    /// <summary>Eine fremde Stelle liefert nichts, statt zu verraten, dass es sie gibt.</summary>
+    /// <summary>Eine fremde Job liefert nichts, statt zu verraten, dass es sie gibt.</summary>
     [Fact]
     public async Task Die_Liste_zur_Stelle_zeigt_nur_die_eigene()
     {
-        var firma = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
-        await Bewirb(AlsPerson(Guid.CreateVersion7()), stelle);
+        var company = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
+        await Bewirb(AlsPerson(Guid.CreateVersion7()), job);
 
-        var eigene = await AlsFirma(Guid.CreateVersion7(), firma)
-            .GetAsync($"/jobs/{stelle}/applications");
+        var eigene = await AlsFirma(Guid.CreateVersion7(), company)
+            .GetAsync($"/jobs/{job}/applications");
         var fremde = await AlsFirma(Guid.CreateVersion7(), Guid.CreateVersion7())
-            .GetAsync($"/jobs/{stelle}/applications");
+            .GetAsync($"/jobs/{job}/applications");
 
         (await Json(eigene)).GetArrayLength().Should().Be(1);
         (await Json(fremde)).GetArrayLength().Should().Be(0);
     }
 
-    /// <summary>Bewerbungen liest, wer für ein Unternehmen handelt.</summary>
+    /// <summary>Applications liest, wer für ein Unternehmen handelt.</summary>
     [Fact]
     public async Task Eine_Privatperson_liest_keine_Bewerbungsliste()
     {
-        var antwort = await AlsPerson(Guid.CreateVersion7())
+        var response = await AlsPerson(Guid.CreateVersion7())
             .GetAsync($"/jobs/{Guid.CreateVersion7()}/applications");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     /// <summary>Die eigene Liste, und nur die eigene.</summary>
     [Fact]
     public async Task Die_eigene_Liste_zeigt_die_eigenen_Bewerbungen()
     {
-        var wer = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
-        await Bewirb(AlsPerson(wer), _stellen.Oeffentlich(firma));
-        await Bewirb(AlsPerson(wer), _stellen.Oeffentlich(firma));
-        await Bewirb(AlsPerson(Guid.CreateVersion7()), _stellen.Oeffentlich(firma));
+        var subject = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
+        await Bewirb(AlsPerson(subject), _stellen.Oeffentlich(company));
+        await Bewirb(AlsPerson(subject), _stellen.Oeffentlich(company));
+        await Bewirb(AlsPerson(Guid.CreateVersion7()), _stellen.Oeffentlich(company));
 
-        var meine = await Json(await AlsPerson(wer).GetAsync("/applications/me"));
+        var meine = await Json(await AlsPerson(subject).GetAsync("/applications/me"));
 
         meine.GetArrayLength().Should().Be(2);
         meine.EnumerateArray()
-            .Should().OnlyContain(eintrag => eintrag.GetProperty("subject_id").GetGuid() == wer);
+            .Should().OnlyContain(entry => entry.GetProperty("subject_id").GetGuid() == subject);
     }
 
     /// <summary>
@@ -468,17 +468,17 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_Zahlen_zaehlen_nur_die_eigenen_Vorgaenge()
     {
-        var firma = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
-        var unternehmen = AlsFirma(Guid.CreateVersion7(), firma);
+        var company = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
+        var unternehmen = AlsFirma(Guid.CreateVersion7(), company);
 
-        var id = (await Json(await Bewirb(AlsPerson(Guid.CreateVersion7()), stelle)))
+        var id = (await Json(await Bewirb(AlsPerson(Guid.CreateVersion7()), job)))
             .GetProperty("id").GetGuid();
-        await Bewirb(AlsPerson(Guid.CreateVersion7()), stelle);
+        await Bewirb(AlsPerson(Guid.CreateVersion7()), job);
         await unternehmen.PostAsJsonAsync(
             $"/applications/{id}/status", new { status = "hired" });
 
-        // Eine fremde Firma mit eigener Bewerbung darf die Zahlen nicht bewegen.
+        // Eine fremde Firma mit eigener JobApplication darf die Zahlen nicht bewegen.
         await Bewirb(
             AlsPerson(Guid.CreateVersion7()),
             _stellen.Oeffentlich(Guid.CreateVersion7()));
@@ -515,7 +515,7 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
         var zahlen = await Json(
             await unternehmen.GetAsync("/companies/me/application-stats"));
 
-        zahlen.EnumerateObject().Select(feld => feld.Name).Should().BeEquivalentTo(
+        zahlen.EnumerateObject().Select(field => field.Name).Should().BeEquivalentTo(
             ["total", "by_status"],
             "ADR-0026 nennt diese Menge und keine groessere");
     }
@@ -530,43 +530,43 @@ public class BewerbungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_Unternehmen_gibt_es_keine_Zahlen()
     {
-        var antwort = await AlsPerson(Guid.CreateVersion7())
+        var response = await AlsPerson(Guid.CreateVersion7())
             .GetAsync("/companies/me/application-stats");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     /// <summary>Ohne Anmeldung geht nichts.</summary>
     [Fact]
     public async Task Ohne_Token_ist_es_401()
     {
-        var antwort = await _dienst.CreateClient().GetAsync("/applications/me");
+        var response = await _dienst.CreateClient().GetAsync("/applications/me");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     /// <summary>
     /// Ohne Anbieter bleibt der Entwurf nicht auf „wird geschrieben" stehen.
     /// </summary>
     /// <remarks>
-    /// 503 sagt der Oberfläche, dass niemand eingerichtet ist. Der Stand muss
+    /// 503 sagt der Oberfläche, dass niemand eingerichtet ist. Der State muss
     /// trotzdem <c>failed</c> werden, sonst darf die Person den Text nicht
     /// selbst setzen — <c>Aendere_selbst</c> ist aus <c>generating</c> verboten.
     /// </remarks>
     [Fact]
     public async Task Ohne_Anbieter_wird_der_Entwurf_fehlgeschlagen_und_nicht_erzeugt()
     {
-        var stelle = _stellen.Oeffentlich(Guid.CreateVersion7());
+        var job = _stellen.Oeffentlich(Guid.CreateVersion7());
         var browser = AlsPerson(Guid.CreateVersion7());
 
         var angelegt = await browser.PostAsJsonAsync(
-            "/applications/drafts", new { job_ids = new[] { stelle } });
+            "/applications/drafts", new { job_ids = new[] { job } });
 
         angelegt.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var entwurf = (await Json(angelegt))[0];
-        var id = entwurf.GetProperty("id").GetGuid();
-        entwurf.GetProperty("status").GetString().Should().Be("generating");
+        var draft = (await Json(angelegt))[0];
+        var id = draft.GetProperty("id").GetGuid();
+        draft.GetProperty("status").GetString().Should().Be("generating");
 
         var schreiben = await browser.PostAsync($"/applications/drafts/{id}/write", null);
 

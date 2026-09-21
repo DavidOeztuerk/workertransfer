@@ -364,20 +364,12 @@ export function ResumePage() {
               {t("lebenslauf.wegwahlLead")}
             </Typography>
             <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-              {/*
-                EINE KLICKBARE KARTE IST KEIN KNOPF.
-                
-                Hier stand `<Card onClick>` — ohne Rolle, ohne `tabIndex`, ohne
-                Tastaturweg. Wer mit der Tastatur oder einem Vorleser arbeitet,
-                konnte nicht wählen, wie sein Lebenslauf entsteht: die Wahl war
-                sichtbar und unerreichbar. `CardActionArea` rendert einen echten
-                `button` und nimmt Fokus, Eingabetaste und Leertaste mit.
-                
-                Gefunden hat es die E2E-Reise, die einen Knopf suchte und keinen
-                fand — sie hatte recht, und der Fehler lag nicht bei ihr.
-              */}
               <Card variant="outlined">
                 <CardActionArea
+                  // A clickable card is not a button: `<Card onClick>` has no
+                  // role, no tabIndex and no keyboard path, so the choice was
+                  // visible and unreachable. CardActionArea renders a real
+                  // <button> and takes focus, Enter and Space with it.
                   onClick={() => {
                     setWeg("manuell");
                     setZeilen((bisher) => (bisher.length === 0 ? [{ ...LEERE_STATION }] : bisher));
@@ -892,8 +884,8 @@ export function ResumePage() {
                   borderWidth: template === templ ? 2 : 1,
                 }}
               >
-                {/* Auch hier ein echter Knopf, aus demselben Grund wie oben. */}
                 <CardActionArea
+                  // A real <button> here too, same reason as at the path choice.
                   onClick={() => void handleTemplateChange(templ)}
                   aria-pressed={template === templ}
                 >
@@ -910,19 +902,6 @@ export function ResumePage() {
             ))}
           </Box>
 
-          {/*
-            DIE VORSCHAU IST NICHT SCHMUCK, SONDERN DIE ZUSAGE.
-
-            ADR-0035: „dieselbe Darstellung, die sie selbst sieht; nichts wird
-            für den Empfänger anders gerendert." Ohne sie wählt die Person eine
-            Vorlage blind und sieht das Ergebnis nie — nur das Unternehmen sieht
-            es. Es ist DIESELBE Komponente wie in der Bewerbungsmappe; zwei
-            Darstellungen wären zwei Wahrheiten.
-
-            Gespeist aus dem LAUFENDEN Formular und nicht aus dem gespeicherten
-            Stand: wer eine Station tippt, soll sie im Blatt sehen, bevor er
-            speichert.
-          */}
           <Divider sx={{ my: 3 }} />
           <Typography variant="h4" sx={{ mb: 0.5 }}>
             {t("lebenslauf.vorschau")}
@@ -931,6 +910,11 @@ export function ResumePage() {
             {t("lebenslauf.vorschauLead")}
           </Typography>
           <Lebenslaufblatt
+            // The preview IS the promise (ADR-0035: the same rendering the
+            // person sees, nothing rendered differently for the recipient), so
+            // it is the SAME component as in the application folder — two
+            // renderings would be two truths. Fed from the RUNNING form and not
+            // from the saved state, so a typed position shows before saving.
             template={template}
             daten={{
               headline: meinProfil.value?.ok

@@ -46,20 +46,20 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
             await vorlauf.Database.ExecuteSqlRawAsync("TRUNCATE TABLE assessments, outbox");
         }
 
-        _tor.Stelle(Anna, Firma, true);
+        _tor.Job(Anna, Firma, true);
 
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:assessment", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _tor)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _tor)));
         });
     }
 
@@ -90,8 +90,8 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
             .OfType<RouteEndpoint>()
             .Select(endpunkt =>
                 $"{Verben(endpunkt)} /{endpunkt.RoutePattern.RawText?.TrimStart('/').TrimEnd('/')}")
-            .Where(zeile => zeile.Contains("assessments", StringComparison.Ordinal)
-                            || zeile.Contains("erasure", StringComparison.Ordinal))
+            .Where(row => row.Contains("assessments", StringComparison.Ordinal)
+                            || row.Contains("erasure", StringComparison.Ordinal))
             .Should().BeEquivalentTo(
                 "POST /assessments",
                 "GET /assessments",
@@ -105,11 +105,11 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
     // Der ganze Weg
     // ---------------------------------------------------------------------
 
-    /// <summary>Stellen, einreichen, bewerten — und beide sehen dasselbe.</summary>
+    /// <summary>Jobs, einreichen, bewerten — und beide sehen dasselbe.</summary>
     [Fact]
     public async Task Der_ganze_Weg_von_der_Aufgabe_bis_zur_Rueckmeldung()
     {
-        var id = await Stelle();
+        var id = await Job();
 
         var eingereicht = await AlsPerson(Anna).PostAsJsonAsync(
             Ziel($"/assessments/{id}/submission"),
@@ -148,15 +148,15 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Beide Seiten bekommen dasselbe Dokument — Byte für Byte.</summary>
     /// <remarks>
-    /// <strong>Der Mechanismus hinter „die Person sieht die Bewertung"</strong>
+    /// <strong>Der Mechanismus hinter „die Person sieht die Evaluation"</strong>
     /// (ADR-0042 §2). Es gibt keine Firmensicht neben einer Personensicht, weil
-    /// es nur einen Endpunkt gibt — zwei wären die Stelle, an der die beiden
+    /// es nur einen Endpunkt gibt — zwei wären die Job, an der die beiden
     /// auseinanderlaufen, und zwar erst Monate später, beim nächsten Feld.
     /// </remarks>
     [Fact]
     public async Task Beide_Seiten_sehen_byte_gleich_dasselbe()
     {
-        var id = await Stelle();
+        var id = await Job();
         await Reiche_ein(id);
         await Bewerte(id, "accepted", "Passt. Reden wir weiter.");
 
@@ -176,30 +176,30 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_Absage_ohne_Text_wird_abgewiesen()
     {
-        var id = await Stelle();
+        var id = await Job();
         await Reiche_ein(id);
 
-        var antwort = await AlsFirma().PostAsJsonAsync(
+        var response = await AlsFirma().PostAsJsonAsync(
             Ziel($"/assessments/{id}/evaluation"),
             new Dictionary<string, object?> { ["outcome"] = "rejected" });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        // Und der Vorgang steht unveraendert da: eine halb geschriebene Absage
+        // Und der Case steht unveraendert da: eine halb geschriebene Absage
         // waere schlimmer als keine.
         (await Json(await AlsPerson(Anna).GetAsync(Ziel($"/assessments/{id}"))))
             .GetProperty("state").GetString().Should().Be("submitted");
     }
 
-    /// <summary>Nach einem Widerruf liest die Person weiter, das Unternehmen nicht.</summary>
+    /// <summary>Nach einem Revocation liest die Person weiter, das Unternehmen nicht.</summary>
     [Fact]
     public async Task Nach_einem_Widerruf_liest_nur_noch_die_Person()
     {
-        var id = await Stelle();
+        var id = await Job();
         await Reiche_ein(id);
         await Bewerte(id, "rejected", "Zu knapp an der Aufgabe vorbei.");
 
-        _tor.Stelle(Anna, Firma, false);
+        _tor.Job(Anna, Firma, false);
 
         var ihrs = await AlsPerson(Anna).GetAsync(Ziel($"/assessments/{id}"));
         ihrs.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -210,22 +210,22 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
         (await AlsFirma().GetAsync(Ziel($"/assessments/{id}"))).StatusCode
             .Should().Be(HttpStatusCode.NotFound);
 
-        var liste = await Json(await AlsFirma().GetAsync(Ziel("/assessments")));
-        liste.GetProperty("items").GetArrayLength().Should().Be(0);
+        var list = await Json(await AlsFirma().GetAsync(Ziel("/assessments")));
+        list.GetProperty("items").GetArrayLength().Should().Be(0);
 
         // Und keine Gesamtzahl daneben, die die Differenz verriete (ADR-0026).
-        liste.TryGetProperty("total", out _).Should().BeFalse();
+        list.TryGetProperty("total", out _).Should().BeFalse();
     }
 
-    /// <summary>Ohne Freigabe gibt es nichts — dieselbe 404 wie für einen Unbekannten.</summary>
+    /// <summary>Ohne Release gibt es nichts — dieselbe 404 wie für einen Unbekannten.</summary>
     [Fact]
     public async Task Ohne_Freigabe_entsteht_keine_Aufgabe()
     {
-        _tor.Stelle(Anna, Firma, false);
+        _tor.Job(Anna, Firma, false);
 
-        var antwort = await AlsFirma().PostAsJsonAsync(Ziel("/assessments"), Aufgabe(Anna));
+        var response = await AlsFirma().PostAsJsonAsync(Ziel("/assessments"), Aufgabe(Anna));
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         // Und fuer eine Kennung, die es gar nicht gibt, dasselbe.
         (await AlsFirma().PostAsJsonAsync(Ziel("/assessments"), Aufgabe(Guid.NewGuid())))
@@ -241,7 +241,7 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Der_Ledger_steht_vor_der_Rumpfpruefung()
     {
-        _tor.Stelle(Anna, Firma, false);
+        _tor.Job(Anna, Firma, false);
 
         var kaputt = Aufgabe(Anna);
         kaputt["hours"] = 99;
@@ -261,9 +261,9 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
         var koerper = Aufgabe(Anna);
         koerper["hours"] = stunden;
 
-        var antwort = await AlsFirma().PostAsJsonAsync(Ziel("/assessments"), koerper);
+        var response = await AlsFirma().PostAsJsonAsync(Ziel("/assessments"), koerper);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     /// <summary>Und ganz ohne Umfang gibt es keine Aufgabe.</summary>
@@ -277,10 +277,10 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
         var koerper = Aufgabe(Anna);
         koerper.Remove("hours");
 
-        var antwort = await AlsFirma().PostAsJsonAsync(Ziel("/assessments"), koerper);
+        var response = await AlsFirma().PostAsJsonAsync(Ziel("/assessments"), koerper);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        (await Json(antwort)).GetProperty("detail").GetString().Should().Contain("hours");
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await Json(response)).GetProperty("detail").GetString().Should().Contain("hours");
     }
 
     /// <summary>Wer für sich selbst handelt, stellt keine Aufgaben.</summary>
@@ -296,11 +296,11 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    /// <summary>Ein fremder Vorgang antwortet wie ein nicht vorhandener.</summary>
+    /// <summary>Ein fremder Case antwortet wie ein nicht vorhandener.</summary>
     [Fact]
     public async Task Ein_fremder_Vorgang_ist_nicht_vorhanden()
     {
-        var id = await Stelle();
+        var id = await Job();
 
         (await AlsPerson(Werber).GetAsync(Ziel($"/assessments/{id}")))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -319,7 +319,7 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_schweigender_Ledger_antwortet_503()
     {
-        await Stelle();
+        await Job();
         _tor.Schweigt = true;
 
         (await AlsFirma().GetAsync(Ziel("/assessments"))).StatusCode
@@ -334,7 +334,7 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eingereicht_und_bewertet_wird_je_einmal()
     {
-        var id = await Stelle();
+        var id = await Job();
         await Reiche_ein(id);
 
         (await AlsPerson(Anna).PostAsJsonAsync(
@@ -354,75 +354,75 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
             .StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
-    /// <summary>Die Aufgabe erzeugt einen Vermerk, die Bewertung auch.</summary>
+    /// <summary>Die Aufgabe erzeugt einen Vermerk, die Evaluation auch.</summary>
     /// <remarks>
     /// Zwei Vermerke, beide an die Person, beide inhaltsfrei: eine Kennung und
-    /// eine Art (ADR-0025). Kein Firmenname, kein Aufgabentext, keine Bewertung
-    /// — eine Mail kann im Postfach beim jetzigen Arbeitgeber landen.
+    /// eine Art (ADR-0025). Kein Firmenname, kein Aufgabentext, keine Evaluation
+    /// — eine Mail kann im Inbox beim jetzigen Arbeitgeber landen.
     /// </remarks>
     [Fact]
     public async Task Die_Person_wird_zweimal_in_Kenntnis_gesetzt()
     {
-        var id = await Stelle();
+        var id = await Job();
         await Reiche_ein(id);
         await Bewerte(id, "accepted", "Passt.");
 
-        await using var kontext = Kontext();
+        await using var context = Kontext();
 
-        var vermerke = await kontext.Set<OutboxZeile>().ToListAsync();
+        var vermerke = await context.Set<OutboxRow>().ToListAsync();
 
         vermerke.Should().HaveCount(2);
         vermerke.Should().OnlyContain(
-            zeile => zeile.UserId == Anna && zeile.Kind == "assessment_update");
+            row => row.UserId == Anna && row.Kind == "assessment_update");
     }
 
     /// <summary>Die Löschung nimmt Vorgänge und Vermerke — und behält nichts.</summary>
     /// <remarks>
-    /// Kein Aufbewahrungsfall, auch nicht für die Bewertung: sie ist kein Beleg,
+    /// Kein Aufbewahrungsfall, auch nicht für die Evaluation: sie ist kein Evidence,
     /// der jemand anderem gehört. Eine, die die Löschung überlebte, wäre das
-    /// Zeugnis, das ADR-0042 ausschliesst.
+    /// Reference, das ADR-0042 ausschliesst.
     /// </remarks>
     [Fact]
     public async Task Die_Loeschung_nimmt_Vorgaenge_und_Vermerke()
     {
-        var id = await Stelle();
+        var id = await Job();
         await Reiche_ein(id);
         await Bewerte(id, "rejected", "Leider nicht.");
 
         var client = _dienst.CreateClient();
         client.DefaultRequestHeaders.Add("X-Erasure-Secret", Loeschgeheimnis);
 
-        var antwort = await client.PostAsJsonAsync(
+        var response = await client.PostAsJsonAsync(
             Ziel("/erasure"), new Dictionary<string, object?> { ["user_id"] = Anna });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(antwort)).GetProperty("retained").GetInt32().Should().Be(0);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(response)).GetProperty("retained").GetInt32().Should().Be(0);
 
-        await using var kontext = Kontext();
+        await using var context = Kontext();
 
-        (await kontext.Vorgaenge.CountAsync()).Should().Be(0);
-        (await kontext.Set<OutboxZeile>().CountAsync()).Should().Be(0);
+        (await context.Vorgaenge.CountAsync()).Should().Be(0);
+        (await context.Set<OutboxRow>().CountAsync()).Should().Be(0);
     }
 
     /// <summary>Ohne das Geheimnis löscht niemand.</summary>
     [Fact]
     public async Task Ohne_Geheimnis_loescht_niemand()
     {
-        await Stelle();
+        await Job();
 
-        var antwort = await _dienst.CreateClient().PostAsJsonAsync(
+        var response = await _dienst.CreateClient().PostAsJsonAsync(
             Ziel("/erasure"), new Dictionary<string, object?> { ["user_id"] = Anna });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        await using var kontext = Kontext();
+        await using var context = Kontext();
 
-        (await kontext.Vorgaenge.CountAsync()).Should().Be(1);
+        (await context.Vorgaenge.CountAsync()).Should().Be(1);
     }
 
     // ---------------------------------------------------------------------
 
-    private static Uri Ziel(string pfad) => new(pfad, UriKind.Relative);
+    private static Uri Ziel(string path) => new(path, UriKind.Relative);
 
     private static string Verben(RouteEndpoint endpunkt) =>
         string.Join(
@@ -430,22 +430,22 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
             endpunkt.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()
                 ?.HttpMethods ?? ["?"]);
 
-    private static Dictionary<string, object?> Aufgabe(Guid wer) => new()
+    private static Dictionary<string, object?> Aufgabe(Guid subject) => new()
     {
-        ["subject_id"] = wer,
+        ["subject_id"] = subject,
         ["title"] = "Kleiner Dienst",
         ["task"] = "Bau einen kleinen Dienst, der eine Liste ausliefert.",
         ["hours"] = 4,
         ["due_at"] = DateTimeOffset.UtcNow.AddDays(7)
     };
 
-    private async Task<Guid> Stelle()
+    private async Task<Guid> Job()
     {
-        var antwort = await AlsFirma().PostAsJsonAsync(Ziel("/assessments"), Aufgabe(Anna));
+        var response = await AlsFirma().PostAsJsonAsync(Ziel("/assessments"), Aufgabe(Anna));
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        return (await Json(antwort)).GetProperty("id").GetGuid();
+        return (await Json(response)).GetProperty("id").GetGuid();
     }
 
     private async Task Reiche_ein(Guid id) =>
@@ -460,7 +460,7 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
             new Dictionary<string, object?> { ["outcome"] = ausgang, ["text"] = text }))
         .EnsureSuccessStatusCode();
 
-    private HttpClient AlsPerson(Guid wer) => Mit(Tokenform.Person(wer));
+    private HttpClient AlsPerson(Guid subject) => Mit(Tokenform.Person(subject));
 
     private HttpClient AlsFirma() => Mit(Tokenform.Firma(Werber, Firma));
 
@@ -474,11 +474,11 @@ public class ArbeitsprobenreiseTests(Postgres postgres) : IAsyncLifetime
         return client;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
-    private static Task<string> Roh(HttpResponseMessage antwort) =>
-        antwort.Content.ReadAsStringAsync();
+    private static Task<string> Roh(HttpResponseMessage response) =>
+        response.Content.ReadAsStringAsync();
 
     private AssessmentDbContext Kontext()
     {

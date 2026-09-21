@@ -12,10 +12,10 @@ namespace WorkerTransfer.Resume.Application.Ports;
 /// </param>
 public sealed record Erkanntes(bool TextGefunden, string Text);
 
-/// <summary>Liest Text aus den Bytes einer Unterlage.</summary>
+/// <summary>Liest Text aus den Bytes einer DocumentRecord.</summary>
 /// <remarks>
 /// <strong>Ein Port, damit die Entscheidung „welcher Texterkenner" eine
-/// Entscheidung bleibt</strong> — dieselbe Naht wie <c>IEntwerfer</c> bei der
+/// Entscheidung bleibt</strong> — dieselbe Naht wie <c>IDrafter</c> bei der
 /// KI (ADR-0024). Die heutige Umsetzung ist eine Bibliothek im Prozess und ruft
 /// niemanden an; wer das je ändert, ändert sichtbar die Registrierung im
 /// Kompositionswurzel und muss das Ziel in die Konfiguration schreiben, sonst
@@ -32,5 +32,5 @@ public interface ITexterkennung
     /// <summary>Liest. Wirft nicht: eine unlesbare Datei ist kein Fehler, sondern leer.</summary>
     /// <param name="inhalt">Die Bytes.</param>
     /// <param name="inhaltstyp">Der Typ, wie die Signaturprüfung ihn ergab.</param>
-    Erkanntes Lies(ReadOnlyMemory<byte> inhalt, string inhaltstyp);
+    Erkanntes Lies(ReadOnlyMemory<byte> content, string inhaltstyp);
 }

@@ -16,7 +16,7 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Advisor.Tests;
 
-/// <summary>Das Mandat, drei Stufen, eine Einigung — und gelöscht werden.</summary>
+/// <summary>Das Mandate, drei Stufen, eine Einigung — und gelöscht werden.</summary>
 /// <remarks>
 /// Die Reihe geht den ganzen Weg über den Draht, weil zwischen einem Handler
 /// und dem, was ein Browser bekommt, noch die Einstellungen, die Verdrahtung
@@ -56,17 +56,17 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:advisor", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _tor));
-                dienste.Replace(ServiceDescriptor.Scoped<IFirmenauskunft>(_ => _firmen));
-                dienste.Replace(ServiceDescriptor.Scoped<IPersonenauskunft>(_ => _personen));
-                dienste.Replace(ServiceDescriptor.Scoped<IVorgangsuebergabe>(_ => _uebergabe));
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _tor));
+                services.Replace(ServiceDescriptor.Scoped<ICompanyLookup>(_ => _firmen));
+                services.Replace(ServiceDescriptor.Scoped<IPersonenauskunft>(_ => _personen));
+                services.Replace(ServiceDescriptor.Scoped<ICaseHandover>(_ => _uebergabe));
             });
         });
     }
@@ -78,10 +78,10 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     // ---------------------------------------------------------------------
-    // Das Mandat
+    // Das Mandate
     // ---------------------------------------------------------------------
 
-    /// <summary>Ein leeres Mandat ist vollständig — und antwortet 200, nicht 404.</summary>
+    /// <summary>Ein leeres Mandate ist vollständig — und antwortet 200, nicht 404.</summary>
     /// <remarks>
     /// „Nichts gesagt" IST ein Zustand. Ein 404 zwänge die Oberfläche, sich eine
     /// Vorgabe auszudenken, und die Gefahr ist, dass sie sich die falsche
@@ -90,14 +90,14 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Wer_nichts_gesagt_hat_bekommt_ein_leeres_Mandat()
     {
-        var antwort = await AlsPerson(Anna).GetAsync(Ziel("/advisor/me/mandate"));
+        var response = await AlsPerson(Anna).GetAsync(Ziel("/advisor/me/mandate"));
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var mandat = await Json(antwort);
+        var mandate = await Json(response);
 
-        mandat.GetProperty("entry_month").ValueKind.Should().Be(JsonValueKind.Null);
-        mandat.GetProperty("excluded_domains").GetArrayLength().Should().Be(0);
+        mandate.GetProperty("entry_month").ValueKind.Should().Be(JsonValueKind.Null);
+        mandate.GetProperty("excluded_domains").GetArrayLength().Should().Be(0);
     }
 
     /// <summary>Die vier Werte reisen hin und zurück — in snake_case.</summary>
@@ -139,25 +139,25 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
     [Theory]
     [InlineData("workload_percent", 5)]
     [InlineData("workload_percent", 120)]
-    public async Task Ein_unmoegliches_Pensum_wird_abgesagt(string feld, int wert)
+    public async Task Ein_unmoegliches_Pensum_wird_abgesagt(string field, int value)
     {
-        var antwort = await AlsPerson(Anna).PutAsJsonAsync(
+        var response = await AlsPerson(Anna).PutAsJsonAsync(
             Ziel("/advisor/me/mandate"),
-            new Dictionary<string, object?> { [feld] = wert });
+            new Dictionary<string, object?> { [field] = value });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
         // Die REGEL, nie der Wert: ein Gehalt oder ein Pensum in einer Meldung
         // stuende am Ende im Protokoll.
-        (await Json(antwort)).GetProperty("detail").GetString()
-            .Should().NotContain(wert.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        (await Json(response)).GetProperty("detail").GetString()
+            .Should().NotContain(value.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
     // ---------------------------------------------------------------------
     // Die drei Stufen
     // ---------------------------------------------------------------------
 
-    /// <summary>Eröffnen darf nur, wer für eine Firma handelt — und nur bei Freigabe.</summary>
+    /// <summary>Eröffnen darf nur, wer für eine Firma handelt — und nur bei Release.</summary>
     [Fact]
     public async Task Eroeffnen_darf_nur_eine_Firma_mit_Freigabe()
     {
@@ -174,7 +174,7 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
             Ziel("/advisor/conversations"), Eroeffnung());
         ohneFreigabe.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        _tor.Stelle(Anna, Firma, Stufe.Profil);
+        _tor.Job(Anna, Firma, Stufe.Profile);
 
         var mitFreigabe = await AlsFirma().PostAsJsonAsync(
             Ziel("/advisor/conversations"), Eroeffnung());
@@ -184,30 +184,30 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
     /// <summary>Die Person erfährt davon — inhaltsfrei, über den Postausgang.</summary>
     /// <remarks>
     /// Eine Kennung und eine Art, mehr passt nicht hinein (ADR-0025). Kein
-    /// Firmenname: eine Mail landet in einem Postfach, und dieses Postfach kann
+    /// Firmenname: eine Mail landet in einem Inbox, und dieses Inbox kann
     /// das des jetzigen Arbeitgebers sein.
     /// </remarks>
     [Fact]
     public async Task Ein_eroeffnetes_Gespraech_hinterlaesst_einen_Vermerk()
     {
-        _tor.Stelle(Anna, Firma, Stufe.Profil);
+        _tor.Job(Anna, Firma, Stufe.Profile);
 
         await AlsFirma().PostAsJsonAsync(Ziel("/advisor/conversations"), Eroeffnung());
 
-        await using var kontext = Kontext();
+        await using var context = Kontext();
 
-        var zeilen = await kontext.Set<OutboxZeile>().ToListAsync();
+        var rows = await context.Set<OutboxRow>().ToListAsync();
 
-        zeilen.Should().ContainSingle()
-            .Which.Should().Match<OutboxZeile>(
-                zeile => zeile.UserId == Anna && zeile.Kind == "advisor_conversation");
+        rows.Should().ContainSingle()
+            .Which.Should().Match<OutboxRow>(
+                row => row.UserId == Anna && row.Kind == "advisor_conversation");
     }
 
     /// <summary>Ein zweites Eröffnen legt kein zweites Gespräch an.</summary>
     [Fact]
     public async Task Ein_zweites_Eroeffnen_gibt_dasselbe_Gespraech()
     {
-        _tor.Stelle(Anna, Firma, Stufe.Profil);
+        _tor.Job(Anna, Firma, Stufe.Profile);
 
         var erstes = await AlsFirma().PostAsJsonAsync(
             Ziel("/advisor/conversations"), Eroeffnung());
@@ -234,35 +234,35 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Jede_Stufe_zeigt_genau_das_was_freigegeben_ist()
     {
-        await Mandat();
+        await Mandate();
         _personen.Bestand[Anna] = new Personenbild("Anna Beispiel", "anna@beispiel.test");
-        _tor.Stelle(Anna, Firma, Stufe.Profil);
+        _tor.Job(Anna, Firma, Stufe.Profile);
 
-        var gespraech = await Eroeffne();
+        var conversation = await Eroeffne();
 
-        var stufe1 = await Roh(await AlsFirma().GetAsync(Ziel($"/advisor/conversations/{gespraech}")));
+        var stufe1 = await Roh(await AlsFirma().GetAsync(Ziel($"/advisor/conversations/{conversation}")));
         stufe1.Should().Contain("\"entry_month\"");
         stufe1.Should().NotContain("salary_min");
         stufe1.Should().NotContain("\"name\"");
 
         await AlsPerson(Anna).PostAsJsonAsync(
-            Ziel($"/advisor/me/conversations/{gespraech}/advance"),
+            Ziel($"/advisor/me/conversations/{conversation}/advance"),
             new Dictionary<string, object?> { ["stage"] = 2 });
 
-        var stufe2 = await Roh(await AlsFirma().GetAsync(Ziel($"/advisor/conversations/{gespraech}")));
+        var stufe2 = await Roh(await AlsFirma().GetAsync(Ziel($"/advisor/conversations/{conversation}")));
         stufe2.Should().Contain("\"salary_min\"");
         stufe2.Should().NotContain("\"name\"");
 
         await AlsPerson(Anna).PostAsJsonAsync(
-            Ziel($"/advisor/me/conversations/{gespraech}/advance"),
+            Ziel($"/advisor/me/conversations/{conversation}/advance"),
             new Dictionary<string, object?> { ["stage"] = 3 });
 
-        var stufe3 = await Roh(await AlsFirma().GetAsync(Ziel($"/advisor/conversations/{gespraech}")));
+        var stufe3 = await Roh(await AlsFirma().GetAsync(Ziel($"/advisor/conversations/{conversation}")));
         stufe3.Should().Contain("\"name\"");
         stufe3.Should().Contain("anna@beispiel.test");
     }
 
-    /// <summary>Ein Widerruf wirkt bei der nächsten Anfrage — und zwar ganz.</summary>
+    /// <summary>Ein Revocation wirkt bei der nächsten ResumeRequest — und zwar ganz.</summary>
     /// <remarks>
     /// Auf Stufe 0 fällt das Gespräch aus der Liste des Unternehmens und
     /// antwortet auf direktem Weg 404. Eine leere Zeile darin wäre der
@@ -272,27 +272,27 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_Widerruf_wirkt_bei_der_naechsten_Anfrage()
     {
-        _tor.Stelle(Anna, Firma, Stufe.Person);
+        _tor.Job(Anna, Firma, Stufe.Person);
 
-        var gespraech = await Eroeffne();
+        var conversation = await Eroeffne();
 
-        (await AlsFirma().GetAsync(Ziel($"/advisor/conversations/{gespraech}")))
+        (await AlsFirma().GetAsync(Ziel($"/advisor/conversations/{conversation}")))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
         var zurueck = await AlsPerson(Anna).PostAsJsonAsync(
-            Ziel($"/advisor/me/conversations/{gespraech}/withdraw"),
+            Ziel($"/advisor/me/conversations/{conversation}/withdraw"),
             new Dictionary<string, object?> { ["stage"] = 1 });
 
         zurueck.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(zurueck)).GetProperty("stage").GetInt32().Should().Be(0);
 
-        (await AlsFirma().GetAsync(Ziel($"/advisor/conversations/{gespraech}")))
+        (await AlsFirma().GetAsync(Ziel($"/advisor/conversations/{conversation}")))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        var liste = await Json(await AlsFirma().GetAsync(Ziel("/advisor/conversations")));
-        liste.GetProperty("items").GetArrayLength().Should().Be(0);
+        var list = await Json(await AlsFirma().GetAsync(Ziel("/advisor/conversations")));
+        list.GetProperty("items").GetArrayLength().Should().Be(0);
 
-        // Die Person behaelt es und kann wieder freigeben — ein Widerruf, der
+        // Die Person behaelt es und kann wieder freigeben — ein Revocation, der
         // die Zeile mit wegnaehme, waere eine Einbahnstrasse.
         var meine = await Json(await AlsPerson(Anna).GetAsync(Ziel("/advisor/me/conversations")));
         meine.GetProperty("items").GetArrayLength().Should().Be(1);
@@ -303,30 +303,30 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Fremde_Gespraeche_gibt_es_nicht()
     {
-        _tor.Stelle(Anna, Firma, Stufe.Profil);
+        _tor.Job(Anna, Firma, Stufe.Profile);
 
-        var gespraech = await Eroeffne();
+        var conversation = await Eroeffne();
 
-        var antwort = await AlsPerson(Werber).PostAsJsonAsync(
-            Ziel($"/advisor/me/conversations/{gespraech}/advance"),
+        var response = await AlsPerson(Werber).PostAsJsonAsync(
+            Ziel($"/advisor/me/conversations/{conversation}/advance"),
             new Dictionary<string, object?> { ["stage"] = 1 });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>Ein schweigender Ledger ist weder ein Ja noch ein Nein: 503.</summary>
     [Fact]
     public async Task Ein_schweigender_Ledger_gibt_503()
     {
-        _tor.Stelle(Anna, Firma, Stufe.Profil);
+        _tor.Job(Anna, Firma, Stufe.Profile);
         await Eroeffne();
 
         _tor.Schweigt = true;
 
-        var antwort = await AlsFirma().GetAsync(Ziel("/advisor/conversations"));
+        var response = await AlsFirma().GetAsync(Ziel("/advisor/conversations"));
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
-        (await Json(antwort)).GetProperty("correlationId").GetString()
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await Json(response)).GetProperty("correlationId").GetString()
             .Should().NotBeNullOrEmpty();
     }
 
@@ -360,55 +360,55 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
         geschrieben.StatusCode.Should().Be(HttpStatusCode.OK);
 
         _tor.Widerrufe.Should().ContainSingle()
-            .Which.Should().Be(Stufenfaehigkeiten.ProfilOeffentlich);
+            .Which.Should().Be(StageCapabilities.ProfilOeffentlich);
 
-        // Auch mit einer eigenen Freigabe kommt dieses Unternehmen nicht
+        // Auch mit einer eigenen Release kommt dieses Unternehmen nicht
         // hinein: der Ausschluss ist das ausdrueckliche Veto der Person.
-        _tor.Stelle(Anna, Firma, Stufe.Profil);
+        _tor.Job(Anna, Firma, Stufe.Profile);
 
-        var antwort = await AlsFirma().PostAsJsonAsync(
+        var response = await AlsFirma().PostAsJsonAsync(
             Ziel("/advisor/conversations"), Eroeffnung());
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     // ---------------------------------------------------------------------
     // Die Einigung
     // ---------------------------------------------------------------------
 
-    /// <summary>Zustimmen, übergeben — und der Vorgang entsteht anderswo.</summary>
+    /// <summary>Zustimmen, übergeben — und der Case entsteht anderswo.</summary>
     [Fact]
     public async Task Eine_Einigung_wird_ein_Vorgang()
     {
-        _tor.Stelle(Anna, Firma, Stufe.Person);
+        _tor.Job(Anna, Firma, Stufe.Person);
 
-        var gespraech = await Eroeffne();
+        var conversation = await Eroeffne();
 
         var zuFrueh = await AlsFirma().PostAsync(
-            Ziel($"/advisor/conversations/{gespraech}/hand-over"), null);
+            Ziel($"/advisor/conversations/{conversation}/hand-over"), null);
         zuFrueh.StatusCode.Should().Be(HttpStatusCode.Conflict);
 
         var zustimmung = await AlsPerson(Anna).PostAsync(
-            Ziel($"/advisor/me/conversations/{gespraech}/agree"), null);
+            Ziel($"/advisor/me/conversations/{conversation}/agree"), null);
         zustimmung.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var nachDerZustimmung = await Json(zustimmung);
         nachDerZustimmung.GetProperty("state").GetString().Should().Be("agreed");
 
         // UND DIE STUFE STEHT RICHTIG DARIN. Hier stand einmal 0 — der Endpunkt
-        // baute die Antwort mit `Stufe.Keine`, weil dieser Schritt die Stufe
+        // baute die Antwort mit `Stufe.None`, weil dieser Schritt die Stufe
         // nicht aendert. Die Antwort behauptete damit „nichts freigegeben",
         // unmittelbar nachdem jemand zugestimmt hatte. Sichtbar war es nicht,
         // weil die Seite danach ohnehin neu laedt — eine Antwort, die luegt und
         // die niemand liest, ist die, der spaeter jemand glaubt.
         nachDerZustimmung.GetProperty("stage").GetInt32().Should().Be(3);
 
-        var uebergabe = await AlsFirma().PostAsync(
-            Ziel($"/advisor/conversations/{gespraech}/hand-over"), null);
-        uebergabe.StatusCode.Should().Be(HttpStatusCode.OK);
+        var handover = await AlsFirma().PostAsync(
+            Ziel($"/advisor/conversations/{conversation}/hand-over"), null);
+        handover.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        (await Json(uebergabe)).GetProperty("transfer_id").GetGuid()
-            .Should().Be(_uebergabe.Vorgang);
+        (await Json(handover)).GetProperty("transfer_id").GetGuid()
+            .Should().Be(_uebergabe.Case);
 
         _uebergabe.Uebergeben.Should().Equal(Anna);
     }
@@ -423,30 +423,30 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_abgelehnte_Uebergabe_ist_409()
     {
-        _tor.Stelle(Anna, Firma, Stufe.Person);
+        _tor.Job(Anna, Firma, Stufe.Person);
         _uebergabe.LehntAb = true;
 
-        var gespraech = await Eroeffne();
+        var conversation = await Eroeffne();
 
         await AlsPerson(Anna).PostAsync(
-            Ziel($"/advisor/me/conversations/{gespraech}/agree"), null);
+            Ziel($"/advisor/me/conversations/{conversation}/agree"), null);
 
-        var antwort = await AlsFirma().PostAsync(
-            Ziel($"/advisor/conversations/{gespraech}/hand-over"), null);
+        var response = await AlsFirma().PostAsync(
+            Ziel($"/advisor/conversations/{conversation}/hand-over"), null);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     /// <summary>Beide Seiten dürfen beenden.</summary>
     [Fact]
     public async Task Beide_Seiten_duerfen_beenden()
     {
-        _tor.Stelle(Anna, Firma, Stufe.Profil);
+        _tor.Job(Anna, Firma, Stufe.Profile);
 
-        var gespraech = await Eroeffne();
+        var conversation = await Eroeffne();
 
         var beendet = await AlsPerson(Anna).PostAsync(
-            Ziel($"/advisor/me/conversations/{gespraech}/end"), null);
+            Ziel($"/advisor/me/conversations/{conversation}/end"), null);
 
         beendet.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -459,7 +459,7 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
         nachDemEnde.GetProperty("stage").GetInt32().Should().Be(1);
 
         var nochmal = await AlsFirma().PostAsync(
-            Ziel($"/advisor/conversations/{gespraech}/end"), null);
+            Ziel($"/advisor/conversations/{conversation}/end"), null);
 
         nochmal.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
@@ -472,46 +472,46 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_das_Geheimnis_loescht_niemand()
     {
-        var antwort = await _dienst.CreateClient().PostAsJsonAsync(
+        var response = await _dienst.CreateClient().PostAsJsonAsync(
             Ziel("/erasure"), new Dictionary<string, object?> { ["user_id"] = Anna });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    /// <summary>Mandat, Gespräche und Vermerke fallen gemeinsam.</summary>
+    /// <summary>Mandate, Gespräche und Vermerke fallen gemeinsam.</summary>
     /// <remarks>
-    /// Alle drei: wer nur die Gespräche löscht, hinterlässt das Mandat mit
+    /// Alle drei: wer nur die Gespräche löscht, hinterlässt das Mandate mit
     /// Eintrittstermin und Gehaltsspanne — und die Zusage aus ADR-0027 ist dann
     /// zur Hälfte eingelöst, ohne dass es jemandem auffällt.
     /// </remarks>
     [Fact]
     public async Task Die_Loeschung_nimmt_Mandat_Gespraeche_und_Vermerke()
     {
-        await Mandat();
-        _tor.Stelle(Anna, Firma, Stufe.Profil);
+        await Mandate();
+        _tor.Job(Anna, Firma, Stufe.Profile);
         await Eroeffne();
 
         var client = _dienst.CreateClient();
         client.DefaultRequestHeaders.Add("X-Erasure-Secret", Loeschgeheimnis);
 
-        var antwort = await client.PostAsJsonAsync(
+        var response = await client.PostAsJsonAsync(
             Ziel("/erasure"), new Dictionary<string, object?> { ["user_id"] = Anna });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Kein Aufbewahrungsfall: hier steht nichts, was jemand anderem gehoert.
-        (await Json(antwort)).GetProperty("retained").GetInt32().Should().Be(0);
+        (await Json(response)).GetProperty("retained").GetInt32().Should().Be(0);
 
-        await using var kontext = Kontext();
+        await using var context = Kontext();
 
-        (await kontext.Mandate.CountAsync()).Should().Be(0);
-        (await kontext.Gespraeche.CountAsync()).Should().Be(0);
-        (await kontext.Set<OutboxZeile>().CountAsync()).Should().Be(0);
+        (await context.Mandate.CountAsync()).Should().Be(0);
+        (await context.Gespraeche.CountAsync()).Should().Be(0);
+        (await context.Set<OutboxRow>().CountAsync()).Should().Be(0);
     }
 
     // ---------------------------------------------------------------------
 
-    private static Uri Ziel(string pfad) => new(pfad, UriKind.Relative);
+    private static Uri Ziel(string path) => new(path, UriKind.Relative);
 
     private static Dictionary<string, object?> Eroeffnung() => new()
     {
@@ -521,15 +521,15 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
 
     private async Task<Guid> Eroeffne()
     {
-        var antwort = await AlsFirma().PostAsJsonAsync(
+        var response = await AlsFirma().PostAsJsonAsync(
             Ziel("/advisor/conversations"), Eroeffnung());
 
-        antwort.EnsureSuccessStatusCode();
+        response.EnsureSuccessStatusCode();
 
-        return (await Json(antwort)).GetProperty("id").GetGuid();
+        return (await Json(response)).GetProperty("id").GetGuid();
     }
 
-    private async Task Mandat() =>
+    private async Task Mandate() =>
         (await AlsPerson(Anna).PutAsJsonAsync(
             Ziel("/advisor/me/mandate"),
             new Dictionary<string, object?>
@@ -540,7 +540,7 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
                 ["workload_percent"] = 80
             })).EnsureSuccessStatusCode();
 
-    private HttpClient AlsPerson(Guid wer) => Mit(Tokenform.Person(wer));
+    private HttpClient AlsPerson(Guid subject) => Mit(Tokenform.Person(subject));
 
     private HttpClient AlsFirma() => Mit(Tokenform.Firma(Werber, Firma));
 
@@ -554,11 +554,11 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
         return client;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
-    private static Task<string> Roh(HttpResponseMessage antwort) =>
-        antwort.Content.ReadAsStringAsync();
+    private static Task<string> Roh(HttpResponseMessage response) =>
+        response.Content.ReadAsStringAsync();
 
     private AdvisorDbContext Kontext()
     {

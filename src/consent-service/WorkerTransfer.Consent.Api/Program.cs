@@ -3,15 +3,15 @@ using WorkerTransfer.Consent.Infrastructure;
 using WorkerTransfer.Consent.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
-// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
+// Konfiguration aus der EnvironmentFile. VOR CreateBuilder, weil der
 // Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
 // geladen hiesse geladen und von niemandem gelesen.
-WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 const string serviceName = "consent-service";
 
-// No AlsAussteller(): only identity-service holds the private half of the key.
+// No AsIssuer(): only identity-service holds the private half of the key.
 // This service verifies tokens and mints none.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName);
@@ -24,7 +24,7 @@ builder.Services.AddConsentInfrastructure(
 var app = builder.Build();
 
 // Erst wandern, dann bedienen (ADR-0010).
-await app.WandereAsync<ConsentDbContext>();
+await app.MigrateSchemaAsync<ConsentDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 

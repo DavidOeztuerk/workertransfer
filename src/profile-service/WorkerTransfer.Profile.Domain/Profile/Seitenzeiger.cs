@@ -10,35 +10,35 @@ namespace WorkerTransfer.Profile.Domain.Profile;
 /// <param name="Wer">Deren Person.</param>
 /// <remarks>
 /// Beide Sortierschlüssel, und das ist der ganze Punkt: <c>GeaendertAm</c>
-/// allein reicht nicht, weil zwei Profile in derselben Sekunde sich beim
+/// allein reicht nicht, weil zwei PersonProfile in derselben Sekunde sich beim
 /// Blättern gegenseitig überspringen oder doppelt erscheinen würden.
 /// <para>
-/// Ein Zeiger und kein Seitenversatz (<c>OFFSET</c>): der Versatz verschiebt
-/// sich, sobald jemand zwischen zwei Seitenaufrufen sein Profil ändert — und
+/// Ein Cursor und kein Seitenversatz (<c>OFFSET</c>): der Versatz verschiebt
+/// sich, sobald jemand zwischen zwei Seitenaufrufen sein PersonProfile ändert — und
 /// hier ändert der Zeitstempel die Sortierung, also passiert genau das
 /// dauernd.
 /// </para>
 /// </remarks>
-public sealed record Seitenzeiger(DateTimeOffset GeaendertAm, SubjectId Wer)
+public sealed record PageCursor(DateTimeOffset GeaendertAm, SubjectId Wer)
 {
     /// <summary>Die Textform, wie sie in der URL steht.</summary>
     /// <remarks>
     /// Base64 nicht als Verschlüsselung — sie ist keine — sondern als Zeichen an
     /// den Aufrufer, dass die Form uns gehört und sich ändern darf.
     /// </remarks>
-    public string Schreibe() =>
+    public string Write() =>
         Convert.ToBase64String(Encoding.UTF8.GetBytes(
             $"{GeaendertAm.ToString("O", CultureInfo.InvariantCulture)}|{Wer.Value}"));
 
     /// <summary>Liest die Textform zurück — oder gibt <c>null</c>.</summary>
     /// <remarks>
-    /// Ein unlesbarer Zeiger ist kein Fehler, sondern der Anfang. Er kommt aus
+    /// Ein unlesbarer Cursor ist kein Fehler, sondern der Anfang. Er kommt aus
     /// einer URL und wird kopiert, gekürzt und weitergereicht; darauf mit einem
     /// 400 zu antworten hilft niemandem und macht einen geteilten Link zu einer
     /// Fehlermeldung.
     /// </remarks>
-    /// <param name="text">Was in der Anfrage stand.</param>
-    public static Seitenzeiger? Lies(string? text)
+    /// <param name="text">Was in der ResumeRequest stand.</param>
+    public static PageCursor? Lies(string? text)
     {
         if (string.IsNullOrEmpty(text))
         {
@@ -63,8 +63,8 @@ public sealed record Seitenzeiger(DateTimeOffset GeaendertAm, SubjectId Wer)
         return DateTimeOffset.TryParse(
                    roh[..trenner], CultureInfo.InvariantCulture,
                    DateTimeStyles.RoundtripKind, out var stempel)
-               && Guid.TryParse(roh[(trenner + 1)..], out var wer)
-            ? new Seitenzeiger(stempel, new SubjectId(wer))
+               && Guid.TryParse(roh[(trenner + 1)..], out var subject)
+            ? new PageCursor(stempel, new SubjectId(subject))
             : null;
     }
 }

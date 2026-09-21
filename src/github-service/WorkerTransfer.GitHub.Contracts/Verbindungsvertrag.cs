@@ -24,13 +24,13 @@ public sealed record RepositoryV1(
     /// <summary>Die Topics, die der Besitzer selbst gesetzt hat.</summary>
     [property: JsonPropertyName("topics")] IReadOnlyList<string> Topics);
 
-/// <summary>Eine Verbindung, wie sie gelesen wird.</summary>
+/// <summary>Eine Connection, wie sie gelesen wird.</summary>
 /// <remarks>
 /// Kein Punktwert, kein Rang, keine abgeleitete Fähigkeit. Was hier steht, ist
 /// eine Liste von Belegen mit Links — wer wissen will, ob der Code gut ist,
 /// klickt darauf.
 /// </remarks>
-public sealed record VerbindungV1(
+public sealed record ConnectionV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     /// <summary><c>null</c>: noch kein Konto genannt.</summary>
     /// <remarks>
@@ -69,7 +69,7 @@ public sealed record VerbindungV1(
 /// einen Knopf zeigen, der ins Leere führt, oder die Gist-Anleitung auch dort,
 /// wo ein Knopf genügt.
 /// </remarks>
-public sealed record AnmeldungMoeglichV1(
+public sealed record SignInPossibleV1(
     [property: JsonPropertyName("available")] bool Available);
 
 public sealed record AnmeldebeginnV1(
@@ -78,16 +78,16 @@ public sealed record AnmeldebeginnV1(
 /// <summary>Was aus GitHubs Rücksprung zurückkommt.</summary>
 /// <remarks>
 /// <c>state</c> ist die Einmalzeichenfolge, die wir mitgegeben haben. Sie muss
-/// zurückgereicht werden: sie beweist, dass diese Antwort zu unserer Anfrage
+/// zurückgereicht werden: sie beweist, dass diese Antwort zu unserer ResumeRequest
 /// gehört und nicht zu einer untergeschobenen.
 /// </remarks>
-public sealed record AnmeldungAbschliessenV1(
+public sealed record CompleteSignInV1(
     [property: JsonPropertyName("code")] string Code,
     [property: JsonPropertyName("state")] string State);
 
 /// <summary>Was eine Person schickt, um ein Konto zu beanspruchen.</summary>
 /// <remarks>
-/// Ohne <c>subject_id</c>: wessen Verbindung es ist, steht im geprüften Token.
+/// Ohne <c>subject_id</c>: wessen Connection es ist, steht im geprüften Token.
 /// </remarks>
-public sealed record VerbindenV1(
+public sealed record ConnectV1(
     [property: JsonPropertyName("login")] string Login);

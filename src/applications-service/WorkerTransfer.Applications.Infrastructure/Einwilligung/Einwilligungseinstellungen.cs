@@ -1,10 +1,10 @@
 namespace WorkerTransfer.Applications.Infrastructure.Einwilligung;
 
 /// <summary>Wo der Consent-Ledger antwortet.</summary>
-public sealed class Einwilligungseinstellungen
+public sealed class ConsentSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Consent";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Consent";
 
     /// <summary>Die Basisadresse des Ledgers.</summary>
     public string Adresse { get; set; } = string.Empty;

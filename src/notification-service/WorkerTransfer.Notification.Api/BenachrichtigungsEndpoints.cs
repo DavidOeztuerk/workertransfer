@@ -10,10 +10,10 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Notification.Api;
 
-/// <summary>Der Diensteingang, das Postfach und die vier Schalter.</summary>
+/// <summary>Der Diensteingang, das Inbox und die vier Schalter.</summary>
 public static class BenachrichtigungsEndpoints
 {
-    /// <summary>Der Kopf, den ein Dienst mitschickt.</summary>
+    /// <summary>Der Header, den ein Dienst mitschickt.</summary>
     /// <remarks>
     /// Ein Browser kann ihn nicht setzen, ohne das Geheimnis zu kennen, und er
     /// kennt es nicht.
@@ -48,34 +48,34 @@ public static class BenachrichtigungsEndpoints
             BenachrichtigenV1 body,
             IMediator mediator,
             IPostbote postbote,
-            IOptions<Posteinstellungen> einstellungen,
+            IOptions<MailSettings> einstellungen,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
             if (!DarfMelden(context, einstellungen.Value))
             {
                 // 404 statt 401: ein 401 bestätigt, dass es den Endpunkt gibt.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
                 return;
             }
 
             ArgumentNullException.ThrowIfNull(body);
 
-            if (Benachrichtigungsarten.Lies(body.Kind) is not { } art)
+            if (Benachrichtigungsarten.Lies(body.Kind) is not { } kind)
             {
                 // Eine Art, die es nicht gibt, ist ein Fehler des Aufrufers und
-                // keine Aussage über die Person — die einzige Stelle, an der
+                // keine Aussage über die Person — die einzige Job, an der
                 // dieser Endpunkt etwas anderes als 202 antwortet.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "That is not a notification kind");
                 return;
             }
 
-            var wer = new SubjectId(body.UserId);
+            var subject = new SubjectId(body.UserId);
             var gesendet = await mediator.Send(
-                new BenachrichtigenBefehl(wer, art), cancellationToken);
+                new BenachrichtigenBefehl(subject, kind), cancellationToken);
 
             context.Response.StatusCode = StatusCodes.Status202Accepted;
 
@@ -84,7 +84,7 @@ public static class BenachrichtigungsEndpoints
                 // NACH dem Befehl und damit nach dem Commit: vorher zu bitten
                 // hieße, über etwas zu benachrichtigen, das gleich
                 // zurückgerollt wird. Der Postbote wirft nicht.
-                await postbote.SchickeAsync(wer, cancellationToken);
+                await postbote.SendAsync(subject, cancellationToken);
             }
         });
 
@@ -102,11 +102,11 @@ public static class BenachrichtigungsEndpoints
                 return;
             }
 
-            // Wessen Postfach, steht im geprüften Token. Es gibt keine Route
+            // Wessen Inbox, steht im geprüften Token. Es gibt keine Route
             // mit einer Kennung im Pfad: die wäre ein Orakel darüber, ob und
             // wie oft jemandem etwas passiert.
             var eingaenge = await mediator.Send(
-                new MeinPostfachAbfrage(handelnder.Subject), cancellationToken);
+                new MyInboxQuery(handelnder.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
                 eingaenge.Select(Antwort), cancellationToken);
@@ -142,10 +142,10 @@ public static class BenachrichtigungsEndpoints
                 return;
             }
 
-            var wunsch = await mediator.Send(
-                new MeineWuenscheAbfrage(handelnder.Subject), cancellationToken);
+            var preference = await mediator.Send(
+                new MyPreferencesQuery(handelnder.Subject), cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(Antwort(wunsch), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Antwort(preference), cancellationToken);
         });
 
         app.MapPut("/me/notification-preferences", async (
@@ -163,7 +163,7 @@ public static class BenachrichtigungsEndpoints
 
             ArgumentNullException.ThrowIfNull(body);
 
-            var wunsch = await mediator.Send(
+            var preference = await mediator.Send(
                 new WuenscheSchreibenBefehl(
                     handelnder.Subject,
                     new Dictionary<Benachrichtigungsart, bool>
@@ -179,19 +179,19 @@ public static class BenachrichtigungsEndpoints
                     }),
                 cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(Antwort(wunsch), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Antwort(preference), cancellationToken);
         });
 
         return app;
     }
 
-    /// <summary>Ob diese Anfrage das Geheimnis der Dienste trägt.</summary>
+    /// <summary>Ob diese ResumeRequest das Geheimnis der Dienste trägt.</summary>
     /// <remarks>
     /// Ein leeres eingestelltes Geheimnis schließt den Endpunkt. In fester Zeit
     /// verglichen, damit die Dauer der Antwort nichts darüber sagt, wie viel
     /// von einem Rateversuch stimmte.
     /// </remarks>
-    private static bool DarfMelden(HttpContext context, Posteinstellungen einstellungen)
+    private static bool DarfMelden(HttpContext context, MailSettings einstellungen)
     {
         if (string.IsNullOrEmpty(einstellungen.Geheimnis)
             || !context.Request.Headers.TryGetValue(Geheimniskopf, out var vorgelegt))
@@ -205,7 +205,7 @@ public static class BenachrichtigungsEndpoints
     }
 
     private static Task NichtAngemeldet(HttpContext context) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
 
     private static EingangV1 Antwort(Eingang eingang) =>
@@ -214,13 +214,13 @@ public static class BenachrichtigungsEndpoints
             eingang.AngelegtAm,
             eingang.GelesenAm);
 
-    private static BenachrichtigungswuenscheV1 Antwort(Benachrichtigungswunsch wunsch) =>
-        new(wunsch.Will(Benachrichtigungsart.ResumeRequest),
-            wunsch.Will(Benachrichtigungsart.MarketRequest),
-            wunsch.Will(Benachrichtigungsart.ApplicationUpdate),
-            wunsch.Will(Benachrichtigungsart.TransferUpdate),
-            wunsch.Will(Benachrichtigungsart.ApplicationReceived),
-            wunsch.Will(Benachrichtigungsart.ProfileDiscovered),
-            wunsch.Will(Benachrichtigungsart.AdvisorConversation),
-            wunsch.Will(Benachrichtigungsart.AssessmentUpdate));
+    private static BenachrichtigungswuenscheV1 Antwort(NotificationPreference preference) =>
+        new(preference.Will(Benachrichtigungsart.ResumeRequest),
+            preference.Will(Benachrichtigungsart.MarketRequest),
+            preference.Will(Benachrichtigungsart.ApplicationUpdate),
+            preference.Will(Benachrichtigungsart.TransferUpdate),
+            preference.Will(Benachrichtigungsart.ApplicationReceived),
+            preference.Will(Benachrichtigungsart.ProfileDiscovered),
+            preference.Will(Benachrichtigungsart.AdvisorConversation),
+            preference.Will(Benachrichtigungsart.AssessmentUpdate));
 }

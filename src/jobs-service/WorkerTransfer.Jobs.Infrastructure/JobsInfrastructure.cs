@@ -7,13 +7,13 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using WorkerTransfer.Jobs.Application.Behaviors;
 using WorkerTransfer.Jobs.Application.Ports;
-using WorkerTransfer.Jobs.Application.Stellen;
-using WorkerTransfer.Jobs.Domain.Stellen;
+using WorkerTransfer.Jobs.Application.Jobs;
+using WorkerTransfer.Jobs.Domain.Jobs;
 using WorkerTransfer.Jobs.Infrastructure.Entwurf;
 using WorkerTransfer.Jobs.Infrastructure.Persistence;
 using WorkerTransfer.Jobs.Infrastructure.Rueckzug;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Jobs.Contracts;
 using Noelia.Abstractions.Security.Checks;
 
@@ -38,82 +38,82 @@ public static class JobsInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Entwurfseinstellungen>(
-            configuration.GetSection(Entwurfseinstellungen.Abschnitt));
-        services.Configure<Rueckzugseinstellungen>(
-            configuration.GetSection(Rueckzugseinstellungen.Abschnitt));
+        services.Configure<DraftSettings>(
+            configuration.GetSection(DraftSettings.Section));
+        services.Configure<WithdrawalSettings>(
+            configuration.GetSection(WithdrawalSettings.Section));
 
 
-        services.AddSingleton(_ => JobsDbContextFactory.Datenquelle(connectionString));
-        services.AddDbContext<JobsDbContext>((anbieter, optionen) =>
-            JobsDbContextFactory.Konfiguriere(
-                optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<JobsDbContext>("jobs");
-        services.AddSchluesselbund<JobsDbContext>();
+        services.AddSingleton(_ => JobsDbContextFactory.DataSource(connectionString));
+        services.AddDbContext<JobsDbContext>((provider, optionen) =>
+            JobsDbContextFactory.Configure(
+                optionen, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatabaseReadiness<JobsDbContext>("jobs");
+        services.AddKeyRing<JobsDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddScoped<IStellenspeicher, EfStellenspeicher>();
+        services.AddScoped<IJobStore, EfJobStore>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
         // Ohne hinterlegten Schlüssel wird kein Fremddienst gerufen. Das ist
         // die Voreinstellung und kein Rückfall.
-        var entwurf = new Entwurfseinstellungen();
-        configuration.GetSection(Entwurfseinstellungen.Abschnitt).Bind(entwurf);
+        var draft = new DraftSettings();
+        configuration.GetSection(DraftSettings.Section).Bind(draft);
 
-        if (string.IsNullOrEmpty(entwurf.Schluessel))
+        if (string.IsNullOrEmpty(draft.Schluessel))
         {
-            services.AddScoped<IEntwerfer, KeinEntwerfer>();
+            services.AddScoped<IDrafter, NoDrafter>();
         }
         else
         {
-            services.AddScoped<IEntwerfer, HttpEntwerfer>();
+            services.AddScoped<IDrafter, HttpDrafter>();
         }
 
-        services.AddCQRS(typeof(StelleAnlegenBefehl).Assembly);
+        services.AddCQRS(typeof(CreateJobCommand).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
-        Nachweis(services, entwurf);
+        Nachweis(services, draft);
 
         return services;
     }
 
     /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
     /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
     /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
     ///
     /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
     /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
     /// vergessen kann.</para>
     /// </remarks>
     private static void Nachweis(
-        IServiceCollection services, Entwurfseinstellungen entwurf)
+        IServiceCollection services, DraftSettings draft)
     {
-        var naht = !string.IsNullOrEmpty(entwurf.Schluessel);
+        var naht = !string.IsNullOrEmpty(draft.Schluessel);
 
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
-            [typeof(Faehigkeitenliste).Assembly, typeof(StelleV1).Assembly]));
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
+            [typeof(SkillList).Assembly, typeof(JobV1).Assembly]));
 
-        services.AddSingleton<ISecurityCheck>(_ => new Nahtpruefung(
-            typeof(Anzeigenentwurf),
+        services.AddSingleton<ISecurityCheck>(_ => new SeamCheck(
+            typeof(AdvertDraft),
             ["Titel", "Beschreibung", "Faehigkeiten", "Ort", "Wunsch", "Prompt"],
             "für eine Stellenanzeige"));
 
         // Der Anbieter dieses Dienstes ist der des BETREIBERS: `Draft__*` aus
-        // der Umgebung, einer fuer alle. Den Zugang je Person haelt
+        // der EnvironmentFile, einer fuer alle. Den Zugang je Person haelt
         // identity-service, und dort wird gezaehlt statt genannt.
-        services.AddSingleton<IAnbieterquelle>(_ => new Betreiberquelle(
-            "anthropic", entwurf.Adresse, naht));
+        services.AddSingleton<IProviderSource>(_ => new OperatorProviderSource(
+            "anthropic", draft.Adresse, naht));
 
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
 
-        // Kein Empfaenger: eine Anzeige gehoert einem Unternehmen, nicht einem Menschen (ADR-0027 §2). Der Firmenrueckzug ist ein eigener Vertrag und zaehlt ausdruecklich nicht zur Vollstaendigkeit einer Loeschung.
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.OhneZeilen("jobs"));
+        // Kein Empfaenger: eine Anzeige gehoert einem Unternehmen, nicht einem Menschen (ADR-0027 §2). Der Firmenrueckzug ist ein eigener Vertrag und zaehlt ausdruecklich nicht zur Vollstaendigkeit einer Erasure.
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.OhneZeilen("jobs"));
     }
 }

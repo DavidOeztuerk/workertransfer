@@ -13,25 +13,25 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// Mandatory. Withdrawing must always be explainable — and the text belongs to
 /// the person: <c>/check</c> never carries it, and an erasure clears it.
 /// </param>
-public sealed record EinwilligungWiderrufenBefehl(
+public sealed record RevokeConsentCommand(
     SubjectId Handelnder,
     TenantId? Firma,
     Guid Gegenstand,
     string Faehigkeit,
-    string Grund) : IBefehl<Einwilligungsergebnis>;
+    string Grund) : IBefehl<ConsentResult>;
 
 /// <summary>Records the withdrawal.</summary>
-public sealed class EinwilligungWiderrufenHandler(Einwilligungsschreiber schreiber)
-    : IRequestHandler<EinwilligungWiderrufenBefehl, Einwilligungsergebnis>
+public sealed class RevokeConsentHandler(ConsentWriter schreiber)
+    : IRequestHandler<RevokeConsentCommand, ConsentResult>
 {
     /// <inheritdoc />
-    public Task<Einwilligungsergebnis> Handle(
-        EinwilligungWiderrufenBefehl request,
+    public Task<ConsentResult> Handle(
+        RevokeConsentCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return schreiber.WiderrufeAsync(
+        return schreiber.RevokeAsync(
             request.Handelnder, request.Firma, request.Gegenstand, request.Faehigkeit,
             request.Grund, cancellationToken);
     }

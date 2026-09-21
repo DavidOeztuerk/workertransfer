@@ -1,16 +1,16 @@
-using WorkerTransfer.Scout.Domain.Suchen;
+using WorkerTransfer.Scout.Domain.Searches;
 
 namespace WorkerTransfer.Scout.Application.Ports;
 
 /// <summary>Der Anbieter hat nicht geantwortet — oder es ist keiner eingerichtet.</summary>
 /// <remarks>
-/// Ein eigener Fehler und <strong>kein stiller Rückfall auf eine Vorlage</strong>:
+/// Ein eigener Fehler und <strong>kein stiller Rückfall auf eine ResumeTemplate</strong>:
 /// ein Entwurf, der nicht vom Modell kommt, aber so aussieht, wäre die
 /// schlechtere Antwort — jemand hielte ihn für einen Vorschlag und schickte ihn
 /// ab. Die Meldung trägt nie den Prompt und nie die Antwort.
 /// </remarks>
 /// <param name="meldung">Die Art des Fehlschlags, nie sein Inhalt.</param>
-public sealed class AnspracheNichtVerfuegbar(string meldung) : Exception(meldung);
+public sealed class AnspracheNichtVerfuegbar(string notification) : Exception(notification);
 
 /// <summary>
 /// Was in den Prompt einer Ansprache darf — und damit auch: was nicht.
@@ -18,14 +18,14 @@ public sealed class AnspracheNichtVerfuegbar(string meldung) : Exception(meldung
 /// <remarks>
 /// <para><strong>Diese Klasse IST die Grenze</strong> (ADR-0024, ADR-0036
 /// Auflage 4). Sie trägt <em>nur schon sichtbare, genannte Worte</em>: was die
-/// angesprochene Person selbst in ihr Profil getippt hat und was dieses
+/// angesprochene Person selbst in ihr Profile getippt hat und was dieses
 /// Unternehmen ohnehin schon sehen darf, plus die Worte, nach denen das
 /// Unternehmen selbst gesucht hat.</para>
 ///
 /// <para>Was hier mit Absicht fehlt: Name, E-Mail-Adresse, <c>SubjectId</c>,
-/// Arbeitgeber, Lebenslauf, Marktstatus, Bewerbungen — und der <em>Name des
+/// Arbeitgeber, Resume, MarketStatus, Applications — und der <em>Name des
 /// suchenden Unternehmens</em>. Der letzte Punkt ist derselbe wie beim
-/// Anzeigenentwurf (ADR-0024): ein Firmenname im Prompt wäre die Einladung,
+/// AdvertDraft (ADR-0024): ein Firmenname im Prompt wäre die Einladung,
 /// das Modell etwas über den Arbeitgeber sagen zu lassen, was niemand geprüft
 /// hat.</para>
 ///
@@ -41,7 +41,7 @@ public sealed class AnspracheNichtVerfuegbar(string meldung) : Exception(meldung
 /// <para>Und ein <em>eigener</em> Typ mit <em>eigenen</em> Regeln, kein
 /// gemeinsamer Prompt mit einem <c>if</c>: die Regeln für einen Profiltext, für
 /// eine Anzeige und für eine Ansprache haben nichts miteinander zu tun, und ein
-/// <c>if</c> ist die Stelle, an der eines Tages eine Regel für die falsche Seite
+/// <c>if</c> ist die Job, an der eines Tages eine Regel für die falsche Seite
 /// gilt.</para>
 /// </remarks>
 /// <param name="Ueberschrift">Was die Person selbst als Überschrift geschrieben hat.</param>
@@ -127,10 +127,10 @@ public sealed record Ansprachelage(
 /// niemand gegeben hat. <strong>Der Knopf ist die Einwilligung</strong>,
 /// informiert und je Benutzung.</para>
 /// </remarks>
-public interface IEntwerfer
+public interface IDrafter
 {
     /// <exception cref="AnspracheNichtVerfuegbar">
     /// Kein Anbieter eingerichtet, oder er antwortet nicht.
     /// </exception>
-    Task<string> EntwirfAsync(Ansprachelage lage, CancellationToken cancellationToken = default);
+    Task<string> DraftAsync(Ansprachelage lage, CancellationToken cancellationToken = default);
 }

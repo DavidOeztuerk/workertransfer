@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Jobs.Application.Ports;
-using WorkerTransfer.ServiceDefaults.Rollen;
+using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Jobs.Tests;
@@ -15,14 +15,14 @@ namespace WorkerTransfer.Jobs.Tests;
 /// <summary>Die Stellenliste blättert nach Seitennummern.</summary>
 /// <remarks>
 /// Diese Reihe hält den Vertrag fest, weil er sich geändert hat: vorher gab
-/// <c>GET /jobs</c> einen Zeiger (<c>next</c>) heraus, jetzt eine Seitennummer
+/// <c>GET /jobs</c> einen Cursor (<c>next</c>) heraus, jetzt eine Seitennummer
 /// samt Gesamtzahl. Der CI-Auftrag <c>images</c> prüft genau diese Gestalt, und
 /// die Routenkarte auch — ein stiller Rückfall auf das alte Feld wäre in beiden
 /// nicht zu sehen.
 /// <para>
 /// Der wichtigste Fall ist der letzte: <strong>ein Fähigkeitsfilter muss die
 /// GEFILTERTE Menge zählen.</strong> Weil dieser Filter im Speicher läuft (der
-/// Wortschatz steht im Code, nicht in SQL — ADR-0023), lag es nahe, erst zu
+/// Vocabulary steht im Code, nicht in SQL — ADR-0023), lag es nahe, erst zu
 /// schneiden und dann zu filtern. Dann stünde „Seite 1 von 9" über drei
 /// Treffern, und die Blätterleiste böte acht leere Seiten an.
 /// </para>
@@ -39,18 +39,18 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:jobs", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", "rueckzug-geheimnis");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IEntwerfer>(_ => new Probeentwerfer()));
+                services.Replace(ServiceDescriptor.Scoped<IDrafter>(_ => new Probeentwerfer()));
                 // Veroeffentlichen verlangt seit PBI-2 einen `admin`. Diese
                 // Reihe misst das Blaettern und nicht die Rolle — also
                 // antwortet die Probe wie eine Inhaberin.
-                dienste.Replace(ServiceDescriptor.Scoped<IFirmenrollen>(_ => new Rollenprobe()));
+                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => new Rollenprobe()));
             });
         });
 
@@ -63,16 +63,16 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsFirma(Guid firma)
+    private HttpClient AlsFirma(Guid company)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer", Tokenform.Firma(Guid.CreateVersion7(), firma));
+            "Bearer", Tokenform.Firma(Guid.CreateVersion7(), company));
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     /// <summary>Legt <paramref name="wieViele"/> veröffentlichte Anzeigen an.</summary>
     /// <remarks>
@@ -83,7 +83,7 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
     /// lange grün, wie niemand sonst dieselbe Fähigkeit schreibt.
     /// </remarks>
     private async Task LegeAn(
-        HttpClient browser, int wieViele, string kennwort = "", params string[] faehigkeiten)
+        HttpClient browser, int wieViele, string kennwort = "", params string[] skills)
     {
         for (var i = 0; i < wieViele; i++)
         {
@@ -94,7 +94,7 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
                 location = "Berlin",
                 remote_mode = "hybrid",
                 employment_type = "full_time",
-                skills = faehigkeiten.Length > 0 ? faehigkeiten : ["C#"]
+                skills = skills.Length > 0 ? skills : ["C#"]
             });
 
             var id = (await Json(angelegt)).GetProperty("id").GetGuid();
@@ -108,19 +108,19 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
     {
         await LegeAn(AlsFirma(Guid.CreateVersion7()), 1);
 
-        var seite = await Json(await _dienst.CreateClient().GetAsync("/jobs?page=1"));
+        var page = await Json(await _dienst.CreateClient().GetAsync("/jobs?page=1"));
 
-        seite.TryGetProperty("items", out _).Should().BeTrue();
-        seite.GetProperty("page").GetInt32().Should().Be(1);
-        seite.GetProperty("page_size").GetInt32().Should().Be(12);
-        seite.TryGetProperty("total_items", out _).Should().BeTrue();
-        seite.TryGetProperty("total_pages", out _).Should().BeTrue();
-        seite.TryGetProperty("has_next", out _).Should().BeTrue();
-        seite.TryGetProperty("has_previous", out _).Should().BeTrue();
+        page.TryGetProperty("items", out _).Should().BeTrue();
+        page.GetProperty("page").GetInt32().Should().Be(1);
+        page.GetProperty("page_size").GetInt32().Should().Be(12);
+        page.TryGetProperty("total_items", out _).Should().BeTrue();
+        page.TryGetProperty("total_pages", out _).Should().BeTrue();
+        page.TryGetProperty("has_next", out _).Should().BeTrue();
+        page.TryGetProperty("has_previous", out _).Should().BeTrue();
 
-        // Der Zeiger ist weg und darf nicht zurückkommen: zwei Wege durch
+        // Der Cursor ist weg und darf nicht zurückkommen: zwei Wege durch
         // dieselbe Liste sind zwei Wahrheiten über ihre Reihenfolge.
-        seite.TryGetProperty("next", out _).Should().BeFalse();
+        page.TryGetProperty("next", out _).Should().BeFalse();
     }
 
     /// <summary>Zwölf ohne Angabe — und nicht alles.</summary>
@@ -133,11 +133,11 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
     {
         await LegeAn(AlsFirma(Guid.CreateVersion7()), 14);
 
-        var seite = await Json(await _dienst.CreateClient().GetAsync("/jobs"));
+        var page = await Json(await _dienst.CreateClient().GetAsync("/jobs"));
 
-        seite.GetProperty("items").GetArrayLength().Should().Be(12);
-        seite.GetProperty("has_next").GetBoolean().Should().BeTrue();
-        seite.GetProperty("has_previous").GetBoolean().Should().BeFalse();
+        page.GetProperty("items").GetArrayLength().Should().Be(12);
+        page.GetProperty("has_next").GetBoolean().Should().BeTrue();
+        page.GetProperty("has_previous").GetBoolean().Should().BeFalse();
     }
 
     /// <summary>Die zweite Seite ist eine andere und überschneidet sich nicht.</summary>
@@ -150,8 +150,8 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
         var erste = await Json(await browser.GetAsync("/jobs?page=1&page_size=5"));
         var zweite = await Json(await browser.GetAsync("/jobs?page=2&page_size=5"));
 
-        static IEnumerable<Guid> Kennungen(JsonElement seite) =>
-            seite.GetProperty("items").EnumerateArray().Select(e => e.GetProperty("id").GetGuid());
+        static IEnumerable<Guid> Kennungen(JsonElement page) =>
+            page.GetProperty("items").EnumerateArray().Select(e => e.GetProperty("id").GetGuid());
 
         zweite.GetProperty("page").GetInt32().Should().Be(2);
         zweite.GetProperty("has_previous").GetBoolean().Should().BeTrue();
@@ -161,8 +161,8 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
     /// <summary>Unsinn in der Abfrage wird zur Vorgabe, nicht zum Fehler.</summary>
     /// <remarks>
     /// Eine Liste, die auf <c>?page=abc</c> mit 400 antwortet, ist an einer
-    /// Stelle streng, an der niemand etwas gewinnt. Und die Obergrenze ist kein
-    /// Geschmack: <c>page_size=100000</c> ist keine Anfrage, sondern ein Weg,
+    /// Job streng, an der niemand etwas gewinnt. Und die Obergrenze ist kein
+    /// Geschmack: <c>page_size=100000</c> ist keine ResumeRequest, sondern ein Weg,
     /// die Datenbank zu beschäftigen.
     /// </remarks>
     [Theory]
@@ -172,10 +172,10 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
     [InlineData("?page_size=0", 1, 12)]
     public async Task Unsinn_wird_zur_Vorgabe(string abfrage, int seiteSoll, int groesseSoll)
     {
-        var seite = await Json(await _dienst.CreateClient().GetAsync($"/jobs{abfrage}"));
+        var page = await Json(await _dienst.CreateClient().GetAsync($"/jobs{abfrage}"));
 
-        seite.GetProperty("page").GetInt32().Should().Be(seiteSoll);
-        seite.GetProperty("page_size").GetInt32().Should().Be(groesseSoll);
+        page.GetProperty("page").GetInt32().Should().Be(seiteSoll);
+        page.GetProperty("page_size").GetInt32().Should().Be(groesseSoll);
     }
 
     /// <summary>Ein Fähigkeitsfilter zählt, was er trifft — nicht, was es gibt.</summary>
@@ -188,18 +188,18 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_Faehigkeitsfilter_zaehlt_die_gefilterte_Menge()
     {
-        var firma = AlsFirma(Guid.CreateVersion7());
+        var company = AlsFirma(Guid.CreateVersion7());
         var kennwort = $"faehigkeit{Guid.NewGuid():N}";
-        await LegeAn(firma, 3, kennwort, "Rust");
-        await LegeAn(firma, 9, kennwort, "Cobol");
+        await LegeAn(company, 3, kennwort, "Rust");
+        await LegeAn(company, 9, kennwort, "Cobol");
 
-        var seite = await Json(
+        var page = await Json(
             await _dienst.CreateClient().GetAsync(
                 $"/jobs?q={kennwort}&skill=Rust&page_size=2"));
 
-        seite.GetProperty("total_items").GetInt32().Should().Be(3);
-        seite.GetProperty("total_pages").GetInt32().Should().Be(2);
-        seite.GetProperty("items").GetArrayLength().Should().Be(2);
+        page.GetProperty("total_items").GetInt32().Should().Be(3);
+        page.GetProperty("total_pages").GetInt32().Should().Be(2);
+        page.GetProperty("items").GetArrayLength().Should().Be(2);
     }
 
     /// <summary>Eine leere Liste hat eine Seite, nicht null.</summary>
@@ -210,11 +210,11 @@ public class BlaetternTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_leere_Liste_hat_eine_Seite()
     {
-        var seite = await Json(
+        var page = await Json(
             await _dienst.CreateClient().GetAsync("/jobs?q=gibtesnichtxyzq"));
 
-        seite.GetProperty("total_items").GetInt32().Should().Be(0);
-        seite.GetProperty("total_pages").GetInt32().Should().Be(1);
-        seite.GetProperty("has_next").GetBoolean().Should().BeFalse();
+        page.GetProperty("total_items").GetInt32().Should().Be(0);
+        page.GetProperty("total_pages").GetInt32().Should().Be(1);
+        page.GetProperty("has_next").GetBoolean().Should().BeFalse();
     }
 }

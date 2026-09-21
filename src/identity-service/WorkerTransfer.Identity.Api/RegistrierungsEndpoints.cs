@@ -65,33 +65,33 @@ public static class RegistrierungsEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            // Der Kopf ist hier eine ERSTE VERMUTUNG und nirgends sonst. Die
+            // Der Header ist hier eine ERSTE VERMUTUNG und nirgends sonst. Die
             // Bestätigungsmail ist das Erste, was dieses Konto je bekommt, und
             // sie geht raus, bevor jemand eine Sprache wählen konnte — ohne
             // diesen Griff wäre sie immer deutsch. Ab dann steht die Sprache in
-            // der Zeile, und der Kopf wird nie wieder gelesen: er ist eine
+            // der Zeile, und der Header wird nie wieder gelesen: er ist eine
             // Angabe des Geräts, keine Entscheidung der Person.
             var vermutet = Sprachwahl.AusKopf(
                 context.Request.Headers.AcceptLanguage.ToString());
 
             // Absagen statt wegwerfen: sonst entstünde ein Konto, die Mail
             // ginge hinaus, und die Wahl wäre still verloren.
-            if (!Berufsfeldwahl.Kennen(body.OccupationalField))
+            if (!OccupationalFieldChoice.Kennen(body.OccupationalField))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "invalid: occupational_field");
                 return;
             }
 
-            var ergebnis = await mediator.Send(
+            var result = await mediator.Send(
                 new RegistrierenBefehl(
                     body.Email, body.Password, body.DisplayName, body.CompanyName,
                     vermutet, body.GivenName, body.FamilyName,
-                    Berufsfeldwahl.Aus(body.OccupationalField)),
+                    OccupationalFieldChoice.Aus(body.OccupationalField)),
                 cancellationToken);
 
-            switch (ergebnis)
+            switch (result)
             {
                 case Registrierergebnis.Angenommen:
                     // The same answer whether or not the address was known. A
@@ -106,20 +106,20 @@ public static class RegistrierungsEndpoints
                 case Registrierergebnis.OeffentlicheDomain oeffentlich:
                     // The same code POST /companies answers with, so one
                     // refusal is not called two things depending on the door.
-                    await ProblemDetailsMiddleware.Schreibe(
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status422UnprocessableEntity, "Request failed",
                         $"'{oeffentlich.Domain}' is a public email provider "
                         + "and cannot be claimed as a company");
                     return;
 
-                case Registrierergebnis.SchwachesPasswort schwach:
-                    await ProblemDetailsMiddleware.Schreibe(
+                case Registrierergebnis.WeakPassword schwach:
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status400BadRequest, "Request failed",
                         $"Password rejected: {schwach.Grund}");
                     return;
 
                 default:
-                    await ProblemDetailsMiddleware.Schreibe(
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status400BadRequest, "Request failed", "invalid");
                     return;
             }
@@ -131,50 +131,50 @@ public static class RegistrierungsEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            // Ein fehlender Token ist eine kaputte Anfrage, kein ungueltiger
+            // Ein fehlender Token ist eine kaputte ResumeRequest, kein ungueltiger
             // Token. Ohne diese Zeilen kam `{}` als 500 zurueck (D2).
             if (string.IsNullOrWhiteSpace(body.Token))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "token is required");
                 return;
             }
 
-            var ergebnis = await mediator.Send(
+            var result = await mediator.Send(
                 new AdresseBestaetigenBefehl(body.Token), cancellationToken);
 
-            switch (ergebnis)
+            switch (result)
             {
                 case Bestaetigungsergebnis.Bestaetigt bestaetigt:
-                    var antwort = new Dictionary<string, string> { ["status"] = "ok" };
+                    var response = new Dictionary<string, string> { ["status"] = "ok" };
 
                     // Three exits, not two. Without the third an interface
                     // shows "all good" while half the intention evaporated.
                     if (bestaetigt.Firmenname is { } name)
                     {
-                        antwort["company"] = name;
+                        response["company"] = name;
                     }
 
-                    if (bestaetigt.Firmenfehler is { } fehler)
+                    if (bestaetigt.Firmenfehler is { } error)
                     {
-                        antwort["company_error"] = fehler;
+                        response["company_error"] = error;
                     }
 
-                    await context.Response.WriteAsJsonAsync(antwort, cancellationToken);
+                    await context.Response.WriteAsJsonAsync(response, cancellationToken);
                     return;
 
                 case Bestaetigungsergebnis.Abgelaufen:
                     // 410 rather than 400, so the interface can offer to send
                     // it again. Only the recipient ever had the token, so the
                     // distinction reveals nothing.
-                    await ProblemDetailsMiddleware.Schreibe(
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status410Gone,
                         "Request failed", "confirmation link expired");
                     return;
 
                 default:
-                    await ProblemDetailsMiddleware.Schreibe(
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status400BadRequest,
                         "Request failed", "invalid confirmation link");
                     return;

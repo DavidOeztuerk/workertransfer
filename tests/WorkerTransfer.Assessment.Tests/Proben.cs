@@ -29,12 +29,12 @@ public sealed class Postgres : IAsyncLifetime
     {
         await _behaelter.StartAsync();
 
-        await using var quelle = AssessmentDbContextFactory.Datenquelle(ConnectionString);
-        await using var kontext = new AssessmentDbContext(
-            (DbContextOptions<AssessmentDbContext>)AssessmentDbContextFactory.Konfiguriere(
-                new DbContextOptionsBuilder<AssessmentDbContext>(), quelle).Options);
+        await using var source = AssessmentDbContextFactory.DataSource(ConnectionString);
+        await using var context = new AssessmentDbContext(
+            (DbContextOptions<AssessmentDbContext>)AssessmentDbContextFactory.Configure(
+                new DbContextOptionsBuilder<AssessmentDbContext>(), source).Options);
 
-        await kontext.Database.MigrateAsync();
+        await context.Database.MigrateAsync();
     }
 
     /// <inheritdoc />
@@ -81,18 +81,18 @@ public static class Tokenform
     public const string Audience = "workertransfer";
 
     /// <summary>Ein Token für eine Person, die für sich selbst handelt.</summary>
-    public static string Person(Guid wer) => Baue(wer, firma: null);
+    public static string Person(Guid subject) => Build(subject, company: null);
 
     /// <summary>Ein Token für jemanden, der für ein Unternehmen handelt.</summary>
-    public static string Firma(Guid wer, Guid firma) => Baue(wer, firma);
+    public static string Firma(Guid subject, Guid company) => Build(subject, company);
 
-    private static string Baue(Guid wer, Guid? firma)
+    private static string Build(Guid subject, Guid? company)
     {
-        List<Claim> ansprueche = [new(JwtRegisteredClaimNames.Sub, wer.ToString())];
+        List<Claim> ansprueche = [new(JwtRegisteredClaimNames.Sub, subject.ToString())];
 
-        if (firma is { } mandant)
+        if (company is { } tenant)
         {
-            ansprueche.Add(new Claim("tenant", mandant.ToString()));
+            ansprueche.Add(new Claim("tenant", tenant.ToString()));
         }
 
         var token = new JwtSecurityToken(
@@ -114,7 +114,7 @@ public static class Tokenform
 /// bei <em>jedem</em> Lesen fragen (ADR-0013), die Personenseite bei
 /// <em>keinem</em> (ADR-0042 §2).
 /// </remarks>
-public sealed class Probetor : IEinwilligungstor
+public sealed class Probetor : IConsentGate
 {
     /// <summary>Wer wem etwas freigegeben hat — Schlüssel „wer|firma".</summary>
     public HashSet<string> Freigaben { get; } = [];
@@ -126,27 +126,27 @@ public sealed class Probetor : IEinwilligungstor
     public bool Schweigt { get; set; }
 
     /// <summary>Gibt frei oder nimmt zurück.</summary>
-    public void Stelle(Guid wer, Guid firma, bool frei)
+    public void Job(Guid subject, Guid company, bool frei)
     {
-        var schluessel = $"{wer}|{firma}";
+        var key = $"{subject}|{company}";
 
         if (frei)
         {
-            Freigaben.Add(schluessel);
+            Freigaben.Add(key);
         }
         else
         {
-            Freigaben.Remove(schluessel);
+            Freigaben.Remove(key);
         }
     }
 
     /// <inheritdoc />
-    public async Task<bool> DarfSehenAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default) =>
-        (await DuerfenSehenAsync([(wer, firma)], cancellationToken))[0];
+    public async Task<bool> MaySeeAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default) =>
+        (await MayEachSeeAsync([(subject, company)], cancellationToken))[0];
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<bool>> DuerfenSehenAsync(
+    public Task<IReadOnlyList<bool>> MayEachSeeAsync(
         IReadOnlyList<(SubjectId Wer, TenantId Firma)> paare,
         CancellationToken cancellationToken = default)
     {
@@ -154,7 +154,7 @@ public sealed class Probetor : IEinwilligungstor
 
         if (Schweigt)
         {
-            throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht");
+            throw new ConsentGateSilent("der Ledger antwortet im Test nicht");
         }
 
         return Task.FromResult<IReadOnlyList<bool>>(
@@ -174,39 +174,39 @@ public sealed class Probetor : IEinwilligungstor
 /// — und genau deshalb steht die andere Reihe daneben.
 /// </para>
 /// </remarks>
-public sealed class Probevorgaenge : IVorgangsspeicher
+public sealed class Probevorgaenge : ICaseStore
 {
-    private readonly List<Vorgang> _bestand = [];
+    private readonly List<Case> _bestand = [];
 
     /// <inheritdoc />
-    public Task<Vorgang?> HoleAsync(Guid id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(_bestand.FirstOrDefault(vorgang => vorgang.Id == id));
+    public Task<Case?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_bestand.FirstOrDefault(caseItem => caseItem.Id == id));
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<Vorgang>> FuerPersonAsync(
-        SubjectId wer, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Vorgang>>([.. _bestand.Where(v => v.Wer == wer)]);
+    public Task<IReadOnlyList<Case>> ForPersonAsync(
+        SubjectId subject, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Case>>([.. _bestand.Where(v => v.Wer == subject)]);
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<Vorgang>> FuerFirmaAsync(
-        TenantId firma, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Vorgang>>([.. _bestand.Where(v => v.Firma == firma)]);
+    public Task<IReadOnlyList<Case>> ForCompanyAsync(
+        TenantId company, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Case>>([.. _bestand.Where(v => v.Firma == company)]);
 
     /// <inheritdoc />
-    public Task SichereAsync(Vorgang vorgang, CancellationToken cancellationToken = default)
+    public Task SaveAsync(Case caseItem, CancellationToken cancellationToken = default)
     {
-        if (!_bestand.Contains(vorgang))
+        if (!_bestand.Contains(caseItem))
         {
-            _bestand.Add(vorgang);
+            _bestand.Add(caseItem);
         }
 
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public Task<int> LoescheAsync(SubjectId wer, CancellationToken cancellationToken = default)
+    public Task<int> DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default)
     {
-        _bestand.RemoveAll(vorgang => vorgang.Wer == wer);
+        _bestand.RemoveAll(caseItem => caseItem.Wer == subject);
 
         return Task.FromResult(0);
     }
@@ -224,10 +224,10 @@ public sealed class Probeausgang : Outbox.IOutbox
     public List<(Guid Wer, string Art)> Vermerke { get; } = [];
 
     /// <inheritdoc />
-    public Task<Guid> VermerkeAsync(
-        SubjectId empfaenger, string art, CancellationToken cancellationToken = default)
+    public Task<Guid> NoteAsync(
+        SubjectId recipient, string kind, CancellationToken cancellationToken = default)
     {
-        Vermerke.Add((empfaenger.Value, art));
+        Vermerke.Add((recipient.Value, kind));
 
         return Task.FromResult(Guid.NewGuid());
     }

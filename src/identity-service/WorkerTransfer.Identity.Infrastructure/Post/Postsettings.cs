@@ -4,7 +4,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Post;
 public sealed class Postsettings
 {
     /// <summary>The configuration section this binds to.</summary>
-    public const string Abschnitt = "Mail";
+    public const string Section = "Mail";
 
     /// <summary>The SMTP host.</summary>
     public string Host { get; set; } = "localhost";

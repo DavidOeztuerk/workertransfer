@@ -18,7 +18,7 @@ namespace WorkerTransfer.Resume.Api;
 /// current employer must not see. A company asks, the person answers, and the
 /// release covers that one company.
 /// </remarks>
-public static class LebenslaufEndpoints
+public static class ResumeEndpoints
 {
     /// <summary>Maps the seven endpoints of the résumé.</summary>
     public static IEndpointRouteBuilder MapLebenslaufEndpoints(this IEndpointRouteBuilder app)
@@ -35,16 +35,16 @@ public static class LebenslaufEndpoints
         // Here as one filter rather than a catch in each route, because the
         // route that forgets it is the one that answers wrongly — and it looks
         // like a working route until the ledger is down.
-        lebenslaeufe.AddEndpointFilter(async (aufruf, weiter) =>
+        lebenslaeufe.AddEndpointFilter(async (call, weiter) =>
         {
             try
             {
-                return await weiter(aufruf);
+                return await weiter(call);
             }
-            catch (EinwilligungSchweigt)
+            catch (ConsentGateSilent)
             {
-                await ProblemDetailsMiddleware.Schreibe(
-                    aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                await ProblemDetailsMiddleware.Write(
+                    call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "the consent ledger did not answer");
 
                 return Geschrieben;
@@ -52,7 +52,7 @@ public static class LebenslaufEndpoints
         });
 
         lebenslaeufe.MapPut("/me", async (
-            LebenslaufSpeichernV1 body,
+            StoreResumeV1 body,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -68,12 +68,12 @@ public static class LebenslaufEndpoints
             //
             // `{}` liess frueher `null.Select(...)` laufen und kam als 500
             // zurueck (D2). Es einfach als leer zu lesen waere schlimmer: dann
-            // hiesse eine Anfrage, in der jemand ein Feld vergessen hat,
-            // „loesche meinen ganzen Lebenslauf". Wer leeren will, schickt
+            // hiesse eine ResumeRequest, in der jemand ein Feld vergessen hat,
+            // „loesche meinen ganzen CurriculumVitae". Wer leeren will, schickt
             // ausdruecklich `[]`.
             if (body.Positions is null || body.Education is null)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "positions and education are required");
                 return;
@@ -84,18 +84,18 @@ public static class LebenslaufEndpoints
                 // Whose résumé this is comes from the verified token, never
                 // from the body: a subject id on the wire would be a way to
                 // write into somebody else's.
-                var lebenslauf = await mediator.Send(
-                    new LebenslaufSichernBefehl(
+                var resume = await mediator.Send(
+                    new SaveResumeCommand(
                         handelnder.Subject, Stationen(body), Ausbildungen(body)),
                     cancellationToken);
 
-                await context.Response.WriteAsJsonAsync(Antwort(lebenslauf), cancellationToken);
+                await context.Response.WriteAsJsonAsync(Antwort(resume), cancellationToken);
             }
-            catch (Lebenslaufregel regel)
+            catch (ResumeRule rule)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
-                    "Request failed", regel.Message);
+                    "Request failed", rule.Message);
             }
         });
 
@@ -111,11 +111,11 @@ public static class LebenslaufEndpoints
                 return;
             }
 
-            var lebenslauf = await mediator.Send(
-                new MeinLebenslaufAbfrage(handelnder.Subject), cancellationToken);
+            var resume = await mediator.Send(
+                new MyResumeQuery(handelnder.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                lebenslauf is null ? null : Antwort(lebenslauf), cancellationToken);
+                resume is null ? null : Antwort(resume), cancellationToken);
         });
 
         // The person's own list, and the one place where "was granted" and
@@ -134,10 +134,10 @@ public static class LebenslaufEndpoints
             }
 
             var meine = await mediator.Send(
-                new MeineAnfragenAbfrage(handelnder.Subject), cancellationToken);
+                new MyRequestsQuery(handelnder.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                meine.Select(ansicht => Antwort(ansicht.Anfrage, ansicht.Aktiv)),
+                meine.Select(ansicht => Antwort(ansicht.ResumeRequest, ansicht.Aktiv)),
                 cancellationToken);
         });
 
@@ -169,10 +169,10 @@ public static class LebenslaufEndpoints
                 return;
             }
 
-            var ergebnis = await mediator.Send(
-                new ZugriffWiderrufenBefehl(id, handelnder.Subject), cancellationToken);
+            var result = await mediator.Send(
+                new RevokeAccessCommand(id, handelnder.Subject), cancellationToken);
 
-            await Beantworte(context, ergebnis, cancellationToken);
+            await Beantworte(context, result, cancellationToken);
         });
 
         // A company asks. It needs the PROFILE release to do so — never the
@@ -191,23 +191,23 @@ public static class LebenslaufEndpoints
                 return;
             }
 
-            if (handelnder.Acting is not Capacity.ForCompany firma)
+            if (handelnder.Acting is not Capacity.ForCompany company)
             {
                 // A statement about the caller, which leaks nothing: only a
                 // company can ask for a résumé, and a private person knows they
                 // are not one.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status403Forbidden,
                     "Request failed", "only a company may ask for a resume");
                 return;
             }
 
-            var ergebnis = await mediator.Send(
-                new LebenslaufAnfragenBefehl(
-                    new SubjectId(subjectId), firma.Tenant, handelnder.Subject),
+            var result = await mediator.Send(
+                new RequestResumeCommand(
+                    new SubjectId(subjectId), company.Tenant, handelnder.Subject),
                 cancellationToken);
 
-            await Beantworte(context, ergebnis, cancellationToken, StatusCodes.Status201Created);
+            await Beantworte(context, result, cancellationToken, StatusCodes.Status201Created);
         });
 
         // The company's own list. `active` is null here: the company already has
@@ -225,19 +225,19 @@ public static class LebenslaufEndpoints
                 return;
             }
 
-            if (handelnder.Acting is not Capacity.ForCompany firma)
+            if (handelnder.Acting is not Capacity.ForCompany company)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status403Forbidden,
                     "Request failed", "no active company");
                 return;
             }
 
-            var anfragen = await mediator.Send(
-                new FirmenanfragenAbfrage(firma.Tenant), cancellationToken);
+            var requests = await mediator.Send(
+                new CompanyRequestsQuery(company.Tenant), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                anfragen.Select(anfrage => Antwort(anfrage, aktiv: null)), cancellationToken);
+                requests.Select(request => Antwort(request, aktiv: null)), cancellationToken);
         });
 
         lebenslaeufe.MapGet("/{subjectId:guid}", async (
@@ -253,30 +253,30 @@ public static class LebenslaufEndpoints
                 return;
             }
 
-            if (handelnder.Acting is not Capacity.ForCompany firma)
+            if (handelnder.Acting is not Capacity.ForCompany company)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status403Forbidden,
                     "Request failed", "no active company");
                 return;
             }
 
-            var ergebnis = await mediator.Send(
-                new SichtbarerLebenslaufAbfrage(new SubjectId(subjectId), firma.Tenant),
+            var result = await mediator.Send(
+                new VisibleResumeQuery(new SubjectId(subjectId), company.Tenant),
                 cancellationToken);
 
-            switch (ergebnis)
+            switch (result)
             {
-                case Lebenslaufergebnis.Gefunden gefunden:
+                case ResumeResult.Gefunden found:
                     await context.Response.WriteAsJsonAsync(
-                        Antwort(gefunden.Lebenslauf), cancellationToken);
+                        Antwort(found.CurriculumVitae), cancellationToken);
                     return;
 
                 default:
                     // Withheld and non-existent answer alike, and they must stay
                     // alike: a different answer would say whether this person
                     // has written a résumé, which is a fact about them.
-                    await ProblemDetailsMiddleware.Schreibe(
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status404NotFound,
                         "Request failed", "no resume");
                     return;
@@ -286,9 +286,9 @@ public static class LebenslaufEndpoints
         // ---------------------------------------------------------------
         // DIE UNTERLAGEN (ADR-0035)
         //
-        // Sie haengen am Lebenslauf und nicht an der Bewerbung: eine Person
-        // laedt ihr Zeugnis einmal hoch und legt es dann zwanzig Bewerbungen
-        // bei. Je Bewerbung zu speichern hiesse, dieselbe Datei zwanzigmal zu
+        // Sie haengen am CurriculumVitae und nicht an der JobApplication: eine Person
+        // laedt ihr Reference einmal hoch und legt es dann zwanzig Applications
+        // bei. Je JobApplication zu speichern hiesse, dieselbe Datei zwanzigmal zu
         // halten — und beim Loeschen neunzehnmal daneben zu greifen.
         // ---------------------------------------------------------------
 
@@ -307,16 +307,16 @@ public static class LebenslaufEndpoints
                 return;
             }
 
-            if (handelnder.Acting is not Capacity.ForCompany firma)
+            if (handelnder.Acting is not Capacity.ForCompany company)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status403Forbidden,
                     "Request failed", "no active company");
                 return;
             }
 
             var alle = await mediator.Send(
-                new SichtbareUnterlagenAbfrage(new SubjectId(subjectId), firma.Tenant),
+                new VisibleDocumentsQuery(new SubjectId(subjectId), company.Tenant),
                 cancellationToken);
 
             // Eine leere Liste, wenn nichts freigegeben ist — und dieselbe
@@ -340,39 +340,39 @@ public static class LebenslaufEndpoints
                 return;
             }
 
-            if (handelnder.Acting is not Capacity.ForCompany firma)
+            if (handelnder.Acting is not Capacity.ForCompany company)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status403Forbidden,
                     "Request failed", "no active company");
                 return;
             }
 
-            var gefunden = await mediator.Send(
-                new SichtbarerUnterlagenInhaltAbfrage(
-                    new SubjectId(subjectId), firma.Tenant, id),
+            var found = await mediator.Send(
+                new VisibleDocumentContentQuery(
+                    new SubjectId(subjectId), company.Tenant, id),
                 cancellationToken);
 
-            if (gefunden is not { } treffer)
+            if (found is not { } hit)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such document");
                 return;
             }
 
-            context.Response.ContentType = treffer.Unterlage.Inhaltstyp;
+            context.Response.ContentType = hit.DocumentRecord.Inhaltstyp;
             context.Response.Headers.ContentDisposition =
-                "inline; filename=\"" + treffer.Unterlage.Id.ToString("N")
-                + Typerkennung.Endung(treffer.Unterlage.Inhaltstyp) + "\"";
+                "inline; filename=\"" + hit.DocumentRecord.Id.ToString("N")
+                + Typerkennung.Endung(hit.DocumentRecord.Inhaltstyp) + "\"";
 
-            await context.Response.Body.WriteAsync(treffer.Inhalt, cancellationToken);
+            await context.Response.Body.WriteAsync(hit.Inhalt, cancellationToken);
         });
 
-        var unterlagen = app.MapGroup("/resumes/me/documents");
+        var documents = app.MapGroup("/resumes/me/documents");
 
-        unterlagen.MapPost("/", async (
-            HttpRequest anfrage,
+        documents.MapPost("/", async (
+            HttpRequest request,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -384,24 +384,24 @@ public static class LebenslaufEndpoints
                 return;
             }
 
-            if (!anfrage.HasFormContentType)
+            if (!request.HasFormContentType)
             {
-                // 415 UND NICHT 400: die Anfrage ist wohlgeformt, nur ihr
+                // 415 UND NICHT 400: die ResumeRequest ist wohlgeformt, nur ihr
                 // Medienformat wird hier nicht bedient. 400 hiesse „ich konnte
                 // deinen Rumpf nicht lesen" und schickt den Aufrufer auf die
-                // Suche nach einem Tippfehler, den es nicht gibt.
-                await ProblemDetailsMiddleware.Schreibe(
+                // Search nach einem Tippfehler, den es nicht gibt.
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status415UnsupportedMediaType,
                     "Request failed", "expected multipart/form-data");
                 return;
             }
 
-            var formular = await anfrage.ReadFormAsync(cancellationToken);
-            var datei = formular.Files.GetFile("file");
+            var formular = await request.ReadFormAsync(cancellationToken);
+            var file = formular.Files.GetFile("file");
 
-            if (datei is null || datei.Length == 0)
+            if (file is null || file.Length == 0)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "invalid: file");
                 return;
@@ -410,52 +410,52 @@ public static class LebenslaufEndpoints
             // Vor dem Lesen pruefen, nicht danach: eine Datei erst vollstaendig
             // in den Speicher zu ziehen und dann abzulehnen ist genau der Weg,
             // auf dem ein Aufrufer mit einer Adresse den Arbeitsspeicher fuellt.
-            if (datei.Length > Unterlage.HoechsteGroesse)
+            if (file.Length > DocumentRecord.HoechsteGroesse)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status413PayloadTooLarge,
                     "Request failed",
-                    $"document must not exceed {Unterlage.HoechsteGroesse} bytes");
+                    $"document must not exceed {DocumentRecord.HoechsteGroesse} bytes");
                 return;
             }
 
-            using var strom = new MemoryStream((int)datei.Length);
-            await datei.CopyToAsync(strom, cancellationToken);
+            using var strom = new MemoryStream((int)file.Length);
+            await file.CopyToAsync(strom, cancellationToken);
 
-            var ergebnis = await mediator.Send(
-                new UnterlageHinzufuegenBefehl(
+            var result = await mediator.Send(
+                new AddDocumentCommand(
                     handelnder.Subject,
                     formular["name"].ToString() is { Length: > 0 } genannt
                         ? genannt
-                        : datei.FileName,
+                        : file.FileName,
                     Artwahl(formular["kind"].ToString()),
                     strom.ToArray()),
                 cancellationToken);
 
-            switch (ergebnis)
+            switch (result)
             {
-                case Unterlagenergebnis.Erledigt erledigt:
+                case DocumentResult.Erledigt erledigt:
                     context.Response.StatusCode = StatusCodes.Status201Created;
                     await context.Response.WriteAsJsonAsync(
-                        Antwort(erledigt.Unterlage), cancellationToken);
+                        Antwort(erledigt.DocumentRecord), cancellationToken);
                     return;
 
-                case Unterlagenergebnis.ZuViele:
-                    await ProblemDetailsMiddleware.Schreibe(
+                case DocumentResult.ZuViele:
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status422UnprocessableEntity,
                         "Request failed",
-                        $"at most {Unterlage.HoechsteAnzahl} documents");
+                        $"at most {DocumentRecord.HoechsteAnzahl} documents");
                     return;
 
-                case Unterlagenergebnis.Abgelehnt abgelehnt:
-                    await ProblemDetailsMiddleware.Schreibe(
+                case DocumentResult.Abgelehnt abgelehnt:
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status422UnprocessableEntity,
                         "Request failed", abgelehnt.Grund);
                     return;
             }
         });
 
-        unterlagen.MapGet("/", async (
+        documents.MapGet("/", async (
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -468,7 +468,7 @@ public static class LebenslaufEndpoints
             }
 
             var alle = await mediator.Send(
-                new MeineUnterlagenAbfrage(handelnder.Subject), cancellationToken);
+                new MyDocumentRecordsQuery(handelnder.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
                 alle.Select(Antwort).ToArray(), cancellationToken);
@@ -489,7 +489,7 @@ public static class LebenslaufEndpoints
          * Abfrage liefe an `TransaktionsBehavior` vorbei und die Zeile wuerde
          * nie festgeschrieben — dieselbe Falle wie `POST /me/oauth/start`.
          */
-        unterlagen.MapPost("/read", async (
+        documents.MapPost("/read", async (
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -501,23 +501,23 @@ public static class LebenslaufEndpoints
                 return;
             }
 
-            var stand = await mediator.Send(
-                new UnterlagenLesenBefehl(handelnder.Subject), cancellationToken);
+            var state = await mediator.Send(
+                new ReadDocumentsCommand(handelnder.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                stand.Select(Antwort).ToArray(), cancellationToken);
+                state.Select(Antwort).ToArray(), cancellationToken);
         });
 
         /*
          * Was zuletzt gelesen wurde — OHNE zu lesen.
          *
-         * Die Profilseite fragt das beim Laden, und sie darf das, weil hier
+         * Die ProfilePage fragt das beim Load, und sie darf das, weil hier
          * nichts geschieht: keine Datei wird geoeffnet, kein Erkenner gerufen,
          * keine Zeile geschrieben. Wer diese Trennung aufhebt und den
          * Lesevorgang hier anhaengt, macht aus dem Oeffnen einer Seite genau
          * den Hintergrundlauf, den der Knopf daneben vermeidet.
          */
-        unterlagen.MapGet("/terms", async (
+        documents.MapGet("/terms", async (
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -529,14 +529,14 @@ public static class LebenslaufEndpoints
                 return;
             }
 
-            var stand = await mediator.Send(
-                new MeineFundeAbfrage(handelnder.Subject), cancellationToken);
+            var state = await mediator.Send(
+                new MyTermsQuery(handelnder.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                stand.Select(Antwort).ToArray(), cancellationToken);
+                state.Select(Antwort).ToArray(), cancellationToken);
         });
 
-        unterlagen.MapGet("/{id:guid}/content", async (
+        documents.MapGet("/{id:guid}/content", async (
             Guid id,
             IMediator mediator,
             ICurrentPrincipal akteur,
@@ -549,29 +549,29 @@ public static class LebenslaufEndpoints
                 return;
             }
 
-            var gefunden = await mediator.Send(
-                new UnterlageInhaltAbfrage(handelnder.Subject, id), cancellationToken);
+            var found = await mediator.Send(
+                new DocumentContentQuery(handelnder.Subject, id), cancellationToken);
 
-            if (gefunden is not { } treffer)
+            if (found is not { } hit)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such document");
                 return;
             }
 
-            // `inline` und nicht `attachment`: die Mappe zeigt die Unterlage im
+            // `inline` und nicht `attachment`: die Mappe zeigt die DocumentRecord im
             // Browser, statt sie herunterzuladen. Der Dateiname traegt die
             // Endung aus dem ERKANNTEN Typ, nicht aus dem hochgeladenen Namen.
-            context.Response.ContentType = treffer.Unterlage.Inhaltstyp;
+            context.Response.ContentType = hit.DocumentRecord.Inhaltstyp;
             context.Response.Headers.ContentDisposition =
-                "inline; filename=\"" + treffer.Unterlage.Id.ToString("N")
-                + Typerkennung.Endung(treffer.Unterlage.Inhaltstyp) + "\"";
+                "inline; filename=\"" + hit.DocumentRecord.Id.ToString("N")
+                + Typerkennung.Endung(hit.DocumentRecord.Inhaltstyp) + "\"";
 
-            await context.Response.Body.WriteAsync(treffer.Inhalt, cancellationToken);
+            await context.Response.Body.WriteAsync(hit.Inhalt, cancellationToken);
         });
 
-        unterlagen.MapDelete("/{id:guid}", async (
+        documents.MapDelete("/{id:guid}", async (
             Guid id,
             IMediator mediator,
             ICurrentPrincipal akteur,
@@ -585,14 +585,14 @@ public static class LebenslaufEndpoints
             }
 
             var weg = await mediator.Send(
-                new UnterlageLoeschenBefehl(handelnder.Subject, id), cancellationToken);
+                new DeleteDocumentRecordCommand(handelnder.Subject, id), cancellationToken);
 
             context.Response.StatusCode = weg
                 ? StatusCodes.Status204NoContent
                 : StatusCodes.Status404NotFound;
         });
 
-        unterlagen.MapPut("/{id:guid}/as-cv", async (
+        documents.MapPut("/{id:guid}/as-cv", async (
             Guid id,
             IMediator mediator,
             ICurrentPrincipal akteur,
@@ -606,7 +606,7 @@ public static class LebenslaufEndpoints
             }
 
             var gesetzt = await mediator.Send(
-                new UnterlageAlsLebenslaufBefehl(handelnder.Subject, id), cancellationToken);
+                new MarkDocumentAsResumeCommand(handelnder.Subject, id), cancellationToken);
 
             context.Response.StatusCode = gesetzt
                 ? StatusCodes.Status204NoContent
@@ -626,23 +626,23 @@ public static class LebenslaufEndpoints
                 return;
             }
 
-            // Eine unbekannte Vorlage wird ABGEWIESEN und nicht still auf die
+            // Eine unbekannte ResumeTemplate wird ABGEWIESEN und nicht still auf die
             // Vorgabe gedreht: sonst waehlt jemand etwas, bekommt 200 zurueck
             // und sieht danach etwas anderes.
-            if (Vorlagenwahl(koerper?.Template) is not { } vorlage)
+            if (Vorlagenwahl(koerper?.Template) is not { } template)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "invalid: template");
                 return;
             }
 
             var gesetzt = await mediator.Send(
-                new VorlageWaehlenBefehl(handelnder.Subject, vorlage), cancellationToken);
+                new VorlageWaehlenBefehl(handelnder.Subject, template), cancellationToken);
 
             if (!gesetzt)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no resume");
                 return;
@@ -661,9 +661,9 @@ public static class LebenslaufEndpoints
     /// <strong>Nicht <c>null</c>.</strong> Ein Filter, der <c>null</c>
     /// zurückgibt, lässt das Rahmenwerk noch einmal schreiben — JSON-<c>null</c>
     /// samt Kopfzeilen, und die stehen zu diesem Zeitpunkt schon. Bei einer
-    /// Anfrage ohne Rumpf sieht der Aufrufer trotzdem sein 503 und nur das
+    /// ResumeRequest ohne Rumpf sieht der Aufrufer trotzdem sein 503 und nur das
     /// Protokoll trägt eine unbehandelte Ausnahme; bei einer mit Rumpf reißt
-    /// die Verbindung, und er bekommt „Error while copying content to a
+    /// die Connection, und er bekommt „Error while copying content to a
     /// stream". Gemessen an <c>POST /applications</c>.
     /// </remarks>
     private static readonly IResult Geschrieben = Results.Empty;
@@ -682,10 +682,10 @@ public static class LebenslaufEndpoints
             return;
         }
 
-        var ergebnis = await mediator.Send(
-            new AnfrageBeantwortenBefehl(id, handelnder.Subject, erteilen), cancellationToken);
+        var result = await mediator.Send(
+            new AnswerRequestCommand(id, handelnder.Subject, erteilen), cancellationToken);
 
-        await Beantworte(context, ergebnis, cancellationToken);
+        await Beantworte(context, result, cancellationToken);
     }
 
     /// <summary>
@@ -694,36 +694,36 @@ public static class LebenslaufEndpoints
     /// </summary>
     private static async Task Beantworte(
         HttpContext context,
-        Anfrageergebnis ergebnis,
+        ResumeRequestResult result,
         CancellationToken cancellationToken,
         int erfolg = StatusCodes.Status200OK)
     {
-        switch (ergebnis)
+        switch (result)
         {
-            case Anfrageergebnis.Erledigt erledigt:
+            case ResumeRequestResult.Erledigt erledigt:
                 context.Response.StatusCode = erfolg;
                 await context.Response.WriteAsJsonAsync(
-                    Antwort(erledigt.Anfrage, aktiv: null), cancellationToken);
+                    Antwort(erledigt.ResumeRequest, aktiv: null), cancellationToken);
                 return;
 
-            case Anfrageergebnis.NichtSichtbar:
+            case ResumeRequestResult.NichtSichtbar:
                 // The same 404 a non-existent person gets. Asking requires the
                 // profile release; without it the company must not be able to
                 // tell "hidden" from "not here".
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "no such profile");
                 return;
 
-            case Anfrageergebnis.SchonGefragt:
-                await ProblemDetailsMiddleware.Schreibe(
+            case ResumeRequestResult.SchonGefragt:
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status409Conflict,
                     "Request failed", "already asked");
                 return;
 
-            case Anfrageergebnis.Regelverstoss verstoss:
-                await ProblemDetailsMiddleware.Schreibe(
+            case ResumeRequestResult.Regelverstoss verstoss:
+                await ProblemDetailsMiddleware.Write(
                     context,
-                    verstoss.Code == Anfrageregel.NichtDieBetroffene
+                    verstoss.Code == ResumeRequestRule.NichtDieBetroffene
                         ? StatusCodes.Status403Forbidden
                         : StatusCodes.Status409Conflict,
                     "Request failed",
@@ -732,72 +732,72 @@ public static class LebenslaufEndpoints
         }
     }
 
-    private static LebenslaufV1 Antwort(Lebenslauf lebenslauf) => new(
-        lebenslauf.Wer.Value,
-        [.. lebenslauf.Stationen.Select(station => new StationV1(
+    private static ResumeV1 Antwort(CurriculumVitae resume) => new(
+        resume.Wer.Value,
+        [.. resume.Stationen.Select(station => new StationV1(
             station.Arbeitgeber, station.Titel, station.Beginn.ToString(),
             station.Ende?.ToString(), station.Beschreibung, station.Technologien))],
-        [.. lebenslauf.Ausbildungen.Select(ausbildung => new AusbildungV1(
+        [.. resume.Ausbildungen.Select(ausbildung => new AusbildungV1(
             ausbildung.Einrichtung, ausbildung.Abschluss, ausbildung.Beginn.ToString(),
             ausbildung.Ende?.ToString(),
             ausbildung.Art == Ausbildungsart.Schule ? "schule" : "ausbildung"))],
-        lebenslauf.Geaendert,
-        Vorlagenwort(lebenslauf.Vorlage));
+        resume.Geaendert,
+        Vorlagenwort(resume.ResumeTemplate));
 
     /// <summary>Der Vorlagenname auf der Leitung.</summary>
     /// <remarks>
     /// Kleingeschrieben und deutsch, wie im Aggregat — ein zweites Wörterbuch
     /// wäre eine zweite Gelegenheit, sich zu verschreiben.
     /// </remarks>
-    private static string Vorlagenwort(Vorlage vorlage) => vorlage switch
+    private static string Vorlagenwort(ResumeTemplate template) => template switch
     {
-        Vorlage.Klassisch => "klassisch",
-        Vorlage.Modern => "modern",
+        ResumeTemplate.Classic => "klassisch",
+        ResumeTemplate.Modern => "modern",
         _ => "schlicht"
     };
 
-    /// <summary>Die Vorlage zum Wort, oder <c>null</c>.</summary>
-    private static Vorlage? Vorlagenwahl(string? wort) => wort switch
+    /// <summary>Die ResumeTemplate zum Wort, oder <c>null</c>.</summary>
+    private static ResumeTemplate? Vorlagenwahl(string? word) => word switch
     {
-        "schlicht" => Vorlage.Schlicht,
-        "klassisch" => Vorlage.Klassisch,
-        "modern" => Vorlage.Modern,
+        "schlicht" => ResumeTemplate.Plain,
+        "klassisch" => ResumeTemplate.Classic,
+        "modern" => ResumeTemplate.Modern,
         _ => null
     };
 
-    /// <summary>Das Wort zur Art einer Unterlage.</summary>
-    private static string Artwort(Unterlagenart art) => art switch
+    /// <summary>Das Wort zur Art einer DocumentRecord.</summary>
+    private static string Artwort(DocumentKind kind) => kind switch
     {
-        Unterlagenart.Zeugnis => "zeugnis",
-        Unterlagenart.Zertifikat => "zertifikat",
-        Unterlagenart.Lebenslauf => "lebenslauf",
+        DocumentKind.Reference => "zeugnis",
+        DocumentKind.Certificate => "zertifikat",
+        DocumentKind.CurriculumVitae => "lebenslauf",
         _ => "sonstiges"
     };
 
     /// <summary>Die Art zum Wort — Unbekanntes wird „sonstiges".</summary>
     /// <remarks>
     /// Hier wird bewusst NICHT abgewiesen: die Art ordnet für den Menschen,
-    /// der die Mappe liest, und sie wird nirgends ausgewertet. Eine Bewerbung
+    /// der die Mappe liest, und sie wird nirgends ausgewertet. Eine JobApplication
     /// an einem Tippfehler in einem Ordnungsbegriff scheitern zu lassen wäre
     /// Strenge am falschen Ort.
     /// </remarks>
-    private static Unterlagenart Artwahl(string? wort) => wort switch
+    private static DocumentKind Artwahl(string? word) => word switch
     {
-        "zeugnis" => Unterlagenart.Zeugnis,
-        "zertifikat" => Unterlagenart.Zertifikat,
-        "lebenslauf" => Unterlagenart.Lebenslauf,
-        _ => Unterlagenart.Sonstiges
+        "zeugnis" => DocumentKind.Reference,
+        "zertifikat" => DocumentKind.Certificate,
+        "lebenslauf" => DocumentKind.CurriculumVitae,
+        _ => DocumentKind.Other
     };
 
-    private static UnterlageV1 Antwort(Unterlage unterlage) => new(
-        unterlage.Id,
-        unterlage.Name,
-        Artwort(unterlage.Art),
-        unterlage.Inhaltstyp,
-        unterlage.Groesse,
-        unterlage.Hochgeladen);
+    private static DocumentRecordV1 Antwort(DocumentRecord document) => new(
+        document.Id,
+        document.Name,
+        Artwort(document.Art),
+        document.Inhaltstyp,
+        document.Groesse,
+        document.Hochgeladen);
 
-    /// <summary>Der Stand einer Unterlage — gelesen oder nicht, und was drin stand.</summary>
+    /// <summary>Der State einer DocumentRecord — gelesen oder nicht, und was drin stand.</summary>
     /// <remarks>
     /// <c>read_at: null</c> heisst „noch nie gelesen" und ist etwas anderes als
     /// eine leere Wortliste. Der Name reist mit, damit die Oberflaeche sagen
@@ -805,35 +805,35 @@ public static class LebenslaufEndpoints
     /// Datei dazu waere wieder die stillschweigende Behauptung, es stehe nichts
     /// darin (ADR-0022 §3).
     /// </remarks>
-    private static UnterlagenfundV1 Antwort(Unterlagenstand stand) => new(
-        stand.Unterlage.Id,
-        stand.Unterlage.Name,
-        stand.Fund?.Gelesen,
-        stand.Fund?.TextGefunden ?? false,
-        stand.Fund?.Begriffe ?? []);
+    private static DocumentTermsV1 Antwort(DocumentRecordState state) => new(
+        state.DocumentRecord.Id,
+        state.DocumentRecord.Name,
+        state.Fund?.Gelesen,
+        state.Fund?.TextGefunden ?? false,
+        state.Fund?.Begriffe ?? []);
 
-    private static AnfrageV1 Antwort(Anfrage anfrage, bool? aktiv) => new(
-        anfrage.Id,
-        anfrage.Wer.Value,
-        anfrage.Firma.Value,
-        anfrage.Stand.ToString().ToUpperInvariant(),
-        anfrage.Gestellt,
-        anfrage.Beantwortet,
+    private static RequestV1 Antwort(ResumeRequest request, bool? aktiv) => new(
+        request.Id,
+        request.Wer.Value,
+        request.Firma.Value,
+        request.State.ToString().ToUpperInvariant(),
+        request.Gestellt,
+        request.Beantwortet,
         aktiv);
 
-    private static IReadOnlyList<Station> Stationen(LebenslaufSpeichernV1 body) =>
+    private static IReadOnlyList<Station> Stationen(StoreResumeV1 body) =>
         [.. body.Positions.Select(station => Station.Aus(
             station.Employer, station.Title, Monat.Lies(station.StartedOn),
             station.EndedOn is null ? null : Monat.Lies(station.EndedOn),
             station.Description, station.Technologies))];
 
-    private static IReadOnlyList<Ausbildung> Ausbildungen(LebenslaufSpeichernV1 body) =>
+    private static IReadOnlyList<Ausbildung> Ausbildungen(StoreResumeV1 body) =>
         [.. body.Education.Select(ausbildung => Ausbildung.Aus(
             ausbildung.Institution, ausbildung.Qualification, Monat.Lies(ausbildung.StartedOn),
             ausbildung.EndedOn is null ? null : Monat.Lies(ausbildung.EndedOn),
             ausbildung.Kind == "schule" ? Ausbildungsart.Schule : Ausbildungsart.Ausbildung))];
 
     private static Task NichtAngemeldet(HttpContext context) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
 }

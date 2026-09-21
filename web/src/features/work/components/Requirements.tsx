@@ -132,13 +132,17 @@ export function Requirements({
               }}
             >
               {state !== "unknown" ? (
-                <Box component="span" aria-hidden="true">
+                <Box
+                  component="span"
+                  // The symbol is decoration; the word below carries it for a
+                  // screen reader, which would otherwise hear three names and no
+                  // difference.
+                  aria-hidden="true"
+                >
                   {state === "have" ? "✓ " : "✗ "}
                 </Box>
               ) : null}
               <Box component="span">{skill}</Box>
-              {/* Das Zeichen ist Dekoration; wer vorgelesen bekommt, braucht
-                  das Wort. Sonst hörte man drei Namen und keinen Unterschied. */}
               {state !== "unknown" ? (
                 <NurVorgelesen>
                   {t(state === "have" ? "stellen.hastDu" : "stellen.fehltDir")}

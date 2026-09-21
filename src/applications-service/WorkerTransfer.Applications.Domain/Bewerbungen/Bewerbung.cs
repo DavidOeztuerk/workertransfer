@@ -1,9 +1,9 @@
 using Noelia.Core.Identity;
 
-namespace WorkerTransfer.Applications.Domain.Bewerbungen;
+namespace WorkerTransfer.Applications.Domain.Applications;
 
-/// <summary>Wo eine Bewerbung steht.</summary>
-public enum Bewerbungsstand
+/// <summary>Wo eine JobApplication steht.</summary>
+public enum ApplicationState
 {
     /// <summary>Abgeschickt.</summary>
     Submitted,
@@ -22,55 +22,55 @@ public enum Bewerbungsstand
 }
 
 /// <summary>Etwas an der Eingabe stimmt nicht.</summary>
-public abstract class Eingabefehler(string meldung) : Exception(meldung);
+public abstract class Eingabefehler(string notification) : Exception(notification);
 
 /// <summary>Die Nachricht ist zu lang.</summary>
-public sealed class NachrichtFehler(int grenze)
-    : Eingabefehler($"Die Nachricht ist länger als {grenze} Zeichen.");
+public sealed class NachrichtFehler(int limit)
+    : Eingabefehler($"Die Nachricht ist länger als {limit} Zeichen.");
 
-/// <summary>Das ist die Bewerbung eines anderen Menschen.</summary>
+/// <summary>Das ist die JobApplication eines anderen Menschen.</summary>
 public sealed class NichtDeine() : Eingabefehler("Diese Bewerbung gehört jemand anderem.");
 
 /// <summary>Dieser Schritt ist von hier aus nicht möglich.</summary>
-public sealed class UebergangNichtErlaubt(Bewerbungsstand jetzt, Bewerbungsstand gewollt)
-    : Eingabefehler($"Eine {jetzt}-Bewerbung kann nicht {gewollt} werden.");
+public sealed class UebergangNichtErlaubt(ApplicationState now, ApplicationState gewollt)
+    : Eingabefehler($"Eine {now}-Bewerbung kann nicht {gewollt} werden.");
 
 /// <summary>Was mitgeschickt wird.</summary>
 /// <remarks>
-/// Das Profil ist immer dabei und lässt sich nicht abwählen: eine Bewerbung
+/// Das Profile ist immer dabei und lässt sich nicht abwählen: eine JobApplication
 /// ohne jede Angabe zur Person ist keine, und „ich bewerbe mich, aber ihr dürft
 /// nichts von mir sehen" ist keine Wahl, die jemand ernsthaft trifft.
 /// </remarks>
 public sealed record Mitgeschicktes(
-    bool Lebenslauf = false,
+    bool CurriculumVitae = false,
     bool Portfolio = false,
     IReadOnlyList<Guid>? Unterlagen = null)
 {
     /// <summary>Immer wahr. Kein Feld, damit es niemand auf falsch setzt.</summary>
-    public bool Profil => true;
+    public bool Profile => true;
 
     /// <summary>Welche Unterlagen beiliegen — die Kennungen, in ihrer Reihenfolge.</summary>
     /// <remarks>
     /// <strong>Eine Momentaufnahme, kein Verweis auf „alles, was sie hat".</strong>
-    /// Wer später eine Unterlage hochlädt, hat sie dieser Bewerbung nicht
+    /// Wer später eine DocumentRecord hochlädt, hat sie dieser JobApplication nicht
     /// beigelegt; wer eine löscht, hat sie trotzdem geschickt. Die Liste hier
     /// sagt, was tatsächlich hinausging.
     /// </remarks>
     public IReadOnlyList<Guid> Unterlagen { get; init; } = Unterlagen ?? [];
 }
 
-/// <summary>Eine Bewerbung.</summary>
+/// <summary>Eine JobApplication.</summary>
 /// <remarks>
 /// Sie gehört <em>beiden</em> — der Person und dem Unternehmen. Deshalb hat
 /// jede Seite eigene Wege: die Person zieht zurück, das Unternehmen bewegt sie
 /// durch das Verfahren, und keiner der beiden darf, was der andere darf.
 /// <para>
 /// Es gibt hier keinen Punktwert und keine Rangfolge. Eine Liste von
-/// Bewerbungen, die nach irgendetwas sortiert wäre, das der Dienst gerechnet
+/// Applications, die nach irgendetwas sortiert wäre, das der Dienst gerechnet
 /// hat, ist die Kandidatenbewertung durch die Hintertür (ADR-0022).
 /// </para>
 /// </remarks>
-public sealed class Bewerbung
+public sealed class JobApplication
 {
     /// <summary>Wie lang die Nachricht sein darf.</summary>
     public const int HoechstlaengeNachricht = 4000;
@@ -80,50 +80,50 @@ public sealed class Bewerbung
     /// </summary>
     /// <remarks>
     /// Nach einer Ablehnung erneut abzuschicken wäre Nachfassen gegen ein
-    /// „nein", das schon gefallen ist — dieselbe Regel wie beim Lebenslauf.
+    /// „nein", das schon gefallen ist — dieselbe Regel wie beim CurriculumVitae.
     /// </remarks>
-    private static readonly Bewerbungsstand[] Endgueltig =
-        [Bewerbungsstand.Rejected, Bewerbungsstand.Hired];
+    private static readonly ApplicationState[] Endgueltig =
+        [ApplicationState.Rejected, ApplicationState.Hired];
 
-    private Bewerbung(
+    private JobApplication(
         Guid id,
-        Guid stelle,
-        TenantId firma,
-        SubjectId wer,
-        string nachricht,
+        Guid job,
+        TenantId company,
+        SubjectId subject,
+        string message,
         Mitgeschicktes mitgeschickt,
-        Bewerbungsstand stand,
+        ApplicationState state,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm,
         DateTimeOffset? beantwortetAm,
-        Bewerbungskontakt kontakt)
+        ApplicantContact kontakt)
     {
         Id = id;
-        Stelle = stelle;
-        Firma = firma;
-        Wer = wer;
-        Nachricht = nachricht;
+        Job = job;
+        Firma = company;
+        Wer = subject;
+        Nachricht = message;
         Mitgeschickt = mitgeschickt;
-        Stand = stand;
+        State = state;
         AngelegtAm = angelegtAm;
         GeaendertAm = geaendertAm;
         BeantwortetAm = beantwortetAm;
         Kontakt = kontakt;
     }
 
-    /// <summary>Welche Bewerbung.</summary>
+    /// <summary>Welche JobApplication.</summary>
     public Guid Id { get; }
 
-    /// <summary>Auf welche Stelle.</summary>
-    public Guid Stelle { get; }
+    /// <summary>Auf welche Job.</summary>
+    public Guid Job { get; }
 
     /// <summary>
-    /// Welches Unternehmen — aus der Stelle kopiert, mit Absicht.
+    /// Welches Unternehmen — aus der Job kopiert, mit Absicht.
     /// </summary>
     /// <remarks>
     /// Ein Fremdschlüssel geht nicht (andere Datenbank, ADR-0004), und ein
     /// Aufruf je Lesezugriff wäre teuer für eine Angabe, die sich nie ändert:
-    /// eine Stelle wechselt nicht das Unternehmen. Eine Kopie ist nur
+    /// eine Job wechselt nicht das Unternehmen. Eine Kopie ist nur
     /// gefährlich, wenn das Original sich ändern kann.
     /// </remarks>
     public TenantId Firma { get; }
@@ -138,7 +138,7 @@ public sealed class Bewerbung
     public Mitgeschicktes Mitgeschickt { get; private set; }
 
     /// <summary>Wo sie steht.</summary>
-    public Bewerbungsstand Stand { get; private set; }
+    public ApplicationState State { get; private set; }
 
     /// <summary>Wann sie abgeschickt wurde.</summary>
     public DateTimeOffset AngelegtAm { get; }
@@ -150,53 +150,53 @@ public sealed class Bewerbung
     public DateTimeOffset? BeantwortetAm { get; private set; }
 
     /// <summary>
-    /// Briefkopf zum Zeitpunkt des Sendens — Klarname, Anschrift, Telefon, Mail.
+    /// Briefkopf zum Zeitpunkt des Sendens — Klarname, PostalAddress, Telefon, Mail.
     /// </summary>
     /// <remarks>
     /// Snapshot, nicht Verweis (ADR-0038): ein späterer Umzug darf die
-    /// Firmenmappe nicht umschreiben. Nie im Anschreibenkontext, nie an ein Modell.
+    /// Firmenmappe nicht umschreiben. Nie im CoverLetterContext, nie an ein Modell.
     /// </remarks>
-    public Bewerbungskontakt Kontakt { get; private set; }
+    public ApplicantContact Kontakt { get; private set; }
 
     /// <summary>
-    /// Läuft sie noch — und damit die Freigabe der Daten?
+    /// Läuft sie noch — und damit die Release der Daten?
     /// </summary>
     /// <remarks>
-    /// Der Grund, warum das eine Frage an die Bewerbung ist und nicht an eine
+    /// Der Grund, warum das eine Frage an die JobApplication ist und nicht an eine
     /// Sichtbarkeitsspalte: solange sie läuft, darf das Unternehmen sehen, was
     /// mitgeschickt wurde. Danach nicht mehr, und niemand muss daran denken,
     /// etwas zurückzunehmen.
     /// </remarks>
-    public bool Laeuft => Stand is Bewerbungsstand.Submitted or Bewerbungsstand.Reviewing;
+    public bool Laeuft => State is ApplicationState.Submitted or ApplicationState.Reviewing;
 
-    /// <summary>Schickt eine Bewerbung ab.</summary>
-    public static Bewerbung Schicke_ab(
-        Guid stelle,
-        TenantId firma,
-        SubjectId wer,
-        string nachricht,
+    /// <summary>Schickt eine JobApplication ab.</summary>
+    public static JobApplication Schicke_ab(
+        Guid job,
+        TenantId company,
+        SubjectId subject,
+        string message,
         Mitgeschicktes mitgeschickt,
-        DateTimeOffset jetzt,
-        Bewerbungskontakt? kontakt = null) =>
-        new(Guid.CreateVersion7(), stelle, firma, wer, Text(nachricht), mitgeschickt,
-            Bewerbungsstand.Submitted, jetzt, jetzt, null,
-            kontakt ?? Bewerbungskontakt.Leer);
+        DateTimeOffset now,
+        ApplicantContact? kontakt = null) =>
+        new(Guid.CreateVersion7(), job, company, subject, Text(message), mitgeschickt,
+            ApplicationState.Submitted, now, now, null,
+            kontakt ?? ApplicantContact.Leer);
 
-    /// <summary>Die Bewerbung, wie eine Zeile sie hält.</summary>
-    public static Bewerbung Stelle_her(
+    /// <summary>Die JobApplication, wie eine Zeile sie hält.</summary>
+    public static JobApplication Stelle_her(
         Guid id,
-        Guid stelle,
-        TenantId firma,
-        SubjectId wer,
-        string nachricht,
+        Guid job,
+        TenantId company,
+        SubjectId subject,
+        string message,
         Mitgeschicktes mitgeschickt,
-        Bewerbungsstand stand,
+        ApplicationState state,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm,
         DateTimeOffset? beantwortetAm,
-        Bewerbungskontakt? kontakt = null) =>
-        new(id, stelle, firma, wer, nachricht, mitgeschickt, stand,
-            angelegtAm, geaendertAm, beantwortetAm, kontakt ?? Bewerbungskontakt.Leer);
+        ApplicantContact? kontakt = null) =>
+        new(id, job, company, subject, message, mitgeschickt, state,
+            angelegtAm, geaendertAm, beantwortetAm, kontakt ?? ApplicantContact.Leer);
 
     /// <summary>Nach einem Rückzug erneut bewerben — eine neue Entscheidung.</summary>
     /// <remarks>
@@ -205,22 +205,22 @@ public sealed class Bewerbung
     /// </remarks>
     /// <exception cref="UebergangNichtErlaubt">Sie wurde nicht zurückgezogen.</exception>
     public void Schicke_erneut(
-        string nachricht,
+        string message,
         Mitgeschicktes mitgeschickt,
-        DateTimeOffset jetzt,
-        Bewerbungskontakt? kontakt = null)
+        DateTimeOffset now,
+        ApplicantContact? kontakt = null)
     {
-        if (Stand is not Bewerbungsstand.Withdrawn)
+        if (State is not ApplicationState.Withdrawn)
         {
-            throw new UebergangNichtErlaubt(Stand, Bewerbungsstand.Submitted);
+            throw new UebergangNichtErlaubt(State, ApplicationState.Submitted);
         }
 
-        Nachricht = Text(nachricht);
+        Nachricht = Text(message);
         Mitgeschickt = mitgeschickt;
-        Kontakt = kontakt ?? Bewerbungskontakt.Leer;
-        Stand = Bewerbungsstand.Submitted;
+        Kontakt = kontakt ?? ApplicantContact.Leer;
+        State = ApplicationState.Submitted;
         BeantwortetAm = null;
-        GeaendertAm = jetzt;
+        GeaendertAm = now;
     }
 
     /// <summary>Zieht sie zurück.</summary>
@@ -230,7 +230,7 @@ public sealed class Bewerbung
     /// </remarks>
     /// <exception cref="NichtDeine">Sie gehört jemand anderem.</exception>
     /// <exception cref="UebergangNichtErlaubt">Sie läuft nicht mehr.</exception>
-    public void Ziehe_zurueck(SubjectId durch, DateTimeOffset jetzt)
+    public void Ziehe_zurueck(SubjectId durch, DateTimeOffset now)
     {
         if (durch != Wer)
         {
@@ -239,46 +239,46 @@ public sealed class Bewerbung
 
         if (!Laeuft)
         {
-            throw new UebergangNichtErlaubt(Stand, Bewerbungsstand.Withdrawn);
+            throw new UebergangNichtErlaubt(State, ApplicationState.Withdrawn);
         }
 
-        Stand = Bewerbungsstand.Withdrawn;
-        GeaendertAm = jetzt;
+        State = ApplicationState.Withdrawn;
+        GeaendertAm = now;
     }
 
     /// <summary>Das Unternehmen bewegt sie durch das Verfahren.</summary>
     /// <exception cref="UebergangNichtErlaubt">Von hier aus geht das nicht.</exception>
-    public void Bewege(Bewerbungsstand ziel, DateTimeOffset jetzt)
+    public void Bewege(ApplicationState target, DateTimeOffset now)
     {
-        if (ziel is not (Bewerbungsstand.Reviewing or Bewerbungsstand.Rejected
-                         or Bewerbungsstand.Hired))
+        if (target is not (ApplicationState.Reviewing or ApplicationState.Rejected
+                         or ApplicationState.Hired))
         {
-            // Ein Unternehmen zieht keine Bewerbung zurück — das ist die
+            // Ein Unternehmen zieht keine JobApplication zurück — das ist die
             // Handlung der Person, und sie hier zuzulassen hieße, es in ihrem
             // Namen tun zu können.
-            throw new UebergangNichtErlaubt(Stand, ziel);
+            throw new UebergangNichtErlaubt(State, target);
         }
 
-        // Eine zurückgezogene Bewerbung ist keine mehr; eine abgelehnte oder
+        // Eine zurückgezogene JobApplication ist keine mehr; eine abgelehnte oder
         // angenommene ist entschieden.
         if (!Laeuft)
         {
-            throw new UebergangNichtErlaubt(Stand, ziel);
+            throw new UebergangNichtErlaubt(State, target);
         }
 
-        Stand = ziel;
+        State = target;
 
-        if (Endgueltig.Contains(ziel))
+        if (Endgueltig.Contains(target))
         {
-            BeantwortetAm = jetzt;
+            BeantwortetAm = now;
         }
 
-        GeaendertAm = jetzt;
+        GeaendertAm = now;
     }
 
-    private static string Text(string? nachricht)
+    private static string Text(string? message)
     {
-        var bereinigt = (nachricht ?? string.Empty).Trim();
+        var bereinigt = (message ?? string.Empty).Trim();
 
         return bereinigt.Length > HoechstlaengeNachricht
             ? throw new NachrichtFehler(HoechstlaengeNachricht)
@@ -289,7 +289,7 @@ public sealed class Bewerbung
 /// <summary>
 /// Briefkopf zum Sendezeitpunkt. Gehört der Mappe, nicht dem Prompt (ADR-0038).
 /// </summary>
-public sealed record Bewerbungskontakt(
+public sealed record ApplicantContact(
     string Klarname,
     string Zeile1,
     string Zeile2,
@@ -300,70 +300,70 @@ public sealed record Bewerbungskontakt(
     string Email)
 {
     /// <summary>Nichts hinterlegt — der Briefkopf bleibt leer, das Senden nicht.</summary>
-    public static Bewerbungskontakt Leer { get; } =
+    public static ApplicantContact Leer { get; } =
         new(string.Empty, string.Empty, string.Empty, string.Empty,
             string.Empty, "DE", string.Empty, string.Empty);
 }
 
-/// <summary>Findet und speichert Bewerbungen.</summary>
-public interface IBewerbungsspeicher
+/// <summary>Findet und speichert Applications.</summary>
+public interface IApplicationStore
 {
-    /// <summary>Eine Bewerbung, oder <c>null</c>.</summary>
-    Task<Bewerbung?> HoleAsync(Guid id, CancellationToken cancellationToken = default);
+    /// <summary>Eine JobApplication, oder <c>null</c>.</summary>
+    Task<JobApplication?> GetAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>Die Bewerbung dieser Person auf diese Stelle, falls es sie gibt.</summary>
+    /// <summary>Die JobApplication dieser Person auf diese Job, falls es sie gibt.</summary>
     /// <remarks>
-    /// Eine Person bewirbt sich einmal je Stelle. Ein zweites Mal ist entweder
-    /// dieselbe Bewerbung erneut geschickt oder gar nicht erlaubt — nie eine
+    /// Eine Person bewirbt sich einmal je Job. Ein zweites Mal ist entweder
+    /// dieselbe JobApplication erneut geschickt oder gar nicht erlaubt — nie eine
     /// zweite Zeile.
     /// </remarks>
-    Task<Bewerbung?> HoleAsync(
-        Guid stelle, SubjectId wer, CancellationToken cancellationToken = default);
+    Task<JobApplication?> GetAsync(
+        Guid job, SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(Bewerbung bewerbung, CancellationToken cancellationToken = default);
+    Task SaveAsync(JobApplication application, CancellationToken cancellationToken = default);
 
-    /// <summary>Die Bewerbungen einer Person, neueste zuerst.</summary>
-    Task<IReadOnlyList<Bewerbung>> FuerPersonAsync(
-        SubjectId wer, CancellationToken cancellationToken = default);
+    /// <summary>Die Applications einer Person, neueste zuerst.</summary>
+    Task<IReadOnlyList<JobApplication>> ForPersonAsync(
+        SubjectId subject, CancellationToken cancellationToken = default);
 
-    /// <summary>Die Bewerbungen auf eine Stelle dieses Unternehmens.</summary>
-    Task<IReadOnlyList<Bewerbung>> FuerStelleAsync(
-        Guid stelle, TenantId firma, CancellationToken cancellationToken = default);
+    /// <summary>Die Applications auf eine Job dieses Unternehmens.</summary>
+    Task<IReadOnlyList<JobApplication>> ForJobAsync(
+        Guid job, TenantId company, CancellationToken cancellationToken = default);
 
-    /// <summary>Wie viele Bewerbungen dieses Unternehmen in welchem Stand hat.</summary>
-    Task<IReadOnlyDictionary<Bewerbungsstand, int>> ZaehleAsync(
-        TenantId firma, CancellationToken cancellationToken = default);
+    /// <summary>Wie viele Applications dieses Unternehmen in welchem State hat.</summary>
+    Task<IReadOnlyDictionary<ApplicationState, int>> CountAsync(
+        TenantId company, CancellationToken cancellationToken = default);
 }
 
-/// <summary>Die Worte, mit denen ein Stand auf der Leitung und in der Spalte steht.</summary>
+/// <summary>Die Worte, mit denen ein State auf der Leitung und in der Spalte steht.</summary>
 /// <remarks>
-/// An einer Stelle, weil es zwei Ränder gibt, die dasselbe Wort brauchen — die
+/// An einer Job, weil es zwei Ränder gibt, die dasselbe Wort brauchen — die
 /// Spalte <c>applications.status</c> und das Feld <c>status</c> im Vertrag. Zwei
 /// Übersetzungen wären zwei Gelegenheiten, sich zu unterscheiden, und die
 /// Oberfläche prüft die Worte einzeln ab.
 /// </remarks>
-public static class Bewerbungsstaende
+public static class ApplicationStates
 {
-    /// <summary>Das Wort zum Stand.</summary>
-    public static string Wort(Bewerbungsstand stand) => stand switch
+    /// <summary>Das Wort zum State.</summary>
+    public static string Wort(ApplicationState state) => state switch
     {
-        Bewerbungsstand.Submitted => "submitted",
-        Bewerbungsstand.Reviewing => "reviewing",
-        Bewerbungsstand.Rejected => "rejected",
-        Bewerbungsstand.Withdrawn => "withdrawn",
-        Bewerbungsstand.Hired => "hired",
-        _ => throw new ArgumentOutOfRangeException(nameof(stand))
+        ApplicationState.Submitted => "submitted",
+        ApplicationState.Reviewing => "reviewing",
+        ApplicationState.Rejected => "rejected",
+        ApplicationState.Withdrawn => "withdrawn",
+        ApplicationState.Hired => "hired",
+        _ => throw new ArgumentOutOfRangeException(nameof(state))
     };
 
-    /// <summary>Der Stand zum Wort, oder <c>null</c>.</summary>
-    public static Bewerbungsstand? Lies(string? wort) => wort switch
+    /// <summary>Der State zum Wort, oder <c>null</c>.</summary>
+    public static ApplicationState? Lies(string? word) => word switch
     {
-        "submitted" => Bewerbungsstand.Submitted,
-        "reviewing" => Bewerbungsstand.Reviewing,
-        "rejected" => Bewerbungsstand.Rejected,
-        "withdrawn" => Bewerbungsstand.Withdrawn,
-        "hired" => Bewerbungsstand.Hired,
+        "submitted" => ApplicationState.Submitted,
+        "reviewing" => ApplicationState.Reviewing,
+        "rejected" => ApplicationState.Rejected,
+        "withdrawn" => ApplicationState.Withdrawn,
+        "hired" => ApplicationState.Hired,
         _ => null
     };
 }

@@ -1,19 +1,19 @@
 using FluentValidation;
 
-namespace WorkerTransfer.Applications.Application.Bewerbungen;
+namespace WorkerTransfer.Applications.Application.Applications;
 
-/// <summary>Ein Bewerbungsstand muss dasein.</summary>
+/// <summary>Ein ApplicationState muss dasein.</summary>
 /// <remarks>
-/// Nur DASS, nicht WELCHER. Ob der Stand einer ist, den es gibt, und ob der
+/// Nur DASS, nicht WELCHER. Ob der State einer ist, den es gibt, und ob der
 /// Übergang dorthin erlaubt ist, entscheidet das Aggregat — dort steht die
 /// Reihenfolge der Stände, und eine zweite Liste hier ginge beim ersten neuen
-/// Stand auseinander.
+/// State auseinander.
 /// </remarks>
-public sealed class StandPruefung : AbstractValidator<BewerbungBewegenBefehl>
+public sealed class StateValidator : AbstractValidator<MoveApplicationCommand>
 {
     /// <summary>Setzt die eine Regel.</summary>
-    public StandPruefung() =>
-        RuleFor(befehl => befehl.Stand)
+    public StateValidator() =>
+        RuleFor(befehl => befehl.State)
             .NotEmpty().WithMessage("status is required")
             .OverridePropertyName("status");
 }

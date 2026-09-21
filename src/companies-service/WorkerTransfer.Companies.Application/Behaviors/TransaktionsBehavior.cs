@@ -18,7 +18,7 @@ public sealed class TransaktionsBehavior<TAnfrage, TAntwort>(IUnitOfWork arbeits
         ArgumentNullException.ThrowIfNull(next);
 
         return request is IBefehl
-            ? arbeitseinheit.InEinerTransaktionAsync(next.Invoke, cancellationToken)
+            ? arbeitseinheit.InTransactionAsync(next.Invoke, cancellationToken)
             : next(cancellationToken);
     }
 }

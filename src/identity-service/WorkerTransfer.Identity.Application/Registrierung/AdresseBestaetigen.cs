@@ -54,25 +54,25 @@ public sealed class AdresseBestaetigenHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var jetzt = uhr.GetUtcNow();
-        var zeile = await tokens.FindByHashAsync(
+        var now = uhr.GetUtcNow();
+        var row = await tokens.FindByHashAsync(
             einmaltoken.Hashe(request.Token), cancellationToken);
 
-        if (zeile is not { Purpose: TokenPurpose.EmailVerify })
+        if (row is not { Purpose: TokenPurpose.EmailVerify })
         {
             // An unknown token says nothing about why it is unknown, or the
             // endpoint becomes an oracle.
             return new Bestaetigungsergebnis.Ungueltig();
         }
 
-        var konto = await benutzer.FindByIdAsync(zeile.Subject, cancellationToken);
+        var konto = await benutzer.FindByIdAsync(row.Subject, cancellationToken);
 
         if (konto is null)
         {
             return new Bestaetigungsergebnis.Ungueltig();
         }
 
-        if (zeile.IsConsumed)
+        if (row.IsConsumed)
         {
             // Clicking the same link twice is not an error: the account is
             // exactly as unlocked as the click wanted it. Whoever holds the
@@ -85,7 +85,7 @@ public sealed class AdresseBestaetigenHandler(
                 : new Bestaetigungsergebnis.Ungueltig();
         }
 
-        if (zeile.IsExpired(jetzt))
+        if (row.IsExpired(now))
         {
             return new Bestaetigungsergebnis.Abgelaufen();
         }
@@ -95,12 +95,12 @@ public sealed class AdresseBestaetigenHandler(
         // Without this the unlock stays in memory: the aggregate comes back
         // detached from the repository.
         await benutzer.SaveAsync(konto, cancellationToken);
-        await tokens.ConsumeAsync(zeile.Id, jetzt, cancellationToken);
+        await tokens.ConsumeAsync(row.Id, now, cancellationToken);
 
         await protokoll.AppendAsync(
             new AuditEvent(
                 AuditAction.EmailVerified,
-                jetzt,
+                now,
                 actor: konto.Id,
                 correlationId: korrelation.Aktuell),
             cancellationToken);
@@ -125,22 +125,22 @@ public sealed class AdresseBestaetigenHandler(
         string gewollt,
         CancellationToken cancellationToken)
     {
-        var ergebnis = await unternehmen.AusfuehrenAsync(konto, gewollt, cancellationToken);
+        var result = await unternehmen.ExecuteOneAsync(konto, gewollt, cancellationToken);
 
-        // Spent in EVERY case, including a refusal — see User.CompanyIntentSpent.
+        // Spent in EVERY caseItem, including a refusal — see User.CompanyIntentSpent.
         konto.CompanyIntentSpent();
         await benutzer.SaveAsync(konto, cancellationToken);
 
-        return ergebnis switch
+        return result switch
         {
-            Firmenergebnis.Angelegt angelegt =>
+            CompanyResult.Angelegt angelegt =>
                 new Bestaetigungsergebnis.Bestaetigt(Firmenname: angelegt.Firma.Name),
 
             // The CONFIRMATION does not fail over this. The account is
             // unlocked, and that is right and irreversible: locking somebody
             // out because a company name was taken would be the wrong answer to
             // the wrong question.
-            Firmenergebnis.Abgelehnt abgelehnt =>
+            CompanyResult.Abgelehnt abgelehnt =>
                 new Bestaetigungsergebnis.Bestaetigt(Firmenfehler: abgelehnt.Code),
 
             _ => new Bestaetigungsergebnis.Bestaetigt()

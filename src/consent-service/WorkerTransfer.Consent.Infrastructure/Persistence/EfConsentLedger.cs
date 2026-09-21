@@ -10,7 +10,7 @@ namespace WorkerTransfer.Consent.Infrastructure.Persistence;
 /// Note what is absent here too: no update, no delete. The port offers neither,
 /// and neither does this.
 /// </remarks>
-public sealed class EfConsentLedger(ConsentDbContext kontext) : IConsentLedger
+public sealed class EfConsentLedger(ConsentDbContext context) : IConsentLedger
 {
     /// <summary>
     /// The reduction, once, as SQL — and the only definition of "newest".
@@ -46,12 +46,12 @@ public sealed class EfConsentLedger(ConsentDbContext kontext) : IConsentLedger
         """;
 
     /// <inheritdoc />
-    public async Task AnhaengenAsync(
+    public async Task AttachAsync(
         ConsentEvent ereignis, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(ereignis);
 
-        kontext.ConsentEvents.Add(new ConsentEventRow
+        context.ConsentEvents.Add(new ConsentEventRow
         {
             EventId = ereignis.EventId,
             SubjectId = ereignis.Subject.Value,
@@ -67,38 +67,38 @@ public sealed class EfConsentLedger(ConsentDbContext kontext) : IConsentLedger
         // time. Two things depend on it: a duplicate event id fails here, where
         // the caller can still see which write caused it, and the read that
         // follows in the same handler sees the fact that was just appended.
-        await kontext.SaveChangesAsync(cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<ConsentEvent>> VerlaufAsync(
+    public async Task<IReadOnlyList<ConsentEvent>> HistoryAsync(
         SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.ConsentEvents
-            .Where(zeile => zeile.SubjectId == subject.Value)
-            .OrderBy(zeile => zeile.RecordedAt)
-            .ThenBy(zeile => zeile.EventId)
+        var rows = await context.ConsentEvents
+            .Where(row => row.SubjectId == subject.Value)
+            .OrderBy(row => row.RecordedAt)
+            .ThenBy(row => row.EventId)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZuFakt)];
+        return [.. rows.Select(ZuFakt)];
     }
 
     /// <inheritdoc />
-    public async Task<ConsentEvent?> NeuestesAsync(
+    public async Task<ConsentEvent?> LatestOneAsync(
         SubjectId subject, Capability capability, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.ConsentEvents
+        var rows = await context.ConsentEvents
             .FromSqlRaw(
                 $"{Neueste} subject_id = {{0}} AND capability = {{1}} {Ordnung}",
                 subject.Value, capability.Value)
             .ToListAsync(cancellationToken);
 
-        return zeilen.Count is 0 ? null : ZuFakt(zeilen[0]);
+        return rows.Count is 0 ? null : ZuFakt(rows[0]);
     }
 
     /// <inheritdoc />
     public async Task<IReadOnlyDictionary<(Guid Subject, string Capability), ConsentEvent>>
-        NeuesteAsync(
+        LatestAsync(
             IReadOnlyList<(SubjectId Subject, Capability Capability)> paare,
             CancellationToken cancellationToken = default)
     {
@@ -115,39 +115,39 @@ public sealed class EfConsentLedger(ConsentDbContext kontext) : IConsentLedger
         // about pairs nobody asked about. A batch is meant to make one question
         // cheaper, not a hundred questions into ten thousand.
         var subjekte = paare.Select(paar => paar.Subject.Value).ToArray();
-        var faehigkeiten = paare.Select(paar => paar.Capability.Value).ToArray();
+        var skills = paare.Select(paar => paar.Capability.Value).ToArray();
 
-        var zeilen = await kontext.ConsentEvents
+        var rows = await context.ConsentEvents
             .FromSqlRaw(
                 $"{Neueste} (subject_id, capability) IN "
                 + "(SELECT s, c FROM unnest({0}::uuid[], {1}::text[]) AS t(s, c)) "
                 + Ordnung,
-                subjekte, faehigkeiten)
+                subjekte, skills)
             .ToListAsync(cancellationToken);
 
-        return zeilen.ToDictionary(
-            zeile => (zeile.SubjectId, zeile.Capability),
+        return rows.ToDictionary(
+            row => (row.SubjectId, row.Capability),
             ZuFakt);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<ConsentEvent>> NeuesteJeFaehigkeitAsync(
+    public async Task<IReadOnlyList<ConsentEvent>> LatestPerSkillAsync(
         SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.ConsentEvents
+        var rows = await context.ConsentEvents
             .FromSqlRaw($"{Neueste} subject_id = {{0}} {Ordnung}", subject.Value)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZuFakt)];
+        return [.. rows.Select(ZuFakt)];
     }
 
-    private static ConsentEvent ZuFakt(ConsentEventRow zeile) => ConsentEvent.Restore(
-        zeile.EventId,
-        new SubjectId(zeile.SubjectId),
-        Capability.Parse(zeile.Capability),
-        zeile.Action,
-        new DateTimeOffset(DateTime.SpecifyKind(zeile.RecordedAt, DateTimeKind.Utc)),
-        zeile.ActorId is { } akteur ? new SubjectId(akteur) : null,
-        zeile.Reason is { } grund ? WithdrawalReason.Parse(grund) : null,
-        JsonSerializer.Deserialize<Dictionary<string, string>>(zeile.Metadata));
+    private static ConsentEvent ZuFakt(ConsentEventRow row) => ConsentEvent.Restore(
+        row.EventId,
+        new SubjectId(row.SubjectId),
+        Capability.Parse(row.Capability),
+        row.Action,
+        new DateTimeOffset(DateTime.SpecifyKind(row.RecordedAt, DateTimeKind.Utc)),
+        row.ActorId is { } akteur ? new SubjectId(akteur) : null,
+        row.Reason is { } reason ? WithdrawalReason.Parse(reason) : null,
+        JsonSerializer.Deserialize<Dictionary<string, string>>(row.Metadata));
 }

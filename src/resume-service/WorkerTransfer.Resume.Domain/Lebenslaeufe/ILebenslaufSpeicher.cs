@@ -8,11 +8,11 @@ namespace WorkerTransfer.Resume.Domain.Lebenslaeufe;
 /// an interface that offered one would be the first step towards a candidate
 /// list — which is exactly what ADR-0022 removed.
 /// </remarks>
-public interface ILebenslaufSpeicher
+public interface IResumeStore
 {
     /// <summary><c>null</c> means nobody has written one. That is a state, not an error.</summary>
-    Task<Lebenslauf?> HoleAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task<CurriculumVitae?> GetAsync(SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Writes it. Joins whatever transaction is open.</summary>
-    Task SichereAsync(Lebenslauf lebenslauf, CancellationToken cancellationToken = default);
+    Task SaveAsync(CurriculumVitae resume, CancellationToken cancellationToken = default);
 }

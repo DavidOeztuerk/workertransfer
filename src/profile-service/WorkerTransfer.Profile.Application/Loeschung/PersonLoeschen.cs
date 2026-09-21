@@ -4,11 +4,11 @@ using WorkerTransfer.Profile.Application.Nachrichten;
 using WorkerTransfer.Profile.Domain.Profile;
 using WorkerTransfer.Profile.Domain.Pruefspur;
 
-namespace WorkerTransfer.Profile.Application.Loeschung;
+namespace WorkerTransfer.Profile.Application.Erasure;
 
 /// <summary>„Lösche alles, was du über diesen Menschen hältst.“</summary>
 /// <param name="Wer">Die Person.</param>
-public sealed record PersonLoeschenBefehl(SubjectId Wer) : IBefehl<int>;
+public sealed record ErasePersonCommand(SubjectId Wer) : IBefehl<int>;
 
 /// <summary>Was „löschen“ in diesem Dienst heißt (ADR-0027 §2).</summary>
 /// <remarks>
@@ -16,7 +16,7 @@ public sealed record PersonLoeschenBefehl(SubjectId Wer) : IBefehl<int>;
 /// hier nichts, was einem anderen gehört, also auch nichts zu erhalten und
 /// nichts zu anonymisieren.
 /// <para>
-/// Kein Sichtbarkeitsfeld, das man stattdessen umlegen könnte: ob ein Profil
+/// Kein Sichtbarkeitsfeld, das man stattdessen umlegen könnte: ob ein PersonProfile
 /// gezeigt werden darf, lebt allein im Ledger (ADR-0020). Ein „unsichtbar
 /// schalten“ wäre hier also nicht die schonendere Löschung, sondern gar keine.
 /// </para>
@@ -26,26 +26,26 @@ public sealed record PersonLoeschenBefehl(SubjectId Wer) : IBefehl<int>;
 /// erfahren, was blieb, statt es zu vermuten.
 /// </para>
 /// </remarks>
-public sealed class PersonLoeschenHandler(
-    IProfilspeicher speicher,
-    IPruefspur spur,
-    TimeProvider uhr) : IRequestHandler<PersonLoeschenBefehl, int>
+public sealed class ErasePersonHandler(
+    IProfileStore store,
+    IAuditTrail spur,
+    TimeProvider uhr) : IRequestHandler<ErasePersonCommand, int>
 {
     /// <inheritdoc />
     public async Task<int> Handle(
-        PersonLoeschenBefehl request, CancellationToken cancellationToken)
+        ErasePersonCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var geblieben = await speicher.LoescheAsync(request.Wer, cancellationToken);
+        var geblieben = await store.DeleteAsync(request.Wer, cancellationToken);
 
         // Die Spur hält fest, DASS gelöscht wurde, und nennt keinen Akteur:
         // hier handelt kein Mensch, sondern der Auftrag, den einer vor Stunden
         // erteilt hat. Was gelöscht wurde, steht nirgends — das wäre eine Kopie
         // dessen, was gerade verschwunden ist.
-        await spur.HaengeAnAsync(
-            new Pruefeintrag(
-                Pruefhandlung.ProfilGeloescht, uhr.GetUtcNow(), betroffen: request.Wer),
+        await spur.AppendOneAsync(
+            new AuditEntry(
+                AuditAction.ProfileDeleted, uhr.GetUtcNow(), betroffen: request.Wer),
             cancellationToken);
 
         return geblieben;

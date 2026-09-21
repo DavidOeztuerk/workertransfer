@@ -7,7 +7,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence;
 public sealed class EfUnitOfWork(IdentityDbContext context) : IUnitOfWork
 {
     /// <inheritdoc />
-    public async Task<T> InEinerTransaktionAsync<T>(
+    public async Task<T> InTransactionAsync<T>(
         Func<CancellationToken, Task<T>> arbeit,
         CancellationToken cancellationToken = default)
     {
@@ -22,11 +22,11 @@ public sealed class EfUnitOfWork(IdentityDbContext context) : IUnitOfWork
 
         await using var klammer = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var ergebnis = await arbeit(cancellationToken);
+        var result = await arbeit(cancellationToken);
 
         await context.SaveChangesAsync(cancellationToken);
         await klammer.CommitAsync(cancellationToken);
 
-        return ergebnis;
+        return result;
     }
 }

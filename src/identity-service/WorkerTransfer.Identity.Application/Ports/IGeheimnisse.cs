@@ -5,14 +5,14 @@ namespace WorkerTransfer.Identity.Application.Ports;
 /// Als Port und nicht als direkter Aufruf, damit die Anwendungsschicht nicht
 /// weiss, WIE verschlüsselt wird — und damit ein Test es ohne Hauptschlüssel
 /// tun kann. Die Umsetzung liegt in der Infrastruktur und benutzt
-/// <c>ServiceDefaults.Geheimnisspeicher</c>.
+/// <c>ServiceDefaults.SecretStore</c>.
 /// </remarks>
-public interface IGeheimnisse
+public interface ISecrets
 {
     /// <summary>Verschlüsselt.</summary>
     /// <param name="klartext">Das Geheimnis.</param>
     /// <returns>Was in die Zeile geschrieben wird.</returns>
-    string Verschluessele(string klartext);
+    string Encrypt(string klartext);
 
     /// <summary>Die letzten vier Zeichen, zum Wiedererkennen.</summary>
     /// <param name="klartext">Das Geheimnis.</param>
@@ -22,5 +22,5 @@ public interface IGeheimnisse
     /// <summary>Entschlüsselt, was <see cref="Verschluessele"/> geschrieben hat.</summary>
     /// <param name="gespeichert">Was in der Zeile steht.</param>
     /// <returns>Der Klartext, oder <c>null</c>, wenn nichts da oder unlesbar.</returns>
-    string? Entschluessele(string? gespeichert);
+    string? Decrypt(string? gespeichert);
 }

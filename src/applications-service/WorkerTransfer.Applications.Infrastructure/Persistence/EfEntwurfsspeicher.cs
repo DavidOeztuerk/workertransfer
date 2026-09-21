@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Noelia.Core.Identity;
 using Microsoft.EntityFrameworkCore;
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 
 namespace WorkerTransfer.Applications.Infrastructure.Persistence;
 
@@ -10,133 +10,133 @@ namespace WorkerTransfer.Applications.Infrastructure.Persistence;
 /// Wie überall hier kommen die Aggregate <strong>abgelöst</strong> zurück: eine
 /// Änderung erreicht die Datenbank nur über ein ausdrückliches Speichern.
 /// </remarks>
-public sealed class EfEntwurfsspeicher(ApplicationsDbContext kontext) : IEntwurfsspeicher
+public sealed class EfDraftStore(ApplicationsDbContext context) : IDraftStore
 {
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Bewerbungsentwurf>> MeineAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ApplicationDraft>> MineAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.Entwuerfe
-            .Where(zeile => zeile.SubjectId == wer.Value)
-            .OrderByDescending(zeile => zeile.UpdatedAt)
+        var rows = await context.Entwuerfe
+            .Where(row => row.SubjectId == subject.Value)
+            .OrderByDescending(row => row.UpdatedAt)
             .ToListAsync(cancellationToken);
 
-        if (zeilen.Count == 0)
+        if (rows.Count == 0)
         {
             return [];
         }
 
         // EINE Abfrage für alle Anmerkungen, nicht eine je Entwurf: eine Liste
         // mit zwanzig Entwürfen kostete sonst einundzwanzig Fahrten.
-        var kennungen = zeilen.Select(zeile => zeile.Id).ToList();
-        var anmerkungen = await kontext.Anmerkungen
-            .Where(zeile => kennungen.Contains(zeile.DraftId))
+        var kennungen = rows.Select(row => row.Id).ToList();
+        var anmerkungen = await context.Anmerkungen
+            .Where(row => kennungen.Contains(row.DraftId))
             .ToListAsync(cancellationToken);
 
         var nachEntwurf = anmerkungen
-            .GroupBy(zeile => zeile.DraftId)
-            .ToDictionary(gruppe => gruppe.Key, gruppe => gruppe.ToList());
+            .GroupBy(row => row.DraftId)
+            .ToDictionary(group => group.Key, group => group.ToList());
 
         return
         [
-            .. zeilen.Select(zeile => ZumAggregat(
-                zeile,
-                nachEntwurf.TryGetValue(zeile.Id, out var eigene) ? eigene : []))
+            .. rows.Select(row => ZumAggregat(
+                row,
+                nachEntwurf.TryGetValue(row.Id, out var eigene) ? eigene : []))
         ];
     }
 
     /// <inheritdoc />
-    public async Task<Bewerbungsentwurf?> HoleAsync(
-        SubjectId wer, Guid id, CancellationToken cancellationToken = default)
+    public async Task<ApplicationDraft?> GetAsync(
+        SubjectId subject, Guid id, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Entwuerfe
+        var row = await context.Entwuerfe
             .FirstOrDefaultAsync(
-                eintrag => eintrag.Id == id && eintrag.SubjectId == wer.Value,
+                entry => entry.Id == id && entry.SubjectId == subject.Value,
                 cancellationToken);
 
-        if (zeile is null)
+        if (row is null)
         {
             return null;
         }
 
-        var anmerkungen = await kontext.Anmerkungen
-            .Where(eintrag => eintrag.DraftId == id)
+        var anmerkungen = await context.Anmerkungen
+            .Where(entry => entry.DraftId == id)
             .ToListAsync(cancellationToken);
 
-        return ZumAggregat(zeile, anmerkungen);
+        return ZumAggregat(row, anmerkungen);
     }
 
     /// <inheritdoc />
-    public async Task<Bewerbungsentwurf?> OffenerAsync(
-        SubjectId wer, Guid stelle, CancellationToken cancellationToken = default)
+    public async Task<ApplicationDraft?> OpenOneAsync(
+        SubjectId subject, Guid job, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Entwuerfe
-            .Where(eintrag => eintrag.SubjectId == wer.Value
-                && eintrag.JobId == stelle
-                && eintrag.Status != Standwort(Entwurfsstand.Gesendet))
-            .OrderByDescending(eintrag => eintrag.UpdatedAt)
+        var row = await context.Entwuerfe
+            .Where(entry => entry.SubjectId == subject.Value
+                && entry.JobId == job
+                && entry.Status != Standwort(DraftState.Gesendet))
+            .OrderByDescending(entry => entry.UpdatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (zeile is null)
+        if (row is null)
         {
             return null;
         }
 
-        var anmerkungen = await kontext.Anmerkungen
-            .Where(eintrag => eintrag.DraftId == zeile.Id)
+        var anmerkungen = await context.Anmerkungen
+            .Where(entry => entry.DraftId == row.Id)
             .ToListAsync(cancellationToken);
 
-        return ZumAggregat(zeile, anmerkungen);
+        return ZumAggregat(row, anmerkungen);
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(
-        Bewerbungsentwurf entwurf, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        ApplicationDraft draft, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(entwurf);
+        ArgumentNullException.ThrowIfNull(draft);
 
-        var zeile = await kontext.Entwuerfe
+        var row = await context.Entwuerfe
             .AsTracking()
-            .FirstOrDefaultAsync(eintrag => eintrag.Id == entwurf.Id, cancellationToken);
+            .FirstOrDefaultAsync(entry => entry.Id == draft.Id, cancellationToken);
 
-        if (zeile is null)
+        if (row is null)
         {
-            zeile = new EntwurfsZeile { Id = entwurf.Id, CreatedAt = entwurf.Angelegt.UtcDateTime };
-            kontext.Entwuerfe.Add(zeile);
+            row = new DraftRow { Id = draft.Id, CreatedAt = draft.Angelegt.UtcDateTime };
+            context.Entwuerfe.Add(row);
         }
 
-        zeile.JobId = entwurf.Stelle;
-        zeile.TenantId = entwurf.Firma.Value;
-        zeile.SubjectId = entwurf.Wer.Value;
-        zeile.Subject = entwurf.Betreff;
-        zeile.Body = entwurf.Text;
-        zeile.Status = Standwort(entwurf.Stand);
-        zeile.Version = entwurf.Fassung;
-        zeile.Error = entwurf.Fehler;
-        zeile.SharesResume = entwurf.TeiltLebenslauf;
-        zeile.Documents = JsonSerializer.Serialize(entwurf.Unterlagen);
-        zeile.UpdatedAt = entwurf.Geaendert.UtcDateTime;
-        zeile.WritingStartedAt = entwurf.SchreibenBegonnen?.UtcDateTime;
+        row.JobId = draft.Job;
+        row.TenantId = draft.Firma.Value;
+        row.SubjectId = draft.Wer.Value;
+        row.Subject = draft.Betreff;
+        row.Body = draft.Text;
+        row.Status = Standwort(draft.State);
+        row.Version = draft.Fassung;
+        row.Error = draft.Fehler;
+        row.SharesResume = draft.TeiltLebenslauf;
+        row.Documents = JsonSerializer.Serialize(draft.Unterlagen);
+        row.UpdatedAt = draft.Geaendert.UtcDateTime;
+        row.WritingStartedAt = draft.SchreibenBegonnen?.UtcDateTime;
 
         // Die Anmerkungen: neue anlegen, abgehakte nachziehen. Gelöscht wird
-        // keine — eine Anmerkung ist der Beleg dafür, dass jemand widersprochen
+        // keine — eine Anmerkung ist der Evidence dafür, dass jemand widersprochen
         // hat, und sie verschwinden zu lassen hiesse, die Fassungsgeschichte
         // um ihre Begründung zu bringen.
-        var vorhandene = await kontext.Anmerkungen
+        var vorhandene = await context.Anmerkungen
             .AsTracking()
-            .Where(eintrag => eintrag.DraftId == entwurf.Id)
+            .Where(entry => entry.DraftId == draft.Id)
             .ToListAsync(cancellationToken);
 
-        foreach (var anmerkung in entwurf.Anmerkungen)
+        foreach (var anmerkung in draft.Anmerkungen)
         {
-            var gefunden = vorhandene.FirstOrDefault(eintrag => eintrag.Id == anmerkung.Id);
+            var found = vorhandene.FirstOrDefault(entry => entry.Id == anmerkung.Id);
 
-            if (gefunden is null)
+            if (found is null)
             {
-                kontext.Anmerkungen.Add(new AnmerkungsZeile
+                context.Anmerkungen.Add(new CommentRow
                 {
                     Id = anmerkung.Id,
-                    DraftId = entwurf.Id,
+                    DraftId = draft.Id,
                     Body = anmerkung.Text,
                     Quote = anmerkung.Zitat,
                     Resolved = anmerkung.Erledigt,
@@ -146,67 +146,67 @@ public sealed class EfEntwurfsspeicher(ApplicationsDbContext kontext) : IEntwurf
                 continue;
             }
 
-            gefunden.Resolved = anmerkung.Erledigt;
+            found.Resolved = anmerkung.Erledigt;
         }
     }
 
     /// <inheritdoc />
-    public async Task LoescheAsync(
-        SubjectId wer, Guid id, CancellationToken cancellationToken = default)
+    public async Task DeleteAsync(
+        SubjectId subject, Guid id, CancellationToken cancellationToken = default)
     {
-        await kontext.Anmerkungen
-            .Where(zeile => zeile.DraftId == id)
+        await context.Anmerkungen
+            .Where(row => row.DraftId == id)
             .ExecuteDeleteAsync(cancellationToken);
 
-        await kontext.Entwuerfe
-            .Where(zeile => zeile.Id == id && zeile.SubjectId == wer.Value)
+        await context.Entwuerfe
+            .Where(row => row.Id == id && row.SubjectId == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
     }
 
-    /// <summary>Der Stand als Wort — snake_case, wie überall auf der Leitung.</summary>
-    public static string Standwort(Entwurfsstand stand) => stand switch
+    /// <summary>Der State als Wort — snake_case, wie überall auf der Leitung.</summary>
+    public static string Standwort(DraftState state) => state switch
     {
-        Entwurfsstand.Entsteht => "generating",
-        Entwurfsstand.Pruefen => "review",
-        Entwurfsstand.Ueberarbeiten => "needs_changes",
-        Entwurfsstand.Freigegeben => "approved",
-        Entwurfsstand.Gesendet => "sent",
+        DraftState.Entsteht => "generating",
+        DraftState.Pruefen => "review",
+        DraftState.Ueberarbeiten => "needs_changes",
+        DraftState.Freigegeben => "approved",
+        DraftState.Gesendet => "sent",
         _ => "failed"
     };
 
-    /// <summary>Das Wort als Stand.</summary>
-    public static Entwurfsstand Standwahl(string? wort) => wort switch
+    /// <summary>Das Wort als State.</summary>
+    public static DraftState Standwahl(string? word) => word switch
     {
-        "review" => Entwurfsstand.Pruefen,
-        "needs_changes" => Entwurfsstand.Ueberarbeiten,
-        "approved" => Entwurfsstand.Freigegeben,
-        "sent" => Entwurfsstand.Gesendet,
-        "failed" => Entwurfsstand.Fehlgeschlagen,
-        _ => Entwurfsstand.Entsteht
+        "review" => DraftState.Pruefen,
+        "needs_changes" => DraftState.Ueberarbeiten,
+        "approved" => DraftState.Freigegeben,
+        "sent" => DraftState.Gesendet,
+        "failed" => DraftState.Fehlgeschlagen,
+        _ => DraftState.Entsteht
     };
 
-    private static Bewerbungsentwurf ZumAggregat(
-        EntwurfsZeile zeile, IReadOnlyList<AnmerkungsZeile> anmerkungen) =>
-        Bewerbungsentwurf.Stelle_her(
-            zeile.Id,
-            zeile.JobId,
-            new TenantId(zeile.TenantId),
-            new SubjectId(zeile.SubjectId),
-            zeile.Subject,
-            zeile.Body,
-            Standwahl(zeile.Status),
-            zeile.Version,
-            zeile.Error,
-            zeile.SharesResume,
-            JsonSerializer.Deserialize<List<Guid>>(zeile.Documents) ?? [],
+    private static ApplicationDraft ZumAggregat(
+        DraftRow row, IReadOnlyList<CommentRow> anmerkungen) =>
+        ApplicationDraft.Stelle_her(
+            row.Id,
+            row.JobId,
+            new TenantId(row.TenantId),
+            new SubjectId(row.SubjectId),
+            row.Subject,
+            row.Body,
+            Standwahl(row.Status),
+            row.Version,
+            row.Error,
+            row.SharesResume,
+            JsonSerializer.Deserialize<List<Guid>>(row.Documents) ?? [],
             [
-                .. anmerkungen.Select(eintrag => Anmerkung.Stelle_her(
-                    eintrag.Id, eintrag.Body, eintrag.Quote, eintrag.Resolved,
-                    new DateTimeOffset(eintrag.CreatedAt, TimeSpan.Zero)))
+                .. anmerkungen.Select(entry => Anmerkung.Stelle_her(
+                    entry.Id, entry.Body, entry.Quote, entry.Resolved,
+                    new DateTimeOffset(entry.CreatedAt, TimeSpan.Zero)))
             ],
-            new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
-            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero),
-            zeile.WritingStartedAt is { } start
+            new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
+            new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero),
+            row.WritingStartedAt is { } start
                 ? new DateTimeOffset(start, TimeSpan.Zero)
                 : null);
 }

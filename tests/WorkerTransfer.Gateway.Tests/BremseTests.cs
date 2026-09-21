@@ -20,7 +20,7 @@ namespace WorkerTransfer.Gateway.Tests;
 /// </summary>
 /// <remarks>
 /// Ein eigener kleiner Wirt statt der ganzen Landschaft, aus einem Grund, der
-/// hier der eigentliche Punkt ist: <strong>die Herkunft muss verstellbar sein.</strong>
+/// hier der eigentliche Punkt ist: <strong>die ProviderOrigin muss verstellbar sein.</strong>
 /// Über einen echten Socket kommt jeder Aufruf von <c>127.0.0.1</c>, und dann
 /// ließe sich nie zeigen, dass zwei Herkünfte getrennte Töpfe haben — der Test
 /// wäre grün, auch wenn die Bremse alle Menschen in einen Topf würfe. Genau
@@ -30,7 +30,7 @@ public sealed class BremseTests
 {
     private const string HerkunftsKopf = "X-Test-Herkunft";
 
-    private static WebApplication Wirt(int grenze, bool auchDieProbe = false)
+    private static WebApplication Wirt(int limit, bool auchDieProbe = false)
     {
         var bau = WebApplication.CreateBuilder();
         bau.WebHost.UseUrls("http://127.0.0.1:0");
@@ -38,14 +38,14 @@ public sealed class BremseTests
         bau.Services.AddMemoryCache();
         bau.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
 
-        var grenzen = new Dictionary<string, EndpointRateLimit>(StringComparer.Ordinal)
+        var limits = new Dictionary<string, EndpointRateLimit>(StringComparer.Ordinal)
         {
-            ["/auth/login"] = new EndpointRateLimit { RequestsPerMinute = grenze }
+            ["/auth/login"] = new EndpointRateLimit { RequestsPerMinute = limit }
         };
 
         if (auchDieProbe)
         {
-            grenzen["/health/live"] = new EndpointRateLimit { RequestsPerMinute = grenze };
+            limits["/health/live"] = new EndpointRateLimit { RequestsPerMinute = limit };
         }
 
         bau.Services.Configure<DistributedRateLimitingOptions>(einstellungen =>
@@ -62,21 +62,21 @@ public sealed class BremseTests
             // gar nicht zaehlt.
             einstellungen.WhitelistedIps = [];
             einstellungen.WhitelistedEndpoints = [];
-            einstellungen.EndpointSpecificLimits = grenzen;
+            einstellungen.EndpointSpecificLimits = limits;
         });
 
         var wirt = bau.Build();
 
-        // NUR IM TEST: die Herkunft der Verbindung setzen. Der Erzeuger nimmt
+        // NUR IM TEST: die ProviderOrigin der Connection setzen. Der Erzeuger nimmt
         // sie aus `Connection.RemoteIpAddress`, und über einen echten Socket
         // ist das immer dieselbe Schleife. Das steht VOR der Bremse, damit sie
         // liest, was hier gesetzt wurde.
-        wirt.Use(async (kontext, weiter) =>
+        wirt.Use(async (context, weiter) =>
         {
-            if (kontext.Request.Headers.TryGetValue(HerkunftsKopf, out var wert))
+            if (context.Request.Headers.TryGetValue(HerkunftsKopf, out var value))
             {
-                kontext.Connection.RemoteIpAddress =
-                    System.Net.IPAddress.Parse(wert.ToString());
+                context.Connection.RemoteIpAddress =
+                    System.Net.IPAddress.Parse(value.ToString());
             }
 
             await weiter();
@@ -92,18 +92,18 @@ public sealed class BremseTests
     }
 
     private static async Task<HttpResponseMessage> Anmelden(
-        HttpClient browser, string herkunft, string adresse = "anna@example.org")
+        HttpClient browser, string herkunft, string address = "anna@example.org")
     {
-        using var anfrage = new HttpRequestMessage(HttpMethod.Post, "/auth/login")
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/auth/login")
         {
             Content = new StringContent(
-                JsonSerializer.Serialize(new { email = adresse, password = "geheim" }),
+                JsonSerializer.Serialize(new { email = address, password = "geheim" }),
                 Encoding.UTF8,
                 "application/json")
         };
-        anfrage.Headers.TryAddWithoutValidation(HerkunftsKopf, herkunft);
+        request.Headers.TryAddWithoutValidation(HerkunftsKopf, herkunft);
 
-        return await browser.SendAsync(anfrage);
+        return await browser.SendAsync(request);
     }
 
     private static HttpClient Browser(WebApplication wirt) =>
@@ -112,15 +112,15 @@ public sealed class BremseTests
     [Fact]
     public async Task Ueber_der_Grenze_kommt_429()
     {
-        await using var wirt = Wirt(grenze: 3);
+        await using var wirt = Wirt(limit: 3);
         await wirt.StartAsync();
         using var browser = Browser(wirt);
 
         var gesehen = new List<HttpStatusCode>();
         for (var i = 0; i < 5; i++)
         {
-            using var antwort = await Anmelden(browser, "10.0.0.1");
-            gesehen.Add(antwort.StatusCode);
+            using var response = await Anmelden(browser, "10.0.0.1");
+            gesehen.Add(response.StatusCode);
         }
 
         gesehen.Should().Equal(
@@ -132,11 +132,11 @@ public sealed class BremseTests
     }
 
     /// <summary>
-    /// Die Zusage, um die es geht: <strong>je Herkunft, nie je Adresse.</strong>
+    /// Die Zusage, um die es geht: <strong>je ProviderOrigin, nie je Adresse.</strong>
     /// </summary>
     /// <remarks>
     /// Fünf Anmeldeversuche mit fünf <em>verschiedenen</em> Adressen aus
-    /// <em>einer</em> Herkunft werden gebremst wie fünf mit derselben. Wäre die
+    /// <em>einer</em> ProviderOrigin werden gebremst wie fünf mit derselben. Wäre die
     /// Adresse Teil des Schlüssels, käme jeder Versuch in einen eigenen Topf und
     /// niemand würde je gebremst — und die gebremste Antwort verriete außerdem,
     /// welche Adresse es gibt.
@@ -144,15 +144,15 @@ public sealed class BremseTests
     [Fact]
     public async Task Fuenf_verschiedene_Adressen_aus_einer_Herkunft_teilen_einen_Topf()
     {
-        await using var wirt = Wirt(grenze: 3);
+        await using var wirt = Wirt(limit: 3);
         await wirt.StartAsync();
         using var browser = Browser(wirt);
 
         var gesehen = new List<HttpStatusCode>();
         for (var i = 0; i < 5; i++)
         {
-            using var antwort = await Anmelden(browser, "10.0.0.1", $"mensch{i}@example.org");
-            gesehen.Add(antwort.StatusCode);
+            using var response = await Anmelden(browser, "10.0.0.1", $"mensch{i}@example.org");
+            gesehen.Add(response.StatusCode);
         }
 
         gesehen.Should().Equal(
@@ -163,11 +163,11 @@ public sealed class BremseTests
             HttpStatusCode.TooManyRequests);
     }
 
-    /// <summary>Die Gegenrichtung: eine Herkunft sperrt keine andere aus.</summary>
+    /// <summary>Die Gegenrichtung: eine ProviderOrigin sperrt keine andere aus.</summary>
     [Fact]
     public async Task Zwei_Herkuenfte_teilen_sich_keinen_Topf()
     {
-        await using var wirt = Wirt(grenze: 2);
+        await using var wirt = Wirt(limit: 2);
         await wirt.StartAsync();
         using var browser = Browser(wirt);
 
@@ -186,14 +186,14 @@ public sealed class BremseTests
     [Fact]
     public async Task Ein_nicht_gelisteter_Pfad_wird_nie_gebremst()
     {
-        await using var wirt = Wirt(grenze: 2);
+        await using var wirt = Wirt(limit: 2);
         await wirt.StartAsync();
         using var browser = Browser(wirt);
 
         for (var i = 0; i < 20; i++)
         {
-            using var antwort = await browser.GetAsync("/jobs");
-            antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+            using var response = await browser.GetAsync("/jobs");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
         }
     }
 
@@ -208,19 +208,19 @@ public sealed class BremseTests
     [Fact]
     public async Task Die_Abweisung_nennt_kein_Konto()
     {
-        await using var wirt = Wirt(grenze: 1);
+        await using var wirt = Wirt(limit: 1);
         await wirt.StartAsync();
         using var browser = Browser(wirt);
 
         (await Anmelden(browser, "10.0.0.1", "anna@example.org")).Dispose();
         using var abgewiesen = await Anmelden(browser, "10.0.0.1", "anna@example.org");
 
-        var rumpf = await abgewiesen.Content.ReadAsStringAsync();
+        var body = await abgewiesen.Content.ReadAsStringAsync();
 
-        rumpf.Should().NotContain("anna", "die Adresse darf in keiner Antwort auftauchen");
-        rumpf.Should().NotContain("example.org");
+        body.Should().NotContain("anna", "die Adresse darf in keiner Antwort auftauchen");
+        body.Should().NotContain("example.org");
 
-        var gelesen = JsonDocument.Parse(rumpf).RootElement;
+        var gelesen = JsonDocument.Parse(body).RootElement;
         gelesen.GetProperty("status").GetInt32().Should().Be(429);
         // Der Wortlaut ist Noelias. Was hier zaehlt, ist die Zusage darueber:
         // er nennt kein Konto — und kann es nicht, weil die Bremse den Rumpf
@@ -234,7 +234,7 @@ public sealed class BremseTests
     [Fact]
     public async Task Die_Abweisung_sagt_wann_es_wieder_geht()
     {
-        await using var wirt = Wirt(grenze: 1);
+        await using var wirt = Wirt(limit: 1);
         await wirt.StartAsync();
         using var browser = Browser(wirt);
 
@@ -263,18 +263,18 @@ public sealed class BremseTests
     /// </summary>
     /// <remarks>
     /// <strong>Der Test, ohne den die Bremse eine Attrappe wäre.</strong> Diesen
-    /// Kopf setzt der Aufrufer selbst. Würde die Herkunft daraus gelesen, drehte
-    /// ein Angreifer ihn bei jeder Anfrage und wäre nie gebremst — die Bremse
+    /// Header setzt der Aufrufer selbst. Würde die ProviderOrigin daraus gelesen, drehte
+    /// ein Angreifer ihn bei jeder ResumeRequest und wäre nie gebremst — die Bremse
     /// sähe von außen genauso aus und hielte nichts auf.
     /// <para>
-    /// Vier Anfragen aus <em>einer</em> Verbindung mit vier <em>verschiedenen</em>
+    /// Vier Anfragen aus <em>einer</em> Connection mit vier <em>verschiedenen</em>
     /// erfundenen Weiterleitungsköpfen müssen sich also einen Topf teilen.
     /// </para>
     /// </remarks>
     [Fact]
     public async Task Ein_mitgebrachter_Weiterleitungskopf_aendert_den_Topf_nicht()
     {
-        await using var wirt = Wirt(grenze: 2);
+        await using var wirt = Wirt(limit: 2);
         await wirt.StartAsync();
         using var browser = Browser(wirt);
 
@@ -282,13 +282,13 @@ public sealed class BremseTests
 
         for (var i = 0; i < 4; i++)
         {
-            using var anfrage = new HttpRequestMessage(HttpMethod.Post, "/auth/login");
-            anfrage.Headers.TryAddWithoutValidation(HerkunftsKopf, "10.0.0.1");
-            anfrage.Headers.TryAddWithoutValidation("X-Forwarded-For", $"203.0.113.{i}");
-            anfrage.Headers.TryAddWithoutValidation("X-Real-IP", $"198.51.100.{i}");
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/auth/login");
+            request.Headers.TryAddWithoutValidation(HerkunftsKopf, "10.0.0.1");
+            request.Headers.TryAddWithoutValidation("X-Forwarded-For", $"203.0.113.{i}");
+            request.Headers.TryAddWithoutValidation("X-Real-IP", $"198.51.100.{i}");
 
-            using var antwort = await browser.SendAsync(anfrage);
-            gesehen.Add(antwort.StatusCode);
+            using var response = await browser.SendAsync(request);
+            gesehen.Add(response.StatusCode);
         }
 
         gesehen.Should().Equal(
@@ -312,25 +312,25 @@ public sealed class BremseTests
     [Fact]
     public async Task Die_Gesundheitsprobe_bleibt_ungebremst_selbst_wenn_sie_gelistet_ist()
     {
-        await using var wirt = Wirt(grenze: 2, auchDieProbe: true);
+        await using var wirt = Wirt(limit: 2, auchDieProbe: true);
         await wirt.StartAsync();
         using var browser = Browser(wirt);
 
         for (var i = 0; i < 40; i++)
         {
-            using var antwort = await browser.GetAsync("/health/live");
-            antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+            using var response = await browser.GetAsync("/health/live");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
         }
     }
 
     // Drei Tests standen hier und sind mit `Bremse.cs` gegangen: die Gestalt des
     // Zählerschlüssels, die Zusammenführung von `::ffff:10.0.0.1`, und der
-    // gemeinsame Topf ohne feststellbare Herkunft. Alle drei prüften eine
+    // gemeinsame Topf ohne feststellbare ProviderOrigin. Alle drei prüften eine
     // Umsetzung, die es hier nicht mehr gibt — sie gehören jetzt zu
     // `ClientAddress` in Noelia und werden dort geprüft.
     //
     // Die ZUSAGE, die sie trugen, steht weiter oben und stärker: „verschiedene
-    // Adressen aus einer Herkunft teilen einen Topf" fährt fünf echte Anmeldungen
+    // Adressen aus einer ProviderOrigin teilen einen Topf" fährt fünf echte Anmeldungen
     // durch das echte Gateway. Ein Schlüssel, der die Adresse enthielte, fiele
     // dort — ohne dass der Test seine Gestalt kennen müsste.
 
@@ -348,7 +348,7 @@ public sealed class BremseTests
             "/auth/refresh");
 
         pfade.Values.Should().OnlyContain(
-            grenze => grenze > 0, "eine Grenze von null wäre eine Sperre, keine Bremse");
+            limit => limit > 0, "eine Grenze von null wäre eine Sperre, keine Bremse");
     }
 
     /// <summary>
@@ -363,7 +363,7 @@ public sealed class BremseTests
     /// </remarks>
     [Fact]
     public void Die_ausgelieferte_Karte_hat_keine_Vorgabe_ueber_allem() =>
-        Bremskarte.Vorgaben().Should().AllSatisfy(vorgabe => vorgabe.Should().Be(0));
+        Bremskarte.Vorgaben().Should().AllSatisfy(defaultValue => defaultValue.Should().Be(0));
 
     /// <summary>
     /// Die ausgelieferte Karte multipliziert nichts.
@@ -393,17 +393,17 @@ public sealed class BremseTests
         var pfade = Bremskarte.Pfade();
         var routen = Bremskarte.Routen();
 
-        foreach (var pfad in pfade.Keys)
+        foreach (var path in pfade.Keys)
         {
             routen.Should().Contain(
-                route => Passt(route, pfad),
-                $"'{pfad}' wird gebremst, aber keine Route führt dorthin");
+                route => Passt(route, path),
+                $"'{path}' wird gebremst, aber keine Route führt dorthin");
         }
     }
 
-    private static bool Passt(string route, string pfad)
+    private static bool Passt(string route, string path)
     {
-        if (string.Equals(route, pfad, StringComparison.Ordinal))
+        if (string.Equals(route, path, StringComparison.Ordinal))
         {
             return true;
         }
@@ -412,8 +412,8 @@ public sealed class BremseTests
         var klammer = route.IndexOf('{', StringComparison.Ordinal);
 
         return klammer > 0
-               && pfad.StartsWith(route[..klammer], StringComparison.Ordinal)
-               && pfad.Length > klammer;
+               && path.StartsWith(route[..klammer], StringComparison.Ordinal)
+               && path.Length > klammer;
     }
 }
 
@@ -422,15 +422,15 @@ internal static class Bremskarte
 {
     private static JsonElement Wurzel()
     {
-        var pfad = Path.Combine(AppContext.BaseDirectory, "ocelot.json");
+        var path = Path.Combine(AppContext.BaseDirectory, "ocelot.json");
 
         return JsonDocument.Parse(
-            File.ReadAllText(pfad),
+            File.ReadAllText(path),
             new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip }).RootElement;
     }
 
     /// <summary>
-    /// Die gebremsten Pfade und ihre Grenzen, aus Noelias Abschnitt.
+    /// Die gebremsten Pfade und ihre Grenzen, aus Noelias Section.
     /// </summary>
     /// <remarks>
     /// Gelesen statt gebaut: was hier steht, ist genau das, was der Behälter
@@ -442,8 +442,8 @@ internal static class Bremskarte
 
         return abschnitt.GetProperty("EndpointSpecificLimits").EnumerateObject()
             .ToDictionary(
-                eintrag => eintrag.Name,
-                eintrag => eintrag.Value.GetProperty("RequestsPerMinute").GetInt32(),
+                entry => entry.Name,
+                entry => entry.Value.GetProperty("RequestsPerMinute").GetInt32(),
                 StringComparer.Ordinal);
     }
 
@@ -467,7 +467,7 @@ internal static class Bremskarte
     {
         var abschnitt = Wurzel().GetProperty(DistributedRateLimitingOptions.SectionName);
 
-        return abschnitt.TryGetProperty("LimitMultiplier", out var wert) ? wert.GetInt32() : 1;
+        return abschnitt.TryGetProperty("LimitMultiplier", out var value) ? value.GetInt32() : 1;
     }
 
     public static IReadOnlyList<string> Routen() =>
@@ -481,10 +481,10 @@ internal static class Bremskarte
 /// <remarks>
 /// Der Wirt oben prüft die Regel, diese Reihe prüft die <em>Verdrahtung</em>:
 /// steht sie in <c>Program.cs</c> überhaupt in der Kette, liest sie die
-/// ausgelieferte Karte, und liegt sie an der richtigen Stelle? Das ist eine
+/// ausgelieferte Karte, und liegt sie an der richtigen Job? Das ist eine
 /// andere Frage, und beide sind schon einmal einzeln falsch gewesen.
 /// <para>
-/// Eigene Landschaft (<see cref="GebremsteLandschaft"/>), weil hier Grenzen
+/// Own Landschaft (<see cref="GebremsteLandschaft"/>), weil hier Grenzen
 /// absichtlich ausgeschöpft werden.
 /// </para>
 /// </remarks>
@@ -503,9 +503,9 @@ public class GebremstesGatewayTests(GebremsteLandschaft landschaft)
 
         for (var i = 0; i < 5; i++)
         {
-            using var antwort = await landschaft.Browser.PostAsync(
+            using var response = await landschaft.Browser.PostAsync(
                 "/auth/resend-verification", content: null);
-            gesehen.Add(antwort.StatusCode);
+            gesehen.Add(response.StatusCode);
         }
 
         gesehen.Should().EndWith([HttpStatusCode.TooManyRequests]);
@@ -518,8 +518,8 @@ public class GebremstesGatewayTests(GebremsteLandschaft landschaft)
     {
         for (var i = 0; i < 40; i++)
         {
-            using var antwort = await landschaft.Browser.GetAsync("/jobs");
-            antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+            using var response = await landschaft.Browser.GetAsync("/jobs");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
         }
     }
 }

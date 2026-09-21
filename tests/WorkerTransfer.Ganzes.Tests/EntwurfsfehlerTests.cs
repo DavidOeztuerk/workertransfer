@@ -20,11 +20,11 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// Bewegung, weil ein Fehlschlag der Moment ist, in dem man mehr sehen will.</para>
 ///
 /// <para>Der Selbstbeschreibungstext einer Person gehört in dieselbe Klasse wie
-/// ein Lebenslauf: <c>product-scope.md</c> verbietet ihn im Protokoll. Eine
+/// ein Resume: <c>product-scope.md</c> verbietet ihn im Protokoll. Eine
 /// Fehlermeldung ist ein Protokolleintrag, der zusätzlich noch zum Aufrufer
 /// zurückgeht.</para>
 ///
-/// <para>Beide Dienste geben dieselbe Zusage, deshalb steht sie an einer Stelle:
+/// <para>Beide Dienste geben dieselbe Zusage, deshalb steht sie an einer Job:
 /// die Reihe wäre sonst zweimal dieselbe, und eine der beiden bliebe beim
 /// nächsten Zweig zurück.</para>
 /// </remarks>
@@ -41,15 +41,15 @@ public class EntwurfsfehlerTests
     [Theory]
     [InlineData("profil")]
     [InlineData("anzeige")]
-    public async Task Ein_Verbindungsfehler_traegt_den_Prompt_nicht_mit(string seite)
+    public async Task Ein_Verbindungsfehler_traegt_den_Prompt_nicht_mit(string page)
     {
-        var fehler = await Fange(
-            seite,
+        var error = await Fange(
+            page,
             new Stubhandler(_ => Task.FromException<HttpResponseMessage>(
                 new HttpRequestException("kein Netz"))));
 
-        fehler.Message.Should().Contain("HttpRequestException", "die Art gehoert hinein");
-        OhneInhalt(fehler);
+        error.Message.Should().Contain("HttpRequestException", "die Art gehoert hinein");
+        OhneInhalt(error);
     }
 
     /// <summary>
@@ -63,16 +63,16 @@ public class EntwurfsfehlerTests
     [Theory]
     [InlineData("profil")]
     [InlineData("anzeige")]
-    public async Task Eine_Fehlerantwort_traegt_weder_Rumpf_noch_Prompt(string seite)
+    public async Task Eine_Fehlerantwort_traegt_weder_Rumpf_noch_Prompt(string page)
     {
-        var fehler = await Fange(seite, new Stubhandler(_ =>
+        var error = await Fange(page, new Stubhandler(_ =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
             {
                 Content = new StringContent($"invalid_request: '{Geheim}'")
             })));
 
-        fehler.Message.Should().Contain("400", "der Statuscode ist die Art");
-        OhneInhalt(fehler);
+        error.Message.Should().Contain("400", "der Statuscode ist die Art");
+        OhneInhalt(error);
     }
 
     /// <summary>
@@ -88,10 +88,10 @@ public class EntwurfsfehlerTests
     [Theory]
     [InlineData("profil")]
     [InlineData("anzeige")]
-    public async Task Ein_Zeitablauf_wird_zum_Anbieterfehler(string seite)
+    public async Task Ein_Zeitablauf_wird_zum_Anbieterfehler(string page)
     {
-        var fehler = await Fange(
-            seite,
+        var error = await Fange(
+            page,
             new Stubhandler(async marke =>
             {
                 await Task.Delay(TimeSpan.FromSeconds(30), marke);
@@ -99,8 +99,8 @@ public class EntwurfsfehlerTests
             }),
             zeitlimit: TimeSpan.FromMilliseconds(80));
 
-        fehler.Message.Should().Contain("Zeitueberschreitung");
-        OhneInhalt(fehler);
+        error.Message.Should().Contain("Zeitueberschreitung");
+        OhneInhalt(error);
     }
 
     /// <summary>
@@ -115,73 +115,73 @@ public class EntwurfsfehlerTests
     [Theory]
     [InlineData("profil")]
     [InlineData("anzeige")]
-    public async Task Ein_Abbruch_des_Aufrufers_bleibt_ein_Abbruch(string seite)
+    public async Task Ein_Abbruch_des_Aufrufers_bleibt_ein_Abbruch(string page)
     {
-        using var abbruch = new CancellationTokenSource();
+        using var cancellationToken = new CancellationTokenSource();
 
         var handler = new Stubhandler(async marke =>
         {
-            await abbruch.CancelAsync();
+            await cancellationToken.CancelAsync();
             await Task.Delay(TimeSpan.FromSeconds(30), marke);
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        var tat = async () => await Entwirf(seite, handler, TimeSpan.FromSeconds(30), abbruch.Token);
+        var tat = async () => await Entwirf(page, handler, TimeSpan.FromSeconds(30), cancellationToken.Token);
 
         await tat.Should().ThrowAsync<OperationCanceledException>(
             "wer auflegt, meldet keinen Anbieterausfall");
     }
 
-    /// <summary>Keine Meldung trägt Inhalt — weder den Text noch den Wunsch.</summary>
-    private static void OhneInhalt(Exception fehler)
+    /// <summary>None Meldung trägt Inhalt — weder den Text noch den Wunsch.</summary>
+    private static void OhneInhalt(Exception error)
     {
-        fehler.Message.Should().NotContain("Aleppo", "kein Wort aus dem Text der Person");
-        fehler.Message.Should().NotContain(Geheim);
-        fehler.Message.Should().NotContain(Wunsch, "auch der Wunsch ist Inhalt");
+        error.Message.Should().NotContain("Aleppo", "kein Wort aus dem Text der Person");
+        error.Message.Should().NotContain(Geheim);
+        error.Message.Should().NotContain(Wunsch, "auch der Wunsch ist Inhalt");
     }
 
     private static async Task<Exception> Fange(
-        string seite, Stubhandler handler, TimeSpan? zeitlimit = null)
+        string page, Stubhandler handler, TimeSpan? zeitlimit = null)
     {
         try
         {
-            await Entwirf(seite, handler, zeitlimit ?? TimeSpan.FromSeconds(30), default);
+            await Entwirf(page, handler, zeitlimit ?? TimeSpan.FromSeconds(30), default);
         }
-        catch (Exception fehler)
+        catch (Exception error)
         {
-            return fehler;
+            return error;
         }
 
         throw new InvalidOperationException("es fiel keine Ausnahme — der Test prueft dann nichts");
     }
 
     private static Task<string> Entwirf(
-        string seite, Stubhandler handler, TimeSpan zeitlimit, CancellationToken marke)
+        string page, Stubhandler handler, TimeSpan zeitlimit, CancellationToken marke)
     {
         var fabrik = new Stubfabrik(handler);
 
-        if (seite == "profil")
+        if (page == "profil")
         {
-            var einstellungen = new ProfilEntwurf.Entwurfseinstellungen
+            var einstellungen = new ProfilEntwurf.DraftSettings
             {
                 Schluessel = "probe",
                 Zeitueberschreitung = zeitlimit
             };
 
-            return new ProfilEntwurf.HttpEntwerfer(fabrik, Options.Create(einstellungen))
-                .EntwirfAsync(
-                    new ProfilPorts.Entwurfslage("Titel", Geheim, ["Python"], Wunsch), marke);
+            return new ProfilEntwurf.HttpDrafter(fabrik, Options.Create(einstellungen))
+                .DraftAsync(
+                    new ProfilPorts.DraftSituation("Titel", Geheim, ["Python"], Wunsch), marke);
         }
 
-        var jobs = new JobsEntwurf.Entwurfseinstellungen
+        var jobs = new JobsEntwurf.DraftSettings
         {
             Schluessel = "probe",
             Zeitueberschreitung = zeitlimit
         };
 
-        return new JobsEntwurf.HttpEntwerfer(fabrik, Options.Create(jobs))
-            .EntwirfAsync(
-                new JobsPorts.Anzeigenentwurf("Titel", Geheim, ["Python"], "Berlin", Wunsch),
+        return new JobsEntwurf.HttpDrafter(fabrik, Options.Create(jobs))
+            .DraftAsync(
+                new JobsPorts.AdvertDraft("Titel", Geheim, ["Python"], "Berlin", Wunsch),
                 marke);
     }
 

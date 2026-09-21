@@ -22,12 +22,12 @@ public static class Gesundheit
 
         return app.Use(async (context, weiter) =>
         {
-            var pfad = context.Request.Path.Value;
+            var path = context.Request.Path.Value;
 
-            if (pfad is "/health/live" or "/health/ready")
+            if (path is "/health/live" or "/health/ready")
             {
                 await context.Response.WriteAsJsonAsync(
-                    new { status = pfad["/health/".Length..] });
+                    new { status = path["/health/".Length..] });
                 return;
             }
 

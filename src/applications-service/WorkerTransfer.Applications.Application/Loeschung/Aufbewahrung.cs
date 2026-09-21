@@ -1,4 +1,4 @@
-namespace WorkerTransfer.Applications.Application.Loeschung;
+namespace WorkerTransfer.Applications.Application.Erasure;
 
 /// <summary>Der Schalter, der auf AUS steht (ADR-0027 §3).</summary>
 /// <remarks>
@@ -18,14 +18,14 @@ namespace WorkerTransfer.Applications.Application.Loeschung;
 /// </para>
 /// <para>
 /// <strong>Was das für das Unternehmen heißt, offen gesagt:</strong> löscht ein
-/// Mensch sein Konto, verschwindet auch die Bewerbung, über die er eingestellt
+/// Mensch sein Konto, verschwindet auch die JobApplication, über die er eingestellt
 /// wurde, aus der Liste des Unternehmens. Das ist gewollt, und
 /// <c>/delete-account</c> sagt es vor dem Knopf.
 /// </para>
 /// </remarks>
-public static class Aufbewahrung
+public static class Retention
 {
-    /// <summary><strong>AUS.</strong> Eingestellte Bewerbungen fallen mit.</summary>
+    /// <summary><strong>AUS.</strong> Eingestellte Applications fallen mit.</summary>
     /// <remarks>
     /// Eine benannte Konstante und <strong>kein Konfigurationswert</strong>: bei
     /// einem Löschversprechen wäre „in Produktion anders als im Test" der
@@ -33,8 +33,8 @@ public static class Aufbewahrung
     /// jemand begründen muss — nicht eine Umgebungsvariable, die niemand liest.
     /// <para>
     /// Sie schaltet <strong>genau eine Zeilenklasse in diesem Dienst</strong>:
-    /// <c>status = 'hired'</c>. Keine Ausdehnung auf <c>rejected</c> — eine
-    /// abgelehnte Bewerbung begründet nichts — und kein „laufender Vorgang" als
+    /// <c>status = 'hired'</c>. None Ausdehnung auf <c>rejected</c> — eine
+    /// abgelehnte JobApplication begründet nichts — und kein „laufender Case" als
     /// Gummiwort. Und keine Frist, in keiner Richtung: weder eine geratene Dauer
     /// noch ein Nachlauf, der später aufräumt. Wird sie je umgelegt, kommt die
     /// Frist <em>zusammen mit der Antwort</em>, nicht vorher.

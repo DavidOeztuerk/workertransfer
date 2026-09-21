@@ -26,11 +26,11 @@ public class FirmaWechselnTests
     private static readonly TenantId Firma = TenantId.New();
     private static readonly SessionId Sitzung = SessionId.New();
 
-    private Task<Firmenwechselergebnis> Wechseln() =>
-        new FirmaWechselnHandler(
+    private Task<CompanySwitchResult> Wechseln() =>
+        new SwitchCompanyHandler(
             _mitglieder, _benutzer, _sitzungen, _form, _token, _protokoll,
             new FesteKorrelation("abc-123"), TimeProvider.System)
-            .Handle(new FirmaWechselnBefehl(Anna, Firma), CancellationToken.None);
+            .Handle(new SwitchCompanyCommand(Anna, Firma), CancellationToken.None);
 
     private void EsGibtDasKonto(AccountStatus status = AccountStatus.Active) =>
         _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>())
@@ -53,9 +53,9 @@ public class FirmaWechselnTests
         EsGibtDasKonto();
         EineSitzungEntsteht();
 
-        var ergebnis = await Wechseln();
+        var result = await Wechseln();
 
-        ergebnis.Should().BeOfType<Firmenwechselergebnis.Gewechselt>();
+        result.Should().BeOfType<CompanySwitchResult.Gewechselt>();
         await _token.Received().IssueAsync(
             Anna, "anna@example.com",
             Arg.Is<Capacity>(c => c.Equals(new Capacity.ForCompany(Firma))),
@@ -71,9 +71,9 @@ public class FirmaWechselnTests
     {
         _mitglieder.IsMemberAsync(Anna, Firma, Arg.Any<CancellationToken>()).Returns(false);
 
-        var ergebnis = await Wechseln();
+        var result = await Wechseln();
 
-        ergebnis.Should().BeOfType<Firmenwechselergebnis.KeinMitglied>();
+        result.Should().BeOfType<CompanySwitchResult.NoMember>();
         await _token.DidNotReceive().IssueAsync(
             Arg.Any<SubjectId>(), Arg.Any<string>(), Arg.Any<Capacity>(),
             Arg.Any<SessionId>(), Arg.Any<CancellationToken>());
@@ -127,9 +127,9 @@ public class FirmaWechselnTests
         _mitglieder.IsMemberAsync(Anna, Firma, Arg.Any<CancellationToken>()).Returns(true);
         EsGibtDasKonto(status);
 
-        var ergebnis = await Wechseln();
+        var result = await Wechseln();
 
-        ergebnis.Should().BeOfType<Firmenwechselergebnis.Abgelehnt>();
+        result.Should().BeOfType<CompanySwitchResult.Abgelehnt>();
         await _sitzungen.DidNotReceive().StartAsync(
             Arg.Any<SubjectId>(), Arg.Any<CancellationToken>());
     }

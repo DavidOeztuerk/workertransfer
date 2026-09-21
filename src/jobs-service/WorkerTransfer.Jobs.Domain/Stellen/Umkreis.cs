@@ -1,4 +1,4 @@
-namespace WorkerTransfer.Jobs.Domain.Stellen;
+namespace WorkerTransfer.Jobs.Domain.Jobs;
 
 /// <summary>„Im Umkreis von N Kilometern um diesen Punkt."</summary>
 /// <remarks>
@@ -27,10 +27,10 @@ public sealed record Umkreis
     /// <summary>Der grösste. Darüber ist es keine Umkreissuche mehr.</summary>
     public const double GroessterRadiusKm = 500;
 
-    private Umkreis(double breite, double laenge, double radiusKm)
+    private Umkreis(double breite, double length, double radiusKm)
     {
         Breite = breite;
-        Laenge = laenge;
+        Laenge = length;
         RadiusKm = radiusKm;
     }
 
@@ -46,8 +46,8 @@ public sealed record Umkreis
     /// <summary>Baut einen Umkreis aus dem, was in der Abfrage stand.</summary>
     /// <remarks>
     /// Unvollständiges oder Unsinniges ergibt <c>null</c> — also KEINEN Filter,
-    /// und keinen Fehler. Dieselbe Haltung wie bei der Seitenwahl: eine Liste,
-    /// die auf <c>?lat=abc</c> mit 400 antwortet, ist an einer Stelle streng, an
+    /// und keinen Fehler. Dieselbe Haltung wie bei der PageSelection: eine Liste,
+    /// die auf <c>?lat=abc</c> mit 400 antwortet, ist an einer Job streng, an
     /// der niemand etwas gewinnt. Der Radius wird geklemmt statt verworfen —
     /// wer 100000 schickt, meint „weit", und daraus keinen Filter zu machen
     /// wäre die überraschendere Antwort.
@@ -56,9 +56,9 @@ public sealed record Umkreis
     /// <param name="laenge">Längengrad, oder <c>null</c>.</param>
     /// <param name="radiusKm">Der gewünschte Radius, oder <c>null</c>.</param>
     /// <returns>Der Umkreis, oder <c>null</c>, wenn keiner gemeint war.</returns>
-    public static Umkreis? Aus(double? breite, double? laenge, double? radiusKm)
+    public static Umkreis? Aus(double? breite, double? length, double? radiusKm)
     {
-        if (breite is not { } b || laenge is not { } l || radiusKm is not { } r)
+        if (breite is not { } b || length is not { } l || radiusKm is not { } r)
         {
             return null;
         }

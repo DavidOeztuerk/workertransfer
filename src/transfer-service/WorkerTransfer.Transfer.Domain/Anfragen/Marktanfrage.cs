@@ -2,8 +2,8 @@ using Noelia.Core.Identity;
 
 namespace WorkerTransfer.Transfer.Domain.Anfragen;
 
-/// <summary>Wo eine Anfrage steht.</summary>
-public enum Anfragestand
+/// <summary>Wo eine ResumeRequest steht.</summary>
+public enum RequestState
 {
     /// <summary>Gestellt, unbeantwortet.</summary>
     Pending,
@@ -15,24 +15,24 @@ public enum Anfragestand
     Declined
 }
 
-/// <summary>Die Worte, mit denen ein Anfragestand auf der Leitung steht.</summary>
-public static class Anfragestaende
+/// <summary>Die Worte, mit denen ein RequestState auf der Leitung steht.</summary>
+public static class RequestStates
 {
-    /// <summary>Das Wort zum Stand. Großgeschrieben, wie im Ledger.</summary>
-    public static string Wort(Anfragestand stand) => stand switch
+    /// <summary>Das Wort zum State. Großgeschrieben, wie im Ledger.</summary>
+    public static string Wort(RequestState state) => state switch
     {
-        Anfragestand.Pending => "PENDING",
-        Anfragestand.Granted => "GRANTED",
-        Anfragestand.Declined => "DECLINED",
-        _ => throw new ArgumentOutOfRangeException(nameof(stand))
+        RequestState.Pending => "PENDING",
+        RequestState.Granted => "GRANTED",
+        RequestState.Declined => "DECLINED",
+        _ => throw new ArgumentOutOfRangeException(nameof(state))
     };
 
-    /// <summary>Der Stand zum Wort, oder <c>null</c>.</summary>
-    public static Anfragestand? Lies(string? wort) => wort switch
+    /// <summary>Der State zum Wort, oder <c>null</c>.</summary>
+    public static RequestState? Lies(string? word) => word switch
     {
-        "PENDING" => Anfragestand.Pending,
-        "GRANTED" => Anfragestand.Granted,
-        "DECLINED" => Anfragestand.Declined,
+        "PENDING" => RequestState.Pending,
+        "GRANTED" => RequestState.Granted,
+        "DECLINED" => RequestState.Declined,
         _ => null
     };
 }
@@ -40,47 +40,47 @@ public static class Anfragestaende
 /// <summary>Nur die gefragte Person darf antworten.</summary>
 public sealed class NichtDieGefragte() : Exception("Only the person asked may answer");
 
-/// <summary>Diese Anfrage ist schon beantwortet.</summary>
-public sealed class SchonBeantwortet(Anfragestand stand)
-    : Exception($"This request is already {Anfragestaende.Wort(stand)}");
+/// <summary>Diese ResumeRequest ist schon beantwortet.</summary>
+public sealed class AlreadyAnswered(RequestState state)
+    : Exception($"This request is already {RequestStates.Wort(state)}");
 
-/// <summary>Die Anfrage eines Unternehmens nach einem Marktstatus.</summary>
+/// <summary>Die ResumeRequest eines Unternehmens nach einem MarketStatus.</summary>
 /// <remarks>
-/// Die Tür zum Transfermarkt. Ohne sie entsteht
-/// <c>market.visibility:tenant:&lt;id&gt;</c> nirgends, und ein Vorgang könnte
+/// Die Tür zum TransferMarket. Ohne sie entsteht
+/// <c>market.visibility:tenant:&lt;id&gt;</c> nirgends, und ein Case könnte
 /// nie beginnen.
 /// <para>
-/// <strong>Ein Vorgang, keine Berechtigung</strong> — dieselbe Trennung wie
-/// beim Lebenslauf: <c>GRANTED</c> heißt „wurde einmal erteilt", nicht „gilt
+/// <strong>Ein Case, keine Berechtigung</strong> — dieselbe Trennung wie
+/// beim Resume: <c>GRANTED</c> heißt „wurde einmal erteilt", nicht „gilt
 /// gerade". Ob der Zugriff jetzt besteht, beantwortet ausschließlich der
 /// Consent-Ledger, frisch bei jedem Zugriff (ADR-0013). Deshalb gibt es hier
-/// weder ein <c>Aktiv</c> noch ein <c>WiderrufenAm</c>. Nach einem Widerruf
-/// bleibt die Anfrage <c>GRANTED</c> und der Zugriff läuft trotzdem ins Leere —
+/// weder ein <c>Aktiv</c> noch ein <c>WiderrufenAm</c>. Nach einem Revocation
+/// bleibt die ResumeRequest <c>GRANTED</c> und der Zugriff läuft trotzdem ins Leere —
 /// kein Widerspruch, sondern die Trennung zwischen dem, was geschehen ist, und
 /// dem, was gilt.
 /// </para>
 /// </remarks>
-public sealed class Marktanfrage
+public sealed class MarketRequest
 {
-    private Marktanfrage(
+    private MarketRequest(
         Guid id,
-        SubjectId wer,
-        TenantId firma,
+        SubjectId subject,
+        TenantId company,
         SubjectId? frager,
-        Anfragestand stand,
+        RequestState state,
         DateTimeOffset angelegtAm,
         DateTimeOffset? beantwortetAm)
     {
         Id = id;
-        Wer = wer;
-        Firma = firma;
+        Wer = subject;
+        Firma = company;
         Frager = frager;
-        Stand = stand;
+        State = state;
         AngelegtAm = angelegtAm;
         BeantwortetAm = beantwortetAm;
     }
 
-    /// <summary>Welche Anfrage.</summary>
+    /// <summary>Welche ResumeRequest.</summary>
     public Guid Id { get; }
 
     /// <summary>Über wen.</summary>
@@ -94,13 +94,13 @@ public sealed class Marktanfrage
     /// Das Unternehmen trägt die Berechtigung, die Person die Spur — ohne
     /// dieses Feld stünde im Protokoll nur „irgendwer bei Acme".
     /// <c>null</c> nach der Löschung des Kontos, das gefragt hat (ADR-0027 §2):
-    /// der Vorgang bleibt dem Unternehmen, der Name der Person fällt weg. Es
+    /// der Case bleibt dem Unternehmen, der Name der Person fällt weg. Es
     /// heißt <strong>nicht</strong> „niemand hat gefragt".
     /// </remarks>
     public SubjectId? Frager { get; }
 
     /// <summary>Wo sie steht.</summary>
-    public Anfragestand Stand { get; private set; }
+    public RequestState State { get; private set; }
 
     /// <summary>Wann gefragt wurde.</summary>
     public DateTimeOffset AngelegtAm { get; }
@@ -109,39 +109,39 @@ public sealed class Marktanfrage
     public DateTimeOffset? BeantwortetAm { get; private set; }
 
     /// <summary>Ein Unternehmen fragt.</summary>
-    public static Marktanfrage Oeffne(
-        SubjectId wer, TenantId firma, SubjectId frager, DateTimeOffset jetzt) =>
-        new(Guid.CreateVersion7(), wer, firma, frager, Anfragestand.Pending, jetzt, null);
+    public static MarketRequest Oeffne(
+        SubjectId subject, TenantId company, SubjectId frager, DateTimeOffset now) =>
+        new(Guid.CreateVersion7(), subject, company, frager, RequestState.Pending, now, null);
 
-    /// <summary>Die Anfrage, wie eine Zeile sie hält.</summary>
-    public static Marktanfrage Stelle_her(
+    /// <summary>Die ResumeRequest, wie eine Zeile sie hält.</summary>
+    public static MarketRequest Stelle_her(
         Guid id,
-        SubjectId wer,
-        TenantId firma,
+        SubjectId subject,
+        TenantId company,
         SubjectId? frager,
-        Anfragestand stand,
+        RequestState state,
         DateTimeOffset angelegtAm,
         DateTimeOffset? beantwortetAm) =>
-        new(id, wer, firma, frager, stand, angelegtAm, beantwortetAm);
+        new(id, subject, company, frager, state, angelegtAm, beantwortetAm);
 
     /// <summary>Die Person gibt frei.</summary>
     /// <exception cref="NichtDieGefragte">Ein anderer wollte antworten.</exception>
     /// <exception cref="SchonBeantwortet">Sie ist bereits beantwortet.</exception>
-    public void Erteile(SubjectId durch, DateTimeOffset jetzt)
+    public void Erteile(SubjectId durch, DateTimeOffset now)
     {
         Beantwortbar(durch);
-        Stand = Anfragestand.Granted;
-        BeantwortetAm = jetzt;
+        State = RequestState.Granted;
+        BeantwortetAm = now;
     }
 
     /// <summary>Die Person lehnt ab.</summary>
     /// <exception cref="NichtDieGefragte">Ein anderer wollte antworten.</exception>
     /// <exception cref="SchonBeantwortet">Sie ist bereits beantwortet.</exception>
-    public void Lehne_ab(SubjectId durch, DateTimeOffset jetzt)
+    public void Lehne_ab(SubjectId durch, DateTimeOffset now)
     {
         Beantwortbar(durch);
-        Stand = Anfragestand.Declined;
-        BeantwortetAm = jetzt;
+        State = RequestState.Declined;
+        BeantwortetAm = now;
     }
 
     private void Beantwortbar(SubjectId akteur)
@@ -151,34 +151,34 @@ public sealed class Marktanfrage
             throw new NichtDieGefragte();
         }
 
-        if (Stand is not Anfragestand.Pending)
+        if (State is not RequestState.Pending)
         {
             // Ein zweites „erteile" nach einem „lehne ab" würde die Ablehnung
-            // stillschweigend umdrehen. Und ein Widerruf gehört in den Ledger,
-            // nicht in diesen Vorgang.
-            throw new SchonBeantwortet(Stand);
+            // stillschweigend umdrehen. Und ein Revocation gehört in den Ledger,
+            // nicht in diesen Case.
+            throw new AlreadyAnswered(State);
         }
     }
 }
 
 /// <summary>Findet und speichert Marktanfragen.</summary>
-public interface IAnfragenspeicher
+public interface IRequestStore
 {
-    /// <summary>Eine Anfrage, oder <c>null</c>.</summary>
-    Task<Marktanfrage?> HoleAsync(Guid id, CancellationToken cancellationToken = default);
+    /// <summary>Eine ResumeRequest, oder <c>null</c>.</summary>
+    Task<MarketRequest?> GetAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>Die Anfrage dieses Unternehmens an diese Person, falls es sie gibt.</summary>
-    Task<Marktanfrage?> HoleAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default);
+    /// <summary>Die ResumeRequest dieses Unternehmens an diese Person, falls es sie gibt.</summary>
+    Task<MarketRequest?> GetAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default);
 
     /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(Marktanfrage anfrage, CancellationToken cancellationToken = default);
+    Task SaveAsync(MarketRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>Die Anfragen über diese Person.</summary>
-    Task<IReadOnlyList<Marktanfrage>> FuerPersonAsync(
-        SubjectId wer, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MarketRequest>> ForPersonAsync(
+        SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Die Anfragen dieses Unternehmens.</summary>
-    Task<IReadOnlyList<Marktanfrage>> FuerFirmaAsync(
-        TenantId firma, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MarketRequest>> ForCompanyAsync(
+        TenantId company, CancellationToken cancellationToken = default);
 }

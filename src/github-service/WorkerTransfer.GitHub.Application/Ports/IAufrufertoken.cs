@@ -7,6 +7,6 @@ namespace WorkerTransfer.GitHub.Application.Ports;
 /// </remarks>
 public interface IAufrufertoken
 {
-    /// <summary><c>null</c>, wenn die Anfrage keines trug.</summary>
+    /// <summary><c>null</c>, wenn die ResumeRequest keines trug.</summary>
     string? Wert { get; }
 }

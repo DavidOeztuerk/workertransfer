@@ -15,18 +15,18 @@ namespace WorkerTransfer.Identity.Application.Unternehmen;
 /// nowhere, and the interface merely hides entries. That is not rebuilt.
 /// </para>
 /// </remarks>
-public sealed class Firmenzugriff(IMembershipRepository mitgliedschaften)
+public sealed class CompanyAccess(IMembershipRepository mitgliedschaften)
 {
     /// <summary>The caller's role, or a refusal that reveals nothing.</summary>
     /// <exception cref="NotAMemberException">
     /// The caller is not a member. Answered the same whether or not the company
     /// exists, so nobody can enumerate companies by probing.
     /// </exception>
-    public async Task<MembershipRole> RolleAsync(
-        SubjectId wer,
-        TenantId firma,
+    public async Task<MembershipRole> RoleAsync(
+        SubjectId subject,
+        TenantId company,
         CancellationToken cancellationToken = default) =>
-        await mitgliedschaften.RoleOfAsync(wer, firma, cancellationToken)
+        await mitgliedschaften.RoleOfAsync(subject, company, cancellationToken)
         ?? throw new NotAMemberException();
 
     /// <summary>
@@ -41,26 +41,26 @@ public sealed class Firmenzugriff(IMembershipRepository mitgliedschaften)
     /// <param name="wer">Wer fragt.</param>
     /// <param name="firma">Welche Firma.</param>
     /// <param name="cancellationToken">Bricht die Abfrage ab.</param>
-    public Task<MembershipRole?> RolleOderNichtsAsync(
-        SubjectId wer,
-        TenantId firma,
+    public Task<MembershipRole?> RoleOrNoneAsync(
+        SubjectId subject,
+        TenantId company,
         CancellationToken cancellationToken = default) =>
-        mitgliedschaften.RoleOfAsync(wer, firma, cancellationToken);
+        mitgliedschaften.RoleOfAsync(subject, company, cancellationToken);
 
     /// <summary>The caller's role, refusing anybody who is not an administrator.</summary>
     /// <param name="wer">Who is asking.</param>
     /// <param name="firma">Which company.</param>
     /// <param name="fuers">What they are trying to do — decides which refusal.</param>
     /// <param name="cancellationToken">Cancels the lookup.</param>
-    public async Task<MembershipRole> AlsAdminAsync(
-        SubjectId wer,
-        TenantId firma,
+    public async Task<MembershipRole> AsAdminAsync(
+        SubjectId subject,
+        TenantId company,
         Verwaltungsakt fuers,
         CancellationToken cancellationToken = default)
     {
-        var rolle = await RolleAsync(wer, firma, cancellationToken);
+        var role = await RoleAsync(subject, company, cancellationToken);
 
-        if (rolle != MembershipRole.Admin)
+        if (role != MembershipRole.Admin)
         {
             // 403 rather than 404: this is a statement about the caller, and
             // they already know they are a member. Hiding it would tell them
@@ -70,7 +70,7 @@ public sealed class Firmenzugriff(IMembershipRepository mitgliedschaften)
                 : new OnlyAdminsMayRemoveException();
         }
 
-        return rolle;
+        return role;
     }
 }
 

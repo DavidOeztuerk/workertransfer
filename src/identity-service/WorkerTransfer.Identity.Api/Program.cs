@@ -5,20 +5,20 @@ using WorkerTransfer.Identity.Infrastructure;
 using WorkerTransfer.Identity.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
-// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
+// Konfiguration aus der EnvironmentFile. VOR CreateBuilder, weil der
 // Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
 // geladen hiesse geladen und von niemandem gelesen.
-WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 const string serviceName = "identity-service";
 
-// The only service that calls AlsAussteller(): it holds the private half of the
+// The only service that calls AsIssuer(): it holds the private half of the
 // key. A second issuer would be a second place that can mint a principal, and
 // nothing downstream could tell the two apart.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
-    girder => girder.AlsAussteller());
+    girder => girder.AsIssuer());
 
 // Die Richtlinienmaschinerie kommt seit Girder 4.0.2 aus der Vorgabe:
 // `NoeliaModule.Authorization` ruft `AddAuthorization()` und bringt damit den
@@ -33,7 +33,7 @@ builder.Services.AddWorkerTransferDefaults(
 //
 // Rechte ins Token zu legen waere der kuerzere Weg und der schlechtere: ein
 // Token lebt weiter, nachdem jemand aus einer Firma entfernt wurde.
-builder.Services.AddScoped<IAuthorizationHandler, Mitgliedschaftsrecht>();
+builder.Services.AddScoped<IAuthorizationHandler, MembershipPermission>();
 
 builder.Services.AddIdentityInfrastructure(
     builder.Configuration,
@@ -43,7 +43,7 @@ builder.Services.AddIdentityInfrastructure(
 var app = builder.Build();
 
 // Erst wandern, dann bedienen (ADR-0010).
-await app.WandereAsync<IdentityDbContext>();
+await app.MigrateSchemaAsync<IdentityDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 

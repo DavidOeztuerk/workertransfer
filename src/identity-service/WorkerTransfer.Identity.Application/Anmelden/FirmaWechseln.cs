@@ -18,19 +18,19 @@ namespace WorkerTransfer.Identity.Application.Anmelden;
 /// </remarks>
 /// <param name="Wer">Who is asking — from the token, never from the body.</param>
 /// <param name="Firma">The company they name.</param>
-public sealed record FirmaWechselnBefehl(SubjectId Wer, TenantId Firma)
-    : IBefehl<Firmenwechselergebnis>;
+public sealed record SwitchCompanyCommand(SubjectId Wer, TenantId Firma)
+    : IBefehl<CompanySwitchResult>;
 
 /// <summary>What the attempt to act for a company produced.</summary>
-public abstract record Firmenwechselergebnis
+public abstract record CompanySwitchResult
 {
-    private Firmenwechselergebnis() { }
+    private CompanySwitchResult() { }
 
     /// <summary>A fresh pair, acting for the company.</summary>
     public sealed record Gewechselt(
         string Zugriffstoken,
         string Erneuerungstoken,
-        DateTimeOffset ErneuerungLaeuftAb) : Firmenwechselergebnis;
+        DateTimeOffset ErneuerungLaeuftAb) : CompanySwitchResult;
 
     /// <summary>
     /// The caller is not a member of this company.
@@ -39,27 +39,27 @@ public abstract record Firmenwechselergebnis
     /// Answered the same whether or not the company exists. A distinct answer
     /// for "no such company" would let anyone probe which companies are here.
     /// </remarks>
-    public sealed record KeinMitglied : Firmenwechselergebnis;
+    public sealed record NoMember : CompanySwitchResult;
 
     /// <summary>The account may not act at all.</summary>
-    public sealed record Abgelehnt : Firmenwechselergebnis;
+    public sealed record Abgelehnt : CompanySwitchResult;
 }
 
 /// <summary>Mints a company-bound pair after verifying membership.</summary>
-public sealed class FirmaWechselnHandler(
+public sealed class SwitchCompanyHandler(
     IMembershipRepository mitgliedschaften,
     IUserRepository benutzer,
-    ISessionService sitzungen,
+    ISessionService sessions,
     ISessionCapacity handlungsform,
     IAccessTokenIssuer token,
     IAuditTrail protokoll,
     IKorrelation korrelation,
     TimeProvider uhr)
-    : IRequestHandler<FirmaWechselnBefehl, Firmenwechselergebnis>
+    : IRequestHandler<SwitchCompanyCommand, CompanySwitchResult>
 {
     /// <inheritdoc />
-    public async Task<Firmenwechselergebnis> Handle(
-        FirmaWechselnBefehl request,
+    public async Task<CompanySwitchResult> Handle(
+        SwitchCompanyCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -77,36 +77,36 @@ public sealed class FirmaWechselnHandler(
                     correlationId: korrelation.Aktuell),
                 cancellationToken);
 
-            return new Firmenwechselergebnis.KeinMitglied();
+            return new CompanySwitchResult.NoMember();
         }
 
         var konto = await benutzer.FindByIdAsync(request.Wer, cancellationToken);
 
         if (konto is null)
         {
-            return new Firmenwechselergebnis.Abgelehnt();
+            return new CompanySwitchResult.Abgelehnt();
         }
 
         try
         {
             konto.AssertCanSignIn();
         }
-        catch (Exception fehler) when (fehler is EmailNotConfirmedException
+        catch (Exception error) when (error is EmailNotConfirmedException
                                               or AccountDisabledException)
         {
-            return new Firmenwechselergebnis.Abgelehnt();
+            return new CompanySwitchResult.Abgelehnt();
         }
 
         // A fresh sign-in rather than an edit of the old one: the personal
         // refresh token keeps working, and the company-bound one can be ended
         // on its own.
-        var sitzung = await sitzungen.StartAsync(konto.Id, cancellationToken);
+        var session = await sessions.StartAsync(konto.Id, cancellationToken);
         var form = new Capacity.ForCompany(request.Firma);
 
-        await handlungsform.RememberAsync(sitzung.Session, form, cancellationToken);
+        await handlungsform.RememberAsync(session.Session, form, cancellationToken);
 
         var zugriff = await token.IssueAsync(
-            konto.Id, konto.Email, form, sitzung.Session, cancellationToken);
+            konto.Id, konto.Email, form, session.Session, cancellationToken);
 
         await protokoll.AppendAsync(
             new AuditEvent(
@@ -117,7 +117,7 @@ public sealed class FirmaWechselnHandler(
                 correlationId: korrelation.Aktuell),
             cancellationToken);
 
-        return new Firmenwechselergebnis.Gewechselt(
-            zugriff, sitzung.RefreshToken, sitzung.ExpiresAt);
+        return new CompanySwitchResult.Gewechselt(
+            zugriff, session.RefreshToken, session.ExpiresAt);
     }
 }

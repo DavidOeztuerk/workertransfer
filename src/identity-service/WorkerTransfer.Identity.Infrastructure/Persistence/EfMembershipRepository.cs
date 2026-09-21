@@ -51,44 +51,44 @@ public sealed class EfMembershipRepository(IdentityDbContext context, TimeProvid
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Mitgliedschaft>> ListForSubjectAsync(
+    public async Task<IReadOnlyList<Membership>> ListForSubjectAsync(
         SubjectId subject,
         CancellationToken cancellationToken = default)
     {
-        var zeilen = await context.Memberships
+        var rows = await context.Memberships
             .Where(row => row.UserId == subject.Value)
             .Join(context.Tenants,
-                mitglied => mitglied.TenantId,
-                firma => firma.Id,
-                (mitglied, firma) => new { firma.Id, firma.Name, firma.Domain, mitglied.Role })
-            .OrderBy(eintrag => eintrag.Name)
+                member => member.TenantId,
+                company => company.Id,
+                (member, company) => new { company.Id, company.Name, company.Domain, member.Role })
+            .OrderBy(entry => entry.Name)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(eintrag => new Mitgliedschaft(
-            new TenantId(eintrag.Id),
-            eintrag.Name,
-            eintrag.Domain,
-            MembershipRoleNames.FromDatabase(eintrag.Role)))];
+        return [.. rows.Select(entry => new Membership(
+            new TenantId(entry.Id),
+            entry.Name,
+            entry.Domain,
+            MembershipRoleNames.FromDatabase(entry.Role)))];
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Firmenmitglied>> ListMembersAsync(
+    public async Task<IReadOnlyList<CompanyMember>> ListMembersAsync(
         TenantId tenant,
         CancellationToken cancellationToken = default)
     {
-        var zeilen = await context.Memberships
+        var rows = await context.Memberships
             .Where(row => row.TenantId == tenant.Value)
             .Join(context.Users,
-                mitglied => mitglied.UserId,
+                member => member.UserId,
                 benutzer => benutzer.Id,
-                (mitglied, benutzer) => new { benutzer.Id, benutzer.DisplayName, mitglied.Role })
-            .OrderBy(eintrag => eintrag.DisplayName)
+                (member, benutzer) => new { benutzer.Id, benutzer.DisplayName, member.Role })
+            .OrderBy(entry => entry.DisplayName)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(eintrag => new Firmenmitglied(
-            new SubjectId(eintrag.Id),
-            eintrag.DisplayName,
-            MembershipRoleNames.FromDatabase(eintrag.Role)))];
+        return [.. rows.Select(entry => new CompanyMember(
+            new SubjectId(entry.Id),
+            entry.DisplayName,
+            MembershipRoleNames.FromDatabase(entry.Role)))];
     }
 
     /// <inheritdoc />
@@ -113,11 +113,11 @@ public sealed class EfMembershipRepository(IdentityDbContext context, TimeProvid
         TenantId tenant,
         CancellationToken cancellationToken = default)
     {
-        var zeilen = await context.Memberships
+        var rows = await context.Memberships
             .AsTracking()
             .Where(row => row.UserId == subject.Value && row.TenantId == tenant.Value)
             .ToListAsync(cancellationToken);
 
-        context.Memberships.RemoveRange(zeilen);
+        context.Memberships.RemoveRange(rows);
     }
 }

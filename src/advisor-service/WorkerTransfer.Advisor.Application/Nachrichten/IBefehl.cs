@@ -4,7 +4,7 @@ namespace WorkerTransfer.Advisor.Application.Nachrichten;
 
 /// <summary>Markiert eine Nachricht, die etwas ändert.</summary>
 /// <remarks>
-/// Nicht generisch, weil das Transaktions-Behavior über Anfrage und Antwort
+/// Nicht generisch, weil das Transaktions-Behavior über ResumeRequest und Antwort
 /// generisch ist und nicht bei jedem Versand über die Schnittstellen eines Typs
 /// nachdenken soll.
 /// <para>

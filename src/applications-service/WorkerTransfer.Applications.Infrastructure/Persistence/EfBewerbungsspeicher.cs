@@ -1,6 +1,6 @@
 using Noelia.Core.Identity;
 using Microsoft.EntityFrameworkCore;
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 
 namespace WorkerTransfer.Applications.Infrastructure.Persistence;
 
@@ -11,167 +11,167 @@ namespace WorkerTransfer.Applications.Infrastructure.Persistence;
 /// <see cref="SichereAsync"/> — wer es vergisst, verliert den Schreibvorgang,
 /// und das soll im Test genauso auffallen wie im Betrieb.
 /// </remarks>
-public sealed class EfBewerbungsspeicher(ApplicationsDbContext kontext) : IBewerbungsspeicher
+public sealed class EfApplicationStore(ApplicationsDbContext context) : IApplicationStore
 {
     /// <inheritdoc />
-    public async Task<Bewerbung?> HoleAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<JobApplication?> GetAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Bewerbungen
+        var row = await context.Applications
             .FirstOrDefaultAsync(kandidat => kandidat.Id == id, cancellationToken);
 
-        return zeile is null ? null : ZumAggregat(zeile);
+        return row is null ? null : ZumAggregat(row);
     }
 
     /// <inheritdoc />
-    public async Task<Bewerbung?> HoleAsync(
-        Guid stelle, SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<JobApplication?> GetAsync(
+        Guid job, SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Bewerbungen.FirstOrDefaultAsync(
-            kandidat => kandidat.JobId == stelle && kandidat.SubjectId == wer.Value,
+        var row = await context.Applications.FirstOrDefaultAsync(
+            kandidat => kandidat.JobId == job && kandidat.SubjectId == subject.Value,
             cancellationToken);
 
-        return zeile is null ? null : ZumAggregat(zeile);
+        return row is null ? null : ZumAggregat(row);
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(
-        Bewerbung bewerbung, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        JobApplication application, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(bewerbung);
+        ArgumentNullException.ThrowIfNull(application);
 
-        var vorhanden = await kontext.Bewerbungen
+        var vorhanden = await context.Applications
             .AsTracking()
-            .FirstOrDefaultAsync(kandidat => kandidat.Id == bewerbung.Id, cancellationToken);
+            .FirstOrDefaultAsync(kandidat => kandidat.Id == application.Id, cancellationToken);
 
         if (vorhanden is null)
         {
-            kontext.Bewerbungen.Add(ZurZeile(bewerbung));
+            context.Applications.Add(ZurZeile(application));
             return;
         }
 
-        Uebertrage(bewerbung, vorhanden);
+        Uebertrage(application, vorhanden);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Bewerbung>> FuerPersonAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<JobApplication>> ForPersonAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.Bewerbungen
-            .Where(kandidat => kandidat.SubjectId == wer.Value)
+        var rows = await context.Applications
+            .Where(kandidat => kandidat.SubjectId == subject.Value)
             .OrderByDescending(kandidat => kandidat.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZumAggregat)];
+        return [.. rows.Select(ZumAggregat)];
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Bewerbung>> FuerStelleAsync(
-        Guid stelle, TenantId firma, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<JobApplication>> ForJobAsync(
+        Guid job, TenantId company, CancellationToken cancellationToken = default)
     {
         // Die Firma steht in der Abfrage, nicht in einem Filter danach: eine
-        // fremde Stelle liefert eine leere Liste, statt zu verraten, dass es
+        // fremde Job liefert eine leere Liste, statt zu verraten, dass es
         // sie gibt.
-        var zeilen = await kontext.Bewerbungen
-            .Where(kandidat => kandidat.JobId == stelle && kandidat.TenantId == firma.Value)
+        var rows = await context.Applications
+            .Where(kandidat => kandidat.JobId == job && kandidat.TenantId == company.Value)
             .OrderByDescending(kandidat => kandidat.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZumAggregat)];
+        return [.. rows.Select(ZumAggregat)];
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyDictionary<Bewerbungsstand, int>> ZaehleAsync(
-        TenantId firma, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyDictionary<ApplicationState, int>> CountAsync(
+        TenantId company, CancellationToken cancellationToken = default)
     {
-        var gezaehlt = await kontext.Bewerbungen
-            .Where(kandidat => kandidat.TenantId == firma.Value)
+        var gezaehlt = await context.Applications
+            .Where(kandidat => kandidat.TenantId == company.Value)
             .GroupBy(kandidat => kandidat.Status)
-            .Select(gruppe => new { Stand = gruppe.Key, Anzahl = gruppe.Count() })
+            .Select(group => new { State = group.Key, Anzahl = group.Count() })
             .ToListAsync(cancellationToken);
 
-        var zahlen = new Dictionary<Bewerbungsstand, int>();
+        var zahlen = new Dictionary<ApplicationState, int>();
 
-        foreach (var eintrag in gezaehlt)
+        foreach (var entry in gezaehlt)
         {
-            // Ein Wort, das kein Stand ist, wird übergangen statt geworfen.
+            // Ein Wort, das kein State ist, wird übergangen statt geworfen.
             // Diese Zahlen sind eine Bequemlichkeit; an ihnen soll keine Liste
             // scheitern, die das Unternehmen ohnehin einzeln sieht.
-            if (Bewerbungsstaende.Lies(eintrag.Stand) is { } stand)
+            if (ApplicationStates.Lies(entry.State) is { } state)
             {
-                zahlen[stand] = eintrag.Anzahl;
+                zahlen[state] = entry.Anzahl;
             }
         }
 
         return zahlen;
     }
 
-    private static Bewerbung ZumAggregat(BewerbungsZeile zeile) =>
-        Bewerbung.Stelle_her(
-            zeile.Id,
-            zeile.JobId,
-            new TenantId(zeile.TenantId),
-            new SubjectId(zeile.SubjectId),
-            zeile.Message,
+    private static JobApplication ZumAggregat(ApplicationRow row) =>
+        JobApplication.Stelle_her(
+            row.Id,
+            row.JobId,
+            new TenantId(row.TenantId),
+            new SubjectId(row.SubjectId),
+            row.Message,
             new Mitgeschicktes(
-                zeile.SharesResume,
-                zeile.SharesPortfolio,
-                System.Text.Json.JsonSerializer.Deserialize<List<Guid>>(zeile.Documents) ?? []),
-            Bewerbungsstaende.Lies(zeile.Status)
+                row.SharesResume,
+                row.SharesPortfolio,
+                System.Text.Json.JsonSerializer.Deserialize<List<Guid>>(row.Documents) ?? []),
+            ApplicationStates.Lies(row.Status)
             ?? throw new InvalidOperationException(
-                $"Unbekannter Bewerbungsstand in der Datenbank: {zeile.Status}"),
-            new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
-            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero),
-            zeile.AnsweredAt is { } beantwortet
+                $"Unbekannter Bewerbungsstand in der Datenbank: {row.Status}"),
+            new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
+            new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero),
+            row.AnsweredAt is { } beantwortet
                 ? new DateTimeOffset(beantwortet, TimeSpan.Zero)
                 : null,
-            LiesKontakt(zeile.ApplicantContact));
+            LiesKontakt(row.ApplicantContact));
 
-    private static BewerbungsZeile ZurZeile(Bewerbung bewerbung)
+    private static ApplicationRow ZurZeile(JobApplication application)
     {
-        var zeile = new BewerbungsZeile
+        var row = new ApplicationRow
         {
-            Id = bewerbung.Id,
-            JobId = bewerbung.Stelle,
-            TenantId = bewerbung.Firma.Value,
-            SubjectId = bewerbung.Wer.Value,
-            CreatedAt = bewerbung.AngelegtAm.UtcDateTime
+            Id = application.Id,
+            JobId = application.Job,
+            TenantId = application.Firma.Value,
+            SubjectId = application.Wer.Value,
+            CreatedAt = application.AngelegtAm.UtcDateTime
         };
 
-        Uebertrage(bewerbung, zeile);
+        Uebertrage(application, row);
 
-        return zeile;
+        return row;
     }
 
-    private static void Uebertrage(Bewerbung bewerbung, BewerbungsZeile zeile)
+    private static void Uebertrage(JobApplication application, ApplicationRow row)
     {
-        // Stelle, Firma, Person und der Zeitpunkt des Abschickens stehen hier
+        // Job, Firma, Person und der Zeitpunkt des Abschickens stehen hier
         // nicht: sie ändern sich nie, und eine Zuweisung, die es doch könnte,
-        // wäre der Weg, eine Bewerbung nachträglich einem anderen zuzuschreiben.
-        zeile.Message = bewerbung.Nachricht;
-        zeile.SharesResume = bewerbung.Mitgeschickt.Lebenslauf;
-        zeile.SharesPortfolio = bewerbung.Mitgeschickt.Portfolio;
-        zeile.Documents = System.Text.Json.JsonSerializer.Serialize(
-            bewerbung.Mitgeschickt.Unterlagen);
-        zeile.Status = Bewerbungsstaende.Wort(bewerbung.Stand);
-        zeile.UpdatedAt = bewerbung.GeaendertAm.UtcDateTime;
-        zeile.AnsweredAt = bewerbung.BeantwortetAm?.UtcDateTime;
-        zeile.ApplicantContact = System.Text.Json.JsonSerializer.Serialize(
-            new KontaktDraht(bewerbung.Kontakt));
+        // wäre der Weg, eine JobApplication nachträglich einem anderen zuzuschreiben.
+        row.Message = application.Nachricht;
+        row.SharesResume = application.Mitgeschickt.CurriculumVitae;
+        row.SharesPortfolio = application.Mitgeschickt.Portfolio;
+        row.Documents = System.Text.Json.JsonSerializer.Serialize(
+            application.Mitgeschickt.Unterlagen);
+        row.Status = ApplicationStates.Wort(application.State);
+        row.UpdatedAt = application.GeaendertAm.UtcDateTime;
+        row.AnsweredAt = application.BeantwortetAm?.UtcDateTime;
+        row.ApplicantContact = System.Text.Json.JsonSerializer.Serialize(
+            new KontaktDraht(application.Kontakt));
     }
 
-    private static Bewerbungskontakt LiesKontakt(string roh)
+    private static ApplicantContact LiesKontakt(string roh)
     {
         if (string.IsNullOrWhiteSpace(roh) || roh == "{}")
         {
-            return Bewerbungskontakt.Leer;
+            return ApplicantContact.Leer;
         }
 
         try
         {
             var draht = System.Text.Json.JsonSerializer.Deserialize<KontaktDraht>(roh);
             return draht is null
-                ? Bewerbungskontakt.Leer
-                : new Bewerbungskontakt(
+                ? ApplicantContact.Leer
+                : new ApplicantContact(
                     draht.Klarname ?? string.Empty,
                     draht.Zeile1 ?? string.Empty,
                     draht.Zeile2 ?? string.Empty,
@@ -183,7 +183,7 @@ public sealed class EfBewerbungsspeicher(ApplicationsDbContext kontext) : IBewer
         }
         catch (System.Text.Json.JsonException)
         {
-            return Bewerbungskontakt.Leer;
+            return ApplicantContact.Leer;
         }
     }
 
@@ -201,7 +201,7 @@ public sealed class EfBewerbungsspeicher(ApplicationsDbContext kontext) : IBewer
         {
         }
 
-        public KontaktDraht(Bewerbungskontakt kontakt)
+        public KontaktDraht(ApplicantContact kontakt)
             : this(
                 kontakt.Klarname,
                 kontakt.Zeile1,

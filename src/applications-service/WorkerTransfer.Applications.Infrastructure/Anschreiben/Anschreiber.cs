@@ -8,14 +8,14 @@ namespace WorkerTransfer.Applications.Infrastructure.Anschreiben;
 
 /// <summary>Ob und wohin ein Modell gefragt wird.</summary>
 /// <remarks>
-/// Derselbe Abschnitt <c>Draft</c> wie in jobs-service und profile-service:
+/// Derselbe Section <c>Draft</c> wie in jobs-service und profile-service:
 /// eine Plattform, ein Anbieter, ein Schluessel. Zwei Abschnitte waeren zwei
 /// Gelegenheiten, einen davon zu vergessen.
 /// </remarks>
-public sealed class Anschreibeneinstellungen
+public sealed class CoverLetterSettings
 {
-    /// <summary>Der Abschnitt in der Konfiguration.</summary>
-    public const string Abschnitt = "Draft";
+    /// <summary>Der Section in der Konfiguration.</summary>
+    public const string Section = "Draft";
 
     /// <summary>Leer heißt: es wird nichts gerufen, und die Oberfläche sagt das.</summary>
     public string Schluessel { get; set; } = string.Empty;
@@ -25,7 +25,7 @@ public sealed class Anschreibeneinstellungen
 
     /// <summary>Wie lange auf eine Antwort gewartet wird.</summary>
     /// <remarks>
-    /// Sechzig und nicht dreissig Sekunden wie beim Anzeigenentwurf: ein
+    /// Sechzig und nicht dreissig Sekunden wie beim AdvertDraft: ein
     /// Anschreiben ist laenger und traegt mehr Kontext. Aber eben nicht
     /// unbegrenzt — ohne diese Zeile gilt die Vorgabe von <c>HttpClient</c> mit
     /// HUNDERT Sekunden.
@@ -38,33 +38,33 @@ public sealed class Anschreibeneinstellungen
 
 /// <summary>Der Anschreiber, wenn keiner eingerichtet ist.</summary>
 /// <remarks>
-/// Er liefert keine Vorlage, sondern sagt, dass es ihn nicht gibt. Ein
+/// Er liefert keine ResumeTemplate, sondern sagt, dass es ihn nicht gibt. Ein
 /// Anschreiben, das nicht vom Modell kommt, aber so aussieht, waere die
-/// schlechtere Antwort — und im Stand „Pruefen" eine Einladung, es
+/// schlechtere Antwort — und im State „Pruefen" eine Einladung, es
 /// versehentlich freizugeben (ADR-0034).
 /// </remarks>
-public sealed class KeinAnschreiber : IAnschreiber
+public sealed class NoCoverLetterWriter : ICoverLetterWriter
 {
     /// <inheritdoc />
-    public Task<string> SchreibeAsync(
+    public Task<string> WriteAsync(
         KiZugang zugang,
-        Anschreibenkontext kontext,
+        CoverLetterContext context,
         Func<string, Task>? fortschritt = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(zugang);
-        ArgumentNullException.ThrowIfNull(kontext);
+        ArgumentNullException.ThrowIfNull(context);
         _ = fortschritt;
         _ = cancellationToken;
 
         return Task.FromException<string>(
-            new AnschreibenNichtVerfuegbar("Es ist kein Entwurfsanbieter eingerichtet."));
+            new CoverLetterUnavailable("Es ist kein Entwurfsanbieter eingerichtet."));
     }
 
     /// <inheritdoc />
-    public Task<string> UeberarbeiteAsync(
+    public Task<string> ReviseAsync(
         KiZugang zugang,
-        Anschreibenkontext kontext,
+        CoverLetterContext context,
         string betreff,
         string text,
         IReadOnlyList<string> anmerkungen,
@@ -72,7 +72,7 @@ public sealed class KeinAnschreiber : IAnschreiber
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(zugang);
-        ArgumentNullException.ThrowIfNull(kontext);
+        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(anmerkungen);
         _ = betreff;
         _ = text;
@@ -80,7 +80,7 @@ public sealed class KeinAnschreiber : IAnschreiber
         _ = cancellationToken;
 
         return Task.FromException<string>(
-            new AnschreibenNichtVerfuegbar("Es ist kein Entwurfsanbieter eingerichtet."));
+            new CoverLetterUnavailable("Es ist kein Entwurfsanbieter eingerichtet."));
     }
 }
 
@@ -88,12 +88,12 @@ public sealed class KeinAnschreiber : IAnschreiber
 /// <remarks>
 /// <strong>Was gespeichert wird, ist das Ergebnis</strong>, weil es das
 /// Dokument ist (ADR-0034). Die Eingabe an das Modell wird es nicht: kein
-/// Prompt-Archiv, keine Einbettungen, kein Gedaechtnis ueber Bewerbungen
-/// hinweg. Ein Modell, das „aus den letzten zwanzig Bewerbungen gelernt" haette,
+/// Prompt-Archiv, keine Einbettungen, kein Gedaechtnis ueber Applications
+/// hinweg. Ein Modell, das „aus den letzten zwanzig Applications gelernt" haette,
 /// traefe Aussagen ueber die Person, die sie nie getroffen hat.
 /// </remarks>
-public sealed class HttpAnschreiber(
-    IHttpClientFactory fabrik, IOptions<Anschreibeneinstellungen> einstellungen) : IAnschreiber
+public sealed class HttpCoverLetterWriter(
+    IHttpClientFactory fabrik, IOptions<CoverLetterSettings> einstellungen) : ICoverLetterWriter
 {
     /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
     public const string Klient = "anschreiben";
@@ -105,25 +105,25 @@ public sealed class HttpAnschreiber(
     /// </summary>
     public const int HoechsteToken = 1200;
 
-    private readonly Anschreibeneinstellungen _einstellungen = einstellungen.Value;
+    private readonly CoverLetterSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public Task<string> SchreibeAsync(
+    public Task<string> WriteAsync(
         KiZugang zugang,
-        Anschreibenkontext kontext,
+        CoverLetterContext context,
         Func<string, Task>? fortschritt = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(zugang);
-        ArgumentNullException.ThrowIfNull(kontext);
+        ArgumentNullException.ThrowIfNull(context);
 
-        return FrageAsync(zugang, Auftrag(kontext), fortschritt, cancellationToken);
+        return AskAsync(zugang, Auftrag(context), fortschritt, cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<string> UeberarbeiteAsync(
+    public Task<string> ReviseAsync(
         KiZugang zugang,
-        Anschreibenkontext kontext,
+        CoverLetterContext context,
         string betreff,
         string text,
         IReadOnlyList<string> anmerkungen,
@@ -131,10 +131,10 @@ public sealed class HttpAnschreiber(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(zugang);
-        ArgumentNullException.ThrowIfNull(kontext);
+        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(anmerkungen);
 
-        var bau = new StringBuilder(Auftrag(kontext));
+        var bau = new StringBuilder(Auftrag(context));
 
         bau.AppendLine().AppendLine("## Das bisherige Anschreiben");
         bau.AppendLine($"BETREFF: {betreff}");
@@ -150,36 +150,36 @@ public sealed class HttpAnschreiber(
             bau.AppendLine($"{nummer + 1}. {anmerkungen[nummer]}");
         }
 
-        return FrageAsync(zugang, bau.ToString(), fortschritt, cancellationToken);
+        return AskAsync(zugang, bau.ToString(), fortschritt, cancellationToken);
     }
 
     /// <summary>Der Auftrag, aus dem Kontext und sonst nichts.</summary>
-    private static string Auftrag(Anschreibenkontext kontext)
+    private static string Auftrag(CoverLetterContext context)
     {
         var bau = new StringBuilder();
 
         bau.AppendLine("## Die Stelle (aus der öffentlichen Anzeige)");
-        bau.AppendLine($"- Titel: {kontext.StellenTitel}");
-        bau.AppendLine($"- Unternehmen: {kontext.Unternehmen}");
-        bau.AppendLine($"- Ort: {kontext.StellenOrt}");
-        bau.AppendLine($"- Gesucht: {string.Join(", ", kontext.GesuchteFaehigkeiten)}");
-        bau.AppendLine($"- Beschreibung: {kontext.StellenBeschreibung}");
+        bau.AppendLine($"- Titel: {context.StellenTitel}");
+        bau.AppendLine($"- Unternehmen: {context.Unternehmen}");
+        bau.AppendLine($"- Ort: {context.StellenOrt}");
+        bau.AppendLine($"- Gesucht: {string.Join(", ", context.GesuchteFaehigkeiten)}");
+        bau.AppendLine($"- Beschreibung: {context.StellenBeschreibung}");
         bau.AppendLine();
         bau.AppendLine("## Die bewerbende Person (ihre eigenen Angaben)");
-        bau.AppendLine($"- Voller Name (Signatur, GENAU so): {kontext.EigenerName}");
-        bau.AppendLine($"- Überschrift: {kontext.EigeneUeberschrift}");
-        bau.AppendLine($"- Über sich: {kontext.EigenerText}");
-        bau.AppendLine($"- Genannte Fähigkeiten: {string.Join(", ", kontext.EigeneFaehigkeiten)}");
-        bau.AppendLine($"- Sprache: {kontext.Sprache} (in dieser Sprache, grammatisch korrekt)");
+        bau.AppendLine($"- Voller Name (Signatur, GENAU so): {context.EigenerName}");
+        bau.AppendLine($"- Überschrift: {context.EigeneUeberschrift}");
+        bau.AppendLine($"- Über sich: {context.EigenerText}");
+        bau.AppendLine($"- Genannte Fähigkeiten: {string.Join(", ", context.EigeneFaehigkeiten)}");
+        bau.AppendLine($"- Sprache: {context.Sprache} (in dieser Sprache, grammatisch korrekt)");
         bau.AppendLine();
         bau.AppendLine("## Werdegang");
 
-        if (kontext.EigenerWerdegang.Count == 0)
+        if (context.EigenerWerdegang.Count == 0)
         {
             bau.AppendLine("(kein Werdegang hinterlegt — erfinde keinen)");
         }
 
-        foreach (var station in kontext.EigenerWerdegang)
+        foreach (var station in context.EigenerWerdegang)
         {
             bau.AppendLine(
                 $"- {station.Zeitraum}: {station.Titel} bei {station.Arbeitgeber}"
@@ -189,15 +189,15 @@ public sealed class HttpAnschreiber(
         return bau.ToString();
     }
 
-    private async Task<string> FrageAsync(
+    private async Task<string> AskAsync(
         KiZugang zugang,
-        string auftrag,
+        string job,
         Func<string, Task>? fortschritt,
         CancellationToken cancellationToken)
     {
         if (!zugang.IstEingerichtet)
         {
-            throw new AnschreibenNichtVerfuegbar("Es ist kein Entwurfsanbieter eingerichtet.");
+            throw new CoverLetterUnavailable("Es ist kein Entwurfsanbieter eingerichtet.");
         }
 
         using var client = fabrik.CreateClient(Klient);
@@ -207,65 +207,65 @@ public sealed class HttpAnschreiber(
         // Minute, obwohl es schon geschrieben hat — gemessen an Ollama.
         client.Timeout = _einstellungen.Zeitueberschreitung;
 
-        using var anfrage = BaueAnfrage(zugang, auftrag);
+        using var request = BaueAnfrage(zugang, job);
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            antwort = await client.SendAsync(
-                anfrage, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            response = await client.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
-            throw new AnschreibenNichtVerfuegbar(
-                $"Der Entwurfsanbieter antwortet nicht ({fehler.GetType().Name}).");
+            throw new CoverLetterUnavailable(
+                $"Der Entwurfsanbieter antwortet nicht ({error.GetType().Name}).");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new AnschreibenNichtVerfuegbar(
+            throw new CoverLetterUnavailable(
                 "Der Entwurfsanbieter antwortet nicht (Zeitüberschreitung).");
         }
 
-        using (antwort)
+        using (response)
         {
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
-                throw new AnschreibenNichtVerfuegbar(
-                    $"Der Entwurfsanbieter antwortet mit {(int)antwort.StatusCode}.");
+                throw new CoverLetterUnavailable(
+                    $"Der Entwurfsanbieter antwortet mit {(int)response.StatusCode}.");
             }
 
             try
             {
-                await using var strom = await antwort.Content.ReadAsStreamAsync(cancellationToken);
-                var text = await LiesStromAsync(
+                await using var strom = await response.Content.ReadAsStreamAsync(cancellationToken);
+                var text = await ReadStreamAsync(
                     zugang.Anbieter, strom, _einstellungen.Zeitueberschreitung,
                     fortschritt, cancellationToken);
 
                 return text is { Length: > 0 }
                     ? text
-                    : throw new AnschreibenNichtVerfuegbar(
+                    : throw new CoverLetterUnavailable(
                         "Der Entwurfsanbieter sandte einen leeren Text.");
             }
-            catch (AnschreibenNichtVerfuegbar)
+            catch (CoverLetterUnavailable)
             {
                 throw;
             }
-            catch (Exception fehler)
-                when (fehler is JsonException or KeyNotFoundException or IndexOutOfRangeException
+            catch (Exception error)
+                when (error is JsonException or KeyNotFoundException or IndexOutOfRangeException
                       or InvalidOperationException)
             {
-                throw new AnschreibenNichtVerfuegbar(
+                throw new CoverLetterUnavailable(
                     "Der Entwurfsanbieter sandte eine unbrauchbare Antwort.");
             }
         }
     }
 
-    private static HttpRequestMessage BaueAnfrage(KiZugang zugang, string auftrag)
+    private static HttpRequestMessage BaueAnfrage(KiZugang zugang, string job)
     {
         if (zugang.Anbieter == "openai_compatible")
         {
-            var anfrage = new HttpRequestMessage(HttpMethod.Post, zugang.Adresse)
+            var request = new HttpRequestMessage(HttpMethod.Post, zugang.Adresse)
             {
                 Content = JsonContent.Create(new
                 {
@@ -274,19 +274,19 @@ public sealed class HttpAnschreiber(
                     stream = true,
                     messages = new[]
                     {
-                        new { role = "system", content = Anschreibenkontext.Regeln },
-                        new { role = "user", content = auftrag }
+                        new { role = "system", content = CoverLetterContext.Regeln },
+                        new { role = "user", content = job }
                     }
                 })
             };
 
             if (zugang.Schluessel.Length > 0)
             {
-                anfrage.Headers.TryAddWithoutValidation(
+                request.Headers.TryAddWithoutValidation(
                     "Authorization", $"Bearer {zugang.Schluessel}");
             }
 
-            return anfrage;
+            return request;
         }
 
         var anthropic = new HttpRequestMessage(HttpMethod.Post, zugang.Adresse)
@@ -296,8 +296,8 @@ public sealed class HttpAnschreiber(
                 model = zugang.Modell,
                 max_tokens = HoechsteToken,
                 stream = true,
-                system = Anschreibenkontext.Regeln,
-                messages = new[] { new { role = "user", content = auftrag } }
+                system = CoverLetterContext.Regeln,
+                messages = new[] { new { role = "user", content = job } }
             })
         };
 
@@ -317,14 +317,14 @@ public sealed class HttpAnschreiber(
     /// ein Anschreiben da, gilt das Stück — sonst wäre eine Minute Schreiben
     /// wieder ein leerer Fehlschlag.
     /// </remarks>
-    public static async Task<string> LiesStromAsync(
-        string anbieter,
+    public static async Task<string> ReadStreamAsync(
+        string provider,
         Stream strom,
         TimeSpan stall,
         Func<string, Task>? fortschritt = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(anbieter);
+        ArgumentNullException.ThrowIfNull(provider);
         ArgumentNullException.ThrowIfNull(strom);
 
         using var stallToken = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -339,12 +339,12 @@ public sealed class HttpAnschreiber(
 
         try
         {
-            while (await leser.ReadLineAsync(stallToken.Token) is { } zeile)
+            while (await leser.ReadLineAsync(stallToken.Token) is { } row)
             {
 
-                if (zeile.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                if (row.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
                 {
-                    var payload = zeile["data:".Length..].Trim();
+                    var payload = row["data:".Length..].Trim();
 
                     if (payload.Length == 0)
                     {
@@ -356,14 +356,14 @@ public sealed class HttpAnschreiber(
                         break;
                     }
 
-                    await NimmDeltaAsync(
-                        anbieter, payload, text, stallToken, stall, fortschritt);
+                    await TakeDeltaAsync(
+                        provider, payload, text, stallToken, stall, fortschritt);
                     continue;
                 }
 
-                if (zeile.StartsWith("event:", StringComparison.OrdinalIgnoreCase)
-                    || zeile.StartsWith(':')
-                    || zeile.Length == 0)
+                if (row.StartsWith("event:", StringComparison.OrdinalIgnoreCase)
+                    || row.StartsWith(':')
+                    || row.Length == 0)
                 {
                     continue;
                 }
@@ -371,14 +371,14 @@ public sealed class HttpAnschreiber(
                 // Ollama nativ und andere NDJSON-Anbieter: eine JSON-Zeile
                 // je Token, ohne `data:`-Präfix. Ohne diesen Zweig landet
                 // alles in `roh` und der Brief erscheint erst am Ende.
-                if (zeile[0] == '{')
+                if (row[0] == '{')
                 {
-                    await NimmDeltaAsync(
-                        anbieter, zeile, text, stallToken, stall, fortschritt);
+                    await TakeDeltaAsync(
+                        provider, row, text, stallToken, stall, fortschritt);
                     continue;
                 }
 
-                roh.Append(zeile);
+                roh.Append(row);
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -388,7 +388,7 @@ public sealed class HttpAnschreiber(
                 return text.ToString();
             }
 
-            throw new AnschreibenNichtVerfuegbar(
+            throw new CoverLetterUnavailable(
                 "Der Entwurfsanbieter antwortet nicht (Zeitüberschreitung).");
         }
 
@@ -404,11 +404,11 @@ public sealed class HttpAnschreiber(
 
         using var gelesen = JsonDocument.Parse(roh.ToString());
 
-        return LiesText(anbieter, gelesen.RootElement) ?? string.Empty;
+        return LiesText(provider, gelesen.RootElement) ?? string.Empty;
     }
 
-    private static async Task NimmDeltaAsync(
-        string anbieter,
+    private static async Task TakeDeltaAsync(
+        string provider,
         string json,
         StringBuilder text,
         CancellationTokenSource stallToken,
@@ -419,7 +419,7 @@ public sealed class HttpAnschreiber(
 
         try
         {
-            stueck = LiesDelta(anbieter, json);
+            stueck = LiesDelta(provider, json);
         }
         catch (JsonException)
         {
@@ -441,33 +441,33 @@ public sealed class HttpAnschreiber(
     }
 
     /// <summary>Ein Token aus einem SSE-Stück — oder null, wenn keins drin ist.</summary>
-    public static string? LiesDelta(string anbieter, string json)
+    public static string? LiesDelta(string provider, string json)
     {
-        ArgumentNullException.ThrowIfNull(anbieter);
+        ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrEmpty(json);
 
         using var gelesen = JsonDocument.Parse(json);
 
-        return LiesDelta(anbieter, gelesen.RootElement);
+        return LiesDelta(provider, gelesen.RootElement);
     }
 
-    private static string? LiesDelta(string anbieter, JsonElement wurzel)
+    private static string? LiesDelta(string provider, JsonElement wurzel)
     {
-        if (anbieter == "openai_compatible")
+        if (provider == "openai_compatible")
         {
             if (wurzel.TryGetProperty("choices", out var auswahl) && auswahl.GetArrayLength() > 0)
             {
                 var erstes = auswahl[0];
 
                 if (erstes.TryGetProperty("delta", out var delta)
-                    && delta.TryGetProperty("content", out var inhalt)
-                    && inhalt.ValueKind == JsonValueKind.String)
+                    && delta.TryGetProperty("content", out var content)
+                    && content.ValueKind == JsonValueKind.String)
                 {
-                    return inhalt.GetString();
+                    return content.GetString();
                 }
 
-                if (erstes.TryGetProperty("message", out var nachricht)
-                    && nachricht.TryGetProperty("content", out var ganzes)
+                if (erstes.TryGetProperty("message", out var message)
+                    && message.TryGetProperty("content", out var ganzes)
                     && ganzes.ValueKind == JsonValueKind.String)
                 {
                     return ganzes.GetString();
@@ -492,8 +492,8 @@ public sealed class HttpAnschreiber(
             return null;
         }
 
-        if (wurzel.TryGetProperty("type", out var typ)
-            && typ.GetString() == "content_block_delta"
+        if (wurzel.TryGetProperty("type", out var type)
+            && type.GetString() == "content_block_delta"
             && wurzel.TryGetProperty("delta", out var anthropic)
             && anthropic.TryGetProperty("text", out var stueck)
             && stueck.ValueKind == JsonValueKind.String)
@@ -504,9 +504,9 @@ public sealed class HttpAnschreiber(
         return null;
     }
 
-    private static string? LiesText(string anbieter, JsonElement wurzel)
+    private static string? LiesText(string provider, JsonElement wurzel)
     {
-        if (anbieter == "openai_compatible")
+        if (provider == "openai_compatible")
         {
             return wurzel
                 .GetProperty("choices")[0]

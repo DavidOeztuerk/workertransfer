@@ -7,19 +7,19 @@ namespace WorkerTransfer.Advisor.Infrastructure.Persistence;
 /// <summary>Eine Zeile von <c>mandates</c> — vier Werte einer Person.</summary>
 /// <remarks>
 /// <para><strong>Was hier NICHT steht, ist der Inhalt dieser Tabelle.</strong>
-/// Keine Sichtbarkeit, keine Freigabe, kein Schalter „für alle" — nichts davon
+/// None Sichtbarkeit, keine Release, kein Schalter „für alle" — nichts davon
 /// gehört einem Dienst, der nicht der Ledger ist (ADR-0020). Ein Test hält
 /// fest, dass keine Spalte dieses Modells <c>sichtbar</c>, <c>visible</c>,
 /// <c>public</c> oder <c>freigabe</c> im Namen trägt, und das ist kein
 /// Namensstreit: eine solche Spalte wäre die zweite Wahrheit, und sie liefe
-/// beim ersten Widerruf auseinander.</para>
+/// beim ersten Revocation auseinander.</para>
 ///
-/// <para>Und keine Verfügbarkeit: die steht im Marktstatus bei
+/// <para>Und keine Verfügbarkeit: die steht im MarketStatus bei
 /// transfer-service, samt der abgeleiteten Aussage „ansprechbar". Sie hier zu
 /// spiegeln hieße, eine Aussage zu halten, die jemanden den Arbeitsplatz kosten
-/// kann, an einer Stelle, an der sie niemand pflegt.</para>
+/// kann, an einer Job, an der sie niemand pflegt.</para>
 /// </remarks>
-public sealed class MandatZeile
+public sealed class MandateRow
 {
     /// <summary>Die Subjekt-Kennung. Sie <em>ist</em> der Schlüssel.</summary>
     public Guid Id { get; set; }
@@ -51,17 +51,17 @@ public sealed class MandatZeile
 
 /// <summary>Eine Zeile von <c>conversations</c>.</summary>
 /// <remarks>
-/// <strong>Keine Stufenspalte.</strong> Nicht <c>stage</c>, nicht
+/// <strong>None Stufenspalte.</strong> Nicht <c>stage</c>, nicht
 /// <c>has_stage</c>, nicht <c>released_at</c>: die Stufe wird bei jedem Lesen
 /// aus dem Ledger geholt (ADR-0037 Entscheidung 2). Eine Spalte hier wäre die
-/// Stufe als zweite Tür neben dem Ledger — und ein Widerruf müsste dann an zwei
-/// Stellen wirken.
+/// Stufe als zweite Tür neben dem Ledger — und ein Revocation müsste dann an zwei
+/// Jobs wirken.
 /// <para>
 /// Und keine Nachrichtentabelle: ADR-0037 Entscheidung 5 lässt offen, ob
 /// Menschen hier tippen. Solange das offen ist, gibt es keine Tabelle dafür.
 /// </para>
 /// </remarks>
-public sealed class GespraechsZeile
+public sealed class ConversationRow
 {
     /// <summary>Welches Gespräch.</summary>
     public Guid Id { get; set; }
@@ -89,63 +89,63 @@ public sealed class GespraechsZeile
 /// <remarks>
 /// Verfolgen ist aus, als Voreinstellung des Kontexts und nicht je Abfrage. Je
 /// Abfrage wäre es Disziplin, und die nächste hinzugefügte vergisst es. Ein
-/// änderndes <c>SichereAsync</c> nimmt sich sein <c>AsTracking()</c> deshalb
+/// änderndes <c>SaveAsync</c> nimmt sich sein <c>AsTracking()</c> deshalb
 /// ausdrücklich.
 /// </remarks>
 public sealed class AdvisorDbContext(DbContextOptions<AdvisorDbContext> options) : DbContext(options)
 {
     /// <summary>Die Mandate.</summary>
-    public DbSet<MandatZeile> Mandate => Set<MandatZeile>();
+    public DbSet<MandateRow> Mandate => Set<MandateRow>();
 
     /// <summary>Die Gespräche.</summary>
-    public DbSet<GespraechsZeile> Gespraeche => Set<GespraechsZeile>();
+    public DbSet<ConversationRow> Gespraeche => Set<ConversationRow>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
-        modelBuilder.Entity<MandatZeile>(zeile =>
+        modelBuilder.Entity<MandateRow>(row =>
         {
-            zeile.ToTable("mandates");
+            row.ToTable("mandates");
             // KEINE zweite Spalte fuer die Person. Der Schluessel IST sie, und
             // `conversations` in derselben Datei fuehrt daneben eine eigene
             // `subject_id` — wer die beiden vergleicht, haelt das hier fuer
             // vergessen und traegt die Spalte nach. Dann stuenden zwei Angaben
-            // ueber denselben Menschen nebeneinander, und die Loeschung (ADR-0027)
+            // ueber denselben Menschen nebeneinander, und die Erasure (ADR-0027)
             // traefe die eine und liesse die andere stehen. Die Anmerkung sagt es
             // stattdessen aus: sie ist das, was `LoeschempfaengerTests` liest, wo
             // kein Spaltenname zu finden ist.
-            zeile.HasAnnotation(Personenzeile.Anmerkung, true);
-            zeile.HasKey(eintrag => eintrag.Id);
-            zeile.Property(eintrag => eintrag.Id).HasColumnName("id").ValueGeneratedNever();
-            zeile.Property(eintrag => eintrag.EntryMonth)
+            row.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
+            row.HasKey(entry => entry.Id);
+            row.Property(entry => entry.Id).HasColumnName("id").ValueGeneratedNever();
+            row.Property(entry => entry.EntryMonth)
                 .HasColumnName("entry_month").HasMaxLength(7);
-            zeile.Property(eintrag => eintrag.SalaryMin).HasColumnName("salary_min");
-            zeile.Property(eintrag => eintrag.SalaryMax).HasColumnName("salary_max");
-            zeile.Property(eintrag => eintrag.WorkloadPercent).HasColumnName("workload_percent");
-            zeile.Property(eintrag => eintrag.ExcludedDomains)
+            row.Property(entry => entry.SalaryMin).HasColumnName("salary_min");
+            row.Property(entry => entry.SalaryMax).HasColumnName("salary_max");
+            row.Property(entry => entry.WorkloadPercent).HasColumnName("workload_percent");
+            row.Property(entry => entry.ExcludedDomains)
                 .HasColumnName("excluded_domains").HasColumnType("jsonb").IsRequired();
-            zeile.Property(eintrag => eintrag.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            row.Property(entry => entry.UpdatedAt).HasColumnName("updated_at").IsRequired();
         });
 
-        modelBuilder.Entity<GespraechsZeile>(zeile =>
+        modelBuilder.Entity<ConversationRow>(row =>
         {
-            zeile.ToTable("conversations");
-            zeile.HasKey(eintrag => eintrag.Id);
-            zeile.Property(eintrag => eintrag.Id).HasColumnName("id").ValueGeneratedNever();
-            zeile.Property(eintrag => eintrag.SubjectId).HasColumnName("subject_id").IsRequired();
-            zeile.Property(eintrag => eintrag.TenantId).HasColumnName("tenant_id").IsRequired();
-            zeile.Property(eintrag => eintrag.State)
+            row.ToTable("conversations");
+            row.HasKey(entry => entry.Id);
+            row.Property(entry => entry.Id).HasColumnName("id").ValueGeneratedNever();
+            row.Property(entry => entry.SubjectId).HasColumnName("subject_id").IsRequired();
+            row.Property(entry => entry.TenantId).HasColumnName("tenant_id").IsRequired();
+            row.Property(entry => entry.State)
                 .HasColumnName("state").HasMaxLength(16).IsRequired();
-            zeile.Property(eintrag => eintrag.Note)
+            row.Property(entry => entry.Note)
                 .HasColumnName("note").HasMaxLength(2000).IsRequired();
-            zeile.Property(eintrag => eintrag.OpenedAt).HasColumnName("opened_at").IsRequired();
-            zeile.Property(eintrag => eintrag.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            row.Property(entry => entry.OpenedAt).HasColumnName("opened_at").IsRequired();
+            row.Property(entry => entry.UpdatedAt).HasColumnName("updated_at").IsRequired();
 
             // Die zwei Abfragen, die es gibt: meine Gespraeche, und unsere.
-            zeile.HasIndex(eintrag => eintrag.SubjectId);
-            zeile.HasIndex(eintrag => eintrag.TenantId);
+            row.HasIndex(entry => entry.SubjectId);
+            row.HasIndex(entry => entry.TenantId);
         });
 
         modelBuilder.ConfigureOutbox();

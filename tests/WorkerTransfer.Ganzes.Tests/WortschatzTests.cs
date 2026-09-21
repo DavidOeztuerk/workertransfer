@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Noelia.Abstractions.Security.Checks;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 
 namespace WorkerTransfer.Ganzes.Tests;
 
@@ -39,31 +39,31 @@ public class WortschatzTests
         ("identity", typeof(Identity.Domain.Audit.AuditAction),
          typeof(Contracts.Identity.KiZugangV1)),
         ("consent", typeof(Consent.Domain.Audit.AuditAction),
-         typeof(Contracts.Consent.EinwilligungsfrageV1)),
-        ("profile", typeof(Profile.Domain.Profile.Profil),
-         typeof(Profile.Contracts.ProfilfundV1)),
-        ("resume", typeof(Resume.Domain.Anfragen.Anfragestand),
+         typeof(Contracts.Consent.ConsentQuestionV1)),
+        ("profile", typeof(Profile.Domain.Profile.PersonProfile),
+         typeof(Profile.Contracts.ProfileHitV1)),
+        ("resume", typeof(Resume.Domain.Anfragen.RequestState),
          typeof(Resume.Contracts.StationV1)),
         ("portfolio", typeof(Portfolio.Domain.Ablage.Abgelegtes),
          typeof(Portfolio.Contracts.EintragV1)),
-        ("jobs", typeof(Jobs.Domain.Stellen.Faehigkeitenliste),
-         typeof(Jobs.Contracts.StelleV1)),
-        ("applications", typeof(Applications.Domain.Bewerbungen.Bewerbungsstand),
-         typeof(Applications.Contracts.BewerbungV1)),
-        ("companies", typeof(Companies.Domain.Arbeitgeberprofile.Arbeitgeberprofil),
-         typeof(Companies.Contracts.ArbeitgeberprofilV1)),
-        ("transfer", typeof(Transfer.Domain.Anfragen.Anfragestand),
-         typeof(Transfer.Contracts.MarktstatusV1)),
+        ("jobs", typeof(Jobs.Domain.Jobs.SkillList),
+         typeof(Jobs.Contracts.JobV1)),
+        ("applications", typeof(Applications.Domain.Applications.ApplicationState),
+         typeof(Applications.Contracts.ApplicationV1)),
+        ("companies", typeof(Companies.Domain.EmployerProfiles.EmployerProfile),
+         typeof(Companies.Contracts.EmployerProfileV1)),
+        ("transfer", typeof(Transfer.Domain.Anfragen.RequestState),
+         typeof(Transfer.Contracts.MarketStatusV1)),
         ("notification", typeof(Notification.Domain.Benachrichtigungen.Benachrichtigungsart),
          typeof(Notification.Contracts.BenachrichtigenV1)),
-        ("github", typeof(GitHub.Domain.Verbindungen.Loginfehler),
+        ("github", typeof(GitHub.Domain.Connections.Loginfehler),
          typeof(GitHub.Contracts.RepositoryV1)),
-        ("scout", typeof(Scout.Domain.Suchen.Suche),
+        ("scout", typeof(Scout.Domain.Searches.Search),
          typeof(Scout.Contracts.HakenV1)),
         ("advisor", typeof(Advisor.Domain.Gespraeche.UebergangNichtErlaubt),
-         typeof(Advisor.Contracts.MandatV1)),
+         typeof(Advisor.Contracts.MandateV1)),
         ("assessment", typeof(Assessment.Domain.Vorgaenge.Eingabefehler),
-         typeof(Assessment.Contracts.AufgabeStellenV1))
+         typeof(Assessment.Contracts.SetTaskV1))
     ];
 
     /// <summary>Dieselben vierzehn, wie xUnit sie aufzählt.</summary>
@@ -77,9 +77,9 @@ public class WortschatzTests
         {
             var daten = new TheoryData<string, Type, Type>();
 
-            foreach (var (dienst, domaene, vertraege) in Paare)
+            foreach (var (service, domaene, vertraege) in Paare)
             {
-                daten.Add(dienst, domaene, vertraege);
+                daten.Add(service, domaene, vertraege);
             }
 
             return daten;
@@ -93,14 +93,14 @@ public class WortschatzTests
     [Theory]
     [MemberData(nameof(Dienste))]
     public async Task Kein_Dienst_traegt_ein_Wort_das_einen_Menschen_bewertet(
-        string dienst, Type domaene, Type vertraege)
+        string service, Type domaene, Type vertraege)
     {
-        var befund = await new Zahlpruefung(
-            [domaene.Assembly, vertraege.Assembly], Ausnahmen(dienst)).RunAsync();
+        var finding = await new NumberCheck(
+            [domaene.Assembly, vertraege.Assembly], Ausnahmen(service)).RunAsync();
 
-        befund.Status.Should().Be(
+        finding.Status.Should().Be(
             SecurityCheckStatus.Pass,
-            $"{dienst}: {befund.Summary}");
+            $"{service}: {finding.Summary}");
     }
 
     /// <summary>Die Erkennung selbst stimmt — sonst wäre alles grün, weil nichts trifft.</summary>
@@ -123,7 +123,7 @@ public class WortschatzTests
         // Ueber DIESELBE Regel, die die Pruefung fahert, und nicht ueber eine
         // nachgebaute: eine zweite Regel neben der ersten ist die, die als
         // Erste falsch wird.
-        Zahlpruefung.Trifft(name).Should().Be(erwartet);
+        NumberCheck.Trifft(name).Should().Be(erwartet);
 
     /// <summary>
     /// Und was sie NICHT findet, steht ebenfalls fest — damit niemand mehr glaubt.
@@ -139,7 +139,7 @@ public class WortschatzTests
     [InlineData("Trefferanzahl")]
     [InlineData("Gesamtpunkte")]
     public void Ein_Kompositum_mit_dem_Wort_am_Ende_entgeht_ihr(string name) =>
-        Zahlpruefung.Trifft(name).Should().BeFalse(
+        NumberCheck.Trifft(name).Should().BeFalse(
             "der Silbenanfang findet es nicht — wer sich darauf verlässt, "
             + "verlässt sich auf zu wenig");
 
@@ -157,8 +157,8 @@ public class WortschatzTests
         var alle = Alle();
 
         alle.Should().HaveCount(13);
-        alle.Should().OnlyContain(ausnahme => ausnahme.Grund.Length > 20);
-        alle.Select(ausnahme => ausnahme.Name).Should().OnlyHaveUniqueItems();
+        alle.Should().OnlyContain(exception => exception.Grund.Length > 20);
+        alle.Select(exception => exception.Name).Should().OnlyHaveUniqueItems();
     }
 
     /// <summary>Die Ausnahmen zeigen auf Namen, die es wirklich gibt.</summary>
@@ -172,19 +172,19 @@ public class WortschatzTests
     [Fact]
     public async Task Keine_Ausnahme_zeigt_ins_Leere()
     {
-        foreach (var (dienst, domaene, vertraege) in Paare)
+        foreach (var (service, domaene, vertraege) in Paare)
         {
-            var befund = await new Zahlpruefung(
-                [domaene.Assembly, vertraege.Assembly], Ausnahmen(dienst))
+            var finding = await new NumberCheck(
+                [domaene.Assembly, vertraege.Assembly], Ausnahmen(service))
                 .RunAsync();
 
-            befund.Summary.Should().NotContain(
-                "zeigen auf Namen", $"{dienst}: {befund.Summary}");
+            finding.Summary.Should().NotContain(
+                "zeigen auf Namen", $"{service}: {finding.Summary}");
         }
     }
 
     /// <summary>Alle Ausnahmen des Baumes, aus den drei Quellen, die sie halten.</summary>
-    private static IReadOnlyList<Wortausnahme> Alle() =>
+    private static IReadOnlyList<TermException> Alle() =>
     [
         .. Advisor.Infrastructure.AdvisorInfrastructure.Wortausnahmen,
         .. Applications.Infrastructure.ApplicationsInfrastructure.Wortausnahmen,
@@ -192,7 +192,7 @@ public class WortschatzTests
     ];
 
     /// <summary>Die Ausnahmen eines Dienstes — aus seinem Verbundpunkt, nicht von hier.</summary>
-    private static IReadOnlyList<Wortausnahme> Ausnahmen(string dienst) => dienst switch
+    private static IReadOnlyList<TermException> Ausnahmen(string service) => service switch
     {
         "advisor" => Advisor.Infrastructure.AdvisorInfrastructure.Wortausnahmen,
         "applications" => Applications.Infrastructure.ApplicationsInfrastructure.Wortausnahmen,

@@ -7,7 +7,7 @@ namespace WorkerTransfer.Resume.Infrastructure.Texterkennung;
 /// <summary>Liest den Text aus einem PDF — im eigenen Prozess.</summary>
 /// <remarks>
 /// <para><strong>Eine Bibliothek und kein Dienst, und das ist die Entscheidung
-/// von ADR-0043.</strong> Ein Zeugnis nennt den Arbeitgeber, die Dauer, oft die
+/// von ADR-0043.</strong> Ein Reference nennt den Arbeitgeber, die Dauer, oft die
 /// Note und manchmal Krankheitszeiten. Ein Texterkenner im Netz hiesse: dieses
 /// Dokument verlässt die Plattform, damit ein Fremder Wörter darin sucht — und
 /// der Gewinn wäre ein Vorschlag im Formular. <c>PdfPig</c> (MIT) zieht
@@ -16,7 +16,7 @@ namespace WorkerTransfer.Resume.Infrastructure.Texterkennung;
 /// woran die Souveränitätsgrenze den Knopf stumm abweisen könnte. Genau daran
 /// ist am 10.09.2026 der Anschreiben-Agent gestorben.</para>
 ///
-/// <para><strong>Keine Texterkennung auf Bildern, und das wird gesagt statt
+/// <para><strong>None Texterkennung auf Bildern, und das wird gesagt statt
 /// verschwiegen.</strong> Ein abfotografierter Meisterbrief ist ein Bild; ein
 /// PDF aus einem Scanner ohne Textschicht ebenso. Beides liefert
 /// <c>TextGefunden = false</c>, und die Oberfläche sagt dann „daraus war kein
@@ -37,7 +37,7 @@ public sealed class PdfTexterkennung(ILogger<PdfTexterkennung> protokoll) : ITex
 {
     /// <summary>Wie viele Seiten gelesen werden.</summary>
     /// <remarks>
-    /// Ein Zeugnis hat keine fünfzig Seiten. Ohne Grenze bezahlt ein Klick die
+    /// Ein Reference hat keine fünfzig Seiten. Ohne Grenze bezahlt ein Klick die
     /// Rechenzeit einer Datei, deren Seitenzahl der Aufrufer bestimmt — zehn
     /// Unterlagen zu je fünf Megabyte sind dafür genug Spielraum.
     /// </remarks>
@@ -47,7 +47,7 @@ public sealed class PdfTexterkennung(ILogger<PdfTexterkennung> protokoll) : ITex
     private static readonly Erkanntes Nichts = new(TextGefunden: false, Text: string.Empty);
 
     /// <inheritdoc />
-    public Erkanntes Lies(ReadOnlyMemory<byte> inhalt, string inhaltstyp)
+    public Erkanntes Lies(ReadOnlyMemory<byte> content, string inhaltstyp)
     {
         if (inhaltstyp != "application/pdf")
         {
@@ -56,7 +56,7 @@ public sealed class PdfTexterkennung(ILogger<PdfTexterkennung> protokoll) : ITex
 
         try
         {
-            using var dokument = PdfDocument.Open(inhalt.ToArray());
+            using var dokument = PdfDocument.Open(content.ToArray());
 
             var stuecke = dokument.GetPages()
                 .Take(HoechsteSeitenzahl)
@@ -64,19 +64,19 @@ public sealed class PdfTexterkennung(ILogger<PdfTexterkennung> protokoll) : ITex
                 // gezeichnete Textblöcke ohne Leerzeichen aneinander, und aus
                 // „MIG/MAG." und „Weiterhin" würde „MIG/MAG.Weiterhin" — ein
                 // Wort, das an keiner Wortgrenze mehr endet. Gemessen.
-                .SelectMany(seite => seite.GetWords().Select(wort => wort.Text));
+                .SelectMany(page => page.GetWords().Select(word => word.Text));
 
             var text = string.Join(' ', stuecke);
 
             return text.Length == 0 ? Nichts : new Erkanntes(TextGefunden: true, text);
         }
-        catch (Exception fehler)
+        catch (Exception error)
         {
             // KEIN INHALT IM PROTOKOLL — die Fehlerart und sonst nichts. Der
             // Wortlaut eines Zeugnisses gehört in dieselbe Klasse wie ein
-            // Lebenslauf: er steht in keinem Log (product-scope).
+            // CurriculumVitae: er steht in keinem Log (product-scope).
             protokoll.LogWarning(
-                "Eine Unterlage liess sich nicht lesen: {Fehlerart}", fehler.GetType().Name);
+                "Eine Unterlage liess sich nicht lesen: {Fehlerart}", error.GetType().Name);
 
             return Nichts;
         }

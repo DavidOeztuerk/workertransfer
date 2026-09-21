@@ -1,7 +1,7 @@
 using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Jobs.Application.Nachrichten;
-using WorkerTransfer.Jobs.Domain.Stellen;
+using WorkerTransfer.Jobs.Domain.Jobs;
 
 namespace WorkerTransfer.Jobs.Application.Rueckzug;
 
@@ -16,7 +16,7 @@ namespace WorkerTransfer.Jobs.Application.Rueckzug;
 public sealed record AnzeigenZurueckziehenBefehl(TenantId Firma) : IBefehl<int>;
 
 /// <inheritdoc cref="AnzeigenZurueckziehenBefehl" />
-public sealed class AnzeigenZurueckziehenHandler(IStellenspeicher speicher, TimeProvider uhr)
+public sealed class AnzeigenZurueckziehenHandler(IJobStore store, TimeProvider uhr)
     : IRequestHandler<AnzeigenZurueckziehenBefehl, int>
 {
     /// <inheritdoc />
@@ -28,7 +28,7 @@ public sealed class AnzeigenZurueckziehenHandler(IStellenspeicher speicher, Time
         // Zurückgezogen, nicht gelöscht: ein Unternehmen ist keine natürliche
         // Person, und seine Anzeigen gehören ihm auch dann noch. Aber eine
         // unbeaufsichtigte Stellenanzeige ist schlechter als keine —
-        // Bewerbungen liefen an niemanden.
-        return speicher.ZieheZurueckAsync(request.Firma, uhr.GetUtcNow(), cancellationToken);
+        // Applications liefen an niemanden.
+        return store.WithdrawAsync(request.Firma, uhr.GetUtcNow(), cancellationToken);
     }
 }

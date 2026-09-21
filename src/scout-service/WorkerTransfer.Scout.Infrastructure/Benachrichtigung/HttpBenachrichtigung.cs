@@ -7,10 +7,10 @@ using WorkerTransfer.Scout.Contracts;
 namespace WorkerTransfer.Scout.Infrastructure.Benachrichtigung;
 
 /// <summary>Wohin Benachrichtigungen gehen, und was sie als unsere ausweist.</summary>
-public sealed class Benachrichtigungseinstellungen
+public sealed class NotificationSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Notifications";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Notifications";
 
     /// <summary>Die Basisadresse des notification-service.</summary>
     public string Adresse { get; set; } = string.Empty;
@@ -32,7 +32,7 @@ public sealed class Benachrichtigungseinstellungen
     public string Geheimnis { get; set; } = string.Empty;
 }
 
-/// <summary>Reicht „dein Profil wurde entdeckt" an notification-service.</summary>
+/// <summary>Reicht „dein Profile wurde entdeckt" an notification-service.</summary>
 /// <remarks>
 /// <para>Wirft bei Transportfehler <em>und</em> bei schlechtem Status — das ist,
 /// was <c>delivered_at</c> überhaupt eine Bedeutung gibt. Der Fehlschlag ist
@@ -41,20 +41,20 @@ public sealed class Benachrichtigungseinstellungen
 ///
 /// <para><strong>Eine zweite Zustellung ist harmlos</strong>, und darauf ist die
 /// Kappe gebaut: höchstens eine Nachricht je Person und Tag entscheidet der
-/// Empfänger aus seinem eigenen Postfach. Eine Kappe hier wäre eine Tabelle
+/// Empfänger aus seinem eigenen Inbox. Eine Kappe hier wäre eine Tabelle
 /// „diese Person wurde am … gemeldet" — wieder ein Verzeichnis über die
 /// Sichtbarkeit eines Menschen (ADR-0033).</para>
 /// </remarks>
 public sealed class HttpBenachrichtigung(
     IHttpClientFactory fabrik,
-    IOptions<Benachrichtigungseinstellungen> einstellungen) : IZustellung
+    IOptions<NotificationSettings> einstellungen) : IDelivery
 {
-    private readonly Benachrichtigungseinstellungen _einstellungen = einstellungen.Value;
+    private readonly NotificationSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task ZustelleAsync(
-        SubjectId empfaenger,
-        string art,
+    public async Task DeliverAsync(
+        SubjectId recipient,
+        string kind,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(_einstellungen.Adresse))
@@ -70,7 +70,7 @@ public sealed class HttpBenachrichtigung(
         using var client = fabrik.CreateClient(nameof(HttpBenachrichtigung));
 
         client.Timeout = _einstellungen.Zeitueberschreitung;
-        using var anfrage = new HttpRequestMessage(
+        using var request = new HttpRequestMessage(
             HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), "/internal/notifications"))
         {
             // EIN TYPISIERTER VERTRAG, kein anonymes Objekt. `user_id` und nicht
@@ -80,13 +80,13 @@ public sealed class HttpBenachrichtigung(
             //
             // Der ganze Inhalt: ueber wen und welcher Art. KEIN Firmenname
             // (ADR-0033), kein Text, kein Grund.
-            Content = JsonContent.Create(new EntdeckungsmeldungV1(empfaenger.Value, art))
+            Content = JsonContent.Create(new DiscoveryNotificationV1(recipient.Value, kind))
         };
 
-        anfrage.Headers.Add("X-Notify-Secret", _einstellungen.Geheimnis);
+        request.Headers.Add("X-Notify-Secret", _einstellungen.Geheimnis);
 
-        using var antwort = await client.SendAsync(anfrage, cancellationToken);
+        using var response = await client.SendAsync(request, cancellationToken);
 
-        antwort.EnsureSuccessStatusCode();
+        response.EnsureSuccessStatusCode();
     }
 }

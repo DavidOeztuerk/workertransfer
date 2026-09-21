@@ -32,8 +32,8 @@ public class AuflagenTests
     /// </summary>
     /// <remarks>
     /// „Welche Menschen tragen ‚Schweißfachmann' in ihren Unterlagen" ist genau
-    /// die Suche, die dieses System nicht hat und nicht bekommt: durchsuchbar
-    /// ist allein, was jemand selbst in sein Profil getippt und <em>gespeichert</em>
+    /// die Search, die dieses System nicht hat und nicht bekommt: durchsuchbar
+    /// ist allein, was jemand selbst in sein Profile getippt und <em>gespeichert</em>
     /// hat (ADR-0033). Gefragt werden darf nur nach den eigenen Unterlagen.
     /// <para>
     /// Ein Mengenvergleich und kein Enthaltensein — eine vierte Methode fällt
@@ -44,8 +44,8 @@ public class AuflagenTests
     /// </remarks>
     [Fact]
     public void Der_Index_kennt_keine_Frage_nach_dem_Wort() =>
-        typeof(IFundSpeicher).GetMethods().Select(glied => glied.Name)
-            .Should().BeEquivalentTo("AlleAsync", "SichereAsync", "LoescheAsync");
+        typeof(ITermStore).GetMethods().Select(glied => glied.Name)
+            .Should().BeEquivalentTo("AllAsync", "SaveAsync", "DeleteAsync");
 
     /// <summary>Und der Speicher dahinter auch nicht.</summary>
     /// <remarks>
@@ -54,21 +54,21 @@ public class AuflagenTests
     /// </remarks>
     [Fact]
     public void Auch_der_Speicher_kennt_keine_dritte_Frage() =>
-        typeof(EfFundSpeicher).GetMethods(BindingFlags.Public | BindingFlags.Instance
+        typeof(EfTermStore).GetMethods(BindingFlags.Public | BindingFlags.Instance
                 | BindingFlags.DeclaredOnly)
             .Select(glied => glied.Name)
-            .Should().BeEquivalentTo("AlleAsync", "SichereAsync", "LoescheAsync");
+            .Should().BeEquivalentTo("AllAsync", "SaveAsync", "DeleteAsync");
 
     // ---------------------------------------------------------------------
     // AUFLAGE 2 — ER HÄLT NAMEN, NIE DEN WORTLAUT
     // ---------------------------------------------------------------------
 
     /// <summary>
-    /// <strong>Die Zeile hält keinen Text aus dem Zeugnis.</strong>
+    /// <strong>Die Zeile hält keinen Text aus dem Reference.</strong>
     /// </summary>
     /// <remarks>
     /// Der Volltext lebt im Arbeitsspeicher des einen Aufrufs, der ihn gelesen
-    /// hat. Eine Spalte mit dem Wortlaut wäre eine zweite Kopie der Unterlage —
+    /// hat. Eine Spalte mit dem Wortlaut wäre eine zweite Kopie der DocumentRecord —
     /// diesmal in der Datenbank, und damit in jeder Sicherung und in jedem
     /// Abzug, den irgendwer für eine Fehlersuche zieht (ADR-0035).
     /// <para>
@@ -79,20 +79,20 @@ public class AuflagenTests
     /// </remarks>
     [Fact]
     public void Die_Indexzeile_haelt_genau_diese_Felder() =>
-        typeof(FundZeile).GetProperties().Select(feld => feld.Name)
+        typeof(TermRow).GetProperties().Select(field => field.Name)
             .Should().BeEquivalentTo(
                 "Id", "SubjectId", "DocumentId", "HasText", "Terms", "ReadAt");
 
     /// <summary>Und hinaus geht dieselbe Menge, um ein Feld ergänzt.</summary>
     /// <remarks>
-    /// Der Name der Unterlage reist mit, weil die Oberfläche sagen können muss,
+    /// Der Name der DocumentRecord reist mit, weil die Oberfläche sagen können muss,
     /// aus <em>welcher</em> Datei nichts zu lesen war. „Nichts gefunden" ohne
     /// die Datei dazu wäre die stillschweigende Behauptung, es stehe nichts
     /// darin (ADR-0022 §3).
     /// </remarks>
     [Fact]
     public void Der_Vertrag_traegt_genau_diese_Felder() =>
-        typeof(UnterlagenfundV1).GetProperties().Select(feld => feld.Name)
+        typeof(DocumentTermsV1).GetProperties().Select(field => field.Name)
             .Should().BeEquivalentTo("DocumentId", "Name", "ReadAt", "HasText", "Terms");
 
     // ---------------------------------------------------------------------
@@ -103,7 +103,7 @@ public class AuflagenTests
     /// Aus einem Fund wird nichts gerechnet.
     /// </summary>
     /// <remarks>
-    /// Die naheliegende Versuchung heisst hier „wie gut passt dieses Zeugnis" —
+    /// Die naheliegende Versuchung heisst hier „wie gut passt dieses Reference" —
     /// drei gefundene Wörter von fünf gesuchten, und schon steht die Zahl da,
     /// die ADR-0022 gelöscht hat. Ein Zwilling von <c>Adr0022Tests</c>, über die
     /// Typen dieser Arbeit.
@@ -117,17 +117,17 @@ public class AuflagenTests
     [InlineData("gewicht")]
     [InlineData("niveau")]
     [InlineData("anzahl")]
-    public void Kein_Feld_rechnet_ueber_einen_Menschen(string wort)
+    public void Kein_Feld_rechnet_ueber_einen_Menschen(string word)
     {
         string[] namen =
         [
-            .. Felder(typeof(Unterlagenfund)),
-            .. Felder(typeof(FundZeile)),
-            .. Felder(typeof(UnterlagenfundV1))
+            .. Felder(typeof(DocumentTerms)),
+            .. Felder(typeof(TermRow)),
+            .. Felder(typeof(DocumentTermsV1))
         ];
 
         namen.Should().NotContain(
-            name => name.Contains(wort, StringComparison.OrdinalIgnoreCase));
+            name => name.Contains(word, StringComparison.OrdinalIgnoreCase));
     }
 
     // ---------------------------------------------------------------------
@@ -144,7 +144,7 @@ public class AuflagenTests
     /// aus der Konfiguration ableitet.</para>
     ///
     /// <para>Ein Texterkenner im Netz wäre die dritte — und es ist die Tür, die
-    /// am teuersten falsch ist: durch sie ginge ein Zeugnis mit Arbeitgeber,
+    /// am teuersten falsch ist: durch sie ginge ein Reference mit Arbeitgeber,
     /// Dauer und Note, damit ein Fremder Wörter darin sucht. Ein dritter Typ
     /// mit einer <c>IHttpClientFactory</c> ist der erste Verdacht, und dieser
     /// Test zwingt, ihn hinzuschreiben. Stünde sein Ziel dann nicht in der
@@ -155,11 +155,11 @@ public class AuflagenTests
     [Fact]
     public void Nach_draussen_gehen_genau_zwei_Tueren() =>
         typeof(ResumeDbContext).Assembly.GetExportedTypes()
-            .Where(typ => typ.GetConstructors().Any(bau => bau.GetParameters()
+            .Where(type => type.GetConstructors().Any(bau => bau.GetParameters()
                 .Any(glied => glied.ParameterType == typeof(IHttpClientFactory))))
-            .Select(typ => typ.Name)
-            .Should().BeEquivalentTo("HttpEinwilligungstor", "HttpBenachrichtigung");
+            .Select(type => type.Name)
+            .Should().BeEquivalentTo("HttpConsentGate", "HttpBenachrichtigung");
 
-    private static IEnumerable<string> Felder(Type typ) =>
-        typ.GetProperties().Select(feld => feld.Name);
+    private static IEnumerable<string> Felder(Type type) =>
+        type.GetProperties().Select(field => field.Name);
 }

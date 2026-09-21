@@ -1,38 +1,38 @@
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 
-namespace WorkerTransfer.Applications.Application.Bewerbungen;
+namespace WorkerTransfer.Applications.Application.Applications;
 
-/// <summary>Wie ein Befehl an einer Bewerbung ausgegangen ist.</summary>
+/// <summary>Wie ein Befehl an einer JobApplication ausgegangen ist.</summary>
 /// <remarks>
 /// Ein Ergebnis statt geworfener Ausnahmen, damit die Zuordnung zu
-/// Statuscodes an <em>einer</em> Stelle steht: sieben Routen, die jede für sich
-/// entscheiden, was ein fremder Vorgang ist, driften auseinander — und die
-/// erste, die 403 statt 404 antwortet, verrät, dass es die Bewerbung gibt.
+/// Statuscodes an <em>einer</em> Job steht: sieben Routen, die jede für sich
+/// entscheiden, was ein fremder Case ist, driften auseinander — und die
+/// erste, die 403 statt 404 antwortet, verrät, dass es die JobApplication gibt.
 /// </remarks>
-public abstract record Bewerbungsergebnis
+public abstract record ApplicationResult
 {
-    private Bewerbungsergebnis()
+    private ApplicationResult()
     {
     }
 
     /// <summary>Hat geklappt.</summary>
-    public sealed record Erledigt(Bewerbung Bewerbung) : Bewerbungsergebnis;
+    public sealed record Erledigt(JobApplication JobApplication) : ApplicationResult;
 
-    /// <summary>Die Stelle gibt es öffentlich nicht.</summary>
-    public sealed record KeineStelle : Bewerbungsergebnis;
+    /// <summary>Die Job gibt es öffentlich nicht.</summary>
+    public sealed record NoJob : ApplicationResult;
 
     /// <summary>
     /// Gibt es nicht ODER gehört jemand anderem — von außen dasselbe.
     /// </summary>
     /// <remarks>
     /// Die beiden auseinanderzuhalten hieße, auf Zuruf zu bestätigen, dass eine
-    /// fremde Bewerbung existiert.
+    /// fremde JobApplication existiert.
     /// </remarks>
-    public sealed record Unbekannt : Bewerbungsergebnis;
+    public sealed record Unbekannt : ApplicationResult;
 
     /// <summary>Die Eingabe ist in Ordnung, der Zustand passt nicht.</summary>
-    public sealed record Zustandskonflikt(string Grund) : Bewerbungsergebnis;
+    public sealed record StateConflict(string Grund) : ApplicationResult;
 
     /// <summary>Mit der Eingabe stimmt etwas nicht.</summary>
-    public sealed record Eingabe(string Grund) : Bewerbungsergebnis;
+    public sealed record Eingabe(string Grund) : ApplicationResult;
 }

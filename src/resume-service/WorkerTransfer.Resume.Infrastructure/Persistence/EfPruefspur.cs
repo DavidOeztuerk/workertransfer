@@ -9,22 +9,22 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence;
 /// not have: the entry commits with the change it records or it records
 /// nothing.
 /// </remarks>
-public sealed class EfPruefspur(ResumeDbContext kontext) : IPruefspur
+public sealed class EfAuditTrail(ResumeDbContext context) : IAuditTrail
 {
     /// <inheritdoc />
-    public Task AppendAsync(Pruefeintrag eintrag, CancellationToken cancellationToken = default)
+    public Task AppendAsync(AuditEntry entry, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(eintrag);
+        ArgumentNullException.ThrowIfNull(entry);
 
-        kontext.Pruefspur.Add(new PruefZeile
+        context.Pruefspur.Add(new AuditRow
         {
             Id = Guid.CreateVersion7(),
-            ActorId = eintrag.Akteur?.Value,
-            TenantId = eintrag.Firma?.Value,
-            Action = eintrag.Handlung,
-            TargetId = eintrag.Betroffene?.Value,
-            CorrelationId = eintrag.Korrelation,
-            OccurredAt = eintrag.Geschehen.UtcDateTime
+            ActorId = entry.Akteur?.Value,
+            TenantId = entry.Firma?.Value,
+            Action = entry.Handlung,
+            TargetId = entry.Betroffene?.Value,
+            CorrelationId = entry.Korrelation,
+            OccurredAt = entry.Geschehen.UtcDateTime
         });
 
         return Task.CompletedTask;

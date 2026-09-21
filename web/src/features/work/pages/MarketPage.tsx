@@ -225,10 +225,10 @@ export function MarketPage() {
           >
             <FormControl sx={{ mb: 2 }}>
               <FormLabel id="markt-status">{t("markt.status")}</FormLabel>
-              {/* Ein RadioGroup mit gemeinsamem `name`: erst dadurch bewegen die
-                  Pfeiltasten den Fokus innerhalb der Gruppe. */}
               <RadioGroup
                 aria-labelledby="markt-status"
+                // A shared `name` is what makes the arrow keys move the focus
+                // inside the group.
                 name="availability"
                 value={verfuegbarkeit}
                 onChange={(event) => {
@@ -255,20 +255,14 @@ export function MarketPage() {
               </RadioGroup>
             </FormControl>
 
-            {/*
-              Ein Kasten und KEIN Schalter, und das ist dieselbe Regel wie beim
-              Einwilligungsschalter — nur andersherum gelesen.
-
-              Ein Schalter sagt: es gilt sofort. Das trifft auf den
-              Einwilligungsschalter zu, und deshalb ist er dort einer. Diese
-              Angabe steht in einem Formular mit „Speichern": wer sie umlegt und
-              die Seite verlaesst, hat nichts geaendert. Ein Schalter versprach
-              hier eine Unmittelbarkeit, die es nicht gibt — und ausgerechnet bei
-              der heikelsten Angabe der Plattform.
-            */}
             <FormControlLabel
               control={
                 <Checkbox
+                  // A box and NOT a switch — the consent-switch rule read
+                  // backwards. A switch says: it holds at once. This field sits
+                  // in a form with "Save", so flipping it and leaving the page
+                  // changes nothing; a switch would promise an immediacy that
+                  // does not exist, at the platform's most delicate field.
                   checked={busy}
                   onChange={(event) => {
                     setGespeichert(false);

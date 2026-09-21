@@ -182,12 +182,12 @@ export function ScoutPage() {
               }
             />
 
-            {/* Ein Kästchen, kein Schalter: der Filter gilt mit dem Absenden,
-                und genau das versprechen die beiden Elemente unterschiedlich. */}
             <Box>
               <FormControlLabel
                 control={
                   <Checkbox
+                    // A box, not a switch: the filter takes effect on submit,
+                    // and the two elements promise that differently.
                     checked={draft.remoteOnly}
                     onChange={(e) =>
                       setEntwurf((now) => ({
@@ -204,12 +204,12 @@ export function ScoutPage() {
               </Typography>
             </Box>
 
-            {/* ADR-0041: Anwesenheit und Ort der Stelle treffen auf die
-                Pendelbereitschaft der Person — daraus wird ein Häkchen je
-                Treffer. KEIN Filter: die Liste wird dadurch nicht kürzer. */}
             {stellen.length > 0 ? (
               <TextField
                 select
+                // ADR-0041: the advert's attendance and place meet the person's
+                // willingness to commute, and that becomes a TICK per hit. NOT a
+                // filter — the list never gets shorter from it.
                 label={t("kandidaten.gegenStelle")}
                 helperText={t("kandidaten.gegenStelleHinweis")}
                 value={stelle}
@@ -288,7 +288,6 @@ export function ScoutPage() {
         )
       ) : null}
 
-      {/* Bewusst keine Gesamtzahl. */}
       {seiten.mehr ? (
         <Box sx={{ mt: 3 }}>
           <Button

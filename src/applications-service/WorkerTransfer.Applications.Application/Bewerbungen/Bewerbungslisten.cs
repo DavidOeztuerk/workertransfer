@@ -1,116 +1,116 @@
 using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Applications.Application.Nachrichten;
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 
-namespace WorkerTransfer.Applications.Application.Bewerbungen;
+namespace WorkerTransfer.Applications.Application.Applications;
 
-/// <summary>Die eigenen Bewerbungen.</summary>
-public sealed record MeineBewerbungenAbfrage(SubjectId Wer)
-    : IAbfrage<IReadOnlyList<Bewerbung>>;
+/// <summary>Die eigenen Applications.</summary>
+public sealed record MyApplicationsQuery(SubjectId Wer)
+    : IAbfrage<IReadOnlyList<JobApplication>>;
 
-/// <summary>Eine Bewerbung, wenn der Aufrufer sie sehen darf.</summary>
+/// <summary>Eine JobApplication, wenn der Aufrufer sie sehen darf.</summary>
 /// <remarks>
 /// 404 für fremd und für nicht vorhanden bleibt ununterscheidbar. Die Mappe
 /// des Unternehmens hängt an dieser einen Kennung; ohne sie müsste die
-/// Oberfläche die Stelle kennen, bevor sie die Bewerbung öffnet.
+/// Oberfläche die Job kennen, bevor sie die JobApplication öffnet.
 /// </remarks>
-public sealed record BewerbungLesenAbfrage(Guid Id, TenantId? Firma, SubjectId? Person)
-    : IAbfrage<Bewerbung?>;
+public sealed record ReadApplicationQuery(Guid Id, TenantId? Firma, SubjectId? Person)
+    : IAbfrage<JobApplication?>;
 
-/// <summary>Die Bewerbungen auf eine Stelle dieses Unternehmens.</summary>
-public sealed record BewerbungenZurStelleAbfrage(Guid Stelle, TenantId Firma)
-    : IAbfrage<IReadOnlyList<Bewerbung>>;
+/// <summary>Die Applications auf eine Job dieses Unternehmens.</summary>
+public sealed record ApplicationsForJobQuery(Guid Job, TenantId Firma)
+    : IAbfrage<IReadOnlyList<JobApplication>>;
 
-/// <summary>Wie viele Bewerbungen dieses Unternehmen in welchem Stand hat.</summary>
+/// <summary>Wie viele Applications dieses Unternehmen in welchem State hat.</summary>
 /// <remarks>
 /// Zahlen über die <em>eigenen</em> Vorgänge (ADR-0026). Die DoD verlangt
 /// „Analytics aggregiert datenschutzkonform"; datenschutzkonform heißt hier
 /// nicht „anonymisiert", sondern: es kommt keine Auskunft heraus, die der
-/// Fragende nicht ohnehin hat. Das Unternehmen sieht seine Bewerbungen einzeln
+/// Fragende nicht ohnehin hat. Das Unternehmen sieht seine Applications einzeln
 /// in der Liste; die Summe darüber ist eine Bequemlichkeit, keine neue
 /// Information.
 /// <para>
 /// Die Grenze verläuft nicht bei der Aggregation, sondern bei der
-/// <strong>Zusammenführung</strong>: eine Zahl, die Bewerbungen mit
-/// Marktstatus, Lebenslauf oder Vorgängen bei anderen Firmen verrechnet, wäre
+/// <strong>Zusammenführung</strong>: eine Zahl, die Applications mit
+/// MarketStatus, CurriculumVitae oder Vorgängen bei anderen Firmen verrechnet, wäre
 /// eine Aussage über Menschen aus Quellen, die einzeln freigegeben wurden. So
 /// etwas gibt es hier nicht und soll es nicht geben (ADR-0022/0026).
 /// </para>
 /// </remarks>
-public sealed record FirmenzahlenAbfrage(TenantId Firma)
-    : IAbfrage<IReadOnlyDictionary<Bewerbungsstand, int>>;
+public sealed record CompanyCountsQuery(TenantId Firma)
+    : IAbfrage<IReadOnlyDictionary<ApplicationState, int>>;
 
 /// <summary>Beantwortet die drei Listenfragen.</summary>
 /// <remarks>
-/// Kein Consent-Aufruf, und das ist kein Versehen. Eine Bewerbung enthält keine
+/// Kein Consent-Aufruf, und das ist kein Versehen. Eine JobApplication enthält keine
 /// Profildaten; sie nennt eine <c>subject_id</c>. Wer mehr sehen will, fragt
 /// die zuständigen Dienste, und dort greift der Ledger. Ihn hier zu fragen,
 /// um zu zählen, was ohnehin sichtbar ist, wäre Theater.
 /// </remarks>
-public sealed class Bewerbungslisten(IBewerbungsspeicher speicher) :
-    IRequestHandler<MeineBewerbungenAbfrage, IReadOnlyList<Bewerbung>>,
-    IRequestHandler<BewerbungLesenAbfrage, Bewerbung?>,
-    IRequestHandler<BewerbungenZurStelleAbfrage, IReadOnlyList<Bewerbung>>,
-    IRequestHandler<FirmenzahlenAbfrage, IReadOnlyDictionary<Bewerbungsstand, int>>
+public sealed class ApplicationLists(IApplicationStore store) :
+    IRequestHandler<MyApplicationsQuery, IReadOnlyList<JobApplication>>,
+    IRequestHandler<ReadApplicationQuery, JobApplication?>,
+    IRequestHandler<ApplicationsForJobQuery, IReadOnlyList<JobApplication>>,
+    IRequestHandler<CompanyCountsQuery, IReadOnlyDictionary<ApplicationState, int>>
 {
     /// <inheritdoc />
-    public Task<IReadOnlyList<Bewerbung>> Handle(
-        MeineBewerbungenAbfrage request,
+    public Task<IReadOnlyList<JobApplication>> Handle(
+        MyApplicationsQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return speicher.FuerPersonAsync(request.Wer, cancellationToken);
+        return store.ForPersonAsync(request.Wer, cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task<Bewerbung?> Handle(
-        BewerbungLesenAbfrage request,
+    public async Task<JobApplication?> Handle(
+        ReadApplicationQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var bewerbung = await speicher.HoleAsync(request.Id, cancellationToken);
+        var application = await store.GetAsync(request.Id, cancellationToken);
 
-        if (bewerbung is null)
+        if (application is null)
         {
             return null;
         }
 
-        if (request.Firma is { } firma && bewerbung.Firma == firma)
+        if (request.Firma is { } company && application.Firma == company)
         {
-            return bewerbung;
+            return application;
         }
 
-        if (request.Person is { } person && bewerbung.Wer == person)
+        if (request.Person is { } person && application.Wer == person)
         {
-            return bewerbung;
+            return application;
         }
 
         return null;
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<Bewerbung>> Handle(
-        BewerbungenZurStelleAbfrage request,
+    public Task<IReadOnlyList<JobApplication>> Handle(
+        ApplicationsForJobQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         // Die Firma reist mit in die Abfrage, statt hinterher zu filtern:
-        // eine fremde Stelle liefert nichts, statt zu verraten, dass es sie
+        // eine fremde Job liefert nichts, statt zu verraten, dass es sie
         // gibt.
-        return speicher.FuerStelleAsync(request.Stelle, request.Firma, cancellationToken);
+        return store.ForJobAsync(request.Job, request.Firma, cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyDictionary<Bewerbungsstand, int>> Handle(
-        FirmenzahlenAbfrage request,
+    public Task<IReadOnlyDictionary<ApplicationState, int>> Handle(
+        CompanyCountsQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return speicher.ZaehleAsync(request.Firma, cancellationToken);
+        return store.CountAsync(request.Firma, cancellationToken);
     }
 }

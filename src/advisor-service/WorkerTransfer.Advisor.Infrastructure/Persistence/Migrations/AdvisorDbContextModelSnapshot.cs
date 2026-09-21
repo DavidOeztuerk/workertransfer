@@ -17,12 +17,12 @@ namespace WorkerTransfer.Advisor.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("WorkerTransfer.Advisor.Infrastructure.Persistence.GespraechsZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Advisor.Infrastructure.Persistence.ConversationRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -65,7 +65,7 @@ namespace WorkerTransfer.Advisor.Infrastructure.Persistence.Migrations
                     b.ToTable("conversations", (string)null);
                 });
 
-            modelBuilder.Entity("WorkerTransfer.Advisor.Infrastructure.Persistence.MandatZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Advisor.Infrastructure.Persistence.MandateRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -104,7 +104,7 @@ namespace WorkerTransfer.Advisor.Infrastructure.Persistence.Migrations
                     b.HasAnnotation("WorkerTransfer:Personenzeile", true);
                 });
 
-            modelBuilder.Entity("WorkerTransfer.Outbox.OutboxZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Outbox.OutboxRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()

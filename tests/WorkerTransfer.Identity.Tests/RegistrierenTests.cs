@@ -35,12 +35,12 @@ public class RegistrierenTests
     private Task<Registrierergebnis> Registriere(
         string email = "anna@example.com",
         string passwort = Passwort,
-        string? firma = null) =>
+        string? company = null) =>
         new RegistrierenHandler(
             _benutzer, _passwoerter, _tokens, _einmaltoken, _postkorb, _protokoll,
             new FesteKorrelation("abc-123"), TimeProvider.System)
             .Handle(
-                new RegistrierenBefehl(email, passwort, "Anna", firma), CancellationToken.None);
+                new RegistrierenBefehl(email, passwort, "Anna", company), CancellationToken.None);
 
     private void EsGibtBereits(string email)
     {
@@ -51,9 +51,9 @@ public class RegistrierenTests
     [Fact]
     public async Task Eine_neue_Adresse_bekommt_ein_Konto_und_einen_Bestaetigungslink()
     {
-        var ergebnis = await Registriere();
+        var result = await Registriere();
 
-        ergebnis.Should().BeOfType<Registrierergebnis.Angenommen>();
+        result.Should().BeOfType<Registrierergebnis.Angenommen>();
         await _benutzer.Received(1).AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
         await _tokens.Received(1).AddAsync(
             Arg.Is<VerificationToken>(t => t.TokenHash == "hash"
@@ -129,8 +129,8 @@ public class RegistrierenTests
     {
         EsGibtBereits("chef@gmail.com");
 
-        var bekannt = await Registriere("chef@gmail.com", firma: "Beispiel GmbH");
-        var unbekannt = await Registriere("neu@gmail.com", firma: "Beispiel GmbH");
+        var bekannt = await Registriere("chef@gmail.com", company: "Beispiel GmbH");
+        var unbekannt = await Registriere("neu@gmail.com", company: "Beispiel GmbH");
 
         bekannt.Should().BeOfType<Registrierergebnis.OeffentlicheDomain>();
         unbekannt.Should().BeOfType<Registrierergebnis.OeffentlicheDomain>();
@@ -144,9 +144,9 @@ public class RegistrierenTests
     [Fact]
     public async Task Ohne_Firmenwunsch_ist_eine_Freemail_Adresse_voellig_in_Ordnung()
     {
-        var ergebnis = await Registriere("anna@gmail.com");
+        var result = await Registriere("anna@gmail.com");
 
-        ergebnis.Should().BeOfType<Registrierergebnis.Angenommen>();
+        result.Should().BeOfType<Registrierergebnis.Angenommen>();
         await _benutzer.Received(1).AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
     }
 
@@ -158,9 +158,9 @@ public class RegistrierenTests
     [Fact]
     public async Task Ob_die_Domain_vergeben_ist_wird_hier_nicht_gefragt()
     {
-        var ergebnis = await Registriere("chef@firma.example", firma: "Beispiel GmbH");
+        var result = await Registriere("chef@firma.example", company: "Beispiel GmbH");
 
-        ergebnis.Should().BeOfType<Registrierergebnis.Angenommen>();
+        result.Should().BeOfType<Registrierergebnis.Angenommen>();
         await _benutzer.Received(1).AddAsync(
             Arg.Is<User>(u => u.PendingCompanyName == "Beispiel GmbH"),
             Arg.Any<CancellationToken>());
@@ -183,9 +183,9 @@ public class RegistrierenTests
     [InlineData("elfzeichen")]
     public async Task Ein_zu_kurzes_Passwort_wird_abgewiesen(string passwort)
     {
-        var ergebnis = await Registriere(passwort: passwort);
+        var result = await Registriere(passwort: passwort);
 
-        ergebnis.Should().BeOfType<Registrierergebnis.SchwachesPasswort>();
+        result.Should().BeOfType<Registrierergebnis.WeakPassword>();
         await _benutzer.DidNotReceive().AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
     }
 
@@ -196,15 +196,15 @@ public class RegistrierenTests
     [Fact]
     public async Task Ein_Passwort_ueber_72_Byte_wird_abgewiesen()
     {
-        var ergebnis = await Registriere(passwort: new string('ä', 40));
+        var result = await Registriere(passwort: new string('ä', 40));
 
-        ergebnis.Should().BeOfType<Registrierergebnis.SchwachesPasswort>();
+        result.Should().BeOfType<Registrierergebnis.WeakPassword>();
     }
 
     [Fact]
     public async Task Die_Registrierung_steht_im_Protokoll_und_traegt_keine_Firma()
     {
-        await Registriere("chef@firma.example", firma: "Beispiel GmbH");
+        await Registriere("chef@firma.example", company: "Beispiel GmbH");
 
         await _protokoll.Received(1).AppendAsync(
             Arg.Is<AuditEvent>(e => e.Action == AuditAction.Register

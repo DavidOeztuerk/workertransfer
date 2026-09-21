@@ -46,11 +46,11 @@ public class DokumentwortTests
 
         foreach (var (dokument, satz) in saetze)
         {
-            foreach (var wort in Untersagt)
+            foreach (var word in Untersagt)
             {
-                satz.Contains(wort, StringComparison.OrdinalIgnoreCase)
+                satz.Contains(word, StringComparison.OrdinalIgnoreCase)
                     .Should().BeFalse(
-                        $"der Geltungssatz von „{dokument}“ trägt „{wort}“ — "
+                        $"der Geltungssatz von „{dokument}“ trägt „{word}“ — "
                         + "Belege, keine Konformität");
             }
         }
@@ -77,8 +77,8 @@ public class DokumentwortTests
     /// <summary>Der Vorbehalt verneint, und die Verneinung steht da.</summary>
     /// <remarks>
     /// Drei Aussagen, und jede fehlt in den Broschüren, gegen die dieses
-    /// Dokument antritt: maschinell erzeugt, kein Zertifikat, von keiner
-    /// akkreditierten Stelle beurteilt.
+    /// Dokument antritt: maschinell erzeugt, kein Certificate, von keiner
+    /// akkreditierten Job beurteilt.
     /// </remarks>
     [Fact]
     public void Der_Vorbehalt_sagt_dass_es_kein_Zertifikat_ist()
@@ -116,7 +116,7 @@ public class DokumentwortTests
     [InlineData("Dieses System ist DSGVO-konform.", true)]
     [InlineData("Hiermit zertifiziert.", true)]
     public void Die_Wortliste_trifft_genau_das_Gemeinte(string satz, bool erwartet) =>
-        Untersagt.Any(wort => satz.Contains(wort, StringComparison.OrdinalIgnoreCase))
+        Untersagt.Any(word => satz.Contains(word, StringComparison.OrdinalIgnoreCase))
             .Should().Be(erwartet);
 
     // ------------------------------------------------------------- Handwerk
@@ -124,39 +124,39 @@ public class DokumentwortTests
     /// <summary>Die drei Geltungssätze, aus dem Erzeuger gelesen.</summary>
     private static IReadOnlyList<(string Dokument, string Satz)> Geltungssaetze()
     {
-        var quelle = Quelle();
+        var source = Quelle();
 
         return
         [
             .. Regex.Matches(
-                    quelle,
+                    source,
                     // Endet am Geltungssatz, ohne den Nachbarschluessel zu
                     // nennen: ein Muster, das seine Nachbarschaft kennt, faellt
-                    // bei deren Umbenennung still auf null Treffer.
+                    // bei deren Umbenennung still auf null Hit.
                     "\"(?<name>datenschutz|ki|mitbestimmung)\":\\s*\\{.*?"
                     + "\"scope\":\\s*\\((?<satz>.*?)\\),\\n",
                     RegexOptions.Singleline,
                     TimeSpan.FromSeconds(5))
-                .Select(treffer => (
-                    treffer.Groups["name"].Value,
-                    Zusammengesetzt(treffer.Groups["satz"].Value)))
+                .Select(hit => (
+                    hit.Groups["name"].Value,
+                    Zusammengesetzt(hit.Groups["satz"].Value)))
         ];
     }
 
     /// <summary>Der feste Vorbehaltssatz, aus dem Erzeuger gelesen.</summary>
     private static string Vorbehalt()
     {
-        var treffer = Regex.Match(
+        var hit = Regex.Match(
             Quelle(),
             "VORBEHALT = \\((?<satz>.*?)\\)\\n",
             RegexOptions.Singleline,
             TimeSpan.FromSeconds(5));
 
-        treffer.Success.Should().BeTrue(
+        hit.Success.Should().BeTrue(
             "ohne den Vorbehalt prüft diese Reihe nichts — und dann ist sie "
             + "grün über einem Dokument, das ihn womöglich gar nicht mehr trägt");
 
-        return Zusammengesetzt(treffer.Groups["satz"].Value);
+        return Zusammengesetzt(hit.Groups["satz"].Value);
     }
 
     /// <summary>Aus den aneinandergereihten Python-Literalen wird ein Satz.</summary>
@@ -178,12 +178,12 @@ public class DokumentwortTests
 
         while (verzeichnis is not null)
         {
-            var datei = Path.Combine(
+            var file = Path.Combine(
                 verzeichnis.FullName, "scripts", "nachweis_dokumente.py");
 
-            if (File.Exists(datei))
+            if (File.Exists(file))
             {
-                return File.ReadAllText(datei);
+                return File.ReadAllText(file);
             }
 
             verzeichnis = verzeichnis.Parent;

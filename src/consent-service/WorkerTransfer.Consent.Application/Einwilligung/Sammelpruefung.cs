@@ -16,16 +16,16 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// one request may carry would be one too many.
 /// </para>
 /// </remarks>
-public sealed record SammelpruefungAbfrage(IReadOnlyList<EinwilligungPruefenAbfrage> Paare)
+public sealed record BatchCheckQuery(IReadOnlyList<CheckConsentQuery> Paare)
     : IAbfrage<Sammelergebnis>;
 
 /// <summary>Reads every pair in one query, answers in the order asked.</summary>
-public sealed class SammelpruefungHandler(IConsentLedger buch)
-    : IRequestHandler<SammelpruefungAbfrage, Sammelergebnis>
+public sealed class BatchCheckHandler(IConsentLedger buch)
+    : IRequestHandler<BatchCheckQuery, Sammelergebnis>
 {
     /// <inheritdoc />
     public async Task<Sammelergebnis> Handle(
-        SammelpruefungAbfrage request,
+        BatchCheckQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -34,26 +34,26 @@ public sealed class SammelpruefungHandler(IConsentLedger buch)
 
         foreach (var frage in request.Paare)
         {
-            if (!Capability.TryParse(frage.Faehigkeit, out var faehigkeit))
+            if (!Capability.TryParse(frage.Faehigkeit, out var skill))
             {
                 return new Sammelergebnis.Unbrauchbar("capability");
             }
 
-            paare.Add((new SubjectId(frage.Gegenstand), faehigkeit));
+            paare.Add((new SubjectId(frage.Gegenstand), skill));
         }
 
-        var neueste = await buch.NeuesteAsync(paare, cancellationToken);
+        var neueste = await buch.LatestAsync(paare, cancellationToken);
 
         // In the order of the questions, one per pair. The caller maps the
         // answers onto its rows; in any other order it would have to match on
         // (subject, capability), and a pair asked twice would be ambiguous.
         var staende = new List<ConsentState>(paare.Count);
 
-        foreach (var (subject, faehigkeit) in paare)
+        foreach (var (subject, skill) in paare)
         {
-            staende.Add(neueste.TryGetValue((subject.Value, faehigkeit.Value), out var ereignis)
-                ? Projektion.Stand([ereignis])
-                : Projektion.Stand([]));
+            staende.Add(neueste.TryGetValue((subject.Value, skill.Value), out var ereignis)
+                ? Projektion.State([ereignis])
+                : Projektion.State([]));
         }
 
         return new Sammelergebnis.Staende(staende);

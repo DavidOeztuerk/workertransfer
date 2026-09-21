@@ -3,7 +3,7 @@ using Noelia.Core.Identity;
 namespace WorkerTransfer.Resume.Domain.Anfragen;
 
 /// <summary>What became of one company's question.</summary>
-public enum Anfragestand
+public enum RequestState
 {
     /// <summary>Asked, not yet answered.</summary>
     Pending,
@@ -22,13 +22,13 @@ public enum Anfragestand
 }
 
 /// <summary>A rule of the request that the caller broke.</summary>
-public sealed class Anfrageregel(string code, string erklaerung) : Exception(erklaerung)
+public sealed class ResumeRequestRule(string code, string erklaerung) : Exception(erklaerung)
 {
     /// <summary>Somebody other than the person asked tried to answer.</summary>
     public const string NichtDieBetroffene = "not_the_subject";
 
     /// <summary>The request already carries an answer.</summary>
-    public const string SchonBeantwortet = "already_answered";
+    public const string AlreadyAnswered = "already_answered";
 
     /// <summary>The stable label of the broken rule.</summary>
     public string Code { get; } = code;
@@ -47,22 +47,22 @@ public sealed class Anfrageregel(string code, string erklaerung) : Exception(erk
 /// two would disagree the first time somebody withdrew.
 /// </para>
 /// </remarks>
-public sealed class Anfrage
+public sealed class ResumeRequest
 {
-    private Anfrage(
+    private ResumeRequest(
         Guid id,
-        SubjectId wer,
-        TenantId firma,
+        SubjectId subject,
+        TenantId company,
         SubjectId? frager,
-        Anfragestand stand,
+        RequestState state,
         DateTimeOffset gestellt,
         DateTimeOffset? beantwortet)
     {
         Id = id;
-        Wer = wer;
-        Firma = firma;
+        Wer = subject;
+        Firma = company;
         Frager = frager;
-        Stand = stand;
+        State = state;
         Gestellt = gestellt;
         Beantwortet = beantwortet;
     }
@@ -87,7 +87,7 @@ public sealed class Anfrage
     public SubjectId? Frager { get; }
 
     /// <summary>Where the proceeding stands.</summary>
-    public Anfragestand Stand { get; private set; }
+    public RequestState State { get; private set; }
 
     /// <summary>When it was asked.</summary>
     public DateTimeOffset Gestellt { get; }
@@ -96,52 +96,52 @@ public sealed class Anfrage
     public DateTimeOffset? Beantwortet { get; private set; }
 
     /// <summary>Opens one.</summary>
-    public static Anfrage Oeffne(
-        SubjectId wer,
-        TenantId firma,
+    public static ResumeRequest Oeffne(
+        SubjectId subject,
+        TenantId company,
         SubjectId frager,
-        DateTimeOffset jetzt) =>
-        new(Guid.CreateVersion7(), wer, firma, frager, Anfragestand.Pending, jetzt, null);
+        DateTimeOffset now) =>
+        new(Guid.CreateVersion7(), subject, company, frager, RequestState.Pending, now, null);
 
     /// <summary>Rebuilds a stored one.</summary>
-    public static Anfrage Wiederherstellen(
+    public static ResumeRequest Wiederherstellen(
         Guid id,
-        SubjectId wer,
-        TenantId firma,
+        SubjectId subject,
+        TenantId company,
         SubjectId? frager,
-        Anfragestand stand,
+        RequestState state,
         DateTimeOffset gestellt,
         DateTimeOffset? beantwortet) =>
-        new(id, wer, firma, frager, stand, gestellt, beantwortet);
+        new(id, subject, company, frager, state, gestellt, beantwortet);
 
     /// <summary>The person says yes.</summary>
     /// <exception cref="Anfrageregel">Not theirs to answer, or already answered.</exception>
-    public void Erteile(SubjectId durch, DateTimeOffset jetzt) =>
-        Beantworte(durch, Anfragestand.Granted, jetzt);
+    public void Erteile(SubjectId durch, DateTimeOffset now) =>
+        Beantworte(durch, RequestState.Granted, now);
 
     /// <summary>The person says no.</summary>
     /// <exception cref="Anfrageregel">Not theirs to answer, or already answered.</exception>
-    public void LehneAb(SubjectId durch, DateTimeOffset jetzt) =>
-        Beantworte(durch, Anfragestand.Declined, jetzt);
+    public void LehneAb(SubjectId durch, DateTimeOffset now) =>
+        Beantworte(durch, RequestState.Declined, now);
 
-    private void Beantworte(SubjectId durch, Anfragestand stand, DateTimeOffset jetzt)
+    private void Beantworte(SubjectId durch, RequestState state, DateTimeOffset now)
     {
         if (durch != Wer)
         {
-            throw new Anfrageregel(
-                Anfrageregel.NichtDieBetroffene, "Nur die gefragte Person darf antworten.");
+            throw new ResumeRequestRule(
+                ResumeRequestRule.NichtDieBetroffene, "Nur die gefragte Person darf antworten.");
         }
 
-        if (Stand != Anfragestand.Pending)
+        if (State != RequestState.Pending)
         {
             // A second "grant" after a "decline" would quietly reverse the
             // refusal. And a withdrawal belongs in the ledger, not in this
             // proceeding.
-            throw new Anfrageregel(
-                Anfrageregel.SchonBeantwortet, $"Diese Anfrage ist bereits {Stand}.");
+            throw new ResumeRequestRule(
+                ResumeRequestRule.AlreadyAnswered, $"Diese Anfrage ist bereits {State}.");
         }
 
-        Stand = stand;
-        Beantwortet = jetzt;
+        State = state;
+        Beantwortet = now;
     }
 }

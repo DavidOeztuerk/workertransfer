@@ -12,7 +12,7 @@ namespace WorkerTransfer.Gateway.Tests;
 /// <c>docs/routenkarte.yml</c> haelt fuer jeden Endpunkt fest, was er in den
 /// drei Handlungsformen antwortet. Gefahren wird sie von
 /// <c>scripts/routenkarte.sh</c> gegen den laufenden Stapel — das ist die
-/// Pruefung der <em>Antworten</em>.
+/// Pruefung der <em>Responses</em>.
 /// <para>
 /// Diese Reihe hier prueft etwas anderes und braucht dafuer keinen Stapel:
 /// <strong>dass die Karte vollstaendig ist.</strong> Ohne sie waere sie genau
@@ -52,7 +52,7 @@ public sealed class RoutenkarteTests
         /// Fast nirgends gesetzt: die meisten Endpunkte sehen gar nicht hinein,
         /// und der Durchlauf schickt sonst `{}`. Wo ein Endpunkt den Rumpf
         /// PRÜFT, mässe die Karte ohne dieses Feld die Antwort auf eine leere
-        /// Anfrage und schriebe sie als die des Endpunkts auf — `PUT
+        /// ResumeRequest und schriebe sie als die des Endpunkts auf — `PUT
         /// /account/language` etwa antwortete 422 statt 200, und die Karte
         /// hielte das für die Wahrheit.
         /// </remarks>
@@ -68,12 +68,12 @@ public sealed class RoutenkarteTests
 
     private static List<Gruppe> Karte()
     {
-        var pfad = Path.Combine(Postgres_Ersatz.Repowurzel(), "docs", "routenkarte.yml");
+        var path = Path.Combine(Postgres_Ersatz.Repowurzel(), "docs", "routenkarte.yml");
         // Die Karte schreibt klein (`pfad`, `ohne`), die Klassen gross.
         var leser = new DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
             .Build();
-        var wurzel = leser.Deserialize<Dictionary<string, List<Gruppe>>>(File.ReadAllText(pfad));
+        var wurzel = leser.Deserialize<Dictionary<string, List<Gruppe>>>(File.ReadAllText(path));
 
         return wurzel["gruppen"];
     }
@@ -83,9 +83,9 @@ public sealed class RoutenkarteTests
 
     private static IReadOnlyList<string> Routen()
     {
-        var pfad = Path.Combine(AppContext.BaseDirectory, "ocelot.json");
+        var path = Path.Combine(AppContext.BaseDirectory, "ocelot.json");
         var wurzel = JsonDocument.Parse(
-            File.ReadAllText(pfad),
+            File.ReadAllText(path),
             new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip }).RootElement;
 
         return [.. wurzel.GetProperty("Routes").EnumerateArray()
@@ -100,14 +100,14 @@ public sealed class RoutenkarteTests
     /// Die Abfragezeichenkette wird abgeschnitten, bevor verglichen wird.
     /// Ocelot routet nach dem PFAD; ein Eintrag darf trotzdem
     /// <c>/jobs?page=2</c> nennen, weil die Karte festhält, was eine bestimmte
-    /// ANFRAGE antwortet — und eine zweite Seite ist eine andere Anfrage als die
+    /// ANFRAGE antwortet — und eine zweite Seite ist eine andere ResumeRequest als die
     /// erste.
     /// </remarks>
-    private static bool Passt(string vorlage, string pfad)
+    private static bool Passt(string template, string path)
     {
-        var ohneAbfrage = pfad.Split('?')[0];
+        var ohneAbfrage = path.Split('?')[0];
 
-        var teileV = vorlage.Trim('/').Split('/');
+        var teileV = template.Trim('/').Split('/');
         var teileP = ohneAbfrage.Trim('/').Split('/');
 
         // Der letzte Platzhalter ist gierig: `/auth/{rest}` faengt auch
@@ -149,11 +149,11 @@ public sealed class RoutenkarteTests
     [Fact]
     public void Jede_Route_hat_mindestens_einen_Eintrag()
     {
-        var eintraege = Eintraege();
+        var entries = Eintraege();
 
         foreach (var route in Routen())
         {
-            eintraege.Should().Contain(
+            entries.Should().Contain(
                 e => Passt(route, e.Pfad),
                 $"die Route '{route}' steht in ocelot.json, aber in keiner Zeile "
                 + "von docs/routenkarte.yml — es ist also nicht aufgeschrieben, "
@@ -175,22 +175,22 @@ public sealed class RoutenkarteTests
     {
         var routen = Routen();
 
-        foreach (var eintrag in Eintraege())
+        foreach (var entry in Eintraege())
         {
-            var getroffen = routen.Any(r => Passt(r, eintrag.Pfad));
+            var getroffen = routen.Any(r => Passt(r, entry.Pfad));
 
             if (getroffen)
             {
                 continue;
             }
 
-            eintrag.Ohne.Should().Be(
+            entry.Ohne.Should().Be(
                 404,
-                $"'{eintrag.Pfad}' hat keine Route — dann ist 404 die einzige "
+                $"'{entry.Pfad}' hat keine Route — dann ist 404 die einzige "
                 + "Antwort, die dort stehen darf");
-            eintrag.Person.Should().Be(404);
-            eintrag.Mitglied.Should().Be(404);
-            eintrag.Firma.Should().Be(404);
+            entry.Person.Should().Be(404);
+            entry.Mitglied.Should().Be(404);
+            entry.Firma.Should().Be(404);
         }
     }
 
@@ -207,19 +207,19 @@ public sealed class RoutenkarteTests
     [Fact]
     public void Jede_Zeile_nennt_alle_vier_Spalten()
     {
-        foreach (var eintrag in Eintraege())
+        foreach (var entry in Eintraege())
         {
-            foreach (var (spalte, wert) in new (string, int)[]
+            foreach (var (column, value) in new (string, int)[]
                      {
-                         ("ohne", eintrag.Ohne),
-                         ("person", eintrag.Person),
-                         ("mitglied", eintrag.Mitglied),
-                         ("firma", eintrag.Firma)
+                         ("ohne", entry.Ohne),
+                         ("person", entry.Person),
+                         ("mitglied", entry.Mitglied),
+                         ("firma", entry.Firma)
                      })
             {
-                wert.Should().BeInRange(
+                value.Should().BeInRange(
                     100, 599,
-                    $"'{eintrag.Methode} {eintrag.Pfad}' nennt fuer '{spalte}' keinen "
+                    $"'{entry.Methode} {entry.Pfad}' nennt fuer '{column}' keinen "
                     + "Statuscode — eine fehlende Spalte liest YAML als 0");
             }
         }
@@ -233,12 +233,12 @@ public sealed class RoutenkarteTests
     [Fact]
     public void Jede_Gruppe_traegt_eine_Begruendung()
     {
-        foreach (var gruppe in Karte())
+        foreach (var group in Karte())
         {
-            gruppe.Name.Should().NotBeNullOrWhiteSpace();
-            gruppe.Warum.Trim().Length.Should().BeGreaterThan(
-                80, $"die Gruppe '{gruppe.Name}' sagt nicht, warum ihre Zeilen so aussehen");
-            gruppe.Eintraege.Should().NotBeEmpty();
+            group.Name.Should().NotBeNullOrWhiteSpace();
+            group.Warum.Trim().Length.Should().BeGreaterThan(
+                80, $"die Gruppe '{group.Name}' sagt nicht, warum ihre Zeilen so aussehen");
+            group.Eintraege.Should().NotBeEmpty();
         }
     }
 
@@ -252,7 +252,7 @@ public sealed class RoutenkarteTests
     /// „bin ich angemeldet?", <c>/auth/resend-verification</c> antwortet fuer
     /// bekannte und unbekannte Adressen gleich, die Karriereseite ist
     /// oeffentlich — und <c>GET /jobs</c> ist es seit derselben Entscheidung:
-    /// die Karriereseite holt ihre Stellen ueber genau diesen Endpunkt, und
+    /// die Karriereseite holt ihre Jobs ueber genau diesen Endpunkt, und
     /// solange er 401 gab, war sie nur halb oeffentlich.
     /// <para>
     /// Wer einen vierten hinzufuegt, muss diese Liste anfassen — und dabei
@@ -271,15 +271,15 @@ public sealed class RoutenkarteTests
             "/jobs"
         ];
 
-        foreach (var eintrag in Eintraege().Where(e => e.Ohne is >= 200 and < 300))
+        foreach (var entry in Eintraege().Where(e => e.Ohne is >= 200 and < 300))
         {
             // Ohne Abfragezeichenkette: `/jobs?page=2` ist derselbe ENDPUNKT
             // wie `/jobs`, und die Liste hier zählt Endpunkte. Ein Parameter
             // macht nichts öffentlich, was es nicht schon war.
             offen.Should().Contain(
-                eintrag.Pfad.Split('?')[0],
-                $"'{eintrag.Methode} {eintrag.Pfad}' antwortet ohne Token mit "
-                + $"{eintrag.Ohne} — das ist ein oeffentlicher Endpunkt, und "
+                entry.Pfad.Split('?')[0],
+                $"'{entry.Methode} {entry.Pfad}' antwortet ohne Token mit "
+                + $"{entry.Ohne} — das ist ein oeffentlicher Endpunkt, und "
                 + "dass er einer ist, gehoert ausdruecklich hingeschrieben");
         }
     }
@@ -296,9 +296,9 @@ public sealed class RoutenkarteTests
     [Fact]
     public void Die_mittlere_Spalte_unterscheidet_sich_wirklich()
     {
-        var eintraege = Eintraege();
+        var entries = Eintraege();
 
-        eintraege.Count(e => e.Person != e.Firma).Should().BeGreaterThan(
+        entries.Count(e => e.Person != e.Firma).Should().BeGreaterThan(
             15, "sonst beschreibt die Karte zweimal denselben Fall");
     }
 
@@ -331,9 +331,9 @@ public sealed class RoutenkarteTests
     [Fact]
     public void Die_vierte_Spalte_unterscheidet_admin_von_member()
     {
-        var eintraege = Eintraege();
+        var entries = Eintraege();
 
-        var abweichend = eintraege
+        var abweichend = entries
             .Where(e => e.Mitglied != e.Firma)
             .ToList();
 
@@ -379,12 +379,12 @@ public sealed class RoutenkarteTests
 
         foreach (var name in verwaltung)
         {
-            var eintrag = Eintraege().Single(e => $"{e.Methode} {e.Pfad}" == name);
+            var entry = Eintraege().Single(e => $"{e.Methode} {e.Pfad}" == name);
 
-            eintrag.Ohne.Should().Be(401);
-            eintrag.Person.Should().Be(403, $"'{name}' haengt an einer Richtlinie");
-            eintrag.Mitglied.Should().Be(403);
-            eintrag.Firma.Should().Be(403);
+            entry.Ohne.Should().Be(401);
+            entry.Person.Should().Be(403, $"'{name}' haengt an einer Richtlinie");
+            entry.Mitglied.Should().Be(403);
+            entry.Firma.Should().Be(403);
         }
     }
 }

@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 using WorkerTransfer.Outbox;
 
 namespace WorkerTransfer.Applications.Infrastructure.Persistence;
@@ -7,24 +7,24 @@ namespace WorkerTransfer.Applications.Infrastructure.Persistence;
 /// <summary>Eine Zeile von <c>applications</c>.</summary>
 /// <remarks>
 /// Nicht das Aggregat. <see cref="EfBewerbungsspeicher"/> baut daraus eine
-/// <c>Bewerbung</c>, damit nichts, was am Aggregat geschieht, von allein in der
+/// <c>JobApplication</c>, damit nichts, was am Aggregat geschieht, von allein in der
 /// Tabelle landet.
 /// </remarks>
-public sealed class BewerbungsZeile
+public sealed class ApplicationRow
 {
-    /// <summary>Welche Bewerbung.</summary>
+    /// <summary>Welche JobApplication.</summary>
     public Guid Id { get; set; }
 
-    /// <summary>Auf welche Stelle.</summary>
+    /// <summary>Auf welche Job.</summary>
     public Guid JobId { get; set; }
 
     /// <summary>
-    /// Welches Unternehmen — aus der Stelle kopiert.
+    /// Welches Unternehmen — aus der Job kopiert.
     /// </summary>
     /// <remarks>
-    /// Ein Fremdschlüssel geht nicht: die Stellen liegen in einer anderen
+    /// Ein Fremdschlüssel geht nicht: die Jobs liegen in einer anderen
     /// Datenbank (ADR-0004). Eine Kopie ist nur gefährlich, wenn das Original
-    /// sich ändern kann, und eine Stelle wechselt nicht das Unternehmen.
+    /// sich ändern kann, und eine Job wechselt nicht das Unternehmen.
     /// </remarks>
     public Guid TenantId { get; set; }
 
@@ -34,7 +34,7 @@ public sealed class BewerbungsZeile
     /// <summary>Was die Person geschrieben hat.</summary>
     public string Message { get; set; } = string.Empty;
 
-    /// <summary>Ob der Lebenslauf mitging.</summary>
+    /// <summary>Ob der CurriculumVitae mitging.</summary>
     public bool SharesResume { get; set; }
 
     /// <summary>Ob das Portfolio mitging.</summary>
@@ -43,11 +43,11 @@ public sealed class BewerbungsZeile
     /// <summary>Welche Unterlagen beilagen, als jsonb-Liste von Kennungen.</summary>
     public string Documents { get; set; } = "[]";
 
-    /// <summary>Der Stand, als Wort.</summary>
+    /// <summary>Der State, als Wort.</summary>
     /// <remarks>
-    /// Als <c>varchar</c> und nicht als Postgres-Enum: der Stand steht so auch
+    /// Als <c>varchar</c> und nicht als Postgres-Enum: der State steht so auch
     /// im Vertrag und in der Oberfläche, und ein Typ, der bei jeder Erweiterung
-    /// eine eigene Wanderung braucht, kauft hier nichts.
+    /// eine eigene SchemaMigration braucht, kauft hier nichts.
     /// </remarks>
     public string Status { get; set; } = string.Empty;
 
@@ -69,12 +69,12 @@ public sealed class BewerbungsZeile
 
 /// <summary>Eine Zeile von <c>application_drafts</c>.</summary>
 /// <remarks>
-/// Der Entwurf ist das FRUEHERE LEBEN derselben Sache — er wird zur Bewerbung,
+/// Der Entwurf ist das FRUEHERE LEBEN derselben Sache — er wird zur JobApplication,
 /// wenn ein Mensch zweimal geklickt hat. Deshalb liegt er in diesem Dienst und
 /// nicht in einem eigenen: es ist derselbe fachliche Zusammenhang, nur eine
 /// Stufe davor.
 /// </remarks>
-public sealed class EntwurfsZeile
+public sealed class DraftRow
 {
     public Guid Id { get; set; }
 
@@ -88,7 +88,7 @@ public sealed class EntwurfsZeile
 
     public string Body { get; set; } = string.Empty;
 
-    /// <summary>Der Stand, als Wort — wie bei der Bewerbung, aus demselben Grund.</summary>
+    /// <summary>Der State, als Wort — wie bei der JobApplication, aus demselben Grund.</summary>
     public string Status { get; set; } = string.Empty;
 
     public int Version { get; set; } = 1;
@@ -120,7 +120,7 @@ public sealed class EntwurfsZeile
 /// werden einzeln abgehakt und einzeln gelesen. Sie als jsonb zu halten hiesse,
 /// bei jeder Anmerkung die ganze Liste neu zu schreiben.
 /// </remarks>
-public sealed class AnmerkungsZeile
+public sealed class CommentRow
 {
     public Guid Id { get; set; }
 
@@ -128,7 +128,7 @@ public sealed class AnmerkungsZeile
 
     public string Body { get; set; } = string.Empty;
 
-    /// <summary>Die markierte Stelle, oder leer.</summary>
+    /// <summary>Die markierte Job, oder leer.</summary>
     public string Quote { get; set; } = string.Empty;
 
     public bool Resolved { get; set; }
@@ -153,112 +153,112 @@ public sealed class AnmerkungsZeile
 public sealed class ApplicationsDbContext(DbContextOptions<ApplicationsDbContext> options)
     : DbContext(options)
 {
-    /// <summary>Die Bewerbungen.</summary>
-    public DbSet<BewerbungsZeile> Bewerbungen => Set<BewerbungsZeile>();
+    /// <summary>Die Applications.</summary>
+    public DbSet<ApplicationRow> Applications => Set<ApplicationRow>();
 
     /// <summary>Die Entwürfe.</summary>
-    public DbSet<EntwurfsZeile> Entwuerfe => Set<EntwurfsZeile>();
+    public DbSet<DraftRow> Entwuerfe => Set<DraftRow>();
 
     /// <summary>Die Anmerkungen an den Entwürfen.</summary>
-    public DbSet<AnmerkungsZeile> Anmerkungen => Set<AnmerkungsZeile>();
+    public DbSet<CommentRow> Anmerkungen => Set<CommentRow>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
-        modelBuilder.Entity<BewerbungsZeile>(entity =>
+        modelBuilder.Entity<ApplicationRow>(entity =>
         {
             entity.ToTable("applications");
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
-            entity.Property(zeile => zeile.JobId).HasColumnName("job_id").IsRequired();
-            entity.Property(zeile => zeile.TenantId).HasColumnName("tenant_id").IsRequired();
-            entity.Property(zeile => zeile.SubjectId).HasColumnName("subject_id").IsRequired();
-            entity.Property(zeile => zeile.Message)
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.JobId).HasColumnName("job_id").IsRequired();
+            entity.Property(row => row.TenantId).HasColumnName("tenant_id").IsRequired();
+            entity.Property(row => row.SubjectId).HasColumnName("subject_id").IsRequired();
+            entity.Property(row => row.Message)
                 .HasColumnName("message").HasColumnType("text").IsRequired();
-            entity.Property(zeile => zeile.SharesResume)
+            entity.Property(row => row.SharesResume)
                 .HasColumnName("shares_resume").IsRequired();
-            entity.Property(zeile => zeile.SharesPortfolio)
+            entity.Property(row => row.SharesPortfolio)
                 .HasColumnName("shares_portfolio").IsRequired();
-            entity.Property(zeile => zeile.Documents)
+            entity.Property(row => row.Documents)
                 .HasColumnName("documents").HasColumnType("jsonb")
                 .HasDefaultValue("[]").IsRequired();
-            entity.Property(zeile => zeile.Status)
+            entity.Property(row => row.Status)
                 .HasColumnName("status").HasMaxLength(16).IsRequired();
-            entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
-            entity.Property(zeile => zeile.UpdatedAt).HasColumnName("updated_at").IsRequired();
-            entity.Property(zeile => zeile.AnsweredAt).HasColumnName("answered_at");
-            entity.Property(zeile => zeile.ApplicantContact)
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(row => row.AnsweredAt).HasColumnName("answered_at");
+            entity.Property(row => row.ApplicantContact)
                 .HasColumnName("applicant_contact")
                 .HasColumnType("jsonb")
                 .HasDefaultValue("{}")
                 .IsRequired();
 
-            entity.HasIndex(zeile => zeile.JobId);
-            entity.HasIndex(zeile => zeile.TenantId);
-            entity.HasIndex(zeile => zeile.SubjectId);
+            entity.HasIndex(row => row.JobId);
+            entity.HasIndex(row => row.TenantId);
+            entity.HasIndex(row => row.SubjectId);
 
-            // Genau eine je (Person, Stelle) — in der Datenbank und nicht nur
+            // Genau eine je (Person, Job) — in der Datenbank und nicht nur
             // im Handler, denn zwei gleichzeitige Absendungen kämen beide durch
-            // eine Prüfung im Code. Zweimal auf dieselbe Stelle zu bewerben ist
+            // eine Prüfung im Code. Zweimal auf dieselbe Job zu bewerben ist
             // kein Ausdruck von Interesse, sondern ein Versehen.
-            entity.HasIndex(zeile => new { zeile.JobId, zeile.SubjectId })
+            entity.HasIndex(row => new { row.JobId, row.SubjectId })
                 .IsUnique()
                 .HasDatabaseName("uq_application_job_subject");
         });
 
-        modelBuilder.Entity<EntwurfsZeile>(entity =>
+        modelBuilder.Entity<DraftRow>(entity =>
         {
             entity.ToTable("application_drafts");
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
-            entity.Property(zeile => zeile.JobId).HasColumnName("job_id").IsRequired();
-            entity.Property(zeile => zeile.TenantId).HasColumnName("tenant_id").IsRequired();
-            entity.Property(zeile => zeile.SubjectId).HasColumnName("subject_id").IsRequired();
-            entity.Property(zeile => zeile.Subject)
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.JobId).HasColumnName("job_id").IsRequired();
+            entity.Property(row => row.TenantId).HasColumnName("tenant_id").IsRequired();
+            entity.Property(row => row.SubjectId).HasColumnName("subject_id").IsRequired();
+            entity.Property(row => row.Subject)
                 .HasColumnName("subject")
-                .HasMaxLength(Bewerbungsentwurf.HoechstlaengeBetreff).IsRequired();
-            entity.Property(zeile => zeile.Body)
+                .HasMaxLength(ApplicationDraft.HoechstlaengeBetreff).IsRequired();
+            entity.Property(row => row.Body)
                 .HasColumnName("body").HasColumnType("text").IsRequired();
-            entity.Property(zeile => zeile.Status)
+            entity.Property(row => row.Status)
                 .HasColumnName("status").HasMaxLength(16).IsRequired();
-            entity.Property(zeile => zeile.Version).HasColumnName("version").IsRequired();
-            entity.Property(zeile => zeile.Error)
+            entity.Property(row => row.Version).HasColumnName("version").IsRequired();
+            entity.Property(row => row.Error)
                 .HasColumnName("error").HasColumnType("text").IsRequired();
-            entity.Property(zeile => zeile.SharesResume)
+            entity.Property(row => row.SharesResume)
                 .HasColumnName("shares_resume").IsRequired();
-            entity.Property(zeile => zeile.Documents)
+            entity.Property(row => row.Documents)
                 .HasColumnName("documents").HasColumnType("jsonb").IsRequired();
-            entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
-            entity.Property(zeile => zeile.UpdatedAt).HasColumnName("updated_at").IsRequired();
-            entity.Property(zeile => zeile.WritingStartedAt).HasColumnName("writing_started_at");
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(row => row.WritingStartedAt).HasColumnName("writing_started_at");
 
-            entity.HasIndex(zeile => zeile.SubjectId);
+            entity.HasIndex(row => row.SubjectId);
 
-            // KEIN eindeutiger Index auf (Stelle, Person): ein gesendeter
-            // Entwurf bleibt als Beleg stehen, und danach darf ein neuer
+            // KEIN eindeutiger Index auf (Job, Person): ein gesendeter
+            // Entwurf bleibt als Evidence stehen, und danach darf ein neuer
             // entstehen. Die Eindeutigkeit sitzt an der BEWERBUNG, wo sie
             // hingehoert — zweimal zu bewerben ist das Versehen, zweimal zu
             // entwerfen nicht.
         });
 
-        modelBuilder.Entity<AnmerkungsZeile>(entity =>
+        modelBuilder.Entity<CommentRow>(entity =>
         {
             entity.ToTable("application_draft_comments");
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
-            entity.Property(zeile => zeile.DraftId).HasColumnName("draft_id").IsRequired();
-            entity.Property(zeile => zeile.Body)
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.DraftId).HasColumnName("draft_id").IsRequired();
+            entity.Property(row => row.Body)
                 .HasColumnName("body")
                 .HasMaxLength(Anmerkung.HoechstlaengeText).IsRequired();
-            entity.Property(zeile => zeile.Quote)
+            entity.Property(row => row.Quote)
                 .HasColumnName("quote")
                 .HasMaxLength(Anmerkung.HoechstlaengeZitat).IsRequired();
-            entity.Property(zeile => zeile.Resolved).HasColumnName("resolved").IsRequired();
-            entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(row => row.Resolved).HasColumnName("resolved").IsRequired();
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
 
-            entity.HasIndex(zeile => zeile.DraftId);
+            entity.HasIndex(row => row.DraftId);
         });
 
         modelBuilder.ConfigureOutbox();

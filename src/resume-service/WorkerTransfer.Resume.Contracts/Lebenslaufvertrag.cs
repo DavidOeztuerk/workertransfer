@@ -22,10 +22,10 @@ public sealed record StationV1(
     [property: JsonPropertyName("description")] string Description = "",
     /// <summary>Womit dort gearbeitet wurde — von der Person selbst genannt.</summary>
     /// <remarks>
-    /// Vereinheitlicht durch denselben Wortschatz wie das Profil, damit
+    /// Vereinheitlicht durch denselben Vocabulary wie das Profile, damit
     /// „postgres" hier wie dort „PostgreSQL" heisst (ADR-0023). Sie machen die
-    /// Station nicht durchsuchbar: ein Lebenslauf ist einzeln freigegeben
-    /// (ADR-0020), und suchbar wird eine Fähigkeit erst im Profil.
+    /// Station nicht durchsuchbar: ein CurriculumVitae ist einzeln freigegeben
+    /// (ADR-0020), und suchbar wird eine Fähigkeit erst im Profile.
     /// </remarks>
     [property: JsonPropertyName("technologies")] IReadOnlyList<string>? Technologies = null);
 
@@ -48,26 +48,26 @@ public sealed record AusbildungV1(
 /// be a second truth, and the two would disagree the first time somebody
 /// withdrew.
 /// </remarks>
-public sealed record LebenslaufV1(
+public sealed record ResumeV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("positions")] IReadOnlyList<StationV1> Positions,
     [property: JsonPropertyName("education")] IReadOnlyList<AusbildungV1> Education,
     [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt,
-    /// <summary>In welcher Vorlage der Lebenslauf gesetzt wird.</summary>
+    /// <summary>In welcher ResumeTemplate der CurriculumVitae gesetzt wird.</summary>
     /// <remarks>
     /// Ein NAME, kein Layout: wie es aussieht, liegt in der Oberfläche und
     /// gilt für beide Seiten — die Person sieht dasselbe wie das Unternehmen,
-    /// dem sie den Lebenslauf schickt (ADR-0035).
+    /// dem sie den CurriculumVitae schickt (ADR-0035).
     /// </remarks>
     [property: JsonPropertyName("template")] string Template = "schlicht");
 
-/// <summary>Eine beigelegte Unterlage — ohne ihre Bytes.</summary>
+/// <summary>Eine beigelegte DocumentRecord — ohne ihre Bytes.</summary>
 /// <remarks>
 /// Der Inhalt kommt über eine eigene Adresse, damit eine Liste nicht ein
 /// Dutzend Dateien mitschleppt. <c>content_type</c> ist das, was die
 /// SIGNATUR ergeben hat, nie das, was der Hochladende behauptet hat.
 /// </remarks>
-public sealed record UnterlageV1(
+public sealed record DocumentRecordV1(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("kind")] string Kind,
@@ -75,7 +75,7 @@ public sealed record UnterlageV1(
     [property: JsonPropertyName("size_bytes")] int SizeBytes,
     [property: JsonPropertyName("uploaded_at")] DateTimeOffset UploadedAt);
 
-/// <summary>Was in einer Unterlage gelesen wurde — oder dass noch nie gelesen wurde.</summary>
+/// <summary>Was in einer DocumentRecord gelesen wurde — oder dass noch nie gelesen wurde.</summary>
 /// <param name="ReadAt">
 /// <c>null</c> heisst <strong>noch nie gelesen</strong>. Der Zustand ist nicht
 /// dasselbe wie „gelesen und nichts gefunden", und die beiden dürfen nie
@@ -88,23 +88,23 @@ public sealed record UnterlageV1(
 /// wäre, und die Antwort sagt das, statt zu schweigen.
 /// </param>
 /// <param name="Terms">
-/// Die kanonischen Namen, die der Wortschatz im Text wiedererkannt hat. Ein
-/// <strong>Beleg</strong> und keine Nennung: eine Aussage über dieses Dokument,
-/// nirgends durchsuchbar, und erst ein Klick und ein Speichern im Profil machen
+/// Die kanonischen Namen, die der Vocabulary im Text wiedererkannt hat. Ein
+/// <strong>Evidence</strong> und keine Nennung: eine Aussage über dieses Dokument,
+/// nirgends durchsuchbar, und erst ein Klick und ein Speichern im Profile machen
 /// daraus eine Aussage über den Menschen (ADR-0033).
 /// <para>
 /// <strong>Kein Wortlaut.</strong> Der gefundene Text geht weder hinaus noch in
 /// die Datenbank; hinaus gehen allein die Namen.
 /// </para>
 /// </param>
-public sealed record UnterlagenfundV1(
+public sealed record DocumentTermsV1(
     [property: JsonPropertyName("document_id")] Guid DocumentId,
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("read_at")] DateTimeOffset? ReadAt,
     [property: JsonPropertyName("has_text")] bool HasText,
     [property: JsonPropertyName("terms")] IReadOnlyList<string> Terms);
 
-/// <summary>Welche Vorlage gewählt wird.</summary>
+/// <summary>Welche ResumeTemplate gewählt wird.</summary>
 public sealed record VorlageWaehlenV1(
     [property: JsonPropertyName("template")] string Template);
 
@@ -113,7 +113,7 @@ public sealed record VorlageWaehlenV1(
 /// No subject id. Whose résumé this is comes from the verified token, so a
 /// caller cannot write into somebody else's.
 /// </remarks>
-public sealed record LebenslaufSpeichernV1(
+public sealed record StoreResumeV1(
     [property: JsonPropertyName("positions")] IReadOnlyList<StationV1> Positions,
     [property: JsonPropertyName("education")] IReadOnlyList<AusbildungV1> Education);
 
@@ -132,7 +132,7 @@ public sealed record LebenslaufSpeichernV1(
 /// belongs on it (ADR-0022).
 /// </para>
 /// </remarks>
-public sealed record AnfrageV1(
+public sealed record RequestV1(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("tenant_id")] Guid TenantId,

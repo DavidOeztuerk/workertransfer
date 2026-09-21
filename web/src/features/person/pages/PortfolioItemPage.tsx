@@ -82,6 +82,9 @@ function zuArbeit(draft: Entwurf): Arbeit {
  * <strong>Das Entfernen steht HIER und nicht in der Liste.</strong> Hier hat die
  * Person die Arbeit vor Augen, um die es geht — in einer Liste träfe der Klick
  * eine Zeile unter vielen.
+ *
+ * <strong>The file field states its rules up front</strong> — which formats and
+ * how large. A field whose rules you learn by failing is a riddle, not a field.
  */
 export function PortfolioItemPage() {
   const { t } = useTranslation();
@@ -191,6 +194,11 @@ export function PortfolioItemPage() {
     else setFehler(result.error.detail);
   }
 
+  // The local file name is NOT shown: it never travels to the server, and the
+  // UI may only say what is true — that a file is attached.
+  const dateiSatz =
+    draft.attachment !== null ? "arbeiten.dateiHaengtAn" : "arbeiten.keineDatei";
+
   return (
     <PageShell
       title={
@@ -259,15 +267,8 @@ export function PortfolioItemPage() {
               <Typography variant="body2" sx={{ mb: 1 }}>
                 {t("arbeiten.datei")}
               </Typography>
-              {/* Der lokale Dateiname wird NICHT angezeigt: er wandert nicht zum
-                  Server, und die Oberfläche soll nur sagen, was wahr ist — dass
-                  eine Datei hängt. */}
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {t(
-                  draft.attachment !== null
-                    ? "arbeiten.dateiHaengtAn"
-                    : "arbeiten.keineDatei",
-                )}
+                {t(dateiSatz)}
               </Typography>
               <Button
                 component="label"
@@ -290,14 +291,6 @@ export function PortfolioItemPage() {
                 />
               </Button>
 
-              {/*
-                WAS für eine Datei, in welchem Format, wie gross — und was mit
-                ihr passiert. Vorher stand hier „Datei / Keine Datei. / Datei
-                wählen" und sonst nichts: die erlaubten Formate erfuhr man erst,
-                wenn der Dienst eine Datei ABLEHNTE, und die Zehn-Megabyte-Grenze
-                gar nicht. Ein Feld, dessen Regeln man durch Scheitern lernt,
-                ist kein Feld, sondern ein Rätsel.
-              */}
               <Typography
                 variant="caption"
                 color="text.secondary"

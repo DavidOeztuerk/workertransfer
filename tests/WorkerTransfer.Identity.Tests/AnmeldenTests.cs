@@ -37,8 +37,8 @@ public class AnmeldenTests
             .Returns(Konten.Bestehend(Anna, "anna@example.com", Eintrag, status));
 
     private void DasPasswortStimmt(
-        PasswordVerification ergebnis = PasswordVerification.Success) =>
-        _passwoerter.Verify("geheim", Eintrag).Returns(ergebnis);
+        PasswordVerification result = PasswordVerification.Success) =>
+        _passwoerter.Verify("geheim", Eintrag).Returns(result);
 
     private void EineSitzungEntsteht()
     {
@@ -57,9 +57,9 @@ public class AnmeldenTests
         DasPasswortStimmt();
         EineSitzungEntsteht();
 
-        var ergebnis = await Anmelden(Handler(), "anna@example.com", "geheim");
+        var result = await Anmelden(Handler(), "anna@example.com", "geheim");
 
-        ergebnis.Should().BeOfType<Anmeldeergebnis.Angemeldet>()
+        result.Should().BeOfType<Anmeldeergebnis.Angemeldet>()
             .Which.Zugriffstoken.Should().Be("zugriffstoken");
     }
 
@@ -122,9 +122,9 @@ public class AnmeldenTests
         EsGibt(AccountStatus.Pending);
         DasPasswortStimmt();
 
-        var ergebnis = await Anmelden(Handler(), "anna@example.com", "geheim");
+        var result = await Anmelden(Handler(), "anna@example.com", "geheim");
 
-        ergebnis.Should().BeOfType<Anmeldeergebnis.NichtBestaetigt>();
+        result.Should().BeOfType<Anmeldeergebnis.NichtBestaetigt>();
     }
 
     /// <summary>
@@ -137,9 +137,9 @@ public class AnmeldenTests
         EsGibt(AccountStatus.Disabled);
         DasPasswortStimmt();
 
-        var ergebnis = await Anmelden(Handler(), "anna@example.com", "geheim");
+        var result = await Anmelden(Handler(), "anna@example.com", "geheim");
 
-        ergebnis.Should().BeOfType<Anmeldeergebnis.Abgelehnt>();
+        result.Should().BeOfType<Anmeldeergebnis.Abgelehnt>();
     }
 
     [Fact]
@@ -167,9 +167,9 @@ public class AnmeldenTests
         DasPasswortStimmt(PasswordVerification.SuccessRehashNeeded);
         EineSitzungEntsteht();
 
-        var ergebnis = await Anmelden(Handler(), "anna@example.com", "geheim");
+        var result = await Anmelden(Handler(), "anna@example.com", "geheim");
 
-        ergebnis.Should().BeOfType<Anmeldeergebnis.Angemeldet>();
+        result.Should().BeOfType<Anmeldeergebnis.Angemeldet>();
     }
 
     /// <summary>
@@ -181,7 +181,7 @@ public class AnmeldenTests
     [InlineData(AccountStatus.Pending, PasswordVerification.Success, "email_not_confirmed")]
     [InlineData(AccountStatus.Disabled, PasswordVerification.Success, "disabled")]
     public async Task Jede_Absage_nennt_ihren_Grund_im_Protokoll(
-        AccountStatus status, PasswordVerification urteil, string grund)
+        AccountStatus status, PasswordVerification urteil, string reason)
     {
         EsGibt(status);
         DasPasswortStimmt(urteil);
@@ -190,7 +190,7 @@ public class AnmeldenTests
 
         await _protokoll.Received(1).AppendAsync(
             Arg.Is<AuditEvent>(e => e.Action == AuditAction.LoginFailure
-                                    && e.Metadata["reason"] == grund
+                                    && e.Metadata["reason"] == reason
                                     && e.Actor == Anna),
             Arg.Any<CancellationToken>());
     }
@@ -229,7 +229,7 @@ public class AnmeldenTests
 }
 
 /// <summary>A correlation id that does not need a request.</summary>
-internal sealed class FesteKorrelation(string? wert) : IKorrelation
+internal sealed class FesteKorrelation(string? value) : IKorrelation
 {
-    public string? Aktuell { get; } = wert;
+    public string? Aktuell { get; } = value;
 }

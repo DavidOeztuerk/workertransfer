@@ -10,14 +10,14 @@ namespace WorkerTransfer.Identity.Application.Registrierung;
 /// einen zweiten Aufrufer.</para>
 ///
 /// <para><strong>Leer ist nicht ungültig.</strong> Ein fehlender Token ist eine
-/// kaputte Anfrage (422); ein Token, den es nicht gibt, ist eine Antwort und
+/// kaputte ResumeRequest (422); ein Token, den es nicht gibt, ist eine Antwort und
 /// gehört in den Handler. Die beiden zu vermischen hieße, aus „du hast nichts
 /// geschickt" und „dieser Link ist verbraucht" dieselbe Auskunft zu machen.</para>
 /// </remarks>
-public sealed class BestaetigungPruefung : AbstractValidator<AdresseBestaetigenBefehl>
+public sealed class ConfirmationValidator : AbstractValidator<AdresseBestaetigenBefehl>
 {
     /// <summary>Setzt die eine Regel.</summary>
-    public BestaetigungPruefung() =>
+    public ConfirmationValidator() =>
         RuleFor(befehl => befehl.Token)
             .NotEmpty().WithMessage("token is required")
             .OverridePropertyName("token");
@@ -27,7 +27,7 @@ public sealed class BestaetigungPruefung : AbstractValidator<AdresseBestaetigenB
 /// <remarks>
 /// Geprüft wird die FORM. Ob die Adresse bekannt ist, beantwortet dieser
 /// Endpunkt bewusst nicht — er antwortet für bekannte und unbekannte gleich,
-/// sonst verriete er die Mitgliedschaft auf dieser Plattform, ohne den Ledger zu
+/// sonst verriete er die Membership auf dieser Plattform, ohne den Ledger zu
 /// fragen. Eine Formprüfung sieht nur die Zeichenkette und kann diese Zusage
 /// deshalb gar nicht brechen.
 /// <para>
@@ -35,10 +35,10 @@ public sealed class BestaetigungPruefung : AbstractValidator<AdresseBestaetigenB
 /// <c>MailMessage</c>.
 /// </para>
 /// </remarks>
-public sealed class ErneutSendenPruefung : AbstractValidator<BestaetigungErneutSendenBefehl>
+public sealed class ResendValidator : AbstractValidator<BestaetigungErneutSendenBefehl>
 {
     /// <summary>Setzt die Regel.</summary>
-    public ErneutSendenPruefung() =>
+    public ResendValidator() =>
         RuleFor(befehl => befehl.Email)
             .NotEmpty().WithMessage("email is required")
             .Must(Emailadresse.IstZustellbar).WithMessage("email is not a deliverable address")

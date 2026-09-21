@@ -1,21 +1,21 @@
 using System.Security.Cryptography;
 using Noelia.Core.Identity;
 
-namespace WorkerTransfer.GitHub.Domain.Verbindungen;
+namespace WorkerTransfer.GitHub.Domain.Connections;
 
 /// <summary>Der Benutzername taugt nicht.</summary>
 public sealed class Loginfehler(string was) : Exception($"GitHub login {was}");
 
-/// <summary>Diese Verbindung ist noch nicht nachgewiesen.</summary>
+/// <summary>Diese Connection ist noch nicht nachgewiesen.</summary>
 public sealed class NichtNachgewiesen() : Exception("This connection is not verified yet");
 
-/// <summary>Diese Verbindung ist bereits nachgewiesen.</summary>
+/// <summary>Diese Connection ist bereits nachgewiesen.</summary>
 public sealed class SchonNachgewiesen() : Exception("This connection is already verified");
 
-/// <summary>Diese Verbindung nennt bereits ein Konto.</summary>
+/// <summary>Diese Connection nennt bereits ein Konto.</summary>
 public sealed class SchonGenannt() : Exception("This connection already names an account");
 
-/// <summary>Ein Beleg. Alle Felder kommen von GitHub, keins ist gerechnet.</summary>
+/// <summary>Ein Evidence. Alle Felder kommen von GitHub, keins ist gerechnet.</summary>
 /// <remarks>
 /// <c>Sterne</c> steht hier, weil GitHub es meldet — <em>weitergegeben, nicht
 /// ausgewertet</em>. Es ist kein Sortierschlüssel und darf keiner werden: eine
@@ -37,7 +37,7 @@ public sealed class SchonGenannt() : Exception("This connection already names an
 /// Die Topics, die der Besitzer selbst am Repository gesetzt hat.
 /// </param>
 /// <remarks>
-/// Der stärkste Beleg von allen, weil er eine <em>Nennung</em> ist: „react",
+/// Der stärkste Evidence von allen, weil er eine <em>Nennung</em> ist: „react",
 /// „kubernetes" hat ein Mensch dorthin geschrieben, nicht ein Zähler abgeleitet.
 /// </remarks>
 public sealed record Repository(
@@ -74,30 +74,30 @@ public sealed record Abzug(
     IReadOnlyList<Repository> Repositories,
     bool SprachenVollstaendig);
 
-/// <summary>Die Verbindung zu einem GitHub-Konto — bewiesen, nicht behauptet.</summary>
+/// <summary>Die Connection zu einem GitHub-Konto — bewiesen, nicht behauptet.</summary>
 /// <remarks>
 /// <strong>Was hier nicht steht, ist der Punkt</strong> (ADR-0022): keine
 /// Punktzahl, keine abgeleiteten Eigenschaften, kein „Können" aus Bytes. Ein
-/// Repository ist ein Beleg mit einem Link; wer wissen will, ob der Code gut
-/// ist, klickt darauf. Das ist die einzige ehrliche Bewertung, die dieses
+/// Repository ist ein Evidence mit einem Link; wer wissen will, ob der Code gut
+/// ist, klickt darauf. Das ist die einzige ehrliche Evaluation, die dieses
 /// System anbieten kann.
 /// <para>
 /// Die Grenze verläuft zwischen einer Aussage über ein <em>Repository</em> —
 /// eine Tatsache — und einer über einen <em>Menschen</em> — ein Urteil, das er
 /// nicht kommentieren kann. „Dieses Repository ist laut GitHub zu 80 % Go" darf
-/// hier stehen; „diese Person kann Go" nicht. Wer Go ins Profil schreibt, ist
+/// hier stehen; „diese Person kann Go" nicht. Wer Go ins Profile schreibt, ist
 /// die Person selbst.
 /// </para>
 /// </remarks>
-public sealed class Verbindung
+public sealed class Connection
 {
     /// <summary>GitHubs eigene Grenze für Benutzernamen.</summary>
     public const int HoechstlaengeLogin = 39;
 
     private readonly List<Repository> _repositories;
 
-    private Verbindung(
-        SubjectId wer,
+    private Connection(
+        SubjectId subject,
         string? login,
         string einmalzeichenfolge,
         DateTimeOffset? nachgewiesenAm,
@@ -105,7 +105,7 @@ public sealed class Verbindung
         List<Repository> repositories,
         bool sprachenVollstaendig)
     {
-        Wer = wer;
+        Wer = subject;
         Login = login;
         Einmalzeichenfolge = einmalzeichenfolge;
         NachgewiesenAm = nachgewiesenAm;
@@ -114,7 +114,7 @@ public sealed class Verbindung
         SprachenVollstaendig = sprachenVollstaendig;
     }
 
-    /// <summary>Wessen Verbindung. Sie <em>ist</em> der Schlüssel.</summary>
+    /// <summary>Wessen Connection. Sie <em>ist</em> der Schlüssel.</summary>
     public SubjectId Wer { get; }
 
     /// <summary>Der GitHub-Benutzername, oder <c>null</c>: noch nicht genannt.</summary>
@@ -122,7 +122,7 @@ public sealed class Verbindung
     /// <strong><c>null</c> ist ein Zustand, kein Fehlen.</strong> Über GitHubs
     /// eigene Anmeldung wird das Konto nicht genannt, sondern <em>gemeldet</em>:
     /// GitHub nennt allein das Konto, das wirklich zugestimmt hat. Bis die
-    /// Antwort da ist, weiß diese Verbindung ihren Namen noch nicht — und ihn
+    /// Antwort da ist, weiß diese Connection ihren Namen noch nicht — und ihn
     /// vorher abzufragen wäre eine Frage, auf die nur der Gist eine Antwort
     /// braucht.
     /// </remarks>
@@ -152,7 +152,7 @@ public sealed class Verbindung
     /// </remarks>
     public bool SprachenVollstaendig { get; private set; } = true;
 
-    /// <summary>Ist die Verbindung bewiesen?</summary>
+    /// <summary>Ist die Connection bewiesen?</summary>
     public bool Nachgewiesen => NachgewiesenAm is not null;
 
     /// <summary>Die Beschreibung, die im öffentlichen Gist stehen muss.</summary>
@@ -166,31 +166,31 @@ public sealed class Verbindung
 
     /// <summary>Nennt einen Benutzernamen und würfelt die Einmalzeichenfolge.</summary>
     /// <exception cref="Loginfehler">Der Benutzername taugt nicht.</exception>
-    public static Verbindung Oeffne(SubjectId wer, string login) =>
-        new(wer, Geprueft(login), NeueZeichenfolge(), null, null, [], true);
+    public static Connection Oeffne(SubjectId subject, string login) =>
+        new(subject, Geprueft(login), NeueZeichenfolge(), null, null, [], true);
 
-    /// <summary>Eröffnet eine Verbindung, deren Konto GitHub selbst nennen wird.</summary>
+    /// <summary>Eröffnet eine Connection, deren Konto GitHub selbst nennen wird.</summary>
     /// <remarks>
     /// Der Weg über GitHubs Anmeldung. Hier wird <strong>nichts behauptet</strong>:
     /// Es gibt kein genanntes Konto, also auch nichts zu vergleichen — und
     /// deshalb auch keine Gelegenheit, sich am falschen Namen auszusperren.
     /// Die Einmalzeichenfolge entsteht trotzdem sofort, denn sie ist der
     /// <c>state</c> der Anmeldung: sie beweist, dass der Rücksprung zu dieser
-    /// Anfrage gehört.
+    /// ResumeRequest gehört.
     /// </remarks>
-    public static Verbindung Erwarte(SubjectId wer) =>
-        new(wer, null, NeueZeichenfolge(), null, null, [], true);
+    public static Connection Erwarte(SubjectId subject) =>
+        new(subject, null, NeueZeichenfolge(), null, null, [], true);
 
-    /// <summary>Die Verbindung, wie eine Zeile sie hält.</summary>
-    public static Verbindung Stelle_her(
-        SubjectId wer,
+    /// <summary>Die Connection, wie eine Zeile sie hält.</summary>
+    public static Connection Stelle_her(
+        SubjectId subject,
         string? login,
         string einmalzeichenfolge,
         DateTimeOffset? nachgewiesenAm,
         DateTimeOffset? geholtAm,
         IReadOnlyList<Repository> repositories,
         bool sprachenVollstaendig = true) =>
-        new(wer, login, einmalzeichenfolge, nachgewiesenAm, geholtAm,
+        new(subject, login, einmalzeichenfolge, nachgewiesenAm, geholtAm,
             [.. repositories], sprachenVollstaendig);
 
     /// <summary>Ein anderes Konto nennen — der Nachweis fällt damit weg.</summary>
@@ -222,7 +222,7 @@ public sealed class Verbindung
 
     /// <summary>Trägt den Namen ein, den GitHub gemeldet hat.</summary>
     /// <remarks>
-    /// Nur für eine Verbindung, die noch keinen trägt. Wäre schon einer
+    /// Nur für eine Connection, die noch keinen trägt. Wäre schon einer
     /// genannt, dann müsste er <em>verglichen</em> und nicht überschrieben
     /// werden — sonst nennt jemand <c>torvalds</c>, meldet sich selbst an und
     /// bekäme den Nachweis stillschweigend auf sein eigenes Konto umgeschrieben.
@@ -241,24 +241,24 @@ public sealed class Verbindung
 
     /// <summary>Hält fest, dass der Nachweis erbracht ist.</summary>
     /// <exception cref="SchonNachgewiesen">Er war schon erbracht.</exception>
-    public void Weise_nach(DateTimeOffset jetzt)
+    public void Weise_nach(DateTimeOffset now)
     {
         if (Nachgewiesen)
         {
             throw new SchonNachgewiesen();
         }
 
-        NachgewiesenAm = jetzt;
+        NachgewiesenAm = now;
     }
 
-    /// <summary>Legt den Abzug ab. Nur für eine nachgewiesene Verbindung.</summary>
+    /// <summary>Legt den Abzug ab. Nur für eine nachgewiesene Connection.</summary>
     /// <remarks>
     /// Ohne diese Prüfung könnte jemand einen fremden Benutzernamen eintragen
     /// und dessen Arbeit als seine zeigen — ohne je Zugriff auf das Konto
     /// gehabt zu haben.
     /// </remarks>
-    /// <exception cref="NichtNachgewiesen">Die Verbindung ist nicht bewiesen.</exception>
-    public void Lege_ab(Abzug abzug, DateTimeOffset jetzt)
+    /// <exception cref="NichtNachgewiesen">Die Connection ist nicht bewiesen.</exception>
+    public void Lege_ab(Abzug abzug, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(abzug);
 
@@ -275,10 +275,10 @@ public sealed class Verbindung
         _repositories.Clear();
         _repositories.AddRange(
             repositories
-                .OrderByDescending(eintrag => eintrag.ZuletztGeschoben is not null)
-                .ThenByDescending(eintrag => eintrag.ZuletztGeschoben));
+                .OrderByDescending(entry => entry.ZuletztGeschoben is not null)
+                .ThenByDescending(entry => entry.ZuletztGeschoben));
 
-        GeholtAm = jetzt;
+        GeholtAm = now;
     }
 
     /// <summary>Sechzehn Byte urlsafe.</summary>
@@ -317,15 +317,15 @@ public sealed class Verbindung
     }
 }
 
-/// <summary>Findet und speichert Verbindungen.</summary>
-public interface IVerbindungsspeicher
+/// <summary>Findet und speichert Connections.</summary>
+public interface IConnectionStore
 {
-    /// <summary>Die Verbindung dieser Person, oder <c>null</c>.</summary>
-    Task<Verbindung?> HoleAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    /// <summary>Die Connection dieser Person, oder <c>null</c>.</summary>
+    Task<Connection?> GetAsync(SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(Verbindung verbindung, CancellationToken cancellationToken = default);
+    Task SaveAsync(Connection connection, CancellationToken cancellationToken = default);
 
     /// <summary>Trennen heißt löschen — der Abzug verschwindet mit.</summary>
-    Task LoescheAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default);
 }

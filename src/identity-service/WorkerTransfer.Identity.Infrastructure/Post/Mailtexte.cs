@@ -32,7 +32,7 @@ public static class Mailtexte
     /// <param name="sprache">The recipient's language.</param>
     /// <param name="link">The full confirmation address.</param>
     /// <returns>Subject and body.</returns>
-    public static Mailtext Bestaetigung(Kontosprache sprache, string link) => sprache switch
+    public static Mailtext Bestaetigung(Kontosprache language, string link) => language switch
     {
         Kontosprache.En => new Mailtext(
             "Please confirm your email address",
@@ -51,7 +51,7 @@ public static class Mailtexte
     /// <summary>"Somebody tried to register with your address."</summary>
     /// <param name="sprache">The recipient's language.</param>
     /// <returns>Subject and body.</returns>
-    public static Mailtext Doppelanmeldung(Kontosprache sprache) => sprache switch
+    public static Mailtext Doppelanmeldung(Kontosprache language) => language switch
     {
         Kontosprache.En => new Mailtext(
             "Registration attempt with your email address",
@@ -77,23 +77,23 @@ public static class Mailtexte
     /// <param name="firma">The company's name, already filled in.</param>
     /// <param name="link">The full invitation address.</param>
     /// <returns>Subject and body.</returns>
-    public static Mailtext Einladung(Kontosprache sprache, string firma, string link) => sprache switch
+    public static Mailtext Einladung(Kontosprache language, string company, string link) => language switch
     {
         Kontosprache.En => new Mailtext(
             "You have been invited to a company",
-            $"You have been invited to act for {firma} at WorkerTransfer. "
+            $"You have been invited to act for {company} at WorkerTransfer. "
             + "Use this link to accept the invitation:\n\n"
             + $"{link}\n\n"
             + "If this means nothing to you, ignore this message.\n"),
         Kontosprache.Fr => new Mailtext(
             "Vous avez été invité dans une entreprise",
-            $"Vous avez été invité à agir pour {firma} sur WorkerTransfer. "
+            $"Vous avez été invité à agir pour {company} sur WorkerTransfer. "
             + "Utilisez ce lien pour accepter l’invitation :\n\n"
             + $"{link}\n\n"
             + "Si cela ne vous dit rien, ignorez ce message.\n"),
         _ => new Mailtext(
             "Du wurdest zu einem Unternehmen eingeladen",
-            $"Du wurdest eingeladen, für {firma} bei WorkerTransfer zu handeln. "
+            $"Du wurdest eingeladen, für {company} bei WorkerTransfer zu handeln. "
             + "Über folgenden Link nimmst du die Einladung an:\n\n"
             + $"{link}\n\n"
             + "Wenn du damit nichts anfangen kannst, ignoriere diese Nachricht.\n")
@@ -102,7 +102,7 @@ public static class Mailtexte
     /// <summary>The company name to use when none was given.</summary>
     /// <param name="sprache">The recipient's language.</param>
     /// <returns>A neutral placeholder.</returns>
-    public static string EinUnternehmen(Kontosprache sprache) => sprache switch
+    public static string EinUnternehmen(Kontosprache language) => language switch
     {
         Kontosprache.En => "a company",
         Kontosprache.Fr => "une entreprise",
@@ -112,7 +112,7 @@ public static class Mailtexte
     /// <summary>The one mail that says the deletion is done.</summary>
     /// <param name="sprache">The recipient's language.</param>
     /// <returns>Subject and body.</returns>
-    public static Mailtext Loeschbestaetigung(Kontosprache sprache) => sprache switch
+    public static Mailtext Loeschbestaetigung(Kontosprache language) => language switch
     {
         Kontosprache.En => new Mailtext(
             "Your WorkerTransfer account has been deleted",
@@ -135,7 +135,7 @@ public static class Mailtexte
     /// <param name="sprache">The recipient's language.</param>
     /// <param name="basis">The site's address.</param>
     /// <returns>Subject and body.</returns>
-    public static Mailtext Neuigkeit(Kontosprache sprache, string basis) => sprache switch
+    public static Mailtext Neuigkeit(Kontosprache language, string basis) => language switch
     {
         Kontosprache.En => new Mailtext(
             // The same subject for every kind — the kind is precisely the secret.

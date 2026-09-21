@@ -3,7 +3,7 @@ namespace WorkerTransfer.Applications.Application.Ports;
 /// <summary>Das Zugriffstoken des Aufrufers, für den Weg zum Ledger.</summary>
 /// <remarks>
 /// Der Ledger wird <em>im Auftrag der Person</em> geschrieben und nicht mit
-/// einem Dienstkonto: sie erteilt die Freigabe, nicht dieser Dienst, und der
+/// einem Dienstkonto: sie erteilt die Release, nicht dieser Dienst, und der
 /// Ledger weist einen fremden Akteur ab. Also muss das Token einen Sprung
 /// weiter reisen.
 /// <para>
@@ -15,6 +15,6 @@ namespace WorkerTransfer.Applications.Application.Ports;
 /// </remarks>
 public interface IAufrufertoken
 {
-    /// <summary><c>null</c>, wenn die Anfrage keines trug.</summary>
+    /// <summary><c>null</c>, wenn die ResumeRequest keines trug.</summary>
     string? Wert { get; }
 }

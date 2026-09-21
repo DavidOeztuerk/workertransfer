@@ -22,7 +22,7 @@ namespace WorkerTransfer.GitHub.Application.Ports;
 /// etwas, das ohnehin öffentlich ist.
 /// </para>
 /// </remarks>
-public interface IGitHubAnmeldung
+public interface IGitHubSignIn
 {
     /// <summary>Ist eine Anmeldung über GitHub überhaupt eingerichtet?</summary>
     /// <remarks>
@@ -34,11 +34,11 @@ public interface IGitHubAnmeldung
 
     /// <summary>Wohin der Browser geschickt wird.</summary>
     /// <param name="zustand">
-    /// Die Einmalzeichenfolge der Verbindung. GitHub reicht sie unverändert
-    /// zurück; sie beweist, dass die Antwort zu DIESER Anfrage gehört und nicht
+    /// Die Einmalzeichenfolge der Connection. GitHub reicht sie unverändert
+    /// zurück; sie beweist, dass die Antwort zu DIESER ResumeRequest gehört und nicht
     /// zu einer, die jemand anderes untergeschoben hat.
     /// </param>
-    Uri Anmeldeadresse(string zustand);
+    Uri Anmeldeadresse(string state);
 
     /// <summary>Tauscht den Einmalcode gegen den Anmeldenamen.</summary>
     /// <remarks>
@@ -46,5 +46,5 @@ public interface IGitHubAnmeldung
     /// eine Aussage über den Code, kein Ausfall.
     /// </remarks>
     /// <exception cref="GitHubSchweigt">GitHub hat nicht geantwortet.</exception>
-    Task<string?> AnmeldenamenAsync(string code, CancellationToken cancellationToken = default);
+    Task<string?> LoginNameAsync(string code, CancellationToken cancellationToken = default);
 }

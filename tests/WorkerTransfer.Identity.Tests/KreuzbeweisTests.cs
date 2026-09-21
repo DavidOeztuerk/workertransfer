@@ -52,15 +52,15 @@ public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("environment", "Development");
         });
 
-        using (var bereich = _dienst.Services.CreateScope())
+        using (var scope = _dienst.Services.CreateScope())
         {
-            await bereich.ServiceProvider.GetRequiredService<IdentityDbContext>()
+            await scope.ServiceProvider.GetRequiredService<IdentityDbContext>()
                 .Database.MigrateAsync();
         }
 
@@ -76,9 +76,9 @@ public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
 
     private async Task LegeKontoAn(string email, string status = "active")
     {
-        await using var verbindung = new NpgsqlConnection(postgres.ConnectionString);
-        await verbindung.OpenAsync();
-        await using var befehl = verbindung.CreateCommand();
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await connection.OpenAsync();
+        await using var befehl = connection.CreateCommand();
         befehl.CommandText = """
             INSERT INTO users (id, email, password_hash, display_name, status, roles,
                                created_at, updated_at, version)
@@ -99,9 +99,9 @@ public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
         HttpClient browser, string email, string passwort) =>
         await browser.PostAsJsonAsync("/auth/login", new { email, password = passwort });
 
-    private static string CookieAus(HttpResponseMessage antwort, string name) =>
-        antwort.Headers.GetValues("Set-Cookie")
-            .First(zeile => zeile.StartsWith($"{name}=", StringComparison.Ordinal))
+    private static string CookieAus(HttpResponseMessage response, string name) =>
+        response.Headers.GetValues("Set-Cookie")
+            .First(row => row.StartsWith($"{name}=", StringComparison.Ordinal))
             .Split(';')[0][(name.Length + 1)..];
 
     /// <summary>
@@ -111,17 +111,17 @@ public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_Passwort_das_Python_gehasht_hat_laesst_herein()
     {
-        var antwort = await Anmelden(Browser(), _email, Passwort);
+        var response = await Anmelden(Browser(), _email, Passwort);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
     public async Task Ein_falsches_Passwort_wird_abgewiesen()
     {
-        var antwort = await Anmelden(Browser(), _email, "falsch-aber-lang-genug");
+        var response = await Anmelden(Browser(), _email, "falsch-aber-lang-genug");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
@@ -130,9 +130,9 @@ public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
         var wartend = $"clara-{Guid.NewGuid():N}@example.com";
         await LegeKontoAn(wartend, status: "pending");
 
-        var antwort = await Anmelden(Browser(), wartend, Passwort);
+        var response = await Anmelden(Browser(), wartend, Passwort);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     /// <summary>
@@ -143,18 +143,18 @@ public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_Absage_kommt_als_RFC_9457_Dokument()
     {
-        var antwort = await Anmelden(Browser(), _email, "falsch-aber-lang-genug");
+        var response = await Anmelden(Browser(), _email, "falsch-aber-lang-genug");
 
-        antwort.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
-        var problem = await antwort.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
+        var problem = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
         problem.Should().ContainKey("detail").And.ContainKey("status").And.ContainKey("title");
     }
 
     [Fact]
     public async Task Die_Cookies_heissen_und_liegen_wie_bei_Python()
     {
-        var antwort = await Anmelden(Browser(), _email, Passwort);
-        var kopfzeilen = antwort.Headers.GetValues("Set-Cookie").ToList();
+        var response = await Anmelden(Browser(), _email, Passwort);
+        var kopfzeilen = response.Headers.GetValues("Set-Cookie").ToList();
 
         var zugriff = kopfzeilen.Single(z => z.StartsWith("access=", StringComparison.Ordinal));
         var erneuerung = kopfzeilen.Single(z => z.StartsWith("refresh=", StringComparison.Ordinal));
@@ -179,9 +179,9 @@ public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_Erneuerungstoken_gibt_es_keine_Erneuerung()
     {
-        var antwort = await Browser().PostAsync("/auth/refresh", null);
+        var response = await Browser().PostAsync("/auth/refresh", null);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
@@ -193,16 +193,16 @@ public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
         var abgemeldet = await browser.PostAsync("/auth/logout", null);
         abgemeldet.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        var versuch = await browser.PostAsync("/auth/refresh", null);
-        versuch.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var attempt = await browser.PostAsync("/auth/refresh", null);
+        attempt.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
     public async Task Abmelden_ohne_Sitzung_ist_kein_Fehler()
     {
-        var antwort = await Browser().PostAsync("/auth/logout", null);
+        var response = await Browser().PostAsync("/auth/logout", null);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     /// <summary>

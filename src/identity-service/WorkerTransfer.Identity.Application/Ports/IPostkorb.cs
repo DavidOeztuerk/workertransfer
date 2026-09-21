@@ -41,7 +41,7 @@ public interface IPostkorb
     /// <param name="klartextToken">The token, in the clear. Only ever here and in the mail.</param>
     /// <param name="sprache">What to write in.</param>
     void Bestaetigungslink(
-        string an, SubjectId empfaenger, string klartextToken, Kontosprache sprache);
+        string an, SubjectId recipient, string klartextToken, Kontosprache language);
 
     /// <summary>
     /// "Somebody tried to register with your address."
@@ -54,7 +54,7 @@ public interface IPostkorb
     /// <param name="an">Where to send it.</param>
     /// <param name="empfaenger">Whose account it is.</param>
     /// <param name="sprache">What to write in.</param>
-    void Doppelanmeldung(string an, SubjectId empfaenger, Kontosprache sprache);
+    void Doppelanmeldung(string an, SubjectId recipient, Kontosprache language);
 
     /// <summary>
     /// "You have been invited into a company", with the link.
@@ -76,8 +76,8 @@ public interface IPostkorb
     /// account, so there is no row of theirs to read.
     /// </param>
     void Einladung(
-        string an, SubjectId einladender, string firma, string klartextToken,
-        Kontosprache sprache);
+        string an, SubjectId einladender, string company, string klartextToken,
+        Kontosprache language);
 
     /// <summary>"Your account is gone."</summary>
     /// <remarks>
@@ -95,7 +95,7 @@ public interface IPostkorb
     /// last thing that account ever receives, and it is written long after the
     /// request that asked for the deletion.
     /// </param>
-    void Loeschbestaetigung(string an, SubjectId wer, Kontosprache sprache);
+    void Loeschbestaetigung(string an, SubjectId subject, Kontosprache language);
 
     /// <summary>"There is something new for you." Nothing more.</summary>
     /// <remarks>
@@ -116,5 +116,5 @@ public interface IPostkorb
     /// <param name="an">Where to send it.</param>
     /// <param name="wer">Whose account it is. For the log.</param>
     /// <param name="sprache">What to write in.</param>
-    void Neuigkeit(string an, SubjectId wer, Kontosprache sprache);
+    void Neuigkeit(string an, SubjectId subject, Kontosprache language);
 }

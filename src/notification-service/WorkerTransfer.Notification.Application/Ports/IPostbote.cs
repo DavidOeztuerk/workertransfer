@@ -29,9 +29,9 @@ public interface IPostbote
 {
     /// <summary>„Sag dieser Person, dass es etwas Neues gibt."</summary>
     /// <remarks>
-    /// Wirft nicht. Ein Fehlschlag hier darf niemals den Vorgang kippen, der
+    /// Wirft nicht. Ein Fehlschlag hier darf niemals den Case kippen, der
     /// ihn ausgelöst hat — bei der Einwilligung geht es um Erlaubnis (im
     /// Zweifel nein), hier um Höflichkeit.
     /// </remarks>
-    Task SchickeAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task SendAsync(SubjectId subject, CancellationToken cancellationToken = default);
 }

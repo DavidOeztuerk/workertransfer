@@ -5,10 +5,10 @@ using Noelia.Core.Identity;
 using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.Advisor.Application.Gespraeche;
 using WorkerTransfer.Advisor.Application.Ports;
-using WorkerTransfer.Advisor.Application.Mandate;
+using WorkerTransfer.Advisor.Application.Mandates;
 using WorkerTransfer.Advisor.Contracts;
 using WorkerTransfer.Advisor.Domain.Gespraeche;
-using WorkerTransfer.Advisor.Domain.Mandate;
+using WorkerTransfer.Advisor.Domain.Mandates;
 using WorkerTransfer.Advisor.Infrastructure.Persistence;
 
 namespace WorkerTransfer.Advisor.Tests;
@@ -40,14 +40,14 @@ public class AuflagenTests
     /// <remarks>
     /// Die Liste aus ADR-0037 Entscheidung 1, plus die deutschen Zwillinge.
     /// Sichtbarkeit lebt im Ledger; eine Spalte hier wäre die zweite Wahrheit,
-    /// und sie liefe beim ersten Widerruf auseinander.
+    /// und sie liefe beim ersten Revocation auseinander.
     /// </remarks>
     private static readonly string[] Verboten =
     [
         "sichtbar", "visible", "public", "freigabe", "released", "stage", "stufe"
     ];
 
-    /// <summary>Keine Spalte des EF-Modells trägt ein solches Wort.</summary>
+    /// <summary>None Spalte des EF-Modells trägt ein solches Wort.</summary>
     /// <remarks>
     /// <para>Am <em>Modell</em> und nicht am Quelltext: eine Spalte kann aus
     /// einer Basisklasse oder einer Konvention kommen, und ein regulärer
@@ -56,23 +56,23 @@ public class AuflagenTests
     ///
     /// <para><c>stage</c> und <c>stufe</c> stehen mit auf der Liste, und das ist
     /// die schärfere Hälfte: eine Stufenspalte wäre die Sichtbarkeit als zweite
-    /// Tür neben dem Ledger, und ein Widerruf müsste dann an zwei Stellen
+    /// Tür neben dem Ledger, und ein Revocation müsste dann an zwei Jobs
     /// wirken — also irgendwann an einer nicht.</para>
     /// </remarks>
     [Fact]
     public void Keine_Spalte_haelt_eine_Sichtbarkeit()
     {
-        var spalten = Spalten();
+        var columns = Spalten();
 
-        spalten.Should().NotBeEmpty("sonst prüft dieser Test nichts");
+        columns.Should().NotBeEmpty("sonst prüft dieser Test nichts");
 
-        foreach (var spalte in spalten)
+        foreach (var column in columns)
         {
-            foreach (var wort in Verboten)
+            foreach (var word in Verboten)
             {
-                spalte.Contains(wort, StringComparison.OrdinalIgnoreCase)
+                column.Contains(word, StringComparison.OrdinalIgnoreCase)
                     .Should().BeFalse(
-                        $"'{spalte}' trägt '{wort}' — Sichtbarkeit lebt im Ledger "
+                        $"'{column}' trägt '{word}' — Sichtbarkeit lebt im Ledger "
                         + "(ADR-0020, ADR-0037 Entscheidung 1)");
             }
         }
@@ -86,11 +86,11 @@ public class AuflagenTests
     [InlineData("is_public", true)]
     [InlineData("stage", true)]
     [InlineData("sichtbar_fuer", true)]
-    public void Die_Erkennung_trennt_richtig(string spalte, bool erwartet) =>
-        Verboten.Any(wort => spalte.Contains(wort, StringComparison.OrdinalIgnoreCase))
+    public void Die_Erkennung_trennt_richtig(string column, bool erwartet) =>
+        Verboten.Any(word => column.Contains(word, StringComparison.OrdinalIgnoreCase))
             .Should().Be(erwartet);
 
-    /// <summary>Das Mandat trägt genau diese Werte — vier, und einen Zeitstempel.</summary>
+    /// <summary>Das Mandate trägt genau diese Werte — vier, und einen Zeitstempel.</summary>
     /// <remarks>
     /// Die geschlossene Feldmenge, nicht eine Verbotsliste: wer ein Feld
     /// ergänzt, schreibt es hier hin — und beantwortet dabei, ob es wirklich
@@ -99,11 +99,11 @@ public class AuflagenTests
     [Fact]
     public void Ein_Mandat_traegt_genau_diese_Felder()
     {
-        Felder(typeof(Mandat)).Should().BeEquivalentTo(
+        Felder(typeof(Mandate)).Should().BeEquivalentTo(
             "Wer", "Eintrittstermin", "GehaltMin", "GehaltMax", "PensumProzent",
             "AusgeschlosseneUnternehmen", "GeaendertAm", "Leer");
 
-        Felder(typeof(MandatV1)).Should().BeEquivalentTo(
+        Felder(typeof(MandateV1)).Should().BeEquivalentTo(
             "EntryMonth", "SalaryMin", "SalaryMax", "WorkloadPercent",
             "ExcludedDomains", "UpdatedAt");
     }
@@ -116,8 +116,8 @@ public class AuflagenTests
     /// </remarks>
     [Fact]
     public void Ein_Gespraech_traegt_genau_diese_Felder() =>
-        Felder(typeof(Gespraech)).Should().BeEquivalentTo(
-            "Id", "Wer", "Firma", "Stand", "Anlass", "EroeffnetAm", "GeaendertAm", "Laeuft");
+        Felder(typeof(Conversation)).Should().BeEquivalentTo(
+            "Id", "Wer", "Firma", "State", "Anlass", "EroeffnetAm", "GeaendertAm", "Laeuft");
 
     // ---------------------------------------------------------------------
     // AUFLAGE 2 — DIE STUFE KOMMT AUS DEM LEDGER, BEI JEDEM LESEN
@@ -125,7 +125,7 @@ public class AuflagenTests
 
     /// <summary>Jedes Lesen fragt den Ledger erneut.</summary>
     /// <remarks>
-    /// ADR-0013: ein Widerruf muss beim nächsten Lesen wirken. Ein
+    /// ADR-0013: ein Revocation muss beim nächsten Lesen wirken. Ein
     /// Zwischenspeicher wäre hier kein Leistungsdetail, sondern ein Regelbruch
     /// — und er fiele erst auf, wenn jemand zurückgezogen hat und trotzdem
     /// gesehen wird.
@@ -133,45 +133,45 @@ public class AuflagenTests
     [Fact]
     public async Task Jedes_Lesen_fragt_den_Ledger_erneut()
     {
-        var (gespraeche, mandate, tor, personen) = Aufbau();
-        await Eroeffne(gespraeche, tor);
+        var (conversations, mandate, tor, personen) = Aufbau();
+        await Eroeffne(conversations, tor);
 
-        var handler = new FirmengespraecheHandler(gespraeche, mandate, tor, personen);
+        var handler = new CompanyConversationsHandler(conversations, mandate, tor, personen);
 
         var vorher = tor.Fragen;
 
-        await handler.Handle(new FirmengespraecheAbfrage(new TenantId(Firma)), default);
-        await handler.Handle(new FirmengespraecheAbfrage(new TenantId(Firma)), default);
+        await handler.Handle(new CompanyConversationsQuery(new TenantId(Firma)), default);
+        await handler.Handle(new CompanyConversationsQuery(new TenantId(Firma)), default);
 
         (tor.Fragen - vorher).Should().Be(2);
     }
 
-    /// <summary>Eine Freigabe schreibt Ledger-Ereignisse — und zwar kumulativ.</summary>
+    /// <summary>Eine Release schreibt Ledger-Ereignisse — und zwar kumulativ.</summary>
     /// <remarks>
     /// Wer Stufe 3 freigibt, erteilt auch 1 und 2. Sonst stünde die neue
     /// Fähigkeit da, während die darunter fehlt, und ein Lesen ergäbe trotzdem
-    /// <c>Keine</c>: eine Stufe ist ein Stand und kein Sprung.
+    /// <c>None</c>: eine Stufe ist ein State und kein Sprung.
     /// </remarks>
     [Fact]
     public async Task Eine_Freigabe_erteilt_alles_bis_zu_ihrer_Stufe()
     {
-        var (gespraeche, _, tor, _) = Aufbau();
-        var gespraech = await Eroeffne(gespraeche, tor);
+        var (conversations, _, tor, _) = Aufbau();
+        var conversation = await Eroeffne(conversations, tor);
 
         tor.Selbst = Anna;
 
-        await new StufeFreigebenHandler(gespraeche, tor).Handle(
-            new StufeFreigebenBefehl(gespraech.Id, new SubjectId(Anna), Stufe.Person), default);
+        await new StufeFreigebenHandler(conversations, tor).Handle(
+            new StufeFreigebenBefehl(conversation.Id, new SubjectId(Anna), Stufe.Person), default);
 
-        var mandant = new TenantId(Firma);
+        var tenant = new TenantId(Firma);
 
         tor.Erteilungen.Should().BeEquivalentTo(
             [
-                Stufenfaehigkeiten.Profil(mandant),
-                Stufenfaehigkeiten.Markt(mandant),
-                Stufenfaehigkeiten.Lebenslauf(mandant),
-                Stufenfaehigkeiten.Unterlagen(mandant),
-                Stufenfaehigkeiten.Klarname(mandant)
+                StageCapabilities.Profile(tenant),
+                StageCapabilities.Markt(tenant),
+                StageCapabilities.Resume(tenant),
+                StageCapabilities.Unterlagen(tenant),
+                StageCapabilities.Klarname(tenant)
             ],
             "eine Stufe ist ein Stand: wer 3 freigibt, erteilt auch 1 und 2");
     }
@@ -189,40 +189,40 @@ public class AuflagenTests
     [Fact]
     public async Task Eine_Freigabe_macht_niemanden_fuer_alle_sichtbar()
     {
-        var (gespraeche, _, tor, _) = Aufbau();
-        var gespraech = await Eroeffne(gespraeche, tor);
+        var (conversations, _, tor, _) = Aufbau();
+        var conversation = await Eroeffne(conversations, tor);
 
         tor.Selbst = Anna;
 
-        await new StufeFreigebenHandler(gespraeche, tor).Handle(
-            new StufeFreigebenBefehl(gespraech.Id, new SubjectId(Anna), Stufe.Person), default);
+        await new StufeFreigebenHandler(conversations, tor).Handle(
+            new StufeFreigebenBefehl(conversation.Id, new SubjectId(Anna), Stufe.Person), default);
 
-        tor.Erteilungen.Should().NotContain(Stufenfaehigkeiten.ProfilOeffentlich);
+        tor.Erteilungen.Should().NotContain(StageCapabilities.ProfilOeffentlich);
         tor.Erteilungen.Should().NotContain("github.visibility:public");
     }
 
-    /// <summary>Ein Widerruf nimmt alles darüber mit — und wirkt sofort.</summary>
+    /// <summary>Ein Revocation nimmt alles darüber mit — und wirkt sofort.</summary>
     [Fact]
     public async Task Ein_Widerruf_nimmt_alles_darueber_mit()
     {
-        var (gespraeche, mandate, tor, personen) = Aufbau();
-        var gespraech = await Eroeffne(gespraeche, tor);
+        var (conversations, mandate, tor, personen) = Aufbau();
+        var conversation = await Eroeffne(conversations, tor);
 
         tor.Selbst = Anna;
-        tor.Stelle(Anna, Firma, Stufe.Person);
+        tor.Job(Anna, Firma, Stufe.Person);
 
-        var steht = await new StufeWiderrufenHandler(gespraeche, tor).Handle(
-            new StufeWiderrufenBefehl(gespraech.Id, new SubjectId(Anna), Stufe.Profil), default);
+        var steht = await new RevokeStageHandler(conversations, tor).Handle(
+            new RevokeStageCommand(conversation.Id, new SubjectId(Anna), Stufe.Profile), default);
 
-        steht.Should().Be(Stufe.Keine, "ein Widerruf wirkt bei der nächsten Anfrage");
+        steht.Should().Be(Stufe.None, "ein Widerruf wirkt bei der nächsten Anfrage");
 
-        tor.Widerrufe.Should().Contain(Stufenfaehigkeiten.Klarname(new TenantId(Firma)));
-        tor.Gruende.Should().OnlyContain(grund => grund == StufeWiderrufenHandler.Grund);
+        tor.Widerrufe.Should().Contain(StageCapabilities.Klarname(new TenantId(Firma)));
+        tor.Gruende.Should().OnlyContain(reason => reason == RevokeStageHandler.Grund);
 
-        // Und das Gespraech faellt damit aus der Liste des Unternehmens: eine
+        // Und das Conversation faellt damit aus der Liste des Unternehmens: eine
         // leere Zeile darin waere der „gesperrt"-Hinweis in Listenform.
-        var ihre = await new FirmengespraecheHandler(gespraeche, mandate, tor, personen)
-            .Handle(new FirmengespraecheAbfrage(new TenantId(Firma)), default);
+        var ihre = await new CompanyConversationsHandler(conversations, mandate, tor, personen)
+            .Handle(new CompanyConversationsQuery(new TenantId(Firma)), default);
 
         ihre.Should().BeEmpty();
     }
@@ -241,7 +241,7 @@ public class AuflagenTests
     [Fact]
     public void Auf_Stufe_eins_fehlen_die_Felder_der_hoeheren_Stufen()
     {
-        var json = Draht(Stufe.Profil);
+        var json = Draht(Stufe.Profile);
 
         json.Should().Contain("\"entry_month\"");
         json.Should().Contain("\"workload_percent\"");
@@ -292,8 +292,8 @@ public class AuflagenTests
     [Fact]
     public void Freigegeben_ohne_Angabe_sieht_aus_wie_nicht_freigegeben()
     {
-        var ohneFreigabe = Draht(Stufe.Profil, mandat: Voll());
-        var freiAberLeer = Draht(Stufe.Unterlagen, mandat: Ohne_Gehalt());
+        var ohneFreigabe = Draht(Stufe.Profile, mandate: Voll());
+        var freiAberLeer = Draht(Stufe.Unterlagen, mandate: Ohne_Gehalt());
 
         // Beide duerfen kein Gehaltsfeld tragen — aus zwei verschiedenen
         // Gruenden, und das darf man ihnen nicht ansehen.
@@ -311,7 +311,7 @@ public class AuflagenTests
     /// <remarks>
     /// <para><strong>Hier hängt die Abnahme.</strong> „Der jetzige Arbeitgeber
     /// sieht die eigene Belegschaft nicht im Scout" wird nicht durch ein zweites
-    /// Tor im Scout eingelöst — das wäre eine zweite Stelle, an der über
+    /// Tor im Scout eingelöst — das wäre eine zweite Job, an der über
     /// Sichtbarkeit entschieden wird — sondern im Ledger selbst.</para>
     ///
     /// <para>Der Ledger kennt keine Verneinung: „sichtbar für alle, aber nicht
@@ -327,23 +327,23 @@ public class AuflagenTests
         tor.Selbst = Anna;
         tor.Oeffentlich(Anna, true);
 
-        await new MandatSchreibenHandler(mandate, tor, TimeProvider.System).Handle(
-            new MandatSchreibenBefehl(
+        await new WriteMandateHandler(mandate, tor, TimeProvider.System).Handle(
+            new WriteMandateCommand(
                 new SubjectId(Anna), null, null, null, null, ["arbeitgeber.test"]),
             default);
 
         tor.Widerrufe.Should().ContainSingle()
-            .Which.Should().Be(Stufenfaehigkeiten.ProfilOeffentlich);
+            .Which.Should().Be(StageCapabilities.ProfilOeffentlich);
 
         tor.Gruende.Should().OnlyContain(
-            grund => grund == MandatSchreibenHandler.Widerrufsgrund);
+            reason => reason == WriteMandateHandler.Widerrufsgrund);
     }
 
     /// <summary>Ohne Ausschluss wird nichts widerrufen.</summary>
     /// <remarks>
-    /// Die Gegenprobe: ein Mandat ohne Ausschluss darf die öffentliche
+    /// Die Gegenprobe: ein Mandate ohne Ausschluss darf die öffentliche
     /// Sichtbarkeit nicht anrühren. Wer sein Gehalt einträgt, verschwindet damit
-    /// nicht aus der Suche.
+    /// nicht aus der Search.
     /// </remarks>
     [Fact]
     public async Task Ohne_Ausschluss_bleibt_die_Sichtbarkeit_unangetastet()
@@ -352,8 +352,8 @@ public class AuflagenTests
         tor.Selbst = Anna;
         tor.Oeffentlich(Anna, true);
 
-        await new MandatSchreibenHandler(mandate, tor, TimeProvider.System).Handle(
-            new MandatSchreibenBefehl(new SubjectId(Anna), "2026-11", 4000, 5000, 80, null),
+        await new WriteMandateHandler(mandate, tor, TimeProvider.System).Handle(
+            new WriteMandateCommand(new SubjectId(Anna), "2026-11", 4000, 5000, 80, null),
             default);
 
         tor.Widerrufe.Should().BeEmpty();
@@ -368,26 +368,26 @@ public class AuflagenTests
     [Fact]
     public async Task Ein_ausgeschlossenes_Unternehmen_bekommt_dieselbe_Antwort()
     {
-        var (gespraeche, mandate, tor, _) = Aufbau();
-        var firmen = new Probefirmen();
-        firmen.Domains[Firma] = "arbeitgeber.test";
+        var (conversations, mandate, tor, _) = Aufbau();
+        var companies = new Probefirmen();
+        companies.Domains[Firma] = "arbeitgeber.test";
 
-        tor.Stelle(Anna, Firma, Stufe.Profil);
+        tor.Job(Anna, Firma, Stufe.Profile);
 
-        await mandate.SichereAsync(
-            Mandat.Schreibe(
+        await mandate.SaveAsync(
+            Mandate.Write(
                 new SubjectId(Anna), null, null, null, null, ["arbeitgeber.test"],
                 DateTimeOffset.UtcNow),
             default);
 
-        var handler = new GespraechEroeffnenHandler(
-            gespraeche, mandate, tor, firmen, new Probeausgang(), TimeProvider.System);
+        var handler = new OpenConversationHandler(
+            conversations, mandate, tor, companies, new Probeausgang(), TimeProvider.System);
 
         var tat = async () => await handler.Handle(
-            new GespraechEroeffnenBefehl(new SubjectId(Anna), new TenantId(Firma), "Hallo"),
+            new OpenConversationCommand(new SubjectId(Anna), new TenantId(Firma), "Hallo"),
             default);
 
-        (await tat.Should().ThrowAsync<KeinGespraech>())
+        (await tat.Should().ThrowAsync<NoConversation>())
             .Which.Message.Should().Be("No such conversation");
     }
 
@@ -400,18 +400,18 @@ public class AuflagenTests
     [Fact]
     public async Task Ohne_Ausschluss_wird_nicht_nach_der_Domain_gefragt()
     {
-        var (gespraeche, mandate, tor, _) = Aufbau();
-        var firmen = new Probefirmen();
+        var (conversations, mandate, tor, _) = Aufbau();
+        var companies = new Probefirmen();
 
-        tor.Stelle(Anna, Firma, Stufe.Profil);
+        tor.Job(Anna, Firma, Stufe.Profile);
 
-        await new GespraechEroeffnenHandler(
-                gespraeche, mandate, tor, firmen, new Probeausgang(), TimeProvider.System)
+        await new OpenConversationHandler(
+                conversations, mandate, tor, companies, new Probeausgang(), TimeProvider.System)
             .Handle(
-                new GespraechEroeffnenBefehl(new SubjectId(Anna), new TenantId(Firma), "Hallo"),
+                new OpenConversationCommand(new SubjectId(Anna), new TenantId(Firma), "Hallo"),
                 default);
 
-        firmen.Fragen.Should().Be(0);
+        companies.Fragen.Should().Be(0);
     }
 
     // ---------------------------------------------------------------------
@@ -426,9 +426,9 @@ public class AuflagenTests
     /// Verhaltenstest beantwortet „passiert es heute nicht?", dieser verlangt,
     /// dass wer eine Marktregel hierher kopiert, sie hier hinschreibt.</para>
     ///
-    /// <para>Ansprechbarkeit, Marktstatus, Arbeitgeberfreigabe, Ablöse: alles
+    /// <para>Ansprechbarkeit, MarketStatus, Arbeitgeberfreigabe, Ablöse: alles
     /// das steht in transfer-service, und die Übergabe ruft dessen Tür. Eine
-    /// zweite Stelle, die diese Regeln kennt, wäre die, die als Erste
+    /// zweite Job, die diese Regeln kennt, wäre die, die als Erste
     /// veraltet.</para>
     /// </remarks>
     [Fact]
@@ -440,17 +440,17 @@ public class AuflagenTests
             "abloese", "gebuehr", "brauchtfreigabe"
         };
 
-        var namen = Namen(typeof(GespraechEroeffnenBefehl).Assembly)
-            .Concat(Namen(typeof(Gespraech).Assembly))
+        var namen = Namen(typeof(OpenConversationCommand).Assembly)
+            .Concat(Namen(typeof(Conversation).Assembly))
             .ToArray();
 
         namen.Should().NotBeEmpty("sonst prüft der Test nichts");
 
         foreach (var name in namen)
         {
-            foreach (var wort in verdaechtig)
+            foreach (var word in verdaechtig)
             {
-                name.Contains(wort, StringComparison.OrdinalIgnoreCase)
+                name.Contains(word, StringComparison.OrdinalIgnoreCase)
                     .Should().BeFalse(
                         $"'{name}' baut eine Regel nach, die in transfer-service steht "
                         + "(ADR-0037 Entscheidung 4)");
@@ -462,53 +462,53 @@ public class AuflagenTests
     [Fact]
     public async Task Uebergeben_geht_erst_nach_der_Zustimmung()
     {
-        var (gespraeche, _, tor, _) = Aufbau();
-        var gespraech = await Eroeffne(gespraeche, tor);
-        var uebergabe = new Probeuebergabe();
+        var (conversations, _, tor, _) = Aufbau();
+        var conversation = await Eroeffne(conversations, tor);
+        var handover = new Probeuebergabe();
 
-        var handler = new UebergebenHandler(gespraeche, uebergabe, TimeProvider.System);
+        var handler = new UebergebenHandler(conversations, handover, TimeProvider.System);
 
         var zuFrueh = async () => await handler.Handle(
-            new UebergebenBefehl(gespraech.Id, new TenantId(Firma)), default);
+            new UebergebenBefehl(conversation.Id, new TenantId(Firma)), default);
 
         await zuFrueh.Should().ThrowAsync<UebergangNichtErlaubt>();
-        uebergabe.Uebergeben.Should().BeEmpty();
+        handover.Uebergeben.Should().BeEmpty();
 
-        await new ZustimmenHandler(gespraeche, tor, TimeProvider.System).Handle(
-            new ZustimmenBefehl(gespraech.Id, new SubjectId(Anna)), default);
+        await new ZustimmenHandler(conversations, tor, TimeProvider.System).Handle(
+            new ZustimmenBefehl(conversation.Id, new SubjectId(Anna)), default);
 
-        var vorgang = await handler.Handle(
-            new UebergebenBefehl(gespraech.Id, new TenantId(Firma)), default);
+        var caseItem = await handler.Handle(
+            new UebergebenBefehl(conversation.Id, new TenantId(Firma)), default);
 
-        vorgang.Should().Be(uebergabe.Vorgang);
-        uebergabe.Uebergeben.Should().Equal(Anna);
+        caseItem.Should().Be(handover.Case);
+        handover.Uebergeben.Should().Equal(Anna);
     }
 
     /// <summary>Lehnt transfer-service ab, bleibt das Gespräch stehen.</summary>
     /// <remarks>
     /// Erst schreiben, wenn es geklappt hat: andersherum stünde hier
-    /// „übergeben" und dort nichts — und niemand fände den Vorgang, den beide
+    /// „übergeben" und dort nichts — und niemand fände den Case, den beide
     /// Seiten für gemacht halten.
     /// </remarks>
     [Fact]
     public async Task Eine_abgelehnte_Uebergabe_laesst_das_Gespraech_stehen()
     {
-        var (gespraeche, _, tor, _) = Aufbau();
-        var gespraech = await Eroeffne(gespraeche, tor);
+        var (conversations, _, tor, _) = Aufbau();
+        var conversation = await Eroeffne(conversations, tor);
 
-        await new ZustimmenHandler(gespraeche, tor, TimeProvider.System).Handle(
-            new ZustimmenBefehl(gespraech.Id, new SubjectId(Anna)), default);
+        await new ZustimmenHandler(conversations, tor, TimeProvider.System).Handle(
+            new ZustimmenBefehl(conversation.Id, new SubjectId(Anna)), default);
 
-        var uebergabe = new Probeuebergabe { LehntAb = true };
+        var handover = new Probeuebergabe { LehntAb = true };
 
         var tat = async () => await new UebergebenHandler(
-                gespraeche, uebergabe, TimeProvider.System)
-            .Handle(new UebergebenBefehl(gespraech.Id, new TenantId(Firma)), default);
+                conversations, handover, TimeProvider.System)
+            .Handle(new UebergebenBefehl(conversation.Id, new TenantId(Firma)), default);
 
-        await tat.Should().ThrowAsync<UebergabeAbgelehnt>();
+        await tat.Should().ThrowAsync<HandoverRefused>();
 
-        (await gespraeche.HoleAsync(gespraech.Id))!.Stand
-            .Should().Be(Gespraechsstand.Zugestimmt);
+        (await conversations.GetAsync(conversation.Id))!.State
+            .Should().Be(ConversationState.Zugestimmt);
     }
 
     // ---------------------------------------------------------------------
@@ -525,38 +525,38 @@ public class AuflagenTests
     [Fact]
     public async Task Der_Klarname_wird_erst_ab_Stufe_drei_geholt()
     {
-        var (gespraeche, mandate, tor, personen) = Aufbau();
-        var gespraech = await Eroeffne(gespraeche, tor);
+        var (conversations, mandate, tor, personen) = Aufbau();
+        var conversation = await Eroeffne(conversations, tor);
 
-        var handler = new FirmengespraecheHandler(gespraeche, mandate, tor, personen);
+        var handler = new CompanyConversationsHandler(conversations, mandate, tor, personen);
 
-        await handler.Handle(new FirmengespraecheAbfrage(new TenantId(Firma)), default);
+        await handler.Handle(new CompanyConversationsQuery(new TenantId(Firma)), default);
         personen.Gefragt.Should().BeEmpty("auf Stufe 1 gibt es keinen Klarnamen zu holen");
 
-        tor.Stelle(Anna, Firma, Stufe.Person);
+        tor.Job(Anna, Firma, Stufe.Person);
         personen.Bestand[Anna] = new Application.Ports.Personenbild("Anna Beispiel", "a@b.test");
 
         var ihre = await handler.Handle(
-            new FirmengespraecheAbfrage(new TenantId(Firma)), default);
+            new CompanyConversationsQuery(new TenantId(Firma)), default);
 
         personen.Gefragt.Should().Equal(Anna);
         ihre.Should().ContainSingle().Which.Name.Should().Be("Anna Beispiel");
-        gespraech.Wer.Value.Should().Be(Anna);
+        conversation.Wer.Value.Should().Be(Anna);
     }
 
     // ---------------------------------------------------------------------
 
     /// <summary>Die öffentlichen Instanzeigenschaften eines Typs.</summary>
-    private static string[] Felder(Type typ) =>
-        [.. typ.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(e => e.Name)];
+    private static string[] Felder(Type type) =>
+        [.. type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(e => e.Name)];
 
     private static string[] Namen(Assembly assembly) =>
         [.. assembly.GetExportedTypes()
-            .SelectMany(typ => typ.GetMembers(
+            .SelectMany(type => type.GetMembers(
                     BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static |
                     BindingFlags.DeclaredOnly)
-                .Select(glied => $"{typ.Name}.{glied.Name}")
-                .Append(typ.Name))
+                .Select(glied => $"{type.Name}.{glied.Name}")
+                .Append(type.Name))
             .Distinct()];
 
     /// <summary>Jede Spalte, die dieses Modell wirklich anlegt.</summary>
@@ -565,34 +565,34 @@ public class AuflagenTests
         var bauer = new DbContextOptionsBuilder<AdvisorDbContext>();
         AdvisorDbContextFactory.ZurEntwurfszeit(bauer, "Host=pruefstand;Database=advisor");
 
-        using var kontext = new AdvisorDbContext(bauer.Options);
+        using var context = new AdvisorDbContext(bauer.Options);
 
-        return [.. kontext.Model.GetEntityTypes()
-            .SelectMany(typ => typ.GetProperties())
+        return [.. context.Model.GetEntityTypes()
+            .SelectMany(type => type.GetProperties())
             .Select(eigenschaft => eigenschaft.GetColumnName())
             .Distinct(StringComparer.Ordinal)];
     }
 
     /// <summary>Was für diese Stufe wirklich auf dem Draht steht.</summary>
-    private static string Draht(Stufe stufe, Mandat? mandat = null)
+    private static string Draht(Stufe stage, Mandate? mandate = null)
     {
-        var gespraech = Gespraech.Eroeffne(
+        var conversation = Conversation.Eroeffne(
             new SubjectId(Anna), new TenantId(Firma), "Hallo", DateTimeOffset.UtcNow);
 
-        var ansicht = Gespraechsansicht.Baue(
-            gespraech,
-            stufe,
-            mandat ?? Voll(),
+        var ansicht = ConversationView.Build(
+            conversation,
+            stage,
+            mandate ?? Voll(),
             new Application.Ports.Personenbild("Anna Beispiel", "anna@beispiel.test"));
 
-        return JsonSerializer.Serialize(new GespraechV1(
-            ansicht.Gespraech.Id,
-            ansicht.Gespraech.Wer.Value,
-            Gespraechsstaende.Wort(ansicht.Gespraech.Stand),
-            Stufenfaehigkeiten.Zahl(ansicht.Stufe),
-            ansicht.Gespraech.Anlass,
-            ansicht.Gespraech.EroeffnetAm,
-            ansicht.Gespraech.GeaendertAm)
+        return JsonSerializer.Serialize(new ConversationV1(
+            ansicht.Conversation.Id,
+            ansicht.Conversation.Wer.Value,
+            ConversationStates.Wort(ansicht.Conversation.State),
+            StageCapabilities.Zahl(ansicht.Stufe),
+            ansicht.Conversation.Anlass,
+            ansicht.Conversation.EroeffnetAm,
+            ansicht.Conversation.GeaendertAm)
         {
             EntryMonth = ansicht.Eintrittstermin,
             WorkloadPercent = ansicht.PensumProzent,
@@ -603,26 +603,26 @@ public class AuflagenTests
         });
     }
 
-    private static Mandat Voll() =>
-        Mandat.Schreibe(
+    private static Mandate Voll() =>
+        Mandate.Write(
             new SubjectId(Anna), "2026-11", 4000, 5000, 80, [], DateTimeOffset.UtcNow);
 
-    private static Mandat Ohne_Gehalt() =>
-        Mandat.Schreibe(
+    private static Mandate Ohne_Gehalt() =>
+        Mandate.Write(
             new SubjectId(Anna), "2026-11", null, null, 80, [], DateTimeOffset.UtcNow);
 
     private static (Probegespraeche, Probemandate, Probetor, Probepersonen) Aufbau() =>
         (new Probegespraeche(), new Probemandate(), new Probetor(), new Probepersonen());
 
-    private static async Task<Gespraech> Eroeffne(Probegespraeche gespraeche, Probetor tor)
+    private static async Task<Conversation> Eroeffne(Probegespraeche conversations, Probetor tor)
     {
-        tor.Stelle(Anna, Firma, Stufe.Profil);
+        tor.Job(Anna, Firma, Stufe.Profile);
 
-        var gespraech = Gespraech.Eroeffne(
+        var conversation = Conversation.Eroeffne(
             new SubjectId(Anna), new TenantId(Firma), "Hallo", DateTimeOffset.UtcNow);
 
-        await gespraeche.SichereAsync(gespraech);
+        await conversations.SaveAsync(conversation);
 
-        return gespraech;
+        return conversation;
     }
 }

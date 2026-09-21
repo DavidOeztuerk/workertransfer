@@ -14,11 +14,11 @@ namespace WorkerTransfer.Profile.Application.Entwurf;
 /// nichts geschrieben, also darf auch keine Transaktion aufgehen. Der Entwurf
 /// lebt im Formular, bis die Person ihn speichert — und dann ist es ihr Text.
 /// </remarks>
-public sealed record EntwurfAbfrage(SubjectId Wer, string Wunsch) : IAbfrage<string>;
+public sealed record DraftQuery(SubjectId Wer, string Wunsch) : IAbfrage<string>;
 
-/// <summary>Baut den Prompt aus dem GESPEICHERTEN Profil und fragt den Anbieter.</summary>
+/// <summary>Baut den Prompt aus dem GESPEICHERTEN PersonProfile und fragt den Anbieter.</summary>
 /// <remarks>
-/// Aus dem gespeicherten Profil, nicht aus der Anfrage: was der Aufrufer nicht
+/// Aus dem gespeicherten PersonProfile, nicht aus der ResumeRequest: was der Aufrufer nicht
 /// schicken kann, kann er nicht in einen fremden Dienst schleusen. Der Wunsch
 /// ist die einzige Zeile, die er beisteuert, und sie ist an ihn selbst
 /// gerichtet.
@@ -28,23 +28,23 @@ public sealed record EntwurfAbfrage(SubjectId Wer, string Wunsch) : IAbfrage<str
 /// einen Menschen, die niemand braucht und die ihn überdauert.
 /// </para>
 /// </remarks>
-public sealed class EntwurfHandler(IProfilspeicher speicher, IEntwerfer entwerfer)
-    : IRequestHandler<EntwurfAbfrage, string>
+public sealed class DraftHandler(IProfileStore store, IDrafter entwerfer)
+    : IRequestHandler<DraftQuery, string>
 {
     /// <inheritdoc />
     /// <exception cref="EntwurfNichtVerfuegbar">Kein Anbieter, oder er schweigt.</exception>
-    public async Task<string> Handle(EntwurfAbfrage request, CancellationToken cancellationToken)
+    public async Task<string> Handle(DraftQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var profil = await speicher.HoleAsync(request.Wer, cancellationToken);
+        var profile = await store.GetAsync(request.Wer, cancellationToken);
 
-        var lage = new Entwurfslage(
-            profil?.Ueberschrift ?? string.Empty,
-            profil?.Text ?? string.Empty,
-            profil?.Faehigkeiten.Werte ?? [],
+        var lage = new DraftSituation(
+            profile?.Ueberschrift ?? string.Empty,
+            profile?.Text ?? string.Empty,
+            profile?.Faehigkeiten.Werte ?? [],
             request.Wunsch);
 
-        return await entwerfer.EntwirfAsync(lage, cancellationToken);
+        return await entwerfer.DraftAsync(lage, cancellationToken);
     }
 }

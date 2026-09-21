@@ -6,82 +6,82 @@ using WorkerTransfer.Transfer.Domain.Markt;
 
 namespace WorkerTransfer.Transfer.Application.Markt;
 
-/// <summary>Den eigenen Marktstatus schreiben.</summary>
-public sealed record MarktstatusSichernBefehl(
+/// <summary>Den eigenen MarketStatus schreiben.</summary>
+public sealed record SaveMarketStatusCommand(
     SubjectId Wer,
     Verfuegbarkeit Verfuegbarkeit,
     bool Beschaeftigt,
-    string Notiz) : IBefehl<Marktstatus>;
+    string Notiz) : IBefehl<MarketStatus>;
 
-/// <summary>Der eigene Marktstatus.</summary>
+/// <summary>Der eigene MarketStatus.</summary>
 /// <remarks>
-/// Nie <c>null</c>. Anders als beim Profil: dort ist „noch keins" ein leeres
+/// Nie <c>null</c>. Anders als beim Profile: dort ist „noch keins" ein leeres
 /// Formular, hier ist „nichts gesagt" ein echter Zustand mit einer Bedeutung —
 /// nicht verfügbar. Ein <c>null</c> würde die Oberfläche zwingen, sich eine
 /// Voreinstellung auszudenken, und die Gefahr ist, dass sie sich die falsche
 /// ausdenkt.
 /// </remarks>
-public sealed record MeinMarktstatusAbfrage(SubjectId Wer) : IAbfrage<Marktstatus>;
+public sealed record MyMarketStatusQuery(SubjectId Wer) : IAbfrage<MarketStatus>;
 
-/// <summary>Der Marktstatus einer anderen Person — wenn er freigegeben ist.</summary>
-public sealed record SichtbarerMarktstatusAbfrage(SubjectId Wer, TenantId Firma)
-    : IAbfrage<Marktstatus?>;
+/// <summary>Der MarketStatus einer anderen Person — wenn er freigegeben ist.</summary>
+public sealed record VisibleMarketStatusQuery(SubjectId Wer, TenantId Firma)
+    : IAbfrage<MarketStatus?>;
 
-/// <summary>Schreibt und liest den Marktstatus.</summary>
-public sealed class Marktbefehle(
-    IMarktspeicher speicher,
-    IEinwilligungstor tor,
+/// <summary>Schreibt und liest den MarketStatus.</summary>
+public sealed class MarketCommands(
+    IMarketStore store,
+    IConsentGate tor,
     TimeProvider uhr) :
-    IRequestHandler<MarktstatusSichernBefehl, Marktstatus>,
-    IRequestHandler<MeinMarktstatusAbfrage, Marktstatus>,
-    IRequestHandler<SichtbarerMarktstatusAbfrage, Marktstatus?>
+    IRequestHandler<SaveMarketStatusCommand, MarketStatus>,
+    IRequestHandler<MyMarketStatusQuery, MarketStatus>,
+    IRequestHandler<VisibleMarketStatusQuery, MarketStatus?>
 {
     /// <inheritdoc />
-    public async Task<Marktstatus> Handle(
-        MarktstatusSichernBefehl request, CancellationToken cancellationToken)
+    public async Task<MarketStatus> Handle(
+        SaveMarketStatusCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var jetzt = uhr.GetUtcNow();
-        var vorhanden = await speicher.HoleAsync(request.Wer, cancellationToken);
-        Marktstatus status;
+        var now = uhr.GetUtcNow();
+        var vorhanden = await store.GetAsync(request.Wer, cancellationToken);
+        MarketStatus status;
 
         if (vorhanden is null)
         {
-            status = Marktstatus.Lege_an(
+            status = MarketStatus.Lege_an(
                 request.Wer, request.Verfuegbarkeit, request.Beschaeftigt,
-                request.Notiz, jetzt);
+                request.Notiz, now);
         }
         else
         {
             vorhanden.Aendere(
-                request.Verfuegbarkeit, request.Beschaeftigt, request.Notiz, jetzt);
+                request.Verfuegbarkeit, request.Beschaeftigt, request.Notiz, now);
 
             status = vorhanden;
         }
 
-        await speicher.SichereAsync(status, cancellationToken);
+        await store.SaveAsync(status, cancellationToken);
 
         return status;
     }
 
     /// <inheritdoc />
-    public async Task<Marktstatus> Handle(
-        MeinMarktstatusAbfrage request, CancellationToken cancellationToken)
+    public async Task<MarketStatus> Handle(
+        MyMarketStatusQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return await speicher.HoleAsync(request.Wer, cancellationToken)
-               ?? Marktstatus.Voreingestellt(request.Wer, uhr.GetUtcNow());
+        return await store.GetAsync(request.Wer, cancellationToken)
+               ?? MarketStatus.Voreingestellt(request.Wer, uhr.GetUtcNow());
     }
 
     /// <inheritdoc />
-    public async Task<Marktstatus?> Handle(
-        SichtbarerMarktstatusAbfrage request, CancellationToken cancellationToken)
+    public async Task<MarketStatus?> Handle(
+        VisibleMarketStatusQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var status = await speicher.HoleAsync(request.Wer, cancellationToken);
+        var status = await store.GetAsync(request.Wer, cancellationToken);
 
         if (status is null)
         {
@@ -91,11 +91,11 @@ public sealed class Marktbefehle(
             return null;
         }
 
-        // EinwilligungSchweigt fliegt bewusst durch: der Endpunkt macht daraus
+        // ConsentGateSilent fliegt bewusst durch: der Endpunkt macht daraus
         // 503. Nicht vorhanden und nicht freigegeben sind dagegen von außen
         // dasselbe — hier zählt das doppelt, denn schon die Existenz der
         // Aussage „diese Person hört zu" kann Schaden anrichten.
-        return await tor.DarfMarktSehenAsync(request.Wer, request.Firma, cancellationToken)
+        return await tor.MaySeeMarketAsync(request.Wer, request.Firma, cancellationToken)
             ? status
             : null;
     }

@@ -7,15 +7,15 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using WorkerTransfer.GitHub.Application.Behaviors;
 using WorkerTransfer.GitHub.Application.Ports;
-using WorkerTransfer.GitHub.Application.Verbindungen;
-using WorkerTransfer.GitHub.Domain.Verbindungen;
+using WorkerTransfer.GitHub.Application.Connections;
+using WorkerTransfer.GitHub.Domain.Connections;
 using WorkerTransfer.GitHub.Infrastructure.Einwilligung;
-using WorkerTransfer.GitHub.Infrastructure.Loeschung;
+using WorkerTransfer.GitHub.Infrastructure.Erasure;
 using WorkerTransfer.GitHub.Infrastructure.Netz;
 using WorkerTransfer.GitHub.Infrastructure.Persistence;
 using WorkerTransfer.GitHub.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.GitHub.Contracts;
 using Noelia.Abstractions.Security.Checks;
 
@@ -30,7 +30,7 @@ namespace WorkerTransfer.GitHub.Infrastructure;
 public static class GitHubInfrastructure
 {
     /// <param name="services">Der Behälter.</param>
-    /// <param name="configuration">Woher Ledger, GitHub und Geheimnisse kommen.</param>
+    /// <param name="configuration">Woher Ledger, GitHub und Secrets kommen.</param>
     /// <param name="connectionString">Wo die GitHub-Datenbank liegt.</param>
     public static IServiceCollection AddGitHubInfrastructure(
         this IServiceCollection services,
@@ -40,39 +40,39 @@ public static class GitHubInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Einwilligungseinstellungen>(
-            configuration.GetSection(Einwilligungseinstellungen.Abschnitt));
-        services.Configure<GitHubeinstellungen>(
-            configuration.GetSection(GitHubeinstellungen.Abschnitt));
-        services.Configure<GitHubAnmeldeeinstellungen>(
-            configuration.GetSection(GitHubAnmeldeeinstellungen.Abschnitt));
-        services.Configure<Loescheinstellungen>(
-            configuration.GetSection(Loescheinstellungen.Abschnitt));
+        services.Configure<ConsentSettings>(
+            configuration.GetSection(ConsentSettings.Section));
+        services.Configure<GitHubSettings>(
+            configuration.GetSection(GitHubSettings.Section));
+        services.Configure<GitHubSignInSettings>(
+            configuration.GetSection(GitHubSignInSettings.Section));
+        services.Configure<ErasureSettings>(
+            configuration.GetSection(ErasureSettings.Section));
 
 
-        services.AddSingleton(_ => GitHubDbContextFactory.Datenquelle(connectionString));
+        services.AddSingleton(_ => GitHubDbContextFactory.DataSource(connectionString));
         services.AddDbContext<GitHubDbContext>((provider, options) =>
-            GitHubDbContextFactory.Konfiguriere(
+            GitHubDbContextFactory.Configure(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<GitHubDbContext>("github");
-        services.AddSchluesselbund<GitHubDbContext>();
+        services.AddDatabaseReadiness<GitHubDbContext>("github");
+        services.AddKeyRing<GitHubDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddScoped<IVerbindungsspeicher, EfVerbindungsspeicher>();
+        services.AddScoped<IConnectionStore, EfConnectionStore>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-        services.AddScoped<ILoeschbestand, EfLoeschbestand>();
-        services.AddScoped<IEinwilligungstor, HttpEinwilligungstor>();
+        services.AddScoped<IErasureLedger, EfErasureLedger>();
+        services.AddScoped<IConsentGate, HttpConsentGate>();
         services.AddScoped<IAufrufertoken, HttpAufrufertoken>();
         services.AddScoped<IGitHub, HttpGitHub>();
         // Ohne Zugangsdaten meldet sie sich als „nicht eingerichtet", und der
         // Gist bleibt der Weg. Registriert wird sie trotzdem — ein Dienst, der
         // je nach Konfiguration andere Abhängigkeiten hat, fällt erst beim
         // ersten Aufruf um statt beim Start.
-        services.AddScoped<IGitHubAnmeldung, HttpGitHubAnmeldung>();
+        services.AddScoped<IGitHubSignIn, HttpGitHubSignIn>();
 
-        services.AddCQRS(typeof(VerbindenBefehl).Assembly);
+        services.AddCQRS(typeof(ConnectCommand).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
 
         Nachweis(services, configuration);
@@ -82,43 +82,43 @@ public static class GitHubInfrastructure
 
     /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
+    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
     /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
     /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
     ///
     /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
     /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
+    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
     /// vergessen kann.</para>
     /// </remarks>
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(Loginfehler).Assembly, typeof(RepositoryV1).Assembly]));
 
-        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
+        // None KI-Naht: `ProviderCheck` ohne Quelle meldet NichtAnwendbar,
         // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
         // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
         // durchschneiden soll.
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
 
         // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
         // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
         // Zwischenspeicher davor faellt niemandem auf, weil alles
-        // weiterfunktioniert, nur eben mit dem Stand von vorhin.
-        services.AddSingleton<ISecurityCheck>(anbieter =>
-            new Widerrufspruefung<IEinwilligungstor>(
-                anbieter, typeof(HttpEinwilligungstor)));
+        // weiterfunktioniert, nur eben mit dem State von vorhin.
+        services.AddSingleton<ISecurityCheck>(provider =>
+            new RevocationCheck<IConsentGate>(
+                provider, typeof(HttpConsentGate)));
 
-        var loeschung = new Loescheinstellungen();
-        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+        var erasure = new ErasureSettings();
+        configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsEmpfaenger(
             "github",
-            !string.IsNullOrEmpty(loeschung.Geheimnis),
+            !string.IsNullOrEmpty(erasure.Geheimnis),
             pruefspurVorhanden: false));
     }
 }

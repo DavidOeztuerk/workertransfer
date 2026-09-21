@@ -50,11 +50,11 @@ public class DrahtnamenTests(Postgres postgres) : IAsyncLifetime
 
     private WebApplicationFactory<Program> _dienst = null!;
 
-    /// <summary>Der Versand geht in eine Liste, nicht in ein echtes Postfach.</summary>
+    /// <summary>Der Versand geht in eine Liste, nicht in ein echtes Inbox.</summary>
     /// <remarks>
     /// Ohne Ersatz läuft der echte <c>SmtpVersender</c> gegen die Vorgabe
     /// <c>localhost:1025</c> — also gegen das Mailpit des Entwicklers. Eine
-    /// Testreihe darf nichts in eine Umgebung schreiben, die ein Mensch ansieht.
+    /// Testreihe darf nichts in eine EnvironmentFile schreiben, die ein Mensch ansieht.
     /// </remarks>
     private readonly Postmitschrift _post = new();
 
@@ -66,17 +66,17 @@ public class DrahtnamenTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
         });
 
-        using var bereich = _dienst.Services.CreateScope();
-        await bereich.ServiceProvider.GetRequiredService<IdentityDbContext>()
+        using var scope = _dienst.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IdentityDbContext>()
             .Database.MigrateAsync();
     }
 
@@ -103,7 +103,7 @@ public class DrahtnamenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Der_Rumpf_der_Oberflaeche_wird_angenommen()
     {
-        using var inhalt = new StringContent(
+        using var content = new StringContent(
             $$"""
             {"email":"{{NeueAdresse()}}","password":"geheim-und-lang-genug",
              "display_name":"Anna"}
@@ -111,9 +111,9 @@ public class DrahtnamenTests(Postgres postgres) : IAsyncLifetime
             System.Text.Encoding.UTF8,
             "application/json");
 
-        var antwort = await Browser().PostAsync("/auth/register", inhalt);
+        var response = await Browser().PostAsync("/auth/register", content);
 
-        antwort.StatusCode.Should().Be(
+        response.StatusCode.Should().Be(
             HttpStatusCode.Created,
             "die Oberflaeche schickt display_name, und der Draht dieser "
             + "Plattform ist snake_case");
@@ -123,7 +123,7 @@ public class DrahtnamenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Auch_der_Firmenname_kommt_an()
     {
-        using var inhalt = new StringContent(
+        using var content = new StringContent(
             $$"""
             {"email":"{{NeueAdresse()}}","password":"geheim-und-lang-genug",
              "display_name":"Bea","company_name":"Beispiel GmbH"}
@@ -131,7 +131,7 @@ public class DrahtnamenTests(Postgres postgres) : IAsyncLifetime
             System.Text.Encoding.UTF8,
             "application/json");
 
-        (await Browser().PostAsync("/auth/register", inhalt))
+        (await Browser().PostAsync("/auth/register", content))
             .StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
@@ -139,7 +139,7 @@ public class DrahtnamenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Auch_der_Klarname_kommt_in_snake_case_an()
     {
-        using var inhalt = new StringContent(
+        using var content = new StringContent(
             $$"""
             {"email":"{{NeueAdresse()}}","password":"geheim-und-lang-genug",
              "display_name":"Anna","given_name":"Anna","family_name":"Beispiel"}
@@ -147,7 +147,7 @@ public class DrahtnamenTests(Postgres postgres) : IAsyncLifetime
             System.Text.Encoding.UTF8,
             "application/json");
 
-        (await Browser().PostAsync("/auth/register", inhalt))
+        (await Browser().PostAsync("/auth/register", content))
             .StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
@@ -163,7 +163,7 @@ public class DrahtnamenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task camelCase_wird_abgewiesen()
     {
-        using var inhalt = new StringContent(
+        using var content = new StringContent(
             $$"""
             {"email":"{{NeueAdresse()}}","password":"geheim-und-lang-genug",
              "displayName":"Cara"}
@@ -171,13 +171,13 @@ public class DrahtnamenTests(Postgres postgres) : IAsyncLifetime
             System.Text.Encoding.UTF8,
             "application/json");
 
-        var antwort = await Browser().PostAsync("/auth/register", inhalt);
+        var response = await Browser().PostAsync("/auth/register", content);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        var rumpf = await antwort.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
 
-        rumpf!["detail"].ToString().Should().Contain(
+        body!["detail"].ToString().Should().Contain(
             "display_name",
             "die Meldung nennt den Namen, den der Aufrufer haette schicken muessen");
     }

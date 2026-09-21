@@ -43,21 +43,21 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
             host.UseSetting("Notify:Geheimnis", "melde-geheimnis");
             // Der Hauptschluessel. Ohne ihn wirft der Dienst beim Aufloesen —
-            // und genau das soll er, siehe `Geheimnisspeicher`.
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            // und genau das soll er, siehe `SecretStore`.
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
         });
 
-        using var bereich = _dienst.Services.CreateScope();
-        await bereich.ServiceProvider.GetRequiredService<IdentityDbContext>()
+        using var scope = _dienst.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IdentityDbContext>()
             .Database.MigrateAsync();
     }
 
@@ -72,27 +72,27 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
 
     private async Task<(HttpClient Browser, Guid Wer)> Angemeldet()
     {
-        var adresse = $"anna-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
+        var address = $"anna-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
         var browser = Browser();
 
         await browser.PostAsJsonAsync("/auth/register", new
         {
-            email = adresse, password = Passwort, display_name = "Anna"
+            email = address, password = Passwort, display_name = "Anna"
         });
 
         var token = Regex.Match(
             _post.Post[^1].Text, @"token=([A-Za-z0-9_\-]+)").Groups[1].Value;
         await browser.PostAsJsonAsync("/auth/verify-email", new { token });
-        await browser.PostAsJsonAsync("/auth/login", new { email = adresse, password = Passwort });
+        await browser.PostAsJsonAsync("/auth/login", new { email = address, password = Passwort });
 
-        var sitzung = JsonDocument.Parse(
+        var session = JsonDocument.Parse(
             await (await browser.GetAsync("/auth/session")).Content.ReadAsStringAsync());
 
-        return (browser, sitzung.RootElement.GetProperty("user").GetProperty("user_id").GetGuid());
+        return (browser, session.RootElement.GetProperty("user").GetProperty("user_id").GetGuid());
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     /// <summary>Wer nie etwas gesetzt hat, bekommt die zurückhaltendste Stellung.</summary>
     /// <remarks>
@@ -104,12 +104,12 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
     {
         var (browser, _) = await Angemeldet();
 
-        var stand = await Json(await browser.GetAsync("/account/settings"));
+        var state = await Json(await browser.GetAsync("/account/settings"));
 
-        stand.GetProperty("ai_provider").GetString().Should().Be("none");
-        stand.GetProperty("ai_key_present").GetBoolean().Should().BeFalse();
-        stand.GetProperty("ai_audit_log").GetBoolean().Should().BeFalse();
-        stand.GetProperty("delete_after_months").ValueKind.Should().Be(JsonValueKind.Null);
+        state.GetProperty("ai_provider").GetString().Should().Be("none");
+        state.GetProperty("ai_key_present").GetBoolean().Should().BeFalse();
+        state.GetProperty("ai_audit_log").GetBoolean().Should().BeFalse();
+        state.GetProperty("delete_after_months").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     /// <summary>DER wichtigste Test: das Geheimnis geht nur in eine Richtung.</summary>
@@ -117,21 +117,21 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
     public async Task Der_Schluessel_kommt_nie_zurueck()
     {
         var (browser, _) = await Angemeldet();
-        const string schluessel = "sk-ant-api03-GEHEIM-abcd1234WXYZ";
+        const string key = "sk-ant-api03-GEHEIM-abcd1234WXYZ";
 
-        (await browser.PutAsJsonAsync("/account/ai-key", new { key = schluessel }))
+        (await browser.PutAsJsonAsync("/account/ai-key", new { key = key }))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var antwort = await browser.GetAsync("/account/settings");
-        var roh = await antwort.Content.ReadAsStringAsync();
-        var stand = JsonDocument.Parse(roh).RootElement;
+        var response = await browser.GetAsync("/account/settings");
+        var roh = await response.Content.ReadAsStringAsync();
+        var state = JsonDocument.Parse(roh).RootElement;
 
-        stand.GetProperty("ai_key_present").GetBoolean().Should().BeTrue();
-        stand.GetProperty("ai_key_tail").GetString().Should().Be("WXYZ");
+        state.GetProperty("ai_key_present").GetBoolean().Should().BeTrue();
+        state.GetProperty("ai_key_tail").GetString().Should().Be("WXYZ");
 
         // Der ganze Rumpf, nicht nur das eine Feld: der Schlüssel darf nirgends
         // darin auftauchen, auch nicht als Teil eines anderen.
-        roh.Should().NotContain(schluessel);
+        roh.Should().NotContain(key);
         roh.Should().NotContain("GEHEIM");
     }
 
@@ -139,22 +139,22 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task In_der_Zeile_liegt_er_verschluesselt()
     {
-        var (browser, wer) = await Angemeldet();
-        const string schluessel = "sk-test-KLARTEXT-0000";
+        var (browser, subject) = await Angemeldet();
+        const string key = "sk-test-KLARTEXT-0000";
 
-        await browser.PutAsJsonAsync("/account/ai-key", new { key = schluessel });
+        await browser.PutAsJsonAsync("/account/ai-key", new { key = key });
 
-        using var bereich = _dienst.Services.CreateScope();
-        var kontext = bereich.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        var zeile = await kontext.AccountSettings.FirstAsync(e => e.SubjectId == wer);
+        using var scope = _dienst.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        var row = await context.AccountSettings.FirstAsync(e => e.SubjectId == subject);
 
-        zeile.AiKeyEncrypted.Should().NotBeEmpty();
-        zeile.AiKeyEncrypted.Should().NotContain("KLARTEXT");
-        zeile.AiKeyTail.Should().Be("0000");
+        row.AiKeyEncrypted.Should().NotBeEmpty();
+        row.AiKeyEncrypted.Should().NotContain("KLARTEXT");
+        row.AiKeyTail.Should().Be("0000");
 
         // Und der Rundlauf stimmt: was gespeichert wurde, kommt wieder heraus.
-        var speicher = bereich.ServiceProvider.GetRequiredService<Geheimnisspeicher>();
-        speicher.Entschluessele(zeile.AiKeyEncrypted).Should().Be(schluessel);
+        var store = scope.ServiceProvider.GetRequiredService<SecretStore>();
+        store.Decrypt(row.AiKeyEncrypted).Should().Be(key);
     }
 
     /// <summary>Ein leerer Schlüssel ENTFERNT — er lässt nicht unverändert.</summary>
@@ -170,9 +170,9 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
         await browser.PutAsJsonAsync("/account/ai-key", new { key = "sk-test-1234" });
         await browser.PutAsJsonAsync("/account/ai-key", new { key = "" });
 
-        var stand = await Json(await browser.GetAsync("/account/settings"));
-        stand.GetProperty("ai_key_present").GetBoolean().Should().BeFalse();
-        stand.GetProperty("ai_key_tail").GetString().Should().BeEmpty();
+        var state = await Json(await browser.GetAsync("/account/settings"));
+        state.GetProperty("ai_key_present").GetBoolean().Should().BeFalse();
+        state.GetProperty("ai_key_tail").GetString().Should().BeEmpty();
     }
 
     /// <summary>„Kein Anbieter" räumt den Schlüssel mit weg.</summary>
@@ -194,8 +194,8 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
             ai_audit_log = false
         });
 
-        var stand = await Json(await browser.GetAsync("/account/settings"));
-        stand.GetProperty("ai_key_present").GetBoolean().Should().BeFalse();
+        var state = await Json(await browser.GetAsync("/account/settings"));
+        state.GetProperty("ai_key_present").GetBoolean().Should().BeFalse();
     }
 
     /// <summary>Ein zu kurzer Verfall wird abgelehnt, nicht stillschweigend gerundet.</summary>
@@ -210,7 +210,7 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
     {
         var (browser, _) = await Angemeldet();
 
-        var antwort = await browser.PutAsJsonAsync("/account/settings", new
+        var response = await browser.PutAsJsonAsync("/account/settings", new
         {
             delete_after_months = monate,
             ai_provider = "none",
@@ -219,7 +219,7 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
             ai_audit_log = false
         });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     /// <summary>Ohne Anmeldung geht nichts — weder lesen noch schreiben.</summary>
@@ -243,13 +243,13 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_Loeschung_nimmt_die_Einstellungen_mit()
     {
-        var (browser, wer) = await Angemeldet();
+        var (browser, subject) = await Angemeldet();
         await browser.PutAsJsonAsync("/account/ai-key", new { key = "sk-test-bleibt-nicht" });
 
         using (var vorher = _dienst.Services.CreateScope())
         {
-            var kontext = vorher.ServiceProvider.GetRequiredService<IdentityDbContext>();
-            (await kontext.AccountSettings.AnyAsync(e => e.SubjectId == wer))
+            var context = vorher.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            (await context.AccountSettings.AnyAsync(e => e.SubjectId == subject))
                 .Should().BeTrue("ohne Zeile prüft dieser Test nichts");
         }
 
@@ -258,13 +258,13 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
 
         // Die Kaskade läuft asynchron; hier zählt der Schritt, der die Zeilen
         // dieses Dienstes räumt. Er wird über den Bestand direkt gefahren.
-        using var bereich = _dienst.Services.CreateScope();
-        var bestand = bereich.ServiceProvider
-            .GetRequiredService<Application.Loeschung.ILoeschbestand>();
-        await bestand.SchliesseAbAsync(new Noelia.Core.Identity.SubjectId(wer), DateTimeOffset.UtcNow);
+        using var scope = _dienst.Services.CreateScope();
+        var bestand = scope.ServiceProvider
+            .GetRequiredService<Application.Erasure.IErasureLedger>();
+        await bestand.CompleteAsync(new Noelia.Core.Identity.SubjectId(subject), DateTimeOffset.UtcNow);
 
-        var danach = bereich.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        (await danach.AccountSettings.AnyAsync(e => e.SubjectId == wer)).Should().BeFalse();
+        var danach = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        (await danach.AccountSettings.AnyAsync(e => e.SubjectId == subject)).Should().BeFalse();
     }
 
     /// <summary>
@@ -273,19 +273,19 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_Geheimnis_gibt_es_den_internen_Zugang_nicht()
     {
-        var (_, wer) = await Angemeldet();
+        var (_, subject) = await Angemeldet();
 
-        var antwort = await _dienst.CreateClient()
-            .GetAsync($"/internal/account/{wer}/ai");
+        var response = await _dienst.CreateClient()
+            .GetAsync($"/internal/account/{subject}/ai");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>Ollama braucht keinen Schlüssel, der interne Draht sagt das.</summary>
     [Fact]
     public async Task Ein_eigener_Server_reist_ohne_Schluessel()
     {
-        var (browser, wer) = await Angemeldet();
+        var (browser, subject) = await Angemeldet();
 
         (await browser.PutAsJsonAsync("/account/settings", new
         {
@@ -299,7 +299,7 @@ public class EinstellungenTests(Postgres postgres) : IAsyncLifetime
         var intern = _dienst.CreateClient();
         intern.DefaultRequestHeaders.Add("X-Notify-Secret", "melde-geheimnis");
 
-        var zugang = await Json(await intern.GetAsync($"/internal/account/{wer}/ai"));
+        var zugang = await Json(await intern.GetAsync($"/internal/account/{subject}/ai"));
 
         zugang.GetProperty("provider").GetString().Should().Be("openai_compatible");
         zugang.GetProperty("base_url").GetString()

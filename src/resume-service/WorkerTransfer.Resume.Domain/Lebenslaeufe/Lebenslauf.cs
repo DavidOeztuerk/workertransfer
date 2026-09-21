@@ -10,10 +10,10 @@ namespace WorkerTransfer.Resume.Domain.Lebenslaeufe;
 /// <para>
 /// There is deliberately no public switch anywhere in this type. A profile can
 /// be shown to everybody; a résumé is released to one named company, asked for
-/// and answered — see <c>Anfrage</c>.
+/// and answered — see <c>ResumeRequest</c>.
 /// </para>
 /// </remarks>
-public sealed class Lebenslauf
+public sealed class CurriculumVitae
 {
     /// <summary>How many positions a résumé may hold.</summary>
     public const int HoechsteStationen = 40;
@@ -21,14 +21,14 @@ public sealed class Lebenslauf
     /// <summary>How many education entries a résumé may hold.</summary>
     public const int HoechsteAusbildungen = 20;
 
-    private Lebenslauf(
-        SubjectId wer,
+    private CurriculumVitae(
+        SubjectId subject,
         IReadOnlyList<Station> stationen,
         IReadOnlyList<Ausbildung> ausbildungen,
         DateTimeOffset angelegt,
         DateTimeOffset geaendert)
     {
-        Wer = wer;
+        Wer = subject;
         Stationen = stationen;
         Ausbildungen = ausbildungen;
         Angelegt = angelegt;
@@ -50,35 +50,35 @@ public sealed class Lebenslauf
     /// <summary>When it last changed.</summary>
     public DateTimeOffset Geaendert { get; private set; }
 
-    /// <summary>In welcher Vorlage er gesetzt wird.</summary>
+    /// <summary>In welcher ResumeTemplate er gesetzt wird.</summary>
     /// <remarks>
     /// Ein Name, kein Layout — siehe <see cref="Lebenslaeufe.Vorlage" />. Er
-    /// steht am Lebenslauf und nicht an der Bewerbung, weil die Person ihn
+    /// steht am CurriculumVitae und nicht an der JobApplication, weil die Person ihn
     /// einmal wählt und nicht je Unternehmen; und weil sie ihn danach ändern
-    /// darf, ohne dass eine abgeschickte Bewerbung sich rückwirkend umzieht:
-    /// die Mappe zeigt die Vorlage, die zum Zeitpunkt des Lesens gilt, und das
+    /// darf, ohne dass eine abgeschickte JobApplication sich rückwirkend umzieht:
+    /// die Mappe zeigt die ResumeTemplate, die zum Zeitpunkt des Lesens gilt, und das
     /// ist die der Person.
     /// </remarks>
-    public Vorlage Vorlage { get; private set; } = Vorlage.Schlicht;
+    public ResumeTemplate ResumeTemplate { get; private set; } = ResumeTemplate.Plain;
 
-    /// <summary>Wählt die Vorlage.</summary>
-    public void Waehle_vorlage(Vorlage vorlage, DateTimeOffset jetzt)
+    /// <summary>Wählt die ResumeTemplate.</summary>
+    public void Waehle_vorlage(ResumeTemplate template, DateTimeOffset now)
     {
-        Vorlage = vorlage;
-        Geaendert = jetzt;
+        ResumeTemplate = template;
+        Geaendert = now;
     }
 
     /// <summary>Writes a new one.</summary>
     /// <exception cref="Lebenslaufregel">The entries break a rule of the whole.</exception>
-    public static Lebenslauf Anlegen(
-        SubjectId wer,
+    public static CurriculumVitae Anlegen(
+        SubjectId subject,
         IReadOnlyList<Station> stationen,
         IReadOnlyList<Ausbildung> ausbildungen,
-        DateTimeOffset jetzt)
+        DateTimeOffset now)
     {
         var (geprueftStationen, geprueftAusbildungen) = Gepruegt(stationen, ausbildungen);
 
-        return new Lebenslauf(wer, geprueftStationen, geprueftAusbildungen, jetzt, jetzt);
+        return new CurriculumVitae(subject, geprueftStationen, geprueftAusbildungen, now, now);
     }
 
     /// <summary>Rebuilds one that was stored. Checks nothing.</summary>
@@ -89,17 +89,17 @@ public sealed class Lebenslauf
     /// Ordering is applied, because that is derived from the data and not
     /// stored.
     /// </remarks>
-    public static Lebenslauf Wiederherstellen(
-        SubjectId wer,
+    public static CurriculumVitae Wiederherstellen(
+        SubjectId subject,
         IReadOnlyList<Station> stationen,
         IReadOnlyList<Ausbildung> ausbildungen,
         DateTimeOffset angelegt,
         DateTimeOffset geaendert,
-        Vorlage vorlage = Vorlage.Schlicht) =>
-        new(wer, Sortiert(stationen, s => s.Ende, s => s.Beginn),
+        ResumeTemplate template = ResumeTemplate.Plain) =>
+        new(subject, Sortiert(stationen, s => s.Ende, s => s.Beginn),
             Sortiert(ausbildungen, a => a.Ende, a => a.Beginn), angelegt, geaendert)
         {
-            Vorlage = vorlage
+            ResumeTemplate = template
         };
 
     /// <summary>Replaces both lists at once.</summary>
@@ -111,13 +111,13 @@ public sealed class Lebenslauf
     public void Aktualisiere(
         IReadOnlyList<Station> stationen,
         IReadOnlyList<Ausbildung> ausbildungen,
-        DateTimeOffset jetzt)
+        DateTimeOffset now)
     {
         var (geprueftStationen, geprueftAusbildungen) = Gepruegt(stationen, ausbildungen);
 
         Stationen = geprueftStationen;
         Ausbildungen = geprueftAusbildungen;
-        Geaendert = jetzt;
+        Geaendert = now;
     }
 
     /// <summary>
@@ -133,13 +133,13 @@ public sealed class Lebenslauf
 
         if (stationen.Count > HoechsteStationen)
         {
-            throw new Lebenslaufregel(
+            throw new ResumeRule(
                 Regelcodes.Menge, $"Höchstens {HoechsteStationen} Stationen sind erlaubt.");
         }
 
         if (ausbildungen.Count > HoechsteAusbildungen)
         {
-            throw new Lebenslaufregel(
+            throw new ResumeRule(
                 Regelcodes.Menge,
                 $"Höchstens {HoechsteAusbildungen} Ausbildungen sind erlaubt.");
         }
@@ -149,7 +149,7 @@ public sealed class Lebenslauf
         // which one is now.
         if (stationen.Count(station => station.Laeuft) > 1)
         {
-            throw new Lebenslaufregel(
+            throw new ResumeRule(
                 Regelcodes.ZweiOffene,
                 "Nur eine Station darf offen bleiben; offen heißt 'noch dort'.");
         }
@@ -167,10 +167,10 @@ public sealed class Lebenslauf
     /// day be wrong, and nothing in the interface would show it.
     /// </remarks>
     private static IReadOnlyList<T> Sortiert<T>(
-        IReadOnlyList<T> eintraege,
+        IReadOnlyList<T> entries,
         Func<T, Monat?> ende,
         Func<T, Monat> beginn) =>
-        [.. eintraege
-            .OrderByDescending(eintrag => ende(eintrag) is null)
+        [.. entries
+            .OrderByDescending(entry => ende(entry) is null)
             .ThenByDescending(beginn)];
 }

@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using WorkerTransfer.Companies.Domain.Arbeitgeberprofile;
+using WorkerTransfer.Companies.Domain.EmployerProfiles;
 
 namespace WorkerTransfer.Companies.Infrastructure.Persistence;
 
 /// <summary>Eine Zeile von <c>company_profiles</c>.</summary>
-public sealed class ProfilZeile
+public sealed class ProfileRow
 {
     /// <summary>Die Mandanten-Kennung. Sie <em>ist</em> der Schlüssel.</summary>
     public Guid Id { get; set; }
@@ -44,9 +44,9 @@ public sealed class ProfilZeile
 
 /// <summary>Die eine Tabelle, die dieser Dienst besitzt.</summary>
 /// <remarks>
-/// Keine Outbox: dieser Dienst verschickt nichts. Und keine Löschtabelle — er
+/// None Outbox: dieser Dienst verschickt nichts. Und keine Löschtabelle — er
 /// hält nichts über einen natürlichen Menschen, weshalb er auch nicht in
-/// <c>Loeschempfaenger.Fremde</c> steht (ADR-0027 §2). Ein Löschendpunkt hier
+/// <c>ErasureRecipient.Fremde</c> steht (ADR-0027 §2). Ein Löschendpunkt hier
 /// wäre einer, der „erledigt" sagt, ohne je etwas getan zu haben.
 /// <para>
 /// Nachverfolgung ist für den ganzen Kontext aus. Der Speicher führt gelesene
@@ -58,48 +58,48 @@ public sealed class ProfilZeile
 public sealed class CompaniesDbContext(DbContextOptions<CompaniesDbContext> options)
     : DbContext(options)
 {
-    /// <summary>Die Arbeitgeberprofile.</summary>
-    public DbSet<ProfilZeile> Profile => Set<ProfilZeile>();
+    /// <summary>Die EmployerProfiles.</summary>
+    public DbSet<ProfileRow> Profile => Set<ProfileRow>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
-        modelBuilder.Entity<ProfilZeile>(entity =>
+        modelBuilder.Entity<ProfileRow>(entity =>
         {
             entity.ToTable("company_profiles");
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
-            entity.Property(zeile => zeile.Slug)
-                .HasColumnName("slug").HasMaxLength(Kuerzel.Hoechstlaenge).IsRequired();
-            entity.Property(zeile => zeile.DisplayName)
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.Slug)
+                .HasColumnName("slug").HasMaxLength(Slug.Hoechstlaenge).IsRequired();
+            entity.Property(row => row.DisplayName)
                 .HasColumnName("display_name").HasColumnType("text").IsRequired();
-            entity.Property(zeile => zeile.About)
+            entity.Property(row => row.About)
                 .HasColumnName("about").HasColumnType("text").IsRequired();
-            entity.Property(zeile => zeile.Website)
+            entity.Property(row => row.Website)
                 .HasColumnName("website").HasColumnType("text");
 
             // Listen als jsonb: sie werden nur als Ganzes gelesen und
             // geschrieben, und es gibt keine Abfrage über einzelne Einträge.
-            entity.Property(zeile => zeile.Locations)
+            entity.Property(row => row.Locations)
                 .HasColumnName("locations").HasColumnType("jsonb").IsRequired();
-            entity.Property(zeile => zeile.Benefits)
+            entity.Property(row => row.Benefits)
                 .HasColumnName("benefits").HasColumnType("jsonb").IsRequired();
-            entity.Property(zeile => zeile.Line1).HasColumnName("line1").HasColumnType("text").IsRequired();
-            entity.Property(zeile => zeile.PostalCode).HasColumnName("postal_code").HasColumnType("text").IsRequired();
-            entity.Property(zeile => zeile.City).HasColumnName("city").HasColumnType("text").IsRequired();
-            entity.Property(zeile => zeile.Country).HasColumnName("country").HasColumnType("text").IsRequired();
-            entity.Property(zeile => zeile.Phone).HasColumnName("phone").HasColumnType("text").IsRequired();
+            entity.Property(row => row.Line1).HasColumnName("line1").HasColumnType("text").IsRequired();
+            entity.Property(row => row.PostalCode).HasColumnName("postal_code").HasColumnType("text").IsRequired();
+            entity.Property(row => row.City).HasColumnName("city").HasColumnType("text").IsRequired();
+            entity.Property(row => row.Country).HasColumnName("country").HasColumnType("text").IsRequired();
+            entity.Property(row => row.Phone).HasColumnName("phone").HasColumnType("text").IsRequired();
 
-            entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
-            entity.Property(zeile => zeile.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at").IsRequired();
 
             // Das Kürzel IST die Adresse der Karriere-Seite. Eindeutig in der
             // Datenbank und nicht nur im Handler: zwei gleichzeitige erste
-            // Speicherungen kämen sonst beide durch die Suche nach dem freien
+            // Speicherungen kämen sonst beide durch die Search nach dem freien
             // Kürzel, und eine Adresse zeigte auf zwei Unternehmen.
-            entity.HasIndex(zeile => zeile.Slug).IsUnique().HasDatabaseName("uq_company_slug");
+            entity.HasIndex(row => row.Slug).IsUnique().HasDatabaseName("uq_company_slug");
         });
 
         base.OnModelCreating(modelBuilder);

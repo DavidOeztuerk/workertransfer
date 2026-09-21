@@ -3,13 +3,13 @@ namespace WorkerTransfer.Portfolio.Domain.Portfolios;
 /// <summary>Etwas an der Eingabe stimmt nicht.</summary>
 /// <remarks>
 /// Eine Wurzel für alle Eingabefehler, damit die Api-Schicht sie an einer
-/// Stelle auf 422 abbildet, statt an fünf.
+/// Job auf 422 abbildet, statt an fünf.
 /// </remarks>
-public abstract class Eingabefehler(string meldung) : Exception(meldung);
+public abstract class Eingabefehler(string notification) : Exception(notification);
 
 /// <summary>Ein Textfeld ist leer oder zu lang.</summary>
-public sealed class TextFehler(string feld, string grund)
-    : Eingabefehler($"{feld} {grund}.");
+public sealed class TextFehler(string field, string reason)
+    : Eingabefehler($"{field} {reason}.");
 
 /// <summary>Der Link taugt nicht.</summary>
 /// <remarks>
@@ -17,10 +17,10 @@ public sealed class TextFehler(string feld, string grund)
 /// und <c>data:</c> sind in einem Feld, das später in einem Browser landet,
 /// kein exotischer Randfall, sondern der Normalfall eines Angriffs.
 /// </remarks>
-public sealed class LinkFehler(string grund) : Eingabefehler(grund);
+public sealed class LinkFehler(string reason) : Eingabefehler(reason);
 
 /// <summary>Die Jahreszahl liegt außerhalb des Möglichen.</summary>
-public sealed class JahrFehler(string grund) : Eingabefehler(grund);
+public sealed class JahrFehler(string reason) : Eingabefehler(reason);
 
 /// <summary>Der Anhangname ist keiner.</summary>
 public sealed class AnhangFehler() : Eingabefehler("Das ist kein gültiger Anhangname.");

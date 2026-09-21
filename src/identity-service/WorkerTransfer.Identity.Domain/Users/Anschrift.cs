@@ -3,23 +3,23 @@ using Noelia.Core.Identity;
 namespace WorkerTransfer.Identity.Domain.Users;
 
 /// <summary>
-/// Die Anschrift einer Person — Vorlage für Briefkopf und Arbeitgebermappe.
+/// Die PostalAddress einer Person — ResumeTemplate für Briefkopf und Arbeitgebermappe.
 /// </summary>
 /// <remarks>
 /// <strong>Zweckbindung (ADR-0038).</strong> Straße und Telefon gehören auf den
-/// Brief, nicht in die Suche, nicht ins Token, nicht an ein Modell. Wer nie
-/// eine Anschrift hinterlegt, hat keine Zeile — Privacy by Default, Art. 25.
+/// Brief, nicht in die Search, nicht ins Token, nicht an ein Modell. Wer nie
+/// eine PostalAddress hinterlegt, hat keine Zeile — Privacy by Default, Art. 25.
 /// <para>
-/// Eine Personenzeile: der Schlüssel IST die Person. Der Löschwächter findet
+/// Eine SubjectKeyedTable: der Schlüssel IST die Person. Der Löschwächter findet
 /// die Tabelle über die Anmerkung, nicht über eine <c>subject_id</c>-Spalte
 /// daneben.
 /// </para>
 /// </remarks>
-public sealed class Anschrift
+public sealed class PostalAddress
 {
-    private Anschrift(SubjectId wer)
+    private PostalAddress(SubjectId subject)
     {
-        Wer = wer;
+        Wer = subject;
     }
 
     /// <summary>Wessen. Zugleich der Schlüssel.</summary>
@@ -44,11 +44,11 @@ public sealed class Anschrift
     public string Telefon { get; private set; } = string.Empty;
 
     /// <summary>Noch nichts hinterlegt.</summary>
-    public static Anschrift Leer(SubjectId wer) => new(wer);
+    public static PostalAddress Leer(SubjectId subject) => new(subject);
 
     /// <summary>Wie die Zeile sie hält.</summary>
-    public static Anschrift Wiederherstellen(
-        SubjectId wer,
+    public static PostalAddress Wiederherstellen(
+        SubjectId subject,
         string zeile1,
         string zeile2,
         string postleitzahl,
@@ -56,13 +56,13 @@ public sealed class Anschrift
         string land,
         string telefon)
     {
-        var anschrift = new Anschrift(wer);
-        anschrift.Setze(zeile1, zeile2, postleitzahl, ort, land, telefon);
+        var anschrift = new PostalAddress(subject);
+        anschrift.Set(zeile1, zeile2, postleitzahl, ort, land, telefon);
         return anschrift;
     }
 
-    /// <summary>Schreibt die Vorlage. Leere Felder bleiben leer — kein Zwang.</summary>
-    public void Setze(
+    /// <summary>Schreibt die ResumeTemplate. Leere Felder bleiben leer — kein Zwang.</summary>
+    public void Set(
         string? zeile1,
         string? zeile2,
         string? postleitzahl,
@@ -79,9 +79,9 @@ public sealed class Anschrift
         Telefon = Kuerze(telefon, 40);
     }
 
-    private static string Kuerze(string? wert, int hoechstens)
+    private static string Kuerze(string? value, int hoechstens)
     {
-        var getrimmt = (wert ?? string.Empty).Trim();
+        var getrimmt = (value ?? string.Empty).Trim();
         return getrimmt.Length <= hoechstens ? getrimmt : getrimmt[..hoechstens];
     }
 }

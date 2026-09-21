@@ -45,10 +45,10 @@ public sealed record Station
     /// <remarks>
     /// <strong>Eine Nennung, keine Ableitung.</strong> Niemand rechnet aus einer
     /// Stellenbezeichnung, welche Werkzeuge dazugehören; hier steht, was die
-    /// Person geschrieben hat, durch denselben Wortschatz vereinheitlicht wie
-    /// im Profil (ADR-0023: benennt um, folgert nie).
+    /// Person geschrieben hat, durch denselben Vocabulary vereinheitlicht wie
+    /// im Profile (ADR-0023: benennt um, folgert nie).
     /// <para>
-    /// Sie macht diese Station NICHT durchsuchbar. Ein Lebenslauf ist einzeln
+    /// Sie macht diese Station NICHT durchsuchbar. Ein CurriculumVitae ist einzeln
     /// freigegeben (ADR-0020), und was hier steht, gehört dem Unternehmen, das
     /// ihn lesen darf. Suchbar wird eine Fähigkeit erst, wenn sie im PROFIL
     /// steht — dorthin kommt sie mit einem Klick, nicht von allein.
@@ -63,8 +63,8 @@ public sealed record Station
     /// <exception cref="Lebenslaufregel">A field or the span is not valid.</exception>
     /// <summary>Wie viele Technologien eine Station nennen darf.</summary>
     /// <remarks>
-    /// Zwölf. Wer dreissig aufzählt, sagt über eine einzelne Stelle nichts mehr
-    /// — und die Grenze schützt zugleich die Vorschlagsliste im Profil davor,
+    /// Zwölf. Wer dreissig aufzählt, sagt über eine einzelne Job nichts mehr
+    /// — und die Grenze schützt zugleich die Vorschlagsliste im Profile davor,
     /// zu einer Wand aus Wörtern zu werden.
     /// </remarks>
     public const int HoechsteTechnologien = 12;
@@ -101,30 +101,30 @@ public sealed record Station
     private static IReadOnlyList<string> Vereinheitlicht(IEnumerable<string> roh)
     {
         var gesehen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var werte = new List<string>();
+        var values = new List<string>();
 
         foreach (var einzeln in roh)
         {
             var geprueft = Text.Gepruegt(
-                "Technologie", einzeln, pflicht: false, Faehigkeitsgrenzen.Hoechstlaenge);
+                "Technologie", einzeln, pflicht: false, SkillLimits.Hoechstlaenge);
 
             if (geprueft.Length == 0)
             {
                 continue;
             }
 
-            var kanonisch = Wortschatz.Kanonisch(geprueft);
+            var kanonisch = Vocabulary.Kanonisch(geprueft);
 
             if (gesehen.Add(kanonisch))
             {
-                werte.Add(kanonisch);
+                values.Add(kanonisch);
             }
         }
 
-        return werte.Count > HoechsteTechnologien
-            ? throw new Lebenslaufregel(
+        return values.Count > HoechsteTechnologien
+            ? throw new ResumeRule(
                 Regelcodes.Menge,
                 $"a position names at most {HoechsteTechnologien} technologies")
-            : werte;
+            : values;
     }
 }

@@ -1,6 +1,7 @@
 {{ .Chart.Name }} {{ .Chart.Version }} ist ausgerollt — Release {{ .Release.Name }}.
 
-  Anwendung           {{ .Values.publicUrl }}
+  Oberflaeche         {{ .Values.webUrl }}
+  API (Gateway)       {{ .Values.publicUrl }}
 {{- if .Values.mailpit.enabled }}
 {{- if .Values.mailpit.nodePort }}
   Mailpit             http://localhost:8025 — dort liegt der Bestätigungslink

@@ -11,19 +11,19 @@ namespace WorkerTransfer.Resume.Application.Anfragen;
 /// not get; a field here would be a second statement about the same fact — and
 /// one that could be polled without ever reading a résumé.
 /// </remarks>
-public sealed record FirmenanfragenAbfrage(TenantId Firma) : IAbfrage<IReadOnlyList<Anfrage>>;
+public sealed record CompanyRequestsQuery(TenantId Firma) : IAbfrage<IReadOnlyList<ResumeRequest>>;
 
 /// <inheritdoc cref="FirmenanfragenAbfrage" />
-public sealed class FirmenanfragenHandler(IAnfragenSpeicher speicher)
-    : IRequestHandler<FirmenanfragenAbfrage, IReadOnlyList<Anfrage>>
+public sealed class CompanyRequestsHandler(IRequestStore store)
+    : IRequestHandler<CompanyRequestsQuery, IReadOnlyList<ResumeRequest>>
 {
     /// <inheritdoc />
-    public Task<IReadOnlyList<Anfrage>> Handle(
-        FirmenanfragenAbfrage request,
+    public Task<IReadOnlyList<ResumeRequest>> Handle(
+        CompanyRequestsQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return speicher.FuerFirmaAsync(request.Firma, cancellationToken);
+        return store.ForCompanyAsync(request.Firma, cancellationToken);
     }
 }

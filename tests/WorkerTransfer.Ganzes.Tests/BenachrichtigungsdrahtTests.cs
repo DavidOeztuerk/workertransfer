@@ -23,7 +23,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// band still auf <c>Guid.Empty</c>, der Dienst antwortete <b>500</b>, und weil
 /// der Versand ein <c>EnsureSuccessStatusCode()</c> hat, gab der Ausgangskorb
 /// nach zehn Versuchen auf. Gemessen am laufenden Stapel: 18 Zeilen, keine
-/// einzige zugestellt, im ganzen Postfach nur Bestätigungsmails. <b>Der
+/// einzige zugestellt, im ganzen Inbox nur Bestätigungsmails. <b>Der
 /// Benachrichtigungsweg hat nie funktioniert.</b></para>
 ///
 /// <para><strong>Warum dieser Test und nicht ein Namensvergleich.</strong> Ein
@@ -47,61 +47,61 @@ public class BenachrichtigungsdrahtTests
     /// <summary>Der Rumpf von transfer-service.</summary>
     [Fact]
     public Task Transfer_schickt_eine_Kennung_die_ankommt() =>
-        Pruefe(async (fabrik, einstellungen) =>
+        Check(async (fabrik, einstellungen) =>
             await new WechselPost.HttpBenachrichtigung(
                 fabrik,
-                Options.Create(new WechselPost.Benachrichtigungseinstellungen
+                Options.Create(new WechselPost.NotificationSettings
                 {
                     Adresse = einstellungen,
                     Geheimnis = "probe"
                 }))
-                .ZustelleAsync(new SubjectId(Empfaenger), "market_request"));
+                .DeliverAsync(new SubjectId(Empfaenger), "market_request"));
 
     /// <summary>Der Rumpf von applications-service.</summary>
     [Fact]
     public Task Bewerbungen_schicken_eine_Kennung_die_ankommt() =>
-        Pruefe(async (fabrik, einstellungen) =>
+        Check(async (fabrik, einstellungen) =>
             await new AnwendungenPost.HttpBenachrichtigung(
                 fabrik,
-                Options.Create(new AnwendungenPost.Benachrichtigungseinstellungen
+                Options.Create(new AnwendungenPost.NotificationSettings
                 {
                     Adresse = einstellungen,
                     Geheimnis = "probe"
                 }))
-                .ZustelleAsync(new SubjectId(Empfaenger), "application_status"));
+                .DeliverAsync(new SubjectId(Empfaenger), "application_status"));
 
     /// <summary>Der Rumpf von resume-service.</summary>
     [Fact]
     public Task Lebenslauf_schickt_eine_Kennung_die_ankommt() =>
-        Pruefe(async (fabrik, einstellungen) =>
+        Check(async (fabrik, einstellungen) =>
             await new LebenslaufPost.HttpBenachrichtigung(
                 fabrik,
-                Options.Create(new LebenslaufPost.Benachrichtigungseinstellungen
+                Options.Create(new LebenslaufPost.NotificationSettings
                 {
                     Adresse = einstellungen,
                     Geheimnis = "probe"
                 }))
-                .ZustelleAsync(new SubjectId(Empfaenger), "resume_request"));
+                .DeliverAsync(new SubjectId(Empfaenger), "resume_request"));
 
     /// <summary>Der Rumpf von scout-service.</summary>
     /// <remarks>
     /// Der einzige der vier, der von Anfang an einen <em>typisierten</em> Vertrag
-    /// schickt (<c>EntdeckungsmeldungV1</c>) statt eines anonymen Objekts — und
+    /// schickt (<c>DiscoveryNotificationV1</c>) statt eines anonymen Objekts — und
     /// er wird trotzdem hier geprüft. Eine Typangabe sagt nur, dass der Absender
     /// sich etwas gedacht hat; ob es beim Empfänger ankommt, sagt allein dieser
     /// Durchlauf.
     /// </remarks>
     [Fact]
     public Task Scout_schickt_eine_Kennung_die_ankommt() =>
-        Pruefe(async (fabrik, einstellungen) =>
+        Check(async (fabrik, einstellungen) =>
             await new SpaeherPost.HttpBenachrichtigung(
                 fabrik,
-                Options.Create(new SpaeherPost.Benachrichtigungseinstellungen
+                Options.Create(new SpaeherPost.NotificationSettings
                 {
                     Adresse = einstellungen,
                     Geheimnis = "probe"
                 }))
-                .ZustelleAsync(new SubjectId(Empfaenger), "profile_discovered"));
+                .DeliverAsync(new SubjectId(Empfaenger), "profile_discovered"));
 
     /// <summary>
     /// Und der vierte Sprung: <c>notification-service</c> bittet
@@ -112,7 +112,7 @@ public class BenachrichtigungsdrahtTests
     /// hinterlassen bei einem Fehlschlag zehn Versuche und eine Fehlerspalte;
     /// dieser wirft nicht, sondern protokolliert eine Warnung. Er kann also
     /// beliebig lange kaputt sein, ohne dass irgendwo etwas rot wird — und er
-    /// war es: im Postfach standen nur die Bestätigungsmails, die
+    /// war es: im Inbox standen nur die Bestätigungsmails, die
     /// <c>identity-service</c> selbst verschickt.
     /// <para>
     /// Der Empfängertyp <c>MeldungV1</c> ist <b>privat</b>. Er wird deshalb über
@@ -128,24 +128,24 @@ public class BenachrichtigungsdrahtTests
 
         await new HttpPostbote(
             new Stubfabrik(lauscher),
-            Options.Create(new Posteinstellungen
+            Options.Create(new MailSettings
             {
                 Adresse = "http://probe.invalid",
                 Geheimnis = "probe"
             }),
             NullLogger<HttpPostbote>.Instance)
-            .SchickeAsync(new SubjectId(Empfaenger));
+            .SendAsync(new SubjectId(Empfaenger));
 
         lauscher.Rumpf.Should().NotBeNull("es wurde nichts geschickt");
 
-        var vertrag = typeof(WorkerTransfer.Identity.Api.MeldeEndpoints).Assembly
+        var contract = typeof(WorkerTransfer.Identity.Api.MeldeEndpoints).Assembly
             .GetTypes()
-            .Single(typ => typ.Name == "MeldungV1");
+            .Single(type => type.Name == "MeldungV1");
 
-        var gelesen = JsonSerializer.Deserialize(lauscher.Rumpf!, vertrag);
+        var gelesen = JsonSerializer.Deserialize(lauscher.Rumpf!, contract);
 
         gelesen.Should().NotBeNull();
-        vertrag.GetProperty("UserId")!.GetValue(gelesen).Should().Be(
+        contract.GetProperty("UserId")!.GetValue(gelesen).Should().Be(
             Empfaenger,
             "identity liest den Namen, den MeldungV1 deklariert — kommt die "
             + "Kennung anders, bindet sie still auf Guid.Empty und es geht keine "
@@ -160,7 +160,7 @@ public class BenachrichtigungsdrahtTests
     /// Endpunkt. Wer hier `PropertyNameCaseInsensitive` setzte, machte den Test
     /// nachsichtiger als die Wirklichkeit — und `userId` käme wieder durch.
     /// </remarks>
-    private static async Task Pruefe(Func<IHttpClientFactory, string, Task> senden)
+    private static async Task Check(Func<IHttpClientFactory, string, Task> senden)
     {
         var lauscher = new Lauscher();
 

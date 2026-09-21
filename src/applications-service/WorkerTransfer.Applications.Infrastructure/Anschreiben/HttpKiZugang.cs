@@ -23,22 +23,22 @@ namespace WorkerTransfer.Applications.Infrastructure.Anschreiben;
 /// </remarks>
 public sealed class HttpKiZugang(
     IHttpClientFactory fabrik,
-    IOptions<UnternehmensmitgliederEinstellungen> identity,
-    IOptions<Anschreibeneinstellungen> entwurf,
+    IOptions<CompanyMemberSettings> identity,
+    IOptions<CoverLetterSettings> draft,
     ILogger<HttpKiZugang> protokoll) : IKiZugangAbfrage
 {
     public const string Klient = "identity-internal";
 
     private const string Geheimniskopf = "X-Notify-Secret";
 
-    private readonly UnternehmensmitgliederEinstellungen _identity = identity.Value;
-    private readonly Anschreibeneinstellungen _entwurf = entwurf.Value;
+    private readonly CompanyMemberSettings _identity = identity.Value;
+    private readonly CoverLetterSettings _entwurf = draft.Value;
 
     /// <inheritdoc />
-    public async Task<KiZugang> HoleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<KiZugang> GetAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var vomKonto = await VomKontoAsync(wer, cancellationToken);
+        var vomKonto = await FromAccountAsync(subject, cancellationToken);
 
         if (vomKonto.IstEingerichtet)
         {
@@ -57,8 +57,8 @@ public sealed class HttpKiZugang(
         return vomKonto;
     }
 
-    private async Task<KiZugang> VomKontoAsync(
-        SubjectId wer, CancellationToken cancellationToken)
+    private async Task<KiZugang> FromAccountAsync(
+        SubjectId subject, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(_identity.Adresse) || string.IsNullOrEmpty(_identity.Geheimnis))
         {
@@ -68,63 +68,63 @@ public sealed class HttpKiZugang(
         using var client = fabrik.CreateClient(Klient);
         client.Timeout = _identity.Zeitueberschreitung;
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            using var anfrage = new HttpRequestMessage(
+            using var request = new HttpRequestMessage(
                 HttpMethod.Get,
-                new Uri(new Uri(_identity.Adresse), $"/internal/account/{wer.Value}/ai"));
-            anfrage.Headers.Add(Geheimniskopf, _identity.Geheimnis);
+                new Uri(new Uri(_identity.Adresse), $"/internal/account/{subject.Value}/ai"));
+            request.Headers.Add(Geheimniskopf, _identity.Geheimnis);
 
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
             protokoll.LogWarning(
-                "Identity-Dienst (KI-Zugang) nicht erreichbar ({Art})", fehler.GetType().Name);
-            throw new AnschreibenNichtVerfuegbar(
+                "Identity-Dienst (KI-Zugang) nicht erreichbar ({Art})", error.GetType().Name);
+            throw new CoverLetterUnavailable(
                 "identity-service (intern) ist nicht erreichbar.");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new AnschreibenNichtVerfuegbar(
+            throw new CoverLetterUnavailable(
                 "identity-service (intern) antwortet nicht (Zeitüberschreitung).");
         }
 
-        using (antwort)
+        using (response)
         {
-            if (antwort.StatusCode == HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return new KiZugang("none", string.Empty, string.Empty, string.Empty);
             }
 
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
-                throw new AnschreibenNichtVerfuegbar(
-                    $"identity-service (intern) antwortet mit {(int)antwort.StatusCode}.");
+                throw new CoverLetterUnavailable(
+                    $"identity-service (intern) antwortet mit {(int)response.StatusCode}.");
             }
 
-            var rumpf = await antwort.Content.ReadFromJsonAsync<KiZugangV1>(cancellationToken)
-                ?? throw new AnschreibenNichtVerfuegbar(
+            var body = await response.Content.ReadFromJsonAsync<KiZugangV1>(cancellationToken)
+                ?? throw new CoverLetterUnavailable(
                     "identity-service (intern) sandte eine unbrauchbare Antwort.");
 
             return new KiZugang(
-                rumpf.Provider ?? "none",
-                FuerDenBehaelter(Vervollstaendige(rumpf.BaseUrl ?? string.Empty, rumpf.Provider)),
-                rumpf.Model ?? string.Empty,
-                rumpf.Key ?? string.Empty);
+                body.Provider ?? "none",
+                FuerDenBehaelter(Vervollstaendige(body.BaseUrl ?? string.Empty, body.Provider)),
+                body.Model ?? string.Empty,
+                body.Key ?? string.Empty);
         }
     }
 
     /// <summary>
     /// Eine nackte Ollama-Adresse ohne Pfad bekommt den OpenAI-Pfad.
     /// </summary>
-    public static string Vervollstaendige(string adresse, string? anbieter)
+    public static string Vervollstaendige(string address, string? provider)
     {
-        var getrimmt = adresse.Trim().TrimEnd('/');
+        var getrimmt = address.Trim().TrimEnd('/');
 
-        if (anbieter != "openai_compatible" || getrimmt.Length == 0)
+        if (provider != "openai_compatible" || getrimmt.Length == 0)
         {
             return getrimmt;
         }
@@ -141,17 +141,17 @@ public sealed class HttpKiZugang(
     /// <summary>
     /// Im Behälter ist localhost der Behälter. Ollama läuft auf der Maschine.
     /// </summary>
-    public static string FuerDenBehaelter(string adresse)
+    public static string FuerDenBehaelter(string address)
     {
         if (!string.Equals(
                 Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"),
                 "true",
                 StringComparison.OrdinalIgnoreCase))
         {
-            return adresse;
+            return address;
         }
 
-        return adresse
+        return address
             .Replace("://localhost", "://host.docker.internal", StringComparison.OrdinalIgnoreCase)
             .Replace("://127.0.0.1", "://host.docker.internal", StringComparison.Ordinal);
     }

@@ -12,7 +12,7 @@ namespace WorkerTransfer.Identity.Tests;
 /// geprueft wird, der sie ohnehin zustimmt.
 /// <para>
 /// Mit dem Umzug besitzt identity-service sein Schema selbst, wie die zehn
-/// anderen: eine EF-Wanderung legt alle neun Tabellen an, beide
+/// anderen: eine EF-SchemaMigration legt alle neun Tabellen an, beide
 /// Postgres-Aufzaehlungen und <c>citext</c>. Was die Reihe prueft, bleibt
 /// dasselbe — Spaltennamen, Etiketten, Typen —, nur die Quelle des Schemas
 /// hat gewechselt.
@@ -39,12 +39,12 @@ public sealed class Postgres : IAsyncLifetime
     {
         await _container.StartAsync();
 
-        await using var quelle = IdentityDbContextFactory.DataSource(ConnectionString);
-        await using var kontext = new IdentityDbContext(
-            (DbContextOptions<IdentityDbContext>)IdentityDbContextFactory.Konfiguriere(
-                new DbContextOptionsBuilder<IdentityDbContext>(), quelle).Options);
+        await using var source = IdentityDbContextFactory.DataSource(ConnectionString);
+        await using var context = new IdentityDbContext(
+            (DbContextOptions<IdentityDbContext>)IdentityDbContextFactory.Configure(
+                new DbContextOptionsBuilder<IdentityDbContext>(), source).Options);
 
-        await kontext.Database.MigrateAsync();
+        await context.Database.MigrateAsync();
     }
 
     public async Task DisposeAsync() => await _container.DisposeAsync();

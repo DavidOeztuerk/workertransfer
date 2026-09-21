@@ -14,7 +14,7 @@ namespace WorkerTransfer.Resume.Domain.Pruefspur;
 /// would be the most sensitive table in it.
 /// </para>
 /// </remarks>
-public enum Pruefhandlung
+public enum AuditAction
 {
     /// <summary>Somebody wrote or rewrote their own résumé.</summary>
     ResumeSaved,
@@ -43,8 +43,8 @@ public enum Pruefhandlung
 /// beyond who, what, about whom and when — and a column that is always empty is
 /// a column somebody eventually fills.
 /// </remarks>
-public sealed record Pruefeintrag(
-    Pruefhandlung Handlung,
+public sealed record AuditEntry(
+    AuditAction Handlung,
     DateTimeOffset Geschehen,
     SubjectId? Akteur = null,
     TenantId? Firma = null,
@@ -63,9 +63,9 @@ public sealed record Pruefeintrag(
 /// happen.
 /// </para>
 /// </remarks>
-public interface IPruefspur
+public interface IAuditTrail
 {
     /// <param name="eintrag">What to record.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
-    Task AppendAsync(Pruefeintrag eintrag, CancellationToken cancellationToken = default);
+    Task AppendAsync(AuditEntry entry, CancellationToken cancellationToken = default);
 }

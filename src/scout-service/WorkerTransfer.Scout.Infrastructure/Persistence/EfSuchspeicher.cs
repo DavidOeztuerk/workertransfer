@@ -1,28 +1,28 @@
 using Noelia.Core.Identity;
 using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.Outbox;
-using WorkerTransfer.Scout.Domain.Suchen;
+using WorkerTransfer.Scout.Domain.Searches;
 
 namespace WorkerTransfer.Scout.Infrastructure.Persistence;
 
-/// <summary>Die gespeicherten Suchen in Postgres.</summary>
-public sealed class EfSuchspeicher(ScoutDbContext kontext) : ISuchspeicher
+/// <summary>Die gespeicherten Searches in Postgres.</summary>
+public sealed class EfSearchStore(ScoutDbContext context) : ISearchStore
 {
     /// <inheritdoc />
-    public Task FuegeHinzuAsync(Suche suche, CancellationToken cancellationToken = default)
+    public Task AppendAsync(Search search, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(suche);
+        ArgumentNullException.ThrowIfNull(search);
 
-        kontext.Suchen.Add(new SucheZeile
+        context.Searches.Add(new SearchRow
         {
-            Id = suche.Id,
-            TenantId = suche.Firma.Value,
-            SubjectId = suche.Wer.Value,
-            Name = suche.Name,
-            Skills = [.. suche.Filter.GenannteWorte],
-            Location = suche.Filter.Ort,
-            Remote = suche.Filter.NurRemote,
-            CreatedAt = suche.AngelegtAm.UtcDateTime
+            Id = search.Id,
+            TenantId = search.Firma.Value,
+            SubjectId = search.Wer.Value,
+            Name = search.Name,
+            Skills = [.. search.Filter.GenannteWorte],
+            Location = search.Filter.Ort,
+            Remote = search.Filter.NurRemote,
+            CreatedAt = search.AngelegtAm.UtcDateTime
         });
 
         // Ohne SaveChanges: der Befehl läuft in der Transaktionsklammer, und
@@ -32,66 +32,66 @@ public sealed class EfSuchspeicher(ScoutDbContext kontext) : ISuchspeicher
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Suche>> FuerMenschAsync(
-        TenantId firma, SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Search>> ForHumanAsync(
+        TenantId company, SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.Suchen
-            .Where(zeile => zeile.TenantId == firma.Value && zeile.SubjectId == wer.Value)
-            .OrderByDescending(zeile => zeile.CreatedAt)
-            .ThenByDescending(zeile => zeile.Id)
+        var rows = await context.Searches
+            .Where(row => row.TenantId == company.Value && row.SubjectId == subject.Value)
+            .OrderByDescending(row => row.CreatedAt)
+            .ThenByDescending(row => row.Id)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZurDomaene)];
+        return [.. rows.Select(ZurDomaene)];
     }
 
     /// <inheritdoc />
-    public async Task<bool> EntferneAsync(
-        Guid id, TenantId firma, SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<bool> RemoveAsync(
+        Guid id, TenantId company, SubjectId subject, CancellationToken cancellationToken = default)
     {
         // AsTracking, weil hier geändert wird: der Kontext liest sonst
         // unverfolgt, `Remove` bekäme eine losgelöste Zeile, und der Aufrufer
         // sähe trotzdem ein „erledigt".
-        var zeile = await kontext.Suchen
+        var row = await context.Searches
             .AsTracking()
             .FirstOrDefaultAsync(
-                eintrag => eintrag.Id == id
-                           && eintrag.TenantId == firma.Value
-                           && eintrag.SubjectId == wer.Value,
+                entry => entry.Id == id
+                           && entry.TenantId == company.Value
+                           && entry.SubjectId == subject.Value,
                 cancellationToken);
 
-        if (zeile is null)
+        if (row is null)
         {
             // „Gehört dir nicht" und „gibt es nicht" antworten gleich: ein
-            // Unterschied verriete, dass die Suche eines Kollegen existiert.
+            // Unterschied verriete, dass die Search eines Kollegen existiert.
             return false;
         }
 
-        kontext.Suchen.Remove(zeile);
+        context.Searches.Remove(row);
 
         return true;
     }
 
     /// <inheritdoc />
-    public async Task<int> LoescheAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<int> DeleteAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var suchen = await kontext.Suchen
+        var searches = await context.Searches
             .AsTracking()
-            .Where(zeile => zeile.SubjectId == wer.Value)
+            .Where(row => row.SubjectId == subject.Value)
             .ToListAsync(cancellationToken);
 
-        kontext.Suchen.RemoveRange(suchen);
+        context.Searches.RemoveRange(searches);
 
         // Und die Vermerke ÜBER diesen Menschen. Sie tragen seine Kennung und
         // sind damit personenbezogen — eine Löschung, die nur die eigenen
-        // Suchen wegnimmt, liesse in jeder Sicherung stehen, dass es diese
+        // Searches wegnimmt, liesse in jeder Sicherung stehen, dass es diese
         // Person gab (ADR-0027).
-        var vermerke = await kontext.Set<OutboxZeile>()
+        var vermerke = await context.Set<OutboxRow>()
             .AsTracking()
-            .Where(zeile => zeile.UserId == wer.Value)
+            .Where(row => row.UserId == subject.Value)
             .ToListAsync(cancellationToken);
 
-        kontext.Set<OutboxZeile>().RemoveRange(vermerke);
+        context.Set<OutboxRow>().RemoveRange(vermerke);
 
         // Immer 0. Dieser Dienst kennt keinen Aufbewahrungsfall: hier steht
         // nichts, was jemand anderem gehört.
@@ -102,16 +102,16 @@ public sealed class EfSuchspeicher(ScoutDbContext kontext) : ISuchspeicher
     /// <remarks>
     /// Über <see cref="Suche.Stelle_her"/> und damit ohne erneute Prüfung: eine
     /// gespeicherte Zeile war bei ihrer Entstehung gültig, und sie beim Lesen
-    /// abzulehnen hiesse, jemandem seine Suche zu entziehen, weil sich eine
+    /// abzulehnen hiesse, jemandem seine Search zu entziehen, weil sich eine
     /// Obergrenze geändert hat. Kanonisiert wird trotzdem — ein neuer Eintrag
-    /// im Wortschatz wirkt so auch auf ältere Zeilen, ohne Datenwanderung.
+    /// im Vocabulary wirkt so auch auf ältere Zeilen, ohne Datenwanderung.
     /// </remarks>
-    private static Suche ZurDomaene(SucheZeile zeile) =>
-        Suche.Stelle_her(
-            zeile.Id,
-            new TenantId(zeile.TenantId),
-            new SubjectId(zeile.SubjectId),
-            zeile.Name,
-            Suchfilter.Stelle_her(zeile.Skills, zeile.Location, zeile.Remote),
-            new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero));
+    private static Search ZurDomaene(SearchRow row) =>
+        Search.Stelle_her(
+            row.Id,
+            new TenantId(row.TenantId),
+            new SubjectId(row.SubjectId),
+            row.Name,
+            SearchFilter.Stelle_her(row.Skills, row.Location, row.Remote),
+            new DateTimeOffset(row.CreatedAt, TimeSpan.Zero));
 }

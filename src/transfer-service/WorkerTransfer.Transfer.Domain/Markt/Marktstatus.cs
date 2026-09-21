@@ -3,11 +3,11 @@ using Noelia.Core.Identity;
 namespace WorkerTransfer.Transfer.Domain.Markt;
 
 /// <summary>Etwas an der Eingabe stimmt nicht.</summary>
-public abstract class Marktfehler(string meldung) : Exception(meldung);
+public abstract class MarketError(string notification) : Exception(notification);
 
 /// <summary>Die Notiz ist zu lang.</summary>
-public sealed class Notizfehler(int grenze)
-    : Marktfehler($"The note exceeds {grenze} characters");
+public sealed class Notizfehler(int limit)
+    : MarketError($"The note exceeds {limit} characters");
 
 /// <summary>Wie ansprechbar jemand ist.</summary>
 /// <remarks>
@@ -32,16 +32,16 @@ public enum Verfuegbarkeit
 public static class Verfuegbarkeiten
 {
     /// <summary>Das Wort zum Zustand.</summary>
-    public static string Wort(Verfuegbarkeit wert) => wert switch
+    public static string Wort(Verfuegbarkeit value) => value switch
     {
         Verfuegbarkeit.Open => "open",
         Verfuegbarkeit.Listening => "listening",
         Verfuegbarkeit.Unavailable => "unavailable",
-        _ => throw new ArgumentOutOfRangeException(nameof(wert))
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
     };
 
     /// <summary>Der Zustand zum Wort, oder <c>null</c>.</summary>
-    public static Verfuegbarkeit? Lies(string? wort) => wort switch
+    public static Verfuegbarkeit? Lies(string? word) => word switch
     {
         "open" => Verfuegbarkeit.Open,
         "listening" => Verfuegbarkeit.Listening,
@@ -50,33 +50,33 @@ public static class Verfuegbarkeiten
     };
 }
 
-/// <summary>Der Marktstatus einer Person — „bin ich ansprechbar?"</summary>
+/// <summary>Der MarketStatus einer Person — „bin ich ansprechbar?"</summary>
 /// <remarks>
-/// <strong>Die gefährlichste Angabe im ganzen System.</strong> Ein Lebenslauf
-/// verrät, wo jemand war; der Marktstatus verrät, dass er weg will — und schon
+/// <strong>Die gefährlichste Angabe im ganzen System.</strong> Ein Resume
+/// verrät, wo jemand war; der MarketStatus verrät, dass er weg will — und schon
 /// die <em>Existenz</em> der Aussage kann jemanden den Arbeitsplatz kosten.
 /// <para>
-/// Deshalb gibt es bewusst <strong>kein <c>:public</c></strong>: die Freigabe
-/// nennt immer einen Empfänger. Beim Profil ist „für alle Unternehmen" eine
+/// Deshalb gibt es bewusst <strong>kein <c>:public</c></strong>: die Release
+/// nennt immer einen Empfänger. Beim Profile ist „für alle Unternehmen" eine
 /// sinnvolle Wahl; hier wäre sie ein Schalter, dessen Folgen niemand
 /// überblickt — darunter der eigene Arbeitgeber, der auf derselben Plattform
 /// ist.
 /// </para>
 /// </remarks>
-public sealed class Marktstatus
+public sealed class MarketStatus
 {
     /// <summary>Wie lang die Notiz sein darf.</summary>
     public const int HoechstlaengeNotiz = 500;
 
-    private Marktstatus(
-        SubjectId wer,
+    private MarketStatus(
+        SubjectId subject,
         Verfuegbarkeit verfuegbarkeit,
         bool beschaeftigt,
         string notiz,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm)
     {
-        Wer = wer;
+        Wer = subject;
         Verfuegbarkeit = verfuegbarkeit;
         Beschaeftigt = beschaeftigt;
         Notiz = notiz;
@@ -94,7 +94,7 @@ public sealed class Marktstatus
     /// <remarks>
     /// Ein Feld, kein Zustand: es ist keine Absicht. Man kann beschäftigt
     /// <em>und</em> offen sein — das ist der Normalfall auf einem
-    /// Transfermarkt, und als Zustand wäre er unmöglich.
+    /// TransferMarket, und als Zustand wäre er unmöglich.
     /// </remarks>
     public bool Beschaeftigt { get; private set; }
 
@@ -109,8 +109,8 @@ public sealed class Marktstatus
 
     /// <summary>Darf man diese Person ansprechen?</summary>
     /// <remarks>
-    /// <c>Unavailable</c> heißt nein — auch für ein Unternehmen mit Freigabe.
-    /// <strong>Die Freigabe erlaubt zu sehen, nicht zu stören.</strong>
+    /// <c>Unavailable</c> heißt nein — auch für ein Unternehmen mit Release.
+    /// <strong>Die Release erlaubt zu sehen, nicht zu stören.</strong>
     /// </remarks>
     public bool Ansprechbar =>
         Verfuegbarkeit is Verfuegbarkeit.Open or Verfuegbarkeit.Listening;
@@ -119,28 +119,28 @@ public sealed class Marktstatus
     /// <remarks>
     /// Die Voreinstellung darf nie zugunsten des Marktes ausfallen.
     /// </remarks>
-    public static Marktstatus Voreingestellt(SubjectId wer, DateTimeOffset jetzt) =>
-        new(wer, Verfuegbarkeit.Unavailable, beschaeftigt: false, string.Empty, jetzt, jetzt);
+    public static MarketStatus Voreingestellt(SubjectId subject, DateTimeOffset now) =>
+        new(subject, Verfuegbarkeit.Unavailable, beschaeftigt: false, string.Empty, now, now);
 
     /// <summary>Legt einen Status an.</summary>
     /// <exception cref="Notizfehler">Die Notiz ist zu lang.</exception>
-    public static Marktstatus Lege_an(
-        SubjectId wer,
+    public static MarketStatus Lege_an(
+        SubjectId subject,
         Verfuegbarkeit verfuegbarkeit,
         bool beschaeftigt,
         string notiz,
-        DateTimeOffset jetzt) =>
-        new(wer, verfuegbarkeit, beschaeftigt, Text(notiz), jetzt, jetzt);
+        DateTimeOffset now) =>
+        new(subject, verfuegbarkeit, beschaeftigt, Text(notiz), now, now);
 
     /// <summary>Der Status, wie eine Zeile ihn hält.</summary>
-    public static Marktstatus Stelle_her(
-        SubjectId wer,
+    public static MarketStatus Stelle_her(
+        SubjectId subject,
         Verfuegbarkeit verfuegbarkeit,
         bool beschaeftigt,
         string notiz,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm) =>
-        new(wer, verfuegbarkeit, beschaeftigt, notiz, angelegtAm, geaendertAm);
+        new(subject, verfuegbarkeit, beschaeftigt, notiz, angelegtAm, geaendertAm);
 
     /// <summary>Schreibt den Status neu.</summary>
     /// <exception cref="Notizfehler">Die Notiz ist zu lang.</exception>
@@ -148,7 +148,7 @@ public sealed class Marktstatus
         Verfuegbarkeit verfuegbarkeit,
         bool beschaeftigt,
         string notiz,
-        DateTimeOffset jetzt)
+        DateTimeOffset now)
     {
         // Erst prüfen, dann schreiben: ein abgelehntes Formular darf kein halb
         // geändertes Aggregat hinterlassen.
@@ -157,7 +157,7 @@ public sealed class Marktstatus
         Verfuegbarkeit = verfuegbarkeit;
         Beschaeftigt = beschaeftigt;
         Notiz = geprueft;
-        GeaendertAm = jetzt;
+        GeaendertAm = now;
     }
 
     private static string Text(string? notiz)
@@ -170,12 +170,12 @@ public sealed class Marktstatus
     }
 }
 
-/// <summary>Findet und speichert Marktstatus.</summary>
-public interface IMarktspeicher
+/// <summary>Findet und speichert MarketStatus.</summary>
+public interface IMarketStore
 {
     /// <summary>Der Status dieser Person, oder <c>null</c>.</summary>
-    Task<Marktstatus?> HoleAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    Task<MarketStatus?> GetAsync(SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(Marktstatus status, CancellationToken cancellationToken = default);
+    Task SaveAsync(MarketStatus status, CancellationToken cancellationToken = default);
 }

@@ -19,28 +19,28 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// (ADR-0013).
 /// </para>
 /// </remarks>
-public sealed record EinwilligungPruefenAbfrage(Guid Gegenstand, string Faehigkeit)
-    : IAbfrage<Pruefergebnis>;
+public sealed record CheckConsentQuery(Guid Gegenstand, string Faehigkeit)
+    : IAbfrage<AuditResult>;
 
 /// <summary>Reads the newest fact and reduces it.</summary>
-public sealed class EinwilligungPruefenHandler(IConsentLedger buch)
-    : IRequestHandler<EinwilligungPruefenAbfrage, Pruefergebnis>
+public sealed class CheckConsentHandler(IConsentLedger buch)
+    : IRequestHandler<CheckConsentQuery, AuditResult>
 {
     /// <inheritdoc />
-    public async Task<Pruefergebnis> Handle(
-        EinwilligungPruefenAbfrage request,
+    public async Task<AuditResult> Handle(
+        CheckConsentQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (!Capability.TryParse(request.Faehigkeit, out var faehigkeit))
+        if (!Capability.TryParse(request.Faehigkeit, out var skill))
         {
-            return new Pruefergebnis.Unbrauchbar("capability");
+            return new AuditResult.Unbrauchbar("capability");
         }
 
-        var neuestes = await buch.NeuestesAsync(
-            new SubjectId(request.Gegenstand), faehigkeit, cancellationToken);
+        var neuestes = await buch.LatestOneAsync(
+            new SubjectId(request.Gegenstand), skill, cancellationToken);
 
-        return new Pruefergebnis.Stand(Projektion.Stand(neuestes is null ? [] : [neuestes]));
+        return new AuditResult.State(Projektion.State(neuestes is null ? [] : [neuestes]));
     }
 }

@@ -20,7 +20,7 @@ namespace WorkerTransfer.Identity.Application.Konto;
 /// <param name="SchluesselDa">Ob ein Schlüssel hinterlegt ist.</param>
 /// <param name="SchluesselEndung">Seine letzten vier Zeichen.</param>
 /// <param name="KiProtokoll">Ob Anfragen protokolliert werden.</param>
-public sealed record Einstellungsansicht(
+public sealed record SettingsView(
     int? LoeschungNachMonaten,
     string Anbieter,
     string Adresse,
@@ -31,44 +31,44 @@ public sealed record Einstellungsansicht(
 
 /// <summary>Die eigenen Einstellungen lesen. Immer nur die eigenen.</summary>
 /// <param name="Wer">Der Aufrufer.</param>
-public sealed record EinstellungenAbfrage(SubjectId Wer) : IAbfrage<Einstellungsansicht>;
+public sealed record SettingsQuery(SubjectId Wer) : IAbfrage<SettingsView>;
 
 /// <inheritdoc cref="EinstellungenAbfrage" />
-public sealed class EinstellungenHandler(IKontoeinstellungen speicher)
-    : IRequestHandler<EinstellungenAbfrage, Einstellungsansicht>
+public sealed class SettingsHandler(IAccountSettingsStore store)
+    : IRequestHandler<SettingsQuery, SettingsView>
 {
     /// <inheritdoc />
-    public async Task<Einstellungsansicht> Handle(
-        EinstellungenAbfrage request, CancellationToken cancellationToken)
+    public async Task<SettingsView> Handle(
+        SettingsQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var stand = await speicher.HoleAsync(request.Wer, cancellationToken);
-        return Ansicht(stand);
+        var state = await store.GetAsync(request.Wer, cancellationToken);
+        return Ansicht(state);
     }
 
     /// <summary>Aus dem Aggregat wird die Ansicht — ohne das Geheimnis.</summary>
-    internal static Einstellungsansicht Ansicht(Kontoeinstellungen stand) =>
-        new(stand.LoeschungNachMonaten,
-            Etikett(stand.Anbieter),
-            stand.Adresse,
-            stand.Modell,
-            stand.SchluesselVerschluesselt.Length > 0,
-            stand.SchluesselEndung,
-            stand.KiProtokoll);
+    internal static SettingsView Ansicht(AccountSettings state) =>
+        new(state.LoeschungNachMonaten,
+            Etikett(state.Anbieter),
+            state.Adresse,
+            state.Modell,
+            state.SchluesselVerschluesselt.Length > 0,
+            state.SchluesselEndung,
+            state.KiProtokoll);
 
-    internal static string Etikett(KiAnbieter anbieter) => anbieter switch
+    internal static string Etikett(AiProvider provider) => provider switch
     {
-        KiAnbieter.OpenAiKompatibel => "openai_compatible",
-        KiAnbieter.Anthropic => "anthropic",
+        AiProvider.OpenAiKompatibel => "openai_compatible",
+        AiProvider.Anthropic => "anthropic",
         _ => "none"
     };
 
-    internal static KiAnbieter Anbieter(string? etikett) => etikett switch
+    internal static AiProvider Anbieter(string? label) => label switch
     {
-        "openai_compatible" => KiAnbieter.OpenAiKompatibel,
-        "anthropic" => KiAnbieter.Anthropic,
-        _ => KiAnbieter.Keiner
+        "openai_compatible" => AiProvider.OpenAiKompatibel,
+        "anthropic" => AiProvider.Anthropic,
+        _ => AiProvider.None
     };
 }
 
@@ -85,36 +85,36 @@ public sealed class EinstellungenHandler(IKontoeinstellungen speicher)
 /// <param name="Adresse">Dessen Adresse.</param>
 /// <param name="Modell">Dessen Modell.</param>
 /// <param name="KiProtokoll">Ob Anfragen protokolliert werden.</param>
-public sealed record EinstellungenSetzenBefehl(
+public sealed record SetSettingsCommand(
     SubjectId Wer,
     int? LoeschungNachMonaten,
     string Anbieter,
     string Adresse,
     string Modell,
-    bool KiProtokoll) : IBefehl<Einstellungsansicht>;
+    bool KiProtokoll) : IBefehl<SettingsView>;
 
 /// <inheritdoc cref="EinstellungenSetzenBefehl" />
-public sealed class EinstellungenSetzenHandler(IKontoeinstellungen speicher)
-    : IRequestHandler<EinstellungenSetzenBefehl, Einstellungsansicht>
+public sealed class SetSettingsHandler(IAccountSettingsStore store)
+    : IRequestHandler<SetSettingsCommand, SettingsView>
 {
     /// <inheritdoc />
-    public async Task<Einstellungsansicht> Handle(
-        EinstellungenSetzenBefehl request, CancellationToken cancellationToken)
+    public async Task<SettingsView> Handle(
+        SetSettingsCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var stand = await speicher.HoleAsync(request.Wer, cancellationToken);
+        var state = await store.GetAsync(request.Wer, cancellationToken);
 
-        stand.SetzeDatenschutz(request.LoeschungNachMonaten);
-        stand.SetzeKi(
-            EinstellungenHandler.Anbieter(request.Anbieter),
+        state.SetzeDatenschutz(request.LoeschungNachMonaten);
+        state.SetzeKi(
+            SettingsHandler.Anbieter(request.Anbieter),
             request.Adresse,
             request.Modell,
             request.KiProtokoll);
 
-        await speicher.SichereAsync(stand, cancellationToken);
+        await store.SaveAsync(state, cancellationToken);
 
-        return EinstellungenHandler.Ansicht(stand);
+        return SettingsHandler.Ansicht(state);
     }
 }
 
@@ -128,7 +128,7 @@ public sealed record SchluesselSetzenBefehl(SubjectId Wer, string Klartext) : IB
 
 /// <inheritdoc cref="SchluesselSetzenBefehl" />
 public sealed class SchluesselSetzenHandler(
-    IKontoeinstellungen speicher, IGeheimnisse geheimnisse)
+    IAccountSettingsStore store, ISecrets geheimnisse)
     : IRequestHandler<SchluesselSetzenBefehl, bool>
 {
     /// <inheritdoc />
@@ -137,20 +137,20 @@ public sealed class SchluesselSetzenHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var stand = await speicher.HoleAsync(request.Wer, cancellationToken);
+        var state = await store.GetAsync(request.Wer, cancellationToken);
         var klartext = request.Klartext.Trim();
 
         if (klartext.Length == 0)
         {
-            stand.LoescheSchluessel();
+            state.LoescheSchluessel();
         }
         else
         {
-            stand.SetzeSchluessel(
-                geheimnisse.Verschluessele(klartext), geheimnisse.Endung(klartext));
+            state.SetzeSchluessel(
+                geheimnisse.Encrypt(klartext), geheimnisse.Endung(klartext));
         }
 
-        await speicher.SichereAsync(stand, cancellationToken);
+        await store.SaveAsync(state, cancellationToken);
         return true;
     }
 }
@@ -163,44 +163,44 @@ public sealed class SchluesselSetzenHandler(
 /// Gestalt nie: <c>GET /account/settings</c> trägt den Schlüssel absichtlich
 /// nicht.
 /// </remarks>
-public sealed record InternerKiZugang(
+public sealed record InternalAiAccess(
     string Anbieter, string Adresse, string Modell, string Schluessel);
 
 /// <summary>Den KI-Zugang einer Person lesen — für andere Dienste, nicht für den Browser.</summary>
-public sealed record InterneKiZugangAbfrage(SubjectId Wer) : IAbfrage<InternerKiZugang>;
+public sealed record InternalAiAccessQuery(SubjectId Wer) : IAbfrage<InternalAiAccess>;
 
 /// <inheritdoc cref="InterneKiZugangAbfrage" />
-public sealed class InterneKiZugangHandler(
-    IKontoeinstellungen speicher, IGeheimnisse geheimnisse)
-    : IRequestHandler<InterneKiZugangAbfrage, InternerKiZugang>
+public sealed class InternalAiAccessHandler(
+    IAccountSettingsStore store, ISecrets geheimnisse)
+    : IRequestHandler<InternalAiAccessQuery, InternalAiAccess>
 {
     /// <inheritdoc />
-    public async Task<InternerKiZugang> Handle(
-        InterneKiZugangAbfrage request, CancellationToken cancellationToken)
+    public async Task<InternalAiAccess> Handle(
+        InternalAiAccessQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var stand = await speicher.HoleAsync(request.Wer, cancellationToken);
+        var state = await store.GetAsync(request.Wer, cancellationToken);
 
-        return new InternerKiZugang(
-            EinstellungenHandler.Etikett(stand.Anbieter),
-            stand.Adresse,
-            stand.Modell,
-            geheimnisse.Entschluessele(stand.SchluesselVerschluesselt) ?? string.Empty);
+        return new InternalAiAccess(
+            SettingsHandler.Etikett(state.Anbieter),
+            state.Adresse,
+            state.Modell,
+            geheimnisse.Decrypt(state.SchluesselVerschluesselt) ?? string.Empty);
     }
 }
 
 /// <summary>
-/// Klarname und Kontakt einer Person — intern, und ausdrücklich ohne Anschrift.
+/// Klarname und Kontakt einer Person — intern, und ausdrücklich ohne PostalAddress.
 /// </summary>
 /// <remarks>
 /// <para><strong>Zwei Felder, und mehr dürfen es nie werden.</strong> Der
-/// bürgerliche Name und die Adresse, unter der man antworten kann. Keine
-/// Postanschrift, kein Telefon: ADR-0038 legt die Anschrift als
-/// <em>Vorlage</em> für einen Briefkopf ab, und sie gehört zu einer Bewerbung,
+/// bürgerliche Name und die Adresse, unter der man antworten kann. None
+/// Postanschrift, kein Telefon: ADR-0038 legt die PostalAddress als
+/// <em>ResumeTemplate</em> für einen Briefkopf ab, und sie gehört zu einer JobApplication,
 /// die die Person selbst sendet — nicht in die Ansicht eines Unternehmens.</para>
 /// </remarks>
-public sealed record InternePerson(string Name, string Email);
+public sealed record InternalPerson(string Name, string Email);
 
 /// <summary>
 /// Wie ein Mensch heisst — für advisor-service, hinter dem Geheimnis.
@@ -217,15 +217,15 @@ public sealed record InternePerson(string Name, string Email);
 /// <para>Deshalb ist die Tür so eng: sie antwortet auf genau eine Kennung, mit
 /// genau zwei Feldern, und sie kennt keine Liste.</para>
 /// </remarks>
-public sealed record InternePersonAbfrage(SubjectId Wer) : IAbfrage<InternePerson?>;
+public sealed record InternalPersonQuery(SubjectId Wer) : IAbfrage<InternalPerson?>;
 
 /// <inheritdoc cref="InternePersonAbfrage" />
-public sealed class InternePersonHandler(IUserRepository konten)
-    : IRequestHandler<InternePersonAbfrage, InternePerson?>
+public sealed class InternalPersonHandler(IUserRepository konten)
+    : IRequestHandler<InternalPersonQuery, InternalPerson?>
 {
     /// <inheritdoc />
-    public async Task<InternePerson?> Handle(
-        InternePersonAbfrage request, CancellationToken cancellationToken)
+    public async Task<InternalPerson?> Handle(
+        InternalPersonQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -235,6 +235,6 @@ public sealed class InternePersonHandler(IUserRepository konten)
         // buergerlicher hinterlegt ist — dasselbe, was unter einem Anschreiben
         // steht. Leer bleibt leer, und der Aufrufer laesst das Feld dann ganz
         // weg: nicht freigegeben und nicht vorhanden sehen gleich aus.
-        return konto is null ? null : new InternePerson(konto.Klarname, konto.Email);
+        return konto is null ? null : new InternalPerson(konto.Klarname, konto.Email);
     }
 }

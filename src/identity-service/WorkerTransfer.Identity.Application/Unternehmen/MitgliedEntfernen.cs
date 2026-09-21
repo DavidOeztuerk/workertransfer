@@ -8,7 +8,7 @@ using WorkerTransfer.Identity.Domain.Companies;
 namespace WorkerTransfer.Identity.Application.Unternehmen;
 
 /// <summary>Remove a member — or oneself.</summary>
-public sealed record MitgliedEntfernenBefehl(SubjectId Wer, TenantId Firma, SubjectId Mitglied)
+public sealed record RemoveMemberCommand(SubjectId Wer, TenantId Firma, SubjectId Mitglied)
     : IBefehl<Unit>;
 
 /// <inheritdoc cref="MitgliedEntfernenBefehl" />
@@ -17,17 +17,17 @@ public sealed record MitgliedEntfernenBefehl(SubjectId Wer, TenantId Firma, Subj
 /// access token already issued stays valid until it expires — the same known
 /// remainder as signing out.
 /// </remarks>
-public sealed class MitgliedEntfernenHandler(
-    Firmenzugriff zugriff,
+public sealed class RemoveMemberHandler(
+    CompanyAccess zugriff,
     IMembershipRepository mitgliedschaften,
     IAuditTrail protokoll,
     IKorrelation korrelation,
     TimeProvider uhr)
-    : IRequestHandler<MitgliedEntfernenBefehl, Unit>
+    : IRequestHandler<RemoveMemberCommand, Unit>
 {
     /// <inheritdoc />
     public async Task<Unit> Handle(
-        MitgliedEntfernenBefehl request,
+        RemoveMemberCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -38,15 +38,15 @@ public sealed class MitgliedEntfernenHandler(
         // somebody could be held in a company by the company.
         if (!selbst)
         {
-            await zugriff.AlsAdminAsync(
+            await zugriff.AsAdminAsync(
                 request.Wer, request.Firma, Verwaltungsakt.Entfernen, cancellationToken);
         }
 
-        var rolle = await mitgliedschaften.RoleOfAsync(
+        var role = await mitgliedschaften.RoleOfAsync(
             request.Mitglied, request.Firma, cancellationToken)
             ?? throw new NotAMemberException();
 
-        if (rolle == MembershipRole.Admin
+        if (role == MembershipRole.Admin
             && await mitgliedschaften.CountAdminsAsync(request.Firma, cancellationToken) <= 1)
         {
             throw new LastAdminMayNotLeaveException();

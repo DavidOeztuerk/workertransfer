@@ -17,12 +17,12 @@ namespace WorkerTransfer.Notification.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("WorkerTransfer.Notification.Infrastructure.Persistence.EingangsZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Notification.Infrastructure.Persistence.InboxRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -53,7 +53,7 @@ namespace WorkerTransfer.Notification.Infrastructure.Persistence.Migrations
                     b.ToTable("notifications", (string)null);
                 });
 
-            modelBuilder.Entity("WorkerTransfer.Notification.Infrastructure.Persistence.WunschZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Notification.Infrastructure.Persistence.PreferenceRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -71,6 +71,8 @@ namespace WorkerTransfer.Notification.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("notification_preferences", (string)null);
+
+                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
                 });
 #pragma warning restore 612, 618
         }

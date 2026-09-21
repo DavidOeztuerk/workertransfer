@@ -6,15 +6,15 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.GitHub.Application.Ports;
-using WorkerTransfer.GitHub.Domain.Verbindungen;
+using WorkerTransfer.GitHub.Domain.Connections;
 
 namespace WorkerTransfer.GitHub.Infrastructure.Netz;
 
 /// <summary>Wohin gefragt wird, und womit.</summary>
-public sealed class GitHubeinstellungen
+public sealed class GitHubSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "GitHub";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "GitHub";
 
     /// <summary>Die Basisadresse der API.</summary>
     public string Adresse { get; set; } = "https://api.github.com";
@@ -30,9 +30,9 @@ public sealed class GitHubeinstellungen
     /// <summary>Womit dieser Dienst sich bei GitHub meldet.</summary>
     /// <remarks>
     /// <strong>Pflicht, nicht Höflichkeit.</strong> GitHubs API beantwortet
-    /// JEDE Anfrage ohne <c>User-Agent</c> mit <c>403</c> — nicht mit 400, nicht
+    /// JEDE ResumeRequest ohne <c>User-Agent</c> mit <c>403</c> — nicht mit 400, nicht
     /// mit einer Meldung, die das Wort nennt. Gemessen am 04.09.2026: dieselbe
-    /// Adresse antwortet mit Kopf <c>200</c> und ohne ihn <c>403</c>.
+    /// Adresse antwortet mit Header <c>200</c> und ohne ihn <c>403</c>.
     /// <para>
     /// Solange er fehlte, hat dieser Dienst NIE funktioniert: der Gist-Nachweis
     /// nicht und der Abruf der Repositories auch nicht. Beides endete in
@@ -61,7 +61,7 @@ internal sealed record RepoEintrag(
     /// <summary>Was der Besitzer selbst an das Repository geschrieben hat.</summary>
     /// <remarks>
     /// Kommt seit 2022 ohne Zutun in der Liste mit — kein zweiter Aufruf, kein
-    /// besonderer Kopf. Und es ist der stärkste Beleg von allen, weil er eine
+    /// besonderer Header. Und es ist der stärkste Evidence von allen, weil er eine
     /// NENNUNG ist: „kubernetes" hat ein Mensch dorthin geschrieben.
     /// </remarks>
     [property: JsonPropertyName("topics")] IReadOnlyList<string>? Topics,
@@ -70,7 +70,7 @@ internal sealed record RepoEintrag(
 /// <summary>Fragt GitHub — einmal, auf Bitte eines Menschen.</summary>
 public sealed class HttpGitHub(
     IHttpClientFactory fabrik,
-    IOptions<GitHubeinstellungen> einstellungen,
+    IOptions<GitHubSettings> einstellungen,
     ILogger<HttpGitHub> protokoll) : IGitHub
 {
     /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
@@ -85,19 +85,19 @@ public sealed class HttpGitHub(
     /// </remarks>
     public const int JeSeite = 100;
 
-    private readonly GitHubeinstellungen _einstellungen = einstellungen.Value;
+    private readonly GitHubSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task<bool> HatNachweisgistAsync(
+    public async Task<bool> HasProofGistAsync(
         string login, string einmalzeichenfolge, CancellationToken cancellationToken = default)
     {
-        var gesucht = Verbindung.Gistbeschreibung(einmalzeichenfolge);
+        var gesucht = Connection.Gistbeschreibung(einmalzeichenfolge);
 
-        var gists = await HoleAsync<List<GistEintrag>>(
+        var gists = await GetAsync<List<GistEintrag>>(
             $"/users/{Uri.EscapeDataString(login)}/gists?per_page={JeSeite}", cancellationToken);
 
-        return gists?.Any(eintrag =>
-            string.Equals(eintrag.Description, gesucht, StringComparison.Ordinal)) ?? false;
+        return gists?.Any(entry =>
+            string.Equals(entry.Description, gesucht, StringComparison.Ordinal)) ?? false;
     }
 
     /// <summary>
@@ -129,20 +129,20 @@ public sealed class HttpGitHub(
     public async Task<Abzug> RepositoriesAsync(
         string login, CancellationToken cancellationToken = default)
     {
-        var eintraege = await HoleAsync<List<RepoEintrag>>(
+        var entries = await GetAsync<List<RepoEintrag>>(
             $"/users/{Uri.EscapeDataString(login)}/repos"
             + $"?per_page={JeSeite}&sort=pushed&type=owner",
             cancellationToken);
 
-        if (eintraege is null)
+        if (entries is null)
         {
             return new Abzug([], true);
         }
 
-        // Forks bleiben draußen: eine Kopie fremder Arbeit ist kein Beleg für
+        // Forks bleiben draußen: eine Kopie fremder Arbeit ist kein Evidence für
         // eigene, und sie unter „meine Repositories" zu zeigen wäre genau die
         // stillschweigende Behauptung, die ADR-0022 ausschließt.
-        var eigene = eintraege.Where(eintrag => !eintrag.Fork).ToList();
+        var eigene = entries.Where(entry => !entry.Fork).ToList();
 
         // Die Liste kommt nach `pushed` sortiert — wenn das Budget nicht für
         // alle reicht, bekommen die zuletzt bearbeiteten ihre Sprachen.
@@ -150,26 +150,26 @@ public sealed class HttpGitHub(
             ? SprachenOhneToken
             : SprachenMitToken;
 
-        var belege = new List<Repository>(eigene.Count);
+        var evidences = new List<Repository>(eigene.Count);
 
-        foreach (var eintrag in eigene)
+        foreach (var entry in eigene)
         {
-            var name = eintrag.Name ?? string.Empty;
+            var name = entry.Name ?? string.Empty;
 
-            belege.Add(new Repository(
+            evidences.Add(new Repository(
                 name,
-                eintrag.Description ?? string.Empty,
-                eintrag.Language,
-                eintrag.StargazersCount,
-                eintrag.HtmlUrl ?? string.Empty,
-                eintrag.PushedAt,
-                belege.Count < budget
-                    ? await SprachenAsync(login, name, cancellationToken)
+                entry.Description ?? string.Empty,
+                entry.Language,
+                entry.StargazersCount,
+                entry.HtmlUrl ?? string.Empty,
+                entry.PushedAt,
+                evidences.Count < budget
+                    ? await LanguagesAsync(login, name, cancellationToken)
                     : [],
-                eintrag.Topics ?? []));
+                entry.Topics ?? []));
         }
 
-        return new Abzug(belege, eigene.Count <= budget);
+        return new Abzug(evidences, eigene.Count <= budget);
     }
 
     /// <summary>Welche Sprachen in einem Repository vorkommen.</summary>
@@ -187,7 +187,7 @@ public sealed class HttpGitHub(
     /// es sagen kann.
     /// </para>
     /// </remarks>
-    private async Task<IReadOnlyList<string>> SprachenAsync(
+    private async Task<IReadOnlyList<string>> LanguagesAsync(
         string login, string repository, CancellationToken cancellationToken)
     {
         if (repository.Length == 0)
@@ -195,71 +195,71 @@ public sealed class HttpGitHub(
             return [];
         }
 
-        var gemeldet = await HoleAsync<Dictionary<string, long>>(
+        var gemeldet = await GetAsync<Dictionary<string, long>>(
             $"/repos/{Uri.EscapeDataString(login)}/{Uri.EscapeDataString(repository)}/languages",
             cancellationToken);
 
         return gemeldet is null ? [] : [.. gemeldet.Keys];
     }
 
-    private async Task<T?> HoleAsync<T>(string pfad, CancellationToken cancellationToken)
+    private async Task<T?> GetAsync<T>(string path, CancellationToken cancellationToken)
     {
         using var client = fabrik.CreateClient(Klient);
         client.Timeout = _einstellungen.Zeitueberschreitung;
 
-        using var anfrage = new HttpRequestMessage(
-            HttpMethod.Get, new Uri(new Uri(_einstellungen.Adresse), pfad));
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, new Uri(new Uri(_einstellungen.Adresse), path));
 
-        anfrage.Headers.Accept.Add(
+        request.Headers.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
 
-        // Ohne diesen Kopf antwortet GitHub auf alles mit 403. Siehe
-        // `GitHubeinstellungen.Benutzerkennung`.
-        anfrage.Headers.UserAgent.ParseAdd(_einstellungen.Benutzerkennung);
+        // Ohne diesen Header antwortet GitHub auf alles mit 403. Siehe
+        // `GitHubSettings.Benutzerkennung`.
+        request.Headers.UserAgent.ParseAdd(_einstellungen.Benutzerkennung);
 
         if (_einstellungen.Token is { Length: > 0 } token)
         {
-            anfrage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
-            protokoll.LogWarning("GitHub nicht erreichbar ({Art})", fehler.GetType().Name);
-            throw new GitHubSchweigt("github unreachable", fehler);
+            protokoll.LogWarning("GitHub nicht erreichbar ({Art})", error.GetType().Name);
+            throw new GitHubSignInSilent("github unreachable", error);
         }
-        catch (TaskCanceledException fehler) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
             protokoll.LogWarning("GitHub antwortete nicht rechtzeitig");
-            throw new GitHubSchweigt("github did not answer in time", fehler);
+            throw new GitHubSignInSilent("github did not answer in time", error);
         }
 
-        using (antwort)
+        using (response)
         {
             // „Gibt es nicht" ist eine Antwort, kein Ausfall.
-            if (antwort.StatusCode == HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return default;
             }
 
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
-                protokoll.LogWarning("GitHub antwortete mit {Code}", (int)antwort.StatusCode);
-                throw new GitHubSchweigt($"github returned {(int)antwort.StatusCode}");
+                protokoll.LogWarning("GitHub antwortete mit {Code}", (int)response.StatusCode);
+                throw new GitHubSignInSilent($"github returned {(int)response.StatusCode}");
             }
 
             try
             {
-                return await antwort.Content.ReadFromJsonAsync<T>(cancellationToken);
+                return await response.Content.ReadFromJsonAsync<T>(cancellationToken);
             }
-            catch (JsonException fehler)
+            catch (JsonException error)
             {
-                throw new GitHubSchweigt("github sent an unusable answer", fehler);
+                throw new GitHubSignInSilent("github sent an unusable answer", error);
             }
         }
     }

@@ -30,17 +30,17 @@ public class TopologieTests
         using var gelesen = JsonDocument.Parse(
             roh, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
 
-        var ziele = new Dictionary<string, int>(StringComparer.Ordinal);
+        var targets = new Dictionary<string, int>(StringComparer.Ordinal);
 
         foreach (var route in gelesen.RootElement.GetProperty("Routes").EnumerateArray())
         {
-            foreach (var ziel in route.GetProperty("DownstreamHostAndPorts").EnumerateArray())
+            foreach (var target in route.GetProperty("DownstreamHostAndPorts").EnumerateArray())
             {
-                ziele[ziel.GetProperty("Host").GetString()!] = ziel.GetProperty("Port").GetInt32();
+                targets[target.GetProperty("Host").GetString()!] = target.GetProperty("Port").GetInt32();
             }
         }
 
-        return ziele;
+        return targets;
     });
 
     /// <summary>Was Compose anlegt: Dienstname auf (SERVICE_DIR, Hafen).</summary>
@@ -52,26 +52,26 @@ public class TopologieTests
             var gelesen = new DeserializerBuilder().Build()
                 .Deserialize<Dictionary<string, object>>(roh);
 
-            var dienste = (Dictionary<object, object>)gelesen["services"];
-            var gefunden = new Dictionary<string, (string, int)>(StringComparer.Ordinal);
+            var services = (Dictionary<object, object>)gelesen["services"];
+            var found = new Dictionary<string, (string, int)>(StringComparer.Ordinal);
 
-            foreach (var (name, block) in dienste)
+            foreach (var (name, block) in services)
             {
-                if (block is not Dictionary<object, object> felder
-                    || !felder.TryGetValue("environment", out var umgebung)
-                    || umgebung is not Dictionary<object, object> werte
-                    || !werte.TryGetValue("SERVICE_DIR", out var dir))
+                if (block is not Dictionary<object, object> fields
+                    || !fields.TryGetValue("environment", out var umgebung)
+                    || umgebung is not Dictionary<object, object> values
+                    || !values.TryGetValue("SERVICE_DIR", out var dir))
                 {
                     continue;
                 }
 
-                var urls = werte["ASPNETCORE_URLS"]!.ToString()!;
+                var urls = values["ASPNETCORE_URLS"]!.ToString()!;
                 var hafen = int.Parse(Regex.Match(urls, @":(\d+)").Groups[1].Value);
 
-                gefunden[name.ToString()!] = (dir.ToString()!, hafen);
+                found[name.ToString()!] = (dir.ToString()!, hafen);
             }
 
-            return gefunden;
+            return found;
         });
 
     /// <summary>Was das Chart anlegt.</summary>
@@ -116,16 +116,16 @@ public class TopologieTests
     public void Compose_und_Chart_beschreiben_dieselbe_Landschaft()
     {
         var ausDemChart = Chart.Value.ToDictionary(
-            eintrag => eintrag["name"].ToString()!,
-            eintrag => (Dir: eintrag["dir"].ToString()!,
-                        Hafen: int.Parse(eintrag["port"].ToString()!)),
+            entry => entry["name"].ToString()!,
+            entry => (Dir: entry["dir"].ToString()!,
+                        Hafen: int.Parse(entry["port"].ToString()!)),
             StringComparer.Ordinal);
 
         // `gateway` steht in Compose als Dienst, im Chart aber in einer eigenen
-        // Vorlage — es ist der Eingang, kein Nachbar.
+        // ResumeTemplate — es ist der Eingang, kein Nachbar.
         var ausCompose = Compose.Value
-            .Where(eintrag => eintrag.Key != "gateway")
-            .ToDictionary(eintrag => eintrag.Key, eintrag => eintrag.Value, StringComparer.Ordinal);
+            .Where(entry => entry.Key != "gateway")
+            .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
 
         ausDemChart.Keys.Should().BeEquivalentTo(ausCompose.Keys);
 
@@ -158,18 +158,18 @@ public class TopologieTests
             sql, @"^\s*--.*$", string.Empty, RegexOptions.Multiline);
 
         var angelegt = Regex.Matches(ohneKommentar, @"CREATE DATABASE (\w+)")
-            .Select(treffer => treffer.Groups[1].Value)
+            .Select(hit => hit.Groups[1].Value)
             .ToHashSet(StringComparer.Ordinal);
 
         // `identity` legt der Postgres-Einstiegspunkt selbst an (POSTGRES_DB).
         angelegt.Add("identity");
 
-        foreach (var eintrag in Chart.Value)
+        foreach (var entry in Chart.Value)
         {
-            var datenbank = eintrag["database"].ToString()!;
+            var datenbank = entry["database"].ToString()!;
 
             angelegt.Should().Contain(
-                datenbank, $"{eintrag["name"]} erwartet die Datenbank {datenbank}");
+                datenbank, $"{entry["name"]} erwartet die Datenbank {datenbank}");
         }
     }
 

@@ -18,7 +18,7 @@ namespace WorkerTransfer.ServiceDefaults;
 ///
 /// <para><strong>Hier und nicht in identity-service.</strong> Sie stand dort,
 /// solange identity der einzige Dienst mit Richtlinien war. Seit die
-/// Firmenrechte in vier Diensten hängen, ist sie genau das, was
+/// CompanyPermissions in vier Diensten hängen, ist sie genau das, was
 /// <c>ServiceDefaults</c> trägt: eine Gestalt über alle Dienste, damit ein
 /// Aufrufer nicht wissen muss, wer geantwortet hat, um den Fehler zu lesen.</para>
 ///
@@ -26,7 +26,7 @@ namespace WorkerTransfer.ServiceDefaults;
 /// Richtlinie fehlte, steht bewusst nicht darin: das wäre eine Landkarte der
 /// Rechte für jeden, der sie abfragt.</para>
 /// </remarks>
-public sealed class Ablehnungsgestalt : IAuthorizationMiddlewareResultHandler
+public sealed class RejectionShape : IAuthorizationMiddlewareResultHandler
 {
     /// <summary>
     /// Die Notiz, mit der ein Handler sagt: es lag nicht am Recht, sondern
@@ -54,7 +54,7 @@ public sealed class Ablehnungsgestalt : IAuthorizationMiddlewareResultHandler
 
         if (authorizeResult.Challenged)
         {
-            await ProblemDetailsMiddleware.Schreibe(
+            await ProblemDetailsMiddleware.Write(
                 context, StatusCodes.Status401Unauthorized,
                 "Request failed", "not authenticated");
             return;
@@ -64,13 +64,13 @@ public sealed class Ablehnungsgestalt : IAuthorizationMiddlewareResultHandler
         {
             if (context.Items.ContainsKey(Schweigt))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "the role lookup did not answer");
                 return;
             }
 
-            await ProblemDetailsMiddleware.Schreibe(
+            await ProblemDetailsMiddleware.Write(
                 context, StatusCodes.Status403Forbidden,
                 "Request failed", "not permitted");
             return;

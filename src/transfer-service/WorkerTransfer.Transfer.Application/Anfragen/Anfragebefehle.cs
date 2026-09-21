@@ -7,15 +7,15 @@ using WorkerTransfer.Transfer.Domain.Anfragen;
 
 namespace WorkerTransfer.Transfer.Application.Anfragen;
 
-/// <summary>Wie eine Anfrage ausgegangen ist.</summary>
-public abstract record Anfrageergebnis
+/// <summary>Wie eine ResumeRequest ausgegangen ist.</summary>
+public abstract record ResumeRequestResult
 {
-    private Anfrageergebnis()
+    private ResumeRequestResult()
     {
     }
 
     /// <summary>Hat geklappt.</summary>
-    public sealed record Erledigt(Marktanfrage Anfrage) : Anfrageergebnis;
+    public sealed record Erledigt(MarketRequest ResumeRequest) : ResumeRequestResult;
 
     /// <summary>
     /// Nicht sichtbar, nicht vorhanden, nicht meins — von außen dasselbe.
@@ -24,218 +24,218 @@ public abstract record Anfrageergebnis
     /// Der Unterschied wäre hier besonders teuer: schon die Existenz der
     /// Aussage verrät etwas.
     /// </remarks>
-    public sealed record NichtSichtbar : Anfrageergebnis;
+    public sealed record NichtSichtbar : ResumeRequestResult;
 
     /// <summary>Dieses Unternehmen hat schon gefragt.</summary>
-    public sealed record SchonGefragt : Anfrageergebnis;
+    public sealed record SchonGefragt : ResumeRequestResult;
 
     /// <summary>Der Zustand passt nicht.</summary>
-    public sealed record Zustandskonflikt(string Grund) : Anfrageergebnis;
+    public sealed record StateConflict(string Grund) : ResumeRequestResult;
 }
 
 /// <summary>„Darf ich sehen, ob du gerade zuhörst?"</summary>
 /// <remarks>
-/// Die leichtere der beiden Fragen — die schwerere ist der Vorgang selbst. Sie
+/// Die leichtere der beiden Fragen — die schwerere ist der Case selbst. Sie
 /// zu beantworten kostet nichts: wer <c>unavailable</c> ist und freigibt, zeigt
 /// genau das, und niemand wurde gestört.
 /// </remarks>
-public sealed record MarktstatusAnfragenBefehl(SubjectId Wer, TenantId Firma, SubjectId Frager)
-    : IBefehl<Anfrageergebnis>;
+public sealed record RequestMarketStatusCommand(SubjectId Wer, TenantId Firma, SubjectId Frager)
+    : IBefehl<ResumeRequestResult>;
 
 /// <summary>Die Person antwortet.</summary>
-public sealed record AnfrageBeantwortenBefehl(Guid Id, SubjectId Wer, bool Erteilen)
-    : IBefehl<Anfrageergebnis>;
+public sealed record AnswerRequestCommand(Guid Id, SubjectId Wer, bool Erteilen)
+    : IBefehl<ResumeRequestResult>;
 
 /// <summary>Die Person nimmt den Zugriff zurück.</summary>
-public sealed record ZugriffWiderrufenBefehl(Guid Id, SubjectId Wer) : IBefehl<Anfrageergebnis>;
+public sealed record RevokeAccessCommand(Guid Id, SubjectId Wer) : IBefehl<ResumeRequestResult>;
 
 /// <summary>Die Anfragen über mich, mit dem Urteil des Ledgers daneben.</summary>
-public sealed record MeineAnfragenAbfrage(SubjectId Wer)
-    : IAbfrage<IReadOnlyList<Anfrageansicht>>;
+public sealed record MyRequestsQuery(SubjectId Wer)
+    : IAbfrage<IReadOnlyList<ResumeRequestView>>;
 
 /// <summary>Die Anfragen dieses Unternehmens.</summary>
 /// <remarks>
 /// Auch abgelehnte bleiben sichtbar. Sonst sähen „abgelehnt" und „nie gefragt"
 /// gleich aus — und dann fragt jemand erneut, im guten Glauben.
 /// </remarks>
-public sealed record FirmenanfragenAbfrage(TenantId Firma) : IAbfrage<IReadOnlyList<Marktanfrage>>;
+public sealed record CompanyRequestsQuery(TenantId Firma) : IAbfrage<IReadOnlyList<MarketRequest>>;
 
-/// <summary>Eine Anfrage und ob der Zugriff gerade gilt.</summary>
+/// <summary>Eine ResumeRequest und ob der Zugriff gerade gilt.</summary>
 /// <remarks>
-/// <c>Aktiv</c> kommt frisch aus dem Ledger und kann vom Stand abweichen: nach
-/// einem Widerruf bleibt <c>GRANTED</c> stehen, <c>Aktiv</c> fällt auf falsch.
-/// Genau deshalb steht die Berechtigung nicht im Vorgang.
+/// <c>Aktiv</c> kommt frisch aus dem Ledger und kann vom State abweichen: nach
+/// einem Revocation bleibt <c>GRANTED</c> stehen, <c>Aktiv</c> fällt auf falsch.
+/// Genau deshalb steht die Berechtigung nicht im Case.
 /// </remarks>
-public sealed record Anfrageansicht(Marktanfrage Anfrage, bool? Aktiv);
+public sealed record ResumeRequestView(MarketRequest ResumeRequest, bool? Aktiv);
 
 /// <summary>Stellt, beantwortet und widerruft Anfragen.</summary>
-public sealed class Anfragebefehle(
-    IAnfragenspeicher speicher,
-    IEinwilligungstor tor,
+public sealed class RequestCommands(
+    IRequestStore store,
+    IConsentGate tor,
     IOutbox outbox,
     TimeProvider uhr) :
-    IRequestHandler<MarktstatusAnfragenBefehl, Anfrageergebnis>,
-    IRequestHandler<AnfrageBeantwortenBefehl, Anfrageergebnis>,
-    IRequestHandler<ZugriffWiderrufenBefehl, Anfrageergebnis>,
-    IRequestHandler<MeineAnfragenAbfrage, IReadOnlyList<Anfrageansicht>>,
-    IRequestHandler<FirmenanfragenAbfrage, IReadOnlyList<Marktanfrage>>
+    IRequestHandler<RequestMarketStatusCommand, ResumeRequestResult>,
+    IRequestHandler<AnswerRequestCommand, ResumeRequestResult>,
+    IRequestHandler<RevokeAccessCommand, ResumeRequestResult>,
+    IRequestHandler<MyRequestsQuery, IReadOnlyList<ResumeRequestView>>,
+    IRequestHandler<CompanyRequestsQuery, IReadOnlyList<MarketRequest>>
 {
     /// <inheritdoc />
-    public async Task<Anfrageergebnis> Handle(
-        MarktstatusAnfragenBefehl request, CancellationToken cancellationToken)
+    public async Task<ResumeRequestResult> Handle(
+        RequestMarketStatusCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         // Voraussetzung ist die PROFILfreigabe, nicht die Existenz eines
-        // Marktstatus. Beides zu prüfen wäre ein Orakel: „hat schon einen
-        // Marktstatus gepflegt" ist eine Information über die Person, die
+        // MarketStatus. Beides zu prüfen wäre ein Orakel: „hat schon einen
+        // MarketStatus gepflegt" ist eine Information über die Person, die
         // niemand erfragen können soll — und sie wäre hier besonders
         // verräterisch.
-        if (!await tor.DarfProfilSehenAsync(request.Wer, cancellationToken))
+        if (!await tor.MaySeeProfileAsync(request.Wer, cancellationToken))
         {
-            return new Anfrageergebnis.NichtSichtbar();
+            return new ResumeRequestResult.NichtSichtbar();
         }
 
         // Einmal fragen. Ohne diese Regel wäre eine Ablehnung wirkungslos: wer
         // dreimal fragen darf, hat kein Nein bekommen, sondern eine
-        // Verzögerung. Gilt auch nach einem Widerruf — der ist eine stärkere
+        // Verzögerung. Gilt auch nach einem Revocation — der ist eine stärkere
         // Aussage als die Ablehnung, nicht eine schwächere.
-        if (await speicher.HoleAsync(request.Wer, request.Firma, cancellationToken) is not null)
+        if (await store.GetAsync(request.Wer, request.Firma, cancellationToken) is not null)
         {
-            return new Anfrageergebnis.SchonGefragt();
+            return new ResumeRequestResult.SchonGefragt();
         }
 
-        var anfrage = Marktanfrage.Oeffne(
+        var requestRecord = MarketRequest.Oeffne(
             request.Wer, request.Firma, request.Frager, uhr.GetUtcNow());
 
-        await speicher.SichereAsync(anfrage, cancellationToken);
+        await store.SaveAsync(requestRecord, cancellationToken);
 
-        // In DERSELBEN Transaktion (ADR-0025): kommt die Anfrage durch, liegt
+        // In DERSELBEN Transaktion (ADR-0025): kommt die ResumeRequest durch, liegt
         // die Absicht fest; wird sie zurückgerollt, ist die Absicht auch weg.
-        await outbox.VermerkeAsync(
+        await outbox.NoteAsync(
             request.Wer, Benachrichtigungsarten.Angefragt, cancellationToken);
 
-        return new Anfrageergebnis.Erledigt(anfrage);
+        return new ResumeRequestResult.Erledigt(requestRecord);
     }
 
     /// <inheritdoc />
-    public async Task<Anfrageergebnis> Handle(
-        AnfrageBeantwortenBefehl request, CancellationToken cancellationToken)
+    public async Task<ResumeRequestResult> Handle(
+        AnswerRequestCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var anfrage = await speicher.HoleAsync(request.Id, cancellationToken);
+        var requestRecord = await store.GetAsync(request.Id, cancellationToken);
 
-        // Eine fremde Anfrage-Kennung verhält sich wie eine fremde
+        // Eine fremde ResumeRequest-Kennung verhält sich wie eine fremde
         // Subjekt-Kennung: nicht vorhanden und nicht meins sind von außen
         // dasselbe.
-        if (anfrage is null || anfrage.Wer != request.Wer)
+        if (requestRecord is null || requestRecord.Wer != request.Wer)
         {
-            return new Anfrageergebnis.NichtSichtbar();
+            return new ResumeRequestResult.NichtSichtbar();
         }
 
-        var jetzt = uhr.GetUtcNow();
+        var now = uhr.GetUtcNow();
 
         try
         {
             if (request.Erteilen)
             {
-                anfrage.Erteile(request.Wer, jetzt);
+                requestRecord.Erteile(request.Wer, now);
             }
             else
             {
-                anfrage.Lehne_ab(request.Wer, jetzt);
+                requestRecord.Lehne_ab(request.Wer, now);
             }
         }
-        catch (SchonBeantwortet fehler)
+        catch (AlreadyAnswered error)
         {
-            return new Anfrageergebnis.Zustandskonflikt(fehler.Message);
+            return new ResumeRequestResult.StateConflict(error.Message);
         }
         catch (NichtDieGefragte)
         {
-            return new Anfrageergebnis.NichtSichtbar();
+            return new ResumeRequestResult.NichtSichtbar();
         }
 
-        // Erst der Ledger, dann der Vorgang: schlägt der Ledger fehl, fliegt
-        // EinwilligungSchweigt durch und die Transaktion wird nie committet.
+        // Erst der Ledger, dann der Case: schlägt der Ledger fehl, fliegt
+        // ConsentGateSilent durch und die Transaktion wird nie committet.
         //
         // Auch die Ablehnung widerruft. Gelingt der Ledger-Aufruf und scheitert
         // danach der Commit, existierte sonst eine Berechtigung ohne sichtbaren
-        // Vorgang — der einzige Weg, auf dem dieses System nach außen OFFEN
+        // Case — der einzige Weg, auf dem dieses System nach außen OFFEN
         // scheitern könnte. Und hier wäre er am teuersten: die Berechtigung
         // sagt „diese Person hört zu".
         if (request.Erteilen)
         {
-            await tor.ErteileAsync(anfrage.Wer, anfrage.Firma, cancellationToken);
+            await tor.GrantAsync(requestRecord.Wer, requestRecord.Firma, cancellationToken);
         }
         else
         {
-            await tor.WiderrufeAsync(anfrage.Wer, anfrage.Firma, cancellationToken);
+            await tor.RevokeAsync(requestRecord.Wer, requestRecord.Firma, cancellationToken);
         }
 
-        await speicher.SichereAsync(anfrage, cancellationToken);
+        await store.SaveAsync(requestRecord, cancellationToken);
 
-        return new Anfrageergebnis.Erledigt(anfrage);
+        return new ResumeRequestResult.Erledigt(requestRecord);
     }
 
     /// <inheritdoc />
-    public async Task<Anfrageergebnis> Handle(
-        ZugriffWiderrufenBefehl request, CancellationToken cancellationToken)
+    public async Task<ResumeRequestResult> Handle(
+        RevokeAccessCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var anfrage = await speicher.HoleAsync(request.Id, cancellationToken);
+        var requestRecord = await store.GetAsync(request.Id, cancellationToken);
 
-        if (anfrage is null || anfrage.Wer != request.Wer)
+        if (requestRecord is null || requestRecord.Wer != request.Wer)
         {
-            return new Anfrageergebnis.NichtSichtbar();
+            return new ResumeRequestResult.NichtSichtbar();
         }
 
-        // Der Widerruf wirkt im Ledger, nicht im Vorgang. `GRANTED` heißt
-        // „wurde einmal erteilt"; diesen Stand beim Widerruf zu ändern würde
+        // Der Revocation wirkt im Ledger, nicht im Case. `GRANTED` heißt
+        // „wurde einmal erteilt"; diesen State beim Revocation zu ändern würde
         // die Geschichte umschreiben, und ob der Zugriff gilt, sagt ohnehin nur
-        // der Ledger. Ein laufender Transfer-Vorgang bleibt bestehen: er hat
+        // der Ledger. Ein laufender Transfer-Case bleibt bestehen: er hat
         // seine eigene Tür und seine eigene Absage.
-        await tor.WiderrufeAsync(anfrage.Wer, anfrage.Firma, cancellationToken);
+        await tor.RevokeAsync(requestRecord.Wer, requestRecord.Firma, cancellationToken);
 
-        return new Anfrageergebnis.Erledigt(anfrage);
+        return new ResumeRequestResult.Erledigt(requestRecord);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Anfrageansicht>> Handle(
-        MeineAnfragenAbfrage request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ResumeRequestView>> Handle(
+        MyRequestsQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var anfragen = await speicher.FuerPersonAsync(request.Wer, cancellationToken);
+        var requestRecords = await store.ForPersonAsync(request.Wer, cancellationToken);
 
         // Nur für erteilte Anfragen fragen: für PENDING und DECLINED steht die
         // Antwort fest, und jede Frage kostet einen Weg hin und zurück.
-        var erteilte = anfragen.Where(a => a.Stand is Anfragestand.Granted).ToList();
+        var erteilte = requestRecords.Where(a => a.State is RequestState.Granted).ToList();
 
-        var urteile = await tor.DuerfenMarktSehenAsync(
+        var urteile = await tor.MayEachSeeMarketAsync(
             [.. erteilte.Select(a => (a.Wer, a.Firma))], cancellationToken);
 
         var aktivNachId = erteilte
-            .Select((anfrage, stelle) => (anfrage.Id, Aktiv: urteile[stelle]))
+            .Select((requestRecord, job) => (requestRecord.Id, Aktiv: urteile[job]))
             .ToDictionary(paar => paar.Id, paar => paar.Aktiv);
 
         return
         [
-            .. anfragen.Select(anfrage => new Anfrageansicht(
-                anfrage,
-                anfrage.Stand is Anfragestand.Granted
-                    ? aktivNachId.GetValueOrDefault(anfrage.Id)
+            .. requestRecords.Select(requestRecord => new ResumeRequestView(
+                requestRecord,
+                requestRecord.State is RequestState.Granted
+                    ? aktivNachId.GetValueOrDefault(requestRecord.Id)
                     : false))
         ];
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<Marktanfrage>> Handle(
-        FirmenanfragenAbfrage request, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<MarketRequest>> Handle(
+        CompanyRequestsQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return speicher.FuerFirmaAsync(request.Firma, cancellationToken);
+        return store.ForCompanyAsync(request.Firma, cancellationToken);
     }
 }

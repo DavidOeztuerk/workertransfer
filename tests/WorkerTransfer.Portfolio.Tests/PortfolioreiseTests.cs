@@ -15,7 +15,7 @@ using WorkerTransfer.ServiceDefaults;
 namespace WorkerTransfer.Portfolio.Tests;
 
 /// <summary>Ein Ledger, den der Test steuert.</summary>
-public sealed class Probetor : IEinwilligungstor
+public sealed class Probetor : IConsentGate
 {
     /// <summary>Wer sein Portfolio freigegeben hat.</summary>
     public HashSet<Guid> Frei { get; } = [];
@@ -26,16 +26,16 @@ public sealed class Probetor : IEinwilligungstor
     /// <summary>Wenn wahr, sagt der Ledger gar nichts.</summary>
     public bool Schweigt { get; set; }
 
-    public Task<bool> DarfSehenAsync(SubjectId wer, CancellationToken cancellationToken = default)
+    public Task<bool> MaySeeAsync(SubjectId subject, CancellationToken cancellationToken = default)
     {
         Fragen++;
         return Schweigt
-            ? throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht")
-            : Task.FromResult(Frei.Contains(wer.Value));
+            ? throw new ConsentGateSilent("der Ledger antwortet im Test nicht")
+            : Task.FromResult(Frei.Contains(subject.Value));
     }
 }
 
-/// <summary>Schreiben, gesehen werden, Arbeitsproben, gelöscht werden.</summary>
+/// <summary>Schreiben, gesehen werden, WorkSamples, gelöscht werden.</summary>
 [Collection(PostgresCollection.Name)]
 public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
 {
@@ -56,14 +56,14 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:portfolio", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Storage:Wurzel", _ablage);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _tor)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _tor)));
         });
 
         return Task.CompletedTask;
@@ -81,18 +81,18 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient Als(Guid wer)
+    private HttpClient Als(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Person(wer));
+            new AuthenticationHeaderValue("Bearer", Tokenform.Person(subject));
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
-    private static Task<HttpResponseMessage> Schreibe(
+    private static Task<HttpResponseMessage> Write(
         HttpClient browser, string? anhang = null, string titel = "Ein Projekt") =>
         browser.PutAsJsonAsync("/portfolios/me", new
         {
@@ -114,13 +114,13 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     /// Technologien an einer Arbeit: <strong>vereinheitlicht und entdoppelt</strong>.
     /// </summary>
     /// <remarks>
-    /// Derselbe Wortschatz wie im Profil und am Lebenslauf — „postgres" heisst
+    /// Derselbe Vocabulary wie im Profile und am Resume — „postgres" heisst
     /// überall „PostgreSQL" (ADR-0023). Erst vereinheitlichen, dann entdoppeln:
     /// anders herum stünden beide Schreibweisen als zwei Einträge da.
     /// <para>
     /// Der Grund für das Feld: es ist ein Ort, an dem jemand NENNEN kann, was
     /// er kann. Durchsuchbar wird die Arbeit dadurch nicht — suchbar ist nur
-    /// das Profil, und dorthin kommt eine Fähigkeit mit einem Klick.
+    /// das Profile, und dorthin kommt eine Fähigkeit mit einem Klick.
     /// </para>
     /// </remarks>
     [Fact]
@@ -149,7 +149,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
 
         (await Json(geschrieben)).GetProperty("items")[0]
             .GetProperty("technologies").EnumerateArray()
-            .Select(eintrag => eintrag.GetString())
+            .Select(entry => entry.GetString())
             .Should().Equal("PostgreSQL", "Go");
     }
 
@@ -163,18 +163,18 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = Als(Guid.CreateVersion7());
 
-        var geschrieben = await Schreibe(browser);
+        var geschrieben = await Write(browser);
 
         (await Json(geschrieben)).GetProperty("items")[0]
             .GetProperty("technologies").GetArrayLength().Should().Be(0);
     }
 
-    private async Task<string> LadeHoch(HttpClient browser, string inhalt = "Arbeitsprobe")
+    private async Task<string> LadeHoch(HttpClient browser, string content = "Arbeitsprobe")
     {
         using var formular = new MultipartFormDataContent();
-        var datei = new ByteArrayContent(Encoding.UTF8.GetBytes(inhalt));
-        datei.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-        formular.Add(datei, "file", "probe.pdf");
+        var file = new ByteArrayContent(Encoding.UTF8.GetBytes(content));
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        formular.Add(file, "file", "probe.pdf");
 
         var hochgeladen = await browser.PostAsync("/portfolios/me/attachments", formular);
         hochgeladen.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -188,7 +188,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
         var browser = Als(anna);
 
-        (await Schreibe(browser)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Write(browser)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         var meins = await Json(await browser.GetAsync("/portfolios/me"));
 
@@ -203,13 +203,13 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Das_Portfolio_traegt_keine_Sichtbarkeit()
     {
         var anna = Guid.CreateVersion7();
-        await Schreibe(Als(anna));
+        await Write(Als(anna));
 
-        var rumpf = await (await Als(anna).GetAsync("/portfolios/me"))
+        var body = await (await Als(anna).GetAsync("/portfolios/me"))
             .Content.ReadAsStringAsync();
 
-        rumpf.Should().NotContain("visibility");
-        rumpf.Should().NotContain("is_public");
+        body.Should().NotContain("visibility");
+        body.Should().NotContain("is_public");
     }
 
     [Fact]
@@ -217,7 +217,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         var erfunden = Guid.CreateVersion7();
-        await Schreibe(Als(anna));
+        await Write(Als(anna));
 
         var browser = Als(Guid.CreateVersion7());
 
@@ -232,7 +232,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Mit_Freigabe_sieht_ein_Fremder_das_Portfolio()
     {
         var anna = Guid.CreateVersion7();
-        await Schreibe(Als(anna));
+        await Write(Als(anna));
         _tor.Frei.Add(anna);
 
         var gelesen = await Als(Guid.CreateVersion7()).GetAsync($"/portfolios/{anna}");
@@ -244,20 +244,20 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Schweigt_der_Ledger_wird_nichts_behauptet()
     {
         var anna = Guid.CreateVersion7();
-        await Schreibe(Als(anna));
+        await Write(Als(anna));
         _tor.Frei.Add(anna);
         _tor.Schweigt = true;
 
-        var versuch = await Als(Guid.CreateVersion7()).GetAsync($"/portfolios/{anna}");
+        var attempt = await Als(Guid.CreateVersion7()).GetAsync($"/portfolios/{anna}");
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        attempt.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     [Fact]
     public async Task Der_Ledger_wird_bei_jedem_Lesen_neu_gefragt()
     {
         var anna = Guid.CreateVersion7();
-        await Schreibe(Als(anna));
+        await Write(Als(anna));
         _tor.Frei.Add(anna);
 
         var browser = Als(Guid.CreateVersion7());
@@ -279,7 +279,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
         var ihr = Als(anna);
         var anhang = await LadeHoch(ihr);
-        await Schreibe(ihr, anhang);
+        await Write(ihr, anhang);
 
         var fremder = Als(Guid.CreateVersion7());
 
@@ -302,21 +302,21 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
         var ihr = Als(anna);
         var anhang = await LadeHoch(ihr);
-        await Schreibe(ihr, anhang);
+        await Write(ihr, anhang);
         _tor.Frei.Add(anna);
 
         // Aus dem Portfolio nehmen, ohne die Datei anzufassen.
-        await Schreibe(ihr, anhang: null);
+        await Write(ihr, anhang: null);
 
-        var versuch = await Als(Guid.CreateVersion7())
+        var attempt = await Als(Guid.CreateVersion7())
             .GetAsync($"/portfolios/{anna}/attachments/{anhang}");
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        attempt.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>
     /// Sonst könnte man seine eigene Arbeitsprobe nicht mehr ansehen, nachdem
-    /// man die Freigabe zurückgenommen hat.
+    /// man die Release zurückgenommen hat.
     /// </summary>
     [Fact]
     public async Task Das_eigene_liest_man_ohne_Freigabe()
@@ -324,7 +324,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
         var ihr = Als(anna);
         var anhang = await LadeHoch(ihr);
-        await Schreibe(ihr, anhang);
+        await Write(ihr, anhang);
 
         var gelesen = await ihr.GetAsync($"/portfolios/{anna}/attachments/{anhang}");
 
@@ -341,7 +341,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
         var ihr = Als(anna);
         var anhang = await LadeHoch(ihr);
-        await Schreibe(ihr, anhang);
+        await Write(ihr, anhang);
 
         var gelesen = await ihr.GetAsync($"/portfolios/{anna}/attachments/{anhang}");
 
@@ -359,13 +359,13 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Ein_Pfad_statt_eines_Namens_fuehrt_nirgendwohin(string boesartig)
     {
         var anna = Guid.CreateVersion7();
-        await Schreibe(Als(anna));
+        await Write(Als(anna));
         _tor.Frei.Add(anna);
 
-        var versuch = await Als(Guid.CreateVersion7())
+        var attempt = await Als(Guid.CreateVersion7())
             .GetAsync($"/portfolios/{anna}/attachments/{boesartig}");
 
-        versuch.StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.BadRequest);
+        attempt.StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.BadRequest);
     }
 
     /// <summary>
@@ -379,12 +379,12 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
     [InlineData("file:///etc/passwd")]
     public async Task Nur_http_und_https_sind_erlaubt(string link)
     {
-        var versuch = await Als(Guid.CreateVersion7()).PutAsJsonAsync("/portfolios/me", new
+        var attempt = await Als(Guid.CreateVersion7()).PutAsJsonAsync("/portfolios/me", new
         {
             items = new[] { new { title = "Ein Projekt", url = link } }
         });
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        attempt.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     /// <summary>
@@ -399,18 +399,18 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
         var ihr = Als(anna);
         var anhang = await LadeHoch(ihr);
-        await Schreibe(ihr, anhang);
+        await Write(ihr, anhang);
 
         var ordner = Path.Combine(_ablage, anna.ToString("N"));
         Directory.Exists(ordner).Should().BeTrue("sonst prüft der Test nichts");
 
-        var anfrage = new HttpRequestMessage(HttpMethod.Post, "/erasure")
+        var request = new HttpRequestMessage(HttpMethod.Post, "/erasure")
         {
             Content = JsonContent.Create(new { user_id = anna })
         };
-        anfrage.Headers.Add("X-Erasure-Secret", Loeschgeheimnis);
+        request.Headers.Add("X-Erasure-Secret", Loeschgeheimnis);
 
-        var geloescht = await _dienst.CreateClient().SendAsync(anfrage);
+        var geloescht = await _dienst.CreateClient().SendAsync(request);
 
         geloescht.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(geloescht)).GetProperty("retained").GetInt32().Should().Be(0);
@@ -429,7 +429,7 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:portfolio", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Storage:Wurzel", _ablage);
@@ -437,13 +437,13 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("environment", "Development");
         });
 
-        var anfrage = new HttpRequestMessage(HttpMethod.Post, "/erasure")
+        var request = new HttpRequestMessage(HttpMethod.Post, "/erasure")
         {
             Content = JsonContent.Create(new { user_id = Guid.CreateVersion7() })
         };
-        anfrage.Headers.Add("X-Erasure-Secret", "irgendwas");
+        request.Headers.Add("X-Erasure-Secret", "irgendwas");
 
-        (await ohne.CreateClient().SendAsync(anfrage)).StatusCode
+        (await ohne.CreateClient().SendAsync(request)).StatusCode
             .Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -454,9 +454,9 @@ public class PortfolioreiseTests(Postgres postgres) : IAsyncLifetime
             .Select(nummer => new { title = $"Projekt {nummer}" })
             .ToArray();
 
-        var versuch = await Als(Guid.CreateVersion7())
+        var attempt = await Als(Guid.CreateVersion7())
             .PutAsJsonAsync("/portfolios/me", new { items = zuViele });
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        attempt.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 }

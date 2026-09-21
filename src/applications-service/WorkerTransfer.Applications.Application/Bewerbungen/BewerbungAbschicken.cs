@@ -3,114 +3,114 @@ using MediatR;
 using WorkerTransfer.Applications.Application.Nachrichten;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.Applications.Application.Ports;
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 
-namespace WorkerTransfer.Applications.Application.Bewerbungen;
+namespace WorkerTransfer.Applications.Application.Applications;
 
 /// <summary>Bewerben — und damit die Daten für dieses eine Unternehmen freigeben.</summary>
-public sealed record BewerbungAbschickenBefehl(
-    Guid Stelle,
+public sealed record SubmitApplicationCommand(
+    Guid Job,
     SubjectId Wer,
     string Nachricht,
     bool TeiltLebenslauf,
-    bool TeiltPortfolio) : IBefehl<Bewerbungsergebnis>;
+    bool TeiltPortfolio) : IBefehl<ApplicationResult>;
 
-/// <summary>Legt den Vorgang an und erteilt die Freigabe dazu.</summary>
+/// <summary>Legt den Case an und erteilt die Release dazu.</summary>
 /// <remarks>
 /// Die Reihenfolge ist die eigentliche Entscheidung: erst der Ledger, dann der
-/// Vorgang, dann der Commit. Schlägt der Ledger fehl, fliegt
+/// Case, dann der Commit. Schlägt der Ledger fehl, fliegt
 /// <see cref="EinwilligungSchweigt"/> durch die Transaktion und es wird nichts
-/// committet — es gäbe sonst eine Bewerbung, die das Unternehmen nicht lesen
+/// committet — es gäbe sonst eine JobApplication, die das Unternehmen nicht lesen
 /// darf. Gelingt der Ledger und scheitert der Commit, hätte das Unternehmen
-/// Zugriff ohne sichtbare Bewerbung; deshalb widerruft der Rückzug
+/// Zugriff ohne sichtbare JobApplication; deshalb widerruft der Rückzug
 /// bedingungslos, und jeder Ausgang führt in einen sauberen Zustand.
 /// <para>
-/// Die Freigabe entsteht im Ledger, nicht in dieser Datenbank, und sie nennt
-/// den Empfänger. Es ist derselbe Mechanismus wie beim Lebenslauf, nur
+/// Die Release entsteht im Ledger, nicht in dieser Datenbank, und sie nennt
+/// den Empfänger. Es ist derselbe Mechanismus wie beim CurriculumVitae, nur
 /// ausgelöst durch eine andere Handlung.
 /// </para>
 /// </remarks>
-public sealed class BewerbungAbschickenHandler(
-    IBewerbungsspeicher speicher,
-    IStellenauskunft stellen,
-    IEinwilligungsschreiber ledger,
+public sealed class SubmitApplicationHandler(
+    IApplicationStore store,
+    IJobLookup jobs,
+    IConsentWriter ledger,
     IOutbox outbox,
-    IUnternehmensmitgliederAbfrage mitglieder,
+    ICompanyMemberLookup members,
     IKontaktauskunft kontakt,
-    TimeProvider uhr) : IRequestHandler<BewerbungAbschickenBefehl, Bewerbungsergebnis>
+    TimeProvider uhr) : IRequestHandler<SubmitApplicationCommand, ApplicationResult>
 {
     /// <inheritdoc />
-    public async Task<Bewerbungsergebnis> Handle(
-        BewerbungAbschickenBefehl request,
+    public async Task<ApplicationResult> Handle(
+        SubmitApplicationCommand request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var stelle = await stellen.HoleAsync(request.Stelle, cancellationToken);
+        var job = await jobs.GetAsync(request.Job, cancellationToken);
 
-        if (stelle is null)
+        if (job is null)
         {
-            return new Bewerbungsergebnis.KeineStelle();
+            return new ApplicationResult.NoJob();
         }
 
         // Mitglieder ZUERST: scheitert identity, darf der Ledger nichts
-        // erteilen. Die Suche ist nicht die Mail (ADR-0025); eine Freigabe
-        // ohne Vorgang wäre die Lücke, die der Rückzug sonst räumen müsste.
-        var firmenMitglieder = await mitglieder.HoleAsync(stelle.Firma, cancellationToken);
+        // erteilen. Die Search ist nicht die Mail (ADR-0025); eine Release
+        // ohne Case wäre die Lücke, die der Rückzug sonst räumen müsste.
+        var firmenMitglieder = await members.GetAsync(job.Firma, cancellationToken);
 
-        var jetzt = uhr.GetUtcNow();
+        var now = uhr.GetUtcNow();
         var mitgeschickt = new Mitgeschicktes(request.TeiltLebenslauf, request.TeiltPortfolio);
-        var briefkopf = await kontakt.HoleKontaktAsync(cancellationToken);
-        var vorhanden = await speicher.HoleAsync(stelle.Id, request.Wer, cancellationToken);
+        var briefkopf = await kontakt.GetContactAsync(cancellationToken);
+        var vorhanden = await store.GetAsync(job.Id, request.Wer, cancellationToken);
 
-        Bewerbung bewerbung;
+        JobApplication application;
 
         try
         {
             if (vorhanden is null)
             {
-                bewerbung = Bewerbung.Schicke_ab(
-                    stelle.Id,
-                    // Einmal aus der Stelle übernommen und danach nicht mehr
-                    // angefasst — eine Stelle wechselt nicht das Unternehmen.
-                    stelle.Firma,
+                application = JobApplication.Schicke_ab(
+                    job.Id,
+                    // Einmal aus der Job übernommen und danach nicht mehr
+                    // angefasst — eine Job wechselt nicht das Unternehmen.
+                    job.Firma,
                     request.Wer,
                     request.Nachricht,
                     mitgeschickt,
-                    jetzt,
+                    now,
                     briefkopf);
             }
             else
             {
-                vorhanden.Schicke_erneut(request.Nachricht, mitgeschickt, jetzt, briefkopf);
-                bewerbung = vorhanden;
+                vorhanden.Schicke_erneut(request.Nachricht, mitgeschickt, now, briefkopf);
+                application = vorhanden;
             }
         }
-        catch (UebergangNichtErlaubt fehler)
+        catch (UebergangNichtErlaubt error)
         {
-            return new Bewerbungsergebnis.Zustandskonflikt(fehler.Message);
+            return new ApplicationResult.StateConflict(error.Message);
         }
-        catch (Eingabefehler fehler)
+        catch (Eingabefehler error)
         {
-            return new Bewerbungsergebnis.Eingabe(fehler.Message);
+            return new ApplicationResult.Eingabe(error.Message);
         }
 
-        await ledger.ErteileAsync(
+        await ledger.GrantAsync(
             request.Wer,
-            Einwilligungsschluessel.Fuer(
-                bewerbung.Firma, mitgeschickt.Lebenslauf, mitgeschickt.Portfolio),
+            ConsentKey.Fuer(
+                application.Firma, mitgeschickt.CurriculumVitae, mitgeschickt.Portfolio),
             cancellationToken);
 
-        await speicher.SichereAsync(bewerbung, cancellationToken);
+        await store.SaveAsync(application, cancellationToken);
 
         // Das Unternehmen benachrichtigen: je Mitglied eine Outbox-Zeile.
         // Der Postausgang bleibt inhaltsfrei (ADR-0025): Kennung und Art,
-        // nie ein Name, nie eine Stelle, nie eine E-Mail-Adresse.
-        foreach (var mitglied in firmenMitglieder)
+        // nie ein Name, nie eine Job, nie eine E-Mail-Adresse.
+        foreach (var member in firmenMitglieder)
         {
-            await outbox.VermerkeAsync(mitglied, Benachrichtigungsarten.Angekommen, cancellationToken);
+            await outbox.NoteAsync(member, Benachrichtigungsarten.Angekommen, cancellationToken);
         }
 
-        return new Bewerbungsergebnis.Erledigt(bewerbung);
+        return new ApplicationResult.Erledigt(application);
     }
 }

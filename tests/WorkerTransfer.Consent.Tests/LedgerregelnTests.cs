@@ -16,8 +16,8 @@ public class LedgerregelnTests
     [InlineData("portfolio.visibility:public")]
     [InlineData("resume.visibility:tenant:9f8e7d6c-5b4a-4938-8271-605f4e3d2c1b")]
     [InlineData("profile.visibility")]
-    public void Eine_Faehigkeit_liest_sich(string wert) =>
-        Capability.TryParse(wert, out _).Should().BeTrue();
+    public void Eine_Faehigkeit_liest_sich(string value) =>
+        Capability.TryParse(value, out _).Should().BeTrue();
 
     [Theory]
     [InlineData("")]
@@ -25,8 +25,8 @@ public class LedgerregelnTests
     [InlineData("p")]
     [InlineData(" profile.visibility:public")]
     [InlineData("profile visibility")]
-    public void Und_was_keine_ist_liest_sich_nicht(string wert) =>
-        Capability.TryParse(wert, out _).Should().BeFalse();
+    public void Und_was_keine_ist_liest_sich_nicht(string value) =>
+        Capability.TryParse(value, out _).Should().BeFalse();
 
     [Fact]
     public void Eine_zu_lange_Faehigkeit_wird_abgewiesen() =>
@@ -91,7 +91,7 @@ public class LedgerregelnTests
             null);
 
         wiederhergestellt.Reason.Should().BeNull();
-        Projektion.Stand([wiederhergestellt]).Granted.Should().BeFalse();
+        Projektion.State([wiederhergestellt]).Granted.Should().BeFalse();
     }
 
     [Fact]
@@ -111,9 +111,9 @@ public class LedgerregelnTests
     [Fact]
     public void Kein_Ereignis_heisst_nicht_erteilt()
     {
-        Projektion.Stand([]).Granted.Should().BeFalse();
-        Projektion.Stand([]).Reason.Should().Be("no consent event");
-        Projektion.Stand([]).Deleted.Should().BeFalse();
+        Projektion.State([]).Granted.Should().BeFalse();
+        Projektion.State([]).Reason.Should().Be("no consent event");
+        Projektion.State([]).Deleted.Should().BeFalse();
     }
 
     [Fact]
@@ -124,8 +124,8 @@ public class LedgerregelnTests
             Anna, Sichtbarkeit, Jetzt.AddMinutes(1), WithdrawalReason.Parse("Ich mag nicht mehr."),
             Anna);
 
-        Projektion.Stand([erteilt, widerrufen]).Granted.Should().BeFalse();
-        Projektion.Stand([widerrufen, erteilt]).Granted.Should().BeFalse();
+        Projektion.State([erteilt, widerrufen]).Granted.Should().BeFalse();
+        Projektion.State([widerrufen, erteilt]).Granted.Should().BeFalse();
     }
 
     /// <summary>A withdrawal must never be a one-way door.</summary>
@@ -136,7 +136,7 @@ public class LedgerregelnTests
             Anna, Sichtbarkeit, Jetzt, WithdrawalReason.Parse("Erst mal nicht."), Anna);
         var erneut = ConsentEvent.Grant(Anna, Sichtbarkeit, Jetzt.AddDays(30), Anna);
 
-        Projektion.Stand([widerrufen, erneut]).Should().Be(new ConsentState(true));
+        Projektion.State([widerrufen, erneut]).Should().Be(new ConsentState(true));
     }
 
     /// <summary>
@@ -158,8 +158,8 @@ public class LedgerregelnTests
             kleinereKennung, Anna, Sichtbarkeit, ConsentAction.Revoke, Jetzt, Anna,
             WithdrawalReason.Parse("Doch nicht."), null);
 
-        Projektion.Stand([erteilt, widerrufen]).Granted.Should().BeTrue();
-        Projektion.Stand([widerrufen, erteilt]).Granted.Should().BeTrue();
+        Projektion.State([erteilt, widerrufen]).Granted.Should().BeTrue();
+        Projektion.State([widerrufen, erteilt]).Granted.Should().BeTrue();
     }
 
     [Fact]
@@ -168,7 +168,7 @@ public class LedgerregelnTests
         var widerrufen = ConsentEvent.Revoke(
             Anna, Sichtbarkeit, Jetzt, WithdrawalReason.Parse("Neue Stelle."), Anna);
 
-        Projektion.Stand([widerrufen]).Should()
+        Projektion.State([widerrufen]).Should()
             .Be(new ConsentState(false, false, "Neue Stelle."));
     }
 
@@ -177,7 +177,7 @@ public class LedgerregelnTests
     {
         var geloescht = ConsentEvent.Delete(Anna, Sichtbarkeit, Jetzt, Anna);
 
-        Projektion.Stand([geloescht]).Should().Be(new ConsentState(false, true));
+        Projektion.State([geloescht]).Should().Be(new ConsentState(false, true));
     }
 
     /// <summary>

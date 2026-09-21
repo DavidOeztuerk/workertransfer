@@ -18,14 +18,14 @@ namespace WorkerTransfer.Consent.Domain.Ledger;
 public interface IConsentLedger
 {
     /// <summary>Records one new fact. Never touches an existing one.</summary>
-    Task AnhaengenAsync(ConsentEvent ereignis, CancellationToken cancellationToken = default);
+    Task AttachAsync(ConsentEvent ereignis, CancellationToken cancellationToken = default);
 
     /// <summary>Every fact about one person, oldest first.</summary>
-    Task<IReadOnlyList<ConsentEvent>> VerlaufAsync(
+    Task<IReadOnlyList<ConsentEvent>> HistoryAsync(
         SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>The newest fact for one pair, or none.</summary>
-    Task<ConsentEvent?> NeuestesAsync(
+    Task<ConsentEvent?> LatestOneAsync(
         SubjectId subject, Capability capability, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -42,7 +42,7 @@ public interface IConsentLedger
     /// pinned by a test.
     /// </para>
     /// </remarks>
-    Task<IReadOnlyDictionary<(Guid Subject, string Capability), ConsentEvent>> NeuesteAsync(
+    Task<IReadOnlyDictionary<(Guid Subject, string Capability), ConsentEvent>> LatestAsync(
         IReadOnlyList<(SubjectId Subject, Capability Capability)> paare,
         CancellationToken cancellationToken = default);
 
@@ -51,6 +51,6 @@ public interface IConsentLedger
     /// The same reduction as <see cref="NeuestesAsync"/>, over all capabilities
     /// instead of one.
     /// </remarks>
-    Task<IReadOnlyList<ConsentEvent>> NeuesteJeFaehigkeitAsync(
+    Task<IReadOnlyList<ConsentEvent>> LatestPerSkillAsync(
         SubjectId subject, CancellationToken cancellationToken = default);
 }

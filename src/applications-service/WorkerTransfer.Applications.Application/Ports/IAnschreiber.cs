@@ -1,11 +1,11 @@
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 
 namespace WorkerTransfer.Applications.Application.Ports;
 
 /// <summary>Es ist kein Anbieter eingerichtet — oder er antwortet nicht.</summary>
-public sealed class AnschreibenNichtVerfuegbar(string meldung) : Exception(meldung);
+public sealed class CoverLetterUnavailable(string notification) : Exception(notification);
 
-/// <summary>Eine Station aus dem eigenen Lebenslauf, wie das Modell sie sieht.</summary>
+/// <summary>Eine Station aus dem eigenen CurriculumVitae, wie das Modell sie sieht.</summary>
 public sealed record Werdegangstation(
     string Arbeitgeber,
     string Titel,
@@ -24,19 +24,19 @@ public sealed record Werdegangstation(
 ///   <item>die <em>öffentliche</em> Stellenanzeige.</item>
 /// </list>
 /// <para>
-/// <strong>Nie eine dritte Person.</strong> Keine anderen Bewerber, keine
+/// <strong>Nie eine dritte Person.</strong> None anderen Bewerber, keine
 /// Vergleichszahlen, keine Einschätzung — nichts, was eine Aussage
 /// <em>über</em> jemanden wäre. Ein Test hält die Feldliste fest, so wie
 /// ADR-0024 es für die anderen beiden Verbraucher tut.
 /// </para>
 /// <para>
 /// <strong>Der Firmenname darf hier stehen</strong>, anders als bei
-/// <c>Anzeigenentwurf</c>. Dort wäre er der Anfang einer Aussage über ein
-/// Unternehmen; hier ist er die Anschrift. Man kann keinen Brief schreiben,
+/// <c>AdvertDraft</c>. Dort wäre er der Anfang einer Aussage über ein
+/// Unternehmen; hier ist er die PostalAddress. Man kann keinen Brief schreiben,
 /// ohne zu wissen, an wen.
 /// </para>
 /// </remarks>
-public sealed record Anschreibenkontext(
+public sealed record CoverLetterContext(
     string StellenTitel,
     string Unternehmen,
     string StellenOrt,
@@ -54,16 +54,16 @@ public sealed record Anschreibenkontext(
     /// <strong>„Erfinde nichts" ist keine Höflichkeit.</strong> Ein erfundener
     /// Satz im Anschreiben ist eine Falschangabe, für die die Person haftet und
     /// nicht die Plattform. Und die Regel gegen Selbstbewertung ist ADR-0022 an
-    /// der Stelle, an der sie am leichtesten zu übersehen ist: „ich bin zu 90 %
+    /// der Job, an der sie am leichtesten zu übersehen ist: „ich bin zu 90 %
     /// geeignet" wäre eine Zahl über einen Menschen, nur aus seiner eigenen
     /// Feder.
     /// </remarks>
     public const string Regeln = """
         Du schreibst ein Bewerbungsanschreiben in der Ich-Form.
 
-        Sprache: genau die angegebene (de, en oder fr). Schreibe wie ein
+        Sprache: genau die angegebene (de, en oder fr). Write wie ein
         Muttersprachler. Nur vollstaendige, grammatisch korrekte Saetze.
-        Keine Wortschoepfungen, keine falschen Verbformen, keine woertlich
+        None Wortschoepfungen, keine falschen Verbformen, keine woertlich
         uebersetzten Floskeln, keine halben Konstruktionen.
 
         1. Verwende ausschliesslich die angegebenen Angaben der Person. Erfinde
@@ -75,9 +75,9 @@ public sealed record Anschreibenkontext(
            aus Ueberschrift, Text, Faehigkeiten und der Stellenanzeige.
         3. Beziehe dich konkret auf die Stellenbeschreibung. Belege nur mit
            Angaben, die dastehen.
-        4. Keine Selbstbewertung in Zahlen — kein Prozentwert, keine Note, kein
+        4. None Selbstbewertung in Zahlen — kein Prozentwert, keine Note, kein
            "zu 90 % geeignet".
-        5. Keine Floskeln wie "hiermit bewerbe ich mich".
+        5. None Floskeln wie "hiermit bewerbe ich mich".
         6. Haupttext 180 bis 250 Woerter — eine Seite, nicht ein duenner Absatz.
         7. Die Signatur ist GENAU der volle Name aus den Angaben, kein Spitzname
            und kein anderer Name.
@@ -90,13 +90,13 @@ public sealed record Anschreibenkontext(
 }
 
 /// <summary>Entwirft ein Anschreiben — auf Bitte, und nur dann.</summary>
-public interface IAnschreiber
+public interface ICoverLetterWriter
 {
     /// <summary>Schreibt. Behält nichts.</summary>
     /// <exception cref="AnschreibenNichtVerfuegbar">Kein Anbieter, oder er schweigt.</exception>
-    Task<string> SchreibeAsync(
+    Task<string> WriteAsync(
         KiZugang zugang,
-        Anschreibenkontext kontext,
+        CoverLetterContext context,
         Func<string, Task>? fortschritt = null,
         CancellationToken cancellationToken = default);
 
@@ -106,9 +106,9 @@ public interface IAnschreiber
     /// der Anweisung, alles Unkommentierte zu lassen.
     /// </remarks>
     /// <exception cref="AnschreibenNichtVerfuegbar">Kein Anbieter, oder er schweigt.</exception>
-    Task<string> UeberarbeiteAsync(
+    Task<string> ReviseAsync(
         KiZugang zugang,
-        Anschreibenkontext kontext,
+        CoverLetterContext context,
         string betreff,
         string text,
         IReadOnlyList<string> anmerkungen,
@@ -124,31 +124,31 @@ public interface IAnschreiber
 /// halten kann. Geholt wird mit dem Token des Aufrufers, also genau das, was
 /// diese Person ohnehin sehen darf.
 /// </remarks>
-public interface IBewerberauskunft
+public interface IApplicantLookup
 {
-    /// <summary>Profil und Werdegang der bewerbenden Person.</summary>
+    /// <summary>Profile und Werdegang der bewerbenden Person.</summary>
     /// <exception cref="BewerberSchweigt">Ein beteiligter Dienst antwortete nicht.</exception>
-    Task<Eigenbild> HoleAsync(CancellationToken cancellationToken = default);
+    Task<Eigenbild> GetAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
-/// Briefkopf — Klarname und Anschrift. Nie Teil von <see cref="Anschreibenkontext"/>.
+/// Briefkopf — Klarname und PostalAddress. Nie Teil von <see cref="Anschreibenkontext"/>.
 /// </summary>
 /// <remarks>
 /// Eigener Port, damit niemand sie in den Prompt mischt (ADR-0038). Ein
-/// Ausfall liefert leer, nicht eine Ausnahme: Senden darf an der Anschrift
+/// Ausfall liefert leer, nicht eine Ausnahme: Senden darf an der PostalAddress
 /// nicht scheitern.
 /// </remarks>
 public interface IKontaktauskunft
 {
     /// <summary>Was zum Sendezeitpunkt auf dem Briefkopf steht.</summary>
-    Task<Bewerbungskontakt> HoleKontaktAsync(CancellationToken cancellationToken = default);
+    Task<ApplicantContact> GetContactAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>Was die Person über sich selbst geschrieben hat.</summary>
 /// <param name="Sprache">
 /// In welcher Sprache der Brief entstehen soll — vom Konto, nicht aus einem
-/// Kopf der Anfrage (ADR-0031).
+/// Header der ResumeRequest (ADR-0031).
 /// </param>
 public sealed record Eigenbild(
     string Name,
@@ -160,8 +160,8 @@ public sealed record Eigenbild(
 
 /// <summary>Wie das Unternehmen heißt, an das der Brief geht.</summary>
 /// <remarks>
-/// Der Name kommt aus dem <em>öffentlichen</em> Arbeitgeberprofil — derselbe,
-/// den jeder auf der Karriereseite liest. Er ist die Anschrift des Briefes und
+/// Der Name kommt aus dem <em>öffentlichen</em> EmployerProfile — derselbe,
+/// den jeder auf der Karriereseite liest. Er ist die PostalAddress des Briefes und
 /// keine Aussage über das Unternehmen.
 /// </remarks>
 public interface IUnternehmensauskunft
@@ -170,13 +170,13 @@ public interface IUnternehmensauskunft
     /// <remarks>
     /// Leer statt einer Ausnahme: ein Brief ohne Firmennamen ist ein Brief mit
     /// „Sehr geehrte Damen und Herren", und das ist kein Fehlerfall. Eine
-    /// Bewerbung daran scheitern zu lassen, dass ein Arbeitgeberprofil fehlt,
+    /// JobApplication daran scheitern zu lassen, dass ein EmployerProfile fehlt,
     /// wäre Strenge zulasten der falschen Person.
     /// </remarks>
     Task<string> NameAsync(
-        Noelia.Core.Identity.TenantId firma, CancellationToken cancellationToken = default);
+        Noelia.Core.Identity.TenantId company, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Ein Dienst, der die eigenen Angaben hält, hat nicht geantwortet.</summary>
-public sealed class BewerberSchweigt(string grund, Exception? ursache = null)
-    : Exception(grund, ursache);
+public sealed class ApplicantLookupSilent(string reason, Exception? ursache = null)
+    : Exception(reason, ursache);

@@ -63,12 +63,12 @@ public sealed class EfInvitationRepository(IdentityDbContext context) : IInvitat
     {
         var offen = InvitationStatusNames.ToDatabase(InvitationStatus.Pending);
 
-        var zeilen = await context.Invitations
+        var rows = await context.Invitations
             .Where(kandidat => kandidat.TenantId == tenant.Value && kandidat.Status == offen)
             .OrderBy(kandidat => kandidat.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZumAggregat)];
+        return [.. rows.Select(ZumAggregat)];
     }
 
     /// <inheritdoc />
@@ -99,7 +99,7 @@ public sealed class EfInvitationRepository(IdentityDbContext context) : IInvitat
         new TenantId(row.TenantId),
         row.Email,
         MembershipRoleNames.FromDatabase(row.Role),
-        row.InvitedBy is { } wer ? new SubjectId(wer) : null,
+        row.InvitedBy is { } subject ? new SubjectId(subject) : null,
         InvitationStatusNames.FromDatabase(row.Status),
         new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
         new DateTimeOffset(row.ExpiresAt, TimeSpan.Zero),

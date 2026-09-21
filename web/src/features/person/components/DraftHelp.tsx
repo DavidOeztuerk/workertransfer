@@ -62,11 +62,10 @@ export function DraftHelp({
         fullWidth
       />
       {problem !== null ? <Alert severity="error">{problem}</Alert> : null}
-      {/* `type="button"` ausgeschrieben: dieser Knopf steht im selben <form> wie
-          „Speichern", und ohne die Angabe würde er das Profil absenden, statt zu
-          helfen. */}
       <Box>
         <Button
+          // Spelled out because this button sits in the same <form> as "Save";
+          // without it the click would submit the profile instead of helping.
           type="button"
           variant="text"
           onClick={() => void frage()}

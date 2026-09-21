@@ -3,99 +3,99 @@ using MediatR;
 using WorkerTransfer.Applications.Application.Nachrichten;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.Applications.Application.Ports;
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 
 namespace WorkerTransfer.Applications.Application.Entwuerfe;
 
 /// <summary>Wie ein Schritt am Entwurf ausgegangen ist.</summary>
-public abstract record Entwurfsergebnis
+public abstract record DraftResult
 {
-    private Entwurfsergebnis()
+    private DraftResult()
     {
     }
 
     /// <summary>Hat geklappt.</summary>
-    public sealed record Erledigt(Bewerbungsentwurf Entwurf) : Entwurfsergebnis;
+    public sealed record Erledigt(ApplicationDraft Entwurf) : DraftResult;
 
     /// <summary>Gibt es nicht — oder gehört jemand anderem. Von außen dasselbe.</summary>
-    public sealed record Keiner : Entwurfsergebnis;
+    public sealed record None : DraftResult;
 
     /// <summary>Von hier aus geht dieser Schritt nicht.</summary>
-    public sealed record Zustandskonflikt(string Grund) : Entwurfsergebnis;
+    public sealed record StateConflict(string Grund) : DraftResult;
 
     /// <summary>Mit der Eingabe stimmt etwas nicht.</summary>
-    public sealed record Eingabe(string Grund) : Entwurfsergebnis;
+    public sealed record Eingabe(string Grund) : DraftResult;
 
     /// <summary>Es ist kein Anbieter eingerichtet — und das sagt die Oberfläche.</summary>
-    public sealed record KeinAnbieter(string Grund) : Entwurfsergebnis;
+    public sealed record NoProvider(string Grund) : DraftResult;
 }
 
-/// <summary>Für mehrere Stellen auf einmal einen Entwurf beginnen.</summary>
+/// <summary>Für mehrere Jobs auf einmal einen Entwurf beginnen.</summary>
 /// <remarks>
 /// <strong>Die Massenhandlung liegt hier und nirgends sonst.</strong> Am
-/// Ausgang steht sie nicht: gesendet wird je Stück, nach je einer Freigabe
+/// Ausgang steht sie nicht: gesendet wird je Stück, nach je einer Release
 /// (ADR-0034). Hier richtet sie nichts an — es entstehen Entwürfe, die
 /// niemand gesehen hat und die niemanden erreichen.
 /// </remarks>
-public sealed record EntwuerfeAnlegenBefehl(SubjectId Wer, IReadOnlyList<Guid> Stellen)
-    : IBefehl<IReadOnlyList<Bewerbungsentwurf>>;
+public sealed record EntwuerfeAnlegenBefehl(SubjectId Wer, IReadOnlyList<Guid> Jobs)
+    : IBefehl<IReadOnlyList<ApplicationDraft>>;
 
 /// <summary>Das Modell soll jetzt schreiben.</summary>
 /// <remarks>
 /// Ein eigener Schritt und kein Anhängsel des Anlegens: das Schreiben dauert
-/// Sekunden je Stück, und zwanzig davon in einer Anfrage wären eine Anfrage,
+/// Sekunden je Stück, und zwanzig davon in einer ResumeRequest wären eine ResumeRequest,
 /// die niemand abwarten kann. Die Oberfläche ruft ihn je Entwurf und zeigt
 /// dabei, wie weit sie ist.
 /// </remarks>
-public sealed record EntwurfSchreibenBefehl(SubjectId Wer, Guid Id) : IBefehl<Entwurfsergebnis>;
+public sealed record WriteDraftCommand(SubjectId Wer, Guid Id) : IBefehl<DraftResult>;
 
 /// <summary>Die eigenen Entwürfe.</summary>
-public sealed record MeineEntwuerfeAbfrage(SubjectId Wer)
-    : IAbfrage<IReadOnlyList<Bewerbungsentwurf>>;
+public sealed record MyDraftsQuery(SubjectId Wer)
+    : IAbfrage<IReadOnlyList<ApplicationDraft>>;
 
 /// <summary>Ein Entwurf.</summary>
-public sealed record EntwurfAbfrage(SubjectId Wer, Guid Id) : IAbfrage<Bewerbungsentwurf?>;
+public sealed record DraftQuery(SubjectId Wer, Guid Id) : IAbfrage<ApplicationDraft?>;
 
 /// <summary>Selbst am Text ändern.</summary>
-public sealed record EntwurfAendernBefehl(SubjectId Wer, Guid Id, string? Betreff, string? Text)
-    : IBefehl<Entwurfsergebnis>;
+public sealed record ChangeDraftCommand(SubjectId Wer, Guid Id, string? Betreff, string? Text)
+    : IBefehl<DraftResult>;
 
 /// <summary>Wählen, was mitgeht.</summary>
 public sealed record BeilagenWaehlenBefehl(
-    SubjectId Wer, Guid Id, bool Lebenslauf, IReadOnlyList<Guid> Unterlagen)
-    : IBefehl<Entwurfsergebnis>;
+    SubjectId Wer, Guid Id, bool CurriculumVitae, IReadOnlyList<Guid> Unterlagen)
+    : IBefehl<DraftResult>;
 
-/// <summary>Etwas anmerken — mit oder ohne markierte Stelle.</summary>
+/// <summary>Etwas anmerken — mit oder ohne markierte Job.</summary>
 public sealed record AnmerkenBefehl(SubjectId Wer, Guid Id, string? Text, string? Zitat)
-    : IBefehl<Entwurfsergebnis>;
+    : IBefehl<DraftResult>;
 
 /// <summary>Das Modell soll die Anmerkungen umsetzen.</summary>
-public sealed record UeberarbeitenBefehl(SubjectId Wer, Guid Id) : IBefehl<Entwurfsergebnis>;
+public sealed record ReviseCommand(SubjectId Wer, Guid Id) : IBefehl<DraftResult>;
 
 /// <summary>So, und nicht anders.</summary>
-public sealed record FreigebenBefehl(SubjectId Wer, Guid Id) : IBefehl<Entwurfsergebnis>;
+public sealed record FreigebenBefehl(SubjectId Wer, Guid Id) : IBefehl<DraftResult>;
 
 /// <summary>Einen Entwurf wegwerfen.</summary>
-public sealed record EntwurfLoeschenBefehl(SubjectId Wer, Guid Id) : IBefehl<bool>;
+public sealed record DeleteDraftCommand(SubjectId Wer, Guid Id) : IBefehl<bool>;
 
 /// <summary>Führt die Entwürfe.</summary>
-public sealed class Entwurfsbefehle(
-    IEntwurfsspeicher speicher,
-    IStellenauskunft stellen,
+public sealed class DraftCommands(
+    IDraftStore store,
+    IJobLookup jobs,
     IKiZugangAbfrage ki,
     TimeProvider uhr) :
-    IRequestHandler<EntwuerfeAnlegenBefehl, IReadOnlyList<Bewerbungsentwurf>>,
-    IRequestHandler<EntwurfSchreibenBefehl, Entwurfsergebnis>,
-    IRequestHandler<MeineEntwuerfeAbfrage, IReadOnlyList<Bewerbungsentwurf>>,
-    IRequestHandler<EntwurfAbfrage, Bewerbungsentwurf?>,
-    IRequestHandler<EntwurfAendernBefehl, Entwurfsergebnis>,
-    IRequestHandler<BeilagenWaehlenBefehl, Entwurfsergebnis>,
-    IRequestHandler<AnmerkenBefehl, Entwurfsergebnis>,
-    IRequestHandler<UeberarbeitenBefehl, Entwurfsergebnis>,
-    IRequestHandler<FreigebenBefehl, Entwurfsergebnis>,
-    IRequestHandler<EntwurfLoeschenBefehl, bool>
+    IRequestHandler<EntwuerfeAnlegenBefehl, IReadOnlyList<ApplicationDraft>>,
+    IRequestHandler<WriteDraftCommand, DraftResult>,
+    IRequestHandler<MyDraftsQuery, IReadOnlyList<ApplicationDraft>>,
+    IRequestHandler<DraftQuery, ApplicationDraft?>,
+    IRequestHandler<ChangeDraftCommand, DraftResult>,
+    IRequestHandler<BeilagenWaehlenBefehl, DraftResult>,
+    IRequestHandler<AnmerkenBefehl, DraftResult>,
+    IRequestHandler<ReviseCommand, DraftResult>,
+    IRequestHandler<FreigebenBefehl, DraftResult>,
+    IRequestHandler<DeleteDraftCommand, bool>
 {
-    /// <summary>Wie viele Stellen eine Massenhandlung tragen darf.</summary>
+    /// <summary>Wie viele Jobs eine Massenhandlung tragen darf.</summary>
     /// <remarks>
     /// Ohne Grenze baut ein Aufrufer mit einer Adresse beliebig viele
     /// Modellaufrufe. Zwanzig ist die Zahl, bei der eine Prüfrunde noch eine
@@ -104,79 +104,79 @@ public sealed class Entwurfsbefehle(
     public const int HoechsteAufEinmal = 20;
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Bewerbungsentwurf>> Handle(
+    public async Task<IReadOnlyList<ApplicationDraft>> Handle(
         EntwuerfeAnlegenBefehl request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var entwuerfe = new List<Bewerbungsentwurf>();
+        var drafts = new List<ApplicationDraft>();
 
-        foreach (var kennung in request.Stellen.Distinct().Take(HoechsteAufEinmal))
+        foreach (var id in request.Jobs.Distinct().Take(HoechsteAufEinmal))
         {
-            // Zweimal fuer dieselbe Stelle zu entwerfen kostet einen
+            // Zweimal fuer dieselbe Job zu entwerfen kostet einen
             // Modellaufruf und verwirrt die Liste. Der offene Entwurf kommt
             // stattdessen zurueck.
-            var offener = await speicher.OffenerAsync(request.Wer, kennung, cancellationToken);
+            var offener = await store.OpenOneAsync(request.Wer, id, cancellationToken);
 
             if (offener is not null)
             {
-                entwuerfe.Add(offener);
+                drafts.Add(offener);
                 continue;
             }
 
-            var stelle = await stellen.HoleAsync(kennung, cancellationToken);
+            var job = await jobs.GetAsync(id, cancellationToken);
 
-            if (stelle is null)
+            if (job is null)
             {
                 continue;
             }
 
-            var entwurf = Bewerbungsentwurf.Beginne(
-                stelle.Id, stelle.Firma, request.Wer, uhr.GetUtcNow());
+            var draft = ApplicationDraft.Beginne(
+                job.Id, job.Firma, request.Wer, uhr.GetUtcNow());
 
-            await speicher.SichereAsync(entwurf, cancellationToken);
-            entwuerfe.Add(entwurf);
+            await store.SaveAsync(draft, cancellationToken);
+            drafts.Add(draft);
         }
 
-        return entwuerfe;
+        return drafts;
     }
 
     /// <inheritdoc />
-    public async Task<Entwurfsergebnis> Handle(
-        EntwurfSchreibenBefehl request, CancellationToken cancellationToken)
+    public async Task<DraftResult> Handle(
+        WriteDraftCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var entwurf = await speicher.HoleAsync(request.Wer, request.Id, cancellationToken);
+        var draft = await store.GetAsync(request.Wer, request.Id, cancellationToken);
 
-        if (entwurf is null)
+        if (draft is null)
         {
-            return new Entwurfsergebnis.Keiner();
+            return new DraftResult.None();
         }
 
-        // Der Modellaufruf läuft hinter der Anfrage (AnschreibenArbeiter).
+        // Der Modellaufruf läuft hinter der ResumeRequest (CoverLetterWorker).
         // Hier nur: ohne Anbieter sofort scheitern, sonst Entsteht merken.
         KiZugang zugang;
 
         try
         {
-            zugang = await ki.HoleAsync(request.Wer, cancellationToken);
+            zugang = await ki.GetAsync(request.Wer, cancellationToken);
         }
-        catch (AnschreibenNichtVerfuegbar fehler)
+        catch (CoverLetterUnavailable error)
         {
-            entwurf.Scheitere(fehler.Message, uhr.GetUtcNow());
-            await speicher.SichereAsync(entwurf, cancellationToken);
+            draft.Scheitere(error.Message, uhr.GetUtcNow());
+            await store.SaveAsync(draft, cancellationToken);
 
-            return new Entwurfsergebnis.KeinAnbieter(fehler.Message);
+            return new DraftResult.NoProvider(error.Message);
         }
 
         if (!zugang.IstEingerichtet)
         {
-            var grund = "Es ist kein Entwurfsanbieter eingerichtet.";
-            entwurf.Scheitere(grund, uhr.GetUtcNow());
-            await speicher.SichereAsync(entwurf, cancellationToken);
+            var reason = "Es ist kein Entwurfsanbieter eingerichtet.";
+            draft.Scheitere(reason, uhr.GetUtcNow());
+            await store.SaveAsync(draft, cancellationToken);
 
-            return new Entwurfsergebnis.KeinAnbieter(grund);
+            return new DraftResult.NoProvider(reason);
         }
 
         try
@@ -185,93 +185,93 @@ public sealed class Entwurfsbefehle(
             // setzt es nicht), und die Oberfläche zählt bei jedem Besuch von 0.
             // Leeren nur, wenn wirklich neu geschrieben wird — ein laufendes
             // Schreiben darf sein Bruchstück nicht verlieren.
-            entwurf.Beginne_schreiben(
+            draft.Beginne_schreiben(
                 uhr.GetUtcNow(),
-                leeren: entwurf.Stand != Entwurfsstand.Entsteht);
+                leeren: draft.State != DraftState.Entsteht);
         }
-        catch (EntwurfsschrittNichtErlaubt fehler)
+        catch (DraftStepNotAllowed error)
         {
-            return new Entwurfsergebnis.Zustandskonflikt(fehler.Message);
+            return new DraftResult.StateConflict(error.Message);
         }
 
-        await speicher.SichereAsync(entwurf, cancellationToken);
+        await store.SaveAsync(draft, cancellationToken);
 
-        return new Entwurfsergebnis.Erledigt(entwurf);
+        return new DraftResult.Erledigt(draft);
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<Bewerbungsentwurf>> Handle(
-        MeineEntwuerfeAbfrage request, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<ApplicationDraft>> Handle(
+        MyDraftsQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return speicher.MeineAsync(request.Wer, cancellationToken);
+        return store.MineAsync(request.Wer, cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<Bewerbungsentwurf?> Handle(
-        EntwurfAbfrage request, CancellationToken cancellationToken)
+    public Task<ApplicationDraft?> Handle(
+        DraftQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return speicher.HoleAsync(request.Wer, request.Id, cancellationToken);
+        return store.GetAsync(request.Wer, request.Id, cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<Entwurfsergebnis> Handle(
-        EntwurfAendernBefehl request, CancellationToken cancellationToken)
+    public Task<DraftResult> Handle(
+        ChangeDraftCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         return Am_entwurf(
             request.Wer, request.Id,
-            entwurf => entwurf.Aendere_selbst(request.Betreff, request.Text, uhr.GetUtcNow()),
+            draft => draft.Aendere_selbst(request.Betreff, request.Text, uhr.GetUtcNow()),
             cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<Entwurfsergebnis> Handle(
+    public Task<DraftResult> Handle(
         BeilagenWaehlenBefehl request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         return Am_entwurf(
             request.Wer, request.Id,
-            entwurf => entwurf.Waehle_beilagen(
-                request.Lebenslauf, request.Unterlagen, uhr.GetUtcNow()),
+            draft => draft.Waehle_beilagen(
+                request.CurriculumVitae, request.Unterlagen, uhr.GetUtcNow()),
             cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<Entwurfsergebnis> Handle(
+    public Task<DraftResult> Handle(
         AnmerkenBefehl request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         return Am_entwurf(
             request.Wer, request.Id,
-            entwurf => entwurf.Merke_an(request.Text, request.Zitat, uhr.GetUtcNow()),
+            draft => draft.Merke_an(request.Text, request.Zitat, uhr.GetUtcNow()),
             cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task<Entwurfsergebnis> Handle(
-        UeberarbeitenBefehl request, CancellationToken cancellationToken)
+    public async Task<DraftResult> Handle(
+        ReviseCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var entwurf = await speicher.HoleAsync(request.Wer, request.Id, cancellationToken);
+        var draft = await store.GetAsync(request.Wer, request.Id, cancellationToken);
 
-        if (entwurf is null)
+        if (draft is null)
         {
-            return new Entwurfsergebnis.Keiner();
+            return new DraftResult.None();
         }
 
         // KEIN AUFRUF OHNE AUFTRAG. Ohne offene Anmerkung waere das die
         // Reflexionsstufe aus ADR-0024 unter anderem Namen.
-        if (!entwurf.HatOffeneAnmerkungen)
+        if (!draft.HatOffeneAnmerkungen)
         {
-            return new Entwurfsergebnis.Zustandskonflikt(
+            return new DraftResult.StateConflict(
                 "Es gibt keine offene Anmerkung — nichts zu überarbeiten.");
         }
 
@@ -279,95 +279,95 @@ public sealed class Entwurfsbefehle(
 
         try
         {
-            zugang = await ki.HoleAsync(request.Wer, cancellationToken);
+            zugang = await ki.GetAsync(request.Wer, cancellationToken);
         }
-        catch (AnschreibenNichtVerfuegbar fehler)
+        catch (CoverLetterUnavailable error)
         {
-            return new Entwurfsergebnis.KeinAnbieter(fehler.Message);
+            return new DraftResult.NoProvider(error.Message);
         }
 
         if (!zugang.IstEingerichtet)
         {
-            return new Entwurfsergebnis.KeinAnbieter(
+            return new DraftResult.NoProvider(
                 "Es ist kein Entwurfsanbieter eingerichtet.");
         }
 
         try
         {
-            entwurf.Beginne_schreiben(uhr.GetUtcNow(), leeren: false);
+            draft.Beginne_schreiben(uhr.GetUtcNow(), leeren: false);
         }
-        catch (EntwurfsschrittNichtErlaubt fehler)
+        catch (DraftStepNotAllowed error)
         {
-            return new Entwurfsergebnis.Zustandskonflikt(fehler.Message);
+            return new DraftResult.StateConflict(error.Message);
         }
 
-        await speicher.SichereAsync(entwurf, cancellationToken);
+        await store.SaveAsync(draft, cancellationToken);
 
-        return new Entwurfsergebnis.Erledigt(entwurf);
+        return new DraftResult.Erledigt(draft);
     }
 
     /// <inheritdoc />
-    public Task<Entwurfsergebnis> Handle(
+    public Task<DraftResult> Handle(
         FreigebenBefehl request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         return Am_entwurf(
             request.Wer, request.Id,
-            entwurf => entwurf.Gib_frei(uhr.GetUtcNow()),
+            draft => draft.Gib_frei(uhr.GetUtcNow()),
             cancellationToken);
     }
 
     /// <inheritdoc />
     public async Task<bool> Handle(
-        EntwurfLoeschenBefehl request, CancellationToken cancellationToken)
+        DeleteDraftCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var entwurf = await speicher.HoleAsync(request.Wer, request.Id, cancellationToken);
+        var draft = await store.GetAsync(request.Wer, request.Id, cancellationToken);
 
-        if (entwurf is null)
+        if (draft is null)
         {
             return false;
         }
 
-        await speicher.LoescheAsync(request.Wer, request.Id, cancellationToken);
+        await store.DeleteAsync(request.Wer, request.Id, cancellationToken);
 
         return true;
     }
 
     /// <summary>Ein Schritt am Entwurf, mit immer derselben Fehlerbehandlung.</summary>
-    private async Task<Entwurfsergebnis> Am_entwurf(
-        SubjectId wer, Guid id, Action<Bewerbungsentwurf> schritt,
+    private async Task<DraftResult> Am_entwurf(
+        SubjectId subject, Guid id, Action<ApplicationDraft> step,
         CancellationToken cancellationToken)
     {
-        var entwurf = await speicher.HoleAsync(wer, id, cancellationToken);
+        var draft = await store.GetAsync(subject, id, cancellationToken);
 
-        if (entwurf is null)
+        if (draft is null)
         {
-            return new Entwurfsergebnis.Keiner();
+            return new DraftResult.None();
         }
 
         try
         {
-            schritt(entwurf);
+            step(draft);
         }
-        catch (EntwurfsschrittNichtErlaubt fehler)
+        catch (DraftStepNotAllowed error)
         {
-            return new Entwurfsergebnis.Zustandskonflikt(fehler.Message);
+            return new DraftResult.StateConflict(error.Message);
         }
-        catch (OffeneAnmerkungen fehler)
+        catch (OffeneAnmerkungen error)
         {
-            return new Entwurfsergebnis.Zustandskonflikt(fehler.Message);
+            return new DraftResult.StateConflict(error.Message);
         }
-        catch (Eingabefehler fehler)
+        catch (Eingabefehler error)
         {
-            return new Entwurfsergebnis.Eingabe(fehler.Message);
+            return new DraftResult.Eingabe(error.Message);
         }
 
-        await speicher.SichereAsync(entwurf, cancellationToken);
+        await store.SaveAsync(draft, cancellationToken);
 
-        return new Entwurfsergebnis.Erledigt(entwurf);
+        return new DraftResult.Erledigt(draft);
     }
 
 }
@@ -379,7 +379,7 @@ public sealed class Entwurfsbefehle(
 /// Trennstrich. Ein Parser, der nur den Idealfall kann, macht aus einer
 /// leichten Abweichung ein leeres Anschreiben.
 /// </remarks>
-public static class Anschreibenformat
+public static class CoverLetterFormat
 {
     /// <summary>Betreff und Text.</summary>
     public static (string Betreff, string Text) Lies(string? ausgabe)
@@ -426,116 +426,116 @@ public static class Anschreibenformat
     }
 }
 
-/// <summary>Den freigegebenen Entwurf als Bewerbung abschicken.</summary>
+/// <summary>Den freigegebenen Entwurf als JobApplication abschicken.</summary>
 /// <remarks>
 /// <strong>Freigeben und Senden sind zwei Handlungen.</strong> Ein Knopf
-/// „freigeben und senden" spart einen Klick und nimmt der Freigabe ihren Sinn:
+/// „freigeben und senden" spart einen Klick und nimmt der Release ihren Sinn:
 /// sie ist der Moment, in dem jemand sagt „so, und nicht anders", und der
 /// braucht einen eigenen (ADR-0034).
 /// </remarks>
-public sealed record EntwurfSendenBefehl(SubjectId Wer, Guid Id) : IBefehl<Entwurfsergebnis>;
+public sealed record SendDraftCommand(SubjectId Wer, Guid Id) : IBefehl<DraftResult>;
 
-/// <summary>Macht aus einem Entwurf eine Bewerbung.</summary>
-public sealed class EntwurfSendenHandler(
-    IEntwurfsspeicher entwuerfe,
-    IBewerbungsspeicher bewerbungen,
-    IStellenauskunft stellen,
-    IEinwilligungsschreiber ledger,
+/// <summary>Macht aus einem Entwurf eine JobApplication.</summary>
+public sealed class SendDraftHandler(
+    IDraftStore drafts,
+    IApplicationStore applications,
+    IJobLookup jobs,
+    IConsentWriter ledger,
     IOutbox outbox,
-    IUnternehmensmitgliederAbfrage mitglieder,
+    ICompanyMemberLookup members,
     IKontaktauskunft kontakt,
-    TimeProvider uhr) : IRequestHandler<EntwurfSendenBefehl, Entwurfsergebnis>
+    TimeProvider uhr) : IRequestHandler<SendDraftCommand, DraftResult>
 {
     /// <inheritdoc />
-    public async Task<Entwurfsergebnis> Handle(
-        EntwurfSendenBefehl request, CancellationToken cancellationToken)
+    public async Task<DraftResult> Handle(
+        SendDraftCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var entwurf = await entwuerfe.HoleAsync(request.Wer, request.Id, cancellationToken);
+        var draft = await drafts.GetAsync(request.Wer, request.Id, cancellationToken);
 
-        if (entwurf is null)
+        if (draft is null)
         {
-            return new Entwurfsergebnis.Keiner();
+            return new DraftResult.None();
         }
 
-        if (entwurf.Stand != Entwurfsstand.Freigegeben)
+        if (draft.State != DraftState.Freigegeben)
         {
-            return new Entwurfsergebnis.Zustandskonflikt(
+            return new DraftResult.StateConflict(
                 "Nur ein freigegebener Entwurf geht hinaus.");
         }
 
-        // Die Stelle noch einmal fragen: zwischen dem Entwurf und dem Versand
+        // Die Job noch einmal fragen: zwischen dem Entwurf und dem Versand
         // koennen Tage liegen, und eine geschlossene Ausschreibung nimmt keine
-        // Bewerbung mehr an.
-        var stelle = await stellen.HoleAsync(entwurf.Stelle, cancellationToken);
+        // JobApplication mehr an.
+        var job = await jobs.GetAsync(draft.Job, cancellationToken);
 
-        if (stelle is null)
+        if (job is null)
         {
-            return new Entwurfsergebnis.Zustandskonflikt(
+            return new DraftResult.StateConflict(
                 "Diese Stelle ist nicht mehr ausgeschrieben.");
         }
 
-        var firmenMitglieder = await mitglieder.HoleAsync(stelle.Firma, cancellationToken);
+        var firmenMitglieder = await members.GetAsync(job.Firma, cancellationToken);
 
-        var jetzt = uhr.GetUtcNow();
+        var now = uhr.GetUtcNow();
         var mitgeschickt = new Mitgeschicktes(
-            entwurf.TeiltLebenslauf, Portfolio: false, entwurf.Unterlagen);
-        var briefkopf = await kontakt.HoleKontaktAsync(cancellationToken);
+            draft.TeiltLebenslauf, Portfolio: false, draft.Unterlagen);
+        var briefkopf = await kontakt.GetContactAsync(cancellationToken);
 
-        var vorhanden = await bewerbungen.HoleAsync(stelle.Id, request.Wer, cancellationToken);
-        Bewerbung bewerbung;
+        var vorhanden = await applications.GetAsync(job.Id, request.Wer, cancellationToken);
+        JobApplication application;
 
         try
         {
             if (vorhanden is null)
             {
-                bewerbung = Bewerbung.Schicke_ab(
-                    stelle.Id, stelle.Firma, request.Wer, entwurf.Text, mitgeschickt, jetzt,
+                application = JobApplication.Schicke_ab(
+                    job.Id, job.Firma, request.Wer, draft.Text, mitgeschickt, now,
                     briefkopf);
             }
             else
             {
-                vorhanden.Schicke_erneut(entwurf.Text, mitgeschickt, jetzt, briefkopf);
-                bewerbung = vorhanden;
+                vorhanden.Schicke_erneut(draft.Text, mitgeschickt, now, briefkopf);
+                application = vorhanden;
             }
         }
-        catch (UebergangNichtErlaubt fehler)
+        catch (UebergangNichtErlaubt error)
         {
-            return new Entwurfsergebnis.Zustandskonflikt(fehler.Message);
+            return new DraftResult.StateConflict(error.Message);
         }
-        catch (Eingabefehler fehler)
+        catch (Eingabefehler error)
         {
-            return new Entwurfsergebnis.Eingabe(fehler.Message);
+            return new DraftResult.Eingabe(error.Message);
         }
 
         // ERST DER LEDGER, DANN DER VORGANG, DANN DER COMMIT — dieselbe
         // Reihenfolge wie beim gewoehnlichen Abschicken, und aus demselben
-        // Grund: es darf keine Bewerbung geben, die das Unternehmen nicht
+        // Grund: es darf keine JobApplication geben, die das Unternehmen nicht
         // lesen darf.
-        await ledger.ErteileAsync(
+        await ledger.GrantAsync(
             request.Wer,
-            Einwilligungsschluessel.Fuer(
-                bewerbung.Firma,
-                mitgeschickt.Lebenslauf,
+            ConsentKey.Fuer(
+                application.Firma,
+                mitgeschickt.CurriculumVitae,
                 mitgeschickt.Portfolio,
                 mitgeschickt.Unterlagen.Count > 0),
             cancellationToken);
 
-        await bewerbungen.SichereAsync(bewerbung, cancellationToken);
+        await applications.SaveAsync(application, cancellationToken);
 
-        entwurf.Vermerke_versand(jetzt);
-        await entwuerfe.SichereAsync(entwurf, cancellationToken);
+        draft.Vermerke_versand(now);
+        await drafts.SaveAsync(draft, cancellationToken);
 
-        // Die Person erfaehrt, dass ihre Bewerbung heraus ist.
-        await outbox.VermerkeAsync(
+        // Die Person erfaehrt, dass ihre JobApplication heraus ist.
+        await outbox.NoteAsync(
             request.Wer, Benachrichtigungsarten.Bewegt, cancellationToken);
 
-        foreach (var mitglied in firmenMitglieder)
+        foreach (var member in firmenMitglieder)
         {
-            await outbox.VermerkeAsync(mitglied, Benachrichtigungsarten.Angekommen, cancellationToken);
+            await outbox.NoteAsync(member, Benachrichtigungsarten.Angekommen, cancellationToken);
         }
 
-        return new Entwurfsergebnis.Erledigt(entwurf);
+        return new DraftResult.Erledigt(draft);
     }
 }

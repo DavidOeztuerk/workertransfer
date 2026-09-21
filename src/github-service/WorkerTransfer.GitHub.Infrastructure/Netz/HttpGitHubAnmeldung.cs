@@ -14,10 +14,10 @@ namespace WorkerTransfer.GitHub.Infrastructure.Netz;
 /// Geheimnis enthält, IST das Geheimnis — und es läge dann in der
 /// Versionsverwaltung.
 /// </remarks>
-public sealed class GitHubAnmeldeeinstellungen
+public sealed class GitHubSignInSettings
 {
-    /// <summary>Der Abschnitt in der Konfiguration.</summary>
-    public const string Abschnitt = "GitHub:OAuth";
+    /// <summary>Der Section in der Konfiguration.</summary>
+    public const string Section = "GitHub:OAuth";
 
     /// <summary>Die Kennung der OAuth-Anwendung. Leer heisst: gibt es nicht.</summary>
     public string Kennung { get; set; } = string.Empty;
@@ -36,7 +36,7 @@ public sealed class GitHubAnmeldeeinstellungen
 }
 
 /// <summary>Was GitHub auf den Tausch antwortet.</summary>
-internal sealed record Tauschantwort(
+internal sealed record ExchangeResponse(
     [property: JsonPropertyName("access_token")] string? AccessToken,
     [property: JsonPropertyName("error")] string? Error);
 
@@ -45,16 +45,16 @@ internal sealed record Kontoeintrag(
     [property: JsonPropertyName("login")] string? Login);
 
 /// <inheritdoc cref="IGitHubAnmeldung" />
-public sealed class HttpGitHubAnmeldung(
+public sealed class HttpGitHubSignIn(
     IHttpClientFactory fabrik,
-    IOptions<GitHubAnmeldeeinstellungen> anmeldung,
-    IOptions<GitHubeinstellungen> api) : IGitHubAnmeldung
+    IOptions<GitHubSignInSettings> anmeldung,
+    IOptions<GitHubSettings> api) : IGitHubSignIn
 {
     /// <summary>Der Name, unter dem der Client registriert ist.</summary>
     public const string Klient = "github-oauth";
 
-    private readonly GitHubAnmeldeeinstellungen _anmeldung = anmeldung.Value;
-    private readonly GitHubeinstellungen _api = api.Value;
+    private readonly GitHubSignInSettings _anmeldung = anmeldung.Value;
+    private readonly GitHubSettings _api = api.Value;
 
     /// <inheritdoc />
     public bool Eingerichtet =>
@@ -63,7 +63,7 @@ public sealed class HttpGitHubAnmeldung(
         && _anmeldung.Rueckadresse.Length > 0;
 
     /// <inheritdoc />
-    public Uri Anmeldeadresse(string zustand)
+    public Uri Anmeldeadresse(string state)
     {
         // OHNE `scope`. `GET /user` beantwortet die Frage nach dem eigenen
         // Namen ohne jedes Recht; ein `repo`-Recht zu erbitten, um öffentliche
@@ -72,7 +72,7 @@ public sealed class HttpGitHubAnmeldung(
         var abfrage =
             $"client_id={Uri.EscapeDataString(_anmeldung.Kennung)}"
             + $"&redirect_uri={Uri.EscapeDataString(_anmeldung.Rueckadresse)}"
-            + $"&state={Uri.EscapeDataString(zustand)}"
+            + $"&state={Uri.EscapeDataString(state)}"
             + "&scope=";
 
         return new Uri(
@@ -80,7 +80,7 @@ public sealed class HttpGitHubAnmeldung(
     }
 
     /// <inheritdoc />
-    public async Task<string?> AnmeldenamenAsync(
+    public async Task<string?> LoginNameAsync(
         string code, CancellationToken cancellationToken = default)
     {
         if (!Eingerichtet)
@@ -88,18 +88,18 @@ public sealed class HttpGitHubAnmeldung(
             return null;
         }
 
-        var token = await TauscheAsync(code, cancellationToken);
+        var token = await ExchangeAsync(code, cancellationToken);
 
-        return token is null ? null : await NamenAsync(token, cancellationToken);
+        return token is null ? null : await NamesAsync(token, cancellationToken);
     }
 
     /// <summary>Der Einmalcode wird gegen ein Zugriffstoken getauscht.</summary>
-    private async Task<string?> TauscheAsync(string code, CancellationToken cancellationToken)
+    private async Task<string?> ExchangeAsync(string code, CancellationToken cancellationToken)
     {
         using var client = fabrik.CreateClient(Klient);
         client.Timeout = _anmeldung.Zeitueberschreitung;
 
-        using var anfrage = new HttpRequestMessage(
+        using var request = new HttpRequestMessage(
             HttpMethod.Post,
             new Uri(new Uri(_anmeldung.Anmeldeadresse), "/login/oauth/access_token"))
         {
@@ -112,22 +112,22 @@ public sealed class HttpGitHubAnmeldung(
             })
         };
 
-        // Ohne diesen Kopf antwortet GitHub in seiner alten Formularschreibweise
+        // Ohne diesen Header antwortet GitHub in seiner alten Formularschreibweise
         // statt in JSON — und der Leser darunter fände nichts.
-        anfrage.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        anfrage.Headers.UserAgent.ParseAdd(_api.Benutzerkennung);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.UserAgent.ParseAdd(_api.Benutzerkennung);
 
-        var antwort = await SendeAsync(client, anfrage, cancellationToken);
+        var response = await SendeAsync(client, request, cancellationToken);
 
-        using (antwort)
+        using (response)
         {
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
-                throw new GitHubSchweigt($"github returned {(int)antwort.StatusCode}");
+                throw new GitHubSignInSilent($"github returned {(int)response.StatusCode}");
             }
 
-            var gelesen = JsonSerializer.Deserialize<Tauschantwort>(
-                await antwort.Content.ReadAsStringAsync(cancellationToken));
+            var gelesen = JsonSerializer.Deserialize<ExchangeResponse>(
+                await response.Content.ReadAsStringAsync(cancellationToken));
 
             // Ein abgelehnter Code ist eine Aussage über den Code, kein Ausfall
             // — GitHub antwortet darauf mit 200 und einem `error`-Feld.
@@ -136,50 +136,50 @@ public sealed class HttpGitHubAnmeldung(
     }
 
     /// <summary>Mit dem Token einmal fragen, wem es gehört — und es vergessen.</summary>
-    private async Task<string?> NamenAsync(string token, CancellationToken cancellationToken)
+    private async Task<string?> NamesAsync(string token, CancellationToken cancellationToken)
     {
         using var client = fabrik.CreateClient(Klient);
         client.Timeout = _anmeldung.Zeitueberschreitung;
 
-        using var anfrage = new HttpRequestMessage(
+        using var request = new HttpRequestMessage(
             HttpMethod.Get, new Uri(new Uri(_api.Adresse), "/user"));
 
-        anfrage.Headers.Accept.Add(
+        request.Headers.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-        anfrage.Headers.UserAgent.ParseAdd(_api.Benutzerkennung);
-        anfrage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Headers.UserAgent.ParseAdd(_api.Benutzerkennung);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var antwort = await SendeAsync(client, anfrage, cancellationToken);
+        var response = await SendeAsync(client, request, cancellationToken);
 
-        using (antwort)
+        using (response)
         {
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
-                throw new GitHubSchweigt($"github returned {(int)antwort.StatusCode}");
+                throw new GitHubSignInSilent($"github returned {(int)response.StatusCode}");
             }
 
             var konto = JsonSerializer.Deserialize<Kontoeintrag>(
-                await antwort.Content.ReadAsStringAsync(cancellationToken));
+                await response.Content.ReadAsStringAsync(cancellationToken));
 
             return konto?.Login is { Length: > 0 } name ? name : null;
         }
     }
 
     private static async Task<HttpResponseMessage> SendeAsync(
-        HttpClient client, HttpRequestMessage anfrage, CancellationToken cancellationToken)
+        HttpClient client, HttpRequestMessage request, CancellationToken cancellationToken)
     {
         try
         {
-            return await client.SendAsync(anfrage, cancellationToken);
+            return await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
             // Die Art, nie der Inhalt.
-            throw new GitHubSchweigt($"github is unreachable ({fehler.GetType().Name})", fehler);
+            throw new GitHubSignInSilent($"github is unreachable ({error.GetType().Name})", error);
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new GitHubSchweigt("github did not answer in time");
+            throw new GitHubSignInSilent("github did not answer in time");
         }
     }
 }

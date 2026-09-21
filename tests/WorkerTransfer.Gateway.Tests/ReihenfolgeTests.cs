@@ -27,11 +27,11 @@ public class ReihenfolgeTests(UmgedreheteLandschaft landschaft)
     [InlineData("/companies/by-slug/muster-gmbh", "companies")]
     [InlineData("/companies/7f000001-0000-0000-0000-000000000000/profile", "companies")]
     [InlineData("/me/notification-preferences", "notification")]
-    public async Task Die_Ausnahmen_gewinnen_auch_rueckwaerts(string pfad, string erwartet)
+    public async Task Die_Ausnahmen_gewinnen_auch_rueckwaerts(string path, string erwartet)
     {
-        var (dienst, _) = await landschaft.Frage(pfad);
+        var (service, _) = await landschaft.Frage(path);
 
-        dienst.Should().Be(erwartet);
+        service.Should().Be(erwartet);
     }
 
     /// <summary>Und die Regelfälle bleiben, wo sie sind.</summary>
@@ -40,11 +40,11 @@ public class ReihenfolgeTests(UmgedreheteLandschaft landschaft)
     [InlineData("/companies", "identity")]
     [InlineData("/jobs", "jobs")]
     [InlineData("/notifications", "notification")]
-    public async Task Die_Regelfaelle_bleiben_auch_rueckwaerts(string pfad, string erwartet)
+    public async Task Die_Regelfaelle_bleiben_auch_rueckwaerts(string path, string erwartet)
     {
-        var (dienst, _) = await landschaft.Frage(pfad);
+        var (service, _) = await landschaft.Frage(path);
 
-        dienst.Should().Be(erwartet);
+        service.Should().Be(erwartet);
     }
 
 }

@@ -16,9 +16,9 @@ public class SitzungsstandTests
 
     private static readonly SubjectId Anna = SubjectId.New();
 
-    private Task<Sitzungsstand> Stand(bool erneuerungLiegtVor) =>
-        new SitzungsstandHandler(_akteur, _benutzer)
-            .Handle(new SitzungsstandAbfrage(erneuerungLiegtVor), CancellationToken.None);
+    private Task<SessionState> State(bool erneuerungLiegtVor) =>
+        new SessionStateHandler(_akteur, _benutzer)
+            .Handle(new SessionStateQuery(erneuerungLiegtVor), CancellationToken.None);
 
     private void EsGibtDasKonto() =>
         _benutzer.FindByIdAsync(Anna, Arg.Any<CancellationToken>())
@@ -30,24 +30,24 @@ public class SitzungsstandTests
         _akteur.Current.Returns(Principal.Person(Anna));
         EsGibtDasKonto();
 
-        var stand = await Stand(erneuerungLiegtVor: false);
+        var state = await State(erneuerungLiegtVor: false);
 
-        stand.Zustand.Should().Be("active");
-        stand.Benutzer.Should().NotBeNull();
-        stand.Benutzer!.Email.Should().Be("anna@example.com");
-        stand.Benutzer.Firma.Should().BeNull();
+        state.Zustand.Should().Be("active");
+        state.Benutzer.Should().NotBeNull();
+        state.Benutzer!.Email.Should().Be("anna@example.com");
+        state.Benutzer.Firma.Should().BeNull();
     }
 
     [Fact]
     public async Task Wer_fuer_eine_Firma_handelt_sieht_sie_hier()
     {
-        var firma = TenantId.New();
-        _akteur.Current.Returns(Principal.Company(Anna, firma));
+        var company = TenantId.New();
+        _akteur.Current.Returns(Principal.Company(Anna, company));
         EsGibtDasKonto();
 
-        var stand = await Stand(erneuerungLiegtVor: false);
+        var state = await State(erneuerungLiegtVor: false);
 
-        stand.Benutzer!.Firma.Should().Be(firma);
+        state.Benutzer!.Firma.Should().Be(company);
     }
 
     /// <summary>
@@ -59,7 +59,7 @@ public class SitzungsstandTests
     {
         _akteur.Current.Returns((Principal?)null);
 
-        (await Stand(erneuerungLiegtVor: true)).Zustand.Should().Be("renewable");
+        (await State(erneuerungLiegtVor: true)).Zustand.Should().Be("renewable");
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class SitzungsstandTests
     {
         _akteur.Current.Returns((Principal?)null);
 
-        (await Stand(erneuerungLiegtVor: false)).Zustand.Should().Be("anonymous");
+        (await State(erneuerungLiegtVor: false)).Zustand.Should().Be("anonymous");
     }
 
     /// <summary>
@@ -81,9 +81,9 @@ public class SitzungsstandTests
     {
         _akteur.Current.Returns((Principal?)null);
 
-        var stand = await Stand(erneuerung);
+        var state = await State(erneuerung);
 
-        stand.Benutzer.Should().BeNull();
+        state.Benutzer.Should().BeNull();
         await _benutzer.DidNotReceive().FindByIdAsync(
             Arg.Any<SubjectId>(), Arg.Any<CancellationToken>());
     }
@@ -94,8 +94,8 @@ public class SitzungsstandTests
         private readonly IUserRepository _benutzer = Substitute.For<IUserRepository>();
 
         private Task<Kontoansicht?> Konto() =>
-            new MeinKontoHandler(_akteur, _benutzer)
-                .Handle(new MeinKontoAbfrage(), CancellationToken.None);
+            new MyAccountHandler(_akteur, _benutzer)
+                .Handle(new MyAccountQuery(), CancellationToken.None);
 
         /// <summary>
         /// A protected resource, so an anonymous caller gets nothing — the

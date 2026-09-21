@@ -10,7 +10,7 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence;
 /// <summary>One row of <c>resumes</c>.</summary>
 /// <remarks>
 /// Not the aggregate. <see cref="EfLebenslaufSpeicher"/> builds a
-/// <c>Lebenslauf</c> from it, so nothing done to the aggregate can reach the
+/// <c>CurriculumVitae</c> from it, so nothing done to the aggregate can reach the
 /// table by itself.
 /// <para>
 /// Positions and education are jsonb in this very row rather than child tables:
@@ -21,7 +21,7 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence;
 /// access pattern that does not exist.
 /// </para>
 /// </remarks>
-public sealed class LebenslaufZeile
+public sealed class ResumeRow
 {
     /// <summary>The subject id. It <em>is</em> the key.</summary>
     public Guid Id { get; set; }
@@ -32,8 +32,8 @@ public sealed class LebenslaufZeile
     /// <summary>The <c>education</c> jsonb column, as written.</summary>
     public string Education { get; set; } = "[]";
 
-    /// <summary>In welcher Vorlage der Lebenslauf gesetzt wird.</summary>
-    public Vorlage Template { get; set; } = Vorlage.Schlicht;
+    /// <summary>In welcher ResumeTemplate der CurriculumVitae gesetzt wird.</summary>
+    public ResumeTemplate Template { get; set; } = ResumeTemplate.Plain;
 
     public DateTime CreatedAt { get; set; }
 
@@ -47,7 +47,7 @@ public sealed class LebenslaufZeile
 /// vollstaendig in jede Sicherung und in jeden Abzug, den irgendwer einmal
 /// fuer eine Fehlersuche zieht.
 /// </remarks>
-public sealed class UnterlageZeile
+public sealed class DocumentRecordRow
 {
     public Guid Id { get; set; }
 
@@ -56,7 +56,7 @@ public sealed class UnterlageZeile
 
     public string Name { get; set; } = string.Empty;
 
-    public Unterlagenart Kind { get; set; }
+    public DocumentKind Kind { get; set; }
 
     public string ContentType { get; set; } = string.Empty;
 
@@ -71,24 +71,24 @@ public sealed class UnterlageZeile
 /// <summary>Eine Zeile von <c>resume_document_terms</c>.</summary>
 /// <remarks>
 /// <strong>Der Index aus PBI-7 — Namen, nie der Wortlaut.</strong> Was in einer
-/// Unterlage gelesen wurde, steht hier als Liste kanonischer Namen; der
+/// DocumentRecord gelesen wurde, steht hier als Liste kanonischer Namen; der
 /// gefundene Volltext wird nirgends abgelegt. Eine Spalte mit dem Wortlaut
-/// eines Zeugnisses waere eine zweite Kopie der Unterlage, diesmal in der
+/// eines Zeugnisses waere eine zweite Kopie der DocumentRecord, diesmal in der
 /// Datenbank — und damit in jeder Sicherung (ADR-0043).
 /// <para>
-/// Die Zeile traegt <c>subject_id</c>, damit die Loeschung sie findet, und
+/// Die Zeile traegt <c>subject_id</c>, damit die Erasure sie findet, und
 /// <c>document_id</c>, damit sie mit ihrer Datei faellt. Beide Wege sind
 /// gemessen, nicht behauptet.
 /// </para>
 /// </remarks>
-public sealed class FundZeile
+public sealed class TermRow
 {
     public Guid Id { get; set; }
 
-    /// <summary>Wessen Unterlage gelesen wurde.</summary>
+    /// <summary>Wessen DocumentRecord gelesen wurde.</summary>
     public Guid SubjectId { get; set; }
 
-    /// <summary>Welche Unterlage.</summary>
+    /// <summary>Welche DocumentRecord.</summary>
     public Guid DocumentId { get; set; }
 
     /// <summary>War ueberhaupt Text zu lesen?</summary>
@@ -108,7 +108,7 @@ public sealed class FundZeile
 }
 
 /// <summary>One row of <c>resume_requests</c>.</summary>
-public sealed class AnfrageZeile
+public sealed class RequestRow
 {
     public Guid Id { get; set; }
 
@@ -125,7 +125,7 @@ public sealed class AnfrageZeile
     /// </remarks>
     public Guid? RequestedBy { get; set; }
 
-    public Anfragestand Status { get; set; }
+    public RequestState Status { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
@@ -138,7 +138,7 @@ public sealed class AnfrageZeile
 /// what, about whom and when — and a column that is always empty is a column
 /// somebody eventually fills.
 /// </remarks>
-public sealed class PruefZeile
+public sealed class AuditRow
 {
     public Guid Id { get; set; }
 
@@ -146,7 +146,7 @@ public sealed class PruefZeile
 
     public Guid? TenantId { get; set; }
 
-    public Pruefhandlung Action { get; set; }
+    public AuditAction Action { get; set; }
 
     public Guid? TargetId { get; set; }
 
@@ -171,134 +171,134 @@ public sealed class PruefZeile
 public sealed class ResumeDbContext(DbContextOptions<ResumeDbContext> options) : DbContext(options)
 {
     /// <summary>The résumés.</summary>
-    public DbSet<LebenslaufZeile> Lebenslaeufe => Set<LebenslaufZeile>();
+    public DbSet<ResumeRow> Lebenslaeufe => Set<ResumeRow>();
 
     /// <summary>The requests.</summary>
-    public DbSet<AnfrageZeile> Anfragen => Set<AnfrageZeile>();
+    public DbSet<RequestRow> Anfragen => Set<RequestRow>();
 
     /// <summary>Die beigelegten Unterlagen.</summary>
-    public DbSet<UnterlageZeile> Unterlagen => Set<UnterlageZeile>();
+    public DbSet<DocumentRecordRow> Unterlagen => Set<DocumentRecordRow>();
 
     /// <summary>Was auf Ausloesung darin gelesen wurde.</summary>
-    public DbSet<FundZeile> Funde => Set<FundZeile>();
+    public DbSet<TermRow> Funde => Set<TermRow>();
 
     /// <summary>The trail.</summary>
-    public DbSet<PruefZeile> Pruefspur => Set<PruefZeile>();
+    public DbSet<AuditRow> Pruefspur => Set<AuditRow>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
-        modelBuilder.HasPostgresEnum<Anfragestand>(name: Enumnamen.Anfragestand);
-        modelBuilder.HasPostgresEnum<Unterlagenart>(name: Enumnamen.Unterlagenart);
-        modelBuilder.HasPostgresEnum<Vorlage>(name: Enumnamen.Vorlage);
-        modelBuilder.HasPostgresEnum<Pruefhandlung>(name: Enumnamen.Pruefhandlung);
+        modelBuilder.HasPostgresEnum<RequestState>(name: Enumnamen.RequestState);
+        modelBuilder.HasPostgresEnum<DocumentKind>(name: Enumnamen.DocumentKind);
+        modelBuilder.HasPostgresEnum<ResumeTemplate>(name: Enumnamen.ResumeTemplate);
+        modelBuilder.HasPostgresEnum<AuditAction>(name: Enumnamen.AuditAction);
 
-        modelBuilder.Entity<LebenslaufZeile>(entity =>
+        modelBuilder.Entity<ResumeRow>(entity =>
         {
             entity.ToTable("resumes");
             // KEINE zweite Spalte fuer die Person. Der Schluessel IST sie, und
             // `resume_documents` und `resume_requests` fuehren daneben eine eigene
             // `subject_id` — wer die beiden vergleicht, haelt das hier fuer
             // vergessen und traegt die Spalte nach. Dann stuenden zwei Angaben
-            // ueber denselben Menschen nebeneinander, und die Loeschung (ADR-0027)
+            // ueber denselben Menschen nebeneinander, und die Erasure (ADR-0027)
             // traefe die eine und liesse die andere stehen. Die Anmerkung sagt es
             // stattdessen aus: sie ist das, was `LoeschempfaengerTests` liest, wo
             // kein Spaltenname zu finden ist.
-            entity.HasAnnotation(Personenzeile.Anmerkung, true);
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
-            entity.Property(zeile => zeile.Positions)
+            entity.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.Positions)
                 .HasColumnName("positions").HasColumnType("jsonb").IsRequired();
-            entity.Property(zeile => zeile.Education)
+            entity.Property(row => row.Education)
                 .HasColumnName("education").HasColumnType("jsonb").IsRequired();
-            entity.Property(zeile => zeile.Template)
+            entity.Property(row => row.Template)
                 .HasColumnName("template").IsRequired();
-            entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
-            entity.Property(zeile => zeile.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at").IsRequired();
         });
 
-        modelBuilder.Entity<UnterlageZeile>(entity =>
+        modelBuilder.Entity<DocumentRecordRow>(entity =>
         {
             entity.ToTable("resume_documents");
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
-            entity.Property(zeile => zeile.SubjectId).HasColumnName("subject_id").IsRequired();
-            entity.HasIndex(zeile => zeile.SubjectId);
-            entity.Property(zeile => zeile.Name)
-                .HasColumnName("name").HasMaxLength(Unterlage.HoechstlaengeName).IsRequired();
-            entity.Property(zeile => zeile.Kind).HasColumnName("kind").IsRequired();
-            entity.Property(zeile => zeile.ContentType)
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.SubjectId).HasColumnName("subject_id").IsRequired();
+            entity.HasIndex(row => row.SubjectId);
+            entity.Property(row => row.Name)
+                .HasColumnName("name").HasMaxLength(DocumentRecord.HoechstlaengeName).IsRequired();
+            entity.Property(row => row.Kind).HasColumnName("kind").IsRequired();
+            entity.Property(row => row.ContentType)
                 .HasColumnName("content_type").HasMaxLength(64).IsRequired();
-            entity.Property(zeile => zeile.SizeBytes).HasColumnName("size_bytes").IsRequired();
-            entity.Property(zeile => zeile.StorageKey)
+            entity.Property(row => row.SizeBytes).HasColumnName("size_bytes").IsRequired();
+            entity.Property(row => row.StorageKey)
                 .HasColumnName("storage_key").HasMaxLength(128).IsRequired();
-            entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
         });
 
-        modelBuilder.Entity<FundZeile>(entity =>
+        modelBuilder.Entity<TermRow>(entity =>
         {
             entity.ToTable("resume_document_terms");
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
-            entity.Property(zeile => zeile.SubjectId).HasColumnName("subject_id").IsRequired();
-            entity.Property(zeile => zeile.DocumentId).HasColumnName("document_id").IsRequired();
-            entity.Property(zeile => zeile.HasText).HasColumnName("has_text").IsRequired();
-            entity.Property(zeile => zeile.Terms)
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.SubjectId).HasColumnName("subject_id").IsRequired();
+            entity.Property(row => row.DocumentId).HasColumnName("document_id").IsRequired();
+            entity.Property(row => row.HasText).HasColumnName("has_text").IsRequired();
+            entity.Property(row => row.Terms)
                 .HasColumnName("terms").HasColumnType("jsonb").IsRequired();
-            entity.Property(zeile => zeile.ReadAt).HasColumnName("read_at").IsRequired();
+            entity.Property(row => row.ReadAt).HasColumnName("read_at").IsRequired();
 
-            entity.HasIndex(zeile => zeile.SubjectId);
+            entity.HasIndex(row => row.SubjectId);
 
             // EINE ZEILE JE UNTERLAGE. Der Knopf liest jedes Mal alles neu, und
             // ohne diese Zusage in der DATENBANK haeuften zwei gleichzeitige
             // Klicks zwei Funde zur selben Datei an — die Oberfläche zeigte
             // dann denselben Vorschlag doppelt, und welcher der aeltere ist,
             // wuesste niemand.
-            entity.HasIndex(zeile => new { zeile.SubjectId, zeile.DocumentId })
+            entity.HasIndex(row => new { row.SubjectId, row.DocumentId })
                 .IsUnique()
                 .HasDatabaseName("uq_terms_subject_document");
         });
 
-        modelBuilder.Entity<AnfrageZeile>(entity =>
+        modelBuilder.Entity<RequestRow>(entity =>
         {
             entity.ToTable("resume_requests");
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
-            entity.Property(zeile => zeile.SubjectId).HasColumnName("subject_id").IsRequired();
-            entity.Property(zeile => zeile.TenantId).HasColumnName("tenant_id").IsRequired();
-            entity.Property(zeile => zeile.RequestedBy).HasColumnName("requested_by");
-            entity.Property(zeile => zeile.Status).HasColumnName("status").IsRequired();
-            entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
-            entity.Property(zeile => zeile.AnsweredAt).HasColumnName("answered_at");
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.SubjectId).HasColumnName("subject_id").IsRequired();
+            entity.Property(row => row.TenantId).HasColumnName("tenant_id").IsRequired();
+            entity.Property(row => row.RequestedBy).HasColumnName("requested_by");
+            entity.Property(row => row.Status).HasColumnName("status").IsRequired();
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(row => row.AnsweredAt).HasColumnName("answered_at");
 
-            entity.HasIndex(zeile => zeile.SubjectId);
-            entity.HasIndex(zeile => zeile.TenantId);
+            entity.HasIndex(row => row.SubjectId);
+            entity.HasIndex(row => row.TenantId);
 
             // "Ask once" — in the database and not only in the handler, because
             // two simultaneous requests would both pass a check in code. A
             // refusal is worthless if the same company may ask again.
-            entity.HasIndex(zeile => new { zeile.SubjectId, zeile.TenantId })
+            entity.HasIndex(row => new { row.SubjectId, row.TenantId })
                 .IsUnique()
                 .HasDatabaseName("uq_request_subject_tenant");
         });
 
-        modelBuilder.Entity<PruefZeile>(entity =>
+        modelBuilder.Entity<AuditRow>(entity =>
         {
             entity.ToTable("audit_events");
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
-            entity.Property(zeile => zeile.ActorId).HasColumnName("actor_id");
-            entity.Property(zeile => zeile.TenantId).HasColumnName("tenant_id");
-            entity.Property(zeile => zeile.Action).HasColumnName("action").IsRequired();
-            entity.Property(zeile => zeile.TargetId).HasColumnName("target_id");
-            entity.Property(zeile => zeile.CorrelationId)
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.ActorId).HasColumnName("actor_id");
+            entity.Property(row => row.TenantId).HasColumnName("tenant_id");
+            entity.Property(row => row.Action).HasColumnName("action").IsRequired();
+            entity.Property(row => row.TargetId).HasColumnName("target_id");
+            entity.Property(row => row.CorrelationId)
                 .HasColumnName("correlation_id").HasMaxLength(120);
-            entity.Property(zeile => zeile.OccurredAt).HasColumnName("occurred_at").IsRequired();
+            entity.Property(row => row.OccurredAt).HasColumnName("occurred_at").IsRequired();
 
-            entity.HasIndex(zeile => zeile.TargetId);
-            entity.HasIndex(zeile => zeile.ActorId);
+            entity.HasIndex(row => row.TargetId);
+            entity.HasIndex(row => row.ActorId);
         });
 
         modelBuilder.ConfigureOutbox();
@@ -316,14 +316,14 @@ public sealed class ResumeDbContext(DbContextOptions<ResumeDbContext> options) :
 public static class Enumnamen
 {
     /// <summary>Behind <c>resume_requests.status</c>.</summary>
-    public const string Anfragestand = "request_status";
+    public const string RequestState = "request_status";
 
     /// <summary>Hinter <c>resume_documents.kind</c>.</summary>
-    public const string Unterlagenart = "document_kind";
+    public const string DocumentKind = "document_kind";
 
     /// <summary>Hinter <c>resumes.template</c>.</summary>
-    public const string Vorlage = "resume_template";
+    public const string ResumeTemplate = "resume_template";
 
     /// <summary>Behind <c>audit_events.action</c>.</summary>
-    public const string Pruefhandlung = "audit_action";
+    public const string AuditAction = "audit_action";
 }

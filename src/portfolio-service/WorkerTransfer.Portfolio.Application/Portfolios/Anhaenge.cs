@@ -18,7 +18,7 @@ public sealed record AnhangAblegenBefehl(
 /// zurückgegeben. Der Client schickt ihn danach beim Speichern des Portfolios
 /// mit — er benennt also nie, wohin geschrieben wird.
 /// </remarks>
-public sealed class AnhangAblegenHandler(IAblage ablage)
+public sealed class AnhangAblegenHandler(IDocumentStore ablage)
     : IRequestHandler<AnhangAblegenBefehl, string>
 {
     /// <inheritdoc />
@@ -26,7 +26,7 @@ public sealed class AnhangAblegenHandler(IAblage ablage)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return ablage.LegeAbAsync(
+        return ablage.PutAsync(
             request.Wer, request.Dateiname, request.Medientyp, request.Inhalt, cancellationToken);
     }
 }
@@ -42,12 +42,12 @@ public sealed record AnhangAbfrage(SubjectId Wer, string Name, SubjectId Aufrufe
 /// dem Portfolio entfernte Arbeitsprobe über ihren Namen erreichbar.
 /// <para>
 /// Das eigene liest man ohne Ledgerfrage — sonst könnte man seine eigene
-/// Arbeitsprobe nicht mehr ansehen, nachdem man die Freigabe zurückgenommen
+/// Arbeitsprobe nicht mehr ansehen, nachdem man die Release zurückgenommen
 /// hat.
 /// </para>
 /// </remarks>
 public sealed class AnhangHandler(
-    IPortfoliospeicher speicher, IAblage ablage, IEinwilligungstor tor)
+    IPortfolioStore store, IDocumentStore ablage, IConsentGate tor)
     : IRequestHandler<AnhangAbfrage, Abgelegtes?>
 {
     /// <inheritdoc />
@@ -59,15 +59,15 @@ public sealed class AnhangHandler(
 
         var selbst = request.Wer == request.Aufrufer;
 
-        if (!selbst && !await tor.DarfSehenAsync(request.Wer, cancellationToken))
+        if (!selbst && !await tor.MaySeeAsync(request.Wer, cancellationToken))
         {
             return null;
         }
 
-        var portfolio = await speicher.HoleAsync(request.Wer, cancellationToken);
+        var portfolio = await store.GetAsync(request.Wer, cancellationToken);
 
         return portfolio?.Nennt(request.Name) == true
-            ? await ablage.HoleAsync(request.Wer, request.Name, cancellationToken)
+            ? await ablage.GetAsync(request.Wer, request.Name, cancellationToken)
             : null;
     }
 }

@@ -14,7 +14,7 @@ public sealed record PortfolioSichernBefehl(SubjectId Wer, IReadOnlyList<Eintrag
     : IBefehl<Domain.Portfolios.Portfolio>;
 
 /// <inheritdoc cref="PortfolioSichernBefehl" />
-public sealed class PortfolioSichernHandler(IPortfoliospeicher speicher, TimeProvider uhr)
+public sealed class PortfolioSichernHandler(IPortfolioStore store, TimeProvider uhr)
     : IRequestHandler<PortfolioSichernBefehl, Domain.Portfolios.Portfolio>
 {
     /// <inheritdoc />
@@ -23,20 +23,20 @@ public sealed class PortfolioSichernHandler(IPortfoliospeicher speicher, TimePro
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var jetzt = uhr.GetUtcNow();
-        var vorhanden = await speicher.HoleAsync(request.Wer, cancellationToken);
+        var now = uhr.GetUtcNow();
+        var vorhanden = await store.GetAsync(request.Wer, cancellationToken);
 
         if (vorhanden is null)
         {
             var neues = Domain.Portfolios.Portfolio.Lege_an(
-                request.Wer, request.Eintraege, jetzt);
+                request.Wer, request.Eintraege, now);
 
-            await speicher.SichereAsync(neues, cancellationToken);
+            await store.SaveAsync(neues, cancellationToken);
             return neues;
         }
 
-        vorhanden.Aendere(request.Eintraege, jetzt);
-        await speicher.SichereAsync(vorhanden, cancellationToken);
+        vorhanden.Aendere(request.Eintraege, now);
+        await store.SaveAsync(vorhanden, cancellationToken);
 
         return vorhanden;
     }

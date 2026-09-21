@@ -19,7 +19,7 @@ namespace WorkerTransfer.Contracts.Erasure;
 /// have to know which tables stand elsewhere (ADR-0004).
 /// </para>
 /// </remarks>
-public sealed record LoeschungV1([property: JsonPropertyName("user_id")] Guid UserId);
+public sealed record ErasureV1([property: JsonPropertyName("user_id")] Guid UserId);
 
 /// <summary>The receipt.</summary>
 /// <param name="Retained">
@@ -31,7 +31,7 @@ public sealed record LoeschungV1([property: JsonPropertyName("user_id")] Guid Us
 /// then the origin should be told rather than left to guess. Suspended is not
 /// skipped.
 /// </remarks>
-public sealed record LoeschungsquittungV1(int Retained = 0);
+public sealed record ErasureReceiptV1(int Retained = 0);
 
 /// <summary>"Withdraw this company's adverts."</summary>
 /// <remarks>
@@ -44,7 +44,7 @@ public sealed record LoeschungsquittungV1(int Retained = 0);
 public sealed record UnternehmensrueckzugV1([property: JsonPropertyName("tenant_id")] Guid TenantId);
 
 /// <summary>Who has to acknowledge before an erasure is finished.</summary>
-public static class Loeschempfaenger
+public static class ErasureRecipient
 {
     /// <summary>The prefix that marks an outbox row as part of a cascade.</summary>
     public const string Praefix = "erasure:";
@@ -90,7 +90,7 @@ public static class Loeschempfaenger
     /// <c>assessment</c> joined with its first table (ADR-0042). It holds the
     /// work samples a company asked a person for, what the person handed in and
     /// the one evaluation that came back — all keyed by the person. There is no
-    /// retention case, not even for the evaluation: an evaluation that survived
+    /// retention caseItem, not even for the evaluation: an evaluation that survived
     /// an erasure would be exactly the reference letter ADR-0042 rules out,
     /// only at a particularly bad moment.
     /// </para>
@@ -122,5 +122,5 @@ public static class Loeschempfaenger
     public const string Unternehmensrueckzug = "company.withdrawal";
 
     /// <summary>The kind for one foreign recipient.</summary>
-    public static string Art(string empfaenger) => Praefix + empfaenger;
+    public static string Art(string recipient) => Praefix + recipient;
 }

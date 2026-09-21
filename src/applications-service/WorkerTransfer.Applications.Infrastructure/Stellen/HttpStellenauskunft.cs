@@ -7,13 +7,13 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Applications.Application.Ports;
 
-namespace WorkerTransfer.Applications.Infrastructure.Stellen;
+namespace WorkerTransfer.Applications.Infrastructure.Jobs;
 
 /// <summary>Wo der Jobs-Dienst antwortet.</summary>
-public sealed class Stelleneinstellungen
+public sealed class JobSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Jobs";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Jobs";
 
     /// <summary>Die Basisadresse des Jobs-Dienstes.</summary>
     public string Adresse { get; set; } = string.Empty;
@@ -23,7 +23,7 @@ public sealed class Stelleneinstellungen
 }
 
 /// <summary>Was <c>GET /jobs/{id}</c> davon zurückgibt, was hier gebraucht wird.</summary>
-internal sealed record Stellenantwort(
+internal sealed record JobResponse(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("tenant_id")] Guid TenantId,
     [property: JsonPropertyName("title")] string Title,
@@ -37,69 +37,69 @@ internal sealed record Stellenantwort(
 /// auskommt und Entwurf, geschlossen und nicht vorhanden ununterscheidbar
 /// hält.
 /// </remarks>
-public sealed class HttpStellenauskunft(
+public sealed class HttpJobLookup(
     IHttpClientFactory fabrik,
-    IOptions<Stelleneinstellungen> einstellungen,
-    ILogger<HttpStellenauskunft> protokoll) : IStellenauskunft
+    IOptions<JobSettings> einstellungen,
+    ILogger<HttpJobLookup> protokoll) : IJobLookup
 {
     /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
     public const string Klient = "jobs";
 
-    private readonly Stelleneinstellungen _einstellungen = einstellungen.Value;
+    private readonly JobSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task<OeffentlicheStelle?> HoleAsync(
-        Guid stelle, CancellationToken cancellationToken = default)
+    public async Task<PublicJob?> GetAsync(
+        Guid job, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(_einstellungen.Adresse))
         {
-            throw new StelleSchweigt("Jobs:Adresse ist nicht gesetzt.");
+            throw new JobLookupSilent("Jobs:Adresse ist nicht gesetzt.");
         }
 
         using var client = fabrik.CreateClient(Klient);
         client.Timeout = _einstellungen.Zeitueberschreitung;
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            antwort = await client.GetAsync(
-                new Uri(new Uri(_einstellungen.Adresse), $"/jobs/{stelle}"), cancellationToken);
+            response = await client.GetAsync(
+                new Uri(new Uri(_einstellungen.Adresse), $"/jobs/{job}"), cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
-            protokoll.LogWarning("Jobs-Dienst nicht erreichbar ({Art})", fehler.GetType().Name);
-            throw new StelleSchweigt("jobs-service ist nicht erreichbar.", fehler);
+            protokoll.LogWarning("Jobs-Dienst nicht erreichbar ({Art})", error.GetType().Name);
+            throw new JobLookupSilent("jobs-service ist nicht erreichbar.", error);
         }
-        catch (TaskCanceledException fehler) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
             protokoll.LogWarning("Jobs-Dienst antwortete nicht rechtzeitig");
-            throw new StelleSchweigt("jobs-service antwortete nicht rechtzeitig.", fehler);
+            throw new JobLookupSilent("jobs-service antwortete nicht rechtzeitig.", error);
         }
 
-        using (antwort)
+        using (response)
         {
-            // Der einzige Statuscode, der eine Aussage über die Stelle ist.
-            if (antwort.StatusCode == HttpStatusCode.NotFound)
+            // Der einzige Statuscode, der eine Aussage über die Job ist.
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return null;
             }
 
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
                 // Nicht als „gibt es nicht" behandeln: die Person bekäme eine
                 // Absage, die niemand ausgesprochen hat.
-                throw new StelleSchweigt(
-                    $"jobs-service antwortete mit {(int)antwort.StatusCode}.");
+                throw new JobLookupSilent(
+                    $"jobs-service antwortete mit {(int)response.StatusCode}.");
             }
 
             try
             {
-                var gelesen = await antwort.Content
-                    .ReadFromJsonAsync<Stellenantwort>(cancellationToken)
-                    ?? throw new StelleSchweigt("jobs-service sandte nichts.");
+                var gelesen = await response.Content
+                    .ReadFromJsonAsync<JobResponse>(cancellationToken)
+                    ?? throw new JobLookupSilent("jobs-service sandte nichts.");
 
-                return new OeffentlicheStelle(
+                return new PublicJob(
                     gelesen.Id,
                     new TenantId(gelesen.TenantId),
                     gelesen.Title,
@@ -107,10 +107,10 @@ public sealed class HttpStellenauskunft(
                     gelesen.Location ?? string.Empty,
                     gelesen.Skills ?? []);
             }
-            catch (JsonException fehler)
+            catch (JsonException error)
             {
-                throw new StelleSchweigt(
-                    "jobs-service sandte eine unbrauchbare Antwort.", fehler);
+                throw new JobLookupSilent(
+                    "jobs-service sandte eine unbrauchbare Antwort.", error);
             }
         }
     }

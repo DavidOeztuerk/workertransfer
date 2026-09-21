@@ -6,10 +6,10 @@ using WorkerTransfer.Outbox;
 namespace WorkerTransfer.Resume.Infrastructure.Benachrichtigung;
 
 /// <summary>Where notifications go, and what proves they are ours.</summary>
-public sealed class Benachrichtigungseinstellungen
+public sealed class NotificationSettings
 {
     /// <summary>The configuration section this binds to.</summary>
-    public const string Abschnitt = "Notifications";
+    public const string Section = "Notifications";
 
     /// <summary>The base address of notification-service.</summary>
     public string Adresse { get; set; } = string.Empty;
@@ -42,14 +42,14 @@ public sealed class Benachrichtigungseinstellungen
 /// </remarks>
 public sealed class HttpBenachrichtigung(
     IHttpClientFactory fabrik,
-    IOptions<Benachrichtigungseinstellungen> einstellungen) : IZustellung
+    IOptions<NotificationSettings> einstellungen) : IDelivery
 {
-    private readonly Benachrichtigungseinstellungen _einstellungen = einstellungen.Value;
+    private readonly NotificationSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task ZustelleAsync(
-        SubjectId empfaenger,
-        string art,
+    public async Task DeliverAsync(
+        SubjectId recipient,
+        string kind,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(_einstellungen.Adresse))
@@ -65,7 +65,7 @@ public sealed class HttpBenachrichtigung(
         using var client = fabrik.CreateClient(nameof(HttpBenachrichtigung));
 
         client.Timeout = _einstellungen.Zeitueberschreitung;
-        using var anfrage = new HttpRequestMessage(
+        using var request = new HttpRequestMessage(
             HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), "/internal/notifications"))
         {
             // The whole payload: whom it is about and what kind. No text, no
@@ -77,13 +77,13 @@ public sealed class HttpBenachrichtigung(
                 // Guid.Empty, und der Dienst antwortete 500. Gemessen: der
                 // ganze Benachrichtigungsweg war tot — 18 Ausgangszeilen, alle
                 // nach zehn Versuchen aufgegeben, keine einzige Mail.
-                new { user_id = empfaenger.Value, kind = art })
+                new { user_id = recipient.Value, kind = kind })
         };
 
-        anfrage.Headers.Add("X-Notify-Secret", _einstellungen.Geheimnis);
+        request.Headers.Add("X-Notify-Secret", _einstellungen.Geheimnis);
 
-        using var antwort = await client.SendAsync(anfrage, cancellationToken);
+        using var response = await client.SendAsync(request, cancellationToken);
 
-        antwort.EnsureSuccessStatusCode();
+        response.EnsureSuccessStatusCode();
     }
 }

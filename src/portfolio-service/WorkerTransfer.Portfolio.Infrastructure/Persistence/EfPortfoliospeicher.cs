@@ -13,7 +13,7 @@ namespace WorkerTransfer.Portfolio.Infrastructure.Persistence;
 /// nicht. Beim Lesen läuft alles durch <c>Eintrag.Aus</c> — eine Zeile, die die
 /// Regeln nicht mehr erfüllt, fällt auf dem Weg nach draußen auf.
 /// </remarks>
-internal sealed record EintragZeile(
+internal sealed record EntryRow(
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("summary")] string Summary,
     [property: JsonPropertyName("url")] string? Url,
@@ -26,54 +26,54 @@ internal sealed record EintragZeile(
     [property: JsonPropertyName("technologies")] IReadOnlyList<string>? Technologies = null);
 
 /// <summary>Liest und schreibt <c>portfolios</c>.</summary>
-public sealed class EfPortfoliospeicher(PortfolioDbContext kontext, TimeProvider uhr)
-    : IPortfoliospeicher
+public sealed class EfPortfolioStore(PortfolioDbContext context, TimeProvider uhr)
+    : IPortfolioStore
 {
     /// <inheritdoc />
-    public async Task<Domain.Portfolios.Portfolio?> HoleAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<Domain.Portfolios.Portfolio?> GetAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Portfolios
-            .FirstOrDefaultAsync(kandidat => kandidat.Id == wer.Value, cancellationToken);
+        var row = await context.Portfolios
+            .FirstOrDefaultAsync(kandidat => kandidat.Id == subject.Value, cancellationToken);
 
-        if (zeile is null)
+        if (row is null)
         {
             return null;
         }
 
-        var jetzt = uhr.GetUtcNow();
+        var now = uhr.GetUtcNow();
 
-        var eintraege = (JsonSerializer.Deserialize<List<EintragZeile>>(zeile.Items) ?? [])
+        var entries = (JsonSerializer.Deserialize<List<EntryRow>>(row.Items) ?? [])
             .Select(gelesen => Eintrag.Aus(
-                gelesen.Title, jetzt, gelesen.Summary, gelesen.Url,
+                gelesen.Title, now, gelesen.Summary, gelesen.Url,
                 gelesen.Role, gelesen.Year, gelesen.Attachment, gelesen.Technologies))
             .ToList();
 
         return Domain.Portfolios.Portfolio.Stelle_her(
-            wer,
-            eintraege,
-            new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
-            new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero));
+            subject,
+            entries,
+            new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
+            new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero));
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(
+    public async Task SaveAsync(
         Domain.Portfolios.Portfolio portfolio, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(portfolio);
 
         var geschrieben = JsonSerializer.Serialize(
-            portfolio.Eintraege.Select(eintrag => new EintragZeile(
-                eintrag.Titel, eintrag.Zusammenfassung, eintrag.Link,
-                eintrag.Rolle, eintrag.Jahr, eintrag.Anhang, eintrag.Technologien)));
+            portfolio.Eintraege.Select(entry => new EntryRow(
+                entry.Titel, entry.Zusammenfassung, entry.Link,
+                entry.Rolle, entry.Jahr, entry.Anhang, entry.Technologien)));
 
-        var vorhanden = await kontext.Portfolios
+        var vorhanden = await context.Portfolios
             .AsTracking()
             .FirstOrDefaultAsync(kandidat => kandidat.Id == portfolio.Wer.Value, cancellationToken);
 
         if (vorhanden is null)
         {
-            kontext.Portfolios.Add(new PortfolioZeile
+            context.Portfolios.Add(new PortfolioRow
             {
                 Id = portfolio.Wer.Value,
                 Items = geschrieben,
@@ -94,15 +94,15 @@ public sealed class EfPortfoliospeicher(PortfolioDbContext kontext, TimeProvider
     /// sofort, und die Zeile wäre auch dann weg, wenn der Befehl darum herum
     /// später scheiterte — die Dateien lägen dann noch da.
     /// </remarks>
-    public async Task<int> LoescheAsync(
-        SubjectId wer, CancellationToken cancellationToken = default)
+    public async Task<int> DeleteAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.Portfolios
+        var rows = await context.Portfolios
             .AsTracking()
-            .Where(kandidat => kandidat.Id == wer.Value)
+            .Where(kandidat => kandidat.Id == subject.Value)
             .ToListAsync(cancellationToken);
 
-        kontext.Portfolios.RemoveRange(zeilen);
+        context.Portfolios.RemoveRange(rows);
 
         // Nichts bleibt absichtlich stehen: ein Portfolio kennt keinen
         // Aufbewahrungsschalter.

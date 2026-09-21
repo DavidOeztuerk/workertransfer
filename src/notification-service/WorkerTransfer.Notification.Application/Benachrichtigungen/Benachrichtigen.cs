@@ -14,15 +14,15 @@ public sealed record BenachrichtigenBefehl(SubjectId Wer, Benachrichtigungsart A
 /// <remarks>
 /// Die beiden Hälften sind bewusst verschieden streng:
 /// <list type="bullet">
-/// <item>Der <strong>Eintrag im Postfach entsteht immer</strong>. Er liegt
+/// <item>Der <strong>Eintrag im Inbox entsteht immer</strong>. Er liegt
 /// hinter der Anmeldung, wo geprüft wird, wer liest; ihn zu drosseln hieße,
 /// jemandem zu verschweigen, dass etwas passiert ist. <em>Eine</em> Art bildet
 /// die Ausnahme, und aus dem umgekehrten Grund: bei
-/// <c>profile_discovered</c> wäre ein Eintrag je Treffer selbst die Auskunft,
+/// <c>profile_discovered</c> wäre ein Eintrag je Hit selbst die Auskunft,
 /// die niemand haben soll — ein Zähler über die eigene Sichtbarkeit
 /// (ADR-0033). Dort gilt eine Tageskappe, und sie nimmt den Eintrag mit.</item>
 /// <item>Die <strong>Mail wird gedrosselt und abbestellbar</strong>. Sie landet
-/// in einem Postfach, das nicht nur der Person gehören muss.</item>
+/// in einem Inbox, das nicht nur der Person gehören muss.</item>
 /// </list>
 /// <para>
 /// Der Rückgabewert sagt, ob gesendet wurde — für Tests und Protokoll. Der
@@ -32,8 +32,8 @@ public sealed record BenachrichtigenBefehl(SubjectId Wer, Benachrichtigungsart A
 /// </para>
 /// </remarks>
 public sealed class BenachrichtigenHandler(
-    IWunschspeicher wuensche,
-    IEingangsspeicher eingaenge,
+    IPreferenceStore preferences,
+    IInboxStore eingaenge,
     TimeProvider uhr) : IRequestHandler<BenachrichtigenBefehl, bool>
 {
     /// <inheritdoc />
@@ -42,27 +42,27 @@ public sealed class BenachrichtigenHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var jetzt = uhr.GetUtcNow();
+        var now = uhr.GetUtcNow();
 
         // DIE EIGENE KAPPE JE ART, und sie trifft den EINTRAG, nicht nur die
-        // Mail. Fuer `profile_discovered` waere ein Eintrag je Treffer ein
+        // Mail. Fuer `profile_discovered` waere ein Eintrag je Hit ein
         // Zaehler ueber die eigene Sichtbarkeit — auf Umwegen genau das
         // Verzeichnis, das ADR-0033 nicht entstehen laesst. Deshalb faellt hier
         // beides weg, und zwar still: der Aufrufer erfaehrt nichts darueber.
         if (Benachrichtigungsarten.Tageskappe(request.Art) is { } kappe
-            && await eingaenge.GabEsSeitAsync(
-                request.Wer, request.Art, jetzt - kappe, cancellationToken))
+            && await eingaenge.ExistedSinceAsync(
+                request.Wer, request.Art, now - kappe, cancellationToken))
         {
             return false;
         }
 
-        await eingaenge.FuegeHinzuAsync(
-            Eingang.Lege_an(request.Wer, request.Art, jetzt), cancellationToken);
+        await eingaenge.AppendAsync(
+            Eingang.Lege_an(request.Wer, request.Art, now), cancellationToken);
 
-        var wunsch = await wuensche.HoleAsync(request.Wer, cancellationToken)
-                     ?? Benachrichtigungswunsch.Voreingestellt(request.Wer);
+        var preference = await preferences.GetAsync(request.Wer, cancellationToken)
+                     ?? NotificationPreference.Voreingestellt(request.Wer);
 
-        if (!wunsch.Darf(request.Art, jetzt))
+        if (!preference.Darf(request.Art, now))
         {
             return false;
         }
@@ -71,8 +71,8 @@ public sealed class BenachrichtigenHandler(
         // Transaktion. Scheitert die Zustellung danach, ist diese Nachricht
         // verloren — das ist die richtige Richtung: lieber eine Mail zu wenig
         // als eine Schleife, die es bei jedem Ereignis erneut versucht.
-        wunsch.MerkeGesendet(jetzt);
-        await wuensche.SichereAsync(wunsch, cancellationToken);
+        preference.MerkeGesendet(now);
+        await preferences.SaveAsync(preference, cancellationToken);
 
         return true;
     }

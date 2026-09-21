@@ -7,10 +7,10 @@ using WorkerTransfer.Outbox;
 namespace WorkerTransfer.Assessment.Infrastructure.Benachrichtigung;
 
 /// <summary>Wohin Benachrichtigungen gehen, und was sie als unsere ausweist.</summary>
-public sealed class Benachrichtigungseinstellungen
+public sealed class NotificationSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Notifications";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Notifications";
 
     /// <summary>Die Basisadresse des notification-service.</summary>
     public string Adresse { get; set; } = string.Empty;
@@ -37,21 +37,21 @@ public sealed class Benachrichtigungseinstellungen
 /// Sache der Outbox: sie zählt den Versuch, behält die Zeile und versucht es
 /// wieder. Die Zustellung ist mindestens-einmal, und eine zweite ist harmlos.</para>
 ///
-/// <para><strong>Kein Aufgabentext und keine Bewertung reisen mit</strong>, nur
-/// eine Kennung und eine Art. Eine Mail landet in einem Postfach, und dieses
-/// Postfach kann das des jetzigen Arbeitgebers sein — eine Zeile „Ihre
+/// <para><strong>Kein Aufgabentext und keine Evaluation reisen mit</strong>, nur
+/// eine Kennung und eine Art. Eine Mail landet in einem Inbox, und dieses
+/// Inbox kann das des jetzigen Arbeitgebers sein — eine Zeile „Ihre
 /// Arbeitsprobe wurde abgelehnt" dort wäre genau die Auskunft, gegen die diese
 /// Plattform gebaut ist.</para>
 /// </remarks>
 public sealed class HttpBenachrichtigung(
     IHttpClientFactory fabrik,
-    IOptions<Benachrichtigungseinstellungen> einstellungen) : IZustellung
+    IOptions<NotificationSettings> einstellungen) : IDelivery
 {
-    private readonly Benachrichtigungseinstellungen _einstellungen = einstellungen.Value;
+    private readonly NotificationSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task ZustelleAsync(
-        SubjectId empfaenger, string art, CancellationToken cancellationToken = default)
+    public async Task DeliverAsync(
+        SubjectId recipient, string kind, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(_einstellungen.Adresse))
         {
@@ -67,16 +67,16 @@ public sealed class HttpBenachrichtigung(
 
         client.Timeout = _einstellungen.Zeitueberschreitung;
 
-        using var anfrage = new HttpRequestMessage(
+        using var request = new HttpRequestMessage(
             HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), "/internal/notifications"))
         {
-            Content = JsonContent.Create(new ArbeitsprobenmeldungV1(empfaenger.Value, art))
+            Content = JsonContent.Create(new WorkSampleNotificationV1(recipient.Value, kind))
         };
 
-        anfrage.Headers.Add("X-Notify-Secret", _einstellungen.Geheimnis);
+        request.Headers.Add("X-Notify-Secret", _einstellungen.Geheimnis);
 
-        using var antwort = await client.SendAsync(anfrage, cancellationToken);
+        using var response = await client.SendAsync(request, cancellationToken);
 
-        antwort.EnsureSuccessStatusCode();
+        response.EnsureSuccessStatusCode();
     }
 }

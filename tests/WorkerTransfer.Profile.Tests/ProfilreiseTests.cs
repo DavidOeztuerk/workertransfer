@@ -20,7 +20,7 @@ namespace WorkerTransfer.Profile.Tests;
 /// bei jedem Lesen, und dass ein schweigender Ledger weder ein Ja noch ein Nein
 /// ist.
 /// </remarks>
-public sealed class Probetor : IEinwilligungstor
+public sealed class Probetor : IConsentGate
 {
     /// <summary>Wer für welches Unternehmen sichtbar ist.</summary>
     public HashSet<(Guid Wer, Guid Firma)> Frei { get; } = [];
@@ -31,24 +31,24 @@ public sealed class Probetor : IEinwilligungstor
     /// <summary>Wenn wahr, sagt der Ledger gar nichts.</summary>
     public bool Schweigt { get; set; }
 
-    public Task<bool> DarfSehenAsync(
-        SubjectId wer, TenantId firma, CancellationToken cancellationToken = default)
+    public Task<bool> MaySeeAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default)
     {
         Fragen++;
         return Schweigt
-            ? throw new EinwilligungSchweigt("der Ledger antwortet im Test nicht")
-            : Task.FromResult(Frei.Contains((wer.Value, firma.Value)));
+            ? throw new ConsentGateSilent("der Ledger antwortet im Test nicht")
+            : Task.FromResult(Frei.Contains((subject.Value, company.Value)));
     }
 }
 
 /// <summary>Ein Entwerfer, der zählt statt zu fragen.</summary>
-public sealed class Probeentwerfer : IEntwerfer
+public sealed class Probeentwerfer : IDrafter
 {
     /// <summary>Was zuletzt hinausgegangen wäre — das ist die interessante Frage.</summary>
-    public Entwurfslage? Letzte { get; private set; }
+    public DraftSituation? Letzte { get; private set; }
 
-    public Task<string> EntwirfAsync(
-        Entwurfslage lage, CancellationToken cancellationToken = default)
+    public Task<string> DraftAsync(
+        DraftSituation lage, CancellationToken cancellationToken = default)
     {
         Letzte = lage;
         return Task.FromResult("Ich arbeite an verteilten Systemen.");
@@ -72,15 +72,15 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _tor));
-                dienste.Replace(ServiceDescriptor.Scoped<IEntwerfer>(_ => _entwerfer));
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _tor));
+                services.Replace(ServiceDescriptor.Scoped<IDrafter>(_ => _entwerfer));
             });
         });
 
@@ -93,9 +93,9 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsPerson(Guid wer) => Mit(Tokenform.Person(wer));
+    private HttpClient AlsPerson(Guid subject) => Mit(Tokenform.Person(subject));
 
-    private HttpClient AlsFirma(Guid wer, Guid firma) => Mit(Tokenform.Firma(wer, firma));
+    private HttpClient AlsFirma(Guid subject, Guid company) => Mit(Tokenform.Firma(subject, company));
 
     private HttpClient Mit(string token)
     {
@@ -105,10 +105,10 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
-    private static Task<HttpResponseMessage> Schreibe(
+    private static Task<HttpResponseMessage> Write(
         HttpClient browser, string ueberschrift = "Entwicklerin") =>
         browser.PutAsJsonAsync("/profiles/me", new
         {
@@ -125,7 +125,7 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
         var browser = AlsPerson(anna);
 
-        (await Schreibe(browser)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Write(browser)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         var meins = await Json(await browser.GetAsync("/profiles/me"));
 
@@ -134,22 +134,22 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Ob ein Profil gezeigt werden darf, steht ausschließlich im Ledger. Ein
+    /// Ob ein PersonProfile gezeigt werden darf, steht ausschließlich im Ledger. Ein
     /// Feld hier wäre eine zweite Wahrheit, und die beiden wären beim ersten
-    /// Widerruf uneins.
+    /// Revocation uneins.
     /// </summary>
     [Fact]
     public async Task Das_Profil_traegt_kein_Sichtbarkeitsfeld()
     {
         var anna = Guid.CreateVersion7();
-        await Schreibe(AlsPerson(anna));
+        await Write(AlsPerson(anna));
 
-        var rumpf = await (await AlsPerson(anna).GetAsync("/profiles/me"))
+        var body = await (await AlsPerson(anna).GetAsync("/profiles/me"))
             .Content.ReadAsStringAsync();
 
-        rumpf.Should().NotContain("visibility");
-        rumpf.Should().NotContain("public");
-        rumpf.Should().NotContain("is_visible");
+        body.Should().NotContain("visibility");
+        body.Should().NotContain("public");
+        body.Should().NotContain("is_visible");
     }
 
     /// <summary>
@@ -161,10 +161,10 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         var erfunden = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
-        await Schreibe(AlsPerson(anna));
+        var company = Guid.CreateVersion7();
+        await Write(AlsPerson(anna));
 
-        var browser = AlsFirma(Guid.CreateVersion7(), firma);
+        var browser = AlsFirma(Guid.CreateVersion7(), company);
 
         var beiVerborgener = await browser.GetAsync($"/profiles/{anna}");
         var beiErfundener = await browser.GetAsync($"/profiles/{erfunden}");
@@ -180,11 +180,11 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Mit_Freigabe_sieht_das_Unternehmen_das_Profil()
     {
         var anna = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
-        await Schreibe(AlsPerson(anna));
-        _tor.Frei.Add((anna, firma));
+        var company = Guid.CreateVersion7();
+        await Write(AlsPerson(anna));
+        _tor.Frei.Add((anna, company));
 
-        var gelesen = await AlsFirma(Guid.CreateVersion7(), firma).GetAsync($"/profiles/{anna}");
+        var gelesen = await AlsFirma(Guid.CreateVersion7(), company).GetAsync($"/profiles/{anna}");
 
         gelesen.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(gelesen)).GetProperty("headline").GetString().Should().Be("Entwicklerin");
@@ -198,43 +198,43 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Ohne_aktives_Unternehmen_gibt_es_403_und_nicht_404()
     {
         var anna = Guid.CreateVersion7();
-        await Schreibe(AlsPerson(anna));
+        await Write(AlsPerson(anna));
 
-        var versuch = await AlsPerson(Guid.CreateVersion7()).GetAsync($"/profiles/{anna}");
+        var attempt = await AlsPerson(Guid.CreateVersion7()).GetAsync($"/profiles/{anna}");
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        attempt.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     /// <summary>
-    /// Weder 404 noch das Profil: beides behauptete etwas, das niemand weiß.
+    /// Weder 404 noch das PersonProfile: beides behauptete etwas, das niemand weiß.
     /// </summary>
     [Fact]
     public async Task Schweigt_der_Ledger_wird_nichts_behauptet()
     {
         var anna = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
-        await Schreibe(AlsPerson(anna));
-        _tor.Frei.Add((anna, firma));
+        var company = Guid.CreateVersion7();
+        await Write(AlsPerson(anna));
+        _tor.Frei.Add((anna, company));
         _tor.Schweigt = true;
 
-        var versuch = await AlsFirma(Guid.CreateVersion7(), firma).GetAsync($"/profiles/{anna}");
+        var attempt = await AlsFirma(Guid.CreateVersion7(), company).GetAsync($"/profiles/{anna}");
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        attempt.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     /// <summary>
-    /// Ein Widerruf muss beim nächsten Lesen wirken, also wird jedes Mal neu
+    /// Ein Revocation muss beim nächsten Lesen wirken, also wird jedes Mal neu
     /// gefragt und nichts zwischen Anfragen behalten.
     /// </summary>
     [Fact]
     public async Task Der_Ledger_wird_bei_jedem_Lesen_neu_gefragt()
     {
         var anna = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
-        await Schreibe(AlsPerson(anna));
-        _tor.Frei.Add((anna, firma));
+        var company = Guid.CreateVersion7();
+        await Write(AlsPerson(anna));
+        _tor.Frei.Add((anna, company));
 
-        var browser = AlsFirma(Guid.CreateVersion7(), firma);
+        var browser = AlsFirma(Guid.CreateVersion7(), company);
         await browser.GetAsync($"/profiles/{anna}");
         var nachErstem = _tor.Fragen;
 
@@ -249,12 +249,12 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Niemand_bekommt_eine_Punktzahl()
     {
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
         var anna = Guid.CreateVersion7();
-        await Schreibe(AlsPerson(anna));
-        _tor.Frei.Add((anna, firma));
+        await Write(AlsPerson(anna));
+        _tor.Frei.Add((anna, company));
 
-        var browser = AlsFirma(Guid.CreateVersion7(), firma);
+        var browser = AlsFirma(Guid.CreateVersion7(), company);
         var einzeln = await (await browser.GetAsync($"/profiles/{anna}")).Content.ReadAsStringAsync();
         var eigen = await (await AlsPerson(anna).GetAsync("/profiles/me")).Content.ReadAsStringAsync();
 
@@ -274,7 +274,7 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         var browser = AlsPerson(anna);
-        await Schreibe(browser);
+        await Write(browser);
 
         var entworfen = await browser.PostAsJsonAsync(
             "/profiles/me/draft", new { wish = "kürzer" });
@@ -295,23 +295,23 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
     /// <remarks>
     /// Er war das einzige Feld dieses Endpunkts, das an keinem Wertobjekt
     /// vorbeikommt: Überschrift, Text und Fähigkeiten stammen aus dem
-    /// gespeicherten Profil und sind dort begrenzt, der Wunsch kam roh aus dem
+    /// gespeicherten PersonProfile und sind dort begrenzt, der Wunsch kam roh aus dem
     /// Rumpf und ging ungeprüft an den fremden Anbieter. Geprüft wird beides —
     /// 501 abgelehnt, 500 durchgelassen: eine Grenze, die auch das Erlaubte
-    /// abweist, merkt man erst an einer echten Anfrage.
+    /// abweist, merkt man erst an einer echten ResumeRequest.
     /// </remarks>
     [Theory]
     [InlineData(500, HttpStatusCode.OK)]
     [InlineData(501, HttpStatusCode.UnprocessableEntity)]
-    public async Task Ein_zu_langer_Wunsch_ist_ein_422(int laenge, HttpStatusCode erwartet)
+    public async Task Ein_zu_langer_Wunsch_ist_ein_422(int length, HttpStatusCode erwartet)
     {
         var browser = AlsPerson(Guid.CreateVersion7());
-        await Schreibe(browser);
+        await Write(browser);
 
-        var antwort = await browser.PostAsJsonAsync(
-            "/profiles/me/draft", new { wish = new string('a', laenge) });
+        var response = await browser.PostAsJsonAsync(
+            "/profiles/me/draft", new { wish = new string('a', length) });
 
-        antwort.StatusCode.Should().Be(erwartet);
+        response.StatusCode.Should().Be(erwartet);
     }
 
     /// <summary>
@@ -323,7 +323,7 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         var browser = AlsPerson(anna);
-        await Schreibe(browser);
+        await Write(browser);
 
         await using (var vorher = Kontext())
         {
@@ -340,15 +340,15 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Die_Loeschung_nimmt_das_Profil_mit()
     {
         var anna = Guid.CreateVersion7();
-        await Schreibe(AlsPerson(anna));
+        await Write(AlsPerson(anna));
 
-        var anfrage = new HttpRequestMessage(HttpMethod.Post, "/erasure")
+        var request = new HttpRequestMessage(HttpMethod.Post, "/erasure")
         {
             Content = JsonContent.Create(new { user_id = anna })
         };
-        anfrage.Headers.Add("X-Erasure-Secret", Loeschgeheimnis);
+        request.Headers.Add("X-Erasure-Secret", Loeschgeheimnis);
 
-        var geloescht = await _dienst.CreateClient().SendAsync(anfrage);
+        var geloescht = await _dienst.CreateClient().SendAsync(request);
 
         geloescht.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(geloescht)).GetProperty("retained").GetInt32().Should().Be(0);
@@ -366,20 +366,20 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", string.Empty);
             host.UseSetting("environment", "Development");
         });
 
-        var anfrage = new HttpRequestMessage(HttpMethod.Post, "/erasure")
+        var request = new HttpRequestMessage(HttpMethod.Post, "/erasure")
         {
             Content = JsonContent.Create(new { user_id = Guid.CreateVersion7() })
         };
-        anfrage.Headers.Add("X-Erasure-Secret", "irgendwas");
+        request.Headers.Add("X-Erasure-Secret", "irgendwas");
 
-        (await ohne.CreateClient().SendAsync(anfrage)).StatusCode
+        (await ohne.CreateClient().SendAsync(request)).StatusCode
             .Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -390,14 +390,14 @@ public class ProfilreiseTests(Postgres postgres) : IAsyncLifetime
 
     private Infrastructure.Persistence.ProfileDbContext Kontext()
     {
-        var quelle = Infrastructure.Persistence.ProfileDbContextFactory
-            .Datenquelle(postgres.ConnectionString);
+        var source = Infrastructure.Persistence.ProfileDbContextFactory
+            .DataSource(postgres.ConnectionString);
 
         return new Infrastructure.Persistence.ProfileDbContext(
             (Microsoft.EntityFrameworkCore.DbContextOptions<
                 Infrastructure.Persistence.ProfileDbContext>)
-            Infrastructure.Persistence.ProfileDbContextFactory.Konfiguriere(
+            Infrastructure.Persistence.ProfileDbContextFactory.Configure(
                 new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<
-                    Infrastructure.Persistence.ProfileDbContext>(), quelle).Options);
+                    Infrastructure.Persistence.ProfileDbContext>(), source).Options);
     }
 }

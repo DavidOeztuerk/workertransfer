@@ -11,25 +11,25 @@ using WorkerTransfer.Transfer.Domain.Vorgaenge;
 namespace WorkerTransfer.Transfer.Api;
 
 /// <summary>
-/// Die Übersetzung von Ergebnissen in Statuscodes — an einer Stelle für alle
+/// Die Übersetzung von Ergebnissen in Statuscodes — an einer Job für alle
 /// Routen.
 /// </summary>
 /// <remarks>
 /// Getrennt geschrieben würde die erste Route, die 403 statt 404 antwortet,
-/// verraten, dass es den Vorgang gibt. Bei diesem Dienst wiegt das am
+/// verraten, dass es den Case gibt. Bei diesem Dienst wiegt das am
 /// schwersten: schon die Existenz der Aussage „diese Person hört zu" kann
 /// jemanden den Arbeitsplatz kosten.
 /// </remarks>
-public static class Antworten
+public static class Responses
 {
     /// <summary>Was ein Filter zurückgibt, der die Antwort selbst geschrieben hat.</summary>
     /// <remarks>
     /// <strong>Nicht <c>null</c>.</strong> Ein Filter, der <c>null</c>
     /// zurückgibt, lässt das Rahmenwerk noch einmal schreiben — JSON-<c>null</c>
     /// samt Kopfzeilen, und die stehen zu diesem Zeitpunkt schon. Bei einer
-    /// Anfrage ohne Rumpf sieht der Aufrufer trotzdem sein 503 und nur das
+    /// ResumeRequest ohne Rumpf sieht der Aufrufer trotzdem sein 503 und nur das
     /// Protokoll trägt eine unbehandelte Ausnahme; bei einer mit Rumpf reißt
-    /// die Verbindung. Gemessen an <c>POST /applications</c>.
+    /// die Connection. Gemessen an <c>POST /applications</c>.
     /// </remarks>
     private static readonly IResult Geschrieben = Results.Empty;
 
@@ -37,7 +37,7 @@ public static class Antworten
     /// <remarks>
     /// Ein schweigender Ledger ist weder ein Ja noch ein Nein. Mit 404 zu
     /// antworten hieße zu behaupten, es gebe diesen Menschen nicht; den Status
-    /// zu zeigen hieße, eine Freigabe zu unterstellen, die niemand bestätigt
+    /// zu zeigen hieße, eine Release zu unterstellen, die niemand bestätigt
     /// hat. 503 sagt das eine Wahre: dieser Dienst kann gerade nicht antworten.
     /// <para>
     /// Als Filter je Gruppe statt als <c>catch</c> je Route — und an
@@ -46,32 +46,32 @@ public static class Antworten
     /// Ledger ausfällt.
     /// </para>
     /// </remarks>
-    public static RouteGroupBuilder Abgesichert(RouteGroupBuilder gruppe)
+    public static RouteGroupBuilder Abgesichert(RouteGroupBuilder group)
     {
-        ArgumentNullException.ThrowIfNull(gruppe);
+        ArgumentNullException.ThrowIfNull(group);
 
-        gruppe.AddEndpointFilter(async (aufruf, weiter) =>
+        group.AddEndpointFilter(async (call, weiter) =>
         {
             try
             {
-                return await weiter(aufruf);
+                return await weiter(call);
             }
-            catch (EinwilligungSchweigt)
+            catch (ConsentGateSilent)
             {
-                await ProblemDetailsMiddleware.Schreibe(
-                    aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                await ProblemDetailsMiddleware.Write(
+                    call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "the consent ledger did not answer");
 
                 return Geschrieben;
             }
         });
 
-        return gruppe;
+        return group;
     }
 
     /// <summary>Schreibt die Absage für einen unangemeldeten Aufrufer.</summary>
     public static Task NichtAngemeldet(HttpContext context) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
 
     /// <summary>Die Firma des Aufrufers, oder eine schon geschriebene Absage.</summary>
@@ -85,120 +85,120 @@ public static class Antworten
             return null;
         }
 
-        if (handelnder.Acting is not Capacity.ForCompany firma)
+        if (handelnder.Acting is not Capacity.ForCompany company)
         {
             // Eine Aussage über den Aufrufer, nicht über das Ziel: eine
             // Privatperson weiß, dass sie kein Unternehmen ist.
-            await ProblemDetailsMiddleware.Schreibe(
+            await ProblemDetailsMiddleware.Write(
                 context, StatusCodes.Status403Forbidden,
                 "Request failed", "reading a market status requires an active company");
 
             return null;
         }
 
-        return firma.Tenant;
+        return company.Tenant;
     }
 
-    /// <summary>Schreibt das Ergebnis einer Anfrage.</summary>
-    public static async Task Schreibe(
+    /// <summary>Schreibt das Ergebnis einer ResumeRequest.</summary>
+    public static async Task Write(
         HttpContext context,
-        Anfrageergebnis ergebnis,
+        ResumeRequestResult result,
         CancellationToken cancellationToken,
         bool? aktiv,
         int erfolg = StatusCodes.Status200OK)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        switch (ergebnis)
+        switch (result)
         {
-            case Anfrageergebnis.Erledigt erledigt:
+            case ResumeRequestResult.Erledigt erledigt:
                 context.Response.StatusCode = erfolg;
                 await context.Response.WriteAsJsonAsync(
-                    Zu(erledigt.Anfrage, aktiv), cancellationToken);
+                    Zu(erledigt.ResumeRequest, aktiv), cancellationToken);
                 return;
 
-            case Anfrageergebnis.NichtSichtbar:
+            case ResumeRequestResult.NichtSichtbar:
                 // Nicht vorhanden, nicht freigegeben, nicht meins — alles
                 // dasselbe. Der Unterschied wäre hier besonders teuer.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "No such market status");
                 return;
 
-            case Anfrageergebnis.SchonGefragt:
-                await ProblemDetailsMiddleware.Schreibe(
+            case ResumeRequestResult.SchonGefragt:
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status409Conflict,
                     "Request failed", "This company has already asked");
                 return;
 
-            case Anfrageergebnis.Zustandskonflikt konflikt:
-                await ProblemDetailsMiddleware.Schreibe(
+            case ResumeRequestResult.StateConflict konflikt:
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status409Conflict, "Request failed", konflikt.Grund);
                 return;
 
             default:
-                throw new InvalidOperationException($"Unbehandeltes Ergebnis: {ergebnis}");
+                throw new InvalidOperationException($"Unbehandeltes Ergebnis: {result}");
         }
     }
 
     /// <summary>Schreibt das Ergebnis eines Vorgangs.</summary>
-    public static async Task Schreibe(
+    public static async Task Write(
         HttpContext context,
-        Vorgangsergebnis ergebnis,
+        CaseResult result,
         CancellationToken cancellationToken,
         int erfolg = StatusCodes.Status200OK)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        switch (ergebnis)
+        switch (result)
         {
-            case Vorgangsergebnis.Erledigt erledigt:
+            case CaseResult.Erledigt erledigt:
                 context.Response.StatusCode = erfolg;
-                await context.Response.WriteAsJsonAsync(Zu(erledigt.Vorgang), cancellationToken);
+                await context.Response.WriteAsJsonAsync(Zu(erledigt.Case), cancellationToken);
                 return;
 
-            case Vorgangsergebnis.Unbekannt:
-                await ProblemDetailsMiddleware.Schreibe(
+            case CaseResult.Unbekannt:
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "No such transfer");
                 return;
 
-            case Vorgangsergebnis.NichtAnsprechbar:
-                // Kein Status, keine Freigabe, oder „gerade nicht" — alles
+            case CaseResult.NichtAnsprechbar:
+                // Kein Status, keine Release, oder „gerade nicht" — alles
                 // dasselbe nach außen. Sonst wäre der Endpunkt ein Orakel
                 // darüber, wer zuhört.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "No such person");
                 return;
 
-            case Vorgangsergebnis.LaeuftSchon:
-                await ProblemDetailsMiddleware.Schreibe(
+            case CaseResult.LaeuftSchon:
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status409Conflict,
                     "Request failed", "There is already a running transfer");
                 return;
 
-            case Vorgangsergebnis.Zustandskonflikt konflikt:
+            case CaseResult.StateConflict konflikt:
                 // Die Eingabe ist in Ordnung, der Zustand passt nicht.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status409Conflict, "Request failed", konflikt.Grund);
                 return;
 
-            case Vorgangsergebnis.Eingabe eingabe:
-                await ProblemDetailsMiddleware.Schreibe(
+            case CaseResult.Eingabe eingabe:
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", eingabe.Grund);
                 return;
 
             default:
-                throw new InvalidOperationException($"Unbehandeltes Ergebnis: {ergebnis}");
+                throw new InvalidOperationException($"Unbehandeltes Ergebnis: {result}");
         }
     }
 
-    /// <summary>Ein Marktstatus auf der Leitung.</summary>
-    public static MarktstatusV1 Zu(Marktstatus status)
+    /// <summary>Ein MarketStatus auf der Leitung.</summary>
+    public static MarketStatusV1 Zu(MarketStatus status)
     {
         ArgumentNullException.ThrowIfNull(status);
 
-        return new MarktstatusV1(
+        return new MarketStatusV1(
             status.Wer.Value,
             Verfuegbarkeiten.Wort(status.Verfuegbarkeit),
             status.Beschaeftigt,
@@ -209,38 +209,38 @@ public static class Antworten
             status.GeaendertAm);
     }
 
-    /// <summary>Eine Anfrage auf der Leitung.</summary>
-    public static MarktanfrageV1 Zu(Marktanfrage anfrage, bool? aktiv)
+    /// <summary>Eine ResumeRequest auf der Leitung.</summary>
+    public static MarketRequestV1 Zu(MarketRequest request, bool? aktiv)
     {
-        ArgumentNullException.ThrowIfNull(anfrage);
+        ArgumentNullException.ThrowIfNull(request);
 
-        return new MarktanfrageV1(
-            anfrage.Id,
-            anfrage.Wer.Value,
-            anfrage.Firma.Value,
-            Anfragestaende.Wort(anfrage.Stand),
-            anfrage.AngelegtAm,
-            anfrage.BeantwortetAm,
+        return new MarketRequestV1(
+            request.Id,
+            request.Wer.Value,
+            request.Firma.Value,
+            RequestStates.Wort(request.State),
+            request.AngelegtAm,
+            request.BeantwortetAm,
             aktiv);
     }
 
-    /// <summary>Ein Vorgang auf der Leitung.</summary>
-    public static TransferV1 Zu(Domain.Vorgaenge.Transfer vorgang)
+    /// <summary>Ein Case auf der Leitung.</summary>
+    public static TransferV1 Zu(Domain.Vorgaenge.Transfer caseItem)
     {
-        ArgumentNullException.ThrowIfNull(vorgang);
+        ArgumentNullException.ThrowIfNull(caseItem);
 
         return new TransferV1(
-            vorgang.Id,
-            vorgang.Wer.Value,
-            vorgang.Firma.Value,
-            Transferstaende.Wort(vorgang.Stand),
-            vorgang.BrauchtFreigabe,
-            vorgang.FreigabeBestaetigt,
-            vorgang.Nachricht,
-            vorgang.Angebotstext,
-            vorgang.Angebotsbeginn,
-            vorgang.AngebotsgebuehrCent,
-            vorgang.AngelegtAm,
-            vorgang.GeaendertAm);
+            caseItem.Id,
+            caseItem.Wer.Value,
+            caseItem.Firma.Value,
+            Transferstaende.Wort(caseItem.State),
+            caseItem.BrauchtFreigabe,
+            caseItem.FreigabeBestaetigt,
+            caseItem.Nachricht,
+            caseItem.Angebotstext,
+            caseItem.Angebotsbeginn,
+            caseItem.AngebotsgebuehrCent,
+            caseItem.AngelegtAm,
+            caseItem.GeaendertAm);
     }
 }

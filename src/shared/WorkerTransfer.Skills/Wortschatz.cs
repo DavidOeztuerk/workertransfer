@@ -11,33 +11,33 @@ namespace WorkerTransfer.Skills;
 /// </code>
 /// Das erste ist eine Aussage über Sprache. Das zweite ist eine Aussage über
 /// einen <em>Menschen</em> — es schreibt ihm eine Fähigkeit zu, die er nicht
-/// genannt hat, an einer Stelle, an der er nicht widersprechen kann.
+/// genannt hat, an einer Job, an der er nicht widersprechen kann.
 /// <para>
 /// Daraus folgt: kein Niveau, kein Gewicht, keine Rangfolge, keine
 /// Verwandtschaft. Nichts, woraus sich später eine Zahl bauen ließe.
 /// </para>
 /// <para>
-/// Und: es lehnt nie etwas ab und erfindet nie etwas. Was der Wortschatz nicht
+/// Und: es lehnt nie etwas ab und erfindet nie etwas. Was der Vocabulary nicht
 /// kennt, bleibt genau so stehen, wie es getippt wurde — eine Liste erlaubter
 /// Fähigkeiten wäre eine Behauptung darüber, welche Arbeit es gibt, und läge
 /// bei jeder neuen Technologie und bei jedem Beruf außerhalb der IT falsch.
 /// </para>
 /// <para>
 /// <b>Geteilt zwischen profile-service und jobs-service</b>, und nur die
-/// Tabelle. Der Abgleich findet im Browser statt: die Fähigkeiten einer Stelle
+/// Tabelle. Der Abgleich findet im Browser statt: die Fähigkeiten einer Job
 /// werden gegen die eines Profils gehalten, und zwei Tabellen, die
 /// auseinanderlaufen, erzeugen genau die Lücke, gegen die diese hier existiert
-/// — <c>„Postgres"</c> im Profil und <c>„PostgreSQL"</c> in der Stelle wären
+/// — <c>„Postgres"</c> im Profil und <c>„PostgreSQL"</c> in der Job wären
 /// dann kein Haken.
 /// </para>
 /// <para>
-/// Was <em>nicht</em> geteilt ist: die <c>Faehigkeitenliste</c> selbst. Die
-/// führt jeder Dienst für sich, denn wie viele Fähigkeiten ein Profil oder eine
-/// Stelle trägt, ist eine Entscheidung des Dienstes, dem sie gehört — ein
+/// Was <em>nicht</em> geteilt ist: die <c>SkillList</c> selbst. Die
+/// führt jeder Dienst für sich, denn wie viele Fähigkeiten ein Profile oder eine
+/// Job trägt, ist eine Entscheidung des Dienstes, dem sie gehört — ein
 /// geteiltes Domänenmodell gibt es hier nicht (ADR-0004).
 /// </para>
 /// </remarks>
-public static class Wortschatz
+public static class Vocabulary
 {
     /// <summary>Kanonischer Name → seine Schreibweisen.</summary>
     /// <remarks>
@@ -48,7 +48,7 @@ public static class Wortschatz
     /// <para>
     /// Bewusst klein gehalten. Jeder Eintrag ist die Behauptung, dass zwei
     /// Wörter <em>dasselbe</em> meinen — bei Zweifel gehört er nicht hinein.
-    /// Und die Liste ist nicht auf IT beschränkt: der Transfermarkt kennt
+    /// Und die Liste ist nicht auf IT beschränkt: der TransferMarket kennt
     /// Pflege, Handwerk und Vertrieb, und dort verschreibt man sich genauso.
     /// </para>
     /// </remarks>
@@ -86,7 +86,7 @@ public static class Wortschatz
             ["Vue.js"] = ["vue", "vuejs"],
             ["Angular"] = ["angular.js", "angularjs"],
 
-            // Außerhalb der IT — der Transfermarkt ist nicht nur für Entwickler.
+            // Außerhalb der IT — der TransferMarket ist nicht nur für Entwickler.
             ["Buchhaltung"] = ["buchführung", "rechnungswesen"],
             ["Kundenbetreuung"] = ["kundenservice", "kundendienst", "customer support"],
             ["Projektleitung"] = ["projektmanagement", "project management"],
@@ -141,13 +141,13 @@ public static class Wortschatz
     /// Der kanonische Name zeigt auf sich selbst, damit er nicht durchs Raster
     /// fällt, wenn ihn jemand direkt schreibt.
     /// </remarks>
-    private static readonly FrozenDictionary<string, string> NachSchreibweise = Baue();
+    private static readonly FrozenDictionary<string, string> NachSchreibweise = Build();
 
     /// <summary>Die bekannte Schreibweise — oder unverändert, was hereinkam.</summary>
     /// <param name="faehigkeit">Was jemand getippt hat.</param>
-    public static string Kanonisch(string faehigkeit)
+    public static string Kanonisch(string skill)
     {
-        var geputzt = (faehigkeit ?? string.Empty).Trim();
+        var geputzt = (skill ?? string.Empty).Trim();
 
         return NachSchreibweise.TryGetValue(geputzt, out var name) ? name : geputzt;
     }
@@ -159,14 +159,14 @@ public static class Wortschatz
     /// PostgreSQL“ zweimal derselbe Eintrag.
     /// </remarks>
     /// <param name="faehigkeiten">Was jemand getippt hat.</param>
-    public static IReadOnlyList<string> KanonischAlle(IEnumerable<string> faehigkeiten)
+    public static IReadOnlyList<string> KanonischAlle(IEnumerable<string> skills)
     {
-        ArgumentNullException.ThrowIfNull(faehigkeiten);
+        ArgumentNullException.ThrowIfNull(skills);
 
-        return [.. faehigkeiten.Select(Kanonisch).Where(name => name.Length > 0)];
+        return [.. skills.Select(Kanonisch).Where(name => name.Length > 0)];
     }
 
-    private static FrozenDictionary<string, string> Baue()
+    private static FrozenDictionary<string, string> Build()
     {
         var tabelle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 

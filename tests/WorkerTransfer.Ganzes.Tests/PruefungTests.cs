@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Noelia.Abstractions.Security.Checks;
 using WorkerTransfer.Profile.Application.Ports;
 using WorkerTransfer.Profile.Infrastructure.Einwilligung;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 
 namespace WorkerTransfer.Ganzes.Tests;
 
@@ -28,16 +28,16 @@ public sealed record KanarienvogelV1(string Name, int Passung);
 /// unerreichbarer Code und damit ein <em>Bau</em>fehler, und ein Baufehler liest
 /// sich in der Ausgabe wie ein bestandener Test.
 /// </remarks>
-public sealed class GemerktesTor(IEinwilligungstor dahinter) : IEinwilligungstor
+public sealed class GemerktesTor(IConsentGate dahinter) : IConsentGate
 {
     private bool? _gemerkt;
 
     /// <inheritdoc />
-    public async Task<bool> DarfSehenAsync(
-        Noelia.Core.Identity.SubjectId wer,
-        Noelia.Core.Identity.TenantId firma,
+    public async Task<bool> MaySeeAsync(
+        Noelia.Core.Identity.SubjectId subject,
+        Noelia.Core.Identity.TenantId company,
         CancellationToken cancellationToken = default) =>
-        _gemerkt ??= await dahinter.DarfSehenAsync(wer, firma, cancellationToken);
+        _gemerkt ??= await dahinter.MaySeeAsync(subject, company, cancellationToken);
 }
 
 /// <summary>Die sechs Prüfungen, die Noelia nicht hat — und jede kann rot werden.</summary>
@@ -64,32 +64,32 @@ public class PruefungTests
     [Fact]
     public async Task Die_Zahlpruefung_findet_in_profile_service_nichts()
     {
-        var befund = await new Zahlpruefung(
-            [typeof(Profile.Domain.Profile.Profil).Assembly,
-             typeof(Profile.Contracts.ProfilfundV1).Assembly]).RunAsync();
+        var finding = await new NumberCheck(
+            [typeof(Profile.Domain.Profile.PersonProfile).Assembly,
+             typeof(Profile.Contracts.ProfileHitV1).Assembly]).RunAsync();
 
-        befund.Status.Should().Be(SecurityCheckStatus.Pass);
-        befund.Id.Should().Be("wt.ki.keine-zahl");
+        finding.Status.Should().Be(SecurityCheckStatus.Pass);
+        finding.Id.Should().Be("wt.ki.keine-zahl");
     }
 
     /// <summary>Und sie wird rot, sobald ein Vertrag ein Feld <c>Passung</c> trägt.</summary>
     [Fact]
     public async Task Die_Zahlpruefung_wird_rot_wenn_ein_Vertrag_eine_Passung_traegt()
     {
-        var befund = await new Zahlpruefung([typeof(KanarienvogelV1).Assembly]).RunAsync();
+        var finding = await new NumberCheck([typeof(KanarienvogelV1).Assembly]).RunAsync();
 
-        befund.Status.Should().Be(SecurityCheckStatus.Fail);
-        befund.Summary.Should().Contain("KanarienvogelV1.Passung");
+        finding.Status.Should().Be(SecurityCheckStatus.Fail);
+        finding.Summary.Should().Contain("KanarienvogelV1.Passung");
     }
 
     /// <summary>Eine leere Fläche ist kein grüner Haken.</summary>
     [Fact]
     public async Task Die_Zahlpruefung_meldet_nicht_gruen_ueber_nichts()
     {
-        var befund = await new Zahlpruefung([]).RunAsync();
+        var finding = await new NumberCheck([]).RunAsync();
 
-        befund.Status.Should().Be(SecurityCheckStatus.Fail);
-        befund.Summary.Should().Contain("nichts angesehen");
+        finding.Status.Should().Be(SecurityCheckStatus.Fail);
+        finding.Summary.Should().Contain("nichts angesehen");
     }
 
     /// <summary>§ 87 Abs. 1 Nr. 6 BetrVG reist im Text mit, weil er als Zitat nicht geht.</summary>
@@ -103,11 +103,11 @@ public class PruefungTests
     [Fact]
     public async Task Die_Mitbestimmung_steht_im_Text_und_nicht_als_falsches_Zitat()
     {
-        var befund = await new Zahlpruefung([typeof(KanarienvogelV1).Assembly]).RunAsync();
+        var finding = await new NumberCheck([typeof(KanarienvogelV1).Assembly]).RunAsync();
 
-        befund.Remediation.Should().Contain("§ 87 Abs. 1 Nr. 6 BetrVG");
+        finding.Remediation.Should().Contain("§ 87 Abs. 1 Nr. 6 BetrVG");
 
-        befund.References.Should().NotContain(
+        finding.References.Should().NotContain(
             bezug => bezug.Article.Contains("87", StringComparison.Ordinal),
             "ein Arbeitsrechtsartikel unter einem DSGVO-Regelwerk wäre eine "
             + "falsche Fundstelle");
@@ -119,26 +119,26 @@ public class PruefungTests
     [Fact]
     public async Task Die_Nahtpruefung_nennt_die_vier_Felder_und_den_Prompt()
     {
-        var befund = await new Nahtpruefung(
-            typeof(Entwurfslage),
+        var finding = await new SeamCheck(
+            typeof(DraftSituation),
             ["Ueberschrift", "Text", "Faehigkeiten", "Wunsch", "Prompt"],
             "für einen Profiltext").RunAsync();
 
-        befund.Status.Should().Be(SecurityCheckStatus.Pass);
-        befund.Summary.Should().Contain("Wunsch").And.Contain("Prompt");
+        finding.Status.Should().Be(SecurityCheckStatus.Pass);
+        finding.Summary.Should().Contain("Wunsch").And.Contain("Prompt");
     }
 
     /// <summary>Ein Feld mehr als vereinbart: rot.</summary>
     [Fact]
     public async Task Die_Nahtpruefung_wird_rot_wenn_ein_Feld_dazukommt()
     {
-        var befund = await new Nahtpruefung(
-            typeof(Entwurfslage),
+        var finding = await new SeamCheck(
+            typeof(DraftSituation),
             ["Ueberschrift", "Text", "Faehigkeiten", "Prompt"],
             "für einen Profiltext").RunAsync();
 
-        befund.Status.Should().Be(SecurityCheckStatus.Fail);
-        befund.Summary.Should().Contain("zusätzlich Wunsch");
+        finding.Status.Should().Be(SecurityCheckStatus.Fail);
+        finding.Summary.Should().Contain("zusätzlich Wunsch");
     }
 
     // --------------------------------------------------------- wt.ki.anbieter
@@ -147,10 +147,10 @@ public class PruefungTests
     [Fact]
     public async Task Die_Anbieterpruefung_meldet_ohne_Eintrag_NichtAnwendbar()
     {
-        var befund = await new Anbieterpruefung([]).RunAsync();
+        var finding = await new ProviderCheck([]).RunAsync();
 
-        befund.Status.Should().Be(SecurityCheckStatus.NotApplicable);
-        befund.Status.Should().NotBe(
+        finding.Status.Should().Be(SecurityCheckStatus.NotApplicable);
+        finding.Status.Should().NotBe(
             SecurityCheckStatus.Pass,
             "ein grüner Haken an etwas, das gar nicht gilt, ist Rauschen in "
             + "genau dem Dokument, das Rauschen durchschneiden soll");
@@ -165,27 +165,27 @@ public class PruefungTests
     [Fact]
     public async Task Die_Anbieterpruefung_zaehlt_Menschen_statt_sie_zu_nennen()
     {
-        var befund = await new Anbieterpruefung(
+        var finding = await new ProviderCheck(
         [
             new Probequelle(
             [
-                new Anbieterzeile("anthropic", "api.anthropic.com", Herkunft.Person, 2),
-                new Anbieterzeile("anthropic", "api.anthropic.com", Herkunft.Person, 1),
-                new Anbieterzeile("openai_compatible", "localhost", Herkunft.Person, 1)
+                new ProviderRow("anthropic", "api.anthropic.com", ProviderOrigin.Person, 2),
+                new ProviderRow("anthropic", "api.anthropic.com", ProviderOrigin.Person, 1),
+                new ProviderRow("openai_compatible", "localhost", ProviderOrigin.Person, 1)
             ])
         ]).RunAsync();
 
-        befund.Summary.Should().Contain("3 Mensch(en) auf api.anthropic.com");
-        befund.Summary.Should().Contain("eigenes Netz");
-        befund.Status.Should().Be(SecurityCheckStatus.Warning);
+        finding.Summary.Should().Contain("3 Mensch(en) auf api.anthropic.com");
+        finding.Summary.Should().Contain("eigenes Netz");
+        finding.Status.Should().Be(SecurityCheckStatus.Warning);
     }
 
     /// <summary>Nicht eingerichtet heißt: keine Zeile, nicht eine leere.</summary>
     [Fact]
     public async Task Ein_nicht_eingerichteter_Betreiberanbieter_liefert_keine_Zeile() =>
-        (await new Betreiberquelle(
+        (await new OperatorProviderSource(
             "anthropic", "https://api.anthropic.com/v1/messages", eingerichtet: false)
-            .LeseAsync()).Should().BeEmpty();
+            .ReadAsync()).Should().BeEmpty();
 
     // ---------------------------------------------------- wt.einwilligung.wirkt
 
@@ -193,33 +193,33 @@ public class PruefungTests
     [Fact]
     public async Task Die_Widerrufspruefung_ist_gruen_ohne_Zwischenstueck()
     {
-        await using var anbieter = Profilbau().BuildServiceProvider();
+        await using var provider = Profilbau().BuildServiceProvider();
 
-        var befund = await new Widerrufspruefung<IEinwilligungstor>(
-            anbieter, typeof(HttpEinwilligungstor)).RunAsync();
+        var finding = await new RevocationCheck<IConsentGate>(
+            provider, typeof(HttpConsentGate)).RunAsync();
 
-        befund.Status.Should().Be(SecurityCheckStatus.Pass);
-        befund.Summary.Should().Contain("kein weiterer Typ");
+        finding.Status.Should().Be(SecurityCheckStatus.Pass);
+        finding.Summary.Should().Contain("kein weiterer Typ");
     }
 
     /// <summary>Und rot, sobald jemand einen Zwischenspeicher davorsetzt.</summary>
     [Fact]
     public async Task Die_Widerrufspruefung_wird_rot_mit_einem_Zwischenspeicher()
     {
-        var dienste = Profilbau();
+        var services = Profilbau();
 
-        dienste.AddScoped<IEinwilligungstor>(anbieter =>
+        services.AddScoped<IConsentGate>(provider =>
             new GemerktesTor(
-                ActivatorUtilities.CreateInstance<HttpEinwilligungstor>(anbieter)));
+                ActivatorUtilities.CreateInstance<HttpConsentGate>(provider)));
 
-        await using var anbieter = dienste.BuildServiceProvider();
+        await using var provider = services.BuildServiceProvider();
 
-        var befund = await new Widerrufspruefung<IEinwilligungstor>(
-            anbieter, typeof(HttpEinwilligungstor)).RunAsync();
+        var finding = await new RevocationCheck<IConsentGate>(
+            provider, typeof(HttpConsentGate)).RunAsync();
 
-        befund.Status.Should().Be(SecurityCheckStatus.Fail);
-        befund.Summary.Should().Contain("GemerktesTor");
-        befund.Remediation.Should().Contain("ADR-0013");
+        finding.Status.Should().Be(SecurityCheckStatus.Fail);
+        finding.Summary.Should().Contain("GemerktesTor");
+        finding.Remediation.Should().Contain("ADR-0013");
     }
 
     // --------------------------------------------------- wt.loeschung.nachweis
@@ -228,62 +228,62 @@ public class PruefungTests
     [Fact]
     public async Task Eine_geschlossene_Loeschtuer_wird_rot()
     {
-        var befund = await Loeschpruefung.AlsEmpfaenger(
+        var finding = await ErasureCheck.AlsEmpfaenger(
             "profile", tuerEingerichtet: false, pruefspurVorhanden: true).RunAsync();
 
-        befund.Status.Should().Be(SecurityCheckStatus.Fail);
-        befund.Summary.Should().Contain("Tür ist");
+        finding.Status.Should().Be(SecurityCheckStatus.Fail);
+        finding.Summary.Should().Contain("Tür ist");
     }
 
     /// <summary>Ein Dienst ohne Personenzeilen ist kein Empfänger — und kein Haken.</summary>
     [Fact]
     public async Task Ein_Dienst_ohne_Personenzeilen_meldet_NichtAnwendbar() =>
-        (await Loeschpruefung.OhneZeilen("jobs").RunAsync())
+        (await ErasureCheck.OhneZeilen("jobs").RunAsync())
             .Status.Should().Be(SecurityCheckStatus.NotApplicable);
 
     /// <summary>Offene Tür, aber keine Prüfspur: erreichbar, unbelegt.</summary>
     [Fact]
     public async Task Ohne_Pruefspur_bleibt_ein_Hinweis()
     {
-        var befund = await Loeschpruefung.AlsEmpfaenger(
+        var finding = await ErasureCheck.AlsEmpfaenger(
             "portfolio", tuerEingerichtet: true, pruefspurVorhanden: false).RunAsync();
 
-        befund.Status.Should().Be(SecurityCheckStatus.Warning);
+        finding.Status.Should().Be(SecurityCheckStatus.Warning);
     }
 
     /// <summary>Der Ursprung kennt jede Adresse — oder er sagt, welche fehlt.</summary>
     [Fact]
     public async Task Ein_Ursprung_ohne_Adresse_wird_rot()
     {
-        var befund = await Loeschpruefung.AlsUrsprung(
+        var finding = await ErasureCheck.AlsUrsprung(
             "identity", ["consent", "profile"], ["consent"]).RunAsync();
 
-        befund.Status.Should().Be(SecurityCheckStatus.Fail);
-        befund.Summary.Should().Contain("profile");
+        finding.Status.Should().Be(SecurityCheckStatus.Fail);
+        finding.Summary.Should().Contain("profile");
     }
 
     // ------------------------------------------------------------- Werkzeug
 
-    private sealed class Probequelle(IReadOnlyList<Anbieterzeile> zeilen) : IAnbieterquelle
+    private sealed class Probequelle(IReadOnlyList<ProviderRow> rows) : IProviderSource
     {
-        public Task<IReadOnlyList<Anbieterzeile>> LeseAsync(CancellationToken ct = default) =>
-            Task.FromResult(zeilen);
+        public Task<IReadOnlyList<ProviderRow>> ReadAsync(CancellationToken ct = default) =>
+            Task.FromResult(rows);
     }
 
     /// <summary>Der Verbundpunkt von profile-service, ohne Datenbank am Draht.</summary>
     private static ServiceCollection Profilbau()
     {
-        var dienste = new ServiceCollection();
+        var services = new ServiceCollection();
 
-        dienste.AddHttpClient();
+        services.AddHttpClient();
         // Das Tor fragt IM AUFTRAG DES AUFRUFERS und braucht dafuer dessen
-        // Anfrage — ohne diese Zeile laesst es sich gar nicht bauen, und die
+        // ResumeRequest — ohne diese Zeile laesst es sich gar nicht bauen, und die
         // Pruefung meldete `Fail` ueber einen Fehler dieser Vorrichtung statt
         // ueber den Baum.
-        dienste.AddHttpContextAccessor();
-        dienste.AddOptions<Einwilligungseinstellungen>();
-        dienste.AddScoped<IEinwilligungstor, HttpEinwilligungstor>();
+        services.AddHttpContextAccessor();
+        services.AddOptions<ConsentSettings>();
+        services.AddScoped<IConsentGate, HttpConsentGate>();
 
-        return dienste;
+        return services;
     }
 }

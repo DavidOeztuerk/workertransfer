@@ -9,13 +9,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Outbox;
-using WorkerTransfer.ServiceDefaults.Rollen;
+using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.Transfer.Application.Ports;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Transfer.Tests;
 
-/// <summary>Der Marktstatus, seine Freigabe und ihr Widerruf.</summary>
+/// <summary>Der MarketStatus, seine Release und ihr Revocation.</summary>
 [Collection(PostgresCollection.Name)]
 public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
 {
@@ -29,20 +29,20 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:transfer", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _ledger));
-                dienste.Replace(ServiceDescriptor.Scoped<IZustellung, Probezustellung>());
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _ledger));
+                services.Replace(ServiceDescriptor.Scoped<IDelivery, Probezustellung>());
                 // Angebot und Abschluss verlangen seit PBI-2 einen `admin`.
-                // Diese Reihen messen den Vorgang und nicht die Rolle — also
+                // Diese Reihen messen den Case und nicht die Rolle — also
                 // antwortet die Probe wie eine Inhaberin. `RollenTests` dreht
                 // sie auf `member`.
-                dienste.Replace(ServiceDescriptor.Scoped<IFirmenrollen>(_ => new Rollenprobe()));
+                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => new Rollenprobe()));
             });
         });
 
@@ -55,9 +55,9 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsFirma(Guid firma) => Mit(Tokenform.Firma(Guid.CreateVersion7(), firma));
+    private HttpClient AlsFirma(Guid company) => Mit(Tokenform.Firma(Guid.CreateVersion7(), company));
 
-    private HttpClient AlsPerson(Guid wer) => Mit(Tokenform.Person(wer));
+    private HttpClient AlsPerson(Guid subject) => Mit(Tokenform.Person(subject));
 
     private HttpClient Mit(string token)
     {
@@ -67,19 +67,19 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     /// <summary>Der Problemrumpf ohne die Korrelationskennung.</summary>
-    private static string OhneKorrelation(string rumpf) =>
+    private static string OhneKorrelation(string body) =>
         System.Text.RegularExpressions.Regex.Replace(
-            rumpf, "\"correlationId\":\"[^\"]*\",?", string.Empty);
+            body, "\"correlationId\":\"[^\"]*\",?", string.Empty);
 
-    private static Task<HttpResponseMessage> Setze(
-        HttpClient browser, string zustand, bool beschaeftigt = false, string notiz = "") =>
+    private static Task<HttpResponseMessage> Set(
+        HttpClient browser, string state, bool beschaeftigt = false, string notiz = "") =>
         browser.PutAsJsonAsync("/market/me", new
         {
-            availability = zustand, employed = beschaeftigt, note = notiz
+            availability = state, employed = beschaeftigt, note = notiz
         });
 
     /// <summary>
@@ -92,11 +92,11 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Wer_nichts_gesagt_hat_ist_nicht_verfuegbar()
     {
-        var antwort = await AlsPerson(Guid.CreateVersion7()).GetAsync("/market/me");
+        var response = await AlsPerson(Guid.CreateVersion7()).GetAsync("/market/me");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var status = await Json(antwort);
+        var status = await Json(response);
         status.GetProperty("availability").GetString().Should().Be("unavailable");
         status.GetProperty("is_approachable").GetBoolean().Should().BeFalse();
     }
@@ -107,12 +107,12 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = AlsPerson(Guid.CreateVersion7());
 
-        foreach (var zustand in new[] { "listening", "unavailable", "open", "listening" })
+        foreach (var state in new[] { "listening", "unavailable", "open", "listening" })
         {
-            var antwort = await Setze(browser, zustand);
+            var response = await Set(browser, state);
 
-            antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-            (await Json(antwort)).GetProperty("availability").GetString().Should().Be(zustand);
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            (await Json(response)).GetProperty("availability").GetString().Should().Be(state);
         }
     }
 
@@ -120,13 +120,13 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_erfundener_Zustand_ist_422()
     {
-        var antwort = await Setze(AlsPerson(Guid.CreateVersion7()), "vielleicht");
+        var response = await Set(AlsPerson(Guid.CreateVersion7()), "vielleicht");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     /// <summary>
-    /// Ohne Freigabe sieht ein Unternehmen nichts — und „nicht vorhanden"
+    /// Ohne Release sieht ein Unternehmen nichts — und „nicht vorhanden"
     /// sieht genauso aus.
     /// </summary>
     /// <remarks>
@@ -137,18 +137,18 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Verborgen_und_nicht_vorhanden_antworten_gleich()
     {
         var anna = Guid.CreateVersion7();
-        await Setze(AlsPerson(anna), "open");
+        await Set(AlsPerson(anna), "open");
 
-        var firma = AlsFirma(Guid.CreateVersion7());
+        var company = AlsFirma(Guid.CreateVersion7());
 
-        var verborgen = await firma.GetAsync($"/market/{anna}");
-        var niemand = await firma.GetAsync($"/market/{Guid.CreateVersion7()}");
+        var verborgen = await company.GetAsync($"/market/{anna}");
+        var niemand = await company.GetAsync($"/market/{Guid.CreateVersion7()}");
 
         verborgen.StatusCode.Should().Be(HttpStatusCode.NotFound);
         niemand.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         // Bis auf die Korrelationskennung buchstabengleich — die ist je
-        // Anfrage verschieden und sagt über die Person nichts.
+        // ResumeRequest verschieden und sagt über die Person nichts.
         OhneKorrelation(await verborgen.Content.ReadAsStringAsync())
             .Should().Be(OhneKorrelation(await niemand.Content.ReadAsStringAsync()));
     }
@@ -158,11 +158,11 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Fragen_freigeben_sehen()
     {
         var anna = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
-        await Setze(AlsPerson(anna), "listening", notiz: "Nur Remote.");
+        var company = Guid.CreateVersion7();
+        await Set(AlsPerson(anna), "listening", notiz: "Nur Remote.");
         _ledger.ProfilFrei.Add(anna);
 
-        var gefragt = await AlsFirma(firma).PostAsync($"/market/{anna}/requests", null);
+        var gefragt = await AlsFirma(company).PostAsync($"/market/{anna}/requests", null);
 
         gefragt.StatusCode.Should().Be(HttpStatusCode.Created);
         (await Json(gefragt)).GetProperty("status").GetString().Should().Be("PENDING");
@@ -172,27 +172,27 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
         var erteilt = await AlsPerson(anna).PostAsync($"/market/requests/{id}/grant", null);
 
         erteilt.StatusCode.Should().Be(HttpStatusCode.OK);
-        _ledger.Erteilt.Should().ContainSingle().Which.Should().Be((anna, firma));
+        _ledger.Erteilt.Should().ContainSingle().Which.Should().Be((anna, company));
 
-        var gesehen = await AlsFirma(firma).GetAsync($"/market/{anna}");
+        var gesehen = await AlsFirma(company).GetAsync($"/market/{anna}");
 
         gesehen.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(gesehen)).GetProperty("note").GetString().Should().Be("Nur Remote.");
     }
 
     /// <summary>
-    /// Die Anfrage setzt die PROFILfreigabe voraus, nicht die Existenz eines
-    /// Marktstatus.
+    /// Die ResumeRequest setzt die PROFILfreigabe voraus, nicht die Existenz eines
+    /// MarketStatus.
     /// </summary>
     /// <remarks>
-    /// Beides zu prüfen wäre ein Orakel: „hat schon einen Marktstatus gepflegt"
+    /// Beides zu prüfen wäre ein Orakel: „hat schon einen MarketStatus gepflegt"
     /// ist eine Information über die Person, die niemand erfragen können soll.
     /// </remarks>
     [Fact]
     public async Task Ohne_Profilfreigabe_ist_niemand_da()
     {
         var anna = Guid.CreateVersion7();
-        await Setze(AlsPerson(anna), "open");
+        await Set(AlsPerson(anna), "open");
 
         var gefragt = await AlsFirma(Guid.CreateVersion7())
             .PostAsync($"/market/{anna}/requests", null);
@@ -201,7 +201,7 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Wer noch nie einen Marktstatus gepflegt hat, sieht genauso aus wie
+    /// Wer noch nie einen MarketStatus gepflegt hat, sieht genauso aus wie
     /// jemand, der einen hat.
     /// </summary>
     [Fact]
@@ -224,31 +224,31 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
     public async Task Ein_Unternehmen_fragt_nur_einmal()
     {
         var anna = Guid.CreateVersion7();
-        var firma = AlsFirma(Guid.CreateVersion7());
+        var company = AlsFirma(Guid.CreateVersion7());
         _ledger.ProfilFrei.Add(anna);
 
-        await firma.PostAsync($"/market/{anna}/requests", null);
-        var nochmal = await firma.PostAsync($"/market/{anna}/requests", null);
+        await company.PostAsync($"/market/{anna}/requests", null);
+        var nochmal = await company.PostAsync($"/market/{anna}/requests", null);
 
         nochmal.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     /// <summary>
-    /// Auch nach einer Ablehnung — der Widerruf ist eine stärkere Aussage als
+    /// Auch nach einer Ablehnung — der Revocation ist eine stärkere Aussage als
     /// die Ablehnung, nicht eine schwächere.
     /// </summary>
     [Fact]
     public async Task Auch_nach_der_Ablehnung_wird_nicht_erneut_gefragt()
     {
         var anna = Guid.CreateVersion7();
-        var firma = AlsFirma(Guid.CreateVersion7());
+        var company = AlsFirma(Guid.CreateVersion7());
         _ledger.ProfilFrei.Add(anna);
 
-        var id = (await Json(await firma.PostAsync($"/market/{anna}/requests", null)))
+        var id = (await Json(await company.PostAsync($"/market/{anna}/requests", null)))
             .GetProperty("id").GetGuid();
         await AlsPerson(anna).PostAsync($"/market/requests/{id}/decline", null);
 
-        var nochmal = await firma.PostAsync($"/market/{anna}/requests", null);
+        var nochmal = await company.PostAsync($"/market/{anna}/requests", null);
 
         nochmal.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
@@ -256,22 +256,22 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
     /// <summary>Auch die Ablehnung widerruft im Ledger.</summary>
     /// <remarks>
     /// Gelänge der Ledger-Aufruf und scheiterte danach der Commit, existierte
-    /// sonst eine Berechtigung ohne sichtbaren Vorgang — der einzige Weg, auf
+    /// sonst eine Berechtigung ohne sichtbaren Case — der einzige Weg, auf
     /// dem dieses System nach außen OFFEN scheitern könnte.
     /// </remarks>
     [Fact]
     public async Task Die_Ablehnung_widerruft_auch()
     {
         var anna = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
         _ledger.ProfilFrei.Add(anna);
 
-        var id = (await Json(await AlsFirma(firma).PostAsync($"/market/{anna}/requests", null)))
+        var id = (await Json(await AlsFirma(company).PostAsync($"/market/{anna}/requests", null)))
             .GetProperty("id").GetGuid();
 
         await AlsPerson(anna).PostAsync($"/market/requests/{id}/decline", null);
 
-        _ledger.Widerrufen.Should().ContainSingle().Which.Should().Be((anna, firma));
+        _ledger.Widerrufen.Should().ContainSingle().Which.Should().Be((anna, company));
     }
 
     /// <summary>
@@ -314,22 +314,22 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Nach dem Widerruf bleibt die Anfrage GRANTED und `active` fällt auf
+    /// Nach dem Revocation bleibt die ResumeRequest GRANTED und `active` fällt auf
     /// false.
     /// </summary>
     /// <remarks>
-    /// Genau deshalb steht die Berechtigung nicht im Vorgang: „wurde einmal
+    /// Genau deshalb steht die Berechtigung nicht im Case: „wurde einmal
     /// erteilt" und „gilt gerade" sind zwei verschiedene Aussagen.
     /// </remarks>
     [Fact]
     public async Task Nach_dem_Widerruf_bleibt_GRANTED_und_active_faellt()
     {
         var anna = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
         _ledger.ProfilFrei.Add(anna);
         var ihr = AlsPerson(anna);
 
-        var id = (await Json(await AlsFirma(firma).PostAsync($"/market/{anna}/requests", null)))
+        var id = (await Json(await AlsFirma(company).PostAsync($"/market/{anna}/requests", null)))
             .GetProperty("id").GetGuid();
         await ihr.PostAsync($"/market/requests/{id}/grant", null);
 
@@ -341,8 +341,8 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
         var widerrufen = await ihr.PostAsync($"/market/requests/{id}/revoke", null);
 
         // Der Statuscode gehört mit geprüft: eine Gegenprobe hat gezeigt, dass
-        // ein Widerruf, der 500 antwortet, hier sonst durchginge — die
-        // Zurückrollung liefe still ins Leere und der Stand sähe richtig aus.
+        // ein Revocation, der 500 antwortet, hier sonst durchginge — die
+        // Zurückrollung liefe still ins Leere und der State sähe richtig aus.
         widerrufen.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var nachher = (await Json(await ihr.GetAsync("/market/me/requests")))
@@ -350,7 +350,7 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
         nachher.GetProperty("status").GetString().Should().Be("GRANTED");
         nachher.GetProperty("active").GetBoolean().Should().BeFalse();
 
-        (await AlsFirma(firma).GetAsync($"/market/{anna}"))
+        (await AlsFirma(company).GetAsync($"/market/{anna}"))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -359,7 +359,7 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
     /// </summary>
     /// <remarks>
     /// Es hat die Antwort schon in Form des Status, den es sieht oder nicht
-    /// sieht — und ein Feld hier ließe sich abfragen, ohne je einen Marktstatus
+    /// sieht — und ein Feld hier ließe sich abfragen, ohne je einen MarketStatus
     /// zu lesen.
     /// </remarks>
     [Fact]
@@ -367,11 +367,11 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         _ledger.ProfilFrei.Add(anna);
-        var firma = AlsFirma(Guid.CreateVersion7());
+        var company = AlsFirma(Guid.CreateVersion7());
 
-        await firma.PostAsync($"/market/{anna}/requests", null);
+        await company.PostAsync($"/market/{anna}/requests", null);
 
-        var ihre = (await Json(await firma.GetAsync("/market/requests")))
+        var ihre = (await Json(await company.GetAsync("/market/requests")))
             .EnumerateArray().Single();
 
         ihre.GetProperty("active").ValueKind.Should().Be(JsonValueKind.Null);
@@ -386,19 +386,19 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         _ledger.ProfilFrei.Add(anna);
-        var firma = AlsFirma(Guid.CreateVersion7());
+        var company = AlsFirma(Guid.CreateVersion7());
 
-        var id = (await Json(await firma.PostAsync($"/market/{anna}/requests", null)))
+        var id = (await Json(await company.PostAsync($"/market/{anna}/requests", null)))
             .GetProperty("id").GetGuid();
         await AlsPerson(anna).PostAsync($"/market/requests/{id}/decline", null);
 
-        var ihre = (await Json(await firma.GetAsync("/market/requests")))
+        var ihre = (await Json(await company.GetAsync("/market/requests")))
             .EnumerateArray().Single();
 
         ihre.GetProperty("status").GetString().Should().Be("DECLINED");
     }
 
-    /// <summary>Die Anfrage hinterlässt ihre Absicht in der Outbox.</summary>
+    /// <summary>Die ResumeRequest hinterlässt ihre Absicht in der Outbox.</summary>
     [Fact]
     public async Task Die_Anfrage_hinterlaesst_die_Absicht_in_der_Outbox()
     {
@@ -407,16 +407,16 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
 
         await AlsFirma(Guid.CreateVersion7()).PostAsync($"/market/{anna}/requests", null);
 
-        await using var kontext = postgres.Kontext();
-        var vermerke = await kontext.Set<OutboxZeile>()
-            .Where(zeile => zeile.UserId == anna)
+        await using var context = postgres.Kontext();
+        var vermerke = await context.Set<OutboxRow>()
+            .Where(row => row.UserId == anna)
             .ToListAsync();
 
         vermerke.Should().ContainSingle().Which.Kind.Should().Be("market_request");
     }
 
     /// <summary>
-    /// Schweigt der Ledger, entsteht keine Anfrage — und die Antwort ist 503.
+    /// Schweigt der Ledger, entsteht keine ResumeRequest — und die Antwort ist 503.
     /// </summary>
     [Fact]
     public async Task Ein_schweigender_Ledger_laesst_keine_Anfrage_zurueck()
@@ -424,24 +424,24 @@ public class MarktreiseTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
         _ledger.Schweigt = true;
 
-        var antwort = await AlsFirma(Guid.CreateVersion7())
+        var response = await AlsFirma(Guid.CreateVersion7())
             .PostAsync($"/market/{anna}/requests", null);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Anfragen.AnyAsync(zeile => zeile.SubjectId == anna))
+        await using var context = postgres.Kontext();
+        (await context.Anfragen.AnyAsync(row => row.SubjectId == anna))
             .Should().BeFalse();
     }
 
-    /// <summary>Ein Marktstatus liest sich nur mit einem Unternehmen.</summary>
+    /// <summary>Ein MarketStatus liest sich nur mit einem Unternehmen.</summary>
     [Fact]
     public async Task Eine_Privatperson_liest_keinen_fremden_Marktstatus()
     {
-        var antwort = await AlsPerson(Guid.CreateVersion7())
+        var response = await AlsPerson(Guid.CreateVersion7())
             .GetAsync($"/market/{Guid.CreateVersion7()}");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     /// <summary>Ohne Anmeldung gibt es nichts.</summary>

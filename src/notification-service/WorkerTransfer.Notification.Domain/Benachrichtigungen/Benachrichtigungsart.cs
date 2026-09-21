@@ -2,10 +2,10 @@ namespace WorkerTransfer.Notification.Domain.Benachrichtigungen;
 
 /// <summary>Worüber benachrichtigt wird — und mehr sagt eine Nachricht nie.</summary>
 /// <remarks>
-/// Eine Mail landet in einem Postfach, und dieses Postfach kann das Postfach
+/// Eine Mail landet in einem Inbox, und dieses Inbox kann das Inbox
 /// beim aktuellen Arbeitgeber sein: auf dessen Servern, in dessen Sicherungen,
 /// im Blick seiner Administratoren. Eine Zeile wie „Acme GmbH möchte deinen
-/// Marktstatus sehen" wäre genau die Auskunft, gegen die diese Plattform gebaut
+/// MarketStatus sehen" wäre genau die Auskunft, gegen die diese Plattform gebaut
 /// ist — freiwillig verschickt und im Klartext.
 /// <para>
 /// Deshalb sagt eine Benachrichtigung nicht, worum es geht. Die Art steht
@@ -15,22 +15,22 @@ namespace WorkerTransfer.Notification.Domain.Benachrichtigungen;
 /// </remarks>
 public enum Benachrichtigungsart
 {
-    /// <summary>Ein Unternehmen hat nach dem Lebenslauf gefragt.</summary>
+    /// <summary>Ein Unternehmen hat nach dem Resume gefragt.</summary>
     ResumeRequest,
 
-    /// <summary>Ein Unternehmen hat nach dem Marktstatus gefragt.</summary>
+    /// <summary>Ein Unternehmen hat nach dem MarketStatus gefragt.</summary>
     MarketRequest,
 
-    /// <summary>Eine Bewerbung hat sich bewegt.</summary>
+    /// <summary>Eine JobApplication hat sich bewegt.</summary>
     ApplicationUpdate,
 
-    /// <summary>Ein Transfer-Vorgang hat sich bewegt.</summary>
+    /// <summary>Ein Transfer-Case hat sich bewegt.</summary>
     TransferUpdate,
 
-    /// <summary>Eine Bewerbung ist bei einem Unternehmen eingegangen.</summary>
+    /// <summary>Eine JobApplication ist bei einem Unternehmen eingegangen.</summary>
     ApplicationReceived,
 
-    /// <summary>Das Profil dieser Person ist in einer Suche aufgetaucht.</summary>
+    /// <summary>Das Profile dieser Person ist in einer Search aufgetaucht.</summary>
     /// <remarks>
     /// <para>Die Auskunft aus ADR-0033, und ausdrücklich <em>statt</em> eines
     /// Protokolls: der Entwurf wollte einmal eine Liste „wer hat wen wann
@@ -78,14 +78,14 @@ public enum Benachrichtigungsart
     ///
     /// <para><strong>Die zweite Bewegung ist der Grund, dass es diese Art
     /// gibt.</strong> ADR-0042 verspricht: die Person <em>sieht</em> die
-    /// Bewertung, immer, auch bei einer Absage. Ohne diese Nachricht erführe sie
+    /// Evaluation, immer, auch bei einer Absage. Ohne diese Nachricht erführe sie
     /// davon erst beim nächsten Vorbeischauen — und eine Beurteilung, die der
     /// Beurteilte nicht liest, ist genau das, was dort nicht gebaut wird.</para>
     ///
     /// <para>Und auch sie nennt <strong>kein Unternehmen</strong> und trägt
-    /// weder Aufgabentext noch Bewertung: eine Benachrichtigung trägt nur eine
+    /// weder Aufgabentext noch Evaluation: eine Benachrichtigung trägt nur eine
     /// Art. Eine Zeile „Ihre Arbeitsprobe wurde abgelehnt" landete sonst
-    /// womöglich im Postfach beim jetzigen Arbeitgeber.</para>
+    /// womöglich im Inbox beim jetzigen Arbeitgeber.</para>
     /// </remarks>
     AssessmentUpdate
 }
@@ -115,7 +115,7 @@ public static class Benachrichtigungsarten
     ];
 
     /// <summary>Das Wort zur Art.</summary>
-    public static string Wort(Benachrichtigungsart art) => art switch
+    public static string Wort(Benachrichtigungsart kind) => kind switch
     {
         Benachrichtigungsart.ResumeRequest => "resume_request",
         Benachrichtigungsart.MarketRequest => "market_request",
@@ -125,11 +125,11 @@ public static class Benachrichtigungsarten
         Benachrichtigungsart.ProfileDiscovered => "profile_discovered",
         Benachrichtigungsart.AdvisorConversation => "advisor_conversation",
         Benachrichtigungsart.AssessmentUpdate => "assessment_update",
-        _ => throw new ArgumentOutOfRangeException(nameof(art))
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
     /// <summary>Die Art zum Wort, oder <c>null</c>.</summary>
-    public static Benachrichtigungsart? Lies(string? wort) => wort switch
+    public static Benachrichtigungsart? Lies(string? word) => word switch
     {
         "resume_request" => Benachrichtigungsart.ResumeRequest,
         "market_request" => Benachrichtigungsart.MarketRequest,
@@ -149,11 +149,11 @@ public static class Benachrichtigungsarten
     /// <remarks>
     /// <para><strong>Eine eigene Kappe je Art, ausdrücklich nicht die stündliche
     /// Drossel über alle Arten</strong> (ADR-0033). Die Drossel schützt das
-    /// Postfach vor Frequenz; sie lässt den <em>Eintrag</em> immer entstehen,
+    /// Inbox vor Frequenz; sie lässt den <em>Eintrag</em> immer entstehen,
     /// weil der hinter der Anmeldung liegt und niemandem etwas verrät.</para>
     ///
     /// <para>Bei <c>profile_discovered</c> ist genau das anders, und darin liegt
-    /// der ganze Grund für diese Methode: ein Eintrag je Treffer wäre ein
+    /// der ganze Grund für diese Methode: ein Eintrag je Hit wäre ein
     /// <em>Zähler über die eigene Sichtbarkeit</em> — auf Umwegen das
     /// Verzeichnis, das hier nicht entstehen soll. Deshalb fällt hier der
     /// Eintrag selbst weg, nicht nur die Mail.</para>
@@ -162,6 +162,6 @@ public static class Benachrichtigungsarten
     /// weil eine Firma an einem Nachmittag mehrfach sucht; länger verschluckt
     /// die Auskunft, um derentwillen der Scout gebaut werden darf.</para>
     /// </remarks>
-    public static TimeSpan? Tageskappe(Benachrichtigungsart art) =>
-        art == Benachrichtigungsart.ProfileDiscovered ? TimeSpan.FromDays(1) : null;
+    public static TimeSpan? Tageskappe(Benachrichtigungsart kind) =>
+        kind == Benachrichtigungsart.ProfileDiscovered ? TimeSpan.FromDays(1) : null;
 }

@@ -10,27 +10,27 @@ namespace WorkerTransfer.Applications.Infrastructure.Einwilligung;
 /// <summary>Wie eine Erteilung auf der Leitung aussieht.</summary>
 internal sealed record Erteilung(Guid SubjectId, string Capability);
 
-/// <summary>Wie ein Widerruf aussieht.</summary>
+/// <summary>Wie ein Revocation aussieht.</summary>
 /// <remarks>
-/// Der Ledger verlangt für einen Widerruf eine Begründung und für eine
+/// Der Ledger verlangt für einen Revocation eine Begründung und für eine
 /// Erteilung keine: etwas wegzunehmen muss erklärbar sein, es zu geben nicht.
-/// Die hier sagt ehrlich, wodurch der Widerruf ausgelöst wurde, statt eine zu
+/// Die hier sagt ehrlich, wodurch der Revocation ausgelöst wurde, statt eine zu
 /// erfinden.
 /// </remarks>
-internal sealed record Widerruf(Guid SubjectId, string Capability, string Reason);
+internal sealed record Revocation(Guid SubjectId, string Capability, string Reason);
 
 /// <summary>Schreibt in den Ledger.</summary>
 /// <remarks>
 /// Jeder Aufruf reist mit dem Token <em>des Aufrufers</em> statt mit einem
 /// Dienstkonto, damit das Protokoll des Ledgers festhält, wer wirklich gefragt
 /// hat. Ein fremder Akteur wird dort abgewiesen — was richtig ist: die
-/// Freigabe erteilt die Person, nicht dieser Dienst.
+/// Release erteilt die Person, nicht dieser Dienst.
 /// </remarks>
-public sealed class HttpEinwilligungsschreiber(
+public sealed class HttpConsentWriter(
     IHttpClientFactory fabrik,
     IAufrufertoken token,
-    IOptions<Einwilligungseinstellungen> einstellungen,
-    ILogger<HttpEinwilligungsschreiber> protokoll) : IEinwilligungsschreiber
+    IOptions<ConsentSettings> einstellungen,
+    ILogger<HttpConsentWriter> protokoll) : IConsentWriter
 {
     /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
     public const string Klient = "consent";
@@ -43,93 +43,93 @@ public sealed class HttpEinwilligungsschreiber(
 
     private const string Begruendung = "Bewerbung zurückgezogen";
 
-    private readonly Einwilligungseinstellungen _einstellungen = einstellungen.Value;
+    private readonly ConsentSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task ErteileAsync(
-        SubjectId wer,
-        IReadOnlyList<string> faehigkeiten,
+    public async Task GrantAsync(
+        SubjectId subject,
+        IReadOnlyList<string> skills,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(faehigkeiten);
+        ArgumentNullException.ThrowIfNull(skills);
 
-        foreach (var faehigkeit in faehigkeiten)
+        foreach (var skill in skills)
         {
-            await SchreibeAsync(
-                "/consent/grant", new Erteilung(wer.Value, faehigkeit), cancellationToken);
+            await WriteAsync(
+                "/consent/grant", new Erteilung(subject.Value, skill), cancellationToken);
         }
     }
 
     /// <inheritdoc />
-    public async Task WiderrufeAsync(
-        SubjectId wer,
-        IReadOnlyList<string> faehigkeiten,
+    public async Task RevokeAsync(
+        SubjectId subject,
+        IReadOnlyList<string> skills,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(faehigkeiten);
+        ArgumentNullException.ThrowIfNull(skills);
 
-        foreach (var faehigkeit in faehigkeiten)
+        foreach (var skill in skills)
         {
-            await SchreibeAsync(
+            await WriteAsync(
                 "/consent/revoke",
-                new Widerruf(wer.Value, faehigkeit, Begruendung),
+                new Revocation(subject.Value, skill, Begruendung),
                 cancellationToken);
         }
     }
 
-    private async Task SchreibeAsync<TRumpf>(
-        string pfad,
-        TRumpf rumpf,
+    private async Task WriteAsync<TRumpf>(
+        string path,
+        TRumpf body,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(_einstellungen.Adresse))
         {
-            throw new EinwilligungSchweigt("Consent:Adresse ist nicht gesetzt.");
+            throw new ConsentGateSilent("Consent:Adresse ist nicht gesetzt.");
         }
 
         using var client = fabrik.CreateClient(Klient);
         client.Timeout = _einstellungen.Zeitueberschreitung;
 
-        using var anfrage = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), pfad))
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), path))
         {
-            Content = JsonContent.Create(rumpf, options: Format)
+            Content = JsonContent.Create(body, options: Format)
         };
 
-        if (token.Wert is { Length: > 0 } wert)
+        if (token.Wert is { Length: > 0 } value)
         {
-            anfrage.Headers.Add("Authorization", $"Bearer {wert}");
+            request.Headers.Add("Authorization", $"Bearer {value}");
         }
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
-            protokoll.LogWarning("Consent-Ledger nicht erreichbar ({Art})", fehler.GetType().Name);
-            throw new EinwilligungSchweigt("consent-service ist nicht erreichbar.", fehler);
+            protokoll.LogWarning("Consent-Ledger nicht erreichbar ({Art})", error.GetType().Name);
+            throw new ConsentGateSilent("consent-service ist nicht erreichbar.", error);
         }
-        catch (TaskCanceledException fehler) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
             protokoll.LogWarning("Consent-Ledger antwortete nicht rechtzeitig");
-            throw new EinwilligungSchweigt("consent-service antwortete nicht rechtzeitig.", fehler);
+            throw new ConsentGateSilent("consent-service antwortete nicht rechtzeitig.", error);
         }
 
-        using (antwort)
+        using (response)
         {
-            if (!antwort.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
                 // 401 und 403 eingeschlossen: unser Token taugt nicht — ein
                 // Systemproblem, und keine Aussage darüber, ob die Person
                 // eingewilligt hat.
                 protokoll.LogWarning(
-                    "Consent-Ledger antwortete mit {Code}", (int)antwort.StatusCode);
+                    "Consent-Ledger antwortete mit {Code}", (int)response.StatusCode);
 
-                throw new EinwilligungSchweigt(
-                    $"consent-service antwortete mit {(int)antwort.StatusCode}.");
+                throw new ConsentGateSilent(
+                    $"consent-service antwortete mit {(int)response.StatusCode}.");
             }
         }
     }

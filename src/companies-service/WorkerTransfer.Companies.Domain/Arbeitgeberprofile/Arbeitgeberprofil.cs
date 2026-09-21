@@ -1,8 +1,8 @@
 using Noelia.Core.Identity;
 
-namespace WorkerTransfer.Companies.Domain.Arbeitgeberprofile;
+namespace WorkerTransfer.Companies.Domain.EmployerProfiles;
 
-/// <summary>Das Arbeitgeberprofil — wie ein Unternehmen sich zeigt.</summary>
+/// <summary>Das EmployerProfile — wie ein Unternehmen sich zeigt.</summary>
 /// <remarks>
 /// <c>tenants</c> in identity-service hält Name und Domain: die
 /// <strong>Identität</strong>, entstanden aus einem Domain-Nachweis (ADR-0019).
@@ -15,7 +15,7 @@ namespace WorkerTransfer.Companies.Domain.Arbeitgeberprofile;
 /// Aussage über sich selbst.
 /// </para>
 /// </remarks>
-public sealed class Arbeitgeberprofil
+public sealed class EmployerProfile
 {
     /// <summary>Wie lang der Anzeigename sein darf.</summary>
     public const int HoechstlaengeAnzeigename = 160;
@@ -32,25 +32,25 @@ public sealed class Arbeitgeberprofil
     /// <summary>Wie viele Einträge eine Liste haben darf.</summary>
     public const int HoechsteEintraege = 20;
 
-    private Arbeitgeberprofil(
-        TenantId firma,
-        string kuerzel,
-        Geprueftes werte,
+    private EmployerProfile(
+        TenantId company,
+        string slug,
+        Geprueftes values,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm)
     {
-        Firma = firma;
-        Kuerzel = kuerzel;
-        Anzeigename = werte.Anzeigename;
-        UeberUns = werte.UeberUns;
-        Netzseite = werte.Netzseite;
-        Orte = werte.Orte;
-        Leistungen = werte.Leistungen;
-        Zeile1 = werte.Zeile1;
-        Postleitzahl = werte.Postleitzahl;
-        Ort = werte.Ort;
-        Land = werte.Land;
-        Telefon = werte.Telefon;
+        Firma = company;
+        Slug = slug;
+        Anzeigename = values.Anzeigename;
+        UeberUns = values.UeberUns;
+        Netzseite = values.Netzseite;
+        Orte = values.Orte;
+        Leistungen = values.Leistungen;
+        Zeile1 = values.Zeile1;
+        Postleitzahl = values.Postleitzahl;
+        Ort = values.Ort;
+        Land = values.Land;
+        Telefon = values.Telefon;
         AngelegtAm = angelegtAm;
         GeaendertAm = geaendertAm;
     }
@@ -64,12 +64,12 @@ public sealed class Arbeitgeberprofil
     /// ein Kürzel, das dem Anzeigenamen folgt, bricht jeden geteilten Link.
     /// Deshalb hat diese Klasse keinen Weg, es zu ändern.
     /// </remarks>
-    public string Kuerzel { get; }
+    public string Slug { get; }
 
     /// <summary>Die Marke.</summary>
     /// <remarks>
     /// <strong>Nicht</strong> <c>tenants.name</c>: der eine ist der Kontoname
-    /// bei der Anlage, der andere die Marke. Keiner wird aus dem anderen
+    /// bei der Anlage, der andere die Marke. None wird aus dem anderen
     /// abgeleitet, also gibt es hier keine Kopie, die driften könnte.
     /// </remarks>
     public string Anzeigename { get; private set; }
@@ -103,31 +103,31 @@ public sealed class Arbeitgeberprofil
     /// <summary>Wann es zuletzt geändert wurde.</summary>
     public DateTimeOffset GeaendertAm { get; private set; }
 
-    /// <summary>Legt ein Profil an.</summary>
+    /// <summary>Legt ein Profile an.</summary>
     /// <exception cref="Profilfehler">Etwas an der Eingabe stimmt nicht.</exception>
-    public static Arbeitgeberprofil Lege_an(
-        TenantId firma,
-        string kuerzel,
+    public static EmployerProfile Lege_an(
+        TenantId company,
+        string slug,
         string anzeigename,
         string ueberUns,
         string? netzseite,
         IReadOnlyList<string>? orte,
         IReadOnlyList<string>? leistungen,
-        DateTimeOffset jetzt,
+        DateTimeOffset now,
         string? zeile1 = null,
         string? postleitzahl = null,
         string? ort = null,
         string? land = null,
         string? telefon = null) =>
-        new(firma, kuerzel,
-            Pruefe(anzeigename, ueberUns, netzseite, orte, leistungen,
+        new(company, slug,
+            Check(anzeigename, ueberUns, netzseite, orte, leistungen,
                 zeile1, postleitzahl, ort, land, telefon),
-            jetzt, jetzt);
+            now, now);
 
-    /// <summary>Das Profil, wie eine Zeile es hält.</summary>
-    public static Arbeitgeberprofil Stelle_her(
-        TenantId firma,
-        string kuerzel,
+    /// <summary>Das Profile, wie eine Zeile es hält.</summary>
+    public static EmployerProfile Stelle_her(
+        TenantId company,
+        string slug,
         string anzeigename,
         string ueberUns,
         string? netzseite,
@@ -140,7 +140,7 @@ public sealed class Arbeitgeberprofil
         string ort = "",
         string land = "DE",
         string telefon = "") =>
-        new(firma, kuerzel,
+        new(company, slug,
             new Geprueftes(anzeigename, ueberUns, netzseite, orte, leistungen,
                 zeile1, postleitzahl, ort, land, telefon),
             angelegtAm, geaendertAm);
@@ -153,7 +153,7 @@ public sealed class Arbeitgeberprofil
         string? netzseite,
         IReadOnlyList<string>? orte,
         IReadOnlyList<string>? leistungen,
-        DateTimeOffset jetzt,
+        DateTimeOffset now,
         string? zeile1 = null,
         string? postleitzahl = null,
         string? ort = null,
@@ -162,7 +162,7 @@ public sealed class Arbeitgeberprofil
     {
         // Erst vollständig prüfen, dann schreiben: ein abgelehntes Formular
         // darf kein halb geändertes Aggregat hinterlassen.
-        var geprueft = Pruefe(anzeigename, ueberUns, netzseite, orte, leistungen,
+        var geprueft = Check(anzeigename, ueberUns, netzseite, orte, leistungen,
             zeile1, postleitzahl, ort, land, telefon);
 
         Anzeigename = geprueft.Anzeigename;
@@ -175,7 +175,7 @@ public sealed class Arbeitgeberprofil
         Ort = geprueft.Ort;
         Land = geprueft.Land;
         Telefon = geprueft.Telefon;
-        GeaendertAm = jetzt;
+        GeaendertAm = now;
     }
 
     /// <summary>Die geprüften Werte, getippt.</summary>
@@ -196,7 +196,7 @@ public sealed class Arbeitgeberprofil
         string Land,
         string Telefon);
 
-    private static Geprueftes Pruefe(
+    private static Geprueftes Check(
         string anzeigename,
         string ueberUns,
         string? netzseite,
@@ -222,23 +222,23 @@ public sealed class Arbeitgeberprofil
             Text("phone", telefon, pflicht: false, 40));
     }
 
-    private static string Text(string feld, string? wert, bool pflicht, int grenze)
+    private static string Text(string field, string? value, bool pflicht, int limit)
     {
-        var bereinigt = (wert ?? string.Empty).Trim();
+        var bereinigt = (value ?? string.Empty).Trim();
 
         if (pflicht && bereinigt.Length == 0)
         {
-            throw new Textfehler(feld, "must not be empty");
+            throw new Textfehler(field, "must not be empty");
         }
 
-        return bereinigt.Length > grenze
-            ? throw new Textfehler(feld, $"exceeds {grenze} characters")
+        return bereinigt.Length > limit
+            ? throw new Textfehler(field, $"exceeds {limit} characters")
             : bereinigt;
     }
 
-    private static string? Link(string? wert)
+    private static string? Link(string? value)
     {
-        var bereinigt = (wert ?? string.Empty).Trim();
+        var bereinigt = (value ?? string.Empty).Trim();
 
         if (bereinigt.Length == 0)
         {
@@ -252,17 +252,17 @@ public sealed class Arbeitgeberprofil
             throw new Linkfehler($"The link exceeds {HoechstlaengeLink} characters");
         }
 
-        if (!Uri.TryCreate(bereinigt, UriKind.Absolute, out var adresse))
+        if (!Uri.TryCreate(bereinigt, UriKind.Absolute, out var address))
         {
             throw new Linkfehler("The link is missing a host");
         }
 
-        if (adresse.Scheme != Uri.UriSchemeHttp && adresse.Scheme != Uri.UriSchemeHttps)
+        if (address.Scheme != Uri.UriSchemeHttp && address.Scheme != Uri.UriSchemeHttps)
         {
             throw new Linkfehler("Only http and https links are allowed");
         }
 
-        return string.IsNullOrEmpty(adresse.Host)
+        return string.IsNullOrEmpty(address.Host)
             ? throw new Linkfehler("The link is missing a host")
             : bereinigt;
     }
@@ -272,7 +272,7 @@ public sealed class Arbeitgeberprofil
     /// Erst entdoppeln, dann zählen: sonst würde jemand mit einundzwanzigmal
     /// „Homeoffice" abgewiesen, obwohl daraus ein Eintrag wird.
     /// </remarks>
-    private static IReadOnlyList<string> Eintraege(string feld, IReadOnlyList<string>? roh)
+    private static IReadOnlyList<string> Eintraege(string field, IReadOnlyList<string>? roh)
     {
         if (roh is null)
         {
@@ -282,9 +282,9 @@ public sealed class Arbeitgeberprofil
         var behalten = new List<string>();
         var gesehen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var eintrag in roh)
+        foreach (var entry in roh)
         {
-            var bereinigt = (eintrag ?? string.Empty).Trim();
+            var bereinigt = (entry ?? string.Empty).Trim();
 
             if (bereinigt.Length == 0)
             {
@@ -293,7 +293,7 @@ public sealed class Arbeitgeberprofil
 
             if (bereinigt.Length > HoechstlaengeEintrag)
             {
-                throw new Textfehler(feld, $"entry exceeds {HoechstlaengeEintrag} characters");
+                throw new Textfehler(field, $"entry exceeds {HoechstlaengeEintrag} characters");
             }
 
             if (gesehen.Add(bereinigt))
@@ -303,28 +303,28 @@ public sealed class Arbeitgeberprofil
         }
 
         return behalten.Count > HoechsteEintraege
-            ? throw new ZuVieleEintraege(feld, HoechsteEintraege)
+            ? throw new ZuVieleEintraege(field, HoechsteEintraege)
             : behalten;
     }
 }
 
-/// <summary>Findet und speichert Arbeitgeberprofile.</summary>
-public interface IProfilspeicher
+/// <summary>Findet und speichert EmployerProfiles.</summary>
+public interface IProfileStore
 {
-    /// <summary>Das Profil dieses Unternehmens, oder <c>null</c>.</summary>
-    Task<Arbeitgeberprofil?> HoleAsync(
-        TenantId firma, CancellationToken cancellationToken = default);
+    /// <summary>Das Profile dieses Unternehmens, oder <c>null</c>.</summary>
+    Task<EmployerProfile?> GetAsync(
+        TenantId company, CancellationToken cancellationToken = default);
 
-    /// <summary>Das Profil hinter diesem Kürzel, oder <c>null</c>.</summary>
-    Task<Arbeitgeberprofil?> HoleAsync(string kuerzel, CancellationToken cancellationToken = default);
+    /// <summary>Das Profile hinter diesem Kürzel, oder <c>null</c>.</summary>
+    Task<EmployerProfile?> GetAsync(string slug, CancellationToken cancellationToken = default);
 
     /// <summary>Das gewünschte Kürzel, oder das nächste freie mit Zähler.</summary>
     /// <remarks>
     /// <strong>Nicht die Mandanten-Kennung anhängen</strong>: die stünde dann in
     /// einer Adresse, die weitergegeben wird.
     /// </remarks>
-    Task<string> FreiesKuerzelAsync(string gewuenscht, CancellationToken cancellationToken = default);
+    Task<string> FreeSlugAsync(string gewuenscht, CancellationToken cancellationToken = default);
 
     /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(Arbeitgeberprofil profil, CancellationToken cancellationToken = default);
+    Task SaveAsync(EmployerProfile profile, CancellationToken cancellationToken = default);
 }

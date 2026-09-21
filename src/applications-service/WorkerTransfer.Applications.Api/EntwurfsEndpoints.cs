@@ -3,7 +3,7 @@ using MediatR;
 using WorkerTransfer.Applications.Application.Entwuerfe;
 using WorkerTransfer.Applications.Application.Ports;
 using WorkerTransfer.Applications.Contracts;
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 using WorkerTransfer.Applications.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
@@ -15,7 +15,7 @@ namespace WorkerTransfer.Applications.Api;
 /// eines Menschen</strong> (ADR-0034). Die Massenhandlung liegt beim Anlegen,
 /// wo sie nichts anrichtet; am Ausgang steht sie nicht.
 /// </remarks>
-public static class EntwurfsEndpoints
+public static class DraftEndpoints
 {
     private static readonly IResult Geschrieben = Results.Empty;
 
@@ -24,52 +24,52 @@ public static class EntwurfsEndpoints
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        var entwuerfe = app.MapGroup("/applications/drafts");
+        var drafts = app.MapGroup("/applications/drafts");
 
         // Drei stille Abhängigkeiten, ein Statuscode: weder der Ledger noch
         // jobs-service noch ein Dienst mit den eigenen Angaben darf zu einer
-        // Behauptung über die Bewerbung werden.
-        entwuerfe.AddEndpointFilter(async (aufruf, weiter) =>
+        // Behauptung über die JobApplication werden.
+        drafts.AddEndpointFilter(async (call, weiter) =>
         {
             try
             {
-                return await weiter(aufruf);
+                return await weiter(call);
             }
-            catch (EinwilligungSchweigt)
+            catch (ConsentGateSilent)
             {
-                await ProblemDetailsMiddleware.Schreibe(
-                    aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                await ProblemDetailsMiddleware.Write(
+                    call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "the consent ledger did not answer");
 
                 return Geschrieben;
             }
-            catch (StelleSchweigt)
+            catch (JobLookupSilent)
             {
-                await ProblemDetailsMiddleware.Schreibe(
-                    aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                await ProblemDetailsMiddleware.Write(
+                    call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "jobs-service did not answer");
 
                 return Geschrieben;
             }
-            catch (BewerberSchweigt)
+            catch (ApplicantLookupSilent)
             {
-                await ProblemDetailsMiddleware.Schreibe(
-                    aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                await ProblemDetailsMiddleware.Write(
+                    call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "a service holding your own data did not answer");
 
                 return Geschrieben;
             }
-            catch (FirmaSchweigt)
+            catch (CompanyLookupSilent)
             {
-                await ProblemDetailsMiddleware.Schreibe(
-                    aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                await ProblemDetailsMiddleware.Write(
+                    call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "identity-service did not answer");
 
                 return Geschrieben;
             }
         });
 
-        entwuerfe.MapPost("/", async (
+        drafts.MapPost("/", async (
             EntwuerfeAnlegenV1 koerper,
             IMediator mediator,
             ICurrentPrincipal akteur,
@@ -91,17 +91,17 @@ public static class EntwurfsEndpoints
             //
             // NICHT betroffen: eine Liste mit Kennungen, die es nicht (mehr)
             // gibt. Eine geschlossene Ausschreibung ist keine fehlerhafte
-            // Anfrage, und die Antwort ist dann eine kuerzere Liste.
-            if (koerper?.JobIds is not { Count: > 0 } stellen)
+            // ResumeRequest, und die Antwort ist dann eine kuerzere Liste.
+            if (koerper?.JobIds is not { Count: > 0 } jobs)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "invalid: job_ids");
                 return;
             }
 
             var angelegt = await mediator.Send(
-                new EntwuerfeAnlegenBefehl(handelnder.Subject, stellen),
+                new EntwuerfeAnlegenBefehl(handelnder.Subject, jobs),
                 cancellationToken);
 
             context.Response.StatusCode = StatusCodes.Status201Created;
@@ -109,24 +109,24 @@ public static class EntwurfsEndpoints
                 angelegt.Select(Antwort).ToArray(), cancellationToken);
         });
 
-        entwuerfe.MapPost("/{id:guid}/write", Schritt(
-            (id, wer) => new EntwurfSchreibenBefehl(wer, id),
-            AnschreibenauftragArt.Schreiben));
+        drafts.MapPost("/{id:guid}/write", Schritt(
+            (id, subject) => new WriteDraftCommand(subject, id),
+            CoverLetterJobKind.Schreiben));
 
-        entwuerfe.MapPost("/{id:guid}/revise", Schritt(
-            (id, wer) => new UeberarbeitenBefehl(wer, id),
-            AnschreibenauftragArt.Ueberarbeiten));
+        drafts.MapPost("/{id:guid}/revise", Schritt(
+            (id, subject) => new ReviseCommand(subject, id),
+            CoverLetterJobKind.Ueberarbeiten));
 
-        entwuerfe.MapPost("/{id:guid}/approve", Schritt(
-            (id, wer) => new FreigebenBefehl(wer, id)));
+        drafts.MapPost("/{id:guid}/approve", Schritt(
+            (id, subject) => new FreigebenBefehl(subject, id)));
 
-        entwuerfe.MapPost("/{id:guid}/send", Schritt(
-            (id, wer) => new EntwurfSendenBefehl(wer, id)));
+        drafts.MapPost("/{id:guid}/send", Schritt(
+            (id, subject) => new SendDraftCommand(subject, id)));
 
-        entwuerfe.MapGet("/", async (
+        drafts.MapGet("/", async (
             IMediator mediator,
             ICurrentPrincipal akteur,
-            IAnschreibenSchlange schlange,
+            ICoverLetterQueue schlange,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -137,7 +137,7 @@ public static class EntwurfsEndpoints
             }
 
             var meine = await mediator.Send(
-                new MeineEntwuerfeAbfrage(handelnder.Subject), cancellationToken);
+                new MyDraftsQuery(handelnder.Subject), cancellationToken);
 
             foreach (var offen in meine)
             {
@@ -148,11 +148,11 @@ public static class EntwurfsEndpoints
                 meine.Select(Antwort).ToArray(), cancellationToken);
         });
 
-        entwuerfe.MapGet("/{id:guid}", async (
+        drafts.MapGet("/{id:guid}", async (
             Guid id,
             IMediator mediator,
             ICurrentPrincipal akteur,
-            IAnschreibenSchlange schlange,
+            ICoverLetterQueue schlange,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -162,25 +162,25 @@ public static class EntwurfsEndpoints
                 return;
             }
 
-            var entwurf = await mediator.Send(
-                new EntwurfAbfrage(handelnder.Subject, id), cancellationToken);
+            var draft = await mediator.Send(
+                new DraftQuery(handelnder.Subject, id), cancellationToken);
 
-            if (entwurf is null)
+            if (draft is null)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such draft");
                 return;
             }
 
-            StarteWennEntsteht(entwurf, handelnder.Subject, context, schlange);
+            StarteWennEntsteht(draft, handelnder.Subject, context, schlange);
 
-            await context.Response.WriteAsJsonAsync(Antwort(entwurf), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Antwort(draft), cancellationToken);
         });
 
-        entwuerfe.MapPatch("/{id:guid}", async (
+        drafts.MapPatch("/{id:guid}", async (
             Guid id,
-            EntwurfAendernV1 koerper,
+            ChangeDraftV1 koerper,
             IMediator mediator,
             ICurrentPrincipal akteur,
             HttpContext context,
@@ -195,13 +195,13 @@ public static class EntwurfsEndpoints
             await Beantworte(
                 context,
                 await mediator.Send(
-                    new EntwurfAendernBefehl(
+                    new ChangeDraftCommand(
                         handelnder.Subject, id, koerper?.Subject, koerper?.Body),
                     cancellationToken),
                 cancellationToken);
         });
 
-        entwuerfe.MapPut("/{id:guid}/attachments", async (
+        drafts.MapPut("/{id:guid}/attachments", async (
             Guid id,
             BeilagenV1 koerper,
             IMediator mediator,
@@ -226,7 +226,7 @@ public static class EntwurfsEndpoints
                 cancellationToken);
         });
 
-        entwuerfe.MapPost("/{id:guid}/comments", async (
+        drafts.MapPost("/{id:guid}/comments", async (
             Guid id,
             AnmerkenV1 koerper,
             IMediator mediator,
@@ -248,7 +248,7 @@ public static class EntwurfsEndpoints
                 cancellationToken);
         });
 
-        entwuerfe.MapDelete("/{id:guid}", async (
+        drafts.MapDelete("/{id:guid}", async (
             Guid id,
             IMediator mediator,
             ICurrentPrincipal akteur,
@@ -262,7 +262,7 @@ public static class EntwurfsEndpoints
             }
 
             var weg = await mediator.Send(
-                new EntwurfLoeschenBefehl(handelnder.Subject, id), cancellationToken);
+                new DeleteDraftCommand(handelnder.Subject, id), cancellationToken);
 
             context.Response.StatusCode = weg
                 ? StatusCodes.Status204NoContent
@@ -279,13 +279,13 @@ public static class EntwurfsEndpoints
     /// Fehlerabbildung zu vergessen.
     /// </remarks>
     private static Delegate Schritt(
-        Func<Guid, SubjectId, IRequest<Entwurfsergebnis>> baue,
-        AnschreibenauftragArt? danach = null) =>
+        Func<Guid, SubjectId, IRequest<DraftResult>> baue,
+        CoverLetterJobKind? danach = null) =>
         async (
             Guid id,
             IMediator mediator,
             ICurrentPrincipal akteur,
-            IAnschreibenSchlange schlange,
+            ICoverLetterQueue schlange,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -295,15 +295,15 @@ public static class EntwurfsEndpoints
                 return;
             }
 
-            var ergebnis = await mediator.Send(
+            var result = await mediator.Send(
                 baue(id, handelnder.Subject), cancellationToken);
 
-            await Beantworte(context, ergebnis, cancellationToken);
+            await Beantworte(context, result, cancellationToken);
 
-            if (danach is { } art && ergebnis is Entwurfsergebnis.Erledigt)
+            if (danach is { } kind && result is DraftResult.Erledigt)
             {
-                schlange.Plane(new Anschreibenauftrag(
-                    handelnder.Subject, id, Traeger(context), art));
+                schlange.Plane(new CoverLetterJob(
+                    handelnder.Subject, id, Traeger(context), kind));
             }
         };
 
@@ -314,37 +314,37 @@ public static class EntwurfsEndpoints
     /// Auftrag erneut anzustellen; läuft er schon, lehnt Plane ab.
     /// </summary>
     private static void StarteWennEntsteht(
-        Bewerbungsentwurf entwurf,
-        SubjectId wer,
+        ApplicationDraft draft,
+        SubjectId subject,
         HttpContext context,
-        IAnschreibenSchlange schlange)
+        ICoverLetterQueue schlange)
     {
-        if (entwurf.Stand != Entwurfsstand.Entsteht)
+        if (draft.State != DraftState.Entsteht)
         {
             return;
         }
 
-        if (schlange.Laeuft(entwurf.Id))
+        if (schlange.Laeuft(draft.Id))
         {
             return;
         }
 
-        schlange.Plane(new Anschreibenauftrag(
-            wer,
-            entwurf.Id,
+        schlange.Plane(new CoverLetterJob(
+            subject,
+            draft.Id,
             Traeger(context),
-            entwurf.HatOffeneAnmerkungen
-                ? AnschreibenauftragArt.Ueberarbeiten
-                : AnschreibenauftragArt.Schreiben));
+            draft.HatOffeneAnmerkungen
+                ? CoverLetterJobKind.Ueberarbeiten
+                : CoverLetterJobKind.Schreiben));
     }
 
     private static string? Traeger(HttpContext context)
     {
-        var kopf = context.Request.Headers.Authorization.ToString();
+        var header = context.Request.Headers.Authorization.ToString();
 
-        if (kopf.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        if (header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
-            return kopf["Bearer ".Length..];
+            return header["Bearer ".Length..];
         }
 
         return context.Request.Cookies.TryGetValue("access", out var ausCookie)
@@ -354,40 +354,40 @@ public static class EntwurfsEndpoints
     }
 
     private static async Task Beantworte(
-        HttpContext context, Entwurfsergebnis ergebnis, CancellationToken cancellationToken)
+        HttpContext context, DraftResult result, CancellationToken cancellationToken)
     {
-        switch (ergebnis)
+        switch (result)
         {
-            case Entwurfsergebnis.Erledigt erledigt:
+            case DraftResult.Erledigt erledigt:
                 await context.Response.WriteAsJsonAsync(
                     Antwort(erledigt.Entwurf), cancellationToken);
                 return;
 
-            case Entwurfsergebnis.Keiner:
+            case DraftResult.None:
                 // „Gibt es nicht" und „gehört jemand anderem" sind von außen
                 // dasselbe — sonst verriete ein 403 die Existenz.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such draft");
                 return;
 
-            case Entwurfsergebnis.KeinAnbieter kein:
+            case DraftResult.NoProvider kein:
                 // 503 und nicht 500: es ist nichts kaputt, es ist nichts
                 // eingerichtet — und die Oberfläche sagt das dem Menschen,
                 // statt still nichts zu tun (ADR-0024).
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", kein.Grund);
                 return;
 
-            case Entwurfsergebnis.Zustandskonflikt konflikt:
-                await ProblemDetailsMiddleware.Schreibe(
+            case DraftResult.StateConflict konflikt:
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status409Conflict,
                     "Request failed", konflikt.Grund);
                 return;
 
-            case Entwurfsergebnis.Eingabe eingabe:
-                await ProblemDetailsMiddleware.Schreibe(
+            case DraftResult.Eingabe eingabe:
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", eingabe.Grund);
                 return;
@@ -395,24 +395,24 @@ public static class EntwurfsEndpoints
     }
 
     private static Task NichtAngemeldet(HttpContext context) =>
-        ProblemDetailsMiddleware.Schreibe(
+        ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized,
             "Request failed", "authentication required");
 
-    private static EntwurfV1 Antwort(Bewerbungsentwurf entwurf) => new(
-        entwurf.Id,
-        entwurf.Stelle,
-        entwurf.Betreff,
-        entwurf.Text,
-        EfEntwurfsspeicher.Standwort(entwurf.Stand),
-        entwurf.Fassung,
-        entwurf.Fehler,
-        entwurf.TeiltLebenslauf,
-        entwurf.Unterlagen,
+    private static DraftV1 Antwort(ApplicationDraft draft) => new(
+        draft.Id,
+        draft.Job,
+        draft.Betreff,
+        draft.Text,
+        EfDraftStore.Standwort(draft.State),
+        draft.Fassung,
+        draft.Fehler,
+        draft.TeiltLebenslauf,
+        draft.Unterlagen,
         [
-            .. entwurf.Anmerkungen.Select(eintrag => new AnmerkungV1(
-                eintrag.Id, eintrag.Text, eintrag.Zitat, eintrag.Erledigt, eintrag.Angelegt))
+            .. draft.Anmerkungen.Select(entry => new AnmerkungV1(
+                entry.Id, entry.Text, entry.Zitat, entry.Erledigt, entry.Angelegt))
         ],
-        entwurf.Geaendert,
-        entwurf.SchreibenBegonnen);
+        draft.Geaendert,
+        draft.SchreibenBegonnen);
 }

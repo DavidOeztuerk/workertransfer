@@ -3,17 +3,17 @@ using WorkerTransfer.Profile.Infrastructure;
 using WorkerTransfer.Profile.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
-// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
+// Konfiguration aus der EnvironmentFile. VOR CreateBuilder, weil der
 // Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
 // geladen hiesse geladen und von niemandem gelesen.
-WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 const string dienstname = "profile-service";
 
-// Kein AlsAussteller(): dieser Dienst prüft Tokens, er stellt keine aus. Die
+// Kein AsIssuer(): dieser Dienst prüft Tokens, er stellt keine aus. Die
 // private Hälfte des Schlüssels liegt bei identity-service, und ein zweiter
-// Aussteller wäre eine zweite Stelle, die einen Principal erzeugen kann —
+// Aussteller wäre eine zweite Job, die einen Principal erzeugen kann —
 // unterscheiden könnte sie danach niemand mehr.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, dienstname);
@@ -26,7 +26,7 @@ builder.Services.AddProfileInfrastructure(
 var app = builder.Build();
 
 // Erst wandern, dann bedienen (ADR-0010).
-await app.WandereAsync<ProfileDbContext>();
+await app.MigrateSchemaAsync<ProfileDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, dienstname);
 

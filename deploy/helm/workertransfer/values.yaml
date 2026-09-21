@@ -75,6 +75,14 @@ env:
 #   - die Laufzeitkonfiguration der Oberfläche (web.runtimeConfig)
 publicUrl: http://localhost:8090
 
+# The origin the BROWSER loads the UI from. Separate from publicUrl on purpose:
+# the gateway serves the API and nothing else (ADR-0040). Routing document
+# requests through it is what this split exists to prevent.
+#
+# Confirmation mails point here, and CORS names it — without that the UI is
+# cross-origin to the gateway and every request fails a preflight.
+webUrl: http://localhost:5173
+
 # --- Geheimnisse ------------------------------------------------------------
 # LEER heisst: das Chart würfelt eines und BEHÄLT es über Upgrades (es liest
 # das bestehende Secret zurück, bevor es ein neues erzeugt — sonst wäre jedes
@@ -106,6 +114,11 @@ secrets:
   # benutzt. LEER heisst hier: die Tuer ist zu, /nachweis antwortet 404 — was
   # in einem Cluster ohne Bedarf die richtige Vorgabe ist.
   nachweisSecret: ""
+
+  # The master key. It encrypts a person's AI key AND the data-protection key
+  # ring (ADR-0046), so EVERY service needs it — not just identity. Missing, a
+  # pod dies at startup naming this variable.
+  secretsKey: ""
   # Die Datenbank ist nur clusterintern erreichbar und hat keinen NodePort.
   # Ein fester Wert hält `kubectl exec ... psql` einfach; wer das ändern will,
   # setzt hier etwas anderes.
@@ -188,6 +201,10 @@ web:
   #
   # Leer heisst: publicUrl verwenden.
   apiOrigin: ""
+
+  # The NodePort deploy/kind/cluster.yaml maps onto host port 5173 — the same
+  # port compose uses, so the UI has one address in both environments.
+  nodePort: 30173
 
 # --- Die Dienste ------------------------------------------------------------
 # Eine Liste, über die zwei Templates laufen (Deployment, Service) — dasselbe

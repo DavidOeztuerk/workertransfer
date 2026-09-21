@@ -32,7 +32,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// <para><strong>Zwei Mengen, nicht eine.</strong> Die beiden Entwürfe sind
 /// Spiegelbilder und dürfen nie zusammenwachsen: der Profilkontext hilft einer
 /// Person, über sich zu schreiben, der Anzeigenkontext einem Unternehmen, über
-/// die eigene Stelle. Ein gemeinsamer Typ wäre die Stelle, an der „erfinde nichts
+/// die eigene Job. Ein gemeinsamer Typ wäre die Job, an der „erfinde nichts
 /// über die Person" eines Tages für eine Anzeige gälte — oder schlimmer, umgekehrt.</para>
 /// </remarks>
 public class EntwurfsgrenzeTests
@@ -43,13 +43,13 @@ public class EntwurfsgrenzeTests
     /// </summary>
     /// <remarks>
     /// Kein Name, keine E-Mail-Adresse, keine <c>SubjectId</c>, kein Arbeitgeber,
-    /// kein Lebenslauf, keine Bewerbung, kein Marktstatus. <c>Wunsch</c> ist die
+    /// kein Resume, keine Application, kein MarketStatus. <c>Wunsch</c> ist die
     /// einzige Zeile, die der Aufrufer in diesem Moment beisteuert.
     /// </remarks>
     [Fact]
     public void Der_Profilkontext_traegt_genau_vier_Felder()
     {
-        Felder(typeof(Entwurfslage)).Should().BeEquivalentTo(
+        Felder(typeof(DraftSituation)).Should().BeEquivalentTo(
             ["Ueberschrift", "Text", "Faehigkeiten", "Wunsch", "Prompt"],
             "ADR-0024 §3 nennt diese Menge, und wer sie erweitert, "
             + "schickt etwas Neues über eine Person hinaus");
@@ -67,7 +67,7 @@ public class EntwurfsgrenzeTests
     [Fact]
     public void Der_Anzeigenkontext_traegt_genau_fuenf_Felder()
     {
-        Felder(typeof(Anzeigenentwurf)).Should().BeEquivalentTo(
+        Felder(typeof(AdvertDraft)).Should().BeEquivalentTo(
             ["Titel", "Beschreibung", "Faehigkeiten", "Ort", "Wunsch", "Prompt"],
             "ADR-0024 §3, Gegenstück — hier fehlt bewusst der Mandant");
     }
@@ -79,22 +79,22 @@ public class EntwurfsgrenzeTests
     /// <remarks>
     /// Der Zusammenzug beginnt nie mit einem gemeinsamen Prompt, sondern mit
     /// „die haben doch beide Faehigkeiten und Wunsch". Danach steht ein
-    /// <c>if</c> in den Regeln, und das ist die Stelle, an der eine Regel für die
+    /// <c>if</c> in den Regeln, und das ist die Job, an der eine Regel für die
     /// falsche Seite gilt.
     /// </remarks>
     [Fact]
     public void Die_beiden_Entwuerfe_teilen_keinen_Typ()
     {
-        var profil = typeof(Entwurfslage);
-        var anzeige = typeof(Anzeigenentwurf);
+        var profile = typeof(DraftSituation);
+        var anzeige = typeof(AdvertDraft);
 
-        profil.BaseType.Should().Be<object>("kein gemeinsamer Basistyp");
+        profile.BaseType.Should().Be<object>("kein gemeinsamer Basistyp");
         anzeige.BaseType.Should().Be<object>("kein gemeinsamer Basistyp");
 
         // Nicht „gar keine Schnittstelle": ein Record bringt IEquatable<T> selbst
         // mit, und das ist je Typ eine andere. Geprueft wird die Schnittmenge —
         // die Zusage lautet, dass die beiden nichts TEILEN.
-        profil.GetInterfaces().Intersect(anzeige.GetInterfaces())
+        profile.GetInterfaces().Intersect(anzeige.GetInterfaces())
             .Should().BeEmpty("die beiden Entwuerfe teilen keine Schnittstelle");
     }
 
@@ -109,7 +109,7 @@ public class EntwurfsgrenzeTests
     /// wird. Beides soll auffallen.
     /// </para>
     /// </remarks>
-    private static string[] Felder(Type typ) =>
-        [.. typ.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+    private static string[] Felder(Type type) =>
+        [.. type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
               .Select(e => e.Name)];
 }

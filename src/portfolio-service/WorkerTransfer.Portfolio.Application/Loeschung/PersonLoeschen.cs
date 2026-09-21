@@ -4,10 +4,10 @@ using WorkerTransfer.Portfolio.Application.Nachrichten;
 using WorkerTransfer.Portfolio.Domain.Ablage;
 using WorkerTransfer.Portfolio.Domain.Portfolios;
 
-namespace WorkerTransfer.Portfolio.Application.Loeschung;
+namespace WorkerTransfer.Portfolio.Application.Erasure;
 
 /// <summary>Löscht alles, was dieser Dienst über eine Person hält.</summary>
-public sealed record PersonLoeschenBefehl(SubjectId Wer) : IBefehl<int>;
+public sealed record ErasePersonCommand(SubjectId Wer) : IBefehl<int>;
 
 /// <summary>Zeilen <em>und</em> Dateien.</summary>
 /// <remarks>
@@ -16,8 +16,8 @@ public sealed record PersonLoeschenBefehl(SubjectId Wer) : IBefehl<int>;
 /// die Zeile ist weg, die Arbeitsprobe nicht — und niemand sieht es, weil die
 /// Oberfläche sie nicht mehr verlinkt.
 /// </remarks>
-public sealed class PersonLoeschenHandler(IPortfoliospeicher speicher, IAblage ablage)
-    : IRequestHandler<PersonLoeschenBefehl, int>
+public sealed class ErasePersonHandler(IPortfolioStore store, IDocumentStore ablage)
+    : IRequestHandler<ErasePersonCommand, int>
 {
     /// <inheritdoc />
     /// <returns>
@@ -25,13 +25,13 @@ public sealed class PersonLoeschenHandler(IPortfoliospeicher speicher, IAblage a
     /// keinen Aufbewahrungsschalter.
     /// </returns>
     public async Task<int> Handle(
-        PersonLoeschenBefehl request, CancellationToken cancellationToken)
+        ErasePersonCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var geblieben = await speicher.LoescheAsync(request.Wer, cancellationToken);
+        var geblieben = await store.DeleteAsync(request.Wer, cancellationToken);
 
-        await ablage.LoescheAllesAsync(request.Wer, cancellationToken);
+        await ablage.DeleteAllAsync(request.Wer, cancellationToken);
 
         return geblieben;
     }

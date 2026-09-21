@@ -19,18 +19,18 @@ namespace WorkerTransfer.Profile.Domain.Pruefspur;
 /// ist Npgsqls Regel und nicht unsere. <b>Ein Test dafür gibt es hier nicht</b>,
 /// anders als in identity-service (<c>SpaltenetikettenTests</c>); dieser
 /// Kommentar behauptete lange einen, den niemand geschrieben hatte. Wer ein
-/// viertes Mitglied ergänzt, ohne eine Wanderung dafür anzulegen, merkt es
+/// viertes Mitglied ergänzt, ohne eine SchemaMigration dafür anzulegen, merkt es
 /// deshalb erst beim ersten Einfügen.
 /// </para>
 /// </remarks>
-public enum Pruefhandlung
+public enum AuditAction
 {
-    /// <summary>Jemand hat sein Profil zum ersten Mal angelegt.</summary>
-    ProfilAngelegt,
+    /// <summary>Jemand hat sein PersonProfile zum ersten Mal angelegt.</summary>
+    ProfileCreated,
 
-    /// <summary>Jemand hat sein Profil geändert.</summary>
-    ProfilGeaendert,
+    /// <summary>Jemand hat sein PersonProfile geändert.</summary>
+    ProfileChanged,
 
-    /// <summary>Ein Profil ist der Löschkaskade gefolgt.</summary>
-    ProfilGeloescht
+    /// <summary>Ein PersonProfile ist der Löschkaskade gefolgt.</summary>
+    ProfileDeleted
 }

@@ -52,18 +52,18 @@ public class MeldungTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
             host.UseSetting("Notify:Geheimnis", Meldegeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
         });
 
-        using var bereich = _dienst.Services.CreateScope();
-        await bereich.ServiceProvider.GetRequiredService<IdentityDbContext>()
+        using var scope = _dienst.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IdentityDbContext>()
             .Database.MigrateAsync();
     }
 
@@ -76,21 +76,21 @@ public class MeldungTests(Postgres postgres) : IAsyncLifetime
     private HttpClient Browser() =>
         _dienst.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
 
-    private Task<HttpResponseMessage> Melde(Guid wer, string geheimnis = Meldegeheimnis)
+    private Task<HttpResponseMessage> Melde(Guid subject, string secret = Meldegeheimnis)
     {
         var browser = Browser();
-        browser.DefaultRequestHeaders.Add("X-Notify-Secret", geheimnis);
-        return browser.PostAsJsonAsync("/internal/notify", new { user_id = wer });
+        browser.DefaultRequestHeaders.Add("X-Notify-Secret", secret);
+        return browser.PostAsJsonAsync("/internal/notify", new { user_id = subject });
     }
 
     /// <summary>Legt ein bestätigtes Konto an und gibt seine Kennung zurück.</summary>
     private async Task<Guid> BestaetigtesKonto()
     {
-        var adresse = $"anna-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
+        var address = $"anna-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
 
         await Browser().PostAsJsonAsync("/auth/register", new
         {
-            email = adresse, password = Passwort, display_name = "Anna"
+            email = address, password = Passwort, display_name = "Anna"
         });
 
         var token = Regex.Match(
@@ -104,11 +104,11 @@ public class MeldungTests(Postgres postgres) : IAsyncLifetime
     /// <summary>Ein unbestätigtes Konto, dessen Adresse noch nicht erwiesen ist.</summary>
     private async Task<Guid> UnbestaetigtesKonto()
     {
-        var adresse = $"bea-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
+        var address = $"bea-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
 
         await Browser().PostAsJsonAsync("/auth/register", new
         {
-            email = adresse, password = Passwort, display_name = "Bea"
+            email = address, password = Passwort, display_name = "Bea"
         });
 
         return _post.Post[^1].Empfaenger.Value;
@@ -121,9 +121,9 @@ public class MeldungTests(Postgres postgres) : IAsyncLifetime
         var anna = await BestaetigtesKonto();
         var vorher = _post.Post.Count;
 
-        var antwort = await Melde(anna);
+        var response = await Melde(anna);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
         _post.Post.Should().HaveCount(vorher + 1);
         _post.Post[^1].Empfaenger.Value.Should().Be(anna);
     }
@@ -132,8 +132,8 @@ public class MeldungTests(Postgres postgres) : IAsyncLifetime
     /// Für jede Art derselbe Betreff — und die Art steht gar nicht im Rumpf.
     /// </summary>
     /// <remarks>
-    /// Eine Mail landet in einem Postfach, das das des Arbeitgebers sein kann.
-    /// Eine Zeile wie „Acme GmbH möchte deinen Marktstatus sehen" wäre genau die
+    /// Eine Mail landet in einem Inbox, das das des Arbeitgebers sein kann.
+    /// Eine Zeile wie „Acme GmbH möchte deinen MarketStatus sehen" wäre genau die
     /// Auskunft, gegen die diese Plattform gebaut ist.
     /// </remarks>
     [Fact]
@@ -161,14 +161,14 @@ public class MeldungTests(Postgres postgres) : IAsyncLifetime
         var bea = await UnbestaetigtesKonto();
         var vorher = _post.Post.Count;
 
-        var antwort = await Melde(bea);
+        var response = await Melde(bea);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
         _post.Post.Should().HaveCount(vorher);
     }
 
     /// <summary>
-    /// Immer 202 — sonst wäre der Endpunkt ein Orakel über die Mitgliedschaft
+    /// Immer 202 — sonst wäre der Endpunkt ein Orakel über die Membership
     /// auf dieser Plattform.
     /// </summary>
     [Fact]
@@ -194,9 +194,9 @@ public class MeldungTests(Postgres postgres) : IAsyncLifetime
         var anna = await BestaetigtesKonto();
         var vorher = _post.Post.Count;
 
-        var antwort = await Melde(anna, "geraten");
+        var response = await Melde(anna, "geraten");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         _post.Post.Should().HaveCount(vorher);
     }
 }

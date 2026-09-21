@@ -39,12 +39,12 @@ public class LandkarteTests(Landschaft landschaft)
     [InlineData("/notifications/me", "notification")]
     [InlineData("/assessments", "assessment")]
     [InlineData("/assessments/me", "assessment")]
-    public async Task Eine_Adresse_landet_bei_ihrem_Dienst(string pfad, string erwartet)
+    public async Task Eine_Adresse_landet_bei_ihrem_Dienst(string path, string erwartet)
     {
-        var (dienst, angekommen) = await landschaft.Frage(pfad);
+        var (service, angekommen) = await landschaft.Frage(path);
 
-        dienst.Should().Be(erwartet);
-        angekommen.Should().Be(pfad, "der Pfad wird durchgereicht, nicht umgeschrieben");
+        service.Should().Be(erwartet);
+        angekommen.Should().Be(path, "der Pfad wird durchgereicht, nicht umgeschrieben");
     }
 
     /// <summary>Der abgeloeste Pfad trifft keinen Dienst mehr.</summary>
@@ -58,18 +58,18 @@ public class LandkarteTests(Landschaft landschaft)
     [Theory]
     [InlineData("/candidates")]
     [InlineData("/candidates/7f000001-0000-0000-0000-000000000000")]
-    public async Task Der_abgeloeste_Pfad_trifft_keinen_Dienst_mehr(string pfad)
+    public async Task Der_abgeloeste_Pfad_trifft_keinen_Dienst_mehr(string path)
     {
-        var (dienst, _) = await landschaft.Frage(pfad);
+        var (service, _) = await landschaft.Frage(path);
 
-        dienst.Should().Be("<keine Route>");
+        service.Should().Be("<keine Route>");
     }
 
     /// <summary>
     /// Die Ausnahmen: Adressen, die sich erst im letzten Segment unterscheiden.
     /// </summary>
     /// <remarks>
-    /// Das ist die Stelle, an der ein Gateway ohne Prioritäten falsch liegt.
+    /// Das ist die Job, an der ein Gateway ohne Prioritäten falsch liegt.
     /// </remarks>
     [Theory]
     [InlineData("/jobs/7f000001-0000-0000-0000-000000000000/applications", "applications")]
@@ -79,11 +79,11 @@ public class LandkarteTests(Landschaft landschaft)
     [InlineData("/companies/by-slug/muster-gmbh", "companies")]
     [InlineData("/companies/7f000001-0000-0000-0000-000000000000/profile", "companies")]
     [InlineData("/me/notification-preferences", "notification")]
-    public async Task Die_genauere_Regel_gewinnt(string pfad, string erwartet)
+    public async Task Die_genauere_Regel_gewinnt(string path, string erwartet)
     {
-        var (dienst, _) = await landschaft.Frage(pfad);
+        var (service, _) = await landschaft.Frage(path);
 
-        dienst.Should().Be(erwartet);
+        service.Should().Be(erwartet);
     }
 
     /// <summary>
@@ -93,10 +93,10 @@ public class LandkarteTests(Landschaft landschaft)
     /// <remarks>
     /// Alle drei liegen hinter einem gemeinsamen Geheimnis. Über den
     /// öffentlichen Ursprung erreichbar wären sie „lösche alles über diesen
-    /// Menschen", bewacht von einem Kopf.
+    /// Menschen", bewacht von einem Header.
     /// <para>
     /// Geprüft wird deshalb nicht „keine Route", sondern das, was wirklich
-    /// zugesagt ist: <strong>der Besitzer sieht die Anfrage nicht.</strong> Der
+    /// zugesagt ist: <strong>der Besitzer sieht die ResumeRequest nicht.</strong> Der
     /// Unterschied ist bei <c>/companies/withdrawal</c> zu sehen — ohne eigene
     /// Route fällt der Pfad auf <c>/companies/{rest}</c> und landet bei
     /// identity-service, das ihn nicht kennt und mit 404 antwortet. Das ist
@@ -116,16 +116,16 @@ public class LandkarteTests(Landschaft landschaft)
     [InlineData("/erasure", "github")]
     [InlineData("/erasure", "notification")]
     [InlineData("/internal/notify", "identity")]
-    // Stand bis D2 mit Priorität 100 in der Landkarte und antwortete öffentlich
+    // State bis D2 mit Priorität 100 in der Landkarte und antwortete öffentlich
     // mit 401 — womit es bestätigte, dass es den Endpunkt gibt. Gebraucht wurde
     // die Route nie: identity-service ruft jobs-service direkt an.
     [InlineData("/companies/withdrawal", "jobs")]
     public async Task Ein_Diensteingang_erreicht_seinen_Besitzer_nicht(
-        string pfad, string besitzer)
+        string path, string besitzer)
     {
-        var (dienst, _) = await landschaft.Frage(pfad);
+        var (service, _) = await landschaft.Frage(path);
 
-        dienst.Should().NotBe(besitzer);
+        service.Should().NotBe(besitzer);
     }
 
     /// <summary>Die Gesundheitsproben beantwortet das Gateway selbst.</summary>
@@ -136,19 +136,19 @@ public class LandkarteTests(Landschaft landschaft)
     [Fact]
     public async Task Die_Gesundheitsprobe_wird_nicht_weitergereicht()
     {
-        using var antwort = await landschaft.Browser.GetAsync("/health/live");
+        using var response = await landschaft.Browser.GetAsync("/health/live");
 
-        antwort.EnsureSuccessStatusCode();
-        (await antwort.Content.ReadAsStringAsync()).Should().Contain("live");
+        response.EnsureSuccessStatusCode();
+        (await response.Content.ReadAsStringAsync()).Should().Contain("live");
     }
 
-    /// <summary>Jede Anfrage bekommt eine Kennung, bevor sie sich aufteilt.</summary>
+    /// <summary>Jede ResumeRequest bekommt eine Kennung, bevor sie sich aufteilt.</summary>
     [Fact]
     public async Task Ohne_Kennung_wird_eine_vergeben()
     {
-        using var antwort = await landschaft.Browser.GetAsync("/jobs");
+        using var response = await landschaft.Browser.GetAsync("/jobs");
 
-        antwort.Headers.GetValues(CorrelationId.HeaderName).Single().Should().NotBeEmpty();
+        response.Headers.GetValues(CorrelationId.HeaderName).Single().Should().NotBeEmpty();
     }
 
     /// <summary>Eine mitgebrachte Kennung wird durchgereicht, nicht überschrieben.</summary>
@@ -158,11 +158,11 @@ public class LandkarteTests(Landschaft landschaft)
     [Fact]
     public async Task Eine_mitgebrachte_Kennung_bleibt()
     {
-        using var anfrage = new HttpRequestMessage(HttpMethod.Get, "/jobs");
-        anfrage.Headers.TryAddWithoutValidation(CorrelationId.HeaderName, "meine-kette");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/jobs");
+        request.Headers.TryAddWithoutValidation(CorrelationId.HeaderName, "meine-kette");
 
-        using var antwort = await landschaft.Browser.SendAsync(anfrage);
+        using var response = await landschaft.Browser.SendAsync(request);
 
-        antwort.Headers.GetValues(CorrelationId.HeaderName).Single().Should().Be("meine-kette");
+        response.Headers.GetValues(CorrelationId.HeaderName).Single().Should().Be("meine-kette");
     }
 }

@@ -29,15 +29,15 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:notification", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Identity:Adresse", "http://identity.test");
             host.UseSetting("Identity:Geheimnis", Meldegeheimnis);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Scoped<IPostbote, Probepostbote>()));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Scoped<IPostbote, Probepostbote>()));
         });
 
         return Task.CompletedTask;
@@ -50,7 +50,7 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Postfach und Einstellungen fallen — ohne Schalter, ohne Ausnahme.
+    /// Inbox und Einstellungen fallen — ohne Schalter, ohne Ausnahme.
     /// </summary>
     /// <remarks>
     /// Es gibt hier keine Zeile, in der jemand nur <em>gehandelt</em> hätte;
@@ -65,20 +65,20 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
 
         await using (var vorher = postgres.Kontext())
         {
-            (await vorher.Eingaenge.AnyAsync(zeile => zeile.UserId == anna)).Should().BeTrue();
-            (await vorher.Wuensche.AnyAsync(zeile => zeile.Id == anna)).Should().BeTrue();
+            (await vorher.Eingaenge.AnyAsync(row => row.UserId == anna)).Should().BeTrue();
+            (await vorher.Wuensche.AnyAsync(row => row.Id == anna)).Should().BeTrue();
         }
 
-        var antwort = await Loesche(anna);
+        var response = await Loesche(anna);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var quittung = JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+        var quittung = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
         quittung.GetProperty("retained").GetInt32().Should().Be(0);
 
         await using var nachher = postgres.Kontext();
-        (await nachher.Eingaenge.AnyAsync(zeile => zeile.UserId == anna)).Should().BeFalse();
-        (await nachher.Wuensche.AnyAsync(zeile => zeile.Id == anna)).Should().BeFalse();
+        (await nachher.Eingaenge.AnyAsync(row => row.UserId == anna)).Should().BeFalse();
+        (await nachher.Wuensche.AnyAsync(row => row.Id == anna)).Should().BeFalse();
     }
 
     /// <summary>Die Löschung eines Menschen fasst niemand anderen an.</summary>
@@ -92,8 +92,8 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
 
         await Loesche(anna);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Eingaenge.AnyAsync(zeile => zeile.UserId == bea)).Should().BeTrue();
+        await using var context = postgres.Kontext();
+        (await context.Eingaenge.AnyAsync(row => row.UserId == bea)).Should().BeTrue();
     }
 
     /// <summary>Ohne das Geheimnis passiert nichts.</summary>
@@ -106,12 +106,12 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", "geraten");
 
-        var antwort = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
+        var response = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Eingaenge.AnyAsync(zeile => zeile.UserId == anna)).Should().BeTrue();
+        await using var context = postgres.Kontext();
+        (await context.Eingaenge.AnyAsync(row => row.UserId == anna)).Should().BeTrue();
     }
 
     /// <summary>
@@ -130,12 +130,12 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", Meldegeheimnis);
 
-        var antwort = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
+        var response = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Eingaenge.AnyAsync(zeile => zeile.UserId == anna)).Should().BeTrue();
+        await using var context = postgres.Kontext();
+        (await context.Eingaenge.AnyAsync(row => row.UserId == anna)).Should().BeTrue();
     }
 
     /// <summary>Ein zweiter Aufruf ist kein Fehlschlag.</summary>
@@ -148,11 +148,11 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         (await Loesche(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    private Task<HttpResponseMessage> Loesche(Guid wer)
+    private Task<HttpResponseMessage> Loesche(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", Loeschgeheimnis);
-        return browser.PostAsJsonAsync("/erasure", new { user_id = wer });
+        return browser.PostAsJsonAsync("/erasure", new { user_id = subject });
     }
 
     /// <summary>Legt einen Eingang an — und besteht darauf, dass es klappt.</summary>
@@ -161,27 +161,27 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     /// fehlgeschlagenes Befuellen meldete sich erst drei Zeilen spaeter als
     /// „kein Eintrag" — eine Ursache, die wie eine Wirkung aussieht.
     /// </remarks>
-    private async Task<HttpResponseMessage> Melde(Guid wer)
+    private async Task<HttpResponseMessage> Melde(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Notify-Secret", Meldegeheimnis);
 
-        var antwort = await browser.PostAsJsonAsync(
-            "/internal/notifications", new { user_id = wer, kind = "market_request" });
+        var response = await browser.PostAsJsonAsync(
+            "/internal/notifications", new { user_id = subject, kind = "market_request" });
 
-        antwort.IsSuccessStatusCode.Should().BeTrue(
+        response.IsSuccessStatusCode.Should().BeTrue(
             "das Befuellen muss gelingen, sonst prueft der Test etwas anderes — "
-            + $"bekam {(int)antwort.StatusCode}: "
-            + await antwort.Content.ReadAsStringAsync());
+            + $"bekam {(int)response.StatusCode}: "
+            + await response.Content.ReadAsStringAsync());
 
-        return antwort;
+        return response;
     }
 
-    private Task<HttpResponseMessage> Wuensche(Guid wer)
+    private Task<HttpResponseMessage> Wuensche(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Person(wer));
+            new AuthenticationHeaderValue("Bearer", Tokenform.Person(subject));
 
         return browser.PutAsJsonAsync("/me/notification-preferences", new
         {

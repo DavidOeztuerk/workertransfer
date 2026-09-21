@@ -39,7 +39,7 @@ public static class IdentityDbContextFactory
 
     /// <summary>Options for a data source the caller owns.</summary>
     public static DbContextOptionsBuilder<IdentityDbContext> Optionen(NpgsqlDataSource dataSource) =>
-        (DbContextOptionsBuilder<IdentityDbContext>)Konfiguriere(
+        (DbContextOptionsBuilder<IdentityDbContext>)Configure(
             new DbContextOptionsBuilder<IdentityDbContext>(), dataSource);
 
     /// <summary>
@@ -49,7 +49,7 @@ public static class IdentityDbContextFactory
     /// </summary>
     /// <param name="options">The builder to configure.</param>
     /// <param name="dataSource">Where the data lives.</param>
-    public static DbContextOptionsBuilder Konfiguriere(
+    public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
         NpgsqlDataSource dataSource)
     {

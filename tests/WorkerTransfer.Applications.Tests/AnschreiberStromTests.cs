@@ -32,7 +32,7 @@ public sealed class AnschreiberStromTests
 
             """;
 
-        (await HttpAnschreiber.LiesStromAsync(
+        (await HttpCoverLetterWriter.ReadStreamAsync(
                 "openai_compatible",
                 new MemoryStream(Encoding.UTF8.GetBytes(sse)),
                 TimeSpan.FromSeconds(5),
@@ -58,7 +58,7 @@ public sealed class AnschreiberStromTests
 
             """;
 
-        (await HttpAnschreiber.LiesStromAsync(
+        (await HttpCoverLetterWriter.ReadStreamAsync(
                 "anthropic",
                 new MemoryStream(Encoding.UTF8.GetBytes(sse)),
                 TimeSpan.FromSeconds(5)))
@@ -72,7 +72,7 @@ public sealed class AnschreiberStromTests
             {"choices":[{"message":{"content":"BETREFF: Test\n---\nText."}}]}
             """;
 
-        (await HttpAnschreiber.LiesStromAsync(
+        (await HttpCoverLetterWriter.ReadStreamAsync(
                 "openai_compatible",
                 new MemoryStream(Encoding.UTF8.GetBytes(json)),
                 TimeSpan.FromSeconds(5)))
@@ -97,9 +97,9 @@ public sealed class AnschreiberStromTests
             }
         };
 
-        var anschreiber = new HttpAnschreiber(
+        var anschreiber = new HttpCoverLetterWriter(
             new FesteFabrik(handler),
-            Options.Create(new Anschreibeneinstellungen()));
+            Options.Create(new CoverLetterSettings()));
 
         var zugang = new KiZugang(
             "openai_compatible",
@@ -107,11 +107,11 @@ public sealed class AnschreiberStromTests
             "qwen2.5-coder:7b",
             "");
 
-        var kontext = new Anschreibenkontext(
+        var context = new CoverLetterContext(
             "Stelle", "Firma", "Ort", "Beschreibung", ["C#"],
             "Anna", "Dev", "Text", ["C#"], [], "de");
 
-        var text = await anschreiber.SchreibeAsync(zugang, kontext);
+        var text = await anschreiber.WriteAsync(zugang, context);
 
         text.Should().Be("BETREFF: X\n---\nY");
         handler.Koerper.Should().Contain("\"stream\":true");
@@ -126,7 +126,7 @@ public sealed class AnschreiberStromTests
 
             """;
 
-        (await HttpAnschreiber.LiesStromAsync(
+        (await HttpCoverLetterWriter.ReadStreamAsync(
                 "openai_compatible",
                 new MemoryStream(Encoding.UTF8.GetBytes(sse)),
                 TimeSpan.FromSeconds(5),
@@ -145,7 +145,7 @@ public sealed class AnschreiberStromTests
 
             """;
 
-        (await HttpAnschreiber.LiesStromAsync(
+        (await HttpCoverLetterWriter.ReadStreamAsync(
                 "openai_compatible",
                 new MemoryStream(Encoding.UTF8.GetBytes(ndjson)),
                 TimeSpan.FromSeconds(5)))
@@ -166,7 +166,7 @@ public sealed class AnschreiberStromTests
 
         var gesehen = new List<string>();
 
-        await HttpAnschreiber.LiesStromAsync(
+        await HttpCoverLetterWriter.ReadStreamAsync(
             "openai_compatible",
             new MemoryStream(Encoding.UTF8.GetBytes(sse)),
             TimeSpan.FromSeconds(5),
@@ -182,12 +182,12 @@ public sealed class AnschreiberStromTests
     [Fact]
     public void OpenAI_Delta_liest_nur_den_Inhalt()
     {
-        HttpAnschreiber.LiesDelta(
+        HttpCoverLetterWriter.LiesDelta(
                 "openai_compatible",
                 """{"choices":[{"delta":{"content":"Hallo"}}]}""")
             .Should().Be("Hallo");
 
-        HttpAnschreiber.LiesDelta(
+        HttpCoverLetterWriter.LiesDelta(
                 "openai_compatible",
                 """{"choices":[{"delta":{"role":"assistant"}}]}""")
             .Should().BeNull();

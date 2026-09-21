@@ -3,19 +3,19 @@ using WorkerTransfer.Profile.Domain.Faehigkeiten;
 
 namespace WorkerTransfer.Profile.Domain.Profile;
 
-/// <summary>Das Profil einer Person — was sie selbst über sich einträgt.</summary>
+/// <summary>Das PersonProfile einer Person — was sie selbst über sich einträgt.</summary>
 /// <remarks>
-/// Bewusst schmal: Überschrift, Freitext, Ort, Remote-Bereitschaft,
-/// Fähigkeiten. Strukturierte Berufserfahrung ist der Lebenslauf, verifizierte
+/// Bewusst schmal: Überschrift, Freitext, Ort, Remote-Readiness,
+/// Fähigkeiten. Strukturierte Berufserfahrung ist der Resume, verifizierte
 /// Nachweise wären ein eigener Dienst; beides würde hier nur doppelt gepflegt.
 /// <para>
-/// <b>Das Profil kennt keine Sichtbarkeit</b> (ADR-0020). Ob es jemand sehen
-/// darf, beantwortet allein der Consent-Ledger. Ein Feld an dieser Stelle wäre
+/// <b>Das PersonProfile kennt keine Sichtbarkeit</b> (ADR-0020). Ob es jemand sehen
+/// darf, beantwortet allein der Consent-Ledger. Ein Feld an dieser Job wäre
 /// eine zweite Wahrheit — und die eine, die man vergisst mitzuändern.
 /// </para>
 /// <para>
-/// Ein Profil je Person: die <see cref="SubjectId"/> <em>ist</em> der
-/// Schlüssel. Es gibt keine eigene Profil-Id, weil es nichts gäbe, was sie
+/// Ein PersonProfile je Person: die <see cref="SubjectId"/> <em>ist</em> der
+/// Schlüssel. Es gibt keine eigene PersonProfile-Id, weil es nichts gäbe, was sie
 /// unterscheiden könnte.
 /// </para>
 /// </remarks>
@@ -52,7 +52,7 @@ public enum Pendelbereitschaft
     Egal
 }
 
-/// <summary>Ob jemand für eine Stelle umziehen würde.</summary>
+/// <summary>Ob jemand für eine Job umziehen würde.</summary>
 /// <remarks>
 /// Drei Werte, und <see cref="Offen"/> ist keiner davon zu viel: „kommt darauf
 /// an" ist die ehrlichste Antwort auf diese Frage und darf nicht als „nein"
@@ -70,7 +70,7 @@ public enum Umzugsbereitschaft
     Offen
 }
 
-public sealed class Profil
+public sealed class PersonProfile
 {
     /// <summary>Wie lang eine Überschrift sein darf.</summary>
     public const int HoechstlaengeUeberschrift = 120;
@@ -85,35 +85,35 @@ public sealed class Profil
     /// <remarks>
     /// Deutlich kürzer als der Text (4000), weil er etwas anderes ist: eine
     /// Anweisung, kein Inhalt. Wer hier mehr braucht, schreibt keinen Wunsch
-    /// mehr, sondern schickt Text an einen fremden Anbieter vorbei am Profil.
+    /// mehr, sondern schickt Text an einen fremden Anbieter vorbei am PersonProfile.
     /// </remarks>
     public const int HoechstlaengeWunsch = 500;
 
-    private Profil(
-        SubjectId wer,
+    private PersonProfile(
+        SubjectId subject,
         string ueberschrift,
         string text,
         string ort,
         bool remoteMoeglich,
-        Faehigkeitenliste faehigkeiten,
+        SkillList skills,
         Pendelbereitschaft? pendelbereitschaft,
         Umzugsbereitschaft? umzugsbereitschaft,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm)
     {
-        Wer = wer;
+        Wer = subject;
         Ueberschrift = ueberschrift;
         Text = text;
         Ort = ort;
         RemoteMoeglich = remoteMoeglich;
-        Faehigkeiten = faehigkeiten;
+        Faehigkeiten = skills;
         Pendelbereitschaft = pendelbereitschaft;
         Umzugsbereitschaft = umzugsbereitschaft;
         AngelegtAm = angelegtAm;
         GeaendertAm = geaendertAm;
     }
 
-    /// <summary>Wessen Profil. Zugleich der Primärschlüssel.</summary>
+    /// <summary>Wessen PersonProfile. Zugleich der Primärschlüssel.</summary>
     public SubjectId Wer { get; }
 
     /// <summary>Die eine Zeile, die zuerst gelesen wird.</summary>
@@ -130,18 +130,18 @@ public sealed class Profil
     /// </summary>
     /// <remarks>
     /// <c>false</c> heißt „hat nicht ja gesagt“, nicht „lehnt ab“. Deshalb
-    /// filtert die Suche nur in eine Richtung.
+    /// filtert die Search nur in eine Richtung.
     /// </remarks>
     public bool RemoteMoeglich { get; private set; }
 
-    /// <summary>Was sie kann — in ihrer Reihenfolge, ohne Bewertung.</summary>
-    public Faehigkeitenliste Faehigkeiten { get; private set; }
+    /// <summary>Was sie kann — in ihrer Reihenfolge, ohne Evaluation.</summary>
+    public SkillList Faehigkeiten { get; private set; }
 
     /// <summary>
     /// Wie weit sie pendeln würde, oder <c>null</c> für „nichts gesagt".
     /// </summary>
     /// <remarks>
-    /// <strong>Nullbar, und das bleibt es.</strong> Ein Profil ohne diese
+    /// <strong>Nullbar, und das bleibt es.</strong> Ein PersonProfile ohne diese
     /// Angabe ist vollständig — „nichts gesagt" ist nicht „passt nicht"
     /// (ADR-0041, ADR-0022 §3). Wer nichts sagt, bekommt im Scout kein Kreuz,
     /// sondern einen Strich.
@@ -151,55 +151,55 @@ public sealed class Profil
     /// <summary>Ob sie umziehen würde, oder <c>null</c>.</summary>
     public Umzugsbereitschaft? Umzugsbereitschaft { get; private set; }
 
-    /// <summary>Wann das Profil entstand.</summary>
+    /// <summary>Wann das PersonProfile entstand.</summary>
     public DateTimeOffset AngelegtAm { get; }
 
-    /// <summary>Wann es zuletzt geändert wurde. Zugleich der halbe Seitenzeiger.</summary>
+    /// <summary>Wann es zuletzt geändert wurde. Zugleich der halbe PageCursor.</summary>
     public DateTimeOffset GeaendertAm { get; private set; }
 
-    /// <summary>Legt ein Profil an.</summary>
+    /// <summary>Legt ein PersonProfile an.</summary>
     /// <exception cref="UeberschriftFehler">Die Überschrift fehlt oder ist zu lang.</exception>
     /// <exception cref="TextFehler">Der Text ist zu lang.</exception>
     /// <exception cref="OrtFehler">Der Ort ist zu lang.</exception>
-    public static Profil Lege_an(
-        SubjectId wer,
+    public static PersonProfile Lege_an(
+        SubjectId subject,
         string ueberschrift,
         string text,
         string ort,
         bool remoteMoeglich,
-        Faehigkeitenliste faehigkeiten,
-        DateTimeOffset jetzt,
+        SkillList skills,
+        DateTimeOffset now,
         Pendelbereitschaft? pendelbereitschaft = null,
         Umzugsbereitschaft? umzugsbereitschaft = null)
     {
-        var (geprueft, gepruefterText, geprueterOrt) = Pruefe(ueberschrift, text, ort);
+        var (geprueft, gepruefterText, geprueterOrt) = Check(ueberschrift, text, ort);
 
-        return new Profil(
-            wer, geprueft, gepruefterText, geprueterOrt, remoteMoeglich,
-            faehigkeiten ?? Faehigkeitenliste.Leer,
-            pendelbereitschaft, umzugsbereitschaft, jetzt, jetzt);
+        return new PersonProfile(
+            subject, geprueft, gepruefterText, geprueterOrt, remoteMoeglich,
+            skills ?? SkillList.Leer,
+            pendelbereitschaft, umzugsbereitschaft, now, now);
     }
 
-    /// <summary>Baut ein gespeichertes Profil wieder auf.</summary>
+    /// <summary>Baut ein gespeichertes PersonProfile wieder auf.</summary>
     /// <remarks>
     /// Der einzige Eingang für eine bestehende Zeile, und er prüft <em>nicht</em>
     /// erneut. Eine gespeicherte Zeile war bei ihrer Entstehung gültig; sie
-    /// beim Lesen abzulehnen hieße, jemandem sein Profil zu entziehen, weil sich
+    /// beim Lesen abzulehnen hieße, jemandem sein PersonProfile zu entziehen, weil sich
     /// eine Obergrenze geändert hat.
     /// </remarks>
-    public static Profil Stelle_her(
-        SubjectId wer,
+    public static PersonProfile Stelle_her(
+        SubjectId subject,
         string ueberschrift,
         string text,
         string ort,
         bool remoteMoeglich,
-        Faehigkeitenliste faehigkeiten,
+        SkillList skills,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm,
         Pendelbereitschaft? pendelbereitschaft = null,
         Umzugsbereitschaft? umzugsbereitschaft = null) =>
-        new(wer, ueberschrift, text, ort, remoteMoeglich,
-            faehigkeiten ?? Faehigkeitenliste.Leer,
+        new(subject, ueberschrift, text, ort, remoteMoeglich,
+            skills ?? SkillList.Leer,
             pendelbereitschaft, umzugsbereitschaft, angelegtAm, geaendertAm);
 
     /// <summary>Ändert alle Felder auf einmal.</summary>
@@ -215,24 +215,24 @@ public sealed class Profil
         string text,
         string ort,
         bool remoteMoeglich,
-        Faehigkeitenliste faehigkeiten,
-        DateTimeOffset jetzt,
+        SkillList skills,
+        DateTimeOffset now,
         Pendelbereitschaft? pendelbereitschaft = null,
         Umzugsbereitschaft? umzugsbereitschaft = null)
     {
-        var (geprueft, gepruefterText, geprueterOrt) = Pruefe(ueberschrift, text, ort);
+        var (geprueft, gepruefterText, geprueterOrt) = Check(ueberschrift, text, ort);
 
         Ueberschrift = geprueft;
         Text = gepruefterText;
         Ort = geprueterOrt;
         RemoteMoeglich = remoteMoeglich;
-        Faehigkeiten = faehigkeiten ?? Faehigkeitenliste.Leer;
+        Faehigkeiten = skills ?? SkillList.Leer;
         // Ohne Angabe wird die Angabe GELOESCHT und nicht beibehalten: das
         // Formular schickt immer alle Felder, und ein „null heisst: lass wie es
         // war" machte die Ruecknahme einer Aussage unmoeglich.
         Pendelbereitschaft = pendelbereitschaft;
         Umzugsbereitschaft = umzugsbereitschaft;
-        GeaendertAm = jetzt;
+        GeaendertAm = now;
     }
 
     /// <summary>
@@ -241,7 +241,7 @@ public sealed class Profil
     /// <remarks>
     /// Gemeinsam, damit Anlegen und Ändern nicht auseinanderlaufen können.
     /// </remarks>
-    private static (string Ueberschrift, string Text, string Ort) Pruefe(
+    private static (string Ueberschrift, string Text, string Ort) Check(
         string ueberschrift, string text, string ort)
     {
         var geputzt = (ueberschrift ?? string.Empty).Trim();

@@ -13,41 +13,41 @@ public class FaehigkeitenlisteTests
     /// </summary>
     [Fact]
     public void Zwei_Woerter_fuer_dieselbe_Sache_werden_ein_Eintrag() =>
-        Faehigkeitenliste.Aus(["Postgres", "PostgreSQL", "psql"]).Werte
+        SkillList.Aus(["Postgres", "PostgreSQL", "psql"]).Werte
             .Should().Equal("PostgreSQL");
 
     [Fact]
     public void Die_erste_Schreibweise_gewinnt() =>
-        Faehigkeitenliste.Aus(["Python", "python", "PYTHON"]).Werte.Should().Equal("Python");
+        SkillList.Aus(["Python", "python", "PYTHON"]).Werte.Should().Equal("Python");
 
     [Fact]
     public void Die_Reihenfolge_der_Person_bleibt() =>
-        Faehigkeitenliste.Aus(["Kubernetes", "Go", "Altenpflege"]).Werte
+        SkillList.Aus(["Kubernetes", "Go", "Altenpflege"]).Werte
             .Should().Equal("Kubernetes", "Go", "Altenpflege");
 
     [Fact]
     public void Nichts_gesagt_ist_eine_leere_Liste_und_kein_Fehler()
     {
-        Faehigkeitenliste.Aus([]).Werte.Should().BeEmpty();
-        Faehigkeitenliste.Aus(null).Werte.Should().BeEmpty();
+        SkillList.Aus([]).Werte.Should().BeEmpty();
+        SkillList.Aus(null).Werte.Should().BeEmpty();
     }
 
     [Fact]
     public void Eine_zu_lange_Faehigkeit_wird_abgelehnt()
     {
-        var zuLang = new string('x', Faehigkeitenliste.Hoechstlaenge + 1);
+        var zuLang = new string('x', SkillList.Hoechstlaenge + 1);
 
-        var handlung = () => Faehigkeitenliste.Aus([zuLang]);
+        var action = () => SkillList.Aus([zuLang]);
 
-        handlung.Should().Throw<Faehigkeitsfehler>();
+        action.Should().Throw<SkillError>();
     }
 
     [Fact]
     public void Genau_die_Hoechstlaenge_geht_noch()
     {
-        var gerade_noch = new string('x', Faehigkeitenliste.Hoechstlaenge);
+        var gerade_noch = new string('x', SkillList.Hoechstlaenge);
 
-        Faehigkeitenliste.Aus([gerade_noch]).Werte.Should().Equal(gerade_noch);
+        SkillList.Aus([gerade_noch]).Werte.Should().Equal(gerade_noch);
     }
 
     /// <summary>
@@ -57,19 +57,19 @@ public class FaehigkeitenlisteTests
     [Fact]
     public void Erst_entdoppeln_dann_zaehlen()
     {
-        var vielMal = Enumerable.Repeat("Python", Faehigkeitenliste.Hoechstzahl + 1);
+        var vielMal = Enumerable.Repeat("Python", SkillList.Hoechstzahl + 1);
 
-        Faehigkeitenliste.Aus(vielMal).Werte.Should().Equal("Python");
+        SkillList.Aus(vielMal).Werte.Should().Equal("Python");
     }
 
     [Fact]
     public void Zu_viele_verschiedene_werden_abgelehnt()
     {
-        var zuViele = Enumerable.Range(0, Faehigkeitenliste.Hoechstzahl + 1)
+        var zuViele = Enumerable.Range(0, SkillList.Hoechstzahl + 1)
             .Select(nummer => $"Fach {nummer}");
 
-        var handlung = () => Faehigkeitenliste.Aus(zuViele);
+        var action = () => SkillList.Aus(zuViele);
 
-        handlung.Should().Throw<Faehigkeitsfehler>();
+        action.Should().Throw<SkillError>();
     }
 }

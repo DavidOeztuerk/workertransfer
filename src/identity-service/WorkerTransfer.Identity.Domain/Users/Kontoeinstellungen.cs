@@ -17,10 +17,10 @@ namespace WorkerTransfer.Identity.Domain.Users;
 /// gegeben hat.
 /// </para>
 /// </remarks>
-public enum KiAnbieter
+public enum AiProvider
 {
-    /// <summary>Keiner. Es wird nichts nach draussen gegeben.</summary>
-    Keiner,
+    /// <summary>None. Es wird nichts nach draussen gegeben.</summary>
+    None,
 
     /// <summary>Alles, was <c>/v1/chat/completions</c> spricht — Ollama eingeschlossen.</summary>
     OpenAiKompatibel,
@@ -45,11 +45,11 @@ public enum KiAnbieter
 /// kann, ist eines, das man abziehen kann.
 /// </para>
 /// </remarks>
-public sealed class Kontoeinstellungen
+public sealed class AccountSettings
 {
-    private Kontoeinstellungen(SubjectId wer)
+    private AccountSettings(SubjectId subject)
     {
-        Wer = wer;
+        Wer = subject;
     }
 
     /// <summary>Wessen Einstellungen.</summary>
@@ -71,7 +71,7 @@ public sealed class Kontoeinstellungen
     // ------------------------------------------------------------------- KI
 
     /// <summary>Welcher Anbieter gefragt werden darf.</summary>
-    public KiAnbieter Anbieter { get; private set; } = KiAnbieter.Keiner;
+    public AiProvider Anbieter { get; private set; } = AiProvider.None;
 
     /// <summary>Die Adresse des Anbieters. Bei Ollama die eigene Maschine.</summary>
     public string Adresse { get; private set; } = string.Empty;
@@ -90,7 +90,7 @@ public sealed class Kontoeinstellungen
     public string SchluesselEndung { get; private set; } = string.Empty;
 
     /// <summary>
-    /// Wird festgehalten, DASS eine Anfrage hinausging — nie, was darin stand.
+    /// Wird festgehalten, DASS eine ResumeRequest hinausging — nie, was darin stand.
     /// </summary>
     /// <remarks>
     /// Der EU AI Act verlangt von Betreibern eines Systems im Beschäftigungs-
@@ -114,21 +114,21 @@ public sealed class Kontoeinstellungen
     /// <param name="schluesselEndung">Die letzten vier Zeichen.</param>
     /// <param name="kiProtokoll">Ob Anfragen protokolliert werden.</param>
     /// <returns>Die Einstellungen.</returns>
-    public static Kontoeinstellungen Wiederherstellen(
-        SubjectId wer,
+    public static AccountSettings Wiederherstellen(
+        SubjectId subject,
         int? loeschungNachMonaten,
-        KiAnbieter anbieter,
-        string adresse,
-        string modell,
+        AiProvider provider,
+        string address,
+        string model,
         string schluesselVerschluesselt,
         string schluesselEndung,
         bool kiProtokoll) =>
-        new(wer)
+        new(subject)
         {
             LoeschungNachMonaten = loeschungNachMonaten,
-            Anbieter = anbieter,
-            Adresse = adresse,
-            Modell = modell,
+            Anbieter = provider,
+            Adresse = address,
+            Modell = model,
             SchluesselVerschluesselt = schluesselVerschluesselt,
             SchluesselEndung = schluesselEndung,
             KiProtokoll = kiProtokoll
@@ -137,7 +137,7 @@ public sealed class Kontoeinstellungen
     /// <summary>Die zurückhaltendste Stellung — für ein Konto, das nie etwas gesetzt hat.</summary>
     /// <param name="wer">Wessen.</param>
     /// <returns>Einstellungen ohne Anbieter, ohne Verfall, ohne Protokoll.</returns>
-    public static Kontoeinstellungen Vorgabe(SubjectId wer) => new(wer);
+    public static AccountSettings Vorgabe(SubjectId subject) => new(subject);
 
     /// <summary>Setzt die Datenschutz-Entscheidungen.</summary>
     /// <param name="loeschungNachMonaten">
@@ -169,16 +169,16 @@ public sealed class Kontoeinstellungen
     /// <param name="adresse">Dessen Adresse.</param>
     /// <param name="modell">Dessen Modell.</param>
     /// <param name="kiProtokoll">Ob Anfragen protokolliert werden.</param>
-    public void SetzeKi(KiAnbieter anbieter, string adresse, string modell, bool kiProtokoll)
+    public void SetzeKi(AiProvider provider, string address, string model, bool kiProtokoll)
     {
-        Anbieter = anbieter;
-        Adresse = (adresse ?? string.Empty).Trim();
-        Modell = (modell ?? string.Empty).Trim();
+        Anbieter = provider;
+        Adresse = (address ?? string.Empty).Trim();
+        Modell = (model ?? string.Empty).Trim();
         KiProtokoll = kiProtokoll;
 
         // Kein Anbieter heisst kein Schlüssel. Ihn stehen zu lassen wäre ein
         // Geheimnis ohne Zweck — und das schlechteste, was man aufbewahren kann.
-        if (anbieter == KiAnbieter.Keiner)
+        if (provider == AiProvider.None)
         {
             SchluesselVerschluesselt = string.Empty;
             SchluesselEndung = string.Empty;

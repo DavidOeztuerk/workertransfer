@@ -40,7 +40,7 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
     {
         ArgumentNullException.ThrowIfNull(user);
 
-        var jetzt = uhr.GetUtcNow().UtcDateTime;
+        var now = uhr.GetUtcNow().UtcDateTime;
 
         context.Users.Add(new UserRow
         {
@@ -54,9 +54,9 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
             Roles = JsonSerializer.Serialize(user.Roles),
             PendingCompanyName = user.PendingCompanyName,
             Language = Sprachwahl.Etikett(user.Kontosprache),
-            Berufsfeld = Berufsfeldwahl.Etikett(user.Berufsfeld),
-            CreatedAt = jetzt,
-            UpdatedAt = jetzt,
+            OccupationalField = OccupationalFieldChoice.Etikett(user.OccupationalField),
+            CreatedAt = now,
+            UpdatedAt = now,
             Version = 1
         });
 
@@ -90,7 +90,7 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
         row.Status = user.Status;
         row.PendingCompanyName = user.PendingCompanyName;
         row.Language = Sprachwahl.Etikett(user.Kontosprache);
-        row.Berufsfeld = Berufsfeldwahl.Etikett(user.Berufsfeld);
+        row.OccupationalField = OccupationalFieldChoice.Etikett(user.OccupationalField);
         row.GivenName = user.GivenName;
         row.FamilyName = user.FamilyName;
         row.UpdatedAt = uhr.GetUtcNow().UtcDateTime;
@@ -108,5 +108,5 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
         Sprachwahl.Aus(row.Language),
         row.GivenName,
         row.FamilyName,
-        Berufsfeldwahl.Aus(row.Berufsfeld));
+        OccupationalFieldChoice.Aus(row.OccupationalField));
 }

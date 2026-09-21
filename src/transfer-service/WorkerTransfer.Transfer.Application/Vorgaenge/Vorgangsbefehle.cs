@@ -8,37 +8,37 @@ using WorkerTransfer.Transfer.Domain.Vorgaenge;
 
 namespace WorkerTransfer.Transfer.Application.Vorgaenge;
 
-/// <summary>Wie ein Befehl an einem Vorgang ausgegangen ist.</summary>
-public abstract record Vorgangsergebnis
+/// <summary>Wie ein Befehl an einem Case ausgegangen ist.</summary>
+public abstract record CaseResult
 {
-    private Vorgangsergebnis()
+    private CaseResult()
     {
     }
 
     /// <summary>Hat geklappt.</summary>
-    public sealed record Erledigt(Transfer.Domain.Vorgaenge.Transfer Vorgang) : Vorgangsergebnis;
+    public sealed record Erledigt(Transfer.Domain.Vorgaenge.Transfer Case) : CaseResult;
 
     /// <summary>Nicht vorhanden ODER nicht deins — von außen dasselbe.</summary>
-    public sealed record Unbekannt : Vorgangsergebnis;
+    public sealed record Unbekannt : CaseResult;
 
     /// <summary>
-    /// Kein Status, keine Freigabe, oder <c>unavailable</c> — alles dasselbe
+    /// Kein Status, keine Release, oder <c>unavailable</c> — alles dasselbe
     /// nach außen.
     /// </summary>
     /// <remarks>
     /// Sonst wäre der Endpunkt ein Orakel darüber, wer auf der Plattform ist
     /// und wer gerade zuhört.
     /// </remarks>
-    public sealed record NichtAnsprechbar : Vorgangsergebnis;
+    public sealed record NichtAnsprechbar : CaseResult;
 
     /// <summary>Es läuft schon einer.</summary>
-    public sealed record LaeuftSchon : Vorgangsergebnis;
+    public sealed record LaeuftSchon : CaseResult;
 
     /// <summary>Die Eingabe ist in Ordnung, der Zustand passt nicht.</summary>
-    public sealed record Zustandskonflikt(string Grund) : Vorgangsergebnis;
+    public sealed record StateConflict(string Grund) : CaseResult;
 
     /// <summary>Mit der Eingabe stimmt etwas nicht.</summary>
-    public sealed record Eingabe(string Grund) : Vorgangsergebnis;
+    public sealed record Eingabe(string Grund) : CaseResult;
 }
 
 /// <summary>Welchen Zug die Person macht.</summary>
@@ -50,7 +50,7 @@ public enum Personenzug
     /// <summary>Das Angebot annehmen.</summary>
     AngebotAnnehmen,
 
-    /// <summary>Die Freigabe des Arbeitgebers bestätigen.</summary>
+    /// <summary>Die Release des Arbeitgebers bestätigen.</summary>
     FreigabeBestaetigen,
 
     /// <summary>Absagen.</summary>
@@ -58,7 +58,7 @@ public enum Personenzug
 }
 
 /// <summary>Welchen Zug das Unternehmen macht.</summary>
-public enum Firmenzug
+public enum CompanySwitch
 {
     /// <summary>Abschließen.</summary>
     Abschliessen,
@@ -69,251 +69,251 @@ public enum Firmenzug
 
 /// <summary>Ein Unternehmen zeigt Interesse.</summary>
 public sealed record InteresseZeigenBefehl(SubjectId Wer, TenantId Firma, string Nachricht)
-    : IBefehl<Vorgangsergebnis>;
+    : IBefehl<CaseResult>;
 
-/// <summary>Die Person bewegt ihren Vorgang.</summary>
+/// <summary>Die Person bewegt ihren Case.</summary>
 public sealed record PersonenzugBefehl(Guid Id, SubjectId Wer, Personenzug Zug)
-    : IBefehl<Vorgangsergebnis>;
+    : IBefehl<CaseResult>;
 
-/// <summary>Das Unternehmen bewegt den Vorgang.</summary>
-public sealed record FirmenzugBefehl(Guid Id, TenantId Firma, Firmenzug Zug)
-    : IBefehl<Vorgangsergebnis>;
+/// <summary>Das Unternehmen bewegt den Case.</summary>
+public sealed record CompanySwitchCommand(Guid Id, TenantId Firma, CompanySwitch Zug)
+    : IBefehl<CaseResult>;
 
 /// <summary>Das Unternehmen macht ein Angebot.</summary>
 public sealed record AngebotMachenBefehl(
     Guid Id, TenantId Firma, string Text, string? Beginn, long? GebuehrCent)
-    : IBefehl<Vorgangsergebnis>;
+    : IBefehl<CaseResult>;
 
 /// <summary>Die Vorgänge dieser Person.</summary>
-public sealed record MeineVorgaengeAbfrage(SubjectId Wer)
+public sealed record MyCasesQuery(SubjectId Wer)
     : IAbfrage<IReadOnlyList<Transfer.Domain.Vorgaenge.Transfer>>;
 
 /// <summary>Die Vorgänge dieses Unternehmens.</summary>
-public sealed record FirmenvorgaengeAbfrage(TenantId Firma)
+public sealed record CompanyCasesQuery(TenantId Firma)
     : IAbfrage<IReadOnlyList<Transfer.Domain.Vorgaenge.Transfer>>;
 
 /// <summary>Führt die Vorgänge.</summary>
-public sealed class Vorgangsbefehle(
-    ITransferspeicher speicher,
-    IMarktspeicher markt,
-    IEinwilligungstor tor,
+public sealed class CaseCommands(
+    ITransferStore store,
+    IMarketStore market,
+    IConsentGate tor,
     IOutbox outbox,
     TimeProvider uhr) :
-    IRequestHandler<InteresseZeigenBefehl, Vorgangsergebnis>,
-    IRequestHandler<PersonenzugBefehl, Vorgangsergebnis>,
-    IRequestHandler<FirmenzugBefehl, Vorgangsergebnis>,
-    IRequestHandler<AngebotMachenBefehl, Vorgangsergebnis>,
-    IRequestHandler<MeineVorgaengeAbfrage, IReadOnlyList<Transfer.Domain.Vorgaenge.Transfer>>,
-    IRequestHandler<FirmenvorgaengeAbfrage, IReadOnlyList<Transfer.Domain.Vorgaenge.Transfer>>
+    IRequestHandler<InteresseZeigenBefehl, CaseResult>,
+    IRequestHandler<PersonenzugBefehl, CaseResult>,
+    IRequestHandler<CompanySwitchCommand, CaseResult>,
+    IRequestHandler<AngebotMachenBefehl, CaseResult>,
+    IRequestHandler<MyCasesQuery, IReadOnlyList<Transfer.Domain.Vorgaenge.Transfer>>,
+    IRequestHandler<CompanyCasesQuery, IReadOnlyList<Transfer.Domain.Vorgaenge.Transfer>>
 {
     /// <inheritdoc />
-    public async Task<Vorgangsergebnis> Handle(
+    public async Task<CaseResult> Handle(
         InteresseZeigenBefehl request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var status = await markt.HoleAsync(request.Wer, cancellationToken);
+        var status = await market.GetAsync(request.Wer, cancellationToken);
 
         if (status is null)
         {
-            return new Vorgangsergebnis.NichtAnsprechbar();
+            return new CaseResult.NichtAnsprechbar();
         }
 
-        // EinwilligungSchweigt fliegt bewusst durch: der Endpunkt macht daraus
+        // ConsentGateSilent fliegt bewusst durch: der Endpunkt macht daraus
         // 503.
-        if (!await tor.DarfMarktSehenAsync(request.Wer, request.Firma, cancellationToken))
+        if (!await tor.MaySeeMarketAsync(request.Wer, request.Firma, cancellationToken))
         {
-            return new Vorgangsergebnis.NichtAnsprechbar();
+            return new CaseResult.NichtAnsprechbar();
         }
 
         if (!status.Ansprechbar)
         {
-            // Die Freigabe erlaubt zu SEHEN, nicht zu STÖREN.
-            return new Vorgangsergebnis.NichtAnsprechbar();
+            // Die Release erlaubt zu SEHEN, nicht zu STÖREN.
+            return new CaseResult.NichtAnsprechbar();
         }
 
-        // Ein zweiter laufender Vorgang wäre Nachfassen an der Absage vorbei.
-        if (await speicher.HoleLaufendenAsync(request.Wer, request.Firma, cancellationToken)
+        // Ein zweiter laufender Case wäre Nachfassen an der Absage vorbei.
+        if (await store.GetCurrentAsync(request.Wer, request.Firma, cancellationToken)
             is not null)
         {
-            return new Vorgangsergebnis.LaeuftSchon();
+            return new CaseResult.LaeuftSchon();
         }
 
-        Transfer.Domain.Vorgaenge.Transfer vorgang;
+        Transfer.Domain.Vorgaenge.Transfer caseItem;
 
         try
         {
-            vorgang = Transfer.Domain.Vorgaenge.Transfer.Zeige_Interesse(
+            caseItem = Transfer.Domain.Vorgaenge.Transfer.Zeige_Interesse(
                 request.Wer,
                 request.Firma,
-                // Aus dem Marktstatus kopiert, damit eine spätere Änderung die
+                // Aus dem MarketStatus kopiert, damit eine spätere Änderung die
                 // Bedingungen eines laufenden Vorgangs nicht rückwirkend
                 // verschiebt.
                 status.Beschaeftigt,
                 request.Nachricht,
                 uhr.GetUtcNow());
         }
-        catch (Vorgangsfehler fehler)
+        catch (CaseError error)
         {
-            return new Vorgangsergebnis.Eingabe(fehler.Message);
+            return new CaseResult.Eingabe(error.Message);
         }
 
-        await speicher.SichereAsync(vorgang, cancellationToken);
-        await Melde(vorgang, cancellationToken);
+        await store.SaveAsync(caseItem, cancellationToken);
+        await Melde(caseItem, cancellationToken);
 
-        return new Vorgangsergebnis.Erledigt(vorgang);
+        return new CaseResult.Erledigt(caseItem);
     }
 
     /// <inheritdoc />
-    public async Task<Vorgangsergebnis> Handle(
+    public async Task<CaseResult> Handle(
         PersonenzugBefehl request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var vorgang = await speicher.HoleAsync(request.Id, cancellationToken);
+        var caseItem = await store.GetAsync(request.Id, cancellationToken);
 
-        if (vorgang is null || vorgang.Wer != request.Wer)
+        if (caseItem is null || caseItem.Wer != request.Wer)
         {
-            return new Vorgangsergebnis.Unbekannt();
+            return new CaseResult.Unbekannt();
         }
 
-        var jetzt = uhr.GetUtcNow();
+        var now = uhr.GetUtcNow();
 
         try
         {
             switch (request.Zug)
             {
                 case Personenzug.GespraechAnnehmen:
-                    vorgang.Nimm_Gespraech_an(request.Wer, jetzt);
+                    caseItem.Nimm_Gespraech_an(request.Wer, now);
                     break;
                 case Personenzug.AngebotAnnehmen:
-                    vorgang.Nimm_Angebot_an(request.Wer, jetzt);
+                    caseItem.Nimm_Angebot_an(request.Wer, now);
                     break;
                 case Personenzug.FreigabeBestaetigen:
-                    vorgang.Bestaetige_Freigabe(request.Wer, jetzt);
+                    caseItem.Bestaetige_Freigabe(request.Wer, now);
                     break;
                 case Personenzug.Absagen:
-                    vorgang.Sage_ab(request.Wer, jetzt);
+                    caseItem.Sage_ab(request.Wer, now);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(request));
             }
         }
-        catch (Vorgangsfehler fehler)
+        catch (CaseError error)
         {
-            return Zu(fehler);
+            return Zu(error);
         }
 
-        await speicher.SichereAsync(vorgang, cancellationToken);
+        await store.SaveAsync(caseItem, cancellationToken);
 
         // Die Züge der Person werden NICHT gemeldet: sie weiß, was sie getan
         // hat, und eine Mail an einen Firmenverteiler mit dem Namen eines
         // Menschen wäre derselbe Leck-Kanal, nur andersherum.
-        return new Vorgangsergebnis.Erledigt(vorgang);
+        return new CaseResult.Erledigt(caseItem);
     }
 
     /// <inheritdoc />
-    public async Task<Vorgangsergebnis> Handle(
-        FirmenzugBefehl request, CancellationToken cancellationToken)
+    public async Task<CaseResult> Handle(
+        CompanySwitchCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var vorgang = await speicher.HoleAsync(request.Id, cancellationToken);
+        var caseItem = await store.GetAsync(request.Id, cancellationToken);
 
-        if (vorgang is null || vorgang.Firma != request.Firma)
+        if (caseItem is null || caseItem.Firma != request.Firma)
         {
-            return new Vorgangsergebnis.Unbekannt();
+            return new CaseResult.Unbekannt();
         }
 
-        var jetzt = uhr.GetUtcNow();
+        var now = uhr.GetUtcNow();
 
         try
         {
             switch (request.Zug)
             {
-                case Firmenzug.Abschliessen:
-                    vorgang.Schliesse_ab(jetzt);
+                case CompanySwitch.Abschliessen:
+                    caseItem.Schliesse_ab(now);
                     break;
-                case Firmenzug.Zurueckziehen:
-                    vorgang.Ziehe_zurueck(jetzt);
+                case CompanySwitch.Zurueckziehen:
+                    caseItem.Ziehe_zurueck(now);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(request));
             }
         }
-        catch (Vorgangsfehler fehler)
+        catch (CaseError error)
         {
-            return Zu(fehler);
+            return Zu(error);
         }
 
-        await speicher.SichereAsync(vorgang, cancellationToken);
-        await Melde(vorgang, cancellationToken);
+        await store.SaveAsync(caseItem, cancellationToken);
+        await Melde(caseItem, cancellationToken);
 
-        return new Vorgangsergebnis.Erledigt(vorgang);
+        return new CaseResult.Erledigt(caseItem);
     }
 
     /// <inheritdoc />
-    public async Task<Vorgangsergebnis> Handle(
+    public async Task<CaseResult> Handle(
         AngebotMachenBefehl request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var vorgang = await speicher.HoleAsync(request.Id, cancellationToken);
+        var caseItem = await store.GetAsync(request.Id, cancellationToken);
 
-        if (vorgang is null || vorgang.Firma != request.Firma)
+        if (caseItem is null || caseItem.Firma != request.Firma)
         {
-            return new Vorgangsergebnis.Unbekannt();
+            return new CaseResult.Unbekannt();
         }
 
         try
         {
-            vorgang.Mache_Angebot(
+            caseItem.Mache_Angebot(
                 request.Text, request.Beginn, request.GebuehrCent, uhr.GetUtcNow());
         }
-        catch (Vorgangsfehler fehler)
+        catch (CaseError error)
         {
-            return Zu(fehler);
+            return Zu(error);
         }
 
-        await speicher.SichereAsync(vorgang, cancellationToken);
-        await Melde(vorgang, cancellationToken);
+        await store.SaveAsync(caseItem, cancellationToken);
+        await Melde(caseItem, cancellationToken);
 
-        return new Vorgangsergebnis.Erledigt(vorgang);
+        return new CaseResult.Erledigt(caseItem);
     }
 
     /// <inheritdoc />
     public Task<IReadOnlyList<Transfer.Domain.Vorgaenge.Transfer>> Handle(
-        MeineVorgaengeAbfrage request, CancellationToken cancellationToken)
+        MyCasesQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return speicher.FuerPersonAsync(request.Wer, cancellationToken);
+        return store.ForPersonAsync(request.Wer, cancellationToken);
     }
 
     /// <inheritdoc />
     public Task<IReadOnlyList<Transfer.Domain.Vorgaenge.Transfer>> Handle(
-        FirmenvorgaengeAbfrage request, CancellationToken cancellationToken)
+        CompanyCasesQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return speicher.FuerFirmaAsync(request.Firma, cancellationToken);
+        return store.ForCompanyAsync(request.Firma, cancellationToken);
     }
 
     /// <summary>Nur Züge des Unternehmens werden gemeldet.</summary>
     /// <remarks>
     /// In DERSELBEN Transaktion wie der Zug (ADR-0025). Vorher stand hier ein
     /// HTTP-Aufruf nach dem Commit, dessen Fehler geschluckt wurde — der
-    /// Vorgang blieb, die Benachrichtigung war für immer weg.
+    /// Case blieb, die Benachrichtigung war für immer weg.
     /// </remarks>
     private Task Melde(
-        Transfer.Domain.Vorgaenge.Transfer vorgang, CancellationToken cancellationToken) =>
-        outbox.VermerkeAsync(vorgang.Wer, Benachrichtigungsarten.Bewegt, cancellationToken);
+        Transfer.Domain.Vorgaenge.Transfer caseItem, CancellationToken cancellationToken) =>
+        outbox.NoteAsync(caseItem.Wer, Benachrichtigungsarten.Bewegt, cancellationToken);
 
-    private static Vorgangsergebnis Zu(Vorgangsfehler fehler) => fehler switch
+    private static CaseResult Zu(CaseError error) => error switch
     {
-        // Ein fremder Vorgang ist von außen wie keiner.
-        NichtDeiner => new Vorgangsergebnis.Unbekannt(),
-        UebergangNichtErlaubt => new Vorgangsergebnis.Zustandskonflikt(fehler.Message),
-        _ => new Vorgangsergebnis.Eingabe(fehler.Message)
+        // Ein fremder Case ist von außen wie keiner.
+        NichtDeiner => new CaseResult.Unbekannt(),
+        UebergangNichtErlaubt => new CaseResult.StateConflict(error.Message),
+        _ => new CaseResult.Eingabe(error.Message)
     };
 }

@@ -11,10 +11,10 @@ using WorkerTransfer.Advisor.Infrastructure.Sicherheit;
 namespace WorkerTransfer.Advisor.Infrastructure.Uebergabe;
 
 /// <summary>Wo transfer-service antwortet.</summary>
-public sealed class Uebergabeeinstellungen
+public sealed class HandoverSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Transfer";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Transfer";
 
     /// <summary>Die Basisadresse von transfer-service.</summary>
     /// <remarks>
@@ -29,7 +29,7 @@ public sealed class Uebergabeeinstellungen
 }
 
 /// <summary>Was transfer-service beim Anlegen zurückgibt — nur die Kennung interessiert.</summary>
-internal sealed record VorgangsantwortV1([property: JsonPropertyName("id")] Guid Id);
+internal sealed record CaseResponseV1([property: JsonPropertyName("id")] Guid Id);
 
 /// <summary>Was hinausgeht, um Interesse zu zeigen.</summary>
 /// <remarks>
@@ -43,113 +43,113 @@ internal sealed record InteresseV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("message")] string Message);
 
-/// <summary>Macht aus einer Einigung einen Vorgang.</summary>
+/// <summary>Macht aus einer Einigung einen Case.</summary>
 /// <remarks>
 /// <para><strong>Ein Aufruf an die bestehende Tür, und keine Nachbildung.</strong>
-/// Der Dreieckskonsens steht in transfer-service: ob der Marktstatus diesem
-/// Unternehmen freigegeben ist, ob die Person ansprechbar ist, ob eine Freigabe
+/// Der Dreieckskonsens steht in transfer-service: ob der MarketStatus diesem
+/// Unternehmen freigegeben ist, ob die Person ansprechbar ist, ob eine Release
 /// des jetzigen Arbeitgebers nötig ist. Dieser Adapter kennt keine dieser
-/// Regeln, und das ist der Punkt — eine zweite Stelle, die sie kennt, wäre die,
+/// Regeln, und das ist der Punkt — eine zweite Job, die sie kennt, wäre die,
 /// die als Erste veraltet.</para>
 ///
 /// <para><strong>Mit dem Token des Aufrufers</strong>, und der Aufrufer ist das
-/// Unternehmen. Ein Vorgang beginnt damit, dass ein Unternehmen Interesse
+/// Unternehmen. Ein Case beginnt damit, dass ein Unternehmen Interesse
 /// zeigt; er kann deshalb gar nicht ohne dessen Token entstehen, und ein
 /// Dienstkonto hier hiesse, dass dieser Dienst Vorgänge im Namen von
 /// Unternehmen anlegen kann.</para>
 /// </remarks>
-public sealed class HttpVorgangsuebergabe(
+public sealed class HttpCaseHandover(
     IHttpClientFactory fabrik,
     IAufrufertoken token,
-    IOptions<Uebergabeeinstellungen> einstellungen,
-    ILogger<HttpVorgangsuebergabe> protokoll) : IVorgangsuebergabe
+    IOptions<HandoverSettings> einstellungen,
+    ILogger<HttpCaseHandover> protokoll) : ICaseHandover
 {
     /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
     public const string Klient = "transfer";
 
-    private readonly Uebergabeeinstellungen _einstellungen = einstellungen.Value;
+    private readonly HandoverSettings _einstellungen = einstellungen.Value;
 
     /// <inheritdoc />
-    public async Task<Guid> UebergibAsync(
-        SubjectId wer, string anlass, CancellationToken cancellationToken = default)
+    public async Task<Guid> HandOverAsync(
+        SubjectId subject, string anlass, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(_einstellungen.Adresse))
         {
-            throw new AuskunftSchweigt("Transfer:Adresse ist nicht gesetzt.");
+            throw new LookupSilent("Transfer:Adresse ist nicht gesetzt.");
         }
 
         using var client = fabrik.CreateClient(Klient);
         client.Timeout = _einstellungen.Geduld;
 
-        using var anfrage = new HttpRequestMessage(
+        using var request = new HttpRequestMessage(
             HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), "/transfers/"))
         {
-            Content = JsonContent.Create(new InteresseV1(wer.Value, anlass ?? string.Empty))
+            Content = JsonContent.Create(new InteresseV1(subject.Value, anlass ?? string.Empty))
         };
 
-        if (token.Wert is { Length: > 0 } wert)
+        if (token.Wert is { Length: > 0 } value)
         {
-            anfrage.Headers.Add("Authorization", $"Bearer {wert}");
+            request.Headers.Add("Authorization", $"Bearer {value}");
         }
 
-        HttpResponseMessage antwort;
+        HttpResponseMessage response;
 
         try
         {
-            antwort = await client.SendAsync(anfrage, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
-        catch (HttpRequestException fehler)
+        catch (HttpRequestException error)
         {
             protokoll.LogWarning(
-                "transfer-service ist nicht erreichbar: {Art}", fehler.GetType().Name);
+                "transfer-service ist nicht erreichbar: {Art}", error.GetType().Name);
 
-            throw new AuskunftSchweigt("transfer-service unreachable");
+            throw new LookupSilent("transfer-service unreachable");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             protokoll.LogWarning("transfer-service hat nicht rechtzeitig geantwortet.");
 
-            throw new AuskunftSchweigt("transfer-service timed out");
+            throw new LookupSilent("transfer-service timed out");
         }
 
-        using (antwort)
+        using (response)
         {
-            if (antwort.IsSuccessStatusCode)
+            if (response.IsSuccessStatusCode)
             {
                 try
                 {
-                    var gelesen = await antwort.Content
-                        .ReadFromJsonAsync<VorgangsantwortV1>(cancellationToken);
+                    var gelesen = await response.Content
+                        .ReadFromJsonAsync<CaseResponseV1>(cancellationToken);
 
                     return gelesen?.Id
-                           ?? throw new AuskunftSchweigt("transfer-service sent no id");
+                           ?? throw new LookupSilent("transfer-service sent no id");
                 }
                 catch (JsonException)
                 {
-                    throw new AuskunftSchweigt("transfer-service sent an unusable answer");
+                    throw new LookupSilent("transfer-service sent an unusable answer");
                 }
             }
 
             // 4xx heisst: transfer-service HAT geantwortet, und zwar ablehnend.
             // Das ist eine Aussage ueber die Bedingungen dieses Vorgangs — etwa
-            // ein nicht freigegebener Marktstatus — und keine Stoerung. 5xx ist
+            // ein nicht freigegebener MarketStatus — und keine Stoerung. 5xx ist
             // das Gegenteil, und die beiden duerfen nicht dieselbe Antwort
             // bekommen: „geht nicht" und „wir wissen es nicht" sind zweierlei.
-            if ((int)antwort.StatusCode is >= 400 and < 500
-                && antwort.StatusCode != HttpStatusCode.RequestTimeout)
+            if ((int)response.StatusCode is >= 400 and < 500
+                && response.StatusCode != HttpStatusCode.RequestTimeout)
             {
                 protokoll.LogInformation(
                     "transfer-service hat die Übergabe abgelehnt: {Status}",
-                    (int)antwort.StatusCode);
+                    (int)response.StatusCode);
 
-                throw new UebergabeAbgelehnt(
-                    $"transfer-service refused with {(int)antwort.StatusCode}");
+                throw new HandoverRefused(
+                    $"transfer-service refused with {(int)response.StatusCode}");
             }
 
             protokoll.LogWarning(
-                "transfer-service antwortete mit {Status}.", (int)antwort.StatusCode);
+                "transfer-service antwortete mit {Status}.", (int)response.StatusCode);
 
-            throw new AuskunftSchweigt($"transfer-service returned {(int)antwort.StatusCode}");
+            throw new LookupSilent($"transfer-service returned {(int)response.StatusCode}");
         }
     }
 }

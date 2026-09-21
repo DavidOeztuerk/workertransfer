@@ -3,20 +3,20 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Identity.Infrastructure.Sicherheit;
 
-/// <summary>Der Port auf den gemeinsamen Geheimnisspeicher.</summary>
+/// <summary>Der Port auf den gemeinsamen SecretStore.</summary>
 /// <remarks>
 /// Eine Zeile Umsetzung und trotzdem ein eigener Typ: die Anwendungsschicht darf
 /// nicht wissen, WIE verschlüsselt wird, und ein Test soll es ohne
 /// Hauptschlüssel tun können.
 /// </remarks>
-public sealed class Geheimnisse(Geheimnisspeicher speicher) : IGeheimnisse
+public sealed class Secrets(SecretStore store) : ISecrets
 {
     /// <inheritdoc />
-    public string Verschluessele(string klartext) => speicher.Verschluessele(klartext);
+    public string Encrypt(string klartext) => store.Encrypt(klartext);
 
     /// <inheritdoc />
-    public string Endung(string klartext) => Geheimnisspeicher.Endung(klartext);
+    public string Endung(string klartext) => SecretStore.Endung(klartext);
 
     /// <inheritdoc />
-    public string? Entschluessele(string? gespeichert) => speicher.Entschluessele(gespeichert);
+    public string? Decrypt(string? gespeichert) => store.Decrypt(gespeichert);
 }

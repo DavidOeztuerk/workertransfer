@@ -7,18 +7,18 @@ internal static class Text
 
     internal const int HoechsteBeschreibungslaenge = 2000;
 
-    internal static string Gepruegt(string feld, string? wert, bool pflicht, int grenze)
+    internal static string Gepruegt(string field, string? value, bool pflicht, int limit)
     {
-        var sauber = (wert ?? string.Empty).Trim();
+        var sauber = (value ?? string.Empty).Trim();
 
         if (pflicht && sauber.Length == 0)
         {
-            throw new Lebenslaufregel(Regelcodes.Text, $"{feld} darf nicht leer sein.");
+            throw new ResumeRule(Regelcodes.Text, $"{field} darf nicht leer sein.");
         }
 
-        return sauber.Length > grenze
-            ? throw new Lebenslaufregel(
-                Regelcodes.Text, $"{feld} überschreitet {grenze} Zeichen.")
+        return sauber.Length > limit
+            ? throw new ResumeRule(
+                Regelcodes.Text, $"{field} überschreitet {limit} Zeichen.")
             : sauber;
     }
 
@@ -30,7 +30,7 @@ internal static class Text
     {
         if (ende is not null && ende < beginn)
         {
-            throw new Lebenslaufregel(
+            throw new ResumeRule(
                 Regelcodes.Monat, $"Das Ende {ende} liegt vor dem Beginn {beginn}.");
         }
     }

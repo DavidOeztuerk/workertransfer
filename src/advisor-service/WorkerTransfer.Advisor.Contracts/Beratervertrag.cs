@@ -2,17 +2,17 @@ using System.Text.Json.Serialization;
 
 namespace WorkerTransfer.Advisor.Contracts;
 
-/// <summary>Das Mandat, wie die Person es sieht und schreibt.</summary>
+/// <summary>Das Mandate, wie die Person es sieht und schreibt.</summary>
 /// <remarks>
 /// <para>Vier Werte und ein Zeitstempel — und ausdrücklich <strong>kein</strong>
 /// Sichtbarkeitsfeld. Sichtbarkeit lebt im Ledger (ADR-0020); ein Schalter an
-/// dieser Stelle wäre eine zweite Wahrheit, und eine, die der Client
+/// dieser Job wäre eine zweite Wahrheit, und eine, die der Client
 /// mitschicken könnte.</para>
 ///
 /// <para>Alle Felder sind <c>null</c>-fähig, weil „nichts gesagt" der Normalfall
-/// ist. Ein leeres Mandat ist vollständig.</para>
+/// ist. Ein leeres Mandate ist vollständig.</para>
 /// </remarks>
-public sealed record MandatV1(
+public sealed record MandateV1(
     [property: JsonPropertyName("entry_month")] string? EntryMonth,
     [property: JsonPropertyName("salary_min")] int? SalaryMin,
     [property: JsonPropertyName("salary_max")] int? SalaryMax,
@@ -20,8 +20,8 @@ public sealed record MandatV1(
     [property: JsonPropertyName("excluded_domains")] IReadOnlyList<string> ExcludedDomains,
     [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt);
 
-/// <summary>Was die Person schickt, um ihr Mandat zu schreiben.</summary>
-public sealed record MandatSchreibenV1(
+/// <summary>Was die Person schickt, um ihr Mandate zu schreiben.</summary>
+public sealed record WriteMandateV1(
     [property: JsonPropertyName("entry_month")] string? EntryMonth = null,
     [property: JsonPropertyName("salary_min")] int? SalaryMin = null,
     [property: JsonPropertyName("salary_max")] int? SalaryMax = null,
@@ -29,7 +29,7 @@ public sealed record MandatSchreibenV1(
     [property: JsonPropertyName("excluded_domains")] IReadOnlyList<string>? ExcludedDomains = null);
 
 /// <summary>Was ein Unternehmen schickt, um ein Gespräch zu eröffnen.</summary>
-public sealed record GespraechEroeffnenV1(
+public sealed record OpenConversationV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("note")] string? Note = null);
 
@@ -40,9 +40,9 @@ public sealed record StufeV1([property: JsonPropertyName("stage")] int? Stage = 
 /// <remarks>
 /// Sie sieht alles: welches Unternehmen, wo es steht, wie weit sie geöffnet
 /// hat. Über sie selbst erfährt sie hier nichts Neues — es ist ihr eigenes
-/// Mandat.
+/// Mandate.
 /// </remarks>
-public sealed record MeinGespraechV1(
+public sealed record MyConversationV1(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("tenant_id")] Guid TenantId,
     [property: JsonPropertyName("state")] string State,
@@ -76,7 +76,7 @@ public sealed record MeinGespraechV1(
 /// es noch fragen soll — und ein Dienst, der das verschweigt, erzeugt genau die
 /// Nachfragen, die er verhindern will.</para>
 /// </remarks>
-public sealed record GespraechV1(
+public sealed record ConversationV1(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("state")] string State,
@@ -118,16 +118,16 @@ public sealed record GespraechV1(
 
 /// <summary>Eine Liste von Gesprächen.</summary>
 /// <remarks>
-/// Keine Gesamtzahl (ADR-0026): sie verriete über die Differenz zur Länge, wie
+/// None Gesamtzahl (ADR-0026): sie verriete über die Differenz zur Länge, wie
 /// viele Gespräche gerade <em>nicht</em> auf Stufe 1 stehen — und damit, wie
 /// viele Menschen zurückgezogen haben.
 /// </remarks>
-public sealed record GespraechslisteV1(
-    [property: JsonPropertyName("items")] IReadOnlyList<GespraechV1> Items);
+public sealed record ConversationListV1(
+    [property: JsonPropertyName("items")] IReadOnlyList<ConversationV1> Items);
 
 /// <summary>Dasselbe für die Person.</summary>
-public sealed record MeineGespraechslisteV1(
-    [property: JsonPropertyName("items")] IReadOnlyList<MeinGespraechV1> Items);
+public sealed record MyConversationListV1(
+    [property: JsonPropertyName("items")] IReadOnlyList<MyConversationV1> Items);
 
 /// <summary>Was an notification-service geht: über wen, und welcher Art.</summary>
 /// <remarks>
@@ -137,9 +137,9 @@ public sealed record MeineGespraechslisteV1(
 /// an — gemessen an vier Sprüngen, die deshalb nie angekommen sind.</para>
 ///
 /// <para>Zwei Felder, und mehr dürfen es nie werden. Kein Firmenname, kein
-/// Text: eine Mail landet in einem Postfach, und dieses Postfach kann das des
+/// Text: eine Mail landet in einem Inbox, und dieses Inbox kann das des
 /// jetzigen Arbeitgebers sein.</para>
 /// </remarks>
-public sealed record GespraechsmeldungV1(
+public sealed record ConversationNotificationV1(
     [property: JsonPropertyName("user_id")] Guid UserId,
     [property: JsonPropertyName("kind")] string Kind);

@@ -1,7 +1,7 @@
 using System.Globalization;
 using Noelia.Core.Identity;
 
-namespace WorkerTransfer.Advisor.Domain.Mandate;
+namespace WorkerTransfer.Advisor.Domain.Mandates;
 
 /// <summary>Etwas an der Eingabe stimmt nicht.</summary>
 /// <remarks>
@@ -10,29 +10,29 @@ namespace WorkerTransfer.Advisor.Domain.Mandate;
 /// dem es hier nie stehen darf.
 /// </remarks>
 /// <param name="meldung">Was die Regel verlangt.</param>
-public sealed class Eingabefehler(string meldung) : Exception(meldung);
+public sealed class Eingabefehler(string notification) : Exception(notification);
 
 /// <summary>
-/// Das Mandat — vier Werte, und alle vier freiwillig.
+/// Das Mandate — vier Werte, und alle vier freiwillig.
 /// </summary>
 /// <remarks>
-/// <para><strong>Das Mandat ist eine SICHT, kein zweiter Speicher</strong>
+/// <para><strong>Das Mandate ist eine SICHT, kein zweiter Speicher</strong>
 /// (ADR-0037 Entscheidung 1). Wer darf mich sehen, steht im Ledger; ob ich
-/// ansprechbar bin, steht im Marktstatus. Beides hier noch einmal zu halten
-/// wäre ADR-0020 wörtlich gebrochen — und ein Widerruf müsste dann an zwei
-/// Stellen wirken, also irgendwann an einer nicht.</para>
+/// ansprechbar bin, steht im MarketStatus. Beides hier noch einmal zu halten
+/// wäre ADR-0020 wörtlich gebrochen — und ein Revocation müsste dann an zwei
+/// Jobs wirken, also irgendwann an einer nicht.</para>
 ///
 /// <para>Übrig bleiben genau die vier Werte, die heute nirgends stehen:
 /// Eintrittstermin, Gehaltsspanne, Pensum, ausgeschlossene Unternehmen. Kein
 /// Feld heißt <c>sichtbar</c>, <c>visible</c>, <c>public</c> oder
 /// <c>freigabe</c>, und ein Test hält das fest.</para>
 ///
-/// <para><strong>Leer ist der Normalfall.</strong> Ein Mandat ohne einen
+/// <para><strong>Leer ist der Normalfall.</strong> Ein Mandate ohne einen
 /// einzigen gefüllten Wert ist vollständig; niemand muss ein Gehalt nennen, um
 /// ein Gespräch zu führen. Deshalb gibt es kein „unvollständig" und keine
 /// Pflichtangabe.</para>
 /// </remarks>
-public sealed class Mandat
+public sealed class Mandate
 {
     /// <summary>Wie viele Unternehmen eine Person ausschließen darf.</summary>
     /// <remarks>
@@ -50,8 +50,8 @@ public sealed class Mandat
     /// <summary>Das größte.</summary>
     public const int GroesstesPensum = 100;
 
-    private Mandat(
-        SubjectId wer,
+    private Mandate(
+        SubjectId subject,
         string? eintrittstermin,
         int? gehaltMin,
         int? gehaltMax,
@@ -59,7 +59,7 @@ public sealed class Mandat
         IReadOnlyList<string> ausgeschlossen,
         DateTimeOffset geaendertAm)
     {
-        Wer = wer;
+        Wer = subject;
         Eintrittstermin = eintrittstermin;
         GehaltMin = gehaltMin;
         GehaltMax = gehaltMax;
@@ -68,7 +68,7 @@ public sealed class Mandat
         GeaendertAm = geaendertAm;
     }
 
-    /// <summary>Wessen Mandat. Es <em>ist</em> der Schlüssel.</summary>
+    /// <summary>Wessen Mandate. Es <em>ist</em> der Schlüssel.</summary>
     public SubjectId Wer { get; }
 
     /// <summary>Ab wann, als Monat <c>JJJJ-MM</c> — oder <c>null</c>.</summary>
@@ -124,45 +124,45 @@ public sealed class Mandat
         && PensumProzent is null
         && AusgeschlosseneUnternehmen.Count == 0;
 
-    /// <summary>Das leere Mandat. „Nichts gesagt" ist ein Zustand.</summary>
-    public static Mandat Leeres(SubjectId wer, DateTimeOffset jetzt) =>
-        new(wer, null, null, null, null, [], jetzt);
+    /// <summary>Das leere Mandate. „Nichts gesagt" ist ein Zustand.</summary>
+    public static Mandate Leeres(SubjectId subject, DateTimeOffset now) =>
+        new(subject, null, null, null, null, [], now);
 
-    /// <summary>Schreibt ein Mandat, nachdem jede Angabe geprüft wurde.</summary>
+    /// <summary>Schreibt ein Mandate, nachdem jede Angabe geprüft wurde.</summary>
     /// <remarks>
     /// Erst prüfen, dann bauen: ein abgelehntes Formular darf kein halb
-    /// geschriebenes Mandat hinterlassen.
+    /// geschriebenes Mandate hinterlassen.
     /// </remarks>
     /// <exception cref="Eingabefehler">Eine Angabe hält die Regel nicht ein.</exception>
-    public static Mandat Schreibe(
-        SubjectId wer,
+    public static Mandate Write(
+        SubjectId subject,
         string? eintrittstermin,
         int? gehaltMin,
         int? gehaltMax,
         int? pensumProzent,
         IReadOnlyList<string>? ausgeschlossen,
-        DateTimeOffset jetzt)
+        DateTimeOffset now)
     {
         var termin = Monat(eintrittstermin);
         var pensum = Pensum(pensumProzent);
         var spanne = Spanne(gehaltMin, gehaltMax);
         var domains = Domains(ausgeschlossen);
 
-        return new Mandat(wer, termin, spanne.Min, spanne.Max, pensum, domains, jetzt);
+        return new Mandate(subject, termin, spanne.Min, spanne.Max, pensum, domains, now);
     }
 
-    /// <summary>Das Mandat, wie eine Zeile es hält.</summary>
-    public static Mandat Stelle_her(
-        SubjectId wer,
+    /// <summary>Das Mandate, wie eine Zeile es hält.</summary>
+    public static Mandate Stelle_her(
+        SubjectId subject,
         string? eintrittstermin,
         int? gehaltMin,
         int? gehaltMax,
         int? pensumProzent,
         IReadOnlyList<string> ausgeschlossen,
         DateTimeOffset geaendertAm) =>
-        new(wer, eintrittstermin, gehaltMin, gehaltMax, pensumProzent, ausgeschlossen, geaendertAm);
+        new(subject, eintrittstermin, gehaltMin, gehaltMax, pensumProzent, ausgeschlossen, geaendertAm);
 
-    /// <summary>Schließt dieses Mandat diese Domain aus?</summary>
+    /// <summary>Schließt dieses Mandate diese Domain aus?</summary>
     /// <remarks>
     /// Genauer Vergleich auf die ganze Domain, kein Suffixtreffer: sonst
     /// schlösse <c>example.com</c> auch <c>notexample.com</c> aus, und der
@@ -175,16 +175,16 @@ public sealed class Mandat
 
     private static string? Monat(string? roh)
     {
-        var wert = (roh ?? string.Empty).Trim();
+        var value = (roh ?? string.Empty).Trim();
 
-        if (wert.Length == 0)
+        if (value.Length == 0)
         {
             return null;
         }
 
         return DateTime.TryParseExact(
-            wert, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)
-            ? wert
+            value, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)
+            ? value
             : throw new Eingabefehler("an entry date is a month, written YYYY-MM");
     }
 
@@ -219,8 +219,8 @@ public sealed class Mandat
         }
 
         var sauber = roh
-            .Select(eintrag => (eintrag ?? string.Empty).Trim().ToLowerInvariant())
-            .Where(eintrag => eintrag.Length > 0)
+            .Select(entry => (entry ?? string.Empty).Trim().ToLowerInvariant())
+            .Where(entry => entry.Length > 0)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
@@ -230,12 +230,12 @@ public sealed class Mandat
                 $"at most {HoechstzahlAusschluesse} excluded companies");
         }
 
-        foreach (var eintrag in sauber)
+        foreach (var entry in sauber)
         {
-            if (eintrag.Length > HoechstlaengeDomain
-                || !eintrag.Contains('.', StringComparison.Ordinal)
-                || eintrag.Contains('@', StringComparison.Ordinal)
-                || eintrag.Contains(' ', StringComparison.Ordinal))
+            if (entry.Length > HoechstlaengeDomain
+                || !entry.Contains('.', StringComparison.Ordinal)
+                || entry.Contains('@', StringComparison.Ordinal)
+                || entry.Contains(' ', StringComparison.Ordinal))
             {
                 // Die Regel, nie der Wert: eine Domain in einer Meldung stünde
                 // am Ende im Protokoll, und sie sagt, wo jemand arbeitet.
@@ -248,11 +248,11 @@ public sealed class Mandat
 }
 
 /// <summary>Findet und speichert Mandate.</summary>
-public interface IMandatspeicher
+public interface IMandateStore
 {
-    /// <summary>Das Mandat dieser Person, oder <c>null</c>.</summary>
-    Task<Mandat?> HoleAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    /// <summary>Das Mandate dieser Person, oder <c>null</c>.</summary>
+    Task<Mandate?> GetAsync(SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(Mandat mandat, CancellationToken cancellationToken = default);
+    Task SaveAsync(Mandate mandate, CancellationToken cancellationToken = default);
 }

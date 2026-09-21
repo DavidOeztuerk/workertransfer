@@ -1,4 +1,4 @@
-using WorkerTransfer.GitHub.Domain.Verbindungen;
+using WorkerTransfer.GitHub.Domain.Connections;
 
 namespace WorkerTransfer.GitHub.Application.Ports;
 
@@ -7,8 +7,8 @@ namespace WorkerTransfer.GitHub.Application.Ports;
 /// Nicht auf „nicht bewiesen" abzubilden: das hieße, jemandem den Nachweis
 /// abzusprechen, weil <em>wir</em> gerade nicht fragen konnten.
 /// </remarks>
-public sealed class GitHubSchweigt(string grund, Exception? ursache = null)
-    : Exception(grund, ursache);
+public sealed class GitHubSignInSilent(string reason, Exception? ursache = null)
+    : Exception(reason, ursache);
 
 /// <summary>Der Zugriff auf GitHub — einmal lesen, nicht zusehen.</summary>
 /// <remarks>
@@ -26,7 +26,7 @@ public interface IGitHub
 {
     /// <summary>Steht die Einmalzeichenfolge in der Beschreibung eines Gists?</summary>
     /// <exception cref="GitHubSchweigt">GitHub hat nicht geantwortet.</exception>
-    Task<bool> HatNachweisgistAsync(
+    Task<bool> HasProofGistAsync(
         string login, string einmalzeichenfolge, CancellationToken cancellationToken = default);
 
     /// <summary>Die öffentlichen Repositories dieses Kontos.</summary>

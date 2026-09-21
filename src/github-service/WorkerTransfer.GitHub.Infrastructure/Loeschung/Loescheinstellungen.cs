@@ -1,4 +1,4 @@
-namespace WorkerTransfer.GitHub.Infrastructure.Loeschung;
+namespace WorkerTransfer.GitHub.Infrastructure.Erasure;
 
 /// <summary>Das Geheimnis, mit dem sich die Löschkaskade ausweist.</summary>
 /// <remarks>
@@ -6,10 +6,10 @@ namespace WorkerTransfer.GitHub.Infrastructure.Loeschung;
 /// Mail anstoßen" und „darf alles über einen Menschen löschen" dürfen nicht
 /// dasselbe Papier sein (ADR-0027 §4.4). Leer heißt zu.
 /// </remarks>
-public sealed class Loescheinstellungen
+public sealed class ErasureSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Erasure";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Erasure";
 
     /// <summary>Das gemeinsame Geheimnis.</summary>
     public string Geheimnis { get; set; } = string.Empty;

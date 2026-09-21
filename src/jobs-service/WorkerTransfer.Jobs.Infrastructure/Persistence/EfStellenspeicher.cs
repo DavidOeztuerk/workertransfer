@@ -1,70 +1,70 @@
 using System.Text.Json;
 using Noelia.Core.Identity;
 using Microsoft.EntityFrameworkCore;
-using WorkerTransfer.Jobs.Domain.Stellen;
+using WorkerTransfer.Jobs.Domain.Jobs;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Jobs.Infrastructure.Persistence;
 
 /// <summary>Liest und schreibt <c>jobs</c>.</summary>
-public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
+public sealed class EfJobStore(JobsDbContext context) : IJobStore
 {
     /// <inheritdoc />
-    public async Task<Stelle?> HoleAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<Job?> GetAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var zeile = await kontext.Stellen
+        var row = await context.Jobs
             .FirstOrDefaultAsync(kandidat => kandidat.Id == id, cancellationToken);
 
-        return zeile is null ? null : ZumAggregat(zeile);
+        return row is null ? null : ZumAggregat(row);
     }
 
     /// <inheritdoc />
-    public async Task SichereAsync(Stelle stelle, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(Job job, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(stelle);
+        ArgumentNullException.ThrowIfNull(job);
 
-        var vorhanden = await kontext.Stellen
+        var vorhanden = await context.Jobs
             .AsTracking()
-            .FirstOrDefaultAsync(kandidat => kandidat.Id == stelle.Id, cancellationToken);
+            .FirstOrDefaultAsync(kandidat => kandidat.Id == job.Id, cancellationToken);
 
         if (vorhanden is null)
         {
-            kontext.Stellen.Add(ZurZeile(stelle));
+            context.Jobs.Add(ZurZeile(job));
             return;
         }
 
-        Uebertrage(stelle, vorhanden);
+        Uebertrage(job, vorhanden);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Stelle>> FuerFirmaAsync(
-        TenantId firma, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Job>> ForCompanyAsync(
+        TenantId company, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.Stellen
-            .Where(kandidat => kandidat.TenantId == firma.Value)
+        var rows = await context.Jobs
+            .Where(kandidat => kandidat.TenantId == company.Value)
             .OrderByDescending(kandidat => kandidat.UpdatedAt)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZumAggregat)];
+        return [.. rows.Select(ZumAggregat)];
     }
 
     /// <inheritdoc />
-    public async Task<Stellenseite> SucheAsync(
-        int seite,
-        int anzahl,
-        IReadOnlyList<string>? faehigkeiten,
+    public async Task<JobPage> SearchAsync(
+        int page,
+        int count,
+        IReadOnlyList<string>? skills,
         string ort,
         Remotegrad? remote,
         string suchbegriff = "",
-        Guid? firma = null,
+        Guid? company = null,
         string beschaeftigung = "",
         Umkreis? umkreis = null,
         CancellationToken cancellationToken = default)
     {
-        // Der Stand wird HIER gefiltert und nie vom Aufrufer: ein
+        // Der State wird HIER gefiltert und nie vom Aufrufer: ein
         // `status=draft` auf der Leitung wäre ein Weg, fremde Entwürfe zu
         // lesen.
-        var abfrage = kontext.Stellen.Where(kandidat => kandidat.Status == "published");
+        var abfrage = context.Jobs.Where(kandidat => kandidat.Status == "published");
 
         if (!string.IsNullOrWhiteSpace(ort))
         {
@@ -73,7 +73,7 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
 
         if (remote is { } grad)
         {
-            var gesucht = Stand(grad);
+            var gesucht = State(grad);
             abfrage = abfrage.Where(kandidat => kandidat.RemoteMode == gesucht);
         }
 
@@ -81,9 +81,9 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
         // `/careers/<kuerzel>` die Anzeigen ALLER Unternehmen unter dem Namen
         // eines einzigen — die Oberflaeche schickte `company` seit jeher, und
         // dieser Dienst hat ihn nie gelesen.
-        if (firma is { } mandant)
+        if (company is { } tenant)
         {
-            abfrage = abfrage.Where(kandidat => kandidat.TenantId == mandant);
+            abfrage = abfrage.Where(kandidat => kandidat.TenantId == tenant);
         }
 
         if (!string.IsNullOrWhiteSpace(beschaeftigung))
@@ -113,13 +113,13 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
 
         // ZWEI FILTER ZWINGEN ZUM VOLLEN DURCHGANG, und das ist kein Versehen.
         //
-        // Fähigkeiten: gefiltert wird im Speicher, weil der Wortschatz im Code
+        // Fähigkeiten: gefiltert wird im Speicher, weil der Vocabulary im Code
         // steht — „Postgres" in der Anfrage muss „PostgreSQL" in der Anzeige
         // treffen, und diese Regel gibt es in SQL nicht (ADR-0023).
         //
         // Entfernung: aus demselben Grund. Die Anzeige speichert einen
         // ORTSNAMEN, keine Koordinaten, und die Tabelle, die daraus einen Punkt
-        // macht, steht im Code (`Ortskunde`). Zwei Spalten `latitude`/`longitude`
+        // macht, steht im Code (`PlaceLookup`). Zwei Spalten `latitude`/`longitude`
         // wären schneller und HÄTTEN EINEN FEHLER, den es hier nicht gibt: ein
         // Ort, der der Tabelle heute fehlt und morgen ergänzt wird, wirkt sofort
         // — mit Spalten bräuchte jede Anzeige eine Nachwanderung, und wer sie
@@ -134,17 +134,17 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
         // Würde es teuer, gehörten die kanonische Fähigkeit und der Punkt in
         // eigene Spalten — samt Nachwanderung, und nicht die Regel in SQL
         // nachgebaut.
-        if (faehigkeiten is { Count: > 0 } || umkreis is not null)
+        if (skills is { Count: > 0 } || umkreis is not null)
         {
             var alle = await sortiert.ToListAsync(cancellationToken);
-            IEnumerable<Stelle> passend = alle.Select(ZumAggregat);
+            IEnumerable<Job> passend = alle.Select(ZumAggregat);
 
-            if (faehigkeiten is { Count: > 0 })
+            if (skills is { Count: > 0 })
             {
-                var gesucht = Faehigkeitenliste.Aus(faehigkeiten).Werte;
+                var gesucht = SkillList.Aus(skills).Werte;
 
-                passend = passend.Where(stelle => gesucht.All(einzeln =>
-                    stelle.Faehigkeiten.Werte.Contains(einzeln, StringComparer.OrdinalIgnoreCase)));
+                passend = passend.Where(job => gesucht.All(einzeln =>
+                    job.Faehigkeiten.Werte.Contains(einzeln, StringComparer.OrdinalIgnoreCase)));
             }
 
             var ohneOrt = 0;
@@ -152,141 +152,141 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
             if (umkreis is { } kreis)
             {
                 var mitte = new Ortspunkt(kreis.Breite, kreis.Laenge);
-                var drin = new List<Stelle>();
+                var drin = new List<Job>();
 
-                foreach (var stelle in passend)
+                foreach (var job in passend)
                 {
-                    // Voll remote ist IMMER dabei. Von wo aus so eine Stelle
+                    // Voll remote ist IMMER dabei. Von wo aus so eine Job
                     // erreichbar ist, ist keine Frage der Entfernung — und sie
                     // wegen eines Ortsfilters zu verstecken träfe genau die
                     // Anzeigen, die für jemanden ausserhalb der Ballungsräume
                     // die interessantesten sind.
-                    if (stelle.Remote is Remotegrad.Full)
+                    if (job.Remote is Remotegrad.Full)
                     {
-                        drin.Add(stelle);
+                        drin.Add(job);
                         continue;
                     }
 
                     // Die Postleitzahl ZUERST — sie ist eindeutig, der
                     // Ortsname muss es nicht sein.
-                    var punkt = Ortskunde.Finde(stelle.Postleitzahl, stelle.Ort);
+                    var punkt = PlaceLookup.Find(job.Postleitzahl, job.Ort);
 
                     // Unbekannter Ort heisst NICHT „weit weg", sondern „darüber
                     // wissen wir nichts". Der Unterschied wird gezählt und
                     // hinausgereicht, statt ihn verschwinden zu lassen.
-                    if (punkt is not { } ziel)
+                    if (punkt is not { } target)
                     {
                         ohneOrt++;
                         continue;
                     }
 
-                    if (Ortskunde.EntfernungKm(mitte, ziel) <= kreis.RadiusKm)
+                    if (PlaceLookup.EntfernungKm(mitte, target) <= kreis.RadiusKm)
                     {
-                        drin.Add(stelle);
+                        drin.Add(job);
                     }
                 }
 
                 passend = drin;
             }
 
-            var liste = passend as List<Stelle> ?? [.. passend];
+            var list = passend as List<Job> ?? [.. passend];
 
-            return new Stellenseite(
-                [.. liste.Skip((seite - 1) * anzahl).Take(anzahl)],
-                liste.Count,
+            return new JobPage(
+                [.. list.Skip((page - 1) * count).Take(count)],
+                list.Count,
                 ohneOrt);
         }
 
         // Ohne diese beiden zählt und schneidet die Datenbank.
         var gesamt = await sortiert.CountAsync(cancellationToken);
 
-        var zeilen = await sortiert
-            .Skip((seite - 1) * anzahl)
-            .Take(anzahl)
+        var rows = await sortiert
+            .Skip((page - 1) * count)
+            .Take(count)
             .ToListAsync(cancellationToken);
 
-        return new Stellenseite([.. zeilen.Select(ZumAggregat)], gesamt);
+        return new JobPage([.. rows.Select(ZumAggregat)], gesamt);
     }
 
     /// <inheritdoc />
-    public async Task<int> ZieheZurueckAsync(
-        TenantId firma, DateTimeOffset jetzt, CancellationToken cancellationToken = default)
+    public async Task<int> WithdrawAsync(
+        TenantId company, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
-        var offene = await kontext.Stellen
+        var offene = await context.Jobs
             .AsTracking()
-            .Where(kandidat => kandidat.TenantId == firma.Value && kandidat.Status != "closed")
+            .Where(kandidat => kandidat.TenantId == company.Value && kandidat.Status != "closed")
             .ToListAsync(cancellationToken);
 
-        foreach (var zeile in offene)
+        foreach (var row in offene)
         {
-            zeile.Status = "closed";
-            zeile.UpdatedAt = jetzt.UtcDateTime;
+            row.Status = "closed";
+            row.UpdatedAt = now.UtcDateTime;
         }
 
         return offene.Count;
     }
 
-    private static Stelle ZumAggregat(StellenZeile zeile) => Stelle.Stelle_her(
-        zeile.Id,
-        new TenantId(zeile.TenantId),
-        zeile.Title,
-        zeile.Description,
-        zeile.Location,
-        zeile.PostalCode,
-        Grad(zeile.RemoteMode),
-        Anstellung(zeile.EmploymentType),
-        Faehigkeitenliste.Stelle_her(JsonSerializer.Deserialize<List<string>>(zeile.Skills) ?? []),
-        Stand(zeile.Status),
-        new DateTimeOffset(zeile.CreatedAt, TimeSpan.Zero),
-        new DateTimeOffset(zeile.UpdatedAt, TimeSpan.Zero),
-        zeile.PublishedAt is { } am ? new DateTimeOffset(am, TimeSpan.Zero) : null);
+    private static Job ZumAggregat(JobRow row) => Job.Stelle_her(
+        row.Id,
+        new TenantId(row.TenantId),
+        row.Title,
+        row.Description,
+        row.Location,
+        row.PostalCode,
+        Grad(row.RemoteMode),
+        Anstellung(row.EmploymentType),
+        SkillList.Stelle_her(JsonSerializer.Deserialize<List<string>>(row.Skills) ?? []),
+        State(row.Status),
+        new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
+        new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero),
+        row.PublishedAt is { } am ? new DateTimeOffset(am, TimeSpan.Zero) : null);
 
-    private static StellenZeile ZurZeile(Stelle stelle)
+    private static JobRow ZurZeile(Job job)
     {
-        var zeile = new StellenZeile
+        var row = new JobRow
         {
-            Id = stelle.Id,
-            TenantId = stelle.Firma.Value,
-            CreatedAt = stelle.AngelegtAm.UtcDateTime
+            Id = job.Id,
+            TenantId = job.Firma.Value,
+            CreatedAt = job.AngelegtAm.UtcDateTime
         };
 
-        Uebertrage(stelle, zeile);
+        Uebertrage(job, row);
 
-        return zeile;
+        return row;
     }
 
-    private static void Uebertrage(Stelle stelle, StellenZeile zeile)
+    private static void Uebertrage(Job job, JobRow row)
     {
-        zeile.Title = stelle.Titel;
-        zeile.Description = stelle.Beschreibung;
-        zeile.Location = stelle.Ort;
-        zeile.PostalCode = stelle.Postleitzahl;
-        zeile.RemoteMode = Stand(stelle.Remote);
-        zeile.EmploymentType = Stand(stelle.Art);
-        zeile.Skills = JsonSerializer.Serialize(stelle.Faehigkeiten.Werte);
-        zeile.Status = Stand(stelle.Stand);
-        zeile.UpdatedAt = stelle.GeaendertAm.UtcDateTime;
-        zeile.PublishedAt = stelle.VeroeffentlichtAm?.UtcDateTime;
+        row.Title = job.Titel;
+        row.Description = job.Beschreibung;
+        row.Location = job.Ort;
+        row.PostalCode = job.Postleitzahl;
+        row.RemoteMode = State(job.Remote);
+        row.EmploymentType = State(job.Art);
+        row.Skills = JsonSerializer.Serialize(job.Faehigkeiten.Werte);
+        row.Status = State(job.State);
+        row.UpdatedAt = job.GeaendertAm.UtcDateTime;
+        row.PublishedAt = job.VeroeffentlichtAm?.UtcDateTime;
     }
 
-    private static string Stand(Stellenstand stand) => stand switch
+    private static string State(JobState state) => state switch
     {
-        Stellenstand.Draft => "draft",
-        Stellenstand.Published => "published",
-        Stellenstand.Closed => "closed",
-        _ => throw new ArgumentOutOfRangeException(nameof(stand), stand, "Unbekannter Stand.")
+        JobState.Draft => "draft",
+        JobState.Published => "published",
+        JobState.Closed => "closed",
+        _ => throw new ArgumentOutOfRangeException(nameof(state), state, "Unbekannter Stand.")
     };
 
-    private static Stellenstand Stand(string gespeichert) => gespeichert switch
+    private static JobState State(string gespeichert) => gespeichert switch
     {
-        "draft" => Stellenstand.Draft,
-        "published" => Stellenstand.Published,
-        "closed" => Stellenstand.Closed,
+        "draft" => JobState.Draft,
+        "published" => JobState.Published,
+        "closed" => JobState.Closed,
         _ => throw new ArgumentOutOfRangeException(
             nameof(gespeichert), gespeichert, "Unbekannter Stand.")
     };
 
-    private static string Stand(Remotegrad grad) => grad switch
+    private static string State(Remotegrad grad) => grad switch
     {
         Remotegrad.None => "none",
         Remotegrad.Hybrid => "hybrid",
@@ -303,21 +303,21 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
             nameof(gespeichert), gespeichert, "Unbekannter Grad.")
     };
 
-    private static string Stand(Anstellungsart art) => art switch
+    private static string State(EmploymentKind kind) => kind switch
     {
-        Anstellungsart.FullTime => "full_time",
-        Anstellungsart.PartTime => "part_time",
-        Anstellungsart.Contract => "contract",
-        Anstellungsart.Internship => "internship",
-        _ => throw new ArgumentOutOfRangeException(nameof(art), art, "Unbekannte Art.")
+        EmploymentKind.FullTime => "full_time",
+        EmploymentKind.PartTime => "part_time",
+        EmploymentKind.Contract => "contract",
+        EmploymentKind.Internship => "internship",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unbekannte Art.")
     };
 
-    private static Anstellungsart Anstellung(string gespeichert) => gespeichert switch
+    private static EmploymentKind Anstellung(string gespeichert) => gespeichert switch
     {
-        "full_time" => Anstellungsart.FullTime,
-        "part_time" => Anstellungsart.PartTime,
-        "contract" => Anstellungsart.Contract,
-        "internship" => Anstellungsart.Internship,
+        "full_time" => EmploymentKind.FullTime,
+        "part_time" => EmploymentKind.PartTime,
+        "contract" => EmploymentKind.Contract,
+        "internship" => EmploymentKind.Internship,
         _ => throw new ArgumentOutOfRangeException(
             nameof(gespeichert), gespeichert, "Unbekannte Art.")
     };
@@ -329,14 +329,14 @@ public sealed class EfStellenspeicher(JobsDbContext kontext) : IStellenspeicher
 /// sonst je nach Laune der Datenbank eine andere Reihenfolge, und eine Seite
 /// überspränge eine.
 /// </remarks>
-internal sealed record Zeiger(DateTime Am, Guid Id)
+internal sealed record Cursor(DateTime Am, Guid Id)
 {
     public override string ToString() =>
         Convert.ToBase64String(
             System.Text.Encoding.UTF8.GetBytes($"{Am:O}|{Id}"))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-    public static Zeiger? Lies(string? text)
+    public static Cursor? Lies(string? text)
     {
         if (string.IsNullOrEmpty(text))
         {
@@ -356,12 +356,12 @@ internal sealed record Zeiger(DateTime Am, Guid Id)
                    && DateTime.TryParse(
                        teile[0], null, System.Globalization.DateTimeStyles.RoundtripKind, out var am)
                    && Guid.TryParse(teile[1], out var id)
-                ? new Zeiger(am, id)
+                ? new Cursor(am, id)
                 : null;
         }
         catch (FormatException)
         {
-            // Ein unleserlicher Zeiger ist kein Fehler des Aufrufers, den man
+            // Ein unleserlicher Cursor ist kein Fehler des Aufrufers, den man
             // ihm um die Ohren hauen müsste: er bekommt die erste Seite.
             return null;
         }

@@ -29,15 +29,15 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:github", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IGitHub>(_ => _github));
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor, Probeledger>());
+                services.Replace(ServiceDescriptor.Scoped<IGitHub>(_ => _github));
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate, Probeledger>());
             });
         });
 
@@ -64,15 +64,15 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
         await Verbinde(anna, "anna-dev");
 
-        var antwort = await Loesche(anna);
+        var response = await Loesche(anna);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var quittung = JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+        var quittung = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
         quittung.GetProperty("retained").GetInt32().Should().Be(0);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Verbindungen.AnyAsync(zeile => zeile.Id == anna)).Should().BeFalse();
+        await using var context = postgres.Kontext();
+        (await context.Connections.AnyAsync(row => row.Id == anna)).Should().BeFalse();
     }
 
     /// <summary>Die Löschung eines Menschen fasst niemand anderen an.</summary>
@@ -86,8 +86,8 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
 
         await Loesche(anna);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Verbindungen.AnyAsync(zeile => zeile.Id == bea)).Should().BeTrue();
+        await using var context = postgres.Kontext();
+        (await context.Connections.AnyAsync(row => row.Id == bea)).Should().BeTrue();
     }
 
     /// <summary>Ohne das Geheimnis passiert nichts.</summary>
@@ -100,12 +100,12 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", "geraten");
 
-        var antwort = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
+        var response = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Verbindungen.AnyAsync(zeile => zeile.Id == anna)).Should().BeTrue();
+        await using var context = postgres.Kontext();
+        (await context.Connections.AnyAsync(row => row.Id == anna)).Should().BeTrue();
     }
 
     /// <summary>Ein zweiter Aufruf ist kein Fehlschlag.</summary>
@@ -118,18 +118,18 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         (await Loesche(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    private Task<HttpResponseMessage> Loesche(Guid wer)
+    private Task<HttpResponseMessage> Loesche(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", Loeschgeheimnis);
-        return browser.PostAsJsonAsync("/erasure", new { user_id = wer });
+        return browser.PostAsJsonAsync("/erasure", new { user_id = subject });
     }
 
-    private Task<HttpResponseMessage> Verbinde(Guid wer, string login)
+    private Task<HttpResponseMessage> Verbinde(Guid subject, string login)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Person(wer));
+            new AuthenticationHeaderValue("Bearer", Tokenform.Person(subject));
 
         return browser.PostAsJsonAsync("/github/me", new { login });
     }

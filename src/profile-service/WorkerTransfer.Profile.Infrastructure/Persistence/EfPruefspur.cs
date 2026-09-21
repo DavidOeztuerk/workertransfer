@@ -10,25 +10,25 @@ namespace WorkerTransfer.Profile.Infrastructure.Persistence;
 /// die Spur nicht haben darf: der Eintrag schließt mit der Änderung ab, die er
 /// festhält, oder er hält nichts fest.
 /// </remarks>
-public sealed class EfPruefspur(ProfileDbContext context) : IPruefspur
+public sealed class EfAuditTrail(ProfileDbContext context) : IAuditTrail
 {
     /// <inheritdoc />
-    public Task HaengeAnAsync(Pruefeintrag eintrag, CancellationToken cancellationToken = default)
+    public Task AppendOneAsync(AuditEntry entry, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(eintrag);
+        ArgumentNullException.ThrowIfNull(entry);
 
-        context.Pruefeintraege.Add(new Pruefzeile
+        context.Pruefeintraege.Add(new AuditRow
         {
             // Zeitgeordnet: die Spur wird nach Zeit gelesen, und eine
             // Zufallskennung streute die Einfügungen über den ganzen Index.
             Id = Guid.CreateVersion7(),
-            AkteurId = eintrag.Akteur?.Value,
-            FirmaId = eintrag.Firma?.Value,
-            Handlung = eintrag.Handlung,
-            BetroffenId = eintrag.Betroffen?.Value,
-            Korrelation = eintrag.Korrelation,
-            GeschehenAm = eintrag.GeschehenAm,
-            Daten = JsonSerializer.Serialize(eintrag.Daten)
+            AkteurId = entry.Akteur?.Value,
+            FirmaId = entry.Firma?.Value,
+            Handlung = entry.Handlung,
+            BetroffenId = entry.Betroffen?.Value,
+            Korrelation = entry.Korrelation,
+            GeschehenAm = entry.GeschehenAm,
+            Daten = JsonSerializer.Serialize(entry.Daten)
         });
 
         return Task.CompletedTask;

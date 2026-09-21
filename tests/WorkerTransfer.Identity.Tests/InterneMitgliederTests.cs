@@ -35,18 +35,18 @@ public class InterneMitgliederTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
             host.UseSetting("Notify:Geheimnis", Meldegeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Singleton<IVersender>(_post)));
         });
 
-        using var bereich = _dienst.Services.CreateScope();
-        await bereich.ServiceProvider.GetRequiredService<IdentityDbContext>()
+        using var scope = _dienst.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IdentityDbContext>()
             .Database.MigrateAsync();
     }
 
@@ -59,18 +59,18 @@ public class InterneMitgliederTests(Postgres postgres) : IAsyncLifetime
     private HttpClient Browser() =>
         _dienst.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     private async Task<(Guid Firma, Guid Wer)> FirmaMitMitglied()
     {
         var domain = $"firma-{Guid.NewGuid():N}.example";
-        var adresse = $"anna-{Guid.NewGuid():N}@{domain}";
+        var address = $"anna-{Guid.NewGuid():N}@{domain}";
         var browser = Browser();
 
         await browser.PostAsJsonAsync("/auth/register", new
         {
-            email = adresse,
+            email = address,
             password = Passwort,
             display_name = "Anna",
             company_name = "Beispiel GmbH"
@@ -79,7 +79,7 @@ public class InterneMitgliederTests(Postgres postgres) : IAsyncLifetime
         var token = Regex.Match(
             _post.Post[^1].Text, @"token=([A-Za-z0-9_\-]+)").Groups[1].Value;
         await browser.PostAsJsonAsync("/auth/verify-email", new { token });
-        await browser.PostAsJsonAsync("/auth/login", new { email = adresse, password = Passwort });
+        await browser.PostAsJsonAsync("/auth/login", new { email = address, password = Passwort });
 
         var ich = await Json(await browser.GetAsync("/me"));
         var meine = await Json(await browser.GetAsync("/me/companies"));
@@ -88,10 +88,10 @@ public class InterneMitgliederTests(Postgres postgres) : IAsyncLifetime
             Guid.Parse(ich.GetProperty("user_id").GetString()!));
     }
 
-    private HttpClient MitGeheimnis(string geheimnis = Meldegeheimnis)
+    private HttpClient MitGeheimnis(string secret = Meldegeheimnis)
     {
         var browser = Browser();
-        browser.DefaultRequestHeaders.Add("X-Notify-Secret", geheimnis);
+        browser.DefaultRequestHeaders.Add("X-Notify-Secret", secret);
         return browser;
     }
 
@@ -99,23 +99,23 @@ public class InterneMitgliederTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_Geheimnis_ist_es_404()
     {
-        var (firma, _) = await FirmaMitMitglied();
+        var (company, _) = await FirmaMitMitglied();
 
-        var antwort = await Browser().GetAsync($"/internal/companies/{firma}/members");
+        var response = await Browser().GetAsync($"/internal/companies/{company}/members");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>Ein geratenes Geheimnis hebt die Tür nicht.</summary>
     [Fact]
     public async Task Ein_geratenes_Geheimnis_ist_404()
     {
-        var (firma, _) = await FirmaMitMitglied();
+        var (company, _) = await FirmaMitMitglied();
 
-        var antwort = await MitGeheimnis("geraten")
-            .GetAsync($"/internal/companies/{firma}/members");
+        var response = await MitGeheimnis("geraten")
+            .GetAsync($"/internal/companies/{company}/members");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>
@@ -125,21 +125,21 @@ public class InterneMitgliederTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Mit_Geheimnis_kommen_die_Mitglieder_als_snake_case()
     {
-        var (firma, wer) = await FirmaMitMitglied();
+        var (company, subject) = await FirmaMitMitglied();
 
-        var antwort = await MitGeheimnis().GetAsync($"/internal/companies/{firma}/members");
+        var response = await MitGeheimnis().GetAsync($"/internal/companies/{company}/members");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var rumpf = await antwort.Content.ReadAsStringAsync();
-        rumpf.Should().Contain("subject_id");
-        rumpf.Should().NotContain("subjectId");
-        rumpf.Should().NotContain("display_name");
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("subject_id");
+        body.Should().NotContain("subjectId");
+        body.Should().NotContain("display_name");
 
-        var gelesen = await Json(antwort);
-        var mitglieder = gelesen.GetProperty("mitglieder");
-        mitglieder.GetArrayLength().Should().Be(1);
-        mitglieder[0].GetProperty("subject_id").GetGuid().Should().Be(wer);
+        var gelesen = await Json(response);
+        var members = gelesen.GetProperty("mitglieder");
+        members.GetArrayLength().Should().Be(1);
+        members[0].GetProperty("subject_id").GetGuid().Should().Be(subject);
     }
 
     /// <summary>
@@ -149,10 +149,10 @@ public class InterneMitgliederTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_unbekannte_Firma_ist_eine_leere_Liste()
     {
-        var antwort = await MitGeheimnis()
+        var response = await MitGeheimnis()
             .GetAsync($"/internal/companies/{Guid.CreateVersion7()}/members");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(antwort)).GetProperty("mitglieder").GetArrayLength().Should().Be(0);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(response)).GetProperty("mitglieder").GetArrayLength().Should().Be(0);
     }
 }

@@ -31,14 +31,14 @@ namespace WorkerTransfer.Identity.Application.Anmelden;
 /// das, was auf der Leitung stand, wird umbenannt — sonst nennt die Antwort ein
 /// Feld, das der Aufrufer nie geschickt hat.</para>
 ///
-/// <para>Keine Prüfung auf E-Mail-<em>Form</em>: ob die Adresse existiert,
+/// <para>None Prüfung auf E-Mail-<em>Form</em>: ob die Adresse existiert,
 /// entscheidet der Versand, und eine Formprüfung, die 422 statt 401 gibt,
 /// verriete, dass die Anmeldung überhaupt so weit gekommen ist.</para>
 /// </remarks>
-public sealed class AnmeldenPruefung : AbstractValidator<AnmeldenBefehl>
+public sealed class SignInValidator : AbstractValidator<AnmeldenBefehl>
 {
     /// <summary>Setzt die zwei Regeln.</summary>
-    public AnmeldenPruefung()
+    public SignInValidator()
     {
         RuleFor(befehl => befehl.Email)
             .NotEmpty().WithMessage("email is required");

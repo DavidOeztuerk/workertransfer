@@ -22,7 +22,7 @@ namespace WorkerTransfer.Identity.Tests;
 /// visible. Inside the transaction it would not be, so a mail sent too early is
 /// caught here rather than in a comment.
 /// </remarks>
-public sealed class MitschreibenderVersender(string verbindung) : IVersender
+public sealed class MitschreibenderVersender(string connection) : IVersender
 {
     private readonly List<AusgehendePost> _post = [];
 
@@ -36,7 +36,7 @@ public sealed class MitschreibenderVersender(string verbindung) : IVersender
     {
         ArgumentNullException.ThrowIfNull(post);
 
-        await using var eigene = new NpgsqlConnection(verbindung);
+        await using var eigene = new NpgsqlConnection(connection);
         await eigene.OpenAsync(cancellationToken);
         await using var befehl = eigene.CreateCommand();
         befehl.CommandText = "SELECT count(*) FROM users WHERE id = @wer";
@@ -66,17 +66,17 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
-                dienste.Replace(ServiceDescriptor.Singleton<IVersender>(_versand)));
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Singleton<IVersender>(_versand)));
         });
 
-        using var bereich = _dienst.Services.CreateScope();
-        await bereich.ServiceProvider.GetRequiredService<IdentityDbContext>()
+        using var scope = _dienst.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IdentityDbContext>()
             .Database.MigrateAsync();
     }
 
@@ -93,13 +93,13 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
         $"{vorname}-{Guid.NewGuid():N}@firma-{Guid.NewGuid():N}.example";
 
     private Task<HttpResponseMessage> Registriere(
-        string email, string? firma = null, string passwort = Passwort) =>
+        string email, string? company = null, string passwort = Passwort) =>
         Browser().PostAsJsonAsync("/auth/register", new
         {
             email,
             password = passwort,
             display_name = "Anna",
-            company_name = firma
+            company_name = company
         });
 
     private Task<HttpResponseMessage> Bestaetige(string token) =>
@@ -202,10 +202,10 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var vorher = _versand.Post.Count;
 
-        var antwort = await Browser().PostAsJsonAsync(
+        var response = await Browser().PostAsJsonAsync(
             "/auth/resend-verification", new { email = NeueAdresse("niemand") });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
         _versand.Post.Should().HaveCount(vorher);
     }
 
@@ -228,9 +228,9 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_zu_kurzes_Passwort_wird_abgewiesen()
     {
-        var antwort = await Registriere(NeueAdresse("greta"), passwort: "kurz");
+        var response = await Registriere(NeueAdresse("greta"), passwort: "kurz");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     /// <summary>Eine Adresse, die keine ist, legt kein Konto an.</summary>
@@ -242,13 +242,13 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_Adresse_die_keine_ist_legt_kein_Konto_an()
     {
-        var antwort = await Registriere("bus");
+        var response = await Registriere("bus");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        await using var verbindung = new NpgsqlConnection(postgres.ConnectionString);
-        await verbindung.OpenAsync();
-        await using var befehl = verbindung.CreateCommand();
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await connection.OpenAsync();
+        await using var befehl = connection.CreateCommand();
         befehl.CommandText = "SELECT count(*) FROM users WHERE email = @email";
         befehl.Parameters.AddWithValue("email", "bus");
 
@@ -259,10 +259,10 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_erneutes_Senden_an_eine_kaputte_Adresse_wird_abgewiesen()
     {
-        var antwort = await _dienst.CreateClient().PostAsJsonAsync(
+        var response = await _dienst.CreateClient().PostAsJsonAsync(
             "/auth/resend-verification", new { email = "bus" });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     [Fact]
@@ -270,12 +270,12 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var email = NeueAdresse("chefin");
 
-        await Registriere(email, firma: "Beispiel GmbH");
+        await Registriere(email, company: "Beispiel GmbH");
 
-        await using (var verbindung = new NpgsqlConnection(postgres.ConnectionString))
+        await using (var connection = new NpgsqlConnection(postgres.ConnectionString))
         {
-            await verbindung.OpenAsync();
-            await using var befehl = verbindung.CreateCommand();
+            await connection.OpenAsync();
+            await using var befehl = connection.CreateCommand();
             befehl.CommandText = "SELECT count(*) FROM tenants WHERE domain = @domain";
             befehl.Parameters.AddWithValue("domain", email.Split('@')[1]);
             ((long)(await befehl.ExecuteScalarAsync())!).Should().Be(
@@ -299,14 +299,14 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
         var erste = $"chefin-{Guid.NewGuid():N}@{domain}";
         var zweite = $"kollege-{Guid.NewGuid():N}@{domain}";
 
-        await Registriere(erste, firma: "Beispiel GmbH");
+        await Registriere(erste, company: "Beispiel GmbH");
         await Bestaetige(LetzterLink());
 
-        await Registriere(zweite, firma: "Zweite GmbH");
-        var antwort = await Bestaetige(LetzterLink());
+        await Registriere(zweite, company: "Zweite GmbH");
+        var response = await Bestaetige(LetzterLink());
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-        var koerper = await antwort.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var koerper = await response.Content.ReadAsStringAsync();
         koerper.Should().Contain("domain_already_claimed");
         koerper.Should().NotContain("Zweite GmbH");
 
@@ -317,10 +317,10 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_Freemail_Adresse_kann_kein_Unternehmen_beanspruchen()
     {
-        var antwort = await Registriere(
-            $"chefin-{Guid.NewGuid():N}@gmail.com", firma: "Beispiel GmbH");
+        var response = await Registriere(
+            $"chefin-{Guid.NewGuid():N}@gmail.com", company: "Beispiel GmbH");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     /// <summary>
@@ -330,8 +330,8 @@ public class RegistrierungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Als_Privatperson_ist_eine_Freemail_Adresse_willkommen()
     {
-        var antwort = await Registriere($"anna-{Guid.NewGuid():N}@gmail.com");
+        var response = await Registriere($"anna-{Guid.NewGuid():N}@gmail.com");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
     }
 }

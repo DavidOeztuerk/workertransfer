@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.GitHub.Application.Ports;
-using WorkerTransfer.GitHub.Domain.Verbindungen;
+using WorkerTransfer.GitHub.Domain.Connections;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.GitHub.Tests;
@@ -30,16 +30,16 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:github", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IGitHub>(_ => _github));
-                dienste.Replace(ServiceDescriptor.Scoped<IGitHubAnmeldung>(_ => _anmeldung));
-                dienste.Replace(ServiceDescriptor.Scoped<IEinwilligungstor>(_ => _ledger));
+                services.Replace(ServiceDescriptor.Scoped<IGitHub>(_ => _github));
+                services.Replace(ServiceDescriptor.Scoped<IGitHubSignIn>(_ => _anmeldung));
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _ledger));
             });
         });
 
@@ -52,30 +52,30 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsPerson(Guid wer)
+    private HttpClient AlsPerson(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Person(wer));
+            new AuthenticationHeaderValue("Bearer", Tokenform.Person(subject));
         return browser;
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
     /// <summary>Der <c>state</c> aus der Anmeldeadresse.</summary>
-    private static string Zustand(string adresse) =>
-        System.Web.HttpUtility.ParseQueryString(new Uri(adresse).Query)["state"]!;
+    private static string Zustand(string address) =>
+        System.Web.HttpUtility.ParseQueryString(new Uri(address).Query)["state"]!;
 
     private static Task<HttpResponseMessage> Verbinde(HttpClient browser, string login) =>
         browser.PostAsJsonAsync("/github/me", new { login });
 
     private static Repository Repo(
-        string name, string? sprache = "Go", int sterne = 0, int tageAlt = 0) =>
-        new(name, $"Ein Repository namens {name}", sprache, sterne,
+        string name, string? language = "Go", int sterne = 0, int tageAlt = 0) =>
+        new(name, $"Ein Repository namens {name}", language, sterne,
             $"https://github.com/anna/{name}",
             DateTimeOffset.UnixEpoch.AddDays(1000 - tageAlt),
-            sprache is null ? [] : [sprache], ["verteilte-systeme"]);
+            language is null ? [] : [language], ["verteilte-systeme"]);
 
     /// <summary>Wer ein Konto GENANNT hat, muss dasselbe nachweisen.</summary>
     /// <remarks>
@@ -89,11 +89,11 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         var ihr = AlsPerson(Guid.CreateVersion7());
 
         var offen = await Json(await Verbinde(ihr, "anna-dev"));
-        var zustand = offen.GetProperty("challenge_description").GetString()!
+        var state = offen.GetProperty("challenge_description").GetString()!
             .Replace("workertransfer-verify-", string.Empty, StringComparison.Ordinal);
 
         var beginn = await Json(await ihr.PostAsync("/github/me/oauth/start", null));
-        beginn.GetProperty("url").GetString().Should().Contain(zustand);
+        beginn.GetProperty("url").GetString().Should().Contain(state);
 
         // Was der Browser bei GitHub täte, ist hier ein Code, der auf den
         // Anmeldenamen führt.
@@ -101,7 +101,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         _github.Repos["anna-dev"] = [Repo("werkzeug")];
 
         var fertig = await Json(await ihr.PostAsJsonAsync(
-            "/github/me/oauth/finish", new { code = "ein-code", state = zustand }));
+            "/github/me/oauth/finish", new { code = "ein-code", state = state }));
 
         fertig.GetProperty("verified").GetBoolean().Should().BeTrue();
         fertig.GetProperty("challenge_description").ValueKind
@@ -123,16 +123,16 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         var ihr = AlsPerson(Guid.CreateVersion7());
 
         var offen = await Json(await Verbinde(ihr, "torvalds"));
-        var zustand = offen.GetProperty("challenge_description").GetString()!
+        var state = offen.GetProperty("challenge_description").GetString()!
             .Replace("workertransfer-verify-", string.Empty, StringComparison.Ordinal);
 
         _anmeldung.Codes["mein-code"] = "anna-dev";
 
-        var antwort = await ihr.PostAsJsonAsync(
-            "/github/me/oauth/finish", new { code = "mein-code", state = zustand });
+        var response = await ihr.PostAsJsonAsync(
+            "/github/me/oauth/finish", new { code = "mein-code", state = state });
 
-        // 422 und nicht 404: die Anfrage war in Ordnung, der Nachweis fehlte.
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        // 422 und nicht 404: die ResumeRequest war in Ordnung, der Nachweis fehlte.
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
         var danach = await Json(await ihr.GetAsync("/github/me"));
         danach.GetProperty("verified").GetBoolean().Should().BeFalse();
@@ -152,12 +152,12 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         await Verbinde(ihr, "anna-dev");
         _anmeldung.Codes["ein-code"] = "anna-dev";
 
-        var antwort = await ihr.PostAsJsonAsync(
+        var response = await ihr.PostAsJsonAsync(
             "/github/me/oauth/finish",
             new { code = "ein-code", state = "ein-anderer-zustand" });
 
-        // 422 und nicht 404: die Anfrage war in Ordnung, der Nachweis fehlte.
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        // 422 und nicht 404: die ResumeRequest war in Ordnung, der Nachweis fehlte.
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
         var danach = await Json(await ihr.GetAsync("/github/me"));
         danach.GetProperty("verified").GetBoolean().Should().BeFalse();
@@ -184,7 +184,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// wissen, in wessen Gists er sucht — die Anmeldung nicht, denn GitHub
     /// meldet allein das Konto, das zugestimmt hat. Gemessen am 05.09.2026 an
     /// einem echten Konto: der Namensschritt hat niemanden geschützt, sondern
-    /// die Person ausgesperrt, auf deren Verbindung noch ein alter Name stand.
+    /// die Person ausgesperrt, auf deren Connection noch ein alter Name stand.
     /// </remarks>
     [Fact]
     public async Task Ohne_genanntes_Konto_fuehrt_die_Anmeldung_trotzdem_hin()
@@ -195,7 +195,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         beginn.GetProperty("url").GetString().Should().NotBeNullOrEmpty();
 
-        // Und die Verbindung, die dabei entsteht, BEHAUPTET NICHTS: kein
+        // Und die Connection, die dabei entsteht, BEHAUPTET NICHTS: kein
         // Konto, kein Nachweis.
         var danach = await Json(await ihr.GetAsync("/github/me"));
         danach.GetProperty("login").ValueKind.Should().Be(JsonValueKind.Null);
@@ -215,13 +215,13 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         var ihr = AlsPerson(Guid.CreateVersion7());
 
         var beginn = await Json(await ihr.PostAsync("/github/me/oauth/start", null));
-        var zustand = Zustand(beginn.GetProperty("url").GetString()!);
+        var state = Zustand(beginn.GetProperty("url").GetString()!);
 
         _anmeldung.Codes["ein-code"] = "anna-dev";
         _github.Repos["anna-dev"] = [Repo("werkzeug")];
 
         var fertig = await Json(await ihr.PostAsJsonAsync(
-            "/github/me/oauth/finish", new { code = "ein-code", state = zustand }));
+            "/github/me/oauth/finish", new { code = "ein-code", state = state }));
 
         fertig.GetProperty("login").GetString().Should().Be("anna-dev");
         fertig.GetProperty("verified").GetBoolean().Should().BeTrue();
@@ -241,7 +241,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         var gefragt = await Json(await ihr.GetAsync("/github/oauth"));
         gefragt.GetProperty("available").GetBoolean().Should().BeTrue();
 
-        // Ohne Verbindung antwortet `/github/me` mit 200 und JSON-`null` —
+        // Ohne Connection antwortet `/github/me` mit 200 und JSON-`null` —
         // die Frage ist erlaubt, die Antwort lautet „keine".
         (await Json(await ihr.GetAsync("/github/me"))).ValueKind
             .Should().Be(JsonValueKind.Null);
@@ -303,7 +303,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Ohne Gist kein Nachweis — und das ist 422, nicht 404.</summary>
     /// <remarks>
-    /// Die Anfrage war in Ordnung, der Nachweis fehlte.
+    /// Die ResumeRequest war in Ordnung, der Nachweis fehlte.
     /// </remarks>
     [Fact]
     public async Task Ohne_Gist_ist_es_422()
@@ -311,9 +311,9 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         var ihr = AlsPerson(Guid.CreateVersion7());
         await Verbinde(ihr, "anna-dev");
 
-        var versuch = await ihr.PostAsync("/github/me/verify", null);
+        var attempt = await ihr.PostAsync("/github/me/verify", null);
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        attempt.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     /// <summary>
@@ -402,7 +402,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         var namen = (await Json(await ihr.GetAsync("/github/me")))
             .GetProperty("repositories").EnumerateArray()
-            .Select(eintrag => eintrag.GetProperty("name").GetString())
+            .Select(entry => entry.GetProperty("name").GetString())
             .ToList();
 
         namen.Should().Equal("neu-und-still", "alt-und-beliebt");
@@ -426,13 +426,13 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         var namen = (await Json(await ihr.GetAsync("/github/me")))
             .GetProperty("repositories").EnumerateArray()
-            .Select(eintrag => eintrag.GetProperty("name").GetString())
+            .Select(entry => entry.GetProperty("name").GetString())
             .ToList();
 
         namen.Should().Equal("mit-datum", "ohne-datum");
     }
 
-    /// <summary>Die eigene Ansicht zeigt auch die unbewiesene Verbindung.</summary>
+    /// <summary>Die eigene Ansicht zeigt auch die unbewiesene Connection.</summary>
     /// <remarks>
     /// Sonst sähe die Person nach dem ersten Schritt gar nichts und wüsste
     /// nicht, welche Zeichenfolge sie in den Gist schreiben soll.
@@ -454,15 +454,15 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_Verbindung_ist_die_eigene_Ansicht_null()
     {
-        var antwort = await AlsPerson(Guid.CreateVersion7()).GetAsync("/github/me");
+        var response = await AlsPerson(Guid.CreateVersion7()).GetAsync("/github/me");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await antwort.Content.ReadAsStringAsync()).Trim().Should().Be("null");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).Trim().Should().Be("null");
     }
 
     /// <summary>
-    /// Eine unbewiesene Verbindung ist von außen nicht vorhanden — auch mit
-    /// Freigabe.
+    /// Eine unbewiesene Connection ist von außen nicht vorhanden — auch mit
+    /// Release.
     /// </summary>
     /// <remarks>
     /// Sie ist eine Behauptung, und Behauptungen zeigt dieser Dienst nicht.
@@ -479,7 +479,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         fremd.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    /// <summary>Ohne Freigabe sieht ein Fremder nichts — und dasselbe wie bei niemandem.</summary>
+    /// <summary>Ohne Release sieht ein Fremder nichts — und dasselbe wie bei niemandem.</summary>
     [Fact]
     public async Task Ohne_Freigabe_sieht_ein_Fremder_nichts()
     {
@@ -496,7 +496,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
             .Should().Be((await Json(niemand)).GetProperty("detail").GetString());
     }
 
-    /// <summary>Mit Freigabe sieht ein Fremder die Belege — aber nie die Zeichenfolge.</summary>
+    /// <summary>Mit Release sieht ein Fremder die Belege — aber nie die Zeichenfolge.</summary>
     [Fact]
     public async Task Mit_Freigabe_sieht_ein_Fremder_die_Belege()
     {
@@ -509,9 +509,9 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         gesehen.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var rumpf = await Json(gesehen);
-        rumpf.GetProperty("repositories").GetArrayLength().Should().Be(1);
-        rumpf.GetProperty("challenge_description").ValueKind.Should().Be(JsonValueKind.Null);
+        var body = await Json(gesehen);
+        body.GetProperty("repositories").GetArrayLength().Should().Be(1);
+        body.GetProperty("challenge_description").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     /// <summary>Trennen heißt löschen — der Abzug verschwindet mit.</summary>
@@ -527,8 +527,8 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         getrennt.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Verbindungen.AnyAsync(zeile => zeile.Id == anna)).Should().BeFalse();
+        await using var context = postgres.Kontext();
+        (await context.Connections.AnyAsync(row => row.Id == anna)).Should().BeFalse();
     }
 
     /// <summary>
@@ -541,9 +541,9 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         await Verbinde(ihr, "anna-dev");
         _github.Schweigt = true;
 
-        var versuch = await ihr.PostAsync("/github/me/verify", null);
+        var attempt = await ihr.PostAsync("/github/me/verify", null);
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        attempt.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     /// <summary>Schweigt der Ledger, wird weder gezeigt noch geleugnet.</summary>
@@ -554,9 +554,9 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         await Bewiesen(AlsPerson(anna), "anna-dev");
         _ledger.Schweigt = true;
 
-        var versuch = await AlsPerson(Guid.CreateVersion7()).GetAsync($"/github/{anna}");
+        var attempt = await AlsPerson(Guid.CreateVersion7()).GetAsync($"/github/{anna}");
 
-        versuch.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        attempt.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     /// <summary>Ein Benutzername, den GitHub nie vergeben würde, wird abgewiesen.</summary>
@@ -571,9 +571,9 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     [InlineData("anna@dev")]
     public async Task Ein_unmoeglicher_Benutzername_ist_422(string login)
     {
-        var antwort = await Verbinde(AlsPerson(Guid.CreateVersion7()), login);
+        var response = await Verbinde(AlsPerson(Guid.CreateVersion7()), login);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         _github.Gefragt.Should().BeEmpty("ein Abruf, der ohnehin nichts findet, entfällt");
     }
 

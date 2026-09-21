@@ -29,21 +29,21 @@ public sealed class VersandBehavior<TAnfrage, TAntwort>(
     {
         ArgumentNullException.ThrowIfNull(next);
 
-        var antwort = await next(cancellationToken);
+        var response = await next(cancellationToken);
 
         try
         {
-            await versand.VersendeGesammeltesAsync(cancellationToken);
+            await versand.SendCollectedAsync(cancellationToken);
         }
-        catch (Exception fehler)
+        catch (Exception error)
         {
             // Never the recipient and never the body: a failure is exactly when
             // somebody wants to see the mail, and exactly when writing it out is
             // worst.
             protokoll.LogError(
-                fehler, "Der Versand nach {Anfrage} ist gescheitert", typeof(TAnfrage).Name);
+                error, "Der Versand nach {Anfrage} ist gescheitert", typeof(TAnfrage).Name);
         }
 
-        return antwort;
+        return response;
     }
 }

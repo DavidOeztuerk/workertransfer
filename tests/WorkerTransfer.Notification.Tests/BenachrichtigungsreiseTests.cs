@@ -31,17 +31,17 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:notification", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Identity:Adresse", "http://identity.test");
             host.UseSetting("Identity:Geheimnis", Meldegeheimnis);
             host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(ServiceDescriptor.Scoped<IPostbote>(_ => _postbote));
-                dienste.Replace(ServiceDescriptor.Singleton<TimeProvider>(_uhr));
+                services.Replace(ServiceDescriptor.Scoped<IPostbote>(_ => _postbote));
+                services.Replace(ServiceDescriptor.Singleton<TimeProvider>(_uhr));
             });
         });
 
@@ -54,26 +54,26 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsPerson(Guid wer)
+    private HttpClient AlsPerson(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Person(wer));
+            new AuthenticationHeaderValue("Bearer", Tokenform.Person(subject));
         return browser;
     }
 
     private Task<HttpResponseMessage> Melde(
-        Guid wer, string art = "market_request", string geheimnis = Meldegeheimnis)
+        Guid subject, string kind = "market_request", string secret = Meldegeheimnis)
     {
         var browser = _dienst.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Notify-Secret", geheimnis);
-        return browser.PostAsJsonAsync("/internal/notifications", new { user_id = wer, kind = art });
+        browser.DefaultRequestHeaders.Add("X-Notify-Secret", secret);
+        return browser.PostAsJsonAsync("/internal/notifications", new { user_id = subject, kind = kind });
     }
 
-    private static async Task<JsonElement> Json(HttpResponseMessage antwort) =>
-        JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+    private static async Task<JsonElement> Json(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
-    /// <summary>Der gewöhnliche Weg: gemeldet, im Postfach, Post angestoßen.</summary>
+    /// <summary>Der gewöhnliche Weg: gemeldet, im Inbox, Post angestoßen.</summary>
     [Fact]
     public async Task Eine_Meldung_landet_im_Postfach_und_stoesst_Post_an()
     {
@@ -84,22 +84,22 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
         gemeldet.StatusCode.Should().Be(HttpStatusCode.Accepted);
         _postbote.Gebeten.Should().Equal(anna);
 
-        var postfach = await Json(await AlsPerson(anna).GetAsync("/notifications/me"));
+        var inbox = await Json(await AlsPerson(anna).GetAsync("/notifications/me"));
 
-        postfach.GetArrayLength().Should().Be(1);
+        inbox.GetArrayLength().Should().Be(1);
 
-        var eintrag = postfach.EnumerateArray().Single();
-        eintrag.GetProperty("kind").GetString().Should().Be("market_request");
-        eintrag.GetProperty("read_at").ValueKind.Should().Be(JsonValueKind.Null);
+        var entry = inbox.EnumerateArray().Single();
+        entry.GetProperty("kind").GetString().Should().Be("market_request");
+        entry.GetProperty("read_at").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     /// <summary>
     /// Der Eintrag entsteht immer, die Mail wird gedrosselt.
     /// </summary>
     /// <remarks>
-    /// Das Postfach liegt hinter der Anmeldung, wo geprüft wird, wer liest; es
+    /// Das Inbox liegt hinter der Anmeldung, wo geprüft wird, wer liest; es
     /// zu drosseln hieße, jemandem zu verschweigen, dass etwas passiert ist.
-    /// Die Mail landet in einem Postfach, das nicht nur der Person gehören
+    /// Die Mail landet in einem Inbox, das nicht nur der Person gehören
     /// muss.
     /// </remarks>
     [Fact]
@@ -113,9 +113,9 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         _postbote.Gebeten.Should().Equal(anna);
 
-        var postfach = await Json(await AlsPerson(anna).GetAsync("/notifications/me"));
+        var inbox = await Json(await AlsPerson(anna).GetAsync("/notifications/me"));
 
-        postfach.GetArrayLength().Should().Be(3);
+        inbox.GetArrayLength().Should().Be(3);
     }
 
     /// <summary>Nach der Drosselstunde geht wieder Post hinaus.</summary>
@@ -125,7 +125,7 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
 
         await Melde(anna);
-        _uhr.Weiter(Benachrichtigungswunsch.Drossel);
+        _uhr.Weiter(NotificationPreference.Drossel);
         await Melde(anna);
 
         _postbote.Gebeten.Should().Equal(anna, anna);
@@ -138,7 +138,7 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
 
         await Melde(anna);
-        _uhr.Weiter(Benachrichtigungswunsch.Drossel - TimeSpan.FromMinutes(1));
+        _uhr.Weiter(NotificationPreference.Drossel - TimeSpan.FromMinutes(1));
         await Melde(anna);
 
         _postbote.Gebeten.Should().Equal(anna);
@@ -159,23 +159,23 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Wer nichts eingestellt hat, hat alles an.</summary>
     /// <remarks>
-    /// Eine Benachrichtigung über den <em>eigenen</em> Vorgang ist keine
+    /// Eine Benachrichtigung über den <em>eigenen</em> Case ist keine
     /// Werbung, sondern die Bedingung dafür, dass „die Person entscheidet"
     /// überhaupt eintreten kann.
     /// </remarks>
     [Fact]
     public async Task Voreingestellt_ist_alles_an()
     {
-        var wuensche = await Json(
+        var preferences = await Json(
             await AlsPerson(Guid.CreateVersion7()).GetAsync("/me/notification-preferences"));
 
-        foreach (var feld in new[]
+        foreach (var field in new[]
                  {
                      "resume_request", "market_request", "application_update", "transfer_update",
                      "application_received"
                  })
         {
-            wuensche.GetProperty(feld).GetBoolean().Should().BeTrue(feld);
+            preferences.GetProperty(field).GetBoolean().Should().BeTrue(field);
         }
     }
 
@@ -198,9 +198,9 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         _postbote.Gebeten.Should().BeEmpty();
 
-        var postfach = await Json(await ihr.GetAsync("/notifications/me"));
+        var inbox = await Json(await ihr.GetAsync("/notifications/me"));
 
-        postfach.GetArrayLength().Should().Be(1);
+        inbox.GetArrayLength().Should().Be(1);
     }
 
     /// <summary>
@@ -251,7 +251,7 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>
     /// Wer die Art abbestellt hat, bekommt keine Mail — der Eintrag im
-    /// Postfach bleibt trotzdem.
+    /// Inbox bleibt trotzdem.
     /// </summary>
     [Fact]
     public async Task ApplicationReceived_abbestellt_heisst_keine_Post()
@@ -272,9 +272,9 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         _postbote.Gebeten.Should().BeEmpty();
 
-        var postfach = await Json(await ihr.GetAsync("/notifications/me"));
-        postfach.GetArrayLength().Should().Be(1);
-        postfach[0].GetProperty("kind").GetString().Should().Be("application_received");
+        var inbox = await Json(await ihr.GetAsync("/notifications/me"));
+        inbox.GetArrayLength().Should().Be(1);
+        inbox[0].GetProperty("kind").GetString().Should().Be("application_received");
     }
 
     /// <summary>Gelesen ist gelesen — und ein zweites Mal ändert nichts.</summary>
@@ -290,17 +290,17 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         gelesen.GetProperty("read").GetInt32().Should().Be(2);
 
-        var postfach = await Json(await ihr.GetAsync("/notifications/me"));
+        var inbox = await Json(await ihr.GetAsync("/notifications/me"));
 
-        postfach.EnumerateArray().Should().OnlyContain(
-            eintrag => eintrag.GetProperty("read_at").ValueKind != JsonValueKind.Null);
+        inbox.EnumerateArray().Should().OnlyContain(
+            entry => entry.GetProperty("read_at").ValueKind != JsonValueKind.Null);
 
         var nochmal = await Json(await ihr.PostAsync("/notifications/me/read", null));
 
         nochmal.GetProperty("read").GetInt32().Should().Be(0);
     }
 
-    /// <summary>Das Postfach zeigt nur die eigenen Einträge.</summary>
+    /// <summary>Das Inbox zeigt nur die eigenen Einträge.</summary>
     [Fact]
     public async Task Das_Postfach_zeigt_nur_die_eigenen_Eintraege()
     {
@@ -325,13 +325,13 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        var antwort = await Melde(anna, geheimnis: "geraten");
+        var response = await Melde(anna, secret: "geraten");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         _postbote.Gebeten.Should().BeEmpty();
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Eingaenge.AnyAsync(zeile => zeile.UserId == anna)).Should().BeFalse();
+        await using var context = postgres.Kontext();
+        (await context.Eingaenge.AnyAsync(row => row.UserId == anna)).Should().BeFalse();
     }
 
     /// <summary>
@@ -345,9 +345,9 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Auch_fuer_eine_unbekannte_Kennung_ist_es_202()
     {
-        var antwort = await Melde(Guid.CreateVersion7());
+        var response = await Melde(Guid.CreateVersion7());
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
     }
 
     /// <summary>
@@ -380,12 +380,12 @@ public class BenachrichtigungsreiseTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Eine_erfundene_Art_ist_422()
     {
-        var antwort = await Melde(Guid.CreateVersion7(), "irgendwas");
+        var response = await Melde(Guid.CreateVersion7(), "irgendwas");
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
-    /// <summary>Ohne Anmeldung gibt es kein Postfach.</summary>
+    /// <summary>Ohne Anmeldung gibt es kein Inbox.</summary>
     [Fact]
     public async Task Ohne_Token_ist_es_401()
     {

@@ -39,11 +39,11 @@ internal static class Tokenform
             Audience = Audience,
             ExpireMinutes = 15
         };
-        var schluessel = SigningKey.FromEcdsaPrivateKey(PrivatSchluessel, Kennung);
+        var key = SigningKey.FromEcdsaPrivateKey(PrivatSchluessel, Kennung);
 
         return new NoeliaAccessTokenIssuer(new JwtService(
             Options.Create(settings),
-            new KeyRing([schluessel], schluessel),
+            new KeyRing([key], key),
             NullLogger<JwtService>.Instance));
     }
 

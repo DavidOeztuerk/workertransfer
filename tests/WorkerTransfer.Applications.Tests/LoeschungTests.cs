@@ -9,9 +9,9 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using WorkerTransfer.Applications.Application.Loeschung;
+using WorkerTransfer.Applications.Application.Erasure;
 using WorkerTransfer.Applications.Application.Ports;
-using WorkerTransfer.Applications.Infrastructure.Loeschung;
+using WorkerTransfer.Applications.Infrastructure.Erasure;
 using WorkerTransfer.Applications.Infrastructure.Persistence;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.ServiceDefaults;
@@ -36,18 +36,18 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:applications", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
             host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
-            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
             host.UseSetting("environment", "Development");
-            host.ConfigureTestServices(dienste =>
+            host.ConfigureTestServices(services =>
             {
-                dienste.Replace(
-                    ServiceDescriptor.Scoped<IEinwilligungsschreiber>(_ => _ledger));
-                dienste.Replace(ServiceDescriptor.Scoped<IStellenauskunft>(_ => _stellen));
-                dienste.Replace(ServiceDescriptor.Scoped<IZustellung, Probezustellung>());
-                dienste.Replace(ServiceDescriptor.Scoped<IUnternehmensmitgliederAbfrage>(_ => _mitglieder));
+                services.Replace(
+                    ServiceDescriptor.Scoped<IConsentWriter>(_ => _ledger));
+                services.Replace(ServiceDescriptor.Scoped<IJobLookup>(_ => _stellen));
+                services.Replace(ServiceDescriptor.Scoped<IDelivery, Probezustellung>());
+                services.Replace(ServiceDescriptor.Scoped<ICompanyMemberLookup>(_ => _mitglieder));
             });
         });
 
@@ -71,11 +71,11 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public void Der_Schalter_steht_auf_aus()
     {
-        Aufbewahrung.EingestellteBehalten.Should().BeFalse();
+        Retention.EingestellteBehalten.Should().BeFalse();
     }
 
     /// <summary>
-    /// „Erledigt" heißt erledigt — auch die Bewerbung, über die jemand
+    /// „Erledigt" heißt erledigt — auch die JobApplication, über die jemand
     /// eingestellt wurde.
     /// </summary>
     /// <remarks>
@@ -86,22 +86,22 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_Voreinstellung_loescht_auch_die_eingestellte_Bewerbung()
     {
-        var wer = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
-        var eingestellt = await Bewerbung(wer, firma, "hired");
-        var laufend = await Bewerbung(wer, firma, "submitted");
+        var subject = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
+        var eingestellt = await JobApplication(subject, company, "hired");
+        var laufend = await JobApplication(subject, company, "submitted");
 
-        var antwort = await Loesche(wer);
+        var response = await Loesche(subject);
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var quittung = JsonDocument.Parse(await antwort.Content.ReadAsStringAsync()).RootElement;
+        var quittung = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
         quittung.GetProperty("retained").GetInt32().Should().Be(0);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Bewerbungen.AnyAsync(zeile => zeile.Id == eingestellt))
+        await using var context = postgres.Kontext();
+        (await context.Applications.AnyAsync(row => row.Id == eingestellt))
             .Should().BeFalse();
-        (await kontext.Bewerbungen.AnyAsync(zeile => zeile.Id == laufend))
+        (await context.Applications.AnyAsync(row => row.Id == laufend))
             .Should().BeFalse();
     }
 
@@ -110,32 +110,32 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     /// ab: <c>status = 'hired'</c>.
     /// </summary>
     /// <remarks>
-    /// Keine Ausdehnung auf <c>rejected</c> — eine abgelehnte Bewerbung
-    /// begründet nichts — und kein „laufender Vorgang" als Gummiwort. Der
+    /// None Ausdehnung auf <c>rejected</c> — eine abgelehnte JobApplication
+    /// begründet nichts — und kein „laufender Case" als Gummiwort. Der
     /// Schalter reist als Parameter herein, damit sich genau das prüfen lässt,
     /// ohne die Voreinstellung anzufassen.
     /// </remarks>
     [Fact]
     public async Task Der_umgelegte_Schalter_deckt_genau_hired_ab()
     {
-        var wer = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
-        var eingestellt = await Bewerbung(wer, firma, "hired");
-        var abgelehnt = await Bewerbung(wer, firma, "rejected");
-        var zurueckgezogen = await Bewerbung(wer, firma, "withdrawn");
-        var laufend = await Bewerbung(wer, firma, "submitted");
+        var subject = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
+        var eingestellt = await JobApplication(subject, company, "hired");
+        var abgelehnt = await JobApplication(subject, company, "rejected");
+        var zurueckgezogen = await JobApplication(subject, company, "withdrawn");
+        var laufend = await JobApplication(subject, company, "submitted");
 
-        await using var kontext = postgres.Kontext();
-        var bestand = new EfLoeschbestand(kontext);
+        await using var context = postgres.Kontext();
+        var bestand = new EfErasureLedger(context);
 
-        var behalten = await bestand.LoescheAsync(
-            new SubjectId(wer), eingestellteBehalten: true);
+        var behalten = await bestand.DeleteAsync(
+            new SubjectId(subject), eingestellteBehalten: true);
 
         behalten.Should().Be(1);
 
-        var uebrig = await kontext.Bewerbungen
-            .Where(zeile => zeile.SubjectId == wer)
-            .Select(zeile => zeile.Id)
+        var uebrig = await context.Applications
+            .Where(row => row.SubjectId == subject)
+            .Select(row => row.Id)
             .ToListAsync();
 
         uebrig.Should().Equal(eingestellt);
@@ -146,35 +146,35 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_Loeschung_raeumt_die_Outbox_dieses_Menschen()
     {
-        var wer = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
-        var stelle = _stellen.Oeffentlich(firma);
+        var subject = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
+        var job = _stellen.Oeffentlich(company);
 
-        _mitglieder.Fuer(new TenantId(firma), new SubjectId(Guid.CreateVersion7()));
+        _mitglieder.Fuer(new TenantId(company), new SubjectId(Guid.CreateVersion7()));
 
-        var person = Mit(Tokenform.Person(wer));
+        var person = Mit(Tokenform.Person(subject));
 
         var angelegt = JsonDocument
             .Parse(await (await person.PostAsJsonAsync("/applications", new
             {
-                job_id = stelle, message = "Hallo.", shares_resume = false,
+                job_id = job, message = "Hallo.", shares_resume = false,
                 shares_portfolio = false
             })).Content.ReadAsStringAsync()).RootElement;
 
-        await Mit(Tokenform.Firma(Guid.CreateVersion7(), firma)).PostAsJsonAsync(
+        await Mit(Tokenform.Firma(Guid.CreateVersion7(), company)).PostAsJsonAsync(
             $"/applications/{angelegt.GetProperty("id").GetGuid()}/status",
             new { status = "reviewing" });
 
         await using (var vorher = postgres.Kontext())
         {
-            (await vorher.Set<OutboxZeile>().AnyAsync(zeile => zeile.UserId == wer))
+            (await vorher.Set<OutboxRow>().AnyAsync(row => row.UserId == subject))
                 .Should().BeTrue();
         }
 
-        await Loesche(wer);
+        await Loesche(subject);
 
         await using var nachher = postgres.Kontext();
-        (await nachher.Set<OutboxZeile>().AnyAsync(zeile => zeile.UserId == wer))
+        (await nachher.Set<OutboxRow>().AnyAsync(row => row.UserId == subject))
             .Should().BeFalse();
     }
 
@@ -182,16 +182,16 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Die_Loeschung_trifft_nur_diesen_Menschen()
     {
-        var firma = Guid.CreateVersion7();
-        var wer = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
         var jemand = Guid.CreateVersion7();
-        await Bewerbung(wer, firma, "submitted");
-        var fremde = await Bewerbung(jemand, firma, "submitted");
+        await JobApplication(subject, company, "submitted");
+        var fremde = await JobApplication(jemand, company, "submitted");
 
-        await Loesche(wer);
+        await Loesche(subject);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Bewerbungen.AnyAsync(zeile => zeile.Id == fremde)).Should().BeTrue();
+        await using var context = postgres.Kontext();
+        (await context.Applications.AnyAsync(row => row.Id == fremde)).Should().BeTrue();
     }
 
     /// <summary>Ohne das Geheimnis passiert nichts.</summary>
@@ -203,19 +203,19 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ohne_das_richtige_Geheimnis_wird_nichts_geloescht()
     {
-        var wer = Guid.CreateVersion7();
-        var firma = Guid.CreateVersion7();
-        var meine = await Bewerbung(wer, firma, "submitted");
+        var subject = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
+        var meine = await JobApplication(subject, company, "submitted");
 
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", "geraten");
 
-        var antwort = await browser.PostAsJsonAsync("/erasure", new { user_id = wer });
+        var response = await browser.PostAsJsonAsync("/erasure", new { user_id = subject });
 
-        antwort.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        await using var kontext = postgres.Kontext();
-        (await kontext.Bewerbungen.AnyAsync(zeile => zeile.Id == meine)).Should().BeTrue();
+        await using var context = postgres.Kontext();
+        (await context.Applications.AnyAsync(row => row.Id == meine)).Should().BeTrue();
     }
 
     /// <summary>Ein zweiter Aufruf ist kein Fehlschlag.</summary>
@@ -227,10 +227,10 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Ein_zweites_Mal_loeschen_ist_wieder_2xx()
     {
-        var wer = Guid.CreateVersion7();
+        var subject = Guid.CreateVersion7();
 
-        (await Loesche(wer)).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Loesche(wer)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Loesche(subject)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Loesche(subject)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     private HttpClient Mit(string token)
@@ -241,38 +241,38 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
-    private Task<HttpResponseMessage> Loesche(Guid wer)
+    private Task<HttpResponseMessage> Loesche(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", Loeschgeheimnis);
-        return browser.PostAsJsonAsync("/erasure", new { user_id = wer });
+        return browser.PostAsJsonAsync("/erasure", new { user_id = subject });
     }
 
-    /// <summary>Legt eine Zeile in einem bestimmten Stand an.</summary>
+    /// <summary>Legt eine Zeile in einem bestimmten State an.</summary>
     /// <remarks>
     /// Direkt in die Tabelle: <c>hired</c> über die Routen zu erreichen kostet
     /// drei Aufrufe und prüft hier nichts, was nicht anderswo schon geprüft
     /// ist.
     /// </remarks>
-    private async Task<Guid> Bewerbung(Guid wer, Guid firma, string stand)
+    private async Task<Guid> JobApplication(Guid subject, Guid company, string state)
     {
-        await using var kontext = postgres.Kontext();
-        var jetzt = DateTime.UtcNow;
-        var zeile = new BewerbungsZeile
+        await using var context = postgres.Kontext();
+        var now = DateTime.UtcNow;
+        var row = new ApplicationRow
         {
             Id = Guid.CreateVersion7(),
             JobId = Guid.CreateVersion7(),
-            TenantId = firma,
-            SubjectId = wer,
+            TenantId = company,
+            SubjectId = subject,
             Message = "Hallo.",
-            Status = stand,
-            CreatedAt = jetzt,
-            UpdatedAt = jetzt
+            Status = state,
+            CreatedAt = now,
+            UpdatedAt = now
         };
 
-        kontext.Bewerbungen.Add(zeile);
-        await kontext.SaveChangesAsync();
+        context.Applications.Add(row);
+        await context.SaveChangesAsync();
 
-        return zeile.Id;
+        return row.Id;
     }
 }

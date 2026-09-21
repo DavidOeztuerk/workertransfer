@@ -5,7 +5,7 @@ using WorkerTransfer.Outbox;
 using WorkerTransfer.Resume.Application.Ports;
 using WorkerTransfer.Resume.Infrastructure.Persistence;
 
-namespace WorkerTransfer.Resume.Infrastructure.Loeschung;
+namespace WorkerTransfer.Resume.Infrastructure.Erasure;
 
 /// <summary>What an erasure really touches in this service.</summary>
 /// <remarks>
@@ -21,17 +21,17 @@ namespace WorkerTransfer.Resume.Infrastructure.Loeschung;
 /// assumption ADR-0027 §3 abolishes.
 /// </para>
 /// </remarks>
-public sealed class EfLoeschbestand(ResumeDbContext kontext, IAblage ablage) : ILoeschbestand
+public sealed class EfErasureLedger(ResumeDbContext context, IDocumentStore ablage) : IErasureLedger
 {
     /// <inheritdoc />
-    public async Task<int> LoescheAsync(
-        SubjectId wer,
+    public async Task<int> DeleteAsync(
+        SubjectId subject,
         CancellationToken cancellationToken = default)
     {
         // The résumé. `resumes.id` IS the subject id, and positions and
         // education lie as jsonb in the same row, so they fall with it.
-        await kontext.Lebenslaeufe
-            .Where(zeile => zeile.Id == wer.Value)
+        await context.Lebenslaeufe
+            .Where(row => row.Id == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
         // DIE UNTERLAGEN — Zeilen UND Dateien.
@@ -43,59 +43,59 @@ public sealed class EfLoeschbestand(ResumeDbContext kontext, IAblage ablage) : I
         //
         // Die Dateien zuletzt, weil ein Abbruch dazwischen eine Datei ohne
         // Zeile hinterlaesst: unerreichbar und aufraeumbar. Andersherum bliebe
-        // eine Zeile ohne Datei stehen und sähe aus wie eine Unterlage.
-        var schluessel = await kontext.Unterlagen
-            .Where(zeile => zeile.SubjectId == wer.Value)
-            .Select(zeile => zeile.StorageKey)
+        // eine Zeile ohne Datei stehen und sähe aus wie eine DocumentRecord.
+        var key = await context.Unterlagen
+            .Where(row => row.SubjectId == subject.Value)
+            .Select(row => row.StorageKey)
             .ToListAsync(cancellationToken);
 
-        await kontext.Unterlagen
-            .Where(zeile => zeile.SubjectId == wer.Value)
+        await context.Unterlagen
+            .Where(row => row.SubjectId == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
         // DER INDEX FAELLT MIT (ADR-0043). Er haelt, was auf Ausloesung in den
-        // Unterlagen gelesen wurde — kanonische Namen aus einem Zeugnis, also
+        // Unterlagen gelesen wurde — kanonische Namen aus einem Reference, also
         // personenbezogen. Ein Index ueber die Texte eines Menschen darf
         // ueberhaupt nur bestehen, solange er im selben Dienst liegt wie die
-        // Dateien UND von derselben Loeschung getroffen wird; ohne diese Zeile
+        // Dateien UND von derselben Erasure getroffen wird; ohne diese Zeile
         // waere die Bedingung gebrochen, unter der er gebaut werden durfte.
         // Gemessen wird das an der Reihe (`ErkennungsreiseTests`), nicht hier.
-        await kontext.Funde
-            .Where(zeile => zeile.SubjectId == wer.Value)
+        await context.Funde
+            .Where(row => row.SubjectId == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
-        foreach (var eintrag in schluessel)
+        foreach (var entry in key)
         {
-            await ablage.LoescheAsync(eintrag, cancellationToken);
+            await ablage.DeleteAsync(entry, cancellationToken);
         }
 
         // Asked ABOUT them: the row is the statement "company X asked about
         // this human being".
-        await kontext.Anfragen
-            .Where(zeile => zeile.SubjectId == wer.Value)
+        await context.Anfragen
+            .Where(row => row.SubjectId == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
         // Asked BY them: the proceeding belongs to the company and concerns a
         // third person. Only the name falls away.
-        await kontext.Anfragen
-            .Where(zeile => zeile.RequestedBy == wer.Value)
+        await context.Anfragen
+            .Where(row => row.RequestedBy == subject.Value)
             .ExecuteUpdateAsync(
-                setzen => setzen.SetProperty(zeile => zeile.RequestedBy, (Guid?)null),
+                setzen => setzen.SetProperty(row => row.RequestedBy, (Guid?)null),
                 cancellationToken);
 
-        await kontext.Pruefspur
-            .Where(zeile => zeile.TargetId == wer.Value)
+        await context.Pruefspur
+            .Where(row => row.TargetId == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
-        await kontext.Pruefspur
-            .Where(zeile => zeile.ActorId == wer.Value)
+        await context.Pruefspur
+            .Where(row => row.ActorId == subject.Value)
             .ExecuteUpdateAsync(
-                setzen => setzen.SetProperty(zeile => zeile.ActorId, (Guid?)null),
+                setzen => setzen.SetProperty(row => row.ActorId, (Guid?)null),
                 cancellationToken);
 
         // An outstanding notification to an account that no longer exists.
-        await kontext.Set<OutboxZeile>()
-            .Where(zeile => zeile.UserId == wer.Value)
+        await context.Set<OutboxRow>()
+            .Where(row => row.UserId == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
         // Nothing stays. The receipt says so rather than leaving the origin to

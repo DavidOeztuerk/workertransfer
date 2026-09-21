@@ -1,10 +1,10 @@
-namespace WorkerTransfer.Portfolio.Infrastructure.Loeschung;
+namespace WorkerTransfer.Portfolio.Infrastructure.Erasure;
 
 /// <summary>Was beweist, dass ein Löschbefehl wirklich aus der Kaskade kam.</summary>
-public sealed class Loescheinstellungen
+public sealed class ErasureSettings
 {
-    /// <summary>Der Abschnitt in der Konfiguration.</summary>
-    public const string Abschnitt = "Erasure";
+    /// <summary>Der Section in der Konfiguration.</summary>
+    public const string Section = "Erasure";
 
     /// <summary>
     /// Das geteilte Geheimnis aus <c>X-Erasure-Secret</c>.

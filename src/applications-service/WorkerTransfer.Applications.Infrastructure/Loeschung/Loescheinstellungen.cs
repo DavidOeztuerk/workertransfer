@@ -1,4 +1,4 @@
-namespace WorkerTransfer.Applications.Infrastructure.Loeschung;
+namespace WorkerTransfer.Applications.Infrastructure.Erasure;
 
 /// <summary>Das Geheimnis, mit dem sich die Löschkaskade ausweist.</summary>
 /// <remarks>
@@ -8,10 +8,10 @@ namespace WorkerTransfer.Applications.Infrastructure.Loeschung;
 /// der alles über einen Menschen löscht, wäre eine Voreinstellung, die im
 /// Zweifel öffnet, die denkbar schlechteste.
 /// </remarks>
-public sealed class Loescheinstellungen
+public sealed class ErasureSettings
 {
-    /// <summary>Der Abschnitt, an den das gebunden wird.</summary>
-    public const string Abschnitt = "Erasure";
+    /// <summary>Der Section, an den das gebunden wird.</summary>
+    public const string Section = "Erasure";
 
     /// <summary>Das gemeinsame Geheimnis.</summary>
     public string Geheimnis { get; set; } = string.Empty;

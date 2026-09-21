@@ -2,8 +2,8 @@ using Noelia.Core.Identity;
 using MediatR;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Contracts.Erasure;
-using WorkerTransfer.Scout.Application.Loeschung;
-using WorkerTransfer.Scout.Infrastructure.Loeschung;
+using WorkerTransfer.Scout.Application.Erasure;
+using WorkerTransfer.Scout.Infrastructure.Erasure;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Scout.Api;
@@ -13,9 +13,9 @@ namespace WorkerTransfer.Scout.Api;
 /// Dieser Dienst ist Löschempfänger, seit er seine erste Tabelle hat
 /// (ADR-0027 §4, ADR-0036): <c>searches</c> trägt eine <c>subject_id</c>, der
 /// Postausgang eine <c>user_id</c>. <c>"scout"</c> steht deshalb in
-/// <c>Loeschempfaenger.Fremde</c> und in <c>LoeschempfaengerTests.Dienste</c>.
+/// <c>ErasureRecipient.Fremde</c> und in <c>LoeschempfaengerTests.Dienste</c>.
 /// </remarks>
-public static class LoeschEndpoints
+public static class ErasureEndpoints
 {
     private const string Geheimniskopf = "X-Erasure-Secret";
 
@@ -25,15 +25,15 @@ public static class LoeschEndpoints
         ArgumentNullException.ThrowIfNull(app);
 
         app.MapPost("/erasure", async (
-            LoeschungV1 koerper,
+            ErasureV1 koerper,
             IMediator mediator,
-            IOptions<Loescheinstellungen> einstellungen,
+            IOptions<ErasureSettings> einstellungen,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
             if (!DarfLoeschen(context, einstellungen.Value))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authorised");
                 return;
@@ -42,16 +42,16 @@ public static class LoeschEndpoints
             ArgumentNullException.ThrowIfNull(koerper);
 
             var geblieben = await mediator.Send(
-                new PersonLoeschenBefehl(new SubjectId(koerper.UserId)), cancellationToken);
+                new ErasePersonCommand(new SubjectId(koerper.UserId)), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                new LoeschungsquittungV1(geblieben), cancellationToken);
+                new ErasureReceiptV1(geblieben), cancellationToken);
         });
 
         return app;
     }
 
-    private static bool DarfLoeschen(HttpContext context, Loescheinstellungen einstellungen)
+    private static bool DarfLoeschen(HttpContext context, ErasureSettings einstellungen)
     {
         if (string.IsNullOrEmpty(einstellungen.Geheimnis)
             || !context.Request.Headers.TryGetValue(Geheimniskopf, out var vorgelegt))

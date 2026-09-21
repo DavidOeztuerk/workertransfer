@@ -22,19 +22,19 @@ public static class OutboxRegistrierung
     public static IServiceCollection AddOutbox<TKontext>(
         this IServiceCollection services,
         IConfiguration configuration,
-        Action<OutboxEinstellungen>? anpassen = null)
+        Action<OutboxSettings>? anpassen = null)
         where TKontext : DbContext
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var einstellungen = new OutboxEinstellungen();
-        configuration.GetSection(OutboxEinstellungen.Abschnitt).Bind(einstellungen);
+        var einstellungen = new OutboxSettings();
+        configuration.GetSection(OutboxSettings.Section).Bind(einstellungen);
         anpassen?.Invoke(einstellungen);
 
         services.AddSingleton(einstellungen);
         services.AddScoped<IOutbox, EfOutbox<TKontext>>();
-        services.AddScoped<OutboxZusteller<TKontext>>();
+        services.AddScoped<OutboxDispatcher<TKontext>>();
         services.AddHostedService<OutboxSchleife<TKontext>>();
 
         return services;
