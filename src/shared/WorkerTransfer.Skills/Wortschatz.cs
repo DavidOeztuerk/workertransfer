@@ -2,60 +2,59 @@ using System.Collections.Frozen;
 
 namespace WorkerTransfer.Skills;
 
-/// <summary>Welche Wörter dasselbe meinen — und sonst nichts (ADR-0023).</summary>
+/// <summary>Which words mean the same thing — and nothing else (ADR-0023).</summary>
 /// <remarks>
-/// Die Grenze, die alles trägt: hier wird <em>umbenannt</em>, nicht abgeleitet.
+/// The boundary that carries everything: here things are <em>renamed</em>, not
+/// inferred.
 /// <code>
-/// erlaubt:   „Postgres“ und „PostgreSQL“ sind dasselbe Wort
-/// verboten:  „React“ heißt, du kannst auch JavaScript
+/// allowed:    „Postgres“ and „PostgreSQL“ are the same word
+/// forbidden:  „React“ means you can do JavaScript too
 /// </code>
-/// Das erste ist eine Aussage über Sprache. Das zweite ist eine Aussage über
-/// einen <em>Menschen</em> — es schreibt ihm eine Fähigkeit zu, die er nicht
-/// genannt hat, an einer Job, an der er nicht widersprechen kann.
+/// The first is a statement about language. The second is a statement about a
+/// <em>person</em> — it credits them with a skill they did not name, at a place
+/// where they cannot object.
 /// <para>
-/// Daraus folgt: kein Niveau, kein Gewicht, keine Rangfolge, keine
-/// Verwandtschaft. Nichts, woraus sich später eine Zahl bauen ließe.
+/// From that it follows: no level, no weight, no ranking, no kinship. Nothing
+/// out of which a number could later be built.
 /// </para>
 /// <para>
-/// Und: es lehnt nie etwas ab und erfindet nie etwas. Was der Vocabulary nicht
-/// kennt, bleibt genau so stehen, wie es getippt wurde — eine Liste erlaubter
-/// Fähigkeiten wäre eine Behauptung darüber, welche Arbeit es gibt, und läge
-/// bei jeder neuen Technologie und bei jedem Beruf außerhalb der IT falsch.
+/// And: it never rejects anything and never invents anything. What the
+/// vocabulary does not know stays exactly as it was typed — a list of permitted
+/// skills would be a claim about which work exists, and it would be wrong at
+/// every new technology and at every trade outside IT.
 /// </para>
 /// <para>
-/// <b>Geteilt zwischen profile-service und jobs-service</b>, und nur die
-/// Tabelle. Der Abgleich findet im Browser statt: die Fähigkeiten einer Job
-/// werden gegen die eines Profils gehalten, und zwei Tabellen, die
-/// auseinanderlaufen, erzeugen genau die Lücke, gegen die diese hier existiert
-/// — <c>„Postgres"</c> im Profil und <c>„PostgreSQL"</c> in der Job wären
-/// dann kein Haken.
+/// <b>Shared between profile-service and jobs-service</b>, and only the table.
+/// The comparison happens in the browser: the skills of a job are held against
+/// those of a profile, and two tables drifting apart produce exactly the gap
+/// this one exists against — <c>"Postgres"</c> in the profile and
+/// <c>"PostgreSQL"</c> in the job would then not be a tick.
 /// </para>
 /// <para>
-/// Was <em>nicht</em> geteilt ist: die <c>SkillList</c> selbst. Die
-/// führt jeder Dienst für sich, denn wie viele Fähigkeiten ein Profile oder eine
-/// Job trägt, ist eine Entscheidung des Dienstes, dem sie gehört — ein
-/// geteiltes Domänenmodell gibt es hier nicht (ADR-0004).
+/// What is <em>not</em> shared: the <c>SkillList</c> itself. Every service
+/// keeps that for itself, because how many skills a profile or a job carries is
+/// a decision of the service that owns it — there is no shared domain model
+/// here (ADR-0004).
 /// </para>
 /// </remarks>
 public static class Vocabulary
 {
-    /// <summary>Kanonischer Name → seine Schreibweisen.</summary>
+    /// <summary>Canonical name → its spellings.</summary>
     /// <remarks>
-    /// Im Repository gepflegt, per Pull Request: nachvollziehbar und
-    /// widersprechbar. Eine Liste, die sich selbst aus den Daten füttert
-    /// („diese Wörter kommen oft zusammen vor“), wäre wieder eine Auswertung
-    /// über Menschen.
+    /// Maintained in the repository, by pull request: traceable and open to
+    /// contradiction. A list that feeds itself from the data ("these words
+    /// often occur together") would again be an evaluation about people.
     /// <para>
-    /// Bewusst klein gehalten. Jeder Eintrag ist die Behauptung, dass zwei
-    /// Wörter <em>dasselbe</em> meinen — bei Zweifel gehört er nicht hinein.
-    /// Und die Liste ist nicht auf IT beschränkt: der TransferMarket kennt
-    /// Pflege, Handwerk und Vertrieb, und dort verschreibt man sich genauso.
+    /// Deliberately kept small. Every entry is the claim that two words mean
+    /// <em>the same thing</em> — in doubt it does not belong in here. And the
+    /// list is not confined to IT: the transfer market knows care work, trades
+    /// and sales, and people mistype there just the same.
     /// </para>
     /// </remarks>
     public static IReadOnlyDictionary<string, IReadOnlyList<string>> Schreibweisen { get; } =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
-            // Sprachen und Laufzeiten
+            // Languages and runtimes
             ["JavaScript"] = ["js", "java script", "ecmascript"],
             ["TypeScript"] = ["ts", "type script"],
             ["Python"] = ["python3", "python 3", "py"],
@@ -65,15 +64,16 @@ public static class Vocabulary
             ["Node.js"] = ["node", "nodejs", "node js"],
             [".NET"] = ["dotnet", "dot net", "net core", ".net core"],
 
-            // Datenbanken. „postgresql“ steht hier NICHT: der kanonische Name
-            // wird ohnehin erkannt, und ihn zusätzlich als eigene Schreibweise
-            // zu führen wäre eine Zeile, die nichts tut und alles verwirrt.
+            // Databases. "postgresql" does NOT stand here: the canonical name
+            // is recognised anyway, and carrying it additionally as a spelling
+            // of its own would be a line that does nothing and confuses
+            // everything.
             ["PostgreSQL"] = ["postgres", "psql", "postgre"],
             ["MySQL"] = ["my sql"],
             ["MongoDB"] = ["mongo", "mongo db"],
             ["Microsoft SQL Server"] = ["mssql", "sql server", "ms sql"],
 
-            // Werkzeuge und Betrieb
+            // Tools and operations
             ["Kubernetes"] = ["k8s", "kubernets"],
             ["Docker"] = ["docker engine"],
             ["CI/CD"] = ["cicd", "ci cd", "continuous integration"],
@@ -81,12 +81,12 @@ public static class Vocabulary
             ["Microsoft Azure"] = ["azure"],
             ["Google Cloud"] = ["gcp", "google cloud platform"],
 
-            // Rahmenwerke
+            // Frameworks
             ["React"] = ["react.js", "reactjs", "react js"],
             ["Vue.js"] = ["vue", "vuejs"],
             ["Angular"] = ["angular.js", "angularjs"],
 
-            // Außerhalb der IT — der TransferMarket ist nicht nur für Entwickler.
+            // Outside IT — the transfer market is not only for developers.
             ["Buchhaltung"] = ["buchführung", "rechnungswesen"],
             ["Kundenbetreuung"] = ["kundenservice", "kundendienst", "customer support"],
             ["Projektleitung"] = ["projektmanagement", "project management"],
@@ -94,10 +94,10 @@ public static class Vocabulary
             ["Elektroinstallation"] = ["elektrik", "elektroinstallateur"],
             ["Lohnbuchhaltung"] = ["entgeltabrechnung", "gehaltsabrechnung", "payroll"],
 
-            // Handwerk, Industrie, Bau (ADR-0039). Wie oben gilt: zwei Wörter
-            // meinen DASSELBE — „MIG/MAG“ impliziert nicht „Schweißen“.
-            // Schreibweisen ohne Umlaut stehen mit dabei, der Vergleich ist
-            // zeichengetreu.
+            // Trades, industry, construction (ADR-0039). As above the rule is:
+            // two words mean THE SAME THING — "MIG/MAG" does not imply
+            // "Schweißen". Spellings without an umlaut stand alongside, the
+            // comparison is character-faithful.
             ["MIG/MAG"] = ["mig mag", "mig-mag", "migmag", "mig/mag-schweißen", "mig/mag-schweissen"],
             ["WIG"] = ["tig", "wolfram-inertgas", "wig-schweißen", "wig-schweissen"],
             ["Schweißerpass"] = ["schweisserpass", "schweißerpaß", "schweisserpaß"],
@@ -109,42 +109,42 @@ public static class Vocabulary
             ["Gerüstbau"] = ["geruestbau", "gerüstbauer", "geruestbauer", "gerüstmontage"],
             ["Trockenbau"] = ["trockenbauer", "trockenbaumontage"],
 
-            // Logistik und Verkehr. „Code 95“ ist die Schlüsselzahl, mit der
-            // dieselbe Qualifikation im Führerschein steht.
+            // Logistics and transport. "Code 95" is the key number under which
+            // the same qualification stands in the driving licence.
             ["Staplerschein"] = ["gabelstaplerschein", "flurförderschein", "flurförderzeugschein"],
             ["Gabelstapler"] = ["stapler", "frontstapler", "forklift"],
             ["Hubwagen"] = ["handhubwagen", "gabelhubwagen", "ameise"],
             ["ADR-Schein"] = ["adr schein", "gefahrgutschein", "gefahrgutführerschein"],
             ["Berufskraftfahrer-Qualifikation"] = ["bkrfqg", "code 95", "schlüsselzahl 95", "modul 95"],
 
-            // Gesundheit und Pflege. „Pflegefachkraft“ ist die gesetzliche
-            // Umbenennung von 2020.
+            // Health and care. "Pflegefachkraft" is the statutory renaming of
+            // 2020.
             ["Pflegefachkraft"] = [
                 "pflegefachmann", "pflegefachfrau", "examinierte pflegekraft",
                 "gesundheits- und krankenpfleger", "gesundheits- und krankenpflegerin"
             ],
             ["Erste Hilfe"] = ["ersthelfer", "erste-hilfe-kurs", "first aid"],
 
-            // Gastronomie, Handel, Verwaltung.
+            // Hospitality, retail, administration.
             ["HACCP"] = ["haccp-konzept", "haccp konzept"],
             ["Warenwirtschaft"] = ["wawi", "warenwirtschaftssystem"]
         };
 
-    /// <summary>Die kanonischen Namen selbst.</summary>
+    /// <summary>The canonical names themselves.</summary>
     public static IReadOnlyList<string> Namen { get; } = [.. Schreibweisen.Keys.Order(StringComparer.Ordinal)];
 
     /// <summary>
-    /// Nachschlagetabelle: Schreibweise → kanonischer Name, ohne Rücksicht auf
-    /// Groß-/Kleinschreibung.
+    /// Lookup table: spelling → canonical name, regardless of upper and lower
+    /// case.
     /// </summary>
     /// <remarks>
-    /// Der kanonische Name zeigt auf sich selbst, damit er nicht durchs Raster
-    /// fällt, wenn ihn jemand direkt schreibt.
+    /// The canonical name points at itself so it does not fall through the net
+    /// when somebody writes it directly.
     /// </remarks>
     private static readonly FrozenDictionary<string, string> NachSchreibweise = Build();
 
-    /// <summary>Die bekannte Schreibweise — oder unverändert, was hereinkam.</summary>
-    /// <param name="faehigkeit">Was jemand getippt hat.</param>
+    /// <summary>The known spelling — or unchanged, whatever came in.</summary>
+    /// <param name="skill">What somebody typed.</param>
     public static string Kanonisch(string skill)
     {
         var geputzt = (skill ?? string.Empty).Trim();
@@ -152,13 +152,13 @@ public static class Vocabulary
         return NachSchreibweise.TryGetValue(geputzt, out var name) ? name : geputzt;
     }
 
-    /// <summary>Wie <see cref="Kanonisch"/>, für eine Liste. Leeres fällt weg.</summary>
+    /// <summary>Like <see cref="Kanonisch"/>, for a list. Empties fall away.</summary>
     /// <remarks>
-    /// <b>Nicht</b> entdoppelt: das gehört in <see cref="Faehigkeitenliste"/>,
-    /// und zwar NACH dem Umbenennen. Andersherum würde aus „Postgres,
-    /// PostgreSQL“ zweimal derselbe Eintrag.
+    /// <b>Not</b> deduplicated: that belongs in <see cref="SkillList"/>, and
+    /// there AFTER the renaming. The other way round, "Postgres, PostgreSQL"
+    /// would become the same entry twice.
     /// </remarks>
-    /// <param name="faehigkeiten">Was jemand getippt hat.</param>
+    /// <param name="skills">What somebody typed.</param>
     public static IReadOnlyList<string> KanonischAlle(IEnumerable<string> skills)
     {
         ArgumentNullException.ThrowIfNull(skills);

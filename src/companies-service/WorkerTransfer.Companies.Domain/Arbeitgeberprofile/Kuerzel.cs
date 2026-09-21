@@ -24,14 +24,14 @@ public static partial class Slug
 
     /// <summary>Leitet ein Kürzel aus dem Anzeigenamen ab.</summary>
     /// <remarks>
-    /// Umlaute werden zerlegt und ihre Grundbuchstaben behalten — „Grün" wird
+    /// Umlaute werden zerlegt und ihre Grundbuchstaben kept — „Grün" wird
     /// <c>gruen</c> nur mit einer Ersetzungstabelle, <c>grun</c> ohne;
     /// letzteres ist ehrlicher als eine Tabelle, die bei der nächsten Sprache
     /// falsch liegt.
     /// </remarks>
-    public static string Aus(string? anzeigename)
+    public static string Aus(string? displayName)
     {
-        var zerlegt = (anzeigename ?? string.Empty)
+        var zerlegt = (displayName ?? string.Empty)
             .ToLowerInvariant()
             .Normalize(NormalizationForm.FormKD);
 

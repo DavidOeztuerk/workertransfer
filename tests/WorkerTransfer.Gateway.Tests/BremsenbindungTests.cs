@@ -4,22 +4,22 @@ using Microsoft.Extensions.Configuration;
 
 namespace WorkerTransfer.Gateway.Tests;
 
-/// <summary>Bindet <c>ocelot.json</c> wirklich an Noelias Bremsoptionen?</summary>
+/// <summary>Does <c>ocelot.json</c> really bind to Noelia's rate-limit options?</summary>
 /// <remarks>
-/// <para><strong>Der Grund für diese Reihe ist eine Messung, die
-/// widersprach.</strong> Am laufenden Stapel gingen sechs Aufrufe auf
-/// <c>/auth/register</c> alle durch, obwohl dort 5 je Minute steht, und die
-/// Antwort trug <c>X-RateLimit-Limit: 200</c> — eine Zahl, die in
-/// <c>ocelot.json</c> nirgends vorkommt.</para>
+/// <para><strong>The reason for this suite is a measurement that
+/// contradicted.</strong> Against the running stack six calls to
+/// <c>/auth/register</c> all went through although 5 per minute stands there,
+/// and the answer carried <c>X-RateLimit-Limit: 200</c> — a number that appears
+/// nowhere in <c>ocelot.json</c>.</para>
 ///
-/// <para><c>BremsenkarteTests</c> konnte das nicht finden: sie prüft, dass jeder
-/// gebremste Pfad eine Route hat — eine Aussage über die <em>Auswahl</em>, nicht
-/// über die <em>Bindung</em>. Eine Konfiguration, die gar nicht ankommt, hat
-/// weiterhin lauter gültige Pfade.</para>
+/// <para><c>BremsenkarteTests</c> could not find that: it checks that every
+/// braked path has a route — a statement about the <em>selection</em>, not
+/// about the <em>binding</em>. A configuration that never arrives still has
+/// nothing but valid paths.</para>
 ///
-/// <para>Diese Reihe schließt die Lücke an der Job, an der sie liegt: sie
-/// liest dieselbe Datei, die der Dienst liest, bindet sie an denselben Typ und
-/// fragt, was herauskommt.</para>
+/// <para>This suite closes the gap in the place where it lies: it reads the
+/// same file the service reads, binds it to the same type and asks what comes
+/// out.</para>
 /// </remarks>
 public sealed class BremsenbindungTests
 {
@@ -46,16 +46,16 @@ public sealed class BremsenbindungTests
     }
 
     /// <summary>
-    /// <strong>Die drei Vorgaben stehen auf 0, und das muss ankommen.</strong>
+    /// <strong>The three defaults stand at 0, and that has to arrive.</strong>
     /// </summary>
     /// <remarks>
-    /// Eine Grenze von 0 legt keinen Zähler an — nur deshalb zählen
-    /// ausschließlich die fünf benannten Pfade. Bindet der Section nicht, so
-    /// gelten Noelias Vorgaben (100 je Minute), und dann zählt <em>jeder</em>
-    /// Bildabruf der Oberfläche mit, die durch dasselbe Gateway läuft.
+    /// A limit of 0 writes no counter — only for that reason do exclusively the
+    /// five named paths count. If the section does not bind, Noelia's defaults
+    /// apply (100 per minute), and then <em>every</em> asset fetch of the
+    /// interface counts along, which travels through the same gateway.
     /// </remarks>
     [Fact]
-    public void Die_drei_Vorgaben_kommen_als_Null_an()
+    public void The_three_defaults_arrive_as_zero()
     {
         var optionen = Gebunden();
 
@@ -64,21 +64,22 @@ public sealed class BremsenbindungTests
         optionen.RequestsPerDay.Should().Be(0);
     }
 
-    /// <summary>Je ProviderOrigin, nie je Benutzer.</summary>
+    /// <summary>Per origin, never per user.</summary>
     /// <remarks>
-    /// Noelias Vorgabe ist <c>UserThenOrigin</c>. Käme die an, zählte ein
-    /// angemeldeter Mensch gegen sich selbst statt gegen seine ProviderOrigin — und
-    /// die Bremse verlöre genau die Eigenschaft, wegen der sie am Eingang steht.
+    /// Noelia's default is <c>UserThenOrigin</c>. If that arrived, a signed-in
+    /// person would count against themselves instead of against their origin —
+    /// and the brake would lose exactly the property it stands at the entrance
+    /// for.
     /// </remarks>
     [Fact]
-    public void Gezaehlt_wird_je_Herkunft()
+    public void Counting_happens_per_origin()
     {
         Gebunden().Subject.Should().Be(RateLimitSubject.Origin);
     }
 
-    /// <summary>Die fünf Pfade mit ihren Zahlen, wie sie dastehen.</summary>
+    /// <summary>The five paths with their numbers, as they stand.</summary>
     [Fact]
-    public void Die_fuenf_Grenzen_kommen_an()
+    public void The_five_limits_arrive()
     {
         var limits = Gebunden().EndpointSpecificLimits;
 
@@ -90,16 +91,16 @@ public sealed class BremsenbindungTests
         limits["/auth/refresh"].RequestsPerMinute.Should().Be(60);
     }
 
-    /// <summary>Und die Ausnahmelisten bleiben leer.</summary>
+    /// <summary>And the exemption lists stay empty.</summary>
     /// <remarks>
-    /// Der Binder <em>ergänzt</em> eine Sammlung und ersetzt sie nie. Stünde
-    /// Loopback in Noelias Vorgabe, käme man mit einer leeren Liste in der Datei
-    /// nicht dagegen an — dann bremste lokal gar nichts, und man sähe es nicht.
-    /// Seit 4.2.0 sind die Vorgaben leer; dieser Test hält fest, dass es so
-    /// bleibt.
+    /// The binder <em>adds to</em> a collection and never replaces it. If
+    /// loopback stood in Noelia's default, an empty list in the file would not
+    /// get you anywhere against it — then nothing would brake locally, and you
+    /// would not see it. Since 4.2.0 the defaults are empty; this test pins that
+    /// it stays that way.
     /// </remarks>
     [Fact]
-    public void Die_Ausnahmelisten_bleiben_leer()
+    public void The_exemption_lists_stay_empty()
     {
         var optionen = Gebunden();
 

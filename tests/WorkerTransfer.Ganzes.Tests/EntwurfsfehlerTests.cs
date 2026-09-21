@@ -9,39 +9,38 @@ using ProfilPorts = WorkerTransfer.Profile.Application.Ports;
 namespace WorkerTransfer.Ganzes.Tests;
 
 /// <summary>
-/// Ein Fehlschlag meldet die <strong>Art</strong>, nie den Inhalt (ADR-0024 §4).
+/// A failure reports the <strong>kind</strong>, never the content (ADR-0024 §4).
 /// </summary>
 /// <remarks>
-/// <para>ADR-0024 §4 sagt zu: „Fehler melden die Fehlerart, nie den Inhalt — ein
-/// Test prüft, dass ein Netzwerkfehler den Prompt nicht mitschleppt."
-/// <strong>Den Test gab es nicht.</strong> Der Quelltext war richtig; er hing
-/// allein daran, dass niemand beim nächsten Fehlerzweig ein
-/// <c>{fehler.Message}</c> anhängt — und genau das ist die naheliegendste
-/// Bewegung, weil ein Fehlschlag der Moment ist, in dem man mehr sehen will.</para>
+/// <para>ADR-0024 §4 promises: "Errors report the failure kind, never the
+/// content — a test checks that a network error does not drag the prompt along."
+/// <strong>That test did not exist.</strong> The source was correct; it hung
+/// solely on nobody appending a <c>{fehler.Message}</c> at the next error
+/// branch — and that is exactly the most obvious movement, because a failure is
+/// the moment when one wants to see more.</para>
 ///
-/// <para>Der Selbstbeschreibungstext einer Person gehört in dieselbe Klasse wie
-/// ein Resume: <c>product-scope.md</c> verbietet ihn im Protokoll. Eine
-/// Fehlermeldung ist ein Protokolleintrag, der zusätzlich noch zum Aufrufer
-/// zurückgeht.</para>
+/// <para>A person's self-description belongs in the same class as a resume:
+/// <c>product-scope.md</c> forbids it in the log. An error message is a log
+/// entry that on top of that goes back to the caller.</para>
 ///
-/// <para>Beide Dienste geben dieselbe Zusage, deshalb steht sie an einer Job:
-/// die Reihe wäre sonst zweimal dieselbe, und eine der beiden bliebe beim
-/// nächsten Zweig zurück.</para>
+/// <para>Both services give the same promise, which is why it stands in one
+/// place: the suite would otherwise be the same one twice, and one of the two
+/// would fall behind at the next branch.</para>
 /// </remarks>
 public class EntwurfsfehlerTests
 {
-    /// <summary>Was in keiner Meldung auftauchen darf.</summary>
+    /// <summary>What must appear in no message.</summary>
     private const string Geheim = "Ich bin 1998 aus Aleppo gekommen und pflege meine Mutter.";
 
     private const string Wunsch = "bitte kuerzer";
 
     /// <summary>
-    /// Ein Verbindungsfehler nennt die Art — und trägt den Prompt nicht mit.
+    /// A connection error names the kind — and does not carry the prompt along.
     /// </summary>
     [Theory]
     [InlineData("profil")]
     [InlineData("anzeige")]
-    public async Task Ein_Verbindungsfehler_traegt_den_Prompt_nicht_mit(string page)
+    public async Task A_connection_error_does_not_carry_the_prompt_along(string page)
     {
         var error = await Fange(
             page,
@@ -53,17 +52,17 @@ public class EntwurfsfehlerTests
     }
 
     /// <summary>
-    /// Eine Fehlerantwort nennt den Statuscode — und nicht den fremden Rumpf.
+    /// An error response names the status code — and not the foreign body.
     /// </summary>
     /// <remarks>
-    /// Der Rumpf des Anbieters ist besonders verlockend, weil dort oft steht,
-    /// was fehlte. Er kann aber den eingeschickten Text zitieren, und dann steht
-    /// er über den Umweg des Anbieters doch im eigenen Protokoll.
+    /// The provider's body is particularly tempting, because what was missing
+    /// often stands in it. But it can quote the text that was sent in, and then
+    /// that text stands in our own log after all, by way of the provider.
     /// </remarks>
     [Theory]
     [InlineData("profil")]
     [InlineData("anzeige")]
-    public async Task Eine_Fehlerantwort_traegt_weder_Rumpf_noch_Prompt(string page)
+    public async Task An_error_response_carries_neither_body_nor_prompt(string page)
     {
         var error = await Fange(page, new Stubhandler(_ =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
@@ -76,19 +75,19 @@ public class EntwurfsfehlerTests
     }
 
     /// <summary>
-    /// Ein Zeitablauf ist ein Anbieterfehler — und kommt nicht als 500 heraus.
+    /// A timeout is a provider error — and does not come out as a 500.
     /// </summary>
     /// <remarks>
-    /// <c>client.Timeout</c> wirft <c>TaskCanceledException</c> und
-    /// <b>nicht</b> <c>HttpRequestException</c>. Ohne einen eigenen Zweig
-    /// verliesse ein langsamer Anbieter den Dienst als unbehandelte Ausnahme,
-    /// also als 500 — obwohl es dieselbe Aussage ist wie ein Verbindungsfehler.
-    /// Gemessen als Prüfungsfund; dies ist der Test dazu.
+    /// <c>client.Timeout</c> throws <c>TaskCanceledException</c> and
+    /// <b>not</b> <c>HttpRequestException</c>. Without a branch of its own a
+    /// slow provider would leave the service as an unhandled exception, that is,
+    /// as a 500 — although it is the same statement as a connection error.
+    /// Measured as an audit finding; this is the test for it.
     /// </remarks>
     [Theory]
     [InlineData("profil")]
     [InlineData("anzeige")]
-    public async Task Ein_Zeitablauf_wird_zum_Anbieterfehler(string page)
+    public async Task A_timeout_becomes_a_provider_error(string page)
     {
         var error = await Fange(
             page,
@@ -104,18 +103,18 @@ public class EntwurfsfehlerTests
     }
 
     /// <summary>
-    /// Legt der Aufrufer auf, ist nichts kaputt — und daraus wird keine 503.
+    /// If the caller hangs up, nothing is broken — and no 503 comes out of it.
     /// </summary>
     /// <remarks>
-    /// Beide Fälle teilen sich <c>TaskCanceledException</c>. Ohne die Bedingung
-    /// am <c>catch</c> würde ein abgebrochener Browser dem Anbieter angelastet,
-    /// und die Zusage „503 heisst: der Anbieter antwortet nicht" wäre nur noch
-    /// manchmal wahr.
+    /// Both cases share <c>TaskCanceledException</c>. Without the condition on
+    /// the <c>catch</c> an aborted browser would be blamed on the provider, and
+    /// the promise "503 means: the provider does not answer" would be true only
+    /// some of the time.
     /// </remarks>
     [Theory]
     [InlineData("profil")]
     [InlineData("anzeige")]
-    public async Task Ein_Abbruch_des_Aufrufers_bleibt_ein_Abbruch(string page)
+    public async Task An_abort_by_the_caller_stays_an_abort(string page)
     {
         using var cancellationToken = new CancellationTokenSource();
 
@@ -132,7 +131,7 @@ public class EntwurfsfehlerTests
             "wer auflegt, meldet keinen Anbieterausfall");
     }
 
-    /// <summary>None Meldung trägt Inhalt — weder den Text noch den Wunsch.</summary>
+    /// <summary>No message carries content — neither the text nor the wish.</summary>
     private static void OhneInhalt(Exception error)
     {
         error.Message.Should().NotContain("Aleppo", "kein Wort aus dem Text der Person");
@@ -185,13 +184,13 @@ public class EntwurfsfehlerTests
                 marke);
     }
 
-    /// <summary>Eine Fabrik, die immer denselben Stub ausliefert.</summary>
+    /// <summary>A factory that always hands out the same stub.</summary>
     private sealed class Stubfabrik(HttpMessageHandler handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
     }
 
-    /// <summary>Ein Handler, der tut, was ihm mitgegeben wurde.</summary>
+    /// <summary>A handler that does what it was given.</summary>
     private sealed class Stubhandler(Func<CancellationToken, Task<HttpResponseMessage>> tat)
         : HttpMessageHandler
     {

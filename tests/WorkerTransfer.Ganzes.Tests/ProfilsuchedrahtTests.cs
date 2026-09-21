@@ -6,37 +6,36 @@ using WorkerTransfer.Scout.Contracts;
 namespace WorkerTransfer.Ganzes.Tests;
 
 /// <summary>
-/// Was profile-service schreibt, muss scout-service lesen können.
+/// What profile-service writes, scout-service has to be able to read.
 /// </summary>
 /// <remarks>
-/// <para><strong>Warum dieser Test und nicht ein Namensvergleich.</strong> Ein
-/// Test, der fragt „heisst das Feld <c>subject_id</c>?", prüft dieselbe
-/// Zeichenkette zweimal und geht mit ihr gemeinsam kaputt. Hier wird stattdessen
-/// der Rumpf serialisiert, den der Absender wirklich schreibt, und mit dem
-/// <em>Typ des Empfängers</em> gelesen. Grün heisst dann: die Werte kommen an.
-/// Das ist die Zusage, und sie überlebt jede Umbenennung.</para>
+/// <para><strong>Why this test and not a comparison of names.</strong> A test
+/// that asks "is the field called <c>subject_id</c>?" checks the same string
+/// twice and breaks together with it. Here the body the sender really writes is
+/// serialised instead, and read with the <em>receiver's type</em>. Green then
+/// means: the values arrive. That is the promise, and it survives every
+/// rename.</para>
 ///
-/// <para><strong>Der Anlass ist älter als dieser Dienst.</strong> Vier Dienste
-/// schickten einmal <c>userId</c> an einen Empfänger, der
-/// <c>[JsonPropertyName("user_id")]</c> deklariert: die Kennung band still auf
-/// <c>Guid.Empty</c>, und der ganze Benachrichtigungsweg hat nie funktioniert —
-/// 18 Ausgangszeilen, keine einzige Mail. Bei einwortigen Feldern
-/// (<c>headline</c>, <c>location</c>) fällt so etwas nie auf; erst ein
-/// zusammengesetzter Name geht auseinander, und <c>subject_id</c> und
-/// <c>remote_ok</c> sind genau solche.</para>
+/// <para><strong>The occasion is older than this service.</strong> Four
+/// services once sent <c>userId</c> to a receiver that declares
+/// <c>[JsonPropertyName("user_id")]</c>: the id bound silently to
+/// <c>Guid.Empty</c>, and the whole notification path never worked — 18 outbox
+/// rows, not a single mail. With single-word fields (<c>headline</c>,
+/// <c>location</c>) such a thing never shows; only a compound name comes apart,
+/// and <c>subject_id</c> and <c>remote_ok</c> are exactly that.</para>
 ///
-/// <para><strong>Warum keine andere Reihe es fängt.</strong>
-/// <c>DrahtvertragTests</c> prüft, dass beide Seiten <em>eine</em> Angabe tragen
-/// — nicht, dass es dieselbe ist. Und keine Dienstreihe kreuzt die Naht: der
-/// Absender hat im Test keinen Empfänger, der Empfänger keinen Absender.</para>
+/// <para><strong>Why no other suite catches it.</strong>
+/// <c>DrahtvertragTests</c> checks that both sides carry <em>an</em> annotation
+/// — not that it is the same one. And no service suite crosses the seam: in the
+/// tests the sender has no receiver, the receiver no sender.</para>
 /// </remarks>
 public class ProfilsuchedrahtTests
 {
     private static readonly Guid Wer = Guid.Parse("3f2504e0-4f89-11d3-9a0c-0305e82c3301");
 
-    /// <summary>Ein Profile überlebt die Naht — mit Kennung und Remote-Häkchen.</summary>
+    /// <summary>A profile survives the seam — with id and remote tick.</summary>
     [Fact]
-    public void Ein_Profil_kommt_vollstaendig_an()
+    public void A_profile_arrives_complete()
     {
         var geschrieben = JsonSerializer.Serialize(
             new ProfileHitV1(Wer, "Entwicklerin", "Ich baue verteilte Systeme.", "Berlin", true, ["Go", "PostgreSQL"]));
@@ -53,13 +52,13 @@ public class ProfilsuchedrahtTests
         gelesen.Skills.Should().Equal("Go", "PostgreSQL");
     }
 
-    /// <summary>Und eine Seite samt ihrem Cursor.</summary>
+    /// <summary>And a page together with its cursor.</summary>
     /// <remarks>
-    /// Ohne den Cursor gäbe es keine zweite Seite — und das sähe aus wie „es
-    /// gibt niemanden mehr".
+    /// Without the cursor there would be no second page — and that would look
+    /// like "there is nobody else".
     /// </remarks>
     [Fact]
-    public void Eine_Seite_kommt_mit_ihrem_Zeiger_an()
+    public void A_page_arrives_with_its_cursor()
     {
         var geschrieben = JsonSerializer.Serialize(
             new ProfileHitPageV1(
@@ -74,16 +73,16 @@ public class ProfilsuchedrahtTests
     }
 
     /// <summary>
-    /// Die Gegenprobe: der Test würde ein falsch benanntes Feld auch bemerken.
+    /// The counter-probe: the test would also notice a wrongly named field.
     /// </summary>
     /// <remarks>
-    /// Eine Reihe, die nichts finden kann, ist grün und wertlos. Hier wird
-    /// derselbe Rumpf mit dem camelCase-Namen geschrieben, den ein vergessenes
-    /// <c>[JsonPropertyName]</c> erzeugen würde — und der Empfänger liest dann
-    /// eine leere Kennung.
+    /// A suite that cannot find anything is green and worthless. Here the same
+    /// body is written with the camelCase name a forgotten
+    /// <c>[JsonPropertyName]</c> would produce — and the receiver then reads an
+    /// empty id.
     /// </remarks>
     [Fact]
-    public void Ein_falsch_benanntes_Feld_faellt_auf()
+    public void A_wrongly_named_field_shows_up()
     {
         var camelCase = """
             {"subjectId":"3f2504e0-4f89-11d3-9a0c-0305e82c3301","headline":"x",

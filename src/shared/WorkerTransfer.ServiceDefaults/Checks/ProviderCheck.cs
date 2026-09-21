@@ -6,58 +6,59 @@ using Noelia.Infrastructure.Sovereignty;
 
 namespace WorkerTransfer.ServiceDefaults.Checks;
 
-/// <summary>Wer den Anbieter eingerichtet hat.</summary>
+/// <summary>Who set the provider up.</summary>
 public enum ProviderOrigin
 {
-    /// <summary>Der Betreiber, in der EnvironmentFile — ein Zugang, der für alle gilt.</summary>
+    /// <summary>The operator, in the environment — one access that applies to everybody.</summary>
     Betreiber,
 
-    /// <summary>Die Person, in ihren AccountSettings — ein Zugang je Mensch.</summary>
+    /// <summary>The person, in their account settings — one access per human being.</summary>
     Person
 }
 
-/// <summary>Ein Anbieter, wie er in dieser Instanz wirklich in Gebrauch ist.</summary>
+/// <summary>A provider as it is really in use in this instance.</summary>
 /// <remarks>
-/// <strong><see cref="Menschen"/> zählt und nennt nicht.</strong> „Drei Menschen
-/// auf <c>api.anthropic.com</c>" ist eine Aussage über die Instanz; „diese
-/// Person auf jenem Server" wäre eine über einen Menschen und gehört nicht in
-/// ein Dokument, das jemand herumreicht (ADR-0026). Bei
-/// <see cref="Herkunft.Betreiber"/> steht hier <c>0</c>: der Zugang hängt an
-/// keiner Person.
+/// <strong><see cref="Menschen"/> counts and does not name.</strong> "Three
+/// people on <c>api.anthropic.com</c>" is a statement about the instance; "this
+/// person on that server" would be one about a human being and does not belong
+/// in a document somebody passes around (ADR-0026). With
+/// <see cref="ProviderOrigin.Betreiber"/> this stands at <c>0</c>: the access
+/// hangs on no person.
 /// </remarks>
-/// <param name="Etikett">Das Anbieter-Etikett: <c>anthropic</c>, <c>openai_compatible</c>.</param>
-/// <param name="Host">Der Host seiner Adresse — nie die ganze Adresse, nie ein Schlüssel.</param>
-/// <param name="Herkunft">Wer ihn eingerichtet hat.</param>
-/// <param name="Menschen">Wie viele Menschen ihn eingetragen haben. Bei Betreiber: 0.</param>
+/// <param name="Etikett">The provider label: <c>anthropic</c>, <c>openai_compatible</c>.</param>
+/// <param name="Host">The host of its address — never the whole address, never a key.</param>
+/// <param name="ProviderOrigin">Who set it up.</param>
+/// <param name="Menschen">How many people entered it. With the operator: 0.</param>
 public sealed record ProviderRow(
     string Etikett,
     string Host,
     ProviderOrigin ProviderOrigin,
     int Menschen);
 
-/// <summary>Woher der Nachweis erfährt, welche Anbieter in Gebrauch sind.</summary>
+/// <summary>Where the evidence learns which providers are in use.</summary>
 /// <remarks>
-/// Ein Port, weil die Antwort je Dienst woanders steht: in identity-service in
-/// einer Tabelle, in profile-service und jobs-service in der EnvironmentFile.
+/// A port, because the answer stands elsewhere for each service: in
+/// identity-service in a table, in profile-service and jobs-service in the
+/// environment.
 /// </remarks>
 public interface IProviderSource
 {
-    /// <summary>Was in dieser Instanz eingetragen ist, aggregiert.</summary>
-    /// <param name="ct">Bricht ab, wenn der Aufrufer auflegt.</param>
-    /// <returns>Die Zeilen. Leer heißt: hier ist nichts eingerichtet.</returns>
+    /// <summary>What is entered in this instance, aggregated.</summary>
+    /// <param name="ct">Cancels when the caller hangs up.</param>
+    /// <returns>The rows. Empty means nothing is set up here.</returns>
     Task<IReadOnlyList<ProviderRow>> ReadAsync(CancellationToken ct = default);
 }
 
-/// <summary>Der Anbieter, den der Betreiber in der EnvironmentFile eingerichtet hat.</summary>
+/// <summary>The provider the operator set up in the environment.</summary>
 /// <remarks>
-/// <strong>Nicht eingerichtet heißt: keine Zeile.</strong> Eine Zeile
-/// „anthropic, nicht in Gebrauch" wäre ein Eintrag über einen Empfänger, den es
-/// nicht gibt — und der Vorgabewert der Adresse stünde dann in einem Dokument,
-/// als spräche jemand mit ihm.
+/// <strong>Not set up means: no row.</strong> A row "anthropic, not in use"
+/// would be an entry about a recipient that does not exist — and the default
+/// value of the address would then stand in a document as though somebody were
+/// speaking to it.
 /// </remarks>
-/// <param name="etikett">Das Anbieter-Etikett.</param>
-/// <param name="adresse">Die Adresse aus der Konfiguration.</param>
-/// <param name="eingerichtet">Ob überhaupt jemand gerufen wird.</param>
+/// <param name="label">The provider label.</param>
+/// <param name="address">The address out of the configuration.</param>
+/// <param name="eingerichtet">Whether anybody is called at all.</param>
 public sealed class OperatorProviderSource(string label, string address, bool eingerichtet)
     : IProviderSource
 {
@@ -71,28 +72,28 @@ public sealed class OperatorProviderSource(string label, string address, bool ei
                 [new ProviderRow(label, target.Host, ProviderOrigin.Betreiber, 0)]);
 }
 
-/// <summary>Welche KI-Anbieter sind in dieser Instanz tatsächlich in Gebrauch?</summary>
+/// <summary>Which AI providers are actually in use in this instance?</summary>
 /// <remarks>
-/// <para><strong>Sie überlebt den Umstieg, und der Grund ist gemessen.</strong>
-/// Noelias <c>noelia.ai.inventory</c> liest die <em>deklarierten</em>
-/// Abhängigkeiten und erkennt einen Modell-Endpunkt an seinem Hostnamen
-/// (<c>HostJurisdiction.IsArtificialIntelligence</c>). Deklariert wird zur
-/// <em>Startzeit</em> — und genau dort steht der Zugang hier nicht: er steht in
-/// <c>KiZugangV1</c>, je Person, in einer Tabelle. Noelias Verzeichnis ist
-/// deshalb zu Recht eine Untergrenze; dieses hier kann vollständig sein.</para>
+/// <para><strong>It survives the migration, and the reason is measured.</strong>
+/// Noelia's <c>noelia.ai.inventory</c> reads the <em>declared</em> dependencies
+/// and recognises a model endpoint by its host name
+/// (<c>HostJurisdiction.IsArtificialIntelligence</c>). Declaring happens at
+/// <em>startup</em> — and that is exactly where the access does not stand here:
+/// it stands in <c>KiZugangV1</c>, per person, in a table. Noelia's directory
+/// is therefore rightly a lower bound; this one here can be complete.</para>
 ///
-/// <para><strong>Und genau deshalb ist der Befund personenbezogen.</strong> Er
-/// nennt Anbieter und Host und <em>zählt</em>. Wer welchen Anbieter benutzt,
-/// steht nirgends — weder hier noch auf der Seite noch in
+/// <para><strong>And exactly for that reason the finding is about
+/// people.</strong> It names provider and host and <em>counts</em>. Who uses
+/// which provider stands nowhere — neither here nor on the page nor in
 /// <c>report.json</c>.</para>
 ///
-/// <para><strong>Die Lage kommt von Noelia, nicht aus einem Nachbau.</strong>
-/// <c>HostJurisdiction.Classify</c> unterscheidet selbst betriebene Ziele von
-/// solchen in einem Drittland; unser früherer <c>Zielkunde</c> tat dasselbe
-/// schlechter und ist gefallen. Zwei Einteilungen derselben Frage sind zwei
-/// Wahrheiten.</para>
+/// <para><strong>The jurisdiction comes from Noelia, not from a rebuild.</strong>
+/// <c>HostJurisdiction.Classify</c> distinguishes self-operated destinations
+/// from ones in a third country; our earlier <c>Zielkunde</c> did the same
+/// thing worse and has fallen. Two classifications of the same question are two
+/// truths.</para>
 /// </remarks>
-/// <param name="quellen">Woher die Zeilen kommen. None heißt: hier gibt es keine KI.</param>
+/// <param name="quellen">Where the rows come from. None means there is no AI here.</param>
 public sealed class ProviderCheck(IEnumerable<IProviderSource> quellen) : ISecurityCheck
 {
     /// <inheritdoc />
@@ -103,10 +104,10 @@ public sealed class ProviderCheck(IEnumerable<IProviderSource> quellen) : ISecur
 
     /// <inheritdoc />
     /// <remarks>
-    /// <c>Composition</c> ist eine Auswahlregel, keine Kosmetik: Noelias Läufer
-    /// nimmt eine Prüfung nur bei dieser Kategorie oder einem komponierten
-    /// Modul. Ein zufällig komponiertes Modul zu wählen hiesse, dass die
-    /// Prüfung still verschwindet, sobald jemand es abwählt.
+    /// <c>Composition</c> is a selection rule, not cosmetics: Noelia's runner
+    /// takes a check only with this category or with a composed module.
+    /// Choosing a module that happens to be composed would mean the check
+    /// silently disappears as soon as somebody deselects it.
     /// </remarks>
     public SecurityCheckCategory Category => SecurityCheckCategory.Composition;
 
@@ -154,9 +155,9 @@ public sealed class ProviderCheck(IEnumerable<IProviderSource> quellen) : ISecur
 
         if (gebuendelt.Count == 0)
         {
-            // NotApplicable und nicht Pass: ein gruener Haken an etwas, das hier
-            // gar nicht gilt, ist Rauschen in genau dem Dokument, das Rauschen
-            // durchschneiden soll.
+            // NotApplicable and not Pass: a green tick on something that does
+            // not apply here at all is noise in exactly the document that is
+            // meant to cut through noise.
             return Ergebnis(
                 SecurityCheckStatus.NotApplicable,
                 "In dieser Instanz ist kein KI-Anbieter eingetragen. Ohne "
@@ -182,7 +183,7 @@ public sealed class ProviderCheck(IEnumerable<IProviderSource> quellen) : ISecur
                   + "ändert das, und zwar ohne Codeänderung.");
     }
 
-    /// <summary>Eine Zeile, wie ein Mensch sie liest.</summary>
+    /// <summary>One row as a human being reads it.</summary>
     private static string Satz(ProviderRow row)
     {
         var lage = HostJurisdiction.Classify(row.Host);

@@ -4,49 +4,47 @@ using Microsoft.Extensions.Configuration;
 
 namespace WorkerTransfer.ServiceDefaults;
 
-/// <summary>Es fehlt der Hauptschlüssel, ohne den nichts verschlüsselt liegen kann.</summary>
-/// <param name="schluessel">Welcher Konfigurationsschlüssel fehlt.</param>
+/// <summary>The master key is missing, without which nothing can lie encrypted.</summary>
+/// <param name="key">Which configuration key is missing.</param>
 public sealed class MasterKeyMissing(string key)
     : Exception($"'{key}' ist nicht gesetzt. Ohne Hauptschlüssel kann kein "
                 + "Geheimnis gespeichert werden — und im Klartext wird keines gespeichert.");
 
-/// <summary>Verschlüsselt Secrets, die eine Person selbst hinterlegt hat.</summary>
+/// <summary>Encrypts secrets a person deposited themselves.</summary>
 /// <remarks>
-/// <strong>AES-GCM, ein Schlüssel aus der EnvironmentFile, ein Zufallsvektor je
-/// Geheimnis.</strong> GCM und nicht CBC, weil es die Echtheit mitprüft: ein
-/// veränderter Geheimtext fällt beim Entschlüsseln auf, statt als Unsinn
-/// herauszukommen. Der Vektor steht vorn im Ergebnis — er ist kein Geheimnis,
-/// aber er darf sich nie wiederholen, und deshalb wird er gewürfelt und nicht
-/// gezählt.
+/// <strong>AES-GCM, one key from the environment, one random vector per
+/// secret.</strong> GCM and not CBC, because it checks authenticity along the
+/// way: an altered ciphertext is noticed on decryption instead of coming out as
+/// nonsense. The vector stands at the front of the result — it is no secret,
+/// but it must never repeat, and that is why it is rolled rather than counted.
 ///
 /// <para>
-/// <strong>Der Hauptschlüssel kommt aus der EnvironmentFile, genau wie
-/// <c>JWT_SECRET</c>.</strong> Das ist bewusst dieselbe Mechanik und nicht eine
-/// zweite: <c>make env</c> würfelt ihn, <c>.env</c> ist ignoriert, und ohne ihn
-/// wirft dieser Dienst beim Start mit dem NAMEN der fehlenden Variablen. Eine
-/// eingebaute Vorgabe wäre der Schlüssel selbst, und der läge dann in git.
+/// <strong>The master key comes from the environment, exactly like
+/// <c>JWT_SECRET</c>.</strong> That is deliberately the same mechanism and not
+/// a second one: <c>make env</c> rolls it, <c>.env</c> is ignored, and without
+/// it this service throws at startup naming the MISSING variable. A built-in
+/// default would be the key itself, and it would then lie in git.
 /// </para>
 ///
 /// <para>
-/// <strong>Was das NICHT ist.</strong> Es ist kein Schlüsselverwaltungssystem:
-/// es gibt keine Rotation, keine Versionierung des Hauptschlüssels und keinen
-/// zweiten Empfänger. Wer den Hauptschlüssel wechselt, macht jedes hinterlegte
-/// Geheimnis unlesbar — die Oberfläche zeigt dann „keiner hinterlegt", und die
-/// Person legt einen neuen an. Das ist der ehrliche Zustand für den ersten
-/// Schritt; Infisical füllt später dieselbe Variable, und erst dann lohnt eine
-/// Rotation.
+/// <strong>What this is NOT.</strong> It is not a key management system: there
+/// is no rotation, no versioning of the master key and no second recipient.
+/// Whoever changes the master key makes every deposited secret unreadable — the
+/// interface then shows "none deposited", and the person deposits a new one.
+/// That is the honest state for the first step; Infisical will later fill the
+/// same variable, and only then is a rotation worth having.
 /// </para>
 /// </remarks>
 public sealed class SecretStore
 {
-    /// <summary>Die Umgebungsvariable, in der der Hauptschlüssel steht.</summary>
+    /// <summary>The environment variable the master key stands in.</summary>
     public const string Variable = "WORKERTRANSFER_SECRETS_KEY";
 
     private readonly byte[] _hauptschluessel;
 
-    /// <summary>Liest den Hauptschlüssel aus der Konfiguration.</summary>
-    /// <param name="konfiguration">Die Konfiguration des Dienstes.</param>
-    /// <exception cref="HauptschluesselFehlt">Er ist nicht gesetzt.</exception>
+    /// <summary>Reads the master key out of the configuration.</summary>
+    /// <param name="konfiguration">The service's configuration.</param>
+    /// <exception cref="MasterKeyMissing">It is not set.</exception>
     public SecretStore(IConfiguration konfiguration)
     {
         ArgumentNullException.ThrowIfNull(konfiguration);
@@ -58,15 +56,15 @@ public sealed class SecretStore
             throw new MasterKeyMissing(Variable);
         }
 
-        // Aus einer beliebig langen Zeichenkette werden 32 Byte. SHA-256 und
-        // nicht die Bytes selbst: `make env` würfelt Base64, und dessen Länge
-        // hängt an der Zufallsquelle — AES verlangt aber genau 16, 24 oder 32.
+        // An arbitrarily long string becomes 32 bytes. SHA-256 and not the
+        // bytes themselves: `make env` rolls base64, and its length hangs on
+        // the source of randomness — but AES demands exactly 16, 24 or 32.
         _hauptschluessel = SHA256.HashData(Encoding.UTF8.GetBytes(roh));
     }
 
-    /// <summary>Verschlüsselt ein Geheimnis.</summary>
-    /// <param name="klartext">Was hinterlegt werden soll.</param>
-    /// <returns>Base64 aus Vektor, Prüfsumme und Geheimtext.</returns>
+    /// <summary>Encrypts a secret.</summary>
+    /// <param name="klartext">What is to be deposited.</param>
+    /// <returns>Base64 of vector, checksum and ciphertext.</returns>
     public string Encrypt(string klartext)
     {
         ArgumentNullException.ThrowIfNull(klartext);
@@ -82,15 +80,14 @@ public sealed class SecretStore
         return Convert.ToBase64String([.. vektor, .. pruefsumme, .. geheim]);
     }
 
-    /// <summary>Entschlüsselt ein Geheimnis.</summary>
+    /// <summary>Decrypts a secret.</summary>
     /// <remarks>
-    /// Gibt <c>null</c> zurück, statt zu werfen. Ein unlesbares Geheimnis ist
-    /// hier kein Programmfehler, sondern ein gewechselter Hauptschlüssel — und
-    /// die richtige Antwort darauf ist „es ist keiner hinterlegt", nicht ein
-    /// Absturz beim Entwerfen.
+    /// Returns <c>null</c> instead of throwing. An unreadable secret is not a
+    /// program error here but a master key that was changed — and the right
+    /// answer to that is "none is deposited", not a crash while drafting.
     /// </remarks>
-    /// <param name="gespeichert">Was in der Zeile stand.</param>
-    /// <returns>Der Klartext, oder <c>null</c>.</returns>
+    /// <param name="gespeichert">What stood in the row.</param>
+    /// <returns>The plaintext, or <c>null</c>.</returns>
     public string? Decrypt(string? gespeichert)
     {
         if (string.IsNullOrWhiteSpace(gespeichert))
@@ -125,9 +122,9 @@ public sealed class SecretStore
         }
     }
 
-    /// <summary>Die letzten vier Zeichen — zum Wiedererkennen, nicht zum Benutzen.</summary>
-    /// <param name="klartext">Das Geheimnis.</param>
-    /// <returns>Höchstens vier Zeichen.</returns>
+    /// <summary>The last four characters — for recognising, not for using.</summary>
+    /// <param name="klartext">The secret.</param>
+    /// <returns>At most four characters.</returns>
     public static string Endung(string klartext) =>
         string.IsNullOrEmpty(klartext) || klartext.Length <= 4
             ? string.Empty

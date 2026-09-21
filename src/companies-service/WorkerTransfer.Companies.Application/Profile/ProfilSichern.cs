@@ -13,16 +13,16 @@ namespace WorkerTransfer.Companies.Application.Profile;
 /// </remarks>
 public sealed record SaveProfileCommand(
     TenantId Firma,
-    string Anzeigename,
-    string UeberUns,
-    string? Netzseite,
-    IReadOnlyList<string>? Orte,
-    IReadOnlyList<string>? Leistungen,
-    string? Zeile1 = null,
-    string? Postleitzahl = null,
-    string? Ort = null,
-    string? Land = null,
-    string? Telefon = null) : IBefehl<EmployerProfile>;
+    string DisplayName,
+    string About,
+    string? Website,
+    IReadOnlyList<string>? Locations,
+    IReadOnlyList<string>? Benefits,
+    string? Line1 = null,
+    string? PostalCode = null,
+    string? City = null,
+    string? Country = null,
+    string? Phone = null) : IBefehl<EmployerProfile>;
 
 /// <summary>Legt an oder ändert — und vergibt das Kürzel genau einmal.</summary>
 public sealed class SaveProfileHandler(IProfileStore store, TimeProvider uhr)
@@ -45,21 +45,21 @@ public sealed class SaveProfileHandler(IProfileStore store, TimeProvider uhr)
             // folgt es dem Anzeigenamen nicht mehr — sonst bräche jeder
             // geteilte Link auf die Karriere-Seite.
             var slug = await store.FreeSlugAsync(
-                Domain.EmployerProfiles.Slug.Aus(request.Anzeigename), cancellationToken);
+                Domain.EmployerProfiles.Slug.Aus(request.DisplayName), cancellationToken);
 
-            profile = EmployerProfile.Lege_an(
-                request.Firma, slug, request.Anzeigename, request.UeberUns,
-                request.Netzseite, request.Orte, request.Leistungen, now,
-                request.Zeile1, request.Postleitzahl, request.Ort, request.Land,
-                request.Telefon);
+            profile = EmployerProfile.Create(
+                request.Firma, slug, request.DisplayName, request.About,
+                request.Website, request.Locations, request.Benefits, now,
+                request.Line1, request.PostalCode, request.City, request.Country,
+                request.Phone);
         }
         else
         {
-            vorhanden.Aendere(
-                request.Anzeigename, request.UeberUns, request.Netzseite,
-                request.Orte, request.Leistungen, now,
-                request.Zeile1, request.Postleitzahl, request.Ort, request.Land,
-                request.Telefon);
+            vorhanden.Change(
+                request.DisplayName, request.About, request.Website,
+                request.Locations, request.Benefits, now,
+                request.Line1, request.PostalCode, request.City, request.Country,
+                request.Phone);
 
             profile = vorhanden;
         }

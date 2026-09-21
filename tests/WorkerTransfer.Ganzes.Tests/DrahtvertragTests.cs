@@ -5,48 +5,47 @@ using FluentAssertions;
 namespace WorkerTransfer.Ganzes.Tests;
 
 /// <summary>
-/// Jeder zusammengesetzte Feldname auf dem Draht steht ausdrücklich da.
+/// Every compound field name on the wire stands there expressly.
 /// </summary>
 /// <remarks>
-/// <para><strong>Der Draht dieser Plattform ist snake_case.</strong> Neun Dienste
-/// setzen ihn mit <c>[JsonPropertyName]</c> auf ihren Vertragstypen, und
-/// <c>apps/web</c> liest und schreibt danach. Ein Rumpf <em>ohne</em> die
-/// Angaben fällt aber auf camelCase aus <c>NoeliaModule.JsonOptions</c> zurück —
-/// und dann heißt dasselbe Feld auf beiden Seiten anders.</para>
+/// <para><strong>This platform's wire is snake_case.</strong> Nine services set
+/// it with <c>[JsonPropertyName]</c> on their contract types, and
+/// <c>apps/web</c> reads and writes accordingly. A body <em>without</em> those
+/// annotations falls back on camelCase from <c>NoeliaModule.JsonOptions</c> —
+/// and then the same field is called something different on each side.</para>
 ///
-/// <para><strong>Warum das über Jahre unsichtbar bleibt.</strong> Bei einwortigen
-/// Feldern sind camelCase und snake_case <em>dasselbe Wort</em>: <c>token</c>,
-/// <c>email</c>, <c>capability</c>, <c>reason</c>. Erst ein zusammengesetzter
-/// Name geht auseinander. Deshalb prüft diese Reihe genau die und nur die.</para>
+/// <para><strong>Why that stays invisible for years.</strong> With single-word
+/// fields camelCase and snake_case are <em>the same word</em>: <c>token</c>,
+/// <c>email</c>, <c>capability</c>, <c>reason</c>. Only a compound name comes
+/// apart. That is why this suite checks exactly those and only those.</para>
 ///
-/// <para><strong>Was es gekostet hat</strong>, vier Jobs, drei
-/// Schadensbilder — alle gemessen, bevor sie behoben wurden:</para>
+/// <para><strong>What it cost</strong>, four places, three kinds of damage —
+/// all measured before they were fixed:</para>
 /// <list type="bullet">
-/// <item><c>RegisterBody.DisplayName</c>: die Spalte ist <c>NOT NULL</c>, also
-/// <c>500</c> (nach H4 <c>422</c>). Über die Oberfläche konnte sich
-/// <strong>niemand registrieren</strong>.</item>
-/// <item><c>ProfileBody.RemoteOk</c>: ein <c>bool</c> fällt still auf
-/// <c>false</c>. Wer „Remote möglich" ankreuzte, bekam <c>200</c> — und das
-/// Häkchen war weg.</item>
-/// <item><c>GrantBody/RevokeBody/CheckBody.SubjectId</c>: kam als
-/// <c>Guid.Empty</c> an, der Wächter verglich mit dem Aufrufer und antwortete
-/// <c>403</c>. Über die Oberfläche war <strong>der Einwilligungs-Ledger
-/// unbedienbar</strong> — der Dienst, auf den sich alle anderen stützen.</item>
+/// <item><c>RegisterBody.DisplayName</c>: the column is <c>NOT NULL</c>, so
+/// <c>500</c> (after H4 <c>422</c>). Through the interface <strong>nobody could
+/// register</strong>.</item>
+/// <item><c>ProfileBody.RemoteOk</c>: a <c>bool</c> falls silently to
+/// <c>false</c>. Whoever ticked "remote possible" got a <c>200</c> — and the
+/// tick was gone.</item>
+/// <item><c>GrantBody/RevokeBody/CheckBody.SubjectId</c>: arrived as
+/// <c>Guid.Empty</c>, the guard compared it with the caller and answered
+/// <c>403</c>. Through the interface <strong>the consent ledger was
+/// unusable</strong> — the service every other one leans on.</item>
 /// </list>
 ///
-/// <para><strong>Und warum kein Test es fand:</strong> die Reihen schickten
-/// selbst camelCase. Wer gegen den Server prüft statt gegen den Vertrag,
-/// bestätigt jeden Dialekt, den der Server gerade spricht — auch einen, den
-/// sonst niemand spricht. 660 grüne Tests, und die Oberfläche kam nicht
-/// hinein.</para>
+/// <para><strong>And why no test found it:</strong> the suites sent camelCase
+/// themselves. Whoever checks against the server instead of against the contract
+/// confirms every dialect the server happens to speak — including one nobody
+/// else speaks. 660 green tests, and the interface could not get in.</para>
 ///
-/// <para>Geprüft wird an den <em>Typen</em> der geladenen Assemblies, nicht am
-/// Quelltext: ein regulärer Ausdruck übersähe ein Feld, das aus einem
-/// Basistyp kommt.</para>
+/// <para>The check is made on the <em>types</em> of the loaded assemblies, not
+/// on the source: a regular expression would miss a field that comes from a base
+/// type.</para>
 /// </remarks>
 public class DrahtvertragTests
 {
-    /// <summary>Je Dienst ein Typ aus seiner Api-Schicht.</summary>
+    /// <summary>One type from each service's API layer.</summary>
     public static TheoryData<string, Type> ApiSchichten => new()
     {
         { "identity", typeof(Identity.Api.AuthEndpoints) },
@@ -63,20 +62,20 @@ public class DrahtvertragTests
         { "scout", typeof(Scout.Api.ErasureEndpoints) },
         { "advisor", typeof(Advisor.Api.ErasureEndpoints) },
 
-        // Die gemeinsamen Vertraege gehoeren dazu, und zwar dringend: hier hat
-        // sich der Fehler zuletzt versteckt. `ConsentQuestionV1` reist
-        // zwischen zwei Diensten, also war sie auf BEIDEN Seiten camelCase und
-        // damit in sich stimmig — bis der Empfaenger auf den Draht der
-        // Plattform kam und der Absender nicht. Gemessen: consent-service warf
-        // `A SubjectId must not be empty`, profile-service meldete 503 „the
-        // consent ledger did not answer", und die Kandidatenliste war leer.
+        // The shared contracts belong here, and urgently so: this is where the
+        // defect hid last. `ConsentQuestionV1` travels between two services, so
+        // it was camelCase on BOTH sides and therefore internally consistent —
+        // until the receiver came onto the platform's wire and the sender did
+        // not. Measured: consent-service threw `A SubjectId must not be empty`,
+        // profile-service reported 503 "the consent ledger did not answer", and
+        // the candidate list was empty.
         { "contracts.consent", typeof(Contracts.Consent.ConsentQuestionV1) },
         { "contracts.erasure", typeof(Contracts.Erasure.ErasureV1) },
         { "contracts.identity", typeof(Contracts.Identity.Tokenform) },
 
-        // Und die Vertragsschicht JEDES Dienstes, die eine hat. Sie liegt in
-        // einer EIGENEN Assembly — wer nur die Api-Schicht scannt, sieht sie
-        // nicht. Genau daran ist `BenachrichtigenV1` vorbeigekommen.
+        // And the contracts layer of EVERY service that has one. It lies in an
+        // assembly of ITS OWN — whoever scans only the API layer does not see
+        // it. That is exactly how `BenachrichtigenV1` slipped past.
         { "applications.contracts", typeof(Applications.Contracts.ApplicationV1) },
         { "companies.contracts", typeof(Companies.Contracts.EmployerProfileV1) },
         { "github.contracts", typeof(GitHub.Contracts.RepositoryV1) },
@@ -86,47 +85,47 @@ public class DrahtvertragTests
         { "resume.contracts", typeof(Resume.Contracts.StationV1) },
         { "transfer.contracts", typeof(Transfer.Contracts.MarketStatusV1) },
 
-        // Die Vertragsschicht des Scouts UND die von profile-service: die beiden
-        // teilen eine Naht (die interne Profilsuche), und ein Feld, das dort
-        // camelCase heisst, kommt nie an. `profile.contracts` war bis dahin
-        // leer — sie steht hier ab ihrem ersten Typ.
+        // The scout's contracts layer AND profile-service's: the two share a
+        // seam (the internal profile search), and a field called camelCase there
+        // never arrives. `profile.contracts` was empty until then — it stands
+        // here from its first type on.
         { "profile.contracts", typeof(Profile.Contracts.ProfileHitV1) },
         { "scout.contracts", typeof(Scout.Contracts.HitV1) },
         { "advisor.contracts", typeof(Advisor.Contracts.ConversationV1) }
     };
 
-    /// <summary>Ob camelCase und snake_case bei diesem Namen auseinandergehen.</summary>
+    /// <summary>Whether camelCase and snake_case come apart for this name.</summary>
     /// <remarks>
-    /// Genau dann, wenn nach dem ersten Zeichen noch ein Grossbuchstabe kommt.
-    /// <c>Token</c> geht nicht auseinander, <c>DisplayName</c> schon.
+    /// Exactly when another capital letter comes after the first character.
+    /// <c>Token</c> does not come apart, <c>DisplayName</c> does.
     /// </remarks>
     private static bool Zusammengesetzt(string name) =>
         name.Skip(1).Any(char.IsUpper);
 
-    /// <summary>Kein Rumpftyp lässt einen zusammengesetzten Namen offen.</summary>
+    /// <summary>No body type leaves a compound name open.</summary>
     [Theory]
     [MemberData(nameof(ApiSchichten))]
-    public void Zusammengesetzte_Namen_stehen_ausdruecklich_da(string service, Type ausDerSchicht)
+    public void Compound_names_stand_there_expressly(string service, Type ausDerSchicht)
     {
         var offen = ausDerSchicht.Assembly
             .GetTypes()
-            // ALLE Records, auch verschachtelte und private: `MeldungV1` in
-            // identity ist ein `private sealed record` innerhalb der
-            // Endpunktklasse, und genau den hat ein Filter auf `IsPublic`
-            // uebersehen — waehrend er auf dem Draht ganz normal gebunden wird.
+            // ALL records, including nested and private ones: `MeldungV1` in
+            // identity is a `private sealed record` inside the endpoint class,
+            // and that is exactly the one a filter on `IsPublic` missed — while
+            // it binds perfectly normally on the wire.
             .Where(type => !type.IsAbstract)
-            // Rumpftypen sind hier Records; das erkennt man am erzeugten Klon.
+            // Body types are records here; that can be told from the generated clone.
             .Where(type => type.GetMethod("<Clone>$", BindingFlags.Public | BindingFlags.Instance) is not null)
             .SelectMany(type => type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(eigenschaft => Zusammengesetzt(eigenschaft.Name))
                 .Select(eigenschaft => (
                     Name: $"{type.Name}.{eigenschaft.Name}",
                     Draht: eigenschaft.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name))
-                // Fehlt die Angabe, oder steht ein Grossbuchstabe darin, ist es
-                // nicht der Draht dieser Plattform. Die zweite Haelfte ist
-                // nicht Kosmetik: `BenachrichtigenV1` TRUG die Angabe — mit dem
-                // Wert "userId". Ein Waechter, der nur Anwesenheit prueft,
-                // haette das durchgewinkt und den zweiten Dialekt festgeschrieben.
+                // If the annotation is missing, or a capital letter stands in
+                // it, it is not this platform's wire. The second half is not
+                // cosmetics: `BenachrichtigenV1` DID carry the annotation — with
+                // the value "userId". A guard that only checks presence would
+                // have waved that through and cemented the second dialect.
                 .Where(entry => entry.Draht is null || entry.Draht.Any(char.IsUpper))
                 .Select(entry => entry.Draht is null
                     ? entry.Name
@@ -139,9 +138,9 @@ public class DrahtvertragTests
             + "schickt snake_case, und der Wert kommt nie an", service);
     }
 
-    /// <summary>Die Liste deckt alle dreizehn Api-Schichten und die geteilten Vertraege ab.</summary>
+    /// <summary>The list covers all thirteen API layers and the shared contracts.</summary>
     [Fact]
-    public void Die_Liste_deckt_alle_Dienste_ab()
+    public void The_list_covers_every_service()
     {
         var services = ApiSchichten.Select(row => (string)row[0]!).ToArray();
 
@@ -150,8 +149,8 @@ public class DrahtvertragTests
     }
 
     /// <summary>
-    /// Die Erkennung selbst stimmt — sonst wäre die Reihe grün, weil sie nichts
-    /// findet.
+    /// The detection itself is right — otherwise the suite would be green
+    /// because it finds nothing.
     /// </summary>
     [Theory]
     [InlineData("Token", false)]
@@ -160,6 +159,6 @@ public class DrahtvertragTests
     [InlineData("DisplayName", true)]
     [InlineData("SubjectId", true)]
     [InlineData("RemoteOk", true)]
-    public void Die_Erkennung_trennt_richtig(string name, bool erwartet) =>
+    public void The_detection_separates_correctly(string name, bool erwartet) =>
         Zusammengesetzt(name).Should().Be(erwartet);
 }

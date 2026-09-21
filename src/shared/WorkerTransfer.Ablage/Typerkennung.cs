@@ -1,35 +1,34 @@
 namespace WorkerTransfer.Ablage;
 
-/// <summary>Was für eine Datei das ist — laut ihren ersten Bytes.</summary>
+/// <summary>What kind of file this is — according to its first bytes.</summary>
 /// <remarks>
-/// <strong>Nie nach dem, was der Aufrufer behauptet.</strong> Ein
-/// <c>Content-Type</c>-Header und eine Dateiendung sind beide frei wählbar; die
-/// Signatur am Anfang der Datei ist es nicht. Wer der Behauptung glaubt, nimmt
-/// eine ausführbare Datei entgegen, weil jemand sie <c>zeugnis.png</c> genannt
-/// hat.
+/// <strong>Never by what the caller claims.</strong> A <c>Content-Type</c>
+/// header and a file extension are both freely chosen; the signature at the
+/// start of the file is not. Whoever believes the claim accepts an executable
+/// because somebody named it <c>zeugnis.png</c>.
 /// <para>
-/// Erlaubt sind drei Typen — dieselben drei wie in ADR-0021. Jeder weitere ist
-/// eine Entscheidung, keine Erweiterung: SVG zum Beispiel ist ein Dokument mit
-/// Skripten und gehört nicht dazu, obwohl es wie ein Bild aussieht.
+/// Three types are allowed — the same three as in ADR-0021. Every further one
+/// is a decision, not an extension: SVG, for example, is a document with
+/// scripts and does not belong here, although it looks like an image.
 /// </para>
 /// </remarks>
 public static class Typerkennung
 {
-    /// <summary>Die drei erlaubten Typen.</summary>
+    /// <summary>The three allowed types.</summary>
     public static readonly IReadOnlyList<string> Erlaubt = ["image/png", "image/jpeg", "application/pdf"];
 
-    /// <summary>Der Typ, oder <c>null</c>, wenn es keiner der erlaubten ist.</summary>
+    /// <summary>The type, or <c>null</c> if it is none of the allowed ones.</summary>
     public static string? Erkenne(ReadOnlySpan<byte> content)
     {
-        // PNG: 89 50 4E 47 0D 0A 1A 0A — acht Bytes, absichtlich so gewählt,
-        // dass eine Übertragung, die Zeilenenden umschreibt, sie zerstört.
+        // PNG: 89 50 4E 47 0D 0A 1A 0A — eight bytes, deliberately chosen so
+        // that a transfer which rewrites line endings destroys them.
         if (Beginnt(content, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
         {
             return "image/png";
         }
 
-        // JPEG: FF D8 FF. Das vierte Byte unterscheidet die Varianten (JFIF,
-        // Exif, …) und wird deshalb nicht geprüft.
+        // JPEG: FF D8 FF. The fourth byte distinguishes the variants (JFIF,
+        // Exif, …) and is therefore not checked.
         if (Beginnt(content, [0xFF, 0xD8, 0xFF]))
         {
             return "image/jpeg";
@@ -39,7 +38,7 @@ public static class Typerkennung
         return Beginnt(content, [0x25, 0x50, 0x44, 0x46, 0x2D]) ? "application/pdf" : null;
     }
 
-    /// <summary>Die übliche Endung zum Typ — für einen Dateinamen beim Abruf.</summary>
+    /// <summary>The usual extension for the type — for a file name on retrieval.</summary>
     public static string Endung(string type) => type switch
     {
         "image/png" => ".png",

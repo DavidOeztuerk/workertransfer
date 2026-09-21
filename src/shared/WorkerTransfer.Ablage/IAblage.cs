@@ -1,34 +1,33 @@
 namespace WorkerTransfer.Ablage;
 
-/// <summary>Wohin Dateien gelegt werden, die kein Feld fassen kann.</summary>
+/// <summary>Where files go that no field can hold.</summary>
 /// <remarks>
-/// <strong>Der Port aus ADR-0021, zurück in .NET.</strong> Das Python-Paket
-/// hatte fünf schwere Abhängigkeiten für Backends, die niemand benutzte — S3,
-/// MinIO, Azure Blob, Pillow, python-magic —, und wurde deshalb auf einen Port
-/// und ein Backend zurückgeschnitten, das wirklich läuft. Genau das steht hier
-/// wieder, und keinen Schritt weiter: <strong>kein S3, noch nicht.</strong> Es
-/// zu bauen, bevor eine EnvironmentFile es braucht, wäre der Fehler, der zu ADR-0021
-/// geführt hat.
+/// <strong>The port from ADR-0021, back in .NET.</strong> The Python package
+/// carried five heavy dependencies for backends nobody used — S3, MinIO, Azure
+/// Blob, Pillow, python-magic — and was therefore cut back to one port and one
+/// backend that actually runs. Exactly that stands here again, and not a step
+/// further: <strong>no S3, not yet.</strong> Building it before an
+/// EnvironmentFile needs it would be the very mistake that led to ADR-0021.
 /// </remarks>
 public interface IDocumentStore
 {
-    /// <summary>Legt Bytes unter einem Schlüssel ab. Ersetzt, was dort lag.</summary>
+    /// <summary>Stores bytes under a key. Replaces whatever lay there.</summary>
     Task PutAsync(
         string key, ReadOnlyMemory<byte> content, CancellationToken cancellationToken = default);
 
-    /// <summary>Holt Bytes, oder <c>null</c>.</summary>
+    /// <summary>Fetches bytes, or <c>null</c>.</summary>
     /// <remarks>
-    /// <c>null</c> statt einer Ausnahme: „gibt es nicht" ist beim Abrufen ein
-    /// normaler Ausgang und kein Fehler. Wer daraus einen macht, zwingt jeden
-    /// Aufrufer zu einem <c>try</c> um den Normalfall.
+    /// <c>null</c> rather than an exception: "does not exist" is a normal
+    /// outcome of a fetch and not an error. Whoever makes one out of it forces
+    /// every caller into a <c>try</c> around the normal case.
     /// </remarks>
     Task<byte[]?> GetAsync(string key, CancellationToken cancellationToken = default);
 
-    /// <summary>Löscht. Schweigt über einen unbekannten Schlüssel.</summary>
+    /// <summary>Deletes. Stays silent about an unknown key.</summary>
     /// <remarks>
-    /// Aufräumpfade sollen keinen Unterschied behandeln müssen, der sie nicht
-    /// interessiert: ob die Datei noch da war, ändert nichts daran, dass sie
-    /// danach weg sein soll.
+    /// Clean-up paths should not have to handle a difference that does not
+    /// concern them: whether the file was still there changes nothing about it
+    /// being gone afterwards.
     /// </remarks>
     Task DeleteAsync(string key, CancellationToken cancellationToken = default);
 }

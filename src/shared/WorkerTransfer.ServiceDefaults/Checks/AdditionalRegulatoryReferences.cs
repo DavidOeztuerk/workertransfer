@@ -2,43 +2,42 @@ using Noelia.Abstractions.Compliance;
 
 namespace WorkerTransfer.ServiceDefaults.Checks;
 
-/// <summary>Die Zitate, die Noelia nicht mitbringt.</summary>
+/// <summary>The citations Noelia does not bring with it.</summary>
 /// <remarks>
-/// <para><strong>Noelia liefert zehn, und sie werden hier nicht nachgebaut.</strong>
+/// <para><strong>Noelia delivers ten, and they are not rebuilt here.</strong>
 /// <c>RegulatoryReferences.GdprRecordsOfProcessing</c>,
 /// <c>GdprThirdCountryTransfer</c>, <c>GdprProcessorContract</c>,
 /// <c>AiActRecordKeeping</c>, <c>AiActDeployerDuties</c>,
-/// <c>AiActTransparency</c> und die übrigen kommen aus dem Paket. Zwei
-/// Fassungen desselben Artikels wären schlimmer als eine: der Leser kann dann
-/// nicht mehr sagen, ob zwei Befunde von <em>einer</em> Pflicht handeln oder von
-/// zweien.</para>
+/// <c>AiActTransparency</c> and the rest come out of the package. Two versions
+/// of the same article would be worse than one: the reader can then no longer
+/// say whether two findings are about <em>one</em> duty or about two.</para>
 ///
-/// <para><strong>Was hier steht, fehlt dort — nachgesehen, nicht angenommen.</strong>
-/// Fünf Artikel, und jeder trägt eine Frage, die dieses Produkt stellt und eine
-/// Todo-Anwendung nicht: die automatisierte AutomatedDecision, der Revocation,
-/// die Löschung, die Accountability und die Einstufungsfrage aus Anhang III.</para>
+/// <para><strong>What stands here is missing there — looked up, not
+/// assumed.</strong> Five articles, and each carries a question this product
+/// raises and a to-do application does not: the automated decision, the
+/// revocation, the erasure, the accountability and the classification question
+/// from Annex III.</para>
 ///
-/// <para><strong>Und einer fehlt ganz.</strong> § 87 Abs. 1 Nr. 6 BetrVG hat in
-/// <c>RegulatoryRegime</c> kein Zuhause — die Aufzählung kennt <c>Gdpr</c>,
-/// <c>AiAct</c>, <c>Nis2</c> und <c>Dora</c>, kein nationales Arbeitsrecht. Das
-/// ist keine Nachlässigkeit Noelias, sondern sein Zuschnitt; für ein Produkt,
-/// dessen Kunde ein Arbeitgeber ist, ist es trotzdem die Lücke, die am meisten
-/// kostet. Sie ist als <c>bugs/betrvg-hat-kein-regelwerk.md</c> gemeldet, und
-/// bis sie geschlossen ist, trägt der Mitbestimmungsnachweis den Artikel im
-/// Text statt als Zitat — <strong>sichtbar, aber nicht strukturiert.</strong></para>
+/// <para><strong>And one is missing entirely.</strong> § 87 (1) no. 6 BetrVG
+/// has no home in <c>RegulatoryRegime</c> — the enumeration knows <c>Gdpr</c>,
+/// <c>AiAct</c>, <c>Nis2</c> and <c>Dora</c>, no national labour law. That is
+/// not negligence on Noelia's part but its cut; for a product whose customer is
+/// an employer it is nevertheless the gap that costs the most. It is filed as
+/// <c>bugs/betrvg-hat-kein-regelwerk.md</c>, and until it is closed the
+/// codetermination evidence carries the article in the text instead of as a
+/// citation — <strong>visible, but not structured.</strong></para>
 ///
-/// <para><c>Reader</c> ist nie leer, und zwar als Test. Ein Zitat, das seinen
-/// eigenen Artikel erledigte, wäre genau die Anmaßung, gegen die das Vokabular
-/// existiert.</para>
+/// <para><c>Reader</c> is never empty, and that as a test. A citation that
+/// settled its own article would be exactly the presumption the vocabulary
+/// exists against.</para>
 /// </remarks>
 public static class AdditionalRegulatoryReferences
 {
-    /// <summary>Art. 22 DSGVO — die automatisierte Entscheidung im Einzelfall.</summary>
+    /// <summary>Art. 22 GDPR — the automated decision in an individual case.</summary>
     /// <remarks>
-    /// <strong>Der Artikel, um den ADR-0022 herumbaut</strong>, und Noelia kennt
-    /// ihn nicht: eine Bibliothek weiß nicht, ob ihr Verbraucher über Menschen
-    /// entscheidet. Dieser hier tut es dem Anschein nach, und deshalb steht der
-    /// Artikel hier.
+    /// <strong>The article ADR-0022 builds around</strong>, and Noelia does not
+    /// know it: a library does not know whether its consumer decides about
+    /// people. This one appears to, and that is why the article stands here.
     /// </remarks>
     public static RegulatoryReference AutomatedDecision { get; } = new(
         RegulatoryRegime.Gdpr,
@@ -52,7 +51,7 @@ public static class AdditionalRegulatoryReferences
         + "Zahl über einen Menschen entsteht; ob ein Mensch am Ende entscheidet, "
         + "zeigt kein Programm.");
 
-    /// <summary>Art. 7 Abs. 3 DSGVO — der Revocation.</summary>
+    /// <summary>Art. 7 (3) GDPR — the revocation.</summary>
     public static RegulatoryReference Revocation { get; } = new(
         RegulatoryRegime.Gdpr,
         "Art. 7 Abs. 3",
@@ -62,7 +61,7 @@ public static class AdditionalRegulatoryReferences
         + "zeigt, dass zwischen der Frage und dem Ledger nichts steht — nicht, "
         + "ob jemand den Schalter findet.");
 
-    /// <summary>Art. 17 DSGVO — die Löschung.</summary>
+    /// <summary>Art. 17 GDPR — the erasure.</summary>
     public static RegulatoryReference Erasure { get; } = new(
         RegulatoryRegime.Gdpr,
         "Art. 17",
@@ -72,7 +71,7 @@ public static class AdditionalRegulatoryReferences
         + "Abs. 3 greift. Der Nachweis zeigt, ob die Kaskade wirken KANN — "
         + "nicht, wie lange sie im Einzelfall gebraucht hat.");
 
-    /// <summary>Art. 5 Abs. 2 DSGVO — die Rechenschaftspflicht.</summary>
+    /// <summary>Art. 5 (2) GDPR — the accountability duty.</summary>
     public static RegulatoryReference Accountability { get; } = new(
         RegulatoryRegime.Gdpr,
         "Art. 5 Abs. 2",
@@ -82,14 +81,13 @@ public static class AdditionalRegulatoryReferences
         + "ist ein Beleg; ob sie der richtige ist, entscheidet, wer den Nachweis "
         + "führen muss.");
 
-    /// <summary>Anhang III Nr. 4 KI-VO — Beschäftigung.</summary>
+    /// <summary>Annex III no. 4 AI Act — employment.</summary>
     /// <remarks>
-    /// <strong>Die Frage, die dieses Repositorium ausdrücklich nicht
-    /// beantwortet.</strong> Sie ist eine Beurteilung der <em>Nutzung</em> und
-    /// gehört einem Menschen mit juristischer Ausbildung. Noelias
-    /// <c>AiActDeployerDuties</c> steht daneben und fragt nach den
-    /// Betreiberpflichten; welche davon greifen, hängt an genau dieser
-    /// Einstufung.
+    /// <strong>The question this repository expressly does not
+    /// answer.</strong> It is a judgement about the <em>use</em> and belongs to
+    /// a human being with legal training. Noelia's <c>AiActDeployerDuties</c>
+    /// stands beside it and asks after the deployer duties; which of them bite
+    /// hangs on exactly this classification.
     /// </remarks>
     public static RegulatoryReference AnnexThree { get; } = new(
         RegulatoryRegime.AiAct,
@@ -102,7 +100,7 @@ public static class AdditionalRegulatoryReferences
         + "beantwortet ein Mensch mit juristischer Ausbildung; der Nachweis legt "
         + "die Belege daneben und stuft nichts ein.");
 
-    /// <summary>Alle fünf, in der Reihenfolge, in der ein Mensch sie liest.</summary>
+    /// <summary>All five, in the order a human being reads them.</summary>
     public static IReadOnlyList<RegulatoryReference> Own { get; } =
     [
         AutomatedDecision,
@@ -113,19 +111,20 @@ public static class AdditionalRegulatoryReferences
     ];
 
     /// <summary>
-    /// § 87 Abs. 1 Nr. 6 BetrVG — als Satz, weil es ihn als Zitat nicht sein kann.
+    /// § 87 (1) no. 6 BetrVG — as a sentence, because as a citation it cannot
+    /// be one.
     /// </summary>
     /// <remarks>
-    /// <strong>Das ist die Lücke, und sie steht hier sichtbar statt
-    /// verschwiegen.</strong> <c>RegulatoryRegime</c> kennt kein nationales
-    /// Arbeitsrecht, also lässt sich die WorksCouncilCodetermination nicht als
-    /// <see cref="RegulatoryReference"/> ausdrücken. Sie auf <c>Gdpr</c> zu
-    /// legen wäre eine falsche Fundstelle in einem Dokument, das jemand
-    /// herumreicht — schlimmer als keine.
+    /// <strong>That is the gap, and it stands here visibly instead of being
+    /// kept quiet.</strong> <c>RegulatoryRegime</c> knows no national labour
+    /// law, so the works council codetermination cannot be expressed as a
+    /// <see cref="RegulatoryReference"/>. Putting it under <c>Gdpr</c> would be
+    /// a wrong citation in a document somebody passes around — worse than
+    /// none.
     /// <para>
-    /// Sie reist deshalb im <em>Text</em> der betroffenen Befunde mit. Wer den
-    /// Nachweis für einen Betriebsrat zusammenstellt, findet sie dort; eine
-    /// Maschine, die nach Zitaten filtert, findet sie nicht. Gemeldet als
+    /// It therefore travels along in the <em>text</em> of the findings
+    /// concerned. Whoever assembles the evidence for a works council finds it
+    /// there; a machine filtering by citations does not. Filed as
     /// <c>bugs/betrvg-hat-kein-regelwerk.md</c>.
     /// </para>
     /// </remarks>

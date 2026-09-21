@@ -90,7 +90,7 @@ public static class ErasureRecipient
     /// <c>assessment</c> joined with its first table (ADR-0042). It holds the
     /// work samples a company asked a person for, what the person handed in and
     /// the one evaluation that came back — all keyed by the person. There is no
-    /// retention caseItem, not even for the evaluation: an evaluation that survived
+    /// retention case, not even for the evaluation: an evaluation that survived
     /// an erasure would be exactly the reference letter ADR-0042 rules out,
     /// only at a particularly bad moment.
     /// </para>

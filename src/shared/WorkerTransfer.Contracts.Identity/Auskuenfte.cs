@@ -2,40 +2,40 @@ using System.Text.Json.Serialization;
 
 namespace WorkerTransfer.Contracts.Identity;
 
-/// <summary>Wer ein Unternehmen ist: ein Name und eine bewiesene Domain.</summary>
+/// <summary>Who a company is: a name and a proven domain.</summary>
 /// <remarks>
-/// <para>Antwort von <c>GET /internal/companies/{tenantId}</c>, hinter dem
-/// geteilten Geheimnis und ohne Gateway-Route.</para>
+/// <para>The answer of <c>GET /internal/companies/{tenantId}</c>, behind the
+/// shared secret and without a gateway route.</para>
 ///
-/// <para><strong>Die Domain ist der Grund, aus dem es diesen Vertrag gibt.</strong>
-/// Eine Person darf Unternehmen ausschliessen und benennt sie durch ihre Domain
-/// (ADR-0037). Sie ist keine Auskunft über einen Menschen: sie steht auf jeder
-/// Karriereseite, und sie ist aus einer <em>bestätigten</em> Adresse entstanden
-/// (ADR-0019), also nicht zu fälschen.</para>
+/// <para><strong>The domain is the reason this contract exists.</strong> A
+/// person may exclude companies and names them by their domain (ADR-0037). It
+/// is not a disclosure about a human being: it stands on every careers page,
+/// and it grew out of a <em>confirmed</em> address (ADR-0019), so it cannot be
+/// forged.</para>
 ///
-/// <para>Was hier <strong>nicht</strong> steht, ist die Belegschaft. Dafür gibt
-/// es <see cref="UnternehmensmitgliederAntwortV1"/>, und das ist eine eigene
-/// Tür mit einer eigenen Frage.</para>
+/// <para>What does <strong>not</strong> stand here is the staff. For that there
+/// is <see cref="CompanyMembersResponseV1"/>, and that is a door of its own with
+/// a question of its own.</para>
 /// </remarks>
 public sealed record UnternehmensauskunftV1(
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("domain")] string Domain);
 
-/// <summary>Wie ein Mensch heisst, und wo man ihm antwortet.</summary>
+/// <summary>What a human being is called, and where to answer them.</summary>
 /// <remarks>
-/// <para>Antwort von <c>GET /internal/account/{subjectId}/identity</c>.</para>
+/// <para>The answer of <c>GET /internal/account/{subjectId}/identity</c>.</para>
 ///
-/// <para><strong>Zwei Felder, und mehr dürfen es nie werden.</strong> None
-/// Postanschrift und kein Telefon: ADR-0038 legt die PostalAddress als
-/// <em>ResumeTemplate</em> für einen Briefkopf ab, und sie gehört zu einer JobApplication,
-/// die die Person selbst sendet — nicht in die Ansicht eines Unternehmens, das
-/// gerade ein Gespräch führt.</para>
+/// <para><strong>Two fields, and they must never become more.</strong> No
+/// postal address and no phone: ADR-0038 keeps the postal address as a template
+/// for a letterhead, and it belongs to an application the person sends
+/// themselves — not in the view of a company that is currently holding a
+/// conversation.</para>
 ///
-/// <para><strong>Das Geheimnis am Endpunkt ist nicht die ganze Erlaubnis.</strong>
-/// Es beweist, dass ein Dienst fragt, nicht dass er fragen darf: die Erlaubnis
-/// steht im Ledger (<c>advisor.identity:tenant:&lt;id&gt;</c>) und wird
-/// <em>vor</em> diesem Aufruf geholt. Wer diese Tür für etwas anderes benutzt,
-/// holt sich die Prüfung dazu.</para>
+/// <para><strong>The secret at the endpoint is not the whole permission.</strong>
+/// It proves that a service is asking, not that it may ask: the permission
+/// stands in the ledger (<c>advisor.identity:tenant:&lt;id&gt;</c>) and is
+/// fetched <em>before</em> this call. Whoever uses this door for something else
+/// fetches the check along with it.</para>
 /// </remarks>
 public sealed record PersonenauskunftV1(
     [property: JsonPropertyName("name")] string Name,

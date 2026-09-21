@@ -1,21 +1,21 @@
 namespace WorkerTransfer.Gateway;
 
-/// <summary>Die zwei Proben, die das Gateway selbst beantwortet.</summary>
+/// <summary>The two probes the gateway answers itself.</summary>
 /// <remarks>
-/// <strong>Nicht als Endpunkt, sondern als Zwischenschicht</strong>, und das
-/// ist keine Vorliebe: Ocelot beendet die Kette. Ein <c>MapGet</c> steht in der
-/// Endpunktschicht, die danach käme — sie läuft nie, und die Probe bekäme das
-/// 404 einer fehlenden Route. Gemessen, nicht vermutet.
+/// <strong>Not as an endpoint but as middleware</strong>, and that is not a
+/// preference: Ocelot ends the chain. A <c>MapGet</c> stands in the endpoint
+/// layer that would come after it — that layer never runs, and the probe would
+/// get the 404 of a missing route. Measured, not assumed.
 /// <para>
-/// Und sie werden <em>nicht</em> weitergereicht: eine Antwort „ich bin da" darf
-/// nicht davon abhängen, ob ein Dienst dahinter antwortet. Sonst kippt ein
-/// einzelner kranker Dienst das Gateway aus dem Lastverteiler und nimmt die
-/// anderen zehn mit.
+/// And they are <em>not</em> passed on: an answer of "I am here" must not
+/// depend on whether a service behind it answers. Otherwise a single sick
+/// service tips the gateway out of the load balancer and takes the other ten
+/// with it.
 /// </para>
 /// </remarks>
 public static class Gesundheit
 {
-    /// <summary>Hängt die Proben in die Kette — vor Ocelot.</summary>
+    /// <summary>Hangs the probes into the chain — before Ocelot.</summary>
     public static IApplicationBuilder UseGesundheit(this IApplicationBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);

@@ -30,30 +30,30 @@ public sealed class EfProfileStore(CompaniesDbContext context) : IProfileStore
 
     /// <inheritdoc />
     public async Task<string> FreeSlugAsync(
-        string gewuenscht, CancellationToken cancellationToken = default)
+        string wanted, CancellationToken cancellationToken = default)
     {
         var vergeben = await context.Profile
-            .Where(kandidat => kandidat.Slug.StartsWith(gewuenscht))
+            .Where(kandidat => kandidat.Slug.StartsWith(wanted))
             .Select(kandidat => kandidat.Slug)
             .ToListAsync(cancellationToken);
 
         var belegt = new HashSet<string>(vergeben, StringComparer.Ordinal);
 
-        if (!belegt.Contains(gewuenscht))
+        if (!belegt.Contains(wanted))
         {
-            return gewuenscht;
+            return wanted;
         }
 
         // Nicht die Mandanten-Kennung anhängen: die stünde dann in einer
         // Adresse, die weitergegeben wird.
         var zaehler = 2;
 
-        while (belegt.Contains($"{gewuenscht}-{zaehler}"))
+        while (belegt.Contains($"{wanted}-{zaehler}"))
         {
             zaehler++;
         }
 
-        return $"{gewuenscht}-{zaehler}";
+        return $"{wanted}-{zaehler}";
     }
 
     /// <inheritdoc />
@@ -76,7 +76,7 @@ public sealed class EfProfileStore(CompaniesDbContext context) : IProfileStore
     }
 
     private static EmployerProfile ZumAggregat(ProfileRow row) =>
-        EmployerProfile.Stelle_her(
+        EmployerProfile.Restore(
             new TenantId(row.Id),
             row.Slug,
             row.DisplayName,
@@ -100,7 +100,7 @@ public sealed class EfProfileStore(CompaniesDbContext context) : IProfileStore
             // Das Kürzel steht nur hier und nicht in `Uebertrage`: es wird
             // einmal vergeben und danach nie wieder geschrieben.
             Slug = profile.Slug,
-            CreatedAt = profile.AngelegtAm.UtcDateTime
+            CreatedAt = profile.CreatedAt.UtcDateTime
         };
 
         Uebertrage(profile, row);
@@ -110,17 +110,17 @@ public sealed class EfProfileStore(CompaniesDbContext context) : IProfileStore
 
     private static void Uebertrage(EmployerProfile profile, ProfileRow row)
     {
-        row.DisplayName = profile.Anzeigename;
-        row.About = profile.UeberUns;
-        row.Website = profile.Netzseite;
-        row.Locations = JsonSerializer.Serialize(profile.Orte);
-        row.Benefits = JsonSerializer.Serialize(profile.Leistungen);
-        row.Line1 = profile.Zeile1;
-        row.PostalCode = profile.Postleitzahl;
-        row.City = profile.Ort;
-        row.Country = profile.Land;
-        row.Phone = profile.Telefon;
-        row.UpdatedAt = profile.GeaendertAm.UtcDateTime;
+        row.DisplayName = profile.DisplayName;
+        row.About = profile.About;
+        row.Website = profile.Website;
+        row.Locations = JsonSerializer.Serialize(profile.Locations);
+        row.Benefits = JsonSerializer.Serialize(profile.Benefits);
+        row.Line1 = profile.Line1;
+        row.PostalCode = profile.PostalCode;
+        row.City = profile.City;
+        row.Country = profile.Country;
+        row.Phone = profile.Phone;
+        row.UpdatedAt = profile.ChangedAt.UtcDateTime;
     }
 
     private static IReadOnlyList<string> Liste(string jsonb) =>

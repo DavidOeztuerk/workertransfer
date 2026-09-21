@@ -2,23 +2,22 @@ using FluentAssertions;
 
 namespace WorkerTransfer.Gateway.Tests;
 
-/// <summary>Die Landkarte hängt nicht an ihrer Zeilenreihenfolge.</summary>
+/// <summary>The route map does not hang on the order of its lines.</summary>
 /// <remarks>
-/// Gemessen, und der Grund, warum die <c>Priority</c>-Werte keine Verzierung
-/// sind: <strong>ohne sie entscheidet die Dateireihenfolge.</strong> Alle
-/// Ausnahmen auf denselben Wert zu setzen sah zunächst harmlos aus — die Reihe
-/// blieb grün, weil die Zeilen zufällig richtig standen. Erst das Umdrehen hat
-/// acht Routen umfallen lassen.
+/// Measured, and the reason the <c>Priority</c> values are no decoration:
+/// <strong>without them the file order decides.</strong> Setting every
+/// exception to the same value looked harmless at first — the suite stayed
+/// green because the lines happened to stand in the right order. Only reversing
+/// them made eight routes fall over.
 /// <para>
-/// Damit ist das hier die Prüfung, die den Nächsten schützt, der eine Route
-/// unten anhängt: dieselben Fragen an dieselbe Landkarte, nur rückwärts
-/// geladen.
+/// So this is the check that protects the next person who appends a route at
+/// the bottom: the same questions to the same map, only loaded backwards.
 /// </para>
 /// </remarks>
 [Collection(UmgedrehteSammlung.Name)]
 public class ReihenfolgeTests(UmgedreheteLandschaft landschaft)
 {
-    /// <summary>Die Ausnahmen — genau die, die ohne Priorität umfallen.</summary>
+    /// <summary>The exceptions — exactly the ones that fall over without a priority.</summary>
     [Theory]
     [InlineData("/jobs/7f000001-0000-0000-0000-000000000000/applications", "applications")]
     [InlineData("/companies/me/jobs", "jobs")]
@@ -27,20 +26,20 @@ public class ReihenfolgeTests(UmgedreheteLandschaft landschaft)
     [InlineData("/companies/by-slug/muster-gmbh", "companies")]
     [InlineData("/companies/7f000001-0000-0000-0000-000000000000/profile", "companies")]
     [InlineData("/me/notification-preferences", "notification")]
-    public async Task Die_Ausnahmen_gewinnen_auch_rueckwaerts(string path, string erwartet)
+    public async Task The_exceptions_win_backwards_too(string path, string erwartet)
     {
         var (service, _) = await landschaft.Frage(path);
 
         service.Should().Be(erwartet);
     }
 
-    /// <summary>Und die Regelfälle bleiben, wo sie sind.</summary>
+    /// <summary>And the ordinary cases stay where they are.</summary>
     [Theory]
     [InlineData("/me", "identity")]
     [InlineData("/companies", "identity")]
     [InlineData("/jobs", "jobs")]
     [InlineData("/notifications", "notification")]
-    public async Task Die_Regelfaelle_bleiben_auch_rueckwaerts(string path, string erwartet)
+    public async Task The_ordinary_cases_stay_backwards_too(string path, string erwartet)
     {
         var (service, _) = await landschaft.Frage(path);
 

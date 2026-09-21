@@ -5,22 +5,22 @@ using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.ServiceDefaults.Checks;
 
-/// <summary>Trägt der Kontext, der das Modell verlässt, mehr als vereinbart?</summary>
+/// <summary>Does the context that leaves for the model carry more than agreed?</summary>
 /// <remarks>
-/// <para><strong>Sie überlebt den Umstieg, weil Noelia sie nicht haben kann.</strong>
-/// Welche vier Felder zu einem Modell hinausgehen dürfen, ist eine Aussage über
-/// <em>diesen</em> Verbraucher (ADR-0024 §3). Eine Bibliothek kennt die Klasse
-/// nicht, die die Grenze IST.</para>
+/// <para><strong>It survives the migration because Noelia cannot have it.</strong>
+/// Which four fields may go out to a model is a statement about <em>this</em>
+/// consumer (ADR-0024 §3). A library does not know the class that IS the
+/// boundary.</para>
 ///
-/// <para><strong>Gegen eine ausgeschriebene Menge, nicht gegen eine
-/// Verbotsliste.</strong> Eine Verbotsliste beantwortet „ist dieser Name
-/// heikel?" — eine Frage, die man beim nächsten Feld neu und womöglich falsch
-/// beantwortet. Eine geschlossene Menge verlangt, dass wer ein Feld hinzufügt,
-/// es hier hinschreibt: dieselbe Bewegung, aber eine, die auffällt.</para>
+/// <para><strong>Against a written-out set, not against a forbidden
+/// list.</strong> A forbidden list answers "is this name sensitive?" — a
+/// question one answers afresh, and possibly wrongly, at the next field. A
+/// closed set demands that whoever adds a field writes it down here: the same
+/// movement, but one that stands out.</para>
 /// </remarks>
-/// <param name="typ">Die Kontextklasse, die die Grenze IST.</param>
-/// <param name="erwartet">Die vereinbarte Feldmenge.</param>
-/// <param name="wofuer">Wofür der Kontext da ist, in drei Worten.</param>
+/// <param name="type">The context class that IS the boundary.</param>
+/// <param name="erwartet">The agreed field set.</param>
+/// <param name="wofuer">What the context is there for, in three words.</param>
 public sealed class SeamCheck(Type type, IReadOnlyList<string> erwartet, string wofuer)
     : ISecurityCheck
 {
@@ -31,7 +31,7 @@ public sealed class SeamCheck(Type type, IReadOnlyList<string> erwartet, string 
     public NoeliaModule Module => NoeliaModule.Composition;
 
     /// <inheritdoc />
-    /// <remarks>Auswahlregel — siehe <c>ProviderCheck</c>.</remarks>
+    /// <remarks>Selection rule — see <c>ProviderCheck</c>.</remarks>
     public SecurityCheckCategory Category => SecurityCheckCategory.Composition;
 
     /// <inheritdoc />

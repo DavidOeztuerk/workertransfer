@@ -2,22 +2,22 @@ using System.Text.Json.Serialization;
 
 namespace WorkerTransfer.Contracts.Identity;
 
-/// <summary>Ein Mitglied eines Unternehmens, wie es über den internen Draht reist.</summary>
+/// <summary>A member of a company, as it travels over the internal wire.</summary>
 /// <remarks>
-/// Dies ist ein TYPISIERTER VERTRAG. Er wird Dienst-zu-Dienst übergeben, nie
-/// als anonymes Objekt. Der Benachrichtigungsdraht kam viermal nie an, genau
-/// weil an seiner Job ein <c>new { ... }</c> stand — und der Serialisierer
-/// beim Empfänger eine andere Eigenschaft erwartete. Ein Vertrag, der hier
-/// liegt, wird von beiden Seiten KOMPILIERT geprüft.
+/// This is a TYPED CONTRACT. It is handed service to service, never as an
+/// anonymous object. The notification wire never arrived four times over,
+/// precisely because in its place stood a <c>new { ... }</c> — and the
+/// serialiser at the receiver expected a different property. A contract that
+/// lies here is checked by COMPILATION on both sides.
 /// <para>
-/// Nur die Kennung. Ein Anzeigename würde mitreisen und in jeder Sicherung
-/// landen, und die Outbox braucht ihn nicht: sie trägt Kennung und Art
-/// (ADR-0025), sonst nichts.
+/// Only the identifier. A display name would travel along and end up in every
+/// backup, and the outbox does not need it: it carries an identifier and a kind
+/// (ADR-0025), nothing else.
 /// </para>
 /// </remarks>
 public sealed record CompanyMemberV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId);
 
-/// <summary>Antwort für GET /internal/companies/{tenantId}/members.</summary>
+/// <summary>The answer for GET /internal/companies/{tenantId}/members.</summary>
 public sealed record CompanyMembersResponseV1(
     [property: JsonPropertyName("mitglieder")] IReadOnlyList<CompanyMemberV1> Mitglieder);

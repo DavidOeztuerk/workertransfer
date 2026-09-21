@@ -6,23 +6,24 @@ using YamlDotNet.Serialization;
 namespace WorkerTransfer.Gateway.Tests;
 
 /// <summary>
-/// Drei Beschreibungen derselben Landschaft — und sie müssen dasselbe sagen.
+/// Three descriptions of the same landscape — and they have to say the same
+/// thing.
 /// </summary>
 /// <remarks>
-/// Die Landkarte des Gateways nennt Rechnernamen und Häfen, `docker-compose.yml`
-/// legt sie an, und das Helm-Chart tut dasselbe noch einmal für ein Cluster.
-/// Läuft eine der drei weg, merkt es niemand beim Bauen: Ocelot meldet einen
-/// unerreichbaren Nachbarn erst beim ersten Aufruf, und ein Chart mit einem
-/// fehlenden Dienst rollt sauber aus.
+/// The gateway's route map names host names and ports, `docker-compose.yml`
+/// creates them, and the Helm chart does the same thing once more for a
+/// cluster. If one of the three runs away, nobody notices at build time: Ocelot
+/// reports an unreachable neighbour only at the first call, and a chart with a
+/// missing service rolls out cleanly.
 /// <para>
-/// Zur Python-Zeit hielt <c>tests/test_k8s_matches_compose.py</c> das fest.
-/// Diese Reihe ist ihr Nachfolger — sie stirbt nicht mit dem Python-Baum,
-/// sondern zieht mit um.
+/// In the Python era <c>tests/test_k8s_matches_compose.py</c> pinned this. This
+/// suite is its successor — it does not die with the Python tree, it moves
+/// along with it.
 /// </para>
 /// </remarks>
 public class TopologieTests
 {
-    /// <summary>Was die Landkarte des Gateways anspricht.</summary>
+    /// <summary>What the gateway's route map addresses.</summary>
     private static readonly Lazy<IReadOnlyDictionary<string, int>> Landkarte = new(() =>
     {
         var roh = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "ocelot.json"));
@@ -43,7 +44,7 @@ public class TopologieTests
         return targets;
     });
 
-    /// <summary>Was Compose anlegt: Dienstname auf (SERVICE_DIR, Hafen).</summary>
+    /// <summary>What compose creates: service name to (SERVICE_DIR, port).</summary>
     private static readonly Lazy<IReadOnlyDictionary<string, (string Dir, int Hafen)>> Compose =
         new(() =>
         {
@@ -74,7 +75,7 @@ public class TopologieTests
             return found;
         });
 
-    /// <summary>Was das Chart anlegt.</summary>
+    /// <summary>What the chart creates.</summary>
     private static readonly Lazy<IReadOnlyList<Dictionary<object, object>>> Chart = new(() =>
     {
         var wurzel = Repowurzel();
@@ -87,20 +88,20 @@ public class TopologieTests
         return [.. ((List<object>)gelesen["services"]).Cast<Dictionary<object, object>>()];
     });
 
-    /// <summary>Jeder Rechner, den die Landkarte nennt, wird auch angelegt.</summary>
+    /// <summary>Every host the route map names is also created.</summary>
     /// <remarks>
-    /// Ein Tippfehler hier ist teuer: Ocelot antwortet dann mit 502, und zwar
-    /// erst, wenn jemand die Route benutzt.
+    /// A typo here is expensive: Ocelot then answers with a 502, and only once
+    /// somebody uses the route.
     /// </remarks>
     [Fact]
-    public void Die_Landkarte_nennt_nur_Dienste_die_es_gibt()
+    public void The_route_map_names_only_services_that_exist()
     {
         foreach (var (rechner, hafen) in Landkarte.Value)
         {
             if (rechner == "web")
             {
-                // Die Oberfläche ist kein .NET-Dienst und trägt kein
-                // SERVICE_DIR — sie steht trotzdem in Compose.
+                // The interface is not a .NET service and carries no
+                // SERVICE_DIR — it stands in compose all the same.
                 Compose.Value.Should().NotContainKey(rechner);
                 continue;
             }
@@ -111,9 +112,9 @@ public class TopologieTests
         }
     }
 
-    /// <summary>Compose und das Chart legen dieselben Dienste an denselben Häfen an.</summary>
+    /// <summary>Compose and the chart create the same services on the same ports.</summary>
     [Fact]
-    public void Compose_und_Chart_beschreiben_dieselbe_Landschaft()
+    public void Compose_and_the_chart_describe_the_same_landscape()
     {
         var ausDemChart = Chart.Value.ToDictionary(
             entry => entry["name"].ToString()!,
@@ -121,8 +122,8 @@ public class TopologieTests
                         Hafen: int.Parse(entry["port"].ToString()!)),
             StringComparer.Ordinal);
 
-        // `gateway` steht in Compose als Dienst, im Chart aber in einer eigenen
-        // ResumeTemplate — es ist der Eingang, kein Nachbar.
+        // `gateway` stands in compose as a service, but in the chart in a
+        // template of its own — it is the entrance, not a neighbour.
         var ausCompose = Compose.Value
             .Where(entry => entry.Key != "gateway")
             .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
@@ -136,24 +137,23 @@ public class TopologieTests
         }
     }
 
-    /// <summary>Jeder Dienst mit einer Datenbank hat eine, die angelegt wird.</summary>
+    /// <summary>Every service with a database has one that is created.</summary>
     /// <remarks>
-    /// ADR-0004 verbietet eine gemeinsame Datenbank. Fehlt eine im
-    /// Anlegeskript, dreht sich der Dienst in „database … does not exist" im
-    /// Kreis — und zwar nur auf einem frischen Datenträger, also nicht bei dem,
-    /// der sie hinzugefügt hat.
+    /// ADR-0004 forbids a shared database. If one is missing from the setup
+    /// script, the service spins in "database … does not exist" — and only on a
+    /// fresh volume, so not for the person who added it.
     /// </remarks>
     [Fact]
-    public void Jede_Dienstdatenbank_wird_auch_angelegt()
+    public void Every_service_database_is_created_too()
     {
         var wurzel = Repowurzel();
         var sql = File.ReadAllText(Path.Combine(
             wurzel, "scripts", "initdb", "01-create-service-databases.sql"));
 
-        // Kommentare zuerst weg. Ohne das las eine auskommentierte Zeile wie eine
-        // angelegte Datenbank — gemessen: die Gegenprobe „eine Datenbank fehlt"
-        // blieb grün, weil `-- CREATE DATABASE notification` denselben Ausdruck
-        // traf wie die echte Zeile.
+        // Comments away first. Without that a commented-out line read like a
+        // created database — measured: the counter-probe "a database is
+        // missing" stayed green, because `-- CREATE DATABASE notification` hit
+        // the same expression as the real line.
         var ohneKommentar = Regex.Replace(
             sql, @"^\s*--.*$", string.Empty, RegexOptions.Multiline);
 
@@ -161,7 +161,7 @@ public class TopologieTests
             .Select(hit => hit.Groups[1].Value)
             .ToHashSet(StringComparer.Ordinal);
 
-        // `identity` legt der Postgres-Einstiegspunkt selbst an (POSTGRES_DB).
+        // `identity` is created by the Postgres entrypoint itself (POSTGRES_DB).
         angelegt.Add("identity");
 
         foreach (var entry in Chart.Value)
@@ -173,7 +173,7 @@ public class TopologieTests
         }
     }
 
-    /// <summary>Wo dieses Repository beginnt, durch Hochlaufen gefunden.</summary>
+    /// <summary>Where this repository begins, found by walking upwards.</summary>
     private static string Repowurzel()
     {
         var verzeichnis = new DirectoryInfo(AppContext.BaseDirectory);

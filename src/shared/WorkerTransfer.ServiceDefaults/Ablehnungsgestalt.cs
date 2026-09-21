@@ -5,38 +5,37 @@ using Microsoft.AspNetCore.Http;
 namespace WorkerTransfer.ServiceDefaults;
 
 /// <summary>
-/// Gibt einer Ablehnung durch eine Richtlinie dieselbe Gestalt wie jedem
-/// anderen Fehler.
+/// Gives a refusal by a policy the same shape as every other error.
 /// </summary>
 /// <remarks>
-/// <para>Ohne das fällt eine gescheiterte Autorisierung als <strong>nackter
-/// 401/403 mit leerem Rumpf</strong> heraus: sie wirft nicht, sie schließt die
-/// Antwort kurz — <c>ProblemDetailsMiddleware</c> sieht sie also nie. Die
-/// Oberfläche bekäme dann für dieselbe Sache zwei Gestalten, je nachdem, ob
-/// eine Handprüfung oder eine Richtlinie abgelehnt hat, und der Bericht eines
-/// Menschen hätte keine Korrelationskennung.</para>
+/// <para>Without this, a failed authorization falls out as a <strong>bare
+/// 401/403 with an empty body</strong>: it does not throw, it short-circuits
+/// the answer — so <c>ProblemDetailsMiddleware</c> never sees it. The interface
+/// would then get two shapes for the same thing, depending on whether a
+/// hand-written check or a policy refused, and a person's report would carry no
+/// correlation id.</para>
 ///
-/// <para><strong>Hier und nicht in identity-service.</strong> Sie stand dort,
-/// solange identity der einzige Dienst mit Richtlinien war. Seit die
-/// CompanyPermissions in vier Diensten hängen, ist sie genau das, was
-/// <c>ServiceDefaults</c> trägt: eine Gestalt über alle Dienste, damit ein
-/// Aufrufer nicht wissen muss, wer geantwortet hat, um den Fehler zu lesen.</para>
+/// <para><strong>Here and not in identity-service.</strong> It stood there for
+/// as long as identity was the only service with policies. Since the company
+/// permissions hang in four services, it is exactly what <c>ServiceDefaults</c>
+/// carries: one shape across all services, so a caller does not have to know
+/// who answered in order to read the error.</para>
 ///
-/// <para>Die Meldung sagt nur, dass es nicht erlaubt war. <em>Welche</em>
-/// Richtlinie fehlte, steht bewusst nicht darin: das wäre eine Landkarte der
-/// Rechte für jeden, der sie abfragt.</para>
+/// <para>The message says only that it was not permitted. <em>Which</em> policy
+/// was missing deliberately does not stand in it: that would be a map of the
+/// permissions for anybody who queries them.</para>
 /// </remarks>
 public sealed class RejectionShape : IAuthorizationMiddlewareResultHandler
 {
     /// <summary>
-    /// Die Notiz, mit der ein Handler sagt: es lag nicht am Recht, sondern
-    /// daran, dass niemand geantwortet hat.
+    /// The note with which a handler says: it was not the permission, it was
+    /// that nobody answered.
     /// </summary>
     /// <remarks>
-    /// Ein Autorisierungshandler kann nur „ja" sagen — ein Schweigen der
-    /// Rollenauskunft sähe von einem entzogenen Recht sonst nicht zu
-    /// unterscheiden aus. 503 heisst „hat nicht geantwortet", 403 heisst „nein";
-    /// dieselbe Unterscheidung trifft dieser Baum beim Einwilligungs-Ledger.
+    /// An authorization handler can only say "yes" — a silent role lookup would
+    /// otherwise be indistinguishable from a permission that was taken away.
+    /// 503 means "did not answer", 403 means "no"; this tree makes the same
+    /// distinction at the consent ledger.
     /// </remarks>
     public const string Schweigt = "workertransfer.rollenauskunft.schweigt";
 

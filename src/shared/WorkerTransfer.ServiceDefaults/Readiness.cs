@@ -4,29 +4,29 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace WorkerTransfer.ServiceDefaults;
 
-/// <summary>Was ein Dienst antworten muss, bevor er Verkehr bekommt.</summary>
+/// <summary>What a service has to answer before it gets traffic.</summary>
 public static class Readiness
 {
-    /// <summary>Wie lange eine stumme Datenbank die Probe aufhalten darf.</summary>
+    /// <summary>How long a silent database may hold the probe up.</summary>
     /// <remarks>
-    /// Eine Bereitschaftsprobe ohne Zeitlimit haengt so lange wie der
-    /// Verbindungsversuch, und der Orchestrierer wertet das Ausbleiben als
-    /// gesund, bis sein eigenes Limit greift.
+    /// A readiness probe without a time limit hangs for as long as the
+    /// connection attempt does, and the orchestrator reads that absence as
+    /// healthy until its own limit bites.
     /// </remarks>
     private static readonly TimeSpan Geduld = TimeSpan.FromSeconds(5);
 
-    /// <summary>Meldet den Dienst erst bereit, wenn seine Datenbank antwortet.</summary>
+    /// <summary>Reports the service ready only once its database answers.</summary>
     /// <remarks>
-    /// <c>/health/ready</c> filtert nach dem Etikett <c>ready</c>. Ohne eine
-    /// einzige so etikettierte Eintragung ist die gefilterte Menge leer, ein
-    /// leerer Bericht gilt als gesund, und die Adresse antwortet 200 — auch
-    /// ueber einer unerreichbaren Datenbank. Der Orchestrierer schickt dann
-    /// Verkehr an einen Dienst, der jede ResumeRequest mit 500 beantwortet.
+    /// <c>/health/ready</c> filters by the tag <c>ready</c>. Without a single
+    /// entry tagged that way the filtered set is empty, an empty report counts
+    /// as healthy, and the address answers 200 — even over an unreachable
+    /// database. The orchestrator then sends traffic to a service that answers
+    /// every request with a 500.
     /// </remarks>
-    /// <typeparam name="TKontext">Der Kontext dieses Dienstes.</typeparam>
-    /// <param name="services">Der Container.</param>
-    /// <param name="dienstname">Benennt die Eintragung im Gesundheitsbericht.</param>
-    /// <returns>Der Container.</returns>
+    /// <typeparam name="TKontext">This service's context.</typeparam>
+    /// <param name="services">The container.</param>
+    /// <param name="dienstname">Names the entry in the health report.</param>
+    /// <returns>The container.</returns>
     public static IServiceCollection AddDatabaseReadiness<TKontext>(
         this IServiceCollection services, string dienstname)
         where TKontext : DbContext
@@ -46,22 +46,22 @@ public static class Readiness
     }
 }
 
-/// <summary>Antwortet die Datenbank dieses Dienstes?</summary>
+/// <summary>Does this service's database answer?</summary>
 /// <remarks>
-/// <c>CanConnectAsync</c> und keine Abfrage: eine Bereitschaftsprobe laeuft im
-/// Sekundentakt, und eine Probe, die selbst Last erzeugt, nimmt einen
-/// angeschlagenen Dienst vollends herunter.
+/// <c>CanConnectAsync</c> and no query: a readiness probe runs every second,
+/// and a probe that produces load itself takes an already ailing service down
+/// completely.
 /// </remarks>
 /// <param name="dbContext">The context whose connection is checked.</param>
 internal sealed class DatabaseReadiness(DbContext dbContext) : IHealthCheck
 {
     /// <inheritdoc />
     /// <remarks>
-    /// Die Beschreibung nennt keinen Wert. Noelia gibt sie auf
-    /// <c>/health/ready</c> aus, und diese Adresse antwortet jedem — eine
-    /// Npgsql-Ausnahme traegt Wirt, Port und mitunter den Benutzer. Die
-    /// Ausnahme reist als zweites Feld mit und landet im Protokoll, nicht in
-    /// der Antwort.
+    /// The description names no value. Noelia prints it on
+    /// <c>/health/ready</c>, and that address answers everybody — an Npgsql
+    /// exception carries host, port and at times the user. The exception
+    /// travels along as a second field and ends up in the log, not in the
+    /// answer.
     /// </remarks>
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context, CancellationToken cancellationToken = default)

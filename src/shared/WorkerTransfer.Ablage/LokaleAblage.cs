@@ -3,29 +3,28 @@ using Microsoft.Extensions.Options;
 
 namespace WorkerTransfer.Ablage;
 
-/// <summary>Wo die lokale Ablage liegt.</summary>
+/// <summary>Where the local document store lies.</summary>
 public sealed class DocumentStoreSettings
 {
-    /// <summary>Der Section in der Konfiguration.</summary>
+    /// <summary>The section in the configuration.</summary>
     public const string Section = "Ablage";
 
-    /// <summary>Das Verzeichnis. In Containern ein Band, sonst ein Ordner.</summary>
+    /// <summary>The directory. A volume in containers, a folder otherwise.</summary>
     public string Verzeichnis { get; set; } = "ablage";
 }
 
-/// <summary>Die Ablage auf dem Dateisystem.</summary>
+/// <summary>The document store on the file system.</summary>
 /// <remarks>
-/// <strong>Schreiben unter Zwischennamen, dann umbenennen.</strong> Direkt zu
-/// schreiben heisst: ein Absturz mittendrin hinterlaesst eine halbe Datei unter
-/// dem richtigen Namen — und die sieht fuer jeden Leser gueltig aus. Das
-/// Umbenennen innerhalb eines Dateisystems ist unteilbar; entweder liegt die
-/// ganze Datei da oder gar keine.
+/// <strong>Write under an intermediate name, then rename.</strong> Writing
+/// directly means: a crash half way through leaves half a file under the right
+/// name — and that looks valid to every reader. Renaming within one file system
+/// is indivisible; either the whole file is there or none of it.
 /// </remarks>
 public sealed class LocalDocumentStore : IDocumentStore
 {
     private readonly string _wurzel;
 
-    /// <summary>Baut die Ablage und legt ihr Verzeichnis an.</summary>
+    /// <summary>Builds the store and creates its directory.</summary>
     public LocalDocumentStore(IOptions<DocumentStoreSettings> einstellungen)
     {
         ArgumentNullException.ThrowIfNull(einstellungen);
@@ -50,8 +49,8 @@ public sealed class LocalDocumentStore : IDocumentStore
         }
         catch
         {
-            // Der Zwischenname darf nicht liegen bleiben: er traegt keinen
-            // gueltigen Schluessel, also findet ihn nie wieder jemand.
+            // The intermediate name must not be left behind: it carries no
+            // valid key, so nobody would ever find it again.
             if (File.Exists(unterwegs))
             {
                 File.Delete(unterwegs);
@@ -86,14 +85,14 @@ public sealed class LocalDocumentStore : IDocumentStore
     }
 
     /// <summary>
-    /// Der Pfad zum Schluessel — und die Job, an der ein Ausbruch scheitert.
+    /// The path to the key — and the place where an escape fails.
     /// </summary>
     /// <remarks>
-    /// Ein Schluessel wie <c>../../etc/passwd</c> waere sonst ein Leseweg durch
-    /// das ganze Dateisystem. Geprueft wird nicht der Text, sondern das
-    /// ERGEBNIS: nach dem Zusammensetzen muss der volle Pfad unter der Wurzel
-    /// liegen. Eine Textpruefung uebersieht die naechste Schreibweise, ein
-    /// Vergleich der aufgeloesten Pfade nicht.
+    /// A key such as <c>../../etc/passwd</c> would otherwise be a read path
+    /// through the whole file system. What is checked is not the text but the
+    /// RESULT: after composing it, the full path must lie below the root. A
+    /// text check misses the next spelling, a comparison of the resolved paths
+    /// does not.
     /// </remarks>
     private string Pfad(string key)
     {
@@ -110,10 +109,10 @@ public sealed class LocalDocumentStore : IDocumentStore
     }
 }
 
-/// <summary>Haengt die Ablage in einen Dienst.</summary>
+/// <summary>Hangs the document store into a service.</summary>
 public static class DocumentStoreWiring
 {
-    /// <summary>Registriert die lokale Ablage samt Einstellungen.</summary>
+    /// <summary>Registers the local document store together with its settings.</summary>
     public static IServiceCollection AddAblage(
         this IServiceCollection services, Microsoft.Extensions.Configuration.IConfiguration konfiguration)
     {

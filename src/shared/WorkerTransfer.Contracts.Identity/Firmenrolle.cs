@@ -3,24 +3,24 @@ using System.Text.Json.Serialization;
 namespace WorkerTransfer.Contracts.Identity;
 
 /// <summary>
-/// Welche Rolle jemand in einem Unternehmen hat — Antwort für
+/// Which role somebody holds in a company — the answer for
 /// <c>GET /internal/companies/{tenantId}/members/{subjectId}/role</c>.
 /// </summary>
 /// <remarks>
-/// <para><strong>Ein TYPISIERTER Vertrag, kein anonymes Objekt.</strong> Vier
-/// Benachrichtigungsdrähte kamen nie an, weil an ihrer Job ein
-/// <c>new { … }</c> stand und der Empfänger eine andere Eigenschaft erwartete.
-/// Ein Draht, an dem eine Zugriffsentscheidung hängt, darf das nicht können:
-/// ein nicht gelesenes Feld wäre hier stillschweigend „kein Admin".</para>
+/// <para><strong>A TYPED contract, not an anonymous object.</strong> Four
+/// notification wires never arrived because in their place stood a
+/// <c>new { … }</c> and the receiver expected a different property. A wire an
+/// access decision hangs on must not be able to do that: a field left unread
+/// would silently be "not an admin" here.</para>
 ///
-/// <para><strong>Eine Frage, eine Antwort.</strong> Die Alternative wäre, die
-/// bestehende Mitgliederliste zu erweitern — dann reiste für jede
-/// Rechteprüfung die ganze Belegschaft über den Draht, nur um eine Zeile
-/// daraus zu lesen. Hier geht genau das hinaus, was gefragt wurde.</para>
+/// <para><strong>One question, one answer.</strong> The alternative would be to
+/// widen the existing member list — then the whole staff would travel over the
+/// wire for every permission check, only to read one line out of it. Here
+/// exactly what was asked goes out.</para>
 ///
-/// <para><c>null</c> heißt „gehört nicht dazu" und ist von „gibt es nicht"
-/// nicht zu unterscheiden — derselbe Grund wie überall sonst: der Unterschied
-/// wäre eine Auskunft darüber, welche Unternehmen es gibt.</para>
+/// <para><c>null</c> means "does not belong to it" and is indistinguishable
+/// from "does not exist" — the same reason as everywhere else: the difference
+/// would be a disclosure about which companies exist.</para>
 /// </remarks>
 public sealed record CompanyRoleV1(
     [property: JsonPropertyName("role")] string? Rolle);

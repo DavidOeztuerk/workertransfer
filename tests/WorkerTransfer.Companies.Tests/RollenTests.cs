@@ -74,7 +74,7 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Ein <c>member</c> schreibt das Schaufenster nicht.</summary>
     [Fact]
-    public async Task Nur_ein_Administrator_schreibt_das_Arbeitgeberprofil()
+    public async Task Only_an_admin_writes_the_employer_profile()
     {
         var browser = AlsFirma(Guid.CreateVersion7());
 
@@ -96,7 +96,7 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     /// Zuschauerkarte.
     /// </summary>
     [Fact]
-    public async Task Ein_Mitglied_liest_das_eigene_Schaufenster()
+    public async Task A_member_reads_their_own_shop_window()
     {
         var company = Guid.CreateVersion7();
 
@@ -118,7 +118,7 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     /// ResumeRequest.
     /// </summary>
     [Fact]
-    public async Task Gefragt_wird_nach_dem_Mandanten_aus_dem_Token()
+    public async Task The_tenant_asked_for_comes_from_the_token()
     {
         var company = Guid.CreateVersion7();
         var subject = Guid.CreateVersion7();
@@ -130,7 +130,7 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Schweigt die Rollenauskunft, ist das kein Nein.</summary>
     [Fact]
-    public async Task Eine_schweigende_Rollenauskunft_ist_kein_Nein()
+    public async Task A_silent_role_lookup_is_not_a_no()
     {
         _rollen.Schweigt = true;
 
@@ -144,7 +144,7 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
     /// daran nichts.
     /// </summary>
     [Fact]
-    public async Task Ohne_Token_und_ohne_Firma_bleibt_es_wie_es_war()
+    public async Task Without_a_token_and_without_a_company_it_stays_as_it_was()
     {
         var ohne = await Write(_dienst.CreateClient(), "Muster GmbH");
         ohne.StatusCode.Should().Be(HttpStatusCode.Unauthorized);

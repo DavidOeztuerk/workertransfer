@@ -11,49 +11,50 @@ using Microsoft.Extensions.Options;
 
 namespace WorkerTransfer.ServiceDefaults;
 
-/// <summary>Wo der Schlüsselbund des Gerüsts liegt und womit er geschützt ist.</summary>
+/// <summary>Where the framework's key ring lies and what it is protected with.</summary>
 public static class KeyRing
 {
-    /// <summary>Trennt den Bund dieser Plattform von fremden auf demselben Speicher.</summary>
+    /// <summary>Separates this platform's ring from foreign ones on the same store.</summary>
     /// <remarks>
-    /// Ein Name für alle fünfzehn und nicht je Dienst einer: aus ihm leitet das
-    /// Gerüst die Verwendungszwecke ab, und zwei Dienste, die einmal dasselbe
-    /// prüfen sollen, könnten das mit verschiedenen Namen nie.
+    /// One name for all fifteen and not one per service: the framework derives
+    /// its purposes from it, and two services that are one day meant to verify
+    /// the same thing could never do so under different names.
     /// </remarks>
     public const string ApplicationName = "workertransfer";
 
-    /// <summary>Legt den Schlüsselbund in die Datenbank und verschlüsselt ihn.</summary>
+    /// <summary>Puts the key ring into the database and encrypts it.</summary>
     /// <remarks>
-    /// <para><strong>Ohne diesen Aufruf schreibt ASP.NET den Bund in das
-    /// Dateisystem des Behälters</strong> und warnt zweimal beim Start. Was
-    /// damit geschützt ist — ein Anmeldecookie, ein Fälschungsschutz-Token, ein
-    /// Rücksetzlink — prüft dann nicht mehr, sobald der Behälter ersetzt wird,
-    /// und eine zweite Instanz prüft gar nicht erst, was die erste ausgestellt
-    /// hat.</para>
+    /// <para><strong>Without this call ASP.NET writes the ring into the
+    /// container's file system</strong> and warns twice at startup. Whatever is
+    /// protected with it — a sign-in cookie, an anti-forgery token, a reset
+    /// link — then no longer verifies as soon as the container is replaced, and
+    /// a second instance does not verify at all what the first one issued.</para>
     ///
-    /// <para><strong>Die Datenbank und kein Zwischenspeicher im Prozess.</strong>
-    /// Noelias <c>UseDataProtection</c> legt den Bund in den registrierten
-    /// Cache-Anbieter; der einzige ohne Redis wäre <c>Noelia.InMemory</c>, und
-    /// der stirbt mit dem Prozess. Das machte die Prüfung grün, ohne etwas zu
-    /// ändern — zwei Instanzen läsen weiterhin verschiedene Bünde.</para>
+    /// <para><strong>The database and no in-process cache.</strong> Noelia's
+    /// <c>UseDataProtection</c> puts the ring into the registered cache
+    /// provider; the only one without Redis would be <c>Noelia.InMemory</c>,
+    /// and that dies with the process. It would have made the check green
+    /// without changing anything — two instances would still read different
+    /// rings.</para>
     ///
-    /// <para><strong>Über den Kontext und nicht über Npgsql.</strong> Dieses
-    /// Paket hält bewusst keine Treiberabhängigkeit; die Anweisungen unten sind
-    /// allerdings PostgreSQL-Syntax, und ein Dienst auf einer anderen Datenbank
-    /// müsste sie ersetzen. Die Tabelle entsteht dabei hier und nicht in einer
-    /// SchemaMigration: sie gehört keinem Fachmodell, und ein <c>DbSet</c> dafür
-    /// ließe sie in <c>LoeschempfaengerTests</c> wie eine SubjectKeyedTable
-    /// aussehen.</para>
+    /// <para><strong>Through the context and not through Npgsql.</strong> This
+    /// package deliberately holds no driver dependency; the statements below
+    /// are PostgreSQL syntax, though, and a service on another database would
+    /// have to replace them. The table comes into being here and not in a
+    /// schema migration: it belongs to no domain model, and a <c>DbSet</c> for
+    /// it would make it look like a SubjectKeyedTable in
+    /// <c>LoeschempfaengerTests</c>.</para>
     /// </remarks>
-    /// <typeparam name="TKontext">Der Kontext, dessen Datenbank den Bund hält.</typeparam>
-    /// <param name="services">Der Container.</param>
-    /// <returns>Der Container.</returns>
+    /// <typeparam name="TKontext">The context whose database holds the ring.</typeparam>
+    /// <param name="services">The container.</param>
+    /// <returns>The container.</returns>
     public static IServiceCollection AddKeyRing<TKontext>(this IServiceCollection services)
         where TKontext : DbContext
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        // TryAdd, weil identity-service ihn für den KI-Zugang schon registriert.
+        // TryAdd, because identity-service already registers it for the AI
+        // access.
         services.TryAddSingleton<SecretStore>();
 
         services.AddSingleton<IXmlRepository, KeyRingStore<TKontext>>();
@@ -61,9 +62,9 @@ public static class KeyRing
         services.AddSingleton<IXmlDecryptor, MasterKeyEnvelope>();
         services.AddDataProtection().SetApplicationName(ApplicationName);
 
-        // Aus dem Container und nicht über den Baumeister: dessen
-        // PersistKeysTo*/ProtectKeysWith*-Überladungen nehmen Instanzen, und
-        // diese beiden brauchen Dienste, die erst nach diesem Aufruf stehen.
+        // Out of the container and not through the builder: its
+        // PersistKeysTo*/ProtectKeysWith* overloads take instances, and these
+        // two need services that only stand after this call.
         services.AddSingleton<IConfigureOptions<KeyManagementOptions>>(
             provider => new Schluesselstellung(provider));
 
@@ -81,14 +82,14 @@ public static class KeyRing
     }
 }
 
-/// <summary>Der Schlüsselbund in der Datenbank dieses Dienstes.</summary>
+/// <summary>The key ring in this service's database.</summary>
 /// <remarks>
-/// Sie nimmt den <c>IServiceProvider</c> und öffnet ihren eigenen Bereich: das
-/// Gerüst löst den Bund als Singleton auf, und ein <c>DbContext</c> darin wäre
-/// eine gefangene Abhängigkeit, die ewig lebt.
+/// It takes the <c>IServiceProvider</c> and opens a scope of its own: the
+/// framework resolves the ring as a singleton, and a <c>DbContext</c> inside it
+/// would be a captive dependency that lives for ever.
 /// </remarks>
-/// <typeparam name="TKontext">Der Kontext dieses Dienstes.</typeparam>
-/// <param name="anbieter">Der Container.</param>
+/// <typeparam name="TKontext">This service's context.</typeparam>
+/// <param name="provider">The container.</param>
 internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRepository
     where TKontext : DbContext
 {
@@ -120,10 +121,10 @@ internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRe
 
     /// <inheritdoc />
     /// <remarks>
-    /// Eine Zeile je Schlüssel und kein Dokument: zwei Instanzen, die im selben
-    /// Moment einen anlegen, schrieben sonst dasselbe Dokument übereinander und
-    /// eine verlöre ihren — was viel später als „Token prüft hier, aber nicht
-    /// dort" auffällt.
+    /// One row per key and not one document: two instances creating one at the
+    /// same moment would otherwise write the same document over each other and
+    /// one would lose its key — which shows up much later as "the token
+    /// verifies here but not there".
     /// </remarks>
     public void StoreElement(XElement element, string friendlyName)
     {
@@ -161,7 +162,7 @@ internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRe
         was(connection);
     }
 
-    /// <summary>Legt die Tabelle an, falls es sie noch nicht gibt.</summary>
+    /// <summary>Creates the table, if it does not exist yet.</summary>
     private void Job(DbConnection connection)
     {
         lock (_riegel)
@@ -192,13 +193,13 @@ internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRe
     }
 }
 
-/// <summary>Verschlüsselt den Schlüsselbund unter dem Hauptschlüssel des Betreibers.</summary>
+/// <summary>Encrypts the key ring under the operator's master key.</summary>
 /// <remarks>
-/// Derselbe <see cref="Geheimnisspeicher"/> wie für den KI-Zugang einer Person:
-/// AES-GCM, ein Schlüssel aus der EnvironmentFile. Eine zweite Verschlüsselung daneben
-/// wäre eine zweite Job, an der jemand den Hauptschlüssel suchen müsste.
+/// The same <see cref="SecretStore"/> as for a person's AI access: AES-GCM, one
+/// key from the environment. A second encryption beside it would be a second
+/// place where somebody would have to look for the master key.
 /// </remarks>
-/// <param name="speicher">Der Hauptschlüssel dieses Betriebs.</param>
+/// <param name="store">This installation's master key.</param>
 internal sealed class MasterKeyEnvelope(SecretStore store)
     : IXmlEncryptor, IXmlDecryptor
 {
@@ -218,9 +219,9 @@ internal sealed class MasterKeyEnvelope(SecretStore store)
 
     /// <inheritdoc />
     /// <remarks>
-    /// Ein unlesbarer Bund wirft hier und wird nicht still übergangen: ein
-    /// gewechselter Hauptschlüssel soll beim Start auffallen und nicht als
-    /// „alle Token sind plötzlich ungültig" beim ersten Menschen.
+    /// An unreadable ring throws here and is not passed over in silence: a
+    /// master key that was changed should be noticed at startup and not as "all
+    /// tokens are suddenly invalid" at the first human being.
     /// </remarks>
     public XElement Decrypt(XElement encryptedElement)
     {

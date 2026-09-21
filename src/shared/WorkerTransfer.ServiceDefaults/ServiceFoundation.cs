@@ -29,40 +29,40 @@ namespace WorkerTransfer.ServiceDefaults;
 /// repositories, whether there is an outbox. Those live in each service's own
 /// <c>Add&lt;Dienst&gt;Infrastructure()</c>, where a reader can see them.</para>
 ///
-/// <para><strong>Seit Girder 4 ist die Vorgabe eine Vorgabe.</strong> Vorher
-/// nahm <c>AddSharedInfrastructure</c> ein Lambda, und dieses Lambda
-/// <em>ersetzte</em> die Vorgabe, statt sie zu ergänzen. Wir listeten fünf
-/// Module auf und bekamen fünf — und merkten nicht, was dadurch fehlte:
-/// <strong>Serilog, Swagger, CORS, die JSON-Feineinstellungen und der
-/// <c>HttpContextAccessor</c></strong>. Nichts davon war abgewählt; niemand
-/// hatte sie je gewählt.</para>
+/// <para><strong>Since Girder 4 the default is a default.</strong> Before
+/// that, <c>AddSharedInfrastructure</c> took a lambda, and that lambda
+/// <em>replaced</em> the default instead of adding to it. We listed five
+/// modules and got five — and did not notice what went missing with it:
+/// <strong>Serilog, Swagger, CORS, the JSON fine-tuning and the
+/// <c>HttpContextAccessor</c></strong>. None of them had been deselected;
+/// nobody had ever selected them.</para>
 ///
-/// <para>Der Beweis dafür, dass wir vom neuen Baumeister nichts benutzten, war
-/// der Versionssprung selbst: 3.0.1 auf 4.0.1 kostete <em>null</em>
-/// Quelltextänderungen. Wer nichts benutzt, merkt auch nichts.</para>
+/// <para>The proof that we were using nothing of the new builder was the
+/// version jump itself: 3.0.1 to 4.0.1 cost <em>zero</em> source changes.
+/// Whoever uses nothing notices nothing either.</para>
 ///
-/// <para><c>UseDefaults()</c> ist ein Aufruf, kein Automatismus — wer ihn
-/// weglässt, bekommt nichts, dieselbe Form wie EF ohne Anbieter. Und
-/// <c>Without(modul, grund)</c> übersetzt ohne Begründung nicht, weshalb jede
-/// Abweichung hier ihren Grund im Quelltext trägt statt in einem Header.</para>
+/// <para><c>UseDefaults()</c> is a call, not an automatism — whoever leaves it
+/// out gets nothing, the same shape as EF without a provider. And
+/// <c>Without(module, reason)</c> does not compile without a reason, which is
+/// why every deviation here carries its reason in the source rather than in a
+/// header.</para>
 /// </remarks>
 public static class ServiceFoundation
 {
     /// <summary>
-    /// Noelias Vorgabe, dazu der Handelnde — und kein Ausstellen.
+    /// Noelia's default, plus the acting principal — and no issuing.
     /// </summary>
     /// <remarks>
-    /// <para><c>Principal</c> steht nicht in der Vorgabe, weil es eine
-    /// Entscheidung verlangt, die Noelia nicht treffen darf. Wir treffen sie für
-    /// alle elf gleich: jeder Dienst liest den Handelnden aus dem geprüften
-    /// Token, denn darauf steht <c>Capacity</c> (ADR-0017).</para>
+    /// <para><c>Principal</c> does not stand in the default, because it demands
+    /// a decision Noelia must not take. We take it the same way for all eleven:
+    /// every service reads the acting principal out of the verified token,
+    /// because <c>Capacity</c> stands on it (ADR-0017).</para>
     ///
-    /// <para><strong>Ausstellen kann nur, wer den privaten Schlüssel hat</strong>
-    /// (<see cref="Schluesselherkunft"/>), und den bekommt allein
-    /// identity-service. Das ist seit ADR-0046 keine Konvention mehr, sondern
-    /// eine Eigenschaft des Schlüssels: ein zweiter Aussteller wäre eine zweite
-    /// Job, die einen Handelnden erschaffen kann, und nichts weiter unten
-    /// könnte die beiden auseinanderhalten.</para>
+    /// <para><strong>Only whoever has the private key can issue</strong>
+    /// (<see cref="ResolveSigningKeys"/>), and identity-service alone gets it.
+    /// Since ADR-0046 that is no longer a convention but a property of the key:
+    /// a second issuer would be a second place that can create an acting
+    /// principal, and nothing further down could tell the two apart.</para>
     /// </remarks>
     /// <param name="services">The container.</param>
     /// <param name="configuration">The service's configuration.</param>
@@ -76,74 +76,71 @@ public static class ServiceFoundation
         string dienstname,
         Action<NoeliaBuilder>? weitere = null)
     {
-        // Die Eingabepruefung sieht NICHT in JSON-Ruempfe. Gemessen, nicht
-        // vermutet.
+        // The input sanitization does NOT look into JSON bodies. Measured, not
+        // assumed.
         //
-        // Sie laeuft vor allem anderen und kann kein Feld benennen — eine
-        // ResumeRequest, die sie abweist, hat den Fachpruefer nie erreicht. Damit wird
-        // aus einem 422, das sagt WELCHES Feld falsch ist, ein blankes 400
-        // „malicious input". Gemessen an fuenf Faellen in drei Diensten:
-        // `javascript:alert(1)` und `data:text/html,<script>` als Portfolio-Link,
-        // dieselben zwei am EmployerProfile, und `../../etc/passwd` als
-        // GitHub-Anmeldename. Alle fuenf werden weiterhin abgewiesen — nur sagt
-        // die Antwort dem Menschen im Formular jetzt weniger als vorher.
+        // It runs before everything else and cannot name a field — a request it
+        // refuses never reached the domain validator. That turns a 422 saying
+        // WHICH field is wrong into a bare 400 "malicious input". Measured on
+        // five cases in three services: `javascript:alert(1)` and
+        // `data:text/html,<script>` as a portfolio link, the same two on the
+        // employer profile, and `../../etc/passwd` as a GitHub login name. All
+        // five are still refused — the answer just tells the person in the form
+        // less than it used to.
         //
-        // Das ist hier zu verschmerzen und anderswo nicht: unsere gesamte
-        // Schreibflaeche ist gepruefte Fachschicht mit RFC-9457-Responses samt
-        // Feldnamen, wir bauen kein SQL aus Zeichenketten (EF mit Parametern),
-        // und die Ausgabe entkommt React. Der Kantenfilter verdeckt hier also
-        // bessere Pruefer, statt etwas zu decken.
+        // That is bearable here and not elsewhere: our whole write surface is
+        // validated domain layer with RFC 9457 responses including field names,
+        // we build no SQL out of strings (EF with parameters), and the output
+        // escapes through React. So the edge filter here conceals better
+        // validators instead of covering anything.
         //
-        // Query-String und die zwei Adresskoepfe bleiben geprueft — das ist die
-        // Flaeche, auf der ein Wert ohne Fachpruefer ankommt.
+        // Query string and the two address headers stay checked — that is the
+        // surface where a value arrives without a domain validator.
         services.Configure<InputSanitizationOptions>(
             optionen => optionen.InspectJsonBodies = false);
 
-        // Das Token kommt aus dem `Authorization`-Header ODER aus dem
-        // `access`-Cookie, und beide Traeger werden gebraucht: Dienst-zu-Dienst
-        // und CLI schicken den Header, der Browser sieht das httpOnly-Token nie und
-        // kann es nur als Cookie zuruecksenden.
+        // The token comes out of the `Authorization` header OR out of the
+        // `access` cookie, and both carriers are needed: service-to-service and
+        // CLI send the header, the browser never sees the httpOnly token and can
+        // only send it back as a cookie.
         //
-        // Das stand elfmal, in jedem Dienst wortgleich. Es ist aber keine
-        // Entscheidung eines Dienstes, sondern eine der Plattform — und elf
-        // Jobs fuer dieselbe Aussage sind elf Gelegenheiten, sie beim
-        // zwoelften Dienst zu vergessen. Dann kaeme jeder Schalter im Browser
-        // mit 401 zurueck, obwohl die Anmeldung aussieht, als haette sie
-        // funktioniert.
+        // This stood eleven times over, word for word in every service. But it
+        // is not a decision of a service, it is one of the platform — and eleven
+        // places for the same statement are eleven chances to forget it at the
+        // twelfth service. Then every switch in the browser would come back with
+        // a 401 although the sign-in looks as though it worked.
         services.PostConfigure<JwtBearerOptions>(
             JwtBearerDefaults.AuthenticationScheme,
             optionen => optionen.AuchAusDemCookie());
 
-        // Eine Ablehnung durch eine Richtlinie schliesst die Antwort KURZ und
-        // wirft nicht — `ProblemDetailsMiddleware` sieht sie nie. Ohne diese
-        // Zeile faellt sie als nackter 401/403 mit leerem Rumpf heraus, ohne
-        // Korrelationskennung, und die Oberflaeche bekaeme fuer dieselbe Sache
-        // zwei Gestalten.
+        // A refusal by a policy SHORT-CIRCUITS the answer and does not throw —
+        // `ProblemDetailsMiddleware` never sees it. Without this line it falls
+        // out as a bare 401/403 with an empty body, without a correlation id,
+        // and the interface would get two shapes for the same thing.
         //
-        // Sie stand in identity-service, solange der der einzige Dienst mit
-        // Richtlinien war. Seit die CompanyPermissions in vier Diensten haengen,
-        // gehoert sie hierher: eine Gestalt ueber alle Dienste.
+        // It stood in identity-service for as long as that was the only service
+        // with policies. Since the company permissions hang in four services it
+        // belongs here: one shape across all services.
         //
-        // In einem Dienst OHNE Richtlinien kostet sie nichts: die
-        // Autorisierungs-Zwischenschicht ruft diesen Handler nur fuer
-        // Endpunkte, die Autorisierungsdaten tragen.
+        // In a service WITHOUT policies it costs nothing: the authorization
+        // middleware calls this handler only for endpoints that carry
+        // authorization metadata.
         services.AddSingleton<IAuthorizationMiddlewareResultHandler, RejectionShape>();
 
-        // DER NACHWEIS HAENGT HIER, weil das der eine Aufruf ist, den jeder
-        // Dienst macht (ADR-0044).
+        // THE EVIDENCE HANGS HERE, because this is the one call every service
+        // makes (ADR-0044).
         //
-        // Der Grund steht schon in dieser Datei, eine Ueberschrift weiter oben:
-        // "Wir listeten fuenf Module auf und bekamen fuenf — und merkten nicht,
-        // was dadurch fehlte. Nichts davon war abgewaehlt; niemand hatte sie je
-        // gewaehlt." Genau diese Krankheit haben die Zusagen dieses Baumes an
-        // drei weiteren Jobs: sie sind aufgeschrieben und nicht ausfuehrbar.
+        // The reason already stands in this file, one heading further up: "We
+        // listed five modules and got five — and did not notice what went
+        // missing with it. None of them had been deselected; nobody had ever
+        // selected them." The promises of this tree have exactly that illness in
+        // three further places: they are written down and not executable.
         //
-        // Und ein Test kann sie nicht heilen. `Adr0022Tests` und
-        // `EntwurfsgrenzeTests` pruefen den BAUM; der KI-Zugang einer Person
-        // steht in `KiZugangV1` — Anbieter, Adresse, Modell und Schluessel pro
-        // Person zur Laufzeit —, und die Ziele der Egress-Grenze stehen in der
-        // EnvironmentFile. Wohin dieser Behaelter heute Abend spricht, weiss nur er
-        // selbst.
+        // And a test cannot cure it. `Adr0022Tests` and `EntwurfsgrenzeTests`
+        // check the TREE; a person's AI access stands in `KiZugangV1` —
+        // provider, address, model and key per person at run time —, and the
+        // destinations of the egress boundary stand in the environment. Where
+        // this container speaks tonight, only it knows itself.
         services.AddEvidence(configuration);
 
         return services.AddNoelia(configuration, environment, dienstname, girder =>
@@ -152,62 +149,63 @@ public static class ServiceFoundation
                 .UseDefaults()
                 .Use(NoeliaModule.Principal)
 
-                // AUSSTELLEN KANN NUR, WER DEN PRIVATEN SCHLUESSEL HAT.
-                // Ein geteiltes HS256-Geheimnis kennt diesen Unterschied nicht:
-                // jeder der fuenfzehn Prozesse koennte ein Token fuer jeden
-                // Menschen praegen, und ein kopiertes Konfigurationsblatt waere
-                // jedes Konto auf jedem Dienst.
+                // ONLY WHOEVER HAS THE PRIVATE KEY CAN ISSUE.
+                // A shared HS256 secret does not know this difference: any one
+                // of the fifteen processes could mint a token for any human
+                // being, and a copied configuration sheet would be every account
+                // on every service.
                 .UseJwt(jwt => ResolveSigningKeys(jwt, configuration))
 
-                // DIE EGRESS-GRENZE, UND WOHER SIE IHRE HOSTS KENNT.
+                // THE EGRESS BOUNDARY, AND WHERE IT KNOWS ITS HOSTS FROM.
                 //
-                // `AddSovereignPlatform` buendelt vier Dinge: die Egress-Grenze,
-                // die Maskierung im Protokoll, den Souveraenitaetsbericht und
-                // eine Pruefspur.
+                // `AddSovereignPlatform` bundles four things: the egress
+                // boundary, the masking in the log, the sovereignty report and
+                // an audit trail.
                 //
-                // Die Pruefspur bleibt AN. Fuer eine fachliche Zeile genuegt
-                // sie ADR-0012 nicht (dafuer `EfAuditTrail`) — der
-                // Dashboard-Zugriff ist aber keine: er hat keine Transaktion,
-                // und ohne Senke verweigert das Dashboard mit 503.
+                // The audit trail stays ON. For a domain row it does not satisfy
+                // ADR-0012 (that is what `EfAuditTrail` is for) — but the
+                // dashboard access is not one: it has no transaction, and
+                // without a sink the dashboard refuses with a 503.
                 //
-                // GEMESSEN, BEVOR DAS HIER STAND (`EgressTests`): der Waechter
-                // WEIST AB statt zu protokollieren, und ein Containername faellt
-                // NICHT unter „loopback und RFC1918" — `consent-service` ist
-                // keine Adresse, die sich als IP lesen laesst. Naiv uebernommen
-                // waere das der Ausfall jedes Dienst-zu-Dienst-Aufrufs gewesen,
-                // und zwar erst im Stapel, nicht im Test.
+                // MEASURED BEFORE THIS STOOD HERE (`EgressTests`): the guard
+                // REFUSES instead of logging, and a container name does NOT fall
+                // under "loopback and RFC1918" — `consent-service` is not an
+                // address that can be read as an IP. Adopted naively that would
+                // have been the failure of every service-to-service call, and in
+                // the stack rather than in the tests.
                 //
-                // Die Hosts kommen deshalb aus der KONFIGURATION und nicht aus
-                // einer Liste hier: `Consent__Adresse`, `Jobs__Adresse`,
-                // `Auskunft__*`, `Erasure__Adressen__*` stehen ohnehin in der
-                // EnvironmentFile, und was ein Dienst ruft, hat er dort schon gesagt.
-                // Eine zweite Liste waere die, die als Erste veraltet — und ihr
-                // Veralten faellt niemandem auf, weil der Aufruf dann einfach
-                // abgewiesen wird.
+                // The hosts therefore come out of the CONFIGURATION and not out
+                // of a list here: `Consent__Adresse`, `Jobs__Adresse`,
+                // `Auskunft__*`, `Erasure__Adressen__*` stand in the environment
+                // anyway, and what a service calls it has already said there. A
+                // second list would be the one to go stale first — and nobody
+                // would notice it going stale, because the call is then simply
+                // refused.
                 //
-                // Was NICHT in der Konfiguration steht, darf auch nicht
-                // hinaus. Genau das ist der Zweck: ein Telemetriezug mit einer
-                // eingebauten Vorgabeadresse, ein SDK, das nach Hause telefoniert.
+                // What does NOT stand in the configuration must not go out
+                // either. That is exactly the purpose: a telemetry package with
+                // a built-in default address, an SDK that phones home.
                 .AddSovereignPlatform(souveraen => Deklariere(
                     souveraen.Allow([.. GerufeneHosts(configuration)]),
                     configuration))
 
-                // DIE BETRIEBSOBERFLAECHE, und sie ersetzt sieben eigene
-                // Adressen (ADR-0045).
+                // THE OPERATIONS SURFACE, and it replaces seven addresses of
+                // our own (ADR-0045).
                 //
-                // `/noelia` traegt Uebersicht, Zusammensetzung, Konfiguration,
-                // Sicherheitspruefungen, Souveraenitaet, KI, PFLICHTEN, Pruefspur,
-                // Sitzungen, Bremsen und Gesundheit — samt `report.json` aus
-                // DERSELBEN Lesung. `WorkerTransfer.Nachweis` hat das selbst
-                // gebaut, bevor dieser Baum auf Noelia stand; es ist geloescht
-                // und steht nicht daneben. Zwei Wege zu einer Aussage laufen
-                // auseinander, und beim ersten Mal merkt es niemand.
+                // `/noelia` carries overview, composition, configuration,
+                // security checks, sovereignty, AI, DUTIES, audit trail,
+                // sessions, rate limits and health — together with
+                // `report.json` out of THE SAME reading.
+                // `WorkerTransfer.Nachweis` built that itself before this tree
+                // stood on Noelia; it is deleted and does not stand beside it.
+                // Two paths to one statement drift apart, and the first time
+                // nobody notices.
                 //
-                // OHNE BERECHTIGUNG 404, nicht 403 — dieselbe Zusage wie vorher.
-                // Eine Betriebsoberflaeche, deren Existenz man erraten kann, ist
-                // selbst schon eine Auskunft. Das Geheimnis bleibt ein EIGENES
-                // Papier: wer eine Mail anstossen darf, muss nicht erfahren,
-                // welche KI-Anbieter diese Instanz benutzt.
+                // WITHOUT AUTHORISATION 404, not 403 — the same promise as
+                // before. An operations surface whose existence you can guess is
+                // already a disclosure in itself. The secret stays a piece of
+                // paper of ITS OWN: whoever may trigger a mail does not have to
+                // learn which AI providers this instance uses.
                 .UseDashboard(dashboard => dashboard
                     .At("/noelia")
                     .VisibleTo(EvidenceSetup.IsOperator)
@@ -217,28 +215,28 @@ public static class ServiceFoundation
                         + "Naht, Loeschkaskade — steht hinter einem eigenen "
                         + "Geheimnis und traegt keinen Wert und keinen Namen."))
 
-                // Noelias Bremse steht in der Vorgabe, und sie ist in 4.0.2
-                // nachgemessen in Ordnung (H2, Messung 1): sie bremst, sie zaehlt
-                // je ProviderOrigin, sie liest X-Forwarded-For nicht mehr, und ein
-                // gefaelschtes "X-Forwarded-For: 127.0.0.1" hebt sie nicht auf.
-                // Der Grund, sie hier trotzdem nicht zu fahren, hat mit Noelia
-                // nichts zu tun und aendert sich auch nicht mehr:
+                // Noelia's rate limiter stands in the default, and measured
+                // against 4.0.2 it is in order (H2, measurement 1): it brakes,
+                // it counts per origin, it no longer reads X-Forwarded-For, and
+                // a forged "X-Forwarded-For: 127.0.0.1" does not lift it. The
+                // reason for not running it here anyway has nothing to do with
+                // Noelia and will not change any more:
                 //
-                // Ein Dienst hinter dem Gateway sieht als ProviderOrigin die Adresse
-                // DES GATEWAYS — fuer jeden Aufrufer dieselbe. Eine Bremse hier
-                // wuerfe alle Menschen in einen Topf: wer als Erster fuenfmal
-                // danebentippt, sperrt die ganze Welt aus. Die Bremse gehoert an
-                // den Eingang, und dort steht seit 4.2.0 GIRDERS EIGENES MODUL,
-                // konfiguriert in `ocelot.json` — der frueher hier genannte
-                // Eigenbau `Bremse.cs` ist geloescht.
+                // A service behind the gateway sees THE GATEWAY's address as the
+                // origin — the same one for every caller. A brake here would
+                // throw all people into one bucket: the first person to mistype
+                // five times locks out the world. The brake belongs at the
+                // entrance, and there, since 4.2.0, stands GIRDER'S OWN MODULE,
+                // configured in `ocelot.json` — the hand-written `Bremse.cs`
+                // named here before is deleted.
                 .Without(
                     NoeliaModule.RateLimiting,
                     "ein Dienst hinter dem Gateway sieht als Herkunft nur das "
                     + "Gateway, also alle Aufrufer als einen — gebremst wird am "
                     + "Eingang, in ocelot.json")
 
-                // Steht ohnehin nicht in der Vorgabe. Hier genannt, damit die
-                // Entscheidung im Quelltext steht und nicht im Gedaechtnis.
+                // Does not stand in the default anyway. Named here so that the
+                // decision stands in the source and not in somebody's memory.
                 .Without(
                     NoeliaModule.HttpResponseCaching,
                     "ETag ist ein Zwischenspeicher beim Aufrufer, und fast alles "
@@ -247,44 +245,43 @@ public static class ServiceFoundation
                     + "Modul stellt Speicher nur bereit, und keine "
                     + "Einwilligungsabfrage ist ein ICacheableQuery")
 
-                // Communication und Encryption stehen ohnehin nicht in der
-                // Vorgabe — hier genannt, weil ein Grund, der nur in einem
-                // Commit-Text steht, beim naechsten Leser nicht existiert.
-                // Noelias eigener Kommentar sagt es: "Silence is not a
-                // decision."
+                // Communication and Encryption do not stand in the default
+                // anyway — named here because a reason that stands only in a
+                // commit message does not exist for the next reader. Noelia's
+                // own comment says it: "Silence is not a decision."
                 //
-                // Communication: gemessen in H2. Die Statuscodes sind heil (ein
-                // 404 kommt als 404 an, EIN Aufruf am Ziel, keine drei). Es
-                // verlangt aber `IEventBus`, und den liefert allein
-                // Noelia.Messaging.MassTransit — also einen Broker, den wir
-                // bewusst nicht betreiben. Dazu schickt `UseGateway = true` per
-                // Vorgabe JEDEN Aufruf an den Dienst "gateway", und
-                // `EnableResponseCaching = true` speichert jede GET-Antwort
-                // fuenf Minuten. Und der Grund, der den Umstieg attraktiv
-                // machte, ist erledigt: die Korrelationskette haengt seit 4.0.0
-                // an jedem HttpClient der Fabrik.
+                // Communication: measured in H2. The status codes are intact (a
+                // 404 arrives as a 404, ONE call at the destination, not three).
+                // But it demands `IEventBus`, and that is delivered by
+                // Noelia.Messaging.MassTransit alone — that is, a broker we
+                // deliberately do not run. On top of that `UseGateway = true`
+                // sends EVERY call to the service named "gateway" by default,
+                // and `EnableResponseCaching = true` stores every GET answer for
+                // five minutes. And the reason that made the migration
+                // attractive is settled: since 4.0.0 the correlation chain hangs
+                // on every HttpClient from the factory.
                 .Without(
                     NoeliaModule.Communication,
                     "verlangt IEventBus und damit einen Broker, den wir nicht "
                     + "betreiben; die Korrelationskette bekommen wir seit 4.0.0 "
                     + "ohne ihn")
 
-                // Encryption: verlangt `IDataEncryptionService` UND
-                // `IMasterKeyProvider`, beide aus Noelia.Redis oder einem
-                // SecretStore. Wir verschluesseln heute auf Feldebene
-                // nichts. Wer damit anfaengt, entscheidet zuerst, WO der
-                // Hauptschluessel liegt — und das ist dieselbe Frage wie bei
-                // SecretManagement, nicht eine Zeile hier.
+                // Encryption: demands `IDataEncryptionService` AND
+                // `IMasterKeyProvider`, both out of Noelia.Redis or a secret
+                // store. We encrypt nothing at field level today. Whoever starts
+                // doing so decides first WHERE the master key lies — and that is
+                // the same question as with SecretManagement, not one line
+                // here.
                 .Without(
                     NoeliaModule.Encryption,
                     "verschluesselt wird heute auf Feldebene nichts; wer damit "
                     + "anfaengt, entscheidet zuerst, wo der Hauptschluessel liegt")
 
-                // ResourceAuthorization bleibt draussen (seit 4.0.2 ein eigenes
-                // Modul): Ressourcenrichtlinien ruft kein Endpunkt hier, und es
-                // verlangt einen Speicher. `Authorization` selbst ist IN der
-                // Vorgabe und bringt den PermissionPolicyProvider mit — genau
-                // den, an dem die CompanyPermissions in identity-service haengen.
+                // ResourceAuthorization stays out (a module of its own since
+                // 4.0.2): no endpoint here calls resource policies, and it
+                // demands a store. `Authorization` itself is IN the default and
+                // brings the PermissionPolicyProvider with it — exactly the one
+                // the company permissions in identity-service hang on.
                 .Without(
                     NoeliaModule.ResourceAuthorization,
                     "ResourceRead und ResourceOwner ruft kein Endpunkt hier, und "
@@ -292,38 +289,38 @@ public static class ServiceFoundation
                     + "sind die Permission-Richtlinien, und die entscheidet "
                     + "Mitgliedschaftsrecht aus der Tabelle statt aus Anspruechen")
 
-                // Seit 4.1.0 ist die abriegelnde Zwischenschicht ein eigenes
-                // Modul, getrennt vom Richtlinienanbieter — genau die Trennung,
-                // die uns gefehlt hat. Vorher hing beides an `Authorization`, und
-                // dann war die Wahl: entweder niemand beantwortet die
-                // Permission-Richtlinien, oder alles ausserhalb der aufgezaehlten
-                // Flaeche antwortet 401.
+                // Since 4.1.0 the blanket middleware is a module of its own,
+                // separated from the policy provider — exactly the separation we
+                // were missing. Before that both hung on `Authorization`, and
+                // then the choice was: either nobody answers the permission
+                // policies, or everything outside the enumerated surface answers
+                // 401.
                 //
-                // `PermissionMiddleware` verlangt fuer JEDE ResumeRequest
-                // Authentifizierung, ausser der Endpunkt traegt `[AllowAnonymous]`
-                // oder eine eigene `IEndpointAccessPolicy` erklaert ihn fuer
-                // oeffentlich. Fail-closed, und fuer ein System ohne oeffentliche
-                // Flaeche richtig. Wir haben eine: `/auth/login`,
-                // `/auth/register`, `/auth/session`, die Karriereseite unter
-                // `/companies/by-slug/{k}`, die Gesundheitsproben — und die
-                // Diensteingaenge hinter einem Geheimniskopf statt hinter einem
-                // Token (`/notifications`, `/erasure`, `/internal/notify`).
+                // `PermissionMiddleware` demands authentication for EVERY
+                // request unless the endpoint carries `[AllowAnonymous]` or an
+                // `IEndpointAccessPolicy` of its own declares it public.
+                // Fail-closed, and right for a system without a public surface.
+                // We have one: `/auth/login`, `/auth/register`,
+                // `/auth/session`, the careers page under
+                // `/companies/by-slug/{k}`, the health probes — and the service
+                // entrances behind a secret header instead of behind a token
+                // (`/notifications`, `/erasure`, `/internal/notify`).
                 //
-                // Gemessen, was sie kostet: mit ihr antwortet `POST
-                // /notifications` mit 401 in Noelias Umschlag, obwohl der
-                // Geheimniskopf stimmt — die Ablehnung faellt vor unserem
-                // Fehlerdokument und vor dem Endpunkt.
+                // Measured what it costs: with it, `POST /notifications` answers
+                // 401 in Noelia's envelope although the secret header is right —
+                // the refusal falls before our problem document and before the
+                // endpoint.
                 //
-                // Sie einzuschalten hiesse, unsere oeffentliche Flaeche ein
-                // ZWEITES Mal zu erklaeren, neben den Endpunkten und neben
-                // `docs/routenkarte.yml`. Zwei Listen ueber dieselbe Frage gehen
-                // auseinander, und die Karte ist die, die gefahren wird. Dazu
-                // kommt: die Middleware liest Rechte aus ANSPRUECHEN, und unser
-                // Token traegt keine — sie koennte also ohnehin nur durchwinken
-                // oder ablehnen, nie erlauben.
+                // Switching it on would mean declaring our public surface a
+                // SECOND time, beside the endpoints and beside
+                // `docs/routenkarte.yml`. Two lists over the same question drift
+                // apart, and the map is the one that gets driven. On top of
+                // that: the middleware reads permissions out of CLAIMS, and our
+                // token carries none — so it could only wave through or refuse,
+                // never permit.
                 //
-                // `Authorization` bleibt und ist deshalb hier NICHT genannt: der
-                // PermissionPolicyProvider traegt die CompanyPermissions.
+                // `Authorization` stays and is therefore NOT named here: the
+                // PermissionPolicyProvider carries the company permissions.
                 .Without(
                     NoeliaModule.PermissionEnforcement,
                     "unsere oeffentliche Flaeche steht an den Endpunkten und in "
@@ -335,20 +332,19 @@ public static class ServiceFoundation
         });
     }
 
-    /// <summary>Woher dieser Dienst seine Token-Schlüssel nimmt.</summary>
+    /// <summary>Where this service takes its token keys from.</summary>
     /// <remarks>
-    /// <para>Der private Schlüssel entscheidet, nicht ein Schalter im Code. Er
-    /// steht allein in der EnvironmentFile von identity-service, und damit ist in
-    /// <c>docker-compose.yml</c> und im Chart nachzulesen, wer prägen kann —
-    /// eine Codezeile wäre dieselbe Aussage an einer Job, die der Betreiber
-    /// nicht sieht.</para>
+    /// <para>The private key decides, not a switch in the code. It stands in
+    /// the environment of identity-service alone, and so who can mint can be
+    /// read in <c>docker-compose.yml</c> and in the chart — a line of code
+    /// would be the same statement in a place the operator does not see.</para>
     ///
-    /// <para>Ohne öffentlichen Schlüssel wirft dieser Aufruf und nennt den
-    /// Namen. Ein Dienst, der stattdessen still jedes Token ablehnte, sähe aus
-    /// wie eine kaputte Anmeldung.</para>
+    /// <para>Without a public key this call throws and names the name. A
+    /// service that instead silently refused every token would look like a
+    /// broken sign-in.</para>
     /// </remarks>
-    /// <param name="jwt">Noelias Schlüsselbaumeister.</param>
-    /// <param name="configuration">Die Konfiguration dieses Dienstes.</param>
+    /// <param name="jwt">Noelia's key builder.</param>
+    /// <param name="configuration">This service's configuration.</param>
     private static void ResolveSigningKeys(JwtBuilder jwt, IConfiguration configuration)
     {
         var id = configuration["Jwt:KeyId"];
@@ -373,15 +369,16 @@ public static class ServiceFoundation
     }
 
     /// <summary>
-    /// Was ein Dienst zusätzlich braucht, um Menschen anzumelden. Nur identity.
+    /// What a service additionally needs in order to sign people in. Identity
+    /// only.
     /// </summary>
     /// <remarks>
-    /// Passwort-Prüfung und Sitzungen — nicht das Ausstellen selbst: das hängt
-    /// seit ADR-0046 am privaten Schlüssel und damit an der EnvironmentFile. Diese
-    /// Methode hat trotzdem einen eigenen Namen, damit eine Search nach ihr
-    /// genau einen Verbundpunkt findet.
+    /// Password checking and sessions — not the issuing itself: since ADR-0046
+    /// that hangs on the private key and therefore on the environment. This
+    /// method has a name of its own all the same, so that a search for it finds
+    /// exactly one composition root.
     /// </remarks>
-    /// <param name="girder">Der Baumeister dieses Dienstes.</param>
+    /// <param name="girder">This service's builder.</param>
     public static NoeliaBuilder AsIssuer(this NoeliaBuilder girder)
     {
         ArgumentNullException.ThrowIfNull(girder);
@@ -391,29 +388,29 @@ public static class ServiceFoundation
             .Use(NoeliaModule.TokenSessions);
     }
 
-    /// <summary>Die Kette, und wer ihre Reihenfolge bestimmt.</summary>
+    /// <summary>The chain, and who decides its order.</summary>
     /// <remarks>
-    /// <para><strong>Die Reihenfolge gehört Noelia.</strong> Hier stand zuletzt
-    /// Noelias Vorgabekette abgeschrieben, dreizehn Glieder lang, mit drei
-    /// ausgelassenen Zeilen — nicht aus Gestaltung, sondern aus Zwang: die Kette
-    /// wusste bis 4.0.2 von der Modulauswahl nichts und brach ohne die
-    /// Auslassung beim Start ab. Seit 4.1.0 liest sie
-    /// <c>NoeliaComposition</c>, also steht hier wieder der Aufruf ohne Lambda:
-    /// dieselbe Kette, die jeder andere Noelia-Dienst fährt, und jede Abwahl
-    /// oben wirkt einmal statt zweimal.</para>
+    /// <para><strong>The order belongs to Noelia.</strong> Until recently
+    /// Noelia's default chain stood here transcribed, thirteen links long, with
+    /// three lines left out — not out of design but out of necessity: until
+    /// 4.0.2 the chain knew nothing of the module selection and aborted at
+    /// startup without the omission. Since 4.1.0 it reads
+    /// <c>NoeliaComposition</c>, so the call without a lambda stands here again:
+    /// the same chain every other Noelia service runs, and every deselection
+    /// above takes effect once instead of twice.</para>
     ///
-    /// <para>Zwei Glieder kommen danach, und beide aus einem Grund:</para>
+    /// <para>Two links come afterwards, and both for a reason:</para>
     ///
-    /// <para><c>UseNoeliaPrincipal()</c>, weil <c>Principal</c> kein Teil der
-    /// Vorgabekette ist — es hängt an einer Entscheidung, und die haben wir oben
-    /// getroffen. Es steht hinter der Authentifizierung, weil der Handelnde aus
-    /// dem <em>geprüften</em> Token gebaut wird.</para>
+    /// <para><c>UseNoeliaPrincipal()</c>, because <c>Principal</c> is not part
+    /// of the default chain — it hangs on a decision, and we took that one
+    /// above. It stands behind the authentication, because the acting principal
+    /// is built out of the <em>verified</em> token.</para>
     ///
-    /// <para><see cref="ProblemDetailsMiddleware"/> zuletzt, also am nächsten an
-    /// den Endpunkten. Noelias eigene Fehlerbehandlung steht weiter außen und
-    /// fängt damit nur, was diese hier durchreicht. Eine Gestalt über alle
-    /// Dienste ist der Grund: ein Aufrufer soll nicht wissen müssen, wer
-    /// geantwortet hat, um den Fehler zu lesen.</para>
+    /// <para><see cref="ProblemDetailsMiddleware"/> last, that is, closest to
+    /// the endpoints. Noelia's own error handling stands further out and so
+    /// catches only what this one passes through. One shape across all services
+    /// is the reason: a caller should not have to know who answered in order to
+    /// read the error.</para>
     /// </remarks>
     /// <param name="app">The application being built.</param>
     /// <param name="environment">Where it runs.</param>
@@ -425,20 +422,20 @@ public static class ServiceFoundation
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        // Noelias Vorgabekette, ohne Lambda.
+        // Noelia's default chain, without a lambda.
         //
-        // Hier standen dreizehn abgeschriebene Zeilen mit drei Auslassungen. Sie
-        // standen da, weil die Kette bis 4.0.2 jedes Glied bedingungslos rief und
-        // von `Without(...)` nichts wusste: `UseRateLimiting()` haette jeden
-        // Dienst beim Start abgebrochen. Die Kopie war also kein Entwurf, sondern
-        // ein Zwang — und genau die Sorte Duplikat, die beim naechsten
-        // Noelia-Release still falsch wird: kommt ein Glied hinzu, fehlt es hier,
-        // kein Bau bricht, kein Test faellt, die Kette ist einfach kuerzer.
+        // Thirteen transcribed lines with three omissions stood here. They stood
+        // there because until 4.0.2 the chain called every link unconditionally
+        // and knew nothing of `Without(...)`: `UseRateLimiting()` would have
+        // aborted every service at startup. So the copy was not a design but a
+        // necessity — and exactly the kind of duplicate that goes silently wrong
+        // at the next Noelia release: if a link is added, it is missing here, no
+        // build breaks, no test falls, the chain is simply shorter.
         //
-        // Seit 4.1.0 liest die Kette `NoeliaComposition`. Jede Abwahl oben wirkt
-        // damit auch hier — RateLimiting, HttpResponseCaching und
-        // PermissionEnforcement fallen von selbst weg, und ihre Begruendung steht
-        // an genau einer Job.
+        // Since 4.1.0 the chain reads `NoeliaComposition`. Every deselection
+        // above therefore takes effect here too — RateLimiting,
+        // HttpResponseCaching and PermissionEnforcement fall away by themselves,
+        // and their reason stands in exactly one place.
         app.UseNoelia(environment, dienstname);
 
         app.UseNoeliaPrincipal();
@@ -449,13 +446,13 @@ public static class ServiceFoundation
         return app;
     }
 
-    /// <summary>Trägt jedes Ziel ins Souveränitätsverzeichnis.</summary>
+    /// <summary>Enters every destination into the sovereignty directory.</summary>
     /// <remarks>
-    /// <c>Allow</c> verhindert den undeklarierten Aufruf; erst
-    /// <c>DeclareDependency</c> macht das Ziel im Bericht sichtbar. Ohne diese
-    /// Zeile ist das Egress-Register leer und die Flottensicht zeigt nichts.
-    /// Deklariert wird unter dem Konfigurationsschlüssel, damit im Bericht steht,
-    /// <em>wofür</em> ein Host gerufen wird.
+    /// <c>Allow</c> prevents the undeclared call; only <c>DeclareDependency</c>
+    /// makes the destination visible in the report. Without this line the egress
+    /// register is empty and the fleet view shows nothing. Declaring happens
+    /// under the configuration key, so that the report says <em>what for</em> a
+    /// host is called.
     /// </remarks>
     private static SovereignPlatformBuilder Deklariere(
         SovereignPlatformBuilder souveraen, IConfiguration configuration)
@@ -468,7 +465,7 @@ public static class ServiceFoundation
         return souveraen;
     }
 
-    /// <summary>Konfigurationsschlüssel und Adresse jedes gerufenen Ziels.</summary>
+    /// <summary>Configuration key and address of every destination called.</summary>
     private static IEnumerable<(string Schluessel, string Adresse)> GerufeneZiele(
         IConfiguration configuration) =>
         configuration.AsEnumerable()
@@ -481,31 +478,31 @@ public static class ServiceFoundation
             .DistinctBy(entry => entry.Item2, StringComparer.OrdinalIgnoreCase)
             .OrderBy(entry => entry.Key, StringComparer.Ordinal);
 
-    /// <summary>Wo dieser Dienst horcht — kein Ziel, das er ruft.</summary>
+    /// <summary>Where this service listens — not a destination it calls.</summary>
     private static bool Horchadresse(string key) =>
         key.Contains("URLS", StringComparison.OrdinalIgnoreCase)
         || key.StartsWith("Kestrel", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Jeder Host, den dieser Dienst laut Konfiguration ruft.</summary>
+    /// <summary>Every host this service calls according to its configuration.</summary>
     /// <remarks>
-    /// <para><strong>Eine Ableitung, keine Liste.</strong> Gelesen wird die ganze
-    /// Konfiguration; jeder Wert, der sich als absolute http- oder https-Adresse
-    /// lesen lässt, gibt seinen Host her. Eine zweite Liste wäre die, die als
-    /// Erste veraltet — und ihr Veralten fiele niemandem auf, weil ein nicht
-    /// erfasster Aufruf von der Egress-Grenze einfach abgewiesen wird.</para>
+    /// <para><strong>A derivation, not a list.</strong> The whole configuration
+    /// is read; every value that can be read as an absolute http or https
+    /// address yields its host. A second list would be the one to go stale first
+    /// — and nobody would notice it going stale, because a call that was not
+    /// captured is simply refused by the egress boundary.</para>
     ///
-    /// <para><strong>Sie stand zwischenzeitlich woanders, und der Grund ist
-    /// weggefallen.</strong> ADR-0044 zog sie in ein eigenes <c>Zielkunde</c>,
-    /// weil sie zwei Leser hatte: die Egress-Grenze und <c>wt.grenze.ziele</c>.
-    /// Mit ADR-0045 berichtet Noelias Souveränitätsabschnitt die Ziele selbst,
-    /// der zweite Leser ist fort — und eine Ableitung mit einem Leser gehört
-    /// dorthin, wo sie gelesen wird.</para>
+    /// <para><strong>It stood somewhere else in the meantime, and the reason
+    /// has fallen away.</strong> ADR-0044 pulled it into a <c>Zielkunde</c> of
+    /// its own because it had two readers: the egress boundary and
+    /// <c>wt.grenze.ziele</c>. With ADR-0045 Noelia's sovereignty section
+    /// reports the destinations itself, the second reader is gone — and a
+    /// derivation with one reader belongs where it is read.</para>
     ///
-    /// <para><strong>Zwei Ziele stehen deshalb in der EnvironmentFile, die früher nur
-    /// im Quelltext standen</strong> — <c>Draft__Adresse</c> und
-    /// <c>GitHub__Adresse</c>. Eine eingebaute Vorgabeadresse nach draußen ist
-    /// genau das, was ein Souveränitätsbericht sichtbar machen soll; sie im
-    /// Code zu lassen hieße, sie vor ihm zu verstecken.</para>
+    /// <para><strong>Two destinations therefore stand in the environment that
+    /// used to stand only in the source</strong> — <c>Draft__Adresse</c> and
+    /// <c>GitHub__Adresse</c>. A built-in default address pointing abroad is
+    /// exactly what a sovereignty report exists to surface; leaving it in the
+    /// code would mean hiding it from that report.</para>
     /// </remarks>
     private static IReadOnlyList<string> GerufeneHosts(IConfiguration configuration) =>
     [
@@ -524,25 +521,25 @@ public static class ServiceFoundation
             .OrderBy(host => host, StringComparer.OrdinalIgnoreCase)
     ];
 
-    /// <summary>Sagt beim Start, was dieser Dienst fährt — und was er warum nicht.</summary>
+    /// <summary>Says at startup what this service runs — and what it does not, and why.</summary>
     /// <remarks>
-    /// <para><strong>Die Absicht steht in <c>ServiceFoundation.cs</c>, die
-    /// Wirklichkeit im Container.</strong> Bis 4.0.2 konnten die beiden
-    /// auseinanderlaufen, ohne dass es jemand merkte: die Kette rief jedes Glied
-    /// bedingungslos, ein <c>Without(...)</c> wirkte nur bei der Registrierung,
-    /// und ob die Auslassung wirklich ankam, sah man erst am Absturz. Genau
-    /// dafür gibt es <c>NoeliaComposition</c>, und ein Bericht, den niemand
-    /// ausgibt, ist keiner.</para>
+    /// <para><strong>The intent stands in <c>ServiceFoundation.cs</c>, the
+    /// reality in the container.</strong> Until 4.0.2 the two could drift apart
+    /// without anybody noticing: the chain called every link unconditionally, a
+    /// <c>Without(...)</c> took effect only at registration, and whether the
+    /// omission really arrived could be seen only from the crash. That is
+    /// exactly what <c>NoeliaComposition</c> is for, and a report nobody prints
+    /// is not one.</para>
     ///
-    /// <para><strong>Ausgegeben wird nur die Zahl der geführten Module und jede
-    /// Auslassung mit ihrem Grund.</strong> Die vollständige Liste wäre bei
-    /// neunzehn Einträgen zwölfmal dasselbe im Startprotokoll; die Auslassungen
-    /// sind das, worüber jemand entschieden hat, und nur sie können von der
-    /// Absicht abweichen. Wer alles sehen will, liest
-    /// <c>NoeliaComposition.Included</c> aus dem Container.</para>
+    /// <para><strong>Printed are only the number of modules in operation and
+    /// every omission with its reason.</strong> With nineteen entries the full
+    /// list would be the same thing twelve times over in the startup log; the
+    /// omissions are what somebody decided about, and only they can deviate from
+    /// the intent. Whoever wants to see everything reads
+    /// <c>NoeliaComposition.Included</c> out of the container.</para>
     ///
-    /// <para>Kein Wert wandert dabei ins Protokoll: ein Modulname ist eine
-    /// Aufzählung, ein Grund ein Satz, den wir selbst geschrieben haben.</para>
+    /// <para>No value travels into the log along the way: a module name is an
+    /// enumeration, a reason a sentence we wrote ourselves.</para>
     /// </remarks>
     private static void BerichteZusammensetzung(WebApplication app, string dienstname)
     {
@@ -550,9 +547,9 @@ public static class ServiceFoundation
 
         if (zusammensetzung is null)
         {
-            // Nicht werfen: der Bericht ist Auskunft, keine Zusage. Ein Dienst,
-            // der wegen einer fehlenden Auskunft nicht startet, tauscht ein
-            // kleines Problem gegen ein grosses.
+            // Do not throw: the report is information, not a promise. A
+            // service that fails to start over a missing piece of information
+            // trades a small problem for a big one.
             app.Logger.LogWarning(
                 "Noelia meldet keine Zusammensetzung für {Dienst} — der Bericht bleibt leer",
                 dienstname);
@@ -560,11 +557,11 @@ public static class ServiceFoundation
             return;
         }
 
-        // MIT NAMEN, nicht nur mit einer Zahl. „19 Module in Betrieb" liest sich
-        // wie eine Bestaetigung und ist keine: dass eine Entscheidung von oben
-        // wirklich ankam, sieht man erst am Namen. Gemessen am 09.09.2026 stand
-        // dieselbe 19 vor und nach einer neuen `AddSovereignPlatform`-Zeile —
-        // die Zahl konnte den Unterschied nicht zeigen, den sie melden sollte.
+        // WITH NAMES, not only with a number. "19 modules in operation" reads
+        // like a confirmation and is none: that a decision from above really
+        // arrived can be seen only from the name. Measured on 09.09.2026, the
+        // same 19 stood before and after a new `AddSovereignPlatform` line — the
+        // number could not show the difference it existed to report.
         app.Logger.LogInformation(
             "Noelia für {Dienst}: {Gefuehrt} Module in Betrieb ({Module}), {Ausgelassen} ausgelassen",
             dienstname,

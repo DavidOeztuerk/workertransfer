@@ -6,53 +6,53 @@ using Microsoft.Extensions.Logging;
 
 namespace WorkerTransfer.ServiceDefaults;
 
-/// <summary>Erst wandern, dann bedienen.</summary>
+/// <summary>Migrate first, then serve.</summary>
 /// <remarks>
-/// Jeder Dienst besitzt sein eigenes Schema (ADR-0010) und wandert nur sich
-/// selbst — es gibt keinen zentralen Schritt, der alle zehn kennen müsste. Das
-/// ist es, was <c>docker compose up</c> auf einem frischen Klon genügen lässt:
-/// kein Skript, kein <c>psql</c> von Hand, keine Reihenfolge zum Merken.
+/// Every service owns its own schema (ADR-0010) and migrates only itself —
+/// there is no central step that would have to know all ten. That is what makes
+/// <c>docker compose up</c> enough on a fresh clone: no script, no <c>psql</c>
+/// by hand, no order to remember.
 /// <para>
-/// <strong>Beim Start und nicht in einem eigenen Behälter</strong>, anders als
-/// zur Python-Zeit: <c>dotnet ef</c> braucht das SDK, und ein Laufzeitbild hat
-/// keins. Der Preis ist eine vierte Begründung für <c>replicaCount: 1</c> —
-/// zwei Pilger auf demselben Schema sind ein Rennen, das niemand gewinnt. Wer
-/// die Zahl anhebt, muss vorher hierhin zurückkommen.
+/// <strong>At startup and not in a container of its own</strong>, unlike in the
+/// Python era: <c>dotnet ef</c> needs the SDK, and a runtime image has none.
+/// The price is a fourth reason for <c>replicaCount: 1</c> — two pilgrims on
+/// the same schema are a race nobody wins. Whoever raises the number has to
+/// come back here first.
 /// </para>
 /// <para>
-/// <strong>Abschaltbar über <c>Datenbank:Wandern</c>.</strong> Nicht für
-/// Bequemlichkeit, sondern für den Fall, dass ein Betreiber die SchemaMigration
-/// bewusst von Hand fährt: dann soll ein Neustart sie nicht doch anwerfen. Die
-/// Voreinstellung ist an, denn ein Dienst, der ohne sein Schema startet,
-/// antwortet auf jede ResumeRequest mit einem Fehler.
+/// <strong>Switchable off through <c>Datenbank:Wandern</c>.</strong> Not for
+/// convenience but for the case where an operator deliberately runs the schema
+/// migration by hand: a restart must then not start it after all. The default
+/// is on, because a service that starts without its schema answers every
+/// request with an error.
 /// </para>
 /// </remarks>
 public static class SchemaMigration
 {
-    /// <summary>Der Schalter in der Konfiguration.</summary>
+    /// <summary>The switch in the configuration.</summary>
     public const string Schluessel = "Datenbank:Wandern";
 
-    /// <summary>Wie lange auf eine Datenbank gewartet wird, die noch hochfährt.</summary>
+    /// <summary>How long a database that is still starting up is waited for.</summary>
     /// <remarks>
-    /// <strong>Nicht Bequemlichkeit, sondern Notwendigkeit.</strong> In Compose
-    /// meldet <c>pg_isready</c> „bereit", während Postgres noch seine
-    /// Anlegeskripte auf einem nur lokal hörenden Server fährt — der Dienst
-    /// bekommt dann „connection refused". In Kubernetes gibt es
-    /// <c>depends_on</c> überhaupt nicht: dort startet der Behälter, wann er
-    /// will. Ein Dienst, der daran stirbt, ist in beiden Umgebungen falsch.
+    /// <strong>Not convenience but necessity.</strong> In compose
+    /// <c>pg_isready</c> reports "ready" while Postgres is still running its
+    /// setup scripts on a server that listens only locally — the service then
+    /// gets "connection refused". In Kubernetes there is no <c>depends_on</c>
+    /// at all: there the container starts whenever it likes. A service that
+    /// dies of that is wrong in both environments.
     /// <para>
-    /// Eine Minute ist eine Wahl, keine Ableitung: lang genug für ein Postgres,
-    /// das zum ersten Mal hochkommt, kurz genug, dass eine echte Fehlkonfiguration
-    /// nicht als Hängen erscheint. Danach fliegt der Fehler — <em>nicht</em>
-    /// stillschweigend weiterbedienen: ein Dienst ohne sein Schema antwortet auf
-    /// jede ResumeRequest mit einem Fehler, und das wäre der schlechtere Zustand.
+    /// One minute is a choice, not a derivation: long enough for a Postgres
+    /// coming up for the first time, short enough that a genuine
+    /// misconfiguration does not look like hanging. After that the error flies
+    /// — <em>not</em> serving on in silence: a service without its schema
+    /// answers every request with an error, and that would be the worse state.
     /// </para>
     /// </remarks>
     public static readonly TimeSpan Geduld = TimeSpan.FromMinutes(1);
 
-    /// <summary>Wandert das Schema dieses Dienstes, falls eingeschaltet.</summary>
-    /// <typeparam name="TKontext">Der Kontext, dem das Schema gehört.</typeparam>
-    /// <param name="app">Die gebaute Anwendung.</param>
+    /// <summary>Migrates this service's schema, if switched on.</summary>
+    /// <typeparam name="TKontext">The context the schema belongs to.</typeparam>
+    /// <param name="app">The built application.</param>
     public static async Task MigrateSchemaAsync<TKontext>(this WebApplication app)
         where TKontext : DbContext
     {
@@ -84,34 +84,34 @@ public static class SchemaMigration
             }
             catch (Exception error) when (Vorruebergehend(error) && uhr.Elapsed < Geduld)
             {
-                // Die Art des Fehlers, nie die Verbindungszeichenfolge: darin
-                // steht ein Passwort, und ein Protokoll ist auch ein Ort, an
-                // dem etwas landet.
+                // The kind of failure, never the connection string: a password
+                // stands in it, and a log is also a place where something ends
+                // up.
                 protokoll.LogWarning(
                     "Datenbank noch nicht bereit ({Art}), erneut in {Pause}s",
                     error.GetType().Name, pause.TotalSeconds);
 
                 await Task.Delay(pause);
 
-                // Wachsend, aber gedeckelt: die ersten Versuche sollen schnell
-                // greifen, die späteren nicht im Sekundentakt hämmern.
+                // Growing but capped: the first attempts should take hold
+                // quickly, the later ones must not hammer every second.
                 pause = TimeSpan.FromSeconds(Math.Min(pause.TotalSeconds * 2, 8));
             }
         }
     }
 
-    /// <summary>Ist das eine Datenbank, die noch hochfährt — oder ein Fehler?</summary>
+    /// <summary>Is this a database still starting up — or an error?</summary>
     /// <remarks>
-    /// <strong>Die Unterscheidung ist der ganze Punkt.</strong> Der erste
-    /// Entwurf fing jede Ausnahme, und ein echter Schemafehler wurde dadurch zu
-    /// einer Minute Warten mit einer irreführenden letzten Meldung: die
-    /// SchemaMigration lief neun Mal erneut an und meldete am Ende „Typ existiert
-    /// bereits" — angelegt vom ersten Versuch, dessen wahre Ursache niemand
-    /// mehr sah.
+    /// <strong>The distinction is the whole point.</strong> The first draft
+    /// caught every exception, and a genuine schema error thereby became a
+    /// minute of waiting with a misleading last message: the schema migration
+    /// started over nine times and reported "type already exists" at the end —
+    /// created by the first attempt, whose true cause nobody could see any
+    /// more.
     /// <para>
-    /// <c>DbException.IsTransient</c> ist die Frage, die der Anbieter selbst
-    /// beantwortet; ein <c>SocketException</c> in der Kette ist der Fall, in
-    /// dem noch gar niemand geantwortet hat.
+    /// <c>DbException.IsTransient</c> is the question the provider answers
+    /// itself; a <c>SocketException</c> in the chain is the case where nobody
+    /// has answered at all yet.
     /// </para>
     /// </remarks>
     private static bool Vorruebergehend(Exception error)

@@ -5,41 +5,41 @@ using Noelia.Application.Interfaces;
 namespace WorkerTransfer.Ganzes.Tests;
 
 /// <summary>
-/// None Abfrage darf zwischengespeichert werden (ADR-0013).
+/// No query may be cached (ADR-0013).
 /// </summary>
 /// <remarks>
-/// <para>Eine Einwilligung wird <strong>synchron und nie zwischengespeichert</strong>
-/// gelesen: eine Rücknahme muss beim nächsten Lesen wirken. Ein Cache ist hier
-/// kein Leistungsdetail, sondern ein Regelbruch — die Person hat abgeschaltet,
-/// und fünf Minuten lang antwortet der Dienst weiter „darf sehen".</para>
+/// <para>A consent is read <strong>synchronously and never cached</strong>: a
+/// withdrawal has to take effect on the next read. A cache here is not a
+/// performance detail but a broken rule — the person switched it off, and for
+/// five minutes the service goes on answering "may see".</para>
 ///
-/// <para><strong>Warum die Prüfung pauschal ist und nicht nur die Einwilligung
-/// meint.</strong> Sie soll nicht die Frage beantworten „ist DIESE Abfrage
-/// heikel", sondern verhindern, dass jemand sie beantworten muss. Fast jede
-/// Leseabfrage in diesem System hängt mittelbar an einer Einwilligungsprüfung:
-/// <c>KandidatenAbfrage</c> fragt den Ledger direkt, <c>ForeignProfileQuery</c>
-/// auch, und was heute harmlos aussieht, bekommt morgen ein Tor davor. Wer eine
-/// Abfrage wirklich speichern will, muss diesen Test ändern und dabei
-/// hinschreiben, warum die Abfrage weder eine Prüfung enthält noch von einer
-/// abhängt — auch nicht mittelbar. Genau dieser Satz soll fällig werden.</para>
+/// <para><strong>Why the check is sweeping and does not only mean the
+/// consent.</strong> It is not meant to answer the question "is THIS query
+/// sensitive", but to prevent anybody from having to answer it. Almost every
+/// read query in this system hangs indirectly on a consent check:
+/// <c>KandidatenAbfrage</c> asks the ledger directly, <c>ForeignProfileQuery</c>
+/// does too, and what looks harmless today gets a gate in front of it tomorrow.
+/// Whoever really wants to cache a query has to change this test and, in doing
+/// so, write down why the query neither contains a check nor depends on one —
+/// not even indirectly. That sentence is exactly what should fall due.</para>
 ///
-/// <para><strong>Was dieser Test ersetzt.</strong> Fünf Dienste tragen im
-/// Quelltext den Satz, hier implementiere niemand <c>ICacheableQuery</c>,
-/// weshalb <c>AddCQRS</c> beide Cache-Behaviors aus der Kette lasse — und
-/// <c>IAbfrage</c> behauptete sogar, ein Test nagle das fest. <strong>Den Test
-/// gab es nicht.</strong> Gemessen in H2, Messung 4: die Zusage stimmte, aber
-/// sie hing allein daran, dass niemand je die eine Zeile schreibt.</para>
+/// <para><strong>What this test replaces.</strong> Five services carry the
+/// sentence in the source that nobody here implements <c>ICacheableQuery</c>,
+/// which is why <c>AddCQRS</c> leaves both cache behaviours out of the chain —
+/// and <c>IAbfrage</c> even claimed a test pinned it. <strong>That test did not
+/// exist.</strong> Measured in H2, measurement 4: the promise was true, but it
+/// hung solely on nobody ever writing that one line.</para>
 ///
-/// <para>Geprüft wird am <em>Typ</em>, nicht am Quelltext: ein regulärer
-/// Ausdruck übersähe eine Basisklasse, die die Schnittstelle mitbringt.</para>
+/// <para>The check is made on the <em>type</em>, not on the source: a regular
+/// expression would miss a base class that brings the interface with it.</para>
 /// </remarks>
 public class ZwischenspeicherTests
 {
-    /// <summary>Je Dienst ein Typ aus seiner Application-Schicht.</summary>
+    /// <summary>One type from each service's application layer.</summary>
     /// <remarks>
-    /// Über ihn wird die Assembly gefunden. Ein neuer Dienst gehört hierher —
-    /// vergisst ihn jemand, prüft dieser Test ihn nicht, und deshalb steht
-    /// unten die Zählung: elf, nicht „mindestens eine".
+    /// The assembly is found through it. A new service belongs here — if
+    /// somebody forgets it, this test does not check it, and that is why the
+    /// count stands below: eleven, not "at least one".
     /// </remarks>
     public static TheoryData<string, Type> Dienste => new()
     {
@@ -55,23 +55,23 @@ public class ZwischenspeicherTests
         { "github", typeof(GitHub.Application.Connections.MyConnectionQuery) },
         { "notification", typeof(Notification.Application.Benachrichtigungen.MyInboxQuery) },
 
-        // scout-service haelt die schaerfste Fassung dieser Regel: er sucht
-        // Menschen, und ein zwischengespeichertes Ergebnis ueberlebte einen
-        // Revocation. Deshalb speichert er die ANFRAGE und nie das Ergebnis
-        // (ADR-0036 Entscheidung 4) — und auch die ResumeRequest ist kein Cache.
+        // scout-service holds the sharpest version of this rule: it searches
+        // for people, and a cached result would survive a revocation. That is
+        // why it stores the REQUEST and never the result (ADR-0036 decision 4)
+        // — and the request is no cache either.
         { "scout", typeof(Scout.Application.Kandidaten.KandidatenAbfrage) },
 
-        // advisor-service haelt sie in derselben Schaerfe: die STUFE eines
-        // Gespraechs steht nur im Ledger und wird bei jedem Lesen dort erfragt
-        // (ADR-0037 Entscheidung 2). Eine zwischengespeicherte Antwort waere
-        // hier dasselbe wie eine Stufenspalte, nur fluechtig.
+        // advisor-service holds it just as sharply: the STAGE of a
+        // conversation stands only in the ledger and is asked for there on every
+        // read (ADR-0037 decision 2). A cached answer would be the same thing
+        // here as a stage column, only transient.
         { "advisor", typeof(Advisor.Application.Gespraeche.CompanyConversationsQuery) }
     };
 
-    /// <summary>Kein Typ eines Dienstes implementiert <c>ICacheableQuery</c>.</summary>
+    /// <summary>No type of a service implements <c>ICacheableQuery</c>.</summary>
     [Theory]
     [MemberData(nameof(Dienste))]
-    public void Keine_Abfrage_darf_zwischengespeichert_werden(string service, Type ausDerSchicht)
+    public void No_query_may_be_cached(string service, Type ausDerSchicht)
     {
         var speicherbare = ausDerSchicht.Assembly
             .GetTypes()
@@ -86,15 +86,16 @@ public class ZwischenspeicherTests
     }
 
     /// <summary>
-    /// Alle dreizehn Dienste sind wirklich dabei — und die Assemblies sind nicht leer.
+    /// All thirteen services are really there — and the assemblies are not
+    /// empty.
     /// </summary>
     /// <remarks>
-    /// Ohne das wäre die Reihe grün, wenn jemand einen Dienst aus der Liste
-    /// nimmt oder ein Typname nicht mehr auflöst. Eine Prüfung, die nichts
-    /// prüft, sieht genauso grün aus wie eine, die trägt.
+    /// Without that the suite would be green if somebody took a service out of
+    /// the list or a type name no longer resolved. A check that checks nothing
+    /// looks just as green as one that carries.
     /// </remarks>
     [Fact]
-    public void Die_Liste_deckt_alle_Dienste_ab()
+    public void The_list_covers_every_service()
     {
         var services = Dienste.Select(row => (string)row[0]!).ToArray();
 

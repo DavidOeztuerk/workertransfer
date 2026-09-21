@@ -6,19 +6,18 @@ using YamlDotNet.Serialization.NamingConventions;
 namespace WorkerTransfer.Gateway.Tests;
 
 /// <summary>
-/// Die Routenkarte deckt jede Route ab — und zwar ohne laufenden Stapel.
+/// The route map covers every route — and without a running stack.
 /// </summary>
 /// <remarks>
-/// <c>docs/routenkarte.yml</c> haelt fuer jeden Endpunkt fest, was er in den
-/// drei Handlungsformen antwortet. Gefahren wird sie von
-/// <c>scripts/routenkarte.sh</c> gegen den laufenden Stapel — das ist die
-/// Pruefung der <em>Responses</em>.
+/// <c>docs/routenkarte.yml</c> records for every endpoint what it answers in
+/// the three capacities. It is driven by <c>scripts/routenkarte.sh</c> against
+/// the running stack — that is the check of the <em>answers</em>.
 /// <para>
-/// Diese Reihe hier prueft etwas anderes und braucht dafuer keinen Stapel:
-/// <strong>dass die Karte vollstaendig ist.</strong> Ohne sie waere sie genau
-/// so lange richtig, bis jemand eine Route hinzufuegt — und der Tag, an dem das
-/// passiert, ist der Tag, an dem niemand daran denkt. Eine Karte, die still
-/// unvollstaendig wird, ist schlimmer als keine: sie sieht aus wie eine Zusage.
+/// This suite checks something else and needs no stack for it: <strong>that the
+/// map is complete.</strong> Without it the map would be correct exactly until
+/// somebody adds a route — and the day that happens is the day nobody thinks of
+/// it. A map that silently becomes incomplete is worse than none: it looks like
+/// a promise.
 /// </para>
 /// </remarks>
 public sealed class RoutenkarteTests
@@ -31,30 +30,29 @@ public sealed class RoutenkarteTests
         public int Person { get; init; }
 
         /// <summary>
-        /// Fuer eine Firma handelnd, Rolle <c>member</c>.
+        /// Acting for a company, role <c>member</c>.
         /// </summary>
         /// <remarks>
-        /// Die vierte Spalte, seit PBI-2. Sie ist die einzige, die von
-        /// <see cref="Firma"/> ueberhaupt abweichen KANN, ohne dass sich der
-        /// Mandant aendert — und damit die einzige, die „admin gegen member"
-        /// ueberhaupt pruefbar macht. Vorher stand das Wort nur in einer
-        /// Tabellenspalte.
+        /// The fourth column, since PBI-2. It is the only one that CAN deviate
+        /// from <see cref="Firma"/> at all without the tenant changing — and so
+        /// the only one that makes "admin versus member" checkable in the first
+        /// place. Before that the word stood only in a table column.
         /// </remarks>
         public int Mitglied { get; init; }
 
-        /// <summary>Fuer eine Firma handelnd, Rolle <c>admin</c>.</summary>
+        /// <summary>Acting for a company, role <c>admin</c>.</summary>
         public int Firma { get; init; }
 
         /// <summary>
-        /// Der Rumpf, den <c>scripts/routenkarte.sh</c> mitschickt.
+        /// The body <c>scripts/routenkarte.sh</c> sends along.
         /// </summary>
         /// <remarks>
-        /// Fast nirgends gesetzt: die meisten Endpunkte sehen gar nicht hinein,
-        /// und der Durchlauf schickt sonst `{}`. Wo ein Endpunkt den Rumpf
-        /// PRÜFT, mässe die Karte ohne dieses Feld die Antwort auf eine leere
-        /// ResumeRequest und schriebe sie als die des Endpunkts auf — `PUT
-        /// /account/language` etwa antwortete 422 statt 200, und die Karte
-        /// hielte das für die Wahrheit.
+        /// Set almost nowhere: most endpoints do not look into it at all, and
+        /// the run otherwise sends `{}`. Where an endpoint DOES check the body,
+        /// the map would without this field measure the answer to an empty
+        /// request and write it down as the endpoint's — `PUT
+        /// /account/language`, for instance, answered 422 instead of 200, and
+        /// the map would take that for the truth.
         /// </remarks>
         public string? Rumpf { get; init; }
     }
@@ -69,7 +67,7 @@ public sealed class RoutenkarteTests
     private static List<Gruppe> Karte()
     {
         var path = Path.Combine(Postgres_Ersatz.Repowurzel(), "docs", "routenkarte.yml");
-        // Die Karte schreibt klein (`pfad`, `ohne`), die Klassen gross.
+        // The map writes in lower case (`pfad`, `ohne`), the classes in upper.
         var leser = new DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
             .Build();
@@ -93,15 +91,14 @@ public sealed class RoutenkarteTests
     }
 
     /// <summary>
-    /// Passt ein Pfad zu einer Routenvorlage? <c>/auth/{rest}</c> deckt
-    /// <c>/auth/login</c> ab, aber nicht <c>/auth</c> selbst.
+    /// Does a path match a route template? <c>/auth/{rest}</c> covers
+    /// <c>/auth/login</c>, but not <c>/auth</c> itself.
     /// </summary>
     /// <remarks>
-    /// Die Abfragezeichenkette wird abgeschnitten, bevor verglichen wird.
-    /// Ocelot routet nach dem PFAD; ein Eintrag darf trotzdem
-    /// <c>/jobs?page=2</c> nennen, weil die Karte festhält, was eine bestimmte
-    /// ANFRAGE antwortet — und eine zweite Seite ist eine andere ResumeRequest als die
-    /// erste.
+    /// The query string is cut off before the comparison. Ocelot routes by the
+    /// PATH; an entry may name <c>/jobs?page=2</c> all the same, because the map
+    /// records what a particular REQUEST answers — and a second page is a
+    /// different request from the first.
     /// </remarks>
     private static bool Passt(string template, string path)
     {
@@ -110,8 +107,8 @@ public sealed class RoutenkarteTests
         var teileV = template.Trim('/').Split('/');
         var teileP = ohneAbfrage.Trim('/').Split('/');
 
-        // Der letzte Platzhalter ist gierig: `/auth/{rest}` faengt auch
-        // `/auth/company/{id}`. Genau so verhaelt sich Ocelot.
+        // The last placeholder is greedy: `/auth/{rest}` also catches
+        // `/auth/company/{id}`. That is exactly how Ocelot behaves.
         var gierig = teileV.Length > 0
                      && teileV[^1].StartsWith('{')
                      && teileV[^1].EndsWith('}');
@@ -138,16 +135,16 @@ public sealed class RoutenkarteTests
     }
 
     /// <summary>
-    /// DER TEST, DER EINE NEUE ROUTE ROT MACHT.
+    /// THE TEST THAT TURNS A NEW ROUTE RED.
     /// </summary>
     /// <remarks>
-    /// Jede Zeile in <c>ocelot.json</c> muss von mindestens einem Eintrag der
-    /// Karte beruehrt werden. Wer eine Route hinzufuegt und die Karte nicht
-    /// ergaenzt, hat einen Endpunkt, von dem niemand aufgeschrieben hat, was er
-    /// antworten soll — und der faellt dann erst jemandem auf, der ihn findet.
+    /// Every line in <c>ocelot.json</c> has to be touched by at least one entry
+    /// of the map. Whoever adds a route and does not extend the map has an
+    /// endpoint nobody wrote down an expected answer for — and it is then
+    /// noticed first by somebody who finds it.
     /// </remarks>
     [Fact]
-    public void Jede_Route_hat_mindestens_einen_Eintrag()
+    public void Every_route_has_at_least_one_entry()
     {
         var entries = Eintraege();
 
@@ -162,16 +159,16 @@ public sealed class RoutenkarteTests
     }
 
     /// <summary>
-    /// Die Gegenrichtung: kein Eintrag beschreibt einen Pfad, den es nicht gibt.
+    /// The reverse direction: no entry describes a path that does not exist.
     /// </summary>
     /// <remarks>
-    /// Bis auf die drei Dienst-zu-Dienst-Tueren — die stehen mit Absicht drin,
-    /// gerade WEIL sie keine Route haben, und ihre erwartete Antwort ist 404.
-    /// Ohne diese Ausnahme koennte man die Zusage „von aussen nicht erreichbar"
-    /// nicht aufschreiben.
+    /// Except for the three service-to-service doors — those stand in there on
+    /// purpose, precisely BECAUSE they have no route, and their expected answer
+    /// is 404. Without that exception the promise "not reachable from outside"
+    /// could not be written down.
     /// </remarks>
     [Fact]
-    public void Kein_Eintrag_beschreibt_einen_Pfad_ohne_Route()
+    public void No_entry_describes_a_path_without_a_route()
     {
         var routen = Routen();
 
@@ -195,17 +192,17 @@ public sealed class RoutenkarteTests
     }
 
     /// <summary>
-    /// Jede Zeile nennt in ALLEN VIER Spalten einen Statuscode.
+    /// Every row names a status code in ALL FOUR columns.
     /// </summary>
     /// <remarks>
-    /// Der Test, der eine vergessene vierte Spalte rot macht. YAML beantwortet
-    /// ein fehlendes Feld mit dem Vorgabewert des Typs — hier also <c>0</c>, und
-    /// das Skript maesse dann „erwartet 0" gegen eine echte Antwort. Ohne diese
-    /// Reihe waere die Karte genau so lange vollstaendig, bis jemand eine Zeile
-    /// hinzufuegt und die neue Spalte uebersieht.
+    /// The test that turns a forgotten fourth column red. YAML answers a missing
+    /// field with the type's default value — here <c>0</c>, and the script would
+    /// then measure "expected 0" against a real answer. Without this suite the
+    /// map would be complete exactly until somebody adds a row and overlooks the
+    /// new column.
     /// </remarks>
     [Fact]
-    public void Jede_Zeile_nennt_alle_vier_Spalten()
+    public void Every_row_names_all_four_columns()
     {
         foreach (var entry in Eintraege())
         {
@@ -225,13 +222,13 @@ public sealed class RoutenkarteTests
         }
     }
 
-    /// <summary>Jede Gruppe sagt, warum ihre Zeilen so aussehen.</summary>
+    /// <summary>Every group says why its rows look the way they do.</summary>
     /// <remarks>
-    /// Eine Zahl ohne Begruendung ist eine Messung, keine Zusage — und beim
-    /// naechsten Umbau aendert sie jemand, weil sie im Weg steht.
+    /// A number without a reason is a measurement, not a promise — and at the
+    /// next rebuild somebody changes it because it is in the way.
     /// </remarks>
     [Fact]
-    public void Jede_Gruppe_traegt_eine_Begruendung()
+    public void Every_group_carries_a_reason()
     {
         foreach (var group in Karte())
         {
@@ -243,24 +240,25 @@ public sealed class RoutenkarteTests
     }
 
     /// <summary>
-    /// Ohne Token ist die Antwort nie 200 — ausser wo es aufgeschrieben ist.
+    /// Without a token the answer is never 200 — except where it is written
+    /// down.
     /// </summary>
     /// <remarks>
-    /// Die schaerfste Zeile der Karte, und deshalb steht sie als eigener Test
-    /// da. Vier Endpunkte antworten anonym mit 2xx, und jeder aus einem Grund,
-    /// der in seiner Gruppe steht: <c>/auth/session</c> beantwortet die Frage
-    /// „bin ich angemeldet?", <c>/auth/resend-verification</c> antwortet fuer
-    /// bekannte und unbekannte Adressen gleich, die Karriereseite ist
-    /// oeffentlich — und <c>GET /jobs</c> ist es seit derselben Entscheidung:
-    /// die Karriereseite holt ihre Jobs ueber genau diesen Endpunkt, und
-    /// solange er 401 gab, war sie nur halb oeffentlich.
+    /// The sharpest line of the map, and that is why it stands as a test of its
+    /// own. Four endpoints answer anonymously with 2xx, and each for a reason
+    /// that stands in its group: <c>/auth/session</c> answers the question "am I
+    /// signed in?", <c>/auth/resend-verification</c> answers identically for
+    /// known and unknown addresses, the careers page is public — and
+    /// <c>GET /jobs</c> is public since the same decision: the careers page
+    /// fetches its jobs over exactly this endpoint, and as long as it gave a
+    /// 401, the page was only half public.
     /// <para>
-    /// Wer einen vierten hinzufuegt, muss diese Liste anfassen — und dabei
-    /// merken, dass er gerade etwas oeffentlich macht.
+    /// Whoever adds a fourth has to touch this list — and in doing so notice
+    /// that they are making something public.
     /// </para>
     /// </remarks>
     [Fact]
-    public void Anonym_antwortet_nur_was_ausdruecklich_offen_ist()
+    public void Anonymously_only_what_is_expressly_open_answers()
     {
         string[] offen =
         [
@@ -273,9 +271,9 @@ public sealed class RoutenkarteTests
 
         foreach (var entry in Eintraege().Where(e => e.Ohne is >= 200 and < 300))
         {
-            // Ohne Abfragezeichenkette: `/jobs?page=2` ist derselbe ENDPUNKT
-            // wie `/jobs`, und die Liste hier zählt Endpunkte. Ein Parameter
-            // macht nichts öffentlich, was es nicht schon war.
+            // Without the query string: `/jobs?page=2` is the same ENDPOINT as
+            // `/jobs`, and this list counts endpoints. A parameter makes nothing
+            // public that was not already.
             offen.Should().Contain(
                 entry.Pfad.Split('?')[0],
                 $"'{entry.Methode} {entry.Pfad}' antwortet ohne Token mit "
@@ -285,16 +283,16 @@ public sealed class RoutenkarteTests
     }
 
     /// <summary>
-    /// Die Karte beschreibt wirklich verschiedene Faelle und nicht viermal
-    /// denselben.
+    /// The map really describes different cases and not the same one four times
+    /// over.
     /// </summary>
     /// <remarks>
-    /// Waeren `person` und `firma` ueberall gleich, waere die Firmenspalte
-    /// Zierde und ADR-0017 in dieser Karte nicht geprueft. Gemessen sind es
-    /// heute ueber zwanzig Zeilen, in denen sie auseinandergehen.
+    /// If `person` and `firma` were the same everywhere, the company column
+    /// would be decoration and ADR-0017 would not be checked in this map.
+    /// Measured, there are more than twenty rows today in which they come apart.
     /// </remarks>
     [Fact]
-    public void Die_mittlere_Spalte_unterscheidet_sich_wirklich()
+    public void The_middle_column_really_differs()
     {
         var entries = Eintraege();
 
@@ -303,33 +301,34 @@ public sealed class RoutenkarteTests
     }
 
     /// <summary>
-    /// Und die vierte unterscheidet sich von der dritten — das ist PBI-2.
+    /// And the fourth differs from the third — that is PBI-2.
     /// </summary>
     /// <remarks>
-    /// <para>Waeren `mitglied` und `firma` ueberall gleich, hiesse das: keine
-    /// einzige Route unterscheidet `admin` von `member`, und genau das war der
-    /// Zustand vor PBI-2 — im ganzen Baum stand NULL <c>RequirePermission</c>
-    /// ausserhalb von identity-service. Die Navigation versteckte
-    /// Firmeneintraege; der Server antwortete 403 nur dort, wo jemand daran
-    /// gedacht hatte. Verstecken ist keine Zugriffskontrolle.</para>
+    /// <para>If `mitglied` and `firma` were the same everywhere, that would
+    /// mean: not a single route distinguishes `admin` from `member`, and that
+    /// was exactly the state before PBI-2 — in the whole tree there stood ZERO
+    /// <c>RequirePermission</c> outside identity-service. The navigation hid
+    /// company entries; the server answered 403 only where somebody had thought
+    /// of it. Hiding is not access control.</para>
     ///
-    /// <para><strong>Fuenf und nicht acht, und der Unterschied ist lehrreich.</strong>
-    /// Geschuetzt sind acht Routen; sichtbar werden hier nur fuenf. Die drei
-    /// aus identity-service (<c>/companies/{id}/invitations</c>,
-    /// <c>…/invitations/{id}</c>, <c>…/members/{id}</c>) nennen die Firma im
-    /// PFAD, und die Kennung dort EXISTIERT NICHT — auch das Chefkonto ist in
-    /// dieser erfundenen Firma kein Administrator und bekommt 403. Beide Spalten
-    /// zeigen also dieselbe Zahl aus zwei verschiedenen Gruenden. Dass die
-    /// Richtlinie dort wirklich zwischen den Rollen unterscheidet, belegt
-    /// <c>UnternehmensreiseTests</c> an einer Firma, die es gibt.</para>
+    /// <para><strong>Five and not eight, and the difference is
+    /// instructive.</strong> Eight routes are protected; only five become
+    /// visible here. The three from identity-service
+    /// (<c>/companies/{id}/invitations</c>, <c>…/invitations/{id}</c>,
+    /// <c>…/members/{id}</c>) name the company in the PATH, and the id there
+    /// DOES NOT EXIST — even the owner account is no administrator in that
+    /// invented company and gets a 403. Both columns therefore show the same
+    /// number for two different reasons. That the policy there really does
+    /// distinguish between the roles is evidenced by
+    /// <c>UnternehmensreiseTests</c> against a company that exists.</para>
     ///
-    /// <para>Die Zahl ist ABSICHTLICH die genaue: wer eine sechste Route so
-    /// schuetzt oder eine der fuenf wieder oeffnet, soll hier vorbeikommen und
-    /// es aufschreiben. Ein „groesser als null" liesse eine still
-    /// zurueckgenommene Pruefung durchgehen.</para>
+    /// <para>The number is DELIBERATELY the exact one: whoever protects a sixth
+    /// route this way or opens one of the five again should come past here and
+    /// write it down. A "greater than zero" would let a silently withdrawn check
+    /// pass.</para>
     /// </remarks>
     [Fact]
-    public void Die_vierte_Spalte_unterscheidet_admin_von_member()
+    public void The_fourth_column_distinguishes_admin_from_member()
     {
         var entries = Eintraege();
 
@@ -355,18 +354,18 @@ public sealed class RoutenkarteTests
     }
 
     /// <summary>
-    /// Die drei Verwaltungsrouten von identity-service antworten in ALLEN drei
-    /// angemeldeten Spalten 403.
+    /// The three administration routes of identity-service answer 403 in ALL
+    /// three signed-in columns.
     /// </summary>
     /// <remarks>
-    /// Die andere Haelfte der Reihe darueber. Hier faellt der Unterschied
-    /// zwischen den Spalten nicht auf, weil die Kennung im Pfad nicht existiert
-    /// — und das ist die Zusage, die dabei herauskommt: die Richtlinie
-    /// antwortet 403 unabhaengig davon, ob es die Firma gibt, verraet also
-    /// nichts. Ein 404 daneben waere die Auskunft „diese Firma gibt es".
+    /// The other half of the suite above. Here the difference between the
+    /// columns does not show, because the id in the path does not exist — and
+    /// that is the promise that comes out of it: the policy answers 403
+    /// regardless of whether the company exists, so it gives nothing away. A 404
+    /// beside it would be the disclosure "this company exists".
     /// </remarks>
     [Fact]
-    public void Die_Firmenverwaltung_verraet_die_Firma_in_keiner_Spalte()
+    public void The_company_administration_reveals_the_company_in_no_column()
     {
         string[] verwaltung =
         [
@@ -389,7 +388,7 @@ public sealed class RoutenkarteTests
     }
 }
 
-/// <summary>Findet die Repowurzel, ohne von einer Testcontainer-Klasse zu erben.</summary>
+/// <summary>Finds the repository root without inheriting from a Testcontainers class.</summary>
 internal static class Postgres_Ersatz
 {
     public static string Repowurzel()

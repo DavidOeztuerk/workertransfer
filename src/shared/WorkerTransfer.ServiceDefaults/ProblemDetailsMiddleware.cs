@@ -32,24 +32,23 @@ public sealed class ProblemDetailsMiddleware(
         }
         catch (FluentValidation.ValidationException ungueltig)
         {
-            // DIE STUFE IST SCHARF, NUR LEER.
+            // THE STAGE IS ARMED, ONLY EMPTY.
             //
-            // `AddCQRS` haengt Noelias `ValidationBehavior` bereits in jede
-            // Pipeline und ruft bereits `AddValidatorsFromAssemblies`. Es steigt
-            // sofort aus, solange es keinen Validator findet — und wir hatten
-            // keinen. Wer den ersten schreibt, bekaeme ohne diesen Zweig eine
-            // 500 fuer eine Eingabe, die der Aufrufer falsch gemacht hat.
+            // `AddCQRS` already hangs Noelia's `ValidationBehavior` into every
+            // pipeline and already calls `AddValidatorsFromAssemblies`. It bows
+            // out immediately as long as it finds no validator — and we had
+            // none. Whoever writes the first one would, without this branch,
+            // get a 500 for an input the caller got wrong.
             //
-            // 422 und nicht 400: der Rumpf war lesbar, sein Inhalt ist es nicht.
-            // Genau die Unterscheidung, die die handgeschriebenen Pruefungen an
-            // den Endpunkten schon treffen.
+            // 422 and not 400: the body was readable, its content is not.
+            // Exactly the distinction the hand-written checks at the endpoints
+            // already make.
             //
-            // GENANNT WERDEN NUR DIE FELDNAMEN, nie die Werte. `ErrorMessage`
-            // wird bewusst nicht durchgereicht: FluentValidation setzt in seine
-            // Vorgabemeldungen Platzhalter ein, und `{PropertyValue}` waere der
-            // Wert einer Person in einem Fehlerdokument — das landet in
-            // Bildschirmfotos und Fehlerberichten. Ein Feldname ist Form, kein
-            // Inhalt.
+            // ONLY THE FIELD NAMES ARE NAMED, never the values. `ErrorMessage`
+            // is deliberately not passed on: FluentValidation puts placeholders
+            // into its default messages, and `{PropertyValue}` would be a
+            // person's value in an error document — that ends up in screenshots
+            // and bug reports. A field name is shape, not content.
             var fields = string.Join(
                 ", ",
                 ungueltig.Errors.Select(error => error.PropertyName)
@@ -69,20 +68,19 @@ public sealed class ProblemDetailsMiddleware(
         }
         catch (BadHttpRequestException kaputt)
         {
-            // EIN KAPUTTER RUMPF IST KEIN SERVERFEHLER.
+            // A BROKEN BODY IS NOT A SERVER ERROR.
             //
-            // Unlesbares JSON — eine offene Klammer, ein falscher Typ — laesst
-            // die Modellbindung von ASP.NET werfen, und ohne diesen Zweig kam
-            // das als 500 zurueck: an JEDEM Endpunkt, mit Stapelabzug im
-            // Protokoll. Gemessen an D3, gefunden mit einem abgeschnittenen
-            // JSON-Rumpf.
+            // Unreadable JSON — an open brace, a wrong type — makes ASP.NET's
+            // model binding throw, and without this branch that came back as a
+            // 500: at EVERY endpoint, with a stack trace in the log. Measured
+            // at D3, found with a truncated JSON body.
             //
-            // Der Abbruchcode kommt aus der Ausnahme selbst (400) und wird
-            // nicht hier erfunden — sie weiss besser, was sie meint.
+            // The status code comes out of the exception itself (400) and is
+            // not invented here — it knows better what it means.
             //
-            // Die Meldung wird NICHT durchgereicht. Sie nennt den Parameter und
-            // die Byteposition, und das ist schon eine Aussage ueber das, was
-            // jemand geschickt hat. `detail` sagt die Form, nie den Inhalt.
+            // The message is NOT passed on. It names the parameter and the byte
+            // position, and that is already a statement about what somebody
+            // sent. `detail` says the shape, never the content.
             logger.LogWarning(
                 "Malformed request body ({Status})", kaputt.StatusCode);
 
@@ -97,24 +95,24 @@ public sealed class ProblemDetailsMiddleware(
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
             /*
-             * DER AUFRUFER HAT AUFGELEGT — das ist kein Serverfehler.
+             * THE CALLER HUNG UP — that is not a server error.
              *
-             * Gemessen an einem E2E-Lauf: 853 der 866 Fehlerzeilen im ganzen
-             * Stapel waren genau das. Der Browser bricht Anfragen ab, sobald
-             * eine Seite wechselt oder ein Abruf einen älteren ablöst
-             * (`AbortController`), und jede einzelne wurde zu einem
-             * „Unhandled request exception" samt 500. Die dreizehn ECHTEN
-             * Fehler standen dazwischen und waren nicht zu finden.
+             * Measured on an E2E run: 853 of the 866 error lines in the whole
+             * stack were exactly that. The browser aborts requests as soon as a
+             * page changes or a fetch supersedes an older one
+             * (`AbortController`), and every single one became an "Unhandled
+             * request exception" together with a 500. The thirteen REAL errors
+             * stood in between and could not be found.
              *
-             * <strong>Die Bedingung trägt das Ganze.</strong> Ohne
-             * `context.RequestAborted.IsCancellationRequested` verschwände auch
-             * eine Zeitüberschreitung, die WIR verursacht haben — ein
-             * `HttpClient`, der aufgibt, wirft dieselbe Ausnahme, und das ist
-             * ein echter Ausfall, der ein 500 verdient.
+             * <strong>The condition carries the whole thing.</strong> Without
+             * `context.RequestAborted.IsCancellationRequested` a timeout WE
+             * caused would disappear too — an `HttpClient` that gives up throws
+             * the same exception, and that is a genuine outage which deserves a
+             * 500.
              *
-             * Geantwortet wird 499 („Client Closed Request"): niemand liest es
-             * mehr, aber die Telemetrie unterscheidet damit „abgebrochen" von
-             * „kaputt". Ein 200 wäre eine Lüge, ein 500 ein Fehlalarm.
+             * The answer is 499 ("Client Closed Request"): nobody reads it any
+             * more, but with it the telemetry distinguishes "aborted" from
+             * "broken". A 200 would be a lie, a 500 a false alarm.
              */
             logger.LogDebug("Request aborted by the caller");
 

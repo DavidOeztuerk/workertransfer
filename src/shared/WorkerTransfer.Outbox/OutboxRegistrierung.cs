@@ -12,7 +12,7 @@ public static class OutboxRegistrierung
     /// </summary>
     /// <remarks>
     /// The delivery itself is the service's: only it knows who its recipients
-    /// are and what a kind means. Register an <see cref="IZustellung"/> of your
+    /// are and what a kind means. Register an <see cref="IDelivery"/> of your
     /// own before or after this.
     /// </remarks>
     /// <typeparam name="TKontext">The context whose database holds the table.</typeparam>

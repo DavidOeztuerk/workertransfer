@@ -2,329 +2,329 @@ using Noelia.Core.Identity;
 
 namespace WorkerTransfer.Companies.Domain.EmployerProfiles;
 
-/// <summary>Das EmployerProfile — wie ein Unternehmen sich zeigt.</summary>
+/// <summary>The employer profile — how a company shows itself.</summary>
 /// <remarks>
-/// <c>tenants</c> in identity-service hält Name und Domain: die
-/// <strong>Identität</strong>, entstanden aus einem Domain-Nachweis (ADR-0019).
-/// Hier geht es um <strong>Darstellung</strong>. Dieselbe Trennung wie zwischen
-/// identity-service und profile-service bei einer Person: die eine Seite weiß,
-/// wer jemand ist, die andere, wie er sich zeigt.
+/// <c>tenants</c> in identity-service holds name and domain: the
+/// <strong>identity</strong>, grown out of a proven domain (ADR-0019). This is
+/// about <strong>presentation</strong>. The same split as between
+/// identity-service and profile-service for a person: one side knows who
+/// somebody is, the other how they show themselves.
 /// <para>
-/// Der Consent-Ledger kommt nicht vor, und das ist kein Versehen: hier ist
-/// niemand betroffen, der einwilligen könnte. Ein Unternehmen macht eine
-/// Aussage über sich selbst.
+/// The consent ledger does not appear here, and that is no oversight: nobody
+/// is affected who could consent. A company is making a statement about
+/// itself.
 /// </para>
 /// </remarks>
 public sealed class EmployerProfile
 {
-    /// <summary>Wie lang der Anzeigename sein darf.</summary>
-    public const int HoechstlaengeAnzeigename = 160;
+    /// <summary>How long the display name may be.</summary>
+    public const int MaxDisplayNameLength = 160;
 
-    /// <summary>Wie lang der Selbstbeschreibungstext sein darf.</summary>
-    public const int HoechstlaengeUeberUns = 8000;
+    /// <summary>How long the self-description may be.</summary>
+    public const int MaxAboutLength = 8000;
 
-    /// <summary>Wie lang ein Link sein darf.</summary>
-    public const int HoechstlaengeLink = 2000;
+    /// <summary>How long a link may be.</summary>
+    public const int MaxLinkLength = 2000;
 
-    /// <summary>Wie lang ein Listeneintrag sein darf.</summary>
-    public const int HoechstlaengeEintrag = 120;
+    /// <summary>How long one list entry may be.</summary>
+    public const int MaxEntryLength = 120;
 
-    /// <summary>Wie viele Einträge eine Liste haben darf.</summary>
-    public const int HoechsteEintraege = 20;
+    /// <summary>How many entries a list may hold.</summary>
+    public const int MaxEntries = 20;
 
     private EmployerProfile(
         TenantId company,
         string slug,
-        Geprueftes values,
+        CheckedValues values,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm)
     {
         Firma = company;
         Slug = slug;
-        Anzeigename = values.Anzeigename;
-        UeberUns = values.UeberUns;
-        Netzseite = values.Netzseite;
-        Orte = values.Orte;
-        Leistungen = values.Leistungen;
-        Zeile1 = values.Zeile1;
-        Postleitzahl = values.Postleitzahl;
-        Ort = values.Ort;
-        Land = values.Land;
-        Telefon = values.Telefon;
-        AngelegtAm = angelegtAm;
-        GeaendertAm = geaendertAm;
+        DisplayName = values.DisplayName;
+        About = values.About;
+        Website = values.Website;
+        Locations = values.Locations;
+        Benefits = values.Benefits;
+        Line1 = values.Line1;
+        PostalCode = values.PostalCode;
+        City = values.City;
+        Country = values.Country;
+        Phone = values.Phone;
+        CreatedAt = angelegtAm;
+        ChangedAt = geaendertAm;
     }
 
-    /// <summary>Welches Unternehmen. Es <em>ist</em> der Schlüssel.</summary>
+    /// <summary>Which company. It <em>is</em> the key.</summary>
     public TenantId Firma { get; }
 
-    /// <summary>Die Adresse der Karriere-Seite.</summary>
+    /// <summary>The address of the careers page.</summary>
     /// <remarks>
-    /// Einmal vergeben und danach unveränderlich — sie ist ein Versprechen, und
-    /// ein Kürzel, das dem Anzeigenamen folgt, bricht jeden geteilten Link.
-    /// Deshalb hat diese Klasse keinen Weg, es zu ändern.
+    /// Assigned once and immutable afterwards — it is a promise, and a slug
+    /// that follows the display name breaks every link anybody shared. That is
+    /// why this class offers no way to change it.
     /// </remarks>
     public string Slug { get; }
 
-    /// <summary>Die Marke.</summary>
+    /// <summary>The brand.</summary>
     /// <remarks>
-    /// <strong>Nicht</strong> <c>tenants.name</c>: der eine ist der Kontoname
-    /// bei der Anlage, der andere die Marke. None wird aus dem anderen
-    /// abgeleitet, also gibt es hier keine Kopie, die driften könnte.
+    /// <strong>Not</strong> <c>tenants.name</c>: one is the account name given
+    /// at registration, the other is the brand. Neither is derived from the
+    /// other, so there is no copy here that could drift.
     /// </remarks>
-    public string Anzeigename { get; private set; }
+    public string DisplayName { get; private set; }
 
-    /// <summary>Was das Unternehmen über sich schreibt.</summary>
-    public string UeberUns { get; private set; }
+    /// <summary>What the company writes about itself.</summary>
+    public string About { get; private set; }
 
-    /// <summary><c>null</c>, wenn keine angegeben ist.</summary>
-    public string? Netzseite { get; private set; }
+    /// <summary><c>null</c> when none was given.</summary>
+    public string? Website { get; private set; }
 
-    /// <summary>Wo gearbeitet wird.</summary>
-    public IReadOnlyList<string> Orte { get; private set; }
+    /// <summary>Where the work happens.</summary>
+    public IReadOnlyList<string> Locations { get; private set; }
 
-    /// <summary>Was geboten wird.</summary>
-    public IReadOnlyList<string> Leistungen { get; private set; }
+    /// <summary>What is on offer.</summary>
+    public IReadOnlyList<string> Benefits { get; private set; }
 
-    /// <summary>Straße für den Briefkopf. Leer, wenn nicht hinterlegt.</summary>
-    public string Zeile1 { get; private set; }
+    /// <summary>Street for the letterhead. Empty when none is stored.</summary>
+    public string Line1 { get; private set; }
 
-    public string Postleitzahl { get; private set; }
+    public string PostalCode { get; private set; }
 
-    public string Ort { get; private set; }
+    public string City { get; private set; }
 
-    public string Land { get; private set; }
+    public string Country { get; private set; }
 
-    public string Telefon { get; private set; }
+    public string Phone { get; private set; }
 
-    /// <summary>Wann es angelegt wurde.</summary>
-    public DateTimeOffset AngelegtAm { get; }
+    /// <summary>When it was created.</summary>
+    public DateTimeOffset CreatedAt { get; }
 
-    /// <summary>Wann es zuletzt geändert wurde.</summary>
-    public DateTimeOffset GeaendertAm { get; private set; }
+    /// <summary>When it last changed.</summary>
+    public DateTimeOffset ChangedAt { get; private set; }
 
-    /// <summary>Legt ein Profile an.</summary>
-    /// <exception cref="Profilfehler">Etwas an der Eingabe stimmt nicht.</exception>
-    public static EmployerProfile Lege_an(
+    /// <summary>Creates a profile.</summary>
+    /// <exception cref="ProfileError">Something about the input is wrong.</exception>
+    public static EmployerProfile Create(
         TenantId company,
         string slug,
-        string anzeigename,
-        string ueberUns,
-        string? netzseite,
-        IReadOnlyList<string>? orte,
-        IReadOnlyList<string>? leistungen,
+        string displayName,
+        string about,
+        string? website,
+        IReadOnlyList<string>? locations,
+        IReadOnlyList<string>? benefits,
         DateTimeOffset now,
-        string? zeile1 = null,
-        string? postleitzahl = null,
+        string? line1 = null,
+        string? postalCode = null,
         string? ort = null,
         string? land = null,
-        string? telefon = null) =>
+        string? phone = null) =>
         new(company, slug,
-            Check(anzeigename, ueberUns, netzseite, orte, leistungen,
-                zeile1, postleitzahl, ort, land, telefon),
+            Check(displayName, about, website, locations, benefits,
+                line1, postalCode, ort, land, phone),
             now, now);
 
-    /// <summary>Das Profile, wie eine Zeile es hält.</summary>
-    public static EmployerProfile Stelle_her(
+    /// <summary>The profile as a row holds it.</summary>
+    public static EmployerProfile Restore(
         TenantId company,
         string slug,
-        string anzeigename,
-        string ueberUns,
-        string? netzseite,
-        IReadOnlyList<string> orte,
-        IReadOnlyList<string> leistungen,
+        string displayName,
+        string about,
+        string? website,
+        IReadOnlyList<string> locations,
+        IReadOnlyList<string> benefits,
         DateTimeOffset angelegtAm,
         DateTimeOffset geaendertAm,
-        string zeile1 = "",
-        string postleitzahl = "",
+        string line1 = "",
+        string postalCode = "",
         string ort = "",
         string land = "DE",
-        string telefon = "") =>
+        string phone = "") =>
         new(company, slug,
-            new Geprueftes(anzeigename, ueberUns, netzseite, orte, leistungen,
-                zeile1, postleitzahl, ort, land, telefon),
+            new CheckedValues(displayName, about, website, locations, benefits,
+                line1, postalCode, ort, land, phone),
             angelegtAm, geaendertAm);
 
-    /// <summary>Schreibt die Felder neu — das Kürzel nicht.</summary>
-    /// <exception cref="Profilfehler">Etwas an der Eingabe stimmt nicht.</exception>
-    public void Aendere(
-        string anzeigename,
-        string ueberUns,
-        string? netzseite,
-        IReadOnlyList<string>? orte,
-        IReadOnlyList<string>? leistungen,
+    /// <summary>Rewrites the fields — not the slug.</summary>
+    /// <exception cref="ProfileError">Something about the input is wrong.</exception>
+    public void Change(
+        string displayName,
+        string about,
+        string? website,
+        IReadOnlyList<string>? locations,
+        IReadOnlyList<string>? benefits,
         DateTimeOffset now,
-        string? zeile1 = null,
-        string? postleitzahl = null,
+        string? line1 = null,
+        string? postalCode = null,
         string? ort = null,
         string? land = null,
-        string? telefon = null)
+        string? phone = null)
     {
-        // Erst vollständig prüfen, dann schreiben: ein abgelehntes Formular
-        // darf kein halb geändertes Aggregat hinterlassen.
-        var geprueft = Check(anzeigename, ueberUns, netzseite, orte, leistungen,
-            zeile1, postleitzahl, ort, land, telefon);
+        // Check everything first, then write: a rejected form must not leave a
+        // half-changed aggregate behind.
+        var checkedValues = Check(displayName, about, website, locations, benefits,
+            line1, postalCode, ort, land, phone);
 
-        Anzeigename = geprueft.Anzeigename;
-        UeberUns = geprueft.UeberUns;
-        Netzseite = geprueft.Netzseite;
-        Orte = geprueft.Orte;
-        Leistungen = geprueft.Leistungen;
-        Zeile1 = geprueft.Zeile1;
-        Postleitzahl = geprueft.Postleitzahl;
-        Ort = geprueft.Ort;
-        Land = geprueft.Land;
-        Telefon = geprueft.Telefon;
-        GeaendertAm = now;
+        DisplayName = checkedValues.DisplayName;
+        About = checkedValues.About;
+        Website = checkedValues.Website;
+        Locations = checkedValues.Locations;
+        Benefits = checkedValues.Benefits;
+        Line1 = checkedValues.Line1;
+        PostalCode = checkedValues.PostalCode;
+        City = checkedValues.City;
+        Country = checkedValues.Country;
+        Phone = checkedValues.Phone;
+        ChangedAt = now;
     }
 
-    /// <summary>Die geprüften Werte, getippt.</summary>
+    /// <summary>The checkedValues values, typed.</summary>
     /// <remarks>
-    /// Gemeinsam für Anlegen und Ändern, damit die beiden nicht auseinander
-    /// laufen können — fünf Felder, die alle Zeichenketten oder Listen davon
-    /// sind, sind genau die Verwechslung, die niemand bemerkt.
+    /// Shared by create and change so the two cannot drift apart — five fields
+    /// that are all strings or lists of strings are exactly the mix-up nobody
+    /// notices.
     /// </remarks>
-    private sealed record Geprueftes(
-        string Anzeigename,
-        string UeberUns,
-        string? Netzseite,
-        IReadOnlyList<string> Orte,
-        IReadOnlyList<string> Leistungen,
-        string Zeile1,
-        string Postleitzahl,
-        string Ort,
-        string Land,
-        string Telefon);
+    private sealed record CheckedValues(
+        string DisplayName,
+        string About,
+        string? Website,
+        IReadOnlyList<string> Locations,
+        IReadOnlyList<string> Benefits,
+        string Line1,
+        string PostalCode,
+        string City,
+        string Country,
+        string Phone);
 
-    private static Geprueftes Check(
-        string anzeigename,
-        string ueberUns,
-        string? netzseite,
-        IReadOnlyList<string>? orte,
-        IReadOnlyList<string>? leistungen,
-        string? zeile1 = null,
-        string? postleitzahl = null,
+    private static CheckedValues Check(
+        string displayName,
+        string about,
+        string? website,
+        IReadOnlyList<string>? locations,
+        IReadOnlyList<string>? benefits,
+        string? line1 = null,
+        string? postalCode = null,
         string? ort = null,
         string? land = null,
-        string? telefon = null)
+        string? phone = null)
     {
-        var iso = Text("country", land, pflicht: false, 2).ToUpperInvariant();
+        var iso = Text("country", land, required: false, 2).ToUpperInvariant();
         return new(
-            Text("Display name", anzeigename, pflicht: true, HoechstlaengeAnzeigename),
-            Text("About", ueberUns, pflicht: false, HoechstlaengeUeberUns),
-            Link(netzseite),
-            Eintraege("locations", orte),
-            Eintraege("benefits", leistungen),
-            Text("line1", zeile1, pflicht: false, 120),
-            Text("postal_code", postleitzahl, pflicht: false, 16),
-            Text("city", ort, pflicht: false, 80),
+            Text("Display name", displayName, required: true, MaxDisplayNameLength),
+            Text("About", about, required: false, MaxAboutLength),
+            Link(website),
+            Entries("locations", locations),
+            Entries("benefits", benefits),
+            Text("line1", line1, required: false, 120),
+            Text("postal_code", postalCode, required: false, 16),
+            Text("city", ort, required: false, 80),
             iso.Length == 2 ? iso : "DE",
-            Text("phone", telefon, pflicht: false, 40));
+            Text("phone", phone, required: false, 40));
     }
 
-    private static string Text(string field, string? value, bool pflicht, int limit)
+    private static string Text(string field, string? value, bool required, int limit)
     {
-        var bereinigt = (value ?? string.Empty).Trim();
+        var trimmed = (value ?? string.Empty).Trim();
 
-        if (pflicht && bereinigt.Length == 0)
+        if (required && trimmed.Length == 0)
         {
-            throw new Textfehler(field, "must not be empty");
+            throw new TextError(field, "must not be empty");
         }
 
-        return bereinigt.Length > limit
-            ? throw new Textfehler(field, $"exceeds {limit} characters")
-            : bereinigt;
+        return trimmed.Length > limit
+            ? throw new TextError(field, $"exceeds {limit} characters")
+            : trimmed;
     }
 
     private static string? Link(string? value)
     {
-        var bereinigt = (value ?? string.Empty).Trim();
+        var trimmed = (value ?? string.Empty).Trim();
 
-        if (bereinigt.Length == 0)
+        if (trimmed.Length == 0)
         {
-            // Leer und „nicht angegeben" sind dasselbe; eine leere Zeichenkette
-            // würde als Link dargestellt und führte ins Nichts.
+            // Empty and "not given" are the same thing; an empty string would
+            // be rendered as a link and lead nowhere.
             return null;
         }
 
-        if (bereinigt.Length > HoechstlaengeLink)
+        if (trimmed.Length > MaxLinkLength)
         {
-            throw new Linkfehler($"The link exceeds {HoechstlaengeLink} characters");
+            throw new LinkError($"The link exceeds {MaxLinkLength} characters");
         }
 
-        if (!Uri.TryCreate(bereinigt, UriKind.Absolute, out var address))
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var address))
         {
-            throw new Linkfehler("The link is missing a host");
+            throw new LinkError("The link is missing a host");
         }
 
         if (address.Scheme != Uri.UriSchemeHttp && address.Scheme != Uri.UriSchemeHttps)
         {
-            throw new Linkfehler("Only http and https links are allowed");
+            throw new LinkError("Only http and https links are allowed");
         }
 
         return string.IsNullOrEmpty(address.Host)
-            ? throw new Linkfehler("The link is missing a host")
-            : bereinigt;
+            ? throw new LinkError("The link is missing a host")
+            : trimmed;
     }
 
-    /// <summary>Getrimmt, ohne Leeres, ohne Dubletten — die Reihenfolge bleibt.</summary>
+    /// <summary>Trimmed, no blanks, no duplicates — the order survives.</summary>
     /// <remarks>
-    /// Erst entdoppeln, dann zählen: sonst würde jemand mit einundzwanzigmal
-    /// „Homeoffice" abgewiesen, obwohl daraus ein Eintrag wird.
+    /// Deduplicate first, then count: otherwise somebody who wrote "remote"
+    /// twenty-one times would be refused, although it collapses into one entry.
     /// </remarks>
-    private static IReadOnlyList<string> Eintraege(string field, IReadOnlyList<string>? roh)
+    private static IReadOnlyList<string> Entries(string field, IReadOnlyList<string>? raw)
     {
-        if (roh is null)
+        if (raw is null)
         {
             return [];
         }
 
-        var behalten = new List<string>();
-        var gesehen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var kept = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var entry in roh)
+        foreach (var entry in raw)
         {
-            var bereinigt = (entry ?? string.Empty).Trim();
+            var trimmed = (entry ?? string.Empty).Trim();
 
-            if (bereinigt.Length == 0)
+            if (trimmed.Length == 0)
             {
                 continue;
             }
 
-            if (bereinigt.Length > HoechstlaengeEintrag)
+            if (trimmed.Length > MaxEntryLength)
             {
-                throw new Textfehler(field, $"entry exceeds {HoechstlaengeEintrag} characters");
+                throw new TextError(field, $"entry exceeds {MaxEntryLength} characters");
             }
 
-            if (gesehen.Add(bereinigt))
+            if (seen.Add(trimmed))
             {
-                behalten.Add(bereinigt);
+                kept.Add(trimmed);
             }
         }
 
-        return behalten.Count > HoechsteEintraege
-            ? throw new ZuVieleEintraege(field, HoechsteEintraege)
-            : behalten;
+        return kept.Count > MaxEntries
+            ? throw new TooManyEntries(field, MaxEntries)
+            : kept;
     }
 }
 
-/// <summary>Findet und speichert EmployerProfiles.</summary>
+/// <summary>Finds and stores employer profiles.</summary>
 public interface IProfileStore
 {
-    /// <summary>Das Profile dieses Unternehmens, oder <c>null</c>.</summary>
+    /// <summary>This company's profile, or <c>null</c>.</summary>
     Task<EmployerProfile?> GetAsync(
         TenantId company, CancellationToken cancellationToken = default);
 
-    /// <summary>Das Profile hinter diesem Kürzel, oder <c>null</c>.</summary>
+    /// <summary>The profile behind this slug, or <c>null</c>.</summary>
     Task<EmployerProfile?> GetAsync(string slug, CancellationToken cancellationToken = default);
 
-    /// <summary>Das gewünschte Kürzel, oder das nächste freie mit Zähler.</summary>
+    /// <summary>The wanted slug, or the next free one with a counter.</summary>
     /// <remarks>
-    /// <strong>Nicht die Mandanten-Kennung anhängen</strong>: die stünde dann in
-    /// einer Adresse, die weitergegeben wird.
+    /// <strong>Do not append the tenant id</strong>: it would then sit in an
+    /// address people pass around.
     /// </remarks>
-    Task<string> FreeSlugAsync(string gewuenscht, CancellationToken cancellationToken = default);
+    Task<string> FreeSlugAsync(string wanted, CancellationToken cancellationToken = default);
 
-    /// <summary>Legt an oder schreibt zurück.</summary>
+    /// <summary>Creates or writes back.</summary>
     Task SaveAsync(EmployerProfile profile, CancellationToken cancellationToken = default);
 }

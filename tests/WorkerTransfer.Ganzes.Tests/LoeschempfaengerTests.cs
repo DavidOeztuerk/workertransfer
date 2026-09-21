@@ -6,35 +6,35 @@ using WorkerTransfer.ServiceDefaults;
 namespace WorkerTransfer.Ganzes.Tests;
 
 /// <summary>
-/// Wer personenbezogene Zeilen hält, MUSS Empfänger der Löschung sein
+/// Whoever holds rows about people MUST be a recipient of the erasure
 /// (ADR-0027 §4).
 /// </summary>
 /// <remarks>
-/// Der Fehler, den diese Reihe verhindert, passiert nicht durch eine falsche
-/// Entscheidung, sondern durch <strong>Wegsehen</strong>: irgendwann bekommt
-/// ein Dienst eine neue Tabelle mit einer <c>subject_id</c>, niemand denkt an
-/// die Kaskade, und die Löschung ist wieder eine Zusage, die nur zum Teil
-/// eingelöst wird. Es fällt nicht auf, weil nichts rot wird.
+/// The defect this suite prevents does not happen through a wrong decision but
+/// through <strong>looking away</strong>: at some point a service grows a new
+/// table with a <c>subject_id</c>, nobody thinks of the cascade, and the erasure
+/// is once again a promise that is only partly redeemed. It does not show,
+/// because nothing goes red.
 /// <para>
-/// Geprüft wird am <em>Modell</em>, nicht am Quelltext: ein regulärer Ausdruck
-/// über die Kontexte übersähe eine Spalte, die aus <c>ConfigureOutbox()</c>
-/// kommt — und die Outbox ist genau so ein Fall.
+/// The check is made on the <em>model</em>, not on the source: a regular
+/// expression over the contexts would miss a column that comes out of
+/// <c>ConfigureOutbox()</c> — and the outbox is exactly such a case.
 /// </para>
 /// <para>
-/// Der Vorgänger hieß <c>tests/test_erasure_recipients.py</c> und prüfte
-/// dasselbe an der SQLAlchemy-Metadata. Er ist mit dem Python-Baum gefallen;
-/// diese Reihe ist sein Nachfolger, nicht sein Ersatz.
+/// The predecessor was called <c>tests/test_erasure_recipients.py</c> and
+/// checked the same thing against the SQLAlchemy metadata. It fell with the
+/// Python tree; this suite is its successor, not its replacement.
 /// </para>
 /// </remarks>
 public class LoeschempfaengerTests
 {
-    /// <summary>Die Spaltennamen, die einen natürlichen Menschen benennen.</summary>
+    /// <summary>The column names that name a natural person.</summary>
     private static readonly string[] Personenspalten = ["subject_id", "user_id"];
 
-    /// <summary>Jeder Dienst mit seinem Kontext und seinem Namen in der Kaskade.</summary>
+    /// <summary>Every service with its context and its name in the cascade.</summary>
     /// <remarks>
-    /// Der Name ist der, den <c>ErasureRecipient.Fremde</c> trägt und den
-    /// identity-service in <c>Erasure__Adressen__&lt;name&gt;</c> nachschlägt.
+    /// The name is the one <c>ErasureRecipient.Fremde</c> carries and the one
+    /// identity-service looks up in <c>Erasure__Adressen__&lt;name&gt;</c>.
     /// </remarks>
     public static TheoryData<string, Type> Dienste => new()
     {
@@ -55,31 +55,31 @@ public class LoeschempfaengerTests
     };
 
     /// <summary>
-    /// Wer eine Zeile je Mensch hält, steht auf der Liste — und wer keine hält,
-    /// steht nicht darauf.
+    /// Whoever holds a row per person stands on the list — and whoever holds
+    /// none does not.
     /// </summary>
     /// <remarks>
-    /// Beide Richtungen, und die zweite ist nicht Ordnungsliebe: ein
-    /// Löschbefehl an einen Dienst ohne etwas zu löschen wäre ein Endpunkt, der
-    /// „erledigt" sagt, ohne je etwas getan zu haben — und die Kaskade wartete
-    /// auf seine Bestätigung.
+    /// Both directions, and the second is not tidiness: an erasure order to a
+    /// service with nothing to delete would be an endpoint that says "done"
+    /// without ever having done anything — and the cascade would wait for its
+    /// acknowledgement.
     /// </remarks>
     [Theory]
     [MemberData(nameof(Dienste))]
-    public void Empfaenger_ist_genau_wer_eine_Zeile_je_Mensch_haelt(string name, Type context)
+    public void A_recipient_is_exactly_whoever_holds_a_row_per_person(string name, Type context)
     {
         var (columns, personenzeilen) = Modell(context);
 
-        // Zwei Signale, und beide sind noetig. Meistens steht die Person in
-        // einer Spalte; bei manchen Aggregaten IST sie der Schluessel, und dann
-        // heisst die Spalte schlicht `id`. Wer nur nach Spaltennamen sucht,
-        // uebersieht profile, portfolio und github — gemessen, beim ersten Lauf
-        // dieser Reihe.
+        // Two signals, and both are needed. Mostly the person stands in a
+        // column; with some aggregates the person IS the key, and then the
+        // column is simply called `id`. Whoever searches only by column names
+        // misses profile, portfolio and github — measured, on the first run of
+        // this suite.
         var haeltMenschen =
             columns.Intersect(Personenspalten, StringComparer.Ordinal).Any() || personenzeilen;
 
-        // identity ist der Ursprung der Kaskade, nicht ihr Empfänger: seine
-        // eigenen Tabellen fallen zuletzt und über einen eigenen Vermerk.
+        // identity is the origin of the cascade, not its recipient: its own
+        // tables fall last and over a note of their own.
         if (name == "identity")
         {
             haeltMenschen.Should().BeTrue("sonst prüft dieser Test nichts");
@@ -99,23 +99,23 @@ public class LoeschempfaengerTests
         }
     }
 
-    /// <summary>Kein Name auf der Liste ohne einen Dienst dahinter.</summary>
+    /// <summary>No name on the list without a service behind it.</summary>
     [Fact]
-    public void Die_Liste_nennt_nur_Dienste_die_es_gibt()
+    public void The_list_names_only_services_that_exist()
     {
         var bekannt = Dienste.Select(row => (string)row[0]!).ToHashSet(StringComparer.Ordinal);
 
         ErasureRecipient.Fremde.Should().BeSubsetOf(bekannt);
     }
 
-    /// <summary>Was ein Kontext wirklich anlegt: Spaltennamen und Personenzeilen.</summary>
+    /// <summary>What a context really creates: column names and subject-keyed tables.</summary>
     private static (IReadOnlyCollection<string> Spalten, bool Personenzeilen) Modell(Type context)
     {
         var type = typeof(DbContextOptionsBuilder<>).MakeGenericType(context);
         var bauer = (DbContextOptionsBuilder)Activator.CreateInstance(type)!;
 
-        // Npgsql, weil die Kontexte Postgres-Typen abbilden (jsonb, citext,
-        // Aufzählungen). Es wird nie verbunden — nur das Modell gebaut.
+        // Npgsql, because the contexts map Postgres types (jsonb, citext,
+        // enumerations). It never connects — only the model is built.
         bauer.UseNpgsql("Host=modell;Database=modell");
 
         using var instanz = (DbContext)Activator.CreateInstance(context, bauer.Options)!;

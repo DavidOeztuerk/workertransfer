@@ -4,33 +4,31 @@ using FluentAssertions;
 namespace WorkerTransfer.Ganzes.Tests;
 
 /// <summary>
-/// Jeder ausgehende Aufruf setzt ein Zeitlimit.
+/// Every outgoing call sets a time limit.
 /// </summary>
 /// <remarks>
-/// <para><strong>Warum das überhaupt ein Test ist.</strong> Ohne eigene Zeile
-/// gilt die Vorgabe von <c>HttpClient</c>: <strong>hundert Sekunden</strong>.
-/// Das liest sich wie „es gibt ein Zeitlimit" und ist in einem
-/// Dienst-zu-Dienst-Aufruf keins — ein hängender Dienst hängt den Aufrufer mit,
-/// und der hängt den Menschen davor mit. Gemessen waren sieben von fünfzehn
-/// Aufrufstellen ohne, darunter ein <em>Einwilligungstor</em>, während alle
-/// anderen Einwilligungstore eines hatten. Das war kein Entwurf, das war ein
-/// Vergessen.</para>
+/// <para><strong>Why this is a test at all.</strong> Without a line of its own
+/// the default of <c>HttpClient</c> applies: <strong>one hundred
+/// seconds</strong>. That reads like "there is a time limit" and in a
+/// service-to-service call is none — a hanging service hangs its caller with
+/// it, and that one hangs the person in front of it. Measured, seven of fifteen
+/// call sites had none, among them a <em>consent gate</em>, while every other
+/// consent gate had one. That was not a design, that was forgetting.</para>
 ///
-/// <para><strong>Über den Quelltext und nicht über die Verdrahtung</strong>,
-/// weil genau das die Frage ist: Vergessen sieht man einer laufenden Anwendung
-/// nicht an. Sie antwortet ja — nur eben irgendwann.</para>
+/// <para><strong>Over the source and not over the wiring</strong>, because that
+/// is exactly the question: forgetting cannot be seen on a running application.
+/// It does answer — only eventually.</para>
 ///
-/// <para>Ein Zeitlimit je Aufrufstelle und nicht eines für alle: fünf Sekunden
-/// sind für eine Einwilligungsprüfung großzügig und für einen Entwurf über ein
-/// Sprachmodell zu wenig. Eine Zahl für beides wäre für eine der beiden
-/// falsch.</para>
+/// <para>One time limit per call site and not one for all: five seconds are
+/// generous for a consent check and too little for a draft over a language
+/// model. One number for both would be wrong for one of the two.</para>
 ///
-/// <para><strong>Gesucht wird die ZUWEISUNG, nicht der Variablenname.</strong>
-/// Hier stand <c>client.Timeout</c>, und damit hing die Zusage daran, wie
-/// jemand seine lokale Variable nennt: <c>HttpCompanyRoles</c> setzt sein
-/// Zeitlimit an <c>klient</c> und fiel als „ohne Zeitlimit" durch, obwohl es
-/// eines hat. Ein Waechter, der bei richtigem Code rot wird, wird beim nächsten
-/// Mal weggeschaltet statt gelesen.</para>
+/// <para><strong>What is searched for is the ASSIGNMENT, not the variable
+/// name.</strong> <c>client.Timeout</c> stood here, and with it the promise hung
+/// on what somebody calls their local variable: <c>HttpCompanyRoles</c> sets its
+/// time limit on <c>klient</c> and failed as "without a time limit" although it
+/// has one. A guard that goes red over correct code gets switched off the next
+/// time instead of read.</para>
 /// </remarks>
 public sealed class ZeitlimitTests
 {
@@ -47,7 +45,7 @@ public sealed class ZeitlimitTests
                 .Contains("fabrik.CreateClient(", StringComparison.Ordinal));
 
     [Fact]
-    public void Jede_Aufrufstelle_setzt_ein_Zeitlimit()
+    public void Every_call_site_sets_a_time_limit()
     {
         var jobs = Aufrufstellen().ToList();
 
@@ -64,15 +62,15 @@ public sealed class ZeitlimitTests
     }
 
     /// <summary>
-    /// Und keine Aufrufstelle wartet länger als eine Minute.
+    /// And no call site waits longer than a minute.
     /// </summary>
     /// <remarks>
-    /// Die Obergrenze ist bewusst weit: sie soll nicht die Wahl zwischen fünf
-    /// und dreißig Sekunden vorschreiben, sondern verhindern, dass jemand
-    /// versehentlich in die Nähe der hundert Sekunden zurückrutscht.
+    /// The ceiling is deliberately wide: it is not meant to prescribe the choice
+    /// between five and thirty seconds, but to prevent anybody from slipping
+    /// back near the hundred seconds by accident.
     /// </remarks>
     [Fact]
-    public void Keine_Aufrufstelle_wartet_laenger_als_eine_Minute()
+    public void No_call_site_waits_longer_than_a_minute()
     {
         var pattern = new Regex(
             @"Zeitueberschreitung \{ get; set; \} = TimeSpan\.From(?<einheit>Seconds|Minutes)\((?<zahl>[\d.]+)\)",
@@ -107,7 +105,7 @@ public sealed class ZeitlimitTests
     }
 }
 
-/// <summary>Findet die Repowurzel.</summary>
+/// <summary>Finds the repository root.</summary>
 internal static class Postgres_Ersatz2
 {
     public static string Repowurzel()

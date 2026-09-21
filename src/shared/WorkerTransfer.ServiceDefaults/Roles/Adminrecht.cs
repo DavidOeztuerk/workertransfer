@@ -6,36 +6,36 @@ using Microsoft.AspNetCore.Http;
 namespace WorkerTransfer.ServiceDefaults.Roles;
 
 /// <summary>
-/// Beantwortet ein Firmenrecht aus der <strong>Mitgliedschaftstabelle</strong>
-/// von identity-service — in jedem Dienst ausser identity selbst.
+/// Answers a company permission out of identity-service's
+/// <strong>membership table</strong> — in every service except identity itself.
 /// </summary>
 /// <remarks>
-/// <para><strong>Warum daneben und nicht statt.</strong> ASP.NET führt
-/// <em>alle</em> Handler zu einer Anforderung aus; ein <c>Succeed</c> genügt.
-/// Noelias <c>PermissionAuthorizationHandler</c> bleibt also stehen und liest
-/// weiter Ansprüche — er findet bei uns keine, weil unser Token keine trägt.
-/// Dieser hier antwortet stattdessen aus der Tabelle.</para>
+/// <para><strong>Why beside and not instead.</strong> ASP.NET runs
+/// <em>all</em> handlers for one requirement; a single <c>Succeed</c> is
+/// enough. Noelia's <c>PermissionAuthorizationHandler</c> therefore stays and
+/// goes on reading claims — with us it finds none, because our token carries
+/// none. This one answers out of the table instead.</para>
 ///
-/// <para><strong>Die Firma kommt aus dem TOKEN, nicht aus dem Pfad.</strong>
-/// Das ist der Unterschied zu <c>MembershipPermission</c> in identity-service,
-/// und er folgt aus den Adressen: dort steht die Firma im Pfad
-/// (<c>/companies/{tenantId}/…</c>), hier handelt jemand für die Firma, die im
-/// Token steht (<c>/jobs/{id}/publish</c> nennt keine). Der Mandant im Token
-/// kam nie aus einer Eingabe des Aufrufers — er wird von
-/// <c>POST /auth/company/{id}</c> vergeben, nachdem der Server die
-/// Membership geprüft hat (ADR-0018).</para>
+/// <para><strong>The company comes from the TOKEN, not from the path.</strong>
+/// That is the difference to <c>MembershipPermission</c> in identity-service,
+/// and it follows from the addresses: there the company stands in the path
+/// (<c>/companies/{tenantId}/…</c>), here somebody acts for the company that
+/// stands in the token (<c>/jobs/{id}/publish</c> names none). The tenant in
+/// the token never came from caller input — it is granted by
+/// <c>POST /auth/company/{id}</c> after the server has checked the membership
+/// (ADR-0018).</para>
 ///
-/// <para><strong>Kein Zwischenspeicher.</strong> Der Preis ist eine Abfrage je
-/// geschützter ResumeRequest, und sie trifft nur die Handlungen, die ein Unternehmen
-/// binden — nicht die Lesewege, die Menschen den ganzen Tag benutzen.</para>
+/// <para><strong>No cache.</strong> The price is one lookup per protected
+/// request, and it touches only the operations that bind a company — never the
+/// reads people use all day.</para>
 ///
-/// <para><strong>Wenn die Auskunft schweigt, wird nicht abgelehnt, sondern
-/// gesagt, dass niemand antwortet.</strong> Der Handler kann nur „ja" sagen,
-/// also hinterlässt er eine Notiz am <c>HttpContext</c>, und
-/// <see cref="Ablehnungsgestalt"/> macht daraus 503 statt 403. Ohne das wäre
-/// ein Ausfall von identity-service von einem entzogenen Recht nicht zu
-/// unterscheiden — und der Mensch davor läse „du darfst nicht", wo „wir wissen
-/// es gerade nicht" die Wahrheit ist.</para>
+/// <para><strong>When the lookup is silent, nothing is refused; it is said that
+/// nobody answers.</strong> The handler can only say "yes", so it leaves a note
+/// on the <c>HttpContext</c>, and <see cref="RejectionShape"/> turns that into
+/// 503 rather than 403. Without it an outage of identity-service would be
+/// indistinguishable from a permission that was taken away — and the person in
+/// front of it would read "you may not" where "we do not know just now" is the
+/// truth.</para>
 /// </remarks>
 public sealed class AdminPermission(
     AdminPermissions permissions,
@@ -53,9 +53,8 @@ public sealed class AdminPermission(
 
         if (!permissions.NurAdmin(requirement.Permission))
         {
-            // Kein Succeed und kein Fail: über dieses Recht hat dieser Dienst
-            // nichts zu sagen — und ein anderer Handler darf trotzdem noch
-            // antworten.
+            // No Succeed and no Fail: about this permission this service has
+            // nothing to say — and another handler may still answer.
             return;
         }
 
@@ -81,14 +80,15 @@ public sealed class AdminPermission(
     }
 
     /// <summary>
-    /// Wer fragt — aus dem <c>ClaimsPrincipal</c>, den die Autorisierung hält.
+    /// Who is asking — out of the <c>ClaimsPrincipal</c> the authorization
+    /// holds.
     /// </summary>
     /// <remarks>
-    /// NICHT aus <c>ICurrentPrincipal</c>: Noelias <c>UseAuth()</c> ist
-    /// Authentifizierung <em>und</em> Autorisierung, und <c>UsePrincipal()</c>
-    /// läuft danach — während die Richtlinie entscheidet, ist
-    /// <c>ICurrentPrincipal.Current</c> also noch leer. Ein
-    /// Autorisierungshandler nimmt den Principal, den er bekommt.
+    /// NOT out of <c>ICurrentPrincipal</c>: Noelia's <c>UseAuth()</c> is
+    /// authentication <em>and</em> authorization, and <c>UsePrincipal()</c>
+    /// runs after it — so while the policy is deciding,
+    /// <c>ICurrentPrincipal.Current</c> is still empty. An authorization
+    /// handler takes the principal it is given.
     /// </remarks>
     private static Guid? Wer(ClaimsPrincipal nutzer)
     {
@@ -98,7 +98,7 @@ public sealed class AdminPermission(
         return Guid.TryParse(roh, out var id) ? id : null;
     }
 
-    /// <summary>Für welche Firma gehandelt wird — der Anspruch aus dem Token.</summary>
+    /// <summary>Which company is acted for — the claim out of the token.</summary>
     private static Guid? Firma(ClaimsPrincipal nutzer) =>
         Guid.TryParse(nutzer.FindFirst("tenant")?.Value, out var id) ? id : null;
 }

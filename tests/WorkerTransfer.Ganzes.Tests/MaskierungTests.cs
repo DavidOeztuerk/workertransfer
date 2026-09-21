@@ -6,30 +6,29 @@ using Serilog.Parsing;
 
 namespace WorkerTransfer.Ganzes.Tests;
 
-/// <summary>Was Noelias Maskierung in 4.4.0 schwärzt — und was sie wieder freigibt.</summary>
+/// <summary>What Noelia's masking redacts in 4.4.0 — and what it releases again.</summary>
 /// <remarks>
-/// <para><strong>Diese Reihe ist die Gegenprobe zu einer Nullmessung.</strong>
-/// Am laufenden Stapel steht nirgends <c>[REDACTED]</c>, und das hat zwei
-/// mögliche Bedeutungen: es gibt nichts zu maskieren, oder die Maskierung läuft
-/// nicht. Ohne diese Tests wäre die erste Lesart eine Hoffnung.</para>
+/// <para><strong>This suite is the counter-probe to a zero measurement.</strong>
+/// Nowhere in the running stack does <c>[REDACTED]</c> stand, and that has two
+/// possible meanings: there is nothing to mask, or the masking does not run.
+/// Without these tests the first reading would be a hope.</para>
 ///
-/// <para><strong>4.4.0 dreht die Richtung an zwei Jobs</strong>, und beide
-/// sind hier festgehalten: verglichen wird jetzt <em>exakt</em> statt als
-/// Teilzeichenkette, wodurch <c>SecretName</c> und <c>TokenId</c> wieder lesbar
-/// sind — der Name eines Geheimnisses ist keines, und ohne ihn kann ein
-/// Betreiber nicht sagen, welches gemeint war. Dafür fallen jetzt
-/// <c>Username</c>, <c>Email</c> und <c>City</c> darunter, die es vorher nicht
-/// taten.</para>
+/// <para><strong>4.4.0 turns the direction in two places</strong>, and both are
+/// pinned here: the comparison is now <em>exact</em> rather than by substring,
+/// which makes <c>SecretName</c> and <c>TokenId</c> readable again — the name of
+/// a secret is not one, and without it an operator cannot say which one was
+/// meant. In return <c>Username</c>, <c>Email</c> and <c>City</c> now fall under
+/// it, which they did not before.</para>
 ///
-/// <para>Für WorkerTransfer ist beides folgenlos, und auch das ist gemessen:
-/// unsere Log-Vorlagen tragen deutsche Namen, und Noelias
-/// <c>LoggingBehavior</c> schreibt ohnehin <em>Gestalten</em> —
-/// <c>Email: string(34)</c> ist eine Länge, nie eine Adresse. Es gibt hier
-/// nichts, das dunkel werden könnte.</para>
+/// <para>For WorkerTransfer both are without consequence, and that too is
+/// measured: our log templates carry German names, and Noelia's
+/// <c>LoggingBehavior</c> writes <em>shapes</em> anyway —
+/// <c>Email: string(34)</c> is a length, never an address. There is nothing here
+/// that could go dark.</para>
 /// </remarks>
 public sealed class MaskierungTests
 {
-    /// <summary>Ein Ereignis mit genau einer Eigenschaft, durch den Anreicherer.</summary>
+    /// <summary>An event with exactly one property, through the enricher.</summary>
     private static string Angereichert(string name, string value)
     {
         var ereignis = new LogEvent(
@@ -46,56 +45,56 @@ public sealed class MaskierungTests
             : ereignis.Properties[name].ToString().Trim('"');
     }
 
-    /// <summary>Was ab 4.4.0 geschwärzt wird — und vorher sichtbar war.</summary>
+    /// <summary>What is redacted from 4.4.0 on — and was visible before.</summary>
     [Theory]
     [InlineData("Username")]
     [InlineData("Email")]
     [InlineData("City")]
-    public void Neu_geschwaerzt(string name)
+    public void Newly_redacted(string name)
     {
         Angereichert(name, "etwas Persönliches").Should().Be(DataMaskingEnricher.Mask);
     }
 
     /// <summary>
-    /// <strong>Und was 4.4.0 wieder freigibt.</strong>
+    /// <strong>And what 4.4.0 releases again.</strong>
     /// </summary>
     /// <remarks>
-    /// In 4.3.0 traf die Teilzeichenkette „secret" auch <c>SecretName</c> und
-    /// „token" auch <c>TokenId</c>. Das war der Fehler, den 4.4.0 behebt: ein
-    /// Log, in dem beide geschwärzt sind, kann niemand mehr verfolgen — man
-    /// weiß dann, dass ein Geheimnis benutzt wurde, aber nicht welches.
+    /// In 4.3.0 the substring "secret" also hit <c>SecretName</c> and "token"
+    /// also hit <c>TokenId</c>. That was the bug 4.4.0 fixes: a log in which both
+    /// are redacted is one nobody can follow any more — you then know that a
+    /// secret was used, but not which one.
     /// </remarks>
     [Theory]
     [InlineData("SecretName", "jwt-signing-key")]
     [InlineData("TokenId", "01a070e2-847e-78f7")]
-    public void Wieder_sichtbar(string name, string value)
+    public void Visible_again(string name, string value)
     {
         Angereichert(name, value).Should().Be(value);
     }
 
-    /// <summary>Exakt, nie als Teilzeichenkette.</summary>
+    /// <summary>Exact, never as a substring.</summary>
     /// <remarks>
-    /// Die Regel hinter beiden Hälften oben. <c>Emails</c> ist nicht
-    /// <c>Email</c>, und <c>SubjectId</c> ist nicht <c>Id</c> — ein Vergleich,
-    /// der Teilzeichenketten trifft, schwärzt irgendwann den halben Log.
+    /// The rule behind both halves above. <c>Emails</c> is not <c>Email</c>, and
+    /// <c>SubjectId</c> is not <c>Id</c> — a comparison that hits substrings
+    /// eventually redacts half the log.
     /// </remarks>
     [Theory]
     [InlineData("Emailvorlage")]
     [InlineData("StadtteilCity")]
     [InlineData("Benutzername")]
-    public void Ein_aehnlicher_Name_wird_nicht_getroffen(string name)
+    public void A_similar_name_is_not_hit(string name)
     {
         Angereichert(name, "sichtbar").Should().Be("sichtbar");
     }
 
     /// <summary>
-    /// <strong>Unsere eigenen Log-Namen bleiben lesbar.</strong>
+    /// <strong>Our own log names stay readable.</strong>
     /// </summary>
     /// <remarks>
-    /// Der Grund, warum die Umstellung hier folgenlos blieb: die Vorlagen
-    /// dieses Systems sind deutsch, und Noelias Liste ist englisch. Das war
-    /// kein Plan, aber es ist jetzt eine Zusage — wer eine Log-Eigenschaft
-    /// <c>Email</c> nennt, macht sie unlesbar, und dieser Test sagt ihm das.
+    /// The reason the change had no consequences here: this system's templates
+    /// are German, and Noelia's list is English. That was not a plan, but it is
+    /// a promise now — whoever names a log property <c>Email</c> makes it
+    /// unreadable, and this test says so.
     /// </remarks>
     [Theory]
     [InlineData("Art")]
@@ -103,19 +102,19 @@ public sealed class MaskierungTests
     [InlineData("Grund")]
     [InlineData("Modul")]
     [InlineData("Dienst")]
-    public void Unsere_Namen_bleiben_stehen(string name)
+    public void Our_own_names_stay_readable(string name)
     {
         Angereichert(name, "lesbar").Should().Be("lesbar");
     }
 
-    /// <summary>Die Liste ist eine, nicht drei.</summary>
+    /// <summary>The list is one, not three.</summary>
     /// <remarks>
-    /// <c>SensitiveFieldNames</c> ist dieselbe Quelle, die auch das
-    /// CQRS-Verhalten und die HTTP-Zwischenschicht lesen. Drei Listen wären an
-    /// dem Tag einig, an dem sie geschrieben wurden, und nie wieder.
+    /// <c>SensitiveFieldNames</c> is the same source the CQRS behaviour and the
+    /// HTTP middleware read as well. Three lists would agree on the day they
+    /// were written, and never again.
     /// </remarks>
     [Fact]
-    public void Die_Liste_traegt_die_neuen_Namen_und_nicht_die_alten()
+    public void The_list_carries_the_new_names_and_not_the_old_ones()
     {
         DataMaskingEnricher.IsSensitiveKey("Email").Should().BeTrue();
         DataMaskingEnricher.IsSensitiveKey("SecretName").Should().BeFalse();

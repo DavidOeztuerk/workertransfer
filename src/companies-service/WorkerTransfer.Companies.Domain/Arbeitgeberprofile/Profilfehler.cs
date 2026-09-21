@@ -4,7 +4,7 @@ namespace WorkerTransfer.Companies.Domain.EmployerProfiles;
 public abstract class ProfileError(string notification) : Exception(notification);
 
 /// <summary>Ein Textfeld ist leer oder zu lang.</summary>
-public sealed class Textfehler(string field, string was) : ProfileError($"{field} {was}");
+public sealed class TextError(string field, string was) : ProfileError($"{field} {was}");
 
 /// <summary>Der Link taugt nicht.</summary>
 /// <remarks>
@@ -12,8 +12,8 @@ public sealed class Textfehler(string field, string was) : ProfileError($"{field
 /// Menschen angeklickt, und <c>javascript:</c> in einem Feld, das im Browser
 /// landet, ist kein Randfall.
 /// </remarks>
-public sealed class Linkfehler(string was) : ProfileError(was);
+public sealed class LinkError(string was) : ProfileError(was);
 
 /// <summary>Es sind zu viele Einträge.</summary>
-public sealed class ZuVieleEintraege(string field, int limit)
+public sealed class TooManyEntries(string field, int limit)
     : ProfileError($"At most {limit} {field} are allowed");

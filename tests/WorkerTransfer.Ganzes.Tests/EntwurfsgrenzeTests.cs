@@ -6,48 +6,48 @@ using WorkerTransfer.Profile.Application.Ports;
 namespace WorkerTransfer.Ganzes.Tests;
 
 /// <summary>
-/// Was an das Modell hinausgeht, ist eine <strong>geschlossene</strong> Menge
-/// (ADR-0024 §3).
+/// What goes out to the model is a <strong>closed</strong> set (ADR-0024 §3).
 /// </summary>
 /// <remarks>
-/// <para>ADR-0024 sagt zu: „Eine Datenklasse und kein freies Wörterbuch, weil
-/// ein Wörterbuch beim nächsten Merkmal stillschweigend einen Schlüssel mehr
-/// trägt. <strong>Ein Test nagelt die Feldmenge fest.</strong>" Und CLAUDE.md
-/// sagt dasselbe für beide Seiten: „Tests pin both field sets."</para>
+/// <para>ADR-0024 promises: "A data class and no free dictionary, because a
+/// dictionary silently carries one more key at the next feature. <strong>A test
+/// pins the field set.</strong>" And CLAUDE.md says the same for both sides:
+/// "Tests pin both field sets."</para>
 ///
-/// <para><strong>Den Test gab es nicht.</strong> Was es gab, prüft die fertige
-/// Prompt-<em>Zeichenkette</em> auf eine SubjectId und ein <c>@</c>
-/// (<c>Der_Entwurf_traegt_nichts_ueber_die_Person_hinaus</c>). Das ist etwas
-/// anderes und deutlich schwächer: ein neues Feld <c>Arbeitgeber</c> auf
-/// <see cref="Entwurfslage"/>, gefüllt mit „Muster GmbH", enthält weder eine
-/// Guid noch ein <c>@</c> und käme durch. Genau die stillschweigende Erweiterung,
-/// gegen die der Record überhaupt gewählt wurde, wäre also ungeprüft geblieben.</para>
+/// <para><strong>That test did not exist.</strong> What did exist checks the
+/// finished prompt <em>string</em> for a subject id and an <c>@</c>
+/// (<c>Der_Entwurf_traegt_nichts_ueber_die_Person_hinaus</c>). That is something
+/// else and considerably weaker: a new field <c>Arbeitgeber</c> on
+/// <see cref="DraftSituation"/>, filled with "Muster GmbH", contains neither a
+/// Guid nor an <c>@</c> and would get through. So exactly the silent extension
+/// the record was chosen against in the first place would have stayed
+/// unchecked.</para>
 ///
-/// <para>Geprüft wird am <em>Typ</em> und gegen eine ausgeschriebene Menge, nicht
-/// gegen eine Verbotsliste. Eine Verbotsliste beantwortet „ist dieser Name
-/// heikel?" — eine Frage, die man beim nächsten Feld neu und womöglich falsch
-/// beantwortet. Eine geschlossene Menge verlangt stattdessen, dass wer ein Feld
-/// hinzufügt, es hier hinschreibt: dieselbe Bewegung, aber eine, die auffällt.</para>
+/// <para>The check is made on the <em>type</em> and against a written-out set,
+/// not against a forbidden list. A forbidden list answers "is this name
+/// sensitive?" — a question one answers afresh, and possibly wrongly, at the
+/// next field. A closed set instead demands that whoever adds a field writes it
+/// down here: the same movement, but one that stands out.</para>
 ///
-/// <para><strong>Zwei Mengen, nicht eine.</strong> Die beiden Entwürfe sind
-/// Spiegelbilder und dürfen nie zusammenwachsen: der Profilkontext hilft einer
-/// Person, über sich zu schreiben, der Anzeigenkontext einem Unternehmen, über
-/// die eigene Job. Ein gemeinsamer Typ wäre die Job, an der „erfinde nichts
-/// über die Person" eines Tages für eine Anzeige gälte — oder schlimmer, umgekehrt.</para>
+/// <para><strong>Two sets, not one.</strong> The two drafts are mirror images
+/// and must never grow together: the profile context helps a person write about
+/// themselves, the advert context helps a company write about its own job. A
+/// shared type would be the place where "invent nothing about the person" would
+/// one day apply to an advert — or worse, the other way round.</para>
 /// </remarks>
 public class EntwurfsgrenzeTests
 {
     /// <summary>
-    /// Der Profilkontext trägt vier Felder — und die Person hat jedes davon
-    /// selbst geschrieben.
+    /// The profile context carries four fields — and the person wrote every one
+    /// of them themselves.
     /// </summary>
     /// <remarks>
-    /// Kein Name, keine E-Mail-Adresse, keine <c>SubjectId</c>, kein Arbeitgeber,
-    /// kein Resume, keine Application, kein MarketStatus. <c>Wunsch</c> ist die
-    /// einzige Zeile, die der Aufrufer in diesem Moment beisteuert.
+    /// No name, no email address, no <c>SubjectId</c>, no employer, no resume,
+    /// no application, no market status. <c>Wunsch</c> is the only line the
+    /// caller contributes at that moment.
     /// </remarks>
     [Fact]
-    public void Der_Profilkontext_traegt_genau_vier_Felder()
+    public void The_profile_context_carries_exactly_four_fields()
     {
         Felder(typeof(DraftSituation)).Should().BeEquivalentTo(
             ["Ueberschrift", "Text", "Faehigkeiten", "Wunsch", "Prompt"],
@@ -56,16 +56,16 @@ public class EntwurfsgrenzeTests
     }
 
     /// <summary>
-    /// Der Anzeigenkontext trägt fünf — und keines davon sagt, WER ausschreibt.
+    /// The advert context carries five — and none of them says WHO is
+    /// advertising.
     /// </summary>
     /// <remarks>
-    /// Kein Mandant und kein Firmenname: die Anzeige soll formuliert werden,
-    /// nicht das Unternehmen beschrieben. Ein Firmenname im Prompt wäre die
-    /// Einladung, das Modell etwas über den Arbeitgeber sagen zu lassen, was
-    /// niemand geprüft hat.
+    /// No tenant and no company name: the advert is to be phrased, not the
+    /// company described. A company name in the prompt would be the invitation
+    /// to let the model say something about the employer that nobody checked.
     /// </remarks>
     [Fact]
-    public void Der_Anzeigenkontext_traegt_genau_fuenf_Felder()
+    public void The_advert_context_carries_exactly_five_fields()
     {
         Felder(typeof(AdvertDraft)).Should().BeEquivalentTo(
             ["Titel", "Beschreibung", "Faehigkeiten", "Ort", "Wunsch", "Prompt"],
@@ -73,17 +73,15 @@ public class EntwurfsgrenzeTests
     }
 
     /// <summary>
-    /// Und die beiden bleiben getrennt: kein gemeinsamer Basistyp, keine
-    /// gemeinsame Schnittstelle.
+    /// And the two stay separate: no shared base type, no shared interface.
     /// </summary>
     /// <remarks>
-    /// Der Zusammenzug beginnt nie mit einem gemeinsamen Prompt, sondern mit
-    /// „die haben doch beide Faehigkeiten und Wunsch". Danach steht ein
-    /// <c>if</c> in den Regeln, und das ist die Job, an der eine Regel für die
-    /// falsche Seite gilt.
+    /// The merging never begins with a shared prompt but with "they both have
+    /// skills and a wish, after all". After that an <c>if</c> stands in the
+    /// rules, and that is the place where a rule applies to the wrong side.
     /// </remarks>
     [Fact]
-    public void Die_beiden_Entwuerfe_teilen_keinen_Typ()
+    public void The_two_drafts_share_no_type()
     {
         var profile = typeof(DraftSituation);
         var anzeige = typeof(AdvertDraft);
@@ -91,22 +89,22 @@ public class EntwurfsgrenzeTests
         profile.BaseType.Should().Be<object>("kein gemeinsamer Basistyp");
         anzeige.BaseType.Should().Be<object>("kein gemeinsamer Basistyp");
 
-        // Nicht „gar keine Schnittstelle": ein Record bringt IEquatable<T> selbst
-        // mit, und das ist je Typ eine andere. Geprueft wird die Schnittmenge —
-        // die Zusage lautet, dass die beiden nichts TEILEN.
+        // Not "no interface at all": a record brings IEquatable<T> with it by
+        // itself, and that is a different one per type. What is checked is the
+        // intersection — the promise is that the two SHARE nothing.
         profile.GetInterfaces().Intersect(anzeige.GetInterfaces())
             .Should().BeEmpty("die beiden Entwuerfe teilen keine Schnittstelle");
     }
 
-    /// <summary>Die öffentlichen Instanzeigenschaften eines Records.</summary>
+    /// <summary>The public instance properties of a record.</summary>
     /// <remarks>
-    /// Statische bleiben draußen: <c>Regeln</c> ist der System-Prompt und kein
-    /// Feld, das jemand befüllt.
+    /// Static ones stay out: <c>Regeln</c> is the system prompt and no field
+    /// anybody fills.
     /// <para>
-    /// <c>Prompt</c> zählt dagegen mit, obwohl es abgeleitet ist — es ist die
-    /// Zeichenkette, die wirklich hinausgeht. Ein neues Eingabefeld taucht damit
-    /// zweimal auf: als Feld und, sobald jemand es einbaut, in dem, was gesendet
-    /// wird. Beides soll auffallen.
+    /// <c>Prompt</c>, by contrast, counts along although it is derived — it is
+    /// the string that really goes out. A new input field therefore shows up
+    /// twice: as a field and, as soon as somebody wires it in, in what gets
+    /// sent. Both are meant to stand out.
     /// </para>
     /// </remarks>
     private static string[] Felder(Type type) =>

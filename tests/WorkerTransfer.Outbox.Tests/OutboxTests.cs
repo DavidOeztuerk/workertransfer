@@ -75,7 +75,7 @@ public class OutboxTests(Postgres postgres)
     /// database would hold nothing of the sort.
     /// </summary>
     [Fact]
-    public async Task Ein_Rollback_nimmt_die_Absicht_mit()
+    public async Task A_rollback_takes_the_intent_with_it()
     {
         var subject = SubjectId.New();
 
@@ -94,7 +94,7 @@ public class OutboxTests(Postgres postgres)
     }
 
     [Fact]
-    public async Task Eine_vermerkte_Absicht_wird_zugestellt_und_abgehakt()
+    public async Task A_recorded_intent_is_delivered_and_ticked_off()
     {
         var subject = await Vermerke("transfer.accepted");
         var zustellung = new Probezustellung();
@@ -113,7 +113,7 @@ public class OutboxTests(Postgres postgres)
     /// ends up in every backup.
     /// </summary>
     [Fact]
-    public async Task Ein_Fehlschlag_zaehlt_hoch_und_speichert_nur_die_Fehlerart()
+    public async Task A_failure_counts_up_and_stores_only_the_kind_of_failure()
     {
         var subject = await Vermerke("transfer.accepted");
         var zustellung = new Probezustellung((_, _) =>
@@ -133,7 +133,7 @@ public class OutboxTests(Postgres postgres)
     /// next tick IS how the order of ADR-0027 §6 is kept.
     /// </summary>
     [Fact]
-    public async Task Noch_nicht_verbraucht_keinen_Versuch()
+    public async Task Not_yet_spends_no_attempt()
     {
         var subject = await Vermerke("erasure:final");
         var zustellung = new Probezustellung(
@@ -155,7 +155,7 @@ public class OutboxTests(Postgres postgres)
     /// state this table abolishes.
     /// </summary>
     [Fact]
-    public async Task Nach_der_Obergrenze_bleibt_die_Zeile_liegen_statt_zu_verschwinden()
+    public async Task After_the_ceiling_the_row_stays_lying_instead_of_vanishing()
     {
         var subject = await Vermerke("transfer.accepted");
         var zustellung = new Probezustellung((_, _) => throw new HttpRequestException("weg"));
@@ -176,7 +176,7 @@ public class OutboxTests(Postgres postgres)
     /// exists against: a promise nobody redeems, and nobody sees it.
     /// </summary>
     [Fact]
-    public async Task Ohne_Obergrenze_bleibt_die_Zeile_faellig()
+    public async Task Without_a_ceiling_the_row_stays_due()
     {
         var subject = await Vermerke("erasure:consent");
         var zustellung = new Probezustellung((_, _) => throw new HttpRequestException("tot"));
@@ -203,7 +203,7 @@ public class OutboxTests(Postgres postgres)
     /// passes can hang instead of failing, and a hanging test says nothing.
     /// </remarks>
     [Fact]
-    public async Task Gesperrte_Zeilen_werden_uebersprungen_statt_doppelt_zugestellt()
+    public async Task Locked_rows_are_skipped_instead_of_delivered_twice()
     {
         await Vermerke("transfer.accepted", wie_viele: 5);
 

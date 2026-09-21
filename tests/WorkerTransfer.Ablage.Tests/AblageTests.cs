@@ -4,7 +4,7 @@ using WorkerTransfer.Ablage;
 
 namespace WorkerTransfer.Ablage.Tests;
 
-/// <summary>Die Ablage aus ADR-0021 — Port, Backend, Signaturprüfung.</summary>
+/// <summary>The document store from ADR-0021 — port, backend, signature check.</summary>
 public sealed class AblageTests : IDisposable
 {
     private readonly string _verzeichnis =
@@ -23,7 +23,7 @@ public sealed class AblageTests : IDisposable
     }
 
     [Fact]
-    public async Task Was_abgelegt_wurde_kommt_unveraendert_zurueck()
+    public async Task What_was_stored_comes_back_unchanged()
     {
         var ablage = Build();
         byte[] content = [0x89, 0x50, 0x4E, 0x47, 1, 2, 3];
@@ -33,20 +33,20 @@ public sealed class AblageTests : IDisposable
         (await ablage.GetAsync("person/abc.png")).Should().Equal(content);
     }
 
-    /// <summary>„Gibt es nicht" ist beim Abrufen ein Ausgang, kein Fehler.</summary>
+    /// <summary>"Does not exist" is an outcome of a fetch, not an error.</summary>
     /// <remarks>
-    /// Eine Ausnahme zwänge jeden Aufrufer zu einem <c>try</c> um den Normalfall
-    /// — und der Normalfall ist beim Abrufen eben auch, dass nichts da ist.
+    /// An exception would force every caller into a <c>try</c> around the normal
+    /// case — and on a fetch the normal case is precisely that nothing is there.
     /// </remarks>
     [Fact]
-    public async Task Was_es_nicht_gibt_kommt_als_null()
+    public async Task What_does_not_exist_comes_back_as_null()
     {
         (await Build().GetAsync("nichts/da.png")).Should().BeNull();
     }
 
-    /// <summary>Löschen schweigt über einen unbekannten Schlüssel.</summary>
+    /// <summary>Deleting stays silent about an unknown key.</summary>
     [Fact]
-    public async Task Loeschen_schweigt_ueber_Unbekanntes()
+    public async Task Deleting_stays_silent_about_the_unknown()
     {
         var attempt = async () => await Build().DeleteAsync("nie/dagewesen.png");
 
@@ -54,7 +54,7 @@ public sealed class AblageTests : IDisposable
     }
 
     [Fact]
-    public async Task Geloeschtes_ist_fort()
+    public async Task What_was_deleted_is_gone()
     {
         var ablage = Build();
         await ablage.PutAsync("weg/damit.png", new byte[] { 1, 2, 3 });
@@ -65,17 +65,17 @@ public sealed class AblageTests : IDisposable
     }
 
     /// <summary>
-    /// <strong>Ein Schlüssel darf nicht aus der Wurzel führen.</strong>
+    /// <strong>A key must not lead out of the root.</strong>
     /// </summary>
     /// <remarks>
-    /// Ohne diese Prüfung wäre <c>../../etc/passwd</c> ein Leseweg durch das
-    /// ganze Dateisystem. Geprüft wird das ERGEBNIS des Zusammensetzens, nicht
-    /// der Text: eine Textprüfung übersieht die nächste Schreibweise.
+    /// Without this check <c>../../etc/passwd</c> would be a read path through
+    /// the whole file system. What is checked is the RESULT of composing it, not
+    /// the text: a text check misses the next spelling.
     /// </remarks>
     [Theory]
     [InlineData("../ausbruch.png")]
     [InlineData("a/../../ausbruch.png")]
-    public async Task Ein_Schluessel_bricht_nicht_aus(string key)
+    public async Task A_key_does_not_escape(string key)
     {
         var attempt = async () => await Build().GetAsync(key);
 
@@ -83,20 +83,20 @@ public sealed class AblageTests : IDisposable
     }
 
     /// <summary>
-    /// <strong>Der Typ kommt aus den Bytes, nie aus der Behauptung.</strong>
+    /// <strong>The type comes from the bytes, never from the claim.</strong>
     /// </summary>
     /// <remarks>
-    /// Ein <c>Content-Type</c> und eine Dateiendung sind beide frei wählbar.
-    /// Wer ihnen glaubt, nimmt eine ausführbare Datei entgegen, weil jemand sie
-    /// <c>zeugnis.png</c> genannt hat.
+    /// A <c>Content-Type</c> and a file extension are both freely chosen.
+    /// Whoever believes them accepts an executable because somebody named it
+    /// <c>zeugnis.png</c>.
     /// </remarks>
     [Fact]
-    public void Eine_gefaelschte_Endung_hilft_nicht()
+    public void A_forged_extension_does_not_help()
     {
-        // MZ — der Anfang einer Windows-Programmdatei, hier als „zeugnis.png".
+        // MZ — the beginning of a Windows executable, here as "zeugnis.png".
         Typerkennung.Erkenne([0x4D, 0x5A, 0x90, 0x00]).Should().BeNull();
 
-        // Und SVG ist kein Bild in diesem Sinn: es ist ein Dokument mit Skripten.
+        // And SVG is no image in this sense: it is a document with scripts.
         Typerkennung.Erkenne("<svg xmlns=\"http://www.w3.org/2000/svg\">"u8).Should().BeNull();
     }
 
@@ -104,15 +104,15 @@ public sealed class AblageTests : IDisposable
     [InlineData(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }, "image/png")]
     [InlineData(new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 }, "image/jpeg")]
     [InlineData(new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D, 0x31 }, "application/pdf")]
-    public void Die_drei_erlaubten_Typen_werden_erkannt(byte[] anfang, string erwartet)
+    public void The_three_allowed_types_are_recognised(byte[] anfang, string erwartet)
     {
         Typerkennung.Erkenne(anfang).Should().Be(erwartet);
         Typerkennung.Erlaubt.Should().Contain(erwartet);
     }
 
-    /// <summary>Ein zu kurzer Anfang ist kein Hit, sondern nichts.</summary>
+    /// <summary>A beginning that is too short is not a hit but nothing.</summary>
     [Fact]
-    public void Zu_wenige_Bytes_sind_kein_Typ()
+    public void Too_few_bytes_are_not_a_type()
     {
         Typerkennung.Erkenne([0x89, 0x50]).Should().BeNull();
         Typerkennung.Erkenne([]).Should().BeNull();

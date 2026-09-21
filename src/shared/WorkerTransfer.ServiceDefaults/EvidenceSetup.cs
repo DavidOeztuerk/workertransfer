@@ -8,64 +8,64 @@ using Noelia.Infrastructure.Audit;
 
 namespace WorkerTransfer.ServiceDefaults;
 
-/// <summary>Was beweist, dass jemand die Betriebsoberfläche sehen darf.</summary>
+/// <summary>What proves that somebody may see the operations surface.</summary>
 /// <remarks>
-/// <para><strong>Ein eigenes Papier, und das ist eine Entscheidung.</strong> Die
-/// internen Türen haben ihr Geheimnis (<c>Notify</c>), die Löschkaskade ihres
-/// (<c>Erasure</c>), und schon dort gilt: „darf Profile durchsuchen" und „darf
-/// alles über einen Menschen löschen" dürfen nicht dasselbe Papier sein.
-/// <c>/noelia</c> ist ein drittes Recht — es hält nichts über einen Menschen,
-/// aber es sagt einem Fremden, welche Anbieter diese Instanz benutzt und wo ihre
-/// Türen offen stehen. Wer Mails anstoßen darf, muss das nicht erfahren.</para>
+/// <para><strong>A piece of paper of its own, and that is a decision.</strong>
+/// The internal doors have their secret (<c>Notify</c>), the erasure cascade
+/// has its own (<c>Erasure</c>), and already there the rule holds: "may search
+/// profiles" and "may delete everything about a person" must not be the same
+/// piece of paper. <c>/noelia</c> is a third permission — it holds nothing
+/// about a person, but it tells a stranger which providers this instance uses
+/// and where its doors stand open. Whoever may trigger mails does not have to
+/// learn that.</para>
 ///
-/// <para><strong>Leer heißt: die Tür ist zu.</strong> Eine nicht gesetzte
-/// Variable ist der Zweifelsfall, und im Zweifel zu. Noelias Dashboard
-/// antwortet dann mit <strong>404</strong> und nicht mit 403 — eine
-/// Betriebsoberfläche, deren Existenz man erraten kann, ist selbst schon eine
-/// Auskunft.</para>
+/// <para><strong>Empty means the door is shut.</strong> An unset variable is
+/// the doubtful case, and in doubt it is shut. Noelia's dashboard then answers
+/// <strong>404</strong> rather than 403 — an operations surface whose existence
+/// you can guess is already a disclosure in itself.</para>
 ///
-/// <para><strong>Der Name blieb, der Inhalt nicht.</strong> Bis ADR-0045 stand
-/// hier der Aufbau für sieben selbstgebaute <c>/nachweis/…</c>-Adressen. Die
-/// liefert Noelia; übrig bleibt die Tür davor und die Registrierung der
-/// Prüfungen, die dieses Produkt selbst beantwortet.</para>
+/// <para><strong>The name stayed, the content did not.</strong> Until ADR-0045
+/// the setup for seven hand-built <c>/nachweis/…</c> addresses stood here.
+/// Noelia delivers those; what remains is the door in front of them and the
+/// registration of the checks this product answers itself.</para>
 /// </remarks>
 public sealed class EvidenceSecret
 {
-    /// <summary>Der Section, an den das gebunden wird.</summary>
+    /// <summary>The section this binds to.</summary>
     public const string Section = "Nachweis";
 
-    /// <summary>Der Header, in dem das Geheimnis vorgezeigt wird.</summary>
+    /// <summary>The header the secret is presented in.</summary>
     /// <remarks>
-    /// Der Name, den die Control Plane sendet. Ein eigener Name hier hiesse,
-    /// dass sie diese Flotte nicht einsammeln kann.
+    /// The name the control plane sends. A name of our own here would mean it
+    /// cannot collect this fleet.
     /// </remarks>
     public const string Header = "X-Noelia-Operator";
 
-    /// <summary>Das Geheimnis. Leer heißt: zu.</summary>
+    /// <summary>The secret. Empty means shut.</summary>
     public string Geheimnis { get; set; } = string.Empty;
 }
 
-/// <summary>Hängt den Nachweis an die ServiceFoundation.</summary>
+/// <summary>Hangs the evidence onto the service foundation.</summary>
 /// <remarks>
-/// <para>Was hier steht, steht hier, weil es für jeden Dienst gleich ist: die
-/// Tür. Welche Prüfungen ein Dienst beantwortet, ist eine Entscheidung
-/// <em>dieses</em> Dienstes und steht in seinem Verbundpunkt, wo ein Leser sie
-/// sieht — dieselbe Linie, die <c>AddWorkerTransferDefaults</c> für die Module
-/// zieht.</para>
+/// <para>What stands here stands here because it is the same for every
+/// service: the door. Which checks a service answers is a decision of
+/// <em>that</em> service and stands in its composition root, where a reader
+/// sees it — the same line <c>AddWorkerTransferDefaults</c> draws for the
+/// modules.</para>
 ///
-/// <para><strong>Noelias Prüfungen sind Singletons</strong>
+/// <para><strong>Noelia's checks are singletons</strong>
 /// (<c>TryAddEnumerable(ServiceDescriptor.Singleton&lt;ISecurityCheck, …&gt;)</c>).
-/// Wer eine eigene registriert und dabei etwas Bereichsgebundenes hineinzieht,
-/// baut eine gefangene Abhängigkeit — ein <c>DbContext</c>, der ewig lebt. Die
-/// Prüfungen hier nehmen deshalb den <c>IServiceProvider</c> und öffnen ihren
-/// eigenen Bereich.</para>
+/// Whoever registers one of their own and pulls something scoped into it builds
+/// a captive dependency — a <c>DbContext</c> that lives for ever. The checks
+/// here therefore take the <c>IServiceProvider</c> and open a scope of their
+/// own.</para>
 /// </remarks>
 public static class EvidenceSetup
 {
-    /// <summary>Die Tür vor der Betriebsoberfläche.</summary>
-    /// <param name="services">Der Container.</param>
-    /// <param name="configuration">Die Konfiguration des Dienstes.</param>
-    /// <returns>Der Container.</returns>
+    /// <summary>The door in front of the operations surface.</summary>
+    /// <param name="services">The container.</param>
+    /// <param name="configuration">The service's configuration.</param>
+    /// <returns>The container.</returns>
     public static IServiceCollection AddEvidence(
         this IServiceCollection services, IConfiguration configuration)
     {
@@ -75,27 +75,27 @@ public static class EvidenceSetup
         services.Configure<EvidenceSecret>(
             configuration.GetSection(EvidenceSecret.Section));
 
-        // Das Dashboard haelt fest, wer es gelesen hat, und verweigert die
-        // Antwort, wenn es das nicht kann. Ohne diese Zeile meldet die
-        // Zugriffspruefung eine Warnung statt eines Passes.
+        // The dashboard records who read it and refuses to answer when it
+        // cannot. Without this line the access check reports a warning instead
+        // of a pass.
         services.AddSovereignAuditTrail();
 
         return services;
     }
 
-    /// <summary>Darf dieser Aufrufer die Betriebsoberfläche sehen?</summary>
+    /// <summary>May this caller see the operations surface?</summary>
     /// <remarks>
-    /// <para><c>FixedTimeEquals</c> und nicht <c>==</c>: ein Vergleich, der beim
-    /// ersten falschen Zeichen aufhört, verrät über seine Dauer, wie viele
-    /// Zeichen stimmten. Derselbe Vergleich wie an jeder anderen internen Tür
-    /// dieses Baumes.</para>
+    /// <para><c>FixedTimeEquals</c> and not <c>==</c>: a comparison that stops
+    /// at the first wrong character gives away through its duration how many
+    /// characters were right. The same comparison as at every other internal
+    /// door of this tree.</para>
     ///
-    /// <para>Sie ist <c>public</c>, weil Noelias <c>VisibleTo(...)</c> sie als
-    /// Prädikat nimmt — und <c>static</c>, weil das Prädikat bei der
-    /// Komposition übergeben wird und keinen Zustand haben darf.</para>
+    /// <para>It is <c>public</c> because Noelia's <c>VisibleTo(...)</c> takes
+    /// it as a predicate — and <c>static</c>, because the predicate is handed
+    /// over at composition time and must hold no state.</para>
     /// </remarks>
-    /// <param name="context">Die ResumeRequest.</param>
-    /// <returns>Ob sie eingelassen wird.</returns>
+    /// <param name="context">The request.</param>
+    /// <returns>Whether it is let in.</returns>
     public static bool IsOperator(HttpContext context)
     {
         ArgumentNullException.ThrowIfNull(context);

@@ -4,75 +4,75 @@ using System.Text;
 
 namespace WorkerTransfer.ServiceDefaults;
 
-/// <summary>Ein Punkt auf der Erde.</summary>
-/// <param name="Breite">Breitengrad in Dezimalgrad.</param>
-/// <param name="Laenge">Längengrad in Dezimalgrad.</param>
+/// <summary>A point on the earth.</summary>
+/// <param name="Breite">Latitude in decimal degrees.</param>
+/// <param name="Laenge">Longitude in decimal degrees.</param>
 public readonly record struct Ortspunkt(double Breite, double Laenge);
 
 /// <summary>
-/// Übersetzt eine Postleitzahl oder einen Ortsnamen in Koordinaten — aus einer
-/// mitgelieferten Tabelle.
+/// Translates a postcode or a place name into coordinates — out of a table
+/// shipped along with it.
 /// </summary>
 /// <remarks>
-/// <strong>None ResumeRequest nach draussen, und das ist der Punkt.</strong> Ein
-/// Geokodierdienst (Nominatim, Google, Mapbox) würde bei jedem Speichern einer
-/// Anzeige den Ort eines Unternehmens an einen fremden Server geben — auf einer
-/// Plattform, deren Datenschutzseite „keine Drittanbieter" verspricht, wäre das
-/// eine Ausnahme, die niemand entschieden hat. Und er brächte Rate-Limit,
-/// Ausfallverhalten und eine Nachwanderung mit.
+/// <strong>No request goes outside, and that is the point.</strong> A geocoding
+/// service (Nominatim, Google, Mapbox) would hand a company's location to a
+/// foreign server every time an advert is saved — on a platform whose privacy
+/// page promises "no third parties" that would be an exception nobody decided.
+/// And it would bring a rate limit, failure behaviour and a follow-up migration
+/// with it.
 ///
 /// <para>
-/// <strong>Die Abdeckung ist deshalb trotzdem vollständig</strong>, weil die
-/// Daten klein genug sind, um sie mitzuliefern: <c>Postleitzahlen.txt</c> hält
-/// alle Postleitzahlen und alle nennenswerten Orte in DE, AT und CH (GeoNames,
-/// CC BY 4.0 — siehe <c>NOTICE.md</c>). Erzeugt von
-/// <c>scripts/plz-tabelle.py</c>; wer sie erneuern will, ruft das Skript.
+/// <strong>The coverage is complete all the same</strong>, because the data are
+/// small enough to ship: <c>Postleitzahlen.txt</c> holds every postcode and
+/// every place of any note in DE, AT and CH (GeoNames, CC BY 4.0 — see
+/// <c>NOTICE.md</c>). Produced by <c>scripts/plz-tabelle.py</c>; whoever wants
+/// to refresh it calls the script.
 /// </para>
 ///
 /// <para>
-/// <strong>Was mehrdeutig ist, bleibt unbekannt.</strong> „Neustadt" gibt es
-/// zwanzigmal in ähnlicher Grösse — dafür einen Punkt zu erfinden hiesse, eine
-/// Job um vierhundert Kilometer zu verschieben, ohne dass es jemand merkt.
-/// <c>null</c> heisst „darüber wissen wir nichts", wird gezählt und der
-/// suchenden Person genannt (ADR-0032). „Husum" dagegen löst auf: der Ort in
-/// Nordfriesland überragt seine vier Namensvettern um das Neunfache.
+/// <strong>What is ambiguous stays unknown.</strong> There are twenty
+/// "Neustadt" of similar size — inventing a point for that would mean shifting
+/// a job by four hundred kilometres without anybody noticing. <c>null</c> means
+/// "we know nothing about it", is counted and is named to the searching person
+/// (ADR-0032). "Husum", on the other hand, resolves: the place in North Frisia
+/// towers nine times over its four namesakes.
 /// </para>
 /// </remarks>
 public static class PlaceLookup
 {
     /// <summary>
-    /// Bis zu wie vielen Wörtern eine Ortsangabe noch in Teilstücke zerlegt
-    /// wird. Siehe <see cref="Teilstuecke"/> — dort steht der Grund.
+    /// Up to how many words a location is still split into pieces. See
+    /// <see cref="Teilstuecke"/> — the reason stands there.
     /// </summary>
     private const int HoechsteWortzahlFuerTeilworte = 3;
 
     private static readonly Lazy<Tabelle> Geladen = new(Lies, LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <param name="NachPlz">
-    /// Postleitzahl auf Kandidaten. Mehrere, weil AT und CH sich den
-    /// vierstelligen Bereich teilen — aufgelöst wird das über den Ortsnamen.
+    /// Postcode to candidates. Several, because AT and CH share the four-digit
+    /// range — that is resolved through the place name.
     /// </param>
-    /// <param name="NachName">Normalisierter Ortsname auf Punkt.</param>
+    /// <param name="NachName">Normalised place name to point.</param>
     private sealed record Tabelle(
         Dictionary<string, List<(Ortspunkt Punkt, string Ort)>> NachPlz,
         Dictionary<string, Ortspunkt> NachName);
 
-    /// <summary>Findet die Koordinaten zu einer Ortsangabe.</summary>
-    /// <param name="ort">Was in der Anzeige steht. Freitext.</param>
-    /// <returns>Der Punkt, oder <c>null</c>, wenn der Ort unbekannt ist.</returns>
+    /// <summary>Finds the coordinates for a location.</summary>
+    /// <param name="ort">What stands in the advert. Free text.</param>
+    /// <returns>The point, or <c>null</c> when the place is unknown.</returns>
     public static Ortspunkt? Find(string? ort) => Find(null, ort);
 
-    /// <summary>Findet die Koordinaten zu Postleitzahl und Ortsangabe.</summary>
+    /// <summary>Finds the coordinates for a postcode and a location.</summary>
     /// <remarks>
-    /// <strong>Die Postleitzahl zuerst</strong>, weil sie eindeutig ist und der
-    /// Ortsname es nicht sein muss. Der Ortsname wird dabei mitgelesen, nicht
-    /// ignoriert: bei einem vierstelligen Code, den Österreich und die Schweiz
-    /// sich teilen, entscheidet er — und ohne ihn bleibt so ein Code unbekannt,
-    /// statt dass die Schweiz für Österreich einspringt.
+    /// <strong>The postcode first</strong>, because it is unambiguous and the
+    /// place name need not be. The place name is read along with it, not
+    /// ignored: with a four-digit code that Austria and Switzerland share, it
+    /// decides — and without it such a code stays unknown instead of
+    /// Switzerland standing in for Austria.
     /// </remarks>
-    /// <param name="postleitzahl">Was im Feld steht, oder <c>null</c>.</param>
-    /// <param name="ort">Was in der Anzeige steht. Freitext.</param>
-    /// <returns>Der Punkt, oder <c>null</c>.</returns>
+    /// <param name="postleitzahl">What stands in the field, or <c>null</c>.</param>
+    /// <param name="ort">What stands in the advert. Free text.</param>
+    /// <returns>The point, or <c>null</c>.</returns>
     public static Ortspunkt? Find(string? postleitzahl, string? ort)
     {
         var tabelle = Geladen.Value;
@@ -83,9 +83,8 @@ public static class PlaceLookup
             return ausFeld;
         }
 
-        // Der längste Hit gewinnt: „Frankfurt am Main" darf nicht an
-        // „Frankfurt" hängenbleiben, und „Raum Stuttgart" muss Stuttgart
-        // finden.
+        // The longest hit wins: "Frankfurt am Main" must not get stuck on
+        // "Frankfurt", and "Raum Stuttgart" has to find Stuttgart.
         foreach (var stueck in teile)
         {
             if (tabelle.NachName.TryGetValue(stueck, out var punkt))
@@ -93,9 +92,9 @@ public static class PlaceLookup
                 return punkt;
             }
 
-            // Eine Postleitzahl MITTEN im Freitext („10115 Berlin"). Alte
-            // Anzeigen haben kein eigenes Feld dafür, und ihnen deswegen den
-            // Ort abzusprechen wäre eine Lücke ohne Grund.
+            // A postcode IN THE MIDDLE of the free text ("10115 Berlin"). Old
+            // adverts have no field of their own for it, and denying them their
+            // location for that reason would be a gap without a reason.
             if (stueck.Length is 4 or 5
                 && stueck.All(char.IsAsciiDigit)
                 && AusPlz(tabelle, stueck, teile) is { } ausText)
@@ -115,8 +114,8 @@ public static class PlaceLookup
             return null;
         }
 
-        // „D-10115", „A-1010", „CH-8001": das Länderkürzel davor ist üblich und
-        // gehört nicht zum Schlüssel.
+        // "D-10115", "A-1010", "CH-8001": the country prefix is common and is
+        // not part of the key.
         var key = new string([.. postleitzahl.Where(char.IsAsciiDigit)]);
 
         if (key.Length == 0
@@ -130,9 +129,9 @@ public static class PlaceLookup
             return kandidaten[0].Punkt;
         }
 
-        // Mehrdeutig — der Ortsname entscheidet. Tut er es nicht, bleibt es
-        // unbekannt: einen der Kandidaten zu greifen wäre ein Münzwurf zwischen
-        // zwei Ländern.
+        // Ambiguous — the place name decides. If it does not, it stays
+        // unknown: grabbing one of the candidates would be a coin toss between
+        // two countries.
         foreach (var kandidat in kandidaten)
         {
             if (teile.Contains(Normalise(kandidat.Ort)))
@@ -144,18 +143,18 @@ public static class PlaceLookup
         return null;
     }
 
-    /// <summary>Der Erdradius, in Kilometern.</summary>
+    /// <summary>The earth's radius, in kilometres.</summary>
     private const double ErdradiusKm = 6371.0;
 
-    /// <summary>Die Entfernung zweier Punkte auf der Erdoberfläche.</summary>
+    /// <summary>The distance between two points on the earth's surface.</summary>
     /// <remarks>
-    /// Haversine. Genau genug für eine Umkreissuche: der Fehler gegenüber einem
-    /// Ellipsoidmodell liegt unter einem halben Prozent, und wer „50 km" wählt,
-    /// meint keine 50,0 km.
+    /// Haversine. Accurate enough for a radius search: the error against an
+    /// ellipsoid model is below half a percent, and whoever chooses "50 km"
+    /// does not mean 50.0 km.
     /// </remarks>
-    /// <param name="a">Der eine Punkt.</param>
-    /// <param name="b">Der andere.</param>
-    /// <returns>Die Entfernung in Kilometern.</returns>
+    /// <param name="a">The one point.</param>
+    /// <param name="b">The other.</param>
+    /// <returns>The distance in kilometres.</returns>
     public static double EntfernungKm(Ortspunkt a, Ortspunkt b)
     {
         var dBreite = Bogenmass(b.Breite - a.Breite);
@@ -170,30 +169,30 @@ public static class PlaceLookup
 
     private static double Bogenmass(double grad) => grad * Math.PI / 180.0;
 
-    /// <summary>Wie weit ein Punkt höchstens von einem bekannten Ort weg sein darf.</summary>
+    /// <summary>How far a point may at most be from a known place.</summary>
     /// <remarks>
-    /// Fünfzig Kilometer. Wer weiter weg steht, ist nicht in DE, AT oder CH —
-    /// und dann den nächsten deutschen Ort zurückzugeben wäre eine Behauptung
-    /// über den Aufenthaltsort, die niemand aufgestellt hat.
+    /// Fifty kilometres. Whoever stands further away is not in DE, AT or CH —
+    /// and returning the nearest German place then would be a claim about
+    /// somebody's whereabouts that nobody made.
     /// </remarks>
     private const double HoechsteRueckwaertsEntfernungKm = 50.0;
 
-    /// <summary>Der nächstgelegene bekannte Ort zu einem Punkt.</summary>
+    /// <summary>The nearest known place to a point.</summary>
     /// <remarks>
-    /// <strong>Die Gegenrichtung, und sie hat genau einen Zweck:</strong> die
-    /// Oberfläche schreibt nach einem Druck auf „Meinen Standort verwenden" den
-    /// gefundenen Ort in das Ortsfeld, damit die suchende Person SIEHT, wovon
-    /// aus gemessen wird. Ein Umkreis um einen unsichtbaren Punkt ist eine
-    /// Zumutung.
+    /// <strong>The reverse direction, and it has exactly one purpose:</strong>
+    /// after a press on "use my location" the interface writes the place it
+    /// found into the location field, so that the searching person SEES what
+    /// the measurement starts from. A radius around an invisible point is an
+    /// imposition.
     /// <para>
-    /// Gesucht wird in der Postleitzahltabelle und nicht im Namensregister: dort
-    /// steht je Eintrag ein amtlicher Ortsname, während das Namensregister auch
-    /// Schreibvarianten und fremdsprachige Formen führt — „Munich" in ein
-    /// deutsches Formular zu schreiben wäre albern.
+    /// The search runs over the postcode table and not over the name register:
+    /// there every entry carries an official place name, while the name
+    /// register also holds spelling variants and foreign-language forms —
+    /// writing "Munich" into a German form would be silly.
     /// </para>
     /// </remarks>
-    /// <param name="punkt">Wo die Person steht.</param>
-    /// <returns>Der Ortsname, oder <c>null</c>, wenn nichts in der Nähe liegt.</returns>
+    /// <param name="punkt">Where the person stands.</param>
+    /// <returns>The place name, or <c>null</c> when nothing lies nearby.</returns>
     public static string? NaechsterOrt(Ortspunkt punkt)
     {
         string? bester = null;
@@ -213,56 +212,56 @@ public static class PlaceLookup
             }
         }
 
-        // „Wien, Innere Stadt" ist ein Stadtteil. In ein Ortsfeld gehört „Wien".
+        // "Wien, Innere Stadt" is a district. A location field takes "Wien".
         var komma = bester?.IndexOf(',');
 
         return komma is > 0 ? bester![..komma.Value].Trim() : bester;
     }
 
-    /// <summary>Wie viele Postleitzahlen und Orte die Tabelle kennt.</summary>
+    /// <summary>How many postcodes and places the table knows.</summary>
     /// <remarks>
-    /// Für einen Test, der beweist, dass die eingebettete Datei überhaupt
-    /// mitgeliefert wurde. Ohne ihn wäre eine leere Tabelle von „kein Ort
-    /// bekannt" nicht zu unterscheiden — und das sähe aus wie eine
-    /// Umkreissuche, die nichts findet, statt wie eine fehlende Datei.
+    /// For a test that proves the embedded file was shipped at all. Without it
+    /// an empty table would be indistinguishable from "no place known" — and
+    /// that would look like a radius search finding nothing instead of a
+    /// missing file.
     /// </remarks>
     public static (int Postleitzahlen, int Orte) Umfang() =>
         (Geladen.Value.NachPlz.Count, Geladen.Value.NachName.Count);
 
     /// <summary>
-    /// Zerlegt eine Ortsangabe in die Teilstücke, die ein Ortsname sein
-    /// könnten — das längste zuerst.
+    /// Splits a location into the pieces that could be a place name — the
+    /// longest one first.
     /// </summary>
     /// <remarks>
-    /// Drei Stufen, und die dritte ist bewusst eingeschränkt:
+    /// Three stages, and the third is deliberately restricted:
     /// <list type="number">
-    /// <item>der ganze Text („Frankfurt am Main"),</item>
-    /// <item>jedes Stück zwischen Komma, Schrägstrich, Klammer oder Doppelpunkt
-    /// („Berlin, Mitte" → „berlin"; „Standort: München" → „muenchen"),</item>
-    /// <item>einzelne Wortfolgen — aber NUR, wenn das Stück höchstens
-    /// <see cref="HoechsteWortzahlFuerTeilworte"/> Wörter hat.</item>
+    /// <item>the whole text ("Frankfurt am Main"),</item>
+    /// <item>every piece between comma, slash, bracket or colon
+    /// ("Berlin, Mitte" → "berlin"; "Standort: München" → "muenchen"),</item>
+    /// <item>single word sequences — but ONLY when the piece has at most
+    /// <see cref="HoechsteWortzahlFuerTeilworte"/> words.</item>
     /// </list>
     ///
     /// <para>
-    /// <strong>Die Grenze in Stufe drei ist gemessen, nicht gewählt.</strong>
-    /// Ohne sie fand „Auf dem Hof meiner Oma" die Stadt <em>Hof</em> in Bayern
-    /// (46000 Einwohner) und legte die Anzeige dorthin. Dieselbe Falle stellen
-    /// „Essen", „Halle", „Lage", „Brand" und „Bad" — alles gewöhnliche Wörter
-    /// und alles Ortsnamen. Aus einer Wortfolge <em>ein</em> Wort zu greifen
-    /// ist bei zwei Wörtern eine Lesart („Raum Stuttgart") und bei fünf ein
-    /// Ratespiel. Wer prosaisch schreibt, wird über die POSTLEITZAHL gefunden;
-    /// dafür hat die Anzeige ein Feld.
+    /// <strong>The limit in stage three is measured, not chosen.</strong>
+    /// Without it "Auf dem Hof meiner Oma" found the town <em>Hof</em> in
+    /// Bavaria (46,000 inhabitants) and put the advert there. The same trap is
+    /// set by "Essen", "Halle", "Lage", "Brand" and "Bad" — all ordinary words
+    /// and all place names. Grabbing <em>one</em> word out of a word sequence
+    /// is a reading with two words ("Raum Stuttgart") and a guessing game with
+    /// five. Whoever writes in prose is found through the POSTCODE; the advert
+    /// has a field for that.
     /// </para>
     ///
     /// <para>
-    /// Der Bindestrich trennt NICHT — sonst zerfiele „Baden-Baden" in zwei
-    /// Wörter, von denen eines woanders liegt.
+    /// The hyphen does NOT separate — otherwise "Baden-Baden" would fall into
+    /// two words, one of which lies somewhere else.
     /// </para>
     ///
     /// <para>
-    /// Und absichtlich so statt als Search „kommt ein bekannter Ort im Text
-    /// vor": die Tabelle hat sechsundzwanzigtausend Namen, und ein Durchgang
-    /// darüber je Anzeige wären Millionen Vergleiche für eine Antwort.
+    /// And deliberately this way rather than as a search for "a known place
+    /// occurs in the text": the table has twenty-six thousand names, and one
+    /// pass over it per advert would be millions of comparisons for one answer.
     /// </para>
     /// </remarks>
     private static List<string> Teilstuecke(string? text)
@@ -307,16 +306,17 @@ public static class PlaceLookup
         return stuecke;
     }
 
-    /// <summary>Kleinschreibung, Umlaute ausgeschrieben, Akzente weg.</summary>
+    /// <summary>Lower case, umlauts written out, accents gone.</summary>
     private static string Normalise(string text)
     {
         var gebaut = new StringBuilder(text.Length);
 
         foreach (var zeichen in text.Trim().ToLower(CultureInfo.InvariantCulture))
         {
-            // Erst die deutschen Sonderfälle: „ä" wird „ae" und nicht „a".
-            // Wer sie über die Zerlegung in Grundzeichen laufen liesse, machte
-            // aus „München" ein „munchen", das keine Schreibweise ist.
+            // The German special cases first: "ä" becomes "ae" and not "a".
+            // Letting them run through the decomposition into base characters
+            // would turn "München" into a "munchen", which is no spelling at
+            // all.
             _ = zeichen switch
             {
                 'ä' => gebaut.Append("ae"),
@@ -327,8 +327,8 @@ public static class PlaceLookup
             };
         }
 
-        // Und dann der Rest der Akzente — „Genève" und „Geneve" sind derselbe
-        // Ort, und die Tabelle trägt beide Schreibweisen nicht.
+        // And then the rest of the accents — "Genève" and "Geneve" are the
+        // same place, and the table does not carry both spellings.
         var zerlegt = gebaut.ToString().Normalize(NormalizationForm.FormD);
         var ohne = new StringBuilder(zerlegt.Length);
 
@@ -377,8 +377,8 @@ public static class PlaceLookup
             {
                 if (fields.Length >= 3 && Punkt(fields[1], fields[2]) is { } punkt)
                 {
-                    // Zwei Schreibweisen desselben Ortes ergeben denselben
-                    // Schlüssel — dann steht dort schon der gleiche Punkt.
+                    // Two spellings of the same place yield the same key —
+                    // and then the same point already stands there.
                     nachName[Normalise(fields[0])] = punkt;
                 }
 

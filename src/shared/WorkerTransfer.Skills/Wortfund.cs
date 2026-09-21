@@ -3,71 +3,69 @@ using System.Text;
 
 namespace WorkerTransfer.Skills;
 
-/// <summary>Welche bekannten Wörter in einem Text vorkommen — und keins mehr.</summary>
+/// <summary>Which known words occur in a text — and not one more.</summary>
 /// <remarks>
-/// <strong>Es sucht, was der <see cref="Wortschatz"/> kennt, und rät nie.</strong>
-/// Das ist die ganze Grenze, und sie ist dieselbe wie eine Zeile weiter oben:
-/// <c>Vocabulary</c> benennt um und folgert nicht, und diese Funktion wendet
-/// genau das auf einen gefundenen Text an. Sie liest in einem Reference die
-/// Schreibweise <c>„schweissfachmann"</c> und bietet dafür den kanonischen
-/// Namen <c>„Schweißfachmann"</c> an — eine Aussage über <em>Sprache</em>.
+/// <strong>It searches for what the <see cref="Vocabulary"/> knows, and never
+/// guesses.</strong> That is the whole boundary, and it is the same one as a
+/// line further up: <c>Vocabulary</c> renames and does not infer, and this
+/// function applies exactly that to a text that was found. It reads the
+/// spelling <c>"schweissfachmann"</c> in a reference and offers the canonical
+/// name <c>"Schweißfachmann"</c> for it — a statement about <em>language</em>.
 /// <para>
-/// Was sie ausdrücklich <em>nicht</em> tut: aus der Form eines Wortes schliessen,
-/// dass es eine Fähigkeit sei. „Grossgeschrieben", „steht hinter dem Doppelpunkt",
-/// „kommt oft vor" — jede dieser Regeln wäre eine Vermutung über einen Menschen,
-/// gebildet aus der Gestalt seines Dokuments. Wer ein Wort vermisst, erweitert
-/// den Vocabulary per Pull Request; er wird nie aus den Unterlagen von Menschen
-/// gelernt (ADR-0023).
+/// What it expressly does <em>not</em> do: conclude from the shape of a word
+/// that it is a skill. "Capitalised", "stands after the colon", "occurs often"
+/// — every one of those rules would be a guess about a person, formed out of
+/// the shape of their document. Whoever misses a word extends the vocabulary by
+/// pull request; it is never learnt from people's documents (ADR-0023).
 /// </para>
 /// <para>
-/// Der Preis ist ehrlich und muss es bleiben: <strong>was der Vocabulary nicht
-/// kennt, wird nicht gefunden.</strong> Eine Oberfläche, die das verschweigt,
-/// behauptet stillschweigend, in einem Dokument stehe nichts — ADR-0022 §3.
+/// The price is honest and has to stay that way: <strong>what the vocabulary
+/// does not know is not found.</strong> A surface that keeps quiet about it
+/// silently claims a document holds nothing — ADR-0022 §3.
 /// </para>
 /// <para>
-/// Das Ergebnis ist ein <em>Vorschlag</em> und nie eine Nennung. Zwischen dem
-/// gefundenen Wort und einer Aussage über den Menschen liegen zwei Handlungen:
-/// ein Klick füllt das Formularfeld, und erst „Speichern" macht daraus eine
-/// Nennung (ADR-0033).
+/// The result is a <em>suggestion</em> and never a naming. Between the word
+/// that was found and a statement about the person lie two acts: a click fills
+/// the form field, and only "Save" makes it a naming (ADR-0033).
 /// </para>
 /// </remarks>
 public static class TermFinder
 {
-    /// <summary>Ab welcher Länge eine Schreibweise in jeder Schreibung gilt.</summary>
+    /// <summary>From which length on a spelling counts in any casing.</summary>
     /// <remarks>
-    /// <strong>Kurze Kürzel nur in Grossbuchstaben, und das ist gemessen.</strong>
-    /// „wig" ist im Englischen eine Perücke, „go" ein alltägliches Verb, „ts"
-    /// und „py" stehen in jedem zweiten Dateinamen. In Kleinschreibung trifft
-    /// ein Dreibuchstabenwort irgendwo in jedem längeren Reference — und ein
-    /// falscher Vorschlag ist hier teurer als ein fehlender, weil er der Person
-    /// ein Wort über sich selbst anbietet, das in ihrem Dokument nie stand.
+    /// <strong>Short abbreviations only in capitals, and that is measured.</strong>
+    /// "wig" is a hairpiece in English, "go" an everyday verb, "ts" and "py"
+    /// stand in every other file name. In lower case a three-letter word hits
+    /// somewhere in every longer reference — and a wrong suggestion is more
+    /// expensive here than a missing one, because it offers the person a word
+    /// about themselves that never stood in their document.
     /// <para>
-    /// Die Regel greift nur bei Schreibweisen aus <em>reinen Buchstaben</em>:
-    /// „C#", „C++" und „k8s" tragen ein Zeichen, das sie ohnehin unverwechselbar
-    /// macht, und werden weiterhin in jeder Schreibung erkannt.
+    /// The rule applies only to spellings made of <em>pure letters</em>: "C#",
+    /// "C++" and "k8s" carry a character that makes them unmistakable anyway,
+    /// and are still recognised in any casing.
     /// </para>
     /// </remarks>
     public const int UnterDieserLaengeNurVersal = 4;
 
-    /// <summary>Schreibweise → kanonischer Name, kleingeschrieben nachgeschlagen.</summary>
+    /// <summary>Spelling → canonical name, looked up in lower case.</summary>
     /// <remarks>
-    /// Aus <see cref="Wortschatz.Schreibweisen"/> gebaut und nicht daneben
-    /// gepflegt: eine zweite Liste wäre die, die als Erste veraltet — und
-    /// niemand merkte es, weil ein nicht gefundenes Wort wie ein Dokument ohne
-    /// Inhalt aussieht.
+    /// Built from <see cref="Vocabulary.Schreibweisen"/> and not maintained
+    /// beside it: a second list would be the one to go stale first — and nobody
+    /// would notice, because a word that is not found looks like a document
+    /// with no content.
     /// </remarks>
     private static readonly FrozenDictionary<string, string> NachSchreibweise = Build();
 
-    /// <summary>Die längste Schreibweise — die Obergrenze jedes Vergleichsfensters.</summary>
+    /// <summary>The longest spelling — the upper bound of every comparison window.</summary>
     private static readonly int LaengsteSchreibweise =
         NachSchreibweise.Keys.Max(schreibweise => schreibweise.Length);
 
-    /// <summary>Die kanonischen Namen, die in diesem Text vorkommen.</summary>
-    /// <param name="text">Der gefundene Volltext. Wird nirgends festgehalten.</param>
+    /// <summary>The canonical names that occur in this text.</summary>
+    /// <param name="text">The full text that was found. It is held nowhere.</param>
     /// <returns>
-    /// Jeden Namen einmal, in der Reihenfolge seines ersten Vorkommens im Text.
-    /// Die Reihenfolge ordnet <em>Wörter</em> in <em>einem Dokument</em> und
-    /// nie Menschen; eine Zahl entsteht daraus nirgends.
+    /// Every name once, in the order of its first occurrence in the text. The
+    /// order arranges <em>words</em> in <em>one document</em> and never people;
+    /// nowhere does a number come out of it.
     /// </returns>
     public static IReadOnlyList<string> Find(string? text)
     {
@@ -89,10 +87,11 @@ public static class TermFinder
                 continue;
             }
 
-            // Vom längsten Fenster abwärts: „Microsoft SQL Server" muss sich
-            // gegen „MySQL" durchsetzen, und „gesundheits- und krankenpfleger"
-            // gegen jedes kürzere Stück darin. Andersherum gewänne das erste
-            // Teilwort und der längere Name käme nie zum Zug.
+            // From the longest window downwards: "Microsoft SQL Server" has to
+            // win against "MySQL", and "gesundheits- und krankenpfleger"
+            // against every shorter piece inside it. The other way round the
+            // first partial word would win and the longer name would never get
+            // its turn.
             var laengste = Math.Min(LaengsteSchreibweise, klein.Length - start);
 
             for (var length = laengste; length > 0; length--)
@@ -121,8 +120,8 @@ public static class TermFinder
                     found.Add(name);
                 }
 
-                // Über den Hit hinweg, nicht mitten hinein: „MIG/MAG" darf
-                // nicht ein zweites Mal als sein eigener Bestandteil zählen.
+                // Over the hit, not into the middle of it: "MIG/MAG" must not
+                // count a second time as a constituent of itself.
                 start += length - 1;
                 break;
             }
@@ -131,11 +130,11 @@ public static class TermFinder
         return found;
     }
 
-    /// <summary>Ein Zeichen, das kein Wort fortsetzt — oder der Rand des Textes.</summary>
+    /// <summary>A character that does not continue a word — or the edge of the text.</summary>
     /// <remarks>
-    /// Die Wortgrenze ist der Unterschied zwischen „SPS" in „SPS-Programmierung"
-    /// und „sps" in einem beliebigen Wortinneren. Ein Bindestrich ist eine
-    /// Grenze, ein Buchstabe ist keine.
+    /// The word boundary is the difference between "SPS" in "SPS-Programmierung"
+    /// and "sps" somewhere inside another word. A hyphen is a boundary, a letter
+    /// is not.
     /// </remarks>
     private static bool BeginntEinWort(string text, int job) =>
         job == 0 || !char.IsLetterOrDigit(text[job - 1]);
@@ -143,7 +142,7 @@ public static class TermFinder
     private static bool EndetEinWort(string text, int job) =>
         job >= text.Length || !char.IsLetterOrDigit(text[job]);
 
-    /// <summary>Steht dieses Stück im Text ohne einen einzigen Kleinbuchstaben da?</summary>
+    /// <summary>Does this piece stand in the text without a single lower-case letter?</summary>
     private static bool IstVersal(string text, int start, int length)
     {
         for (var job = start; job < start + length; job++)
@@ -158,12 +157,12 @@ public static class TermFinder
     }
 
     /// <summary>
-    /// Jede Folge von Leerraum wird ein einzelnes Leerzeichen.
+    /// Every run of whitespace becomes a single space.
     /// </summary>
     /// <remarks>
-    /// Ohne das fände „Erste Hilfe" sich selbst nicht, sobald ein Zeilenumbruch
-    /// dazwischen steht — und in einem gesetzten Dokument steht er irgendwann
-    /// zwischen jedem Wortpaar.
+    /// Without it "Erste Hilfe" would not find itself as soon as a line break
+    /// stands between the two words — and in a typeset document one eventually
+    /// stands between every pair of words.
     /// </remarks>
     private static string Verdichte(string? text)
     {
@@ -201,8 +200,8 @@ public static class TermFinder
 
         foreach (var (name, schreibweisen) in Vocabulary.Schreibweisen)
         {
-            // Der kanonische Name zeigt auf sich selbst: wer „Kubernetes"
-            // schreibt, hat Kubernetes geschrieben.
+            // The canonical name points at itself: whoever writes "Kubernetes"
+            // has written Kubernetes.
             tabelle[name.ToLowerInvariant()] = name;
 
             foreach (var schreibweise in schreibweisen)

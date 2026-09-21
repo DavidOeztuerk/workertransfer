@@ -48,7 +48,7 @@ keep the compound's shape.
 | Anschreiber | CoverLetterWriter | |
 | Gespraech | Conversation | |
 | Mandat | Mandate | |
-| Vorgang | Case | a running process; `Transfer` only where it is one |
+| Vorgang | Case | a running process; `Transfer` only where it is one. Locals are `caseItem` — `case` is a keyword |
 | Arbeitsprobe | WorkSample | |
 | Einreichung | Submission | |
 | Bewertung | Evaluation | never `Rating`, never `Score` (ADR-0022) |
@@ -70,7 +70,7 @@ keep the compound's shape.
 | Fund | Term | what a document yielded |
 | Berufsfeld | OccupationalField | |
 | Anschrift | PostalAddress | never `Address` alone — that is also a URL here |
-| Anfrage | Request | |
+| Anfrage | ResumeRequest / MarketRequest | never bare `Request`: MediatR already names its handler parameter that, and a local `request` beside it does not compile. Locals use `requestRecord`. |
 | Antwort | Response | |
 | Fassung | Version | |
 | Stand | State | a status value |
@@ -83,7 +83,7 @@ keep the compound's shape.
 | Klammer | Scope | `Transaktionsklammer` → `TransactionScope` |
 | Zeiger | Cursor | `Seitenzeiger` → `PageCursor` |
 | Laenge | Length | `Seitenlaenge` → `PageLength` — never `Count` (ADR-0026) |
-| Umgebung | Environment | |
+| Umgebung | EnvironmentFile | not `Environment`: it would shadow `System.Environment` |
 | Reise | Journey | test suites: `ProfilreiseTests` → `ProfileJourneyTests` |
 | Kanarienvogel | Canary | |
 | Gegenprobe | CounterProbe | |
@@ -109,9 +109,36 @@ Ein_leeres_Loeschgeheimnis_schliesst_den_Endpunkt
   → An_empty_erasure_secret_closes_the_endpoint
 ```
 
+## Five places where an identifier is also a contract
+
+A green build proves nothing about these. All five were measured on 21.09.2026,
+and each one surfaced only at runtime — or, in the last case, as a schema change.
+
+- **Anonymous objects.** `new { dienst = …, pfad = … }` becomes JSON, and its
+  keys carry no quotes, so masking string literals does not protect them. The
+  gateway harness lost 43 of 89 journeys to this; the reading side looked the
+  key up as a string.
+- **Route templates.** `"/{stelle:guid}/applications"` is a string, its lambda
+  parameter is not. After the rename ASP.NET could not bind and answered **400
+  where the test expected 403** — which reads like a domain fault.
+- **Raw string literals** (`"""…"""`). A `@"…"` pattern does not match them, so
+  the SQL inside was renamed (`@typ` → `@type`) while the `AddWithValue("typ")`
+  beside it was not.
+- **`case` and `default` are C# keywords.** `vorgang` and `vorgabe` translate
+  straight into them and stop compiling; they are `caseItem` and `defaultValue`.
+- **Postgres enum labels follow the C# member name.** Npgsql derives them, so
+  `Lebenslauf` → `CurriculumVitae` renames `lebenslauf` to `curriculum_vitae` in
+  the database — and PostgreSQL cannot replace a label rows still point at. The
+  answer is not a hand-written `ALTER TYPE`: delete the migrations and let
+  `dotnet ef migrations add` generate them, so a fresh schema creates the right
+  label from the start.
+
 ## How a rename is verified
 
-The compiler is the check: `dotnet build` at 0 errors and 0 warnings, then
-`./scripts/test-dotnet.sh` in its own invocation. For `web/`, `pnpm check` then
-`pnpm test` then `pnpm build`. Nothing here is a judgement call the build cannot
-catch — except the two decisions above, which have tests.
+`dotnet build` at 0 errors and 0 warnings, then `./scripts/test-dotnet.sh` in
+its own invocation — never chained, or the Testcontainers suites die and look
+like real failures. For `web/`, `pnpm check`, then `pnpm test`, then `pnpm build`.
+
+**The build is not the check.** It misses every one of the five places above, and
+it missed all of them on 21.09.2026: the suite found them, at runtime, after a
+green build. A rename is finished when the suite is green, not when it compiles.

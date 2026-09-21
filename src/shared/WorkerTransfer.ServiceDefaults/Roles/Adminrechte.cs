@@ -5,69 +5,69 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace WorkerTransfer.ServiceDefaults.Roles;
 
-/// <summary>Welche Rechte dieser Dienst nur einem <c>admin</c> gibt.</summary>
+/// <summary>Which permissions this service gives only to an <c>admin</c>.</summary>
 /// <remarks>
-/// <para><strong>Eine Liste je Dienst, keine gemeinsame.</strong> Was ein
-/// Unternehmen bindet, weiss nur der Dienst, dem die Handlung gehört —
-/// „veröffentlichen" ist in jobs-service eine Aussage nach aussen und anderswo
-/// gar nichts. Eine gemeinsame Liste wäre die zweite Job, an der dieselbe
-/// Frage beantwortet wird, und zwei gehen auseinander.</para>
+/// <para><strong>One list per service, not a shared one.</strong> What binds a
+/// company is known only to the service the operation belongs to —
+/// "publishing" is a statement to the outside world in jobs-service and nothing
+/// at all elsewhere. A shared list would be the second place where the same
+/// question is answered, and two of them drift apart.</para>
 ///
-/// <para><strong>Was NICHT in dieser Liste steht, darf jedes Mitglied.</strong>
-/// Das ist die Vorgabe und sie ist Absicht: ein zu enges Recht macht aus einer
-/// Einladung eine Zuschauerkarte, und dann legt jemand einen zweiten Admin an,
-/// um arbeiten zu können — und „admin" ist wieder ein Wort in einer Tabelle.
-/// Ein Mitglied braucht deshalb auch keine Richtlinie: die Prüfung „handelst du
-/// für eine Firma?" steht schon am Endpunkt.</para>
+/// <para><strong>Whatever does NOT stand in this list, every member may
+/// do.</strong> That is the default and it is deliberate: a permission that is
+/// too narrow turns an invitation into a spectator seat, and then somebody
+/// creates a second admin in order to work — and "admin" is a word in a table
+/// again. A member therefore needs no policy either: the check "are you acting
+/// for a company?" already stands at the endpoint.</para>
 /// </remarks>
 public sealed class AdminPermissions
 {
     private readonly HashSet<string> _rechte;
 
-    /// <summary>Mit den Rechten, die diesem Dienst gehören.</summary>
-    /// <param name="rechte">Jedes Recht, das ein <c>admin</c> braucht.</param>
+    /// <summary>With the permissions that belong to this service.</summary>
+    /// <param name="permissions">Every permission an <c>admin</c> needs.</param>
     public AdminPermissions(IEnumerable<string> permissions)
     {
         ArgumentNullException.ThrowIfNull(permissions);
         _rechte = [.. permissions];
     }
 
-    /// <summary>Verlangt dieses Recht einen <c>admin</c>?</summary>
-    /// <param name="recht">Der Name aus der Richtlinie.</param>
+    /// <summary>Does this permission demand an <c>admin</c>?</summary>
+    /// <param name="permission">The name out of the policy.</param>
     public bool NurAdmin(string permission) => _rechte.Contains(permission);
 
-    /// <summary>Jedes Recht, das dieser Dienst kennt — für Tests und Berichte.</summary>
+    /// <summary>Every permission this service knows — for tests and reports.</summary>
     public IReadOnlyCollection<string> Alle => _rechte;
 }
 
-/// <summary>Meldet die CompanyPermissions eines Dienstes an.</summary>
+/// <summary>Registers a service's company permissions.</summary>
 public static class AdminPermissionExtensions
 {
-    /// <summary>Noelias Präfix für dynamisch aufgelöste Richtlinien.</summary>
+    /// <summary>Noelia's prefix for policies resolved at run time.</summary>
     /// <remarks>
-    /// Sein <c>PermissionPolicyProvider</c> baut aus jedem so benannten
-    /// Richtliniennamen zur Laufzeit eine Richtlinie. Deshalb muss keine vorher
-    /// angemeldet werden — und deshalb ist wichtig, dass der Anbieter überhaupt
-    /// läuft: ohne ihn beantwortet niemand diese Namen, und das Gerüst lehnt
-    /// <em>jede</em> ResumeRequest an den geschützten Endpunkt ab.
+    /// Its <c>PermissionPolicyProvider</c> builds a policy at run time out of
+    /// every policy name spelled this way. That is why none has to be
+    /// registered in advance — and why it matters that the provider runs at
+    /// all: without it nobody answers those names, and the framework refuses
+    /// <em>every</em> request to the protected endpoint.
     /// </remarks>
     public const string Praefix = "Permission:";
 
-    /// <summary>Der Richtlinienname zu einem Recht.</summary>
-    /// <param name="recht">Das Recht, etwa <c>jobs.publish</c>.</param>
+    /// <summary>The policy name for a permission.</summary>
+    /// <param name="permission">The permission, for example <c>jobs.publish</c>.</param>
     public static string Richtlinie(string permission) => Praefix + permission;
 
     /// <summary>
-    /// Verdrahtet die Rollenauskunft und den Handler, der die genannten Rechte
-    /// aus ihr beantwortet.
+    /// Wires up the role lookup and the handler that answers the named
+    /// permissions out of it.
     /// </summary>
-    /// <param name="dienste">Der Container.</param>
-    /// <param name="konfiguration">Woher <c>Identity:Adresse</c> kommt.</param>
-    /// <param name="nurAdmin">Die Rechte, die einen <c>admin</c> verlangen.</param>
+    /// <param name="services">The container.</param>
+    /// <param name="konfiguration">Where <c>Identity:Adresse</c> comes from.</param>
+    /// <param name="nurAdmin">The permissions that demand an <c>admin</c>.</param>
     /// <remarks>
-    /// Nicht in <c>AddWorkerTransferDefaults</c>, und das ist dieselbe Trennung
-    /// wie überall hier: der MECHANISMUS darf nicht elfmal beantwortet werden,
-    /// die LISTE ist eine Entscheidung und steht dort, wo ein Leser sie sieht.
+    /// Not in <c>AddWorkerTransferDefaults</c>, and that is the same separation
+    /// as everywhere here: the MECHANISM must not be answered eleven times, the
+    /// LIST is a decision and stands where a reader sees it.
     /// </remarks>
     public static IServiceCollection AddAdminrechte(
         this IServiceCollection services,
@@ -80,9 +80,9 @@ public static class AdminPermissionExtensions
 
         if (nurAdmin.Length == 0)
         {
-            // Ein Dienst, der diese Zeile ruft und nichts nennt, hat sie
-            // vergessen zu fuellen — und bekaeme eine Verdrahtung, die nie
-            // etwas entscheidet. Das sieht aus wie Schutz.
+            // A service that calls this line and names nothing forgot to fill
+            // it — and would get a wiring that never decides anything. That
+            // looks like protection.
             throw new ArgumentException(
                 "Ohne ein einziges Recht ist diese Verdrahtung wirkungslos.", nameof(nurAdmin));
         }

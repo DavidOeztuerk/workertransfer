@@ -69,20 +69,20 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     private static Task<HttpResponseMessage> Write(
         HttpClient browser,
         string name = "Muster GmbH",
-        string? netzseite = "https://muster.example",
-        string[]? orte = null,
-        string[]? leistungen = null) =>
+        string? website = "https://muster.example",
+        string[]? locations = null,
+        string[]? benefits = null) =>
         browser.PutAsJsonAsync("/companies/me/profile", new
         {
             display_name = name,
             about = "Wir bauen verteilte Systeme.",
-            website = netzseite,
-            locations = orte ?? ["Berlin"],
-            benefits = leistungen ?? ["Homeoffice"]
+            website = website,
+            locations = locations ?? ["Berlin"],
+            benefits = benefits ?? ["Homeoffice"]
         });
 
     [Fact]
-    public async Task Die_Briefanschrift_ueberlebt_die_Runde()
+    public async Task The_postal_address_survives_the_round_trip()
     {
         var company = Guid.CreateVersion7();
         var browser = AlsFirma(company);
@@ -116,7 +116,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Der gewöhnliche Weg: einmal schreiben, öffentlich lesbar sein.</summary>
     [Fact]
-    public async Task Ein_Profil_ist_ohne_Anmeldung_lesbar()
+    public async Task A_profile_is_readable_without_signing_in()
     {
         var company = Guid.CreateVersion7();
 
@@ -144,7 +144,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     /// Karriere-Seite.
     /// </remarks>
     [Fact]
-    public async Task Das_Kuerzel_bleibt_wenn_der_Name_sich_aendert()
+    public async Task The_slug_stays_when_the_name_changes()
     {
         var company = Guid.CreateVersion7();
         var browser = AlsFirma(company);
@@ -162,7 +162,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Zwei Unternehmen mit demselben Namen bekommen zwei Adressen.</summary>
     [Fact]
-    public async Task Ein_belegtes_Kuerzel_bekommt_einen_Zaehler()
+    public async Task A_taken_slug_gets_a_counter()
     {
         const string name = "Gleichnamig AG";
 
@@ -180,7 +180,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     /// Adresse, die weitergegeben wird.
     /// </summary>
     [Fact]
-    public async Task Das_Kuerzel_verraet_die_Mandantenkennung_nicht()
+    public async Task The_slug_does_not_reveal_the_tenant_id()
     {
         var company = Guid.CreateVersion7();
 
@@ -193,7 +193,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Umlaute werden zerlegt, ihre Grundbuchstaben bleiben.</summary>
     [Fact]
-    public async Task Aus_dem_Namen_wird_eine_Adresse()
+    public async Task A_name_becomes_an_address()
     {
         var geschrieben = await Write(AlsFirma(Guid.CreateVersion7()), "Grün & Söhne GmbH");
 
@@ -206,7 +206,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     /// Adresse besser als gar keine.
     /// </summary>
     [Fact]
-    public async Task Ein_Name_ganz_ohne_lateinische_Buchstaben_bekommt_trotzdem_eine_Adresse()
+    public async Task A_name_with_no_latin_letters_at_all_still_gets_an_address()
     {
         var geschrieben = await Write(AlsFirma(Guid.CreateVersion7()), "株式会社");
 
@@ -219,7 +219,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>„Noch keins" ist ein Zustand, kein Fehler.</summary>
     [Fact]
-    public async Task Das_eigene_Profil_ist_null_solange_keins_da_ist()
+    public async Task Ones_own_profile_is_null_until_one_exists()
     {
         var response = await AlsFirma(Guid.CreateVersion7()).GetAsync("/companies/me/profile");
 
@@ -232,7 +232,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     /// dann bleibt eine Job anonym.
     /// </summary>
     [Fact]
-    public async Task Oeffentlich_gibt_es_nichts_solange_nichts_angelegt_ist()
+    public async Task Publicly_there_is_nothing_until_something_is_created()
     {
         var response = await _dienst.CreateClient()
             .GetAsync($"/companies/{Guid.CreateVersion7()}/profile");
@@ -243,7 +243,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Ein Kürzel, das es nicht gibt, ist 404 und kein Absturz.</summary>
     [Fact]
-    public async Task Ein_unbekanntes_Kuerzel_ist_404()
+    public async Task An_unknown_slug_is_404()
     {
         var response = await _dienst.CreateClient().GetAsync("/companies/by-slug/gibt-es-nicht");
 
@@ -254,7 +254,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     /// Eine Aussage über den Aufrufer, nicht über ein fremdes Unternehmen.
     /// </summary>
     [Fact]
-    public async Task Eine_Privatperson_schreibt_kein_Arbeitgeberprofil()
+    public async Task A_private_person_writes_no_employer_profile()
     {
         var response = await Write(AlsPerson());
 
@@ -263,7 +263,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Ohne Anmeldung gibt es kein eigenes Profile.</summary>
     [Fact]
-    public async Task Ohne_Token_ist_das_eigene_Profil_401()
+    public async Task Without_a_token_ones_own_profile_is_401()
     {
         var response = await _dienst.CreateClient().GetAsync("/companies/me/profile");
 
@@ -281,19 +281,19 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     /// Schemaprüfung blieb die Reihe grün.
     /// </remarks>
     [Fact]
-    public async Task Nur_http_und_https_kommen_durch()
+    public async Task Only_http_and_https_get_through()
     {
         var browser = AlsFirma(Guid.CreateVersion7());
 
-        var boese = await Write(browser, netzseite: "javascript:alert(1)");
+        var boese = await Write(browser, website: "javascript:alert(1)");
 
         boese.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        var fremdesSchema = await Write(browser, netzseite: "ftp://muster.example/datei");
+        var fremdesSchema = await Write(browser, website: "ftp://muster.example/datei");
 
         fremdesSchema.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        var ohneWirt = await Write(browser, netzseite: "https://");
+        var ohneWirt = await Write(browser, website: "https://");
 
         ohneWirt.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
@@ -304,9 +304,9 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     /// Nichts.
     /// </remarks>
     [Fact]
-    public async Task Ein_leerer_Link_wird_null()
+    public async Task An_empty_link_becomes_null()
     {
-        var geschrieben = await Write(AlsFirma(Guid.CreateVersion7()), netzseite: "   ");
+        var geschrieben = await Write(AlsFirma(Guid.CreateVersion7()), website: "   ");
 
         geschrieben.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(geschrieben)).GetProperty("website").ValueKind
@@ -318,12 +318,12 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     /// „Homeoffice" abgewiesen, obwohl daraus ein Eintrag wird.
     /// </summary>
     [Fact]
-    public async Task Dubletten_zaehlen_nicht_gegen_die_Grenze()
+    public async Task Duplicates_do_not_count_against_the_limit()
     {
         var vieleGleiche = Enumerable.Repeat("Homeoffice", 21).ToArray();
 
         var geschrieben = await Write(
-            AlsFirma(Guid.CreateVersion7()), leistungen: vieleGleiche);
+            AlsFirma(Guid.CreateVersion7()), benefits: vieleGleiche);
 
         geschrieben.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(geschrieben)).GetProperty("benefits").GetArrayLength().Should().Be(1);
@@ -331,18 +331,18 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Einundzwanzig verschiedene Einträge sind zu viele.</summary>
     [Fact]
-    public async Task Mehr_als_zwanzig_Eintraege_werden_abgewiesen()
+    public async Task More_than_twenty_entries_are_refused()
     {
         var vieleVerschiedene = Enumerable.Range(1, 21).Select(n => $"Ort {n}").ToArray();
 
-        var geschrieben = await Write(AlsFirma(Guid.CreateVersion7()), orte: vieleVerschiedene);
+        var geschrieben = await Write(AlsFirma(Guid.CreateVersion7()), locations: vieleVerschiedene);
 
         geschrieben.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     /// <summary>Ein abgelehntes Formular hinterlässt kein halb geändertes Profile.</summary>
     [Fact]
-    public async Task Eine_abgewiesene_Aenderung_aendert_nichts()
+    public async Task A_refused_change_changes_nothing()
     {
         var company = Guid.CreateVersion7();
         var browser = AlsFirma(company);
@@ -366,9 +366,9 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
             .Select(entry => entry.GetString()).Should().Equal("Berlin");
     }
 
-    /// <summary>Ein Anzeigename ist Pflicht — ohne ihn zeigt sich niemand.</summary>
+    /// <summary>Ein DisplayName ist Pflicht — ohne ihn zeigt sich niemand.</summary>
     [Fact]
-    public async Task Ohne_Anzeigenamen_geht_es_nicht()
+    public async Task Without_a_display_name_it_does_not_work()
     {
         var response = await Write(AlsFirma(Guid.CreateVersion7()), "   ");
 
@@ -382,7 +382,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
     /// schreiben könnte.
     /// </remarks>
     [Fact]
-    public async Task Wem_das_Profil_gehoert_steht_im_Token()
+    public async Task Whose_profile_it_is_stands_in_the_token()
     {
         var eine = Guid.CreateVersion7();
         var andere = Guid.CreateVersion7();
@@ -409,7 +409,7 @@ public class ArbeitgeberreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Zwei Speicherungen legen keine zweite Zeile an.</summary>
     [Fact]
-    public async Task Es_gibt_genau_ein_Profil_je_Unternehmen()
+    public async Task There_is_exactly_one_profile_per_company()
     {
         var company = Guid.CreateVersion7();
         var browser = AlsFirma(company);

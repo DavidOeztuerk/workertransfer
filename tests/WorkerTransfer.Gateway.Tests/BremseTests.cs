@@ -16,15 +16,15 @@ using Microsoft.Extensions.Logging;
 namespace WorkerTransfer.Gateway.Tests;
 
 /// <summary>
-/// Die Bremse selbst, ohne Ocelot: was zählt und was nicht.
+/// The rate limiter itself, without Ocelot: what counts and what does not.
 /// </summary>
 /// <remarks>
-/// Ein eigener kleiner Wirt statt der ganzen Landschaft, aus einem Grund, der
-/// hier der eigentliche Punkt ist: <strong>die ProviderOrigin muss verstellbar sein.</strong>
-/// Über einen echten Socket kommt jeder Aufruf von <c>127.0.0.1</c>, und dann
-/// ließe sich nie zeigen, dass zwei Herkünfte getrennte Töpfe haben — der Test
-/// wäre grün, auch wenn die Bremse alle Menschen in einen Topf würfe. Genau
-/// dieser Fehler wäre der schlimme.
+/// A small host of its own instead of the whole landscape, for a reason that is
+/// the actual point here: <strong>the origin has to be adjustable.</strong> Over
+/// a real socket every call comes from <c>127.0.0.1</c>, and then it could never
+/// be shown that two origins have separate buckets — the test would be green
+/// even if the brake threw all people into one bucket. That is exactly the bad
+/// defect.
 /// </remarks>
 public sealed class BremseTests
 {
@@ -50,16 +50,16 @@ public sealed class BremseTests
 
         bau.Services.Configure<DistributedRateLimitingOptions>(einstellungen =>
         {
-            // Wie in der ausgelieferten Karte: keine Vorgabe ueber allem, damit
-            // NUR die genannten Pfade zaehlen.
+            // As in the shipped map: no default over everything, so that ONLY
+            // the named paths count.
             einstellungen.RequestsPerMinute = 0;
             einstellungen.RequestsPerHour = 0;
             einstellungen.RequestsPerDay = 0;
             einstellungen.Subject = RateLimitSubject.Origin;
 
-            // Loopback steht per Vorgabe auf der Ausnahmeliste, und im Test kommt
-            // alles von dort — ohne diese Zeile misst die Probe eine Bremse, die
-            // gar nicht zaehlt.
+            // Loopback stands on the exemption list by default, and in the test
+            // everything comes from there — without this line the probe measures
+            // a brake that does not count at all.
             einstellungen.WhitelistedIps = [];
             einstellungen.WhitelistedEndpoints = [];
             einstellungen.EndpointSpecificLimits = limits;
@@ -67,10 +67,10 @@ public sealed class BremseTests
 
         var wirt = bau.Build();
 
-        // NUR IM TEST: die ProviderOrigin der Connection setzen. Der Erzeuger nimmt
-        // sie aus `Connection.RemoteIpAddress`, und über einen echten Socket
-        // ist das immer dieselbe Schleife. Das steht VOR der Bremse, damit sie
-        // liest, was hier gesetzt wurde.
+        // ONLY IN THE TEST: set the connection's origin. The generator takes it
+        // out of `Connection.RemoteIpAddress`, and over a real socket that is
+        // always the same loopback. This stands BEFORE the brake, so that it
+        // reads what was set here.
         wirt.Use(async (context, weiter) =>
         {
             if (context.Request.Headers.TryGetValue(HerkunftsKopf, out var value))
@@ -82,7 +82,7 @@ public sealed class BremseTests
             await weiter();
         });
 
-        // Dieselbe Reihenfolge wie in `Program.cs`: die Probe zuerst.
+        // The same order as in `Program.cs`: the probe first.
         wirt.UseGesundheit();
         wirt.UseMiddleware<CorrelationIdMiddleware>();
         wirt.UseMiddleware<DistributedRateLimitingMiddleware>();
@@ -110,7 +110,7 @@ public sealed class BremseTests
         new() { BaseAddress = new Uri(wirt.Urls.First()) };
 
     [Fact]
-    public async Task Ueber_der_Grenze_kommt_429()
+    public async Task Above_the_limit_a_429_comes()
     {
         await using var wirt = Wirt(limit: 3);
         await wirt.StartAsync();
@@ -132,17 +132,17 @@ public sealed class BremseTests
     }
 
     /// <summary>
-    /// Die Zusage, um die es geht: <strong>je ProviderOrigin, nie je Adresse.</strong>
+    /// The promise it is all about: <strong>per origin, never per address.</strong>
     /// </summary>
     /// <remarks>
-    /// Fünf Anmeldeversuche mit fünf <em>verschiedenen</em> Adressen aus
-    /// <em>einer</em> ProviderOrigin werden gebremst wie fünf mit derselben. Wäre die
-    /// Adresse Teil des Schlüssels, käme jeder Versuch in einen eigenen Topf und
-    /// niemand würde je gebremst — und die gebremste Antwort verriete außerdem,
-    /// welche Adresse es gibt.
+    /// Five sign-in attempts with five <em>different</em> addresses from
+    /// <em>one</em> origin are braked like five with the same one. If the
+    /// address were part of the key, every attempt would land in a bucket of its
+    /// own and nobody would ever be braked — and the braked answer would on top
+    /// of that reveal which address exists.
     /// </remarks>
     [Fact]
-    public async Task Fuenf_verschiedene_Adressen_aus_einer_Herkunft_teilen_einen_Topf()
+    public async Task Five_different_addresses_from_one_origin_share_a_bucket()
     {
         await using var wirt = Wirt(limit: 3);
         await wirt.StartAsync();
@@ -163,9 +163,9 @@ public sealed class BremseTests
             HttpStatusCode.TooManyRequests);
     }
 
-    /// <summary>Die Gegenrichtung: eine ProviderOrigin sperrt keine andere aus.</summary>
+    /// <summary>The reverse direction: one origin locks out no other.</summary>
     [Fact]
-    public async Task Zwei_Herkuenfte_teilen_sich_keinen_Topf()
+    public async Task Two_origins_do_not_share_a_bucket()
     {
         await using var wirt = Wirt(limit: 2);
         await wirt.StartAsync();
@@ -184,7 +184,7 @@ public sealed class BremseTests
     }
 
     [Fact]
-    public async Task Ein_nicht_gelisteter_Pfad_wird_nie_gebremst()
+    public async Task A_path_that_is_not_listed_is_never_braked()
     {
         await using var wirt = Wirt(limit: 2);
         await wirt.StartAsync();
@@ -198,15 +198,15 @@ public sealed class BremseTests
     }
 
     /// <summary>
-    /// Die gebremste Antwort sagt nichts über ein Konto.
+    /// The braked answer says nothing about an account.
     /// </summary>
     /// <remarks>
-    /// „zu viele Versuche für anna@…" wäre die Aufzählung durch die Hintertür.
-    /// Die Bremse <em>kann</em> das gar nicht sagen, weil sie den Rumpf nie
-    /// liest — dieser Test hält fest, dass das so bleibt.
+    /// "too many attempts for anna@…" would be enumeration through the back
+    /// door. The brake <em>cannot</em> say that at all, because it never reads
+    /// the body — this test pins that it stays that way.
     /// </remarks>
     [Fact]
-    public async Task Die_Abweisung_nennt_kein_Konto()
+    public async Task The_rejection_names_no_account()
     {
         await using var wirt = Wirt(limit: 1);
         await wirt.StartAsync();
@@ -222,9 +222,9 @@ public sealed class BremseTests
 
         var gelesen = JsonDocument.Parse(body).RootElement;
         gelesen.GetProperty("status").GetInt32().Should().Be(429);
-        // Der Wortlaut ist Noelias. Was hier zaehlt, ist die Zusage darueber:
-        // er nennt kein Konto — und kann es nicht, weil die Bremse den Rumpf
-        // nie liest.
+        // The wording is Noelia's. What counts here is the promise above it:
+        // it names no account — and cannot, because the brake never reads the
+        // body.
         gelesen.GetProperty("detail").GetString().Should().NotBeNullOrWhiteSpace();
         gelesen.GetProperty("correlationId").GetString().Should().NotBeNullOrWhiteSpace();
         abgewiesen.Content.Headers.ContentType!.MediaType
@@ -232,7 +232,7 @@ public sealed class BremseTests
     }
 
     [Fact]
-    public async Task Die_Abweisung_sagt_wann_es_wieder_geht()
+    public async Task The_rejection_says_when_it_works_again()
     {
         await using var wirt = Wirt(limit: 1);
         await wirt.StartAsync();
@@ -241,38 +241,38 @@ public sealed class BremseTests
         (await Anmelden(browser, "10.0.0.1")).Dispose();
         using var abgewiesen = await Anmelden(browser, "10.0.0.1");
 
-        // Eine Minute, und die ist nicht mehr verstellbar: Noelia zaehlt in
-        // festen Fenstern (Minute, Stunde, Tag). Die ausgelieferte Karte stand
-        // ohnehin auf einer Minute, also aendert sich im Betrieb nichts.
+        // One minute, and that is no longer adjustable: Noelia counts in fixed
+        // windows (minute, hour, day). The shipped map stood at one minute
+        // anyway, so nothing changes in operation.
         abgewiesen.Headers.GetValues("Retry-After").Single().Should().Be("60");
         abgewiesen.Headers.GetValues("X-RateLimit-Limit").Single().Should().Be("1");
         abgewiesen.Headers.GetValues("X-RateLimit-Remaining").Single().Should().Be("0");
     }
 
-    // `Das_Fenster_laeuft_ab_und_gibt_wieder_frei` stand hier und ist gegangen.
-    // Es fuhr ein Ein-Sekunden-Fenster und wartete 1,5 Sekunden; Noelia zaehlt in
-    // festen Fenstern, also hiesse derselbe Test jetzt eine Minute warten.
+    // `Das_Fenster_laeuft_ab_und_gibt_wieder_frei` stood here and has gone. It
+    // ran a one-second window and waited 1.5 seconds; Noelia counts in fixed
+    // windows, so the same test would now mean waiting a minute.
     //
-    // Die Zusage — eine Bremse ist keine Sperre, sie muss wieder loslassen —
-    // haelt Noelias `RateLimitStoreConformance`, an einem kurzen Fenster und
-    // gegen JEDEN Speicher, auch den von Redis. Dort gehoert sie hin: sie ist
-    // eine Eigenschaft des Zaehlers, nicht unserer Verdrahtung.
+    // The promise — a brake is not a lock, it has to let go again — is held by
+    // Noelia's `RateLimitStoreConformance`, on a short window and against EVERY
+    // store, including Redis's. That is where it belongs: it is a property of
+    // the counter, not of our wiring.
 
     /// <summary>
-    /// Ein mitgebrachter <c>X-Forwarded-For</c> verschiebt den Topf nicht.
+    /// An <c>X-Forwarded-For</c> brought along does not move the bucket.
     /// </summary>
     /// <remarks>
-    /// <strong>Der Test, ohne den die Bremse eine Attrappe wäre.</strong> Diesen
-    /// Header setzt der Aufrufer selbst. Würde die ProviderOrigin daraus gelesen, drehte
-    /// ein Angreifer ihn bei jeder ResumeRequest und wäre nie gebremst — die Bremse
-    /// sähe von außen genauso aus und hielte nichts auf.
+    /// <strong>The test without which the brake would be a dummy.</strong> This
+    /// header is set by the caller themselves. If the origin were read out of
+    /// it, an attacker would turn it on every request and would never be braked
+    /// — the brake would look the same from outside and would stop nothing.
     /// <para>
-    /// Vier Anfragen aus <em>einer</em> Connection mit vier <em>verschiedenen</em>
-    /// erfundenen Weiterleitungsköpfen müssen sich also einen Topf teilen.
+    /// Four requests from <em>one</em> connection with four <em>different</em>
+    /// invented forwarding headers therefore have to share one bucket.
     /// </para>
     /// </remarks>
     [Fact]
-    public async Task Ein_mitgebrachter_Weiterleitungskopf_aendert_den_Topf_nicht()
+    public async Task A_forwarding_header_brought_along_does_not_change_the_bucket()
     {
         await using var wirt = Wirt(limit: 2);
         await wirt.StartAsync();
@@ -299,18 +299,17 @@ public sealed class BremseTests
     }
 
     /// <summary>
-    /// Die Gesundheitsprobe steht vor der Bremse — auch wenn sie in der Karte
-    /// stünde.
+    /// The health probe stands before the brake — even if it stood in the map.
     /// </summary>
     /// <remarks>
-    /// Hier wird <c>/health/live</c> absichtlich MITGEBREMST und muss trotzdem
-    /// vierzigmal antworten: <c>UseGesundheit()</c> steht vor <c>UseBremse()</c>
-    /// und beendet die Kette vorher. Andersherum nähme eine gebremste Probe den
-    /// Behälter aus dem Lastverteiler — die Bremse wäre selbst der Ausfall, und
-    /// zwar genau unter Last.
+    /// Here <c>/health/live</c> is deliberately BRAKED ALONG and must answer
+    /// forty times all the same: <c>UseGesundheit()</c> stands before
+    /// <c>UseBremse()</c> and ends the chain earlier. The other way round a
+    /// braked probe would take the container out of the load balancer — the
+    /// brake would itself be the outage, and precisely under load.
     /// </remarks>
     [Fact]
-    public async Task Die_Gesundheitsprobe_bleibt_ungebremst_selbst_wenn_sie_gelistet_ist()
+    public async Task The_health_probe_stays_unbraked_even_when_it_is_listed()
     {
         await using var wirt = Wirt(limit: 2, auchDieProbe: true);
         await wirt.StartAsync();
@@ -323,20 +322,20 @@ public sealed class BremseTests
         }
     }
 
-    // Drei Tests standen hier und sind mit `Bremse.cs` gegangen: die Gestalt des
-    // Zählerschlüssels, die Zusammenführung von `::ffff:10.0.0.1`, und der
-    // gemeinsame Topf ohne feststellbare ProviderOrigin. Alle drei prüften eine
-    // Umsetzung, die es hier nicht mehr gibt — sie gehören jetzt zu
-    // `ClientAddress` in Noelia und werden dort geprüft.
+    // Three tests stood here and went with `Bremse.cs`: the shape of the
+    // counter key, the merging of `::ffff:10.0.0.1`, and the shared bucket
+    // without a determinable origin. All three checked an implementation that
+    // no longer exists here — they belong to `ClientAddress` in Noelia now and
+    // are checked there.
     //
-    // Die ZUSAGE, die sie trugen, steht weiter oben und stärker: „verschiedene
-    // Adressen aus einer ProviderOrigin teilen einen Topf" fährt fünf echte Anmeldungen
-    // durch das echte Gateway. Ein Schlüssel, der die Adresse enthielte, fiele
-    // dort — ohne dass der Test seine Gestalt kennen müsste.
+    // The PROMISE they carried stands further up and stronger: "different
+    // addresses from one origin share a bucket" drives five real sign-ins
+    // through the real gateway. A key that contained the address would fall
+    // there — without the test having to know its shape.
 
-    /// <summary>Die Zahlen aus der ausgelieferten Karte, nicht aus einer Kopie.</summary>
+    /// <summary>The numbers out of the shipped map, not out of a copy.</summary>
     [Fact]
-    public void Die_ausgelieferte_Karte_bremst_genau_die_fuenf_Auth_Pfade()
+    public void The_shipped_map_brakes_exactly_the_five_auth_paths()
     {
         var pfade = Bremskarte.Pfade();
 
@@ -352,43 +351,43 @@ public sealed class BremseTests
     }
 
     /// <summary>
-    /// Die drei Vorgaben stehen auf 0 — und daran hängt alles.
+    /// The three defaults stand at 0 — and everything hangs on that.
     /// </summary>
     /// <remarks>
-    /// Eine Vorgabe legt einen Zähler für JEDEN Pfad an. Durch dieses Gateway
-    /// läuft auch die ganze Oberfläche, also zählte dann jeder Bildabruf mit,
-    /// und die fünf Auth-Grenzen wären nur noch die zusätzliche Verschärfung
-    /// darüber. Genau diese Form war der Grund, warum hier jahrelang eine eigene
-    /// Bremse stand — bis jemand nachgemessen hat, dass 0 sie abschaltet.
+    /// A default writes a counter for EVERY path. The whole interface travels
+    /// through this gateway too, so every asset fetch would then count along,
+    /// and the five auth limits would only be the additional tightening above
+    /// it. Exactly this shape was the reason a hand-written brake stood here for
+    /// years — until somebody measured that 0 switches it off.
     /// </remarks>
     [Fact]
-    public void Die_ausgelieferte_Karte_hat_keine_Vorgabe_ueber_allem() =>
+    public void The_shipped_map_has_no_default_over_everything() =>
         Bremskarte.Vorgaben().Should().AllSatisfy(defaultValue => defaultValue.Should().Be(0));
 
     /// <summary>
-    /// Die ausgelieferte Karte multipliziert nichts.
+    /// The shipped map multiplies nothing.
     /// </summary>
     /// <remarks>
-    /// <c>LimitMultiplier</c> ist Luft für den Prüfstand und wird in
-    /// <c>docker-compose.yml</c> gesetzt, nirgends sonst. Stünde er in der
-    /// Karte, gälten die Zahlen daneben nicht mehr — und niemand würde es
-    /// merken, weil die Bremse weiter antwortet, nur später.
+    /// <c>LimitMultiplier</c> is headroom for the test bench and is set in
+    /// <c>docker-compose.yml</c>, nowhere else. If it stood in the map, the
+    /// numbers beside it would no longer apply — and nobody would notice,
+    /// because the brake goes on answering, only later.
     /// </remarks>
     [Fact]
-    public void Die_ausgelieferte_Karte_multipliziert_nichts() =>
+    public void The_shipped_map_multiplies_nothing() =>
         Bremskarte.Multiplikator().Should().Be(1);
 
     /// <summary>
-    /// Jeder gebremste Pfad ist auch eine Route.
+    /// Every braked path is also a route.
     /// </summary>
     /// <remarks>
-    /// Sonst bremst eine Zeile etwas, das es nicht gibt — und niemand merkt es,
-    /// weil ein Tippfehler im Pfad genau so aussieht wie eine Bremse, die nie
-    /// greift. Der umgekehrte Fall braucht keinen Test: eine Route ohne Bremse
-    /// ist der Normalfall.
+    /// Otherwise a line brakes something that does not exist — and nobody
+    /// notices, because a typo in the path looks exactly like a brake that never
+    /// bites. The reverse case needs no test: a route without a brake is the
+    /// normal case.
     /// </remarks>
     [Fact]
-    public void Jeder_gebremste_Pfad_hat_eine_Route()
+    public void Every_braked_path_has_a_route()
     {
         var pfade = Bremskarte.Pfade();
         var routen = Bremskarte.Routen();
@@ -408,7 +407,7 @@ public sealed class BremseTests
             return true;
         }
 
-        // `/auth/{rest}` deckt `/auth/login` ab.
+        // `/auth/{rest}` covers `/auth/login`.
         var klammer = route.IndexOf('{', StringComparison.Ordinal);
 
         return klammer > 0
@@ -417,7 +416,7 @@ public sealed class BremseTests
     }
 }
 
-/// <summary>Liest die ausgelieferte <c>ocelot.json</c>.</summary>
+/// <summary>Reads the shipped <c>ocelot.json</c>.</summary>
 internal static class Bremskarte
 {
     private static JsonElement Wurzel()
@@ -430,11 +429,11 @@ internal static class Bremskarte
     }
 
     /// <summary>
-    /// Die gebremsten Pfade und ihre Grenzen, aus Noelias Section.
+    /// The braked paths and their limits, out of Noelia's section.
     /// </summary>
     /// <remarks>
-    /// Gelesen statt gebaut: was hier steht, ist genau das, was der Behälter
-    /// bindet. Ein Test gegen eine eigene Kopie prüfte seine eigene Kopie.
+    /// Read rather than built: what stands here is exactly what the container
+    /// binds. A test against a copy of its own would check its own copy.
     /// </remarks>
     public static IReadOnlyDictionary<string, int> Pfade()
     {
@@ -448,7 +447,7 @@ internal static class Bremskarte
     }
 
     /// <summary>
-    /// Die drei Vorgaben. Sie MÜSSEN 0 sein — sonst zählt jeder Pfad mit.
+    /// The three defaults. They MUST be 0 — otherwise every path counts along.
     /// </summary>
     public static IReadOnlyList<int> Vorgaben()
     {
@@ -462,7 +461,7 @@ internal static class Bremskarte
         ];
     }
 
-    /// <summary>Der Multiplikator, sofern die Karte einen nennt.</summary>
+    /// <summary>The multiplier, if the map names one.</summary>
     public static int Multiplikator()
     {
         var abschnitt = Wurzel().GetProperty(DistributedRateLimitingOptions.SectionName);
@@ -476,28 +475,28 @@ internal static class Bremskarte
 }
 
 /// <summary>
-/// Die Bremse im ausgelieferten Gateway, nicht in einem Wirt für sie allein.
+/// The brake in the shipped gateway, not in a host of its own.
 /// </summary>
 /// <remarks>
-/// Der Wirt oben prüft die Regel, diese Reihe prüft die <em>Verdrahtung</em>:
-/// steht sie in <c>Program.cs</c> überhaupt in der Kette, liest sie die
-/// ausgelieferte Karte, und liegt sie an der richtigen Job? Das ist eine
-/// andere Frage, und beide sind schon einmal einzeln falsch gewesen.
+/// The host above checks the rule, this suite checks the <em>wiring</em>: does
+/// it stand in the chain in <c>Program.cs</c> at all, does it read the shipped
+/// map, and does it lie in the right place? That is a different question, and
+/// both have been wrong individually at one time or another.
 /// <para>
-/// Own Landschaft (<see cref="GebremsteLandschaft"/>), weil hier Grenzen
-/// absichtlich ausgeschöpft werden.
+/// A landscape of its own (<see cref="GebremsteLandschaft"/>), because limits
+/// are deliberately exhausted here.
 /// </para>
 /// </remarks>
 [Collection(BremsSammlung.Name)]
 public class GebremstesGatewayTests(GebremsteLandschaft landschaft)
 {
     /// <summary>
-    /// `/auth/resend-verification` ist mit 3 die engste Grenze der Karte — und
-    /// sie ist die richtige dafür: der Endpunkt verschickt eine MAIL an eine
-    /// Adresse, die dem Aufrufer nicht gehören muss.
+    /// At 3, `/auth/resend-verification` is the tightest limit of the map — and
+    /// it is the right one for it: the endpoint sends a MAIL to an address that
+    /// need not belong to the caller.
     /// </summary>
     [Fact]
-    public async Task Die_ausgelieferte_Kette_bremst_wirklich()
+    public async Task The_shipped_chain_really_brakes()
     {
         var gesehen = new List<HttpStatusCode>();
 
@@ -512,9 +511,9 @@ public class GebremstesGatewayTests(GebremsteLandschaft landschaft)
         gesehen.Count(s => s == HttpStatusCode.OK).Should().Be(3);
     }
 
-    /// <summary>Ein gewöhnlicher Pfad bleibt ungebremst, auch oft aufgerufen.</summary>
+    /// <summary>An ordinary path stays unbraked, even when called often.</summary>
     [Fact]
-    public async Task Ein_Pfad_ohne_Eintrag_laeuft_durch()
+    public async Task A_path_without_an_entry_runs_through()
     {
         for (var i = 0; i < 40; i++)
         {

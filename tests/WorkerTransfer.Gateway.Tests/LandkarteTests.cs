@@ -3,17 +3,16 @@ using FluentAssertions;
 
 namespace WorkerTransfer.Gateway.Tests;
 
-/// <summary>Wohin welche Adresse zeigt — gemessen, nicht gelesen.</summary>
+/// <summary>Where which address points — measured, not read.</summary>
 /// <remarks>
-/// Die Landkarte ist der ganze Dienst. Sie zu prüfen, indem man sie liest, ist
-/// dasselbe, wie sie zu schreiben; deshalb läuft hier das echte Gateway mit der
-/// ausgelieferten Datei vor elf Attrappen, und jede Zeile ist eine Frage an
-/// eine echte Adresse.
+/// The route map is the whole service. Checking it by reading it is the same as
+/// writing it; that is why the real gateway runs here with the shipped file in
+/// front of eleven fakes, and every line is a question to a real address.
 /// </remarks>
 [Collection(LandschaftsSammlung.Name)]
 public class LandkarteTests(Landschaft landschaft)
 {
-    /// <summary>Die Regelfälle: ein Präfix, ein Dienst.</summary>
+    /// <summary>The ordinary cases: one prefix, one service.</summary>
     [Theory]
     [InlineData("/auth/login", "identity")]
     [InlineData("/me", "identity")]
@@ -39,7 +38,7 @@ public class LandkarteTests(Landschaft landschaft)
     [InlineData("/notifications/me", "notification")]
     [InlineData("/assessments", "assessment")]
     [InlineData("/assessments/me", "assessment")]
-    public async Task Eine_Adresse_landet_bei_ihrem_Dienst(string path, string erwartet)
+    public async Task An_address_lands_at_its_service(string path, string erwartet)
     {
         var (service, angekommen) = await landschaft.Frage(path);
 
@@ -47,18 +46,18 @@ public class LandkarteTests(Landschaft landschaft)
         angekommen.Should().Be(path, "der Pfad wird durchgereicht, nicht umgeschrieben");
     }
 
-    /// <summary>Der abgeloeste Pfad trifft keinen Dienst mehr.</summary>
+    /// <summary>The superseded path no longer hits a service.</summary>
     /// <remarks>
-    /// <c>/candidates</c> war bis zum 11.09.2026 die Kandidatenliste und ist mit
-    /// dem Umzug der Oberflaeche gefallen (ADR-0036). Diese Reihe ist die
-    /// Gegenprobe zur Zeile in <c>docs/routenkarte.yml</c>: dort steht 404 in
-    /// allen vier Spalten, und hier steht, dass wirklich keine Route mehr
-    /// dahintersteht — nicht etwa eine, die nur gerade nichts antwortet.
+    /// <c>/candidates</c> was the candidate list until 11.09.2026 and fell with
+    /// the move of the interface (ADR-0036). This suite is the counter-probe to
+    /// the row in <c>docs/routenkarte.yml</c>: there 404 stands in all four
+    /// columns, and here it stands that really no route is behind it any more —
+    /// not merely one that happens to answer nothing right now.
     /// </remarks>
     [Theory]
     [InlineData("/candidates")]
     [InlineData("/candidates/7f000001-0000-0000-0000-000000000000")]
-    public async Task Der_abgeloeste_Pfad_trifft_keinen_Dienst_mehr(string path)
+    public async Task The_superseded_path_no_longer_hits_a_service(string path)
     {
         var (service, _) = await landschaft.Frage(path);
 
@@ -66,10 +65,10 @@ public class LandkarteTests(Landschaft landschaft)
     }
 
     /// <summary>
-    /// Die Ausnahmen: Adressen, die sich erst im letzten Segment unterscheiden.
+    /// The exceptions: addresses that differ only in the last segment.
     /// </summary>
     /// <remarks>
-    /// Das ist die Job, an der ein Gateway ohne Prioritäten falsch liegt.
+    /// This is the place where a gateway without priorities gets it wrong.
     /// </remarks>
     [Theory]
     [InlineData("/jobs/7f000001-0000-0000-0000-000000000000/applications", "applications")]
@@ -79,7 +78,7 @@ public class LandkarteTests(Landschaft landschaft)
     [InlineData("/companies/by-slug/muster-gmbh", "companies")]
     [InlineData("/companies/7f000001-0000-0000-0000-000000000000/profile", "companies")]
     [InlineData("/me/notification-preferences", "notification")]
-    public async Task Die_genauere_Regel_gewinnt(string path, string erwartet)
+    public async Task The_more_precise_rule_wins(string path, string erwartet)
     {
         var (service, _) = await landschaft.Frage(path);
 
@@ -87,25 +86,24 @@ public class LandkarteTests(Landschaft landschaft)
     }
 
     /// <summary>
-    /// Ein Dienst-zu-Dienst-Eingang erreicht von außen nie den Dienst, der ihn
-    /// umsetzt.
+    /// A service-to-service entrance never reaches the service that implements
+    /// it from outside.
     /// </summary>
     /// <remarks>
-    /// Alle drei liegen hinter einem gemeinsamen Geheimnis. Über den
-    /// öffentlichen Ursprung erreichbar wären sie „lösche alles über diesen
-    /// Menschen", bewacht von einem Header.
+    /// All three lie behind a shared secret. Reachable over the public origin
+    /// they would be "delete everything about this person", guarded by a header.
     /// <para>
-    /// Geprüft wird deshalb nicht „keine Route", sondern das, was wirklich
-    /// zugesagt ist: <strong>der Besitzer sieht die ResumeRequest nicht.</strong> Der
-    /// Unterschied ist bei <c>/companies/withdrawal</c> zu sehen — ohne eigene
-    /// Route fällt der Pfad auf <c>/companies/{rest}</c> und landet bei
-    /// identity-service, das ihn nicht kennt und mit 404 antwortet. Das ist
-    /// genau richtig: kein Handler läuft, und die Antwort bestätigt nichts. Es
-    /// „keine Route" zu nennen wäre eine Zusage, die die Landkarte nicht gibt.
+    /// What is checked is therefore not "no route" but what is really promised:
+    /// <strong>the owner does not see the request.</strong> The difference can
+    /// be seen at <c>/companies/withdrawal</c> — without a route of its own the
+    /// path falls onto <c>/companies/{rest}</c> and lands at identity-service,
+    /// which does not know it and answers with a 404. That is exactly right: no
+    /// handler runs, and the answer confirms nothing. Calling it "no route"
+    /// would be a promise the map does not give.
     /// </para>
     /// </remarks>
     [Theory]
-    // `/erasure` setzen acht Dienste um — keiner darf es sehen.
+    // Eight services implement `/erasure` — none of them may see it.
     [InlineData("/internal/notifications", "notification")]
     [InlineData("/erasure", "consent")]
     [InlineData("/erasure", "profile")]
@@ -116,11 +114,11 @@ public class LandkarteTests(Landschaft landschaft)
     [InlineData("/erasure", "github")]
     [InlineData("/erasure", "notification")]
     [InlineData("/internal/notify", "identity")]
-    // State bis D2 mit Priorität 100 in der Landkarte und antwortete öffentlich
-    // mit 401 — womit es bestätigte, dass es den Endpunkt gibt. Gebraucht wurde
-    // die Route nie: identity-service ruft jobs-service direkt an.
+    // Until D2 it stood in the map with priority 100 and answered publicly
+    // with a 401 — thereby confirming that the endpoint exists. The route was
+    // never needed: identity-service calls jobs-service directly.
     [InlineData("/companies/withdrawal", "jobs")]
-    public async Task Ein_Diensteingang_erreicht_seinen_Besitzer_nicht(
+    public async Task A_service_entrance_does_not_reach_its_owner(
         string path, string besitzer)
     {
         var (service, _) = await landschaft.Frage(path);
@@ -128,13 +126,13 @@ public class LandkarteTests(Landschaft landschaft)
         service.Should().NotBe(besitzer);
     }
 
-    /// <summary>Die Gesundheitsproben beantwortet das Gateway selbst.</summary>
+    /// <summary>The gateway answers the health probes itself.</summary>
     /// <remarks>
-    /// Sonst kippte ein einzelner kranker Dienst das Gateway aus dem
-    /// Lastverteiler und nähme die anderen neun mit.
+    /// Otherwise a single sick service would tip the gateway out of the load
+    /// balancer and take the other nine with it.
     /// </remarks>
     [Fact]
-    public async Task Die_Gesundheitsprobe_wird_nicht_weitergereicht()
+    public async Task The_health_probe_is_not_passed_on()
     {
         using var response = await landschaft.Browser.GetAsync("/health/live");
 
@@ -142,21 +140,21 @@ public class LandkarteTests(Landschaft landschaft)
         (await response.Content.ReadAsStringAsync()).Should().Contain("live");
     }
 
-    /// <summary>Jede ResumeRequest bekommt eine Kennung, bevor sie sich aufteilt.</summary>
+    /// <summary>Every request gets an id before it branches.</summary>
     [Fact]
-    public async Task Ohne_Kennung_wird_eine_vergeben()
+    public async Task Without_an_id_one_is_granted()
     {
         using var response = await landschaft.Browser.GetAsync("/jobs");
 
         response.Headers.GetValues(CorrelationId.HeaderName).Single().Should().NotBeEmpty();
     }
 
-    /// <summary>Eine mitgebrachte Kennung wird durchgereicht, nicht überschrieben.</summary>
+    /// <summary>An id that was brought along is passed on, not overwritten.</summary>
     /// <remarks>
-    /// Sie kommt dann von einem Aufrufer, der schon eine Kette führt.
+    /// It then comes from a caller that already keeps a chain.
     /// </remarks>
     [Fact]
-    public async Task Eine_mitgebrachte_Kennung_bleibt()
+    public async Task An_id_that_was_brought_along_stays()
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "/jobs");
         request.Headers.TryAddWithoutValidation(CorrelationId.HeaderName, "meine-kette");

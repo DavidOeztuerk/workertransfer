@@ -18,7 +18,7 @@ namespace WorkerTransfer.Companies.Tests;
 public class ProfilregelnTests
 {
     private static EmployerProfile Profile() =>
-        EmployerProfile.Lege_an(
+        EmployerProfile.Create(
             new TenantId(Guid.CreateVersion7()),
             "muster",
             "Erste Fassung",
@@ -33,22 +33,22 @@ public class ProfilregelnTests
     /// hinterlassen.
     /// </summary>
     [Fact]
-    public void Eine_abgewiesene_Aenderung_laesst_das_Aggregat_unberuehrt()
+    public void A_refused_change_leaves_the_aggregate_untouched()
     {
         var profile = Profile();
 
-        var attempt = () => profile.Aendere(
+        var attempt = () => profile.Change(
             "Zweite Fassung", "Ganz anders.", "ftp://muster.example",
             ["Hamburg"], ["Dienstrad"], DateTimeOffset.UnixEpoch.AddDays(1));
 
-        attempt.Should().Throw<Linkfehler>();
+        attempt.Should().Throw<LinkError>();
 
-        profile.Anzeigename.Should().Be("Erste Fassung");
-        profile.UeberUns.Should().Be("Über uns.");
-        profile.Netzseite.Should().Be("https://muster.example");
-        profile.Orte.Should().Equal("Berlin");
-        profile.Leistungen.Should().Equal("Homeoffice");
-        profile.GeaendertAm.Should().Be(DateTimeOffset.UnixEpoch);
+        profile.DisplayName.Should().Be("Erste Fassung");
+        profile.About.Should().Be("Über uns.");
+        profile.Website.Should().Be("https://muster.example");
+        profile.Locations.Should().Equal("Berlin");
+        profile.Benefits.Should().Equal("Homeoffice");
+        profile.ChangedAt.Should().Be(DateTimeOffset.UnixEpoch);
     }
 
     /// <summary>Das Kürzel hat keinen Weg, sich zu ändern.</summary>
@@ -58,7 +58,7 @@ public class ProfilregelnTests
     /// das ist der Punkt, an dem ein geteilter Link zu brechen beginnt.
     /// </remarks>
     [Fact]
-    public void Das_Kuerzel_hat_keinen_Setzer()
+    public void The_slug_has_no_setter()
     {
         typeof(EmployerProfile)
             .GetProperty(nameof(EmployerProfile.Slug))!
@@ -73,7 +73,7 @@ public class ProfilregelnTests
     [InlineData("株式会社", Slug.Rueckfall)]
     [InlineData("", Slug.Rueckfall)]
     [InlineData("---", Slug.Rueckfall)]
-    public void Aus_dem_Namen_wird_ein_Kuerzel(string name, string erwartet)
+    public void A_name_becomes_a_slug(string name, string erwartet)
     {
         Slug.Aus(name).Should().Be(erwartet);
     }
@@ -84,7 +84,7 @@ public class ProfilregelnTests
     /// Trennstrich endet, ergäbe <c>marke--2</c>.
     /// </remarks>
     [Fact]
-    public void Ein_abgeschnittenes_Kuerzel_endet_nicht_auf_einem_Trennstrich()
+    public void A_truncated_slug_does_not_end_on_a_hyphen()
     {
         var sehrLang = string.Join(" ", Enumerable.Repeat("wort", 40));
 

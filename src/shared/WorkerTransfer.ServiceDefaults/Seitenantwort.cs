@@ -4,42 +4,40 @@ namespace WorkerTransfer.ServiceDefaults;
 
 /// <summary>One page of a list, with everything a pager needs to draw itself.</summary>
 /// <remarks>
-/// <strong>Seitennummern statt Cursor, und das ist ein Tausch mit einem Preis.</strong>
-/// Ein Cursor (`cursor`) ist stabil, wenn zwischen zwei Seiten etwas eingefügt
-/// wird — eine Seitennummer nicht: erscheint eine neue Anzeige, rutscht auf
-/// Seite 2 ein Eintrag von Seite 1 nach. Dafür kann eine Seitennummer etwas,
-/// das ein Cursor nicht kann: <em>springen</em>. Wer „Seite 7 von 14" sehen und
-/// direkt dorthin will, braucht eine Gesamtzahl, und die gibt es nur mit einem
-/// zweiten Zählen.
+/// <strong>Page numbers instead of a cursor, and that is a trade with a price.</strong>
+/// A cursor (`cursor`) is stable when something is inserted between two pages —
+/// a page number is not: if a new advert appears, an entry from page 1 slips
+/// down onto page 2. In return a page number can do something a cursor cannot:
+/// <em>jump</em>. Whoever wants to see "page 7 of 14" and go straight there
+/// needs a total, and there is no total without counting a second time.
 /// <para>
-/// Für eine Stellenliste ist das der richtige Tausch: sie ändert sich in
-/// Minuten, nicht in Sekunden, und „wie viele gibt es überhaupt" ist die Frage,
-/// die jeder zuerst stellt.
+/// For a job list that is the right trade: it changes in minutes, not in
+/// seconds, and "how many are there at all" is the question everybody asks
+/// first.
 /// </para>
 /// <para>
-/// <strong>Die Gesamtzahl zählt ANZEIGEN, keine Menschen.</strong> Auf einer
-/// Kandidatenliste wäre dieselbe Zahl eine Aussage über Personen, und die
-/// verbietet ADR-0026. Wer diesen Umschlag dort benutzt, lässt
-/// <see cref="Gesamt"/> weg und schaltet auf <see cref="HatWeiter"/> zurück.
+/// <strong>The total counts ADVERTS, not people.</strong> On a candidate list
+/// the same number would be a statement about persons, and ADR-0026 forbids
+/// that. Whoever uses this envelope there leaves <see cref="Gesamt"/> out and
+/// falls back on <see cref="HatWeiter"/>.
 /// </para>
 /// </remarks>
-/// <typeparam name="T">Was auf der Seite steht.</typeparam>
-/// <param name="Items">Die Einträge dieser Seite, in der Reihenfolge der Abfrage.</param>
-/// <param name="Seite">Die aktuelle Seite, 1-basiert. Menschen zählen ab eins.</param>
-/// <param name="Seitengroesse">Wie viele Einträge angefragt wurden.</param>
-/// <param name="Gesamt">Wie viele Einträge es insgesamt gibt.</param>
+/// <typeparam name="T">What stands on the page.</typeparam>
+/// <param name="Items">The entries of this page, in the order of the query.</param>
+/// <param name="Seite">The current page, 1-based. People count from one.</param>
+/// <param name="Seitengroesse">How many entries were asked for.</param>
+/// <param name="Gesamt">How many entries there are in total.</param>
 /// <param name="Ausgelassen">
-/// Wie viele Einträge ein Filter <em>nicht beurteilen konnte</em> und deshalb
-/// weggelassen hat. <c>null</c>, wenn die Frage sich nicht stellte — dann steht
-/// das Feld auch nicht in der Antwort.
+/// How many entries a filter <em>could not judge</em> and therefore left out.
+/// <c>null</c> when the question did not arise — then the field does not stand
+/// in the answer either.
 /// <para>
-/// <strong>Es steht hier, damit die Oberfläche es sagen KANN.</strong> Ein
-/// Filter, der einen Teil der Menge nicht beurteilen kann, liefert sonst ein
-/// Ergebnis, das vollständig aussieht und es nicht ist — dieselbe Lüge durch
-/// Auslassen, die ADR-0022 §3 verbietet. Der erste Anwendungsfall ist die
-/// Umkreissuche nach Jobs: Anzeigen mit unbekanntem Ort fallen heraus, und
-/// wer „25 km um mich" wählt, muss erfahren, dass darüber nicht geurteilt
-/// wurde.
+/// <strong>It stands here so that the interface CAN say it.</strong> A filter
+/// that cannot judge part of the set otherwise delivers a result that looks
+/// complete and is not — the same lie by omission that ADR-0022 §3 forbids. The
+/// first use is the radius search for jobs: adverts with an unknown location
+/// fall out, and whoever chooses "25 km around me" has to learn that no
+/// judgement was made about those.
 /// </para>
 /// </param>
 public sealed record PageResponse<T>(
@@ -51,57 +49,56 @@ public sealed record PageResponse<T>(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     int? Ausgelassen = null)
 {
-    /// <summary>Wie viele Seiten es gibt. Mindestens eine, auch bei null Einträgen.</summary>
+    /// <summary>How many pages there are. At least one, even with zero entries.</summary>
     /// <remarks>
-    /// Eine leere Liste hat EINE Seite und nicht null: „Seite 1 von 0" ist eine
-    /// Aussage, die niemand lesen kann, und ein Pager mit null Seiten hat keinen
-    /// Zustand, den er zeichnen könnte.
+    /// An empty list has ONE page and not zero: "page 1 of 0" is a statement
+    /// nobody can read, and a pager with zero pages has no state it could draw.
     /// </remarks>
     [JsonPropertyName("total_pages")]
     public int Seiten => Math.Max(1, (int)Math.Ceiling(Gesamt / (double)Math.Max(1, Seitengroesse)));
 
-    /// <summary>Gibt es eine Seite danach?</summary>
+    /// <summary>Is there a page after this one?</summary>
     [JsonPropertyName("has_next")]
     public bool HatWeiter => Seite < Seiten;
 
-    /// <summary>Gibt es eine Seite davor?</summary>
+    /// <summary>Is there a page before this one?</summary>
     [JsonPropertyName("has_previous")]
     public bool HatZurueck => Seite > 1;
 }
 
-/// <summary>Liest Seite und Seitengrösse aus einer Abfrage — an einer Job.</summary>
+/// <summary>Reads page and page size out of a query — in one place.</summary>
 /// <remarks>
-/// <strong>Die Grenzen sind hier und nicht im Endpunkt.</strong> Ein
-/// <c>page_size=100000</c> ist keine ResumeRequest, sondern ein Weg, die Datenbank zu
-/// beschäftigen; und drei Endpunkte, die sich ihre eigene Obergrenze ausdenken,
-/// haben drei verschiedene.
+/// <strong>The limits are here and not in the endpoint.</strong> A
+/// <c>page_size=100000</c> is not a request but a way of keeping the database
+/// busy; and three endpoints that invent their own ceiling have three different
+/// ones.
 /// <para>
-/// Unsinn wird zur Vorgabe und nicht zu einem Fehler: eine Liste, die auf
-/// <c>?page=abc</c> mit 400 antwortet, ist an einer Job streng, an der
-/// niemand etwas gewinnt.
+/// Nonsense becomes the default and not an error: a list that answers
+/// <c>?page=abc</c> with a 400 is strict in a place where nobody gains
+/// anything.
 /// </para>
 /// </remarks>
 public static class PageSelection
 {
-    /// <summary>Wie viele Einträge, wenn niemand etwas sagt.</summary>
+    /// <summary>How many entries when nobody says anything.</summary>
     /// <remarks>
-    /// Zwölf, weil eine Kartenliste in zwei, drei und vier Spalten aufgeht —
-    /// zehn oder zwanzig lassen in der letzten Zeile eine Lücke.
+    /// Twelve, because a card list divides evenly into two, three and four
+    /// columns — ten or twenty leave a gap in the last row.
     /// </remarks>
     public const int VorgabeGroesse = 12;
 
-    /// <summary>Die Obergrenze. Darüber ist es kein Blättern mehr.</summary>
+    /// <summary>The ceiling. Above it, it is no longer paging.</summary>
     public const int HoechsteGroesse = 96;
 
-    /// <summary>Die Seite, 1-basiert. Unsinn wird 1.</summary>
-    /// <param name="roh">Was in der Abfrage stand.</param>
-    /// <returns>Eine Seitennummer ab 1.</returns>
+    /// <summary>The page, 1-based. Nonsense becomes 1.</summary>
+    /// <param name="roh">What stood in the query.</param>
+    /// <returns>A page number from 1 upwards.</returns>
     public static int Seite(string? roh) =>
         int.TryParse(roh, out var value) && value > 0 ? value : 1;
 
-    /// <summary>Die Seitengrösse, begrenzt. Unsinn wird die Vorgabe.</summary>
-    /// <param name="roh">Was in der Abfrage stand.</param>
-    /// <returns>Eine Grösse zwischen 1 und <see cref="HoechsteGroesse"/>.</returns>
+    /// <summary>The page size, capped. Nonsense becomes the default.</summary>
+    /// <param name="roh">What stood in the query.</param>
+    /// <returns>A size between 1 and <see cref="HoechsteGroesse"/>.</returns>
     public static int Groesse(string? roh) =>
         int.TryParse(roh, out var value) && value > 0
             ? Math.Min(value, HoechsteGroesse)

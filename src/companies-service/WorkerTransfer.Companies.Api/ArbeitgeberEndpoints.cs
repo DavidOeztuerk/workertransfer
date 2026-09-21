@@ -172,15 +172,15 @@ public static class EmployerEndpoints
     private static EmployerProfileV1 Antwort(EmployerProfile profile) =>
         new(profile.Firma.Value,
             profile.Slug,
-            profile.Anzeigename,
-            profile.UeberUns,
-            profile.Netzseite,
-            profile.Orte,
-            profile.Leistungen,
-            profile.Zeile1,
-            profile.Postleitzahl,
-            profile.Ort,
-            profile.Land,
-            profile.Telefon,
-            profile.GeaendertAm);
+            profile.DisplayName,
+            profile.About,
+            profile.Website,
+            profile.Locations,
+            profile.Benefits,
+            profile.Line1,
+            profile.PostalCode,
+            profile.City,
+            profile.Country,
+            profile.Phone,
+            profile.ChangedAt);
 }

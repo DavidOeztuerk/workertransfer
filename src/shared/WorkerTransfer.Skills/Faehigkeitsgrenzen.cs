@@ -1,25 +1,25 @@
 namespace WorkerTransfer.Skills;
 
-/// <summary>Die eine Zahl, über die zwei Dienste sich einig sein müssen.</summary>
+/// <summary>The one number two services have to agree on.</summary>
 /// <remarks>
-/// <c>profile-service</c> und <c>jobs-service</c> führen jeweils ihre eigene
-/// Fähigkeitenliste — so will es die Sharing-Regel, denn wie viele Einträge
-/// eine Liste trägt, ist eine Entscheidung des Dienstes, dem sie gehört. Ein
-/// Profile hält dreißig, eine Job zwanzig, und das ist in Ordnung.
+/// <c>profile-service</c> and <c>jobs-service</c> each keep their own skill
+/// list — the sharing rule wants it that way, because how many entries a list
+/// carries is a decision of the service that owns it. A profile holds thirty, a
+/// job twenty, and that is fine.
 /// <para>
-/// <b>Die Länge ist es nicht.</b> Der Abgleich findet im Browser statt: dürfte
-/// eine Ausschreibung eine Anforderung nennen, die länger ist, als eine Person
-/// sie überhaupt eintragen kann, wäre sie garantiert nie ein Hit — eine
-/// Zeile in der Liste, die für niemanden je ein Haken werden kann.
+/// <b>The length is not.</b> The comparison happens in the browser: if an
+/// advert were allowed to name a requirement longer than a person can enter at
+/// all, it would be guaranteed never to be a hit — a line in the list that can
+/// never become a tick for anybody.
 /// </para>
 /// <para>
-/// Der Python-Dienst hielt das mit einem Test zusammen, der beide Konstanten
-/// importierte. Hier ist es <em>eine</em> Konstante: die zwei können nicht mehr
-/// auseinanderlaufen, weil es nichts gibt, was auseinanderlaufen könnte.
+/// The Python service held that together with a test importing both constants.
+/// Here it is <em>one</em> constant: the two can no longer drift apart, because
+/// there is nothing that could drift.
 /// </para>
 /// </remarks>
 public static class SkillLimits
 {
-    /// <summary>Wie lang eine einzelne Fähigkeit sein darf.</summary>
+    /// <summary>How long a single skill may be.</summary>
     public const int Hoechstlaenge = 50;
 }

@@ -13,42 +13,41 @@ using Microsoft.Extensions.Logging;
 namespace WorkerTransfer.Gateway.Tests;
 
 /// <summary>
-/// Die Abweisung der Bremse trägt Sicherheitsköpfe — und sonst legt das
-/// Gateway keine über fremde Responses.
+/// The rate limiter's rejection carries security headers — and otherwise the
+/// gateway lays none over foreign responses.
 /// </summary>
 /// <remarks>
-/// <para><strong>Beide Hälften sind teuer bezahlt.</strong> Ein Prüfbericht
-/// meldete, Gateway-eigene Responses trügen keine Sicherheitsköpfe. Das stimmte
-/// für die 429 der Bremse — sie ist eine gewöhnliche Antwort an einen
-/// gewöhnlichen Aufrufer und kommt bei jemandem an, der nie einen Dienst
-/// erreicht hat.</para>
+/// <para><strong>Both halves were paid for dearly.</strong> An audit report
+/// stated that the gateway's own responses carried no security headers. That
+/// was true for the rate limiter's 429 — it is an ordinary answer to an
+/// ordinary caller and arrives at somebody who never reached a service.</para>
 ///
-/// <para><strong>Der erste Versuch, das zu beheben, machte die Oberfläche
-/// kaputt.</strong> Noelias <c>UseSecurityHeaders()</c> vor die ganze Kette
-/// gehängt legt seine Köpfe auch über alles <em>Durchgereichte</em> — und
-/// bringt eine CSP mit <c>script-src 'self'</c> und
-/// <c>upgrade-insecure-requests</c> mit. Gemessen im Browser: weisse Seite.
-/// Vites Modul-Einstieg ist inline und seine Worker sind <c>blob:</c>, beides
-/// von der CSP verboten; und <c>upgrade-insecure-requests</c> schrieb
-/// <c>http://localhost:8090/…</c> auf <c>https://</c> um, wo niemand hört —
-/// im Browserprotokoll als „TLS-Fehler" für <c>main.tsx</c> und
-/// <c>config.js</c>.</para>
+/// <para><strong>The first attempt to fix it broke the interface.</strong>
+/// Noelia's <c>UseSecurityHeaders()</c> hung in front of the whole chain lays
+/// its headers over everything <em>passed through</em> as well — and brings a
+/// CSP with <c>script-src 'self'</c> and <c>upgrade-insecure-requests</c> with
+/// it. Measured in the browser: a white page. Vite's module entry is inline and
+/// its workers are <c>blob:</c>, both forbidden by the CSP; and
+/// <c>upgrade-insecure-requests</c> rewrote <c>http://localhost:8090/…</c> to
+/// <c>https://</c>, where nobody listens — in the browser log as a "TLS error"
+/// for <c>main.tsx</c> and <c>config.js</c>.</para>
 ///
-/// <para>Deshalb sitzen die Köpfe jetzt <strong>an der Abweisung selbst</strong>
-/// und nicht als Stufe darüber. Das Gateway beantwortet fast nichts selbst; was
-/// es durchreicht, gehört dem Dienst dahinter, und dessen Köpfe sind seine
-/// Sache. Eine CSP ist für einen JSON-Rumpf ohnehin bedeutungslos.</para>
+/// <para>That is why the headers now sit <strong>on the rejection
+/// itself</strong> and not as a stage above it. The gateway answers almost
+/// nothing itself; what it passes through belongs to the service behind it, and
+/// that service's headers are its own business. A CSP is meaningless for a JSON
+/// body anyway.</para>
 ///
-/// <para>Die zweite Prüfung unten ist die wichtigere: sie hält fest, dass eine
-/// durchgereichte Antwort <em>keine</em> CSP vom Gateway bekommt. Ohne sie
-/// könnte derselbe Fehler beim nächsten Aufräumen zurückkommen, und er sähe
-/// von aussen aus wie eine Verbesserung.</para>
+/// <para>The second check below is the more important one: it pins that a
+/// passed-through answer gets <em>no</em> CSP from the gateway. Without it the
+/// same defect could come back at the next tidy-up, and from the outside it
+/// would look like an improvement.</para>
 /// </remarks>
 public sealed class SicherheitskoepfeTests
 {
     private const string HerkunftsKopf = "X-Test-Herkunft";
 
-    /// <summary>Der Wirt, in derselben Reihenfolge wie <c>Program.cs</c>.</summary>
+    /// <summary>The host, in the same order as <c>Program.cs</c>.</summary>
     private static WebApplication Wirt()
     {
         var bau = WebApplication.CreateBuilder();
@@ -85,8 +84,8 @@ public sealed class SicherheitskoepfeTests
 
         wirt.UseMiddleware<DistributedRateLimitingMiddleware>();
 
-        // Steht für das, was Ocelot sonst durchreicht: eine fremde Seite, die
-        // ihre eigenen Köpfe mitbringt (oder eben keine).
+        // Stands for what Ocelot otherwise passes through: a foreign page that
+        // brings its own headers with it (or precisely none).
         wirt.Run(async context =>
         {
             context.Response.ContentType = "text/html";
@@ -103,7 +102,7 @@ public sealed class SicherheitskoepfeTests
                 wirt.Urls.First(u => u.StartsWith("http://", StringComparison.Ordinal)))
         };
 
-    /// <summary>Zweimal anmelden bei einer Grenze von eins — die zweite ist die 429.</summary>
+    /// <summary>Signing in twice at a limit of one — the second one is the 429.</summary>
     private static async Task<HttpResponseMessage> Abgewiesen(WebApplication wirt, string herkunft)
     {
         using var browser = Browser(wirt);
@@ -116,9 +115,9 @@ public sealed class SicherheitskoepfeTests
         return await browser.PostAsync("/auth/login", zweiter);
     }
 
-    /// <summary>Die Abweisung trägt die zwei Köpfe, die für sie zählen.</summary>
+    /// <summary>The rejection carries the two headers that matter for it.</summary>
     [Fact]
-    public async Task Die_Abweisung_traegt_die_Koepfe()
+    public async Task The_rejection_carries_the_headers()
     {
         await using var wirt = Wirt();
         await wirt.StartAsync();
@@ -131,11 +130,11 @@ public sealed class SicherheitskoepfeTests
     }
 
     /// <summary>
-    /// Eine durchgereichte Antwort bekommt vom Gateway KEINE CSP — sonst ist
-    /// die Oberfläche weiss.
+    /// A passed-through answer gets NO CSP from the gateway — otherwise the
+    /// interface is white.
     /// </summary>
     [Fact]
-    public async Task Durchgereichtes_bekommt_keine_CSP_vom_Gateway()
+    public async Task What_is_passed_through_gets_no_CSP_from_the_gateway()
     {
         await using var wirt = Wirt();
         await wirt.StartAsync();

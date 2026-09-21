@@ -4,25 +4,25 @@ using Noelia.Infrastructure.Sovereignty;
 namespace WorkerTransfer.Ganzes.Tests;
 
 /// <summary>
-/// Was Noelias Egress-Politik mit UNSEREN Adressen macht — gemessen, bevor sie
-/// irgendwo registriert wird.
+/// What Noelia's egress policy does with OUR addresses — measured before it is
+/// registered anywhere.
 /// </summary>
 /// <remarks>
-/// <para><strong>Der Grund für diese Reihe ist ein Beinahe-Ausfall.</strong>
-/// <c>AddSovereignPlatform</c> hängt <c>EgressGuardHandler</c> an <em>jeden</em>
-/// Klienten aus der <c>IHttpClientFactory</c>, und der Wächter <em>weist ab</em>
-/// statt zu protokollieren. Unsere Dienste rufen einander unter Containernamen
-/// — <c>http://consent-service:8002</c>, nicht unter einer IP. Die Vorgabe
-/// erlaubt „loopback und RFC1918"; ob ein <em>Name</em> darunter fällt,
-/// entscheidet über die halbe Plattform und steht in keiner Zusammenfassung.
+/// <para><strong>The reason for this suite is a near outage.</strong>
+/// <c>AddSovereignPlatform</c> hangs <c>EgressGuardHandler</c> on <em>every</em>
+/// client from the <c>IHttpClientFactory</c>, and the guard <em>refuses</em>
+/// instead of logging. Our services call each other under container names —
+/// <c>http://consent-service:8002</c>, not under an IP. The default allows
+/// "loopback and RFC1918"; whether a <em>name</em> falls under that decides
+/// about half the platform and stands in no summary.
 /// </para>
-/// <para>Deshalb steht die Antwort hier als Messung und nicht als Annahme —
-/// und sie bleibt stehen, damit eine spätere Noelia-Fassung sie nicht
-/// stillschweigend ändert.</para>
+/// <para>That is why the answer stands here as a measurement and not as an
+/// assumption — and it stays, so that a later Noelia version does not change it
+/// silently.</para>
 /// </remarks>
 public sealed class EgressTests
 {
-    /// <summary>Die Vorgabe, wie <c>AddSovereignPlatform</c> sie baut.</summary>
+    /// <summary>The default as <c>AddSovereignPlatform</c> builds it.</summary>
     private static IEgressPolicy Vorgabe() =>
         Gebaut(bauer => bauer.AllowLoopback().AllowPrivateNetworks());
 
@@ -35,35 +35,34 @@ public sealed class EgressTests
     }
 
     /// <summary>
-    /// <strong>Ein Containername ist weder Loopback noch RFC1918.</strong>
+    /// <strong>A container name is neither loopback nor RFC1918.</strong>
     /// </summary>
     /// <remarks>
-    /// Wenn diese Reihe rot wird, weil die Namen plötzlich <em>erlaubt</em>
-    /// sind, ist das keine gute Nachricht: dann trifft die Politik auf einmal
-    /// Namen, die sie nicht auflösen kann, und erlaubt damit mehr als
-    /// beabsichtigt.
+    /// If this suite goes red because the names are suddenly <em>allowed</em>,
+    /// that is no good news: the policy would then be hitting names it cannot
+    /// resolve, and allowing more than intended.
     /// </remarks>
     [Theory]
     [InlineData("http://consent-service:8002/consent/check")]
     [InlineData("http://identity-service:8001/auth/session")]
     [InlineData("http://notification-service:8010/notifications/send")]
-    public void Ein_Containername_faellt_nicht_unter_die_Vorgabe(string address)
+    public void A_container_name_does_not_fall_under_the_default(string address)
     {
         Vorgabe().IsAllowed(new Uri(address)).Should().BeFalse(
             "sonst reichte die Vorgabe fuer Dienst-zu-Dienst-Verkehr, und der "
             + "Test unten waere ueberfluessig");
     }
 
-    /// <summary>Namentlich erlaubt, und dann geht es.</summary>
+    /// <summary>Allowed by name, and then it works.</summary>
     /// <remarks>
-    /// Das ist der Weg, den WorkerTransfer nehmen muss: jeder Dienst nennt die
-    /// Hosts, die er wirklich ruft. Die Liste darf dabei nicht von Hand
-    /// gepflegt werden — sie steht schon in der EnvironmentFile
-    /// (<c>Consent__Adresse</c>, <c>Jobs__Adresse</c>, …), und eine zweite
-    /// Liste daneben wäre die, die als Erste veraltet.
+    /// That is the path WorkerTransfer has to take: every service names the
+    /// hosts it really calls. The list must not be maintained by hand in doing
+    /// so — it already stands in the environment (<c>Consent__Adresse</c>,
+    /// <c>Jobs__Adresse</c>, …), and a second list beside it would be the one to
+    /// go stale first.
     /// </remarks>
     [Fact]
-    public void Namentlich_erlaubt_geht_durch()
+    public void What_is_allowed_by_name_goes_through()
     {
         var politik = Gebaut(bauer => bauer
             .AllowLoopback()
@@ -75,40 +74,39 @@ public sealed class EgressTests
         politik.IsAllowed(new Uri("https://api.anthropic.com/v1/messages"))
             .Should().BeTrue();
 
-        // Und was nicht genannt ist, bleibt draussen — das ist der ganze Zweck.
+        // And what is not named stays out — that is the whole purpose.
         politik.IsAllowed(new Uri("https://telemetrie.beispiel.test/v1/traces"))
             .Should().BeFalse();
     }
 
     /// <summary>
-    /// <strong>Die zwei Ziele, die wirklich nach draußen gehen.</strong>
+    /// <strong>The two destinations that really go outside.</strong>
     /// </summary>
     /// <remarks>
-    /// GitHub und der Entwurfsanbieter sind die einzigen Hosts außerhalb des
-    /// eigenen Netzes, die dieses System ruft. Beide müssen genannt werden,
-    /// sonst stirbt der Nachweis einer GitHub-Connection und das Anschreiben
-    /// mit „Anbieter antwortet nicht" — einer Meldung, die nach einem Ausfall
-    /// bei GitHub aussieht und keiner ist.
+    /// GitHub and the draft provider are the only hosts outside our own network
+    /// that this system calls. Both have to be named, otherwise the proof of a
+    /// GitHub connection and the cover letter die with "provider does not
+    /// answer" — a message that looks like an outage at GitHub and is none.
     /// </remarks>
     [Theory]
     [InlineData("https://api.github.com/users/anna/repos")]
     [InlineData("https://api.anthropic.com/v1/messages")]
-    public void Die_zwei_Aussenziele_brauchen_eine_Nennung(string address)
+    public void The_two_outside_destinations_need_to_be_named(string address)
     {
         Vorgabe().IsAllowed(new Uri(address)).Should().BeFalse();
     }
 
-    /// <summary>Eine IP aus dem Privatbereich fällt sehr wohl unter die Vorgabe.</summary>
+    /// <summary>A private-range IP does fall under the default.</summary>
     /// <remarks>
-    /// Die Gegenprobe zur ersten Reihe: die Vorgabe ist nicht kaputt, sie
-    /// versteht nur Namen nicht. Ohne diese Hälfte könnte der obige Befund auch
-    /// heißen „die Politik erlaubt gar nichts".
+    /// The counter-probe to the first suite: the default is not broken, it
+    /// simply does not understand names. Without this half the finding above
+    /// could also mean "the policy allows nothing at all".
     /// </remarks>
     [Theory]
     [InlineData("http://127.0.0.1:8002/consent/check")]
     [InlineData("http://10.0.0.5:8002/consent/check")]
     [InlineData("http://192.168.1.20:5432/")]
-    public void Eine_private_Adresse_faellt_darunter(string address)
+    public void A_private_address_falls_under_it(string address)
     {
         Vorgabe().IsAllowed(new Uri(address)).Should().BeTrue();
     }

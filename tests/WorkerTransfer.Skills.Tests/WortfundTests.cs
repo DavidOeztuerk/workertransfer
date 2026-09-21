@@ -4,26 +4,26 @@ using WorkerTransfer.Skills;
 namespace WorkerTransfer.Skills.Tests;
 
 /// <summary>
-/// Der TermFinder sucht, was der Vocabulary kennt — und rät nie.
+/// The term finder searches for what the vocabulary knows — and never guesses.
 /// </summary>
 /// <remarks>
-/// <para>Die Reihe hält beide Hälften fest, und die zweite ist die wichtigere:
-/// ein Finder, der auch fündig wird, wo nichts steht, ist schlimmer als keiner.
-/// Er böte einem Menschen ein Wort über sich selbst an, das in seinem Reference
-/// nie stand — und das Reference liest niemand nach.</para>
+/// <para>The suite pins both halves, and the second is the more important one:
+/// a finder that also finds something where nothing stands is worse than none.
+/// It would offer a human being a word about themselves that never stood in
+/// their reference — and nobody looks the reference up.</para>
 ///
-/// <para>Deshalb steht neben jeder Zusage ihre Gegenprobe: „MIG/MAG" wird
-/// gefunden, „Schweissen" daraus nicht gefolgert; „WIG" wird gefunden, das
-/// englische „wig" nicht.</para>
+/// <para>Beside every promise therefore stands its counter-probe: "MIG/MAG" is
+/// found, "Schweissen" is not inferred from it; "WIG" is found, the English
+/// "wig" is not.</para>
 /// </remarks>
 public class WortfundTests
 {
-    /// <summary>Die Schreibweise aus dem Reference, der kanonische Name zurück.</summary>
+    /// <summary>The spelling out of the reference, the canonical name back.</summary>
     /// <remarks>
-    /// Der Fall, um dessentwillen es diese Funktion gibt: im Reference steht die
-    /// Schreibweise ohne Eszett, im Profile soll der Name stehen, den auch eine
-    /// Job nennt. Genau das ist eine Aussage über <em>Sprache</em> und
-    /// erlaubt (ADR-0023).
+    /// The case this function exists for: in the reference the spelling without
+    /// an eszett stands, in the profile the name should stand that a job names
+    /// too. That is precisely a statement about <em>language</em> and permitted
+    /// (ADR-0023).
     /// </remarks>
     [Theory]
     [InlineData("Herr Meier ist geprüfter Schweissfachmann.", "Schweißfachmann")]
@@ -33,120 +33,121 @@ public class WortfundTests
     [InlineData("Ausbildung zur Pflegefachfrau abgeschlossen.", "Pflegefachkraft")]
     [InlineData("Der Gabelstaplerschein liegt vor.", "Staplerschein")]
     [InlineData("Arbeitete mit postgres und node.", "PostgreSQL")]
-    public void Eine_bekannte_Schreibweise_wird_zu_ihrem_Namen(string text, string name) =>
+    public void A_known_spelling_becomes_its_name(string text, string name) =>
         TermFinder.Find(text).Should().Contain(name);
 
     /// <summary>
-    /// <strong>Aus „MIG/MAG" folgt kein „Schweißen".</strong>
+    /// <strong>From "MIG/MAG" no "Schweißen" follows.</strong>
     /// </summary>
     /// <remarks>
-    /// Die Gegenprobe zur Verlockung, nicht die Bestätigung der Funktion —
-    /// dasselbe Paar wie <c>Aus_React_folgt_kein_JavaScript</c> im Vocabulary,
-    /// nur an der Job, an der es schwerer zu halten ist: wer einen Text
-    /// durchsucht, hat die verwandten Wörter buchstäblich vor sich.
+    /// The counter-probe to the temptation, not the confirmation of the
+    /// function — the same pair as <c>From_React_no_JavaScript_follows</c> in
+    /// the vocabulary, only in the place where it is harder to keep: whoever
+    /// searches a text has the related words literally in front of them.
     /// </remarks>
     [Fact]
-    public void Aus_einem_Fund_folgt_kein_zweites_Wort() =>
+    public void From_one_term_no_second_word_follows() =>
         TermFinder.Find("Beherrscht MIG/MAG.").Should().Equal("MIG/MAG");
 
-    /// <summary>Ein Wort im Wortinneren ist kein Fund.</summary>
+    /// <summary>A word inside another word is not a term.</summary>
     /// <remarks>
-    /// Ohne Wortgrenze fände „SPS" sich in jedem Text mit dieser Buchstabenfolge
-    /// und „go" in „gogo". Der Bindestrich dagegen IST eine Grenze: in
-    /// „SPS-Programmierung" steht SPS.
+    /// Without a word boundary "SPS" would find itself in every text with that
+    /// sequence of letters and "go" in "gogo". The hyphen, by contrast, IS a
+    /// boundary: in "SPS-Programmierung" SPS stands.
     /// </remarks>
     [Theory]
     [InlineData("Die Abkürzung stand mitten in ASPSPS drin.")]
     [InlineData("Er hat rechtzeitig und sorgfältig gearbeitet.")]
-    public void Ein_Wortinneres_ist_kein_Fund(string text) =>
+    public void The_inside_of_a_word_is_not_a_term(string text) =>
         TermFinder.Find(text).Should().BeEmpty();
 
-    /// <summary>Ein Bindestrich trennt, er verbirgt nicht.</summary>
+    /// <summary>A hyphen separates, it does not hide.</summary>
     [Fact]
-    public void Ein_Bindestrich_ist_eine_Wortgrenze() =>
+    public void A_hyphen_is_a_word_boundary() =>
         TermFinder.Find("Erfahrung in der SPS-Programmierung.").Should().Equal("SPS");
 
     /// <summary>
-    /// <strong>Kurze Kürzel nur in Grossbuchstaben.</strong>
+    /// <strong>Short abbreviations only in capitals.</strong>
     /// </summary>
     /// <remarks>
-    /// „wig" ist im Englischen eine Perücke, „go" ein alltägliches Verb. Ein
-    /// falscher Vorschlag ist hier teurer als ein fehlender: er bietet einem
-    /// Menschen ein Wort über sich selbst an, das in seinem Dokument nie stand.
+    /// "wig" is a hairpiece in English, "go" an everyday verb. A wrong
+    /// suggestion is more expensive here than a missing one: it offers a human
+    /// being a word about themselves that never stood in their document.
     /// </remarks>
     [Theory]
     [InlineData("She was wearing a wig at the ceremony.")]
     [InlineData("Please go to the office and ask.")]
-    public void Ein_kurzes_Kuerzel_in_Kleinschreibung_ist_kein_Fund(string text) =>
+    public void A_short_abbreviation_in_lower_case_is_not_a_term(string text) =>
         TermFinder.Find(text).Should().BeEmpty();
 
-    /// <summary>Die Gegenhälfte — sonst hiesse der Befund oben „es trifft gar nichts".</summary>
+    /// <summary>The other half — otherwise the finding above would mean "nothing hits at all".</summary>
     [Theory]
     [InlineData("Schweissverfahren WIG und Autogen.", "WIG")]
     [InlineData("Programmierung von CNC-Maschinen.", "CNC")]
-    public void Dasselbe_Kuerzel_in_Versalien_ist_ein_Fund(string text, string name) =>
+    public void The_same_abbreviation_in_capitals_is_a_term(string text, string name) =>
         TermFinder.Find(text).Should().Contain(name);
 
-    /// <summary>Ein Zeichen im Namen hebt die Versalregel auf.</summary>
+    /// <summary>A character in the name lifts the capitals rule.</summary>
     /// <remarks>
-    /// „c#" und „k8s" sind auch kleingeschrieben unverwechselbar — die Regel
-    /// oben schützt gegen Buchstabenfolgen, die zufällig auch Wörter sind, und
-    /// diese hier sind keine.
+    /// "c#" and "k8s" are unmistakable in lower case too — the rule above
+    /// protects against letter sequences that happen to be words as well, and
+    /// these are not.
     /// </remarks>
     [Theory]
     [InlineData("Programmiert in c# seit 2019.", "C#")]
     [InlineData("Betrieb auf k8s.", "Kubernetes")]
-    public void Ein_Kuerzel_mit_Sonderzeichen_gilt_in_jeder_Schreibung(string text, string name) =>
+    public void An_abbreviation_with_a_special_character_counts_in_any_casing(string text, string name) =>
         TermFinder.Find(text).Should().Contain(name);
 
-    /// <summary>Der längere Name gewinnt gegen das kürzere Stück in ihm.</summary>
+    /// <summary>The longer name wins against the shorter piece inside it.</summary>
     /// <remarks>
-    /// Ohne diese Reihenfolge fände „MySQL" sich in „Microsoft SQL Server"
-    /// nicht — aber das kürzere Fenster gewönne, und der längere Name käme nie
-    /// zum Zug. Gesucht wird deshalb vom längsten Fenster abwärts.
+    /// Without this order "MySQL" would not find itself inside "Microsoft SQL
+    /// Server" — but the shorter window would win, and the longer name would
+    /// never get its turn. The search therefore runs from the longest window
+    /// downwards.
     /// </remarks>
     [Fact]
-    public void Der_laengere_Name_gewinnt() =>
+    public void The_longer_name_wins() =>
         TermFinder.Find("Betrieb von Microsoft SQL Server.").Should().Equal("Microsoft SQL Server");
 
-    /// <summary>Ein Zeilenumbruch mitten im Namen trennt ihn nicht.</summary>
+    /// <summary>A line break in the middle of a name does not split it.</summary>
     /// <remarks>
-    /// In einem gesetzten Dokument steht irgendwann zwischen jedem Wortpaar ein
-    /// Umbruch. „Erste Hilfe" fände sich sonst selbst nicht.
+    /// In a typeset document a break eventually stands between every pair of
+    /// words. "Erste Hilfe" would otherwise not find itself.
     /// </remarks>
     [Fact]
-    public void Ein_Umbruch_im_Namen_trennt_ihn_nicht() =>
+    public void A_line_break_inside_a_name_does_not_split_it() =>
         TermFinder.Find("Teilnahme am Kurs\n  Erste\nHilfe   im Betrieb.").Should().Equal("Erste Hilfe");
 
-    /// <summary>Jeder Name einmal, in der Reihenfolge seines ersten Vorkommens.</summary>
+    /// <summary>Every name once, in the order of its first occurrence.</summary>
     /// <remarks>
-    /// Eine Reihenfolge über <em>Wörter</em> in <em>einem</em> Dokument. Eine
-    /// Zahl entsteht daraus nirgends, und aus ihr folgt keine Rangfolge über
-    /// irgendjemanden (ADR-0022).
+    /// An order over <em>words</em> in <em>one</em> document. Nowhere does a
+    /// number come out of it, and no ranking over anybody follows from it
+    /// (ADR-0022).
     /// </remarks>
     [Fact]
-    public void Jeder_Name_einmal_in_der_Reihenfolge_des_Textes() =>
+    public void Every_name_once_in_the_order_of_the_text() =>
         TermFinder.Find("CNC, dann SPS, dann nochmal CNC und zuletzt WIG.")
             .Should().Equal("CNC", "SPS", "WIG");
 
-    /// <summary>Was der Vocabulary nicht kennt, wird nicht gefunden.</summary>
+    /// <summary>What the vocabulary does not know is not found.</summary>
     /// <remarks>
-    /// <strong>Und das ist die Grenze, nicht die Lücke.</strong> „Bohrwerksdreher"
-    /// ist ein echter Beruf; ihn hier zu erfinden hiesse, aus der Gestalt eines
-    /// Wortes zu schliessen, es sei eine Fähigkeit. Wer ihn vermisst, erweitert
-    /// den Vocabulary per Pull Request — er wird nie aus den Unterlagen von
-    /// Menschen gelernt.
+    /// <strong>And that is the boundary, not the gap.</strong>
+    /// "Bohrwerksdreher" is a real trade; inventing it here would mean
+    /// concluding from the shape of a word that it is a skill. Whoever misses it
+    /// extends the vocabulary by pull request — it is never learnt from people's
+    /// documents.
     /// </remarks>
     [Fact]
-    public void Ein_unbekanntes_Wort_wird_nicht_erfunden() =>
+    public void An_unknown_word_is_not_invented() =>
         TermFinder.Find("Er arbeitete als Bohrwerksdreher und Rohrleitungsbauer.")
             .Should().BeEmpty();
 
-    /// <summary>Kein Text, kein Fund — und kein Fehler.</summary>
+    /// <summary>No text, no term — and no error.</summary>
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   \n\t ")]
-    public void Ohne_Text_gibt_es_nichts_zu_finden(string? text) =>
+    public void Without_text_there_is_nothing_to_find(string? text) =>
         TermFinder.Find(text).Should().BeEmpty();
 }

@@ -4,42 +4,42 @@ using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.ServiceDefaults.Checks;
 
-/// <summary>Was ein Dienst in der Löschkaskade ist.</summary>
+/// <summary>What a service is in the erasure cascade.</summary>
 /// <remarks>
-/// Drei Rollen und nicht zwei. <see cref="Empfaenger"/> und
-/// <see cref="Unbeteiligt"/> liegen nahe; <see cref="Ursprung"/> ist der, den
-/// eine zweiwertige Frage falsch beantwortet hätte: identity-service steht
-/// nicht in <c>ErasureRecipient.Fremde</c> — es <em>ist</em> die Kaskade —, und
-/// „nicht auf der Liste“ hieße dort fälschlich „hält nichts über einen
-/// Menschen“.
+/// Three roles and not two. <see cref="Empfaenger"/> and
+/// <see cref="Unbeteiligt"/> suggest themselves; <see cref="Ursprung"/> is the
+/// one a two-valued question would have answered wrongly: identity-service does
+/// not stand in <c>ErasureRecipient.Fremde</c> — it <em>is</em> the cascade —,
+/// and "not on the list" would there wrongly mean "holds nothing about a human
+/// being".
 /// </remarks>
 public enum ErasureRole
 {
-    /// <summary>Er stößt die Kaskade an und fällt zuletzt selbst.</summary>
+    /// <summary>It sets the cascade going and falls last itself.</summary>
     Ursprung,
 
-    /// <summary>Er hält Zeilen über Menschen und quittiert.</summary>
+    /// <summary>It holds rows about people and acknowledges.</summary>
     Empfaenger,
 
-    /// <summary>Er hält nichts über eine natürliche Person.</summary>
+    /// <summary>It holds nothing about a natural person.</summary>
     Unbeteiligt
 }
 
-/// <summary>Kann die Löschkaskade wirken, und was bleibt danach als Evidence?</summary>
+/// <summary>Can the erasure cascade work, and what remains afterwards as evidence?</summary>
 /// <remarks>
-/// <para><strong>Was hier gemessen wird, sieht kein Test.</strong>
-/// <c>LoeschempfaengerTests</c> prüft die <em>Liste</em> gegen die EF-Modelle,
-/// und zwar gut: kein Dienst kann still eine Personentabelle bekommen und von
-/// der Liste fehlen. Was ein Test nicht wissen kann, ist, ob die Türen
-/// <em>dieser Instanz</em> offen sind und ob der Ursprung jede Adresse kennt.
-/// Beides steht in der EnvironmentFile, beides ist je EnvironmentFile anders, und beides
-/// scheitert lautlos: eine Löschung ohne Quittung bleibt offen, und offen sieht
-/// von außen aus wie „läuft noch“.</para>
+/// <para><strong>What is measured here, no test sees.</strong>
+/// <c>LoeschempfaengerTests</c> checks the <em>list</em> against the EF models,
+/// and does it well: no service can silently grow a table about people and be
+/// missing from the list. What a test cannot know is whether the doors of
+/// <em>this instance</em> are open and whether the origin knows every address.
+/// Both stand in the environment, both differ per environment, and both fail
+/// silently: an erasure without an acknowledgement stays open, and from the
+/// outside open looks like "still running".</para>
 ///
-/// <para><strong>Deshalb <see cref="Stand.Fehlt"/> und kein Hinweis.</strong>
-/// Die Löschzusage ist die eine in diesem Baum, bei der „im Zweifel zu“ und „im
-/// Zweifel eingelöst“ auseinanderfallen: die Tür im Zweifel zu zu halten ist
-/// richtig entschieden — und genau dann ist die Zusage nicht eingelöst.</para>
+/// <para><strong>That is why <see cref="SecurityCheckStatus.Fail"/> and not a
+/// hint.</strong> The erasure promise is the one in this tree where "shut in
+/// doubt" and "redeemed in doubt" come apart: keeping the door shut in doubt is
+/// decided correctly — and precisely then the promise is not redeemed.</para>
 /// </remarks>
 public sealed class ErasureCheck : ISecurityCheck
 {
@@ -66,37 +66,37 @@ public sealed class ErasureCheck : ISecurityCheck
         _bekannt = bekannt;
     }
 
-    /// <summary>Ein Dienst, den ein Löschauftrag erreichen muss.</summary>
-    /// <param name="dienstname">Wie er in der Empfängerliste heißt.</param>
-    /// <param name="tuerEingerichtet">Ob das Löschgeheimnis in dieser Instanz gesetzt ist.</param>
-    /// <param name="pruefspurVorhanden">Ob eine Prüfspur in derselben Transaktion schreibt.</param>
-    /// <returns>Die Prüfung.</returns>
+    /// <summary>A service an erasure order has to reach.</summary>
+    /// <param name="dienstname">How it is called in the recipient list.</param>
+    /// <param name="tuerEingerichtet">Whether the erasure secret is set in this instance.</param>
+    /// <param name="pruefspurVorhanden">Whether an audit trail writes in the same transaction.</param>
+    /// <returns>The check.</returns>
     public static ErasureCheck AlsEmpfaenger(
         string dienstname, bool tuerEingerichtet, bool pruefspurVorhanden) =>
         new(dienstname, ErasureRole.Empfaenger, tuerEingerichtet, pruefspurVorhanden, [], []);
 
-    /// <summary>Der Dienst, der die Kaskade anstößt.</summary>
+    /// <summary>The service that sets the cascade going.</summary>
     /// <remarks>
-    /// <strong>Die Frage ist hier eine andere</strong>, und sie ist die
-    /// schärfste im ganzen Bereich: kennt der Ursprung für <em>jeden</em>
-    /// Empfänger eine Adresse? Ein Empfänger ohne Adresse bekommt keinen
-    /// Auftrag; die Kaskade wartet dann auf eine Quittung, die niemand
-    /// angefordert hat — und das ist von „der Empfänger antwortet gerade nicht“
-    /// nicht zu unterscheiden.
+    /// <strong>The question is a different one here</strong>, and it is the
+    /// sharpest in the whole area: does the origin know an address for
+    /// <em>every</em> recipient? A recipient without an address gets no order;
+    /// the cascade then waits for an acknowledgement nobody asked for — and
+    /// that is indistinguishable from "the recipient is not answering right
+    /// now".
     /// </remarks>
-    /// <param name="dienstname">Wie er sich nennt.</param>
-    /// <param name="erwartet">Die Empfängerliste (<c>ErasureRecipient.Fremde</c>).</param>
-    /// <param name="bekannt">Wofür in dieser Instanz eine Adresse konfiguriert ist.</param>
-    /// <returns>Die Prüfung.</returns>
+    /// <param name="dienstname">What it calls itself.</param>
+    /// <param name="erwartet">The recipient list (<c>ErasureRecipient.Fremde</c>).</param>
+    /// <param name="bekannt">What an address is configured for in this instance.</param>
+    /// <returns>The check.</returns>
     public static ErasureCheck AlsUrsprung(
         string dienstname,
         IReadOnlyList<string> erwartet,
         IReadOnlyList<string> bekannt) =>
         new(dienstname, ErasureRole.Ursprung, true, false, erwartet, bekannt);
 
-    /// <summary>Ein Dienst ohne eine einzige Zeile über eine natürliche Person.</summary>
-    /// <param name="dienstname">Wie er sich nennt.</param>
-    /// <returns>Die Prüfung.</returns>
+    /// <summary>A service without a single row about a natural person.</summary>
+    /// <param name="dienstname">What it calls itself.</param>
+    /// <returns>The check.</returns>
     public static ErasureCheck OhneZeilen(string dienstname) =>
         new(dienstname, ErasureRole.Unbeteiligt, false, false, [], []);
 
@@ -107,7 +107,7 @@ public sealed class ErasureCheck : ISecurityCheck
     public NoeliaModule Module => NoeliaModule.Composition;
 
     /// <inheritdoc />
-    /// <remarks>Auswahlregel — siehe <c>ProviderCheck</c>.</remarks>
+    /// <remarks>Selection rule — see <c>ProviderCheck</c>.</remarks>
     public SecurityCheckCategory Category => SecurityCheckCategory.Composition;
 
     /// <inheritdoc />

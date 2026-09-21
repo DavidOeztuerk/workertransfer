@@ -1,39 +1,39 @@
 namespace WorkerTransfer.ServiceDefaults.Roles;
 
-/// <summary>Was jemand in einem Unternehmen ist.</summary>
+/// <summary>What somebody is in a company.</summary>
 /// <remarks>
-/// Zwei Rollen und ein „nichts", mehr kennt die Mitgliedschaftstabelle. Es gibt
-/// bewusst keine dritte Rolle und keine Vererbung: jede weitere wäre eine
-/// Entscheidung darüber, wer wen aussperren kann, und die gehört nicht in eine
-/// Aufzählung, sondern in ein ADR.
+/// Two roles and a "nothing" — the membership table knows no more. There is
+/// deliberately no third role and no inheritance: every further one would be a
+/// decision about who can lock out whom, and that does not belong in an
+/// enumeration but in an ADR.
 /// </remarks>
 public enum CompanyRole
 {
-    /// <summary>Gehört nicht dazu — oder das Unternehmen gibt es nicht.</summary>
+    /// <summary>Does not belong to it — or the company does not exist.</summary>
     /// <remarks>
-    /// Die beiden sind absichtlich derselbe Wert. Der Unterschied wäre eine
-    /// Auskunft darüber, welche Unternehmen es gibt.
+    /// The two are deliberately the same value. The difference would be a
+    /// disclosure about which companies exist.
     /// </remarks>
     None,
 
-    /// <summary>Darf für das Unternehmen handeln.</summary>
+    /// <summary>May act for the company.</summary>
     Mitglied,
 
-    /// <summary>Darf ausserdem binden: einladen, entfernen, veröffentlichen, anbieten.</summary>
+    /// <summary>May also bind: invite, remove, publish, offer.</summary>
     Admin
 }
 
-/// <summary>Die Schreibweise, in der die Rolle über den Draht reist.</summary>
+/// <summary>The spelling in which the role travels over the wire.</summary>
 /// <remarks>
-/// Dieselben Wörter wie in der Mitgliedschaftstabelle (<c>admin</c>,
-/// <c>member</c>). Eine zweite Schreibweise unterwegs wäre die Job, an der
-/// ein Tippfehler still zu „kein Admin" wird — und ein stiller Rechteverlust
-/// sieht aus wie eine richtige Ablehnung.
+/// The same words as in the membership table (<c>admin</c>, <c>member</c>). A
+/// second spelling on the way would be the place where a typo silently becomes
+/// "not an admin" — and a silent loss of permission looks like a correct
+/// refusal.
 /// </remarks>
 public static class RoleNames
 {
-    /// <summary>Liest, was identity-service geschrieben hat.</summary>
-    /// <param name="roh">Das Wort vom Draht, oder <c>null</c>.</param>
+    /// <summary>Reads what identity-service wrote.</summary>
+    /// <param name="roh">The word off the wire, or <c>null</c>.</param>
     public static CompanyRole Lies(string? roh) => roh switch
     {
         "admin" => CompanyRole.Admin,

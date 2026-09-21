@@ -5,28 +5,28 @@ using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.ServiceDefaults.Checks;
 
-/// <summary>Steht zwischen der Frage an den Ledger und dem Ledger noch etwas?</summary>
+/// <summary>Does anything else stand between the question and the ledger?</summary>
 /// <remarks>
-/// <para><strong>Sie überlebt den Umstieg, weil Noelia den Ledger nicht
-/// kennt.</strong> <c>noelia.revocation.*</c> misst Noelias eigene
-/// Widerrufsliste für Token; der Einwilligungsledger dieses Produkts ist ein
-/// Dienst mit einer eigenen Zusage (ADR-0013): ein Revocation muss beim NÄCHSTEN
-/// Lesen wirken.</para>
+/// <para><strong>It survives the migration because Noelia does not know the
+/// ledger.</strong> <c>noelia.revocation.*</c> measures Noelia's own revocation
+/// list for tokens; this product's consent ledger is a service with a promise
+/// of its own (ADR-0013): a revocation has to take effect on the NEXT
+/// read.</para>
 ///
-/// <para><strong>Was gemessen wird, und was nicht.</strong> Gemessen wird,
-/// welcher Typ aufgelöst wird, wenn dieser Dienst das Einwilligungstor benutzt
-/// — und ob das derselbe ist, der unmittelbar mit dem Ledger spricht. Ein
-/// Zwischenspeicher kommt in diesem System nicht als Konfiguration, sondern als
-/// ein weiterer Typ dazwischen. Genau den sieht sie.</para>
+/// <para><strong>What is measured, and what is not.</strong> What is measured
+/// is which type is resolved when this service uses the consent gate — and
+/// whether that is the same one that speaks directly to the ledger. In this
+/// system a cache does not arrive as configuration but as one more type in
+/// between. That is exactly what this sees.</para>
 ///
-/// <para>Sie behauptet <em>nicht</em>, einen Revocation ausprobiert zu haben. Das
-/// könnte sie nur, indem sie in den Ledger schriebe, und eine Betriebsauskunft,
-/// die Einwilligungen gewährt und widerruft, um sich selbst zu belegen, wäre
-/// der schlechteste Tausch in diesem Baum.</para>
+/// <para>It does <em>not</em> claim to have tried a revocation. It could only
+/// do so by writing into the ledger, and an operations report that grants and
+/// revokes consents in order to evidence itself would be the worst trade in
+/// this tree.</para>
 /// </remarks>
-/// <typeparam name="TTor">Der Port, über den dieser Dienst den Ledger fragt.</typeparam>
-/// <param name="anbieter">Der Container — es wird in einem eigenen Bereich aufgelöst.</param>
-/// <param name="unmittelbar">Der Adapter, der wirklich mit dem Ledger spricht.</param>
+/// <typeparam name="TTor">The port through which this service asks the ledger.</typeparam>
+/// <param name="provider">The container — it is resolved in a scope of its own.</param>
+/// <param name="unmittelbar">The adapter that really speaks to the ledger.</param>
 public sealed class RevocationCheck<TTor>(IServiceProvider provider, Type unmittelbar)
     : ISecurityCheck
     where TTor : notnull
@@ -38,7 +38,7 @@ public sealed class RevocationCheck<TTor>(IServiceProvider provider, Type unmitt
     public NoeliaModule Module => NoeliaModule.Composition;
 
     /// <inheritdoc />
-    /// <remarks>Auswahlregel — siehe <c>ProviderCheck</c>.</remarks>
+    /// <remarks>Selection rule — see <c>ProviderCheck</c>.</remarks>
     public SecurityCheckCategory Category => SecurityCheckCategory.Composition;
 
     /// <inheritdoc />
@@ -64,10 +64,10 @@ public sealed class RevocationCheck<TTor>(IServiceProvider provider, Type unmitt
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentNullException.ThrowIfNull(unmittelbar);
 
-        // Ein eigener Bereich, weil das Tor je ResumeRequest lebt — und weil diese
-        // Pruefung als Singleton registriert ist. Aus dem Wurzelanbieter heraus
-        // aufzuloesen wuerfe bei einem bereichsgebundenen Dienst, und das saehe
-        // aus wie ein Befund, waere aber ein Fehler dieser Pruefung.
+        // A scope of its own, because the gate lives per request — and because
+        // this check is registered as a singleton. Resolving out of the root
+        // provider would throw for a scoped service, and that would look like a
+        // finding while being a defect of this check.
         using var scope = provider.CreateScope();
 
         var aufgeloest = scope.ServiceProvider.GetService<TTor>();
@@ -101,7 +101,7 @@ public sealed class RevocationCheck<TTor>(IServiceProvider provider, Type unmitt
                 Remediation));
     }
 
-    /// <summary>Ein Typname ohne Namensraum — eine Gestalt, kein Wert.</summary>
+    /// <summary>A type name without a namespace — a shape, not a value.</summary>
     private static string Kurz(Type type) => type.Name;
 
     private SecurityCheckResult Ergebnis(

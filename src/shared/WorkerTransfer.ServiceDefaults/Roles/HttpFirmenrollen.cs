@@ -7,50 +7,50 @@ using WorkerTransfer.Contracts.Identity;
 
 namespace WorkerTransfer.ServiceDefaults.Roles;
 
-/// <summary>Wo identity-service für interne Abfragen antwortet.</summary>
+/// <summary>Where identity-service answers internal queries.</summary>
 /// <remarks>
-/// Derselbe Section und dasselbe Geheimnis wie bei der Mitgliederabfrage von
-/// applications-service — ein zweiter Name für dieselbe Adresse wäre der, der
-/// beim nächsten Umzug stehen bleibt.
+/// The same section and the same secret as for applications-service's member
+/// query — a second name for the same address would be the one left behind at
+/// the next move.
 /// </remarks>
 public sealed class CompanyRoleSettings
 {
-    /// <summary>Der Section in der Konfiguration.</summary>
+    /// <summary>The section in the configuration.</summary>
     public const string Section = "Identity";
 
-    /// <summary>Wo identity-service antwortet.</summary>
+    /// <summary>Where identity-service answers.</summary>
     public string Adresse { get; set; } = string.Empty;
 
-    /// <summary>Das gemeinsame Geheimnis der internen Türen.</summary>
+    /// <summary>The shared secret of the internal doors.</summary>
     public string Geheimnis { get; set; } = string.Empty;
 
-    /// <summary>Wie lange auf eine Antwort gewartet wird.</summary>
+    /// <summary>How long an answer is waited for.</summary>
     /// <remarks>
-    /// Fünf Sekunden, wie bei jedem anderen Dienst-zu-Dienst-Aufruf hier. OHNE
-    /// diese Zeile gilt die Vorgabe von <c>HttpClient</c>: HUNDERT Sekunden —
-    /// und ein hängender Dienst hinge dann jede Rechteprüfung mit.
+    /// Five seconds, as with every other service-to-service call here. WITHOUT
+    /// this line the default of <c>HttpClient</c> applies: ONE HUNDRED seconds
+    /// — and a hanging service would then hang every permission check with it.
     /// </remarks>
     public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
 }
 
-/// <summary>Fragt identity-service nach der Rolle — je ResumeRequest, ohne Speicher.</summary>
+/// <summary>Asks identity-service for the role — per request, with no store.</summary>
 /// <remarks>
-/// <para><strong>Kein Zwischenspeicher, und das ist dieselbe Regel wie beim
-/// Einwilligungs-Ledger (ADR-0013).</strong> Wer aus einem Unternehmen entfernt
-/// wird, ist bei der nächsten ResumeRequest draussen. Ein Speicher mit einer Lebenszeit
-/// wäre genau das Fenster, in dem die Entfernung nicht gilt — und dieses Fenster
-/// bräuchte eine Begründung, die niemand geben kann.</para>
+/// <para><strong>No cache, and that is the same rule as at the consent ledger
+/// (ADR-0013).</strong> Whoever is removed from a company is out at the next
+/// request. A store with a lifetime would be exactly the window in which the
+/// removal does not apply — and that window would need a justification nobody
+/// can give.</para>
 ///
-/// <para>Ruft <c>GET /internal/companies/{firma}/members/{wer}/role</c> mit dem
-/// gemeinsamen Geheimniskopf. Liest den geteilten Vertrag, nie ein anonymes
-/// Objekt: ein nicht gelesenes Feld wäre hier stillschweigend „kein Admin".</para>
+/// <para>Calls <c>GET /internal/companies/{company}/members/{subject}/role</c>
+/// with the shared secret header. Reads the shared contract, never an anonymous
+/// object: a field left unread would silently be "not an admin" here.</para>
 /// </remarks>
 public sealed class HttpCompanyRoles(
     IHttpClientFactory fabrik,
     IOptions<CompanyRoleSettings> einstellungen,
     ILogger<HttpCompanyRoles> protokoll) : ICompanyRoles
 {
-    /// <summary>Der Name des Klienten in der Fabrik.</summary>
+    /// <summary>The name of the client in the factory.</summary>
     public const string Klient = "identity-rollen";
 
     private const string Geheimniskopf = "X-Notify-Secret";
@@ -104,11 +104,10 @@ public sealed class HttpCompanyRoles(
 
         using (response)
         {
-            // 404 heisst hier NICHT „kein Mitglied": der interne Endpunkt
-            // antwortet 404, wenn das Geheimnis fehlt oder nicht stimmt. Als
-            // „keine Rolle" gelesen wuerde ein falsch verdrahtetes Geheimnis
-            // ueberall zu einem sauber aussehenden 403 — und niemand suchte
-            // danach.
+            // 404 does NOT mean "not a member" here: the internal endpoint
+            // answers 404 when the secret is missing or wrong. Read as "no
+            // role", a mis-wired secret would turn into a clean-looking 403
+            // everywhere — and nobody would go looking for it.
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 throw new RoleLookupSilent(

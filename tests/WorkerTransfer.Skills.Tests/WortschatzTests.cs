@@ -5,7 +5,7 @@ using WorkerTransfer.Skills;
 
 namespace WorkerTransfer.Skills.Tests;
 
-/// <summary>Der Vocabulary benennt um und schließt nie etwas.</summary>
+/// <summary>The vocabulary renames and never infers anything.</summary>
 public class WortschatzTests
 {
     [Theory]
@@ -16,39 +16,39 @@ public class WortschatzTests
     [InlineData("k8s", "Kubernetes")]
     [InlineData("dotnet", ".NET")]
     [InlineData("kundenservice", "Kundenbetreuung")]
-    public void Dieselbe_Sache_bekommt_dasselbe_Wort(string getippt, string erwartet) =>
+    public void The_same_thing_gets_the_same_word(string getippt, string erwartet) =>
         Vocabulary.Kanonisch(getippt).Should().Be(erwartet);
 
     /// <summary>
-    /// Der Kern von ADR-0023: „React“ heißt React und sonst nichts.
+    /// The core of ADR-0023: "React" means React and nothing else.
     /// </summary>
     /// <remarks>
-    /// Eine Ableitung wäre eine Aussage über einen Menschen an einer Job, an
-    /// der er nicht widersprechen kann. Wer React kann und JavaScript nennen
-    /// will, nennt es.
+    /// An inference would be a statement about a human being at a place where
+    /// they cannot object. Whoever can do React and wants to name JavaScript
+    /// names it.
     /// </remarks>
     [Fact]
-    public void Aus_React_folgt_kein_JavaScript() =>
+    public void From_React_no_JavaScript_follows() =>
         Vocabulary.KanonischAlle(["React"]).Should().Equal("React");
 
     /// <summary>
-    /// Wie <see cref="Aus_React_folgt_kein_JavaScript"/>, an dem Ort, an dem
-    /// die Regel schwerer zu halten ist: „MIG/MAG" ist kein „Schweißen".
+    /// Like <see cref="From_React_no_JavaScript_follows"/>, in the place where
+    /// the rule is harder to keep: "MIG/MAG" is not "Schweißen".
     /// </summary>
     [Fact]
-    public void Aus_MIG_MAG_folgt_kein_Schweissen() =>
+    public void From_MIG_MAG_no_welding_follows() =>
         Vocabulary.KanonischAlle(["MIG/MAG"]).Should().Equal("MIG/MAG");
 
     /// <summary>
-    /// Ein Staplerschein ist ein Papier, kein Gabelstapler. Der Vocabulary
-    /// führt beide Wörter und verbindet sie nicht.
+    /// A forklift licence is a piece of paper, not a forklift. The vocabulary
+    /// carries both words and does not connect them.
     /// </summary>
     [Fact]
-    public void Ein_Schein_ist_keine_Maschine() =>
+    public void A_certificate_is_not_a_machine() =>
         Vocabulary.KanonischAlle(["Staplerschein", "Gabelstapler"])
             .Should().Equal("Staplerschein", "Gabelstapler");
 
-    /// <summary>Das Handwerk wird kanonisiert wie alles andere auch.</summary>
+    /// <summary>The trades are canonicalised like everything else.</summary>
     [Theory]
     [InlineData("mig-mag", "MIG/MAG")]
     [InlineData("MIG MAG", "MIG/MAG")]
@@ -60,32 +60,32 @@ public class WortschatzTests
     [InlineData("code 95", "Berufskraftfahrer-Qualifikation")]
     [InlineData("gesundheits- und krankenpfleger", "Pflegefachkraft")]
     [InlineData("  Ameise  ", "Hubwagen")]
-    public void Handwerksbegriffe_bekommen_dasselbe_Wort(string getippt, string erwartet) =>
+    public void Trade_terms_get_the_same_word(string getippt, string erwartet) =>
         Vocabulary.Kanonisch(getippt).Should().Be(erwartet);
 
     [Fact]
-    public void Unbekanntes_bleibt_stehen_wie_getippt() =>
+    public void What_is_unknown_stays_as_it_was_typed() =>
         Vocabulary.Kanonisch("Hufbeschlag").Should().Be("Hufbeschlag");
 
     [Fact]
-    public void Leeres_faellt_aus_der_Liste() =>
+    public void What_is_empty_falls_out_of_the_list() =>
         Vocabulary.KanonischAlle(["Go", "   ", "", "aws"])
             .Should().Equal("Go", "Amazon Web Services");
 
     /// <summary>
-    /// Eine Liste entdoppelt der Vocabulary absichtlich <em>nicht</em>.
+    /// The vocabulary deliberately does <em>not</em> deduplicate a list.
     /// </summary>
     /// <remarks>
-    /// Das gehört in <see cref="Faehigkeitenliste"/> und dort NACH dem
-    /// Umbenennen — andersherum stünde „Postgres, PostgreSQL“ zweimal.
+    /// That belongs in <c>SkillList</c> and there AFTER the renaming — the
+    /// other way round "Postgres, PostgreSQL" would stand twice.
     /// </remarks>
     [Fact]
-    public void Der_Wortschatz_entdoppelt_nicht() =>
+    public void The_vocabulary_does_not_deduplicate() =>
         Vocabulary.KanonischAlle(["Postgres", "PostgreSQL"])
             .Should().Equal("PostgreSQL", "PostgreSQL");
 
     [Fact]
-    public void Ein_Name_steht_nie_als_eigene_Schreibweise()
+    public void A_name_never_stands_as_its_own_spelling()
     {
         foreach (var (name, schreibweisen) in Vocabulary.Schreibweisen)
         {
@@ -96,7 +96,7 @@ public class WortschatzTests
     }
 
     [Fact]
-    public void Eine_Schreibweise_gehoert_zu_hoechstens_einem_Namen()
+    public void A_spelling_belongs_to_at_most_one_name()
     {
         var alle = Vocabulary.Schreibweisen
             .SelectMany(entry => entry.Value)
@@ -107,11 +107,11 @@ public class WortschatzTests
     }
 
     /// <summary>
-    /// Kein Name ist zugleich Schreibweise eines anderen (ADR-0023) — sonst
-    /// hinge das Ergebnis an der Reihenfolge des Nachschlagens.
+    /// No name is at the same time a spelling of another (ADR-0023) —
+    /// otherwise the result would hang on the order of the lookup.
     /// </summary>
     [Fact]
-    public void Kein_Name_ist_die_Schreibweise_eines_anderen()
+    public void No_name_is_the_spelling_of_another()
     {
         var namen = Vocabulary.Schreibweisen.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -127,9 +127,9 @@ public class WortschatzTests
     }
 
     /// <summary>
-    /// Die Grenze, die sich am leichtesten verschieben lässt: irgendwann will
-    /// jemand ein Niveau, ein Gewicht oder eine Rangfolge — und ab da bewertet
-    /// der Vocabulary Menschen (ADR-0022, ADR-0023).
+    /// The boundary that is easiest to shift: at some point somebody wants a
+    /// level, a weight or a ranking — and from then on the vocabulary evaluates
+    /// human beings (ADR-0022, ADR-0023).
     /// </summary>
     [Theory]
     [InlineData("level")]
@@ -142,7 +142,7 @@ public class WortschatzTests
     [InlineData("rang")]
     [InlineData("implies")]
     [InlineData("impliziert")]
-    public void Der_Wortschatz_kennt_kein_Wort_fuer_Bewertung(string verboten)
+    public void The_vocabulary_knows_no_word_for_evaluation(string verboten)
     {
         var namen = typeof(Vocabulary)
             .GetMembers(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)
