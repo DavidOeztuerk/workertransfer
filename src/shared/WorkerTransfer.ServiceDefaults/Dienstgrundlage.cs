@@ -11,8 +11,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using Noelia.Dashboard;
+using Noelia.Infrastructure.Sovereignty;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 
 namespace WorkerTransfer.ServiceDefaults;
 
@@ -56,10 +57,12 @@ public static class Dienstgrundlage
     /// alle elf gleich: jeder Dienst liest den Handelnden aus dem geprüften
     /// Token, denn darauf steht <c>Capacity</c> (ADR-0017).</para>
     ///
-    /// <para><strong>Ausstellen kann nur identity-service</strong>
-    /// (<see cref="AlsAussteller"/>). Das ist keine Konvention: ein zweiter
-    /// Aussteller wäre eine zweite Stelle, die einen Handelnden erschaffen kann,
-    /// und nichts weiter unten könnte die beiden auseinanderhalten.</para>
+    /// <para><strong>Ausstellen kann nur, wer den privaten Schlüssel hat</strong>
+    /// (<see cref="Schluesselherkunft"/>), und den bekommt allein
+    /// identity-service. Das ist seit ADR-0046 keine Konvention mehr, sondern
+    /// eine Eigenschaft des Schlüssels: ein zweiter Aussteller wäre eine zweite
+    /// Stelle, die einen Handelnden erschaffen kann, und nichts weiter unten
+    /// könnte die beiden auseinanderhalten.</para>
     /// </remarks>
     /// <param name="services">The container.</param>
     /// <param name="configuration">The service's configuration.</param>
@@ -141,7 +144,7 @@ public static class Dienstgrundlage
         // Person zur Laufzeit —, und die Ziele der Egress-Grenze stehen in der
         // Umgebung. Wohin dieser Behaelter heute Abend spricht, weiss nur er
         // selbst.
-        services.AddNachweis(configuration, dienstname);
+        services.AddNachweis(configuration);
 
         return services.AddNoelia(configuration, environment, dienstname, girder =>
         {
@@ -149,25 +152,23 @@ public static class Dienstgrundlage
                 .UseDefaults()
                 .Use(NoeliaModule.Principal)
 
-                // WOHER DIE SCHLUESSEL KOMMEN, sagt Girder 4 nicht mehr selbst —
-                // `NoeliaModule.Jwt` registriert den Dienst, nicht den
-                // Schluesselbund. Das ist richtig: ob ein Dienst ausstellt oder
-                // nur prueft, ist eine Aussage ueber seine Rolle im System.
-                //
-                // Heute teilen sich alle elf EIN Geheimnis (HS256), deshalb
-                // ueberall dasselbe. Die Form, die wir wollen, steht schon
-                // daneben: `Issue(privat, kid)` fuer identity, `VerifyOnly(
-                // oeffentlich, kid)` fuer die anderen zehn. Das ist H3 und
-                // braucht eine Schluesselverteilung, keine Codeaenderung hier.
-                .UseJwt(jwt => jwt.FromSharedSecret())
+                // AUSSTELLEN KANN NUR, WER DEN PRIVATEN SCHLUESSEL HAT.
+                // Ein geteiltes HS256-Geheimnis kennt diesen Unterschied nicht:
+                // jeder der fuenfzehn Prozesse koennte ein Token fuer jeden
+                // Menschen praegen, und ein kopiertes Konfigurationsblatt waere
+                // jedes Konto auf jedem Dienst.
+                .UseJwt(jwt => Schluesselherkunft(jwt, configuration))
 
                 // DIE EGRESS-GRENZE, UND WOHER SIE IHRE HOSTS KENNT.
                 //
                 // `AddSovereignPlatform` buendelt vier Dinge: die Egress-Grenze,
                 // die Maskierung im Protokoll, den Souveraenitaetsbericht und
-                // eine Pruefspur. Die ersten drei sind der Grund; die vierte
-                // laesst sich nicht abwaehlen und bekommt deshalb unten eine
-                // Senke, die sagt, dass sie nicht benutzt wird.
+                // eine Pruefspur.
+                //
+                // Die Pruefspur bleibt AN. Fuer eine fachliche Zeile genuegt
+                // sie ADR-0012 nicht (dafuer `EfPruefspur`) — der
+                // Dashboard-Zugriff ist aber keine: er hat keine Transaktion,
+                // und ohne Senke verweigert das Dashboard mit 503.
                 //
                 // GEMESSEN, BEVOR DAS HIER STAND (`EgressTests`): der Waechter
                 // WEIST AB statt zu protokollieren, und ein Containername faellt
@@ -187,9 +188,34 @@ public static class Dienstgrundlage
                 // Was NICHT in der Konfiguration steht, darf auch nicht
                 // hinaus. Genau das ist der Zweck: ein Telemetriezug mit einer
                 // eingebauten Vorgabeadresse, ein SDK, das nach Hause telefoniert.
-                .AddSovereignPlatform(souveraen => souveraen
-                    .Allow([.. GerufeneHosts(configuration)])
-                    .WithAuditSink<VerweigerndePruefspur>())
+                .AddSovereignPlatform(souveraen => Deklariere(
+                    souveraen.Allow([.. GerufeneHosts(configuration)]),
+                    configuration))
+
+                // DIE BETRIEBSOBERFLAECHE, und sie ersetzt sieben eigene
+                // Adressen (ADR-0045).
+                //
+                // `/noelia` traegt Uebersicht, Zusammensetzung, Konfiguration,
+                // Sicherheitspruefungen, Souveraenitaet, KI, PFLICHTEN, Pruefspur,
+                // Sitzungen, Bremsen und Gesundheit — samt `report.json` aus
+                // DERSELBEN Lesung. `WorkerTransfer.Nachweis` hat das selbst
+                // gebaut, bevor dieser Baum auf Noelia stand; es ist geloescht
+                // und steht nicht daneben. Zwei Wege zu einer Aussage laufen
+                // auseinander, und beim ersten Mal merkt es niemand.
+                //
+                // OHNE BERECHTIGUNG 404, nicht 403 — dieselbe Zusage wie vorher.
+                // Eine Betriebsoberflaeche, deren Existenz man erraten kann, ist
+                // selbst schon eine Auskunft. Das Geheimnis bleibt ein EIGENES
+                // Papier: wer eine Mail anstossen darf, muss nicht erfahren,
+                // welche KI-Anbieter diese Instanz benutzt.
+                .UseDashboard(dashboard => dashboard
+                    .At("/noelia")
+                    .VisibleTo(Nachweisaufbau.Eingelassen)
+                    .InspectConfiguration("Consent", "Draft", "Erasure")
+                    .InProduction(
+                        "Der Betriebsnachweis dieser Instanz — Empfaenger, "
+                        + "Naht, Loeschkaskade — steht hinter einem eigenen "
+                        + "Geheimnis und traegt keinen Wert und keinen Namen."))
 
                 // Noelias Bremse steht in der Vorgabe, und sie ist in 4.0.2
                 // nachgemessen in Ordnung (H2, Messung 1): sie bremst, sie zaehlt
@@ -309,13 +335,51 @@ public static class Dienstgrundlage
         });
     }
 
+    /// <summary>Woher dieser Dienst seine Token-Schlüssel nimmt.</summary>
+    /// <remarks>
+    /// <para>Der private Schlüssel entscheidet, nicht ein Schalter im Code. Er
+    /// steht allein in der Umgebung von identity-service, und damit ist in
+    /// <c>docker-compose.yml</c> und im Chart nachzulesen, wer prägen kann —
+    /// eine Codezeile wäre dieselbe Aussage an einer Stelle, die der Betreiber
+    /// nicht sieht.</para>
+    ///
+    /// <para>Ohne öffentlichen Schlüssel wirft dieser Aufruf und nennt den
+    /// Namen. Ein Dienst, der stattdessen still jedes Token ablehnte, sähe aus
+    /// wie eine kaputte Anmeldung.</para>
+    /// </remarks>
+    /// <param name="jwt">Noelias Schlüsselbaumeister.</param>
+    /// <param name="configuration">Die Konfiguration dieses Dienstes.</param>
+    private static void Schluesselherkunft(JwtBuilder jwt, IConfiguration configuration)
+    {
+        var kennung = configuration["Jwt:KeyId"];
+        var oeffentlich = configuration["Jwt:PublicKey"];
+        var privat = configuration["Jwt:PrivateKey"];
+
+        if (string.IsNullOrWhiteSpace(kennung) || string.IsNullOrWhiteSpace(oeffentlich))
+        {
+            throw new InvalidOperationException(
+                "Jwt:KeyId und Jwt:PublicKey sind nicht gesetzt. `make env` würfelt "
+                + "das Schlüsselpaar in die .env; in compose und im Chart kommen "
+                + "sie aus der Umgebung.");
+        }
+
+        if (string.IsNullOrWhiteSpace(privat))
+        {
+            jwt.VerifyOnly(oeffentlich, kennung);
+            return;
+        }
+
+        jwt.Issue(privat, kennung);
+    }
+
     /// <summary>
-    /// The extra a service needs to <em>issue</em> tokens. identity-service only.
+    /// Was ein Dienst zusätzlich braucht, um Menschen anzumelden. Nur identity.
     /// </summary>
     /// <remarks>
-    /// Its own method with its own name so that a search for it finds exactly
-    /// one composition root. A reviewer should be able to answer "who can mint a
-    /// token here?" by grepping, not by reading eleven files.
+    /// Passwort-Prüfung und Sitzungen — nicht das Ausstellen selbst: das hängt
+    /// seit ADR-0046 am privaten Schlüssel und damit an der Umgebung. Diese
+    /// Methode hat trotzdem einen eigenen Namen, damit eine Suche nach ihr
+    /// genau einen Verbundpunkt findet.
     /// </remarks>
     /// <param name="girder">Der Baumeister dieses Dienstes.</param>
     public static NoeliaBuilder AlsAussteller(this NoeliaBuilder girder)
@@ -380,27 +444,62 @@ public static class Dienstgrundlage
         app.UseNoeliaPrincipal();
         app.UseMiddleware<ProblemDetailsMiddleware>();
 
-        // Die sieben Adressen des Nachweises, hier und nicht in vierzehn
-        // Program.cs (ADR-0044). „Ein Tor, das man aufrufen muss, um es zu
-        // haben, hat man nicht" — dasselbe Argument, aus dem
-        // `make nachweis-pruefen` in `make validate` steht. Ein Dienst, der
-        // seinen eigenen Nachweis zu verdrahten vergisst, antwortet 404 und
-        // sieht damit aus wie einer, der ihn absichtlich zuhat.
-        app.MapNachweisEndpunkte();
-
         BerichteZusammensetzung(app, dienstname);
 
         return app;
     }
 
+    /// <summary>Trägt jedes Ziel ins Souveränitätsverzeichnis.</summary>
+    /// <remarks>
+    /// <c>Allow</c> verhindert den undeklarierten Aufruf; erst
+    /// <c>DeclareDependency</c> macht das Ziel im Bericht sichtbar. Ohne diese
+    /// Zeile ist das Egress-Register leer und die Flottensicht zeigt nichts.
+    /// Deklariert wird unter dem Konfigurationsschlüssel, damit im Bericht steht,
+    /// <em>wofür</em> ein Host gerufen wird.
+    /// </remarks>
+    private static SovereignPlatformBuilder Deklariere(
+        SovereignPlatformBuilder souveraen, IConfiguration configuration)
+    {
+        foreach (var (schluessel, adresse) in GerufeneZiele(configuration))
+        {
+            souveraen.DeclareDependency(schluessel, adresse);
+        }
+
+        return souveraen;
+    }
+
+    /// <summary>Konfigurationsschlüssel und Adresse jedes gerufenen Ziels.</summary>
+    private static IEnumerable<(string Schluessel, string Adresse)> GerufeneZiele(
+        IConfiguration configuration) =>
+        configuration.AsEnumerable()
+            .Where(eintrag => !Horchadresse(eintrag.Key)
+                              && !string.IsNullOrWhiteSpace(eintrag.Value)
+                              && Uri.TryCreate(eintrag.Value, UriKind.Absolute, out var ziel)
+                              && (ziel.Scheme == Uri.UriSchemeHttp
+                                  || ziel.Scheme == Uri.UriSchemeHttps))
+            .Select(eintrag => (eintrag.Key, eintrag.Value!))
+            .DistinctBy(eintrag => eintrag.Item2, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(eintrag => eintrag.Key, StringComparer.Ordinal);
+
+    /// <summary>Wo dieser Dienst horcht — kein Ziel, das er ruft.</summary>
+    private static bool Horchadresse(string schluessel) =>
+        schluessel.Contains("URLS", StringComparison.OrdinalIgnoreCase)
+        || schluessel.StartsWith("Kestrel", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Jeder Host, den dieser Dienst laut Konfiguration ruft.</summary>
     /// <remarks>
-    /// <para><strong>Eine Ableitung, keine Liste</strong> — und sie steht seit
-    /// ADR-0044 in <see cref="Zielkunde"/>, weil sie zwei Leser hat: die
-    /// Egress-Grenze erlaubt genau diese Hosts, und <c>wt.grenze.ziele</c>
-    /// berichtet genau diese Hosts. Zwei Ableitungen über dieselbe Frage wären
-    /// zwei Wahrheiten, und die schlechtere Hälfte davon wäre eine Grenze, die
-    /// mehr durchlässt, als der Nachweis nennt.</para>
+    /// <para><strong>Eine Ableitung, keine Liste.</strong> Gelesen wird die ganze
+    /// Konfiguration; jeder Wert, der sich als absolute http- oder https-Adresse
+    /// lesen lässt, gibt seinen Host her. Eine zweite Liste wäre die, die als
+    /// Erste veraltet — und ihr Veralten fiele niemandem auf, weil ein nicht
+    /// erfasster Aufruf von der Egress-Grenze einfach abgewiesen wird.</para>
+    ///
+    /// <para><strong>Sie stand zwischenzeitlich woanders, und der Grund ist
+    /// weggefallen.</strong> ADR-0044 zog sie in ein eigenes <c>Zielkunde</c>,
+    /// weil sie zwei Leser hatte: die Egress-Grenze und <c>wt.grenze.ziele</c>.
+    /// Mit ADR-0045 berichtet Noelias Souveränitätsabschnitt die Ziele selbst,
+    /// der zweite Leser ist fort — und eine Ableitung mit einem Leser gehört
+    /// dorthin, wo sie gelesen wird.</para>
     ///
     /// <para><strong>Zwei Ziele stehen deshalb in der Umgebung, die früher nur
     /// im Quelltext standen</strong> — <c>Draft__Adresse</c> und
@@ -409,7 +508,21 @@ public static class Dienstgrundlage
     /// Code zu lassen hieße, sie vor ihm zu verstecken.</para>
     /// </remarks>
     private static IReadOnlyList<string> GerufeneHosts(IConfiguration configuration) =>
-        Zielkunde.Hosts(configuration);
+    [
+        .. configuration.AsEnumerable()
+            .Select(eintrag => eintrag.Value)
+            .Where(wert => !string.IsNullOrWhiteSpace(wert))
+            .Select(wert =>
+                Uri.TryCreate(wert, UriKind.Absolute, out var adresse)
+                && (adresse.Scheme == Uri.UriSchemeHttp
+                    || adresse.Scheme == Uri.UriSchemeHttps)
+                    ? adresse.Host
+                    : null)
+            .Where(host => host is { Length: > 0 })
+            .Select(host => host!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(host => host, StringComparer.OrdinalIgnoreCase)
+    ];
 
     /// <summary>Sagt beim Start, was dieser Dienst fährt — und was er warum nicht.</summary>
     /// <remarks>

@@ -130,8 +130,11 @@ public class DokumentwortTests
         [
             .. Regex.Matches(
                     quelle,
+                    // Endet am Geltungssatz, ohne den Nachbarschluessel zu
+                    // nennen: ein Muster, das seine Nachbarschaft kennt, faellt
+                    // bei deren Umbenennung still auf null Treffer.
                     "\"(?<name>datenschutz|ki|mitbestimmung)\":\\s*\\{.*?"
-                    + "\"scope\":\\s*\\((?<satz>.*?)\\),\\s*\"areas\"",
+                    + "\"scope\":\\s*\\((?<satz>.*?)\\),\\n",
                     RegexOptions.Singleline,
                     TimeSpan.FromSeconds(5))
                 .Select(treffer => (

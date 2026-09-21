@@ -175,7 +175,7 @@ export async function sucheKandidaten(
       503: {
         reason: "consent-unavailable",
         titel: "fehler.ledgerSchweigt",
-        text: "fehler.lieberNichts",
+        text: "fehler.spaeterErneut",
       },
     },
     "offline"

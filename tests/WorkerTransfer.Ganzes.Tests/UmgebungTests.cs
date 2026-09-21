@@ -70,7 +70,8 @@ public sealed class UmgebungTests
     /// und er liegt damit in git. <c>make env</c> würfelt sie beim Anlegen.
     /// </remarks>
     [Theory]
-    [InlineData("WORKERTRANSFER_JWT_SECRET")]
+    [InlineData("WORKERTRANSFER_JWT_PRIVATE_KEY")]
+    [InlineData("WORKERTRANSFER_JWT_PUBLIC_KEY")]
     [InlineData("WORKERTRANSFER_NOTIFY_SECRET")]
     [InlineData("WORKERTRANSFER_ERASURE_SECRET")]
     public void Kein_Geheimnis_traegt_einen_Wert(string name)
@@ -91,7 +92,8 @@ public sealed class UmgebungTests
     /// eingebaute Geheimnis; <c>${X:?…}</c> bricht ab und nennt den Namen.
     /// </remarks>
     [Theory]
-    [InlineData("WORKERTRANSFER_JWT_SECRET")]
+    [InlineData("WORKERTRANSFER_JWT_PRIVATE_KEY")]
+    [InlineData("WORKERTRANSFER_JWT_PUBLIC_KEY")]
     [InlineData("WORKERTRANSFER_NOTIFY_SECRET")]
     [InlineData("WORKERTRANSFER_ERASURE_SECRET")]
     public void Compose_haelt_fuer_kein_Geheimnis_eine_Vorgabe_bereit(string name)

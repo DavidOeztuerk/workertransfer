@@ -160,7 +160,44 @@ Infisical will later fill the environment. It feeds `.env`; it does not replace 
 
 Adding a service is three steps and no new Dockerfile: its database in `scripts/initdb/`, its entry point in `docker/dotnet-service.Dockerfile`, a copied block in `docker-compose.yml` with three values changed — plus its route in `src/gateway/WorkerTransfer.Gateway/ocelot.json`.
 
+**`/health/ready` answers for the database, and until 21.09.2026 it answered for nothing.** The endpoint filters the registered checks by the `ready` tag; with none registered the filtered set is empty, an empty report counts as healthy, and the service reports ready over an unreachable database — the orchestrator then routes traffic to a service that answers every request with 500. `Bereitschaft.AddDatenbankbereitschaft<T>(name)` is called in all fourteen composition roots, one line next to the `AddDbContext` it belongs to. It asks `CanConnectAsync` — not a query, because a readiness probe runs on a timer and one that generates load finishes off a struggling service. **Its description names no value**: `/health/ready` answers anyone, and an Npgsql exception carries host, port and sometimes the user; the exception travels as the second field and reaches the log, not the response. `BereitschaftsreiseTests` reads the *body*, not the status — the status is green precisely when nothing is checked.
+
+**ASP.NET's own key ring lives in Postgres, encrypted under the operator's master key** (`Schluesselbund`, ADR-0046). Left alone the framework writes it into the container's filesystem and says so twice at every start — and anything protected with it stops verifying when the container is replaced. Nothing in this tree reads it *today*; it is configured anyway, because the framework registers it whether or not you want it, and a gate that stays red gets ignored. **Not `Noelia.InMemory`**: that would satisfy the check while two instances still read different rings. The table carries no `DbSet` — it belongs to no domain model, and in the EF model it would look like a `Personenzeile` to the erasure guard.
+
 **`curl` is in the runtime image on purpose.** Docker's healthcheck asks from *inside* the container, and the aspnet runtime image ships no curl, no wget, no nc; `sh` is dash and cannot do `/dev/tcp`. The probe used to be `dotnet --version`, which can *never* succeed on a runtime image (no SDK, exit 155) — every service reported `unhealthy` for months while answering perfectly, and a probe that is always red is worse than none. One probe now lives in the `x-dienst` anchor, covers all fourteen services *and* the gateway, asks `/health/live`, and derives the port from `ASPNETCORE_URLS` so no second list of ports can drift. Kubernetes does not need any of this — there the kubelet asks over HTTP from outside.
+
+### The Noelia Control Plane — an overlay, deliberately not part of `make up`
+
+```bash
+make control-plane        # http://localhost:8091
+```
+
+It collects `/noelia/report.json` from all fourteen services and lays them side
+by side — egress, AI dependencies, obligations, findings, drift, attestation.
+It is pull-only: there is no path from it into a service.
+
+**A separate compose file, and that is the decision.** The product lives in a
+neighbouring repository (`~/Projects/NoeliaControlPlane`, overridable with
+`NOELIA_CONTROL_PLANE_PFAD`). Putting it in `docker-compose.yml` would make
+`make up` fail for everyone who has not checked that repository out.
+
+Three things are easy to get wrong here:
+
+- **The fleet file mounts as `appsettings.Development.json`**, not under a
+  descriptive name. The application loads `appsettings.{ASPNETCORE_ENVIRONMENT}.json`
+  and no other file — an `appsettings.Flotte.json` would sit in the image and
+  never be read, and the fleet would be silently empty. The image ships the
+  vendor's demo fleet at that path, which has to go anyway or it collects seven
+  unreachable addresses.
+- **`docker/noelia-control-plane.json` belongs here and not there.** It
+  describes *this* stack, and its addresses are the compose service names.
+- **The licence comes from the environment** (`WORKERTRANSFER_NOELIA_LICENCE`),
+  never from that file: it is a signed paper naming a customer. Empty means the
+  free tier — one fleet, three services — and this fleet has fourteen.
+
+It presents the same paper as the dashboard it reads
+(`WORKERTRANSFER_NACHWEIS_SECRET`) and no second one. Empty means every service
+answers 404 and the fleet stays empty without anything being broken.
 
 ### Kubernetes — a staging environment on your own machine
 
@@ -411,7 +448,7 @@ Two rules that produced most of the corrections here:
 
 | Modul | Stand | gemessen |
 |---|---|---|
-| `AddJwtAuthentication` | **gerufen** | Prüft Token in jedem Dienst. Identity stellt aus (`AlsAussteller`), alle anderen prüfen nur. |
+| `AddJwtAuthentication` | **gerufen** | Prüft Token in jedem Dienst. **ECDSA P-256 seit ADR-0046:** identity-service hält den privaten Schlüssel (`Jwt__PrivateKey`) und prägt, die anderen vierzehn halten nur den öffentlichen und können es nicht. Vorher teilten sich alle fünfzehn ein HS256-Geheimnis — damit konnte jeder, der prüfen kann, auch prägen. |
 | `AddPrincipal` | **gerufen** | Baut `ICurrentPrincipal` aus dem geprüften Token — die Grundlage von `Capacity` (ADR-0017). |
 | `AddSecurityHeaders` | **gerufen** | Setzt die Sicherheitsköpfe vor allem, was einen Rumpf schreibt. |
 | `AddHealthChecks` | **gerufen** | `/health/live` und `/health/ready` in jedem Dienst. Das Gateway hat eigene — siehe unten. |

@@ -1,7 +1,10 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Noelia.Abstractions.Compliance;
+using Noelia.Abstractions.Hosting;
+using Noelia.Abstractions.Security.Checks;
 
-namespace WorkerTransfer.Nachweis.Pruefungen;
+namespace WorkerTransfer.ServiceDefaults.Pruefungen;
 
 /// <summary>Ein Name, bei dem ein Wort der Verbotsliste ein Homonym ist.</summary>
 /// <remarks>
@@ -70,7 +73,7 @@ public sealed record Wortausnahme(string Name, string Grund);
 public sealed class Zahlpruefung(
     IReadOnlyList<Assembly> flaechen,
     IReadOnlyList<Wortausnahme>? ausnahmen = null,
-    IReadOnlyList<string>? wortschatz = null) : IPruefung
+    IReadOnlyList<string>? wortschatz = null) : ISecurityCheck
 {
     /// <summary>Worte, die eine Zahl oder eine Rangfolge über einen Menschen ankündigen.</summary>
     /// <remarks>
@@ -110,23 +113,44 @@ public sealed class Zahlpruefung(
     public string Id => "wt.ki.keine-zahl";
 
     /// <inheritdoc />
-    public Bereich Bereich => Bereich.KI;
+    public NoeliaModule Module => NoeliaModule.Composition;
+
+    /// <inheritdoc />
+    /// <remarks>Auswahlregel — siehe <c>Anbieterpruefung</c>.</remarks>
+    public SecurityCheckCategory Category => SecurityCheckCategory.Composition;
+
+    /// <inheritdoc />
+    public SecurityCheckSeverity Severity => SecurityCheckSeverity.Critical;
 
     /// <inheritdoc />
     /// <remarks>
-    /// „Keine Zahl über einen Menschen“ ist die Tatsache, die Art. 22 DSGVO am
+    /// „Keine Zahl über einen Menschen" ist die Tatsache, die Art. 22 DSGVO am
     /// nächsten kommt, ohne ihn zu beantworten — und sie ist das Erste, wonach
     /// gefragt wird, wenn jemand den Einsatz nach Anhang III einstuft.
+    /// <para>
+    /// <strong>§ 87 Abs. 1 Nr. 6 BetrVG gehört hierher und steht nicht hier</strong>,
+    /// sondern im Text der Abhilfe: <c>RegulatoryRegime</c> kennt kein
+    /// nationales Arbeitsrecht (<c>bugs/betrvg-hat-kein-regelwerk.md</c>). Ihn
+    /// auf <c>Gdpr</c> zu legen waere eine falsche Fundstelle in einem
+    /// Dokument, das ein Betriebsrat liest — schlimmer als keine.
+    /// </para>
     /// </remarks>
-    public IReadOnlyList<Rechtsbezug> Bezuege =>
+    public IReadOnlyList<RegulatoryReference> References =>
     [
         Rechtsbezuege.Einzelentscheidung,
-        Rechtsbezuege.AnhangIII,
-        Rechtsbezuege.Mitbestimmung
+        Rechtsbezuege.AnhangIII
     ];
 
     /// <inheritdoc />
-    public Task<Befund> LaufenAsync(CancellationToken ct = default)
+    public string Remediation =>
+        "ADR-0022 §1: eine Zahl, die einen Menschen zusammenfasst, samt jeder "
+        + "Rangfolge daraus, gibt es hier nicht. Entweder das Feld faellt, oder "
+        + "es benennt eine Sache statt einer Person. Ein echtes Homonym wird "
+        + "einzeln begruendet und steht dann in diesem Befund. — "
+        + Rechtsbezuege.Mitbestimmung;
+
+    /// <inheritdoc />
+    public Task<SecurityCheckResult> RunAsync(CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(flaechen);
 
@@ -137,10 +161,8 @@ public sealed class Zahlpruefung(
             // Sonst meldete die Pruefung gruen ueber nichts — derselbe Fehler,
             // den `scripts/test-dotnet.sh` mit seiner Zahl auf dem Schirm
             // schliesst.
-            return Task.FromResult(new Befund(
-                Id,
-                Bereich,
-                Stand.Fehlt,
+            return Task.FromResult(Ergebnis(
+                SecurityCheckStatus.Fail,
                 "Die abgesuchten Flächen sind leer — diese Prüfung hat nichts "
                 + "angesehen und belegt damit nichts.",
                 "Im Verbundpunkt des Dienstes nachsehen, welche Assemblies "
@@ -159,11 +181,9 @@ public sealed class Zahlpruefung(
 
         if (verwaist.Count > 0)
         {
-            return Task.FromResult(new Befund(
-                Id,
-                Bereich,
-                Stand.Fehlt,
-                $"{Zielkunde.Zahl(verwaist.Count)} Ausnahme(n) zeigen auf Namen, "
+            return Task.FromResult(Ergebnis(
+                SecurityCheckStatus.Fail,
+                $"{(verwaist.Count)} Ausnahme(n) zeigen auf Namen, "
                 + $"die es nicht mehr gibt: {string.Join(", ", verwaist)}.",
                 "Eine Ausnahme ohne Namen ist ein Freibrief, den niemand mehr "
                 + "braucht — sie gehört gelöscht, nicht stehengelassen."));
@@ -180,28 +200,19 @@ public sealed class Zahlpruefung(
 
         if (treffer.Count > 0)
         {
-            return Task.FromResult(new Befund(
-                Id,
-                Bereich,
-                Stand.Fehlt,
-                $"{Zielkunde.Zahl(treffer.Count)} öffentliche(r) Name(n) kündigen "
+            return Task.FromResult(Ergebnis(
+                SecurityCheckStatus.Fail,
+                $"{(treffer.Count)} öffentliche(r) Name(n) kündigen "
                 + $"eine Zahl über einen Menschen an: {string.Join(", ", treffer)}.",
-                "ADR-0022 §1: eine Zahl, die einen Menschen zusammenfasst, samt "
-                + "jeder Rangfolge daraus, gibt es hier nicht. Entweder das Feld "
-                + "fällt, oder es benennt eine Sache statt einer Person — die "
-                + "Seitenlänge heißt in scout-service aus genau diesem Grund "
-                + "Seitenlaenge. Ein echtes Homonym wird einzeln begründet und "
-                + "steht dann in diesem Befund."));
+                Remediation));
         }
 
-        return Task.FromResult(new Befund(
-            Id,
-            Bereich,
-            Stand.Erfuellt,
-            $"In {Zielkunde.Zahl(flaechen.Count)} Flächen "
+        return Task.FromResult(Ergebnis(
+            SecurityCheckStatus.Pass,
+            $"In {(flaechen.Count)} Flächen "
             + $"({string.Join(", ", flaechen.Select(Kurzname))}) kündigt keiner "
-            + $"von {Zielkunde.Zahl(namen.Count)} öffentlichen Namen eine Zahl "
-            + $"über einen Menschen an ({Zielkunde.Zahl(Verboten.Count)} Worte "
+            + $"von {(namen.Count)} öffentlichen Namen eine Zahl "
+            + $"über einen Menschen an ({(Verboten.Count)} Worte "
             + "geprüft)"
             + (erlaubt.Count > 0
                 ? ". Einzeln begründete Homonyme: "
@@ -262,4 +273,11 @@ public sealed class Zahlpruefung(
     /// <summary>Der Name einer Assembly, ohne Kultur und Schlüssel.</summary>
     private static string Kurzname(Assembly flaeche) =>
         flaeche.GetName().Name ?? "unbenannt";
+
+    private SecurityCheckResult Ergebnis(
+        SecurityCheckStatus stand, string zusammenfassung, string abhilfe) =>
+        new(Id, Module, Category, stand, Severity, zusammenfassung, abhilfe)
+        {
+            References = References
+        };
 }

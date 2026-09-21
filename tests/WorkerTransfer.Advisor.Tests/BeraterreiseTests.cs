@@ -12,6 +12,7 @@ using WorkerTransfer.Advisor.Application.Ports;
 using WorkerTransfer.Advisor.Domain.Gespraeche;
 using WorkerTransfer.Advisor.Infrastructure.Persistence;
 using WorkerTransfer.Outbox;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Advisor.Tests;
 
@@ -53,7 +54,9 @@ public class BeraterreiseTests(Postgres postgres) : IAsyncLifetime
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:advisor", postgres.ConnectionString);
-            host.UseSetting("JwtSettings:Secret", Tokenform.Geheimnis);
+            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
+            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);

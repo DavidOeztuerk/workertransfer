@@ -50,7 +50,7 @@ describe("HomePage", () => {
 
     for (const name of [
       "Neue Arbeit soll sich wie eine selbstbestimmte Entscheidung anfühlen.",
-      "Vertrauen ist kein Feature. Es ist die Architektur.",
+      "Worauf die Plattform aufbaut.",
       "Eine Plattform, die mit einer klaren ersten Grundlage wächst.",
     ]) {
       expect(screen.getByRole("region", { name })).toBeInTheDocument();

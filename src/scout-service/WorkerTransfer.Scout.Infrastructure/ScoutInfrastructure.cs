@@ -17,9 +17,10 @@ using WorkerTransfer.Scout.Infrastructure.Loeschung;
 using WorkerTransfer.Scout.Infrastructure.Persistence;
 using WorkerTransfer.Scout.Infrastructure.Profile;
 using WorkerTransfer.Scout.Infrastructure.Stellen;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 using WorkerTransfer.Scout.Contracts;
+using Noelia.Abstractions.Security.Checks;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Scout.Infrastructure;
 
@@ -73,6 +74,8 @@ public static class ScoutInfrastructure
         services.AddDbContext<ScoutDbContext>((anbieter, optionen) =>
             ScoutDbContextFactory.Konfiguriere(
                 optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<ScoutDbContext>("scout");
+        services.AddSchluesselbund<ScoutDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
@@ -131,10 +134,10 @@ public static class ScoutInfrastructure
     {
         var naht = !string.IsNullOrEmpty(entwurf.Schluessel);
 
-        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
             [typeof(Suche).Assembly, typeof(HakenV1).Assembly]));
 
-        services.AddScoped<IPruefung>(_ => new Nahtpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Nahtpruefung(
             typeof(Ansprachelage),
             ["Ueberschrift", "Genannt", "Gesucht", "Wunsch", "Prompt"],
             "für eine Ansprache"));
@@ -142,30 +145,25 @@ public static class ScoutInfrastructure
         // Der Anbieter dieses Dienstes ist der des BETREIBERS: `Draft__*` aus
         // der Umgebung, einer fuer alle. Den Zugang je Person haelt
         // identity-service, und dort wird gezaehlt statt genannt.
-        services.AddScoped<IAnbieterquelle>(_ => new Betreiberquelle(
+        services.AddSingleton<IAnbieterquelle>(_ => new Betreiberquelle(
             "anthropic", entwurf.Adresse, naht));
 
-        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
-        // KEINE AUFZEICHNUNG, und das ist eine Entscheidung (ADR-0024): weder
-        // Prompt noch Antwort noch ein Ledger-Eintrag. `null` ist hier die
-        // richtige Antwort und keine fehlende Verdrahtung.
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(
-            nahtVorhanden: true, anbieterEingerichtet: naht, null));
 
         // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
         // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
         // Zwischenspeicher davor faellt niemandem auf, weil alles
         // weiterfunktioniert, nur eben mit dem Stand von vorhin.
-        services.AddScoped<IPruefung>(anbieter =>
+        services.AddSingleton<ISecurityCheck>(anbieter =>
             new Widerrufspruefung<IEinwilligungstor>(
                 anbieter, typeof(HttpEinwilligungstor)));
 
         var loeschung = new Loescheinstellungen();
         configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
 
-        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
             "scout",
             !string.IsNullOrEmpty(loeschung.Geheimnis),
             pruefspurVorhanden: false));

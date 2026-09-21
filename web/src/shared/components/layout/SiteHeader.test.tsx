@@ -151,7 +151,7 @@ describe("SiteHeader und das Berufsfeld", () => {
       screen.getByRole("menuitem", { name: "Lebenslauf" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("menuitem", { name: "Arbeitsproben" }),
+      screen.getByRole("menuitem", { name: "Portfolio" }),
     ).toBeInTheDocument();
   });
 });
