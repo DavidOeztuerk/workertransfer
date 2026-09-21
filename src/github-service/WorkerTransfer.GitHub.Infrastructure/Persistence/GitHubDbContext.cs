@@ -4,20 +4,19 @@ using WorkerTransfer.GitHub.Domain.Connections;
 
 namespace WorkerTransfer.GitHub.Infrastructure.Persistence;
 
-/// <summary>Eine Zeile von <c>github_connections</c>.</summary>
+/// <summary>One row of <c>github_connections</c>.</summary>
 /// <remarks>
-/// Der Abzug liegt als jsonb daneben, nicht in einer eigenen Tabelle: er wird
-/// immer als Ganzes geschrieben und als Ganzes gelesen, nie einzeln abgefragt.
-/// Eine zweite Tabelle wäre ein Verbund für einen Wert, der nur zusammen Sinn
-/// ergibt — und eine Zeile je Repository wäre die Einladung, danach zu
-/// sortieren.
+/// The snapshot lies beside it as jsonb, not in a table of its own: it is
+/// always written as a whole and read as a whole, never queried individually. A
+/// second table would be a join for a value that only makes sense together —
+/// and one row per repository would be the invitation to sort by it.
 /// </remarks>
 public sealed class ConnectionRow
 {
-    /// <summary>Die Subjekt-Kennung. Sie <em>ist</em> der Schlüssel.</summary>
+    /// <summary>The subject id. It <em>is</em> the key.</summary>
     public Guid Id { get; set; }
 
-    /// <summary><c>null</c>: noch kein Konto genannt.</summary>
+    /// <summary><c>null</c>: no account named yet.</summary>
     public string? Login { get; set; }
 
     public string Challenge { get; set; } = string.Empty;
@@ -37,16 +36,15 @@ public sealed class ConnectionRow
     public DateTime UpdatedAt { get; set; }
 }
 
-/// <summary>Die eine Tabelle, die dieser Dienst besitzt.</summary>
+/// <summary>The one table this service owns.</summary>
 /// <remarks>
-/// None Outbox: dieser Dienst verschickt nichts. Und keine Spalte, die einen
-/// Menschen zusammenfasst — kein Punktwert, kein Rang, keine abgeleitete
-/// Fähigkeit (ADR-0022).
+/// No outbox: this service sends nothing. And no column that summarises a human
+/// being — no score, no rank, no derived skill (ADR-0022).
 /// </remarks>
 public sealed class GitHubDbContext(DbContextOptions<GitHubDbContext> options)
     : DbContext(options)
 {
-    /// <summary>Die Connections.</summary>
+    /// <summary>The connections.</summary>
     public DbSet<ConnectionRow> Connections => Set<ConnectionRow>();
 
     /// <inheritdoc />
@@ -60,13 +58,13 @@ public sealed class GitHubDbContext(DbContextOptions<GitHubDbContext> options)
             entity.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
-            // OHNE `IsRequired`: eine Connection, die über GitHubs Anmeldung
-            // entsteht, kennt ihr Konto noch nicht — den Namen meldet GitHub.
-            // Eine leere Zeichenkette statt `null` wäre ein Name, den es nicht
-            // gibt, und würde in jeder Abfrage mitgezählt.
+            // WITHOUT `IsRequired`: a connection that comes into being over
+            // GitHub's sign-in does not know its account yet — GitHub reports
+            // the name. An empty string instead of `null` would be a name that
+            // does not exist, and it would be counted in every query.
             entity.Property(row => row.Login)
                 .HasColumnName("login")
-                .HasMaxLength(Connection.HoechstlaengeLogin);
+                .HasMaxLength(Connection.MaxLoginLength);
             entity.Property(row => row.Challenge)
                 .HasColumnName("challenge").HasMaxLength(64).IsRequired();
             entity.Property(row => row.VerifiedAt).HasColumnName("verified_at");
@@ -76,7 +74,7 @@ public sealed class GitHubDbContext(DbContextOptions<GitHubDbContext> options)
             // Vorgabe `true`: bestehende Zeilen stammen aus einer Zeit, in der
             // ohne Token gar keine Sprachen geholt wurden. `false` zu setzen
             // waere ehrlicher fuer die Vergangenheit und laestiger fuer die
-            // Gegenwart — der naechste Abruf schreibt ohnehin den wahren Wert,
+            // Gegenwart — der naechste Abruf schreibt ohnehin den wahren Value,
             // und bis dahin behauptet die Zeile nichts, was sie nicht belegen
             // koennte: sie zeigt schlicht, was sie hat.
             entity.Property(row => row.LanguagesComplete)

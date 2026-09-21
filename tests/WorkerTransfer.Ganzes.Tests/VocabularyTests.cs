@@ -55,7 +55,7 @@ public class VocabularyTests
          typeof(Transfer.Contracts.MarketStatusV1)),
         ("notification", typeof(Notification.Domain.Notifications.NotificationKind),
          typeof(Notification.Contracts.NotifyV1)),
-        ("github", typeof(GitHub.Domain.Connections.Loginfehler),
+        ("github", typeof(GitHub.Domain.Connections.LoginError),
          typeof(GitHub.Contracts.RepositoryV1)),
         ("scout", typeof(Scout.Domain.Searches.Search),
          typeof(Scout.Contracts.HakenV1)),

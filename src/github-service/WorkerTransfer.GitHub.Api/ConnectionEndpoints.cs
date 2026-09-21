@@ -8,48 +8,48 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.GitHub.Api;
 
-/// <summary><c>/github/*</c> — beanspruchen, beweisen, zeigen, trennen.</summary>
+/// <summary><c>/github/*</c> — claim, prove, show, disconnect.</summary>
 /// <remarks>
-/// None Route hier trägt einen Punktwert, einen Rang oder eine abgeleitete
-/// Fähigkeit. Was hinausgeht, sind Belege mit Links: was GitHub über ein
-/// <em>Repository</em> sagt. Eine Aussage über einen <em>Menschen</em> wäre ein
-/// Urteil, das er nicht kommentieren kann (ADR-0022).
+/// No route here carries a score, a rank or a derived skill. What goes out is
+/// evidence with links: what GitHub says about a <em>repository</em>. A
+/// statement about a <em>human being</em> would be a judgement they cannot
+/// comment on (ADR-0022).
 /// </remarks>
 public static class ConnectionEndpoints
 {
-    /// <summary>Was ein Filter zurückgibt, der die Antwort selbst geschrieben hat.</summary>
+    /// <summary>What a filter returns when it has written the response itself.</summary>
     /// <remarks>
-    /// <strong>Nicht <c>null</c>.</strong> Ein Filter, der <c>null</c>
-    /// zurückgibt, lässt das Rahmenwerk noch einmal schreiben — JSON-<c>null</c>
-    /// samt Kopfzeilen, und die stehen zu diesem Zeitpunkt schon. Bei einer
-    /// ResumeRequest mit Rumpf reißt dabei die Connection.
+    /// <strong>Not <c>null</c>.</strong> A filter that returns <c>null</c> lets
+    /// the framework write once more — a JSON <c>null</c> along with headers,
+    /// and those have already gone out by then. On a request with a body the
+    /// connection tears.
     /// </remarks>
-    private static readonly IResult Geschrieben = Results.Empty;
+    private static readonly IResult AlreadyWritten = Results.Empty;
 
-    /// <summary>Bildet die Routen dieses Dienstes ab.</summary>
-    public static IEndpointRouteBuilder MapVerbindungsEndpoints(this IEndpointRouteBuilder app)
+    /// <summary>Maps the routes of this service.</summary>
+    public static IEndpointRouteBuilder MapConnectionEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
         var github = app.MapGroup("/github");
 
-        // Zwei stille Abhängigkeiten, zwei verschiedene Sätze — aber derselbe
-        // Statuscode. Weder GitHub noch der Ledger darf zu einer Behauptung
-        // über die Person werden: „nicht bewiesen", weil wir nicht fragen
-        // konnten, wäre eine.
+        // Two silent dependencies, two different sentences — but the same
+        // status code. Neither GitHub nor the ledger may become an assertion
+        // about the person: "not proved", because we could not ask, would be
+        // one.
         github.AddEndpointFilter(async (call, weiter) =>
         {
             try
             {
                 return await weiter(call);
             }
-            catch (GitHubSignInSilent)
+            catch (GitHubSilent)
             {
                 await ProblemDetailsMiddleware.Write(
                     call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "github unavailable");
 
-                return Geschrieben;
+                return AlreadyWritten;
             }
             catch (ConsentGateSilent)
             {
@@ -57,7 +57,7 @@ public static class ConnectionEndpoints
                     call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "the consent ledger did not answer");
 
-                return Geschrieben;
+                return AlreadyWritten;
             }
         });
 
@@ -68,106 +68,106 @@ public static class ConnectionEndpoints
         github.MapPost("/me", async (
             ConnectV1 body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
             ArgumentNullException.ThrowIfNull(body);
 
             var result = await mediator.Send(
-                new ConnectCommand(handelnder.Subject, body.Login), cancellationToken);
+                new ConnectCommand(actor.Subject, body.Login), cancellationToken);
 
             await Beantworte(context, result, eigen: true, cancellationToken);
         });
 
         github.MapPost("/me/verify", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
             var result = await mediator.Send(
-                new ProveCommand(handelnder.Subject), cancellationToken);
+                new ProveCommand(actor.Subject), cancellationToken);
 
             await Beantworte(context, result, eigen: true, cancellationToken);
         });
 
-        // DER WEG ÜBER GITHUBS EIGENE ANMELDUNG — er ersetzt den Gist, nicht
-        // die Nennung. Ohne hinterlegte Zugangsdaten antwortet er mit `null`,
-        // und die Oberfläche bietet weiter den Gist an.
+        // THE PATH OVER GITHUB'S OWN SIGN-IN — it replaces the gist, not the
+        // naming. Without stored credentials it answers `null`, and the
+        // interface goes on offering the gist.
         github.MapPost("/me/oauth/start", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
             var beginn = await mediator.Send(
-                new BeginSignInCommand(handelnder.Subject), cancellationToken);
+                new StartSignInCommand(actor.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                new AnmeldebeginnV1(beginn.Adresse?.ToString()), cancellationToken);
+                new SignInStartV1(beginn.Url?.ToString()), cancellationToken);
         });
 
-        // OHNE `/me`, WEIL NICHTS PERSÖNLICHES DARIN STEHT: die Frage lautet,
-        // ob dieser Server die Anmeldung eingerichtet hat. Sie legt nichts an —
-        // im Gegensatz zu `/me/oauth/start`, das genau deshalb erst auf
-        // Knopfdruck gerufen wird und nicht beim Betrachten der Seite.
+        // WITHOUT `/me`, BECAUSE NOTHING PERSONAL STANDS IN IT: the question is
+        // whether this server has the sign-in configured. It creates nothing —
+        // unlike `/me/oauth/start`, which is called on a button press for
+        // exactly that reason and not on looking at the page.
         github.MapGet("/oauth", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            // Angemeldet, obwohl nichts Persönliches darin steht: die Antwort
-            // hilft nur beim Verbinden, und das kann ohnehin nur, wer
-            // angemeldet ist. Eine neue offene Tür ohne Grund ist eine zu viel.
-            if (akteur.Current is null)
+            // Signed in, although nothing personal stands in it: the answer
+            // helps only with connecting, and only somebody signed in can do
+            // that anyway. A new open door without a reason is one too many.
+            if (principal.Current is null)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
-            var moeglich = await mediator.Send(
+            var available = await mediator.Send(
                 new SignInPossibleQuery(), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                new SignInPossibleV1(moeglich), cancellationToken);
+                new SignInPossibleV1(available), cancellationToken);
         });
 
         github.MapPost("/me/oauth/finish", async (
-            CompleteSignInV1 koerper,
+            CompleteSignInV1 body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
             var result = await mediator.Send(
                 new CompleteSignInCommand(
-                    handelnder.Subject, koerper.Code, koerper.State),
+                    actor.Subject, body.Code, body.State),
                 cancellationToken);
 
             await Beantworte(context, result, eigen: true, cancellationToken);
@@ -175,58 +175,58 @@ public static class ConnectionEndpoints
 
         github.MapPost("/me/refresh", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
             var result = await mediator.Send(
-                new AuffrischenBefehl(handelnder.Subject), cancellationToken);
+                new RefreshCommand(actor.Subject), cancellationToken);
 
             await Beantworte(context, result, eigen: true, cancellationToken);
         });
 
-        // Auch die unbewiesene Connection — sonst sähe die Person nach dem
-        // ersten Schritt gar nichts und wüsste nicht, welche Zeichenfolge sie
-        // in den Gist schreiben soll.
+        // The unproved connection too — otherwise the person would see nothing
+        // at all after the first step and would not know which string to write
+        // into the gist.
         github.MapGet("/me", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
             var connection = await mediator.Send(
-                new MyConnectionQuery(handelnder.Subject), cancellationToken);
+                new MyConnectionQuery(actor.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                connection is null ? null : Antwort(connection, eigen: true), cancellationToken);
+                connection is null ? null : Response(connection, eigen: true), cancellationToken);
         });
 
-        // Trennen heißt löschen — der Abzug verschwindet mit.
+        // Disconnecting means erasing — the snapshot goes with it.
         github.MapDelete("/me", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
-            await mediator.Send(new TrennenBefehl(handelnder.Subject), cancellationToken);
+            await mediator.Send(new DisconnectCommand(actor.Subject), cancellationToken);
 
             context.Response.StatusCode = StatusCodes.Status204NoContent;
         });
@@ -234,13 +234,13 @@ public static class ConnectionEndpoints
         github.MapGet("/{subjectId:guid}", async (
             Guid subjectId,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is null)
+            if (principal.Current is null)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
@@ -259,7 +259,7 @@ public static class ConnectionEndpoints
             }
 
             await context.Response.WriteAsJsonAsync(
-                Antwort(connection, eigen: false), cancellationToken);
+                Response(connection, eigen: false), cancellationToken);
         });
 
         return app;
@@ -275,7 +275,7 @@ public static class ConnectionEndpoints
         {
             case ConnectionResult.Erledigt erledigt:
                 await context.Response.WriteAsJsonAsync(
-                    Antwort(erledigt.Connection, eigen), cancellationToken);
+                    Response(erledigt.Connection, eigen), cancellationToken);
                 return;
 
             case ConnectionResult.None:
@@ -285,14 +285,14 @@ public static class ConnectionEndpoints
                 return;
 
             case ConnectionResult.NichtBewiesen:
-                // 422, nicht 404: die ResumeRequest war in Ordnung, der Nachweis
-                // fehlte.
+                // 422, not 404: the request was fine, the proof was missing.
                 //
-                // Die Meldung nennt den WEG nicht mehr. Sie lautete „no public
-                // gist with that description was found" — richtig, solange es
-                // nur den Gist gab, und irreführend, seit die Anmeldung über
-                // GitHub daneben steht: wer dort ein fremdes Konto autorisiert,
-                // hätte gelesen, sein Gist fehle.
+                // The message no longer names the PATH. It used to read "no
+                // public gist with that description was found" — right for as
+                // long as there was only the gist, and misleading since the
+                // sign-in over GitHub stands beside it: whoever authorises a
+                // foreign account there would have read that their gist was
+                // missing.
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "the account was not proven");
@@ -309,25 +309,26 @@ public static class ConnectionEndpoints
         }
     }
 
-    private static Task NichtAngemeldet(HttpContext context) =>
+    private static Task NotAuthenticated(HttpContext context) =>
         ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
 
-    private static ConnectionV1 Antwort(Connection connection, bool eigen) =>
-        new(connection.Wer.Value,
+    private static ConnectionV1 Response(Connection connection, bool eigen) =>
+        new(connection.Subject.Value,
             connection.Login,
-            connection.Nachgewiesen,
-            // Nur in der eigenen Ansicht, und nur solange nicht bewiesen: die
-            // Einmalzeichenfolge nützt allein der Person, die den Gist anlegt.
-            eigen && !connection.Nachgewiesen
-                ? Connection.Gistbeschreibung(connection.Einmalzeichenfolge)
+            connection.IsVerified,
+            // Only in one's own view, and only for as long as it is not proved:
+            // the one-time string is of use only to the person creating the
+            // gist.
+            eigen && !connection.IsVerified
+                ? Connection.GistDescription(connection.Nonce)
                 : null,
-            connection.GeholtAm,
+            connection.FetchedAt,
             [
                 .. connection.Repositories.Select(entry => new RepositoryV1(
-                    entry.Name, entry.Beschreibung, entry.Sprache,
-                    entry.Sterne, entry.Adresse, entry.ZuletztGeschoben,
-                    entry.Sprachen, entry.Themen))
+                    entry.Name, entry.Description, entry.Language,
+                    entry.Stars, entry.Url, entry.LastPushedAt,
+                    entry.Languages, entry.Topics))
             ],
-            connection.SprachenVollstaendig);
+            connection.LanguagesComplete);
 }

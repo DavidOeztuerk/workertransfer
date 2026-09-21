@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 using WorkerTransfer.Contracts.Consent;
 using WorkerTransfer.GitHub.Application.Ports;
 
-namespace WorkerTransfer.GitHub.Infrastructure.Einwilligung;
+namespace WorkerTransfer.GitHub.Infrastructure.Consent;
 
 /// <summary>Wo der Consent-Ledger antwortet.</summary>
 public sealed class ConsentSettings
@@ -23,17 +23,16 @@ public sealed class ConsentSettings
 
 /// <summary>Fragt den Ledger. Schreibt nie in ihn.</summary>
 /// <remarks>
-/// Synchron und ohne Zwischenspeicher (ADR-0013). Jeder Aufruf reist mit dem
-/// Token <em>des Aufrufers</em>, damit das Protokoll des Ledgers festhält, wer
-/// wirklich gefragt hat.
+/// Synchronously and without a cache (ADR-0013). Every call travels with
+/// <em>the caller's</em> token, so the ledger's log records who really asked.
 /// </remarks>
 public sealed class HttpConsentGate(
-    IHttpClientFactory fabrik,
-    IAufrufertoken token,
-    IOptions<ConsentSettings> einstellungen,
-    ILogger<HttpConsentGate> protokoll) : IConsentGate
+    IHttpClientFactory factory,
+    ICallerToken token,
+    IOptions<ConsentSettings> settings,
+    ILogger<HttpConsentGate> log) : IConsentGate
 {
-    /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
+    /// <summary>The name the client is registered under.</summary>
     public const string Klient = "consent";
 
     private static readonly JsonSerializerOptions Format = new(JsonSerializerDefaults.Web)
@@ -41,29 +40,29 @@ public sealed class HttpConsentGate(
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
 
-    private readonly ConsentSettings _einstellungen = einstellungen.Value;
+    private readonly ConsentSettings _settings = settings.Value;
 
     /// <inheritdoc />
     public async Task<bool> MayBeShownAsync(
         SubjectId subject, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_einstellungen.Adresse))
+        if (string.IsNullOrEmpty(_settings.Adresse))
         {
             throw new ConsentGateSilent("Consent:Adresse ist nicht gesetzt.");
         }
 
-        using var client = fabrik.CreateClient(Klient);
-        client.Timeout = _einstellungen.Zeitueberschreitung;
+        using var client = factory.CreateClient(Klient);
+        client.Timeout = _settings.Zeitueberschreitung;
 
         using var request = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(_einstellungen.Adresse), "/consent/check"))
+            HttpMethod.Post, new Uri(new Uri(_settings.Adresse), "/consent/check"))
         {
             Content = JsonContent.Create(
-                new ConsentQuestionV1(subject.Value, ConsentKey.Sichtbarkeit),
+                new ConsentQuestionV1(subject.Value, ConsentKey.Visibility),
                 options: Format)
         };
 
-        if (token.Wert is { Length: > 0 } value)
+        if (token.Value is { Length: > 0 } value)
         {
             request.Headers.Add("Authorization", $"Bearer {value}");
         }
@@ -76,12 +75,12 @@ public sealed class HttpConsentGate(
         }
         catch (HttpRequestException error)
         {
-            protokoll.LogWarning("Consent-Ledger nicht erreichbar ({Art})", error.GetType().Name);
+            log.LogWarning("Consent-Ledger nicht erreichbar ({Art})", error.GetType().Name);
             throw new ConsentGateSilent("consent-service ist nicht erreichbar.", error);
         }
         catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
-            protokoll.LogWarning("Consent-Ledger antwortete nicht rechtzeitig");
+            log.LogWarning("Consent-Ledger antwortete nicht rechtzeitig");
             throw new ConsentGateSilent("consent-service antwortete nicht rechtzeitig.", error);
         }
 
@@ -90,8 +89,8 @@ public sealed class HttpConsentGate(
             if (!response.IsSuccessStatusCode)
             {
                 // 401 und 403 eingeschlossen: unser Token taugt nicht — ein
-                // Systemproblem, keine Aussage über die Einwilligung.
-                protokoll.LogWarning(
+                // A system problem, no statement about the consent.
+                log.LogWarning(
                     "Consent-Ledger antwortete mit {Code}", (int)response.StatusCode);
 
                 throw new ConsentGateSilent(
@@ -100,12 +99,12 @@ public sealed class HttpConsentGate(
 
             try
             {
-                var gelesen = await response.Content
+                var read = await response.Content
                     .ReadFromJsonAsync<ConsentResponseV1>(Format, cancellationToken)
                     ?? throw new ConsentGateSilent("consent-service sandte nichts.");
 
-                // Erteilt und nicht gelöscht. Alles andere ist ein Nein.
-                return gelesen.Granted && !gelesen.Deleted;
+                // Granted and not deleted. Everything else is a no.
+                return read.Granted && !read.Deleted;
             }
             catch (JsonException error)
             {

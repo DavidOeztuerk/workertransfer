@@ -1,10 +1,10 @@
 namespace WorkerTransfer.GitHub.Infrastructure.Erasure;
 
-/// <summary>Das Geheimnis, mit dem sich die Löschkaskade ausweist.</summary>
+/// <summary>The secret the erasure cascade identifies itself with.</summary>
 /// <remarks>
-/// Ausdrücklich ein <em>anderes</em> als das der Benachrichtigung: „darf eine
-/// Mail anstoßen" und „darf alles über einen Menschen löschen" dürfen nicht
-/// dasselbe Papier sein (ADR-0027 §4.4). Leer heißt zu.
+/// Expressly a <em>different</em> one from the notification's: "may trigger a
+/// mail" and "may erase everything about a human being" must not be the same
+/// piece of paper (ADR-0027 §4.4). Empty means shut.
 /// </remarks>
 public sealed class ErasureSettings
 {

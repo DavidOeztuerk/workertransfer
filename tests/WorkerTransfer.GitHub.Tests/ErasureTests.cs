@@ -13,11 +13,11 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.GitHub.Tests;
 
-/// <summary>Die Löschung — hier ohne jede Ausnahme.</summary>
+/// <summary>The erasure — here without any exception.</summary>
 [Collection(PostgresCollection.Name)]
-public class LoeschungTests(Postgres postgres) : IAsyncLifetime
+public class ErasureTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Loeschgeheimnis = "loesch-geheimnis";
+    private const string ErasureSecret = "loesch-geheimnis";
 
     private WebApplicationFactory<Program> _dienst = null!;
     private readonly ProbeGitHub _github = new();
@@ -27,12 +27,12 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:github", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
-            host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
+            host.UseSetting("Erasure:Geheimnis", ErasureSecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {
@@ -51,51 +51,51 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Die Verknüpfung fällt — und mit ihr das Personendatum.
+    /// The link falls — and the personal datum with it.
     /// </summary>
     /// <remarks>
-    /// Der Login ist öffentlich; jeder kann ihn auf github.com nachschlagen.
-    /// Das Personendatum ist nicht der Name, sondern die Verknüpfung „dieser
-    /// Plattform-Mensch ist jener GitHub-Name".
+    /// The login is public; anybody can look it up on github.com. The personal
+    /// datum is not the name but the link "this platform person is that GitHub
+    /// name".
     /// </remarks>
     [Fact]
-    public async Task Die_Loeschung_nimmt_die_Verknuepfung_mit()
+    public async Task The_erasure_takes_the_link_with_it()
     {
         var anna = Guid.CreateVersion7();
-        await Verbinde(anna, "anna-dev");
+        await Connect(anna, "anna-dev");
 
-        var response = await Loesche(anna);
+        var response = await Erase(anna);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var quittung = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
-        quittung.GetProperty("retained").GetInt32().Should().Be(0);
+        var receipt = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        receipt.GetProperty("retained").GetInt32().Should().Be(0);
 
-        await using var context = postgres.Kontext();
+        await using var context = postgres.Context();
         (await context.Connections.AnyAsync(row => row.Id == anna)).Should().BeFalse();
     }
 
-    /// <summary>Die Löschung eines Menschen fasst niemand anderen an.</summary>
+    /// <summary>Erasing one human being touches nobody else.</summary>
     [Fact]
-    public async Task Die_Loeschung_trifft_nur_diesen_Menschen()
+    public async Task The_erasure_strikes_only_this_human_being()
     {
         var anna = Guid.CreateVersion7();
         var bea = Guid.CreateVersion7();
-        await Verbinde(anna, "anna-dev");
-        await Verbinde(bea, "bea-dev");
+        await Connect(anna, "anna-dev");
+        await Connect(bea, "bea-dev");
 
-        await Loesche(anna);
+        await Erase(anna);
 
-        await using var context = postgres.Kontext();
+        await using var context = postgres.Context();
         (await context.Connections.AnyAsync(row => row.Id == bea)).Should().BeTrue();
     }
 
     /// <summary>Ohne das Geheimnis passiert nichts.</summary>
     [Fact]
-    public async Task Ohne_das_richtige_Geheimnis_wird_nichts_geloescht()
+    public async Task Without_the_right_secret_nothing_is_erased()
     {
         var anna = Guid.CreateVersion7();
-        await Verbinde(anna, "anna-dev");
+        await Connect(anna, "anna-dev");
 
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", "geraten");
@@ -104,32 +104,32 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        await using var context = postgres.Kontext();
+        await using var context = postgres.Context();
         (await context.Connections.AnyAsync(row => row.Id == anna)).Should().BeTrue();
     }
 
     /// <summary>Ein zweiter Aufruf ist kein Fehlschlag.</summary>
     [Fact]
-    public async Task Ein_zweites_Mal_loeschen_ist_wieder_2xx()
+    public async Task Erasing_a_second_time_is_2xx_again()
     {
         var anna = Guid.CreateVersion7();
 
-        (await Loesche(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Loesche(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Erase(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Erase(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    private Task<HttpResponseMessage> Loesche(Guid subject)
+    private Task<HttpResponseMessage> Erase(Guid subject)
     {
         var browser = _dienst.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", Loeschgeheimnis);
+        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", ErasureSecret);
         return browser.PostAsJsonAsync("/erasure", new { user_id = subject });
     }
 
-    private Task<HttpResponseMessage> Verbinde(Guid subject, string login)
+    private Task<HttpResponseMessage> Connect(Guid subject, string login)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Person(subject));
+            new AuthenticationHeaderValue("Bearer", TokenShape.Person(subject));
 
         return browser.PostAsJsonAsync("/github/me", new { login });
     }

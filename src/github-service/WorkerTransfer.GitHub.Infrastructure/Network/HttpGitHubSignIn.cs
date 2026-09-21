@@ -5,85 +5,84 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.GitHub.Application.Ports;
 
-namespace WorkerTransfer.GitHub.Infrastructure.Netz;
+namespace WorkerTransfer.GitHub.Infrastructure.Network;
 
-/// <summary>Die Zugangsdaten für GitHubs Anmeldung.</summary>
+/// <summary>The credentials for GitHub's sign-in.</summary>
 /// <remarks>
-/// <strong>Leer heisst aus</strong>, und dann bleibt der Gist der Weg. Dieselbe
-/// Haltung wie bei der Formulierungshilfe: eine Voreinstellung, die ein
-/// Geheimnis enthält, IST das Geheimnis — und es läge dann in der
-/// Versionsverwaltung.
+/// <strong>Empty means off</strong>, and then the gist stays the path. The same
+/// stance as with the drafting help: a default that contains a secret IS the
+/// secret — and it would then sit in version control.
 /// </remarks>
 public sealed class GitHubSignInSettings
 {
-    /// <summary>Der Section in der Konfiguration.</summary>
+    /// <summary>The configuration section.</summary>
     public const string Section = "GitHub:OAuth";
 
-    /// <summary>Die Kennung der OAuth-Anwendung. Leer heisst: gibt es nicht.</summary>
+    /// <summary>The OAuth application's id. Empty means: there is none.</summary>
     public string Kennung { get; set; } = string.Empty;
 
     /// <summary>Das Geheimnis dazu.</summary>
     public string Geheimnis { get; set; } = string.Empty;
 
-    /// <summary>Wohin GitHub den Browser zurückschickt.</summary>
-    public string Rueckadresse { get; set; } = string.Empty;
+    /// <summary>Where GitHub sends the browser back to.</summary>
+    public string RedirectUrl { get; set; } = string.Empty;
 
-    /// <summary>Wo GitHubs Anmeldung liegt. Für Proben umstellbar.</summary>
-    public string Anmeldeadresse { get; set; } = "https://github.com";
+    /// <summary>Where GitHub's sign-in lies. Switchable for probes.</summary>
+    public string AuthorizeUrl { get; set; } = "https://github.com";
 
-    /// <summary>Wie lange ein Tausch dauern darf.</summary>
+    /// <summary>How long an exchange may take.</summary>
     public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(10);
 }
 
-/// <summary>Was GitHub auf den Tausch antwortet.</summary>
+/// <summary>What GitHub answers to the exchange.</summary>
 internal sealed record ExchangeResponse(
     [property: JsonPropertyName("access_token")] string? AccessToken,
     [property: JsonPropertyName("error")] string? Error);
 
 /// <summary>Was <c>GET /user</c> davon hergibt, was hier gebraucht wird.</summary>
-internal sealed record Kontoeintrag(
+internal sealed record AccountEntry(
     [property: JsonPropertyName("login")] string? Login);
 
-/// <inheritdoc cref="IGitHubAnmeldung" />
+/// <inheritdoc cref="IGitHubSignIn" />
 public sealed class HttpGitHubSignIn(
-    IHttpClientFactory fabrik,
-    IOptions<GitHubSignInSettings> anmeldung,
+    IHttpClientFactory factory,
+    IOptions<GitHubSignInSettings> signIn,
     IOptions<GitHubSettings> api) : IGitHubSignIn
 {
     /// <summary>Der Name, unter dem der Client registriert ist.</summary>
     public const string Klient = "github-oauth";
 
-    private readonly GitHubSignInSettings _anmeldung = anmeldung.Value;
+    private readonly GitHubSignInSettings _signIn = signIn.Value;
     private readonly GitHubSettings _api = api.Value;
 
     /// <inheritdoc />
-    public bool Eingerichtet =>
-        _anmeldung.Kennung.Length > 0
-        && _anmeldung.Geheimnis.Length > 0
-        && _anmeldung.Rueckadresse.Length > 0;
+    public bool IsConfigured =>
+        _signIn.Kennung.Length > 0
+        && _signIn.Geheimnis.Length > 0
+        && _signIn.RedirectUrl.Length > 0;
 
     /// <inheritdoc />
-    public Uri Anmeldeadresse(string state)
+    public Uri AuthorizeUrl(string state)
     {
-        // OHNE `scope`. `GET /user` beantwortet die Frage nach dem eigenen
-        // Namen ohne jedes Recht; ein `repo`-Recht zu erbitten, um öffentliche
-        // Repositories zu lesen, wäre eine Vollmacht für etwas, das ohnehin
-        // öffentlich ist.
+        // WITHOUT `scope`. `GET /user` answers the question about one's own
+        // name without any right; asking for a `repo` right in order to read
+        // public repositories would be a power of attorney for something that
+        // is public anyway.
         var abfrage =
-            $"client_id={Uri.EscapeDataString(_anmeldung.Kennung)}"
-            + $"&redirect_uri={Uri.EscapeDataString(_anmeldung.Rueckadresse)}"
+            $"client_id={Uri.EscapeDataString(_signIn.Kennung)}"
+            + $"&redirect_uri={Uri.EscapeDataString(_signIn.RedirectUrl)}"
             + $"&state={Uri.EscapeDataString(state)}"
             + "&scope=";
 
         return new Uri(
-            new Uri(_anmeldung.Anmeldeadresse), $"/login/oauth/authorize?{abfrage}");
+            new Uri(_signIn.AuthorizeUrl), $"/login/oauth/authorize?{abfrage}");
     }
 
     /// <inheritdoc />
     public async Task<string?> LoginNameAsync(
         string code, CancellationToken cancellationToken = default)
     {
-        if (!Eingerichtet)
+        if (!IsConfigured)
         {
             return null;
         }
@@ -96,26 +95,26 @@ public sealed class HttpGitHubSignIn(
     /// <summary>Der Einmalcode wird gegen ein Zugriffstoken getauscht.</summary>
     private async Task<string?> ExchangeAsync(string code, CancellationToken cancellationToken)
     {
-        using var client = fabrik.CreateClient(Klient);
-        client.Timeout = _anmeldung.Zeitueberschreitung;
+        using var client = factory.CreateClient(Klient);
+        client.Timeout = _signIn.Zeitueberschreitung;
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            new Uri(new Uri(_anmeldung.Anmeldeadresse), "/login/oauth/access_token"))
+            new Uri(new Uri(_signIn.AuthorizeUrl), "/login/oauth/access_token"))
         {
             Content = JsonContent.Create(new
             {
-                client_id = _anmeldung.Kennung,
-                client_secret = _anmeldung.Geheimnis,
+                client_id = _signIn.Kennung,
+                client_secret = _signIn.Geheimnis,
                 code,
-                redirect_uri = _anmeldung.Rueckadresse
+                redirect_uri = _signIn.RedirectUrl
             })
         };
 
-        // Ohne diesen Header antwortet GitHub in seiner alten Formularschreibweise
-        // statt in JSON — und der Leser darunter fände nichts.
+        // Without this header GitHub answers in its old form encoding instead
+        // of in JSON — and the reader below would find nothing.
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        request.Headers.UserAgent.ParseAdd(_api.Benutzerkennung);
+        request.Headers.UserAgent.ParseAdd(_api.UserAgent);
 
         var response = await SendeAsync(client, request, cancellationToken);
 
@@ -123,30 +122,30 @@ public sealed class HttpGitHubSignIn(
         {
             if (!response.IsSuccessStatusCode)
             {
-                throw new GitHubSignInSilent($"github returned {(int)response.StatusCode}");
+                throw new GitHubSilent($"github returned {(int)response.StatusCode}");
             }
 
-            var gelesen = JsonSerializer.Deserialize<ExchangeResponse>(
+            var read = JsonSerializer.Deserialize<ExchangeResponse>(
                 await response.Content.ReadAsStringAsync(cancellationToken));
 
-            // Ein abgelehnter Code ist eine Aussage über den Code, kein Ausfall
-            // — GitHub antwortet darauf mit 200 und einem `error`-Feld.
-            return gelesen?.AccessToken is { Length: > 0 } token ? token : null;
+            // A refused code is a statement about the code, not an outage —
+            // GitHub answers it with 200 and an `error` field.
+            return read?.AccessToken is { Length: > 0 } token ? token : null;
         }
     }
 
-    /// <summary>Mit dem Token einmal fragen, wem es gehört — und es vergessen.</summary>
+    /// <summary>Ask once with the token whom it belongs to — and forget it.</summary>
     private async Task<string?> NamesAsync(string token, CancellationToken cancellationToken)
     {
-        using var client = fabrik.CreateClient(Klient);
-        client.Timeout = _anmeldung.Zeitueberschreitung;
+        using var client = factory.CreateClient(Klient);
+        client.Timeout = _signIn.Zeitueberschreitung;
 
         using var request = new HttpRequestMessage(
             HttpMethod.Get, new Uri(new Uri(_api.Adresse), "/user"));
 
         request.Headers.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-        request.Headers.UserAgent.ParseAdd(_api.Benutzerkennung);
+        request.Headers.UserAgent.ParseAdd(_api.UserAgent);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await SendeAsync(client, request, cancellationToken);
@@ -155,10 +154,10 @@ public sealed class HttpGitHubSignIn(
         {
             if (!response.IsSuccessStatusCode)
             {
-                throw new GitHubSignInSilent($"github returned {(int)response.StatusCode}");
+                throw new GitHubSilent($"github returned {(int)response.StatusCode}");
             }
 
-            var konto = JsonSerializer.Deserialize<Kontoeintrag>(
+            var konto = JsonSerializer.Deserialize<AccountEntry>(
                 await response.Content.ReadAsStringAsync(cancellationToken));
 
             return konto?.Login is { Length: > 0 } name ? name : null;
@@ -175,11 +174,11 @@ public sealed class HttpGitHubSignIn(
         catch (HttpRequestException error)
         {
             // Die Art, nie der Inhalt.
-            throw new GitHubSignInSilent($"github is unreachable ({error.GetType().Name})", error);
+            throw new GitHubSilent($"github is unreachable ({error.GetType().Name})", error);
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new GitHubSignInSilent("github did not answer in time");
+            throw new GitHubSilent("github did not answer in time");
         }
     }
 }

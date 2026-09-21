@@ -9,9 +9,9 @@ using WorkerTransfer.GitHub.Application.Behaviors;
 using WorkerTransfer.GitHub.Application.Ports;
 using WorkerTransfer.GitHub.Application.Connections;
 using WorkerTransfer.GitHub.Domain.Connections;
-using WorkerTransfer.GitHub.Infrastructure.Einwilligung;
+using WorkerTransfer.GitHub.Infrastructure.Consent;
 using WorkerTransfer.GitHub.Infrastructure.Erasure;
-using WorkerTransfer.GitHub.Infrastructure.Netz;
+using WorkerTransfer.GitHub.Infrastructure.Network;
 using WorkerTransfer.GitHub.Infrastructure.Persistence;
 using WorkerTransfer.GitHub.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
@@ -29,9 +29,9 @@ namespace WorkerTransfer.GitHub.Infrastructure;
 /// </remarks>
 public static class GitHubInfrastructure
 {
-    /// <param name="services">Der Behälter.</param>
-    /// <param name="configuration">Woher Ledger, GitHub und Secrets kommen.</param>
-    /// <param name="connectionString">Wo die GitHub-Datenbank liegt.</param>
+    /// <param name="services">The container.</param>
+    /// <param name="configuration">Where ledger, GitHub and secrets come from.</param>
+    /// <param name="connectionString">Where the GitHub database lies.</param>
     public static IServiceCollection AddGitHubInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -64,43 +64,42 @@ public static class GitHubInfrastructure
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IErasureLedger, EfErasureLedger>();
         services.AddScoped<IConsentGate, HttpConsentGate>();
-        services.AddScoped<IAufrufertoken, HttpAufrufertoken>();
+        services.AddScoped<ICallerToken, HttpCallerToken>();
         services.AddScoped<IGitHub, HttpGitHub>();
         // Ohne Zugangsdaten meldet sie sich als „nicht eingerichtet", und der
-        // Gist bleibt der Weg. Registriert wird sie trotzdem — ein Dienst, der
-        // je nach Konfiguration andere Abhängigkeiten hat, fällt erst beim
-        // ersten Aufruf um statt beim Start.
+        // The gist stays the path. It is registered all the same — a service
+        // whose dependencies differ by configuration falls over at the first
+        // call instead of at startup.
         services.AddScoped<IGitHubSignIn, HttpGitHubSignIn>();
 
         services.AddCQRS(typeof(ConnectCommand).Assembly);
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
         Nachweis(services, configuration);
 
         return services;
     }
 
-    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <summary>What this service can answer about itself (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
-    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
-    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    /// <para>They stand here and not in ServiceFoundation, for the same reason
+    /// the ledger, the audit trail and the store stand here: they are decisions
+    /// of <em>this</em> service.</para>
     ///
-    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
-    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
-    /// vergessen kann.</para>
+    /// <para><c>wt.grenze.ziele</c> is deliberately missing here — it reads only
+    /// the configuration, is therefore the same for every service and stands in
+    /// <c>AddEvidence</c>. It is the one a new service cannot forget.</para>
     /// </remarks>
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
-            [typeof(Loginfehler).Assembly, typeof(RepositoryV1).Assembly]));
+            [typeof(LoginError).Assembly, typeof(RepositoryV1).Assembly]));
 
-        // None KI-Naht: `ProviderCheck` ohne Quelle meldet NichtAnwendbar,
-        // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
-        // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
-        // durchschneiden soll.
+        // No AI seam: a `ProviderCheck` without a source reports NotApplicable,
+        // and that is expressly NOT a green tick — a tick on something that
+        // does not apply here at all would be noise in the very document that
+        // exists to cut through noise.
         services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
             provider.GetServices<IProviderSource>()));
 

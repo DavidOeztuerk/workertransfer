@@ -16,11 +16,11 @@ namespace WorkerTransfer.GitHub.Tests;
 
 /// <summary>Beanspruchen, beweisen, zeigen, trennen.</summary>
 [Collection(PostgresCollection.Name)]
-public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
+public class ConnectionJourneyTests(Postgres postgres) : IAsyncLifetime
 {
     private WebApplicationFactory<Program> _dienst = null!;
     private readonly ProbeGitHub _github = new();
-    private readonly ProbeAnmeldung _anmeldung = new();
+    private readonly ProbeSignIn _signIn = new();
     private readonly Probeledger _ledger = new();
 
     public Task InitializeAsync()
@@ -28,17 +28,17 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:github", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {
                 services.Replace(ServiceDescriptor.Scoped<IGitHub>(_ => _github));
-                services.Replace(ServiceDescriptor.Scoped<IGitHubSignIn>(_ => _anmeldung));
+                services.Replace(ServiceDescriptor.Scoped<IGitHubSignIn>(_ => _signIn));
                 services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _ledger));
             });
         });
@@ -56,7 +56,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Person(subject));
+            new AuthenticationHeaderValue("Bearer", TokenShape.Person(subject));
         return browser;
     }
 
@@ -81,10 +81,10 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// <remarks>
     /// Der Vergleich gilt weiterhin — nur eben dort, wo es etwas zu vergleichen
     /// gibt. Wer nichts genannt hat, bekommt den gemeldeten Namen eingetragen
-    /// (siehe <see cref="Anmelden_ohne_Nennung_traegt_den_gemeldeten_Namen_ein" />).
+    /// (siehe <see cref="Signing_in_without_a_naming_writes_in_the_reported_name" />).
     /// </remarks>
     [Fact]
-    public async Task Nennen_anmelden_sehen()
+    public async Task Name_sign_in_see()
     {
         var ihr = AlsPerson(Guid.CreateVersion7());
 
@@ -97,7 +97,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         // Was der Browser bei GitHub täte, ist hier ein Code, der auf den
         // Anmeldenamen führt.
-        _anmeldung.Codes["ein-code"] = "anna-dev";
+        _signIn.Codes["ein-code"] = "anna-dev";
         _github.Repos["anna-dev"] = [Repo("werkzeug")];
 
         var fertig = await Json(await ihr.PostAsJsonAsync(
@@ -118,7 +118,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// erschiene als seine.
     /// </remarks>
     [Fact]
-    public async Task Eine_Anmeldung_mit_fremdem_Konto_beweist_nichts()
+    public async Task Signing_in_with_a_foreign_account_proves_nothing()
     {
         var ihr = AlsPerson(Guid.CreateVersion7());
 
@@ -126,7 +126,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         var state = offen.GetProperty("challenge_description").GetString()!
             .Replace("workertransfer-verify-", string.Empty, StringComparison.Ordinal);
 
-        _anmeldung.Codes["mein-code"] = "anna-dev";
+        _signIn.Codes["mein-code"] = "anna-dev";
 
         var response = await ihr.PostAsJsonAsync(
             "/github/me/oauth/finish", new { code = "mein-code", state = state });
@@ -145,12 +145,12 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// ihr damit sein Konto anhängen.
     /// </remarks>
     [Fact]
-    public async Task Ein_fremder_Zustand_beweist_nichts()
+    public async Task A_foreign_state_proves_nothing()
     {
         var ihr = AlsPerson(Guid.CreateVersion7());
 
         await Verbinde(ihr, "anna-dev");
-        _anmeldung.Codes["ein-code"] = "anna-dev";
+        _signIn.Codes["ein-code"] = "anna-dev";
 
         var response = await ihr.PostAsJsonAsync(
             "/github/me/oauth/finish",
@@ -165,9 +165,9 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Ohne Zugangsdaten gibt es keine Adresse — und der Gist bleibt.</summary>
     [Fact]
-    public async Task Ohne_eingerichtete_Anmeldung_gibt_es_keine_Adresse()
+    public async Task Without_a_configured_sign_in_there_is_no_address()
     {
-        _anmeldung.Eingerichtet = false;
+        _signIn.IsConfigured = false;
 
         var ihr = AlsPerson(Guid.CreateVersion7());
         await Verbinde(ihr, "anna-dev");
@@ -187,7 +187,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// die Person ausgesperrt, auf deren Connection noch ein alter Name stand.
     /// </remarks>
     [Fact]
-    public async Task Ohne_genanntes_Konto_fuehrt_die_Anmeldung_trotzdem_hin()
+    public async Task Without_a_named_account_the_sign_in_still_leads_there()
     {
         var ihr = AlsPerson(Guid.CreateVersion7());
 
@@ -210,14 +210,14 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// genannt werden kann.
     /// </remarks>
     [Fact]
-    public async Task Anmelden_ohne_Nennung_traegt_den_gemeldeten_Namen_ein()
+    public async Task Signing_in_without_a_naming_writes_in_the_reported_name()
     {
         var ihr = AlsPerson(Guid.CreateVersion7());
 
         var beginn = await Json(await ihr.PostAsync("/github/me/oauth/start", null));
         var state = Zustand(beginn.GetProperty("url").GetString()!);
 
-        _anmeldung.Codes["ein-code"] = "anna-dev";
+        _signIn.Codes["ein-code"] = "anna-dev";
         _github.Repos["anna-dev"] = [Repo("werkzeug")];
 
         var fertig = await Json(await ihr.PostAsJsonAsync(
@@ -234,7 +234,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// ohne für jeden Besuch eine Zeile zu hinterlassen.
     /// </remarks>
     [Fact]
-    public async Task Die_Einrichtung_ist_erfragbar_und_legt_nichts_an()
+    public async Task The_configuration_can_be_asked_for_and_creates_nothing()
     {
         var ihr = AlsPerson(Guid.CreateVersion7());
 
@@ -246,7 +246,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
         (await Json(await ihr.GetAsync("/github/me"))).ValueKind
             .Should().Be(JsonValueKind.Null);
 
-        _anmeldung.Eingerichtet = false;
+        _signIn.IsConfigured = false;
 
         var ohne = await Json(await ihr.GetAsync("/github/oauth"));
         ohne.GetProperty("available").GetBoolean().Should().BeFalse();
@@ -254,7 +254,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Der ganze Weg: nennen, Gist anlegen, beweisen, sehen.</summary>
     [Fact]
-    public async Task Nennen_beweisen_sehen()
+    public async Task Name_prove_see()
     {
         var anna = Guid.CreateVersion7();
         var ihr = AlsPerson(anna);
@@ -294,11 +294,11 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// verriete GitHub nur, dass jemand nach diesem Konto gefragt hat.
     /// </remarks>
     [Fact]
-    public async Task Beim_Nennen_wird_GitHub_nicht_gefragt()
+    public async Task On_naming_GitHub_is_not_asked()
     {
         await Verbinde(AlsPerson(Guid.CreateVersion7()), "fremdes-konto");
 
-        _github.Gefragt.Should().BeEmpty();
+        _github.Asked.Should().BeEmpty();
     }
 
     /// <summary>Ohne Gist kein Nachweis — und das ist 422, nicht 404.</summary>
@@ -306,7 +306,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// Die ResumeRequest war in Ordnung, der Nachweis fehlte.
     /// </remarks>
     [Fact]
-    public async Task Ohne_Gist_ist_es_422()
+    public async Task Without_a_gist_it_is_422()
     {
         var ihr = AlsPerson(Guid.CreateVersion7());
         await Verbinde(ihr, "anna-dev");
@@ -325,7 +325,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// für ein anderes Konto erbracht worden.
     /// </remarks>
     [Fact]
-    public async Task Ein_anderes_Konto_setzt_den_Nachweis_zurueck()
+    public async Task A_different_account_resets_the_proof()
     {
         var anna = Guid.CreateVersion7();
         var ihr = AlsPerson(anna);
@@ -344,7 +344,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// weiter.
     /// </summary>
     [Fact]
-    public async Task Eine_andere_Schreibweise_ist_kein_anderes_Konto()
+    public async Task A_different_spelling_is_not_a_different_account()
     {
         var ihr = AlsPerson(Guid.CreateVersion7());
         await Bewiesen(ihr, "anna-dev");
@@ -364,7 +364,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// neue mit.
     /// </remarks>
     [Fact]
-    public async Task Beim_Kontowechsel_gilt_die_alte_Zeichenfolge_nicht_weiter()
+    public async Task On_an_account_change_the_old_string_no_longer_holds()
     {
         var ihr = AlsPerson(Guid.CreateVersion7());
         var alte = (await Json(await Verbinde(ihr, "anna-dev")))
@@ -384,11 +384,11 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Neueste zuerst — nicht nach Sternen.</summary>
     /// <remarks>
-    /// Sterne messen Sichtbarkeit, nicht Arbeit, und eine Sortierung ist
+    /// Sterne messen Visibility, nicht Arbeit, und eine Sortierung ist
     /// bereits eine Wertung (ADR-0022).
     /// </remarks>
     [Fact]
-    public async Task Sortiert_wird_nach_Datum_nicht_nach_Sternen()
+    public async Task Sorted_by_date_not_by_stars()
     {
         var ihr = AlsPerson(Guid.CreateVersion7());
 
@@ -412,7 +412,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// Ein Repository ohne Datum steht hinten, nicht vorn.
     /// </summary>
     [Fact]
-    public async Task Ein_Repository_ohne_Datum_steht_hinten()
+    public async Task A_repository_without_a_date_stands_last()
     {
         var ihr = AlsPerson(Guid.CreateVersion7());
 
@@ -438,7 +438,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// nicht, welche Zeichenfolge sie in den Gist schreiben soll.
     /// </remarks>
     [Fact]
-    public async Task Die_eigene_Ansicht_zeigt_auch_die_unbewiesene()
+    public async Task Ones_own_view_shows_the_unproved_one_too()
     {
         var ihr = AlsPerson(Guid.CreateVersion7());
         await Verbinde(ihr, "anna-dev");
@@ -452,7 +452,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Wer nichts genannt hat, bekommt `null`.</summary>
     [Fact]
-    public async Task Ohne_Verbindung_ist_die_eigene_Ansicht_null()
+    public async Task Without_a_connection_ones_own_view_is_null()
     {
         var response = await AlsPerson(Guid.CreateVersion7()).GetAsync("/github/me");
 
@@ -468,7 +468,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     /// Sie ist eine Behauptung, und Behauptungen zeigt dieser Dienst nicht.
     /// </remarks>
     [Fact]
-    public async Task Eine_unbewiesene_Verbindung_ist_von_aussen_nicht_da()
+    public async Task An_unproved_connection_does_not_exist_from_outside()
     {
         var anna = Guid.CreateVersion7();
         await Verbinde(AlsPerson(anna), "anna-dev");
@@ -481,7 +481,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Ohne Release sieht ein Fremder nichts — und dasselbe wie bei niemandem.</summary>
     [Fact]
-    public async Task Ohne_Freigabe_sieht_ein_Fremder_nichts()
+    public async Task Without_a_release_a_stranger_sees_nothing()
     {
         var anna = Guid.CreateVersion7();
         await Bewiesen(AlsPerson(anna), "anna-dev");
@@ -498,7 +498,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Mit Release sieht ein Fremder die Belege — aber nie die Zeichenfolge.</summary>
     [Fact]
-    public async Task Mit_Freigabe_sieht_ein_Fremder_die_Belege()
+    public async Task With_a_release_a_stranger_sees_the_evidence()
     {
         var anna = Guid.CreateVersion7();
         _github.Repos["anna-dev"] = [Repo("werkzeug")];
@@ -516,7 +516,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Trennen heißt löschen — der Abzug verschwindet mit.</summary>
     [Fact]
-    public async Task Trennen_heisst_loeschen()
+    public async Task Disconnecting_means_erasing()
     {
         var anna = Guid.CreateVersion7();
         var ihr = AlsPerson(anna);
@@ -527,32 +527,32 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
         getrennt.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        await using var context = postgres.Kontext();
+        await using var context = postgres.Context();
         (await context.Connections.AnyAsync(row => row.Id == anna)).Should().BeFalse();
     }
 
     /// <summary>
-    /// Schweigt GitHub, wird niemandem der Nachweis abgesprochen.
+    /// IsSilent GitHub, wird niemandem der Nachweis abgesprochen.
     /// </summary>
     [Fact]
-    public async Task Ein_schweigendes_GitHub_wird_503_und_nicht_422()
+    public async Task A_silent_GitHub_becomes_503_and_not_422()
     {
         var ihr = AlsPerson(Guid.CreateVersion7());
         await Verbinde(ihr, "anna-dev");
-        _github.Schweigt = true;
+        _github.IsSilent = true;
 
         var attempt = await ihr.PostAsync("/github/me/verify", null);
 
         attempt.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
-    /// <summary>Schweigt der Ledger, wird weder gezeigt noch geleugnet.</summary>
+    /// <summary>IsSilent der Ledger, wird weder gezeigt noch geleugnet.</summary>
     [Fact]
-    public async Task Ein_schweigender_Ledger_wird_503_und_nicht_404()
+    public async Task A_silent_ledger_becomes_503_and_not_404()
     {
         var anna = Guid.CreateVersion7();
         await Bewiesen(AlsPerson(anna), "anna-dev");
-        _ledger.Schweigt = true;
+        _ledger.IsSilent = true;
 
         var attempt = await AlsPerson(Guid.CreateVersion7()).GetAsync($"/github/{anna}");
 
@@ -569,17 +569,17 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
     [InlineData("anna dev")]
     [InlineData("../../etc/passwd")]
     [InlineData("anna@dev")]
-    public async Task Ein_unmoeglicher_Benutzername_ist_422(string login)
+    public async Task An_impossible_user_name_is_422(string login)
     {
         var response = await Verbinde(AlsPerson(Guid.CreateVersion7()), login);
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        _github.Gefragt.Should().BeEmpty("ein Abruf, der ohnehin nichts findet, entfällt");
+        _github.Asked.Should().BeEmpty("ein Abruf, der ohnehin nichts findet, entfällt");
     }
 
     /// <summary>Das führende @ ist Gewohnheit, kein Fehler.</summary>
     [Fact]
-    public async Task Ein_fuehrendes_At_wird_abgestreift()
+    public async Task A_leading_at_sign_is_stripped()
     {
         var genannt = await Verbinde(AlsPerson(Guid.CreateVersion7()), "@anna-dev");
 
@@ -589,7 +589,7 @@ public class VerbindungsreiseTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>Ohne Anmeldung geht nichts.</summary>
     [Fact]
-    public async Task Ohne_Token_ist_es_401()
+    public async Task Without_a_token_it_is_401()
     {
         (await _dienst.CreateClient().GetAsync("/github/me"))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);

@@ -11,25 +11,25 @@ namespace WorkerTransfer.GitHub.Api;
 public static class ErasureEndpoints
 {
     /// <summary>Der Header, den der Ursprung vorlegt.</summary>
-    private const string Geheimniskopf = "X-Erasure-Secret";
+    private const string SecretHeader = "X-Erasure-Secret";
 
-    /// <summary>Bildet den einen Endpunkt ab, den die Löschkaskade ruft.</summary>
-    public static IEndpointRouteBuilder MapLoeschEndpoints(this IEndpointRouteBuilder app)
+    /// <summary>Maps the one endpoint the erasure cascade calls.</summary>
+    public static IEndpointRouteBuilder MapErasureEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
         app.MapPost("/erasure", async (
             ErasureV1 body,
             IMediator mediator,
-            IOptions<ErasureSettings> einstellungen,
+            IOptions<ErasureSettings> settings,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (!DarfLoeschen(context, einstellungen.Value))
+            if (!MayErase(context, settings.Value))
             {
-                // Dieselbe Antwort für ein falsches und für ein nicht gesetztes
-                // Geheimnis: ein Aufrufer darf „falsch geraten" nicht von „hier
-                // ist noch nichts verdrahtet" unterscheiden können.
+                // The same answer for a wrong secret and for an unset one: a
+                // caller must not be able to tell "guessed wrong" from
+                // "nothing is wired up here yet".
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authorised");
@@ -41,9 +41,9 @@ public static class ErasureEndpoints
                 cancellationToken);
 
             // Eine Zahl, kein Merker — hier immer 0, weil es nichts gibt, was
-            // stehen bliebe. Die Form ist trotzdem dieselbe wie überall: der
-            // Ursprung soll die Antwort lesen können, ohne zu wissen, welcher
-            // Dienst gerade geantwortet hat.
+            // would stay. The shape is the same as everywhere all the same:
+            // the origin should be able to read the answer without knowing
+            // which service just answered.
             await context.Response.WriteAsJsonAsync(
                 new ErasureReceiptV1(behalten), cancellationToken);
         });
@@ -51,22 +51,22 @@ public static class ErasureEndpoints
         return app;
     }
 
-    /// <summary>Ob diese ResumeRequest das Geheimnis der Kaskade trägt.</summary>
+    /// <summary>Whether this request carries the cascade's secret.</summary>
     /// <remarks>
-    /// Ein leeres eingestelltes Geheimnis schließt den Endpunkt. In fester Zeit
-    /// verglichen, damit die Dauer der Antwort nichts darüber sagt, wie viel
-    /// von einem Rateversuch stimmte.
+    /// An empty configured secret shuts the endpoint. Compared in fixed time,
+    /// so the duration of the answer says nothing about how much of a guess was
+    /// right.
     /// </remarks>
-    private static bool DarfLoeschen(HttpContext context, ErasureSettings einstellungen)
+    private static bool MayErase(HttpContext context, ErasureSettings settings)
     {
-        if (string.IsNullOrEmpty(einstellungen.Geheimnis)
-            || !context.Request.Headers.TryGetValue(Geheimniskopf, out var vorgelegt))
+        if (string.IsNullOrEmpty(settings.Geheimnis)
+            || !context.Request.Headers.TryGetValue(SecretHeader, out var presented))
         {
             return false;
         }
 
         return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(vorgelegt.ToString()),
-            System.Text.Encoding.UTF8.GetBytes(einstellungen.Geheimnis));
+            System.Text.Encoding.UTF8.GetBytes(presented.ToString()),
+            System.Text.Encoding.UTF8.GetBytes(settings.Geheimnis));
     }
 }

@@ -5,18 +5,18 @@ namespace WorkerTransfer.GitHub.Infrastructure.Security;
 
 /// <summary>Liest das Token aus der laufenden ResumeRequest.</summary>
 /// <remarks>
-/// Header zuerst, dann Cookie — dieselbe Reihenfolge, in der die Dienste eines
-/// prüfen. Ein Browser sieht das Token nur als <c>httpOnly</c>-Cookie, ein
-/// Dienst-zu-Dienst-Aufrufer schickt den Header.
+/// Header first, then cookie — the same order in which the services verify
+/// one. A browser sees the token only as an <c>httpOnly</c> cookie; a
+/// service-to-service caller sends the header.
 /// </remarks>
-public sealed class HttpAufrufertoken(IHttpContextAccessor zugriff) : IAufrufertoken
+public sealed class HttpCallerToken(IHttpContextAccessor accessor) : ICallerToken
 {
     /// <inheritdoc />
-    public string? Wert
+    public string? Value
     {
         get
         {
-            var request = zugriff.HttpContext?.Request;
+            var request = accessor.HttpContext?.Request;
 
             if (request is null)
             {

@@ -5,11 +5,11 @@ using WorkerTransfer.GitHub.Infrastructure.Persistence;
 
 namespace WorkerTransfer.GitHub.Infrastructure.Erasure;
 
-/// <summary>Was eine Löschung in diesem Dienst anfasst.</summary>
+/// <summary>What an erasure touches in this service.</summary>
 /// <remarks>
-/// Eine Anweisung, ohne Ausnahme. Der Login ist öffentlich; das Personendatum
-/// ist die <strong>Verknüpfung</strong> — „dieser Plattform-Mensch ist jener
-/// GitHub-Name". Sie entsteht hier, und hier fällt sie.
+/// One statement, without exception. The login is public; the personal datum is
+/// the <strong>link</strong> — "this platform person is that GitHub name". It
+/// comes into being here, and here it falls.
 /// </remarks>
 public sealed class EfErasureLedger(GitHubDbContext context) : IErasureLedger
 {

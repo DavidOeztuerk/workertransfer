@@ -5,26 +5,26 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.GitHub.Application.Ports;
 using WorkerTransfer.GitHub.Domain.Connections;
-using WorkerTransfer.GitHub.Infrastructure.Netz;
+using WorkerTransfer.GitHub.Infrastructure.Network;
 
 namespace WorkerTransfer.GitHub.Tests;
 
-/// <summary>Ein GitHub aus Papier.</summary>
-public sealed class Papierantwort(
+/// <summary>A GitHub made of paper.</summary>
+public sealed class CannedResponse(
     Func<HttpRequestMessage, (HttpStatusCode Code, string Rumpf)> response)
     : HttpMessageHandler
 {
-    /// <summary>Welche Pfade abgefragt wurden.</summary>
-    public List<string> Pfade { get; } = [];
+    /// <summary>Which paths were asked for.</summary>
+    public List<string> Paths { get; } = [];
 
-    /// <summary>Die Anfragen selbst — für Proben über Kopfzeilen.</summary>
-    public List<HttpRequestMessage> Anfragen { get; } = [];
+    /// <summary>The requests themselves — for probes about headers.</summary>
+    public List<HttpRequestMessage> Requests { get; } = [];
 
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        Pfade.Add(request.RequestUri!.PathAndQuery);
-        Anfragen.Add(request);
+        Paths.Add(request.RequestUri!.PathAndQuery);
+        Requests.Add(request);
 
         var (code, body) = response(request);
 
@@ -35,41 +35,41 @@ public sealed class Papierantwort(
     }
 }
 
-/// <summary>Eine Fabrik, die immer denselben Klienten liefert.</summary>
-public sealed class Einzelfabrik(HttpMessageHandler behandler) : IHttpClientFactory
+/// <summary>A factory that always delivers the same client.</summary>
+public sealed class SingleClientFactory(HttpMessageHandler behandler) : IHttpClientFactory
 {
     public HttpClient CreateClient(string name) => new(behandler, disposeHandler: false);
 }
 
 /// <summary>
-/// Der echte Klient gegen ein GitHub aus Papier.
+/// The real client against a GitHub made of paper.
 /// </summary>
 /// <remarks>
-/// Diese Reihe gibt es, weil eine Gegenprobe eine Lücke gezeigt hat: die
-/// Reisetests ersetzen <see cref="IGitHub"/> durch eine Probe, und damit war
-/// alles ungeprüft, was <em>im</em> Klienten steht — allen voran der
-/// Fork-Filter. Forks wegzulassen ist keine Kosmetik: eine Kopie fremder Arbeit
-/// ist kein Evidence für eigene, und sie unter „meine Repositories" zu zeigen wäre
-/// genau die stillschweigende Behauptung, die ADR-0022 ausschließt.
+/// This suite exists because a counter-probe showed a gap: the journey tests
+/// replace <see cref="IGitHub"/> with a probe, and so everything <em>inside</em>
+/// the client went unchecked — above all the fork filter. Leaving forks out is
+/// no cosmetic: a copy of somebody else's work is no evidence of one's own, and
+/// showing it under "my repositories" would be exactly the silent assertion
+/// ADR-0022 excludes.
 /// </remarks>
 public class HttpGitHubTests
 {
-    /// <summary>Antwortet mit dieser Liste — und auf jede Sprachfrage leer.</summary>
+    /// <summary>Answers with this listing — and empty to every language question.</summary>
     /// <remarks>
-    /// Ohne die Trennung bekäme eine <c>/languages</c>-ResumeRequest die
-    /// Repository-<em>Liste</em> als Antwort. Das ist kein Wörterbuch, also
-    /// wirft es — ein echter Fehler, der aber in der Probe läge und nicht im
-    /// Code. Seit die Sprachen auch ohne Token geholt werden, trifft das jede
-    /// Probe, die pauschal antwortet.
+    /// Without the separation a <c>/languages</c> request would get the
+    /// repository <em>listing</em> as its answer. That is no dictionary, so it
+    /// throws — a real error, but one that would lie in the probe and not in the
+    /// code. Since the languages are fetched without a token too, this strikes
+    /// every probe that answers blanket.
     /// </remarks>
-    private static Papierantwort NurListe(string list) =>
+    private static CannedResponse NurListe(string list) =>
         new(request =>
             request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, "{}")
                 : (HttpStatusCode.OK, list));
 
-    private static HttpGitHub Build(Papierantwort papier, string token = "") =>
-        new(new Einzelfabrik(papier),
+    private static HttpGitHub Build(CannedResponse paper, string token = "") =>
+        new(new SingleClientFactory(paper),
             Options.Create(new GitHubSettings
             {
                 Adresse = "https://api.github.test",
@@ -78,61 +78,62 @@ public class HttpGitHubTests
             NullLogger<HttpGitHub>.Instance);
 
     /// <summary>
-    /// <strong>Jede ResumeRequest trägt einen <c>User-Agent</c> — sonst antwortet
-    /// GitHub mit 403.</strong>
+    /// <strong>Every request carries a <c>User-Agent</c> — otherwise GitHub
+    /// answers 403.</strong>
     /// </summary>
     /// <remarks>
-    /// Kein Stilfehler, sondern der Grund, warum dieser Dienst nie funktioniert
-    /// hat. GitHub verlangt den Header und weist ohne ihn ALLES ab — nicht mit
-    /// 400, nicht mit einer Meldung, die das Wort nennt, sondern mit einem 403,
-    /// das aussieht wie ein Ratenlimit. Gemessen am 04.09.2026 an derselben
-    /// Adresse: mit Header 200, ohne Header 403.
+    /// No style slip but the reason this service never worked. GitHub demands
+    /// the header and refuses EVERYTHING without it — not with a 400, not with a
+    /// message naming the word, but with a 403 that looks like a rate limit.
+    /// Measured 04.09.2026 against the same address: with the header 200,
+    /// without it 403.
     /// <para>
-    /// Solange er fehlte, scheiterte auch der Gist-Nachweis — niemand konnte
-    /// eine Connection je abschliessen, und die Oberfläche sagte dazu „github
-    /// unavailable", was nach einem Ausfall bei GitHub aussieht.
+    /// For as long as it was missing, the gist proof failed too — nobody could
+    /// ever complete a connection, and the interface said "github unavailable"
+    /// about it, which looks like an outage at GitHub.
     /// </para>
     /// </remarks>
     [Fact]
-    public async Task Jede_Anfrage_traegt_eine_Benutzerkennung()
+    public async Task Every_request_carries_a_user_agent()
     {
-        var papier = new Papierantwort(_ => (HttpStatusCode.OK, "[]"));
-        var service = Build(papier);
+        var paper = new CannedResponse(_ => (HttpStatusCode.OK, "[]"));
+        var service = Build(paper);
 
         await service.RepositoriesAsync("anna-dev");
         await service.HasProofGistAsync("anna-dev", "workertransfer-verify-abc");
 
-        papier.Anfragen.Should().NotBeEmpty("sonst prüft der Test nichts");
-        papier.Anfragen.Should().OnlyContain(
+        paper.Requests.Should().NotBeEmpty("otherwise the test checks nothing");
+        paper.Requests.Should().OnlyContain(
             request => request.Headers.UserAgent.Count > 0);
     }
 
-    /// <summary>Die Topics kommen mit, weil sie eine NENNUNG sind.</summary>
+    /// <summary>The topics travel along, because they are a NAMING.</summary>
     /// <remarks>
-    /// Der stärkste Evidence von allen: „kubernetes" hat ein Mensch an das
-    /// Repository geschrieben, kein Zähler abgeleitet. Und sie kosten nichts —
-    /// GitHub liefert sie seit 2022 ohne Zutun in derselben Liste mit.
+    /// The strongest evidence of all: a human being wrote "kubernetes" onto the
+    /// repository, no counter derived it. And they cost nothing — GitHub has
+    /// delivered them in the same listing since 2022 without anything being
+    /// done.
     /// </remarks>
     [Fact]
-    public async Task Topics_kommen_mit()
+    public async Task Topics_travel_along()
     {
-        var papier = NurListe("""
+        var paper = NurListe("""
             [{"name":"leitwarte","description":"","language":"TypeScript",
               "stargazers_count":0,"html_url":"https://github.com/anna/leitwarte",
               "pushed_at":"2026-08-01T10:00:00Z","fork":false,
               "topics":["react","kubernetes","observability"]}]
             """);
 
-        var entry = (await Build(papier).RepositoriesAsync("anna-dev")).Repositories.Single();
+        var entry = (await Build(paper).RepositoriesAsync("anna-dev")).Repositories.Single();
 
-        entry.Themen.Should().Equal("react", "kubernetes", "observability");
+        entry.Topics.Should().Equal("react", "kubernetes", "observability");
     }
 
-    /// <summary>Ein Repository ohne Topics ist kein Fehler, sondern leer.</summary>
+    /// <summary>A repository without topics is not an error, just empty.</summary>
     [Fact]
-    public async Task Ohne_Topics_bleibt_die_Liste_leer()
+    public async Task Without_topics_the_list_stays_empty()
     {
-        var papier = new Papierantwort(request =>
+        var paper = new CannedResponse(request =>
             request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, "{}")
                 : (HttpStatusCode.OK, """
@@ -141,26 +142,27 @@ public class HttpGitHubTests
                       "pushed_at":null,"fork":false}]
                     """));
 
-        var entry = (await Build(papier).RepositoriesAsync("anna-dev")).Repositories.Single();
+        var entry = (await Build(paper).RepositoriesAsync("anna-dev")).Repositories.Single();
 
-        entry.Themen.Should().BeEmpty();
-        entry.Sprachen.Should().BeEmpty();
+        entry.Topics.Should().BeEmpty();
+        entry.Languages.Should().BeEmpty();
     }
 
     /// <summary>
-    /// <strong>Auch ohne Token kommen die Sprachen — nur für weniger Repositories.</strong>
+    /// <strong>Without a token the languages still come — only for fewer
+    /// repositories.</strong>
     /// </summary>
     /// <remarks>
-    /// Vorher stand hier das Gegenteil, und es war ein gemessener Schaden:
-    /// GitHub meldet für <c>workertransfer</c> sieben Sprachen, die Seite
-    /// zeigte eine. Der Grund war das Ratenlimit — sechzig Anfragen in der
-    /// Stunde —, aber sechzig reichen sehr wohl für zehn Repositories je Abruf.
-    /// Der Verzicht sparte nichts und kostete die halbe Auskunft.
+    /// The opposite used to stand here, and it was a measured harm: GitHub
+    /// reports seven languages for <c>workertransfer</c>, the page showed one.
+    /// The reason was the rate limit — sixty requests an hour — but sixty are
+    /// perfectly enough for ten repositories per fetch. Going without saved
+    /// nothing and cost half the information.
     /// </remarks>
     [Fact]
-    public async Task Ohne_Token_kommen_die_Sprachen_trotzdem()
+    public async Task Without_a_token_the_languages_still_come()
     {
-        var papier = new Papierantwort(request =>
+        var paper = new CannedResponse(request =>
             request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, """{"Python":70,"TypeScript":26,"CSS":1}""")
                 : (HttpStatusCode.OK, """
@@ -169,29 +171,30 @@ public class HttpGitHubTests
                       "pushed_at":null,"fork":false}]
                     """));
 
-        var abzug = await Build(papier).RepositoriesAsync("anna-dev");
+        var snapshot = await Build(paper).RepositoriesAsync("anna-dev");
 
-        abzug.Repositories.Single().Sprachen
+        snapshot.Repositories.Single().Languages
             .Should().BeEquivalentTo(["Python", "TypeScript", "CSS"]);
 
-        // Und die Anteile bleiben draußen, mit oder ohne Token (ADR-0022 §2).
-        System.Text.Json.JsonSerializer.Serialize(abzug.Repositories.Single())
+        // And the shares stay out, with or without a token (ADR-0022 §2).
+        System.Text.Json.JsonSerializer.Serialize(snapshot.Repositories.Single())
             .Should().NotContain("70");
 
-        abzug.SprachenVollstaendig.Should().BeTrue();
+        snapshot.LanguagesComplete.Should().BeTrue();
     }
 
     /// <summary>
-    /// <strong>Reicht das Budget nicht, sagt der Abzug es — statt schmal auszusehen.</strong>
+    /// <strong>When the budget does not stretch, the snapshot says so — instead
+    /// of looking narrow.</strong>
     /// </summary>
     /// <remarks>
-    /// ADR-0022 §3: „Wer nichts auf GitHub hat, ist nicht schlechter, sondern
-    /// woanders. Eine Ansicht, die das nicht sagt, lügt durch Auslassung."
-    /// Dasselbe gilt eine Ebene tiefer — bei einem Repository, dessen Sprachen
-    /// wir nicht holen konnten, läse sich die Hauptsprache wie die einzige.
+    /// ADR-0022 §3: "Whoever has nothing on GitHub is not worse, but elsewhere.
+    /// A view that does not say so lies by omission." The same holds one level
+    /// down — at a repository whose languages we could not fetch, the main
+    /// language would read like the only one.
     /// </remarks>
     [Fact]
-    public async Task Mehr_Repositories_als_Budget_melden_sich_als_unvollstaendig()
+    public async Task More_repositories_than_budget_report_themselves_incomplete()
     {
         var viele = string.Join(",", Enumerable.Range(0, 11).Select(nummer =>
             "{\"name\":\"repo" + nummer + "\",\"description\":\"\","
@@ -199,36 +202,36 @@ public class HttpGitHubTests
             + "\"html_url\":\"https://github.com/anna/repo" + nummer + "\","
             + "\"pushed_at\":null,\"fork\":false}"));
 
-        var papier = new Papierantwort(request =>
+        var paper = new CannedResponse(request =>
             request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, """{"Go":1}""")
                 : (HttpStatusCode.OK, $"[{viele}]"));
 
-        var abzug = await Build(papier).RepositoriesAsync("anna-dev");
+        var snapshot = await Build(paper).RepositoriesAsync("anna-dev");
 
-        abzug.Repositories.Should().HaveCount(11);
-        abzug.SprachenVollstaendig.Should().BeFalse();
+        snapshot.Repositories.Should().HaveCount(11);
+        snapshot.LanguagesComplete.Should().BeFalse();
 
-        // Die zehn zuletzt bearbeiteten haben ihre Sprachen — GitHub liefert
-        // nach `pushed` sortiert, also trifft das Budget die ältesten.
-        abzug.Repositories.Take(10).Should().OnlyContain(entry => entry.Sprachen.Count == 1);
-        abzug.Repositories.Last().Sprachen.Should().BeEmpty();
+        // The ten most recently worked on have their languages — GitHub
+        // delivers sorted by `pushed`, so the budget strikes the oldest.
+        snapshot.Repositories.Take(10).Should().OnlyContain(entry => entry.Languages.Count == 1);
+        snapshot.Repositories.Last().Languages.Should().BeEmpty();
     }
 
     /// <summary>
-    /// <strong>Die Sprachen kommen als MENGE — die Bytes bleiben draussen.</strong>
+    /// <strong>The languages come as a SET — the bytes stay out.</strong>
     /// </summary>
     /// <remarks>
-    /// GitHub antwortet mit <c>{"Go": 120000, "Shell": 210}</c>. Genau aus
-    /// diesen Zahlen rechnete das gelöschte Paket sein „Können" als
-    /// <c>bytes / total_bytes</c> — „eine eingecheckte Abhängigkeit schlägt
-    /// jede sorgfältige Bibliothek. Wer wenig und gut schreibt, verliert"
-    /// (ADR-0022 §2). Was nicht abgelegt wird, kann niemand aufsummieren.
+    /// GitHub answers with <c>{"Go": 120000, "Shell": 210}</c>. Out of exactly
+    /// those numbers the deleted package computed its "skill" as
+    /// <c>bytes / total_bytes</c> — "a checked-in dependency beats every careful
+    /// library. Whoever writes little and well loses" (ADR-0022 §2). What is not
+    /// stored nobody can add up.
     /// </remarks>
     [Fact]
-    public async Task Sprachen_kommen_als_Menge_ohne_Bytes()
+    public async Task Languages_come_as_a_set_without_bytes()
     {
-        var papier = new Papierantwort(request =>
+        var paper = new CannedResponse(request =>
             request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, """{"Go":120000,"Shell":210,"Dockerfile":90}""")
                 : (HttpStatusCode.OK, """
@@ -237,29 +240,30 @@ public class HttpGitHubTests
                       "pushed_at":null,"fork":false}]
                     """));
 
-        var entry = (await Build(papier, token: "ein-token")
+        var entry = (await Build(paper, token: "ein-token")
             .RepositoriesAsync("anna-dev")).Repositories.Single();
 
-        entry.Sprachen.Should().BeEquivalentTo(["Go", "Shell", "Dockerfile"]);
+        entry.Languages.Should().BeEquivalentTo(["Go", "Shell", "Dockerfile"]);
 
-        // Die Zahlen dürfen nirgends mitgereist sein — auch nicht als Text.
+        // The numbers must not have travelled along anywhere — not even as text.
         var abgelegt = System.Text.Json.JsonSerializer.Serialize(entry);
         abgelegt.Should().NotContain("120000");
         abgelegt.Should().NotContain("210");
     }
 
-    /// <summary>Ohne Token wird gefragt, aber nicht beliebig oft.</summary>
+    /// <summary>Without a token the question is asked, but not arbitrarily often.</summary>
     /// <remarks>
-    /// Hier stand bis zum 05.09.2026 die Behauptung, ohne Token werde gar nicht
-    /// gefragt — mit der Begründung, ein halb gefüllter Evidence sei schlechter
-    /// als ein ehrlich leerer. Am echten Konto gemessen war der leere Evidence
-    /// nicht ehrlich: er zeigte „Python", wo GitHub sieben Sprachen meldet,
-    /// und sagte nirgends, dass er nur eine kennt. Gefragt wird jetzt für die
-    /// zehn zuletzt bearbeiteten Repositories — elf Anfragen von sechzig —,
-    /// und was darüber liegt, meldet der Abzug als unvollständig.
+    /// Until 05.09.2026 the assertion stood here that without a token nothing
+    /// is asked at all — with the reasoning that half-filled evidence is worse
+    /// than honestly empty evidence. Measured against a real account, the empty
+    /// evidence was not honest: it showed "Python" where GitHub reports seven
+    /// languages, and said nowhere that it knows only one. The question is now
+    /// asked for the ten most recently worked on repositories — eleven requests
+    /// out of sixty — and what lies beyond that the snapshot reports as
+    /// incomplete.
     /// </remarks>
     [Fact]
-    public async Task Ohne_Token_bleibt_die_Zahl_der_Sprachabfragen_begrenzt()
+    public async Task Without_a_token_the_number_of_language_queries_stays_capped()
     {
         var viele = string.Join(",", Enumerable.Range(0, 25).Select(nummer =>
             "{\"name\":\"repo" + nummer + "\",\"description\":\"\","
@@ -267,23 +271,23 @@ public class HttpGitHubTests
             + "\"html_url\":\"https://github.com/anna/repo" + nummer + "\","
             + "\"pushed_at\":null,\"fork\":false}"));
 
-        var papier = new Papierantwort(request =>
+        var paper = new CannedResponse(request =>
             request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, """{"Go":1}""")
                 : (HttpStatusCode.OK, $"[{viele}]"));
 
-        await Build(papier).RepositoriesAsync("anna-dev");
+        await Build(paper).RepositoriesAsync("anna-dev");
 
-        papier.Pfade
+        paper.Paths
             .Count(path => path.Contains("/languages", StringComparison.Ordinal))
             .Should().Be(10);
     }
 
-    /// <summary>Ein Fork ist kein Evidence für eigene Arbeit.</summary>
+    /// <summary>A fork is no evidence of one's own work.</summary>
     [Fact]
-    public async Task Forks_bleiben_draussen()
+    public async Task Forks_stay_out()
     {
-        var papier = NurListe("""
+        var paper = NurListe("""
             [
               {"name":"eigenes","description":"meins","language":"Go",
                "stargazers_count":3,"html_url":"https://github.com/anna/eigenes",
@@ -294,70 +298,70 @@ public class HttpGitHubTests
             ]
             """);
 
-        var found = await Build(papier).RepositoriesAsync("anna-dev");
+        var found = await Build(paper).RepositoriesAsync("anna-dev");
 
         found.Repositories.Select(entry => entry.Name).Should().Equal("eigenes");
     }
 
     /// <summary>Jedes Feld kommt von GitHub, keins ist gerechnet.</summary>
     [Fact]
-    public async Task Die_Felder_werden_abgeschrieben()
+    public async Task The_fields_are_copied()
     {
-        var papier = NurListe("""
+        var paper = NurListe("""
             [{"name":"werkzeug","description":"Ein Werkzeug","language":"Go",
               "stargazers_count":42,"html_url":"https://github.com/anna/werkzeug",
               "pushed_at":"2026-08-01T10:00:00Z","fork":false,
               "topics":["cli","verteilte-systeme"]}]
             """);
 
-        var entry = (await Build(papier).RepositoriesAsync("anna-dev")).Repositories.Single();
+        var entry = (await Build(paper).RepositoriesAsync("anna-dev")).Repositories.Single();
 
-        // `BeEquivalentTo` und nicht `Be`: seit `Repository` zwei Listen trägt,
-        // vergleicht die Gleichheit eines `record` sie über die REFERENZ — zwei
-        // gleich befüllte Listen sind damit nie gleich. Der Vergleich muss
-        // strukturell sein, sonst prüft er nur, ob es dasselbe Objekt ist.
+        // `BeEquivalentTo` and not `Be`: since `Repository` carries two lists,
+        // a `record`'s equality compares them by REFERENCE — two identically
+        // filled lists are therefore never equal. The comparison has to be
+        // structural, or it only checks whether it is the same object.
         entry.Should().BeEquivalentTo(new Repository(
             "werkzeug", "Ein Werkzeug", "Go", 42,
             "https://github.com/anna/werkzeug",
             new DateTimeOffset(2026, 8, 1, 10, 0, 0, TimeSpan.Zero),
-            // Ohne Token wird nicht je Repository nach den Sprachen gefragt —
-            // sechzig Anfragen in der Stunde reichen dafür nicht.
+            // Without a token the languages are not asked for per repository —
+            // sixty requests an hour do not stretch to that.
             [],
             ["cli", "verteilte-systeme"]));
     }
 
     /// <summary>Fehlende Felder werden nicht erfunden.</summary>
     [Fact]
-    public async Task Fehlendes_bleibt_leer_statt_geraten()
+    public async Task What_is_missing_stays_empty_instead_of_guessed()
     {
-        var papier = NurListe("""
+        var paper = NurListe("""
             [{"name":"still","description":null,"language":null,
               "stargazers_count":0,"html_url":"https://github.com/anna/still",
               "pushed_at":null,"fork":false}]
             """);
 
-        var entry = (await Build(papier).RepositoriesAsync("anna-dev")).Repositories.Single();
+        var entry = (await Build(paper).RepositoriesAsync("anna-dev")).Repositories.Single();
 
-        entry.Beschreibung.Should().BeEmpty();
-        entry.Sprache.Should().BeNull();
-        entry.ZuletztGeschoben.Should().BeNull();
+        entry.Description.Should().BeEmpty();
+        entry.Language.Should().BeNull();
+        entry.LastPushedAt.Should().BeNull();
     }
 
     /// <summary>Der Nachweis hängt an der Beschreibung, nicht am Inhalt.</summary>
     /// <remarks>
     /// Die Gist-Liste liefert die Beschreibung mit; ein Inhalt bräuchte einen
-    /// Abruf je Gist. Bei sechzig Anfragen pro Stunde ohne Token ist das kein
+    /// Abruf je Gist. Bei sechzig Requests pro Stunde ohne Token ist das kein
     /// Detail.
     /// </remarks>
     [Fact]
-    public async Task Der_Gist_wird_ueber_die_Beschreibung_gefunden()
+    public async Task The_gist_is_found_over_its_description()
     {
-        var papier = NurListe("""
+        var paper = NurListe("""
             [{"description":"irgendwas"},
              {"description":"workertransfer-verify-abc123"}]
             """);
 
-        var github = Build(papier);
+        var github = Build(paper);
 
         (await github.HasProofGistAsync("anna-dev", "abc123")).Should().BeTrue();
         (await github.HasProofGistAsync("anna-dev", "xyz789")).Should().BeFalse();
@@ -365,10 +369,10 @@ public class HttpGitHubTests
 
     /// <summary>„Gibt es nicht" ist eine Antwort, kein Ausfall.</summary>
     [Fact]
-    public async Task Ein_unbekanntes_Konto_ist_kein_Ausfall()
+    public async Task An_unknown_account_is_not_an_outage()
     {
-        var papier = new Papierantwort(_ => (HttpStatusCode.NotFound, "{}"));
-        var github = Build(papier);
+        var paper = new CannedResponse(_ => (HttpStatusCode.NotFound, "{}"));
+        var github = Build(paper);
 
         (await github.RepositoriesAsync("gibt-es-nicht")).Repositories.Should().BeEmpty();
         (await github.HasProofGistAsync("gibt-es-nicht", "abc")).Should().BeFalse();
@@ -380,39 +384,39 @@ public class HttpGitHubTests
     /// abzusprechen, weil wir gerade nicht fragen konnten.
     /// </remarks>
     [Fact]
-    public async Task Ein_Ratenlimit_wird_zu_GitHubSchweigt()
+    public async Task A_rate_limit_becomes_GitHubSilent()
     {
-        var papier = new Papierantwort(_ => ((HttpStatusCode)403, "rate limited"));
+        var paper = new CannedResponse(_ => ((HttpStatusCode)403, "rate limited"));
 
-        var attempt = async () => await Build(papier).RepositoriesAsync("anna-dev");
+        var attempt = async () => await Build(paper).RepositoriesAsync("anna-dev");
 
-        await attempt.Should().ThrowAsync<GitHubSignInSilent>();
+        await attempt.Should().ThrowAsync<GitHubSilent>();
     }
 
     /// <summary>Ein unbrauchbarer Rumpf ebenso.</summary>
     [Fact]
-    public async Task Ein_unbrauchbarer_Rumpf_wird_zu_GitHubSchweigt()
+    public async Task An_unusable_body_becomes_GitHubSilent()
     {
-        var papier = new Papierantwort(_ => (HttpStatusCode.OK, "kein json"));
+        var paper = new CannedResponse(_ => (HttpStatusCode.OK, "kein json"));
 
-        var attempt = async () => await Build(papier).RepositoriesAsync("anna-dev");
+        var attempt = async () => await Build(paper).RepositoriesAsync("anna-dev");
 
-        await attempt.Should().ThrowAsync<GitHubSignInSilent>();
+        await attempt.Should().ThrowAsync<GitHubSilent>();
     }
 
-    /// <summary>Gefragt wird nach eigenen Repositories, nach Datum sortiert.</summary>
+    /// <summary>Asked wird nach eigenen Repositories, nach Datum sortiert.</summary>
     /// <remarks>
     /// <c>type=owner</c> lässt Mitgliedschaften draußen, <c>sort=pushed</c>
     /// macht die eine Seite zur ehrlichen Auswahl: die zuletzt geänderten.
     /// </remarks>
     [Fact]
-    public async Task Gefragt_wird_nach_eigenen_und_zuletzt_geaenderten()
+    public async Task What_is_asked_for_is_ones_own_and_most_recently_changed()
     {
-        var papier = new Papierantwort(_ => (HttpStatusCode.OK, "[]"));
+        var paper = new CannedResponse(_ => (HttpStatusCode.OK, "[]"));
 
-        await Build(papier).RepositoriesAsync("anna-dev");
+        await Build(paper).RepositoriesAsync("anna-dev");
 
-        papier.Pfade.Single().Should()
+        paper.Paths.Single().Should()
             .Be($"/users/anna-dev/repos?per_page={HttpGitHub.JeSeite}&sort=pushed&type=owner");
     }
 }
