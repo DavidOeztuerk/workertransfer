@@ -53,7 +53,7 @@ public class ZwischenspeicherTests
         { "companies", typeof(Companies.Application.Profiles.MyProfileQuery) },
         { "transfer", typeof(Transfer.Application.Markt.MyMarketStatusQuery) },
         { "github", typeof(GitHub.Application.Connections.MyConnectionQuery) },
-        { "notification", typeof(Notification.Application.Benachrichtigungen.MyInboxQuery) },
+        { "notification", typeof(Notification.Application.Notifications.MyInboxQuery) },
 
         // scout-service holds the sharpest version of this rule: it searches
         // for people, and a cached result would survive a revocation. That is

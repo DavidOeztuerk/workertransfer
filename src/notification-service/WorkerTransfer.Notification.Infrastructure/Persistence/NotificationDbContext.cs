@@ -3,29 +3,29 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Notification.Infrastructure.Persistence;
 
-/// <summary>Eine Zeile von <c>notification_preferences</c>.</summary>
+/// <summary>One row of <c>notification_preferences</c>.</summary>
 public sealed class PreferenceRow
 {
-    /// <summary>Die Subjekt-Kennung. Sie <em>ist</em> der Schlüssel.</summary>
+    /// <summary>The subject id. It <em>is</em> the key.</summary>
     public Guid Id { get; set; }
 
-    /// <summary>Die Schalter, als jsonb.</summary>
+    /// <summary>The switches, as jsonb.</summary>
     /// <remarks>
-    /// Als eine Spalte und nicht als vier: die Arten werden nur zusammen
-    /// gelesen und geschrieben, es gibt keine Abfrage über eine einzelne, und
-    /// eine fünfte Art hieße sonst eine SchemaMigration für ein Feld.
+    /// As one column and not as eight: the kinds are only read and written
+    /// together, there is no query over a single one, and a ninth kind would
+    /// otherwise mean a migration for one field.
     /// </remarks>
     public string Kinds { get; set; } = "{}";
 
-    /// <summary>Wann zuletzt etwas hinausging.</summary>
+    /// <summary>When something last went out.</summary>
     public DateTime? LastSentAt { get; set; }
 }
 
-/// <summary>Eine Zeile von <c>notifications</c>.</summary>
+/// <summary>One row of <c>notifications</c>.</summary>
 /// <remarks>
-/// <strong>None Inhaltsspalte.</strong> Was hier steht, landet in jeder
-/// Sicherung — und eine Spalte für den Text wäre die Einladung, hineinzuschreiben,
-/// worum es geht.
+/// <strong>No content column.</strong> What stands here ends up in every
+/// backup — and a column for the text would be the invitation to write into it
+/// what the matter is.
 /// </remarks>
 public sealed class InboxRow
 {
@@ -40,21 +40,20 @@ public sealed class InboxRow
     public DateTime? ReadAt { get; set; }
 }
 
-/// <summary>Die zwei Tabellen, die dieser Dienst besitzt.</summary>
+/// <summary>The two tables this service owns.</summary>
 /// <remarks>
-/// <strong>None Outbox.</strong> Dieser Dienst ist der Empfänger von
-/// Absichten, nicht ihr Absender; eine Outbox hier wäre eine zweite Warteschlange
-/// hinter der ersten. Und keine Adressspalte — er kennt keine E-Mail-Adresse
-/// und soll keine kennen.
+/// <strong>No outbox.</strong> This service is the recipient of intents, not
+/// their sender; an outbox here would be a second queue behind the first. And
+/// no address column — it knows no email address and is meant to know none.
 /// </remarks>
 public sealed class NotificationDbContext(DbContextOptions<NotificationDbContext> options)
     : DbContext(options)
 {
-    /// <summary>Die Einstellungen.</summary>
-    public DbSet<PreferenceRow> Wuensche => Set<PreferenceRow>();
+    /// <summary>The settings.</summary>
+    public DbSet<PreferenceRow> Preferences => Set<PreferenceRow>();
 
-    /// <summary>Die Postfächer.</summary>
-    public DbSet<InboxRow> Eingaenge => Set<InboxRow>();
+    /// <summary>The inboxes.</summary>
+    public DbSet<InboxRow> InboxEntries => Set<InboxRow>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -64,14 +63,14 @@ public sealed class NotificationDbContext(DbContextOptions<NotificationDbContext
         modelBuilder.Entity<PreferenceRow>(entity =>
         {
             entity.ToTable("notification_preferences");
-            // KEINE zweite Spalte fuer die Person. Der Schluessel IST sie, und
-            // `notifications` in derselben Datei fuehrt daneben eine eigene
-            // `user_id` — wer die beiden vergleicht, haelt das hier fuer vergessen
-            // und traegt die Spalte nach. Dann stuenden zwei Angaben ueber
-            // denselben Menschen nebeneinander, und die Erasure (ADR-0027)
-            // traefe die eine und liesse die andere stehen. Die Anmerkung sagt es
-            // stattdessen aus: sie ist das, was `LoeschempfaengerTests` liest, wo
-            // kein Spaltenname zu finden ist.
+            // NO second column for the person. The key IS them, and
+            // `notifications` in the same file carries a `user_id` of its own
+            // beside it — whoever compares the two takes this for forgotten and
+            // adds the column. Then two statements about the same human being
+            // would stand side by side, and the erasure (ADR-0027) would strike
+            // the one and leave the other. The annotation says it instead: it
+            // is what `LoeschempfaengerTests` reads where no column name is to
+            // be found.
             entity.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();

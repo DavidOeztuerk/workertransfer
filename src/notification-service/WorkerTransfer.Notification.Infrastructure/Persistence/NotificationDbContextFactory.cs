@@ -4,37 +4,36 @@ using Npgsql;
 
 namespace WorkerTransfer.Notification.Infrastructure.Persistence;
 
-/// <summary>Baut DataSource und Kontext über dem Schema dieses Dienstes.</summary>
+/// <summary>Builds the data source and the context over this service's schema.</summary>
 public static class NotificationDbContextFactory
 {
-    /// <summary>Die DataSource.</summary>
+    /// <summary>The data source.</summary>
     public static NpgsqlDataSource DataSource(string connectionString) =>
         new NpgsqlDataSourceBuilder(connectionString).Build();
 
-    /// <summary>Optionen über einer DataSource, die dem Aufrufer gehört.</summary>
-    public static DbContextOptionsBuilder<NotificationDbContext> Optionen(
-        NpgsqlDataSource datenquelle) =>
+    /// <summary>Options over a data source that belongs to the caller.</summary>
+    public static DbContextOptionsBuilder<NotificationDbContext> Options(
+        NpgsqlDataSource dataSource) =>
         (DbContextOptionsBuilder<NotificationDbContext>)Configure(
-            new DbContextOptionsBuilder<NotificationDbContext>(), datenquelle);
+            new DbContextOptionsBuilder<NotificationDbContext>(), dataSource);
 
     /// <summary>
-    /// Die eine Job, an der die Nachverfolgung ausgeschaltet wird, damit
-    /// Behälter, Tests und <c>dotnet ef</c> nicht mit verschiedenen Modellen
-    /// enden.
+    /// The one place where tracking is switched off, so that container, tests
+    /// and <c>dotnet ef</c> do not end up with different models.
     /// </summary>
     public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
-        NpgsqlDataSource datenquelle)
+        NpgsqlDataSource dataSource)
     {
         ArgumentNullException.ThrowIfNull(options);
 
         return options
-            .UseNpgsql(datenquelle)
+            .UseNpgsql(dataSource)
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
     }
 
-    /// <summary>Dasselbe Modell für <c>dotnet ef</c>, das keine Connection braucht.</summary>
-    public static DbContextOptionsBuilder ZurEntwurfszeit(
+    /// <summary>The same model for <c>dotnet ef</c>, which needs no connection.</summary>
+    public static DbContextOptionsBuilder AtDesignTime(
         DbContextOptionsBuilder options,
         string connectionString)
     {
@@ -44,14 +43,14 @@ public static class NotificationDbContextFactory
     }
 }
 
-/// <summary>Baut einen Kontext für <c>dotnet ef</c>.</summary>
+/// <summary>Builds a context for <c>dotnet ef</c>.</summary>
 public sealed class NotificationDesignTimeFactory
     : IDesignTimeDbContextFactory<NotificationDbContext>
 {
     /// <inheritdoc />
     public NotificationDbContext CreateDbContext(string[] args) =>
         new((DbContextOptions<NotificationDbContext>)NotificationDbContextFactory
-            .ZurEntwurfszeit(
+            .AtDesignTime(
                 new DbContextOptionsBuilder<NotificationDbContext>(),
                 "Host=entwurfszeit;Database=notification")
             .Options);

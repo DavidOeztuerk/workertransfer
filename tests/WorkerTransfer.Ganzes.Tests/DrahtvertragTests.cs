@@ -75,12 +75,12 @@ public class DrahtvertragTests
 
         // And the contracts layer of EVERY service that has one. It lies in an
         // assembly of ITS OWN — whoever scans only the API layer does not see
-        // it. That is exactly how `BenachrichtigenV1` slipped past.
+        // it. That is exactly how `NotifyV1` slipped past.
         { "applications.contracts", typeof(Applications.Contracts.ApplicationV1) },
         { "companies.contracts", typeof(Companies.Contracts.EmployerProfileV1) },
         { "github.contracts", typeof(GitHub.Contracts.RepositoryV1) },
         { "jobs.contracts", typeof(Jobs.Contracts.JobV1) },
-        { "notification.contracts", typeof(Notification.Contracts.BenachrichtigenV1) },
+        { "notification.contracts", typeof(Notification.Contracts.NotifyV1) },
         { "portfolio.contracts", typeof(Portfolio.Contracts.EntryV1) },
         { "resume.contracts", typeof(Resume.Contracts.StationV1) },
         { "transfer.contracts", typeof(Transfer.Contracts.MarketStatusV1) },
@@ -123,7 +123,7 @@ public class DrahtvertragTests
                     Draht: eigenschaft.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name))
                 // If the annotation is missing, or a capital letter stands in
                 // it, it is not this platform's wire. The second half is not
-                // cosmetics: `BenachrichtigenV1` DID carry the annotation — with
+                // cosmetics: `NotifyV1` DID carry the annotation — with
                 // the value "userId". A guard that only checks presence would
                 // have waved that through and cemented the second dialect.
                 .Where(entry => entry.Draht is null || entry.Draht.Any(char.IsUpper))

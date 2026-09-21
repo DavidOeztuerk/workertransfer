@@ -8,52 +8,52 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Notification.Application.Ports;
-using WorkerTransfer.Notification.Domain.Benachrichtigungen;
+using WorkerTransfer.Notification.Domain.Notifications;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Notification.Tests;
 
 /// <summary>
-/// „Dein Profile wurde entdeckt" — höchstens eine je Person und Tag.
+/// "Your profile was discovered" — at most one per person per day.
 /// </summary>
 /// <remarks>
-/// <para>Die Auskunft aus ADR-0033, und die einzige Art mit einer
-/// <em>eigenen</em> Kappe. Bei jeder anderen entsteht der Postfacheintrag immer
-/// und nur die Mail wird gedrosselt: das Inbox liegt hinter der Anmeldung
-/// und verrät niemandem etwas.</para>
+/// <para>The disclosure from ADR-0033, and the only kind with a cap of its
+/// <em>own</em>. With every other one the inbox entry always comes into being
+/// and only the mail is throttled: the inbox lies behind the sign-in and gives
+/// nobody anything away.</para>
 ///
-/// <para>Hier ist das anders, und darin liegt der ganze Grund für diese Reihe:
-/// ein Eintrag je Hit wäre ein <strong>Zähler über die eigene
-/// Sichtbarkeit</strong> — auf Umwegen genau das Verzeichnis „wer hat wen
-/// angesehen", das nicht entstehen soll. Die Kappe nimmt deshalb den Eintrag
-/// mit, nicht nur die Mail.</para>
+/// <para>Here that is different, and in it lies the whole reason for this
+/// suite: one entry per hit would be a <strong>counter over one's own
+/// visibility</strong> — by a detour exactly the register "who looked at whom"
+/// that must not come into being. So the cap takes the entry with it, not only
+/// the mail.</para>
 /// </remarks>
 [Collection(PostgresCollection.Name)]
-public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
+public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
 {
     private const string Meldegeheimnis = "melde-geheimnis";
 
     private WebApplicationFactory<Program> _dienst = null!;
-    private readonly Probepostbote _postbote = new();
-    private readonly Probeuhr _uhr = new(new DateTimeOffset(2026, 9, 11, 9, 0, 0, TimeSpan.Zero));
+    private readonly ProbeMailer _postbote = new();
+    private readonly ProbeClock _uhr = new(new DateTimeOffset(2026, 9, 11, 9, 0, 0, TimeSpan.Zero));
 
     public Task InitializeAsync()
     {
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:notification", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Identity:Adresse", "http://identity.test");
             host.UseSetting("Identity:Geheimnis", Meldegeheimnis);
             host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {
-                services.Replace(ServiceDescriptor.Scoped<IPostbote>(_ => _postbote));
+                services.Replace(ServiceDescriptor.Scoped<IMailer>(_ => _postbote));
                 services.Replace(ServiceDescriptor.Singleton<TimeProvider>(_uhr));
             });
         });
@@ -67,9 +67,9 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    /// <summary>Die Art gibt es, und sie kommt an.</summary>
+    /// <summary>The kind exists, and it arrives.</summary>
     [Fact]
-    public async Task Die_Art_gibt_es()
+    public async Task The_kind_exists()
     {
         var anna = Guid.CreateVersion7();
 
@@ -81,14 +81,14 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
             .Which.GetProperty("kind").GetString().Should().Be("profile_discovered");
     }
 
-    /// <summary>Zehn Hit an einem Tag ergeben EINEN Eintrag.</summary>
+    /// <summary>Ten hits in one day yield ONE entry.</summary>
     /// <remarks>
-    /// Nicht zehn und auch nicht „einen Eintrag, aber nur eine Mail": zehn
-    /// Einträge wären zehn Zeilen darüber, wie oft diese Person gesehen wurde.
-    /// Genau das ist der Zähler, den ADR-0033 nicht entstehen lässt.
+    /// Not ten, and not "one entry but only one mail" either: ten entries would
+    /// be ten lines about how often this person was seen. That is exactly the
+    /// counter ADR-0033 does not let come into being.
     /// </remarks>
     [Fact]
-    public async Task Zehn_Treffer_an_einem_Tag_ergeben_einen_Eintrag()
+    public async Task Ten_hits_in_one_day_yield_one_entry()
     {
         var anna = Guid.CreateVersion7();
 
@@ -102,9 +102,9 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         _postbote.Gebeten.Should().Equal(anna);
     }
 
-    /// <summary>Am nächsten Tag wieder — sonst wäre es keine Auskunft mehr.</summary>
+    /// <summary>The next day again — otherwise it would be no disclosure any more.</summary>
     [Fact]
-    public async Task Am_naechsten_Tag_wieder()
+    public async Task The_next_day_again()
     {
         var anna = Guid.CreateVersion7();
 
@@ -115,13 +115,13 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         (await Inbox(anna)).GetArrayLength().Should().Be(2);
     }
 
-    /// <summary>Kurz vor dem Tag noch nicht.</summary>
+    /// <summary>Just before the day, not yet.</summary>
     /// <remarks>
-    /// Die Gegenprobe zur Zeile darüber: ohne sie wäre der Test auch grün, wenn
-    /// die Kappe gar nicht griffe und jede Meldung durchginge.
+    /// The counter-probe to the line above: without it the test would be green
+    /// too if the cap did not bite at all and every notification went through.
     /// </remarks>
     [Fact]
-    public async Task Kurz_vor_dem_Tag_noch_nicht()
+    public async Task Just_before_the_day_not_yet()
     {
         var anna = Guid.CreateVersion7();
 
@@ -132,14 +132,14 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         (await Inbox(anna)).GetArrayLength().Should().Be(1);
     }
 
-    /// <summary>Die Kappe gilt je Art, nicht über alle Arten.</summary>
+    /// <summary>The cap applies per kind, not across all kinds.</summary>
     /// <remarks>
-    /// Eine MarketRequest am selben Tag muss ankommen. Wäre die Kappe global,
-    /// verschluckte eine Entdeckung am Morgen die Lebenslaufanfrage am
-    /// Nachmittag — und die ist etwas, worauf jemand antworten soll.
+    /// A market request on the same day has to arrive. Were the cap global, a
+    /// discovery in the morning would swallow the CV request in the afternoon —
+    /// and that is something somebody is meant to answer.
     /// </remarks>
     [Fact]
-    public async Task Die_Kappe_gilt_je_Art()
+    public async Task The_cap_applies_per_kind()
     {
         var anna = Guid.CreateVersion7();
 
@@ -147,16 +147,16 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         await Melde(anna, "market_request");
         await Melde(anna);
 
-        var arten = (await Inbox(anna)).EnumerateArray()
+        var kinds = (await Inbox(anna)).EnumerateArray()
             .Select(entry => entry.GetProperty("kind").GetString())
             .ToArray();
 
-        arten.Should().BeEquivalentTo(["profile_discovered", "market_request"]);
+        kinds.Should().BeEquivalentTo(["profile_discovered", "market_request"]);
     }
 
-    /// <summary>Die Kappe gilt je Person, nicht für alle zusammen.</summary>
+    /// <summary>The cap applies per person, not to everybody together.</summary>
     [Fact]
-    public async Task Die_Kappe_gilt_je_Person()
+    public async Task The_cap_applies_per_person()
     {
         var anna = Guid.CreateVersion7();
         var bea = Guid.CreateVersion7();
@@ -168,15 +168,15 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
         (await Inbox(bea)).GetArrayLength().Should().Be(1);
     }
 
-    /// <summary>Sie ist einzeln abbestellbar — und das Abbestellen wirkt.</summary>
+    /// <summary>It can be switched off on its own — and switching off works.</summary>
     /// <remarks>
-    /// ADR-0033 verlangt eine <em>eigene</em> Art neben den vieren, gerade damit
-    /// sie einzeln abbestellt werden kann: es ist die einzige Auskunft, die eine
-    /// Person über ihre eigene Sichtbarkeit bekommt, und wer sie nicht will,
-    /// soll nicht alles andere mit abstellen müssen.
+    /// ADR-0033 demands a kind of its <em>own</em> beside the others, precisely
+    /// so that it can be switched off singly: it is the only disclosure a
+    /// person gets about their own visibility, and whoever does not want it
+    /// should not have to switch everything else off with it.
     /// </remarks>
     [Fact]
-    public async Task Sie_ist_einzeln_abbestellbar()
+    public async Task It_can_be_switched_off_on_its_own()
     {
         var anna = Guid.CreateVersion7();
 
@@ -206,43 +206,42 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
 
         _postbote.Gebeten.Should().BeEmpty("abbestellt heisst abbestellt");
 
-        // Der EINTRAG entsteht trotzdem: er liegt hinter der Anmeldung, und ihn
-        // wegzulassen hiesse, jemandem zu verschweigen, dass etwas passiert ist.
-        // Abbestellt ist die MAIL.
+        // The ENTRY comes into being all the same: it lies behind the sign-in,
+        // and leaving it out would mean concealing from somebody that something
+        // happened. What is switched off is the MAIL.
         (await Inbox(anna)).GetArrayLength().Should().Be(1);
     }
 
-    /// <summary>Die Art ist eine von acht, und alle acht sind einstellbar.</summary>
+    /// <summary>The kind is one of eight, and all eight are settable.</summary>
     /// <remarks>
-    /// Die achte kam mit assessment-service (ADR-0042):
-    /// <c>assessment_update</c>. Diese Zahl steht hier, damit eine neue Art
-    /// nicht stillschweigend dazukommt — jede ist ein Schalter, den ein Mensch
-    /// zu sehen bekommt, und eine unbemerkt hinzugefügte Art wäre eine Mail,
-    /// die niemand bestellt hat.
+    /// The eighth came with assessment-service (ADR-0042):
+    /// <c>assessment_update</c>. This number stands here so that a new kind does
+    /// not arrive silently — every one is a switch a human being gets to see,
+    /// and a kind added unnoticed would be a mail nobody asked for.
     /// </remarks>
     [Fact]
-    public void Es_sind_acht_Arten() =>
-        Benachrichtigungsarten.Alle.Should().HaveCount(8)
-            .And.Contain(Benachrichtigungsart.ProfileDiscovered)
-            .And.Contain(Benachrichtigungsart.AssessmentUpdate);
+    public void There_are_eight_kinds() =>
+        NotificationKinds.All.Should().HaveCount(8)
+            .And.Contain(NotificationKind.ProfileDiscovered)
+            .And.Contain(NotificationKind.AssessmentUpdate);
 
-    /// <summary>Nur diese eine Art trägt eine Tageskappe.</summary>
+    /// <summary>Only this one kind carries a daily cap.</summary>
     /// <remarks>
-    /// Die Gegenprobe zur Kappe selbst: wer sie versehentlich auf eine weitere
-    /// Art legte, nähme dort den Postfacheintrag mit — und eine Application, die
-    /// sich zweimal am Tag bewegt, verschwände zur Hälfte.
+    /// The counter-probe to the cap itself: whoever put it on a further kind by
+    /// accident would take the inbox entry with it there — and an application
+    /// that moves twice in a day would half disappear.
     /// </remarks>
     [Fact]
-    public void Nur_die_Entdeckung_traegt_eine_Tageskappe()
+    public void Only_discovery_carries_a_daily_cap()
     {
-        Benachrichtigungsarten.Tageskappe(Benachrichtigungsart.ProfileDiscovered)
+        NotificationKinds.DailyCap(NotificationKind.ProfileDiscovered)
             .Should().Be(TimeSpan.FromDays(1));
 
-        foreach (var kind in Benachrichtigungsarten.Alle
-                     .Where(kind => kind != Benachrichtigungsart.ProfileDiscovered))
+        foreach (var kind in NotificationKinds.All
+                     .Where(kind => kind != NotificationKind.ProfileDiscovered))
         {
-            Benachrichtigungsarten.Tageskappe(kind).Should().BeNull(
-                $"{Benachrichtigungsarten.Wort(kind)} darf so oft kommen, wie es passiert");
+            NotificationKinds.DailyCap(kind).Should().BeNull(
+                $"{NotificationKinds.Word(kind)} darf so oft kommen, wie es passiert");
         }
     }
 
@@ -252,7 +251,7 @@ public class EntdeckungTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Person(subject));
+            new AuthenticationHeaderValue("Bearer", TokenShape.Person(subject));
         return browser;
     }
 

@@ -13,9 +13,9 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Notification.Tests;
 
-/// <summary>Die Löschung — hier ohne jede Ausnahme.</summary>
+/// <summary>The erasure — here without any exception.</summary>
 [Collection(PostgresCollection.Name)]
-public class LoeschungTests(Postgres postgres) : IAsyncLifetime
+public class ErasureTests(Postgres postgres) : IAsyncLifetime
 {
     private const string Loeschgeheimnis = "loesch-geheimnis";
     private const string Meldegeheimnis = "melde-geheimnis";
@@ -27,17 +27,17 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:notification", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Identity:Adresse", "http://identity.test");
             host.UseSetting("Identity:Geheimnis", Meldegeheimnis);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
-                services.Replace(ServiceDescriptor.Scoped<IPostbote, Probepostbote>()));
+                services.Replace(ServiceDescriptor.Scoped<IMailer, ProbeMailer>()));
         });
 
         return Task.CompletedTask;
@@ -50,23 +50,23 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Inbox und Einstellungen fallen — ohne Schalter, ohne Ausnahme.
+    /// Inbox and settings fall — no switch, no exception.
     /// </summary>
     /// <remarks>
-    /// Es gibt hier keine Zeile, in der jemand nur <em>gehandelt</em> hätte;
-    /// jede handelt <em>von</em> der Person.
+    /// There is no row here in which somebody merely <em>acted</em>; every one
+    /// is <em>about</em> the person.
     /// </remarks>
     [Fact]
-    public async Task Die_Loeschung_nimmt_Postfach_und_Einstellungen_mit()
+    public async Task The_erasure_takes_inbox_and_settings_with_it()
     {
         var anna = Guid.CreateVersion7();
         await Melde(anna);
-        await Wuensche(anna);
+        await Preferences(anna);
 
         await using (var vorher = postgres.Kontext())
         {
-            (await vorher.Eingaenge.AnyAsync(row => row.UserId == anna)).Should().BeTrue();
-            (await vorher.Wuensche.AnyAsync(row => row.Id == anna)).Should().BeTrue();
+            (await vorher.InboxEntries.AnyAsync(row => row.UserId == anna)).Should().BeTrue();
+            (await vorher.Preferences.AnyAsync(row => row.Id == anna)).Should().BeTrue();
         }
 
         var response = await Loesche(anna);
@@ -77,13 +77,13 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         quittung.GetProperty("retained").GetInt32().Should().Be(0);
 
         await using var nachher = postgres.Kontext();
-        (await nachher.Eingaenge.AnyAsync(row => row.UserId == anna)).Should().BeFalse();
-        (await nachher.Wuensche.AnyAsync(row => row.Id == anna)).Should().BeFalse();
+        (await nachher.InboxEntries.AnyAsync(row => row.UserId == anna)).Should().BeFalse();
+        (await nachher.Preferences.AnyAsync(row => row.Id == anna)).Should().BeFalse();
     }
 
-    /// <summary>Die Löschung eines Menschen fasst niemand anderen an.</summary>
+    /// <summary>Erasing one human being touches nobody else.</summary>
     [Fact]
-    public async Task Die_Loeschung_trifft_nur_diesen_Menschen()
+    public async Task The_erasure_strikes_only_this_human_being()
     {
         var anna = Guid.CreateVersion7();
         var bea = Guid.CreateVersion7();
@@ -93,12 +93,12 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         await Loesche(anna);
 
         await using var context = postgres.Kontext();
-        (await context.Eingaenge.AnyAsync(row => row.UserId == bea)).Should().BeTrue();
+        (await context.InboxEntries.AnyAsync(row => row.UserId == bea)).Should().BeTrue();
     }
 
-    /// <summary>Ohne das Geheimnis passiert nichts.</summary>
+    /// <summary>Without the secret nothing happens.</summary>
     [Fact]
-    public async Task Ohne_das_richtige_Geheimnis_wird_nichts_geloescht()
+    public async Task Without_the_right_secret_nothing_is_erased()
     {
         var anna = Guid.CreateVersion7();
         await Melde(anna);
@@ -111,18 +111,18 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
         await using var context = postgres.Kontext();
-        (await context.Eingaenge.AnyAsync(row => row.UserId == anna)).Should().BeTrue();
+        (await context.InboxEntries.AnyAsync(row => row.UserId == anna)).Should().BeTrue();
     }
 
     /// <summary>
-    /// Das Löschgeheimnis ist ein anderes als das der Meldung.
+    /// The erasure secret is a different one from the notification's.
     /// </summary>
     /// <remarks>
-    /// „Darf eine Mail anstoßen" und „darf alles über einen Menschen löschen"
-    /// dürfen nicht dasselbe Papier sein (ADR-0027 §4.4).
+    /// "May trigger a mail" and "may erase everything about a human being" must
+    /// not be the same piece of paper (ADR-0027 §4.4).
     /// </remarks>
     [Fact]
-    public async Task Das_Meldegeheimnis_oeffnet_die_Loeschung_nicht()
+    public async Task The_notify_secret_does_not_open_the_erasure()
     {
         var anna = Guid.CreateVersion7();
         await Melde(anna);
@@ -135,12 +135,12 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
         await using var context = postgres.Kontext();
-        (await context.Eingaenge.AnyAsync(row => row.UserId == anna)).Should().BeTrue();
+        (await context.InboxEntries.AnyAsync(row => row.UserId == anna)).Should().BeTrue();
     }
 
-    /// <summary>Ein zweiter Aufruf ist kein Fehlschlag.</summary>
+    /// <summary>A second call is not a failure.</summary>
     [Fact]
-    public async Task Ein_zweites_Mal_loeschen_ist_wieder_2xx()
+    public async Task Erasing_a_second_time_is_2xx_again()
     {
         var anna = Guid.CreateVersion7();
 
@@ -155,11 +155,11 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         return browser.PostAsJsonAsync("/erasure", new { user_id = subject });
     }
 
-    /// <summary>Legt einen Eingang an — und besteht darauf, dass es klappt.</summary>
+    /// <summary>Creates an inbox entry — and insists that it works.</summary>
     /// <remarks>
-    /// Die Antwort wird GEPRUEFT. Vorher wurde sie weggeworfen, und ein
-    /// fehlgeschlagenes Befuellen meldete sich erst drei Zeilen spaeter als
-    /// „kein Eintrag" — eine Ursache, die wie eine Wirkung aussieht.
+    /// The answer is CHECKED. Before, it was thrown away, and a failed fill
+    /// reported itself three lines later as "no entry" — a cause that looks
+    /// like an effect.
     /// </remarks>
     private async Task<HttpResponseMessage> Melde(Guid subject)
     {
@@ -177,11 +177,11 @@ public class LoeschungTests(Postgres postgres) : IAsyncLifetime
         return response;
     }
 
-    private Task<HttpResponseMessage> Wuensche(Guid subject)
+    private Task<HttpResponseMessage> Preferences(Guid subject)
     {
         var browser = _dienst.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Person(subject));
+            new AuthenticationHeaderValue("Bearer", TokenShape.Person(subject));
 
         return browser.PutAsJsonAsync("/me/notification-preferences", new
         {

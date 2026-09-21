@@ -5,7 +5,7 @@ using Noelia.Core.Identity;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Notification.Contracts;
-using WorkerTransfer.Notification.Infrastructure.Post;
+using WorkerTransfer.Notification.Infrastructure.Mail;
 using AnwendungenPost = WorkerTransfer.Applications.Infrastructure.Benachrichtigung;
 using LebenslaufPost = WorkerTransfer.Resume.Infrastructure.Benachrichtigung;
 using SpaeherPost = WorkerTransfer.Scout.Infrastructure.Benachrichtigung;
@@ -124,14 +124,14 @@ public class BenachrichtigungsdrahtTests
     {
         var lauscher = new Lauscher();
 
-        await new HttpPostbote(
+        await new HttpMailer(
             new Stubfabrik(lauscher),
             Options.Create(new MailSettings
             {
                 Adresse = "http://probe.invalid",
                 Geheimnis = "probe"
             }),
-            NullLogger<HttpPostbote>.Instance)
+            NullLogger<HttpMailer>.Instance)
             .SendAsync(new SubjectId(Empfaenger));
 
         lauscher.Rumpf.Should().NotBeNull("es wurde nichts geschickt");
@@ -167,7 +167,7 @@ public class BenachrichtigungsdrahtTests
 
         lauscher.Rumpf.Should().NotBeNull("es wurde nichts geschickt");
 
-        var gelesen = JsonSerializer.Deserialize<BenachrichtigenV1>(lauscher.Rumpf!);
+        var gelesen = JsonSerializer.Deserialize<NotifyV1>(lauscher.Rumpf!);
 
         gelesen.Should().NotBeNull();
         gelesen!.UserId.Should().Be(
