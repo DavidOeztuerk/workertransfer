@@ -6,7 +6,7 @@ using WorkerTransfer.Consent.Domain.Ledger;
 namespace WorkerTransfer.Consent.Application.Einwilligung;
 
 /// <summary>Every event of one's own history, oldest first.</summary>
-/// <param name="Wer">Taken from the token, never from the request.</param>
+/// <param name="Subject">Taken from the token, never from the request.</param>
 /// <remarks>
 /// <c>/consent/me</c> deliberately shows only what holds; a history reveals who
 /// once asked, and that is more than an overview page promises. Here it is
@@ -17,11 +17,11 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// the difference between "belongs to them" and "concerns others".
 /// </para>
 /// </remarks>
-public sealed record MyHistoryQuery(SubjectId Wer)
-    : IAbfrage<IReadOnlyList<ConsentEvent>>;
+public sealed record MyHistoryQuery(SubjectId Subject)
+    : IQuery<IReadOnlyList<ConsentEvent>>;
 
 /// <summary>Reads the whole stream, unreduced.</summary>
-public sealed class MyHistoryHandler(IConsentLedger buch)
+public sealed class MyHistoryHandler(IConsentLedger ledger)
     : IRequestHandler<MyHistoryQuery, IReadOnlyList<ConsentEvent>>
 {
     /// <inheritdoc />
@@ -31,6 +31,6 @@ public sealed class MyHistoryHandler(IConsentLedger buch)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return buch.HistoryAsync(request.Wer, cancellationToken);
+        return ledger.HistoryAsync(request.Subject, cancellationToken);
     }
 }

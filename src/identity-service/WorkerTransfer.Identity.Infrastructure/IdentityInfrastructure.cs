@@ -178,7 +178,7 @@ public static class IdentityInfrastructure
         // eine andere — kennt es fuer jeden Empfaenger eine Adresse? Ohne
         // Adresse bekommt der Empfaenger keinen Auftrag, und die Kaskade wartet
         // auf eine Quittung, die niemand angefordert hat.
-        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsUrsprung(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsOrigin(
             "identity",
             ErasureRecipient.Fremde,
             [.. erasure.Adressen

@@ -10,18 +10,17 @@ namespace WorkerTransfer.Consent.Api;
 
 /// <summary>What a caller sends to give a permission.</summary>
 /// <remarks>
-/// <para><strong>Die Drahtnamen stehen ausdrücklich da.</strong> Der Draht dieser
-/// Plattform ist snake_case; ohne <c>[JsonPropertyName]</c> fiele
-/// <c>SubjectId</c> auf <c>subjectId</c> zurück, während die Oberfläche
-/// <c>subject_id</c> schickt (<c>apps/web/src/consent/client.ts:38,63</c>).</para>
+/// <para><strong>The wire names stand there expressly.</strong> This platform's
+/// wire is snake_case; without <c>[JsonPropertyName]</c> <c>SubjectId</c> would
+/// fall back to <c>subjectId</c> while the interface sends <c>subject_id</c>
+/// (<c>apps/web/src/consent/client.ts:38,63</c>).</para>
 ///
-/// <para>Was das kostete, war gemessen kein stiller Schaden, sondern ein
-/// vollständiger Ausfall: der Wert kam als <c>Guid.Empty</c> an, der Wächter
-/// verglich ihn mit dem Aufrufer und antwortete <c>403 „a consent belongs to its
-/// subject"</c>. <strong>Über die Oberfläche konnte niemand etwas freigeben oder
-/// zurücknehmen</strong> — bei dem Dienst, auf den sich alle anderen stützen.
-/// Dass nichts Falsches ins Buch geriet, ist das Verdienst des Wächters, nicht
-/// dieser Zeile.</para>
+/// <para>What that cost was, measured, no silent damage but a complete outage:
+/// the value arrived as <c>Guid.Empty</c>, the guard compared it with the caller
+/// and answered <c>403 „a consent belongs to its subject"</c>. <strong>Through
+/// the interface nobody could release anything or take it back</strong> — at the
+/// service every other one leans on. That nothing wrong got into the ledger is
+/// the guard's doing, not this line's.</para>
 /// </remarks>
 /// <param name="Reason">Optional: giving a permission needs no justification.</param>
 public sealed record GrantBody(
@@ -48,7 +47,7 @@ public sealed record CheckBatchBody(IReadOnlyList<CheckBody> Pairs);
 public static class ConsentEndpoints
 {
     /// <summary>Maps the five endpoints of the ledger.</summary>
-    public static IEndpointRouteBuilder MapEinwilligungsEndpoints(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapConsentEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
@@ -57,45 +56,45 @@ public static class ConsentEndpoints
         consent.MapPost("/grant", async (
             GrantBody body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
             var result = await mediator.Send(
                 new GrantConsentCommand(
-                    handelnder.Subject, Firma(handelnder),
+                    actor.Subject, Company(actor),
                     body.SubjectId, body.Capability, body.Reason),
                 cancellationToken);
 
-            await Beantworte(context, result, cancellationToken);
+            await Respond(context, result, cancellationToken);
         });
 
         consent.MapPost("/revoke", async (
             RevokeBody body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
             var result = await mediator.Send(
                 new RevokeConsentCommand(
-                    handelnder.Subject, Firma(handelnder),
+                    actor.Subject, Company(actor),
                     body.SubjectId, body.Capability, body.Reason),
                 cancellationToken);
 
-            await Beantworte(context, result, cancellationToken);
+            await Respond(context, result, cancellationToken);
         });
 
         // Deliberately takes no subject — not in the path and not as a query.
@@ -104,24 +103,24 @@ public static class ConsentEndpoints
         // its owner and to nobody else.
         consent.MapGet("/me", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
             var releases = await mediator.Send(
-                new MyReleasesQuery(handelnder.Subject), cancellationToken);
+                new MyReleasesQuery(actor.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
                 releases.Select(release => new Dictionary<string, string>
                 {
-                    ["capability"] = release.Faehigkeit.Value,
-                    ["granted_at"] = release.Seit.ToString("O")
+                    ["capability"] = release.Capability.Value,
+                    ["granted_at"] = release.Since.ToString("O")
                 }),
                 cancellationToken);
         });
@@ -133,18 +132,18 @@ public static class ConsentEndpoints
         // business".
         consent.MapGet("/me/history", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
             var history = await mediator.Send(
-                new MyHistoryQuery(handelnder.Subject), cancellationToken);
+                new MyHistoryQuery(actor.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
                 history.Select(entry => new Dictionary<string, string?>
@@ -164,13 +163,13 @@ public static class ConsentEndpoints
         consent.MapPost("/check", async (
             CheckBody body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is null)
+            if (principal.Current is null)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
@@ -182,14 +181,14 @@ public static class ConsentEndpoints
             {
                 case AuditResult.State state:
                     await context.Response.WriteAsJsonAsync(
-                        Antwort(body.SubjectId, body.Capability, state.Zustand),
+                        Response(body.SubjectId, body.Capability, state.Value),
                         cancellationToken);
                     return;
 
-                case AuditResult.Unbrauchbar unbrauchbar:
+                case AuditResult.Malformed malformed:
                     await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status422UnprocessableEntity,
-                        "Request failed", unbrauchbar.Detail);
+                        "Request failed", malformed.Detail);
                     return;
             }
         });
@@ -201,13 +200,13 @@ public static class ConsentEndpoints
         consent.MapPost("/check-batch", async (
             CheckBatchBody body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is null)
+            if (principal.Current is null)
             {
-                await NichtAngemeldet(context);
+                await NotAuthenticated(context);
                 return;
             }
 
@@ -232,31 +231,31 @@ public static class ConsentEndpoints
 
             var result = await mediator.Send(
                 new BatchCheckQuery(
-                    [.. body.Pairs.Select(paar =>
-                        new CheckConsentQuery(paar.SubjectId, paar.Capability))]),
+                    [.. body.Pairs.Select(pair =>
+                        new CheckConsentQuery(pair.SubjectId, pair.Capability))]),
                 cancellationToken);
 
             switch (result)
             {
-                case Sammelergebnis.Staende staende:
+                case BatchCheckResult.States states:
                     // In the order of the questions, one per pair. The order is
                     // part of the contract: the caller maps answers onto its
                     // rows, and a pair asked twice would otherwise be ambiguous.
                     await context.Response.WriteAsJsonAsync(
                         new Dictionary<string, object>
                         {
-                            ["results"] = staende.Zustaende
-                                .Select((state, i) => Antwort(
+                            ["results"] = states.Values
+                                .Select((state, i) => Response(
                                     body.Pairs[i].SubjectId, body.Pairs[i].Capability, state))
                                 .ToArray()
                         },
                         cancellationToken);
                     return;
 
-                case Sammelergebnis.Unbrauchbar unbrauchbar:
+                case BatchCheckResult.Malformed malformed:
                     await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status422UnprocessableEntity,
-                        "Request failed", unbrauchbar.Detail);
+                        "Request failed", malformed.Detail);
                     return;
             }
         });
@@ -272,16 +271,16 @@ public static class ConsentEndpoints
     /// state carries the withdrawal reason because the subject's own views need
     /// it; this shape has no field for one, so it cannot leak by accident.
     /// </remarks>
-    private static Dictionary<string, object> Antwort(
-        Guid gegenstand, string skill, ConsentState state) => new()
+    private static Dictionary<string, object> Response(
+        Guid subjectId, string skill, ConsentState state) => new()
     {
-        ["subject_id"] = gegenstand,
+        ["subject_id"] = subjectId,
         ["capability"] = skill,
         ["granted"] = state.Granted,
         ["deleted"] = state.Deleted
     };
 
-    private static async Task Beantworte(
+    private static async Task Respond(
         HttpContext context,
         ConsentResult result,
         CancellationToken cancellationToken)
@@ -292,9 +291,9 @@ public static class ConsentEndpoints
                 await context.Response.WriteAsJsonAsync(
                     new Dictionary<string, object?>
                     {
-                        ["granted"] = state.Zustand.Granted,
-                        ["deleted"] = state.Zustand.Deleted,
-                        ["reason"] = state.Zustand.Reason
+                        ["granted"] = state.Value.Granted,
+                        ["deleted"] = state.Value.Deleted,
+                        ["reason"] = state.Value.Reason
                     },
                     cancellationToken);
                 return;
@@ -308,10 +307,10 @@ public static class ConsentEndpoints
                     "Request failed", "a consent belongs to its subject");
                 return;
 
-            case ConsentResult.Unbrauchbar unbrauchbar:
+            case ConsentResult.Malformed malformed:
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
-                    "Request failed", unbrauchbar.Detail);
+                    "Request failed", malformed.Detail);
                 return;
         }
     }
@@ -325,10 +324,10 @@ public static class ConsentEndpoints
     /// column (ADR-0017). It is recorded so an operator can see in what capacity
     /// somebody was acting, not so anyone can act for another.
     /// </remarks>
-    private static TenantId? Firma(Principal handelnder) =>
-        handelnder.Acting is Capacity.ForCompany company ? company.Tenant : null;
+    private static TenantId? Company(Principal actor) =>
+        actor.Acting is Capacity.ForCompany company ? company.Tenant : null;
 
-    private static Task NichtAngemeldet(HttpContext context) =>
+    private static Task NotAuthenticated(HttpContext context) =>
         ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
 }

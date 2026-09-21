@@ -14,7 +14,7 @@ namespace WorkerTransfer.Consent.Application.Ports;
 /// and deleting it would make the promise unprovable (ADR-0027 §5).
 /// </para>
 /// </remarks>
-public interface IFreitextraeumung
+public interface IFreeTextClearing
 {
     /// <param name="subject">Whose rows.</param>
     /// <param name="cancellationToken">Cancels the write.</param>

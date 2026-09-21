@@ -114,6 +114,6 @@ public static class JobsInfrastructure
 
 
         // Kein Empfaenger: eine Anzeige gehoert einem Unternehmen, nicht einem Menschen (ADR-0027 §2). Der Firmenrueckzug ist ein eigener Vertrag und zaehlt ausdruecklich nicht zur Vollstaendigkeit einer Erasure.
-        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.OhneZeilen("jobs"));
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.WithoutSubjectRows("jobs"));
     }
 }

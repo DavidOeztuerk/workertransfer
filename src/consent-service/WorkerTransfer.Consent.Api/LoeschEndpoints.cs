@@ -11,21 +11,21 @@ namespace WorkerTransfer.Consent.Api;
 public static class ErasureEndpoints
 {
     /// <summary>The header the origin presents.</summary>
-    private const string Geheimniskopf = "X-Erasure-Secret";
+    private const string SecretHeader = "X-Erasure-Secret";
 
     /// <summary>Maps the one endpoint the erasure cascade calls.</summary>
-    public static IEndpointRouteBuilder MapLoeschEndpoints(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapErasureEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
         app.MapPost("/erasure", async (
             ErasureV1 body,
             IMediator mediator,
-            IOptions<ErasureSettings> einstellungen,
+            IOptions<ErasureSettings> settings,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (!DarfLoeschen(context, einstellungen.Value))
+            if (!MayErase(context, settings.Value))
             {
                 // The same answer for a wrong secret and for an unset one. A
                 // caller must not be able to tell "you guessed wrong" from
@@ -36,14 +36,14 @@ public static class ErasureEndpoints
                 return;
             }
 
-            var quittung = await mediator.Send(
+            var receipt = await mediator.Send(
                 new ExecuteErasureCommand(body.UserId), cancellationToken);
 
             // `retained` is a count, not a flag: the origin should learn what
             // stayed rather than guess. Here it is the closing facts the ledger
             // keeps as proof (ADR-0027 §5) — suspended is not skipped.
             await context.Response.WriteAsJsonAsync(
-                new ErasureReceiptV1(quittung.Behalten), cancellationToken);
+                new ErasureReceiptV1(receipt.Retained), cancellationToken);
         });
 
         return app;
@@ -57,20 +57,20 @@ public static class ErasureEndpoints
     /// so the answer's duration says nothing about how much of a guess was
     /// right.
     /// </remarks>
-    private static bool DarfLoeschen(HttpContext context, ErasureSettings einstellungen)
+    private static bool MayErase(HttpContext context, ErasureSettings settings)
     {
-        if (string.IsNullOrEmpty(einstellungen.Geheimnis))
+        if (string.IsNullOrEmpty(settings.Geheimnis))
         {
             return false;
         }
 
-        if (!context.Request.Headers.TryGetValue(Geheimniskopf, out var vorgelegt))
+        if (!context.Request.Headers.TryGetValue(SecretHeader, out var presented))
         {
             return false;
         }
 
         return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(vorgelegt.ToString()),
-            System.Text.Encoding.UTF8.GetBytes(einstellungen.Geheimnis));
+            System.Text.Encoding.UTF8.GetBytes(presented.ToString()),
+            System.Text.Encoding.UTF8.GetBytes(settings.Geheimnis));
     }
 }

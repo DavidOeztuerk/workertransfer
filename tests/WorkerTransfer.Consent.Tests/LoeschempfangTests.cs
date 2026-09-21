@@ -17,46 +17,46 @@ namespace WorkerTransfer.Consent.Tests;
 /// with nothing left to check it against.
 /// </remarks>
 [Collection(PostgresCollection.Name)]
-public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
+public class ErasureArrivalTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Geheimnis = "loesch-geheimnis-fuer-den-test";
+    private const string Secret = "loesch-geheimnis-fuer-den-test";
 
-    private WebApplicationFactory<Program> _dienst = null!;
+    private WebApplicationFactory<Program> _service = null!;
 
     public Task InitializeAsync()
     {
-        _dienst = Dienst(Geheimnis);
+        _service = Service(Secret);
         return Task.CompletedTask;
     }
 
     public Task DisposeAsync()
     {
-        _dienst.Dispose();
+        _service.Dispose();
         return Task.CompletedTask;
     }
 
-    private WebApplicationFactory<Program> Dienst(string secret) =>
+    private WebApplicationFactory<Program> Service(string secret) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:consent", postgres.ConnectionString);
-            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
-            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
-            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
-            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Erasure:Geheimnis", secret);
             host.UseSetting("environment", "Development");
         });
 
-    private HttpClient Als(Guid subject)
+    private HttpClient As(Guid subject)
     {
-        var browser = _dienst.CreateClient();
+        var browser = _service.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Tokenform.Fuer(subject));
+            new AuthenticationHeaderValue("Bearer", TokenShape.For(subject));
         return browser;
     }
 
-    private static HttpRequestMessage Loeschbefehl(Guid subject, string? secret)
+    private static HttpRequestMessage ErasureRequest(Guid subject, string? secret)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/erasure")
         {
@@ -71,10 +71,10 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
         return request;
     }
 
-    private async Task<Guid> PersonMitFreigaben()
+    private async Task<Guid> PersonWithReleases()
     {
         var anna = Guid.CreateVersion7();
-        var browser = Als(anna);
+        var browser = As(anna);
 
         await browser.PostAsJsonAsync("/consent/grant", new
         {
@@ -94,20 +94,20 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
         return anna;
     }
 
-    private async Task<List<(string Action, string? Reason)>> Zeilen(Guid subject)
+    private async Task<List<(string Action, string? Reason)>> Rows(Guid subject)
     {
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
-        await using var befehl = connection.CreateCommand();
-        befehl.CommandText =
+        await using var command = connection.CreateCommand();
+        command.CommandText =
             "SELECT action::text, reason FROM consent_events WHERE subject_id = @wer ORDER BY id";
-        befehl.Parameters.AddWithValue("wer", subject);
+        command.Parameters.AddWithValue("wer", subject);
 
         var rows = new List<(string, string?)>();
-        await using var leser = await befehl.ExecuteReaderAsync();
-        while (await leser.ReadAsync())
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
         {
-            rows.Add((leser.GetString(0), leser.IsDBNull(1) ? null : leser.GetString(1)));
+            rows.Add((reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1)));
         }
 
         return rows;
@@ -119,12 +119,12 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
     /// case of doubt.
     /// </summary>
     [Fact]
-    public async Task Ein_leeres_Geheimnis_schliesst_den_Endpunkt()
+    public async Task An_empty_secret_closes_the_endpoint()
     {
-        using var ohne = Dienst(string.Empty);
+        using var without = Service(string.Empty);
 
-        var response = await ohne.CreateClient().SendAsync(
-            Loeschbefehl(Guid.CreateVersion7(), "irgendwas"));
+        var response = await without.CreateClient().SendAsync(
+            ErasureRequest(Guid.CreateVersion7(), "irgendwas"));
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -132,14 +132,14 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
     [Theory]
     [InlineData(null)]
     [InlineData("falsch")]
-    public async Task Ohne_das_richtige_Geheimnis_wird_nichts_geloescht(string? vorgelegt)
+    public async Task Without_the_right_secret_nothing_is_erased(string? presented)
     {
-        var anna = await PersonMitFreigaben();
+        var anna = await PersonWithReleases();
 
-        var response = await _dienst.CreateClient().SendAsync(Loeschbefehl(anna, vorgelegt));
+        var response = await _service.CreateClient().SendAsync(ErasureRequest(anna, presented));
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await Zeilen(anna)).Should().NotContain(row => row.Action == "DELETE");
+        (await Rows(anna)).Should().NotContain(row => row.Action == "DELETE");
     }
 
     /// <summary>
@@ -148,39 +148,39 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
     /// retain" but that nothing maps a subject id to a person afterwards.
     /// </summary>
     [Fact]
-    public async Task Die_Kette_bleibt_der_Freitext_geht()
+    public async Task The_chain_stays_the_free_text_goes()
     {
-        var anna = await PersonMitFreigaben();
+        var anna = await PersonWithReleases();
 
-        var response = await _dienst.CreateClient().SendAsync(Loeschbefehl(anna, Geheimnis));
+        var response = await _service.CreateClient().SendAsync(ErasureRequest(anna, Secret));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var rows = await Zeilen(anna);
+        var rows = await Rows(anna);
 
-        rows.Should().Contain(row => row.Action == "GRANT", "die Kette bleibt");
+        rows.Should().Contain(row => row.Action == "GRANT", "the chain stays");
         rows.Should().Contain(row => row.Action == "REVOKE");
         rows.Count(row => row.Action == "DELETE")
-            .Should().Be(2, "je jemals gehaltener Faehigkeit eine Schlusszeile");
+            .Should().Be(2, "one closing row per capability ever held");
         rows.Should().OnlyContain(
-            row => row.Reason == null, "der Freitext ist ueberall geleert");
+            row => row.Reason == null, "the free text is cleared everywhere");
     }
 
     [Fact]
-    public async Task Nach_der_Loeschung_gilt_keine_Freigabe_mehr()
+    public async Task After_the_erasure_no_release_holds_any_more()
     {
-        var anna = await PersonMitFreigaben();
+        var anna = await PersonWithReleases();
 
-        await _dienst.CreateClient().SendAsync(Loeschbefehl(anna, Geheimnis));
+        await _service.CreateClient().SendAsync(ErasureRequest(anna, Secret));
 
-        var geprueft = await Als(Guid.CreateVersion7()).PostAsJsonAsync(
+        var checkResult = await As(Guid.CreateVersion7()).PostAsJsonAsync(
             "/consent/check", new { subject_id = anna, capability = "profile.visibility:public" });
 
-        var state = JsonDocument.Parse(await geprueft.Content.ReadAsStringAsync()).RootElement;
+        var state = JsonDocument.Parse(await checkResult.Content.ReadAsStringAsync()).RootElement;
 
         state.GetProperty("granted").GetBoolean().Should().BeFalse();
         state.GetProperty("deleted").GetBoolean().Should().BeTrue(
-            "geloescht ist nicht dasselbe wie widerrufen");
+            "erased is not the same as revoked");
     }
 
     /// <summary>
@@ -189,17 +189,17 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
     /// off would double every closing fact.
     /// </summary>
     [Fact]
-    public async Task Zweimal_loeschen_aendert_nichts_mehr()
+    public async Task Erasing_twice_changes_nothing_more()
     {
-        var anna = await PersonMitFreigaben();
+        var anna = await PersonWithReleases();
 
-        await _dienst.CreateClient().SendAsync(Loeschbefehl(anna, Geheimnis));
-        var nachher = await Zeilen(anna);
+        await _service.CreateClient().SendAsync(ErasureRequest(anna, Secret));
+        var after = await Rows(anna);
 
-        var zweite = await _dienst.CreateClient().SendAsync(Loeschbefehl(anna, Geheimnis));
+        var second = await _service.CreateClient().SendAsync(ErasureRequest(anna, Secret));
 
-        zweite.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Zeilen(anna)).Should().HaveCount(nachher.Count);
+        second.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Rows(anna)).Should().HaveCount(after.Count);
     }
 
     /// <summary>
@@ -216,14 +216,14 @@ public class LoeschempfangTests(Postgres postgres) : IAsyncLifetime
     /// somebody survived, which is exactly what did not happen.
     /// </remarks>
     [Fact]
-    public async Task Die_Quittung_meldet_null_denn_nichts_Personenbezogenes_blieb()
+    public async Task The_receipt_reports_zero_because_nothing_personal_stayed()
     {
-        var anna = await PersonMitFreigaben();
+        var anna = await PersonWithReleases();
 
-        var response = await _dienst.CreateClient().SendAsync(Loeschbefehl(anna, Geheimnis));
-        var quittung = JsonDocument.Parse(
+        var response = await _service.CreateClient().SendAsync(ErasureRequest(anna, Secret));
+        var receipt = JsonDocument.Parse(
             await response.Content.ReadAsStringAsync()).RootElement;
 
-        quittung.GetProperty("retained").GetInt32().Should().Be(0);
+        receipt.GetProperty("retained").GetInt32().Should().Be(0);
     }
 }

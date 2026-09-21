@@ -33,7 +33,7 @@ public sealed class EfConsentLedger(ConsentDbContext context) : IConsentLedger
     /// by field where Postgres orders by byte.
     /// </para>
     /// </remarks>
-    private const string Neueste = """
+    private const string Latest = """
         SELECT DISTINCT ON (subject_id, capability)
                id, event_id, subject_id, capability, action, actor_id, reason, metadata,
                recorded_at
@@ -41,26 +41,26 @@ public sealed class EfConsentLedger(ConsentDbContext context) : IConsentLedger
         WHERE
         """;
 
-    private const string Ordnung = """
+    private const string Ordering = """
         ORDER BY subject_id, capability, recorded_at DESC, event_id DESC
         """;
 
     /// <inheritdoc />
     public async Task AttachAsync(
-        ConsentEvent ereignis, CancellationToken cancellationToken = default)
+        ConsentEvent consentEvent, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(ereignis);
+        ArgumentNullException.ThrowIfNull(consentEvent);
 
         context.ConsentEvents.Add(new ConsentEventRow
         {
-            EventId = ereignis.EventId,
-            SubjectId = ereignis.Subject.Value,
-            Capability = ereignis.Capability.Value,
-            Action = ereignis.Action,
-            ActorId = ereignis.Actor?.Value,
-            Reason = ereignis.Reason?.Value,
-            Metadata = JsonSerializer.Serialize(ereignis.Metadata),
-            RecordedAt = ereignis.RecordedAt.UtcDateTime
+            EventId = consentEvent.EventId,
+            SubjectId = consentEvent.Subject.Value,
+            Capability = consentEvent.Capability.Value,
+            Action = consentEvent.Action,
+            ActorId = consentEvent.Actor?.Value,
+            Reason = consentEvent.Reason?.Value,
+            Metadata = JsonSerializer.Serialize(consentEvent.Metadata),
+            RecordedAt = consentEvent.RecordedAt.UtcDateTime
         });
 
         // Written through inside the transaction the caller holds, not at commit
@@ -80,7 +80,7 @@ public sealed class EfConsentLedger(ConsentDbContext context) : IConsentLedger
             .ThenBy(row => row.EventId)
             .ToListAsync(cancellationToken);
 
-        return [.. rows.Select(ZuFakt)];
+        return [.. rows.Select(ToFact)];
     }
 
     /// <inheritdoc />
@@ -89,22 +89,22 @@ public sealed class EfConsentLedger(ConsentDbContext context) : IConsentLedger
     {
         var rows = await context.ConsentEvents
             .FromSqlRaw(
-                $"{Neueste} subject_id = {{0}} AND capability = {{1}} {Ordnung}",
+                $"{Latest} subject_id = {{0}} AND capability = {{1}} {Ordering}",
                 subject.Value, capability.Value)
             .ToListAsync(cancellationToken);
 
-        return rows.Count is 0 ? null : ZuFakt(rows[0]);
+        return rows.Count is 0 ? null : ToFact(rows[0]);
     }
 
     /// <inheritdoc />
     public async Task<IReadOnlyDictionary<(Guid Subject, string Capability), ConsentEvent>>
         LatestAsync(
-            IReadOnlyList<(SubjectId Subject, Capability Capability)> paare,
+            IReadOnlyList<(SubjectId Subject, Capability Capability)> pairs,
             CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(paare);
+        ArgumentNullException.ThrowIfNull(pairs);
 
-        if (paare.Count is 0)
+        if (pairs.Count is 0)
         {
             return new Dictionary<(Guid, string), ConsentEvent>();
         }
@@ -114,20 +114,20 @@ public sealed class EfConsentLedger(ConsentDbContext context) : IConsentLedger
         // combination of the subjects and the capabilities named, and answer
         // about pairs nobody asked about. A batch is meant to make one question
         // cheaper, not a hundred questions into ten thousand.
-        var subjekte = paare.Select(paar => paar.Subject.Value).ToArray();
-        var skills = paare.Select(paar => paar.Capability.Value).ToArray();
+        var subjects = pairs.Select(pair => pair.Subject.Value).ToArray();
+        var skills = pairs.Select(pair => pair.Capability.Value).ToArray();
 
         var rows = await context.ConsentEvents
             .FromSqlRaw(
-                $"{Neueste} (subject_id, capability) IN "
+                $"{Latest} (subject_id, capability) IN "
                 + "(SELECT s, c FROM unnest({0}::uuid[], {1}::text[]) AS t(s, c)) "
-                + Ordnung,
-                subjekte, skills)
+                + Ordering,
+                subjects, skills)
             .ToListAsync(cancellationToken);
 
         return rows.ToDictionary(
             row => (row.SubjectId, row.Capability),
-            ZuFakt);
+            ToFact);
     }
 
     /// <inheritdoc />
@@ -135,19 +135,19 @@ public sealed class EfConsentLedger(ConsentDbContext context) : IConsentLedger
         SubjectId subject, CancellationToken cancellationToken = default)
     {
         var rows = await context.ConsentEvents
-            .FromSqlRaw($"{Neueste} subject_id = {{0}} {Ordnung}", subject.Value)
+            .FromSqlRaw($"{Latest} subject_id = {{0}} {Ordering}", subject.Value)
             .ToListAsync(cancellationToken);
 
-        return [.. rows.Select(ZuFakt)];
+        return [.. rows.Select(ToFact)];
     }
 
-    private static ConsentEvent ZuFakt(ConsentEventRow row) => ConsentEvent.Restore(
+    private static ConsentEvent ToFact(ConsentEventRow row) => ConsentEvent.Restore(
         row.EventId,
         new SubjectId(row.SubjectId),
         Capability.Parse(row.Capability),
         row.Action,
         new DateTimeOffset(DateTime.SpecifyKind(row.RecordedAt, DateTimeKind.Utc)),
-        row.ActorId is { } akteur ? new SubjectId(akteur) : null,
+        row.ActorId is { } actorId ? new SubjectId(actorId) : null,
         row.Reason is { } reason ? WithdrawalReason.Parse(reason) : null,
         JsonSerializer.Deserialize<Dictionary<string, string>>(row.Metadata));
 }

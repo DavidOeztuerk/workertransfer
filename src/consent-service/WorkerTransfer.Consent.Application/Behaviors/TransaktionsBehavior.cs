@@ -8,22 +8,22 @@ namespace WorkerTransfer.Consent.Application.Behaviors;
 /// <remarks>
 /// Here rather than in each handler, because the handler that forgets it is the
 /// one nobody notices: everything it writes still lands, just not together.
-/// Queries pass straight through — see <see cref="IAbfrage{TAntwort}"/>.
+/// Queries pass straight through — see <see cref="IQuery{TResponse}"/>.
 /// </remarks>
-public sealed class TransaktionsBehavior<TAnfrage, TAntwort>(IUnitOfWork arbeitseinheit)
-    : IPipelineBehavior<TAnfrage, TAntwort>
-    where TAnfrage : notnull
+public sealed class TransactionBehavior<TRequest, TResponse>(IUnitOfWork unitOfWork)
+    : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : notnull
 {
     /// <inheritdoc />
-    public Task<TAntwort> Handle(
-        TAnfrage request,
-        RequestHandlerDelegate<TAntwort> next,
+    public Task<TResponse> Handle(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(next);
 
-        return request is IBefehl
-            ? arbeitseinheit.InTransactionAsync(next.Invoke, cancellationToken)
+        return request is ICommand
+            ? unitOfWork.InTransactionAsync(next.Invoke, cancellationToken)
             : next(cancellationToken);
     }
 }

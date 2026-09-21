@@ -20,7 +20,7 @@ public sealed class ReasonRequiredException()
 /// <remarks>
 /// There is no mutable consent aggregate and no status column. Grant, revoke
 /// and delete are facts appended to a log; the current state is
-/// <em>computed</em> from them (<see cref="Projektion"/>), so there is exactly
+/// <em>computed</em> from them (<see cref="Projection"/>), so there is exactly
 /// one place consent can be true and no second store to fall out of sync.
 /// <para>
 /// The constructor is private and the three factories are the only entrances,
@@ -49,7 +49,7 @@ public sealed class ConsentEvent
         SubjectId? actor,
         WithdrawalReason? reason,
         IReadOnlyDictionary<string, string>? metadata,
-        bool ausDerAblage)
+        bool restored)
     {
         if (metadata is not null)
         {
@@ -72,7 +72,7 @@ public sealed class ConsentEvent
         // breaks the ledger — and the ledger is what proves the erasure
         // happened. The Python service checked both ways and would have thrown
         // on its own erased rows.
-        if (!ausDerAblage && action is ConsentAction.Revoke && reason is null)
+        if (!restored && action is ConsentAction.Revoke && reason is null)
         {
             throw new ReasonRequiredException();
         }
@@ -120,7 +120,7 @@ public sealed class ConsentEvent
         WithdrawalReason? reason = null,
         IReadOnlyDictionary<string, string>? metadata = null) =>
         new(Guid.CreateVersion7(), subject, capability, ConsentAction.Grant, recordedAt, actor,
-            reason, metadata, ausDerAblage: false);
+            reason, metadata, restored: false);
 
     /// <summary>Permission was taken back, and said why.</summary>
     public static ConsentEvent Revoke(
@@ -131,7 +131,7 @@ public sealed class ConsentEvent
         SubjectId? actor = null,
         IReadOnlyDictionary<string, string>? metadata = null) =>
         new(Guid.CreateVersion7(), subject, capability, ConsentAction.Revoke, recordedAt, actor,
-            reason, metadata, ausDerAblage: false);
+            reason, metadata, restored: false);
 
     /// <summary>
     /// The account was erased. Deliberately without a reason.
@@ -147,7 +147,7 @@ public sealed class ConsentEvent
         DateTimeOffset recordedAt,
         SubjectId? actor = null) =>
         new(Guid.CreateVersion7(), subject, capability, ConsentAction.Delete, recordedAt, actor,
-            null, null, ausDerAblage: false);
+            null, null, restored: false);
 
     /// <summary>Rebuilds a fact from a stored row.</summary>
     /// <remarks>
@@ -165,5 +165,5 @@ public sealed class ConsentEvent
         WithdrawalReason? reason,
         IReadOnlyDictionary<string, string>? metadata) =>
         new(eventId, subject, capability, action, recordedAt, actor, reason, metadata,
-            ausDerAblage: true);
+            restored: true);
 }

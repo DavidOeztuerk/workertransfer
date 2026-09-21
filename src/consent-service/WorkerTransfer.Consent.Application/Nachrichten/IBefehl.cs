@@ -16,11 +16,11 @@ namespace WorkerTransfer.Consent.Application.Nachrichten;
 /// them.
 /// </para>
 /// </remarks>
-public interface IBefehl;
+public interface ICommand;
 
-/// <summary>A message that changes something and answers with <typeparamref name="TAntwort"/>.</summary>
-/// <typeparam name="TAntwort">What the handler answers.</typeparam>
-public interface IBefehl<out TAntwort> : IRequest<TAntwort>, IBefehl;
+/// <summary>A message that changes something and answers with <typeparamref name="TResponse"/>.</summary>
+/// <typeparam name="TResponse">What the handler answers.</typeparam>
+public interface ICommand<out TResponse> : IRequest<TResponse>, ICommand;
 
 /// <summary>A message that only reads.</summary>
 /// <remarks>
@@ -37,5 +37,5 @@ public interface IBefehl<out TAntwort> : IRequest<TAntwort>, IBefehl;
 /// (found in H2, measurement 4); the promise held, but nothing held it.
 /// </para>
 /// </remarks>
-/// <typeparam name="TAntwort">What the handler answers.</typeparam>
-public interface IAbfrage<out TAntwort> : IRequest<TAntwort>;
+/// <typeparam name="TResponse">What the handler answers.</typeparam>
+public interface IQuery<out TResponse> : IRequest<TResponse>;

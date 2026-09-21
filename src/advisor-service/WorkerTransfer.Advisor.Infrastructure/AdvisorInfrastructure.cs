@@ -107,7 +107,7 @@ public static class AdvisorInfrastructure
     /// </summary>
     /// <remarks>
     /// <para><strong>Öffentlich, weil sie zwei Leser hat.</strong>
-    /// <c>wt.ki.keine-zahl</c> liest sie zur Laufzeit, <c>WortschatzTests</c>
+    /// <c>wt.ki.keine-zahl</c> liest sie zur Laufzeit, <c>VocabularyTests</c>
     /// zur Bauzeit. Zwei Listen über dieselbe Frage laufen auseinander, und
     /// die stillere von beiden wüchse — hier wächst keine: jede Zeile steht im
     /// Befund, den ein Betriebsrat liest.</para>
@@ -179,9 +179,9 @@ public static class AdvisorInfrastructure
         var erasure = new ErasureSettings();
         configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "advisor",
             !string.IsNullOrEmpty(erasure.Geheimnis),
-            pruefspurVorhanden: false));
+            auditTrailPresent: false));
     }
 }

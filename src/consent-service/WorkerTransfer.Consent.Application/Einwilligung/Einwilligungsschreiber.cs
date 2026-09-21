@@ -13,33 +13,33 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// agreement true rather than duplicated.
 /// </remarks>
 public sealed class ConsentWriter(
-    IConsentLedger buch,
-    IAuditTrail pruefspur,
-    IKorrelation korrelation,
-    TimeProvider uhr)
+    IConsentLedger ledger,
+    IAuditTrail auditTrail,
+    ICorrelation correlation,
+    TimeProvider clock)
 {
     /// <summary>Records a grant.</summary>
     public Task<ConsentResult> GrantAsync(
-        SubjectId handelnder,
+        SubjectId actor,
         TenantId? company,
-        Guid gegenstand,
+        Guid subjectId,
         string skill,
         string? reason,
         CancellationToken cancellationToken) =>
         WriteAsync(
-            ConsentAction.Grant, handelnder, company, gegenstand, skill, reason,
+            ConsentAction.Grant, actor, company, subjectId, skill, reason,
             cancellationToken);
 
     /// <summary>Records a withdrawal.</summary>
     public Task<ConsentResult> RevokeAsync(
-        SubjectId handelnder,
+        SubjectId actor,
         TenantId? company,
-        Guid gegenstand,
+        Guid subjectId,
         string skill,
         string reason,
         CancellationToken cancellationToken) =>
         WriteAsync(
-            ConsentAction.Revoke, handelnder, company, gegenstand, skill, reason,
+            ConsentAction.Revoke, actor, company, subjectId, skill, reason,
             cancellationToken);
 
     private static AuditAction ToAuditAction(ConsentAction action) => action switch
@@ -51,70 +51,70 @@ public sealed class ConsentWriter(
 
     private async Task<ConsentResult> WriteAsync(
         ConsentAction action,
-        SubjectId handelnder,
+        SubjectId actor,
         TenantId? company,
-        Guid gegenstand,
+        Guid subjectId,
         string skill,
         string? reason,
         CancellationToken cancellationToken)
     {
         // Before anything is read or written: a person manages their own
         // consent and nobody else's.
-        if (handelnder.Value != gegenstand)
+        if (actor.Value != subjectId)
         {
             return new ConsentResult.ForeignSubject();
         }
 
-        if (!Capability.TryParse(skill, out var faehigkeitswert))
+        if (!Capability.TryParse(skill, out var capabilityValue))
         {
-            return new ConsentResult.Unbrauchbar("capability");
+            return new ConsentResult.Malformed("capability");
         }
 
-        WithdrawalReason? grundwert = null;
+        WithdrawalReason? reasonValue = null;
 
-        if (reason is not null && !WithdrawalReason.TryParse(reason, out grundwert))
+        if (reason is not null && !WithdrawalReason.TryParse(reason, out reasonValue))
         {
-            return new ConsentResult.Unbrauchbar("reason");
+            return new ConsentResult.Malformed("reason");
         }
 
-        if (action is ConsentAction.Revoke && grundwert is null)
+        if (action is ConsentAction.Revoke && reasonValue is null)
         {
-            return new ConsentResult.Unbrauchbar("reason");
+            return new ConsentResult.Malformed("reason");
         }
 
-        var now = uhr.GetUtcNow();
-        var subject = new SubjectId(gegenstand);
+        var now = clock.GetUtcNow();
+        var subject = new SubjectId(subjectId);
 
-        var ereignis = action is ConsentAction.Grant
-            ? ConsentEvent.Grant(subject, faehigkeitswert, now, handelnder, grundwert)
-            : ConsentEvent.Revoke(subject, faehigkeitswert, now, grundwert!, handelnder);
+        var consentEvent = action is ConsentAction.Grant
+            ? ConsentEvent.Grant(subject, capabilityValue, now, actor, reasonValue)
+            : ConsentEvent.Revoke(subject, capabilityValue, now, reasonValue!, actor);
 
-        await buch.AttachAsync(ereignis, cancellationToken);
+        await ledger.AttachAsync(consentEvent, cancellationToken);
 
         // Same transaction as the fact above (ADR-0012). The capability name is
         // allowlisted metadata; the data it governs never is, and neither is
         // the reason the person wrote — that one stays in the ledger row, where
         // only they can read it back.
-        await pruefspur.AttachAsync(
+        await auditTrail.AttachAsync(
             new AuditEvent(
                 ToAuditAction(action),
                 now,
-                handelnder,
+                actor,
                 company,
                 subject,
-                korrelation.Aktuell,
+                correlation.Current,
                 new Dictionary<string, string>(StringComparer.Ordinal)
                 {
-                    ["capability"] = faehigkeitswert.Value
+                    ["capability"] = capabilityValue.Value
                 }),
             cancellationToken);
 
         // Read back rather than assumed: the fact just written is the newest
         // one unless a clock went backwards, and in that case the ledger is
         // right and this handler is not.
-        var neuestes = await buch.LatestOneAsync(subject, faehigkeitswert, cancellationToken);
+        var newest = await ledger.LatestOneAsync(subject, capabilityValue, cancellationToken);
 
         return new ConsentResult.State(
-            Projektion.State(neuestes is null ? [] : [neuestes]));
+            Projection.State(newest is null ? [] : [newest]));
     }
 }

@@ -6,7 +6,7 @@ using WorkerTransfer.Skills;
 namespace WorkerTransfer.Skills.Tests;
 
 /// <summary>The vocabulary renames and never infers anything.</summary>
-public class WortschatzTests
+public class SkillVocabularyTests
 {
     [Theory]
     [InlineData("postgres", "PostgreSQL")]

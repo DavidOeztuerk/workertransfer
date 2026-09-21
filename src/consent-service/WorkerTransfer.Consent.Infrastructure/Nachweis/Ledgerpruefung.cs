@@ -8,41 +8,40 @@ using WorkerTransfer.ServiceDefaults.Checks;
 
 namespace WorkerTransfer.Consent.Infrastructure.Nachweis;
 
-/// <summary>Der Ledger hält eine Einwilligung der Person, nicht des Mandanten.</summary>
+/// <summary>The ledger holds a consent of the person, not of the tenant.</summary>
 /// <remarks>
-/// <para><strong>Die Tatsache, die hier gemessen wird, ist ein Nicht-Vorhandensein</strong>
-/// — und die sind die, die am leichtesten wieder verschwinden. Eine Einwilligung
-/// gehört dem Menschen und folgt ihm über Arbeitgeber hinweg (ADR-0017); eine
-/// Mandantenspalte an dieser Tabelle würde sie an ein Unternehmen binden, und
-/// beim Wechsel wäre sie weg. Genau deshalb steht in CLAUDE.md der Satz „Do not
-/// ‚fix‘ that by adding one“ — dieser Befund ist derselbe Satz, nur ausführbar
-/// und datiert.</para>
+/// <para><strong>The fact measured here is a non-existence</strong> — and those
+/// are the ones that disappear again most easily. A consent belongs to the human
+/// being and follows them across employers (ADR-0017); a tenant column on this
+/// table would bind it to a company, and on a change of employer it would be
+/// gone. That is exactly why CLAUDE.md carries the sentence „Do not ‚fix‘ that
+/// by adding one“ — this finding is the same sentence, only executable and
+/// dated.</para>
 ///
-/// <para><strong>Gelesen wird das EF-Modell, nicht der Quelltext.</strong>
-/// Dieselbe Bewegung wie in <c>LoeschempfaengerTests</c> und
-/// <c>AuflagenTests</c>: eine Spalte, die über eine Konvention oder eine
-/// Basisklasse hereinkäme, stünde in keiner Datei, die ein Textsucher
-/// durchsieht. Das Modell wird dafür gebaut, nicht abgefragt — es braucht keine
-/// Connection, und diese Prüfung rührt die Datenbank nicht an.</para>
+/// <para><strong>What is read is the EF model, not the source text.</strong> The
+/// same movement as in <c>LoeschempfaengerTests</c> and <c>AuflagenTests</c>: a
+/// column arriving through a convention or a base class would stand in no file a
+/// text search looks through. The model is built for this, not queried — it
+/// needs no connection, and this check does not touch the database.</para>
 ///
-/// <para>Der Ledger kennt außerdem <strong>keine Verweigerung</strong>: jede
-/// Fähigkeit ist eine Sichtbarkeit, und es gibt nur Gewähren und Widerrufen
-/// (ADR-0037). „Sichtbar für alle außer X“ lässt sich darin nicht ausdrücken —
-/// weshalb der Modus „alle“ aufhört zu existieren, sobald jemand ein X nennt.
-/// Auch das ist eine Handlung, die es nicht gibt, und deshalb wird sie hier
-/// gezählt statt beschrieben.</para>
+/// <para>The ledger moreover knows <strong>no denial</strong>: every capability
+/// is a visibility, and there is only granting and revoking (ADR-0037).
+/// „Visible to everyone except X“ cannot be expressed in it — which is why the
+/// mode „everyone“ stops existing the moment somebody names an X. That too is
+/// an action that does not exist, and that is why it is counted here rather than
+/// described.</para>
 /// </remarks>
-/// <param name="anbieter">
-/// Der Container. Der Kontext wird in einem EIGENEN BEREICH aufgeloest, und das
-/// ist kein Umstand, sondern Pflicht: Noelias Pruefungen sind Singletons, der
-/// <c>DbContext</c> ist bereichsgebunden. Ihn in ein Singleton zu ziehen waere
-/// eine gefangene Abhaengigkeit — ein Kontext, der ewig lebt, und der erste
-/// Fehler daran faellt Wochen spaeter an einer ganz anderen Job auf.
+/// <param name="provider">
+/// The container. The context is resolved in A SCOPE OF ITS OWN, and that is no
+/// inconvenience but a duty: Noelia's checks are singletons, the
+/// <c>DbContext</c> is scoped. Pulling it into a singleton would be a captive
+/// dependency — a context that lives for ever, and the first fault from it
+/// surfaces weeks later in a completely different place.
 /// </param>
 public sealed class LedgerCheck(IServiceProvider provider) : ISecurityCheck
 {
-    /// <summary>Spaltennamen, die einen Mandanten bezeichnen.</summary>
-    private static readonly string[] Mandantenworte =
+    /// <summary>Column names that denote a tenant.</summary>
+    private static readonly string[] TenantWords =
         ["tenant", "mandant", "company", "firma", "unternehmen", "arbeitgeber"];
 
     /// <inheritdoc />
@@ -52,7 +51,7 @@ public sealed class LedgerCheck(IServiceProvider provider) : ISecurityCheck
     public NoeliaModule Module => NoeliaModule.Composition;
 
     /// <inheritdoc />
-    /// <remarks>Auswahlregel — siehe <c>ProviderCheck</c>.</remarks>
+    /// <remarks>Selection rule — see <c>ProviderCheck</c>.</remarks>
     public SecurityCheckCategory Category => SecurityCheckCategory.Composition;
 
     /// <inheritdoc />
@@ -78,30 +77,30 @@ public sealed class LedgerCheck(IServiceProvider provider) : ISecurityCheck
         using var scope = provider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ConsentDbContext>();
 
-        // NUR DER LEDGER, und das ist beim ersten Lauf gegen den echten Stapel
-        // gemessen worden: ueber ALLE Entitaeten gelesen meldete diese Pruefung
-        // `audit_events.TenantId` — und lag falsch. Die Pruefspur haelt fest,
-        // WER gehandelt hat und in welcher Eigenschaft (ADR-0012); dass dort
-        // ein Mandant steht, wenn jemand fuer ein Unternehmen handelte, ist die
-        // Aussage dieser Tabelle und nicht ihr Fehler. Der Ledger dagegen haelt
-        // die Einwilligung selbst, und die gehoert der Person.
+        // THE LEDGER ONLY, and that was measured on the first run against the
+        // real stack: read over ALL entities this check reported
+        // `audit_events.TenantId` — and was wrong. The audit trail records WHO
+        // acted and in which capacity (ADR-0012); that a tenant stands there
+        // when somebody acted for a company is that table's statement and not
+        // its fault. The ledger, by contrast, holds the consent itself, and that
+        // belongs to the person.
         //
-        // Zwei Tabellen, zwei Regeln — eine Pruefung, die beide ueber einen
-        // Kamm schert, ist nicht strenger, sondern unbrauchbar: sie meldet rot
-        // ueber korrekten Code, und beim zweiten Mal schaltet sie jemand ab.
+        // Two tables, two rules — a check that tars both with the same brush is
+        // not stricter but useless: it reports red over correct code, and the
+        // second time somebody switches it off.
         var ledger = context.Model.FindEntityType(typeof(ConsentEventRow));
 
         var columns = ledger is null
             ? []
             : ledger.GetProperties()
-                .Select(eigenschaft => (
-                    Tabelle: ledger.GetTableName() ?? ledger.ShortName(),
-                    Spalte: eigenschaft.Name))
+                .Select(property => (
+                    Table: ledger.GetTableName() ?? ledger.ShortName(),
+                    Column: property.Name))
                 .ToList();
 
         if (columns.Count == 0)
         {
-            return Task.FromResult(Ergebnis(
+            return Task.FromResult(Result(
                 SecurityCheckStatus.Fail,
                 "Das Datenmodell des Ledgers ist leer — diese Prüfung hat nichts "
                 + "angesehen und belegt damit nichts.",
@@ -111,15 +110,15 @@ public sealed class LedgerCheck(IServiceProvider provider) : ISecurityCheck
         }
 
         var hit = columns
-            .Where(entry => Mandantenworte.Any(word =>
-                entry.Spalte.Contains(word, StringComparison.OrdinalIgnoreCase)))
-            .Select(entry => $"{entry.Tabelle}.{entry.Spalte}")
+            .Where(entry => TenantWords.Any(word =>
+                entry.Column.Contains(word, StringComparison.OrdinalIgnoreCase)))
+            .Select(entry => $"{entry.Table}.{entry.Column}")
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
 
         if (hit.Count > 0)
         {
-            return Task.FromResult(Ergebnis(
+            return Task.FromResult(Result(
                 SecurityCheckStatus.Fail,
                 $"Der Ledger trägt {hit.Count} Spalte(n), die einen "
                 + $"Mandanten bezeichnen: {string.Join(", ", hit)}.",
@@ -129,7 +128,7 @@ public sealed class LedgerCheck(IServiceProvider provider) : ISecurityCheck
                 + "niemand hätte es widerrufen."));
         }
 
-        return Task.FromResult(Ergebnis(
+        return Task.FromResult(Result(
             SecurityCheckStatus.Pass,
             $"Keine der {columns.Count} Spalten der Ledger-Tabelle bezeichnet einen "
             + "Mandanten: eine Einwilligung gehört der Person und folgt ihr über "
@@ -142,9 +141,9 @@ public sealed class LedgerCheck(IServiceProvider provider) : ISecurityCheck
             + "überlebt."));
     }
 
-    private SecurityCheckResult Ergebnis(
-        SecurityCheckStatus state, string zusammenfassung, string abhilfe) =>
-        new(Id, Module, Category, state, Severity, zusammenfassung, abhilfe)
+    private SecurityCheckResult Result(
+        SecurityCheckStatus state, string summary, string remediation) =>
+        new(Id, Module, Category, state, Severity, summary, remediation)
         {
             References = References
         };

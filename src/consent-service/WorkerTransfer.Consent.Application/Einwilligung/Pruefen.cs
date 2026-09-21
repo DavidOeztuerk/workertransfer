@@ -19,11 +19,11 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// (ADR-0013).
 /// </para>
 /// </remarks>
-public sealed record CheckConsentQuery(Guid Gegenstand, string Faehigkeit)
-    : IAbfrage<AuditResult>;
+public sealed record CheckConsentQuery(Guid Subject, string Capability)
+    : IQuery<AuditResult>;
 
 /// <summary>Reads the newest fact and reduces it.</summary>
-public sealed class CheckConsentHandler(IConsentLedger buch)
+public sealed class CheckConsentHandler(IConsentLedger ledger)
     : IRequestHandler<CheckConsentQuery, AuditResult>
 {
     /// <inheritdoc />
@@ -33,14 +33,14 @@ public sealed class CheckConsentHandler(IConsentLedger buch)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (!Capability.TryParse(request.Faehigkeit, out var skill))
+        if (!Capability.TryParse(request.Capability, out var skill))
         {
-            return new AuditResult.Unbrauchbar("capability");
+            return new AuditResult.Malformed("capability");
         }
 
-        var neuestes = await buch.LatestOneAsync(
-            new SubjectId(request.Gegenstand), skill, cancellationToken);
+        var newest = await ledger.LatestOneAsync(
+            new SubjectId(request.Subject), skill, cancellationToken);
 
-        return new AuditResult.State(Projektion.State(neuestes is null ? [] : [neuestes]));
+        return new AuditResult.State(Projection.State(newest is null ? [] : [newest]));
     }
 }

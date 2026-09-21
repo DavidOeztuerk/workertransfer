@@ -16,7 +16,7 @@ public abstract record ConsentResult
     }
 
     /// <summary>The fact was recorded; this is what now holds.</summary>
-    public sealed record State(ConsentState Zustand) : ConsentResult;
+    public sealed record State(ConsentState Value) : ConsentResult;
 
     /// <summary>
     /// The caller tried to change somebody else's consent.
@@ -33,7 +33,7 @@ public abstract record ConsentResult
     /// Which of the two, in words a caller can act on — never the value they
     /// sent, which would put it in a log and a screenshot.
     /// </param>
-    public sealed record Unbrauchbar(string Detail) : ConsentResult;
+    public sealed record Malformed(string Detail) : ConsentResult;
 }
 
 /// <summary>What a check produced.</summary>
@@ -44,21 +44,21 @@ public abstract record AuditResult
     }
 
     /// <summary>What holds for the pair that was asked about.</summary>
-    public sealed record State(ConsentState Zustand) : AuditResult;
+    public sealed record State(ConsentState Value) : AuditResult;
 
     /// <summary>The capability does not read as one.</summary>
-    public sealed record Unbrauchbar(string Detail) : AuditResult;
+    public sealed record Malformed(string Detail) : AuditResult;
 }
 
 /// <summary>What a batch check produced.</summary>
-public abstract record Sammelergebnis
+public abstract record BatchCheckResult
 {
-    private Sammelergebnis()
+    private BatchCheckResult()
     {
     }
 
     /// <summary>One state per question, in the order of the questions.</summary>
-    public sealed record Staende(IReadOnlyList<ConsentState> Zustaende) : Sammelergebnis;
+    public sealed record States(IReadOnlyList<ConsentState> Values) : BatchCheckResult;
 
     /// <summary>
     /// One pair did not read, and the whole request fails.
@@ -69,5 +69,5 @@ public abstract record Sammelergebnis
     /// missing consent would hide it — until somebody sees an empty page and
     /// goes looking for the reason in the ledger.
     /// </remarks>
-    public sealed record Unbrauchbar(string Detail) : Sammelergebnis;
+    public sealed record Malformed(string Detail) : BatchCheckResult;
 }

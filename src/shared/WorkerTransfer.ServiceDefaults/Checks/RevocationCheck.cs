@@ -24,12 +24,12 @@ namespace WorkerTransfer.ServiceDefaults.Checks;
 /// revokes consents in order to evidence itself would be the worst trade in
 /// this tree.</para>
 /// </remarks>
-/// <typeparam name="TTor">The port through which this service asks the ledger.</typeparam>
+/// <typeparam name="TGate">The port through which this service asks the ledger.</typeparam>
 /// <param name="provider">The container — it is resolved in a scope of its own.</param>
-/// <param name="unmittelbar">The adapter that really speaks to the ledger.</param>
-public sealed class RevocationCheck<TTor>(IServiceProvider provider, Type unmittelbar)
+/// <param name="direct">The adapter that really speaks to the ledger.</param>
+public sealed class RevocationCheck<TGate>(IServiceProvider provider, Type direct)
     : ISecurityCheck
-    where TTor : notnull
+    where TGate : notnull
 {
     /// <inheritdoc />
     public string Id => "wt.einwilligung.wirkt";
@@ -62,7 +62,7 @@ public sealed class RevocationCheck<TTor>(IServiceProvider provider, Type unmitt
     public Task<SecurityCheckResult> RunAsync(CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(provider);
-        ArgumentNullException.ThrowIfNull(unmittelbar);
+        ArgumentNullException.ThrowIfNull(direct);
 
         // A scope of its own, because the gate lives per request — and because
         // this check is registered as a singleton. Resolving out of the root
@@ -70,13 +70,13 @@ public sealed class RevocationCheck<TTor>(IServiceProvider provider, Type unmitt
         // finding while being a defect of this check.
         using var scope = provider.CreateScope();
 
-        var aufgeloest = scope.ServiceProvider.GetService<TTor>();
+        var aufgeloest = scope.ServiceProvider.GetService<TGate>();
 
         if (aufgeloest is null)
         {
-            return Task.FromResult(Ergebnis(
+            return Task.FromResult(Finding(
                 SecurityCheckStatus.NotApplicable,
-                $"Dieser Dienst fragt den Ledger nicht: für {Kurz(typeof(TTor))} "
+                $"Dieser Dienst fragt den Ledger nicht: für {ShortName(typeof(TGate))} "
                 + "ist nichts registriert.",
                 "Wer hier eine Sichtbarkeit entscheidet, fragt den Ledger — und "
                 + "zwar synchron und ohne Zwischenspeicher (ADR-0013)."));
@@ -84,29 +84,29 @@ public sealed class RevocationCheck<TTor>(IServiceProvider provider, Type unmitt
 
         var tatsaechlich = aufgeloest.GetType();
 
-        return tatsaechlich == unmittelbar
-            ? Task.FromResult(Ergebnis(
+        return tatsaechlich == direct
+            ? Task.FromResult(Finding(
                 SecurityCheckStatus.Pass,
-                $"Zwischen der Frage ({Kurz(typeof(TTor))}) und dem Ledger steht "
-                + $"kein weiterer Typ: aufgelöst wird {Kurz(unmittelbar)}, der "
+                $"Zwischen der Frage ({ShortName(typeof(TGate))}) und dem Ledger steht "
+                + $"kein weiterer Typ: aufgelöst wird {ShortName(direct)}, der "
                 + "Adapter, der unmittelbar fragt. Kein Zwischenspeicher, kein "
                 + "Umhüller.",
                 "Ein Umhüller an dieser Stelle — auch einer, der nur für eine "
                 + "Minute merkt — stößt diesen Befund um. Ein Widerruf wirkte "
                 + "dann beim übernächsten Lesen, und niemand sähe es."))
-            : Task.FromResult(Ergebnis(
+            : Task.FromResult(Finding(
                 SecurityCheckStatus.Fail,
-                $"Zwischen der Frage ({Kurz(typeof(TTor))}) und dem Ledger steht "
-                + $"{Kurz(tatsaechlich)} statt {Kurz(unmittelbar)}.",
+                $"Zwischen der Frage ({ShortName(typeof(TGate))}) und dem Ledger steht "
+                + $"{ShortName(tatsaechlich)} statt {ShortName(direct)}.",
                 Remediation));
     }
 
     /// <summary>A type name without a namespace — a shape, not a value.</summary>
-    private static string Kurz(Type type) => type.Name;
+    private static string ShortName(Type type) => type.Name;
 
-    private SecurityCheckResult Ergebnis(
-        SecurityCheckStatus state, string zusammenfassung, string abhilfe) =>
-        new(Id, Module, Category, state, Severity, zusammenfassung, abhilfe)
+    private SecurityCheckResult Finding(
+        SecurityCheckStatus state, string summary, string remediation) =>
+        new(Id, Module, Category, state, Severity, summary, remediation)
         {
             References = References
         };

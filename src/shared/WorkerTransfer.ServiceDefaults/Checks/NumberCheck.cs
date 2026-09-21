@@ -24,8 +24,8 @@ namespace WorkerTransfer.ServiceDefaults.Checks;
 /// line an individual case.</para>
 /// </remarks>
 /// <param name="Name">The full name as the check forms it: <c>Type.Member</c> or <c>Type</c>.</param>
-/// <param name="Grund">Why this word is not a judgement about a human being here.</param>
-public sealed record TermException(string Name, string Grund);
+/// <param name="Reason">Why this word is not a judgement about a human being here.</param>
+public sealed record TermException(string Name, string Reason);
 
 /// <summary>Does any public surface carry a number about a human being?</summary>
 /// <remarks>
@@ -63,17 +63,17 @@ public sealed record TermException(string Name, string Grund);
 /// times. And not the comments — "without an evaluation" is a promise and
 /// should be allowed to stand there.</para>
 /// </remarks>
-/// <param name="flaechen">The domain and the contracts of this service.</param>
+/// <param name="surfaces">The domain and the contracts of this service.</param>
 /// <param name="exceptions">Names where a word is a genuine homonym.</param>
-/// <param name="wortschatz">
-/// The words. The default is <see cref="Kern"/>; a service may be stricter —
+/// <param name="vocabulary">
+/// The words. The default is <see cref="Core"/>; a service may be stricter —
 /// scout-service additionally forbids <c>bewert</c> in its own conditions,
 /// where a word would stand beside a name.
 /// </param>
 public sealed class NumberCheck(
-    IReadOnlyList<Assembly> flaechen,
+    IReadOnlyList<Assembly> surfaces,
     IReadOnlyList<TermException>? exceptions = null,
-    IReadOnlyList<string>? wortschatz = null) : ISecurityCheck
+    IReadOnlyList<string>? vocabulary = null) : ISecurityCheck
 {
     /// <summary>Words that announce a number or a ranking about a human being.</summary>
     /// <remarks>
@@ -99,7 +99,7 @@ public sealed class NumberCheck(
     /// it means "remark" is the price — and each of the seven exemptions says
     /// so in one sentence somebody reads.</para>
     /// </remarks>
-    public static IReadOnlyList<string> Kern { get; } =
+    public static IReadOnlyList<string> Core { get; } =
     [
         "score", "punkt", "rank", "rang", "passung", "fit", "percent", "prozent",
         "quote", "anzahl", "gewicht", "weight", "level", "note", "match",
@@ -107,7 +107,7 @@ public sealed class NumberCheck(
     ];
 
     /// <summary>The words this check runs.</summary>
-    public IReadOnlyList<string> Verboten { get; } = wortschatz ?? Kern;
+    public IReadOnlyList<string> Forbidden { get; } = vocabulary ?? Core;
 
     /// <inheritdoc />
     public string Id => "wt.ki.keine-zahl";
@@ -153,15 +153,15 @@ public sealed class NumberCheck(
     /// <inheritdoc />
     public Task<SecurityCheckResult> RunAsync(CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(flaechen);
+        ArgumentNullException.ThrowIfNull(surfaces);
 
-        var namen = Namen();
+        var names = Names();
 
-        if (namen.Count == 0)
+        if (names.Count == 0)
         {
             // Otherwise the check would report green over nothing — the same
             // defect `scripts/test-dotnet.sh` closes with its count on screen.
-            return Task.FromResult(Ergebnis(
+            return Task.FromResult(Finding(
                 SecurityCheckStatus.Fail,
                 "Die abgesuchten Flächen sind leer — diese Prüfung hat nichts "
                 + "angesehen und belegt damit nichts.",
@@ -169,56 +169,56 @@ public sealed class NumberCheck(
                 + "übergeben werden."));
         }
 
-        var erlaubt = exceptions ?? [];
+        var allowed = exceptions ?? [];
 
         // An exemption for a name that no longer exists is a licence nobody
         // needs any more and nobody withdraws.
-        var verwaist = erlaubt
-            .Where(exception => !namen.Contains(exception.Name))
+        var orphaned = allowed
+            .Where(exception => !names.Contains(exception.Name))
             .Select(exception => exception.Name)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
 
-        if (verwaist.Count > 0)
+        if (orphaned.Count > 0)
         {
-            return Task.FromResult(Ergebnis(
+            return Task.FromResult(Finding(
                 SecurityCheckStatus.Fail,
-                $"{(verwaist.Count)} Ausnahme(n) zeigen auf Namen, "
-                + $"die es nicht mehr gibt: {string.Join(", ", verwaist)}.",
+                $"{(orphaned.Count)} Ausnahme(n) zeigen auf Namen, "
+                + $"die es nicht mehr gibt: {string.Join(", ", orphaned)}.",
                 "Eine Ausnahme ohne Namen ist ein Freibrief, den niemand mehr "
                 + "braucht — sie gehört gelöscht, nicht stehengelassen."));
         }
 
-        var hit = namen
-            .Where(name => !erlaubt.Any(
+        var hit = names
+            .Where(name => !allowed.Any(
                 exception => exception.Name.Equals(name, StringComparison.Ordinal)))
-            .SelectMany(name => Verboten
-                .Where(word => Trifft(name, word))
+            .SelectMany(name => Forbidden
+                .Where(word => Strikes(name, word))
                 .Select(word => $"{name} ({word})"))
             .OrderBy(row => row, StringComparer.Ordinal)
             .ToList();
 
         if (hit.Count > 0)
         {
-            return Task.FromResult(Ergebnis(
+            return Task.FromResult(Finding(
                 SecurityCheckStatus.Fail,
                 $"{(hit.Count)} öffentliche(r) Name(n) kündigen "
                 + $"eine Zahl über einen Menschen an: {string.Join(", ", hit)}.",
                 Remediation));
         }
 
-        return Task.FromResult(Ergebnis(
+        return Task.FromResult(Finding(
             SecurityCheckStatus.Pass,
-            $"In {(flaechen.Count)} Flächen "
-            + $"({string.Join(", ", flaechen.Select(Kurzname))}) kündigt keiner "
-            + $"von {(namen.Count)} öffentlichen Namen eine Zahl "
-            + $"über einen Menschen an ({(Verboten.Count)} Worte "
+            $"In {(surfaces.Count)} Flächen "
+            + $"({string.Join(", ", surfaces.Select(ShortName))}) kündigt keiner "
+            + $"von {(names.Count)} öffentlichen Namen eine Zahl "
+            + $"über einen Menschen an ({(Forbidden.Count)} Worte "
             + "geprüft)"
-            + (erlaubt.Count > 0
+            + (allowed.Count > 0
                 ? ". Einzeln begründete Homonyme: "
-                  + string.Join("; ", erlaubt
+                  + string.Join("; ", allowed
                       .OrderBy(exception => exception.Name, StringComparer.Ordinal)
-                      .Select(exception => $"{exception.Name} — {exception.Grund}"))
+                      .Select(exception => $"{exception.Name} — {exception.Reason}"))
                   + "."
                 : "."),
             "Ein Feld, dessen Name eines dieser Worte am Silbenanfang trägt, "
@@ -229,14 +229,14 @@ public sealed class NumberCheck(
     }
 
     /// <summary>Every public type name and every public property.</summary>
-    private HashSet<string> Namen() =>
+    private HashSet<string> Names() =>
     [
-        .. flaechen
-            .SelectMany(flaeche => flaeche.GetExportedTypes())
+        .. surfaces
+            .SelectMany(surface => surface.GetExportedTypes())
             .SelectMany(type => type
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance
                                | BindingFlags.Static | BindingFlags.DeclaredOnly)
-                .Select(eigenschaft => $"{type.Name}.{eigenschaft.Name}")
+                .Select(property => $"{type.Name}.{property.Name}")
                 .Append(type.Name))
     ];
 
@@ -254,28 +254,28 @@ public sealed class NumberCheck(
     /// </remarks>
     /// <param name="name">A type name or <c>Type.Member</c>.</param>
     /// <returns>Whether one of the core words strikes.</returns>
-    public static bool Trifft(string name) =>
-        Kern.Any(word => Trifft(name, word));
+    public static bool Strikes(string name) =>
+        Core.Any(word => Strikes(name, word));
 
-    private static bool Trifft(string name, string word) =>
+    private static bool Strikes(string name, string word) =>
         name.Split('.')
-            .SelectMany(Silben)
-            .Any(silbe => silbe.StartsWith(word, StringComparison.OrdinalIgnoreCase));
+            .SelectMany(Syllables)
+            .Any(syllable => syllable.StartsWith(word, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>An identifier, split at its capital letters.</summary>
-    private static IEnumerable<string> Silben(string bezeichner) =>
-        Zerlegung.Split(bezeichner).Where(silbe => silbe.Length > 0);
+    private static IEnumerable<string> Syllables(string identifier) =>
+        SyllableSplit.Split(identifier).Where(syllable => syllable.Length > 0);
 
-    private static readonly Regex Zerlegung =
+    private static readonly Regex SyllableSplit =
         new(@"(?<!^)(?=[A-Z0-9])", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
 
     /// <summary>The name of an assembly, without culture and key.</summary>
-    private static string Kurzname(Assembly flaeche) =>
-        flaeche.GetName().Name ?? "unbenannt";
+    private static string ShortName(Assembly surface) =>
+        surface.GetName().Name ?? "unbenannt";
 
-    private SecurityCheckResult Ergebnis(
-        SecurityCheckStatus state, string zusammenfassung, string abhilfe) =>
-        new(Id, Module, Category, state, Severity, zusammenfassung, abhilfe)
+    private SecurityCheckResult Finding(
+        SecurityCheckStatus state, string summary, string remediation) =>
+        new(Id, Module, Category, state, Severity, summary, remediation)
         {
             References = References
         };

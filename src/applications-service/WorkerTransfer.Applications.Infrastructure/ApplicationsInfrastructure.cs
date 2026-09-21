@@ -128,7 +128,7 @@ public static class ApplicationsInfrastructure
     /// <summary>Zwei Namen, bei denen <c>quote</c> ein echtes Homonym ist.</summary>
     /// <remarks>
     /// <strong>Öffentlich, weil sie zwei Leser hat</strong>: <c>wt.ki.keine-zahl</c>
-    /// zur Laufzeit und <c>WortschatzTests</c> zur Bauzeit. Zwei Listen über
+    /// zur Laufzeit und <c>VocabularyTests</c> zur Bauzeit. Zwei Listen über
     /// dieselbe Frage laufen auseinander, und die stillere von beiden wüchse.
     /// <para>
     /// <c>Quote</c> ist hier das <em>Zitat</em>: die Job im Anschreiben, auf
@@ -193,9 +193,9 @@ public static class ApplicationsInfrastructure
         var erasure = new ErasureSettings();
         configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "applications",
             !string.IsNullOrEmpty(erasure.Geheimnis),
-            pruefspurVorhanden: false));
+            auditTrailPresent: false));
     }
 }

@@ -17,10 +17,10 @@ namespace WorkerTransfer.Consent.Application.Ports;
 /// </remarks>
 public interface IUnitOfWork
 {
-    /// <param name="arbeit">What to run inside the transaction.</param>
+    /// <param name="work">What to run inside the transaction.</param>
     /// <param name="cancellationToken">Cancels the work and rolls back.</param>
-    /// <returns>Whatever <paramref name="arbeit"/> answered.</returns>
+    /// <returns>Whatever <paramref name="work"/> answered.</returns>
     Task<T> InTransactionAsync<T>(
-        Func<CancellationToken, Task<T>> arbeit,
+        Func<CancellationToken, Task<T>> work,
         CancellationToken cancellationToken = default);
 }

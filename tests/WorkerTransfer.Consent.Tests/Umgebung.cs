@@ -55,38 +55,38 @@ public sealed class PostgresCollection : ICollectionFixture<Postgres>
 /// with authentication stubbed away would prove the endpoints work for
 /// everybody, which is not the claim.
 /// </remarks>
-public static class Tokenform
+public static class TokenShape
 {
-    /// <summary>Der private Testschlüssel (P-256, PKCS#8, base64).</summary>
+    /// <summary>The private test key (P-256, PKCS#8, base64).</summary>
     /// <remarks>
-    /// Fest im Baum, weil er nur hier gilt: der Dienst unter Test bekommt den
-    /// passenden öffentlichen Schlüssel. Gewürfelt machte er die Reise von der
-    /// Maschine abhängig, auf der sie läuft.
+    /// Fixed in the tree because it holds only here: the service under test gets
+    /// the matching public key. Rolled at random it would make the journey
+    /// depend on the machine it runs on.
     /// </remarks>
-    public const string PrivatSchluessel = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgJ3H3ErtgAxTOpVVLh08LeYAzp06ePuF5MOe37hEIpZehRANCAATsDC5wPWJV4/HRgf8P2JwSrTF3mFASKSK7RsgkpBN97pH87mRpgy/rmLIjBqFZhq2C/VrcyfvLR2iev4OwNO7s";
+    public const string PrivateKey = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgJ3H3ErtgAxTOpVVLh08LeYAzp06ePuF5MOe37hEIpZehRANCAATsDC5wPWJV4/HRgf8P2JwSrTF3mFASKSK7RsgkpBN97pH87mRpgy/rmLIjBqFZhq2C/VrcyfvLR2iev4OwNO7s";
 
-    /// <summary>Der passende öffentliche Schlüssel (SPKI, base64).</summary>
-    public const string OeffentlichSchluessel = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7AwucD1iVePx0YH/D9icEq0xd5hQEikiu0bIJKQTfe6R/O5kaYMv65iyIwahWYatgv1a3Mn7y0donr+DsDTu7A==";
+    /// <summary>The matching public key (SPKI, base64).</summary>
+    public const string PublicKey = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7AwucD1iVePx0YH/D9icEq0xd5hQEikiu0bIJKQTfe6R/O5kaYMv65iyIwahWYatgv1a3Mn7y0donr+DsDTu7A==";
 
-    /// <summary>Benennt den Schlüssel, damit ein Wechsel zwei nebeneinander erlaubt.</summary>
-    public const string Kennung = "test";
+    /// <summary>Names the key, so a rotation can hold two side by side.</summary>
+    public const string KeyId = "test";
 
     public const string Issuer = "workertransfer";
     public const string Audience = "workertransfer";
 
-    private static readonly ECDsa Kurve = Lies();
+    private static readonly ECDsa Curve = Read();
 
-    private static ECDsa Lies()
+    private static ECDsa Read()
     {
-        var kurve = ECDsa.Create();
-        kurve.ImportPkcs8PrivateKey(Convert.FromBase64String(PrivatSchluessel), out _);
-        return kurve;
+        var curve = ECDsa.Create();
+        curve.ImportPkcs8PrivateKey(Convert.FromBase64String(PrivateKey), out _);
+        return curve;
     }
 
     /// <summary>An access token for one person, acting as themselves.</summary>
-    public static string Fuer(Guid subject)
+    public static string For(Guid subject)
     {
-        var key = new ECDsaSecurityKey(Kurve) { KeyId = Kennung };
+        var key = new ECDsaSecurityKey(Curve) { KeyId = KeyId };
 
         var token = new JwtSecurityToken(
             issuer: Issuer,

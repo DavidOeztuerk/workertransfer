@@ -16,7 +16,7 @@ namespace WorkerTransfer.Consent.Infrastructure.Erasure;
 /// already have covered them.
 /// </para>
 /// </remarks>
-public sealed class EfFreitextraeumung(ConsentDbContext context) : IFreitextraeumung
+public sealed class EfFreeTextClearing(ConsentDbContext context) : IFreeTextClearing
 {
     /// <inheritdoc />
     public async Task ClearAsync(Guid subject, CancellationToken cancellationToken = default)

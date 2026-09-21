@@ -116,9 +116,9 @@ public static class GitHubInfrastructure
         var erasure = new ErasureSettings();
         configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "github",
             !string.IsNullOrEmpty(erasure.Geheimnis),
-            pruefspurVorhanden: false));
+            auditTrailPresent: false));
     }
 }

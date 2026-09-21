@@ -28,7 +28,7 @@ public sealed class InvalidCapabilityException(string value)
 public sealed partial record Capability
 {
     /// <summary>The longest token the boundary contract carries.</summary>
-    public const int HoechsteLaenge = 255;
+    public const int MaxLength = 255;
 
     private Capability(string value) => Value = value;
 
@@ -40,7 +40,7 @@ public sealed partial record Capability
     {
         capability = null!;
 
-        if (string.IsNullOrEmpty(value) || value.Length > HoechsteLaenge || !Muster().IsMatch(value))
+        if (string.IsNullOrEmpty(value) || value.Length > MaxLength || !Pattern().IsMatch(value))
         {
             return false;
         }
@@ -62,5 +62,5 @@ public sealed partial record Capability
     // what makes `resume.visibility:tenant:<uuid>` one capability rather than a
     // family of them.
     [GeneratedRegex(@"^[a-z][a-z_.]+(:\w+)?(:[{]?[\w-]+[}]?)?$")]
-    private static partial Regex Muster();
+    private static partial Regex Pattern();
 }

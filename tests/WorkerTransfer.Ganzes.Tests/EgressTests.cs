@@ -23,15 +23,15 @@ namespace WorkerTransfer.Ganzes.Tests;
 public sealed class EgressTests
 {
     /// <summary>The default as <c>AddSovereignPlatform</c> builds it.</summary>
-    private static IEgressPolicy Vorgabe() =>
-        Gebaut(bauer => bauer.AllowLoopback().AllowPrivateNetworks());
+    private static IEgressPolicy Default() =>
+        Built(builder => builder.AllowLoopback().AllowPrivateNetworks());
 
-    private static IEgressPolicy Gebaut(Action<EgressPolicyBuilder> aufbau)
+    private static IEgressPolicy Built(Action<EgressPolicyBuilder> configure)
     {
-        var bauer = new EgressPolicyBuilder();
-        aufbau(bauer);
+        var builder = new EgressPolicyBuilder();
+        configure(builder);
 
-        return bauer.Build();
+        return builder.Build();
     }
 
     /// <summary>
@@ -48,8 +48,8 @@ public sealed class EgressTests
     [InlineData("http://notification-service:8010/notifications/send")]
     public void A_container_name_does_not_fall_under_the_default(string address)
     {
-        Vorgabe().IsAllowed(new Uri(address)).Should().BeFalse(
-            "sonst reichte die Vorgabe fuer Dienst-zu-Dienst-Verkehr, und der "
+        Default().IsAllowed(new Uri(address)).Should().BeFalse(
+            "sonst reichte die Default fuer Dienst-zu-Dienst-Verkehr, und der "
             + "Test unten waere ueberfluessig");
     }
 
@@ -64,18 +64,18 @@ public sealed class EgressTests
     [Fact]
     public void What_is_allowed_by_name_goes_through()
     {
-        var politik = Gebaut(bauer => bauer
+        var policy = Built(builder => builder
             .AllowLoopback()
             .AllowPrivateNetworks()
             .Allow("consent-service", "api.anthropic.com"));
 
-        politik.IsAllowed(new Uri("http://consent-service:8002/consent/check"))
+        policy.IsAllowed(new Uri("http://consent-service:8002/consent/check"))
             .Should().BeTrue();
-        politik.IsAllowed(new Uri("https://api.anthropic.com/v1/messages"))
+        policy.IsAllowed(new Uri("https://api.anthropic.com/v1/messages"))
             .Should().BeTrue();
 
         // And what is not named stays out — that is the whole purpose.
-        politik.IsAllowed(new Uri("https://telemetrie.beispiel.test/v1/traces"))
+        policy.IsAllowed(new Uri("https://telemetrie.beispiel.test/v1/traces"))
             .Should().BeFalse();
     }
 
@@ -93,7 +93,7 @@ public sealed class EgressTests
     [InlineData("https://api.anthropic.com/v1/messages")]
     public void The_two_outside_destinations_need_to_be_named(string address)
     {
-        Vorgabe().IsAllowed(new Uri(address)).Should().BeFalse();
+        Default().IsAllowed(new Uri(address)).Should().BeFalse();
     }
 
     /// <summary>A private-range IP does fall under the default.</summary>
@@ -108,6 +108,6 @@ public sealed class EgressTests
     [InlineData("http://192.168.1.20:5432/")]
     public void A_private_address_falls_under_it(string address)
     {
-        Vorgabe().IsAllowed(new Uri(address)).Should().BeTrue();
+        Default().IsAllowed(new Uri(address)).Should().BeTrue();
     }
 }

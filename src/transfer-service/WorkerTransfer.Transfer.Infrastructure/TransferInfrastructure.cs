@@ -89,7 +89,7 @@ public static class TransferInfrastructure
     /// <summary>Vier Namen, bei denen <c>note</c> ein echtes Homonym ist.</summary>
     /// <remarks>
     /// <strong>Öffentlich, weil sie zwei Leser hat</strong>: <c>wt.ki.keine-zahl</c>
-    /// zur Laufzeit und <c>WortschatzTests</c> zur Bauzeit.
+    /// zur Laufzeit und <c>VocabularyTests</c> zur Bauzeit.
     /// <para>
     /// Es ist überall die <em>Anmerkung</em> — was eine Person zu ihrem
     /// MarketStatus schreibt, und was ein Unternehmen zu seinem Angebot
@@ -147,9 +147,9 @@ public static class TransferInfrastructure
         var erasure = new ErasureSettings();
         configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "transfer",
             !string.IsNullOrEmpty(erasure.Geheimnis),
-            pruefspurVorhanden: false));
+            auditTrailPresent: false));
     }
 }

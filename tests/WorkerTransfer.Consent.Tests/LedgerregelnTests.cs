@@ -5,18 +5,18 @@ using WorkerTransfer.Consent.Domain.Ledger;
 namespace WorkerTransfer.Consent.Tests;
 
 /// <summary>The rules of the log, without a database.</summary>
-public class LedgerregelnTests
+public class LedgerRulesTests
 {
     private static readonly SubjectId Anna = new(Guid.CreateVersion7());
-    private static readonly Capability Sichtbarkeit = Capability.Parse("profile.visibility:public");
-    private static readonly DateTimeOffset Jetzt = new(2026, 8, 22, 10, 0, 0, TimeSpan.Zero);
+    private static readonly Capability Visibility = Capability.Parse("profile.visibility:public");
+    private static readonly DateTimeOffset Now = new(2026, 8, 22, 10, 0, 0, TimeSpan.Zero);
 
     [Theory]
     [InlineData("profile.visibility:public")]
     [InlineData("portfolio.visibility:public")]
     [InlineData("resume.visibility:tenant:9f8e7d6c-5b4a-4938-8271-605f4e3d2c1b")]
     [InlineData("profile.visibility")]
-    public void Eine_Faehigkeit_liest_sich(string value) =>
+    public void A_capability_reads(string value) =>
         Capability.TryParse(value, out _).Should().BeTrue();
 
     [Theory]
@@ -25,12 +25,12 @@ public class LedgerregelnTests
     [InlineData("p")]
     [InlineData(" profile.visibility:public")]
     [InlineData("profile visibility")]
-    public void Und_was_keine_ist_liest_sich_nicht(string value) =>
+    public void And_what_is_not_one_does_not_read(string value) =>
         Capability.TryParse(value, out _).Should().BeFalse();
 
     [Fact]
-    public void Eine_zu_lange_Faehigkeit_wird_abgewiesen() =>
-        Capability.TryParse("a." + new string('b', Capability.HoechsteLaenge), out _)
+    public void A_capability_that_is_too_long_is_refused() =>
+        Capability.TryParse("a." + new string('b', Capability.MaxLength), out _)
             .Should().BeFalse();
 
     /// <summary>
@@ -42,18 +42,18 @@ public class LedgerregelnTests
     /// about anything — absence is a state, not an error.
     /// </remarks>
     [Fact]
-    public void Eine_unbekannte_aber_wohlgeformte_Faehigkeit_wird_angenommen() =>
+    public void An_unknown_but_well_formed_capability_is_accepted() =>
         Capability.TryParse("gibtesnochnicht.visibility:public", out _).Should().BeTrue();
 
     [Fact]
-    public void Ein_Grund_darf_nicht_leer_sein()
+    public void A_reason_must_not_be_empty()
     {
         WithdrawalReason.TryParse("   ", out _).Should().BeFalse();
         WithdrawalReason.TryParse(null, out _).Should().BeFalse();
     }
 
     [Fact]
-    public void Ein_Grund_darf_nicht_laenger_als_fuenfhundert_Zeichen_sein()
+    public void A_reason_must_not_be_longer_than_five_hundred_characters()
     {
         WithdrawalReason.TryParse(new string('x', 500), out _).Should().BeTrue();
         WithdrawalReason.TryParse(new string('x', 501), out _).Should().BeFalse();
@@ -61,15 +61,15 @@ public class LedgerregelnTests
 
     /// <summary>Withdrawing must always be explainable; granting need not be.</summary>
     [Fact]
-    public void Ein_Widerruf_ohne_Grund_kommt_nicht_zustande()
+    public void A_revocation_without_a_reason_does_not_come_about()
     {
-        var ohneGrund = () => ConsentEvent.Restore(
-            Guid.CreateVersion7(), Anna, Sichtbarkeit, ConsentAction.Revoke, Jetzt, Anna, null,
+        var withoutReason = () => ConsentEvent.Restore(
+            Guid.CreateVersion7(), Anna, Visibility, ConsentAction.Revoke, Now, Anna, null,
             null);
 
         // Restoring one is fine — see the next test. Recording one is not, and
         // the signature of Revoke() is what says so.
-        ohneGrund.Should().NotThrow();
+        withoutReason.Should().NotThrow();
         typeof(ConsentEvent).GetMethod(nameof(ConsentEvent.Revoke))!
             .GetParameters().Should().Contain(p => p.Name == "reason" && !p.IsOptional);
     }
@@ -84,59 +84,59 @@ public class LedgerregelnTests
     /// the erasure happened.
     /// </remarks>
     [Fact]
-    public void Ein_gelesener_Widerruf_ohne_Grund_ist_kein_Fehler()
+    public void A_restored_revocation_without_a_reason_is_no_error()
     {
-        var wiederhergestellt = ConsentEvent.Restore(
-            Guid.CreateVersion7(), Anna, Sichtbarkeit, ConsentAction.Revoke, Jetzt, Anna, null,
+        var restoredEvent = ConsentEvent.Restore(
+            Guid.CreateVersion7(), Anna, Visibility, ConsentAction.Revoke, Now, Anna, null,
             null);
 
-        wiederhergestellt.Reason.Should().BeNull();
-        Projektion.State([wiederhergestellt]).Granted.Should().BeFalse();
+        restoredEvent.Reason.Should().BeNull();
+        Projection.State([restoredEvent]).Granted.Should().BeFalse();
     }
 
     [Fact]
-    public void Eine_Loeschung_verlangt_keinen_Grund() =>
-        ConsentEvent.Delete(Anna, Sichtbarkeit, Jetzt, Anna).Reason.Should().BeNull();
+    public void An_erasure_demands_no_reason() =>
+        ConsentEvent.Delete(Anna, Visibility, Now, Anna).Reason.Should().BeNull();
 
     [Fact]
-    public void Fremde_Metadaten_kommen_nicht_hinein()
+    public void Foreign_metadata_does_not_get_in()
     {
-        var mitEmail = () => ConsentEvent.Grant(
-            Anna, Sichtbarkeit, Jetzt, Anna,
+        var withEmail = () => ConsentEvent.Grant(
+            Anna, Visibility, Now, Anna,
             metadata: new Dictionary<string, string> { ["email"] = "anna@example.com" });
 
-        mitEmail.Should().Throw<ConsentMetadataException>().Which.Key.Should().Be("email");
+        withEmail.Should().Throw<ConsentMetadataException>().Which.Key.Should().Be("email");
     }
 
     [Fact]
-    public void Kein_Ereignis_heisst_nicht_erteilt()
+    public void No_event_means_not_granted()
     {
-        Projektion.State([]).Granted.Should().BeFalse();
-        Projektion.State([]).Reason.Should().Be("no consent event");
-        Projektion.State([]).Deleted.Should().BeFalse();
+        Projection.State([]).Granted.Should().BeFalse();
+        Projection.State([]).Reason.Should().Be("no consent event");
+        Projection.State([]).Deleted.Should().BeFalse();
     }
 
     [Fact]
-    public void Das_juengste_Ereignis_entscheidet()
+    public void The_newest_event_decides()
     {
-        var erteilt = ConsentEvent.Grant(Anna, Sichtbarkeit, Jetzt, Anna);
-        var widerrufen = ConsentEvent.Revoke(
-            Anna, Sichtbarkeit, Jetzt.AddMinutes(1), WithdrawalReason.Parse("Ich mag nicht mehr."),
+        var granted = ConsentEvent.Grant(Anna, Visibility, Now, Anna);
+        var revoked = ConsentEvent.Revoke(
+            Anna, Visibility, Now.AddMinutes(1), WithdrawalReason.Parse("Ich mag nicht mehr."),
             Anna);
 
-        Projektion.State([erteilt, widerrufen]).Granted.Should().BeFalse();
-        Projektion.State([widerrufen, erteilt]).Granted.Should().BeFalse();
+        Projection.State([granted, revoked]).Granted.Should().BeFalse();
+        Projection.State([revoked, granted]).Granted.Should().BeFalse();
     }
 
     /// <summary>A withdrawal must never be a one-way door.</summary>
     [Fact]
-    public void Nach_einem_Widerruf_darf_neu_erteilt_werden()
+    public void After_a_revocation_it_may_be_granted_again()
     {
-        var widerrufen = ConsentEvent.Revoke(
-            Anna, Sichtbarkeit, Jetzt, WithdrawalReason.Parse("Erst mal nicht."), Anna);
-        var erneut = ConsentEvent.Grant(Anna, Sichtbarkeit, Jetzt.AddDays(30), Anna);
+        var revoked = ConsentEvent.Revoke(
+            Anna, Visibility, Now, WithdrawalReason.Parse("Erst mal nicht."), Anna);
+        var again = ConsentEvent.Grant(Anna, Visibility, Now.AddDays(30), Anna);
 
-        Projektion.State([widerrufen, erneut]).Should().Be(new ConsentState(true));
+        Projection.State([revoked, again]).Should().Be(new ConsentState(true));
     }
 
     /// <summary>
@@ -147,44 +147,44 @@ public class LedgerregelnTests
     /// back in, and the same pair could read differently twice in a row.
     /// </remarks>
     [Fact]
-    public void Zwei_Ereignisse_im_selben_Takt_loesen_sich_ueber_die_Kennung()
+    public void Two_events_in_the_same_tick_resolve_over_the_id()
     {
-        var kleinereKennung = Guid.Parse("00000000-0000-7000-8000-000000000001");
-        var groessereKennung = Guid.Parse("00000000-0000-7000-8000-000000000002");
+        var smallerId = Guid.Parse("00000000-0000-7000-8000-000000000001");
+        var largerId = Guid.Parse("00000000-0000-7000-8000-000000000002");
 
-        var erteilt = ConsentEvent.Restore(
-            groessereKennung, Anna, Sichtbarkeit, ConsentAction.Grant, Jetzt, Anna, null, null);
-        var widerrufen = ConsentEvent.Restore(
-            kleinereKennung, Anna, Sichtbarkeit, ConsentAction.Revoke, Jetzt, Anna,
+        var granted = ConsentEvent.Restore(
+            largerId, Anna, Visibility, ConsentAction.Grant, Now, Anna, null, null);
+        var revoked = ConsentEvent.Restore(
+            smallerId, Anna, Visibility, ConsentAction.Revoke, Now, Anna,
             WithdrawalReason.Parse("Doch nicht."), null);
 
-        Projektion.State([erteilt, widerrufen]).Granted.Should().BeTrue();
-        Projektion.State([widerrufen, erteilt]).Granted.Should().BeTrue();
+        Projection.State([granted, revoked]).Granted.Should().BeTrue();
+        Projection.State([revoked, granted]).Granted.Should().BeTrue();
     }
 
     [Fact]
-    public void Ein_Widerruf_traegt_seinen_Grund_in_den_Stand()
+    public void A_revocation_carries_its_reason_into_the_state()
     {
-        var widerrufen = ConsentEvent.Revoke(
-            Anna, Sichtbarkeit, Jetzt, WithdrawalReason.Parse("Neue Stelle."), Anna);
+        var revoked = ConsentEvent.Revoke(
+            Anna, Visibility, Now, WithdrawalReason.Parse("Neue Stelle."), Anna);
 
-        Projektion.State([widerrufen]).Should()
+        Projection.State([revoked]).Should()
             .Be(new ConsentState(false, false, "Neue Stelle."));
     }
 
     [Fact]
-    public void Eine_Loeschung_ist_nicht_dasselbe_wie_ein_Widerruf()
+    public void An_erasure_is_not_the_same_as_a_revocation()
     {
-        var geloescht = ConsentEvent.Delete(Anna, Sichtbarkeit, Jetzt, Anna);
+        var deleted = ConsentEvent.Delete(Anna, Visibility, Now, Anna);
 
-        Projektion.State([geloescht]).Should().Be(new ConsentState(false, true));
+        Projection.State([deleted]).Should().Be(new ConsentState(false, true));
     }
 
     /// <summary>
     /// Append-only is the shape of the port, not a rule in a document.
     /// </summary>
     [Fact]
-    public void Das_Buch_bietet_kein_Aendern_und_kein_Loeschen() =>
+    public void The_ledger_offers_no_update_and_no_delete() =>
         typeof(IConsentLedger).GetMethods().Select(m => m.Name).Should()
             .NotContain(name =>
                 name.Contains("Update", StringComparison.OrdinalIgnoreCase)

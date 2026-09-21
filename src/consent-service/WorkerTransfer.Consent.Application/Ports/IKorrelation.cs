@@ -6,8 +6,8 @@ namespace WorkerTransfer.Consent.Application.Ports;
 /// be written by something that is not a request — the erasure arrives over
 /// HTTP today and may not tomorrow.
 /// </remarks>
-public interface IKorrelation
+public interface ICorrelation
 {
     /// <summary>The id of the running request, where there is one.</summary>
-    string? Aktuell { get; }
+    string? Current { get; }
 }

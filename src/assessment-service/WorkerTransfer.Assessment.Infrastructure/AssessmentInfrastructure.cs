@@ -129,9 +129,9 @@ public static class AssessmentInfrastructure
         var erasure = new ErasureSettings();
         configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "assessment",
             !string.IsNullOrEmpty(erasure.Geheimnis),
-            pruefspurVorhanden: false));
+            auditTrailPresent: false));
     }
 }

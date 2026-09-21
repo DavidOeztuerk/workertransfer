@@ -8,16 +8,16 @@ using WorkerTransfer.Consent.Domain.Ledger;
 namespace WorkerTransfer.Consent.Application.Erasure;
 
 /// <summary>Delete everything this service holds about one person.</summary>
-/// <param name="Wer">The person, as the cascade named them.</param>
-public sealed record ExecuteErasureCommand(Guid Wer) : IBefehl<ErasureReceipt>;
+/// <param name="Subject">The person, as the cascade named them.</param>
+public sealed record ExecuteErasureCommand(Guid Subject) : ICommand<ErasureReceipt>;
 
 /// <summary>The receipt.</summary>
-/// <param name="Behalten">
+/// <param name="Retained">
 /// Zero, always. This service has no retention exception: the two switches
 /// ADR-0027 §3 knows of are a hired application and a paid transfer, and
 /// neither stands here.
 /// </param>
-public sealed record ErasureReceipt(int Behalten = 0);
+public sealed record ErasureReceipt(int Retained = 0);
 
 /// <summary>
 /// The recipient where something deliberately <em>stays</em> (ADR-0027 §5).
@@ -48,11 +48,11 @@ public sealed record ErasureReceipt(int Behalten = 0);
 /// </para>
 /// </remarks>
 public sealed class ExecuteErasureHandler(
-    IConsentLedger buch,
-    IAuditTrail pruefspur,
-    IFreitextraeumung raeumung,
-    IKorrelation korrelation,
-    TimeProvider uhr)
+    IConsentLedger ledger,
+    IAuditTrail auditTrail,
+    IFreeTextClearing clearing,
+    ICorrelation correlation,
+    TimeProvider clock)
     : IRequestHandler<ExecuteErasureCommand, ErasureReceipt>
 {
     /// <inheritdoc />
@@ -62,41 +62,41 @@ public sealed class ExecuteErasureHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var subject = new SubjectId(request.Wer);
-        var now = uhr.GetUtcNow();
-        var neueste = await buch.LatestPerSkillAsync(subject, cancellationToken);
+        var subject = new SubjectId(request.Subject);
+        var now = clock.GetUtcNow();
+        var latest = await ledger.LatestPerSkillAsync(subject, cancellationToken);
 
-        foreach (var ereignis in neueste)
+        foreach (var consentEvent in latest)
         {
             // Already closed ones are skipped, and that is the idempotency
             // (ADR-0027 §4.2). Deleting is idempotent by nature, appending is
             // not: a second delivery would otherwise write a second closing
             // fact per capability. No harm, but an untruth — the person deleted
             // once, not twice.
-            if (ereignis.Action is ConsentAction.Delete)
+            if (consentEvent.Action is ConsentAction.Delete)
             {
                 continue;
             }
 
             // The person themselves. There is no delegation model, and that is
             // deliberate: nobody but they deletes their account.
-            await buch.AttachAsync(
-                ConsentEvent.Delete(subject, ereignis.Capability, now, subject),
+            await ledger.AttachAsync(
+                ConsentEvent.Delete(subject, consentEvent.Capability, now, subject),
                 cancellationToken);
         }
 
         // Without the capability names. The trail records that the erasure ran;
         // listing what it covered would be the one statement about the person
         // that the very next step has to remove again.
-        await pruefspur.AttachAsync(
+        await auditTrail.AttachAsync(
             new AuditEvent(
-                AuditAction.ConsentDelete, now, subject, null, subject, korrelation.Aktuell),
+                AuditAction.ConsentDelete, now, subject, null, subject, correlation.Current),
             cancellationToken);
 
         // Afterwards, not before: this way it also catches the rows just
         // written, and there stays exactly one place where "no free text any
         // more" is enforced instead of two that can drift apart.
-        await raeumung.ClearAsync(request.Wer, cancellationToken);
+        await clearing.ClearAsync(request.Subject, cancellationToken);
 
         return new ErasureReceipt();
     }

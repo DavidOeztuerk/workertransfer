@@ -6,8 +6,8 @@ namespace WorkerTransfer.ServiceDefaults.Checks;
 
 /// <summary>What a service is in the erasure cascade.</summary>
 /// <remarks>
-/// Three roles and not two. <see cref="Empfaenger"/> and
-/// <see cref="Unbeteiligt"/> suggest themselves; <see cref="Ursprung"/> is the
+/// Three roles and not two. <see cref="Recipient"/> and
+/// <see cref="NotInvolved"/> suggest themselves; <see cref="Origin"/> is the
 /// one a two-valued question would have answered wrongly: identity-service does
 /// not stand in <c>ErasureRecipient.Fremde</c> — it <em>is</em> the cascade —,
 /// and "not on the list" would there wrongly mean "holds nothing about a human
@@ -16,13 +16,13 @@ namespace WorkerTransfer.ServiceDefaults.Checks;
 public enum ErasureRole
 {
     /// <summary>It sets the cascade going and falls last itself.</summary>
-    Ursprung,
+    Origin,
 
     /// <summary>It holds rows about people and acknowledges.</summary>
-    Empfaenger,
+    Recipient,
 
     /// <summary>It holds nothing about a natural person.</summary>
-    Unbeteiligt
+    NotInvolved
 }
 
 /// <summary>Can the erasure cascade work, and what remains afterwards as evidence?</summary>
@@ -43,37 +43,37 @@ public enum ErasureRole
 /// </remarks>
 public sealed class ErasureCheck : ISecurityCheck
 {
-    private readonly string _dienstname;
-    private readonly ErasureRole _rolle;
-    private readonly bool _tuerEingerichtet;
-    private readonly bool _pruefspurVorhanden;
-    private readonly IReadOnlyList<string> _erwartet;
-    private readonly IReadOnlyList<string> _bekannt;
+    private readonly string _serviceName;
+    private readonly ErasureRole _role;
+    private readonly bool _doorConfigured;
+    private readonly bool _auditTrailPresent;
+    private readonly IReadOnlyList<string> _expected;
+    private readonly IReadOnlyList<string> _known;
 
     private ErasureCheck(
-        string dienstname,
+        string serviceName,
         ErasureRole role,
-        bool tuerEingerichtet,
-        bool pruefspurVorhanden,
-        IReadOnlyList<string> erwartet,
-        IReadOnlyList<string> bekannt)
+        bool doorConfigured,
+        bool auditTrailPresent,
+        IReadOnlyList<string> expected,
+        IReadOnlyList<string> known)
     {
-        _dienstname = dienstname;
-        _rolle = role;
-        _tuerEingerichtet = tuerEingerichtet;
-        _pruefspurVorhanden = pruefspurVorhanden;
-        _erwartet = erwartet;
-        _bekannt = bekannt;
+        _serviceName = serviceName;
+        _role = role;
+        _doorConfigured = doorConfigured;
+        _auditTrailPresent = auditTrailPresent;
+        _expected = expected;
+        _known = known;
     }
 
     /// <summary>A service an erasure order has to reach.</summary>
-    /// <param name="dienstname">How it is called in the recipient list.</param>
-    /// <param name="tuerEingerichtet">Whether the erasure secret is set in this instance.</param>
-    /// <param name="pruefspurVorhanden">Whether an audit trail writes in the same transaction.</param>
+    /// <param name="serviceName">How it is called in the recipient list.</param>
+    /// <param name="doorConfigured">Whether the erasure secret is set in this instance.</param>
+    /// <param name="auditTrailPresent">Whether an audit trail writes in the same transaction.</param>
     /// <returns>The check.</returns>
-    public static ErasureCheck AlsEmpfaenger(
-        string dienstname, bool tuerEingerichtet, bool pruefspurVorhanden) =>
-        new(dienstname, ErasureRole.Empfaenger, tuerEingerichtet, pruefspurVorhanden, [], []);
+    public static ErasureCheck AsRecipient(
+        string serviceName, bool doorConfigured, bool auditTrailPresent) =>
+        new(serviceName, ErasureRole.Recipient, doorConfigured, auditTrailPresent, [], []);
 
     /// <summary>The service that sets the cascade going.</summary>
     /// <remarks>
@@ -84,21 +84,21 @@ public sealed class ErasureCheck : ISecurityCheck
     /// that is indistinguishable from "the recipient is not answering right
     /// now".
     /// </remarks>
-    /// <param name="dienstname">What it calls itself.</param>
-    /// <param name="erwartet">The recipient list (<c>ErasureRecipient.Fremde</c>).</param>
-    /// <param name="bekannt">What an address is configured for in this instance.</param>
+    /// <param name="serviceName">What it calls itself.</param>
+    /// <param name="expected">The recipient list (<c>ErasureRecipient.Fremde</c>).</param>
+    /// <param name="known">What an address is configured for in this instance.</param>
     /// <returns>The check.</returns>
-    public static ErasureCheck AlsUrsprung(
-        string dienstname,
-        IReadOnlyList<string> erwartet,
-        IReadOnlyList<string> bekannt) =>
-        new(dienstname, ErasureRole.Ursprung, true, false, erwartet, bekannt);
+    public static ErasureCheck AsOrigin(
+        string serviceName,
+        IReadOnlyList<string> expected,
+        IReadOnlyList<string> known) =>
+        new(serviceName, ErasureRole.Origin, true, false, expected, known);
 
     /// <summary>A service without a single row about a natural person.</summary>
-    /// <param name="dienstname">What it calls itself.</param>
+    /// <param name="serviceName">What it calls itself.</param>
     /// <returns>The check.</returns>
-    public static ErasureCheck OhneZeilen(string dienstname) =>
-        new(dienstname, ErasureRole.Unbeteiligt, false, false, [], []);
+    public static ErasureCheck WithoutSubjectRows(string serviceName) =>
+        new(serviceName, ErasureRole.NotInvolved, false, false, [], []);
 
     /// <inheritdoc />
     public string Id => "wt.loeschung.nachweis";
@@ -128,17 +128,17 @@ public sealed class ErasureCheck : ISecurityCheck
 
     /// <inheritdoc />
     public Task<SecurityCheckResult> RunAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(_rolle switch
+        Task.FromResult(_role switch
         {
-            ErasureRole.Unbeteiligt => Unbeteiligt(),
-            ErasureRole.Ursprung => Ursprung(),
-            _ => Empfaenger()
+            ErasureRole.NotInvolved => NotInvolved(),
+            ErasureRole.Origin => Origin(),
+            _ => Recipient()
         });
 
-    private SecurityCheckResult Unbeteiligt() =>
-        Ergebnis(
+    private SecurityCheckResult NotInvolved() =>
+        Finding(
             SecurityCheckStatus.NotApplicable,
-            $"„{_dienstname}“ hält nichts über eine natürliche Person und steht "
+            $"„{_serviceName}“ hält nichts über eine natürliche Person und steht "
             + "deshalb nicht in der Kaskade. Ein Löschauftrag an einen Dienst "
             + "ohne Zeilen wäre ein Endpunkt, der „erledigt“ sagt, ohne je etwas "
             + "getan zu haben.",
@@ -147,45 +147,45 @@ public sealed class ErasureCheck : ISecurityCheck
             + "LoeschempfaengerTests liest dafür das EF-Modell und nicht den "
             + "Quelltext.");
 
-    private SecurityCheckResult Ursprung()
+    private SecurityCheckResult Origin()
     {
-        var fehlend = _erwartet
-            .Where(service => !_bekannt.Contains(service, StringComparer.OrdinalIgnoreCase))
+        var missing = _expected
+            .Where(service => !_known.Contains(service, StringComparer.OrdinalIgnoreCase))
             .OrderBy(service => service, StringComparer.Ordinal)
             .ToList();
 
-        if (fehlend.Count > 0)
+        if (missing.Count > 0)
         {
-            return Ergebnis(
+            return Finding(
                 SecurityCheckStatus.Fail,
-                $"„{_dienstname}“ stößt die Löschkaskade an, kennt aber für "
-                + $"{(fehlend.Count)} von "
-                + $"{(_erwartet.Count)} Empfängern keine Adresse: "
-                + $"{string.Join(", ", fehlend)}.",
+                $"„{_serviceName}“ stößt die Löschkaskade an, kennt aber für "
+                + $"{(missing.Count)} von "
+                + $"{(_expected.Count)} Empfängern keine Adresse: "
+                + $"{string.Join(", ", missing)}.",
                 "Erasure__Adressen__<dienst> setzen. Ohne Adresse bekommt der "
                 + "Empfänger keinen Auftrag, die Kaskade wartet auf eine "
                 + "Quittung, die niemand angefordert hat — und von außen sieht "
                 + "das aus wie „läuft noch“.");
         }
 
-        return Ergebnis(
+        return Finding(
             SecurityCheckStatus.Pass,
-            $"„{_dienstname}“ stößt die Löschkaskade an und kennt für alle "
-            + $"{(_erwartet.Count)} Empfänger eine Adresse "
-            + $"({string.Join(", ", _erwartet)}). Die eigenen Zeilen fallen "
+            $"„{_serviceName}“ stößt die Löschkaskade an und kennt für alle "
+            + $"{(_expected.Count)} Empfänger eine Adresse "
+            + $"({string.Join(", ", _expected)}). Die eigenen Zeilen fallen "
             + "zuletzt, nach der Quittung jedes Empfängers.",
             "Ein zwölfter Dienst mit Zeilen über Menschen muss in derselben "
             + "Bewegung in Loeschempfaenger.Fremde UND in die Umgebung — sonst "
             + "geht diese Prüfung rot, und das ist ihr Zweck.");
     }
 
-    private SecurityCheckResult Empfaenger()
+    private SecurityCheckResult Recipient()
     {
-        if (!_tuerEingerichtet)
+        if (!_doorConfigured)
         {
-            return Ergebnis(
+            return Finding(
                 SecurityCheckStatus.Fail,
-                $"„{_dienstname}“ steht in der Löschkaskade, aber seine Tür ist "
+                $"„{_serviceName}“ steht in der Löschkaskade, aber seine Tür ist "
                 + "zu: das Löschgeheimnis ist in dieser Instanz nicht gesetzt. "
                 + "Ein Löschauftrag erreicht diesen Dienst damit nicht.",
                 "Erasure__Geheimnis setzen — dasselbe, das der Ursprung "
@@ -196,11 +196,11 @@ public sealed class ErasureCheck : ISecurityCheck
                 + "ein Empfänger schweigt.");
         }
 
-        if (!_pruefspurVorhanden)
+        if (!_auditTrailPresent)
         {
-            return Ergebnis(
+            return Finding(
                 SecurityCheckStatus.Warning,
-                $"„{_dienstname}“ ist über die Kaskade erreichbar, hält aber "
+                $"„{_serviceName}“ ist über die Kaskade erreichbar, hält aber "
                 + "keine eigene Prüfspur: was er gelöscht hat, kann er "
                 + "hinterher nur behaupten.",
                 "ADR-0012: eine Prüfspur ist eine Tabelle in derselben "
@@ -210,18 +210,18 @@ public sealed class ErasureCheck : ISecurityCheck
                 + "selbst bestehen (ADR-0027).");
         }
 
-        return Ergebnis(
+        return Finding(
             SecurityCheckStatus.Pass,
-            $"„{_dienstname}“ steht in der Löschkaskade, seine Tür ist "
+            $"„{_serviceName}“ steht in der Löschkaskade, seine Tür ist "
             + "eingerichtet, und er schreibt eine Prüfspur in derselben "
             + "Transaktion wie die Löschung.",
             "Ein leeres Erasure__Geheimnis stößt diesen Befund um — und zwar in "
             + "genau der Umgebung, in der es leer ist, nicht im Baum.");
     }
 
-    private SecurityCheckResult Ergebnis(
-        SecurityCheckStatus state, string zusammenfassung, string abhilfe) =>
-        new(Id, Module, Category, state, Severity, zusammenfassung, abhilfe)
+    private SecurityCheckResult Finding(
+        SecurityCheckStatus state, string summary, string remediation) =>
+        new(Id, Module, Category, state, Severity, summary, remediation)
         {
             References = References
         };

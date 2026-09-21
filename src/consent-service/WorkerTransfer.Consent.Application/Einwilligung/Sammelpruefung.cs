@@ -7,7 +7,7 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 
 /// <summary>Several "may I?" in one round trip.</summary>
 /// <remarks>
-/// The same question as <see cref="EinwilligungPruefenAbfrage"/>, <em>n</em>
+/// The same question as <see cref="CheckConsentQuery"/>, <em>n</em>
 /// times: same access, same synchronous read, same absence of a cache and the
 /// same silence about the withdrawal reason (ADR-0030). What gets cheaper is
 /// the number of round trips, not the access.
@@ -16,46 +16,46 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// one request may carry would be one too many.
 /// </para>
 /// </remarks>
-public sealed record BatchCheckQuery(IReadOnlyList<CheckConsentQuery> Paare)
-    : IAbfrage<Sammelergebnis>;
+public sealed record BatchCheckQuery(IReadOnlyList<CheckConsentQuery> Pairs)
+    : IQuery<BatchCheckResult>;
 
 /// <summary>Reads every pair in one query, answers in the order asked.</summary>
-public sealed class BatchCheckHandler(IConsentLedger buch)
-    : IRequestHandler<BatchCheckQuery, Sammelergebnis>
+public sealed class BatchCheckHandler(IConsentLedger ledger)
+    : IRequestHandler<BatchCheckQuery, BatchCheckResult>
 {
     /// <inheritdoc />
-    public async Task<Sammelergebnis> Handle(
+    public async Task<BatchCheckResult> Handle(
         BatchCheckQuery request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var paare = new List<(SubjectId Subject, Capability Capability)>(request.Paare.Count);
+        var pairs = new List<(SubjectId Subject, Capability Capability)>(request.Pairs.Count);
 
-        foreach (var frage in request.Paare)
+        foreach (var question in request.Pairs)
         {
-            if (!Capability.TryParse(frage.Faehigkeit, out var skill))
+            if (!Capability.TryParse(question.Capability, out var skill))
             {
-                return new Sammelergebnis.Unbrauchbar("capability");
+                return new BatchCheckResult.Malformed("capability");
             }
 
-            paare.Add((new SubjectId(frage.Gegenstand), skill));
+            pairs.Add((new SubjectId(question.Subject), skill));
         }
 
-        var neueste = await buch.LatestAsync(paare, cancellationToken);
+        var latest = await ledger.LatestAsync(pairs, cancellationToken);
 
         // In the order of the questions, one per pair. The caller maps the
         // answers onto its rows; in any other order it would have to match on
         // (subject, capability), and a pair asked twice would be ambiguous.
-        var staende = new List<ConsentState>(paare.Count);
+        var states = new List<ConsentState>(pairs.Count);
 
-        foreach (var (subject, skill) in paare)
+        foreach (var (subject, skill) in pairs)
         {
-            staende.Add(neueste.TryGetValue((subject.Value, skill.Value), out var ereignis)
-                ? Projektion.State([ereignis])
-                : Projektion.State([]));
+            states.Add(latest.TryGetValue((subject.Value, skill.Value), out var consentEvent)
+                ? Projection.State([consentEvent])
+                : Projection.State([]));
         }
 
-        return new Sammelergebnis.Staende(staende);
+        return new BatchCheckResult.States(states);
     }
 }

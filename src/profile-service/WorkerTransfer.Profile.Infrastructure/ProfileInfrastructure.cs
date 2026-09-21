@@ -157,9 +157,9 @@ public static class ProfileInfrastructure
         var erasure = new ErasureSettings();
         configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "profile",
             !string.IsNullOrEmpty(erasure.Geheimnis),
-            pruefspurVorhanden: true));
+            auditTrailPresent: true));
     }
 }

@@ -5,24 +5,24 @@ using WorkerTransfer.Consent.Application.Nachrichten;
 namespace WorkerTransfer.Consent.Application.Einwilligung;
 
 /// <summary>Give a permission.</summary>
-/// <param name="Handelnder">Who is asking. Must be the subject.</param>
-/// <param name="Firma">The company they are acting for, for the trail only.</param>
-/// <param name="Gegenstand">Whose consent it is, as the caller named it.</param>
-/// <param name="Faehigkeit">Which permission.</param>
-/// <param name="Grund">Optional — giving a permission needs no justification.</param>
+/// <param name="Actor">Who is asking. Must be the subject.</param>
+/// <param name="Company">The company they are acting for, for the trail only.</param>
+/// <param name="Subject">Whose consent it is, as the caller named it.</param>
+/// <param name="Capability">Which permission.</param>
+/// <param name="Reason">Optional — giving a permission needs no justification.</param>
 /// <remarks>
 /// A command, not a <c>PUT</c> on a resource: it appends a fact. Mapping it
 /// onto a verb that implies mutation would misrepresent an append-only ledger.
 /// </remarks>
 public sealed record GrantConsentCommand(
-    SubjectId Handelnder,
-    TenantId? Firma,
-    Guid Gegenstand,
-    string Faehigkeit,
-    string? Grund) : IBefehl<ConsentResult>;
+    SubjectId Actor,
+    TenantId? Company,
+    Guid Subject,
+    string Capability,
+    string? Reason) : ICommand<ConsentResult>;
 
 /// <summary>Records the grant.</summary>
-public sealed class GrantConsentHandler(ConsentWriter schreiber)
+public sealed class GrantConsentHandler(ConsentWriter writer)
     : IRequestHandler<GrantConsentCommand, ConsentResult>
 {
     /// <inheritdoc />
@@ -32,8 +32,8 @@ public sealed class GrantConsentHandler(ConsentWriter schreiber)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return schreiber.GrantAsync(
-            request.Handelnder, request.Firma, request.Gegenstand, request.Faehigkeit,
-            request.Grund, cancellationToken);
+        return writer.GrantAsync(
+            request.Actor, request.Company, request.Subject, request.Capability,
+            request.Reason, cancellationToken);
     }
 }

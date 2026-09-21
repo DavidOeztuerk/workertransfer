@@ -85,6 +85,6 @@ public static class CompaniesInfrastructure
 
 
         // Kein Empfaenger: ein EmployerProfile gehoert einem Unternehmen, nicht einem Menschen (ADR-0027 §2).
-        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.OhneZeilen("companies"));
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.WithoutSubjectRows("companies"));
     }
 }

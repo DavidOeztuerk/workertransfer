@@ -19,9 +19,9 @@ namespace WorkerTransfer.ServiceDefaults.Checks;
 /// movement, but one that stands out.</para>
 /// </remarks>
 /// <param name="type">The context class that IS the boundary.</param>
-/// <param name="erwartet">The agreed field set.</param>
-/// <param name="wofuer">What the context is there for, in three words.</param>
-public sealed class SeamCheck(Type type, IReadOnlyList<string> erwartet, string wofuer)
+/// <param name="expected">The agreed field set.</param>
+/// <param name="purpose">What the context is there for, in three words.</param>
+public sealed class SeamCheck(Type type, IReadOnlyList<string> expected, string purpose)
     : ISecurityCheck
 {
     /// <inheritdoc />
@@ -54,41 +54,41 @@ public sealed class SeamCheck(Type type, IReadOnlyList<string> erwartet, string 
     public Task<SecurityCheckResult> RunAsync(CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(type);
-        ArgumentNullException.ThrowIfNull(erwartet);
+        ArgumentNullException.ThrowIfNull(expected);
 
         var found = type
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Select(eigenschaft => eigenschaft.Name)
+            .Select(property => property.Name)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
 
-        var dazu = found.Except(erwartet, StringComparer.Ordinal).ToList();
-        var fehlend = erwartet.Except(found, StringComparer.Ordinal).ToList();
+        var extra = found.Except(expected, StringComparer.Ordinal).ToList();
+        var missing = expected.Except(found, StringComparer.Ordinal).ToList();
 
-        if (dazu.Count == 0 && fehlend.Count == 0)
+        if (extra.Count == 0 && missing.Count == 0)
         {
-            return Task.FromResult(Ergebnis(
+            return Task.FromResult(Finding(
                 SecurityCheckStatus.Pass,
-                $"Der Kontext {wofuer} trägt genau {found.Count} Felder: "
+                $"Der Kontext {purpose} trägt genau {found.Count} Felder: "
                 + $"{string.Join(", ", found)}. Mehr verlässt diesen Dienst "
                 + "auf dem Weg zum Modell nicht.",
                 "Ein Feld mehr an dieser Klasse schickt etwas Neues über einen "
                 + "Menschen hinaus — und stößt diesen Befund um."));
         }
 
-        return Task.FromResult(Ergebnis(
+        return Task.FromResult(Finding(
             SecurityCheckStatus.Fail,
-            $"Der Kontext {wofuer} weicht von der vereinbarten Feldmenge ab: "
-            + (dazu.Count > 0 ? $"zusätzlich {string.Join(", ", dazu)}" : "")
-            + (dazu.Count > 0 && fehlend.Count > 0 ? "; " : "")
-            + (fehlend.Count > 0 ? $"es fehlen {string.Join(", ", fehlend)}" : "")
+            $"Der Kontext {purpose} weicht von der vereinbarten Feldmenge ab: "
+            + (extra.Count > 0 ? $"zusätzlich {string.Join(", ", extra)}" : "")
+            + (extra.Count > 0 && missing.Count > 0 ? "; " : "")
+            + (missing.Count > 0 ? $"es fehlen {string.Join(", ", missing)}" : "")
             + ".",
             Remediation));
     }
 
-    private SecurityCheckResult Ergebnis(
-        SecurityCheckStatus state, string zusammenfassung, string abhilfe) =>
-        new(Id, Module, Category, state, Severity, zusammenfassung, abhilfe)
+    private SecurityCheckResult Finding(
+        SecurityCheckStatus state, string summary, string remediation) =>
+        new(Id, Module, Category, state, Severity, summary, remediation)
         {
             References = References
         };

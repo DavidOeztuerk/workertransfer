@@ -10,7 +10,7 @@ namespace WorkerTransfer.ServiceDefaults.Checks;
 public enum ProviderOrigin
 {
     /// <summary>The operator, in the environment — one access that applies to everybody.</summary>
-    Betreiber,
+    Operator,
 
     /// <summary>The person, in their account settings — one access per human being.</summary>
     Person
@@ -18,22 +18,22 @@ public enum ProviderOrigin
 
 /// <summary>A provider as it is really in use in this instance.</summary>
 /// <remarks>
-/// <strong><see cref="Menschen"/> counts and does not name.</strong> "Three
+/// <strong><see cref="People"/> counts and does not name.</strong> "Three
 /// people on <c>api.anthropic.com</c>" is a statement about the instance; "this
 /// person on that server" would be one about a human being and does not belong
 /// in a document somebody passes around (ADR-0026). With
-/// <see cref="ProviderOrigin.Betreiber"/> this stands at <c>0</c>: the access
+/// <see cref="ProviderOrigin.Operator"/> this stands at <c>0</c>: the access
 /// hangs on no person.
 /// </remarks>
-/// <param name="Etikett">The provider label: <c>anthropic</c>, <c>openai_compatible</c>.</param>
+/// <param name="Label">The provider label: <c>anthropic</c>, <c>openai_compatible</c>.</param>
 /// <param name="Host">The host of its address — never the whole address, never a key.</param>
-/// <param name="ProviderOrigin">Who set it up.</param>
-/// <param name="Menschen">How many people entered it. With the operator: 0.</param>
+/// <param name="Origin">Who set it up.</param>
+/// <param name="People">How many people entered it. With the operator: 0.</param>
 public sealed record ProviderRow(
-    string Etikett,
+    string Label,
     string Host,
-    ProviderOrigin ProviderOrigin,
-    int Menschen);
+    ProviderOrigin Origin,
+    int People);
 
 /// <summary>Where the evidence learns which providers are in use.</summary>
 /// <remarks>
@@ -58,18 +58,18 @@ public interface IProviderSource
 /// </remarks>
 /// <param name="label">The provider label.</param>
 /// <param name="address">The address out of the configuration.</param>
-/// <param name="eingerichtet">Whether anybody is called at all.</param>
-public sealed class OperatorProviderSource(string label, string address, bool eingerichtet)
+/// <param name="configured">Whether anybody is called at all.</param>
+public sealed class OperatorProviderSource(string label, string address, bool configured)
     : IProviderSource
 {
     /// <inheritdoc />
     public Task<IReadOnlyList<ProviderRow>> ReadAsync(CancellationToken ct = default) =>
-        !eingerichtet
+        !configured
         || !Uri.TryCreate(address, UriKind.Absolute, out var target)
         || target.Host.Length == 0
             ? Task.FromResult<IReadOnlyList<ProviderRow>>([])
             : Task.FromResult<IReadOnlyList<ProviderRow>>(
-                [new ProviderRow(label, target.Host, ProviderOrigin.Betreiber, 0)]);
+                [new ProviderRow(label, target.Host, ProviderOrigin.Operator, 0)]);
 }
 
 /// <summary>Which AI providers are actually in use in this instance?</summary>
@@ -93,8 +93,8 @@ public sealed class OperatorProviderSource(string label, string address, bool ei
 /// thing worse and has fallen. Two classifications of the same question are two
 /// truths.</para>
 /// </remarks>
-/// <param name="quellen">Where the rows come from. None means there is no AI here.</param>
-public sealed class ProviderCheck(IEnumerable<IProviderSource> quellen) : ISecurityCheck
+/// <param name="sources">Where the rows come from. None means there is no AI here.</param>
+public sealed class ProviderCheck(IEnumerable<IProviderSource> sources) : ISecurityCheck
 {
     /// <inheritdoc />
     public string Id => "wt.ki.anbieter";
@@ -133,32 +133,32 @@ public sealed class ProviderCheck(IEnumerable<IProviderSource> quellen) : ISecur
     /// <inheritdoc />
     public async Task<SecurityCheckResult> RunAsync(CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(quellen);
+        ArgumentNullException.ThrowIfNull(sources);
 
         var rows = new List<ProviderRow>();
 
-        foreach (var source in quellen)
+        foreach (var source in sources)
         {
             rows.AddRange(await source.ReadAsync(cancellationToken));
         }
 
-        var gebuendelt = rows
-            .GroupBy(row => (row.Etikett, row.Host, row.ProviderOrigin))
+        var grouped = rows
+            .GroupBy(row => (row.Label, row.Host, row.Origin))
             .Select(group => new ProviderRow(
-                group.Key.Etikett,
+                group.Key.Label,
                 group.Key.Host,
-                group.Key.ProviderOrigin,
-                group.Sum(row => row.Menschen)))
-            .OrderBy(row => row.Etikett, StringComparer.Ordinal)
+                group.Key.Origin,
+                group.Sum(row => row.People)))
+            .OrderBy(row => row.Label, StringComparer.Ordinal)
             .ThenBy(row => row.Host, StringComparer.Ordinal)
             .ToList();
 
-        if (gebuendelt.Count == 0)
+        if (grouped.Count == 0)
         {
             // NotApplicable and not Pass: a green tick on something that does
             // not apply here at all is noise in exactly the document that is
             // meant to cut through noise.
-            return Ergebnis(
+            return Finding(
                 SecurityCheckStatus.NotApplicable,
                 "In dieser Instanz ist kein KI-Anbieter eingetragen. Ohne "
                 + "Eintrag wird kein Modell gefragt, und die Oberfläche sagt "
@@ -168,14 +168,14 @@ public sealed class ProviderCheck(IEnumerable<IProviderSource> quellen) : ISecur
                 + "als Etikett und Host, gezählt, nie namentlich.");
         }
 
-        var draussen = gebuendelt
+        var draussen = grouped
             .Where(row => HostJurisdiction.Classify(row.Host).Jurisdiction
                             != Jurisdiction.SelfHosted)
             .ToList();
 
-        return Ergebnis(
+        return Finding(
             draussen.Count > 0 ? SecurityCheckStatus.Warning : SecurityCheckStatus.Pass,
-            string.Join("; ", gebuendelt.Select(Satz)) + ".",
+            string.Join("; ", grouped.Select(Sentence)) + ".",
             draussen.Count > 0
                 ? Remediation
                 : "Solange jeder Eintrag im eigenen Netz liegt, verlässt kein "
@@ -184,27 +184,27 @@ public sealed class ProviderCheck(IEnumerable<IProviderSource> quellen) : ISecur
     }
 
     /// <summary>One row as a human being reads it.</summary>
-    private static string Satz(ProviderRow row)
+    private static string Sentence(ProviderRow row)
     {
-        var lage = HostJurisdiction.Classify(row.Host);
+        var jurisdiction = HostJurisdiction.Classify(row.Host);
 
-        return row.ProviderOrigin == ProviderOrigin.Betreiber
-            ? $"{row.Etikett} auf {row.Host} ({Wort(lage.Jurisdiction)}), vom "
+        return row.Origin == ProviderOrigin.Operator
+            ? $"{row.Label} auf {row.Host} ({Word(jurisdiction.Jurisdiction)}), vom "
               + "Betreiber eingerichtet und für alle gültig"
-            : $"{row.Menschen} Mensch(en) auf {row.Host} über {row.Etikett} "
-              + $"({Wort(lage.Jurisdiction)})";
+            : $"{row.People} Mensch(en) auf {row.Host} über {row.Label} "
+              + $"({Word(jurisdiction.Jurisdiction)})";
     }
 
-    private static string Wort(Jurisdiction lage) => lage switch
+    private static string Word(Jurisdiction jurisdiction) => jurisdiction switch
     {
         Jurisdiction.SelfHosted => "eigenes Netz",
         Jurisdiction.ThirdCountryProvider => "Drittland",
         _ => "Rechtsraum offen"
     };
 
-    private SecurityCheckResult Ergebnis(
-        SecurityCheckStatus state, string zusammenfassung, string abhilfe) =>
-        new(Id, Module, Category, state, Severity, zusammenfassung, abhilfe)
+    private SecurityCheckResult Finding(
+        SecurityCheckStatus state, string summary, string remediation) =>
+        new(Id, Module, Category, state, Severity, summary, remediation)
         {
             References = References
         };
