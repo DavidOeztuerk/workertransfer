@@ -36,10 +36,10 @@ public sealed class EmployerProfile
         TenantId company,
         string slug,
         CheckedValues values,
-        DateTimeOffset angelegtAm,
-        DateTimeOffset geaendertAm)
+        DateTimeOffset createdAt,
+        DateTimeOffset changedAt)
     {
-        Firma = company;
+        Company = company;
         Slug = slug;
         DisplayName = values.DisplayName;
         About = values.About;
@@ -51,12 +51,12 @@ public sealed class EmployerProfile
         City = values.City;
         Country = values.Country;
         Phone = values.Phone;
-        CreatedAt = angelegtAm;
-        ChangedAt = geaendertAm;
+        CreatedAt = createdAt;
+        ChangedAt = changedAt;
     }
 
     /// <summary>Which company. It <em>is</em> the key.</summary>
-    public TenantId Firma { get; }
+    public TenantId Company { get; }
 
     /// <summary>The address of the careers page.</summary>
     /// <remarks>
@@ -116,12 +116,12 @@ public sealed class EmployerProfile
         DateTimeOffset now,
         string? line1 = null,
         string? postalCode = null,
-        string? ort = null,
-        string? land = null,
+        string? city = null,
+        string? country = null,
         string? phone = null) =>
         new(company, slug,
             Check(displayName, about, website, locations, benefits,
-                line1, postalCode, ort, land, phone),
+                line1, postalCode, city, country, phone),
             now, now);
 
     /// <summary>The profile as a row holds it.</summary>
@@ -133,17 +133,17 @@ public sealed class EmployerProfile
         string? website,
         IReadOnlyList<string> locations,
         IReadOnlyList<string> benefits,
-        DateTimeOffset angelegtAm,
-        DateTimeOffset geaendertAm,
+        DateTimeOffset createdAt,
+        DateTimeOffset changedAt,
         string line1 = "",
         string postalCode = "",
-        string ort = "",
-        string land = "DE",
+        string city = "",
+        string country = "DE",
         string phone = "") =>
         new(company, slug,
             new CheckedValues(displayName, about, website, locations, benefits,
-                line1, postalCode, ort, land, phone),
-            angelegtAm, geaendertAm);
+                line1, postalCode, city, country, phone),
+            createdAt, changedAt);
 
     /// <summary>Rewrites the fields — not the slug.</summary>
     /// <exception cref="ProfileError">Something about the input is wrong.</exception>
@@ -156,14 +156,14 @@ public sealed class EmployerProfile
         DateTimeOffset now,
         string? line1 = null,
         string? postalCode = null,
-        string? ort = null,
-        string? land = null,
+        string? city = null,
+        string? country = null,
         string? phone = null)
     {
         // Check everything first, then write: a rejected form must not leave a
         // half-changed aggregate behind.
         var checkedValues = Check(displayName, about, website, locations, benefits,
-            line1, postalCode, ort, land, phone);
+            line1, postalCode, city, country, phone);
 
         DisplayName = checkedValues.DisplayName;
         About = checkedValues.About;
@@ -178,7 +178,7 @@ public sealed class EmployerProfile
         ChangedAt = now;
     }
 
-    /// <summary>The checkedValues values, typed.</summary>
+    /// <summary>The checked values, typed.</summary>
     /// <remarks>
     /// Shared by create and change so the two cannot drift apart — five fields
     /// that are all strings or lists of strings are exactly the mix-up nobody
@@ -204,11 +204,11 @@ public sealed class EmployerProfile
         IReadOnlyList<string>? benefits,
         string? line1 = null,
         string? postalCode = null,
-        string? ort = null,
-        string? land = null,
+        string? city = null,
+        string? country = null,
         string? phone = null)
     {
-        var iso = Text("country", land, required: false, 2).ToUpperInvariant();
+        var iso = Text("country", country, required: false, 2).ToUpperInvariant();
         return new(
             Text("Display name", displayName, required: true, MaxDisplayNameLength),
             Text("About", about, required: false, MaxAboutLength),
@@ -217,7 +217,7 @@ public sealed class EmployerProfile
             Entries("benefits", benefits),
             Text("line1", line1, required: false, 120),
             Text("postal_code", postalCode, required: false, 16),
-            Text("city", ort, required: false, 80),
+            Text("city", city, required: false, 80),
             iso.Length == 2 ? iso : "DE",
             Text("phone", phone, required: false, 40));
     }

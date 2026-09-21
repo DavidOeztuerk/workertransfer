@@ -5,7 +5,7 @@ using WorkerTransfer.Companies.Domain.EmployerProfiles;
 
 namespace WorkerTransfer.Companies.Infrastructure.Persistence;
 
-/// <summary>Liest und schreibt <c>company_profiles</c>.</summary>
+/// <summary>Reads and writes <c>company_profiles</c>.</summary>
 public sealed class EfProfileStore(CompaniesDbContext context) : IProfileStore
 {
     /// <inheritdoc />
@@ -13,9 +13,9 @@ public sealed class EfProfileStore(CompaniesDbContext context) : IProfileStore
         TenantId company, CancellationToken cancellationToken = default)
     {
         var row = await context.Profile
-            .FirstOrDefaultAsync(kandidat => kandidat.Id == company.Value, cancellationToken);
+            .FirstOrDefaultAsync(candidate => candidate.Id == company.Value, cancellationToken);
 
-        return row is null ? null : ZumAggregat(row);
+        return row is null ? null : ToAggregate(row);
     }
 
     /// <inheritdoc />
@@ -23,37 +23,37 @@ public sealed class EfProfileStore(CompaniesDbContext context) : IProfileStore
         string slug, CancellationToken cancellationToken = default)
     {
         var row = await context.Profile
-            .FirstOrDefaultAsync(kandidat => kandidat.Slug == slug, cancellationToken);
+            .FirstOrDefaultAsync(candidate => candidate.Slug == slug, cancellationToken);
 
-        return row is null ? null : ZumAggregat(row);
+        return row is null ? null : ToAggregate(row);
     }
 
     /// <inheritdoc />
     public async Task<string> FreeSlugAsync(
         string wanted, CancellationToken cancellationToken = default)
     {
-        var vergeben = await context.Profile
-            .Where(kandidat => kandidat.Slug.StartsWith(wanted))
-            .Select(kandidat => kandidat.Slug)
+        var assigned = await context.Profile
+            .Where(candidate => candidate.Slug.StartsWith(wanted))
+            .Select(candidate => candidate.Slug)
             .ToListAsync(cancellationToken);
 
-        var belegt = new HashSet<string>(vergeben, StringComparer.Ordinal);
+        var taken = new HashSet<string>(assigned, StringComparer.Ordinal);
 
-        if (!belegt.Contains(wanted))
+        if (!taken.Contains(wanted))
         {
             return wanted;
         }
 
-        // Nicht die Mandanten-Kennung anhängen: die stünde dann in einer
-        // Adresse, die weitergegeben wird.
-        var zaehler = 2;
+        // Do not append the tenant id: it would then sit in an address that
+        // people pass around.
+        var counter = 2;
 
-        while (belegt.Contains($"{wanted}-{zaehler}"))
+        while (taken.Contains($"{wanted}-{counter}"))
         {
-            zaehler++;
+            counter++;
         }
 
-        return $"{wanted}-{zaehler}";
+        return $"{wanted}-{counter}";
     }
 
     /// <inheritdoc />
@@ -62,28 +62,28 @@ public sealed class EfProfileStore(CompaniesDbContext context) : IProfileStore
     {
         ArgumentNullException.ThrowIfNull(profile);
 
-        var vorhanden = await context.Profile
+        var existing = await context.Profile
             .AsTracking()
-            .FirstOrDefaultAsync(kandidat => kandidat.Id == profile.Firma.Value, cancellationToken);
+            .FirstOrDefaultAsync(candidate => candidate.Id == profile.Company.Value, cancellationToken);
 
-        if (vorhanden is null)
+        if (existing is null)
         {
-            context.Profile.Add(ZurZeile(profile));
+            context.Profile.Add(ToRow(profile));
             return;
         }
 
-        Uebertrage(profile, vorhanden);
+        Transfer(profile, existing);
     }
 
-    private static EmployerProfile ZumAggregat(ProfileRow row) =>
+    private static EmployerProfile ToAggregate(ProfileRow row) =>
         EmployerProfile.Restore(
             new TenantId(row.Id),
             row.Slug,
             row.DisplayName,
             row.About,
             row.Website,
-            Liste(row.Locations),
-            Liste(row.Benefits),
+            List(row.Locations),
+            List(row.Benefits),
             new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
             new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero),
             row.Line1,
@@ -92,23 +92,23 @@ public sealed class EfProfileStore(CompaniesDbContext context) : IProfileStore
             row.Country,
             row.Phone);
 
-    private static ProfileRow ZurZeile(EmployerProfile profile)
+    private static ProfileRow ToRow(EmployerProfile profile)
     {
         var row = new ProfileRow
         {
-            Id = profile.Firma.Value,
-            // Das Kürzel steht nur hier und nicht in `Uebertrage`: es wird
-            // einmal vergeben und danach nie wieder geschrieben.
+            Id = profile.Company.Value,
+            // Das Kürzel steht nur hier und nicht in `Transfer`: es wird
+            // einmal assigned und danach nie wieder geschrieben.
             Slug = profile.Slug,
             CreatedAt = profile.CreatedAt.UtcDateTime
         };
 
-        Uebertrage(profile, row);
+        Transfer(profile, row);
 
         return row;
     }
 
-    private static void Uebertrage(EmployerProfile profile, ProfileRow row)
+    private static void Transfer(EmployerProfile profile, ProfileRow row)
     {
         row.DisplayName = profile.DisplayName;
         row.About = profile.About;
@@ -123,6 +123,6 @@ public sealed class EfProfileStore(CompaniesDbContext context) : IProfileStore
         row.UpdatedAt = profile.ChangedAt.UtcDateTime;
     }
 
-    private static IReadOnlyList<string> Liste(string jsonb) =>
+    private static IReadOnlyList<string> List(string jsonb) =>
         JsonSerializer.Deserialize<List<string>>(jsonb) ?? [];
 }

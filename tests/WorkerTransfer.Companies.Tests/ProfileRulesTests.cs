@@ -4,18 +4,17 @@ using WorkerTransfer.Companies.Domain.EmployerProfiles;
 
 namespace WorkerTransfer.Companies.Tests;
 
-/// <summary>Regeln, die am Aggregat hängen und nicht an einer Route.</summary>
+/// <summary>Rules that hang on the aggregate and not on a route.</summary>
 /// <remarks>
-/// Diese Reihe gibt es, weil eine Gegenprobe eine Lücke gezeigt hat: die
-/// Reihenfolge „erst vollständig prüfen, dann schreiben" ließ sich über HTTP
-/// nicht widerlegen. Der Speicher gibt gelesene Zeilen als <em>neues</em>
-/// Aggregat zurück und schreibt nur über <c>SaveAsync</c>, das nach einer
-/// Ausnahme gar nicht mehr aufgerufen wird — die halb geänderte Instanz wird
-/// einfach verworfen. Die Regel schützt also den, der das Aggregat über den
-/// Fehlschlag hinaus in der Hand behält, und genau dort muss sie geprüft
-/// werden.
+/// This suite exists because a counter-probe showed a gap: the order "check
+/// everything first, then write" could not be refuted over HTTP. The store
+/// returns read rows as a <em>new</em> aggregate and writes only through
+/// <c>SaveAsync</c>, which after an exception is not called at all — the
+/// half-changed instance is simply discarded. So the rule protects whoever
+/// keeps the aggregate in hand beyond the failure, and that is exactly where
+/// it has to be checked.
 /// </remarks>
-public class ProfilregelnTests
+public class ProfileRulesTests
 {
     private static EmployerProfile Profile() =>
         EmployerProfile.Create(
@@ -29,8 +28,7 @@ public class ProfilregelnTests
             DateTimeOffset.UnixEpoch);
 
     /// <summary>
-    /// Ein abgelehntes Formular darf kein halb geändertes Aggregat
-    /// hinterlassen.
+    /// A refused form must not leave a half-changed aggregate behind.
     /// </summary>
     [Fact]
     public void A_refused_change_leaves_the_aggregate_untouched()
@@ -51,11 +49,11 @@ public class ProfilregelnTests
         profile.ChangedAt.Should().Be(DateTimeOffset.UnixEpoch);
     }
 
-    /// <summary>Das Kürzel hat keinen Weg, sich zu ändern.</summary>
+    /// <summary>The slug has no way of changing.</summary>
     /// <remarks>
-    /// Nicht „wird nicht geändert", sondern <em>kann</em> nicht: es gibt keine
-    /// Zuweisung dafür. Diese Prüfung fällt, sobald jemand eine hinzufügt — und
-    /// das ist der Punkt, an dem ein geteilter Link zu brechen beginnt.
+    /// Not "is not changed" but <em>cannot</em> be: there is no assignment for
+    /// it. This check falls the moment somebody adds one — and that is the
+    /// point at which a shared link begins to break.
     /// </remarks>
     [Fact]
     public void The_slug_has_no_setter()
@@ -65,32 +63,32 @@ public class ProfilregelnTests
             .CanWrite.Should().BeFalse();
     }
 
-    /// <summary>Umlaute werden zerlegt, ihre Grundbuchstaben bleiben.</summary>
+    /// <summary>Umlauts are decomposed, their base letters stay.</summary>
     [Theory]
     [InlineData("Grün & Söhne GmbH", "grun-sohne-gmbh")]
     [InlineData("  Führende   Technik  ", "fuhrende-technik")]
     [InlineData("ACME", "acme")]
-    [InlineData("株式会社", Slug.Rueckfall)]
-    [InlineData("", Slug.Rueckfall)]
-    [InlineData("---", Slug.Rueckfall)]
-    public void A_name_becomes_a_slug(string name, string erwartet)
+    [InlineData("株式会社", Slug.Fallback)]
+    [InlineData("", Slug.Fallback)]
+    [InlineData("---", Slug.Fallback)]
+    public void A_name_becomes_a_slug(string name, string expected)
     {
-        Slug.Aus(name).Should().Be(erwartet);
+        Slug.From(name).Should().Be(expected);
     }
 
-    /// <summary>Ein Kürzel endet nie auf einem Trennstrich.</summary>
+    /// <summary>A slug never ends on a hyphen.</summary>
     /// <remarks>
-    /// Der Zähler hängt <c>-2</c> an; ein Kürzel, das schon auf einen
-    /// Trennstrich endet, ergäbe <c>marke--2</c>.
+    /// The counter appends <c>-2</c>; a slug that already ends on a hyphen
+    /// would yield <c>marke--2</c>.
     /// </remarks>
     [Fact]
     public void A_truncated_slug_does_not_end_on_a_hyphen()
     {
-        var sehrLang = string.Join(" ", Enumerable.Repeat("wort", 40));
+        var veryLong = string.Join(" ", Enumerable.Repeat("wort", 40));
 
-        var slug = Slug.Aus(sehrLang);
+        var slug = Slug.From(veryLong);
 
-        slug.Length.Should().BeLessThanOrEqualTo(Slug.Hoechstlaenge);
+        slug.Length.Should().BeLessThanOrEqualTo(Slug.MaxLength);
         slug.Should().NotEndWith("-");
         slug.Should().NotStartWith("-");
     }

@@ -1,18 +1,18 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Companies.Application.Nachrichten;
+using WorkerTransfer.Companies.Application.Messages;
 using WorkerTransfer.Companies.Domain.EmployerProfiles;
 
-namespace WorkerTransfer.Companies.Application.Profile;
+namespace WorkerTransfer.Companies.Application.Profiles;
 
-/// <summary>Das eigene EmployerProfile schreiben.</summary>
+/// <summary>Writes the company's own employer profile.</summary>
 /// <remarks>
-/// <strong>Jedes Mitglied darf das</strong> — dieselbe Abwägung wie bei den
-/// Jobs. Das Rollensystem kennt zwei Rollen, und <c>admin</c> heißt
-/// „verwaltet die Mannschaft"; Inhalte sind die Arbeit der Mitglieder.
+/// <strong>Every member may do this</strong> — the same weighing as with the
+/// job adverts. The role system knows two roles, and <c>admin</c> means
+/// "manages the team"; content is the members' work.
 /// </remarks>
 public sealed record SaveProfileCommand(
-    TenantId Firma,
+    TenantId Company,
     string DisplayName,
     string About,
     string? Website,
@@ -22,10 +22,10 @@ public sealed record SaveProfileCommand(
     string? PostalCode = null,
     string? City = null,
     string? Country = null,
-    string? Phone = null) : IBefehl<EmployerProfile>;
+    string? Phone = null) : ICommandMessage<EmployerProfile>;
 
-/// <summary>Legt an oder ändert — und vergibt das Kürzel genau einmal.</summary>
-public sealed class SaveProfileHandler(IProfileStore store, TimeProvider uhr)
+/// <summary>Creates or changes — and assigns the slug exactly once.</summary>
+public sealed class SaveProfileHandler(IProfileStore store, TimeProvider clock)
     : IRequestHandler<SaveProfileCommand, EmployerProfile>
 {
     /// <inheritdoc />
@@ -35,33 +35,33 @@ public sealed class SaveProfileHandler(IProfileStore store, TimeProvider uhr)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var now = uhr.GetUtcNow();
-        var vorhanden = await store.GetAsync(request.Firma, cancellationToken);
+        var now = clock.GetUtcNow();
+        var existing = await store.GetAsync(request.Company, cancellationToken);
         EmployerProfile profile;
 
-        if (vorhanden is null)
+        if (existing is null)
         {
-            // Das Kürzel entsteht genau einmal, beim ersten Speichern. Danach
-            // folgt es dem Anzeigenamen nicht mehr — sonst bräche jeder
-            // geteilte Link auf die Karriere-Seite.
+            // The slug comes into being exactly once, at the first save. After
+            // that it no longer follows the display name — otherwise every
+            // shared link to the careers page would break.
             var slug = await store.FreeSlugAsync(
-                Domain.EmployerProfiles.Slug.Aus(request.DisplayName), cancellationToken);
+                Domain.EmployerProfiles.Slug.From(request.DisplayName), cancellationToken);
 
             profile = EmployerProfile.Create(
-                request.Firma, slug, request.DisplayName, request.About,
+                request.Company, slug, request.DisplayName, request.About,
                 request.Website, request.Locations, request.Benefits, now,
                 request.Line1, request.PostalCode, request.City, request.Country,
                 request.Phone);
         }
         else
         {
-            vorhanden.Change(
+            existing.Change(
                 request.DisplayName, request.About, request.Website,
                 request.Locations, request.Benefits, now,
                 request.Line1, request.PostalCode, request.City, request.Country,
                 request.Phone);
 
-            profile = vorhanden;
+            profile = existing;
         }
 
         await store.SaveAsync(profile, cancellationToken);

@@ -1,7 +1,7 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Companies.Api.Berechtigung;
-using WorkerTransfer.Companies.Application.Profile;
+using WorkerTransfer.Companies.Api.Authorization;
+using WorkerTransfer.Companies.Application.Profiles;
 using WorkerTransfer.Companies.Contracts;
 using WorkerTransfer.Companies.Domain.EmployerProfiles;
 using WorkerTransfer.ServiceDefaults;
@@ -9,16 +9,16 @@ using WorkerTransfer.ServiceDefaults.Roles;
 
 namespace WorkerTransfer.Companies.Api;
 
-/// <summary>Die vier Routen des Arbeitgeberprofils.</summary>
+/// <summary>The four routes of the employer profile.</summary>
 /// <remarks>
-/// Drei davon brauchen keine Anmeldung, und das ist der Zweck: ein
-/// EmployerProfile ist die Selbstdarstellung eines Unternehmens: es hinter
-/// eine Anmeldung zu legen wäre das Gegenteil — genau wie bei den Jobs.
+/// Three of them need no sign-in, and that is the purpose: an employer profile
+/// is how a company presents itself, so putting it behind a sign-in would be
+/// the opposite — exactly as with the job adverts.
 /// </remarks>
 public static class EmployerEndpoints
 {
-    /// <summary>Bildet alle Routen dieses Dienstes ab.</summary>
-    public static IEndpointRouteBuilder MapArbeitgeberEndpoints(this IEndpointRouteBuilder app)
+    /// <summary>Maps all routes of this service.</summary>
+    public static IEndpointRouteBuilder MapEmployerEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
@@ -27,11 +27,11 @@ public static class EmployerEndpoints
         companies.MapPut("/me/profile", async (
             WriteEmployerProfileV1 body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (await Firma(context, akteur) is not { } company)
+            if (await Company(context, principal) is not { } company)
             {
                 return;
             }
@@ -47,7 +47,7 @@ public static class EmployerEndpoints
                         body.Line1, body.PostalCode, body.City, body.Country, body.Phone),
                     cancellationToken);
 
-                await context.Response.WriteAsJsonAsync(Antwort(profile), cancellationToken);
+                await context.Response.WriteAsJsonAsync(Response(profile), cancellationToken);
             }
             catch (ProfileError error)
             {
@@ -56,21 +56,21 @@ public static class EmployerEndpoints
                     "Request failed", error.Message);
             }
         })
-        // Das Schaufenster steht oeffentlich und spricht fuer alle Mitglieder —
-        // es zu schreiben verlangt deshalb einen `admin`. Aufgeloest aus der
-        // Mitgliedschaftstabelle von identity-service, nie aus dem Token.
+        // The shop window stands publicly and speaks for every member — writing
+        // it therefore demands an `admin`. Resolved from identity-service's
+        // membership table, never from the token.
         .RequireAuthorization(
-            AdminPermissionExtensions.Richtlinie(ShopWindowPermissions.Schreiben));
+            AdminPermissionExtensions.Richtlinie(ShopWindowPermissions.Write));
 
-        // `null` statt 404: „noch keins" ist ein Zustand, kein Fehler. Die
-        // Oberfläche zeigt darauf ein leeres Formular.
+        // `null` instead of 404: "none yet" is a state, not an error. The
+        // interface shows an empty form for it.
         companies.MapGet("/me/profile", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (await Firma(context, akteur) is not { } company)
+            if (await Company(context, principal) is not { } company)
             {
                 return;
             }
@@ -78,15 +78,15 @@ public static class EmployerEndpoints
             var profile = await mediator.Send(new MyProfileQuery(company), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                profile is null ? null : Antwort(profile), cancellationToken);
+                profile is null ? null : Response(profile), cancellationToken);
         });
 
-        // Die Reihenfolge zu den beiden Routen darunter ist hier gleichgültig —
-        // gemessen, nicht angenommen: `{tenantId:guid}` trägt eine Einschränkung,
-        // an der `by-slug` nie vorbeikommt. Der Python-Dienst musste diese Route
-        // nach vorn ziehen, weil FastAPI nach Deklarationsreihenfolge trifft;
-        // diese Begründung mitzukopieren hieße, einen Satz stehen zu lassen, der
-        // hier falsch ist.
+        // The order relative to the two routes below does not matter here —
+        // measured, not assumed: `{tenantId:guid}` carries a constraint that
+        // `by-slug` can never get past. The Python service had to pull this
+        // route forward because FastAPI matches by declaration order; copying
+        // that reason along would mean leaving a sentence standing that is
+        // wrong here.
         companies.MapGet("/by-slug/{slug}", async (
             string slug,
             IMediator mediator,
@@ -96,13 +96,13 @@ public static class EmployerEndpoints
             var profile = await mediator.Send(
                 new ProfileBySlugQuery(slug), cancellationToken);
 
-            await Beantworte(context, profile, fehltIst404: true, cancellationToken);
+            await Answer(context, profile, missingIs404: true, cancellationToken);
         });
 
-        // Öffentlich, ohne Anmeldung. 404, solange nichts angelegt wurde — dann
-        // bleibt eine Job anonym. Ein Profile zu erzwingen, bevor jemand
-        // ausschreiben darf, wäre eine Kopplung zwischen zwei Diensten für eine
-        // Regel, die niemand verlangt hat.
+        // Public, without a sign-in. 404 for as long as nothing was created —
+        // then a company stays anonymous. Forcing a profile before anybody may
+        // advertise would be a coupling between two services for a rule nobody
+        // asked for.
         companies.MapGet("/{tenantId:guid}/profile", async (
             Guid tenantId,
             IMediator mediator,
@@ -112,16 +112,16 @@ public static class EmployerEndpoints
             var profile = await mediator.Send(
                 new PublicProfileQuery(new TenantId(tenantId)), cancellationToken);
 
-            await Beantworte(context, profile, fehltIst404: false, cancellationToken);
+            await Answer(context, profile, missingIs404: false, cancellationToken);
         });
 
         return app;
     }
 
-    /// <summary>Die Firma des Aufrufers, oder eine schon geschriebene Absage.</summary>
-    private static async Task<TenantId?> Firma(HttpContext context, ICurrentPrincipal akteur)
+    /// <summary>The caller's company, or a refusal already written.</summary>
+    private static async Task<TenantId?> Company(HttpContext context, ICurrentPrincipal principal)
     {
-        if (akteur.Current is not { } handelnder)
+        if (principal.Current is not { } actor)
         {
             await ProblemDetailsMiddleware.Write(
                 context, StatusCodes.Status401Unauthorized,
@@ -130,10 +130,10 @@ public static class EmployerEndpoints
             return null;
         }
 
-        if (handelnder.Acting is not Capacity.ForCompany company)
+        if (actor.Acting is not Capacity.ForCompany company)
         {
-            // Eine Aussage über den Aufrufer, nicht über ein fremdes
-            // Unternehmen: eine Privatperson weiß, dass sie keines ist.
+            // A statement about the caller, not about somebody else's company:
+            // a private person knows that they are not one.
             await ProblemDetailsMiddleware.Write(
                 context, StatusCodes.Status403Forbidden,
                 "Request failed", "editing a company profile requires an active company");
@@ -144,17 +144,17 @@ public static class EmployerEndpoints
         return company.Tenant;
     }
 
-    private static async Task Beantworte(
+    private static async Task Answer(
         HttpContext context,
         EmployerProfile? profile,
-        bool fehltIst404,
+        bool missingIs404,
         CancellationToken cancellationToken)
     {
         if (profile is null)
         {
-            // Kürzel: die Adresse selbst behauptet eine Firma. Tenant-Id:
-            // die Job ist anonym, 200 null — sonst loggt /jobs jede Karte.
-            if (fehltIst404)
+            // Slug: the address itself asserts a company. Tenant id: the
+            // company is anonymous, 200 null — otherwise /jobs logs every card.
+            if (missingIs404)
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
@@ -166,11 +166,11 @@ public static class EmployerEndpoints
             return;
         }
 
-        await context.Response.WriteAsJsonAsync(Antwort(profile), cancellationToken);
+        await context.Response.WriteAsJsonAsync(Response(profile), cancellationToken);
     }
 
-    private static EmployerProfileV1 Antwort(EmployerProfile profile) =>
-        new(profile.Firma.Value,
+    private static EmployerProfileV1 Response(EmployerProfile profile) =>
+        new(profile.Company.Value,
             profile.Slug,
             profile.DisplayName,
             profile.About,

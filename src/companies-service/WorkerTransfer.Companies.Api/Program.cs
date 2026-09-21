@@ -1,27 +1,27 @@
 using WorkerTransfer.Companies.Api;
-using WorkerTransfer.Companies.Api.Berechtigung;
+using WorkerTransfer.Companies.Api.Authorization;
 using WorkerTransfer.Companies.Infrastructure;
 using WorkerTransfer.Companies.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.ServiceDefaults.Roles;
 
-// Konfiguration aus der EnvironmentFile. VOR CreateBuilder, weil der
-// Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
-// geladen hiesse geladen und von niemandem gelesen.
+// Configuration out of the .env file. BEFORE CreateBuilder, because the
+// configuration builder reads the environment variables exactly once — loaded
+// afterwards would mean loaded and read by nobody.
 WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 const string serviceName = "companies-service";
 
-// Kein AsIssuer(): nur identity-service hält die private Hälfte.
+// No AsIssuer(): only identity-service holds the private half.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName);
 
-// Das EmployerProfile ist die Selbstdarstellung des Unternehmens und steht
-// oeffentlich — es zu schreiben verlangt einen `admin`. Wer das ist, entscheidet
-// die MITGLIEDSCHAFTSTABELLE von identity-service, je ResumeRequest: eine Rolle im
-// Token wirkte nach einer Entfernung erst beim Ablauf.
-builder.Services.AddAdminrechte(builder.Configuration, ShopWindowPermissions.Schreiben);
+// The employer profile is how the company presents itself and stands
+// publicly — writing it demands an `admin`. Who that is, the MEMBERSHIP TABLE
+// of identity-service decides, per request: a role in the token would take
+// effect after a removal only at expiry.
+builder.Services.AddAdminrechte(builder.Configuration, ShopWindowPermissions.Write);
 
 builder.Services.AddCompaniesInfrastructure(
     builder.Configuration,
@@ -30,19 +30,19 @@ builder.Services.AddCompaniesInfrastructure(
 
 var app = builder.Build();
 
-// Erst wandern, dann bedienen (ADR-0010).
+// Migrate first, serve second (ADR-0010).
 await app.MigrateSchemaAsync<CompaniesDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
-app.MapArbeitgeberEndpoints();
+app.MapEmployerEndpoints();
 
-// Kein MapLoeschEndpoints(): dieser Dienst hält nichts über einen natürlichen
-// Menschen und steht deshalb nicht in `ErasureRecipient.Fremde` (ADR-0027 §2).
-// Ein Löschendpunkt hier wäre einer, der „erledigt" sagt, ohne je etwas getan
-// zu haben.
+// No MapErasureEndpoints(): this service holds nothing about a natural person
+// and therefore does not stand in `ErasureRecipient.Fremde` (ADR-0027 §2). An
+// erasure endpoint here would be one that says "done" without ever having done
+// anything.
 
 await app.RunAsync();
 
-/// <summary>Benennt den Einstiegspunkt für den Testwirt.</summary>
+/// <summary>Names the entry point for the test host.</summary>
 public partial class Program;

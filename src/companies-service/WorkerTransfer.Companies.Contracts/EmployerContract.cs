@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace WorkerTransfer.Companies.Contracts;
 
-/// <summary>Ein EmployerProfile, wie es gelesen wird.</summary>
+/// <summary>An employer profile as it is read.</summary>
 public sealed record EmployerProfileV1(
     [property: JsonPropertyName("tenant_id")] Guid TenantId,
     [property: JsonPropertyName("slug")] string Slug,
@@ -18,12 +18,13 @@ public sealed record EmployerProfileV1(
     [property: JsonPropertyName("phone")] string Phone,
     [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt);
 
-/// <summary>Ein EmployerProfile, wie es geschrieben wird.</summary>
+/// <summary>An employer profile as it is written.</summary>
 /// <remarks>
-/// Ohne <c>tenant_id</c> — wem das Profile gehört, steht im geprüften Token —
-/// und ohne <c>slug</c>: das Kürzel vergibt der Server beim ersten Speichern
-/// und ändert es danach nie. Ein Feld dafür wäre eine Einladung, fremde Namen
-/// zu besetzen, und jede spätere Änderung bräche einen geteilten Link.
+/// Without <c>tenant_id</c> — whom the profile belongs to stands in the
+/// verified token — and without <c>slug</c>: the server assigns the slug at
+/// the first save and never changes it afterwards. A field for it would be an
+/// invitation to occupy somebody else's name, and every later change would
+/// break a shared link.
 /// </remarks>
 public sealed record WriteEmployerProfileV1(
     [property: JsonPropertyName("display_name")] string DisplayName,
