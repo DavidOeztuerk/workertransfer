@@ -66,18 +66,18 @@ public static class KeyRing
         // PersistKeysTo*/ProtectKeysWith* overloads take instances, and these
         // two need services that only stand after this call.
         services.AddSingleton<IConfigureOptions<KeyManagementOptions>>(
-            provider => new Schluesselstellung(provider));
+            provider => new KeyRingConnection(provider));
 
         return services;
     }
 
-    private sealed class Schluesselstellung(IServiceProvider provider)
+    private sealed class KeyRingConnection(IServiceProvider provider)
         : IConfigureOptions<KeyManagementOptions>
     {
-        public void Configure(KeyManagementOptions optionen)
+        public void Configure(KeyManagementOptions options)
         {
-            optionen.XmlRepository = provider.GetRequiredService<IXmlRepository>();
-            optionen.XmlEncryptor = provider.GetRequiredService<IXmlEncryptor>();
+            options.XmlRepository = provider.GetRequiredService<IXmlRepository>();
+            options.XmlEncryptor = provider.GetRequiredService<IXmlEncryptor>();
         }
     }
 }
@@ -93,7 +93,7 @@ public static class KeyRing
 internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRepository
     where TKontext : DbContext
 {
-    private const string Tabelle = "dataprotection_schluessel";
+    private const string Table = "dataprotection_schluessel";
 
     private readonly Lock _riegel = new();
     private bool _angelegt;
@@ -103,12 +103,12 @@ internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRe
     {
         var elemente = new List<XElement>();
 
-        Mit(connection =>
+        WithConnection(connection =>
         {
-            using var befehl = connection.CreateCommand();
-            befehl.CommandText = $"SELECT inhalt FROM {Tabelle}";
+            using var command = connection.CreateCommand();
+            command.CommandText = $"SELECT inhalt FROM {Table}";
 
-            using var leser = befehl.ExecuteReader();
+            using var leser = command.ExecuteReader();
 
             while (leser.Read())
             {
@@ -134,20 +134,20 @@ internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRe
             ? Guid.NewGuid().ToString()
             : friendlyName;
 
-        Mit(connection =>
+        WithConnection(connection =>
         {
-            using var befehl = connection.CreateCommand();
-            befehl.CommandText =
-                $"INSERT INTO {Tabelle} (name, inhalt) VALUES (@name, @inhalt) "
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                $"INSERT INTO {Table} (name, inhalt) VALUES (@name, @inhalt) "
                 + "ON CONFLICT (name) DO UPDATE SET inhalt = EXCLUDED.inhalt";
 
-            Gib(befehl, "@name", name);
-            Gib(befehl, "@inhalt", element.ToString(SaveOptions.DisableFormatting));
-            befehl.ExecuteNonQuery();
+            Bind(command, "@name", name);
+            Bind(command, "@inhalt", element.ToString(SaveOptions.DisableFormatting));
+            command.ExecuteNonQuery();
         });
     }
 
-    private void Mit(Action<DbConnection> was)
+    private void WithConnection(Action<DbConnection> work)
     {
         using var scope = provider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TKontext>();
@@ -159,7 +159,7 @@ internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRe
         }
 
         Job(connection);
-        was(connection);
+        work(connection);
     }
 
     /// <summary>Creates the table, if it does not exist yet.</summary>
@@ -172,24 +172,24 @@ internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRe
                 return;
             }
 
-            using var befehl = connection.CreateCommand();
-            befehl.CommandText =
-                $"CREATE TABLE IF NOT EXISTS {Tabelle} ("
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                $"CREATE TABLE IF NOT EXISTS {Table} ("
                 + "name text PRIMARY KEY, "
                 + "inhalt text NOT NULL, "
                 + "angelegt timestamptz NOT NULL DEFAULT now())";
 
-            befehl.ExecuteNonQuery();
+            command.ExecuteNonQuery();
             _angelegt = true;
         }
     }
 
-    private static void Gib(DbCommand befehl, string name, string value)
+    private static void Bind(DbCommand command, string name, string value)
     {
-        var parameter = befehl.CreateParameter();
+        var parameter = command.CreateParameter();
         parameter.ParameterName = name;
         parameter.Value = value;
-        befehl.Parameters.Add(parameter);
+        command.Parameters.Add(parameter);
     }
 }
 
@@ -203,18 +203,18 @@ internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRe
 internal sealed class MasterKeyEnvelope(SecretStore store)
     : IXmlEncryptor, IXmlDecryptor
 {
-    private const string Huelle = "wtGeschuetzterSchluessel";
+    private const string Envelope = "wtGeschuetzterSchluessel";
 
     /// <inheritdoc />
     public EncryptedXmlInfo Encrypt(XElement plaintextElement)
     {
         ArgumentNullException.ThrowIfNull(plaintextElement);
 
-        var huelle = new XElement(
-            Huelle,
+        var envelope = new XElement(
+            Envelope,
             store.Encrypt(plaintextElement.ToString(SaveOptions.DisableFormatting)));
 
-        return new EncryptedXmlInfo(huelle, typeof(MasterKeyEnvelope));
+        return new EncryptedXmlInfo(envelope, typeof(MasterKeyEnvelope));
     }
 
     /// <inheritdoc />
@@ -227,11 +227,11 @@ internal sealed class MasterKeyEnvelope(SecretStore store)
     {
         ArgumentNullException.ThrowIfNull(encryptedElement);
 
-        var klartext = store.Decrypt(encryptedElement.Value)
+        var plainText = store.Decrypt(encryptedElement.Value)
             ?? throw new InvalidOperationException(
                 "Ein Schlüssel des Bundes lässt sich nicht entschlüsseln. Das "
                 + $"passiert, wenn {SecretStore.Variable} gewechselt wurde.");
 
-        return XElement.Parse(klartext);
+        return XElement.Parse(plainText);
     }
 }

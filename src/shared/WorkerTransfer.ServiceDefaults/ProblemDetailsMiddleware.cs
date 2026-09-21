@@ -30,7 +30,7 @@ public sealed class ProblemDetailsMiddleware(
         {
             await next(context);
         }
-        catch (FluentValidation.ValidationException ungueltig)
+        catch (FluentValidation.ValidationException invalid)
         {
             // THE STAGE IS ARMED, ONLY EMPTY.
             //
@@ -40,7 +40,7 @@ public sealed class ProblemDetailsMiddleware(
             // none. Whoever writes the first one would, without this branch,
             // get a 500 for an input the caller got wrong.
             //
-            // 422 and not 400: the body was readable, its content is not.
+            // 422 and not 400: the body work readable, its content is not.
             // Exactly the distinction the hand-written checks at the endpoints
             // already make.
             //
@@ -51,7 +51,7 @@ public sealed class ProblemDetailsMiddleware(
             // and bug reports. A field name is shape, not content.
             var fields = string.Join(
                 ", ",
-                ungueltig.Errors.Select(error => error.PropertyName)
+                invalid.Errors.Select(error => error.PropertyName)
                     .Where(name => !string.IsNullOrWhiteSpace(name))
                     .Distinct(StringComparer.Ordinal));
 

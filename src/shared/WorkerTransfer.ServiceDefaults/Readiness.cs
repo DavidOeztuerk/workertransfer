@@ -25,17 +25,17 @@ public static class Readiness
     /// </remarks>
     /// <typeparam name="TKontext">This service's context.</typeparam>
     /// <param name="services">The container.</param>
-    /// <param name="dienstname">Names the entry in the health report.</param>
+    /// <param name="serviceName">Names the entry in the health report.</param>
     /// <returns>The container.</returns>
     public static IServiceCollection AddDatabaseReadiness<TKontext>(
-        this IServiceCollection services, string dienstname)
+        this IServiceCollection services, string serviceName)
         where TKontext : DbContext
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentException.ThrowIfNullOrWhiteSpace(dienstname);
+        ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
 
         services.AddHealthChecks().Add(new HealthCheckRegistration(
-            $"{dienstname}-datenbank",
+            $"{serviceName}-datenbank",
             provider => new DatabaseReadiness(
                 provider.GetRequiredService<TKontext>()),
             HealthStatus.Unhealthy,

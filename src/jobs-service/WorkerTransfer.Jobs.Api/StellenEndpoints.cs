@@ -186,7 +186,7 @@ public static class JobEndpoints
                 // und „50 km" wählt, meint „um Leipzig herum" — und braucht
                 // dafür weder GPS noch die Erlaubnis dazu.
                 ?? (PlaceLookup.Find(null, ort) is { } mitte
-                    ? Umkreis.Aus(mitte.Breite, mitte.Laenge, radius)
+                    ? Umkreis.Aus(mitte.Latitude, mitte.Longitude, radius)
                     : null);
 
             var page = await mediator.Send(
@@ -232,14 +232,14 @@ public static class JobEndpoints
                         && Zahl(context.Request.Query["lon"]) is { } length
                         && breite is >= -90 and <= 90
                         && length is >= -180 and <= 180
-                ? new Ortspunkt(breite, length)
-                : (Ortspunkt?)null;
+                ? new PlacePoint(breite, length)
+                : (PlacePoint?)null;
 
             // Kein Ort in der Naehe ist kein Fehler, sondern eine Auskunft: der
             // Punkt liegt ausserhalb von DE, AT und CH. Ein 404 waere hier
             // irrefuehrend — die Adresse gibt es.
             await context.Response.WriteAsJsonAsync(
-                new { location = punkt is { } p ? PlaceLookup.NaechsterOrt(p) : null },
+                new { location = punkt is { } p ? PlaceLookup.NearestPlace(p) : null },
                 cancellationToken);
         });
 

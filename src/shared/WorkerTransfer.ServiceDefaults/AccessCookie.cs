@@ -28,7 +28,7 @@ public static class AccessCookie
     /// Header first, deliberately: a caller that went to the trouble of sending
     /// one means it, and a stale cookie must not quietly win over it.
     /// </remarks>
-    public static JwtBearerOptions AuchAusDemCookie(this JwtBearerOptions options)
+    public static JwtBearerOptions AlsoFromTheCookie(this JwtBearerOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
 

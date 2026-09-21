@@ -151,7 +151,7 @@ public sealed class EfJobStore(JobsDbContext context) : IJobStore
 
             if (umkreis is { } kreis)
             {
-                var mitte = new Ortspunkt(kreis.Breite, kreis.Laenge);
+                var mitte = new PlacePoint(kreis.Breite, kreis.Laenge);
                 var drin = new List<Job>();
 
                 foreach (var job in passend)
@@ -180,7 +180,7 @@ public sealed class EfJobStore(JobsDbContext context) : IJobStore
                         continue;
                     }
 
-                    if (PlaceLookup.EntfernungKm(mitte, target) <= kreis.RadiusKm)
+                    if (PlaceLookup.DistanceKm(mitte, target) <= kreis.RadiusKm)
                     {
                         drin.Add(job);
                     }

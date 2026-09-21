@@ -120,8 +120,8 @@ public sealed record Availability(
     public static Availability Bilde(
         Pendelstufe? stage,
         Anwesenheit? anwesenheit,
-        Ortspunkt? beiDerPerson,
-        Ortspunkt? beiDerStelle)
+        PlacePoint? beiDerPerson,
+        PlacePoint? beiDerStelle)
     {
         if (anwesenheit is null)
         {
@@ -156,7 +156,7 @@ public sealed record Availability(
         }
 
         var limit = Grenze(stage.Value);
-        var entfernung = PlaceLookup.EntfernungKm(person, job);
+        var entfernung = PlaceLookup.DistanceKm(person, job);
 
         return new Availability(
             entfernung <= limit

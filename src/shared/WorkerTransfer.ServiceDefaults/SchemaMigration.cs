@@ -30,7 +30,7 @@ namespace WorkerTransfer.ServiceDefaults;
 public static class SchemaMigration
 {
     /// <summary>The switch in the configuration.</summary>
-    public const string Schluessel = "Datenbank:Wandern";
+    public const string Key = "Datenbank:Wandern";
 
     /// <summary>How long a database that is still starting up is waited for.</summary>
     /// <remarks>
@@ -58,7 +58,7 @@ public static class SchemaMigration
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        if (!app.Configuration.GetValue(Schluessel, defaultValue: true))
+        if (!app.Configuration.GetValue(Key, defaultValue: true))
         {
             return;
         }
@@ -82,7 +82,7 @@ public static class SchemaMigration
                 await context.Database.MigrateAsync();
                 return;
             }
-            catch (Exception error) when (Vorruebergehend(error) && uhr.Elapsed < Geduld)
+            catch (Exception error) when (IsTransient(error) && uhr.Elapsed < Geduld)
             {
                 // The kind of failure, never the connection string: a password
                 // stands in it, and a log is also a place where something ends
@@ -114,7 +114,7 @@ public static class SchemaMigration
     /// has answered at all yet.
     /// </para>
     /// </remarks>
-    private static bool Vorruebergehend(Exception error)
+    private static bool IsTransient(Exception error)
     {
         for (var glied = error; glied is not null; glied = glied.InnerException)
         {

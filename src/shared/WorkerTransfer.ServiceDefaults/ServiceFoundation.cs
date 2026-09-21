@@ -67,14 +67,14 @@ public static class ServiceFoundation
     /// <param name="services">The container.</param>
     /// <param name="configuration">The service's configuration.</param>
     /// <param name="environment">Where it runs.</param>
-    /// <param name="dienstname">What it calls itself in logs and telemetry.</param>
-    /// <param name="weitere">Modules only this service needs.</param>
+    /// <param name="serviceName">What it calls itself in logs and telemetry.</param>
+    /// <param name="additional">Modules only this service needs.</param>
     public static IServiceCollection AddWorkerTransferDefaults(
         this IServiceCollection services,
         IConfiguration configuration,
         IHostEnvironment environment,
-        string dienstname,
-        Action<NoeliaBuilder>? weitere = null)
+        string serviceName,
+        Action<NoeliaBuilder>? additional = null)
     {
         // The input sanitization does NOT look into JSON bodies. Measured, not
         // assumed.
@@ -97,7 +97,7 @@ public static class ServiceFoundation
         // Query string and the two address headers stay checked — that is the
         // surface where a value arrives without a domain validator.
         services.Configure<InputSanitizationOptions>(
-            optionen => optionen.InspectJsonBodies = false);
+            options => options.InspectJsonBodies = false);
 
         // The token comes out of the `Authorization` header OR out of the
         // `access` cookie, and both carriers are needed: service-to-service and
@@ -111,7 +111,7 @@ public static class ServiceFoundation
         // a 401 although the sign-in looks as though it worked.
         services.PostConfigure<JwtBearerOptions>(
             JwtBearerDefaults.AuthenticationScheme,
-            optionen => optionen.AuchAusDemCookie());
+            options => options.AlsoFromTheCookie());
 
         // A refusal by a policy SHORT-CIRCUITS the answer and does not throw —
         // `ProblemDetailsMiddleware` never sees it. Without this line it falls
@@ -143,9 +143,9 @@ public static class ServiceFoundation
         // this container speaks tonight, only it knows itself.
         services.AddEvidence(configuration);
 
-        return services.AddNoelia(configuration, environment, dienstname, girder =>
+        return services.AddNoelia(configuration, environment, serviceName, noelia =>
         {
-            girder
+            noelia
                 .UseDefaults()
                 .Use(NoeliaModule.Principal)
 
@@ -185,8 +185,8 @@ public static class ServiceFoundation
                 // What does NOT stand in the configuration must not go out
                 // either. That is exactly the purpose: a telemetry package with
                 // a built-in default address, an SDK that phones home.
-                .AddSovereignPlatform(souveraen => Deklariere(
-                    souveraen.Allow([.. GerufeneHosts(configuration)]),
+                .AddSovereignPlatform(sovereign => Declare(
+                    sovereign.Allow([.. CalledHosts(configuration)]),
                     configuration))
 
                 // THE OPERATIONS SURFACE, and it replaces seven addresses of
@@ -328,7 +328,7 @@ public static class ServiceFoundation
                     + "hiesse zwei Listen ueber dieselbe Frage. Der "
                     + "Richtlinienanbieter (Authorization) bleibt");
 
-            weitere?.Invoke(girder);
+            additional?.Invoke(noelia);
         });
     }
 
@@ -348,10 +348,10 @@ public static class ServiceFoundation
     private static void ResolveSigningKeys(JwtBuilder jwt, IConfiguration configuration)
     {
         var id = configuration["Jwt:KeyId"];
-        var oeffentlich = configuration["Jwt:PublicKey"];
-        var privat = configuration["Jwt:PrivateKey"];
+        var publicKey = configuration["Jwt:PublicKey"];
+        var privateKey = configuration["Jwt:PrivateKey"];
 
-        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(oeffentlich))
+        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(publicKey))
         {
             throw new InvalidOperationException(
                 "Jwt:KeyId und Jwt:PublicKey sind nicht gesetzt. `make env` würfelt "
@@ -359,13 +359,13 @@ public static class ServiceFoundation
                 + "sie aus der Umgebung.");
         }
 
-        if (string.IsNullOrWhiteSpace(privat))
+        if (string.IsNullOrWhiteSpace(privateKey))
         {
-            jwt.VerifyOnly(oeffentlich, id);
+            jwt.VerifyOnly(publicKey, id);
             return;
         }
 
-        jwt.Issue(privat, id);
+        jwt.Issue(privateKey, id);
     }
 
     /// <summary>
@@ -378,12 +378,12 @@ public static class ServiceFoundation
     /// method has a name of its own all the same, so that a search for it finds
     /// exactly one composition root.
     /// </remarks>
-    /// <param name="girder">This service's builder.</param>
-    public static NoeliaBuilder AsIssuer(this NoeliaBuilder girder)
+    /// <param name="noelia">This service's builder.</param>
+    public static NoeliaBuilder AsIssuer(this NoeliaBuilder noelia)
     {
-        ArgumentNullException.ThrowIfNull(girder);
+        ArgumentNullException.ThrowIfNull(noelia);
 
-        return girder
+        return noelia
             .Use(NoeliaModule.PasswordHashing)
             .Use(NoeliaModule.TokenSessions);
     }
@@ -414,11 +414,11 @@ public static class ServiceFoundation
     /// </remarks>
     /// <param name="app">The application being built.</param>
     /// <param name="environment">Where it runs.</param>
-    /// <param name="dienstname">What it calls itself.</param>
+    /// <param name="serviceName">What it calls itself.</param>
     public static WebApplication UseWorkerTransferDefaults(
         this WebApplication app,
         IHostEnvironment environment,
-        string dienstname)
+        string serviceName)
     {
         ArgumentNullException.ThrowIfNull(app);
 
@@ -436,12 +436,12 @@ public static class ServiceFoundation
         // above therefore takes effect here too — RateLimiting,
         // HttpResponseCaching and PermissionEnforcement fall away by themselves,
         // and their reason stands in exactly one place.
-        app.UseNoelia(environment, dienstname);
+        app.UseNoelia(environment, serviceName);
 
         app.UseNoeliaPrincipal();
         app.UseMiddleware<ProblemDetailsMiddleware>();
 
-        BerichteZusammensetzung(app, dienstname);
+        ReportComposition(app, serviceName);
 
         return app;
     }
@@ -454,22 +454,22 @@ public static class ServiceFoundation
     /// under the configuration key, so that the report says <em>what for</em> a
     /// host is called.
     /// </remarks>
-    private static SovereignPlatformBuilder Deklariere(
-        SovereignPlatformBuilder souveraen, IConfiguration configuration)
+    private static SovereignPlatformBuilder Declare(
+        SovereignPlatformBuilder sovereign, IConfiguration configuration)
     {
-        foreach (var (key, address) in GerufeneZiele(configuration))
+        foreach (var (key, address) in CalledDestinations(configuration))
         {
-            souveraen.DeclareDependency(key, address);
+            sovereign.DeclareDependency(key, address);
         }
 
-        return souveraen;
+        return sovereign;
     }
 
     /// <summary>Configuration key and address of every destination called.</summary>
-    private static IEnumerable<(string Schluessel, string Adresse)> GerufeneZiele(
+    private static IEnumerable<(string Key, string Address)> CalledDestinations(
         IConfiguration configuration) =>
         configuration.AsEnumerable()
-            .Where(entry => !Horchadresse(entry.Key)
+            .Where(entry => !IsListenAddress(entry.Key)
                               && !string.IsNullOrWhiteSpace(entry.Value)
                               && Uri.TryCreate(entry.Value, UriKind.Absolute, out var target)
                               && (target.Scheme == Uri.UriSchemeHttp
@@ -479,7 +479,7 @@ public static class ServiceFoundation
             .OrderBy(entry => entry.Key, StringComparer.Ordinal);
 
     /// <summary>Where this service listens — not a destination it calls.</summary>
-    private static bool Horchadresse(string key) =>
+    private static bool IsListenAddress(string key) =>
         key.Contains("URLS", StringComparison.OrdinalIgnoreCase)
         || key.StartsWith("Kestrel", StringComparison.OrdinalIgnoreCase);
 
@@ -504,7 +504,7 @@ public static class ServiceFoundation
     /// exactly what a sovereignty report exists to surface; leaving it in the
     /// code would mean hiding it from that report.</para>
     /// </remarks>
-    private static IReadOnlyList<string> GerufeneHosts(IConfiguration configuration) =>
+    private static IReadOnlyList<string> CalledHosts(IConfiguration configuration) =>
     [
         .. configuration.AsEnumerable()
             .Select(entry => entry.Value)
@@ -541,18 +541,18 @@ public static class ServiceFoundation
     /// <para>No value travels into the log along the way: a module name is an
     /// enumeration, a reason a sentence we wrote ourselves.</para>
     /// </remarks>
-    private static void BerichteZusammensetzung(WebApplication app, string dienstname)
+    private static void ReportComposition(WebApplication app, string serviceName)
     {
-        var zusammensetzung = app.Services.GetService<NoeliaComposition>();
+        var composition = app.Services.GetService<NoeliaComposition>();
 
-        if (zusammensetzung is null)
+        if (composition is null)
         {
             // Do not throw: the report is information, not a promise. A
             // service that fails to start over a missing piece of information
             // trades a small problem for a big one.
             app.Logger.LogWarning(
                 "Noelia meldet keine Zusammensetzung für {Dienst} — der Bericht bleibt leer",
-                dienstname);
+                serviceName);
 
             return;
         }
@@ -564,15 +564,15 @@ public static class ServiceFoundation
         // number could not show the difference it existed to report.
         app.Logger.LogInformation(
             "Noelia für {Dienst}: {Gefuehrt} Module in Betrieb ({Module}), {Ausgelassen} ausgelassen",
-            dienstname,
-            zusammensetzung.Included.Count,
-            string.Join(", ", zusammensetzung.Included),
-            zusammensetzung.Excluded.Count);
+            serviceName,
+            composition.Included.Count,
+            string.Join(", ", composition.Included),
+            composition.Excluded.Count);
 
-        foreach (var (modul, reason) in zusammensetzung.Excluded)
+        foreach (var (module, reason) in composition.Excluded)
         {
             app.Logger.LogInformation(
-                "Noelia-Modul {Modul} nicht in Betrieb: {Grund}", modul, reason);
+                "Noelia-Modul {Modul} nicht in Betrieb: {Grund}", module, reason);
         }
     }
 }

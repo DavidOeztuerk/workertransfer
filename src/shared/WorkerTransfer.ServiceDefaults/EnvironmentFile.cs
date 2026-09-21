@@ -35,30 +35,30 @@ namespace WorkerTransfer.ServiceDefaults;
 public static class EnvironmentFile
 {
     /// <summary>The name of the file without an environment part.</summary>
-    public const string Datei = ".env";
+    public const string FileName = ".env";
 
     /// <summary>
     /// Loads <c>.env.&lt;environment&gt;</c>, otherwise <c>.env</c>, otherwise
     /// nothing.
     /// </summary>
-    /// <param name="verzeichnis">
+    /// <param name="directory">
     /// Where to look. Without a value, the working directory — that is, what a
     /// service sees at startup. The parameter exists for the test: changing the
     /// working directory is process-wide and topples suites running in
     /// parallel.
     /// </param>
-    /// <returns>Which file was loaded, or <c>null</c>.</returns>
-    public static string? Load(string? verzeichnis = null)
+    /// <returns>Which file work loaded, or <c>null</c>.</returns>
+    public static string? Load(string? directory = null)
     {
-        var umgebung =
+        var environment =
             (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development")
             .ToLowerInvariant();
 
-        var wo = verzeichnis ?? Directory.GetCurrentDirectory();
+        var where = directory ?? Directory.GetCurrentDirectory();
 
-        foreach (var name in new[] { $"{Datei}.{umgebung}", Datei })
+        foreach (var name in new[] { $"{FileName}.{environment}", FileName })
         {
-            var kandidat = Path.Combine(wo, name);
+            var kandidat = Path.Combine(where, name);
 
             if (!File.Exists(kandidat))
             {

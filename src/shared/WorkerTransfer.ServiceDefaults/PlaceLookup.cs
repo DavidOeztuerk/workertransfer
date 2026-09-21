@@ -5,9 +5,9 @@ using System.Text;
 namespace WorkerTransfer.ServiceDefaults;
 
 /// <summary>A point on the earth.</summary>
-/// <param name="Breite">Latitude in decimal degrees.</param>
-/// <param name="Laenge">Longitude in decimal degrees.</param>
-public readonly record struct Ortspunkt(double Breite, double Laenge);
+/// <param name="Latitude">Latitude in decimal degrees.</param>
+/// <param name="Longitude">Longitude in decimal degrees.</param>
+public readonly record struct PlacePoint(double Latitude, double Longitude);
 
 /// <summary>
 /// Translates a postcode or a place name into coordinates — out of a table
@@ -25,7 +25,7 @@ public readonly record struct Ortspunkt(double Breite, double Laenge);
 /// <strong>The coverage is complete all the same</strong>, because the data are
 /// small enough to ship: <c>Postleitzahlen.txt</c> holds every postcode and
 /// every place of any note in DE, AT and CH (GeoNames, CC BY 4.0 — see
-/// <c>NOTICE.md</c>). Produced by <c>scripts/plz-tabelle.py</c>; whoever wants
+/// <c>NOTICE.md</c>). Produced by <c>scripts/plz-table.py</c>; whoever wants
 /// to refresh it calls the script.
 /// </para>
 ///
@@ -42,25 +42,25 @@ public static class PlaceLookup
 {
     /// <summary>
     /// Up to how many words a location is still split into pieces. See
-    /// <see cref="Teilstuecke"/> — the reason stands there.
+    /// <see cref="Segments"/> — the reason stands there.
     /// </summary>
-    private const int HoechsteWortzahlFuerTeilworte = 3;
+    private const int MaxWordsPerSegment = 3;
 
-    private static readonly Lazy<Tabelle> Geladen = new(Lies, LazyThreadSafetyMode.ExecutionAndPublication);
+    private static readonly Lazy<Table> Loaded = new(Read, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    /// <param name="NachPlz">
+    /// <param name="ByPostalCode">
     /// Postcode to candidates. Several, because AT and CH share the four-digit
     /// range — that is resolved through the place name.
     /// </param>
-    /// <param name="NachName">Normalised place name to point.</param>
-    private sealed record Tabelle(
-        Dictionary<string, List<(Ortspunkt Punkt, string Ort)>> NachPlz,
-        Dictionary<string, Ortspunkt> NachName);
+    /// <param name="ByName">Normalised place name to point.</param>
+    private sealed record Table(
+        Dictionary<string, List<(PlacePoint Point, string Place)>> ByPostalCode,
+        Dictionary<string, PlacePoint> ByName);
 
     /// <summary>Finds the coordinates for a location.</summary>
-    /// <param name="ort">What stands in the advert. Free text.</param>
+    /// <param name="place">What stands in the advert. Free text.</param>
     /// <returns>The point, or <c>null</c> when the place is unknown.</returns>
-    public static Ortspunkt? Find(string? ort) => Find(null, ort);
+    public static PlacePoint? Find(string? place) => Find(null, place);
 
     /// <summary>Finds the coordinates for a postcode and a location.</summary>
     /// <remarks>
@@ -70,73 +70,73 @@ public static class PlaceLookup
     /// decides — and without it such a code stays unknown instead of
     /// Switzerland standing in for Austria.
     /// </remarks>
-    /// <param name="postleitzahl">What stands in the field, or <c>null</c>.</param>
-    /// <param name="ort">What stands in the advert. Free text.</param>
+    /// <param name="postalCode">What stands in the field, or <c>null</c>.</param>
+    /// <param name="place">What stands in the advert. Free text.</param>
     /// <returns>The point, or <c>null</c>.</returns>
-    public static Ortspunkt? Find(string? postleitzahl, string? ort)
+    public static PlacePoint? Find(string? postalCode, string? place)
     {
-        var tabelle = Geladen.Value;
-        var teile = Teilstuecke(ort);
+        var table = Loaded.Value;
+        var segments = Segments(place);
 
-        if (AusPlz(tabelle, postleitzahl, teile) is { } ausFeld)
+        if (FromPostalCode(table, postalCode, segments) is { } fromField)
         {
-            return ausFeld;
+            return fromField;
         }
 
         // The longest hit wins: "Frankfurt am Main" must not get stuck on
         // "Frankfurt", and "Raum Stuttgart" has to find Stuttgart.
-        foreach (var stueck in teile)
+        foreach (var segment in segments)
         {
-            if (tabelle.NachName.TryGetValue(stueck, out var punkt))
+            if (table.ByName.TryGetValue(segment, out var point))
             {
-                return punkt;
+                return point;
             }
 
             // A postcode IN THE MIDDLE of the free text ("10115 Berlin"). Old
             // adverts have no field of their own for it, and denying them their
             // location for that reason would be a gap without a reason.
-            if (stueck.Length is 4 or 5
-                && stueck.All(char.IsAsciiDigit)
-                && AusPlz(tabelle, stueck, teile) is { } ausText)
+            if (segment.Length is 4 or 5
+                && segment.All(char.IsAsciiDigit)
+                && FromPostalCode(table, segment, segments) is { } fromText)
             {
-                return ausText;
+                return fromText;
             }
         }
 
         return null;
     }
 
-    private static Ortspunkt? AusPlz(
-        Tabelle tabelle, string? postleitzahl, IReadOnlyList<string> teile)
+    private static PlacePoint? FromPostalCode(
+        Table table, string? postalCode, IReadOnlyList<string> segments)
     {
-        if (string.IsNullOrWhiteSpace(postleitzahl))
+        if (string.IsNullOrWhiteSpace(postalCode))
         {
             return null;
         }
 
         // "D-10115", "A-1010", "CH-8001": the country prefix is common and is
         // not part of the key.
-        var key = new string([.. postleitzahl.Where(char.IsAsciiDigit)]);
+        var key = new string([.. postalCode.Where(char.IsAsciiDigit)]);
 
         if (key.Length == 0
-            || !tabelle.NachPlz.TryGetValue(key, out var kandidaten))
+            || !table.ByPostalCode.TryGetValue(key, out var candidates))
         {
             return null;
         }
 
-        if (kandidaten.Count == 1)
+        if (candidates.Count == 1)
         {
-            return kandidaten[0].Punkt;
+            return candidates[0].Point;
         }
 
         // Ambiguous — the place name decides. If it does not, it stays
         // unknown: grabbing one of the candidates would be a coin toss between
         // two countries.
-        foreach (var kandidat in kandidaten)
+        foreach (var candidate in candidates)
         {
-            if (teile.Contains(Normalise(kandidat.Ort)))
+            if (segments.Contains(Normalise(candidate.Place)))
             {
-                return kandidat.Punkt;
+                return candidate.Point;
             }
         }
 
@@ -144,7 +144,7 @@ public static class PlaceLookup
     }
 
     /// <summary>The earth's radius, in kilometres.</summary>
-    private const double ErdradiusKm = 6371.0;
+    private const double EarthRadiusKm = 6371.0;
 
     /// <summary>The distance between two points on the earth's surface.</summary>
     /// <remarks>
@@ -155,19 +155,19 @@ public static class PlaceLookup
     /// <param name="a">The one point.</param>
     /// <param name="b">The other.</param>
     /// <returns>The distance in kilometres.</returns>
-    public static double EntfernungKm(Ortspunkt a, Ortspunkt b)
+    public static double DistanceKm(PlacePoint a, PlacePoint b)
     {
-        var dBreite = Bogenmass(b.Breite - a.Breite);
-        var dLaenge = Bogenmass(b.Laenge - a.Laenge);
+        var dLatitude = Radians(b.Latitude - a.Latitude);
+        var dLongitude = Radians(b.Longitude - a.Longitude);
 
-        var h = (Math.Sin(dBreite / 2) * Math.Sin(dBreite / 2))
-                + (Math.Cos(Bogenmass(a.Breite)) * Math.Cos(Bogenmass(b.Breite))
-                   * Math.Sin(dLaenge / 2) * Math.Sin(dLaenge / 2));
+        var h = (Math.Sin(dLatitude / 2) * Math.Sin(dLatitude / 2))
+                + (Math.Cos(Radians(a.Latitude)) * Math.Cos(Radians(b.Latitude))
+                   * Math.Sin(dLongitude / 2) * Math.Sin(dLongitude / 2));
 
-        return ErdradiusKm * 2 * Math.Atan2(Math.Sqrt(h), Math.Sqrt(1 - h));
+        return EarthRadiusKm * 2 * Math.Atan2(Math.Sqrt(h), Math.Sqrt(1 - h));
     }
 
-    private static double Bogenmass(double grad) => grad * Math.PI / 180.0;
+    private static double Radians(double degrees) => degrees * Math.PI / 180.0;
 
     /// <summary>How far a point may at most be from a known place.</summary>
     /// <remarks>
@@ -175,7 +175,7 @@ public static class PlaceLookup
     /// and returning the nearest German place then would be a claim about
     /// somebody's whereabouts that nobody made.
     /// </remarks>
-    private const double HoechsteRueckwaertsEntfernungKm = 50.0;
+    private const double MaxReverseDistanceKm = 50.0;
 
     /// <summary>The nearest known place to a point.</summary>
     /// <remarks>
@@ -191,31 +191,31 @@ public static class PlaceLookup
     /// writing "Munich" into a German form would be silly.
     /// </para>
     /// </remarks>
-    /// <param name="punkt">Where the person stands.</param>
+    /// <param name="point">Where the person stands.</param>
     /// <returns>The place name, or <c>null</c> when nothing lies nearby.</returns>
-    public static string? NaechsterOrt(Ortspunkt punkt)
+    public static string? NearestPlace(PlacePoint point)
     {
-        string? bester = null;
-        var kuerzeste = HoechsteRueckwaertsEntfernungKm;
+        string? best = null;
+        var shortest = MaxReverseDistanceKm;
 
-        foreach (var kandidaten in Geladen.Value.NachPlz.Values)
+        foreach (var candidates in Loaded.Value.ByPostalCode.Values)
         {
-            foreach (var (target, ort) in kandidaten)
+            foreach (var (target, place) in candidates)
             {
-                var entfernung = EntfernungKm(punkt, target);
+                var distance = DistanceKm(point, target);
 
-                if (entfernung < kuerzeste)
+                if (distance < shortest)
                 {
-                    kuerzeste = entfernung;
-                    bester = ort;
+                    shortest = distance;
+                    best = place;
                 }
             }
         }
 
         // "Wien, Innere Stadt" is a district. A location field takes "Wien".
-        var komma = bester?.IndexOf(',');
+        var comma = best?.IndexOf(',');
 
-        return komma is > 0 ? bester![..komma.Value].Trim() : bester;
+        return comma is > 0 ? best![..comma.Value].Trim() : best;
     }
 
     /// <summary>How many postcodes and places the table knows.</summary>
@@ -225,8 +225,8 @@ public static class PlaceLookup
     /// that would look like a radius search finding nothing instead of a
     /// missing file.
     /// </remarks>
-    public static (int Postleitzahlen, int Orte) Umfang() =>
-        (Geladen.Value.NachPlz.Count, Geladen.Value.NachName.Count);
+    public static (int PostalCodes, int Places) Size() =>
+        (Loaded.Value.ByPostalCode.Count, Loaded.Value.ByName.Count);
 
     /// <summary>
     /// Splits a location into the pieces that could be a place name — the
@@ -239,7 +239,7 @@ public static class PlaceLookup
     /// <item>every piece between comma, slash, bracket or colon
     /// ("Berlin, Mitte" → "berlin"; "Standort: München" → "muenchen"),</item>
     /// <item>single word sequences — but ONLY when the piece has at most
-    /// <see cref="HoechsteWortzahlFuerTeilworte"/> words.</item>
+    /// <see cref="MaxWordsPerSegment"/> words.</item>
     /// </list>
     ///
     /// <para>
@@ -264,32 +264,32 @@ public static class PlaceLookup
     /// pass over it per advert would be millions of comparisons for one answer.
     /// </para>
     /// </remarks>
-    private static List<string> Teilstuecke(string? text)
+    private static List<string> Segments(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
             return [];
         }
 
-        var ganz = Normalise(text);
-        var stuecke = new List<string> { ganz };
+        var whole = Normalise(text);
+        var segmentList = new List<string> { whole };
 
-        var abschnitte = ganz.Split([',', '/', '|', '(', ')', ';', ':', '·'],
+        var sections = whole.Split([',', '/', '|', '(', ')', ';', ':', '·'],
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        foreach (var abschnitt in abschnitte)
+        foreach (var section in sections)
         {
-            if (abschnitt != ganz)
+            if (section != whole)
             {
-                stuecke.Add(abschnitt);
+                segmentList.Add(section);
             }
         }
 
-        foreach (var abschnitt in abschnitte)
+        foreach (var section in sections)
         {
-            var words = abschnitt.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var words = section.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-            if (words.Length is < 2 or > HoechsteWortzahlFuerTeilworte)
+            if (words.Length is < 2 or > MaxWordsPerSegment)
             {
                 continue;
             }
@@ -298,67 +298,67 @@ public static class PlaceLookup
             {
                 for (var start = 0; start + length <= words.Length; start++)
                 {
-                    stuecke.Add(string.Join(' ', words, start, length));
+                    segmentList.Add(string.Join(' ', words, start, length));
                 }
             }
         }
 
-        return stuecke;
+        return segmentList;
     }
 
     /// <summary>Lower case, umlauts written out, accents gone.</summary>
     private static string Normalise(string text)
     {
-        var gebaut = new StringBuilder(text.Length);
+        var built = new StringBuilder(text.Length);
 
-        foreach (var zeichen in text.Trim().ToLower(CultureInfo.InvariantCulture))
+        foreach (var character in text.Trim().ToLower(CultureInfo.InvariantCulture))
         {
             // The German special cases first: "ä" becomes "ae" and not "a".
             // Letting them run through the decomposition into base characters
             // would turn "München" into a "munchen", which is no spelling at
             // all.
-            _ = zeichen switch
+            _ = character switch
             {
-                'ä' => gebaut.Append("ae"),
-                'ö' => gebaut.Append("oe"),
-                'ü' => gebaut.Append("ue"),
-                'ß' => gebaut.Append("ss"),
-                _ => gebaut.Append(zeichen)
+                'ä' => built.Append("ae"),
+                'ö' => built.Append("oe"),
+                'ü' => built.Append("ue"),
+                'ß' => built.Append("ss"),
+                _ => built.Append(character)
             };
         }
 
         // And then the rest of the accents — "Genève" and "Geneve" are the
         // same place, and the table does not carry both spellings.
-        var zerlegt = gebaut.ToString().Normalize(NormalizationForm.FormD);
-        var ohne = new StringBuilder(zerlegt.Length);
+        var decomposed = built.ToString().Normalize(NormalizationForm.FormD);
+        var stripped = new StringBuilder(decomposed.Length);
 
-        foreach (var zeichen in zerlegt)
+        foreach (var character in decomposed)
         {
-            if (CharUnicodeInfo.GetUnicodeCategory(zeichen) != UnicodeCategory.NonSpacingMark)
+            if (CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
             {
-                _ = ohne.Append(zeichen);
+                _ = stripped.Append(character);
             }
         }
 
-        return ohne.ToString().Normalize(NormalizationForm.FormC);
+        return stripped.ToString().Normalize(NormalizationForm.FormC);
     }
 
-    private static Tabelle Lies()
+    private static Table Read()
     {
-        var nachPlz = new Dictionary<string, List<(Ortspunkt, string)>>(StringComparer.Ordinal);
-        var nachName = new Dictionary<string, Ortspunkt>(StringComparer.Ordinal);
+        var byPostalCode = new Dictionary<string, List<(PlacePoint, string)>>(StringComparer.Ordinal);
+        var byName = new Dictionary<string, PlacePoint>(StringComparer.Ordinal);
 
-        using var strom = typeof(PlaceLookup).Assembly.GetManifestResourceStream(
+        using var stream = typeof(PlaceLookup).Assembly.GetManifestResourceStream(
             "WorkerTransfer.ServiceDefaults.Postleitzahlen.txt")
             ?? throw new InvalidOperationException(
                 "Postleitzahlen.txt fehlt im Bild. Ohne sie kennt die "
                 + "Umkreissuche keinen einzigen Ort.");
 
-        using var leser = new StreamReader(strom, Encoding.UTF8);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
 
-        var inOrten = false;
+        var inPlaces = false;
 
-        while (leser.ReadLine() is { } row)
+        while (reader.ReadLine() is { } row)
         {
             if (row.Length == 0 || row[0] == '#')
             {
@@ -367,42 +367,42 @@ public static class PlaceLookup
 
             if (row[0] == '[')
             {
-                inOrten = row == "[orte]";
+                inPlaces = row == "[orte]";
                 continue;
             }
 
             var fields = row.Split('\t');
 
-            if (inOrten)
+            if (inPlaces)
             {
-                if (fields.Length >= 3 && Punkt(fields[1], fields[2]) is { } punkt)
+                if (fields.Length >= 3 && Point(fields[1], fields[2]) is { } point)
                 {
                     // Two spellings of the same place yield the same key —
                     // and then the same point already stands there.
-                    nachName[Normalise(fields[0])] = punkt;
+                    byName[Normalise(fields[0])] = point;
                 }
 
                 continue;
             }
 
-            if (fields.Length >= 5 && Punkt(fields[2], fields[3]) is { } target)
+            if (fields.Length >= 5 && Point(fields[2], fields[3]) is { } target)
             {
-                if (!nachPlz.TryGetValue(fields[1], out var list))
+                if (!byPostalCode.TryGetValue(fields[1], out var list))
                 {
                     list = [];
-                    nachPlz[fields[1]] = list;
+                    byPostalCode[fields[1]] = list;
                 }
 
                 list.Add((target, fields[4]));
             }
         }
 
-        return new Tabelle(nachPlz, nachName);
+        return new Table(byPostalCode, byName);
     }
 
-    private static Ortspunkt? Punkt(string breite, string length) =>
-        double.TryParse(breite, NumberStyles.Float, CultureInfo.InvariantCulture, out var b)
+    private static PlacePoint? Point(string latitude, string length) =>
+        double.TryParse(latitude, NumberStyles.Float, CultureInfo.InvariantCulture, out var b)
         && double.TryParse(length, NumberStyles.Float, CultureInfo.InvariantCulture, out var l)
-            ? new Ortspunkt(b, l)
+            ? new PlacePoint(b, l)
             : null;
 }

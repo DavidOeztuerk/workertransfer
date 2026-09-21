@@ -37,8 +37,8 @@ public class OrtskundeTests
         var punkt = PlaceLookup.Find(geschrieben);
 
         punkt.Should().NotBeNull();
-        punkt!.Value.Breite.Should().BeApproximately(52.52, 0.01);
-        punkt.Value.Laenge.Should().BeApproximately(13.405, 0.01);
+        punkt!.Value.Latitude.Should().BeApproximately(52.52, 0.01);
+        punkt.Value.Longitude.Should().BeApproximately(13.405, 0.01);
     }
 
     /// <summary>Umlaute treffen in beiden Schreibweisen.</summary>
@@ -75,7 +75,7 @@ public class OrtskundeTests
     [Fact]
     public void Die_Tabelle_ist_mitgeliefert()
     {
-        var (postleitzahlen, orte) = PlaceLookup.Umfang();
+        var (postleitzahlen, orte) = PlaceLookup.Size();
 
         postleitzahlen.Should().BeGreaterThan(10000);
         orte.Should().BeGreaterThan(10000);
@@ -97,8 +97,8 @@ public class OrtskundeTests
         var punkt = PlaceLookup.Find(plz, "");
 
         punkt.Should().NotBeNull();
-        punkt!.Value.Breite.Should().BeApproximately(breite, 0.05);
-        punkt.Value.Laenge.Should().BeApproximately(length, 0.05);
+        punkt!.Value.Latitude.Should().BeApproximately(breite, 0.05);
+        punkt.Value.Longitude.Should().BeApproximately(length, 0.05);
     }
 
     /// <summary>Eine Grosskunden-Postleitzahl bezeichnet keinen Ort.</summary>
@@ -128,7 +128,7 @@ public class OrtskundeTests
         var ohne = PlaceLookup.Find("1010", "");
 
         wien.Should().NotBeNull();
-        wien!.Value.Breite.Should().BeApproximately(48.21, 0.1);
+        wien!.Value.Latitude.Should().BeApproximately(48.21, 0.1);
         ohne.Should().BeNull();
     }
 
@@ -144,7 +144,7 @@ public class OrtskundeTests
         var punkt = PlaceLookup.Find(null, "10115 Berlin");
 
         punkt.Should().NotBeNull();
-        punkt!.Value.Breite.Should().BeApproximately(52.53, 0.05);
+        punkt!.Value.Latitude.Should().BeApproximately(52.53, 0.05);
     }
 
     /// <summary>Der grosse Ort gewinnt gegen seine Namensvettern.</summary>
@@ -161,7 +161,7 @@ public class OrtskundeTests
         var husum = PlaceLookup.Find("Husum");
 
         husum.Should().NotBeNull();
-        husum!.Value.Breite.Should().BeApproximately(54.49, 0.1);
+        husum!.Value.Latitude.Should().BeApproximately(54.49, 0.1);
 
         PlaceLookup.Find("Neustadt").Should().BeNull();
     }
@@ -181,8 +181,8 @@ public class OrtskundeTests
         var punkt = PlaceLookup.Find(name);
 
         punkt.Should().NotBeNull();
-        punkt!.Value.Breite.Should().BeApproximately(breite, 0.1);
-        punkt.Value.Laenge.Should().BeApproximately(length, 0.1);
+        punkt!.Value.Latitude.Should().BeApproximately(breite, 0.1);
+        punkt.Value.Longitude.Should().BeApproximately(length, 0.1);
     }
 
     /// <summary>Aus Prosa wird kein Ort herausgepflückt.</summary>
@@ -249,7 +249,7 @@ public class OrtskundeTests
 
         // Zehn Prozent Toleranz: die Zahlen sind Stadtmittelpunkte, und keine
         // Umkreissuche hängt an einem Kilometer.
-        PlaceLookup.EntfernungKm(a, b).Should().BeApproximately(sollKm, sollKm * 0.1);
+        PlaceLookup.DistanceKm(a, b).Should().BeApproximately(sollKm, sollKm * 0.1);
     }
 
     /// <summary>Dieselbe Stadt ist null Kilometer weit weg.</summary>
@@ -258,7 +258,7 @@ public class OrtskundeTests
     {
         var berlin = PlaceLookup.Find("Berlin")!.Value;
 
-        PlaceLookup.EntfernungKm(berlin, berlin).Should().BeApproximately(0, 0.001);
+        PlaceLookup.DistanceKm(berlin, berlin).Should().BeApproximately(0, 0.001);
     }
 
     /// <summary>Unvollständiges ergibt keinen Filter, kein halbes Ergebnis.</summary>

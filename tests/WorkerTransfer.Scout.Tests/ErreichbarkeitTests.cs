@@ -21,10 +21,10 @@ namespace WorkerTransfer.Scout.Tests;
 /// </remarks>
 public class ErreichbarkeitTests
 {
-    private static readonly Ortspunkt? Berlin = PlaceLookup.Find("Berlin");
-    private static readonly Ortspunkt? Potsdam = PlaceLookup.Find("Potsdam");
-    private static readonly Ortspunkt? Wittenberg = PlaceLookup.Find("Wittenberg");
-    private static readonly Ortspunkt? Muenchen = PlaceLookup.Find("München");
+    private static readonly PlacePoint? Berlin = PlaceLookup.Find("Berlin");
+    private static readonly PlacePoint? Potsdam = PlaceLookup.Find("Potsdam");
+    private static readonly PlacePoint? Wittenberg = PlaceLookup.Find("Wittenberg");
+    private static readonly PlacePoint? Muenchen = PlaceLookup.Find("München");
 
     /// <summary>Die Ortstabelle kennt diese vier — sonst prüft nichts hier etwas.</summary>
     [Fact]
@@ -38,9 +38,9 @@ public class ErreichbarkeitTests
         // Und die Entfernungen sind die, mit denen die Faelle unten rechnen.
         // Ohne diese drei Zeilen waere jeder Fall unten eine Annahme ueber die
         // Ortstabelle — und genau daran ist der erste Entwurf gescheitert.
-        PlaceLookup.EntfernungKm(Berlin!.Value, Potsdam!.Value).Should().BeInRange(20, 35);
-        PlaceLookup.EntfernungKm(Berlin.Value, Wittenberg!.Value).Should().BeInRange(70, 99);
-        PlaceLookup.EntfernungKm(Berlin.Value, Muenchen!.Value).Should().BeInRange(450, 550);
+        PlaceLookup.DistanceKm(Berlin!.Value, Potsdam!.Value).Should().BeInRange(20, 35);
+        PlaceLookup.DistanceKm(Berlin.Value, Wittenberg!.Value).Should().BeInRange(70, 99);
+        PlaceLookup.DistanceKm(Berlin.Value, Muenchen!.Value).Should().BeInRange(450, 550);
     }
 
     /// <summary>Innerhalb der genannten Stufe: ein Ja.</summary>

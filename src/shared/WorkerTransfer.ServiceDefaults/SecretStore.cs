@@ -40,18 +40,18 @@ public sealed class SecretStore
     /// <summary>The environment variable the master key stands in.</summary>
     public const string Variable = "WORKERTRANSFER_SECRETS_KEY";
 
-    private readonly byte[] _hauptschluessel;
+    private readonly byte[] _masterKey;
 
     /// <summary>Reads the master key out of the configuration.</summary>
-    /// <param name="konfiguration">The service's configuration.</param>
+    /// <param name="configuration">The service's configuration.</param>
     /// <exception cref="MasterKeyMissing">It is not set.</exception>
-    public SecretStore(IConfiguration konfiguration)
+    public SecretStore(IConfiguration configuration)
     {
-        ArgumentNullException.ThrowIfNull(konfiguration);
+        ArgumentNullException.ThrowIfNull(configuration);
 
-        var roh = konfiguration[Variable] ?? Environment.GetEnvironmentVariable(Variable);
+        var raw = configuration[Variable] ?? Environment.GetEnvironmentVariable(Variable);
 
-        if (string.IsNullOrWhiteSpace(roh))
+        if (string.IsNullOrWhiteSpace(raw))
         {
             throw new MasterKeyMissing(Variable);
         }
@@ -59,31 +59,31 @@ public sealed class SecretStore
         // An arbitrarily long string becomes 32 bytes. SHA-256 and not the
         // bytes themselves: `make env` rolls base64, and its length hangs on
         // the source of randomness — but AES demands exactly 16, 24 or 32.
-        _hauptschluessel = SHA256.HashData(Encoding.UTF8.GetBytes(roh));
+        _masterKey = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
     }
 
     /// <summary>Encrypts a secret.</summary>
-    /// <param name="klartext">What is to be deposited.</param>
+    /// <param name="plainText">What is to be deposited.</param>
     /// <returns>Base64 of vector, checksum and ciphertext.</returns>
-    public string Encrypt(string klartext)
+    public string Encrypt(string plainText)
     {
-        ArgumentNullException.ThrowIfNull(klartext);
+        ArgumentNullException.ThrowIfNull(plainText);
 
         var vektor = RandomNumberGenerator.GetBytes(AesGcm.NonceByteSizes.MaxSize);
-        var content = Encoding.UTF8.GetBytes(klartext);
+        var content = Encoding.UTF8.GetBytes(plainText);
         var geheim = new byte[content.Length];
-        var pruefsumme = new byte[AesGcm.TagByteSizes.MaxSize];
+        var checksum = new byte[AesGcm.TagByteSizes.MaxSize];
 
-        using var aes = new AesGcm(_hauptschluessel, AesGcm.TagByteSizes.MaxSize);
-        aes.Encrypt(vektor, content, geheim, pruefsumme);
+        using var aes = new AesGcm(_masterKey, AesGcm.TagByteSizes.MaxSize);
+        aes.Encrypt(vektor, content, geheim, checksum);
 
-        return Convert.ToBase64String([.. vektor, .. pruefsumme, .. geheim]);
+        return Convert.ToBase64String([.. vektor, .. checksum, .. geheim]);
     }
 
     /// <summary>Decrypts a secret.</summary>
     /// <remarks>
     /// Returns <c>null</c> instead of throwing. An unreadable secret is not a
-    /// program error here but a master key that was changed — and the right
+    /// program error here but a master key that work changed — and the right
     /// answer to that is "none is deposited", not a crash while drafting.
     /// </remarks>
     /// <param name="gespeichert">What stood in the row.</param>
@@ -98,23 +98,23 @@ public sealed class SecretStore
         try
         {
             var alles = Convert.FromBase64String(gespeichert);
-            var vektorLaenge = AesGcm.NonceByteSizes.MaxSize;
-            var pruefLaenge = AesGcm.TagByteSizes.MaxSize;
+            var nonceLength = AesGcm.NonceByteSizes.MaxSize;
+            var checksumLength = AesGcm.TagByteSizes.MaxSize;
 
-            if (alles.Length <= vektorLaenge + pruefLaenge)
+            if (alles.Length <= nonceLength + checksumLength)
             {
                 return null;
             }
 
-            var vektor = alles.AsSpan(0, vektorLaenge);
-            var pruefsumme = alles.AsSpan(vektorLaenge, pruefLaenge);
-            var geheim = alles.AsSpan(vektorLaenge + pruefLaenge);
-            var klartext = new byte[geheim.Length];
+            var vektor = alles.AsSpan(0, nonceLength);
+            var checksum = alles.AsSpan(nonceLength, checksumLength);
+            var geheim = alles.AsSpan(nonceLength + checksumLength);
+            var plainText = new byte[geheim.Length];
 
-            using var aes = new AesGcm(_hauptschluessel, pruefLaenge);
-            aes.Decrypt(vektor, geheim, pruefsumme, klartext);
+            using var aes = new AesGcm(_masterKey, checksumLength);
+            aes.Decrypt(vektor, geheim, checksum, plainText);
 
-            return Encoding.UTF8.GetString(klartext);
+            return Encoding.UTF8.GetString(plainText);
         }
         catch (Exception error) when (error is CryptographicException or FormatException)
         {
@@ -123,10 +123,10 @@ public sealed class SecretStore
     }
 
     /// <summary>The last four characters — for recognising, not for using.</summary>
-    /// <param name="klartext">The secret.</param>
+    /// <param name="plainText">The secret.</param>
     /// <returns>At most four characters.</returns>
-    public static string Endung(string klartext) =>
-        string.IsNullOrEmpty(klartext) || klartext.Length <= 4
+    public static string Endung(string plainText) =>
+        string.IsNullOrEmpty(plainText) || plainText.Length <= 4
             ? string.Empty
-            : klartext[^4..];
+            : plainText[^4..];
 }
