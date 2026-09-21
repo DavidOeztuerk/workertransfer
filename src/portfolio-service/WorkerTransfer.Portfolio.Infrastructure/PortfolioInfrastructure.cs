@@ -53,6 +53,8 @@ public static class PortfolioInfrastructure
         services.AddDbContext<PortfolioDbContext>((anbieter, optionen) =>
             PortfolioDbContextFactory.Konfiguriere(
                 optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<PortfolioDbContext>("portfolio");
+        services.AddSchluesselbund<PortfolioDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);

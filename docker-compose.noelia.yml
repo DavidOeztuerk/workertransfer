@@ -1,0 +1,67 @@
+# Die Noelia Control Plane, die diese Flotte einsammelt.
+#
+# EIN EIGENES OVERLAY UND NICHT IN docker-compose.yml. Das Produkt liegt in
+# einem Nachbarrepositorium; der Hauptstapel darf davon nicht abhaengen, sonst
+# scheitert `make up` bei jedem, der es nicht ausgecheckt hat.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.noelia.yml up -d
+#   make control-plane
+#
+# Sie liest nur. Es gibt keinen Weg von hier in einen Dienst hinein: sie holt
+# `/noelia/report.json` ab und legt es zusammen.
+
+services:
+  noelia-control-plane:
+    build:
+      context: ${NOELIA_CONTROL_PLANE_PFAD:-../NoeliaControlPlane}
+      dockerfile: Dockerfile
+    image: noelia-control-plane:local
+    container_name: workertransfer-control-plane
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: "http://0.0.0.0:8080"
+
+      # DASSELBE PAPIER WIE DIE BETRIEBSOBERFLAECHE, und kein zweites: sie legt
+      # es an genau der Tuer vor, die es prueft. Leer heisst, dass jeder Dienst
+      # mit 404 antwortet — die Flotte bliebe leer, ohne dass etwas kaputt ist.
+      ControlPlane__OperatorSecret: ${WORKERTRANSFER_NACHWEIS_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+
+      # Die Lizenz steht in der Umgebung und nicht in der Flottendatei: sie ist
+      # ein unterschriebenes Papier auf einen Kunden, und ein solches gehoert
+      # nicht in git.
+      ControlPlane__Licence: ${WORKERTRANSFER_NOELIA_LICENCE:-}
+
+      # Der Verlauf gehoert auf den Datentraeger, nicht ins Arbeitsverzeichnis.
+      # Das Bild laeuft als Nicht-Root und darf in `/app` nicht schreiben — die
+      # Vorgabe legt die SQLite-Datei aber genau dorthin, und der Behaelter
+      # stirbt beim Aufloesen mit „unable to open database file".
+      ControlPlane__HistoryPath: /var/lib/noelia-control-plane/verlauf.sqlite
+    volumes:
+      # Die Flotte: WELCHE Dienste, unter welchen Adressen. Sie gehoert hierher
+      # und nicht ins Nachbarrepositorium — sie beschreibt DIESEN Stapel, und
+      # die Adressen sind die compose-Dienstnamen.
+      #
+      # Der Zielname ist `appsettings.Development.json` und kein sprechender:
+      # die Anwendung laedt `appsettings.{ASPNETCORE_ENVIRONMENT}.json` und
+      # sonst keine Datei — eine `appsettings.Flotte.json` laege im Bild und
+      # wuerde nie gelesen, und die Flotte waere still leer. Im Bild steht dort
+      # die Demo-Flotte des Herstellers; die muss ohnehin weg, sonst sammelt
+      # sie sieben unerreichbare Adressen ein.
+      - ./docker/noelia-control-plane.json:/app/appsettings.Development.json:ro
+
+      # DER SIGNIERSCHLUESSEL UEBERLEBT DEN BEHAELTER. Eine Bescheinigung, die
+      # mit einem Schluessel unterschrieben wurde, der mit dem Prozess starb,
+      # laesst sich hinterher von niemandem mehr pruefen.
+      - noelia-control-plane-daten:/var/lib/noelia-control-plane
+    ports:
+      # 8091, gleich neben dem Gateway auf 8090. Nicht 8080: das ist der Port,
+      # um den sich compose und kind schon einmal gestritten haben, und danach
+      # konnte niemand sagen, wer geantwortet hat.
+      - "8091:8080"
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+volumes:
+  noelia-control-plane-daten:

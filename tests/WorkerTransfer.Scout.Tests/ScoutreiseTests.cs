@@ -13,6 +13,7 @@ using WorkerTransfer.Outbox;
 using WorkerTransfer.Scout.Application.Ports;
 using WorkerTransfer.Scout.Domain.Treffer;
 using WorkerTransfer.Scout.Infrastructure.Persistence;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Scout.Tests;
 
@@ -53,7 +54,9 @@ public class ScoutreiseTests(Postgres postgres) : IAsyncLifetime
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:scout", postgres.ConnectionString);
-            host.UseSetting("JwtSettings:Secret", Tokenform.Geheimnis);
+            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
+            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);

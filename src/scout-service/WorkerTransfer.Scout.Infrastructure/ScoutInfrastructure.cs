@@ -20,6 +20,7 @@ using WorkerTransfer.Scout.Infrastructure.Stellen;
 using WorkerTransfer.ServiceDefaults.Pruefungen;
 using WorkerTransfer.Scout.Contracts;
 using Noelia.Abstractions.Security.Checks;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Scout.Infrastructure;
 
@@ -73,6 +74,8 @@ public static class ScoutInfrastructure
         services.AddDbContext<ScoutDbContext>((anbieter, optionen) =>
             ScoutDbContextFactory.Konfiguriere(
                 optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<ScoutDbContext>("scout");
+        services.AddSchluesselbund<ScoutDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);

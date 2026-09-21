@@ -60,6 +60,8 @@ public static class ResumeInfrastructure
         services.AddDbContext<ResumeDbContext>((provider, options) =>
             ResumeDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<ResumeDbContext>("resume");
+        services.AddSchluesselbund<ResumeDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);

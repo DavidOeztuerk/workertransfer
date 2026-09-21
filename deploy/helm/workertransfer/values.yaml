@@ -90,7 +90,12 @@ publicUrl: http://localhost:8090
 # anders verwaltet, und das Chart fasst es nur an, um es zu lesen.
 secrets:
   existingSecret: ""
-  jwtSecret: ""
+  # Das Token-Schluesselpaar (ECDSA P-256, base64). Beide Haelften gehoeren zu
+  # EINEM Paar; getrennt gewuerfelt passt keins zum anderen.
+  jwtPrivateKey: ""
+  jwtPublicKey: ""
+  # Benennt den Schluessel, damit ein Wechsel zwei nebeneinander erlaubt.
+  jwtKeyId: "k1"
   # Zwei getrennte Geheimnisse, ausdrücklich (ADR-0027 §4.4): "darf eine Mail
   # anstossen" und "darf alles über einen Menschen löschen" dürfen nicht
   # dasselbe Papier sein.

@@ -49,6 +49,8 @@ public static class NotificationInfrastructure
         services.AddDbContext<NotificationDbContext>((provider, options) =>
             NotificationDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<NotificationDbContext>("notification");
+        services.AddSchluesselbund<NotificationDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);

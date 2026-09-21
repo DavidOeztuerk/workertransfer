@@ -53,6 +53,8 @@ public static class ConsentInfrastructure
         services.AddDbContext<ConsentDbContext>((provider, options) =>
             ConsentDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<ConsentDbContext>("consent");
+        services.AddSchluesselbund<ConsentDbContext>();
 
         services.TryAddSingleton(TimeProvider.System);
 

@@ -17,6 +17,7 @@ using WorkerTransfer.Outbox;
 using WorkerTransfer.ServiceDefaults.Pruefungen;
 using WorkerTransfer.Assessment.Contracts;
 using Noelia.Abstractions.Security.Checks;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Assessment.Infrastructure;
 
@@ -70,6 +71,8 @@ public static class AssessmentInfrastructure
         services.AddDbContext<AssessmentDbContext>((anbieter, optionen) =>
             AssessmentDbContextFactory.Konfiguriere(
                 optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<AssessmentDbContext>("assessment");
+        services.AddSchluesselbund<AssessmentDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);

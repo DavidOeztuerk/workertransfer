@@ -305,7 +305,9 @@ public class UmkreissucheTests(Postgres postgres) : IAsyncLifetime
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:jobs", postgres.ConnectionString);
-            host.UseSetting("JwtSettings:Secret", Tokenform.Geheimnis);
+            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
+            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", "rueckzug-geheimnis");

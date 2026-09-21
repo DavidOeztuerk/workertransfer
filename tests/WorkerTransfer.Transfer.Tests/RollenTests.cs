@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.ServiceDefaults.Rollen;
 using WorkerTransfer.Transfer.Application.Ports;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Transfer.Tests;
 
@@ -39,7 +40,9 @@ public class RollenTests(Postgres postgres) : IAsyncLifetime
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:transfer", postgres.ConnectionString);
-            host.UseSetting("JwtSettings:Secret", Tokenform.Geheimnis);
+            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
+            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");

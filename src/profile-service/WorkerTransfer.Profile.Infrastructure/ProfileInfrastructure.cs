@@ -64,6 +64,8 @@ public static class ProfileInfrastructure
         services.AddDbContext<ProfileDbContext>((anbieter, optionen) =>
             ProfileDbContextFactory.Konfiguriere(
                 optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<ProfileDbContext>("profile");
+        services.AddSchluesselbund<ProfileDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);

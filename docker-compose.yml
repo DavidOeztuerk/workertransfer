@@ -92,10 +92,12 @@ x-umgebung: &umgebung
   #
   # Kein Geheimnis, deshalb darf hier eine Vorgabe stehen.
   CORS_ORIGINS: ${WORKERTRANSFER_CORS_ORIGINS:-http://localhost:5173,http://localhost:8090}
-  # Ein gemeinsames Geheimnis: identity unterschreibt, alle anderen pruefen
-  # (ADR-0007/0015). Die Dienste weisen diese Voreinstellung in
-  # Produktion/Staging zurueck.
-  JwtSettings__Secret: ${WORKERTRANSFER_JWT_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+  # DER OEFFENTLICHE SCHLUESSEL GEHT AN ALLE, DER PRIVATE NUR AN IDENTITY.
+  # Er steht deshalb hier im gemeinsamen Anker und `Jwt__PrivateKey` allein
+  # beim identity-Dienst — wer praegen kann, ist damit in dieser Datei
+  # nachzulesen und nicht in einer Codezeile.
+  Jwt__PublicKey: ${WORKERTRANSFER_JWT_PUBLIC_KEY:?fehlt — `make env` legt eine .env an und erzeugt das Paar}
+  Jwt__KeyId: ${WORKERTRANSFER_JWT_KEY_ID:-k1}
   JwtSettings__Issuer: workertransfer
   JwtSettings__Audience: workertransfer
   # Gemeinsames Geheimnis der Loeschkaskade (ADR-0027 4.4). AUSDRUECKLICH EIN
@@ -163,6 +165,10 @@ services:
     environment:
       <<: *umgebung
       SERVICE_DIR: identity
+      # DER EINZIGE DIENST MIT DEM PRIVATEN SCHLUESSEL. Ein zweiter waere eine
+      # zweite Stelle, die einen Handelnden erschaffen kann, und nichts weiter
+      # unten koennte die beiden auseinanderhalten.
+      Jwt__PrivateKey: ${WORKERTRANSFER_JWT_PRIVATE_KEY:?fehlt — `make env` legt eine .env an und erzeugt das Paar}
       ASPNETCORE_URLS: "http://0.0.0.0:8001"
       ConnectionStrings__identity: Host=postgres;Port=5432;Database=identity;Username=worker;Password=worker
       Mail__Host: mailpit

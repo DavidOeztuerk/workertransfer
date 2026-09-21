@@ -1,4 +1,10 @@
 using System.Net;
+using WorkerTransfer.Profile.Infrastructure.Persistence;
+using WorkerTransfer.ServiceDefaults;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using FluentAssertions;
@@ -45,7 +51,9 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
-            host.UseSetting("JwtSettings:Secret", Tokenform.Geheimnis);
+            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
+            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
@@ -147,7 +155,9 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
         using var ohneTuer = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
-            host.UseSetting("JwtSettings:Secret", Tokenform.Geheimnis);
+            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
+            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("Nachweis:Geheimnis", "");
@@ -377,7 +387,8 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
                 $"{pfad} trägt eine Verbindungszeichenfolge");
 
             inhalt.Should().NotContain(
-                Tokenform.Geheimnis, $"{pfad} trägt das Signaturgeheimnis");
+                Tokenform.PrivatSchluessel,
+                $"{pfad} trägt den privaten Signaturschlüssel");
         }
     }
 
@@ -402,4 +413,165 @@ public class NoeliareiseTests(Postgres postgres) : IAsyncLifetime
     private static string OhneKorrelation(string rumpf) =>
         System.Text.RegularExpressions.Regex.Replace(
             rumpf, "\"correlationId\"\\s*:\\s*\"[^\"]*\"", "\"correlationId\":\"\"");
+}
+
+/// <summary>Was <c>/health/ready</c> tatsächlich beantwortet.</summary>
+/// <remarks>
+/// <para><strong>Eine leere Bereitschaft antwortet 200.</strong> Die Adresse
+/// filtert die eingetragenen Prüfungen nach dem Etikett <c>ready</c>; ohne eine
+/// einzige ist die gefilterte Menge leer, ein leerer Bericht gilt als gesund,
+/// und der Dienst meldet sich bereit — auch über einer unerreichbaren
+/// Datenbank. Der Orchestrierer schickt dann Verkehr an einen Dienst, der jede
+/// Anfrage mit 500 beantwortet.</para>
+///
+/// <para>Deshalb prüft dieser Test den <em>Inhalt</em> der Antwort und nicht
+/// ihren Status: der Status ist genau dann grün, wenn nichts geprüft wird.</para>
+/// </remarks>
+[Collection(PostgresCollection.Name)]
+public sealed class BereitschaftsreiseTests(Postgres postgres) : IAsyncLifetime
+{
+    private WebApplicationFactory<Program> _dienst = null!;
+
+    public Task InitializeAsync()
+    {
+        _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
+        {
+            host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
+            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
+            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
+            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+        });
+
+        return Task.CompletedTask;
+    }
+
+    public Task DisposeAsync()
+    {
+        _dienst.Dispose();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task Die_Bereitschaft_antwortet_fuer_die_Datenbank_und_nicht_fuer_nichts()
+    {
+        var antwort = await _dienst.CreateClient().GetAsync(new Uri("/health/ready", UriKind.Relative));
+
+        antwort.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var bericht = JsonDocument.Parse(await antwort.Content.ReadAsStringAsync());
+        var pruefungen = bericht.RootElement.GetProperty("checks").EnumerateArray().ToList();
+
+        pruefungen.Should().NotBeEmpty(
+            "eine Bereitschaft ohne Eintragung meldet 200 ueber jeder Datenbank");
+
+        pruefungen.Should().Contain(
+            eintrag => eintrag.GetProperty("name").GetString() == "profile-datenbank",
+            "der Dienst kann ohne seine Datenbank keine einzige Anfrage beantworten");
+    }
+
+    /// <summary>Und die Beschreibung nennt keinen Wert.</summary>
+    /// <remarks>
+    /// <c>/health/ready</c> antwortet jedem. Eine Npgsql-Ausnahme trägt Wirt,
+    /// Port und mitunter den Benutzer — sie gehört ins Protokoll, nicht in
+    /// diese Antwort.
+    /// </remarks>
+    [Fact]
+    public async Task Die_Bereitschaft_nennt_keine_Verbindungszeichenfolge()
+    {
+        var inhalt = await _dienst.CreateClient()
+            .GetStringAsync(new Uri("/health/ready", UriKind.Relative));
+
+        inhalt.Should().NotContain(postgres.ConnectionString);
+        inhalt.Should().NotContainEquivalentOf("password");
+    }
+}
+
+/// <summary>Wo der Schlüsselbund des Gerüsts liegt, und ob er lesbar dort liegt.</summary>
+/// <remarks>
+/// <para>Ohne Zutun schreibt ASP.NET ihn in das Dateisystem des Behälters und
+/// warnt zweimal beim Start — zwei Warnungen, auf die niemand reagiert. Was
+/// damit geschützt ist, prüft nicht mehr, sobald der Behälter ersetzt wird.</para>
+///
+/// <para>Geprüft wird hier <em>dasselbe Paar</em>, das
+/// <c>noelia.dataprotection.key-ring</c> liest: eine Ablage und eine
+/// Verschlüsselung. Dazu die Zeile in der Datenbank, denn eine gesetzte
+/// Verschlüsselung, die nichts verschlüsselt, sähe von oben gleich aus.</para>
+/// </remarks>
+[Collection(PostgresCollection.Name)]
+public sealed class SchluesselbundreiseTests(Postgres postgres) : IAsyncLifetime
+{
+    private WebApplicationFactory<Program> _dienst = null!;
+
+    public Task InitializeAsync()
+    {
+        _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
+        {
+            host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
+            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
+            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
+            host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
+            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-den-bund");
+        });
+
+        return Task.CompletedTask;
+    }
+
+    public Task DisposeAsync()
+    {
+        _dienst.Dispose();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public void Der_Bund_hat_eine_Ablage_und_eine_Verschluesselung()
+    {
+        var optionen = _dienst.Services
+            .GetRequiredService<IOptions<KeyManagementOptions>>().Value;
+
+        optionen.XmlRepository.Should().NotBeNull(
+            "ohne Ablage schreibt das Geruest ihn in das Dateisystem des Behaelters");
+
+        optionen.XmlEncryptor.Should().NotBeNull(
+            "ein Bund, der unverschluesselt in einer Sicherung liegt, ist keiner");
+    }
+
+    /// <summary>Und in der Datenbank steht kein Schlüsselmaterial im Klartext.</summary>
+    /// <remarks>
+    /// Die Gegenprobe zum Test darüber: eine gesetzte Verschlüsselung beweist
+    /// nicht, dass sie etwas tut. Ein unverschlüsselter Bund trägt
+    /// <c>&lt;masterKey&gt;</c> und <c>&lt;value&gt;</c> im Klartext.
+    /// </remarks>
+    [Fact]
+    public async Task Was_in_der_Datenbank_liegt_ist_verschluesselt()
+    {
+        // Schuetzen erzwingt, dass ein Schluessel entsteht und gespeichert wird.
+        _dienst.Services.GetRequiredService<IDataProtectionProvider>()
+            .CreateProtector("reise").Protect("etwas");
+
+        await using var quelle = ProfileDbContextFactory.Datenquelle(postgres.ConnectionString);
+        await using var befehl = quelle.CreateCommand(
+            "SELECT inhalt FROM dataprotection_schluessel");
+        await using var leser = await befehl.ExecuteReaderAsync();
+
+        var zeilen = new List<string>();
+
+        while (await leser.ReadAsync())
+        {
+            zeilen.Add(leser.GetString(0));
+        }
+
+        zeilen.Should().NotBeEmpty("sonst prueft dieser Test eine leere Tabelle");
+
+        foreach (var zeile in zeilen)
+        {
+            zeile.Should().NotContain(
+                "<masterKey", "das waere das Schluesselmaterial im Klartext");
+            zeile.Should().Contain(
+                "wtGeschuetzterSchluessel", "die Huelle nennt sich selbst");
+        }
+    }
 }

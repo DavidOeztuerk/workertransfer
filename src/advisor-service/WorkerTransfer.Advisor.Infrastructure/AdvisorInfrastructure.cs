@@ -20,6 +20,7 @@ using WorkerTransfer.Outbox;
 using WorkerTransfer.ServiceDefaults.Pruefungen;
 using WorkerTransfer.Advisor.Contracts;
 using Noelia.Abstractions.Security.Checks;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Advisor.Infrastructure;
 
@@ -71,6 +72,8 @@ public static class AdvisorInfrastructure
         services.AddDbContext<AdvisorDbContext>((anbieter, optionen) =>
             AdvisorDbContextFactory.Konfiguriere(
                 optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<AdvisorDbContext>("advisor");
+        services.AddSchluesselbund<AdvisorDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);

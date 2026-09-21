@@ -72,6 +72,8 @@ public static class IdentityInfrastructure
         services.AddDbContext<IdentityDbContext>((provider, options) =>
             IdentityDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<IdentityDbContext>("identity");
+        services.AddSchluesselbund<IdentityDbContext>();
 
         services.AddEntityFrameworkRefreshTokens<IdentityDbContext>();
         services.AddScoped<IUserRepository, EfUserRepository>();

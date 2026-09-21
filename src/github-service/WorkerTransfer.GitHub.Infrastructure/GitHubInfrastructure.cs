@@ -54,6 +54,8 @@ public static class GitHubInfrastructure
         services.AddDbContext<GitHubDbContext>((provider, options) =>
             GitHubDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<GitHubDbContext>("github");
+        services.AddSchluesselbund<GitHubDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);

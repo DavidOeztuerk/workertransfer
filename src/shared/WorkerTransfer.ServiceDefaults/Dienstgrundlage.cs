@@ -57,10 +57,12 @@ public static class Dienstgrundlage
     /// alle elf gleich: jeder Dienst liest den Handelnden aus dem geprüften
     /// Token, denn darauf steht <c>Capacity</c> (ADR-0017).</para>
     ///
-    /// <para><strong>Ausstellen kann nur identity-service</strong>
-    /// (<see cref="AlsAussteller"/>). Das ist keine Konvention: ein zweiter
-    /// Aussteller wäre eine zweite Stelle, die einen Handelnden erschaffen kann,
-    /// und nichts weiter unten könnte die beiden auseinanderhalten.</para>
+    /// <para><strong>Ausstellen kann nur, wer den privaten Schlüssel hat</strong>
+    /// (<see cref="Schluesselherkunft"/>), und den bekommt allein
+    /// identity-service. Das ist seit ADR-0046 keine Konvention mehr, sondern
+    /// eine Eigenschaft des Schlüssels: ein zweiter Aussteller wäre eine zweite
+    /// Stelle, die einen Handelnden erschaffen kann, und nichts weiter unten
+    /// könnte die beiden auseinanderhalten.</para>
     /// </remarks>
     /// <param name="services">The container.</param>
     /// <param name="configuration">The service's configuration.</param>
@@ -150,17 +152,12 @@ public static class Dienstgrundlage
                 .UseDefaults()
                 .Use(NoeliaModule.Principal)
 
-                // WOHER DIE SCHLUESSEL KOMMEN, sagt Girder 4 nicht mehr selbst —
-                // `NoeliaModule.Jwt` registriert den Dienst, nicht den
-                // Schluesselbund. Das ist richtig: ob ein Dienst ausstellt oder
-                // nur prueft, ist eine Aussage ueber seine Rolle im System.
-                //
-                // Heute teilen sich alle elf EIN Geheimnis (HS256), deshalb
-                // ueberall dasselbe. Die Form, die wir wollen, steht schon
-                // daneben: `Issue(privat, kid)` fuer identity, `VerifyOnly(
-                // oeffentlich, kid)` fuer die anderen zehn. Das ist H3 und
-                // braucht eine Schluesselverteilung, keine Codeaenderung hier.
-                .UseJwt(jwt => jwt.FromSharedSecret())
+                // AUSSTELLEN KANN NUR, WER DEN PRIVATEN SCHLUESSEL HAT.
+                // Ein geteiltes HS256-Geheimnis kennt diesen Unterschied nicht:
+                // jeder der fuenfzehn Prozesse koennte ein Token fuer jeden
+                // Menschen praegen, und ein kopiertes Konfigurationsblatt waere
+                // jedes Konto auf jedem Dienst.
+                .UseJwt(jwt => Schluesselherkunft(jwt, configuration))
 
                 // DIE EGRESS-GRENZE, UND WOHER SIE IHRE HOSTS KENNT.
                 //
@@ -338,13 +335,51 @@ public static class Dienstgrundlage
         });
     }
 
+    /// <summary>Woher dieser Dienst seine Token-Schlüssel nimmt.</summary>
+    /// <remarks>
+    /// <para>Der private Schlüssel entscheidet, nicht ein Schalter im Code. Er
+    /// steht allein in der Umgebung von identity-service, und damit ist in
+    /// <c>docker-compose.yml</c> und im Chart nachzulesen, wer prägen kann —
+    /// eine Codezeile wäre dieselbe Aussage an einer Stelle, die der Betreiber
+    /// nicht sieht.</para>
+    ///
+    /// <para>Ohne öffentlichen Schlüssel wirft dieser Aufruf und nennt den
+    /// Namen. Ein Dienst, der stattdessen still jedes Token ablehnte, sähe aus
+    /// wie eine kaputte Anmeldung.</para>
+    /// </remarks>
+    /// <param name="jwt">Noelias Schlüsselbaumeister.</param>
+    /// <param name="configuration">Die Konfiguration dieses Dienstes.</param>
+    private static void Schluesselherkunft(JwtBuilder jwt, IConfiguration configuration)
+    {
+        var kennung = configuration["Jwt:KeyId"];
+        var oeffentlich = configuration["Jwt:PublicKey"];
+        var privat = configuration["Jwt:PrivateKey"];
+
+        if (string.IsNullOrWhiteSpace(kennung) || string.IsNullOrWhiteSpace(oeffentlich))
+        {
+            throw new InvalidOperationException(
+                "Jwt:KeyId und Jwt:PublicKey sind nicht gesetzt. `make env` würfelt "
+                + "das Schlüsselpaar in die .env; in compose und im Chart kommen "
+                + "sie aus der Umgebung.");
+        }
+
+        if (string.IsNullOrWhiteSpace(privat))
+        {
+            jwt.VerifyOnly(oeffentlich, kennung);
+            return;
+        }
+
+        jwt.Issue(privat, kennung);
+    }
+
     /// <summary>
-    /// The extra a service needs to <em>issue</em> tokens. identity-service only.
+    /// Was ein Dienst zusätzlich braucht, um Menschen anzumelden. Nur identity.
     /// </summary>
     /// <remarks>
-    /// Its own method with its own name so that a search for it finds exactly
-    /// one composition root. A reviewer should be able to answer "who can mint a
-    /// token here?" by grepping, not by reading eleven files.
+    /// Passwort-Prüfung und Sitzungen — nicht das Ausstellen selbst: das hängt
+    /// seit ADR-0046 am privaten Schlüssel und damit an der Umgebung. Diese
+    /// Methode hat trotzdem einen eigenen Namen, damit eine Suche nach ihr
+    /// genau einen Verbundpunkt findet.
     /// </remarks>
     /// <param name="girder">Der Baumeister dieses Dienstes.</param>
     public static NoeliaBuilder AlsAussteller(this NoeliaBuilder girder)

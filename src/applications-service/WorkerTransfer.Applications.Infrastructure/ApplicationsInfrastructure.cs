@@ -68,6 +68,8 @@ public static class ApplicationsInfrastructure
         services.AddDbContext<ApplicationsDbContext>((provider, options) =>
             ApplicationsDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<ApplicationsDbContext>("applications");
+        services.AddSchluesselbund<ApplicationsDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);

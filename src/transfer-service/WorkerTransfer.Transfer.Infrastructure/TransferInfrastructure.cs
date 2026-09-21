@@ -57,6 +57,8 @@ public static class TransferInfrastructure
         services.AddDbContext<TransferDbContext>((provider, options) =>
             TransferDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<TransferDbContext>("transfer");
+        services.AddSchluesselbund<TransferDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);

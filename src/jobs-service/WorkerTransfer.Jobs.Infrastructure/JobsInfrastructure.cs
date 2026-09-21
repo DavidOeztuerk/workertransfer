@@ -48,6 +48,8 @@ public static class JobsInfrastructure
         services.AddDbContext<JobsDbContext>((anbieter, optionen) =>
             JobsDbContextFactory.Konfiguriere(
                 optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<JobsDbContext>("jobs");
+        services.AddSchluesselbund<JobsDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);

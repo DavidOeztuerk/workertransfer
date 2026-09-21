@@ -43,6 +43,8 @@ public static class CompaniesInfrastructure
         services.AddDbContext<CompaniesDbContext>((provider, options) =>
             CompaniesDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<CompaniesDbContext>("companies");
+        services.AddSchluesselbund<CompaniesDbContext>();
 
         services.TryAddSingleton(TimeProvider.System);
 

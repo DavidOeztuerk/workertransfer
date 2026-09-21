@@ -291,7 +291,7 @@ test("GitHub verbinden verlangt einen Nachweis — und rechnet keine Note", asyn
   // Die Zusage steht auf der Seite, auf der jemand sein Konto verbindet — nicht
   // in einer ADR, die er nie liest.
   await expect(person.getByText(/Belege, keine Noten/)).toBeVisible();
-  await expect(person.getByText(/kein Abgleich im Hintergrund/)).toBeVisible();
+  await expect(person.getByText(/Geholt wird nur, wenn du es auslöst/)).toBeVisible();
 
   // DER SCHNELLE WEG STEHT VORN und verlangt keinen Namen: GitHub meldet das
   // Konto selbst. Er ist hier nur zu sehen, nicht zu gehen — die Reise darf

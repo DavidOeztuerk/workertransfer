@@ -9,7 +9,7 @@ DOTNET_SLN := WorkerTransfer.slnx
 
 .PHONY: help check check-dotnet check-web build test test-web validate validate-e2e \
         fix dev env up down images routenkarte analyze nachweis nachweis-pruefen \
-        k8s-up k8s-down k8s-lint k8s-seed clean
+        control-plane k8s-up k8s-down k8s-lint k8s-seed clean
 
 help:  # Diese Liste.
 	@# `0-9` im Muster, sonst fehlen k8s-up/-down/-seed/-lint — vorhanden, aber
@@ -79,7 +79,7 @@ validate-e2e:  # Zusaetzlich die Browser-Reise; braucht den laufenden Stapel.
 fix:  # Formatieren.
 	dotnet format $(DOTNET_SLN)
 
-env:  # .env aus der Vorlage anlegen und die fuenf Geheimnisse wuerfeln.
+env:  # .env anlegen: vier Geheimnisse wuerfeln, das Token-Schluesselpaar erzeugen.
 	@# Der erste Befehl in einem frischen Klon. Danach laeuft `make up`.
 	@#
 	@# Die Geheimnisse stehen in .env.example LEER — ein eingebauter Vorgabewert
@@ -90,12 +90,22 @@ env:  # .env aus der Vorlage anlegen und die fuenf Geheimnisse wuerfeln.
 		echo "Zum Neuwuerfeln: rm .env && make env"; \
 	else \
 		cp .env.example .env; \
-		for s in WORKERTRANSFER_JWT_SECRET WORKERTRANSFER_NOTIFY_SECRET WORKERTRANSFER_ERASURE_SECRET WORKERTRANSFER_SECRETS_KEY WORKERTRANSFER_NACHWEIS_SECRET; do \
+		for s in WORKERTRANSFER_NOTIFY_SECRET WORKERTRANSFER_ERASURE_SECRET WORKERTRANSFER_SECRETS_KEY WORKERTRANSFER_NACHWEIS_SECRET; do \
 			wert=$$(openssl rand -base64 32); \
 			tmp=$$(mktemp); \
 			awk -v k="$$s" -v v="$$wert" '$$0 == k "=" { print k "=" v; next } { print }' .env > "$$tmp" && mv "$$tmp" .env; \
 		done; \
-		echo ".env angelegt, fuenf Geheimnisse frisch gewuerfelt."; \
+		pem=$$(mktemp); \
+		openssl ecparam -name prime256v1 -genkey -noout -out "$$pem" 2>/dev/null; \
+		privat=$$(openssl pkcs8 -topk8 -nocrypt -in "$$pem" -outform DER 2>/dev/null | base64 | tr -d '\n'); \
+		oeffentlich=$$(openssl ec -in "$$pem" -pubout -outform DER 2>/dev/null | base64 | tr -d '\n'); \
+		rm -f "$$pem"; \
+		for paar in "WORKERTRANSFER_JWT_PRIVATE_KEY=$$privat" "WORKERTRANSFER_JWT_PUBLIC_KEY=$$oeffentlich"; do \
+			k=$${paar%%=*}; v=$${paar#*=}; \
+			tmp=$$(mktemp); \
+			awk -v k="$$k" -v v="$$v" '$$0 == k "=" { print k "=" v; next } { print }' .env > "$$tmp" && mv "$$tmp" .env; \
+		done; \
+		echo ".env angelegt: vier Geheimnisse gewuerfelt, ein Schluesselpaar erzeugt."; \
 		echo "Sie ist ignoriert und gehoert nicht in git."; \
 	fi
 
@@ -116,6 +126,12 @@ k8s-down:  # Den kind-Cluster samt Daten loeschen.
 k8s-seed:  # Testdaten in die laufende Umgebung: Firma, drei Stellen, ein Bewerber-Konto.
 	./scripts/k8s-seed.sh
 
+control-plane:  # Die Noelia Control Plane ueber den laufenden Stapel: http://localhost:8091
+	@# Ein Overlay und kein Teil von `make up`: das Produkt liegt in einem
+	@# Nachbarrepositorium, und `make up` darf bei niemandem daran scheitern.
+	@# Der Pfad laesst sich mit NOELIA_CONTROL_PLANE_PFAD umbiegen.
+	docker compose -f docker-compose.yml -f docker-compose.noelia.yml up -d --build noelia-control-plane
+
 images:  # Beide ausgelieferten Bilder bauen. Der lokale Zwilling des CI-Jobs.
 	@# Eine gruene Pruefung, die kein Bild baut, sagt nichts ueber das, was
 	@# ausgeliefert wird: der Sprung auf node 25 kam so durch und zerlegte das
@@ -125,11 +141,16 @@ images:  # Beide ausgelieferten Bilder bauen. Der lokale Zwilling des CI-Jobs.
 		-t workertransfer-dotnet:local .
 	docker build -f docker/web-prod.Dockerfile -t workertransfer/web:local .
 
+# Die zwei Schluesselwerte sind WEGWERFWERTE und heissen deshalb so. Das Chart
+# verlangt sie (`required`), weil ein gewuerfeltes Paar nicht zueinander passt
+# — hier wird aber nur gerendert, nie angewendet. Ohne sie prueft dieses Ziel
+# das Chart gar nicht erst zu Ende.
+HELM_PROBE = --set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql \
+	--set secrets.jwtPrivateKey=wegwerfwert --set secrets.jwtPublicKey=wegwerfwert
+
 k8s-lint:  # Chart pruefen, ohne Cluster: helm lint + rendern.
-	helm lint deploy/helm/workertransfer \
-		--set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql
-	helm template deploy/helm/workertransfer \
-		--set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql > /dev/null
+	helm lint deploy/helm/workertransfer $(HELM_PROBE)
+	helm template deploy/helm/workertransfer $(HELM_PROBE) > /dev/null
 	@echo "Chart rendert."
 
 clean:  # Bau- und Testreste.

@@ -82,9 +82,33 @@ schritt "Helm-Release"
 # Nur noch EIN --set-file: die Datenbankanlage kommt aus derselben Datei, die
 # docker compose benutzt. Die Routen brauchen keins mehr — die Landkarte reist
 # im Bild, und damit faehrt hier, was Compose faehrt.
+# Das Token-Schluesselpaar entsteht hier und nicht im Chart: `keepOrMake`
+# wuerfelt jede Haelfte einzeln, und zwei einzeln gewuerfelte Haelften passen
+# nicht zueinander. Bei einem bestehenden Release wird das vorhandene Paar
+# weiterbenutzt — ein neues meldete jede offene Sitzung ab.
+schluesselpaar=$(mktemp)
+trap 'rm -f "$schluesselpaar"' EXIT
+
+if kubectl get secret "$RELEASE-secrets" >/dev/null 2>&1; then
+  jwt_privat=$(kubectl get secret "$RELEASE-secrets" \
+    -o jsonpath='{.data.WORKER_JWT_PRIVATE_KEY}' | base64 -d)
+  jwt_oeffentlich=$(kubectl get secret "$RELEASE-secrets" \
+    -o jsonpath='{.data.WORKER_JWT_PUBLIC_KEY}' | base64 -d)
+  echo "  Schluesselpaar aus dem bestehenden Release uebernommen."
+else
+  openssl ecparam -name prime256v1 -genkey -noout -out "$schluesselpaar" 2>/dev/null
+  jwt_privat=$(openssl pkcs8 -topk8 -nocrypt -in "$schluesselpaar" -outform DER \
+    2>/dev/null | base64 | tr -d '\n')
+  jwt_oeffentlich=$(openssl ec -in "$schluesselpaar" -pubout -outform DER \
+    2>/dev/null | base64 | tr -d '\n')
+  echo "  Schluesselpaar frisch erzeugt (P-256)."
+fi
+
 helm upgrade --install "$RELEASE" "$CHART" \
   --set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql \
   --set anthropicApiKey="${ANTHROPIC_API_KEY:-}" \
+  --set secrets.jwtPrivateKey="$jwt_privat" \
+  --set secrets.jwtPublicKey="$jwt_oeffentlich" \
   --wait --timeout 12m
 
 # ---------------------------------------------------------------------------
