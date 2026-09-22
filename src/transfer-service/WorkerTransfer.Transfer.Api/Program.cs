@@ -1,7 +1,7 @@
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.Transfer.Api;
-using WorkerTransfer.Transfer.Api.Berechtigung;
+using WorkerTransfer.Transfer.Api.Authorization;
 using WorkerTransfer.Transfer.Infrastructure;
 using WorkerTransfer.Transfer.Infrastructure.Persistence;
 
@@ -13,7 +13,7 @@ WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 var builder = WebApplication.CreateBuilder(args);
 const string serviceName = "transfer-service";
 
-// Kein AsIssuer(): nur identity-service hält die private Hälfte.
+// No AsIssuer(): only identity-service holds the private half.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName);
 
@@ -26,8 +26,8 @@ builder.Services.AddWorkerTransferDefaults(
 // duerfen.
 builder.Services.AddAdminrechte(
     builder.Configuration,
-    CasePermissions.Anbieten,
-    CasePermissions.Abschliessen);
+    CasePermissions.Offer,
+    CasePermissions.Complete);
 
 builder.Services.AddTransferInfrastructure(
     builder.Configuration,
@@ -41,11 +41,11 @@ await app.MigrateSchemaAsync<TransferDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
-app.MapMarktEndpoints();
-app.MapVorgangsEndpoints();
-app.MapLoeschEndpoints();
+app.MapMarketEndpoints();
+app.MapCaseEndpoints();
+app.MapErasureEndpoints();
 
 await app.RunAsync();
 
-/// <summary>Benennt den Einstiegspunkt für den Testwirt.</summary>
+/// <summary>Names the entry point for the test host.</summary>
 public partial class Program;

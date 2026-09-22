@@ -8,13 +8,13 @@ using Npgsql;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.Transfer.Application.Behaviors;
-using WorkerTransfer.Transfer.Application.Markt;
+using WorkerTransfer.Transfer.Application.Market;
 using WorkerTransfer.Transfer.Application.Ports;
-using WorkerTransfer.Transfer.Domain.Anfragen;
-using WorkerTransfer.Transfer.Domain.Markt;
-using WorkerTransfer.Transfer.Domain.Vorgaenge;
-using WorkerTransfer.Transfer.Infrastructure.Benachrichtigung;
-using WorkerTransfer.Transfer.Infrastructure.Einwilligung;
+using WorkerTransfer.Transfer.Domain.Requests;
+using WorkerTransfer.Transfer.Domain.Market;
+using WorkerTransfer.Transfer.Domain.Cases;
+using WorkerTransfer.Transfer.Infrastructure.Notification;
+using WorkerTransfer.Transfer.Infrastructure.Consent;
 using WorkerTransfer.Transfer.Infrastructure.Erasure;
 using WorkerTransfer.Transfer.Infrastructure.Persistence;
 using WorkerTransfer.Transfer.Infrastructure.Security;
@@ -24,19 +24,19 @@ using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Transfer.Infrastructure;
 
-/// <summary>Beantwortet die Ports der Anwendungsschicht.</summary>
+/// <summary>Answers the ports of the application layer.</summary>
 /// <remarks>
-/// Kein Zwischenspeicher — und bei diesem Dienst wiegt das am schwersten: was
-/// hier freigegeben wird, ist die Aussage „ich höre zu", und ein Revocation muss
-/// beim allernächsten Lesezugriff wirken (ADR-0013). Nichts hier ist ein
-/// <c>ICacheableQuery</c>, weshalb <c>AddCQRS</c> beide
-/// Zwischenspeicher-Glieder gar nicht erst in die Kette hängt.
+/// No cache — and at this service that weighs heaviest: what is released here
+/// is the statement "I am listening", and a revocation has to take effect at
+/// the very next read (ADR-0013). Nothing here is an <c>ICacheableQuery</c>,
+/// which is why <c>AddCQRS</c> does not hang either caching link into the chain
+/// in the first place.
 /// </remarks>
 public static class TransferInfrastructure
 {
-    /// <param name="services">Der Behälter.</param>
-    /// <param name="configuration">Woher Ledger und Secrets kommen.</param>
-    /// <param name="connectionString">Wo die Transferdatenbank liegt.</param>
+    /// <param name="services">The container.</param>
+    /// <param name="configuration">Where ledger and secrets come from.</param>
+    /// <param name="connectionString">Where the transfer database lies.</param>
     public static IServiceCollection AddTransferInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -69,57 +69,56 @@ public static class TransferInfrastructure
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IErasureLedger, EfErasureLedger>();
         services.AddScoped<IConsentGate, HttpConsentGate>();
-        services.AddScoped<IAufrufertoken, HttpAufrufertoken>();
+        services.AddScoped<ICallerToken, HttpCallerToken>();
 
-        // Die Absicht committet mit der Änderung, ein Zusteller bringt sie
-        // (ADR-0025). Zehn Versuche, nicht unbegrenzt: nie aufzugeben ist der
-        // Löschung vorbehalten, wo ein toter Empfänger die Vollständigkeit
-        // blockieren muss.
-        services.AddScoped<IDelivery, HttpBenachrichtigung>();
+        // The intent commits with the change, a dispatcher delivers it
+        // (ADR-0025). Ten attempts, not unlimited: never giving up is reserved
+        // for the erasure, where a dead recipient has to block completeness.
+        services.AddScoped<IDelivery, HttpNotifier>();
         services.AddOutbox<TransferDbContext>(configuration);
 
         services.AddCQRS(typeof(SaveMarketStatusCommand).Assembly);
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
         Nachweis(services, configuration);
 
         return services;
     }
 
-    /// <summary>Vier Namen, bei denen <c>note</c> ein echtes Homonym ist.</summary>
+    /// <summary>Four names where <c>note</c> is a genuine homonym.</summary>
     /// <remarks>
-    /// <strong>Öffentlich, weil sie zwei Leser hat</strong>: <c>wt.ki.keine-zahl</c>
-    /// zur Laufzeit und <c>VocabularyTests</c> zur Bauzeit.
+    /// <strong>Public, because it has two readers</strong>:
+    /// <c>wt.ki.keine-zahl</c> at run time and <c>VocabularyTests</c> at build
+    /// time.
     /// <para>
-    /// Es ist überall die <em>Anmerkung</em> — was eine Person zu ihrem
-    /// MarketStatus schreibt, und was ein Unternehmen zu seinem Angebot
-    /// dazusagt. Das deutsche Wort wäre die gefährlichste Vokabel, die eine
-    /// Vermittlungsplattform haben kann, und steht deshalb auf der Liste.
+    /// Everywhere it is the <em>remark</em> — what a person writes about their
+    /// market status, and what a company adds to its offer. The German word
+    /// would be the most dangerous vocabulary a placement platform can have,
+    /// and therefore stands on the list.
     /// </para>
     /// </remarks>
     public static IReadOnlyList<TermException> Wortausnahmen { get; } =
     [
-        new("MarketStatusV1.Note", Anmerkung),
-        new("WriteMarketStatusV1.Note", Anmerkung),
-        new("AngebotV1.Note", Anmerkung),
-        new("TransferV1.OfferNote", Anmerkung)
+        new("MarketStatusV1.Note", Note),
+        new("WriteMarketStatusV1.Note", Note),
+        new("AngebotV1.Note", Note),
+        new("TransferV1.OfferNote", Note)
     ];
 
-    private const string Anmerkung =
+    private const string Note =
         "englisch note = Anmerkung — was die Person zu ihrem Marktstatus "
         + "schreibt, beziehungsweise was ein Unternehmen zu seinem Angebot "
         + "dazusagt; deutsch Note waere eine Bewertung und ist hier nicht gemeint";
 
-    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <summary>What this service can answer about itself (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
-    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
-    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    /// <para>They stand here and not in ServiceFoundation, for the same reason
+    /// the ledger, the audit trail and the store stand here: they are decisions
+    /// of <em>this</em> service.</para>
     ///
-    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
-    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
-    /// vergessen kann.</para>
+    /// <para><c>wt.grenze.ziele</c> is deliberately missing here — it reads only
+    /// the configuration, is therefore the same for every service and stands in
+    /// <c>AddEvidence</c>. It is the one a new service cannot forget.</para>
     /// </remarks>
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)

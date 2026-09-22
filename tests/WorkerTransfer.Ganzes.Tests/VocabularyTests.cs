@@ -51,7 +51,7 @@ public class VocabularyTests
          typeof(Applications.Contracts.ApplicationV1)),
         ("companies", typeof(Companies.Domain.EmployerProfiles.EmployerProfile),
          typeof(Companies.Contracts.EmployerProfileV1)),
-        ("transfer", typeof(Transfer.Domain.Anfragen.RequestState),
+        ("transfer", typeof(Transfer.Domain.Requests.RequestState),
          typeof(Transfer.Contracts.MarketStatusV1)),
         ("notification", typeof(Notification.Domain.Notifications.NotificationKind),
          typeof(Notification.Contracts.NotifyV1)),

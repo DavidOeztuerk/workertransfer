@@ -1,14 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.Outbox;
-using WorkerTransfer.Transfer.Domain.Vorgaenge;
+using WorkerTransfer.Transfer.Domain.Cases;
 
 namespace WorkerTransfer.Transfer.Infrastructure.Persistence;
 
 /// <summary>Eine Zeile von <c>market_status</c>.</summary>
 public sealed class MarketRow
 {
-    /// <summary>Die Subjekt-Kennung. Sie <em>ist</em> der Schlüssel.</summary>
+    /// <summary>The subject id. It <em>is</em> the key.</summary>
     public Guid Id { get; set; }
 
     public string Availability { get; set; } = string.Empty;
@@ -22,10 +22,10 @@ public sealed class MarketRow
     public DateTime UpdatedAt { get; set; }
 }
 
-/// <summary>Eine Zeile von <c>market_requests</c>.</summary>
+/// <summary>One row of <c>market_requests</c>.</summary>
 /// <remarks>
-/// Kein <c>revoked_at</c>: der Revocation lebt im Ledger. Ihn hier zu spiegeln
-/// hieße, zwei Wahrheiten über dieselbe Frage zu führen.
+/// No <c>revoked_at</c>: the revocation lives in the ledger. Mirroring it here
+/// would mean keeping two truths about the same question.
 /// </remarks>
 public sealed class RequestRow
 {
@@ -35,11 +35,10 @@ public sealed class RequestRow
 
     public Guid TenantId { get; set; }
 
-    /// <summary><c>null</c> heißt: wer gefragt hat, hat sein Konto gelöscht.</summary>
+    /// <summary><c>null</c> means: whoever asked has erased their account.</summary>
     /// <remarks>
-    /// Die ResumeRequest bleibt — sie gehört dem Unternehmen und handelt von einem
-    /// Dritten (ADR-0027 §2). Es heißt <strong>nicht</strong> „niemand hat
-    /// gefragt".
+    /// The request stays — it belongs to the company and is about a third party
+    /// (ADR-0027 §2). It does <strong>not</strong> mean "nobody asked".
     /// </remarks>
     public Guid? RequestedBy { get; set; }
 
@@ -80,9 +79,9 @@ public sealed class CaseRow
 
 /// <summary>Die drei Tabellen, die dieser Dienst besitzt — und seine Outbox.</summary>
 /// <remarks>
-/// Es gibt keine gemeinsame Datenbank und deshalb auch keine gemeinsame Outbox
-/// (ADR-0004/0025) — sie hängt in <em>diesen</em> Kontext, damit die Absicht mit
-/// der Änderung committet, die sie ausgelöst hat.
+/// There is no shared database and therefore no shared outbox either
+/// (ADR-0004/0025) — it hangs in <em>this</em> context, so the intent commits
+/// with the change that triggered it.
 /// </remarks>
 public sealed class TransferDbContext(DbContextOptions<TransferDbContext> options)
     : DbContext(options)
@@ -91,10 +90,10 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
     public DbSet<MarketRow> MarketStatus => Set<MarketRow>();
 
     /// <summary>Die Anfragen.</summary>
-    public DbSet<RequestRow> Anfragen => Set<RequestRow>();
+    public DbSet<RequestRow> Requests => Set<RequestRow>();
 
-    /// <summary>Die Vorgänge.</summary>
-    public DbSet<CaseRow> Vorgaenge => Set<CaseRow>();
+    /// <summary>The cases.</summary>
+    public DbSet<CaseRow> Cases => Set<CaseRow>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -141,8 +140,8 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
             entity.HasIndex(row => row.TenantId);
 
             // Einmal fragen — in der Datenbank und nicht nur im Handler, denn
-            // zwei gleichzeitige Anfragen kämen beide durch eine Prüfung im
-            // Code, und eine Ablehnung wäre wirkungslos.
+            // two concurrent requests would both get through a check in code,
+            // and a refusal would have no effect.
             entity.HasIndex(row => new { row.SubjectId, row.TenantId })
                 .IsUnique()
                 .HasDatabaseName("uq_market_requests_subject_tenant");
@@ -176,8 +175,8 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
             entity.HasIndex(row => row.TenantId);
 
             // Genau EIN laufender Case je (Person, Unternehmen). Ein zweiter
-            // wäre Nachfassen an der Absage vorbei. Teilindex, weil
-            // abgeschlossene Vorgänge beliebig oft nebeneinander stehen dürfen.
+            // would be following up past the refusal. A partial index, because
+            // completed cases may stand side by side any number of times.
             entity.HasIndex(row => new { row.SubjectId, row.TenantId })
                 .IsUnique()
                 .HasDatabaseName("uq_running_transfer")
@@ -191,13 +190,13 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
 
     /// <summary>Der Teilindex-Filter, aus derselben Menge wie das Aggregat.</summary>
     /// <remarks>
-    /// Aus <see cref="Transferstaende.Laufende"/> gebaut statt hier
-    /// abgeschrieben: zwei Listen, die dasselbe meinen, driften auseinander —
-    /// und die Datenbank wäre die, die es nicht sagt.
+    /// Built from <see cref="TransferStates.Running"/> rather than copied here:
+    /// two lists that mean the same thing drift apart — and the database would
+    /// be the one that does not say so.
     /// </remarks>
     private static string Laufendfilter() =>
         "status IN ("
-        + string.Join(", ", Transferstaende.Laufende.Select(
-            state => $"'{Transferstaende.Wort(state)}'"))
+        + string.Join(", ", TransferStates.Running.Select(
+            state => $"'{TransferStates.Word(state)}'"))
         + ")";
 }
