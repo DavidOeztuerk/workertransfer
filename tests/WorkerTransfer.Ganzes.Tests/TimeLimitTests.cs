@@ -29,10 +29,25 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// time limit on <c>klient</c> and failed as "without a time limit" although it
 /// has one. A guard that goes red over correct code gets switched off the next
 /// time instead of read.</para>
+///
+/// <para><strong>And the call site is found by its CALL, not by the name of
+/// the factory.</strong> This test used to look for <c>fabrik.CreateClient(</c>.
+/// The English rename turned <c>fabrik</c> into <c>factory</c> service by
+/// service, and every renamed call site silently dropped out of the check —
+/// sixteen of thirty-four, while the test stayed green over its floor of ten.
+/// The time-limit properties are found the same way: by what is assigned to
+/// <c>.Timeout</c>, not by the German word <c>Zeitueberschreitung</c>, which
+/// already missed <c>Geduld</c> and <c>Timeout</c>.</para>
 /// </remarks>
-public sealed class ZeitlimitTests
+public sealed class TimeLimitTests
 {
-    private static IEnumerable<string> Aufrufstellen() =>
+    private static readonly Regex CreatesClient = new(
+        @"\b\w+\.CreateClient\(", RegexOptions.None, TimeSpan.FromSeconds(5));
+
+    private static readonly Regex AssignsTimeout = new(
+        @"\.Timeout = [\w.]*?\.(?<property>\w+);", RegexOptions.None, TimeSpan.FromSeconds(5));
+
+    private static IEnumerable<string> Sources() =>
         Directory.EnumerateFiles(
                 Path.Combine(Postgres_Ersatz2.Repowurzel(), "src"),
                 "*.cs",
@@ -40,24 +55,25 @@ public sealed class ZeitlimitTests
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
                        StringComparison.Ordinal)
                    && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
-                       StringComparison.Ordinal))
-            .Where(path => File.ReadAllText(path)
-                .Contains("fabrik.CreateClient(", StringComparison.Ordinal));
+                       StringComparison.Ordinal));
+
+    private static List<string> CallSites() =>
+        [.. Sources().Where(path => CreatesClient.IsMatch(File.ReadAllText(path)))];
 
     [Fact]
     public void Every_call_site_sets_a_time_limit()
     {
-        var jobs = Aufrufstellen().ToList();
+        var callSites = CallSites();
 
-        jobs.Should().HaveCountGreaterThan(
-            10, "sonst findet dieser Test die Aufrufstellen gar nicht mehr");
+        callSites.Should().HaveCountGreaterThan(
+            30, "otherwise this test no longer finds the call sites at all");
 
-        foreach (var path in jobs)
+        foreach (var path in callSites)
         {
             File.ReadAllText(path).Should().Contain(
                 ".Timeout =",
-                $"'{Path.GetFileName(path)}' ruft einen anderen Dienst, setzt aber kein "
-                + "Zeitlimit — dann gilt die Vorgabe von hundert Sekunden");
+                $"'{Path.GetFileName(path)}' calls another service but sets no time "
+                + "limit — then the default of a hundred seconds applies");
         }
     }
 
@@ -67,41 +83,52 @@ public sealed class ZeitlimitTests
     /// <remarks>
     /// The ceiling is deliberately wide: it is not meant to prescribe the choice
     /// between five and thirty seconds, but to prevent anybody from slipping
-    /// back near the hundred seconds by accident.
+    /// back near the hundred seconds by accident. Checked are exactly the
+    /// properties some call site assigns to <c>.Timeout</c> — the outbox's
+    /// polling interval is a <c>TimeSpan</c> too, and no time limit.
     /// </remarks>
     [Fact]
     public void No_call_site_waits_longer_than_a_minute()
     {
-        var pattern = new Regex(
-            @"Zeitueberschreitung \{ get; set; \} = TimeSpan\.From(?<einheit>Seconds|Minutes)\((?<zahl>[\d.]+)\)",
+        var sources = Sources().Select(File.ReadAllText).ToList();
+
+        var timeLimits = sources
+            .SelectMany(text => AssignsTimeout.Matches(text))
+            .Select(hit => hit.Groups["property"].Value)
+            .ToHashSet(StringComparer.Ordinal);
+
+        timeLimits.Should().NotBeEmpty("otherwise no call site assigns a time limit at all");
+
+        var declaration = new Regex(
+            @"TimeSpan (?<property>\w+) \{ get; set; \} = TimeSpan\.From(?<unit>Seconds|Minutes)\((?<value>[\d.]+)\)",
             RegexOptions.None,
             TimeSpan.FromSeconds(5));
 
-        var quellen = Directory.EnumerateFiles(
-                Path.Combine(Postgres_Ersatz2.Repowurzel(), "src"), "*.cs", SearchOption.AllDirectories)
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                        && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
-
         var found = 0;
 
-        foreach (var path in quellen)
+        foreach (var text in sources)
         {
-            foreach (Match hit in pattern.Matches(File.ReadAllText(path)))
+            foreach (Match hit in declaration.Matches(text))
             {
-                found++;
-                var zahl = double.Parse(hit.Groups["zahl"].Value,
-                    System.Globalization.CultureInfo.InvariantCulture);
-                var spanne = hit.Groups["einheit"].Value == "Minutes"
-                    ? TimeSpan.FromMinutes(zahl)
-                    : TimeSpan.FromSeconds(zahl);
+                if (!timeLimits.Contains(hit.Groups["property"].Value))
+                {
+                    continue;
+                }
 
-                spanne.Should().BeLessThanOrEqualTo(
+                found++;
+                var value = double.Parse(hit.Groups["value"].Value,
+                    System.Globalization.CultureInfo.InvariantCulture);
+                var span = hit.Groups["unit"].Value == "Minutes"
+                    ? TimeSpan.FromMinutes(value)
+                    : TimeSpan.FromSeconds(value);
+
+                span.Should().BeLessThanOrEqualTo(
                     TimeSpan.FromMinutes(1),
-                    $"'{Path.GetFileName(path)}' wartet zu lange");
+                    $"'{hit.Groups["property"].Value}' waits too long");
             }
         }
 
-        found.Should().BeGreaterThan(10, "sonst prueft dieser Test nichts");
+        found.Should().BeGreaterThan(30, "otherwise this test checks nothing");
     }
 }
 
