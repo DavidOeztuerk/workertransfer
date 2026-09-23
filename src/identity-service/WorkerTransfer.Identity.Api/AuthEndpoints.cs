@@ -1,11 +1,11 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Identity.Application.Anmelden;
+using WorkerTransfer.Identity.Application.SignIn;
 
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.Identity.Domain.Users;
 using System.Text.Json.Serialization;
-using WorkerTransfer.Identity.Application.Konto;
+using WorkerTransfer.Identity.Application.Account;
 
 namespace WorkerTransfer.Identity.Api;
 
@@ -28,7 +28,7 @@ public sealed record SettingsBody(
 /// <summary>What a caller sends to store a key.</summary>
 /// <param name="Key">
 /// The key in the clear. Empty means REMOVE — a field that does nothing when
-/// empty has no way back to „none".
+/// empty has no way back to "none".
 /// </param>
 public sealed record AiKeyBody(
     [property: JsonPropertyName("key")] string? Key);
@@ -255,7 +255,7 @@ public static class AuthEndpoints
             }
 
             // `LanguageChoice.From` answers anything unknown with the default
-            // instead of with an error. Here that is wrong: whoever sends „is"
+            // instead of with an error. Here that is wrong: whoever sends "is"
             // would silently get German stored and would not know why their
             // choice did not hold. A choice that does not take effect has to
             // say so.
@@ -299,7 +299,7 @@ public static class AuthEndpoints
                 return;
             }
 
-            // Anything unknown is refused, not quietly turned into „none".
+            // Anything unknown is refused, not quietly turned into "none".
             if (!OccupationalFieldChoice.Known(body.OccupationalField))
             {
                 await ProblemDetailsMiddleware.Write(
@@ -523,8 +523,8 @@ public static class AuthEndpoints
         ["language"] = LanguageChoice.Label(account.Language),
         // For the picture in the header: the initials come from the name, and
         // the colour beside it follows it. Both could be derived from an address
-        // too — it would only be wrong, because `max.werber@…` gives „M" and
-        // not „MW".
+        // too — it would only be wrong, because `max.werber@…` gives "M" and
+        // not "MW".
         ["display_name"] = account.DisplayName,
         // The civil name for a signature and a letterhead. No postal address
         // here: the candidate view reads the session, and the postal address

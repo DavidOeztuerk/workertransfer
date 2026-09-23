@@ -113,7 +113,7 @@ public class BenachrichtigungsdrahtTests
     /// without anything going red anywhere — and it was: in the inbox stood
     /// nothing but the confirmation mails <c>identity-service</c> sends itself.
     /// <para>
-    /// The receiver type <c>MeldungV1</c> is <b>private</b>. It is therefore
+    /// The receiver type <c>NotifyBodyV1</c> is <b>private</b>. It is therefore
     /// fetched through reflection rather than rebuilt: a rebuilt contract in the
     /// test would be a second truth, and the two would go separate ways at the
     /// next rename — exactly the divergence this test exists to expose.
@@ -136,16 +136,16 @@ public class BenachrichtigungsdrahtTests
 
         lauscher.Rumpf.Should().NotBeNull("es wurde nichts geschickt");
 
-        var contract = typeof(WorkerTransfer.Identity.Api.MeldeEndpoints).Assembly
+        var contract = typeof(WorkerTransfer.Identity.Api.NotifyEndpoints).Assembly
             .GetTypes()
-            .Single(type => type.Name == "MeldungV1");
+            .Single(type => type.Name == "NotifyBodyV1");
 
         var gelesen = JsonSerializer.Deserialize(lauscher.Rumpf!, contract);
 
         gelesen.Should().NotBeNull();
         contract.GetProperty("UserId")!.GetValue(gelesen).Should().Be(
             Empfaenger,
-            "identity liest den Namen, den MeldungV1 deklariert — kommt die "
+            "identity liest den Namen, den NotifyBodyV1 deklariert — kommt die "
             + "Kennung anders, bindet sie still auf Guid.Empty und es geht keine "
             + "Mail hinaus, ohne dass irgendetwas rot wird");
     }

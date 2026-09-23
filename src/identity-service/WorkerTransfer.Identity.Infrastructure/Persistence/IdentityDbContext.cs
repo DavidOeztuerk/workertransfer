@@ -74,7 +74,7 @@ public sealed class AccountSettingsRow
     /// <summary>Whose. And at the same time the key.</summary>
     public Guid SubjectId { get; set; }
 
-    /// <summary>The lapse in months, or <c>null</c> for „never by itself".</summary>
+    /// <summary>The lapse in months, or <c>null</c> for "never by itself".</summary>
     public int? DeleteAfterMonths { get; set; }
 
     /// <summary>The AI provider as a label: none, openai_compatible, anthropic.</summary>

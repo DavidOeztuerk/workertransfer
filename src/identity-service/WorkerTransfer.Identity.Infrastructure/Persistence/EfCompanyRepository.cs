@@ -12,7 +12,7 @@ public sealed class EfCompanyRepository(IdentityDbContext context, TimeProvider 
     /// <remarks>
     /// <c>tenants.domain</c> is citext and unique, so the database decides
     /// whether two spellings are one domain. Comparing here would let
-    /// <c>Firma.de</c> claim a domain <c>firma.de</c> already holds.
+    /// <c>Company.de</c> claim a domain <c>company.de</c> already holds.
     /// </remarks>
     public async Task<Company?> FindByDomainAsync(
         EmailDomain domain,

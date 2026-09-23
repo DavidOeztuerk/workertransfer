@@ -88,7 +88,7 @@ public sealed class EfInvitationRepository(IdentityDbContext context) : IInvitat
             .AsTracking()
             .FirstOrDefaultAsync(candidate => candidate.Id == invitation.Id, cancellationToken)
             ?? throw new InvalidOperationException(
-                $"Keine Einladung {invitation.Id} zum Speichern.");
+                $"No invitation {invitation.Id} to save.");
 
         row.Status = InvitationStatusNames.ToDatabase(invitation.Status);
         row.AcceptedAt = invitation.AcceptedAt?.UtcDateTime;

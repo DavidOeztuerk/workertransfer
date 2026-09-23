@@ -5,7 +5,7 @@ namespace WorkerTransfer.Identity.Domain.Users;
 /// <summary>Where an account stands in its lifecycle.</summary>
 /// <remarks>
 /// Every member maps to one label of the <c>account_status</c> enum in the
-/// database, snake_case of the member name. <c>SpaltenetikettenTests</c> pins
+/// database, snake_case of the member name. <c>ColumnLabelTests</c> pins
 /// all four against the real column, because the rule that produces them is
 /// Npgsql's and not ours.
 /// </remarks>
@@ -126,7 +126,7 @@ public sealed class User
 
     /// <summary>Which working world this person stands in, or <c>null</c>.</summary>
     /// <remarks>
-    /// <c>null</c> means „not stated" and is the ordinary case (ADR-0039). It is
+    /// <c>null</c> means "not stated" and is the ordinary case (ADR-0039). It is
     /// never derived: a GitHub connection makes nobody <c>it_software</c>.
     /// </remarks>
     public OccupationalField? OccupationalField { get; private set; }
@@ -217,7 +217,7 @@ public sealed class User
 
     /// <summary>The person names their occupational field — or takes the statement back.</summary>
     /// <remarks>
-    /// <c>null</c> means remove, not „unchanged" — as with
+    /// <c>null</c> means remove, not "unchanged" — as with
     /// <see cref="SetFullName"/>.
     /// </remarks>
     /// <param name="occupationalField">What they chose, or <c>null</c>.</param>
@@ -225,8 +225,8 @@ public sealed class User
 
     /// <summary>Set or clear the civil name.</summary>
     /// <remarks>
-    /// Empty means REMOVE, not „unchanged": otherwise there would be no way
-    /// back to „none". The display name stays untouched.
+    /// Empty means REMOVE, not "unchanged": otherwise there would be no way
+    /// back to "none". The display name stays untouched.
     /// </remarks>
     public void SetFullName(string? givenName, string? familyName)
     {

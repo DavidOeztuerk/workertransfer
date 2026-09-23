@@ -109,7 +109,7 @@ public class DrahtvertragTests
     {
         var offen = ausDerSchicht.Assembly
             .GetTypes()
-            // ALL records, including nested and private ones: `MeldungV1` in
+            // ALL records, including nested and private ones: `NotifyBodyV1` in
             // identity is a `private sealed record` inside the endpoint class,
             // and that is exactly the one a filter on `IsPublic` missed — while
             // it binds perfectly normally on the wire.

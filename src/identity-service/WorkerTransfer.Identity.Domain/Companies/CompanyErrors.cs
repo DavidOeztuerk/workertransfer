@@ -11,7 +11,7 @@ public sealed class PublicEmailDomainException(string domain)
 /// <summary>The domain already belongs to a company.</summary>
 /// <remarks>
 /// Only ever raised at confirmation, never at registration. Asked earlier it
-/// would answer "is firma.de on this platform?" to anyone who guesses a domain.
+/// would answer "is company.de on this platform?" to anyone who guesses a domain.
 /// </remarks>
 public sealed class DomainAlreadyClaimedException(string domain)
     : Exception($"'{domain}' already belongs to a company")

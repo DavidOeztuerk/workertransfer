@@ -8,12 +8,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using WorkerTransfer.Outbox;
-using WorkerTransfer.Identity.Application.Anmelden;
+using WorkerTransfer.Identity.Application.SignIn;
 using WorkerTransfer.Identity.Application.Behaviors;
 using WorkerTransfer.Identity.Application.Ports;
-using WorkerTransfer.Identity.Application.Registrierung;
+using WorkerTransfer.Identity.Application.Registration;
 using WorkerTransfer.Identity.Application.Erasure;
-using WorkerTransfer.Identity.Application.Unternehmen;
+using WorkerTransfer.Identity.Application.Companies;
 using WorkerTransfer.Identity.Domain.Audit;
 using WorkerTransfer.Identity.Domain.Companies;
 using WorkerTransfer.Identity.Domain.Sessions;
@@ -21,13 +21,12 @@ using WorkerTransfer.Identity.Domain.Verification;
 using WorkerTransfer.Identity.Domain.Users;
 using WorkerTransfer.Identity.Infrastructure.Persistence;
 using WorkerTransfer.Identity.Infrastructure.Erasure;
-using WorkerTransfer.Identity.Infrastructure.Post;
+using WorkerTransfer.Identity.Infrastructure.Mail;
 using WorkerTransfer.Identity.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.Identity.Infrastructure.Sicherheit;
 using WorkerTransfer.Contracts.Erasure;
 using WorkerTransfer.Contracts.Identity;
-using WorkerTransfer.Identity.Infrastructure.Nachweis;
+using WorkerTransfer.Identity.Infrastructure.Evidence;
 using WorkerTransfer.ServiceDefaults.Checks;
 using Noelia.Abstractions.Security.Checks;
 
@@ -41,8 +40,6 @@ namespace WorkerTransfer.Identity.Infrastructure;
 /// </remarks>
 public static class IdentityInfrastructure
 {
-    /// <param name="services">The container.</param>
-    /// <param name="connectionString">Where the identity database lives.</param>
     /// <param name="services">The container.</param>
     /// <param name="configuration">Where the mail settings come from.</param>
     /// <param name="connectionString">Where the identity database lives.</param>
@@ -129,7 +126,7 @@ public static class IdentityInfrastructure
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(DispatchBehavior<,>));
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
-        Nachweis(services, configuration);
+        Evidence(services, configuration);
 
         return services;
     }
@@ -145,7 +142,7 @@ public static class IdentityInfrastructure
     /// and stands in <c>AddEvidence</c>. It is the one a new service cannot
     /// forget.</para>
     /// </remarks>
-    private static void Nachweis(
+    private static void Evidence(
         IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
@@ -163,10 +160,10 @@ public static class IdentityInfrastructure
         services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
             provider.GetServices<IProviderSource>()));
 
-        // This service asks no model itself — but it holds the switch „log
+        // This service asks no model itself — but it holds the switch "log
         // requests", and nobody in this tree reads it. That is exactly the
         // finding a screenshot of the account page tells the other way round,
-        // and that is why `gegenstandVorhanden` stands at true here.
+        // and that is why the check is registered here and not left out.
 
         var erasure = new ErasureSettings();
         configuration.GetSection(ErasureSettings.Section).Bind(erasure);

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using WorkerTransfer.Identity.Api;
-using WorkerTransfer.Identity.Api.Berechtigung;
+using WorkerTransfer.Identity.Api.Permissions;
 using WorkerTransfer.Identity.Infrastructure;
 using WorkerTransfer.Identity.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
@@ -25,7 +25,7 @@ builder.Services.AddWorkerTransferDefaults(
 // the PermissionPolicyProvider — the one that resolves `Permission:*` names at
 // run time. Until 4.0.1 the same module called `AddResourceAuthorization()`,
 // and the machinery was silently missing; it stood here by hand. Not needed any
-// more — UnternehmensreiseTests shows it bites all the same.
+// more — CompanyJourneyTests shows it bites all the same.
 
 // Who holds a company permission is decided by the MEMBERSHIP TABLE, not by
 // the token. Noelia's own handler stays beside it and reads claims — it finds
@@ -50,7 +50,7 @@ app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 app.MapAuthEndpoints();
 app.MapRegistrationEndpoints();
 app.MapCompanyEndpoints();
-app.MapMeldeEndpoints();
+app.MapNotifyEndpoints();
 app.MapErasureEndpoints();
 app.MapInternalEndpoints();
 

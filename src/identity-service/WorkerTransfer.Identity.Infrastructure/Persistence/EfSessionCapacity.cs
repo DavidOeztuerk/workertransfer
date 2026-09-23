@@ -13,7 +13,7 @@ public sealed class EfSessionCapacity(IdentityDbContext context) : ISessionCapac
         Capacity capacity,
         CancellationToken cancellationToken = default)
     {
-        var row = await Zeile(session, cancellationToken);
+        var row = await FindRow(session, cancellationToken);
 
         if (capacity is not Capacity.ForCompany company)
         {
@@ -47,7 +47,7 @@ public sealed class EfSessionCapacity(IdentityDbContext context) : ISessionCapac
         SessionId session,
         CancellationToken cancellationToken = default)
     {
-        var row = await Zeile(session, cancellationToken);
+        var row = await FindRow(session, cancellationToken);
 
         return row is null
             ? Capacity.AsSelf.Instance
@@ -62,7 +62,7 @@ public sealed class EfSessionCapacity(IdentityDbContext context) : ISessionCapac
     /// </remarks>
     public async Task ForgetAsync(SessionId session, CancellationToken cancellationToken = default)
     {
-        var row = await Zeile(session, cancellationToken);
+        var row = await FindRow(session, cancellationToken);
 
         if (row is not null)
         {
@@ -70,7 +70,7 @@ public sealed class EfSessionCapacity(IdentityDbContext context) : ISessionCapac
         }
     }
 
-    private Task<SessionCapacityRow?> Zeile(
+    private Task<SessionCapacityRow?> FindRow(
         SessionId session,
         CancellationToken cancellationToken) =>
         context.SessionCapacities
