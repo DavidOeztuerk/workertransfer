@@ -1,10 +1,17 @@
 namespace WorkerTransfer.Jobs.Application.Ports;
 
-/// <summary>Eine Transaktion um einen Befehl.</summary>
+/// <summary>A transaction around a command.</summary>
+/// <remarks>
+/// Re-entrant by contract: a nested call joins the open transaction instead of
+/// opening a second one.
+/// </remarks>
 public interface IUnitOfWork
 {
-    /// <summary>Führt die Arbeit in einer Transaktion aus.</summary>
+    /// <summary>Runs the work inside a transaction.</summary>
+    /// <param name="work">What is to run inside the transaction.</param>
+    /// <param name="cancellationToken">Cancels and rolls back.</param>
+    /// <returns>What <paramref name="work"/> answered.</returns>
     Task<T> InTransactionAsync<T>(
-        Func<CancellationToken, Task<T>> arbeit,
+        Func<CancellationToken, Task<T>> work,
         CancellationToken cancellationToken = default);
 }

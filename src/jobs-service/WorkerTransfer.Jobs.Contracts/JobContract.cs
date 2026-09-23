@@ -2,15 +2,15 @@ using System.Text.Json.Serialization;
 
 namespace WorkerTransfer.Jobs.Contracts;
 
-/// <summary>Eine Anzeige, wie sie gelesen wird.</summary>
+/// <summary>An advert, as it is read.</summary>
 /// <remarks>
-/// Trägt keinen Punktwert, keinen Rang und keinen Prozentwert — und es gehört
-/// keiner darauf. Wie gut jemand zu einer Job passt, wird im Browser
-/// gerechnet, der <em>Person</em> gezeigt und nie dem Unternehmen (ADR-0022).
+/// Carries no score, no rank and no percentage — and none belongs on it. How
+/// well somebody suits a job is computed in the browser, shown to the
+/// <em>person</em> and never to the company (ADR-0022).
 /// <para>
-/// <c>skills</c> ist die Liste, gegen die der Browser das Profile hält. Deshalb
-/// steht sie hier ausgeschrieben und nicht als Zahl: eine Zahl verbürge, welche
-/// Anforderung fehlt, und genau die ist das einzig Hilfreiche.
+/// <c>skills</c> is the list the browser holds the profile against. That is why
+/// it stands here spelled out and not as a number: a number would hide which
+/// requirement is missing, and that is exactly the only helpful thing.
 /// </para>
 /// </remarks>
 public sealed record JobV1(
@@ -27,11 +27,11 @@ public sealed record JobV1(
     [property: JsonPropertyName("published_at")] DateTimeOffset? PublishedAt,
     [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt);
 
-/// <summary>Eine Anzeige, wie sie geschrieben wird.</summary>
+/// <summary>An advert, as it is written.</summary>
 /// <remarks>
-/// Ohne <c>tenant_id</c>: wem die Anzeige gehört, steht im geprüften Token.
-/// Und ohne <c>status</c> — eine neue Anzeige beginnt als Entwurf, und der
-/// Übergang ist eine eigene Handlung mit eigener Route.
+/// Without <c>tenant_id</c>: whom the advert belongs to stands in the verified
+/// token. And without <c>status</c> — a new advert begins as a draft, and the
+/// transition is an act of its own with a route of its own.
 /// </remarks>
 public sealed record WriteJobV1(
     [property: JsonPropertyName("title")] string Title,
@@ -42,23 +42,22 @@ public sealed record WriteJobV1(
     [property: JsonPropertyName("employment_type")] string EmploymentType = "full_time",
     [property: JsonPropertyName("skills")] IReadOnlyList<string>? Skills = null);
 
-// EINE SEITE ANZEIGEN GIBT ES HIER NICHT MEHR — sie ist jetzt
-// `PageResponse<JobV1>` aus `ServiceDefaults`, damit jede blätterbare
-// Liste denselben Umschlag hat.
+// A PAGE OF ADVERTS NO LONGER EXISTS HERE — it is now `PageResponse<JobV1>`
+// from `ServiceDefaults`, so that every pageable list has the same envelope.
 //
-// Der Satz, der hier stand, verdient es, nicht verlorenzugehen: „ohne
-// Gesamtzahl, und aus demselben Grund wie bei den Kandidaten: sie sagte über
-// die Differenz etwas darüber aus, was gefiltert wurde."
+// The sentence that stood here deserves not to get lost: "without a total, and
+// for the same reason as with the candidates: through the difference it would
+// say something about what was filtered."
 //
-// Das stimmt — bei KANDIDATEN. Dort ist die Differenz zwischen „42 insgesamt"
-// und „3 angezeigt" die Auskunft, wie viele Menschen sich verborgen haben, und
-// genau die darf niemand bekommen (ADR-0026). Eine Stellenanzeige ist aber
-// keine Person: sie wurde von einem Unternehmen veröffentlicht, um gesehen zu
-// werden, und „9 Hit" sagt über niemanden etwas.
+// That is true — for CANDIDATES. There the difference between "42 in total" and
+// "3 shown" is the information how many people have hidden themselves, and
+// exactly that nobody may get (ADR-0026). A job advert, however, is no person:
+// it was published by a company in order to be seen, and "9 hits" says nothing
+// about anybody.
 //
-// Die Kandidatenliste bleibt deshalb beim Cursor und bekommt KEINE Gesamtzahl.
+// The candidate list therefore stays with the cursor and gets NO total.
 
-/// <summary>Was ein Unternehmen schickt, um sich beim Formulieren helfen zu lassen.</summary>
+/// <summary>What a company sends to get help with the phrasing.</summary>
 public sealed record DraftV1(
     [property: JsonPropertyName("title")] string Title = "",
     [property: JsonPropertyName("description")] string Description = "",

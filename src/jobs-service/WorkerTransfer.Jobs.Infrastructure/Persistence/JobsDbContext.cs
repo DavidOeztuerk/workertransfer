@@ -4,7 +4,7 @@ using Npgsql;
 
 namespace WorkerTransfer.Jobs.Infrastructure.Persistence;
 
-/// <summary>Eine Zeile von <c>jobs</c>.</summary>
+/// <summary>A row of <c>jobs</c>.</summary>
 public sealed class JobRow
 {
     public Guid Id { get; set; }
@@ -17,14 +17,14 @@ public sealed class JobRow
 
     public string Location { get; set; } = string.Empty;
 
-    /// <summary>Die Postleitzahl. Leer, wenn keine angegeben wurde.</summary>
+    /// <summary>The postal code. Empty when none was given.</summary>
     public string PostalCode { get; set; } = string.Empty;
 
     public string RemoteMode { get; set; } = "none";
 
     public string EmploymentType { get; set; } = "full_time";
 
-    /// <summary>Die Anforderungen als jsonb.</summary>
+    /// <summary>The requirements as jsonb.</summary>
     public string Skills { get; set; } = "[]";
 
     public string Status { get; set; } = "draft";
@@ -36,7 +36,7 @@ public sealed class JobRow
     public DateTime? PublishedAt { get; set; }
 }
 
-/// <summary>Die eine Tabelle dieses Dienstes.</summary>
+/// <summary>The one table of this service.</summary>
 public sealed class JobsDbContext(DbContextOptions<JobsDbContext> options) : DbContext(options)
 {
     public DbSet<JobRow> Jobs => Set<JobRow>();
@@ -67,8 +67,8 @@ public sealed class JobsDbContext(DbContextOptions<JobsDbContext> options) : DbC
             row.Property(entry => entry.UpdatedAt).HasColumnName("updated_at");
             row.Property(entry => entry.PublishedAt).HasColumnName("published_at");
 
-            // Beides sind Wege, auf denen gesucht wird: die Liste eines
-            // Unternehmens und die öffentliche Seite.
+            // Both are paths that are searched along: a company's list and the
+            // public page.
             row.HasIndex(entry => entry.TenantId);
             row.HasIndex(entry => new { entry.Status, entry.PublishedAt });
         });
@@ -77,14 +77,14 @@ public sealed class JobsDbContext(DbContextOptions<JobsDbContext> options) : DbC
     }
 }
 
-/// <summary>Baut DataSource und Kontext.</summary>
+/// <summary>Builds data source and context.</summary>
 public static class JobsDbContextFactory
 {
-    /// <summary>Die DataSource.</summary>
+    /// <summary>The data source.</summary>
     public static NpgsqlDataSource DataSource(string connectionString) =>
         new NpgsqlDataSourceBuilder(connectionString).Build();
 
-    /// <summary>Die eine Job, an der Verfolgen abgeschaltet wird.</summary>
+    /// <summary>The one place where tracking is switched off.</summary>
     public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options, NpgsqlDataSource dataSource)
     {
@@ -95,8 +95,8 @@ public static class JobsDbContextFactory
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
     }
 
-    /// <summary>Dasselbe Modell für <c>dotnet ef</c>.</summary>
-    public static DbContextOptionsBuilder ZurEntwurfszeit(
+    /// <summary>The same model for <c>dotnet ef</c>.</summary>
+    public static DbContextOptionsBuilder AtDesignTime(
         DbContextOptionsBuilder options, string connectionString)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -105,13 +105,13 @@ public static class JobsDbContextFactory
     }
 }
 
-/// <summary>Der Kontext für <c>dotnet ef</c>.</summary>
+/// <summary>The context for <c>dotnet ef</c>.</summary>
 public sealed class JobsDesignTimeFactory : IDesignTimeDbContextFactory<JobsDbContext>
 {
     /// <inheritdoc />
     public JobsDbContext CreateDbContext(string[] args) =>
         new((DbContextOptions<JobsDbContext>)JobsDbContextFactory
-            .ZurEntwurfszeit(
-                new DbContextOptionsBuilder<JobsDbContext>(), "Host=entwurfszeit;Database=jobs")
+            .AtDesignTime(
+                new DbContextOptionsBuilder<JobsDbContext>(), "Host=design-time;Database=jobs")
             .Options);
 }

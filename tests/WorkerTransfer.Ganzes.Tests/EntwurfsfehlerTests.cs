@@ -1,7 +1,7 @@
 using System.Net;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
-using JobsEntwurf = WorkerTransfer.Jobs.Infrastructure.Entwurf;
+using JobsEntwurf = WorkerTransfer.Jobs.Infrastructure.Draft;
 using JobsPorts = WorkerTransfer.Jobs.Application.Ports;
 using ProfilEntwurf = WorkerTransfer.Profile.Infrastructure.Draft;
 using ProfilPorts = WorkerTransfer.Profile.Application.Ports;
@@ -98,10 +98,9 @@ public class EntwurfsfehlerTests
             }),
             zeitlimit: TimeSpan.FromMilliseconds(80));
 
-        // Per page, because the two services name the kind in their own words:
-        // profile-service speaks English since its translation, jobs-service
-        // not yet. Either way it is the KIND, never the content.
-        error.Message.Should().Contain(page == "profil" ? "timeout" : "Zeitueberschreitung");
+        // Both services name the kind in the same word since their
+        // translation. Either way it is the KIND, never the content.
+        error.Message.Should().Contain("timeout");
         OhneInhalt(error);
     }
 

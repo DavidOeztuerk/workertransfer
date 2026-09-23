@@ -68,7 +68,7 @@ public class EntwurfsgrenzeTests
     public void The_advert_context_carries_exactly_five_fields()
     {
         Felder(typeof(AdvertDraft)).Should().BeEquivalentTo(
-            ["Titel", "Beschreibung", "Faehigkeiten", "Ort", "Wunsch", "Prompt"],
+            ["Title", "Description", "Skills", "Location", "Wish", "Prompt"],
             "ADR-0024 §3, Gegenstück — hier fehlt bewusst der Mandant");
     }
 
@@ -98,7 +98,7 @@ public class EntwurfsgrenzeTests
 
     /// <summary>The public instance properties of a record.</summary>
     /// <remarks>
-    /// Static ones stay out: <c>Regeln</c> is the system prompt and no field
+    /// Static ones stay out: <c>Rules</c> is the system prompt and no field
     /// anybody fills.
     /// <para>
     /// <c>Prompt</c>, by contrast, counts along although it is derived — it is

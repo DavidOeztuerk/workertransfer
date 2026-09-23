@@ -53,7 +53,7 @@ public class DrahtvertragTests
         { "profile", typeof(Profile.Api.ProfileEndpoints) },
         { "resume", typeof(Resume.Api.ResumeEndpoints) },
         { "portfolio", typeof(Portfolio.Api.PortfolioEndpoints) },
-        { "jobs", typeof(Jobs.Api.RueckzugsEndpoints) },
+        { "jobs", typeof(Jobs.Api.WithdrawalEndpoints) },
         { "applications", typeof(Applications.Api.ErasureEndpoints) },
         { "companies", typeof(Companies.Api.EmployerEndpoints) },
         { "transfer", typeof(Transfer.Api.CaseEndpoints) },
